@@ -4,8 +4,10 @@
 //! never observe a premature `Ok(())` while an in-flight teardown may still fail
 //! and roll back, and never invoke the closure again once any attempt succeeds.
 
+#[cfg(all(test, feature = "loom"))]
 use std::fmt;
 
+#[cfg(all(test, feature = "loom"))]
 use crate::loom_sync::{AtomicU8, Condvar, Mutex, Ordering};
 
 const ARMED: u8 = 0;
@@ -13,6 +15,7 @@ const TERMINATING: u8 = 1;
 const TERMINATED: u8 = 2;
 
 /// Serializes idempotent teardown with rollback on failure or unwind.
+#[cfg(all(test, feature = "loom"))]
 pub(crate) struct TeardownGate {
     /// Lock-free mirror of the current 3-state value for fast-path reads.
     state: AtomicU8,
@@ -21,6 +24,7 @@ pub(crate) struct TeardownGate {
     cv: Condvar,
 }
 
+#[cfg(all(test, feature = "loom"))]
 impl TeardownGate {
     pub(crate) fn new() -> Self {
         Self {
@@ -82,12 +86,14 @@ impl TeardownGate {
     }
 }
 
+#[cfg(all(test, feature = "loom"))]
 impl Default for TeardownGate {
     fn default() -> Self {
         Self::new()
     }
 }
 
+#[cfg(all(test, feature = "loom"))]
 impl fmt::Debug for TeardownGate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let label = match self.state.load(Ordering::Acquire) {
@@ -100,11 +106,13 @@ impl fmt::Debug for TeardownGate {
     }
 }
 
+#[cfg(all(test, feature = "loom"))]
 struct RollbackGuard<'a> {
     gate: &'a TeardownGate,
     committed: bool,
 }
 
+#[cfg(all(test, feature = "loom"))]
 impl Drop for RollbackGuard<'_> {
     fn drop(&mut self) {
         if self.committed {
@@ -115,6 +123,97 @@ impl Drop for RollbackGuard<'_> {
         self.gate.state.store(ARMED, Ordering::Release);
         drop(guard);
         self.gate.cv.notify_all();
+    }
+}
+
+/// Async three-state serialized idempotent teardown gate (`ARMED -> TERMINATING -> TERMINATED`).
+pub(crate) struct AsyncTeardownGate {
+    state: std::sync::atomic::AtomicU8,
+    mu: parking_lot::Mutex<u8>,
+    notify: tokio::sync::Notify,
+}
+
+impl AsyncTeardownGate {
+    pub(crate) fn new() -> Self {
+        Self {
+            state: std::sync::atomic::AtomicU8::new(ARMED),
+            mu: parking_lot::Mutex::new(ARMED),
+            notify: tokio::sync::Notify::new(),
+        }
+    }
+
+    pub(crate) fn is_terminated(&self) -> bool {
+        self.state.load(std::sync::atomic::Ordering::Acquire) == TERMINATED
+    }
+
+    pub(crate) async fn teardown_once<E, Fut>(&self, f: impl FnOnce() -> Fut) -> Result<(), E>
+    where
+        Fut: std::future::Future<Output = Result<(), E>>,
+    {
+        if self.state.load(std::sync::atomic::Ordering::Acquire) == TERMINATED {
+            return Ok(());
+        }
+
+        loop {
+            let notified = self.notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            {
+                let mut guard = self.mu.lock();
+                match *guard {
+                    TERMINATED => return Ok(()),
+                    TERMINATING => {}
+                    ARMED => {
+                        *guard = TERMINATING;
+                        self.state.store(TERMINATING, std::sync::atomic::Ordering::Release);
+                        break;
+                    }
+                    _ => unreachable!("invalid AsyncTeardownGate state"),
+                }
+            }
+            notified.await;
+        }
+
+        struct AsyncRollbackGuard<'a> {
+            gate: &'a AsyncTeardownGate,
+            committed: bool,
+        }
+
+        impl Drop for AsyncRollbackGuard<'_> {
+            fn drop(&mut self) {
+                if self.committed {
+                    return;
+                }
+                let mut guard = self.gate.mu.lock();
+                *guard = ARMED;
+                self.gate.state.store(ARMED, std::sync::atomic::Ordering::Release);
+                drop(guard);
+                self.gate.notify.notify_waiters();
+            }
+        }
+
+        let mut rollback = AsyncRollbackGuard { gate: self, committed: false };
+        match f().await {
+            Ok(()) => {
+                let mut guard = self.mu.lock();
+                *guard = TERMINATED;
+                self.state.store(TERMINATED, std::sync::atomic::Ordering::Release);
+                rollback.committed = true;
+                drop(guard);
+                self.notify.notify_waiters();
+                Ok(())
+            }
+            Err(err) => {
+                drop(rollback);
+                Err(err)
+            }
+        }
+    }
+}
+
+impl Default for AsyncTeardownGate {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

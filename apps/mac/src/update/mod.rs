@@ -407,7 +407,7 @@ pub enum UpdateOp {
 }
 
 pub fn host_call(op: UpdateOp, reply: crate::hosted::Replier, cx: &mut App) {
-    use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
+    use vibevalley_server::gateway::bridge::{BizCode, Envelope, refusal};
     let updater = updater().clone();
     match op {
         UpdateOp::State => reply.send(Envelope::ok(updater.state())),

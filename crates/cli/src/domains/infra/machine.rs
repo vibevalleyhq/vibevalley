@@ -12,7 +12,7 @@ use vibevalley_protocol::{MachineInfo, RemotePairExchangeRequest, RemotePlatform
 
 use crate::auth::{default_device_name, normalize_server_url, same_server};
 use crate::client::{Client, Done, Failure, no_dry_run};
-use crate::output::line;
+use crate::output::{line, non_empty_opt};
 
 #[derive(Debug, Args)]
 #[command(arg_required_else_help = true, subcommand_required = true)]
@@ -30,45 +30,35 @@ pub enum MachineAction {
     #[command(
         after_help = "Examples:\n  vibevalley machine up --server http://100.64.0.5:8890 --code ABC234 --name gpu-box\n  vibevalley machine up --server http://127.0.0.1:8790 --token vv_dev_... --scripted --once\n  vibevalley machine up --server https://hub.ts.net --ephemeral --workdir /tmp/work"
     )]
-    Up {
-        /// One-time 6-character pairing code from `vibevalley remote code --scope remote:runtime`
-        #[arg(long)]
-        code: Option<String>,
-        /// Human-readable display name for this execution machine
-        #[arg(long)]
-        name: Option<String>,
-        /// Stable machine identifier (defaults to paired device id or a generated id)
-        #[arg(long)]
-        machine_id: Option<String>,
-        /// Run as an ephemeral sandbox machine (does not persist machine-auth.json; cleans up worktrees on exit)
-        #[arg(long)]
-        ephemeral: bool,
-        /// Base directory for isolated git worktrees and session workspaces
-        #[arg(long, value_name = "DIR")]
-        workdir: Option<PathBuf>,
-        /// Restrict advertised local OAR runtimes to these ids (repeatable)
-        #[arg(long, value_name = "ID")]
-        runtime: Vec<String>,
-        /// Advertise the deterministic offline scripted OAR runtime for testing and acceptance
-        #[arg(long)]
-        scripted: bool,
-        /// Connect once without reconnecting after the WebSocket closes
-        #[arg(long)]
-        once: bool,
-    },
+    Up(MachineUpArgs),
 }
 
-fn non_empty_opt(raw: Option<String>, flag: &str) -> Result<Option<String>, Failure> {
-    match raw {
-        None => Ok(None),
-        Some(value) => {
-            let trimmed = value.trim();
-            if trimmed.is_empty() {
-                return Err(Failure::usage("InvalidValue", format!("{flag} must not be empty")));
-            }
-            Ok(Some(trimmed.to_string()))
-        }
-    }
+#[derive(Debug, Args)]
+pub struct MachineUpArgs {
+    /// One-time 6-character pairing code from `vibevalley remote code --scope remote:runtime`
+    #[arg(long)]
+    pub code: Option<String>,
+    /// Human-readable display name for this execution machine
+    #[arg(long)]
+    pub name: Option<String>,
+    /// Stable machine identifier (defaults to paired device id or a generated id)
+    #[arg(long)]
+    pub machine_id: Option<String>,
+    /// Run as an ephemeral sandbox machine (does not persist machine-auth.json; cleans up worktrees on exit)
+    #[arg(long)]
+    pub ephemeral: bool,
+    /// Base directory for isolated git worktrees and session workspaces
+    #[arg(long, value_name = "DIR")]
+    pub workdir: Option<PathBuf>,
+    /// Restrict advertised local OAR runtimes to these ids (repeatable)
+    #[arg(long, value_name = "ID")]
+    pub runtime: Vec<String>,
+    /// Advertise the deterministic offline scripted OAR runtime for testing and acceptance
+    #[arg(long)]
+    pub scripted: bool,
+    /// Connect once without reconnecting after the WebSocket closes
+    #[arg(long)]
+    pub once: bool,
 }
 
 fn default_machine_id(ephemeral: bool) -> String {
@@ -93,17 +83,6 @@ fn machine_line(machine: &MachineInfo) -> String {
         .collect::<Vec<_>>()
         .join(",");
     line(&[&machine.id, &machine.name, machine.platform.as_str(), machine.status.as_str(), kind, &runtimes])
-}
-
-struct MachineUpArgs {
-    code: Option<String>,
-    name: Option<String>,
-    machine_id: Option<String>,
-    ephemeral: bool,
-    workdir: Option<PathBuf>,
-    runtime: Vec<String>,
-    scripted: bool,
-    once: bool,
 }
 
 fn resolve_machine_up(client: &Client, args: &MachineUpArgs) -> Result<MachineAgentConfig, Failure> {
@@ -238,9 +217,9 @@ fn run_up(client: &Client, args: MachineUpArgs) -> Done {
     let config = resolve_machine_up(client, &args)?;
     let registry = build_runtime_registry(&args.runtime, args.scripted);
     let cancel = CancellationToken::new();
-    let agent = MachineAgent::new(config, registry, cancel.clone());
 
     vibevalley_runtime::rt::block_on(async move {
+        let agent = MachineAgent::new_async(config, registry, cancel.clone()).await;
         let sig_cancel = cancel.clone();
         let sig_task = tokio::spawn(async move {
             wait_for_shutdown_signal().await;
@@ -260,27 +239,6 @@ pub fn run(client: &Client, cmd: MachineCmd) -> Done {
             client.output.show(&machines, |ms| ms.iter().map(machine_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
-        MachineAction::Up {
-            code,
-            name,
-            machine_id,
-            ephemeral,
-            workdir,
-            runtime,
-            scripted,
-            once,
-        } => run_up(
-            client,
-            MachineUpArgs {
-                code,
-                name,
-                machine_id,
-                ephemeral,
-                workdir,
-                runtime,
-                scripted,
-                once,
-            },
-        ),
+        MachineAction::Up(args) => run_up(client, args),
     }
 }

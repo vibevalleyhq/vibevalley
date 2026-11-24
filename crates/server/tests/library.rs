@@ -4,19 +4,20 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::{Value, json};
-use vibevalley_protocol::{BizCode, Caller, Envelope, Fact, LibraryAddRequest};
-use vibevalley_server::modules::content::library::AddedBy;
+use vibevalley_protocol::{BizCode, Caller, Envelope, LibraryAddRequest, MediaJob};
+use vibevalley_server::artifact::library::AddedBy;
+use vibevalley_server::{App, Config, context::Context, create_app_blocking};
 
-fn start(dir: &std::path::Path) -> vibevalley_server::Started {
+fn start(dir: &std::path::Path) -> App {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    vibevalley_server::start(vibevalley_server::ServerConfig {
+    create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        ..vibevalley_server::ServerConfig::under(dir)
+        ..Config::under(dir)
     })
     .unwrap()
 }
@@ -26,8 +27,8 @@ fn ok(e: Envelope) -> Value {
     e.data.unwrap_or(Value::Null)
 }
 
-fn wait_for(hub: &vibevalley_server::Hub, what: &str, f: impl FnMut() -> Option<Value>) -> Value {
-    crate::support::wait_until_settled(Some(hub), Duration::from_secs(5), what, f)
+fn wait_for(ctx: &Context, what: &str, f: impl FnMut() -> Option<Value>) -> Value {
+    crate::support::wait_until_settled(Some(ctx), Duration::from_secs(5), what, f)
 }
 
 fn file(name: &str, words: &str, kind: &str) -> Value {
@@ -35,25 +36,20 @@ fn file(name: &str, words: &str, kind: &str) -> Value {
     json!({ "name": name, "type": kind, "data": base64::engine::general_purpose::STANDARD.encode(words) })
 }
 
-fn image(id: &str, attachment: &Value, phase: &str) -> Fact {
+fn image(id: &str, attachment: &Value, phase: &str) -> MediaJob {
     serde_json::from_value(json!({
-        "type": "mediaChanged",
-        "at": 2,
-        "jobs": [{
-            "kind": "image", "id": id, "prompt": "一只橘猫", "model": "m", "connection": "c", "revision": 1,
-            "source": { "kind": "user" }, "phase": phase, "phaseText": "", "problem": "", "canCancel": false,
-            "canRetryDownload": false, "createdAt": 1, "updatedAt": 2, "attachment": attachment
-        }]
+        "kind": "image", "id": id, "prompt": "一只橘猫", "model": "m", "connection": "c", "revision": 1,
+        "source": { "kind": "user" }, "phase": phase, "phaseText": "", "problem": "", "canCancel": false,
+        "canRetryDownload": false, "createdAt": 1, "updatedAt": 2, "attachment": attachment
     }))
-    .expect("a mediaChanged fact")
+    .expect("a MediaJob")
 }
 
 #[test]
 fn keeps_what_the_user_says_with_a_file_and_what_a_ready_job_made_once_each() {
     let dir = tempfile::tempdir().unwrap();
-    let started = start(dir.path());
-    let hub = started.hub.clone();
-    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+    let app = start(dir.path());
+    let call = |op: &str, p: Value| app.router().call_as(Caller::User, op, p);
     let list = |p: Value| ok(call("library.item.list", p));
     let general = ok(call("channel.list", json!(null)))[0]["id"].as_str().unwrap().to_string();
 
@@ -62,7 +58,7 @@ fn keeps_what_the_user_says_with_a_file_and_what_a_ready_job_made_once_each() {
         "channel.message.send",
         json!({ "id": general, "text": "看这个", "sendKey": "k1", "attachments": [said["id"]] }),
     ));
-    let uploaded = wait_for(&hub, "the uploaded file", || {
+    let uploaded = wait_for(app.ctx(), "the uploaded file", || {
         Some(list(json!({ "origin": "uploaded" }))).filter(|v| v.as_array().unwrap().len() == 1)
     });
     assert_eq!(uploaded[0]["attachment"], said);
@@ -70,10 +66,13 @@ fn keeps_what_the_user_says_with_a_file_and_what_a_ready_job_made_once_each() {
     assert!(uploaded[0]["origin"]["message"].is_string());
 
     let made = ok(call("attachment.create", file("cat.png", "not really a png", "image/png")));
-    hub.apply(vec![image("job-1", &made, "generating")]);
-    hub.apply(vec![image("job-1", &made, "ready")]);
-    hub.apply(vec![image("job-1", &made, "ready")]);
-    let generated = wait_for(&hub, "the generated file", || {
+    crate::support::block_on(app.test_internals().artifact.library.record_made_async(&[
+        image("job-1", &made, "generating"),
+        image("job-1", &made, "ready"),
+        image("job-1", &made, "ready"),
+    ]))
+    .unwrap();
+    let generated = wait_for(app.ctx(), "the generated file", || {
         Some(list(json!({ "origin": "generated" }))).filter(|v| v.as_array().unwrap().len() == 1)
     });
     assert_eq!(generated[0]["attachment"], made);
@@ -87,7 +86,7 @@ fn keeps_what_the_user_says_with_a_file_and_what_a_ready_job_made_once_each() {
         "channel.message.send",
         json!({ "id": general, "text": "再看一次", "sendKey": "k2", "attachments": [made["id"]] }),
     ));
-    let all = wait_for(&hub, "the item moved up", || {
+    let all = wait_for(app.ctx(), "the item moved up", || {
         Some(list(json!({}))).filter(|v| v[0]["attachment"]["id"] == made["id"] && v[0]["lastAt"].as_i64() > v[0]["addedAt"].as_i64())
     });
     let got: Vec<(Value, Value)> = all
@@ -119,8 +118,8 @@ fn keeps_what_the_user_says_with_a_file_and_what_a_ready_job_made_once_each() {
 #[test]
 fn takes_an_item_out_but_keeps_the_file() {
     let dir = tempfile::tempdir().unwrap();
-    let started = start(dir.path());
-    let call = |op: &str, p: Value| started.hub.call_as(Caller::User, op, p);
+    let app = start(dir.path());
+    let call = |op: &str, p: Value| app.router().call_as(Caller::User, op, p);
     let kept = ok(call("attachment.create", file("a.txt", "a", "text/plain")));
     let item = ok(call("library.item.add", json!({ "attachment": kept["id"] })));
     assert_eq!(item["origin"], json!({ "kind": "uploaded" }));
@@ -138,13 +137,14 @@ fn takes_an_item_out_but_keeps_the_file() {
         call("library.item.delete", json!({ "id": kept["id"] })).biz_code,
         BizCode::LibraryNotFound.code()
     );
+    app.close_blocking();
 }
 
 #[test]
 fn refuses_what_does_not_name_one_public_source_or_is_not_the_callers_to_give() {
     let dir = tempfile::tempdir().unwrap();
-    let started = start(dir.path());
-    let library = &started.test_internals().library;
+    let app = start(dir.path());
+    let library = &app.test_internals().artifact.library;
     let helper = AddedBy::Agent {
         agent: "lab".into(),
         session: Some("w1".into()),
@@ -168,7 +168,7 @@ fn refuses_what_does_not_name_one_public_source_or_is_not_the_callers_to_give() 
     }
     asks.push((req(json!({ "path": "a.png" })), helper.clone()));
     for (r, by) in &asks {
-        let e = library.add(r, by).expect_err("refused");
+        let e = vibevalley_runtime::rt::block_on(library.add_async(r, by)).expect_err("refused");
         assert_eq!(e.biz_code, BizCode::LibraryRefused, "{r:?}: {}", e.message);
     }
 
@@ -180,13 +180,13 @@ fn refuses_what_does_not_name_one_public_source_or_is_not_the_callers_to_give() 
         session: None,
         dir: Some(work.path().into()),
     };
-    let item = library.add(&req(json!({ "path": "plan.md" })), &inside).unwrap();
+    let item = vibevalley_runtime::rt::block_on(library.add_async(&req(json!({ "path": "plan.md" })), &inside)).unwrap();
     assert_eq!((item.attachment.name.as_str(), item.attachment.r#type.as_str()), ("plan.md", "text/markdown"));
     assert_eq!(
         serde_json::to_value(&item.origin).unwrap(),
         json!({ "kind": "fetched", "agent": "lab", "from": { "path": "plan.md" } })
     );
-    let e = library.add(&req(json!({ "path": "../../etc/hosts" })), &inside).expect_err("outside");
+    let e = vibevalley_runtime::rt::block_on(library.add_async(&req(json!({ "path": "../../etc/hosts" })), &inside)).expect_err("outside");
     assert_eq!(e.biz_code, BizCode::LibraryRefused);
 }
 
@@ -201,19 +201,19 @@ fn regression_library_sort_filter_and_attachment_identity_survive_reopen() {
         ("aUDIO.mp3", "aabbb", "audio/mpeg"),
         ("beta.md", "bbb", "text/markdown"),
     ] {
-        let file = ok(s.hub.call_as(Caller::User, "attachment.create", file(name, data, kind)));
+        let file = ok(s.router().call_as(Caller::User, "attachment.create", file(name, data, kind)));
         let id = file["id"].as_str().unwrap().to_string();
-        let added = ok(s.hub.call_as(Caller::User, "library.item.add", json!({"attachment": id})));
+        let added = ok(s.router().call_as(Caller::User, "library.item.add", json!({"attachment": id})));
         assert_eq!(added["attachment"], file);
         ids.push(id);
     }
-    s.close();
+    s.close_blocking();
     let mut db = crate::support::inspect_db(&dir.path().join("server.db"));
     crate::support::execute_sql(&mut db, "update media_library_item set last_at = 10");
     drop(db);
     let s = start(dir.path());
     let list = |args: Value| {
-        let items = ok(s.hub.call_as(Caller::User, "library.item.list", args));
+        let items = ok(s.router().call_as(Caller::User, "library.item.list", args));
         items
             .as_array()
             .unwrap()
@@ -234,17 +234,20 @@ fn regression_library_sort_filter_and_attachment_identity_survive_reopen() {
     );
     assert_eq!(list(json!({"text":"  ALP  "})), [ids[1].clone()]);
     assert!(list(json!({"origin":"generated"})).is_empty());
-    ok(s.hub.call_as(Caller::User, "library.item.delete", json!({"id":ids[1]})));
+    ok(s.router().call_as(Caller::User, "library.item.delete", json!({"id":ids[1]})));
     assert!(list(json!({"text":"Alpha"})).is_empty());
-    assert_eq!(std::fs::read(s.test_internals().attachments.file(&ids[1]).unwrap().path).unwrap(), b"a");
-    s.close();
+    assert_eq!(
+        std::fs::read(vibevalley_runtime::rt::block_on(s.test_internals().storage.file_async(&ids[1])).unwrap().path).unwrap(),
+        b"a"
+    );
+    s.close_blocking();
 }
 
 #[test]
 fn regression_library_observes_edited_message_attachments() {
     let dir = tempfile::tempdir().unwrap();
-    let started = start(dir.path());
-    let call = |op: &str, p: Value| started.hub.call_as(Caller::User, op, p);
+    let app = start(dir.path());
+    let call = |op: &str, p: Value| app.router().call_as(Caller::User, op, p);
     let list = || ok(call("library.item.list", json!({})));
     let general = ok(call("channel.list", json!(null)))[0]["id"].as_str().unwrap().to_string();
 
@@ -257,7 +260,7 @@ fn regression_library_observes_edited_message_attachments() {
         .as_str()
         .unwrap()
         .to_string();
-    let first = wait_for(&started.hub, "initial attachment in library", || {
+    let first = wait_for(app.ctx(), "initial attachment in library", || {
         Some(list()).filter(|v| v.as_array().is_some_and(|a| a.len() == 1))
     });
     let first_last_at = first[0]["lastAt"].as_i64().unwrap();
@@ -271,12 +274,12 @@ fn regression_library_observes_edited_message_attachments() {
         "channel.message.update",
         json!({ "id": message_id, "text": "edited with same attachment" }),
     ));
-    let restored = wait_for(&started.hub, "edited message attachment in library", || {
+    let restored = wait_for(app.ctx(), "edited message attachment in library", || {
         Some(list()).filter(|v| v.as_array().is_some_and(|a| a.len() == 1))
     });
     assert_eq!(restored[0]["attachment"], attached);
     assert_eq!(restored[0]["origin"]["channel"], general.as_str());
     assert_eq!(restored[0]["origin"]["message"], message_id.as_str());
     assert!(restored[0]["lastAt"].as_i64().unwrap() >= first_last_at);
-    started.close();
+    app.close_blocking();
 }

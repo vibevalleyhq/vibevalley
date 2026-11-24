@@ -225,7 +225,7 @@ fn machine_agent_reconnect_replays_missed_events_and_deduplicates_retried_inputs
         cfg.reconnect_max_delay = Duration::from_millis(160);
 
         let cancel = CancellationToken::new();
-        let agent = Arc::new(MachineAgent::new(cfg, Arc::new(registry), cancel.clone()));
+        let agent = Arc::new(MachineAgent::new_async(cfg, Arc::new(registry), cancel.clone()).await);
         let agent_task = {
             let agent = agent.clone();
             tokio::spawn(async move { agent.run().await })
@@ -435,7 +435,7 @@ fn machine_agent_local_mcp_proxy_and_permission_respond_round_trip() {
             workdir.path().to_path_buf(),
         );
         let cancel = CancellationToken::new();
-        let agent = Arc::new(MachineAgent::new(cfg, Arc::new(registry), cancel.clone()));
+        let agent = Arc::new(MachineAgent::new_async(cfg, Arc::new(registry), cancel.clone()).await);
         let agent_task = {
             let agent = agent.clone();
             tokio::spawn(async move { agent.run().await })
@@ -571,7 +571,7 @@ fn machine_agent_worktree_prepare_cleanup_and_path_guard() {
             workdir.clone(),
         );
         let cancel = CancellationToken::new();
-        let agent = Arc::new(MachineAgent::new(cfg, Arc::new(registry), cancel.clone()));
+        let agent = Arc::new(MachineAgent::new_async(cfg, Arc::new(registry), cancel.clone()).await);
         let agent_task = {
             let agent = agent.clone();
             tokio::spawn(async move { agent.run().await })

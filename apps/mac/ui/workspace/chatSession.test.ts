@@ -8,7 +8,6 @@ import {
   clampThoughtLevel,
   computeTelemetry,
   defaultThoughtLevelFor,
-  deriveChatTitle,
   extractToolTarget,
   formatTokens,
   mergeChatSteps,
@@ -126,14 +125,6 @@ test("parseBoardTokens separates @mentions, #seq references, and [done]/[stall] 
     { kind: "text", value: " with " },
     { kind: "mention", value: "@all" },
   ]);
-});
-
-test("deriveChatTitle prefers real session title, then swarm title, then clean clipped first user message", () => {
-  expect(deriveChatTitle("  Fix ACP titles  ", "Swarm Title", "First prompt")).toBe("Fix ACP titles");
-  expect(deriveChatTitle("   ", "Unified Content Hub", "First prompt")).toBe("Unified Content Hub");
-  expect(deriveChatTitle(undefined, undefined, "\n\n  Refactor   sidebar\t\tmenu\nsecond line")).toBe("Refactor sidebar menu");
-  expect(deriveChatTitle(undefined, undefined, "1234567890123456789012345678901234567890")).toBe("12345678901234567890123456789012345…");
-  expect(deriveChatTitle(undefined, "  ", "   \n  ")).toBeUndefined();
 });
 
 const makeRuntimeInfo = (overrides: Partial<RuntimeInfo> = {}): RuntimeInfo => ({

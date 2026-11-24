@@ -15,7 +15,7 @@ const HISTORY_LIMIT: usize = 30;
 const FILE_LIMIT: usize = 24;
 const COMMAND_LIMIT: usize = 12;
 
-pub(crate) fn empty_play() -> SessionPlay {
+pub fn empty_play() -> SessionPlay {
     SessionPlay {
         station: -1,
         history: vec![],
@@ -27,12 +27,12 @@ pub(crate) fn empty_play() -> SessionPlay {
     }
 }
 
-pub(crate) fn play_of(plays: Option<&BTreeMap<String, SessionPlay>>, id: &str) -> SessionPlay {
+pub fn play_of(plays: Option<&BTreeMap<String, SessionPlay>>, id: &str) -> SessionPlay {
     plays.and_then(|p| p.get(id)).cloned().unwrap_or_else(empty_play)
 }
 
 /// `freeStation`: -1 when no station on this repo's farm is free.
-pub(crate) fn free_station(plays: Option<&BTreeMap<String, SessionPlay>>, sessions: &[&Session], repo: &str, prefer: Option<i64>) -> i64 {
+pub fn free_station(plays: Option<&BTreeMap<String, SessionPlay>>, sessions: &[&Session], repo: &str, prefer: Option<i64>) -> i64 {
     let taken: Vec<i64> = sessions.iter().filter(|h| farm_of(h) == repo).map(|h| play_of(plays, &h.id).station).collect();
     let max = MAX_RUNNING as i64;
     if let Some(p) = prefer
@@ -62,7 +62,7 @@ fn is_tool_action(a: SessionAction) -> bool {
 }
 
 /// `playedRun`: a new run starts.
-pub(crate) fn played_run(p: &SessionPlay, at: i64) -> SessionPlay {
+pub fn played_run(p: &SessionPlay, at: i64) -> SessionPlay {
     let mut history = p.history.clone();
     history.push(PlayAction {
         at,
@@ -78,7 +78,7 @@ pub(crate) fn played_run(p: &SessionPlay, at: i64) -> SessionPlay {
 }
 
 /// `playedDoing`: one step of a run.
-pub(crate) fn played_doing(p: &SessionPlay, at: i64, action: SessionAction, label: &str) -> SessionPlay {
+pub fn played_doing(p: &SessionPlay, at: i64, action: SessionAction, label: &str) -> SessionPlay {
     if p.history.last().is_some_and(|l| l.action == action && l.label == label) {
         return p.clone();
     }
@@ -128,7 +128,7 @@ fn xp_to_next(level: i64) -> i64 {
 }
 
 /// `levelForCommits`: (level, xp into it).
-pub(crate) fn level_for_commits(total: i64) -> (i64, i64) {
+pub fn level_for_commits(total: i64) -> (i64, i64) {
     let mut level = 1;
     let mut rest = total.max(0);
     while rest >= xp_to_next(level) {
@@ -138,8 +138,8 @@ pub(crate) fn level_for_commits(total: i64) -> (i64, i64) {
     (level, rest)
 }
 
-fn farm_level_of(state: &SpaceState) -> FarmLevel {
-    let (level, xp) = level_for_commits(state.commits.as_ref().map_or(0, |c| c.total));
+fn farm_level_of(commits: Option<&CommitCount>) -> FarmLevel {
+    let (level, xp) = level_for_commits(commits.map_or(0, |c| c.total));
     FarmLevel {
         level,
         xp,
@@ -258,43 +258,63 @@ fn plot_of_session(h: &Session, play: &SessionPlay) -> PlotView {
     }
 }
 
-fn level_ups(before: Option<i64>, after: i64) -> Vec<GameEffect> {
+pub fn level_ups(before: Option<i64>, after: i64) -> Vec<GameEffect> {
     let Some(before) = before else { return vec![] };
     let (from, _) = level_for_commits(before);
     let (to, _) = level_for_commits(after);
     (from + 1..=to).map(|level| GameEffect::LevelUp(GameEffectLevelUp { level })).collect()
 }
 
+/// Pure farm effect extraction for a progress/commit update without `SpaceState`.
+pub fn progress_effects(
+    before_commits: Option<i64>,
+    news: Option<&ProgressNews>,
+    progress: Option<&Progress>,
+    commits: Option<&CommitCount>,
+) -> Vec<GameEffect> {
+    let mut out = vec![];
+    if let Some(c) = commits {
+        out.extend(level_ups(before_commits, c.total));
+    }
+    if let (Some(news), Some(progress)) = (news, progress) {
+        if let Some(coins) = news.coins
+            && coins != 0
+        {
+            out.push(GameEffect::Reward(GameEffectReward {
+                session_id: news.session.clone(),
+                coins,
+                streak: progress.streak,
+            }));
+        }
+        for u in &news.unlocked {
+            out.push(GameEffect::Achievement(achievement_effect(&u.id, u.tier)));
+        }
+    }
+    out
+}
+
+/// Pure farm penalty effect when a hired board/channel worker fails a run.
+pub fn session_failed_penalty(session: &Session, outcome: Outcome) -> Option<GameEffect> {
+    (outcome == Outcome::Failed && is_hired(session)).then(|| {
+        GameEffect::Penalty(GameEffectPenalty {
+            session_id: session.id.clone(),
+        })
+    })
+}
+
 /// `effectsOf`: what a fact sets off on the farm, from the state before it.
 pub fn effects_of(before: &SpaceState, fact: &Fact) -> Vec<GameEffect> {
     match fact {
-        Fact::ProgressChanged(f) => {
-            let mut out = vec![];
-            if let Some(c) = &f.commits {
-                out.extend(level_ups(before.commits.as_ref().map(|c| c.total), c.total));
-            }
-            if let (Some(news), Some(progress)) = (&f.news, &f.progress) {
-                if let Some(coins) = news.coins
-                    && coins != 0
-                {
-                    out.push(GameEffect::Reward(GameEffectReward {
-                        session_id: news.session.clone(),
-                        coins,
-                        streak: progress.streak,
-                    }));
-                }
-                for u in &news.unlocked {
-                    out.push(GameEffect::Achievement(achievement_effect(&u.id, u.tier)));
-                }
-            }
-            out
-        }
-        Fact::SessionReported(f) => match session_of(before, &f.id) {
-            Some(reporter) if f.outcome == Outcome::Failed && is_hired(reporter) => {
-                vec![GameEffect::Penalty(GameEffectPenalty { session_id: f.id.clone() })]
-            }
-            _ => vec![],
-        },
+        Fact::ProgressChanged(f) => progress_effects(
+            before.commits.as_ref().map(|c| c.total),
+            f.news.as_ref(),
+            f.progress.as_ref(),
+            f.commits.as_ref(),
+        ),
+        Fact::SessionReported(f) => session_of(before, &f.id)
+            .and_then(|reporter| session_failed_penalty(reporter, f.outcome))
+            .into_iter()
+            .collect(),
         _ => vec![],
     }
 }
@@ -302,8 +322,18 @@ pub fn effects_of(before: &SpaceState, fact: &Fact) -> Vec<GameEffect> {
 /// `viewOf`: a plot per issue (the later hired session when two are on
 /// it), each session's play, and the level.
 pub(crate) fn view_of(state: &SpaceState) -> FarmView {
+    farm_view(&state.issues, &state.sessions, state.plays.as_ref(), state.commits.as_ref())
+}
+
+/// Pure farm view projection from derived issues, overlaid sessions, plays, and commit counts.
+pub(crate) fn farm_view(
+    issues_slice: &[Issue],
+    sessions: &[Session],
+    plays: Option<&BTreeMap<String, SessionPlay>>,
+    commits: Option<&CommitCount>,
+) -> FarmView {
     let mut latest: HashMap<&str, &Session> = HashMap::new();
-    for h in &state.sessions {
+    for h in sessions {
         if !is_farm_worker(h) {
             continue;
         }
@@ -312,8 +342,7 @@ pub(crate) fn view_of(state: &SpaceState) -> FarmView {
             latest.insert(key, h);
         }
     }
-    let issues: HashMap<&str, &Issue> = state.issues.iter().map(|i| (i.id.as_str(), i)).collect();
-    let plays = state.plays.as_ref();
+    let issues: HashMap<&str, &Issue> = issues_slice.iter().map(|i| (i.id.as_str(), i)).collect();
     let plots = latest
         .into_iter()
         .map(|(key, h)| {
@@ -321,8 +350,7 @@ pub(crate) fn view_of(state: &SpaceState) -> FarmView {
             (key.to_string(), plot_of(h, issue, &play_of(plays, &h.id)))
         })
         .collect();
-    let played = state
-        .sessions
+    let played = sessions
         .iter()
         .filter(|h| is_farm_worker(h))
         .map(|h| {
@@ -350,7 +378,7 @@ pub(crate) fn view_of(state: &SpaceState) -> FarmView {
         })
         .collect();
     FarmView {
-        level: farm_level_of(state),
+        level: farm_level_of(commits),
         plots,
         plays: played,
     }

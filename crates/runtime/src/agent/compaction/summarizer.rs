@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::BoxFuture;
 use crate::agent::ai::ModelClient;
 use crate::agent::ai::types::{ChatRequest, Message};
 use crate::agent::compaction::Level;
@@ -17,7 +18,7 @@ Produce a concise, factual Markdown summary with exactly these sections:
 Keep file paths, symbol names, command outcomes, and unresolved items exact. Do not invent facts.";
 
 pub trait Summarizer: Send + Sync {
-    fn summarize(&self, level: Level, entries: &[Entry], file_ops: &FileOps) -> durable::Result<String>;
+    fn summarize<'a>(&'a self, level: Level, entries: &'a [Entry], file_ops: &'a FileOps) -> BoxFuture<'a, durable::Result<String>>;
 }
 
 pub struct LlmSummarizer {
@@ -26,31 +27,33 @@ pub struct LlmSummarizer {
 }
 
 impl Summarizer for LlmSummarizer {
-    fn summarize(&self, level: Level, entries: &[Entry], file_ops: &FileOps) -> durable::Result<String> {
-        let mut transcript = format!("Compaction level: {}\n\n", level.name());
-        for entry in entries {
-            transcript.push_str(&format!("[#{}] {}: {}\n", entry.seq, entry.kind, entry.payload));
-        }
-        let response = self
-            .client
-            .complete(
-                &ChatRequest {
-                    model: self.model.clone(),
-                    messages: vec![Message::system(SUMMARIZE_SYSTEM), Message::user(transcript)],
-                    ..Default::default()
-                },
-                &mut |_| {},
-            )
-            .map_err(|e| Error::Invalid(format!("compaction summarization failed: {e}")))?;
-        let mut summary = response.message.content.unwrap_or_default().trim().to_string();
-        let ops_block = render_file_ops(file_ops);
-        if !ops_block.is_empty() {
-            if !summary.is_empty() {
-                summary.push_str("\n\n");
+    fn summarize<'a>(&'a self, level: Level, entries: &'a [Entry], file_ops: &'a FileOps) -> BoxFuture<'a, durable::Result<String>> {
+        Box::pin(async move {
+            let mut transcript = format!("Compaction level: {}\n\n", level.name());
+            for entry in entries {
+                transcript.push_str(&format!("[#{}] {}: {}\n", entry.seq, entry.kind, entry.payload));
             }
-            summary.push_str(&ops_block);
-        }
-        Ok(summary)
+            let req = ChatRequest {
+                model: self.model.clone(),
+                messages: vec![Message::system(SUMMARIZE_SYSTEM), Message::user(transcript)],
+                ..Default::default()
+            };
+            let mut noop = |_| {};
+            let response = self
+                .client
+                .complete(&req, &mut noop)
+                .await
+                .map_err(|e| Error::Invalid(format!("compaction summarization failed: {e}")))?;
+            let mut summary = response.message.content.unwrap_or_default().trim().to_string();
+            let ops_block = render_file_ops(file_ops);
+            if !ops_block.is_empty() {
+                if !summary.is_empty() {
+                    summary.push_str("\n\n");
+                }
+                summary.push_str(&ops_block);
+            }
+            Ok(summary)
+        })
     }
 }
 
@@ -58,7 +61,7 @@ impl Summarizer for LlmSummarizer {
 pub struct DeterministicSummarizer;
 
 impl Summarizer for DeterministicSummarizer {
-    fn summarize(&self, level: Level, entries: &[Entry], file_ops: &FileOps) -> durable::Result<String> {
+    fn summarize<'a>(&'a self, level: Level, entries: &'a [Entry], file_ops: &'a FileOps) -> BoxFuture<'a, durable::Result<String>> {
         let first = entries.first().map_or(0, |e| e.seq);
         let last = entries.last().map_or(0, |e| e.seq);
         let mut text = format!("[compaction:{} seq={}..{}]", level.name(), first, last);
@@ -70,6 +73,6 @@ impl Summarizer for DeterministicSummarizer {
             text.push_str("\n\n");
             text.push_str(&ops_block);
         }
-        Ok(text)
+        Box::pin(std::future::ready(Ok(text)))
     }
 }

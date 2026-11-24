@@ -2,7 +2,6 @@ use super::{
     CodeModeResult, CodeModeSpec, Outcome, Tool, ToolRecord,
     instrument::{Guards, compile},
 };
-use crate::agent::durable::TaskContext;
 use rquickjs::{CatchResultExt, Context, Ctx, Exception, Function, Runtime, Value as JsValue};
 use serde_json::{Value, json};
 use std::{
@@ -10,6 +9,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
+use tokio_util::sync::CancellationToken;
 
 struct Replay {
     id: String,
@@ -80,7 +80,9 @@ fn bound(n: i64, default: usize) -> usize {
 }
 
 pub(super) fn execute(
-    tc: &TaskContext,
+    task_id: String,
+    created_at_ms: i64,
+    cancel: CancellationToken,
     spec: &CodeModeSpec,
     records: HashMap<String, ToolRecord>,
     finished_sleeps: HashSet<String>,
@@ -98,8 +100,8 @@ pub(super) fn execute(
     let guards = Arc::new(Guards::new(&spec.script, seed));
     let source = compile(&spec.script, &guards, max_vars)?;
     let state = Arc::new(Mutex::new(Replay {
-        id: tc.task.id.clone(),
-        now: if spec.start_time_ms == 0 { tc.task.created_at_ms } else { spec.start_time_ms },
+        id: task_id,
+        now: if spec.start_time_ms == 0 { created_at_ms } else { spec.start_time_ms },
         seed,
         steps: 0,
         call_seq: 0,
@@ -117,12 +119,11 @@ pub(super) fn execute(
     // QuickJS accounts for built-ins and bytecode alongside allocations by the script.
     let baseline = rt.memory_usage().malloc_size.max(0) as usize;
     rt.set_memory_limit(baseline.saturating_add(max_memory).saturating_add(64 * 1024));
-    let cancel = tc.cancellation();
     let interrupt = state.clone();
     let started = Instant::now();
     rt.set_interrupt_handler(Some(Box::new(move || {
         let mut s = interrupt.lock().unwrap();
-        if cancel.is_disconnected() {
+        if cancel.is_cancelled() {
             s.fatal.get_or_insert_with(|| "execution cancelled".into());
         }
         if started.elapsed() >= timeout {

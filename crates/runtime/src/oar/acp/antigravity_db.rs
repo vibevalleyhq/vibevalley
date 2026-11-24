@@ -18,8 +18,6 @@ use regex::Regex;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::{ConnectOptions, Row, SqliteConnection};
 
-use crate::rt::block_on;
-
 pub(crate) const STEP_TYPE_ERROR_MESSAGE: i64 = 17;
 pub(crate) const STEP_TYPE_INVOKE_SUBAGENT: i64 = 127;
 pub(crate) const MAX_CHILDREN: usize = 16;
@@ -171,14 +169,14 @@ fn readonly_open_count(path: &Path) -> usize {
     readonly_open_counts().lock().get(path).copied().unwrap_or(0)
 }
 
-fn open_readonly(path: &Path) -> Option<(SqliteConnection, (u64, u64))> {
+async fn open_readonly(path: &Path) -> Option<(SqliteConnection, (u64, u64))> {
     let before = safe_db_identity(path)?;
     #[cfg(test)]
     {
         *readonly_open_counts().lock().entry(path.to_path_buf()).or_insert(0) += 1;
     }
     let options = SqliteConnectOptions::new().filename(path).read_only(true).busy_timeout(BUSY_TIMEOUT);
-    let conn = block_on(options.connect()).ok()?;
+    let conn = options.connect().await.ok()?;
     let after = safe_db_identity(path)?;
     if before != after {
         return None;
@@ -186,17 +184,21 @@ fn open_readonly(path: &Path) -> Option<(SqliteConnection, (u64, u64))> {
     Some((conn, before))
 }
 
-fn with_readonly_conn<T>(path: &Path, mut query: impl FnMut(&mut SqliteConnection) -> Result<T, sqlx::Error>) -> Option<T> {
+async fn with_readonly_conn<T, F>(path: &Path, mut query: F) -> Option<T>
+where
+    F: for<'a> FnMut(&'a mut SqliteConnection) -> crate::BoxFuture<'a, Result<T, sqlx::Error>>,
+{
     let identity = safe_db_identity(path)?;
-    let (mut conn, identity, from_cache) = match conn_cache().lock().take(path, identity) {
+    let cached = conn_cache().lock().take(path, identity);
+    let (mut conn, identity, from_cache) = match cached {
         Some(conn) => (conn, identity, true),
         None => {
-            let (conn, opened_id) = open_readonly(path)?;
+            let (conn, opened_id) = open_readonly(path).await?;
             (conn, opened_id, false)
         }
     };
 
-    match query(&mut conn) {
+    match query(&mut conn).await {
         Ok(value) => {
             if safe_db_identity(path) != Some(identity) {
                 return None;
@@ -209,8 +211,8 @@ fn with_readonly_conn<T>(path: &Path, mut query: impl FnMut(&mut SqliteConnectio
             if !from_cache {
                 return None;
             }
-            let (mut fresh, fresh_id) = open_readonly(path)?;
-            let value = query(&mut fresh).ok()?;
+            let (mut fresh, fresh_id) = open_readonly(path).await?;
+            let value = query(&mut fresh).await.ok()?;
             if safe_db_identity(path) != Some(fresh_id) {
                 return None;
             }
@@ -220,10 +222,11 @@ fn with_readonly_conn<T>(path: &Path, mut query: impl FnMut(&mut SqliteConnectio
     }
 }
 
-pub(crate) fn latest_step_index(path: &Path) -> Option<i64> {
+pub(crate) async fn latest_step_index(path: &Path) -> Option<i64> {
     with_readonly_conn(path, |conn| {
-        block_on(sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(idx), -1) FROM steps").fetch_one(conn))
+        Box::pin(async move { sqlx::query_scalar::<_, i64>("SELECT COALESCE(MAX(idx), -1) FROM steps").fetch_one(conn).await })
     })
+    .await
 }
 
 fn read_blob_or_text(row: &sqlx::sqlite::SqliteRow, column: &str) -> Option<Vec<u8>> {
@@ -236,14 +239,16 @@ fn read_blob_or_text(row: &sqlx::sqlite::SqliteRow, column: &str) -> Option<Vec<
     None
 }
 
-pub(crate) fn detect_silent_error(path: &Path, after_idx: i64) -> Option<SilentError> {
+pub(crate) async fn detect_silent_error(path: &Path, after_idx: i64) -> Option<SilentError> {
     let row = with_readonly_conn(path, |conn| {
-        block_on(
+        Box::pin(async move {
             sqlx::query("SELECT step_type, step_payload, error_details FROM steps WHERE idx > ?1 ORDER BY idx DESC LIMIT 1")
                 .bind(after_idx)
-                .fetch_optional(conn),
-        )
-    })??;
+                .fetch_optional(conn)
+                .await
+        })
+    })
+    .await??;
     let step_type: i64 = row.try_get("step_type").ok()?;
     if step_type != STEP_TYPE_ERROR_MESSAGE {
         return None;
@@ -616,16 +621,19 @@ pub(crate) fn parse_subagent_payload(step_idx: i64, status: i64, payload: &[u8])
 /// Reads recent `step_type = 127` (`INVOKE_SUBAGENT`) entries from a conversation
 /// DB read-only. Silently returns an empty list on missing DB, symlink, lock,
 /// or schema drift.
-pub(crate) fn list_invoked_subagents(path: &Path, limit: usize) -> Vec<InvokedSubagent> {
+pub(crate) async fn list_invoked_subagents(path: &Path, limit: usize) -> Vec<InvokedSubagent> {
     let cap = if limit == 0 { MAX_CHILDREN } else { limit.min(MAX_CHILDREN) } as i64;
     let Some(rows) = with_readonly_conn(path, |conn| {
-        block_on(
+        Box::pin(async move {
             sqlx::query("SELECT idx, status, step_payload FROM steps WHERE step_type = ?1 ORDER BY idx DESC LIMIT ?2")
                 .bind(STEP_TYPE_INVOKE_SUBAGENT)
                 .bind(cap)
-                .fetch_all(conn),
-        )
-    }) else {
+                .fetch_all(conn)
+                .await
+        })
+    })
+    .await
+    else {
         return Vec::new();
     };
     let mut out = Vec::new();
@@ -645,10 +653,10 @@ mod tests {
     use super::*;
     use sqlx::Executor;
 
-    fn create_steps_db(path: &Path) {
+    async fn create_steps_db(path: &Path) {
         let options = SqliteConnectOptions::new().filename(path).create_if_missing(true);
-        let mut conn = block_on(options.connect()).expect("create sqlite db");
-        block_on(conn.execute(
+        let mut conn = options.connect().await.expect("create sqlite db");
+        conn.execute(
             "CREATE TABLE steps (
                 idx integer PRIMARY KEY,
                 step_type integer NOT NULL DEFAULT 0,
@@ -662,22 +670,22 @@ mod tests {
                 step_payload blob,
                 step_format integer NOT NULL DEFAULT 0
             );",
-        ))
+        )
+        .await
         .expect("create steps table");
     }
 
-    fn insert_step(path: &Path, idx: i64, step_type: i64, payload: Option<&[u8]>, error_details: Option<&[u8]>) {
+    async fn insert_step(path: &Path, idx: i64, step_type: i64, payload: Option<&[u8]>, error_details: Option<&[u8]>) {
         let options = SqliteConnectOptions::new().filename(path);
-        let mut conn = block_on(options.connect()).expect("open sqlite db");
-        block_on(
-            sqlx::query("INSERT INTO steps (idx, step_type, step_payload, error_details) VALUES (?1, ?2, ?3, ?4)")
-                .bind(idx)
-                .bind(step_type)
-                .bind(payload)
-                .bind(error_details)
-                .execute(&mut conn),
-        )
-        .expect("insert step");
+        let mut conn = options.connect().await.expect("open sqlite db");
+        sqlx::query("INSERT INTO steps (idx, step_type, step_payload, error_details) VALUES (?1, ?2, ?3, ?4)")
+            .bind(idx)
+            .bind(step_type)
+            .bind(payload)
+            .bind(error_details)
+            .execute(&mut conn)
+            .await
+            .expect("insert step");
     }
 
     #[test]
@@ -693,20 +701,20 @@ mod tests {
         assert_eq!(conversation_db_path("abc", gemini, "../bad"), None);
     }
 
-    #[test]
-    fn detects_429_quota_exhausted_with_retry_hint() {
+    #[tokio::test]
+    async fn detects_429_quota_exhausted_with_retry_hint() {
         let dir = tempfile::tempdir().unwrap();
         let conv = dir.path().join("conversations");
         std::fs::create_dir_all(&conv).unwrap();
         let db = conv.join("sess-1.db");
-        create_steps_db(&db);
-        insert_step(&db, 0, 5, Some(b"normal assistant turn"), None);
-        assert_eq!(latest_step_index(&db), Some(0));
-        assert_eq!(detect_silent_error(&db, -1), None);
+        create_steps_db(&db).await;
+        insert_step(&db, 0, 5, Some(b"normal assistant turn"), None).await;
+        assert_eq!(latest_step_index(&db).await, Some(0));
+        assert_eq!(detect_silent_error(&db, -1).await, None);
 
         let proto = b"\x08\x11\x12\x80Error 429, Message: Resource has been exhausted, Status: RESOURCE_EXHAUSTED\nreason:QUOTA_EXHAUSTED quotaResetDelay:\"42s\"\x00\x01";
-        insert_step(&db, 1, STEP_TYPE_ERROR_MESSAGE, Some(proto), None);
-        let err = detect_silent_error(&db, 0).expect("detects error");
+        insert_step(&db, 1, STEP_TYPE_ERROR_MESSAGE, Some(proto), None).await;
+        let err = detect_silent_error(&db, 0).await.expect("detects error");
         assert_eq!(err.status_code, Some(429));
         assert!(err.quota_exhausted);
         assert_eq!(err.retry_hint.as_deref(), Some("42s"));
@@ -716,58 +724,59 @@ mod tests {
         assert!(err.message.contains("42s"), "{}", err.message);
     }
 
-    #[test]
-    fn detects_503_status_code_error_and_ignores_normal_step() {
+    #[tokio::test]
+    async fn detects_503_status_code_error_and_ignores_normal_step() {
         let dir = tempfile::tempdir().unwrap();
         let conv = dir.path().join("conversations");
         std::fs::create_dir_all(&conv).unwrap();
         let db = conv.join("sess-2.db");
-        create_steps_db(&db);
-        insert_step(&db, 2, STEP_TYPE_ERROR_MESSAGE, None, Some(b"STATUS (code 503): Service Unavailable"));
-        let err = detect_silent_error(&db, 1).expect("detects 503");
+        create_steps_db(&db).await;
+        insert_step(&db, 2, STEP_TYPE_ERROR_MESSAGE, None, Some(b"STATUS (code 503): Service Unavailable")).await;
+        let err = detect_silent_error(&db, 1).await.expect("detects 503");
         assert_eq!(err.status_code, Some(503));
         assert!(err.message.contains("Service Unavailable"));
         assert!(!err.quota_exhausted);
 
         // Subsequent normal reply step supersedes earlier step_type=17.
-        insert_step(&db, 3, 6, Some(b"recovered"), None);
-        assert_eq!(detect_silent_error(&db, 1), None);
+        insert_step(&db, 3, 6, Some(b"recovered"), None).await;
+        assert_eq!(detect_silent_error(&db, 1).await, None);
     }
 
-    #[test]
-    fn detects_invalid_thinking_signature() {
+    #[tokio::test]
+    async fn detects_invalid_thinking_signature() {
         let dir = tempfile::tempdir().unwrap();
         let conv = dir.path().join("conversations");
         std::fs::create_dir_all(&conv).unwrap();
         let db = conv.join("sess-3.db");
-        create_steps_db(&db);
+        create_steps_db(&db).await;
         insert_step(
             &db,
             4,
             STEP_TYPE_ERROR_MESSAGE,
             Some(b"\x00Error 400, Message: Invalid thinking signature, Status: INVALID_THINKING_SIGNATURE"),
             None,
-        );
-        let err = detect_silent_error(&db, 3).expect("detects thinking signature error");
+        )
+        .await;
+        let err = detect_silent_error(&db, 3).await.expect("detects thinking signature error");
         assert_eq!(err.status_code, Some(400));
         assert!(err.invalid_thinking_signature);
     }
 
-    #[test]
-    fn rejects_symlinked_db_and_missing_files_silently() {
+    #[tokio::test]
+    async fn rejects_symlinked_db_and_missing_files_silently() {
         let dir = tempfile::tempdir().unwrap();
         let conv = dir.path().join("conversations");
         std::fs::create_dir_all(&conv).unwrap();
         let real_db = dir.path().join("real.db");
-        create_steps_db(&real_db);
-        insert_step(&real_db, 1, STEP_TYPE_ERROR_MESSAGE, Some(b"STATUS (code 500): boom"), None);
+        create_steps_db(&real_db).await;
+        insert_step(&real_db, 1, STEP_TYPE_ERROR_MESSAGE, Some(b"STATUS (code 500): boom"), None).await;
 
         let link_db = conv.join("linked.db");
         std::os::unix::fs::symlink(&real_db, &link_db).unwrap();
-        assert_eq!(latest_step_index(&link_db), None);
-        assert_eq!(detect_silent_error(&link_db, 0), None);
-        assert_eq!(detect_silent_error(&conv.join("missing.db"), 0), None);
-        assert!(list_invoked_subagents(&link_db, 16).is_empty());
+        assert_eq!(latest_step_index(&link_db).await, None);
+        assert_eq!(detect_silent_error(&link_db, 0).await, None);
+        assert_eq!(detect_silent_error(&conv.join("missing.db"), 0).await, None);
+        assert!(list_invoked_subagents(&link_db, 16).await.is_empty());
     }
 
     fn encode_varint(mut v: u64, out: &mut Vec<u8>) {
@@ -790,13 +799,13 @@ mod tests {
         out.extend_from_slice(payload);
     }
 
-    #[test]
-    fn lists_invoked_subagents_from_protobuf_payload_and_tolerates_schema_drift() {
+    #[tokio::test]
+    async fn lists_invoked_subagents_from_protobuf_payload_and_tolerates_schema_drift() {
         let dir = tempfile::tempdir().unwrap();
         let conv = dir.path().join("conversations");
         std::fs::create_dir_all(&conv).unwrap();
         let db = conv.join("sess-sub.db");
-        create_steps_db(&db);
+        create_steps_db(&db).await;
 
         // Nested CortexStep(field 127) -> InvokeSubagent(role, prompt, conv_id, log_uri).
         let mut inner = Vec::new();
@@ -811,17 +820,17 @@ mod tests {
         let mut wrapper = Vec::new();
         encode_len_field(127, &inner, &mut wrapper);
 
-        insert_step(&db, 10, STEP_TYPE_INVOKE_SUBAGENT, Some(&wrapper), None);
+        insert_step(&db, 10, STEP_TYPE_INVOKE_SUBAGENT, Some(&wrapper), None).await;
         // Corrupted / unknown binary bytes on another step should fail silently without breaking valid rows.
-        insert_step(&db, 11, STEP_TYPE_INVOKE_SUBAGENT, Some(b"\xff\xff\xff\x07\x04"), None);
+        insert_step(&db, 11, STEP_TYPE_INVOKE_SUBAGENT, Some(b"\xff\xff\xff\x07\x04"), None).await;
         // Second valid subagent whose conversation_id is only in log_uri.
         let mut inner2 = Vec::new();
         encode_len_field(1, b"verifier", &mut inner2);
         encode_len_field(2, b"Run cargo test across the runtime crate", &mut inner2);
         encode_len_field(4, b"/tmp/base/brain/worker-conv-99/.system_generated/logs/transcript.jsonl", &mut inner2);
-        insert_step(&db, 12, STEP_TYPE_INVOKE_SUBAGENT, Some(&inner2), None);
+        insert_step(&db, 12, STEP_TYPE_INVOKE_SUBAGENT, Some(&inner2), None).await;
 
-        let found = list_invoked_subagents(&db, 16);
+        let found = list_invoked_subagents(&db, 16).await;
         assert_eq!(found.len(), 2);
         assert_eq!(found[0].step_idx, 12);
         assert_eq!(found[0].role.as_deref(), Some("verifier"));
@@ -836,29 +845,29 @@ mod tests {
         // Schema drift: DB without `steps` table returns empty silently.
         let drift_db = conv.join("drift.db");
         let options = SqliteConnectOptions::new().filename(&drift_db).create_if_missing(true);
-        let mut conn = block_on(options.connect()).unwrap();
-        block_on(conn.execute("CREATE TABLE other_table (id integer PRIMARY KEY);")).unwrap();
-        assert!(list_invoked_subagents(&drift_db, 16).is_empty());
+        let mut conn = options.connect().await.unwrap();
+        conn.execute("CREATE TABLE other_table (id integer PRIMARY KEY);").await.unwrap();
+        assert!(list_invoked_subagents(&drift_db, 16).await.is_empty());
     }
 
-    #[test]
-    fn reuses_cached_readonly_connection_and_invalidates_on_inode_change() {
+    #[tokio::test]
+    async fn reuses_cached_readonly_connection_and_invalidates_on_inode_change() {
         let dir = tempfile::tempdir().unwrap();
         let conv = dir.path().join("conversations");
         std::fs::create_dir_all(&conv).unwrap();
         let db = conv.join("sess-cached.db");
-        create_steps_db(&db);
-        insert_step(&db, 1, 5, Some(b"first"), None);
+        create_steps_db(&db).await;
+        insert_step(&db, 1, 5, Some(b"first"), None).await;
 
         // Prime cache with the first read.
-        assert_eq!(latest_step_index(&db), Some(1));
+        assert_eq!(latest_step_index(&db).await, Some(1));
         let opens_after_first = readonly_open_count(&db);
 
         // Subsequent reads against the same inode hit the cached connection without reopening.
-        insert_step(&db, 2, 5, Some(b"second"), None);
-        assert_eq!(latest_step_index(&db), Some(2));
-        assert_eq!(detect_silent_error(&db, 0), None);
-        assert!(list_invoked_subagents(&db, 4).is_empty());
+        insert_step(&db, 2, 5, Some(b"second"), None).await;
+        assert_eq!(latest_step_index(&db).await, Some(2));
+        assert_eq!(detect_silent_error(&db, 0).await, None);
+        assert!(list_invoked_subagents(&db, 4).await.is_empty());
         assert_eq!(
             readonly_open_count(&db),
             opens_after_first,
@@ -867,10 +876,10 @@ mod tests {
 
         // Replacing the file with a new inode invalidates the cached handle and reads fresh state.
         let replacement = conv.join("sess-replacement.db");
-        create_steps_db(&replacement);
-        insert_step(&replacement, 99, 5, Some(b"replaced"), None);
+        create_steps_db(&replacement).await;
+        insert_step(&replacement, 99, 5, Some(b"replaced"), None).await;
         std::fs::rename(&replacement, &db).unwrap();
-        assert_eq!(latest_step_index(&db), Some(99));
+        assert_eq!(latest_step_index(&db).await, Some(99));
         assert!(
             readonly_open_count(&db) > opens_after_first,
             "inode change must invalidate cached handle and reopen"

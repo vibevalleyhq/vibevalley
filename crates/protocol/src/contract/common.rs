@@ -16,10 +16,7 @@ pub type SessionId = String;
 /// An artifact's id.
 pub type ArtifactId = String;
 
-/// A block's id, within its artifact: a block op names the block it is for, never its artifact.
-pub type BlockId = String;
-
-/// A suggested change to a block.
+/// A suggested change to an artifact file.
 pub type SuggestionId = String;
 
 pub type MessageId = String;

@@ -37,29 +37,37 @@ fn eval_export_and_inspect_work_end_to_end_on_sqlite_and_jsonl() {
         assert_eq!((sub, help.code, help.out.contains("Examples:")), (sub, 0, true), "{}", help.out);
     }
 
-    let store = vibevalley_runtime::agent::durable::Store::open(&db_path).unwrap();
-    store
-        .write(|tx| {
-            tx.create_conversation("conv-cli", "deepseek-flash")?;
-            tx.append_entry("conv-cli", "pi.user", &json!({ "text": "hello" }))?;
-            tx.append_entry(
-                "conv-cli",
-                "pi.assistant",
-                &json!({
-                    "text": "",
-                    "toolCalls": [{ "id": "c1", "toolName": "read", "argsJson": { "path": "Cargo.toml" } }]
-                }),
-            )?;
-            tx.append_entry(
-                "conv-cli",
-                "pi.tool_result",
-                &json!({ "toolCallId": "c1", "toolName": "read", "ok": true, "output": "ok" }),
-            )?;
-            tx.append_entry("conv-cli", "pi.assistant", &json!({ "text": "all good" }))?;
-            Ok(())
-        })
-        .unwrap();
-    store.close().unwrap();
+    let store = vibevalley_runtime::rt::block_on(async {
+        let store = vibevalley_runtime::agent::durable::Store::open(&db_path).await.unwrap();
+        store
+            .write_async(|tx| {
+                Box::pin(async move {
+                    tx.create_conversation_async("conv-cli", "deepseek-flash").await?;
+                    tx.append_entry_async("conv-cli", "pi.user", &json!({ "text": "hello" })).await?;
+                    tx.append_entry_async(
+                        "conv-cli",
+                        "pi.assistant",
+                        &json!({
+                            "text": "",
+                            "toolCalls": [{ "id": "c1", "toolName": "read", "argsJson": { "path": "Cargo.toml" } }]
+                        }),
+                    )
+                    .await?;
+                    tx.append_entry_async(
+                        "conv-cli",
+                        "pi.tool_result",
+                        &json!({ "toolCallId": "c1", "toolName": "read", "ok": true, "output": "ok" }),
+                    )
+                    .await?;
+                    tx.append_entry_async("conv-cli", "pi.assistant", &json!({ "text": "all good" })).await?;
+                    Ok(())
+                })
+            })
+            .await
+            .unwrap();
+        store.close().await.unwrap();
+    });
+    let _ = store;
 
     let exported = eval_cli(
         dir.path(),

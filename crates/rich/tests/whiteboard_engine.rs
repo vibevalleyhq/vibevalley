@@ -1,23 +1,22 @@
 use std::collections::BTreeMap;
 
-use vibevalley_protocol::{ArtifactEntry, ArtifactEntryKind, ArtifactEntryOp};
 use vibevalley_rich::engine::canvas::{Canvas, End, Node as CanvasNode, Side};
 use vibevalley_rich::engine::whiteboard::{
     AlignOp, AnchorSide, ArrowCurve, ArrowEndpoint, ArrowHead, BoardAction, BoardCommand, BoardDoc, Camera, ControllerEffect, DEFAULT_HISTORY_LIMIT,
     DistributeAxis, ElementId, ElementKind, ElementRecord, ExtraFields, GridStyle, InkMode, MilestoneKind, Modifiers, Point2, PointerButton, PointerInput,
     Presence, PresenceColor, PresenceKind, PresenceViewport, Rect2, STICKERS, ShapeKind, SnapConfig, SnapGuide, SpatialIndex, StrokePoint, StrokeStyle,
-    TemplateCopy, TemplateKind, TextAlign, TextVariant, TimelineMilestone, Tool, UndoHistory, Vec2, WbFill, WhiteboardController, apply_command,
-    apply_remote_entries, build_ink_outline, build_template_doc, compute_align_deltas, compute_distribute_deltas, compute_move_snap, compute_resize_snap,
-    compute_tidy_grid_deltas, decode_board_entries, decode_presences_json, encode_element_patch, encode_element_write, encode_meta_write,
-    encode_presence_write, import_json_canvas, project_point_to_polyline, rotated_bbox, route_arrow, sample_polyline, simplify_stroke_points, sticker_drawing,
-    strokes_hit_by_eraser,
+    TemplateCopy, TemplateKind, TextAlign, TextVariant, TimelineMilestone, Tool, UndoHistory, Vec2, WbFill, WhiteboardController, WhiteboardEntry,
+    WhiteboardEntryKind, WhiteboardEntryOp, apply_command, apply_remote_entries, build_ink_outline, build_template_doc, compute_align_deltas,
+    compute_distribute_deltas, compute_move_snap, compute_resize_snap, compute_tidy_grid_deltas, decode_board_entries, decode_presences_json,
+    encode_element_patch, encode_element_write, encode_meta_write, encode_presence_write, import_json_canvas, project_point_to_polyline, rotated_bbox,
+    route_arrow, sample_polyline, simplify_stroke_points, sticker_drawing, strokes_hit_by_eraser,
 };
 
-fn make_entry(path: &str, rev: i64, value: &str) -> ArtifactEntry {
-    ArtifactEntry {
+fn make_entry(path: &str, rev: i64, value: &str) -> WhiteboardEntry {
+    WhiteboardEntry {
         artifact_id: "art-test".to_owned(),
         path: path.to_owned(),
-        kind: ArtifactEntryKind::Json,
+        kind: WhiteboardEntryKind::Json,
         mime: "application/json".to_owned(),
         size: value.len() as i64,
         rev,
@@ -307,7 +306,7 @@ fn codec_roundtrip_all_12_element_kinds_extra_fields_and_json_canvas() {
     entries.push(make_entry(&meta_write.path, 1, meta_write.value.as_deref().unwrap()));
     for el in &original.elements {
         let w = encode_element_write(el, true);
-        assert_eq!(w.op, ArtifactEntryOp::Set);
+        assert_eq!(w.op, WhiteboardEntryOp::Set);
         assert_eq!(w.if_rev, Some(el.rev));
         entries.push(make_entry(&w.path, el.rev, w.value.as_deref().unwrap()));
     }
@@ -344,7 +343,7 @@ fn codec_roundtrip_all_12_element_kinds_extra_fields_and_json_canvas() {
     let mut updated_card = decoded_card.clone();
     updated_card.translate(25.0, 15.0);
     let patch = encode_element_patch(decoded_card, &updated_card, true);
-    assert_eq!(patch.op, ArtifactEntryOp::Patch);
+    assert_eq!(patch.op, WhiteboardEntryOp::Patch);
     assert_eq!(patch.if_rev, Some(decoded_card.rev));
     let patch_obj = patch.value.as_deref().unwrap();
     assert!(patch_obj.contains("125"));

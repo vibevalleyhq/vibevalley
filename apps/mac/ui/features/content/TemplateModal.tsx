@@ -3,7 +3,6 @@ import { computed, Scroll, signal, Text, untracked, View, windowSize } from "nsh
 import { t } from "@vibevalley/i18n";
 
 import { createAct } from "../../design/act";
-import { Button } from "../../design/Button";
 import { Dialog } from "../../design/Dialog";
 import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
@@ -14,7 +13,7 @@ import { mix } from "../../design/tone";
 import { spelled } from "../../infra/base/search";
 import { ready, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
-import { openOutlineImport, useArtifacts } from "../artifact";
+import { useArtifacts } from "../artifact";
 import { closeTemplatePicker, type TemplateCategory, templatePickerState } from "./navigation";
 import { CONTENT_TEMPLATES, type ContentTemplate, createFromTemplate, TEMPLATE_CATEGORIES, templateDesc, templateName } from "./templates";
 
@@ -75,19 +74,6 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
           onChange={(v) => category.set(v)}
           options={categoryOptions}
         />
-        <View class="ml-auto">
-          <Button
-            icon="upload"
-            size="compact"
-            testID="content-template-import-md"
-            onPress={() => {
-              closeTemplatePicker();
-              openOutlineImport();
-            }}
-          >
-            {t("web.artifact.outline.importAction")}
-          </Button>
-        </View>
       </View>
 
       <Scroll style={{ maxHeight: Math.max(280, windowSize().height * 0.62) }} contentClass="pb-1">
@@ -242,7 +228,7 @@ function DeliverablePreview(props: { tpl: ContentTemplate }) {
           </View>
         </View>
       </If>
-      <If when={artType() === "html"}>
+      <If when={artType() === "prototype"}>
         <View class="h-full w-40 overflow-hidden rounded-sm border border-line bg-page">
           <View class="h-3.5 flex-row items-center gap-1 bg-selected px-2">
             <View class="size-1.5 rounded-full bg-berry opacity-75" />
@@ -255,7 +241,7 @@ function DeliverablePreview(props: { tpl: ContentTemplate }) {
           </View>
         </View>
       </If>
-      <If when={artType() === "docs"}>
+      <If when={artType() === "docs" || artType() === "sheet" || artType() === "diagram" || artType() === "storyboard"}>
         <View class="h-full w-40 justify-center gap-1.5 rounded-sm border border-line bg-page px-3 py-2">
           <View class="h-2 w-18 rounded-xs bg-ink opacity-75" />
           <View class="h-1.5 w-28 rounded-xs bg-faint opacity-50" />

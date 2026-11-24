@@ -21,7 +21,7 @@ Status: proposed
 
 ## Alternatives considered
 
-- **照搬白皮书外部工具链（ast-grep、dependency-cruiser、bun）**：与本仓的 `vp`、oxlint 插件、clippy 与 `crates/server/src/modules/` 模块拓扑重复；复用既有 Rust/TS 检查即可。
+- **照搬白皮书外部工具链（ast-grep、dependency-cruiser、bun）**：与本仓的 `vp`、oxlint 插件、clippy 与 `crates/server/src/` 模块拓扑重复；复用既有 Rust/TS 检查即可。
 - **对文件行数、函数行数或 3:1 重构比例设硬门槛**：会诱导机械切文件凑数；改由热点返工记录指导重构。
 
 ## Acceptance criteria

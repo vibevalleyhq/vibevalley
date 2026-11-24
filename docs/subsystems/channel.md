@@ -1,8 +1,8 @@
 # 频道
 
-频道（`Channel`）是用户、助手和帮工说话的地方，含公共频道 `channel`（默认 `general` 叫「田头」）、私聊 `direct` 和工单串 `thread` 三类通道。外部聊天软件（微信、飞书、QQ）经连接器（`modules/collab/connector`）各接到一个频道上：用户在那边对机器人说的话记成他在这个频道里说的，农场里该用户听的话（助手的话、汇报、派活、`@` 他的）在他还没在农场里读到时发到那边。
+频道（`Channel`）是用户、助手和帮工说话的地方，含公共频道 `channel`（默认 `general` 叫「田头」）、私聊 `direct` 和工单串 `thread` 三类通道。外部聊天软件（微信、飞书、QQ）经连接器（`collab/connector`）各接到一个频道上：用户在那边对机器人说的话记成他在这个频道里说的，农场里该用户听的话（助手的话、汇报、派活、`@` 他的）在他还没在农场里读到时发到那边。
 
-连接器按平台和外部消息标识登记入站消息。一批消息与读取游标在同一个数据库事务中保存。换绑账号时，连接器同时清除旧入站记录并退役旧待发消息。重启后只读取 `pending` 状态的出站分片，按序号投递。平台已接收但本地尚未记录回执的分片仍可能重发。[连接器存储](crates/server/src/modules/collab/connector/store.rs)
+连接器按平台和外部消息标识登记入站消息。一批消息与读取游标在同一个数据库事务中保存。换绑账号时，连接器同时清除旧入站记录并退役旧待发消息。重启后只读取 `pending` 状态的出站分片，按序号投递。平台已接收但本地尚未记录回执的分片仍可能重发。[连接器存储](crates/server/src/connector/mod.rs)
 
 ## 读取频道消息
 
@@ -24,12 +24,12 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/modules/collab/channel/` | `Chat` 核心、事务保存点（`store.rs`）、原生异步消息写入/编辑/搜索（`messages.rs`）、异步房间/投递/订阅流（`rooms.rs`）、DTO 与 `ChannelEvent` 定义（`types.rs`）及通过 `Hub::on_async` 安装全部 `channel.*` 端点的服务层（`service.rs`）；每条消息连同 `channel_event` 与 `channel_delivery` 待发记录在同一个事务里落库，提交后非阻塞广播 `ChannelEvent`（`Chat::subscribe_events()`）并推送 `Chat::dispatches()` |
-| `crates/server/src/modules/collab/channel/dispatch.rs` | 纯受众规则（`who_hears`）、两道环路刹车（`brakes`：`hopLimit = 4`、`cooldown = 60s`）与 `plan_deliveries`，仅读频道模型与参与者表，零依赖 `issue`、`session` 或 `orchestrator` |
-| [频道实体](crates/server/src/db/entities/collab_channel.rs)、[频道存储](crates/server/src/modules/collab/channel/db.rs) | SeaORM + SeaQuery 双后端查询。频道连接在共享数据库上读写消息、串与 `channel_delivery` |
-| `crates/server/src/modules/collab/channel/model.rs` | 写事务在频道锁内更新镜像。回滚恢复原镜像与环路记账，提交后才向订阅者发布 |
-| `crates/server/src/modules/collab/channel/words.rs` | `@` 识别、地址解析、搜索过滤与公网链接预览 |
-| `crates/server/src/transport/http/mod.rs` | 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)） |
+| `crates/server/src/channel/` | `Chat` 核心、事务保存点（`store.rs`）、原生异步消息写入/编辑/搜索（`messages.rs`）、异步房间/投递/订阅流（`rooms.rs`）、DTO 与 `ChannelEvent` 定义（`types.rs`）及通过 `Hub::on_async` 安装全部 `channel.*` 端点的服务层（`service.rs`）；每条消息连同 `channel_event` 与 `channel_delivery` 待发记录在同一个事务里落库，提交后非阻塞广播 `ChannelEvent`（`Chat::subscribe_events()`）并推送 `Chat::dispatches()` |
+| `crates/server/src/channel/dispatch.rs` | 纯受众规则（`who_hears`）、两道环路刹车（`brakes`：`hopLimit = 4`、`cooldown = 60s`）与 `plan_deliveries`，仅读频道模型与参与者表，零依赖 `issue`、`session` 或 `orchestrator` |
+| [频道实体](crates/server/src/db/entity/channel.rs)、[频道存储](crates/server/src/service/channel.rs) | SeaORM + SeaQuery 双后端查询。频道连接在共享数据库上读写消息、串与 `channel_delivery` |
+| `crates/server/src/channel/model.rs` | 写事务在频道锁内更新镜像。回滚恢复原镜像与环路记账，提交后才向订阅者发布 |
+| `crates/server/src/channel/words.rs` | `@` 识别、地址解析、搜索过滤与公网链接预览 |
+| `crates/server/src/gateway/http/mod.rs` | 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)） |
 | 表 `channel`、`channel_participant`、`channel_message`、`channel_mention`、`channel_member`、`channel_read_cursor`、`channel_seen`、`channel_event`、`channel_delivery` | 频道与消息；`channel_seen` 是参与者在聊天之外收下的消息，`channel_event` 是按提交次序编号的事件（`posted`、`removed`），`channel_delivery` 记录持久 `pending` / `delivered` / `withdrawn` / `failed` 投递 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`channel.*`；附件见[附件](docs/subsystems/attachment.md)）。
@@ -47,9 +47,9 @@
 - **主动阅读与被动消费分开记账，都在聊天里**：
   - 调读取接口、自己说话推进 `channel_read_cursor.read_number`。
   - 会话收下投递的消息记进 `channel_seen`（`Chat::mark_seen`）：下游消费方（`work/issue`、`team/orchestrator`）成功交出消息后结算 `channel_delivery`、记 `channel_seen` 并贴 👀。未读（`UnreadOf`）和说话前的新鲜度（`UnseenIn`）都排除这两样。
-- **参与者只记谁在说话，线上读 `ChatMessage.actor`**：一个农场只有一个人。`channel_participant` 记 `kind`（`user`、`agent`、`system`）、名字、「家」，和 agent 的席位代哪个档案说话（`agent_id`）：助手是档案自己说话（没有），帮工（会话、私聊里档案的席位）代它的档案说。消息的 `Actor` 由此得出（代档案说的是 `worker`，否则是 `orchestrator`）。农机、会话里的角色是 `Session` 的事，不记在聊天里；席位由所属领域排（`Chat::seat`：助手在 `channel/service.rs`，工单会话在 `work/issue`，私聊会话在 `work/session`）。
+- **参与者只记谁在说话，线上读 `ChatMessage.actor`**：一个农场只有一个人。`channel_participant` 记 `kind`（`user`、`agent`、`system`）、名字、「家」，和 agent 的席位代哪个档案说话（`agent_id`）：助手是档案自己说话（没有），帮工（会话、私聊里档案的席位）代它的档案说。消息的 `Actor` 由此得出（代档案说的是 `worker`，否则是 `orchestrator`）。农机、会话里的角色是 `Session` 的事，不记在聊天里；席位由所属领域排（`Chat::seat`：助手在 `channel/mod.rs`，工单会话在 `work/issue`，私聊会话在 `work/session`）。
 - **写话按要做的事分四个门，都落进同一个写**：`say`（用户的话，页面和命令行都走它，农场随之上线）、`speak`（agent 经说话工具说的话：同样的话 60 秒内是同一条，有没看过的新话先给它看、不发，读完串立刻发顶层频道要确认）、`post`（以谁的名义写进一处：它的家、带上做出来的 Artifact 或图片、服务端里跑的 agent 一轮说的话、通话里说的、工单对它的帮工说的；说话的人读到自己这句）、`notice`（农场的通知，尽力而为、不会失败；`untilUserSpeaks` 的在一处只说一次，直到用户再在那里说话）。消息的 `run` 由调用方给（工具、Artifact 的 `Maker`），频道不问会话。
-- **频道只靠底座，同步路由与异步唤醒严格分层**：`modules/collab/channel`（`L2`）只用附件和 `Hub`，零 import `issue`、`session`、`orchestrator`。每次写入在同一个 SQLite 事务内完成 < 1 ms 的纯策略计算（`dispatch::plan_deliveries`）并落盘 `channel_delivery`（`pending`）与 `channel_event`；若触发 `hop_limit` 则紧跟原消息写出通知；提交后经单一 `tokio::sync::broadcast` 通道非阻塞广播封闭穷尽枚举 `ChannelEvent`（`Posted`、`Edited`、`Removed`、`Reacted`、`Pinned`、`UserRead`，经 `Chat::subscribe_events()` 订阅）并推送 `Chat::dispatches()` 即返回，绝不等待慢速 `Board::tell_message` 或 `runtime.open`。`Chat::embed_later` 等异步外呼经 `Hub::spawn_task` 纳入 `TaskTracker` + `CancellationToken` 并以有界并发扇出，不再使用裸线程或散落 `AtomicBool`。`Chat::remove` 在同一事务中清除该消息的 `channel_mention` 行并将对应 `pending` 投递标记为 `withdrawn`，提交后同步刷新 `InboxSlice` 的 `userMentions`（查询过滤已删消息与已删回复）并通过 `ChannelEvent::Removed` 触发 `SessionChat` 按 `source_message_id` 调用 `withdraw_mailbox_by_message` 统一撤回私聊、工单与助手的未领用信箱项；`Chat::preview_remove` 直接从 `channel_delivery` 统计待撤回条数。参与者的「家」（`channel_participant.home_id`，`Chat::home_of`）是空目标的去处，由工单与会话模块在开串、拉起私聊时给。删频道时查谁还指着它：频道只数自己的话题串，工单、帮工与连接器各自通过 `guard_removal` 登记理由。
+- **频道只靠底座，同步路由与异步唤醒严格分层**：`collab/channel`（`L2`）只用附件和 `Hub`，零 import `issue`、`session`、`orchestrator`。每次写入在同一个 SQLite 事务内完成 < 1 ms 的纯策略计算（`dispatch::plan_deliveries`）并落盘 `channel_delivery`（`pending`）与 `channel_event`；若触发 `hop_limit` 则紧跟原消息写出通知；提交后经单一 `tokio::sync::broadcast` 通道非阻塞广播封闭穷尽枚举 `ChannelEvent`（`Posted`、`Edited`、`Removed`、`Reacted`、`Pinned`、`UserRead`，经 `Chat::subscribe_events()` 订阅）并推送 `Chat::dispatches()` 即返回，绝不等待慢速 `Board::tell_message` 或 `runtime.open`。`Chat::embed_later` 等异步外呼经 `Hub::spawn_task` 纳入 `TaskTracker` + `CancellationToken` 并以有界并发扇出，不再使用裸线程或散落 `AtomicBool`。`Chat::remove` 在同一事务中清除该消息的 `channel_mention` 行并将对应 `pending` 投递标记为 `withdrawn`，提交后同步刷新 `InboxSlice` 的 `userMentions`（查询过滤已删消息与已删回复）并通过 `ChannelEvent::Removed` 触发 `SessionChat` 按 `source_message_id` 调用 `withdraw_mailbox_by_message` 统一撤回私聊、工单与助手的未领用信箱项；`Chat::preview_remove` 直接从 `channel_delivery` 统计待撤回条数。参与者的「家」（`channel_participant.home_id`，`Chat::home_of`）是空目标的去处，由工单与会话模块在开串、拉起私聊时给。删频道时查谁还指着它：频道只数自己的话题串，工单、帮工与连接器各自通过 `guard_removal` 登记理由。
 - **发送幂等键 `sendKey`**：用户发言带 `sendKey`（唯一索引 `(sender, send_key)`），重发返回原消息；帮工 60 秒内向同处发相同正文也自动去重。
 
 ### 受众计算与说话防撞
@@ -58,7 +58,7 @@
 
 用户发言可带 `to`（一个助手的档案 id）：只交给他，不交给成员，`to` 不是助手就拒绝；输入框的 `/imagegen` 用它把生图交给这里的助手（[媒体](docs/subsystems/media.md)）。
 
-「这里的助手」（`Chat::orchestrator_in`，`T.Channel.orchestrator`）由频道一处算（`crates/server/src/modules/collab/channel/store.rs`，按助手的席位认谁是助手）：私聊是对面（他是助手时），否则是频道成员里的默认助手或第一个助手，都没有就是默认助手；泛称的「@助手」、派活说明的署名、没指定人的工单和定时任务、没人收的机器事件都交给它。
+「这里的助手」（`Chat::orchestrator_in`，`T.Channel.orchestrator`）由频道一处算（`crates/server/src/channel/mod.rs`，按助手的席位认谁是助手）：私聊是对面（他是助手时），否则是频道成员里的默认助手或第一个助手，都没有就是默认助手；泛称的「@助手」、派活说明的署名、没指定人的工单和定时任务、没人收的机器事件都交给它。
 
 | 发言者与位置 | 唤醒目标 | 被动通知（仅知晓） |
 |---|---|---|
@@ -81,9 +81,9 @@
 
 1. `Chat::say` 在单写锁内将消息、提及、关注、`channel_event` 与 `dispatch::plan_deliveries` 算出的 `channel_delivery`（`pending`）在同一个事务里写入库，推进用户已读游标。
 2. 提交后施加 `messageChanged`、`channelChanged`、`userMentionsChanged` 事实，非阻塞广播 `ChannelEvent`（供 `channel.follow`、素材库、`SessionChat` 与连接器订阅）并推送 `Chat::dispatches()`（若触发 `hop_limit` 则紧跟写出通知）后立即返回。
-3. 各领域消费方（含 `L3` 的 [work/chat.rs](crates/server/src/modules/work/chat.rs)，直连 `Board`/`Sessions` 与 `Chat` 并以原生异步 `IssueChat::comment` 投递，不经中间 Port trait）按目标类型异步消费 `Chat::dispatches`（重启时先补读 SQLite 中的 `pending` 投递）：`work/issue` 按工单串行投递至 `Board::tell_message`、`work/session` 按目标档案异步拉起私聊 `Sessions::talk`、`team/orchestrator` 交由 `Orchestrator::hear`/`overhear`；消费完成后结算 `channel_delivery`、记 `mark_seen` 并贴 👀。
+3. 各领域消费方（含 `L3` 的 [issue/chat.rs](crates/server/src/issue/chat.rs)，直连 `Board`/`Sessions` 与 `Chat` 并以原生异步 `IssueChat::comment` 投递，不经中间 Port trait）按目标类型异步消费 `Chat::dispatches`（重启时先补读 SQLite 中的 `pending` 投递）：`work/issue` 按工单串行投递至 `Board::tell_message`、`work/session` 按目标档案异步拉起私聊 `Sessions::talk`、`team/orchestrator` 交由 `Orchestrator::hear`/`overhear`；消费完成后结算 `channel_delivery`、记 `mark_seen` 并贴 👀。
 
-派活开串、单轮汇报与 `issue.report` 补投归[工单](docs/subsystems/issue.md)（[work/chat.rs](crates/server/src/modules/work/chat.rs)），席位清理、删频道守卫与私聊帮工归[帮工](docs/subsystems/session.md)（`work/session/mod.rs`），频道只提供 `note`、`seat`、`leave`、`thread_about` 与 `channel_delivery` 原语。
+派活开串、单轮汇报与 `issue.report` 补投归[工单](docs/subsystems/issue.md)（[issue/chat.rs](crates/server/src/issue/chat.rs)），席位清理、删频道守卫与私聊帮工归[帮工](docs/subsystems/session.md)（`runtime/session/mod.rs`），频道只提供 `note`、`seat`、`leave`、`thread_about` 与 `channel_delivery` 原语。
 
 ## 和谁打交道
 

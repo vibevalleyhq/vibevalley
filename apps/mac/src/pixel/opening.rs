@@ -89,12 +89,6 @@ fn prune_dead_art_cache() {
     opening_art_cache().lock().retain(|_, weak| weak.strong_count() > 0);
 }
 
-/// Explicitly clears all cached opening splash art references.
-#[allow(dead_code)]
-pub fn evict_art_cache() {
-    opening_art_cache().lock().clear();
-}
-
 impl OpeningScene {
     /// Blocking on cold miss: decodes the pictures and shares them across active
     /// `OpeningScene` instances via a weak cache that evicts automatically once

@@ -1,7 +1,7 @@
 import { Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { ArtifactBody, ArtifactCard as Card, ArtifactDisplay, ArtifactListRequest, ArtifactType } from "@vibevalley/protocol";
+import { type ArtifactCard as Card, type ArtifactListRequest, type ArtifactType } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 
 import { Icon } from "../../design/Icon";
@@ -29,22 +29,34 @@ export const useArtifacts = (q: () => ArtifactListRequest) => useQuery(() => art
 /** Where an artifact is looked at; a version other than the latest is in the query string. */
 export const artifactHref = (id: string, version?: number) => `/artifacts/${id}${version != null && version !== 0 ? `?v=${version}` : ""}`;
 
-const displayLabel: Record<ArtifactDisplay, string> = {
-  page: t("web.artifact.body.html"),
-  slides: t("web.artifact.body.slides"),
-  motion: t("web.artifact.body.motion"),
-};
-
-const artifactTypeLabel: Record<ArtifactType, string> = {
-  docs: t("web.artifact.types.docs"),
-  outline: t("web.artifact.types.outline"),
-  slides: t("web.artifact.types.slides"),
-  dashboard: t("web.artifact.types.dashboard"),
-  motion: t("web.artifact.types.motion"),
-  whiteboard: t("web.artifact.types.whiteboard"),
-  design: t("web.artifact.types.design"),
-  "design-system": t("web.artifact.types.designSystem"),
-};
+export function artifactTypeLabel(type: ArtifactType): string {
+  switch (type) {
+    case "docs":
+      return t("web.artifact.types.docs");
+    case "outline":
+      return t("web.artifact.types.outline");
+    case "slides":
+      return t("web.artifact.types.slides");
+    case "dashboard":
+      return t("web.artifact.types.dashboard");
+    case "motion":
+      return t("web.artifact.types.motion");
+    case "whiteboard":
+      return t("web.artifact.types.whiteboard");
+    case "design":
+      return t("web.artifact.types.design");
+    case "design-system":
+      return t("web.artifact.types.designSystem");
+    case "sheet":
+      return "Sheet";
+    case "prototype":
+      return "Prototype";
+    case "diagram":
+      return "Diagram";
+    case "storyboard":
+      return "Storyboard";
+  }
+}
 
 export const artifactTypeIcon: Record<ArtifactType, IconName> = {
   docs: "artifacts",
@@ -55,55 +67,29 @@ export const artifactTypeIcon: Record<ArtifactType, IconName> = {
   whiteboard: "idea",
   design: "devices",
   "design-system": "appearance",
+  sheet: "log",
+  prototype: "web",
+  diagram: "branch",
+  storyboard: "image",
 };
 
-const artifactTypeSuffix: Record<ArtifactType, string> = {
-  docs: ".doc.md",
-  outline: ".outline.md",
-  slides: ".slide.html",
-  dashboard: ".dashboard.html",
-  motion: ".motion.html",
-  whiteboard: ".whiteboard",
-  design: ".design.html",
-  "design-system": ".tokens.json",
-};
+export const kindLabel = (a: { readonly artifactType: ArtifactType }): string => artifactTypeLabel(a.artifactType);
 
-/** What it is, as a card or a header says it: a structured type by its domain, or an html one by how it is shown. */
-export const kindLabel = (a: {
-  readonly body: ArtifactBody;
-  readonly display?: ArtifactDisplay | undefined;
-  readonly artifactType?: ArtifactType | undefined;
-}) => {
-  if (a.artifactType) return artifactTypeLabel[a.artifactType];
-  if (a.body === "blocks") return t("web.artifact.body.blocks");
-  if (a.body === "store") return t("web.artifact.body.store");
-  return displayLabel[a.display ?? "page"];
-};
+export const artifactIcon = (a: { readonly artifactType: ArtifactType }): IconName => artifactTypeIcon[a.artifactType];
 
-const bodyIcon: Record<ArtifactBody, IconName> = { blocks: "artifacts", html: "web", store: "catalog" };
+export const artifactSuffix = (a: { readonly artifactType: ArtifactType }): string => artifactSuffixOf(a);
 
-export const artifactIcon = (a: { readonly body: ArtifactBody; readonly artifactType?: ArtifactType | undefined }): IconName =>
-  a.artifactType ? artifactTypeIcon[a.artifactType] : bodyIcon[a.body];
-
-export const artifactSuffix = (a: {
-  readonly body: ArtifactBody;
-  readonly display?: ArtifactDisplay | undefined;
-  readonly artifactType?: ArtifactType | undefined;
-}): string => (a.artifactType ? artifactTypeSuffix[a.artifactType] : artifactSuffixOf(a));
-
-/** The card's second line: what it is, its version (html), its note. */
+/** The card's second line: what it is, its snapshot version if any, and its note. */
 const cardLine = (card: Card) =>
-  [kindLabel(card), ...(card.body === "html" ? [t("web.artifact.card.version", { version: card.version })] : []), ...(card.note ? [card.note] : [])].join(
-    " · ",
-  );
+  [kindLabel(card), ...(card.version > 0 ? [t("web.artifact.card.version", { version: card.version })] : []), ...(card.note ? [card.note] : [])].join(" · ");
 
-/** The card a message announces an artifact with: the whole card opens that version. */
+/** The card a message announces an artifact with: the whole card opens that artifact or version. */
 export function ArtifactCard(props: { card: Card }) {
   const router = useRouter();
   // In a chat the card opens the artifact beside the talk; anywhere else it goes to the artifact's page.
   const href = () => {
     const [path = ""] = router.path().split("?");
-    if (!path.startsWith("/chat")) return artifactHref(props.card.id, props.card.body === "html" ? props.card.version : undefined);
+    if (!path.startsWith("/chat")) return artifactHref(props.card.id, props.card.version > 0 ? props.card.version : undefined);
     const params = new URLSearchParams(router.path().split("?")[1] ?? "");
     params.set("artifact", props.card.id);
     return `${path}?${params.toString()}`;

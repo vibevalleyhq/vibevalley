@@ -10,6 +10,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::BoxFuture;
 use crate::agent::ai::types::ToolCall;
 use crate::agent::core::doc::{OarSessionDoc, OarSessionState, TASK_SCOPE, UsageTotals, read_doc, read_doc_opt, write_doc};
 use crate::agent::core::engine::{Engine, git_status_summary};
@@ -69,14 +70,15 @@ struct OarInner {
 }
 
 impl OarInner {
-    fn prune_terminal_active(&self) {
+    async fn prune_terminal_active(&self) {
         let entries: Vec<(String, Store)> = self.active.lock().unwrap().iter().map(|(id, rec)| (id.clone(), rec.store.clone())).collect();
         if entries.is_empty() {
             return;
         }
         let mut stale_ids = Vec::new();
         for (id, store) in entries {
-            let is_terminal = match store.read(|tx| tx.task(&id)) {
+            let id_read = id.clone();
+            let is_terminal = match store.read_async(move |tx| Box::pin(async move { tx.task_async(&id_read).await })).await {
                 Ok(task) => task.status == TaskStatus::Terminal,
                 Err(Error::Closed | Error::Missing(_)) => true,
                 Err(_) => false,
@@ -98,8 +100,8 @@ impl OarInner {
             }
         }
         for entry in removed {
-            let _ = entry.session.abort();
-            entry.session.dispose();
+            let _ = entry.session.abort().await;
+            entry.session.dispose().await;
         }
     }
 }
@@ -128,8 +130,8 @@ impl OarExtension {
         &self.inner.registry
     }
 
-    pub fn active_sessions(&self) -> Vec<ActiveOarSession> {
-        self.inner.prune_terminal_active();
+    pub async fn active_sessions(&self) -> Vec<ActiveOarSession> {
+        self.inner.prune_terminal_active().await;
         self.inner.active.lock().unwrap().values().map(|r| r.entry.clone()).collect()
     }
 }
@@ -184,40 +186,42 @@ impl TypedTool for OarList {
         ReplayPolicy::Safe
     }
 
-    fn execute(&self, _args: Self::Args, _ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        let runtimes: Vec<OarRuntimeSummary> = self
-            .inner
-            .registry
-            .list()
-            .iter()
-            .filter(|rt| runtime_allowed(&self.inner.policy, rt.id()))
-            .map(|rt| OarRuntimeSummary {
-                id: rt.id().to_owned(),
-                display_name: rt.display_name().to_owned(),
-                installation: rt.installation(),
-                capabilities: rt.capabilities(),
-            })
-            .collect();
-        self.inner.prune_terminal_active();
-        let active_sessions: Vec<OarActiveSummary> = self
-            .inner
-            .active
-            .lock()
-            .unwrap()
-            .values()
-            .map(|r| &r.entry)
-            .map(|s| OarActiveSummary {
-                task_id: s.task_id.clone(),
-                conversation_id: s.conversation_id.clone(),
-                runtime_id: s.runtime_id.clone(),
-                vendor_session_id: s.vendor_session_id.clone(),
-                cwd: s.cwd.to_string_lossy().into_owned(),
-                permission_mode: permission_mode_str(s.permission_mode).into(),
-            })
-            .collect();
-        let details = OarListDetails { runtimes, active_sessions };
-        let text = serde_json::to_string(&details).map_err(|e| e.to_string())?;
-        Ok(TypedToolOutput::ok_with(text, details))
+    fn execute<'a>(&'a self, _args: Self::Args, _ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            let mut runtimes = Vec::new();
+            for rt in self.inner.registry.list() {
+                if !runtime_allowed(&self.inner.policy, rt.id()) {
+                    continue;
+                }
+                let installation = rt.installation().await;
+                runtimes.push(OarRuntimeSummary {
+                    id: rt.id().to_owned(),
+                    display_name: rt.display_name().to_owned(),
+                    installation,
+                    capabilities: rt.capabilities(),
+                });
+            }
+            self.inner.prune_terminal_active().await;
+            let active_sessions: Vec<OarActiveSummary> = self
+                .inner
+                .active
+                .lock()
+                .unwrap()
+                .values()
+                .map(|r| &r.entry)
+                .map(|s| OarActiveSummary {
+                    task_id: s.task_id.clone(),
+                    conversation_id: s.conversation_id.clone(),
+                    runtime_id: s.runtime_id.clone(),
+                    vendor_session_id: s.vendor_session_id.clone(),
+                    cwd: s.cwd.to_string_lossy().into_owned(),
+                    permission_mode: permission_mode_str(s.permission_mode).into(),
+                })
+                .collect();
+            let details = OarListDetails { runtimes, active_sessions };
+            let text = serde_json::to_string(&details).map_err(|e| e.to_string())?;
+            Ok(TypedToolOutput::ok_with(text, details))
+        })
     }
 }
 
@@ -263,8 +267,8 @@ impl TypedTool for OarRun {
         ReplayPolicy::Unsafe
     }
 
-    fn execute(&self, _args: Self::Args, _ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        Err("oar_run requires the durable engine dispatcher".into())
+    fn execute<'a>(&'a self, _args: Self::Args, _ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(std::future::ready(Err("oar_run requires the durable engine dispatcher".into())))
     }
 }
 
@@ -301,18 +305,21 @@ impl TypedTool for OarSteer {
         ReplayPolicy::Unsafe
     }
 
-    fn execute(&self, args: Self::Args, _ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        let active = find_active_session(&self.inner.active, &args.target).ok_or_else(|| format!("no active OAR session matching `{}`", args.target))?;
-        active
-            .session
-            .steer(vec![ContentBlock::Text(args.message)])
-            .map_err(|e| format!("failed to steer OAR session: {e}"))?;
-        let details = OarSteerDetails {
-            task_id: active.task_id,
-            vendor_session_id: active.vendor_session_id,
-        };
-        let text = serde_json::to_string(&details).map_err(|e| e.to_string())?;
-        Ok(TypedToolOutput::ok_with(text, details))
+    fn execute<'a>(&'a self, args: Self::Args, _ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            let active = find_active_session(&self.inner.active, &args.target).ok_or_else(|| format!("no active OAR session matching `{}`", args.target))?;
+            active
+                .session
+                .steer(vec![ContentBlock::Text(args.message)])
+                .await
+                .map_err(|e| format!("failed to steer OAR session: {e}"))?;
+            let details = OarSteerDetails {
+                task_id: active.task_id,
+                vendor_session_id: active.vendor_session_id,
+            };
+            let text = serde_json::to_string(&details).map_err(|e| e.to_string())?;
+            Ok(TypedToolOutput::ok_with(text, details))
+        })
     }
 }
 
@@ -349,20 +356,22 @@ impl TypedTool for OarStop {
         ReplayPolicy::Unsafe
     }
 
-    fn execute(&self, args: Self::Args, ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        let removed = remove_active_session(&self.inner.active, &args.target).ok_or_else(|| format!("no active OAR session matching `{}`", args.target))?;
-        let _ = removed.session.abort();
-        removed.session.dispose();
-        if let Some(scheduler) = &ctx.scheduler {
-            let _ = scheduler.abort(&removed.task_id);
-        }
-        let details = OarStopDetails {
-            task_id: removed.task_id,
-            vendor_session_id: removed.vendor_session_id,
-            stopped: true,
-        };
-        let text = serde_json::to_string(&details).map_err(|e| e.to_string())?;
-        Ok(TypedToolOutput::ok_with(text, details))
+    fn execute<'a>(&'a self, args: Self::Args, ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            let removed = remove_active_session(&self.inner.active, &args.target).ok_or_else(|| format!("no active OAR session matching `{}`", args.target))?;
+            let _ = removed.session.abort().await;
+            removed.session.dispose().await;
+            if let Some(scheduler) = &ctx.scheduler {
+                let _ = scheduler.abort(&removed.task_id).await;
+            }
+            let details = OarStopDetails {
+                task_id: removed.task_id,
+                vendor_session_id: removed.vendor_session_id,
+                stopped: true,
+            };
+            let text = serde_json::to_string(&details).map_err(|e| e.to_string())?;
+            Ok(TypedToolOutput::ok_with(text, details))
+        })
     }
 }
 
@@ -405,11 +414,19 @@ impl Extension for OarExtension {
     fn register_phases(&self, scheduler: &Scheduler, engine: &Engine) {
         let open_ext = self.clone();
         let open_engine = engine.clone();
-        scheduler.register(OAR_TASK_KIND, OAR_PHASE_OPEN, move |tc| open_ext.phase_open(tc, &open_engine));
+        scheduler.register(OAR_TASK_KIND, OAR_PHASE_OPEN, move |tc| {
+            let open_ext = open_ext.clone();
+            let open_engine = open_engine.clone();
+            async move { open_ext.phase_open(&tc, &open_engine).await }
+        });
 
         let run_ext = self.clone();
         let run_engine = engine.clone();
-        scheduler.register(OAR_TASK_KIND, OAR_PHASE_RUN, move |tc| run_ext.phase_run(tc, &run_engine));
+        scheduler.register(OAR_TASK_KIND, OAR_PHASE_RUN, move |tc| {
+            let run_ext = run_ext.clone();
+            let run_engine = run_engine.clone();
+            async move { run_ext.phase_run(&tc, &run_engine).await }
+        });
     }
 
     fn on_task_aborted(&self, task_ids: &[String]) {
@@ -422,30 +439,50 @@ impl Extension for OarExtension {
                 }
             }
         }
-        for entry in removed {
-            let _ = entry.session.abort();
-            entry.session.dispose();
+        if removed.is_empty() {
+            return;
         }
+        for entry in &removed {
+            entry.session.signal_dispose();
+        }
+        crate::rt::current_or_global_handle().spawn(async move {
+            for entry in removed {
+                let _ = entry.session.abort().await;
+                entry.session.dispose().await;
+            }
+        });
     }
 
-    fn dispatch_tool(&self, call: &ToolCall, tc: &TaskContext, engine: &Engine) -> Option<durable::Result<Transition>> {
-        if call.name != "oar_run" {
-            return None;
-        }
-        Some(self.dispatch_oar_run(call, tc, engine))
+    fn dispatch_tool<'a>(&'a self, call: &'a ToolCall, tc: &'a TaskContext, engine: &'a Engine) -> BoxFuture<'a, Option<durable::Result<Transition>>> {
+        Box::pin(async move {
+            if call.name != "oar_run" {
+                return None;
+            }
+            Some(self.dispatch_oar_run(call, tc, engine).await)
+        })
     }
 }
 
 impl OarExtension {
-    fn dispatch_oar_run(&self, call: &ToolCall, tc: &TaskContext, engine: &Engine) -> durable::Result<Transition> {
+    async fn dispatch_oar_run(&self, call: &ToolCall, tc: &TaskContext, engine: &Engine) -> durable::Result<Transition> {
         if let Some(res) = engine.check_dispatched_memo(tc) {
             return res;
         }
 
         let dedup = format!("oar:{}", tc.task.id);
+        let tid = tc.task.id.clone();
+        let dedup_read = dedup.clone();
         let existing_child = engine
             .store()
-            .read(|r| Ok(r.children(&tc.task.id)?.into_iter().find(|c| c.dedup_key == dedup && c.kind == OAR_TASK_KIND)))?;
+            .read_async(move |r| {
+                Box::pin(async move {
+                    Ok(r.children_async(&tid)
+                        .await?
+                        .into_iter()
+                        .find(|c| c.dedup_key == dedup_read && c.kind == OAR_TASK_KIND))
+                })
+            })
+            .await?;
 
         if let Some(child) = existing_child {
             if child.status != TaskStatus::Terminal {
@@ -458,32 +495,34 @@ impl OarExtension {
             }
             if child.terminal_reason == "completed" {
                 let text = serde_json::to_string(&child.result)?;
-                return engine.complete_dispatched_tool(tc, call, text, false);
+                return engine.complete_dispatched_tool(tc, call, text, false).await;
             }
             let err = if child.error_text.is_empty() {
                 format!("oar_run failed ({})", child.terminal_reason)
             } else {
                 child.error_text
             };
-            return engine.complete_dispatched_tool(tc, call, err, true);
+            return engine.complete_dispatched_tool(tc, call, err, true).await;
         }
 
         let args: OarRunArgs = match serde_json::from_str(&call.arguments) {
             Ok(args) => args,
             Err(err) => {
-                return engine.complete_dispatched_tool(tc, call, format!("invalid arguments for `oar_run`: {err}"), true);
+                return engine
+                    .complete_dispatched_tool(tc, call, format!("invalid arguments for `oar_run`: {err}"), true)
+                    .await;
             }
         };
 
-        let cp = match self.validate_and_build_checkpoint(&args, call, tc, engine) {
+        let cp = match self.validate_and_build_checkpoint(&args, call, tc, engine).await {
             Ok(cp) => cp,
-            Err(err) => return engine.complete_dispatched_tool(tc, call, err, true),
+            Err(err) => return engine.complete_dispatched_tool(tc, call, err, true).await,
         };
 
         let mut child = Task::new(OAR_TASK_KIND, OAR_PHASE_OPEN);
         child.dedup_key = dedup;
         child.checkpoint = json!(cp);
-        let (spawned, _) = tc.spawn_child(child)?;
+        let (spawned, _) = tc.spawn_child(child).await?;
 
         Ok(Transition::Wait {
             phase: tc.task.phase_name.clone(),
@@ -493,7 +532,7 @@ impl OarExtension {
         })
     }
 
-    fn validate_and_build_checkpoint(
+    async fn validate_and_build_checkpoint(
         &self,
         args: &OarRunArgs,
         call: &ToolCall,
@@ -532,12 +571,12 @@ impl OarExtension {
             }
         }
 
-        let depth = compute_oar_depth(engine.store(), &tc.task.id).map_err(|e| e.to_string())?;
+        let depth = compute_oar_depth(engine.store(), &tc.task.id).await.map_err(|e| e.to_string())?;
         if depth >= self.inner.policy.max_depth {
             return Err(format!("OAR recursion depth {depth} reached max_depth {}", self.inner.policy.max_depth));
         }
 
-        self.inner.prune_terminal_active();
+        self.inner.prune_terminal_active().await;
         {
             let active = self.inner.active.lock().unwrap();
             if active.len() >= self.inner.policy.max_concurrent {
@@ -569,9 +608,13 @@ impl OarExtension {
         })
     }
 
-    fn phase_open(&self, tc: &TaskContext, engine: &Engine) -> durable::Result<Transition> {
+    async fn phase_open(&self, tc: &TaskContext, engine: &Engine) -> durable::Result<Transition> {
         let cp: OarRunCheckpoint = serde_json::from_value(tc.task.checkpoint.clone())?;
-        if let Some(existing) = engine.store().read(|tx| read_doc_opt::<OarSessionDoc>(tx, TASK_SCOPE, &tc.task.id))?
+        let tid = tc.task.id.clone();
+        if let Some(existing) = engine
+            .store()
+            .read_async(move |tx| Box::pin(async move { read_doc_opt::<OarSessionDoc>(tx, TASK_SCOPE, &tid).await }))
+            .await?
             && !existing.vendor_session_id.is_empty()
         {
             return Ok(Transition::Next {
@@ -580,7 +623,7 @@ impl OarExtension {
             });
         }
 
-        self.inner.prune_terminal_active();
+        self.inner.prune_terminal_active().await;
         {
             let active = self.inner.active.lock().unwrap();
             if active.len() >= self.inner.policy.max_concurrent {
@@ -604,11 +647,11 @@ impl OarExtension {
 
         let runtime = self.inner.registry.require(&cp.runtime).map_err(|e| Error::Invalid(e.to_string()))?;
         let opts = session_options(&cp, cp.resume.clone());
-        let session = runtime.open(opts).map_err(|e| Error::Invalid(e.to_string()))?;
+        let session = runtime.open(opts).await.map_err(|e| Error::Invalid(e.to_string()))?;
 
         if tc.is_cancelled() {
-            let _ = session.abort();
-            session.dispose();
+            let _ = session.abort().await;
+            session.dispose().await;
             return Ok(Transition::Fail("aborted".into()));
         }
 
@@ -620,14 +663,20 @@ impl OarExtension {
             permission_mode: permission_mode_str(cp.permission_mode).into(),
             status: "opened".into(),
         };
-        engine.store().write(|tx| {
-            write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tc.task.id, &state)?;
-            Ok(())
-        })?;
+        let tid = tc.task.id.clone();
+        engine
+            .store()
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tid, &state).await?;
+                    Ok(())
+                })
+            })
+            .await?;
 
         if tc.is_cancelled() {
-            let _ = session.abort();
-            session.dispose();
+            let _ = session.abort().await;
+            session.dispose().await;
             return Ok(Transition::Fail("aborted".into()));
         }
 
@@ -677,14 +726,18 @@ impl OarExtension {
         })
     }
 
-    fn phase_run(&self, tc: &TaskContext, engine: &Engine) -> durable::Result<Transition> {
+    async fn phase_run(&self, tc: &TaskContext, engine: &Engine) -> durable::Result<Transition> {
         if let Some(saved) = tc.task.memo.get("turnResult") {
             self.inner.active.lock().unwrap().remove(&tc.task.id);
             return Ok(Transition::Complete(saved.clone()));
         }
 
         let cp: OarRunCheckpoint = serde_json::from_value(tc.task.checkpoint.clone())?;
-        let mut doc = engine.store().read(|tx| read_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tc.task.id))?;
+        let tid = tc.task.id.clone();
+        let mut doc = engine
+            .store()
+            .read_async(move |tx| Box::pin(async move { read_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tid).await }))
+            .await?;
         if doc.runtime_id.is_empty() {
             doc.runtime_id = cp.runtime.clone();
             doc.cwd = cp.cwd.clone();
@@ -693,15 +746,23 @@ impl OarExtension {
         let child_conv_label = format!("oar:{}", doc.vendor_session_id);
 
         if tc.task.memo.get("turnStarted").and_then(Value::as_bool) == Some(true) {
-            if let Some(removed) = self.inner.active.lock().unwrap().remove(&tc.task.id) {
-                removed.entry.session.dispose();
+            let removed = self.inner.active.lock().unwrap().remove(&tc.task.id);
+            if let Some(removed) = removed {
+                removed.entry.session.dispose().await;
             }
-            let git_status = git_status_summary(Some(Path::new(&doc.cwd)));
+            let git_status = git_status_summary(Some(Path::new(&doc.cwd))).await;
             doc.status = "interrupted".into();
-            engine.store().write(|tx| {
-                write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tc.task.id, &doc)?;
-                Ok(())
-            })?;
+            let tid = tc.task.id.clone();
+            let doc_write = doc.clone();
+            engine
+                .store()
+                .write_async(move |tx| {
+                    Box::pin(async move {
+                        write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tid, &doc_write).await?;
+                        Ok(())
+                    })
+                })
+                .await?;
             engine.emit(
                 &cp.parent_conv_id,
                 &cp.parent_tool_task_id,
@@ -719,7 +780,8 @@ impl OarExtension {
                 "cwd": doc.cwd,
                 "gitStatus": git_status,
             });
-            tc.memo("turnResult", || Ok(result.clone()))?;
+            let result_memo = result.clone();
+            tc.memo("turnResult", || async move { Ok(result_memo) }).await?;
             return Ok(Transition::Complete(result));
         }
 
@@ -738,14 +800,21 @@ impl OarExtension {
                 } else {
                     cp.resume.clone()
                 };
-                let reopened = runtime.open(session_options(&cp, resume)).map_err(|e| Error::Invalid(e.to_string()))?;
+                let reopened = runtime.open(session_options(&cp, resume)).await.map_err(|e| Error::Invalid(e.to_string()))?;
                 let new_vid = resolve_session_id(&reopened);
                 if !new_vid.is_empty() && doc.vendor_session_id != new_vid {
                     doc.vendor_session_id = new_vid.clone();
-                    engine.store().write(|tx| {
-                        write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tc.task.id, &doc)?;
-                        Ok(())
-                    })?;
+                    let tid = tc.task.id.clone();
+                    let doc_write = doc.clone();
+                    engine
+                        .store()
+                        .write_async(move |tx| {
+                            Box::pin(async move {
+                                write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tid, &doc_write).await?;
+                                Ok(())
+                            })
+                        })
+                        .await?;
                 }
                 self.inner.active.lock().unwrap().insert(
                     tc.task.id.clone(),
@@ -772,36 +841,50 @@ impl OarExtension {
             task_id: tc.task.id.clone(),
         };
 
-        let events = session.events();
-        tc.memo("turnStarted", || Ok(json!(true)))?;
-        if let Err(err) = session.prompt(vec![ContentBlock::Text(cp.prompt.clone())]) {
-            session.dispose();
+        let mut events = session.events();
+        tc.memo("turnStarted", || async { Ok(json!(true)) }).await?;
+        if let Err(err) = session.prompt(vec![ContentBlock::Text(cp.prompt.clone())]).await {
+            session.dispose().await;
             doc.status = "errored".into();
-            let _ = engine.store().write(|tx| {
-                write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tc.task.id, &doc)?;
-                Ok(())
-            });
+            let tid = tc.task.id.clone();
+            let doc_write = doc.clone();
+            let _ = engine
+                .store()
+                .write_async(move |tx| {
+                    Box::pin(async move {
+                        write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tid, &doc_write).await?;
+                        Ok(())
+                    })
+                })
+                .await;
             return Err(Error::Invalid(format!("OAR prompt failed: {err}")));
         }
 
-        let cancel_rx = tc.cancellation();
+        let cancel_token = tc.cancel_token();
         let mut output = String::new();
         let mut last_error: Option<String> = None;
 
         enum LoopItem {
-            Event(Result<crate::oar::Event, flume::RecvError>),
+            Event(Option<crate::oar::Event>),
             Cancelled,
         }
 
         loop {
             if tc.is_cancelled() {
-                let _ = session.abort();
-                session.dispose();
+                let _ = session.abort().await;
+                session.dispose().await;
                 doc.status = "aborted".into();
-                let _ = engine.store().write(|tx| {
-                    write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tc.task.id, &doc)?;
-                    Ok(())
-                });
+                let tid = tc.task.id.clone();
+                let doc_write = doc.clone();
+                let _ = engine
+                    .store()
+                    .write_async(move |tx| {
+                        Box::pin(async move {
+                            write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tid, &doc_write).await?;
+                            Ok(())
+                        })
+                    })
+                    .await;
                 engine.emit(
                     &cp.parent_conv_id,
                     &cp.parent_tool_task_id,
@@ -815,24 +898,32 @@ impl OarExtension {
                 return Ok(Transition::Fail("aborted".into()));
             }
 
-            let next = flume::Selector::new()
-                .recv(&events, LoopItem::Event)
-                .recv(&cancel_rx, |_| LoopItem::Cancelled)
-                .wait();
+            let next = tokio::select! {
+                biased;
+                _ = cancel_token.cancelled() => LoopItem::Cancelled,
+                ev = events.recv() => LoopItem::Event(ev),
+            };
 
             match next {
                 LoopItem::Cancelled => continue,
-                LoopItem::Event(Err(_)) => {
-                    session.dispose();
+                LoopItem::Event(None) => {
+                    session.dispose().await;
                     let err_msg = last_error.unwrap_or_else(|| "OAR event stream closed unexpectedly".into());
                     doc.status = "errored".into();
-                    let _ = engine.store().write(|tx| {
-                        write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tc.task.id, &doc)?;
-                        Ok(())
-                    });
+                    let tid = tc.task.id.clone();
+                    let doc_write = doc.clone();
+                    let _ = engine
+                        .store()
+                        .write_async(move |tx| {
+                            Box::pin(async move {
+                                write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tid, &doc_write).await?;
+                                Ok(())
+                            })
+                        })
+                        .await;
                     return Err(Error::Invalid(err_msg));
                 }
-                LoopItem::Event(Ok(ev)) => match ev.kind {
+                LoopItem::Event(Some(ev)) => match ev.kind {
                     EventKind::TextDelta { text } => {
                         output.push_str(&text);
                         engine.emit(
@@ -859,13 +950,13 @@ impl OarExtension {
                     }
                     EventKind::PermissionRequested { request_id, tool, input, .. } => {
                         let decision = decide_headless_permission(cp.permission_mode, &tool, &input);
-                        let _ = session.respond_permission(&request_id, decision);
+                        let _ = session.respond_permission(&request_id, decision).await;
                     }
                     EventKind::Error { message } => {
                         last_error = Some(message);
                     }
                     EventKind::TurnFinished { reason, usage } => {
-                        session.dispose();
+                        session.dispose().await;
                         let status = match reason {
                             StopReason::Completed => "completed",
                             StopReason::Aborted => "aborted",
@@ -878,11 +969,18 @@ impl OarExtension {
                             cost_micros: usage.cost_usd.map(|c| (c * 1_000_000.0).round() as i64),
                             ..Default::default()
                         };
-                        engine.store().write(|tx| {
-                            totals.record_task(tx, &tc.task.id)?;
-                            write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tc.task.id, &doc)?;
-                            Ok(())
-                        })?;
+                        let tid = tc.task.id.clone();
+                        let doc_write = doc.clone();
+                        engine
+                            .store()
+                            .write_async(move |tx| {
+                                Box::pin(async move {
+                                    totals.record_task(tx, &tid).await?;
+                                    write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tid, &doc_write).await?;
+                                    Ok(())
+                                })
+                            })
+                            .await?;
 
                         let result = json!({
                             "interrupted": false,
@@ -893,7 +991,8 @@ impl OarExtension {
                             "usage": usage,
                             "error": last_error,
                         });
-                        tc.memo("turnResult", || Ok(result.clone()))?;
+                        let result_memo = result.clone();
+                        tc.memo("turnResult", || async move { Ok(result_memo) }).await?;
                         engine.emit(
                             &cp.parent_conv_id,
                             &cp.parent_tool_task_id,
@@ -907,12 +1006,19 @@ impl OarExtension {
                         return Ok(Transition::Complete(result));
                     }
                     EventKind::SessionEnded => {
-                        session.dispose();
+                        session.dispose().await;
                         doc.status = "errored".into();
-                        let _ = engine.store().write(|tx| {
-                            write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tc.task.id, &doc)?;
-                            Ok(())
-                        });
+                        let tid = tc.task.id.clone();
+                        let doc_write = doc.clone();
+                        let _ = engine
+                            .store()
+                            .write_async(move |tx| {
+                                Box::pin(async move {
+                                    write_doc::<OarSessionDoc>(tx, TASK_SCOPE, &tid, &doc_write).await?;
+                                    Ok(())
+                                })
+                            })
+                            .await;
                         let err_msg = last_error.unwrap_or_else(|| "OAR session ended before TurnFinished".into());
                         return Err(Error::Invalid(err_msg));
                     }
@@ -969,7 +1075,7 @@ fn resolve_session_id(session: &Arc<dyn Session>) -> String {
     if !direct.is_empty() {
         return direct;
     }
-    let history = session.events_with_history();
+    let mut history = session.events_with_history();
     while let Ok(ev) = history.try_recv() {
         if let EventKind::SessionStarted { session_id, .. } = ev.kind {
             return session_id;
@@ -1041,48 +1147,53 @@ fn decide_headless_permission(mode: PermissionMode, tool: &str, input: &Value) -
     }
 }
 
-fn compute_oar_depth(store: &crate::agent::durable::Store, start_task_id: &str) -> durable::Result<u32> {
+async fn compute_oar_depth(store: &crate::agent::durable::Store, start_task_id: &str) -> durable::Result<u32> {
     let env_depth = std::env::var(OAR_DEPTH_ENV).ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
-    let sql_depth = store.read(|tx| {
-        let mut depth = 0_u32;
-        let mut seen = HashSet::new();
-        let mut cur = start_task_id.to_owned();
-        for _ in 0..32 {
-            if cur.is_empty() || !seen.insert(cur.clone()) {
-                break;
-            }
-            let Ok(task) = tx.task(&cur) else {
-                break;
-            };
-            if task.kind == OAR_TASK_KIND {
-                depth = depth.saturating_add(1);
-            }
-            if !task.owner_task_id.is_empty() {
-                cur = task.owner_task_id;
-                continue;
-            }
-            if let Ok(conv) = tx.conversation(&task.conversation_id)
-                && !conv.owner_task_id.is_empty()
-            {
-                cur = conv.owner_task_id;
-                continue;
-            }
-            break;
-        }
-        Ok(depth)
-    })?;
+    let start = start_task_id.to_owned();
+    let sql_depth = store
+        .read_async(move |tx| {
+            Box::pin(async move {
+                let mut depth = 0_u32;
+                let mut seen = HashSet::new();
+                let mut cur = start;
+                for _ in 0..32 {
+                    if cur.is_empty() || !seen.insert(cur.clone()) {
+                        break;
+                    }
+                    let Ok(task) = tx.task_async(&cur).await else {
+                        break;
+                    };
+                    if task.kind == OAR_TASK_KIND {
+                        depth = depth.saturating_add(1);
+                    }
+                    if !task.owner_task_id.is_empty() {
+                        cur = task.owner_task_id;
+                        continue;
+                    }
+                    if let Ok(conv) = tx.conversation_async(&task.conversation_id).await
+                        && !conv.owner_task_id.is_empty()
+                    {
+                        cur = conv.owner_task_id;
+                        continue;
+                    }
+                    break;
+                }
+                Ok(depth)
+            })
+        })
+        .await?;
     Ok(env_depth.max(sql_depth))
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::VecDeque;
-    use std::process::Command;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
 
     use crate::oar::scripted::{Script, ScriptedRuntime, Step, TurnAsk};
     use tempfile::TempDir;
+    use tokio::process::Command;
 
     use super::*;
     use crate::agent::Result as AiResult;
@@ -1107,17 +1218,17 @@ mod tests {
     }
 
     impl ModelClient for QueueClient {
-        fn complete(&self, _req: &ChatRequest, on: &mut dyn FnMut(Delta)) -> AiResult<Completion> {
+        fn complete<'a>(&'a self, _req: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> BoxFuture<'a, AiResult<Completion>> {
             let reply = self.replies.lock().unwrap().pop_front().expect("unexpected model call");
             if let Some(t) = &reply.message.content {
                 on(Delta::Text(t.clone()));
             }
-            Ok(reply)
+            Box::pin(std::future::ready(Ok(reply)))
         }
     }
 
-    #[test]
-    fn oar_list_filters_allowed_runtimes() {
+    #[tokio::test]
+    async fn oar_list_filters_allowed_runtimes() {
         let mut reg = Registry::new();
         reg.register(Arc::new(ScriptedRuntime::new("alpha", Script::echo())));
         reg.register(Arc::new(ScriptedRuntime::new("beta", Script::echo())));
@@ -1130,15 +1241,15 @@ mod tests {
         );
         let tools = ext.tools();
         let list_tool = tools.iter().find(|t| t.spec().name == "oar_list").unwrap();
-        let out = list_tool.execute(&json!({}));
+        let out = list_tool.execute(&json!({})).await;
         assert!(!out.is_error);
         let parsed: Value = serde_json::from_str(&out.text).unwrap();
         let ids: Vec<_> = parsed["runtimes"].as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap()).collect();
         assert_eq!(ids, vec!["beta"]);
     }
 
-    #[test]
-    fn oar_run_handles_plan_vs_bypass_and_records_tree_spend() -> durable::Result<()> {
+    #[tokio::test]
+    async fn oar_run_handles_plan_vs_bypass_and_records_tree_spend() -> durable::Result<()> {
         let dir = TempDir::new().unwrap();
         let mut reg = Registry::new();
         reg.register(Arc::new(ScriptedRuntime::demo()));
@@ -1152,7 +1263,7 @@ mod tests {
                 ..Default::default()
             },
         )));
-        harness.recover()?;
+        harness.recover().await?;
 
         let client = Arc::new(QueueClient::new(vec![
             Completion {
@@ -1204,23 +1315,27 @@ mod tests {
             },
         ]));
         let conv = worker_conversation("oar-1");
-        harness.attach_worker(&conv, Arc::new(Brain::new(client, "deepseek-chat", "sys")), Arc::new(|_| {}))?;
-        let (_, task, _) = harness.submit(Request {
-            conversation: &conv,
-            provider: "mock",
-            request_id: "r1",
-            prompt: "delegate",
-            source: "user",
-            system: "sys",
-            ..Default::default()
-        })?;
-        let done = harness.scheduler().wait(&task.id, Duration::from_secs(5))?;
+        harness
+            .attach_worker(&conv, Arc::new(Brain::new(client, "deepseek-chat", "sys")), Arc::new(|_| {}))
+            .await?;
+        let (_, task, _) = harness
+            .submit(Request {
+                conversation: &conv,
+                provider: "mock",
+                request_id: "r1",
+                prompt: "delegate",
+                source: "user",
+                system: "sys",
+                ..Default::default()
+            })
+            .await?;
+        let done = harness.scheduler().wait(&task.id, Duration::from_secs(5)).await?;
         assert_eq!(done.terminal_reason, "completed");
         assert_eq!(done.result["output"], "reviewed");
 
         // Call 1 (Plan) denies Write -> "I did not write the file.";
         // Call 2 (Bypass) allows Write -> "Done." and emits cost_usd = 0.0042 (4200 micros).
-        let entries = harness.entries(&conv)?;
+        let entries = harness.entries(&conv).await?;
         let tool_results: Vec<_> = entries.iter().filter(|e| e.kind == "pi.tool_result").collect();
         assert_eq!(tool_results.len(), 2);
         let out_plan: Value = serde_json::from_str(tool_results[0].payload["output"].as_str().unwrap()).unwrap();
@@ -1231,15 +1346,17 @@ mod tests {
         assert_eq!(out_bypass["interrupted"], false);
         assert!(out_bypass["output"].as_str().unwrap().contains("Done."));
 
-        let spent = store.read(|tx| tree_spend(tx, &conv))?;
+        let conv_read = conv.clone();
+        let spent = store.read_async(move |tx| Box::pin(async move { tree_spend(tx, &conv_read).await })).await?;
         assert_eq!(spent, 4200, "expected child OAR cost (4200 micros) in parent tree_spend, got {spent}");
+        harness.close().await;
         Ok(())
     }
 
-    #[test]
-    fn oar_run_crash_after_turn_started_returns_interrupted_without_reprompting() -> durable::Result<()> {
+    #[tokio::test]
+    async fn oar_run_crash_after_turn_started_returns_interrupted_without_reprompting() -> durable::Result<()> {
         let dir = TempDir::new().unwrap();
-        Command::new("git").args(["init", "-q"]).current_dir(dir.path()).status().unwrap();
+        Command::new("git").args(["init", "-q"]).current_dir(dir.path()).status().await.unwrap();
         std::fs::write(dir.path().join("dirty_oar.txt"), "wip\n").unwrap();
 
         let prompt_count = Arc::new(AtomicUsize::new(0));
@@ -1256,7 +1373,7 @@ mod tests {
         let store = Store::memory()?;
         let harness = Harness::from_store(store.clone(), Arc::new(WorkersOnly));
         harness.register_extension(Arc::new(OarExtension::new(Arc::new(reg), OarPolicy::default())));
-        harness.recover()?;
+        harness.recover().await?;
 
         let mut crashed = Task::new(OAR_TASK_KIND, OAR_PHASE_RUN);
         crashed.id = "oar-crashed".into();
@@ -1274,44 +1391,52 @@ mod tests {
         });
         crashed.memo = json!({ "turnStarted": true });
 
-        store.write(|tx| {
-            tx.create_conversation("conv-oar-crash", "mock")?;
-            write_doc::<OarSessionDoc>(
-                tx,
-                TASK_SCOPE,
-                "oar-crashed",
-                &OarSessionState {
-                    runtime_id: "scripted".into(),
-                    vendor_session_id: "vendor-99".into(),
-                    cwd: dir.path().to_string_lossy().into_owned(),
-                    permission_mode: "bypass".into(),
-                    status: "opened".into(),
-                },
-            )?;
-            Ok(())
-        })?;
-        harness.scheduler().start(crashed)?;
-        let done = harness.scheduler().wait("oar-crashed", Duration::from_secs(3))?;
+        let cwd_str = dir.path().to_string_lossy().into_owned();
+        store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    tx.create_conversation_async("conv-oar-crash", "mock").await?;
+                    write_doc::<OarSessionDoc>(
+                        tx,
+                        TASK_SCOPE,
+                        "oar-crashed",
+                        &OarSessionState {
+                            runtime_id: "scripted".into(),
+                            vendor_session_id: "vendor-99".into(),
+                            cwd: cwd_str,
+                            permission_mode: "bypass".into(),
+                            status: "opened".into(),
+                        },
+                    )
+                    .await?;
+                    Ok(())
+                })
+            })
+            .await?;
+        harness.scheduler().start(crashed).await?;
+        let done = harness.scheduler().wait("oar-crashed", Duration::from_secs(3)).await?;
         assert_eq!(done.terminal_reason, "completed");
         assert_eq!(prompt_count.load(Ordering::SeqCst), 0);
         assert_eq!(done.result["interrupted"], true);
         assert_eq!(done.result["vendorSessionId"], "vendor-99");
         assert!(done.result["gitStatus"].as_str().unwrap().contains("dirty_oar.txt"));
+        harness.close().await;
         Ok(())
     }
 
-    #[test]
-    fn oar_run_enforces_concurrent_mutating_cwd_guard() -> durable::Result<()> {
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn oar_run_enforces_concurrent_mutating_cwd_guard() -> durable::Result<()> {
         let dir = TempDir::new().unwrap();
-        let (entered_tx, entered_rx) = flume::bounded(1);
-        let (release_tx, release_rx) = flume::bounded(1);
+        let (entered_tx, mut entered_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (release_tx, release_rx) = std::sync::mpsc::sync_channel::<()>(1);
+        let release_rx = Arc::new(Mutex::new(release_rx));
 
         let mut reg = Registry::new();
         reg.register(Arc::new(ScriptedRuntime::new(
             "scripted",
             Script::computed(Arc::new(move |_: &TurnAsk| {
                 let _ = entered_tx.send(());
-                let _ = release_rx.recv_timeout(Duration::from_secs(3));
+                let _ = release_rx.lock().unwrap().recv_timeout(Duration::from_secs(3));
                 Ok(vec![Step::text("done"), Step::finish(StopReason::Completed)])
             })),
         )));
@@ -1320,7 +1445,7 @@ mod tests {
         let ext = Arc::new(OarExtension::new(Arc::new(reg), OarPolicy::default()));
         let harness = Harness::from_store(store.clone(), Arc::new(WorkersOnly));
         harness.register_extension(ext.clone());
-        harness.recover()?;
+        harness.recover().await?;
 
         // Turn 1: open mutating session in `dir` and block inside ScriptedRuntime.
         let c1 = Arc::new(QueueClient::new(vec![
@@ -1352,17 +1477,21 @@ mod tests {
             },
         ]));
         let conv1 = worker_conversation("mut1");
-        harness.attach_worker(&conv1, Arc::new(Brain::new(c1, "deepseek-chat", "sys")), Arc::new(|_| {}))?;
-        let (_, t1, _) = harness.submit(Request {
-            conversation: &conv1,
-            provider: "mock",
-            request_id: "r1",
-            prompt: "go",
-            source: "user",
-            system: "sys",
-            ..Default::default()
-        })?;
-        entered_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+        harness
+            .attach_worker(&conv1, Arc::new(Brain::new(c1, "deepseek-chat", "sys")), Arc::new(|_| {}))
+            .await?;
+        let (_, t1, _) = harness
+            .submit(Request {
+                conversation: &conv1,
+                provider: "mock",
+                request_id: "r1",
+                prompt: "go",
+                source: "user",
+                system: "sys",
+                ..Default::default()
+            })
+            .await?;
+        tokio::time::timeout(Duration::from_secs(3), entered_rx.recv()).await.unwrap().unwrap();
 
         // Turn 2 on SAME cwd with mutating mode (`bypass`) is rejected cleanly via tool error!
         let c2 = Arc::new(QueueClient::new(vec![
@@ -1394,32 +1523,37 @@ mod tests {
             },
         ]));
         let conv2 = worker_conversation("mut2");
-        harness.attach_worker(&conv2, Arc::new(Brain::new(c2, "deepseek-chat", "sys")), Arc::new(|_| {}))?;
-        let (_, t2, _) = harness.submit(Request {
-            conversation: &conv2,
-            provider: "mock",
-            request_id: "r2",
-            prompt: "go2",
-            source: "user",
-            system: "sys",
-            ..Default::default()
-        })?;
-        let d2 = harness.scheduler().wait(&t2.id, Duration::from_secs(3))?;
+        harness
+            .attach_worker(&conv2, Arc::new(Brain::new(c2, "deepseek-chat", "sys")), Arc::new(|_| {}))
+            .await?;
+        let (_, t2, _) = harness
+            .submit(Request {
+                conversation: &conv2,
+                provider: "mock",
+                request_id: "r2",
+                prompt: "go2",
+                source: "user",
+                system: "sys",
+                ..Default::default()
+            })
+            .await?;
+        let d2 = harness.scheduler().wait(&t2.id, Duration::from_secs(3)).await?;
         assert_eq!(d2.result["output"], "saw conflict");
-        let e2 = harness.entries(&conv2)?;
+        let e2 = harness.entries(&conv2).await?;
         let res2 = e2.iter().find(|e| e.kind == "pi.tool_result").unwrap();
         assert_eq!(res2.payload["ok"], false);
         assert!(res2.payload["error"].as_str().unwrap().contains("concurrent mutating"));
 
         let _ = release_tx.send(());
-        let d1 = harness.scheduler().wait(&t1.id, Duration::from_secs(3))?;
+        let d1 = harness.scheduler().wait(&t1.id, Duration::from_secs(3)).await?;
         assert_eq!(d1.result["output"], "t1 done");
-        assert!(ext.active_sessions().is_empty());
+        assert!(ext.active_sessions().await.is_empty());
+        harness.close().await;
         Ok(())
     }
 
-    #[test]
-    fn oar_terminal_task_between_open_and_run_prunes_active_session() -> durable::Result<()> {
+    #[tokio::test]
+    async fn oar_terminal_task_between_open_and_run_prunes_active_session() -> durable::Result<()> {
         let dir = TempDir::new().unwrap();
         let mut reg = Registry::new();
         reg.register(Arc::new(ScriptedRuntime::demo()));
@@ -1429,6 +1563,7 @@ mod tests {
                 cwd: dir.path().to_path_buf(),
                 ..Default::default()
             })
+            .await
             .unwrap();
 
         let store = Store::memory()?;
@@ -1439,11 +1574,16 @@ mod tests {
         let mut task = Task::new(OAR_TASK_KIND, OAR_PHASE_RUN);
         task.id = "oar-aborted-gap".into();
         task.conversation_id = "conv-gap".into();
-        store.write(|tx| {
-            tx.create_conversation("conv-gap", "mock")?;
-            tx.create_task(task.clone())?;
-            Ok(())
-        })?;
+        let task_write = task.clone();
+        store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    tx.create_conversation_async("conv-gap", "mock").await?;
+                    tx.create_task_async(task_write).await?;
+                    Ok(())
+                })
+            })
+            .await?;
         ext.inner.active.lock().unwrap().insert(
             task.id.clone(),
             ActiveRecord {
@@ -1460,12 +1600,13 @@ mod tests {
                 },
             },
         );
-        assert_eq!(ext.active_sessions().len(), 1);
+        assert_eq!(ext.active_sessions().await.len(), 1);
 
         // Abort directly via scheduler without Harness::abort_conversation:
         // pruning still cleans up the active session immediately.
-        harness.scheduler().abort(&task.id)?;
-        assert!(ext.active_sessions().is_empty());
+        harness.scheduler().abort(&task.id).await?;
+        assert!(ext.active_sessions().await.is_empty());
+        harness.close().await;
         Ok(())
     }
 }

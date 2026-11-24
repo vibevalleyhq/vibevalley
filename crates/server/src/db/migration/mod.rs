@@ -1,6 +1,7 @@
 //! SeaORM migrations for the VibeValley server schema (SQLite + PostgreSQL).
 
 pub mod m20261124_100001_create_server_tables;
+pub mod m20261124_100002_create_outbox_item;
 
 use sea_orm_migration::prelude::*;
 
@@ -13,6 +14,9 @@ impl MigratorTrait for Migrator {
     }
 
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-        vec![Box::new(m20261124_100001_create_server_tables::Migration)]
+        vec![
+            Box::new(m20261124_100001_create_server_tables::Migration),
+            Box::new(m20261124_100002_create_outbox_item::Migration),
+        ]
     }
 }

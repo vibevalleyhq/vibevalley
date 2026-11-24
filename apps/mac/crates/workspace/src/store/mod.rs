@@ -4,7 +4,6 @@
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
@@ -72,10 +71,6 @@ impl From<serde_json::Error> for StoreError {
     fn from(e: serde_json::Error) -> Self {
         StoreError::Db(format!("json: {e}"))
     }
-}
-
-fn now_ms() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
 }
 
 fn path_text(path: &Path) -> String {
@@ -245,7 +240,7 @@ impl Store {
                         path: Set(text),
                         name: Set(display_name(&path)),
                         position: Set(max_position.map_or(0, |m| m + 1)),
-                        last_opened_ms: Set(now_ms()),
+                        last_opened_ms: Set(crate::util::now_ms()),
                     }
                     .insert(&tx)
                     .await?;
@@ -323,7 +318,7 @@ impl Store {
     pub fn touch_project(&self, id: ProjectId) -> Result<()> {
         vibevalley_runtime::rt::block_on(async {
             let res = projects::Entity::update_many()
-                .col_expr(projects::Column::LastOpenedMs, Expr::value(now_ms()))
+                .col_expr(projects::Column::LastOpenedMs, Expr::value(crate::util::now_ms()))
                 .filter(projects::Column::Id.eq(id))
                 .exec(&self.conn)
                 .await?;

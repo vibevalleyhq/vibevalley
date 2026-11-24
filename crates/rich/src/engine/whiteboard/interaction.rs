@@ -1,8 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use vibevalley_protocol::{ArtifactEntry, ArtifactEntryWriteInput};
-
-use crate::engine::whiteboard::codec::merge_live_presences;
+use crate::engine::whiteboard::codec::{WhiteboardEntry, WhiteboardWriteInput, merge_live_presences};
 use crate::engine::whiteboard::geometry::{Camera, MAX_ZOOM, MIN_ZOOM, anchor_point, project_point_to_polyline, route_arrow};
 use crate::engine::whiteboard::hit::{HitConfig, HitTarget, ResizeHandle8, hit_test, marquee_select, snap_anchor_endpoint};
 use crate::engine::whiteboard::ink::{simplify_stroke_points, strokes_hit_by_eraser};
@@ -118,7 +116,7 @@ pub struct AnimationStepResult {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ControllerEffect {
-    FlushBatch(Vec<ArtifactEntryWriteInput>),
+    FlushBatch(Vec<WhiteboardWriteInput>),
     SelectionChanged(Vec<ElementId>),
     ToolChanged(Tool),
     ViewportChanged {
@@ -514,7 +512,7 @@ impl WhiteboardController {
         effects
     }
 
-    pub fn apply_remote_delta(&mut self, updated: &[ArtifactEntry], deleted: &[String], seq: i64) -> Vec<ControllerEffect> {
+    pub fn apply_remote_delta(&mut self, updated: &[WhiteboardEntry], deleted: &[String], seq: i64) -> Vec<ControllerEffect> {
         let removed = apply_remote_entries(&mut self.doc, updated, deleted, seq);
         if !removed.is_empty() {
             let rem_set: BTreeSet<ElementId> = removed.into_iter().collect();

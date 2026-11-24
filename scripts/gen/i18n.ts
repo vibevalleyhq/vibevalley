@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { placeholderKinds, placeholders } from "@vibevalley/i18n/format";
+import { placeholderKinds, placeholders } from "@vibevalley/i18n";
 
 import { readGlossary, wordProblems } from "../docs/glossary.ts";
 import { messageUses } from "./i18n-uses.ts";

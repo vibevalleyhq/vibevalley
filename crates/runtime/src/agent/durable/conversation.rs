@@ -6,24 +6,24 @@ use super::telemetry::TelemetryEvent;
 use super::{Compaction, Conversation, Entry, Error, Read, Result, Submission, SubmissionStatus, Tx, id};
 
 impl Read<'_> {
-    pub fn conversation(&self, id: &str) -> Result<Conversation> {
-        self.ops.conversation(id)?.ok_or_else(|| Error::Missing(id.into()))
+    pub async fn conversation_async(&self, id: &str) -> Result<Conversation> {
+        self.ops.conversation_async(id).await?.ok_or_else(|| Error::Missing(id.into()))
     }
 
-    pub fn conversations(&self) -> Result<Vec<Conversation>> {
-        self.ops.conversations()
+    pub async fn conversations_async(&self) -> Result<Vec<Conversation>> {
+        self.ops.conversations_async().await
     }
 
-    pub fn conversations_by_owner_task(&self, id: &str) -> Result<Vec<Conversation>> {
-        self.ops.conversations_by_owner_task(id)
+    pub async fn conversations_by_owner_task_async(&self, id: &str) -> Result<Vec<Conversation>> {
+        self.ops.conversations_by_owner_task_async(id).await
     }
 
-    pub fn entries(&self, id: &str, from: i64) -> Result<Vec<Entry>> {
-        self.ops.entries_from(id, from.max(1))
+    pub async fn entries_async(&self, id: &str, from: i64) -> Result<Vec<Entry>> {
+        self.ops.entries_from_async(id, from.max(1)).await
     }
 
-    pub fn visible_entries(&self, id: &str) -> Result<Vec<Entry>> {
-        let mut current = self.conversation(id)?;
+    pub async fn visible_entries_async(&self, id: &str) -> Result<Vec<Entry>> {
+        let mut current = self.conversation_async(id).await?;
         let mut limit = current.next_seq - 1;
         let head = current.head_seq;
         let mut chain = vec![];
@@ -32,48 +32,52 @@ impl Read<'_> {
             if !seen.insert(current.id.clone()) {
                 return Err(Error::Invalid("conversation fork cycle".into()));
             }
-            let segment = self.ops.entries_within(&current.id, head, limit)?;
+            let segment = self.ops.entries_within_async(&current.id, head, limit).await?;
             chain.push(segment);
             if current.parent_id.is_empty() {
                 break;
             }
             limit = limit.min(current.fork_entry_seq);
-            current = self.conversation(&current.parent_id)?;
+            current = self.conversation_async(&current.parent_id).await?;
         }
-        let mut entries: Vec<_> = chain.into_iter().rev().flatten().collect();
-        if let Some(at) = entries.iter().rposition(|e| e.kind == "pi.reset") {
-            entries.drain(..=at);
-        }
-        if let Some(at) = entries.iter().rposition(|e| e.kind == "pi.compaction") {
-            let summary = entries.remove(at);
-            let cut = summary.payload["cutSeq"]
-                .as_i64()
-                .ok_or_else(|| Error::Invalid("invalid compaction cut".into()))?;
-            entries.retain(|e| e.kind != "pi.compaction" && e.seq > cut);
-            entries.insert(0, summary);
-        }
-        Ok(entries)
+        finalize_visible_entries(chain)
     }
 
-    pub fn submission(&self, id: &str) -> Result<Submission> {
-        self.ops.submission(id)?.ok_or_else(|| Error::Missing(id.into()))
+    pub async fn submission_async(&self, id: &str) -> Result<Submission> {
+        self.ops.submission_async(id).await?.ok_or_else(|| Error::Missing(id.into()))
     }
 
-    pub fn submission_by_request(&self, conv: &str, request: &str) -> Result<Option<Submission>> {
-        self.ops.submission_by_request(conv, request)
+    pub async fn submission_by_request_async(&self, conv: &str, request: &str) -> Result<Option<Submission>> {
+        self.ops.submission_by_request_async(conv, request).await
     }
 
-    pub fn submissions(&self, conv: &str) -> Result<Vec<Submission>> {
-        self.ops.submissions(conv)
+    pub async fn submissions_async(&self, conv: &str) -> Result<Vec<Submission>> {
+        self.ops.submissions_async(conv).await
     }
 }
 
+fn finalize_visible_entries(chain: Vec<Vec<Entry>>) -> Result<Vec<Entry>> {
+    let mut entries: Vec<_> = chain.into_iter().rev().flatten().collect();
+    if let Some(at) = entries.iter().rposition(|e| e.kind == "pi.reset") {
+        entries.drain(..=at);
+    }
+    if let Some(at) = entries.iter().rposition(|e| e.kind == "pi.compaction") {
+        let summary = entries.remove(at);
+        let cut = summary.payload["cutSeq"]
+            .as_i64()
+            .ok_or_else(|| Error::Invalid("invalid compaction cut".into()))?;
+        entries.retain(|e| e.kind != "pi.compaction" && e.seq > cut);
+        entries.insert(0, summary);
+    }
+    Ok(entries)
+}
+
 impl Tx<'_> {
-    pub fn create_conversation(&mut self, conv: &str, provider: &str) -> Result<Conversation> {
-        self.create_owned_conversation(conv, provider, "")
+    pub async fn create_conversation_async(&mut self, conv: &str, provider: &str) -> Result<Conversation> {
+        self.create_owned_conversation_async(conv, provider, "").await
     }
 
-    pub fn create_owned_conversation(&mut self, conv: &str, provider: &str, owner_task_id: &str) -> Result<Conversation> {
+    pub async fn create_owned_conversation_async(&mut self, conv: &str, provider: &str, owner_task_id: &str) -> Result<Conversation> {
         let id = if conv.is_empty() { id() } else { conv.to_owned() };
         let record = Conversation {
             id: id.clone(),
@@ -87,12 +91,12 @@ impl Tx<'_> {
             created_at_ms: self.now_ms,
             updated_at_ms: self.now_ms,
         };
-        self.write.insert_conversation(&record)?;
-        self.conversation(&id)
+        self.write.insert_conversation_async(&record).await?;
+        self.conversation_async(&id).await
     }
 
-    pub fn fork_conversation(&mut self, parent: &str, child: &str, owner: &str, provider: &str, seq: i64) -> Result<Conversation> {
-        let p = self.conversation(parent)?;
+    pub async fn fork_conversation_async(&mut self, parent: &str, child: &str, owner: &str, provider: &str, seq: i64) -> Result<Conversation> {
+        let p = self.conversation_async(parent).await?;
         if seq < 0 || seq >= p.next_seq {
             return Err(Error::Invalid(format!("fork sequence {seq} outside conversation {parent}")));
         }
@@ -111,15 +115,19 @@ impl Tx<'_> {
             created_at_ms: self.now_ms,
             updated_at_ms: self.now_ms,
         };
-        self.write.insert_conversation(&record)?;
-        self.conversation(&child_id)
+        self.write.insert_conversation_async(&record).await?;
+        self.conversation_async(&child_id).await
     }
 
-    pub fn append_entry(&mut self, conv: &str, kind: &str, payload: &Value) -> Result<Entry> {
+    pub async fn append_entry_async(&mut self, conv: &str, kind: &str, payload: &Value) -> Result<Entry> {
         if kind.is_empty() {
             return Err(Error::Invalid("empty entry kind".into()));
         }
-        let next_seq = self.write.advance_sequence(conv, self.now_ms)?.ok_or_else(|| Error::Missing(conv.into()))?;
+        let next_seq = self
+            .write
+            .advance_sequence_async(conv, self.now_ms)
+            .await?
+            .ok_or_else(|| Error::Missing(conv.into()))?;
         let seq = next_seq - 1;
         let entry = Entry {
             conversation_id: conv.into(),
@@ -128,7 +136,7 @@ impl Tx<'_> {
             payload: payload.clone(),
             created_at_ms: self.now_ms,
         };
-        self.write.insert_entry(&entry)?;
+        self.write.insert_entry_async(&entry).await?;
         self.record_telemetry(TelemetryEvent::Entry {
             conversation_id: conv.into(),
             seq,
@@ -138,7 +146,7 @@ impl Tx<'_> {
         Ok(entry)
     }
 
-    pub fn compact(&mut self, conv: &str, request: Compaction<'_>) -> Result<Option<Entry>> {
+    pub async fn compact_async(&mut self, conv: &str, request: Compaction<'_>) -> Result<Option<Entry>> {
         let Compaction {
             level,
             base_head,
@@ -147,33 +155,35 @@ impl Tx<'_> {
             summary,
             token_count,
         } = request;
-        let c = self.conversation(conv)?;
+        let c = self.conversation_async(conv).await?;
         if cut < 1 || cut >= c.next_seq {
             return Err(Error::Invalid(format!("compaction cut {cut} outside conversation {conv}")));
         }
         if (base_head > 0 && c.head_seq > base_head) || cut < c.head_seq {
             return Ok(None);
         }
-        let e = self.append_entry(
-            conv,
-            "pi.compaction",
-            &json!({"level":level,"baseHeadSeq":base_head,"fromSeq":from,"cutSeq":cut,"summary":summary,"tokenCount":token_count}),
-        )?;
-        self.write.set_head(conv, cut + 1)?;
+        let e = self
+            .append_entry_async(
+                conv,
+                "pi.compaction",
+                &json!({"level":level,"baseHeadSeq":base_head,"fromSeq":from,"cutSeq":cut,"summary":summary,"tokenCount":token_count}),
+            )
+            .await?;
+        self.write.set_head_async(conv, cut + 1).await?;
         Ok(Some(e))
     }
 
-    pub fn reset(&mut self, conv: &str, payload: &Value) -> Result<Entry> {
-        let e = self.append_entry(conv, "pi.reset", payload)?;
-        self.write.reset_head(conv)?;
+    pub async fn reset_async(&mut self, conv: &str, payload: &Value) -> Result<Entry> {
+        let e = self.append_entry_async(conv, "pi.reset", payload).await?;
+        self.write.reset_head_async(conv).await?;
         Ok(e)
     }
 
-    pub fn submit(&mut self, conv: &str, request: &str, kind: &str, payload: &Value, notify: Option<&str>) -> Result<(Submission, bool)> {
+    pub async fn submit_async(&mut self, conv: &str, request: &str, kind: &str, payload: &Value, notify: Option<&str>) -> Result<(Submission, bool)> {
         if conv.is_empty() || request.is_empty() {
             return Err(Error::Invalid("submission needs a conversation and request ID".into()));
         }
-        if let Some(previous) = self.submission_by_request(conv, request)? {
+        if let Some(previous) = self.submission_by_request_async(conv, request).await? {
             return Ok((previous, true));
         }
         let id = id();
@@ -189,8 +199,8 @@ impl Tx<'_> {
             created_at_ms: self.now_ms,
             updated_at_ms: self.now_ms,
         };
-        self.write.insert_submission(&sub)?;
-        let saved = self.submission(&id)?;
+        self.write.insert_submission_async(&sub).await?;
+        let saved = self.submission_async(&id).await?;
         self.record_telemetry(TelemetryEvent::Submission {
             conversation_id: conv.into(),
             submission_id: saved.id.clone(),
@@ -200,21 +210,21 @@ impl Tx<'_> {
         Ok((saved, false))
     }
 
-    pub fn set_submission_status(&mut self, id: &str, status: SubmissionStatus) -> Result<Submission> {
-        self.write.set_submission_status(id, status, self.now_ms)?;
-        self.submission(id)
+    pub async fn set_submission_status_async(&mut self, id: &str, status: SubmissionStatus) -> Result<Submission> {
+        self.write.set_submission_status_async(id, status, self.now_ms).await?;
+        self.submission_async(id).await
     }
 
-    pub fn settle(&mut self, id: &str, status: SubmissionStatus, result: &Value) -> Result<Submission> {
+    pub async fn settle_async(&mut self, id: &str, status: SubmissionStatus, result: &Value) -> Result<Submission> {
         if !matches!(status, SubmissionStatus::Done | SubmissionStatus::Unanswered) {
             return Err(Error::Invalid("settlement requires done or unanswered".into()));
         }
-        let prior = self.submission(id)?;
+        let prior = self.submission_async(id).await?;
         if matches!(prior.status, SubmissionStatus::Done | SubmissionStatus::Unanswered) {
             return Ok(prior);
         }
-        self.write.settle_submission(id, status, result, self.now_ms)?;
-        let sub = self.submission(id)?;
+        self.write.settle_submission_async(id, status, result, self.now_ms).await?;
+        let sub = self.submission_async(id).await?;
         self.record_telemetry(TelemetryEvent::Submission {
             conversation_id: sub.conversation_id.clone(),
             submission_id: sub.id.clone(),
@@ -222,12 +232,13 @@ impl Tx<'_> {
             at_ms: self.now_ms,
         });
         if !sub.notify_task_id.is_empty() {
-            self.send_signal(
+            self.send_signal_async(
                 &sub.notify_task_id,
                 "pi.submission_settled",
                 Some(id),
                 &json!({"submissionId":id,"conversationId":sub.conversation_id,"requestId":sub.request_id,"status":status,"result":result}),
-            )?;
+            )
+            .await?;
         }
         Ok(sub)
     }

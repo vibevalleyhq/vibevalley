@@ -20,10 +20,13 @@ fn write_executable(dir: &Path, name: &str, body: &str) -> PathBuf {
     path
 }
 
-fn recv_until(rx: &flume::Receiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
+async fn recv_until(rx: &mut tokio::sync::mpsc::UnboundedReceiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
     let mut out = Vec::new();
     loop {
-        let ev = rx.recv_timeout(WAIT).expect("expected event before timeout");
+        let ev = tokio::time::timeout(WAIT, rx.recv())
+            .await
+            .expect("expected event before timeout")
+            .expect("channel open before stop event");
         let done = stop(&ev.kind);
         out.push(ev);
         if done {
@@ -267,8 +270,8 @@ for raw in sys.stdin:
         send({"jsonrpc": "2.0", "id": req_id, "result": {"stopReason": "end_turn"}})
 "#;
 
-#[test]
-fn antigravity_swarm_layer1_events_layer2_sidecar_and_read_subagent() {
+#[tokio::test]
+async fn antigravity_swarm_layer1_events_layer2_sidecar_and_read_subagent() {
     let rt_default = default_runtimes().require("antigravity").expect("antigravity registered");
     assert!(rt_default.capabilities().subagents);
 
@@ -289,14 +292,15 @@ fn antigravity_swarm_layer1_events_layer2_sidecar_and_read_subagent() {
             ],
             ..Default::default()
         })
+        .await
         .expect("open mock antigravity session");
 
     // Before any swarm/subagent activity, swarm_snapshot is None (no sidecar I/O).
     assert_eq!(session.swarm_snapshot(), None);
 
-    let rx = session.events();
-    session.prompt(vec![ContentBlock::Text("/swarm go".into())]).unwrap();
-    let events = recv_until(&rx, |k| matches!(k, EventKind::TurnFinished { .. }));
+    let mut rx = session.events();
+    session.prompt(vec![ContentBlock::Text("/swarm go".into())]).await.unwrap();
+    let events = recv_until(&mut rx, |k| matches!(k, EventKind::TurnFinished { .. })).await;
 
     // Verify Layer 1 EventKind::Subagent* projections.
     assert!(events.iter().any(|e| matches!(
@@ -368,23 +372,24 @@ fn antigravity_swarm_layer1_events_layer2_sidecar_and_read_subagent() {
     assert!(session.read_child_transcript("../escape", 10).is_empty());
 
     // Verify read_subagent resolves both a swarm worker and an invoke_subagent SQLite step_type=127 row.
-    let worker_snap = session.read_subagent("worker-a", None).expect("read swarm worker");
+    let worker_snap = session.read_subagent("worker-a", None).await.expect("read swarm worker");
     assert_eq!(worker_snap.agent_name.as_deref(), Some("worker-a"));
     assert_eq!(worker_snap.status, Some(SubagentStatus::Running));
     assert_eq!(worker_snap.message.as_deref(), Some("Implemented read-only sidecar reader."));
 
     let sub_snap = session
         .read_subagent("5d4f594b-ca4a-4e3c-a081-171ddb1d2d1d", None)
+        .await
         .expect("read invoke_subagent");
     assert_eq!(sub_snap.agent_name.as_deref(), Some("explore"));
     assert_eq!(sub_snap.status, Some(SubagentStatus::Completed));
     assert_eq!(sub_snap.message.as_deref(), Some("Inspected protocol shapes cleanly."));
 
-    session.dispose();
+    session.dispose().await;
 }
 
-#[test]
-fn resumed_antigravity_session_detects_preexisting_swarm_without_tool_calls() {
+#[tokio::test]
+async fn resumed_antigravity_session_detects_preexisting_swarm_without_tool_calls() {
     let dir = tempfile::tempdir().unwrap();
     let gemini_home = dir.path().join("gemini");
     let swarm_dir = gemini_home
@@ -419,6 +424,7 @@ fn resumed_antigravity_session_detects_preexisting_swarm_without_tool_calls() {
             ],
             ..Default::default()
         })
+        .await
         .expect("open resumed session");
 
     let snap = session.swarm_snapshot().expect("preexisting swarm detected");
@@ -426,11 +432,11 @@ fn resumed_antigravity_session_detects_preexisting_swarm_without_tool_calls() {
     assert_eq!(snap.title.as_deref(), Some("Resumed Swarm"));
     assert_eq!(snap.messages.len(), 1);
     assert_eq!(snap.messages[0].seq, 7);
-    session.dispose();
+    session.dispose().await;
 }
 
-#[test]
-fn generic_acp_session_keeps_swarm_and_subagent_sidecars_disabled() {
+#[tokio::test]
+async fn generic_acp_session_keeps_swarm_and_subagent_sidecars_disabled() {
     let dir = tempfile::tempdir().unwrap();
     let script = write_executable(dir.path(), "mock-generic", MOCK_SWARM_AGY);
     let rt = AcpRuntime::new(AcpAgentSpec::new("acp:generic-test", "Generic ACP", script.to_string_lossy(), ["acp"]));
@@ -441,13 +447,14 @@ fn generic_acp_session_keeps_swarm_and_subagent_sidecars_disabled() {
             env: vec![("MOCK_SWARM_SCENARIO".into(), "idle".into())],
             ..Default::default()
         })
+        .await
         .expect("open generic acp session");
 
     assert_eq!(session.swarm_snapshot(), None);
     assert!(session.read_child_transcript("conv-worker-a", 10).is_empty());
     assert!(matches!(
-        session.read_subagent("worker-a", None),
+        session.read_subagent("worker-a", None).await,
         Err(AgentError::Unsupported { option, .. }) if option == "read_subagent"
     ));
-    session.dispose();
+    session.dispose().await;
 }

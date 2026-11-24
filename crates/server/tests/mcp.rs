@@ -12,7 +12,7 @@ use vibevalley_runtime::oar::{Capabilities, Installation, McpServer, ModelInfo, 
 /// The scripted runtime, keeping what each open was given.
 struct Recording {
     inner: ScriptedRuntime,
-    opened: flume::Sender<SessionOptions>,
+    opened: std::sync::mpsc::Sender<SessionOptions>,
 }
 
 impl Runtime for Recording {
@@ -25,13 +25,13 @@ impl Runtime for Recording {
     fn capabilities(&self) -> Capabilities {
         self.inner.capabilities()
     }
-    fn installation(&self) -> Installation {
+    fn installation(&self) -> vibevalley_runtime::oar::BoxFuture<'_, Installation> {
         self.inner.installation()
     }
-    fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
+    fn list_models(&self) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<ModelInfo>>> {
         self.inner.list_models()
     }
-    fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn Session>> {
+    fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn Session>>> {
         let _ = self.opened.send(opts.clone());
         self.inner.open(opts)
     }
@@ -58,31 +58,31 @@ fn text_of(answer: &Value) -> String {
 fn a_helper_calls_its_tools_through_the_door_it_was_given() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
-    let (opened_tx, opened_rx) = flume::unbounded();
+    let (opened_tx, opened_rx) = std::sync::mpsc::channel();
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(Recording {
         inner: ScriptedRuntime::demo(),
         opened: opened_tx,
     }));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         orchestrator_listens: false,
         link_previews: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
-    let listener = vibevalley_server::transport::http::serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let listener = vibevalley_server::gateway::http::serve(app.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let door = format!("{}/mcp", listener.url());
-    started.test_internals().board.sessions().set_mcp_url(door.clone());
+    app.set_mcp_url(door.clone());
     std::fs::write(dir.path().join("AGENTS.md"), "所有仓库都用 2 个空格缩进。").unwrap();
 
-    let call = |op: &str, p| started.hub.call_as(Caller::User, op, p);
+    let call = |op: &str, p| app.router().call_as(Caller::User, op, p);
     assert!(call("repo.create", json!({ "name": "farm" })).data.is_some());
-    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
     helper.name = "小帮手".into();
-    started.test_internals().agents.profiles.save(helper).unwrap();
+    vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let made = call("issue.create", json!({ "title": "say hi", "repo": "farm", "agent": "小帮手" }));
     let id = made.data.unwrap()["id"].as_str().unwrap().to_string();
     let sent = call("issue.status.update", json!({ "id": id, "status": "todo" }));
@@ -107,7 +107,7 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
             _ => None,
         })
         .expect("the vibevalley door with a bearer token");
-    let session = started.test_internals().board.sessions().who(&token).expect("the token names the helper");
+    let session = app.test_internals().board.session_engine().who(&token).expect("the token names the helper");
 
     let hello = rpc(&door, &token, 1, "initialize", json!({ "protocolVersion": "2025-06-18", "capabilities": {} }));
     assert_eq!(hello["result"]["serverInfo"]["name"], "vibevalley");
@@ -118,11 +118,11 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         .iter()
         .map(|t| t["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names.len(), 28, "{names:?}");
+    assert_eq!(names.len(), 25, "{names:?}");
     assert!(names.contains(&"issue_report"));
-    assert!(names.contains(&"artifact_block_list"));
-    assert!(names.contains(&"artifact_block_batch"));
-    assert!(names.contains(&"artifact_outline_import"));
+    assert!(names.contains(&"artifact_file_list"));
+    assert!(names.contains(&"artifact_file_write"));
+    assert!(names.contains(&"artifact_suggestion_create"));
     assert!(!names.contains(&"pkm_search"));
 
     let stranger = rpc(&door, "not-a-token", 3, "tools/call", json!({ "name": "session_list", "arguments": {} }));
@@ -177,101 +177,99 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         json!({ "name": "issue_report", "arguments": { "summary": "打了招呼 abc123", "remember": [{ "text": "测试用 cargo test", "scope": "all" }] } }),
     );
     assert_eq!(text_of(&reported), "报告已记录；现在用简短正文说明结果。");
-    let kept = std::fs::read_to_string(started.test_internals().board.sessions().report_path(&session)).unwrap();
+    let kept = std::fs::read_to_string(app.test_internals().board.session_engine().report_path(&session)).unwrap();
     assert!(kept.contains("打了招呼 abc123") && kept.contains("测试用 cargo test"), "{kept}");
 
     let none = rpc(&door, &token, 9, "tools/call", json!({ "name": "no_such_tool", "arguments": {} }));
     assert_eq!(none["result"]["isError"], true);
     assert!(text_of(&none).contains("没有 no_such_tool 这个工具"));
 
-    // Artifact S2 + S6 MCP tools: outline import, block snapshot, and block batch (including tempId nesting, move, and suggestion diversion).
-    let imported_res = rpc(
+    // Artifact MCP tools: directory create, file list/get/write, and human-owned suggestion diversion.
+    let created_res = rpc(
         &door,
         &token,
         10,
         "tools/call",
         json!({
-            "name": "artifact_outline_import",
+            "name": "artifact_create",
             "arguments": {
-                "markdown": "---\ntitle: Sprint Outline\n---\n- TODO Ship collab tools\n  id:: block-prop-1\n  - DONE Wire block batch",
+                "title": "Sprint Outline",
+                "artifactType": "outline",
+                "files": [{ "path": "structure/notes.md", "content": "Initial agent notes" }],
                 "announce": false
             }
         }),
     );
-    assert_eq!(imported_res["result"]["isError"], false, "{imported_res}");
-    let imported_art: Value = serde_json::from_str(&text_of(&imported_res)).unwrap();
-    let outline_id = imported_art["id"].as_str().unwrap().to_string();
-    assert_eq!(imported_art["title"], "Sprint Outline");
-    assert_eq!(imported_art["artifactType"], "outline");
-    assert_eq!(imported_art["body"], "blocks");
+    assert_eq!(created_res["result"]["isError"], false, "{created_res}");
+    let created_art: Value = serde_json::from_str(&text_of(&created_res)).unwrap();
+    let outline_id = created_art["id"].as_str().unwrap().to_string();
+    assert_eq!(created_art["title"], "Sprint Outline");
+    assert_eq!(created_art["artifactType"], "outline");
 
-    let snap_res = rpc(
+    let list_res = rpc(
         &door,
         &token,
         11,
         "tools/call",
-        json!({ "name": "artifact_block_list", "arguments": { "id": outline_id } }),
+        json!({ "name": "artifact_file_list", "arguments": { "id": outline_id, "prefix": "structure/" } }),
     );
-    assert_eq!(snap_res["result"]["isError"], false, "{snap_res}");
-    let snap: Value = serde_json::from_str(&text_of(&snap_res)).unwrap();
-    let blocks = snap["blocks"].as_array().unwrap();
-    assert_eq!(blocks.len(), 2, "{snap}");
-    let first_block_id = blocks[0]["id"].as_str().unwrap().to_string();
-    let first_block_rev = blocks[0]["rev"].as_i64().unwrap();
+    assert_eq!(list_res["result"]["isError"], false, "{list_res}");
+    let listed: Value = serde_json::from_str(&text_of(&list_res)).unwrap();
+    let files = listed["files"].as_array().unwrap();
+    assert!(files.iter().any(|f| f["path"] == "structure/notes.md"), "{listed}");
 
-    // User adds a block directly; helper batch editing that user block must divert to a suggestion.
-    let user_block = call(
-        "artifact.block.create",
-        json!({ "id": outline_id, "type": "paragraph", "text": "User authored note" }),
-    )
-    .data
-    .unwrap();
-    let user_block_id = user_block["blockId"].as_str().unwrap().to_string();
-    let user_block_rev = user_block["rev"].as_i64().unwrap();
+    // Human edits `structure/notes.md` directly; subsequent helper write diverts to a review suggestion.
+    let human_write = call(
+        "artifact.file.write",
+        json!({
+            "id": outline_id,
+            "files": [{ "path": "structure/notes.md", "content": "Human edited note" }],
+            "summary": "user tweak"
+        }),
+    );
+    assert_eq!(human_write.biz_code, 0, "{}", human_write.message);
 
-    let batch_res = rpc(
+    let agent_write_res = rpc(
         &door,
         &token,
         12,
         "tools/call",
         json!({
-            "name": "artifact_block_batch",
+            "name": "artifact_file_write",
             "arguments": {
                 "id": outline_id,
-                "note": "expand outline",
-                "ops": [
-                    { "op": "create", "tempId": "sec", "type": "heading", "level": 2, "text": "Follow-ups" },
-                    { "op": "create", "tempId": "child", "type": "bulleted", "parentId": "sec", "text": "Verify MCP tools" },
-                    { "op": "update", "block": first_block_id, "baseRev": first_block_rev, "checked": true, "text": "Shipped collab tools" },
-                    { "op": "move", "block": "child", "parentId": "", "afterBlock": "" },
-                    { "op": "update", "block": user_block_id, "baseRev": user_block_rev, "text": "Suggested rewrite" }
+                "summary": "suggest improvement",
+                "files": [
+                    { "path": "structure/notes.md", "content": "Agent proposed rewrite" },
+                    { "path": "structure/appendix.md", "content": "Brand new section" }
                 ]
             }
         }),
     );
-    assert_eq!(batch_res["result"]["isError"], false, "{batch_res}");
-    let batch: Value = serde_json::from_str(&text_of(&batch_res)).unwrap();
-    let results = batch["results"].as_array().unwrap();
-    assert_eq!(results.len(), 5, "{batch}");
-    assert_eq!(results[0]["status"], "applied");
-    assert_eq!(results[1]["status"], "applied");
-    assert_eq!(results[2]["status"], "applied");
-    assert_eq!(results[3]["status"], "applied");
-    assert_eq!(results[4]["status"], "rejected");
-    assert!(results[4]["suggestion"].as_str().is_some(), "{batch}");
-    let moved_child_id = batch["createdIds"]["child"].as_str().unwrap().to_string();
+    assert_eq!(agent_write_res["result"]["isError"], false, "{agent_write_res}");
+    let written: Value = serde_json::from_str(&text_of(&agent_write_res)).unwrap();
+    assert_eq!(written["suggestions"].as_array().unwrap().len(), 1, "{written}");
+    assert_eq!(written["suggestions"][0]["path"], "structure/notes.md");
 
-    let after_snap_res = rpc(
+    let notes_res = rpc(
         &door,
         &token,
         13,
         "tools/call",
-        json!({ "name": "artifact_block_list", "arguments": { "id": outline_id } }),
+        json!({ "name": "artifact_file_get", "arguments": { "id": outline_id, "path": "structure/notes.md" } }),
     );
-    let after_snap: Value = serde_json::from_str(&text_of(&after_snap_res)).unwrap();
-    let after_blocks = after_snap["blocks"].as_array().unwrap();
-    assert_eq!(after_blocks[0]["id"], moved_child_id, "child moved to top-level first");
-    assert!(after_blocks[0].get("parentId").is_none());
+    let notes_file: Value = serde_json::from_str(&text_of(&notes_res)).unwrap();
+    assert_eq!(notes_file["content"], "Human edited note");
 
-    started.close();
+    let appendix_res = rpc(
+        &door,
+        &token,
+        14,
+        "tools/call",
+        json!({ "name": "artifact_file_get", "arguments": { "id": outline_id, "path": "structure/appendix.md" } }),
+    );
+    let appendix_file: Value = serde_json::from_str(&text_of(&appendix_res)).unwrap();
+    assert_eq!(appendix_file["content"], "Brand new section");
+
+    app.close_blocking();
 }

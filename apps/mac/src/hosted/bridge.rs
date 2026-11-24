@@ -163,7 +163,7 @@ mod tests {
             HostFontPayload, HostMotionChoice, HostOp, HostOpeningPayload, HostOpeningPhase, HostPlaySoundPayload, HostQrPayload, HostSoundName,
             HostThemeChoice, Locale,
         };
-        use vibevalley_server::transport::bridge::BizCode;
+        use vibevalley_server::gateway::bridge::BizCode;
 
         let cases = vec![
             ("host.info", json!(null), HostOp::Info),

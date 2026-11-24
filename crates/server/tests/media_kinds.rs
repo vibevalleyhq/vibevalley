@@ -7,10 +7,25 @@ use std::{
     time::{Duration, Instant},
 };
 use vibevalley_protocol::Caller;
-use vibevalley_server::{
-    Server,
-    modules::infra::http::{Fetch, Request},
-};
+use vibevalley_server::context::{Fetch, FetchError, Request, Response};
+use vibevalley_server::{App, BoxFuture, Config, Server as _, create_app_blocking};
+
+struct RecordedFetch {
+    inner: Arc<dyn Fetch>,
+    calls: Arc<Mutex<Vec<String>>>,
+    changed: Arc<Condvar>,
+}
+
+impl Fetch for RecordedFetch {
+    fn fetch_async(self: Arc<Self>, r: Request, cancel: tokio_util::sync::CancellationToken) -> BoxFuture<'static, Result<Response, FetchError>> {
+        Box::pin(async move {
+            let path = r.url.trim_start_matches("https://api.mosi.cn/v1").to_string();
+            self.calls.lock().unwrap().push(format!("{} {path}", r.method));
+            self.changed.notify_all();
+            self.inner.clone().fetch_async(r, cancel).await
+        })
+    }
+}
 
 struct Network {
     vendor: Arc<dyn Fetch>,
@@ -21,16 +36,13 @@ struct Network {
 }
 impl Network {
     fn new() -> Network {
-        let (vendor, download) = vibevalley_server::offline::network();
+        let (vendor, download) = vibevalley_server::fake::moss::network();
         let calls = Arc::new(Mutex::new(Vec::new()));
         let changed = Arc::new(Condvar::new());
-        let seen = calls.clone();
-        let notify = changed.clone();
-        let recorded: Arc<dyn Fetch> = Arc::new(move |r: Request| {
-            let path = r.url.trim_start_matches("https://api.mosi.cn/v1").to_string();
-            seen.lock().unwrap().push(format!("{} {path}", r.method));
-            notify.notify_all();
-            vendor.fetch(r)
+        let recorded: Arc<dyn Fetch> = Arc::new(RecordedFetch {
+            inner: vendor,
+            calls: calls.clone(),
+            changed: changed.clone(),
         });
         Network {
             vendor: recorded,
@@ -60,30 +72,30 @@ impl Network {
         }
     }
 }
-fn start(dir: &std::path::Path, network: &Network) -> vibevalley_server::Started {
+fn start(dir: &std::path::Path, network: &Network) -> App {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    vibevalley_server::start(vibevalley_server::ServerConfig {
+    create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         media_network: Some((network.vendor.clone(), network.download.clone())),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        ..vibevalley_server::ServerConfig::under(dir)
+        ..Config::under(dir)
     })
     .unwrap()
 }
-fn ok(s: &vibevalley_server::Started, op: &str, p: Value) -> Value {
-    let e = s.hub.call(op, p);
+fn ok(s: &App, op: &str, p: Value) -> Value {
+    let e = s.router().call(op, p);
     assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
     e.data.unwrap_or(Value::Null)
 }
-fn refused(s: &vibevalley_server::Started, op: &str, p: Value) {
-    assert_ne!(s.hub.call(op, p).biz_code, 0, "{op} was not refused");
+fn refused(s: &App, op: &str, p: Value) {
+    assert_ne!(s.router().call(op, p).biz_code, 0, "{op} was not refused");
 }
 /// Binds every media use to one account with `key`; the revision requests then name.
-fn bind(s: &vibevalley_server::Started, key: &str) -> i64 {
+fn bind(s: &App, key: &str) -> i64 {
     let at = ok(s, "provider.get", Value::Null)["revision"].as_i64().unwrap();
     let to = |model: &str| json!({"connection":"moss","model":model});
     let status = ok(
@@ -102,31 +114,31 @@ fn bind(s: &vibevalley_server::Started, key: &str) -> i64 {
     );
     status["revision"].as_i64().unwrap()
 }
-fn input(s: &vibevalley_server::Started, kind: &str, mime: &str, name: &str, bytes: Vec<u8>) -> String {
+fn input(s: &App, kind: &str, mime: &str, name: &str, bytes: Vec<u8>) -> String {
     let made = ok(s, "media.input.create", json!({"kind":kind,"mime":mime,"name":name,"size":bytes.len()}));
     let id = made["id"].as_str().unwrap().to_string();
-    s.test_internals().media_inputs.upload(&id, Cursor::new(bytes)).unwrap();
+    vibevalley_runtime::rt::block_on(s.test_internals().storage.media_input.upload_async(&id, Box::new(Cursor::new(bytes)))).unwrap();
     id
 }
-fn sample(s: &vibevalley_server::Started) -> String {
-    input(s, "audio", "audio/wav", "sample.wav", vibevalley_server::offline::wav(2880))
+fn sample(s: &App) -> String {
+    input(s, "audio", "audio/wav", "sample.wav", vibevalley_server::fake::moss::wav(2880))
 }
-fn picture(s: &vibevalley_server::Started) -> String {
+fn picture(s: &App) -> String {
     let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
     png.resize(24, 0);
     input(s, "image", "image/png", "cat.png", png)
 }
-fn deletable(s: &vibevalley_server::Started, input: &str) -> bool {
+fn deletable(s: &App, input: &str) -> bool {
     ok(s, "media.input.get", json!({"id":input}))["canDelete"] == true
 }
-fn until(s: &vibevalley_server::Started, id: &str, what: &str, done: impl Fn(&Value) -> bool) -> Value {
-    crate::support::wait_until_settled(Some(&s.hub), Duration::from_secs(10), what, || {
+fn until(s: &App, id: &str, what: &str, done: impl Fn(&Value) -> bool) -> Value {
+    crate::support::wait_until_settled(Some(s.ctx()), Duration::from_secs(10), what, || {
         let j = ok(s, "media.job.get", json!({"id":id}));
         done(&j).then_some(j)
     })
 }
-fn wait(s: &vibevalley_server::Started, id: &str, phase: &str) -> Value {
-    crate::support::wait_until_transition(&s.hub, Duration::from_secs(10), phase, || {
+fn wait(s: &App, id: &str, phase: &str) -> Value {
+    crate::support::wait_until_transition(s.ctx(), Duration::from_secs(10), phase, || {
         let j = ok(s, "media.job.get", json!({"id":id}));
         (j["phase"] == phase).then_some(j)
     })
@@ -149,16 +161,16 @@ fn understanding(id: &str, revision: i64, input: &str, prompt: &str) -> Value {
 }
 type Tools = (
     Vec<Box<dyn vibevalley_runtime::agent::Tool>>,
-    Arc<parking_lot::Mutex<vibevalley_server::modules::team::tool::Route>>,
+    Arc<parking_lot::Mutex<vibevalley_server::agent::tool::Route>>,
 );
-fn tools(s: &vibevalley_server::Started, channel: &str) -> Tools {
-    use vibevalley_server::modules::team::tool::{Route, held};
+fn tools(s: &App, channel: &str) -> Tools {
+    use vibevalley_server::agent::tool::{Route, held};
     let route = Arc::new(parking_lot::Mutex::new(Route {
         agent: "orchestrator".into(),
         channel: channel.into(),
         ..Route::default()
     }));
-    (held(s.test_internals().tools, &route), route)
+    (held(&s.test_internals().agent.tool, &route), route)
 }
 
 #[test]
@@ -175,7 +187,7 @@ fn a_dialogue_and_a_designed_voice_are_followed_kept_and_released() {
     let ready = wait(&s, "talk", "ready");
     assert_eq!((&ready["format"], &ready["contentType"]), (&json!("wav"), &json!("audio/wav")));
     assert_eq!(ready["metadata"]["sampleRate"].as_f64(), Some(24000.0));
-    assert!(s.test_internals().attachments.file(ready["attachment"]["id"].as_str().unwrap()).is_ok());
+    assert!(vibevalley_runtime::rt::block_on(s.test_internals().storage.file_async(ready["attachment"]["id"].as_str().unwrap())).is_ok());
     // The same request is the same job; another under its id is refused; nothing is asked of the vendor twice.
     assert_eq!(ok(&s, "media.dialogue.create", dialogue("talk", revision, "Hello there."))["phase"], "ready");
     refused(&s, "media.dialogue.create", dialogue("talk", revision, "Something else."));
@@ -194,7 +206,7 @@ fn a_dialogue_and_a_designed_voice_are_followed_kept_and_released() {
     assert_eq!((&released["canRelease"], &released["previewInput"]), (&json!(false), &Value::Null));
     assert!(released.get("attachment").is_none());
     refused(&s, "media.input.get", json!({"id":preview}));
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -213,7 +225,7 @@ fn an_unknown_audio_answer_is_not_asked_again_and_a_failed_download_retries_alon
     ok(&s, "media.job.download", json!({"id":"fetch"}));
     wait(&s, "fetch", "ready");
     assert_eq!(network.count("POST /audio/voice/generations"), 1);
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -238,7 +250,7 @@ fn followed_audio_tasks_resume_by_hand_and_after_a_restart_without_being_asked_a
     for id in ["talk", "voice", "words"] {
         assert_eq!(ok(&s, "media.job.get", json!({"id":id}))["phase"], "generating");
     }
-    s.close();
+    s.close_blocking();
     let reopened = start(dir.path(), &network);
     assert!(wait(&reopened, "talk", "ready")["attachment"]["id"].is_string());
     assert!(wait(&reopened, "voice", "ready")["attachment"]["id"].is_string());
@@ -248,7 +260,7 @@ fn followed_audio_tasks_resume_by_hand_and_after_a_restart_without_being_asked_a
     assert_eq!(network.count("POST /audio/voice/generations"), 1);
     assert_eq!(network.count("POST /audio/transcriptions"), 1);
     assert_eq!((network.count("POST /files"), network.count("DELETE /files/")), (1, 1));
-    reopened.close();
+    reopened.close_blocking();
 }
 
 #[test]
@@ -260,7 +272,10 @@ fn a_voice_is_cloned_once_from_the_users_sample() {
     let audio = sample(&s);
     let clone = |id: &str, name: &str| json!({"id":id,"connection":"moss","revision":revision,"input":audio,"name":name,"consent":true});
     // Only the user says whose voice a sample is, and says so each time.
-    assert_ne!(s.hub.call_as(Caller::Orchestrator, "media.clone.create", clone("mine", "Mine")).biz_code, 0);
+    assert_ne!(
+        s.router().call_as(Caller::Orchestrator, "media.clone.create", clone("mine", "Mine")).biz_code,
+        0
+    );
     let mut silent = clone("mine", "Mine");
     silent["consent"] = json!(false);
     refused(&s, "media.clone.create", silent);
@@ -291,11 +306,11 @@ fn a_voice_is_cloned_once_from_the_users_sample() {
     // A restart in the middle never clones again: the voice may or may not exist.
     ok(&s, "media.clone.create", clone("cut", "[clone:hold]"));
     network.until("POST /audio/voices", 4);
-    s.close();
+    s.close_blocking();
     let reopened = start(dir.path(), &network);
     assert_eq!(wait(&reopened, "cut", "unknown")["canResume"], false);
     assert_eq!(network.count("POST /audio/voices"), 4);
-    reopened.close();
+    reopened.close_blocking();
 }
 
 #[test]
@@ -340,7 +355,7 @@ fn a_transcript_comes_by_task_or_by_stream_and_the_upload_is_deleted_after() {
     assert_eq!(cut["result"]["text"], "First synthetic speaker.");
     assert_eq!(cut["canResume"], false);
     refused(&s, "media.audio.resume", json!({"id":"cut"}));
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -359,7 +374,7 @@ fn a_vendor_file_that_would_not_go_is_cleaned_when_asked_again() {
     let cleaned = ok(&s, "media.audio.cleanup", json!({"id":"words"}));
     assert_eq!((&cleaned["canCleanup"], &cleaned["problem"]), (&json!(false), &json!("")));
     assert_eq!(network.count("DELETE /files/"), 2);
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -428,7 +443,7 @@ fn understanding_uploads_asks_once_and_deletes_what_it_uploaded() {
     let stuck = until(&s, "stuck", "a blocked cleanup", |j| j["cleanup"] == "blocked");
     assert_eq!((&stuck["phase"], &stuck["canCleanup"]), (&json!("ready"), &json!(true)));
     assert_eq!(ok(&s, "media.understanding.cleanup", json!({"id":"stuck"}))["cleanup"], "done");
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -446,11 +461,11 @@ fn understanding_cut_by_a_restart_is_unknown_and_cleans_when_asked() {
     network.until("POST /responses", 1);
     assert_eq!(ok(&s, "media.job.get", json!({"id":"cut"}))["phase"], "generating");
     refused(&s, "media.understanding.cleanup", json!({"id":"cut"}));
-    let channel = s.test_internals().chat.default_channel();
+    let channel = s.test_internals().channel.default_channel();
     let mut approved = understanding("waiting", revision, &image, "Describe.");
     approved["channel"] = json!(channel);
     assert_eq!(ok(&s, "media.understanding.authorize", approved)["phase"], "authorized");
-    s.close();
+    s.close_blocking();
     let reopened = start(dir.path(), &network);
     let cut = wait(&reopened, "cut", "unknown");
     assert_eq!((&cut["cleanup"], &cut["canCleanup"]), (&json!("pending"), &json!(true)));
@@ -459,7 +474,7 @@ fn understanding_cut_by_a_restart_is_unknown_and_cleans_when_asked() {
     assert_eq!(ok(&reopened, "media.understanding.cleanup", json!({"id":"cut"}))["cleanup"], "done");
     assert!(deletable(&reopened, &image));
     assert_eq!((network.count("POST /responses"), network.count("DELETE /files/")), (1, 1));
-    reopened.close();
+    reopened.close_blocking();
 }
 
 #[test]
@@ -469,7 +484,7 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     let s = start(dir.path(), &network);
     let revision = bind(&s, "test-understanding");
     let image = picture(&s);
-    let channel = s.test_internals().chat.default_channel();
+    let channel = s.test_internals().channel.default_channel();
     let mut approved = understanding("look", revision, &image, "What is this?");
     approved["channel"] = json!("no-such-channel");
     refused(&s, "media.understanding.authorize", approved.clone());
@@ -487,16 +502,16 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     let (tools, route) = tools(&s, "elsewhere");
     let tool = |name: &str| tools.iter().find(|t| t.spec().name == name).unwrap();
     let start = tool("media_understanding_start");
-    assert!(start.execute(&json!({"id":"look"})).is_error);
+    assert!(vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"}))).is_error);
     route.lock().user = true;
-    assert!(start.execute(&json!({"id":"look"})).is_error);
+    assert!(vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"}))).is_error);
     assert_eq!(ok(&s, "media.job.get", json!({"id":"look"}))["phase"], "authorized");
     route.lock().channel = channel.clone();
-    let started = start.execute(&json!({"id":"look"}));
+    let started = vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"})));
     assert!(!started.is_error, "{}", started.text);
     let done = until(&s, "look", "ready and cleaned", |j| j["phase"] == "ready" && j["cleanup"] == "done");
     assert_eq!(done["source"], json!({"kind":"orchestrator","agent":"orchestrator","channel":channel}));
-    assert!(!start.execute(&json!({"id":"look"})).is_error);
+    assert!(!vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"look"}))).is_error);
     assert_eq!((network.count("POST /files"), network.count("POST /responses")), (1, 1));
 
     // An approval the user withdraws lets go of its inputs and can no longer be started.
@@ -506,20 +521,20 @@ fn an_orchestrator_makes_audio_and_starts_understanding_only_with_the_users_word
     assert!(!deletable(&s, &image));
     assert_eq!(ok(&s, "media.job.cancel", json!({"id":"withdrawn"}))["cleanup"], "done");
     assert!(deletable(&s, &image));
-    assert!(!start.execute(&json!({"id":"withdrawn"})).is_error);
+    assert!(!vibevalley_runtime::rt::block_on(start.execute(&json!({"id":"withdrawn"}))).is_error);
     assert_eq!(ok(&s, "media.job.get", json!({"id":"withdrawn"}))["phase"], "canceled");
 
     let talk = tool("media_dialogue_create");
     route.lock().user = false;
-    assert!(talk.execute(&dialogue("talk", revision, "Hello there.")).is_error);
+    assert!(vibevalley_runtime::rt::block_on(talk.execute(&dialogue("talk", revision, "Hello there."))).is_error);
     route.lock().user = true;
-    let asked = talk.execute(&dialogue("talk", revision, "Hello there."));
+    let asked = vibevalley_runtime::rt::block_on(talk.execute(&dialogue("talk", revision, "Hello there.")));
     assert!(!asked.is_error, "{}", asked.text);
     assert_eq!(wait(&s, "talk", "ready")["source"]["kind"], "orchestrator");
-    let voice = tool("media_voice_design_create").execute(&design("voice", revision, "A short line."));
+    let voice = vibevalley_runtime::rt::block_on(tool("media_voice_design_create").execute(&design("voice", revision, "A short line.")));
     assert!(!voice.is_error, "{}", voice.text);
     assert_eq!(wait(&s, "voice", "ready")["source"]["agent"], "orchestrator");
-    s.close();
+    s.close_blocking();
 }
 
 #[test]
@@ -531,7 +546,7 @@ fn regression_job_admission_rolls_back_input_pins_without_a_second_write() {
     let revision = bind(&s, "test-understanding");
     let image = picture(&s);
     let mut approved = understanding("atomic", revision, &image, "Describe");
-    approved["channel"] = json!(s.test_internals().chat.default_channel());
+    approved["channel"] = json!(s.test_internals().channel.default_channel());
     let mut db = vibevalley_runtime::rt::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(dir.path().join("server.db")).connect()).unwrap();
     vibevalley_runtime::rt::block_on(
         sqlx::raw_sql(
@@ -561,5 +576,5 @@ fn regression_job_admission_rolls_back_input_pins_without_a_second_write() {
     assert_eq!(network.count("POST /files"), 0);
     ok(&s, "media.job.cancel", json!({"id":"atomic"}));
     assert!(deletable(&s, &image));
-    s.close();
+    s.close_blocking();
 }

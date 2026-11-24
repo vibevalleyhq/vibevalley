@@ -6,8 +6,8 @@ use std::{
 };
 use vibevalley_runtime::oar::{ControlAction, ControlStatus, EventKind, SessionOptions, StopReason};
 
-#[test]
-fn all_go_driver_families_replay_through_child_processes() {
+#[tokio::test]
+async fn all_go_driver_families_replay_through_child_processes() {
     let directory = tempfile::tempdir().unwrap();
     let executable = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     let registry = vibevalley_runtime::oar::default_runtimes();
@@ -36,12 +36,16 @@ fn all_go_driver_families_replay_through_child_processes() {
                 record_to: Some(directory.path().join(format!("{id}.jsonl"))),
                 ..Default::default()
             })
+            .await
             .unwrap_or_else(|e| panic!("{id}: {e}"));
-        let stream = session.events();
-        let out = session.control(ControlAction::Prompt, "hello", "input1", "span-1").unwrap();
+        let mut stream = session.events();
+        let out = session.control(ControlAction::Prompt, "hello", "input1", "span-1").await.unwrap();
         assert_eq!(out.status, ControlStatus::Accepted, "{id}: {out:?}");
         loop {
-            let ev = stream.recv_timeout(Duration::from_secs(6)).unwrap_or_else(|e| panic!("{id}: {e}"));
+            let ev = tokio::time::timeout(Duration::from_secs(6), stream.recv())
+                .await
+                .unwrap_or_else(|e| panic!("{id}: {e}"))
+                .unwrap_or_else(|| panic!("{id}: channel closed"));
             if ev.agent_path.is_empty()
                 && let EventKind::TurnFinished { reason, usage } = ev.kind
             {
@@ -86,9 +90,11 @@ fn all_go_driver_families_replay_through_child_processes() {
             .collect();
         assert!(!text.is_empty(), "{id}: frame has no root text");
         let prior = records.last().unwrap().seq;
-        let stream = session.subscribe_records(Some(prior));
-        session.dispose();
-        assert!(stream.into_iter().all(|r| r.seq > prior));
+        let mut rec_stream = session.subscribe_records(Some(prior));
+        session.dispose().await;
+        while let Some(r) = rec_stream.recv().await {
+            assert!(r.seq > prior);
+        }
         let disk = fs::read_to_string(directory.path().join(format!("{id}.jsonl"))).unwrap();
         let header: Value = serde_json::from_str(disk.lines().next().unwrap()).unwrap();
         assert_eq!(header["format"], "oar-voyage/3");

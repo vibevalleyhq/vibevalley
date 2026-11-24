@@ -59,9 +59,13 @@ pub enum MemoryAction {
     },
 }
 
+fn format_memory_line(id: &str, agent: &str, kind: &str, repo: Option<&str>, text: &str) -> String {
+    let repo = repo.map(|r| format!("[{r}]")).unwrap_or_default();
+    line(&[id, &format!("@{agent}"), kind, &repo, &one_line(text)])
+}
+
 fn memory_line(memory: &Memory) -> String {
-    let repo = memory.repo.as_ref().map(|r| format!("[{r}]")).unwrap_or_default();
-    line(&[&memory.id, &format!("@{}", memory.agent), memory.kind.as_str(), &repo, &one_line(&memory.text)])
+    format_memory_line(&memory.id, &memory.agent, memory.kind.as_str(), memory.repo.as_deref(), &memory.text)
 }
 
 pub fn run(client: &Client, cmd: MemoryCmd) -> Done {
@@ -83,10 +87,7 @@ pub fn run(client: &Client, cmd: MemoryCmd) -> Done {
             client.output.show(&found, |hits| {
                 hits.found
                     .iter()
-                    .map(|m| {
-                        let repo = m.repo.as_ref().map(|r| format!("[{r}]")).unwrap_or_default();
-                        line(&[&m.id, &format!("@{}", m.agent), m.kind.as_str(), &repo, &one_line(&m.text)])
-                    })
+                    .map(|m| format_memory_line(&m.id, &m.agent, m.kind.as_str(), m.repo.as_deref(), &m.text))
                     .collect::<Vec<_>>()
                     .join("\n")
             });

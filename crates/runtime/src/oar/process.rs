@@ -48,7 +48,7 @@ impl AbortWatchdog {
 
     pub(crate) fn arm(self: &Arc<Self>, grace: Duration, core: Arc<SessionCore>, child: Arc<LineChild>) {
         self.arm_with(grace, core, async move {
-            child.kill_async().await;
+            child.kill().await;
         });
     }
 
@@ -347,16 +347,18 @@ pub async fn run_output_with_timeout(mut command: Command, timeout: Duration, ma
 }
 
 /// Runs a short command and returns its stdout; `None` on failure or timeout.
-pub(crate) fn run_capture(binary: &Path, args: &[&str], timeout: Duration) -> Option<String> {
-    run_capture_streams(binary, args, timeout, false).and_then(|(ok, text)| ok.then_some(text))
+pub(crate) async fn run_capture(binary: &Path, args: &[&str], timeout: Duration) -> Option<String> {
+    run_capture_streams(binary, args, timeout, false)
+        .await
+        .and_then(|(ok, text)| ok.then_some(text))
 }
 
 /// Exit status and output; `with_stderr` appends stderr (some CLIs print
 /// their status there). `None` when it could not run or timed out.
-pub(crate) fn run_capture_streams(binary: &Path, args: &[&str], timeout: Duration, with_stderr: bool) -> Option<(bool, String)> {
+pub(crate) async fn run_capture_streams(binary: &Path, args: &[&str], timeout: Duration, with_stderr: bool) -> Option<(bool, String)> {
     let mut cmd = Command::new(binary);
     cmd.args(args).env("PATH", child_path());
-    let output = crate::rt::block_on(run_output_with_timeout(cmd, timeout, None)).ok()?;
+    let output = run_output_with_timeout(cmd, timeout, None).await.ok()?;
     if output.timed_out {
         return None;
     }
@@ -382,18 +384,20 @@ pub(crate) enum LoginStatus {
     Unknown,
 }
 
-pub(crate) fn probe_installation_with(name: &str, login: Option<&LoginCheck>) -> Installation {
+pub(crate) async fn probe_installation_with(name: &str, login: Option<&LoginCheck>) -> Installation {
     let Some(path) = find_binary(name) else {
         return Installation::NotInstalled;
     };
-    let Some(output) = run_capture(&path, &["--version"], Duration::from_secs(15)) else {
+    let Some(output) = run_capture(&path, &["--version"], Duration::from_secs(15)).await else {
         return Installation::Unusable {
             reason: format!("`{} --version` failed", path.display()),
         };
     };
     let version = output.lines().map(str::trim).find(|l| !l.is_empty()).map(str::to_string);
     if let Some(check) = login {
-        let status = run_capture_streams(&path, check.args, Duration::from_secs(15), true).map_or(LoginStatus::Unknown, |(ok, text)| (check.status)(ok, &text));
+        let status = run_capture_streams(&path, check.args, Duration::from_secs(15), true)
+            .await
+            .map_or(LoginStatus::Unknown, |(ok, text)| (check.status)(ok, &text));
         match status {
             LoginStatus::SignedIn => {}
             LoginStatus::SignedOut => return Installation::LoginRequired { path },
@@ -493,11 +497,15 @@ impl Drop for LineChild {
 }
 
 impl LineChild {
-    pub(crate) fn spawn(
+    pub(crate) fn spawn<FL, FE>(
         spec: Spawn<'_>,
-        mut on_line: impl FnMut(&str) + Send + 'static,
-        on_exit: impl FnOnce(Option<i32>, String) + Send + 'static,
-    ) -> Result<Arc<Self>> {
+        mut on_line: impl FnMut(String) -> FL + Send + 'static,
+        on_exit: impl FnOnce(Option<i32>, String) -> FE + Send + 'static,
+    ) -> Result<Arc<Self>>
+    where
+        FL: std::future::Future<Output = ()> + Send + 'static,
+        FE: std::future::Future<Output = ()> + Send + 'static,
+    {
         let mut command = Command::new(spec.binary);
         command
             .args(&spec.args)
@@ -507,7 +515,8 @@ impl LineChild {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             // Its own group, so stopping it reaches the tools it started.
-            .process_group(0);
+            .process_group(0)
+            .kill_on_drop(true);
         if let Some(opts) = spec.options {
             if let Some(base) = &opts.base_env {
                 command.env_clear().envs(base.iter().map(|(k, v)| (k, v)));
@@ -523,9 +532,10 @@ impl LineChild {
             command.env(name, value);
         }
 
-        // Enter the shared runtime so `tokio::process::Command` registers its pipes and SIGCHLD driver.
+        let rt = crate::rt::current_or_global_handle();
+        // Enter the active Tokio runtime so `tokio::process::Command` registers its pipes and SIGCHLD driver.
         let mut child = {
-            let _enter = crate::rt::handle().enter();
+            let _enter = rt.enter();
             command
                 .spawn()
                 .map_err(|e| AgentError::NotAvailable(format!("cannot start {}: {e}", spec.binary.display())))?
@@ -556,7 +566,7 @@ impl LineChild {
 
         // Task A: exclusively owns `Child` and reaps the process group on exit, kill, or stdout EOF.
         let reaper_inner = inner.clone();
-        crate::rt::spawn(async move {
+        rt.spawn(async move {
             let status = tokio::select! {
                 res = child.wait() => {
                     let status = res.ok();
@@ -601,7 +611,7 @@ impl LineChild {
         // Task B: captures the rolling 40-line stderr tail asynchronously.
         let stderr_task = stderr.map(|stderr| {
             let stderr_inner = inner.clone();
-            crate::rt::spawn(async move {
+            rt.spawn(async move {
                 let mut lines = BufReader::new(stderr).lines();
                 while let Ok(Some(line)) = lines.next_line().await {
                     let mut tail = stderr_inner.stderr_tail.lock();
@@ -615,7 +625,7 @@ impl LineChild {
 
         // Task C: streams stdout lines into `on_line`, then waits for exit + stderr before `on_exit`.
         let reader_inner = inner.clone();
-        crate::rt::spawn(async move {
+        rt.spawn(async move {
             let mut lines = BufReader::new(stdout);
             let mut buffer = Vec::new();
             loop {
@@ -627,8 +637,7 @@ impl LineChild {
                         let line = line.trim();
                         if !line.is_empty() {
                             trace.log("recv", line);
-                            // `on_line` is synchronous and may re-entrantly call `LineChild::kill()`.
-                            tokio::task::block_in_place(|| on_line(line));
+                            on_line(line.to_owned()).await;
                         }
                     }
                 }
@@ -640,13 +649,13 @@ impl LineChild {
                 let _ = task.await;
             }
             let stderr_text = reader_inner.stderr_text();
-            tokio::task::block_in_place(|| on_exit(status.and_then(|s| s.code()), stderr_text));
+            on_exit(status.and_then(|s| s.code()), stderr_text).await;
         });
 
         Ok(this)
     }
 
-    pub(crate) async fn write_line_async(&self, line: &str) -> Result<()> {
+    pub(crate) async fn write_line(&self, line: &str) -> Result<()> {
         let mut stdin = self.inner.stdin.lock().await;
         let Some(pipe) = stdin.as_mut() else {
             return Err(AgentError::Io("the runtime's stdin is closed".into()));
@@ -661,12 +670,8 @@ impl LineChild {
         pipe.flush().await.map_err(|e| AgentError::Io(format!("write to runtime failed: {e}")))
     }
 
-    pub(crate) fn write_line(&self, line: &str) -> Result<()> {
-        crate::rt::block_on(self.write_line_async(line))
-    }
-
-    pub(crate) fn write_json(&self, value: &serde_json::Value) -> Result<()> {
-        self.write_line(&value.to_string())
+    pub(crate) async fn write_json(&self, value: &serde_json::Value) -> Result<()> {
+        self.write_line(&value.to_string()).await
     }
 
     pub(crate) fn stderr_text(&self) -> String {
@@ -688,22 +693,17 @@ impl LineChild {
         Some((status.code().unwrap_or(128 + signal), reason))
     }
 
-    pub(crate) fn kill(self: &Arc<Self>) {
-        if self.inner.killed.swap(true, Ordering::SeqCst) {
-            return;
+    /// Non-blocking signal to start PGID termination (for `Drop` paths).
+    pub(crate) fn signal_kill(&self) {
+        if !self.inner.killed.swap(true, Ordering::SeqCst) {
+            self.inner.signal_kill();
         }
-        self.inner.signal_kill();
-        let mut rx = self.inner.exit_rx.clone();
-        crate::rt::block_on(async move {
-            let _ = rx.wait_for(Option::is_some).await;
-        });
     }
 
-    pub(crate) async fn kill_async(self: &Arc<Self>) {
-        if self.inner.killed.swap(true, Ordering::SeqCst) {
-            return;
+    pub(crate) async fn kill(self: &Arc<Self>) {
+        if !self.inner.killed.swap(true, Ordering::SeqCst) {
+            self.inner.signal_kill();
         }
-        self.inner.signal_kill();
         let mut rx = self.inner.exit_rx.clone();
         let _ = rx.wait_for(Option::is_some).await;
     }
@@ -711,24 +711,24 @@ impl LineChild {
 
 #[cfg(test)]
 mod tests {
+    use tokio::sync::mpsc;
+
     use super::*;
 
-    fn wait_until_dead(pid: i32, timeout: Duration) {
-        crate::rt::block_on(async {
-            tokio::time::timeout(timeout, async {
-                while nix::sys::signal::kill(Pid::from_raw(pid), None) != Err(Errno::ESRCH) {
-                    tokio::time::sleep(Duration::from_millis(10)).await;
-                }
-            })
-            .await
+    async fn wait_until_dead(pid: i32, timeout: Duration) {
+        tokio::time::timeout(timeout, async {
+            while nix::sys::signal::kill(Pid::from_raw(pid), None) != Err(Errno::ESRCH) {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
         })
+        .await
         .unwrap_or_else(|_| panic!("process {pid} still alive after {timeout:?}"));
     }
 
-    #[test]
-    fn line_child_streams_lines_stderr_and_exit_status() {
-        let (line_tx, line_rx) = flume::unbounded();
-        let (exit_tx, exit_rx) = flume::bounded(1);
+    #[tokio::test]
+    async fn line_child_streams_lines_stderr_and_exit_status() {
+        let (line_tx, mut line_rx) = mpsc::unbounded_channel();
+        let (exit_tx, exit_rx) = oneshot::channel();
         let child = LineChild::spawn(
             Spawn {
                 label: "test-stream",
@@ -740,26 +740,32 @@ mod tests {
                 env_remove: &[],
             },
             move |line| {
-                let _ = line_tx.send(line.to_string());
+                let line_tx = line_tx.clone();
+                async move {
+                    let _ = line_tx.send(line);
+                }
             },
-            move |code, stderr| {
+            move |code, stderr| async move {
                 let _ = exit_tx.send((code, stderr));
             },
         )
         .unwrap();
 
-        let (code, stderr) = exit_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-        let lines: Vec<String> = line_rx.try_iter().collect();
+        let (code, stderr) = tokio::time::timeout(Duration::from_secs(5), exit_rx).await.unwrap().unwrap();
+        let mut lines = Vec::new();
+        while let Ok(line) = line_rx.try_recv() {
+            lines.push(line);
+        }
         assert_eq!(lines, vec!["first", "second"]);
         assert_eq!(code, Some(7));
         assert!(stderr.contains("errline"), "{stderr}");
         assert_eq!(child.status(), Some((7, String::new())));
     }
 
-    #[test]
-    fn line_child_kill_and_drop_reap_grandchild_process_groups() {
+    #[tokio::test]
+    async fn line_child_kill_and_drop_reap_grandchild_process_groups() {
         // Explicit kill() reaps a grandchild even when SIGTERM is ignored by the shell.
-        let (pid_tx, pid_rx) = flume::bounded(1);
+        let (pid_tx, mut pid_rx) = mpsc::unbounded_channel();
         let child = LineChild::spawn(
             Spawn {
                 label: "test-kill-pgid",
@@ -771,19 +777,22 @@ mod tests {
                 env_remove: &[],
             },
             move |line| {
-                if let Ok(pid) = line.parse::<i32>() {
-                    let _ = pid_tx.send(pid);
+                let pid_tx = pid_tx.clone();
+                async move {
+                    if let Ok(pid) = line.parse::<i32>() {
+                        let _ = pid_tx.send(pid);
+                    }
                 }
             },
-            |_, _| {},
+            |_, _| async {},
         )
         .unwrap();
-        let grandchild_pid = pid_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-        child.kill();
-        wait_until_dead(grandchild_pid, Duration::from_secs(2));
+        let grandchild_pid = tokio::time::timeout(Duration::from_secs(5), pid_rx.recv()).await.unwrap().unwrap();
+        child.kill().await;
+        wait_until_dead(grandchild_pid, Duration::from_secs(2)).await;
 
         // Dropping the last Arc<LineChild> without calling kill() also reaps the process group.
-        let (drop_tx, drop_rx) = flume::bounded(1);
+        let (drop_tx, mut drop_rx) = mpsc::unbounded_channel();
         let orphan = LineChild::spawn(
             Spawn {
                 label: "test-drop-pgid",
@@ -795,37 +804,40 @@ mod tests {
                 env_remove: &[],
             },
             move |line| {
-                if let Ok(pid) = line.parse::<i32>() {
-                    let _ = drop_tx.send(pid);
+                let drop_tx = drop_tx.clone();
+                async move {
+                    if let Ok(pid) = line.parse::<i32>() {
+                        let _ = drop_tx.send(pid);
+                    }
                 }
             },
-            |_, _| {},
+            |_, _| async {},
         )
         .unwrap();
-        let orphan_grandchild = drop_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let orphan_grandchild = tokio::time::timeout(Duration::from_secs(5), drop_rx.recv()).await.unwrap().unwrap();
         drop(orphan);
-        wait_until_dead(orphan_grandchild, Duration::from_secs(4));
+        wait_until_dead(orphan_grandchild, Duration::from_secs(4)).await;
     }
 
-    #[test]
-    fn run_capture_streams_times_out_and_reaps_process_group() {
+    #[tokio::test]
+    async fn run_capture_streams_times_out_and_reaps_process_group() {
         let dir = tempfile::tempdir().unwrap();
         let pid_file = dir.path().join("probe.pid");
         let script = format!("sleep 30 & echo $! > {}; wait", pid_file.display());
-        let res = run_capture_streams(Path::new("/bin/sh"), &["-c", &script], Duration::from_millis(150), true);
+        let res = run_capture_streams(Path::new("/bin/sh"), &["-c", &script], Duration::from_millis(150), true).await;
         assert!(res.is_none());
         if let Ok(raw) = std::fs::read_to_string(&pid_file)
             && let Ok(pid) = raw.trim().parse::<i32>()
         {
-            wait_until_dead(pid, Duration::from_secs(2));
+            wait_until_dead(pid, Duration::from_secs(2)).await;
         }
     }
 
-    #[test]
-    fn run_output_with_timeout_captures_truncates_and_reaps_pgid() {
+    #[tokio::test]
+    async fn run_output_with_timeout_captures_truncates_and_reaps_pgid() {
         let mut ok_cmd = Command::new("/bin/sh");
         ok_cmd.args(["-c", "printf 'hello-out'; printf 'hello-err' >&2; exit 3"]);
-        let out = crate::rt::block_on(run_output_with_timeout(ok_cmd, Duration::from_secs(5), None)).unwrap();
+        let out = run_output_with_timeout(ok_cmd, Duration::from_secs(5), None).await.unwrap();
         assert!(!out.timed_out);
         assert!(!out.success());
         assert_eq!(out.code(), Some(3));
@@ -834,7 +846,7 @@ mod tests {
 
         let mut trunc_cmd = Command::new("/bin/sh");
         trunc_cmd.args(["-c", "printf '0123456789abcdef'"]);
-        let trunc = crate::rt::block_on(run_output_with_timeout(trunc_cmd, Duration::from_secs(5), Some(6))).unwrap();
+        let trunc = run_output_with_timeout(trunc_cmd, Duration::from_secs(5), Some(6)).await.unwrap();
         assert!(trunc.success());
         assert!(trunc.stdout_truncated);
         assert_eq!(trunc.stdout_lossy(), "012345\n[truncated]");
@@ -843,22 +855,19 @@ mod tests {
         let pid_file = dir.path().join("child.pid");
         let mut timeout_cmd = Command::new("/bin/sh");
         timeout_cmd.args(["-c", &format!("echo partial; sleep 30 & echo $! > {}; wait", pid_file.display())]);
-        let timed = crate::rt::block_on(run_output_with_timeout(timeout_cmd, Duration::from_millis(150), Some(1024))).unwrap();
+        let timed = run_output_with_timeout(timeout_cmd, Duration::from_millis(150), Some(1024)).await.unwrap();
         assert!(timed.timed_out);
         assert!(!timed.success());
         assert!(timed.stdout_lossy().contains("partial"), "{}", timed.stdout_lossy());
         if let Ok(raw) = std::fs::read_to_string(&pid_file)
             && let Ok(pid) = raw.trim().parse::<i32>()
         {
-            wait_until_dead(pid, Duration::from_secs(2));
+            wait_until_dead(pid, Duration::from_secs(2)).await;
         }
 
-        let missing = crate::rt::block_on(run_output_with_timeout(
-            Command::new("/definitely/missing/vibevalley-binary"),
-            Duration::from_secs(1),
-            None,
-        ))
-        .unwrap_err();
+        let missing = run_output_with_timeout(Command::new("/definitely/missing/vibevalley-binary"), Duration::from_secs(1), None)
+            .await
+            .unwrap_err();
         assert_eq!(missing.kind(), std::io::ErrorKind::NotFound);
     }
 
@@ -866,7 +875,7 @@ mod tests {
     async fn abort_watchdog_kills_after_grace_and_marks_exit_aborted() {
         let wall = std::time::Instant::now();
         let core = SessionCore::new("claude", "wd-timeout", None);
-        let events = core.subscribe(true);
+        let mut events = core.subscribe(true);
         core.begin_turn("slow work").unwrap();
 
         let watchdog = AbortWatchdog::new();
@@ -885,7 +894,10 @@ mod tests {
         assert!(killed.load(Ordering::SeqCst), "watchdog should fire once grace expires");
 
         watchdog.finish_on_exit(&core, "process exited with status 143".into());
-        let collected: Vec<_> = events.try_iter().collect();
+        let mut collected = Vec::new();
+        while let Ok(ev) = events.try_recv() {
+            collected.push(ev);
+        }
         assert!(
             collected.iter().any(|e| matches!(
                 e.kind,
@@ -911,7 +923,7 @@ mod tests {
     async fn abort_watchdog_disarms_when_turn_finishes_within_grace() {
         let wall = std::time::Instant::now();
         let core = SessionCore::new("codex", "wd-disarm", None);
-        let events = core.subscribe(true);
+        let mut events = core.subscribe(true);
         core.begin_turn("interruptible work").unwrap();
 
         let watchdog = AbortWatchdog::new();
@@ -935,7 +947,10 @@ mod tests {
         assert!(!killed.load(Ordering::SeqCst), "disarmed watchdog must not kill child");
 
         watchdog.finish_on_exit(&core, "unexpected crash".into());
-        let collected: Vec<_> = events.try_iter().collect();
+        let mut collected = Vec::new();
+        while let Ok(ev) = events.try_recv() {
+            collected.push(ev);
+        }
         assert!(
             collected
                 .iter()

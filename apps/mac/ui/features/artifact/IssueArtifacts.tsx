@@ -21,11 +21,9 @@ export function IssueArtifacts(props: { issue: IssueId; heading: JSX.Element }) 
                   card={{
                     id: a().id,
                     title: a().title,
-                    body: a().body,
+                    artifactType: a().artifactType,
                     version: a().version,
                     note: a().versions.at(-1)?.note ?? "",
-                    ...(a().display ? { display: a().display } : {}),
-                    ...(a().artifactType ? { artifactType: a().artifactType } : {}),
                   }}
                 />
               )}

@@ -101,23 +101,10 @@
    "artifact": {
     "id": "s1624",
     "title": "s1625",
-    "body": "blocks",
+    "artifactType": "docs",
     "version": 1626,
-    "note": "s1627",
-    "display": "page"
-   },
-   "blocks": [
-    {
-     "artifactId": "s1628",
-     "blockId": "s1629",
-     "rev": 1630,
-     "title": "s1631",
-     "type": "s1632",
-     "text": "s1633",
-     "nowRev": 1634,
-     "deleted": false
-    }
-   ]
+    "note": "s1627"
+   }
   },
   {
    "id": "s1636",
@@ -298,23 +285,10 @@
     "artifact": {
      "id": "s1759",
      "title": "s1760",
-     "body": "blocks",
+     "artifactType": "docs",
      "version": 1761,
-     "note": "s1762",
-     "display": "page"
-    },
-    "blocks": [
-     {
-      "artifactId": "s1763",
-      "blockId": "s1764",
-      "rev": 1765,
-      "title": "s1766",
-      "type": "s1767",
-      "text": "s1768",
-      "nowRev": 1769,
-      "deleted": true
-     }
-    ]
+     "note": "s1762"
+    }
    },
    "channel": "s1771",
    "address": "s1772"
@@ -465,18 +439,10 @@
       "artifact": {
        "id": "s1852",
        "title": "s1853",
-       "body": "blocks",
+       "artifactType": "docs",
        "version": 1854,
        "note": "s1855"
-      },
-      "blocks": [
-       {
-        "artifactId": "s1856",
-        "blockId": "s1857",
-        "rev": 1858,
-        "title": "s1859"
-       }
-      ]
+      }
      },
      "channel": "s1860",
      "address": "s1861"
@@ -612,23 +578,10 @@
     "artifact": {
      "id": "s1925",
      "title": "s1926",
-     "body": "blocks",
+     "artifactType": "docs",
      "version": 1927,
-     "note": "s1928",
-     "display": "page"
-    },
-    "blocks": [
-     {
-      "artifactId": "s1929",
-      "blockId": "s1930",
-      "rev": 1931,
-      "title": "s1932",
-      "type": "s1933",
-      "text": "s1934",
-      "nowRev": 1935,
-      "deleted": true
-     }
-    ]
+     "note": "s1928"
+    }
    }
   },
   {
@@ -687,13 +640,6 @@
   {
    "id": "s1959",
    "text": "s1960",
-   "blocks": [
-    {
-     "artifactId": "s1961",
-     "blockId": "s1962",
-     "rev": 1963
-    }
-   ],
    "replyTo": 1964,
    "attachments": [
     "s1965"
@@ -869,23 +815,10 @@
     "artifact": {
      "id": "s2051",
      "title": "s2052",
-     "body": "blocks",
+     "artifactType": "docs",
      "version": 2053,
-     "note": "s2054",
-     "display": "page"
-    },
-    "blocks": [
-     {
-      "artifactId": "s2055",
-      "blockId": "s2056",
-      "rev": 2057,
-      "title": "s2058",
-      "type": "s2059",
-      "text": "s2060",
-      "nowRev": 2061,
-      "deleted": true
-     }
-    ]
+     "note": "s2054"
+    }
    },
    "channel": "s2063",
    "address": "s2064"

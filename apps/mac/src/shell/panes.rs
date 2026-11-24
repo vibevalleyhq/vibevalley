@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use gpui::{AppContext as _, Context, Focusable, Window};
 use serde_json::{Value, json};
 use vibevalley_git::Repo;
+use vibevalley_server::gateway::bridge::BridgeRpc as _;
 use vibevalley_workspace::{Axis, PaneKind, ProjectId, TabId};
 
 use crate::diff::DiffView;
@@ -296,12 +297,12 @@ impl Shell {
             if self.workspace.chat_watches.contains_key(&sid) {
                 continue;
             }
-            let Ok((sub_id, rx)) = server.subscribe("session.watch", json!({ "id": sid, "afterSeq": i64::MAX })) else {
+            let Ok((sub_id, mut rx)) = server.subscribe("session.watch", json!({ "id": sid, "afterSeq": i64::MAX })) else {
                 continue;
             };
             let watch_sid = sid.clone();
             let task = cx.spawn(async move |this, cx| {
-                while let Ok(value) = rx.recv_async().await {
+                while let Some(value) = rx.recv().await {
                     let Ok(ev) = serde_json::from_value::<vibevalley_protocol::SessionWatchEvent>(value) else {
                         continue;
                     };
@@ -1097,32 +1098,12 @@ fn classify_terminal_file_action(path: PathBuf, line: Option<u32>, project_root:
     }
 }
 
-/// `%XX` escapes of a `file:` URL's path decoded (spaces, CJK names).
-pub(super) fn percent_decode(s: &str) -> String {
-    let bytes = s.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%'
-            && let Some(hex) = s.get(i + 1..i + 3)
-            && let Ok(b) = u8::from_str_radix(hex, 16)
-        {
-            out.push(b);
-            i += 3;
-            continue;
-        }
-        out.push(bytes[i]);
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
 #[cfg(test)]
 mod url_tests {
     #[test]
     fn file_urls_decode() {
-        assert_eq!(super::percent_decode("/tmp/%E6%88%AA%E5%9B%BE%201.png"), "/tmp/截图 1.png");
-        assert_eq!(super::percent_decode("/a%zzb%"), "/a%zzb%");
+        assert_eq!(crate::host::percent_decode("/tmp/%E6%88%AA%E5%9B%BE%201.png"), "/tmp/截图 1.png");
+        assert_eq!(crate::host::percent_decode("/a%zzb%"), "/a%zzb%");
     }
 
     #[test]

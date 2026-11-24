@@ -6,8 +6,8 @@ use std::{
 };
 use vibevalley_runtime::oar::{ContentBlock, EventKind, McpServer, SessionOptions, StopReason};
 
-#[test]
-fn sdk_streams_keep_secrets_private_and_resume_with_the_vendors_id() {
+#[tokio::test]
+async fn sdk_streams_keep_secrets_private_and_resume_with_the_vendors_id() {
     let root = tempfile::tempdir().unwrap();
     let binary = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     let registry = vibevalley_runtime::oar::default_runtimes();
@@ -31,12 +31,12 @@ fn sdk_streams_keep_secrets_private_and_resume_with_the_vendors_id() {
             }],
             ..Default::default()
         };
-        let session = runtime.open(opts).unwrap();
-        let events = session.events_with_history();
-        session.prompt(vec![ContentBlock::Text("multiline\nprompt".into())]).unwrap();
+        let session = runtime.open(opts).await.unwrap();
+        let mut events = session.events_with_history();
+        session.prompt(vec![ContentBlock::Text("multiline\nprompt".into())]).await.unwrap();
         let mut heard = false;
         loop {
-            match events.recv_timeout(Duration::from_secs(5)).unwrap().kind {
+            match tokio::time::timeout(Duration::from_secs(5), events.recv()).await.unwrap().unwrap().kind {
                 EventKind::TextDelta { text } => heard |= text == "hello sdk",
                 EventKind::TurnFinished { reason, usage } => {
                     assert_eq!(reason, StopReason::Completed);
@@ -51,7 +51,7 @@ fn sdk_streams_keep_secrets_private_and_resume_with_the_vendors_id() {
         }
         assert!(heard);
         assert_eq!(session.resume_id().as_deref(), Some("vendor-42"));
-        session.dispose();
+        session.dispose().await;
         let rows: Vec<Value> = fs::read_to_string(log).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
         let launch = &rows[0];
         assert!(!launch["argv"].to_string().contains("fixture-token"));

@@ -161,7 +161,7 @@ pub struct SubscriptionSpec {
     pub event: &'static str,
 }
 
-/// One of `rpc.ts`'s subscriptions as a type.
+/// One of `api.ts`'s subscriptions as a type.
 pub trait Subscription {
     const NAME: &'static str;
     const CAN: &'static [Caller];

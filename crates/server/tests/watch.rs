@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use vibevalley_protocol::Caller;
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime};
 use vibevalley_runtime::oar::{Capabilities, Installation, ModelInfo, Runtime, Session, SessionOptions};
-use vibevalley_server::modules::collab::channel::DeliveryTargetKind;
+use vibevalley_server::channel::DeliveryTargetKind;
 
 #[test]
 fn the_watch_routes_the_chat_to_a_session() {
@@ -20,32 +20,31 @@ fn the_watch_routes_the_chat_to_a_session() {
     let dir = tempfile::tempdir().unwrap();
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(ScriptedRuntime::demo()));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         link_previews: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
-    let hub = started.hub.clone();
-    let chat = started.test_internals().chat.clone();
+    let hub = started.router().clone();
+    let chat = started.test_internals().channel.clone();
     let call = |op: &str, p: Value| {
         let e = hub.call_as(Caller::User, op, p);
         assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
         e.data.unwrap_or(Value::Null)
     };
-    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
-    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(helper)).unwrap();
     call("repo.create", json!({ "name": "farm" }));
     let issue = call("issue.create", json!({ "title": "say hello", "repo": "farm", "agent": helper.id }));
     let id = issue["id"].as_str().unwrap().to_string();
     call("issue.status.update", json!({ "id": id, "status": "todo" }));
-    let session = crate::support::wait_until_transition(&hub, Duration::from_secs(30), "the session", || {
-        started
-            .test_internals()
-            .board
-            .read(|s| s.sessions.iter().find(|x| x.issue_id() == Some(id.as_str())).cloned())
+    let session = crate::support::wait_until_transition(started.ctx(), Duration::from_secs(30), "the session", || {
+        crate::support::board_sessions(started.test_internals().board)
+            .into_iter()
+            .find(|x| x.issue_id() == Some(id.as_str()))
     });
     let runs = |sid: &str| -> usize {
         let events = hub
@@ -57,7 +56,9 @@ fn the_watch_routes_the_chat_to_a_session() {
             .map(|a| a.iter().filter(|e| e["type"] == "run/end").count())
             .unwrap_or(0)
     };
-    crate::support::wait_until_live(&hub, Duration::from_secs(30), "the first run to end", || (runs(&session.id) >= 1).then_some(()));
+    crate::support::wait_until_live(started.ctx(), Duration::from_secs(30), "the first run to end", || {
+        (runs(&session.id) >= 1).then_some(())
+    });
 
     // The thread hangs under the dispatch in #general; the session is seated there.
     let thread = crate::support::wait_until_channel_event(&chat, Duration::from_secs(30), "the issue's thread", || chat.issue_thread_id(&id));
@@ -76,20 +77,20 @@ fn the_watch_routes_the_chat_to_a_session() {
 
     // The report lands in the thread from the session.
     crate::support::wait_until_channel_event(&chat, Duration::from_secs(30), "the report", || {
-        let rows = chat.issue_messages(&id).ok()?;
+        let rows = vibevalley_runtime::rt::block_on(chat.issue_messages_async(&id)).ok()?;
         rows.iter().any(|m| m.from == session.id).then_some(())
     });
 
     // A comment is said in the thread and delivered asynchronously to the session: a new round, 👀 on it.
     call("issue.comment.create", json!({ "id": id, "text": "再说一遍" }));
-    let rows = chat.issue_messages(&id).unwrap();
+    let rows = vibevalley_runtime::rt::block_on(chat.issue_messages_async(&id)).unwrap();
     let mine = rows.iter().rev().find(|m| m.text == "再说一遍").unwrap_or_else(|| panic!("{rows:?}"));
     crate::support::wait_until_channel_event(&chat, Duration::from_secs(30), "👀 on the comment", || {
         let seen = call("channel.message.list", json!({ "id": thread }));
         let mine_now = seen.as_array()?.iter().find(|m| m["id"] == mine.id.as_str())?;
         mine_now["reactions"].to_string().contains(&session.id).then_some(())
     });
-    crate::support::wait_until_live(&hub, Duration::from_secs(30), "the second run to end", || {
+    crate::support::wait_until_live(started.ctx(), Duration::from_secs(30), "the second run to end", || {
         (runs(&session.id) >= 2).then_some(())
     });
 
@@ -101,7 +102,7 @@ fn the_watch_routes_the_chat_to_a_session() {
         .unwrap()
         .to_string();
     // Wait until the orchestrator settles its own delivery so only the session's passive delivery stays pending.
-    crate::support::wait_until_settled(Some(&hub), Duration::from_secs(30), "1 pending delivery on ambient message", || {
+    crate::support::wait_until_settled(Some(started.ctx()), Duration::from_secs(30), "1 pending delivery on ambient message", || {
         let preview = call("channel.message.previewDelete", json!({ "id": around_id }));
         preview["does"].to_string().contains("1 份不再送").then_some(())
     });
@@ -111,21 +112,23 @@ fn the_watch_routes_the_chat_to_a_session() {
         "channel.message.send",
         json!({ "id": general, "text": format!("@{} 看一下", session.id), "sendKey": "named" }),
     );
-    crate::support::wait_until_live(&hub, Duration::from_secs(30), "the third run to end", || (runs(&session.id) >= 3).then_some(()));
+    crate::support::wait_until_live(started.ctx(), Duration::from_secs(30), "the third run to end", || {
+        (runs(&session.id) >= 3).then_some(())
+    });
     let events = call("session.event.list", json!({ "id": session.id }));
     let asked = events.to_string();
     assert!(asked.contains("[输入] 有 2 条给你的新消息"), "{asked}");
-    crate::support::wait_until_settled(Some(&hub), Duration::from_secs(30), "ambient delivery settled", || {
+    crate::support::wait_until_settled(Some(started.ctx()), Duration::from_secs(30), "ambient delivery settled", || {
         let preview = call("channel.message.previewDelete", json!({ "id": around_id }));
         (preview["does"].as_array()?.len() == 1).then_some(())
     });
-    started.close();
+    started.close_blocking();
 }
 
 struct BlockingRuntime {
     id: String,
-    entered: flume::Sender<()>,
-    release: flume::Receiver<()>,
+    entered: tokio::sync::mpsc::Sender<()>,
+    release: Arc<tokio::sync::Mutex<tokio::sync::mpsc::Receiver<()>>>,
 }
 
 impl Runtime for BlockingRuntime {
@@ -141,21 +144,27 @@ impl Runtime for BlockingRuntime {
         ScriptedRuntime::new(&self.id, Script::new()).capabilities()
     }
 
-    fn installation(&self) -> Installation {
-        Installation::Available {
-            version: None,
-            path: PathBuf::from("(blocking-test)"),
-        }
+    fn installation(&self) -> vibevalley_runtime::oar::BoxFuture<'_, Installation> {
+        Box::pin(async {
+            Installation::Available {
+                version: None,
+                path: PathBuf::from("(blocking-test)"),
+            }
+        })
     }
 
-    fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
-        Ok(vec![])
+    fn list_models(&self) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<ModelInfo>>> {
+        Box::pin(async { Ok(vec![]) })
     }
 
-    fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn Session>> {
-        let _ = self.entered.send(());
-        let _ = self.release.recv_timeout(Duration::from_secs(15));
-        ScriptedRuntime::demo().open(opts)
+    fn open(&self, opts: SessionOptions) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn Session>>> {
+        Box::pin(async move {
+            let _ = self.entered.send(()).await;
+            let mut rx = self.release.lock().await;
+            let _ = tokio::time::timeout(Duration::from_secs(15), rx.recv()).await;
+            drop(rx);
+            ScriptedRuntime::demo().open(opts).await
+        })
     }
 }
 
@@ -163,34 +172,34 @@ impl Runtime for BlockingRuntime {
 fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
-    let (entered_tx, entered_rx) = flume::bounded::<()>(4);
-    let (release_tx, release_rx) = flume::bounded::<()>(4);
+    let (entered_tx, mut entered_rx) = tokio::sync::mpsc::channel::<()>(4);
+    let (release_tx, release_rx) = tokio::sync::mpsc::channel::<()>(4);
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(BlockingRuntime {
         id: "blocking".into(),
         entered: entered_tx,
-        release: release_rx,
+        release: Arc::new(tokio::sync::Mutex::new(release_rx)),
     }));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         link_previews: false,
         tick_crons: false,
         orchestrator_listens: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| {
         let e = hub.call_as(Caller::User, op, p);
         assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
         e.data.unwrap_or(Value::Null)
     };
 
-    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "blocking".into();
     helper.name = "慢速帮手".into();
-    started.test_internals().agents.profiles.save(helper).unwrap();
+    vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let direct = call("channel.direct.create", json!({ "agent": "慢速帮手" })).as_str().unwrap().to_string();
     let other = call("channel.create", json!({ "name": "other" })).as_str().unwrap().to_string();
 
@@ -202,8 +211,9 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
         "Chat::say blocked on slow direct wakeup: {:?}",
         started_at.elapsed()
     );
-    entered_rx
-        .recv_timeout(Duration::from_secs(5))
+    vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), entered_rx.recv()).await })
+        .ok()
+        .flatten()
         .expect("direct talk lane entered BlockingRuntime::open");
 
     // While `BlockingRuntime::open` is actively blocked, writing in `#other` returns immediately.
@@ -220,33 +230,31 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
 
     // Deleting a message withdraws its pending deliveries immediately.
     assert!(
-        started
-            .test_internals()
-            .chat
-            .pending_deliveries(DeliveryTargetKind::Orchestrator)
+        vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
             .unwrap()
             .iter()
             .any(|d| d.message_id == fast_id)
     );
     call("channel.message.delete", json!({ "id": fast_id }));
     assert!(
-        !started
-            .test_internals()
-            .chat
-            .pending_deliveries(DeliveryTargetKind::Orchestrator)
+        !vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
             .unwrap()
             .iter()
             .any(|d| d.message_id == fast_id)
     );
 
     // Unblock `runtime.open` and verify the direct-channel talk settles and reports cleanly.
-    let _ = release_tx.send(());
-    crate::support::wait_until_channel_event(started.test_internals().chat, Duration::from_secs(30), "direct talk report landed", || {
+    let _ = release_tx.try_send(());
+    crate::support::wait_until_channel_event(started.test_internals().channel, Duration::from_secs(30), "direct talk report landed", || {
         let rows = call("channel.message.list", json!({ "id": direct }));
         rows.as_array()?.iter().any(|m| m["kind"] == "report").then_some(())
     });
-    assert!(started.test_internals().chat.pending_deliveries(DeliveryTargetKind::Direct).unwrap().is_empty());
-    started.close();
+    assert!(
+        vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Direct))
+            .unwrap()
+            .is_empty()
+    );
+    started.close_blocking();
 }
 
 struct ResumableTalkRuntime {
@@ -271,15 +279,15 @@ impl Runtime for ResumableTalkRuntime {
         }
     }
 
-    fn installation(&self) -> Installation {
+    fn installation(&self) -> vibevalley_runtime::oar::BoxFuture<'_, Installation> {
         self.inner.installation()
     }
 
-    fn list_models(&self) -> vibevalley_runtime::oar::Result<Vec<ModelInfo>> {
+    fn list_models(&self) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<ModelInfo>>> {
         self.inner.list_models()
     }
 
-    fn open(&self, mut opts: SessionOptions) -> vibevalley_runtime::oar::Result<Arc<dyn Session>> {
+    fn open(&self, mut opts: SessionOptions) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn Session>>> {
         self.resumes.lock().unwrap().push(opts.resume.clone());
         opts.resume = None;
         self.inner.open(opts)
@@ -301,24 +309,24 @@ fn pr2_direct_talk_reopen_passes_resume() {
             inner: ScriptedRuntime::new("resumable", Script::new().turn(vec![ScriptStep::text(reply)])),
             resumes,
         }));
-        vibevalley_server::start(vibevalley_server::ServerConfig {
+        vibevalley_server::create_app_blocking(vibevalley_server::Config {
             registry: Some(Arc::new(registry)),
             probe_runtimes: false,
             link_previews: false,
             tick_crons: false,
             orchestrator_listens: false,
-            ..vibevalley_server::ServerConfig::under(dir.path())
+            ..vibevalley_server::Config::under(dir.path())
         })
         .unwrap()
     };
 
     let s1 = open_server(resumes.clone(), "round-1");
-    let mut helper = s1.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(s1.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "resumable".into();
     helper.name = "接续帮手".into();
-    let helper = s1.test_internals().agents.profiles.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(s1.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let direct = s1
-        .hub
+        .router()
         .call_as(Caller::User, "channel.direct.create", json!({ "agent": "接续帮手" }))
         .data
         .unwrap()
@@ -326,23 +334,23 @@ fn pr2_direct_talk_reopen_passes_resume() {
         .unwrap()
         .to_string();
 
-    s1.hub
+    s1.router()
         .call_as(Caller::User, "channel.message.send", json!({ "id": direct, "text": "第一轮", "sendKey": "t1" }));
-    crate::support::wait_until_channel_event(s1.test_internals().chat, Duration::from_secs(30), "first direct talk report", || {
-        let rows = s1.hub.call_as(Caller::User, "channel.message.list", json!({ "id": direct })).data?;
+    crate::support::wait_until_channel_event(s1.test_internals().channel, Duration::from_secs(30), "first direct talk report", || {
+        let rows = s1.router().call_as(Caller::User, "channel.message.list", json!({ "id": direct })).data?;
         rows.as_array()?.iter().any(|m| m["kind"] == "report" && m["text"] == "round-1").then_some(())
     });
-    let session = s1.test_internals().board.sessions().talker(&helper.id, &direct).expect("talker session");
+    let session = vibevalley_runtime::rt::block_on(s1.test_internals().runtime.session_engine().talker_async(&helper.id, &direct)).expect("talker session");
     assert_eq!(resumes.lock().unwrap().as_slice(), &[None]);
-    s1.close();
+    s1.close_blocking();
     drop(s1);
 
     // Reopen server so live process map is empty and `talk` must call `open_talk` with `resume`.
     let s2 = open_server(resumes.clone(), "round-2");
-    s2.hub
+    s2.router()
         .call_as(Caller::User, "channel.message.send", json!({ "id": direct, "text": "第二轮", "sendKey": "t2" }));
-    crate::support::wait_until_channel_event(s2.test_internals().chat, Duration::from_secs(30), "second direct talk report", || {
-        let rows = s2.hub.call_as(Caller::User, "channel.message.list", json!({ "id": direct })).data?;
+    crate::support::wait_until_channel_event(s2.test_internals().channel, Duration::from_secs(30), "second direct talk report", || {
+        let rows = s2.router().call_as(Caller::User, "channel.message.list", json!({ "id": direct })).data?;
         rows.as_array()?.iter().any(|m| m["kind"] == "report" && m["text"] == "round-2").then_some(())
     });
     let recorded = resumes.lock().unwrap();
@@ -354,47 +362,50 @@ fn pr2_direct_talk_reopen_passes_resume() {
         session.id,
         *recorded
     );
-    s2.close();
+    s2.close_blocking();
 }
 
 #[test]
 fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
-    use vibevalley_server::modules::work::session::mailbox::MailboxStatus;
+    use vibevalley_server::runtime::MailboxStatus;
 
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
-    let (entered_tx, entered_rx) = flume::bounded::<()>(4);
-    let (release_tx, release_rx) = flume::bounded::<()>(4);
+    let (entered_tx, mut entered_rx) = tokio::sync::mpsc::channel::<()>(4);
+    let (release_tx, release_rx) = tokio::sync::mpsc::channel::<()>(4);
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(BlockingRuntime {
         id: "blocking".into(),
         entered: entered_tx,
-        release: release_rx,
+        release: Arc::new(tokio::sync::Mutex::new(release_rx)),
     }));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         link_previews: false,
         tick_crons: false,
         orchestrator_listens: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
     let call = |op: &str, p: Value| {
-        let e = started.hub.call_as(Caller::User, op, p);
+        let e = started.router().call_as(Caller::User, op, p);
         assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
         e.data.unwrap_or(Value::Null)
     };
 
-    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "blocking".into();
     helper.name = "信箱帮手".into();
-    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let direct = call("channel.direct.create", json!({ "agent": "信箱帮手" })).as_str().unwrap().to_string();
 
     // First message enters BlockingRuntime::open so the lane thread is busy before second is claimed.
     call("channel.message.send", json!({ "id": direct, "text": "第一条", "sendKey": "mb-1" }));
-    entered_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), entered_rx.recv()).await })
+        .ok()
+        .flatten()
+        .unwrap();
 
     call("channel.message.send", json!({ "id": direct, "text": "撤回这条", "sendKey": "mb-2" }));
     let msgs = call("channel.message.list", json!({ "id": direct }));
@@ -403,65 +414,65 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
         .unwrap()
         .to_string();
     let owner = format!("profile:{}", helper.id);
-    crate::support::wait_until_settled(Some(&started.hub), Duration::from_secs(30), "second message queued in mailbox", || {
-        let entries = started.test_internals().board.sessions().mailbox_entries(&owner).ok()?;
+    crate::support::wait_until_settled(Some(started.ctx()), Duration::from_secs(30), "second message queued in mailbox", || {
+        let entries = vibevalley_runtime::rt::block_on(started.test_internals().runtime.mailbox_entries_async(&owner)).ok()?;
         entries.into_iter().find(|e| e.payload == "撤回这条" && e.status == MailboxStatus::Pending)
     });
 
     call("channel.message.delete", json!({ "id": msg2_id }));
     crate::support::wait_until_settled(
-        Some(&started.hub),
+        Some(started.ctx()),
         Duration::from_secs(30),
         "deleted channel message withdraws pending mailbox entry",
         || {
-            let entries = started.test_internals().board.sessions().mailbox_entries(&owner).ok()?;
+            let entries = vibevalley_runtime::rt::block_on(started.test_internals().runtime.mailbox_entries_async(&owner)).ok()?;
             entries.into_iter().find(|e| e.payload == "撤回这条" && e.status == MailboxStatus::Withdrawn)
         },
     );
 
     // Release BlockingRuntime so the first delivery finishes and the withdrawn second message is skipped.
-    let _ = release_tx.send(());
-    let _ = release_tx.send(());
+    let _ = release_tx.try_send(());
+    let _ = release_tx.try_send(());
     crate::support::wait_until_settled(
-        Some(&started.hub),
+        Some(started.ctx()),
         Duration::from_secs(30),
         "first direct talk report landed and all deliveries cleared",
         || {
             let rows = call("channel.message.list", json!({ "id": direct }));
             let reports = rows.as_array()?.iter().filter(|m| m["kind"] == "report").count();
-            let pending = started.test_internals().chat.pending_deliveries(DeliveryTargetKind::Direct).ok()?;
+            let pending = vibevalley_runtime::rt::block_on(started.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Direct)).ok()?;
             (reports == 1 && pending.is_empty()).then_some(())
         },
     );
-    let entries = started.test_internals().board.sessions().mailbox_entries(&owner).unwrap();
+    let entries = vibevalley_runtime::rt::block_on(started.test_internals().runtime.mailbox_entries_async(&owner)).unwrap();
     assert_eq!(entries.iter().find(|e| e.payload == "撤回这条").unwrap().status, MailboxStatus::Withdrawn);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
 fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_direct_issue_and_orchestrator() {
-    use vibevalley_server::modules::work::session::mailbox::{MailboxSource, MailboxStatus};
+    use vibevalley_server::runtime::{MailboxSource, MailboxStatus};
 
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(ScriptedRuntime::demo()));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         link_previews: false,
         tick_crons: false,
         orchestrator_listens: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
     let call = |op: &str, p: Value| {
-        let e = started.hub.call_as(Caller::User, op, p);
+        let e = started.router().call_as(Caller::User, op, p);
         assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
         e.data.unwrap_or(Value::Null)
     };
 
-    let general = started.test_internals().chat.default_channel();
+    let general = started.test_internals().channel.default_channel();
     call(
         "channel.message.send",
         json!({ "id": general, "text": "待撤回消息", "sendKey": "multi-withdraw" }),
@@ -472,55 +483,53 @@ fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_
         .unwrap()
         .to_string();
 
-    let sessions = started.test_internals().board.sessions();
-    sessions
-        .enqueue_mailbox(
-            "profile:direct-1",
-            "direct:direct-1:msg",
-            MailboxSource::ChannelDirect,
-            Some(&msg_id),
-            "待撤回消息",
-        )
+    let runtime = started.test_internals().runtime;
+    vibevalley_runtime::rt::block_on(runtime.enqueue_mailbox_async(
+        "profile:direct-1",
+        "direct:direct-1:msg",
+        MailboxSource::ChannelDirect,
+        Some(&msg_id),
+        "待撤回消息",
+    ))
+    .unwrap();
+    vibevalley_runtime::rt::block_on(runtime.enqueue_mailbox_async("issue:42", "issue:42:msg", MailboxSource::IssueComment, Some(&msg_id), "待撤回消息"))
         .unwrap();
-    sessions
-        .enqueue_mailbox("issue:42", "issue:42:msg", MailboxSource::IssueComment, Some(&msg_id), "待撤回消息")
-        .unwrap();
-    sessions
-        .enqueue_mailbox(
-            "orchestrator",
-            "orchestrator:orchestrator:msg",
-            MailboxSource::ChannelOrchestrator,
-            Some(&msg_id),
-            "待撤回消息",
-        )
-        .unwrap();
+    vibevalley_runtime::rt::block_on(runtime.enqueue_mailbox_async(
+        "orchestrator",
+        "orchestrator:orchestrator:msg",
+        MailboxSource::ChannelOrchestrator,
+        Some(&msg_id),
+        "待撤回消息",
+    ))
+    .unwrap();
 
     call("channel.message.delete", json!({ "id": msg_id }));
     crate::support::wait_until_settled(
-        Some(&started.hub),
+        Some(started.ctx()),
         Duration::from_secs(30),
         "all three pending mailbox rows withdrawn by source_message_id",
         || {
-            let direct_w = sessions
-                .mailbox_entries("profile:direct-1")
+            let direct_w = vibevalley_runtime::rt::block_on(runtime.mailbox_entries_async("profile:direct-1"))
                 .ok()?
                 .iter()
                 .any(|e| e.status == MailboxStatus::Withdrawn);
-            let issue_w = sessions.mailbox_entries("issue:42").ok()?.iter().any(|e| e.status == MailboxStatus::Withdrawn);
-            let orch_w = sessions
-                .mailbox_entries("orchestrator")
+            let issue_w = vibevalley_runtime::rt::block_on(runtime.mailbox_entries_async("issue:42"))
+                .ok()?
+                .iter()
+                .any(|e| e.status == MailboxStatus::Withdrawn);
+            let orch_w = vibevalley_runtime::rt::block_on(runtime.mailbox_entries_async("orchestrator"))
                 .ok()?
                 .iter()
                 .any(|e| e.status == MailboxStatus::Withdrawn);
             (direct_w && issue_w && orch_w).then_some(())
         },
     );
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
 fn regression_issue_comment_clears_asking_in_board_slice_before_returning() {
-    use vibevalley_protocol::{InboxKind, IssueStageKind, IssueStatus};
+    use vibevalley_protocol::{BoardSlice, InboxKind, InboxSlice, IssueStageKind, IssueStatus, SliceKind};
     use vibevalley_runtime::oar::scripted::Step as ScriptStep;
 
     vibevalley_i18n::set_locale("zh");
@@ -530,49 +539,69 @@ fn regression_issue_comment_clears_asking_in_board_slice_before_returning() {
         .turn(vec![ScriptStep::text("Configured port 8797.")]);
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(ScriptedRuntime::new("scripted", script)));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         link_previews: false,
         tick_crons: false,
         orchestrator_listens: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
-    let hub = started.hub.clone();
+    let hub = started.router().clone();
     let call = |op: &str, p: Value| {
         let e = hub.call_as(Caller::User, op, p);
         assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
         e.data.unwrap_or(Value::Null)
     };
+    let board_slice = || -> BoardSlice {
+        vibevalley_runtime::rt::block_on(started.ctx().feed.flush());
+        serde_json::from_str(&started.ctx().feed.snapshot_json(SliceKind::Board)).unwrap()
+    };
+    let inbox_slice = || -> InboxSlice {
+        vibevalley_runtime::rt::block_on(started.ctx().feed.flush());
+        serde_json::from_str(&started.ctx().feed.snapshot_json(SliceKind::Inbox)).unwrap()
+    };
 
-    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
-    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(helper)).unwrap();
     call("repo.create", json!({ "name": "clock" }));
     let issue = call("issue.create", json!({ "title": "Pick port", "repo": "clock", "agent": helper.id }));
     let id = issue["id"].as_str().unwrap().to_string();
     call("issue.status.update", json!({ "id": id, "status": "todo" }));
 
-    crate::support::wait_until_transition(&hub, Duration::from_secs(30), "issue reaches asking stage", || {
-        let board = hub.board_slice();
+    crate::support::wait_until_transition(started.ctx(), Duration::from_secs(30), "issue reaches asking stage", || {
+        let board = board_slice();
         let item = board.issues.iter().find(|i| i.id == id)?;
         (item.status == IssueStatus::InProgress && item.stage.state == IssueStageKind::Asking).then_some(())
     });
-    assert!(hub.inbox_slice().items.iter().any(|item| item.kind == InboxKind::Ask));
+    assert!(inbox_slice().items.iter().any(|item| item.kind == InboxKind::Ask));
 
     // Record every post-Asking board state transition while answering so we
     // verify there is no spurious intermediate `InReview` flicker.
     let states = Arc::new(std::sync::Mutex::new(Vec::<(IssueStatus, IssueStageKind)>::new()));
     let states_sub = states.clone();
     let id_sub = id.clone();
-    let _sub = hub.subscribe_transitions("test-asking-transition", move |_, tr| {
-        let before = tr.before.issues.iter().find(|i| i.id == id_sub).map(|i| (i.status, i.stage.state));
-        let after = tr.after.issues.iter().find(|i| i.id == id_sub).map(|i| (i.status, i.stage.state));
-        if let Some(next) = after
-            && before != Some(next)
-        {
-            states_sub.lock().unwrap().push(next);
+    let mut board_sub = started.ctx().feed.subscribe(SliceKind::Board);
+    let mut prev: Option<(IssueStatus, IssueStageKind)> = {
+        let frame = board_sub.borrow_and_update(false);
+        serde_json::from_str::<BoardSlice>(&frame.json)
+            .ok()
+            .and_then(|b| b.issues.into_iter().find(|i| i.id == id_sub).map(|i| (i.status, i.stage.state)))
+    };
+    started.ctx().spawn("test-asking-transition", async move {
+        while board_sub.changed().await {
+            let frame = board_sub.borrow_and_update(false);
+            if let Ok(b) = serde_json::from_str::<BoardSlice>(&frame.json)
+                && let Some(item) = b.issues.into_iter().find(|i| i.id == id_sub)
+            {
+                let next = (item.status, item.stage.state);
+                if prev != Some(next) {
+                    prev = Some(next);
+                    states_sub.lock().unwrap().push(next);
+                }
+            }
         }
     });
 
@@ -580,14 +609,14 @@ fn regression_issue_comment_clears_asking_in_board_slice_before_returning() {
 
     // Immediately on return (no polling): BoardSlice must no longer be `Asking`
     // and InboxSlice must have dropped the `Ask` item.
-    let board_now = hub.board_slice();
+    let board_now = board_slice();
     let item_now = board_now.issues.iter().find(|i| i.id == id).expect("issue present");
     assert!(item_now.questions.is_empty(), "questions still present: {:?}", item_now.questions);
     assert_ne!(item_now.stage.state, IssueStageKind::Asking, "still Asking immediately after comment");
-    assert!(!hub.inbox_slice().items.iter().any(|item| item.kind == InboxKind::Ask));
+    assert!(!inbox_slice().items.iter().any(|item| item.kind == InboxKind::Ask));
 
-    crate::support::wait_until_transition(&hub, Duration::from_secs(30), "second round settles in_review", || {
-        let board = hub.board_slice();
+    crate::support::wait_until_transition(started.ctx(), Duration::from_secs(30), "second round settles in_review", || {
+        let board = board_slice();
         let item = board.issues.iter().find(|i| i.id == id)?;
         (item.status == IssueStatus::InReview && item.stage.state == IssueStageKind::Reviewing).then_some(())
     });
@@ -599,5 +628,5 @@ fn regression_issue_comment_clears_asking_in_board_slice_before_returning() {
         "expected first transition after comment to be (InProgress, Working), saw: {:?}",
         *seen
     );
-    started.close();
+    started.close_blocking();
 }

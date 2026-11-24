@@ -11,14 +11,14 @@ fn a_repo_is_made_by_name_and_an_issue_names_it() {
     let dir = tempfile::tempdir().unwrap();
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
-    let hub = started.hub.clone();
-    let call = |op: &str, p| hub.call_as(Caller::User, op, p);
+    let router = app.router().clone();
+    let call = |op: &str, p| router.call_as(Caller::User, op, p);
 
     assert!(
         !call("repo.validate", json!({ "name": "bad name" })).data.unwrap()["problem"]
@@ -49,10 +49,10 @@ fn a_repo_is_made_by_name_and_an_issue_names_it() {
     let unassigned = issue["id"].as_str().unwrap().to_string();
     let refused = call("issue.status.previewUpdate", json!({ "id": unassigned, "status": "todo" }));
     assert_eq!(refused.biz_code, vibevalley_protocol::BizCode::IssueRefused.code(), "{}", refused.message);
-    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
     helper.name = "小帮手".into();
-    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let assigned = call("issue.create", json!({ "title": "say hi", "repo": "farm", "agent": "小帮手" }));
     let assigned = assigned.data.unwrap_or_else(|| panic!("{}", assigned.message));
     assert_eq!(assigned["assignments"][0]["agent"], helper.id.as_str());
@@ -62,15 +62,14 @@ fn a_repo_is_made_by_name_and_an_issue_names_it() {
     assert!(does["does"][0].as_str().unwrap().contains("小帮手"), "{does}");
     let sent = call("issue.status.update", json!({ "id": id, "status": "todo" }));
     assert!(sent.data.is_some(), "{}", sent.message);
-    let session = started
-        .test_internals()
-        .board
-        .read(|s| s.sessions.iter().find(|s| s.issue_id() == Some(id.as_str())).cloned())
+    let session = crate::support::board_sessions(app.test_internals().board)
+        .into_iter()
+        .find(|s| s.issue_id() == Some(id.as_str()))
         .unwrap();
     assert_eq!((session.profile.as_deref(), session.runtime.as_str()), (Some(helper.id.as_str()), "scripted"));
     assert!(session.name.starts_with("小帮手"), "{}", session.name);
     // The user looking at a live session's changes is a `reviewed` entry, once per session.
-    let diff = crate::support::wait_until_transition(&hub, std::time::Duration::from_secs(10), "issue.diff.get ready", || {
+    let diff = crate::support::wait_until_transition(app.ctx(), std::time::Duration::from_secs(10), "issue.diff.get ready", || {
         let diff = call("issue.diff.get", json!({ "id": id }));
         diff.data.is_some().then_some(diff)
     });
@@ -96,7 +95,7 @@ fn a_repo_is_made_by_name_and_an_issue_names_it() {
         call("repo.template.list", json!({ "id": "nope" })).biz_code,
         vibevalley_protocol::BizCode::RepoNotFound.code()
     );
-    started.test_internals().board.close();
+    app.close_blocking();
 }
 
 #[test]
@@ -105,22 +104,22 @@ fn a_closed_farm_opens_again_in_the_same_process() {
     let config = || {
         let mut registry = vibevalley_runtime::oar::Registry::new();
         registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-        vibevalley_server::ServerConfig {
+        vibevalley_server::Config {
             registry: Some(Arc::new(registry)),
             probe_runtimes: false,
             orchestrator_listens: false,
             link_previews: false,
-            ..vibevalley_server::ServerConfig::under(dir.path())
+            ..vibevalley_server::Config::under(dir.path())
         }
     };
-    let first = vibevalley_server::start(config()).unwrap();
-    let made = first.hub.call_as(Caller::User, "issue.create", json!({ "title": "kept across a reopen" }));
+    let first = vibevalley_server::create_app_blocking(config()).unwrap();
+    let made = first.router().call_as(Caller::User, "issue.create", json!({ "title": "kept across a reopen" }));
     assert_eq!(made.biz_code, 0, "{}", made.message);
-    first.close();
-    let second = vibevalley_server::start(config()).expect("the board's lock was let go");
-    let list = second.hub.call_as(Caller::User, "issue.list", json!({})).data.unwrap();
+    first.close_blocking();
+    let second = vibevalley_server::create_app_blocking(config()).expect("the board's lock was let go");
+    let list = second.router().call_as(Caller::User, "issue.list", json!({})).data.unwrap();
     assert!(list.to_string().contains("kept across a reopen"), "{list}");
-    second.close();
+    second.close_blocking();
 }
 
 #[test]
@@ -130,7 +129,7 @@ fn every_contract_endpoint_and_subscription_is_registered_and_hub_drops_cleanly(
     let work = dir.path().join("work");
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         home,
         work_root: work.clone(),
         version: "9.8.7-test".into(),
@@ -138,7 +137,7 @@ fn every_contract_endpoint_and_subscription_is_registered_and_hub_drops_cleanly(
         probe_runtimes: false,
         orchestrator_listens: false,
         link_previews: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
 
@@ -147,16 +146,16 @@ fn every_contract_endpoint_and_subscription_is_registered_and_hub_drops_cleanly(
     }
     assert!(reqwest::Client::builder().build().is_ok());
 
-    let health = started.hub.call_as(Caller::User, "server.health.get", json!({})).data.unwrap();
+    let health = app.router().call_as(Caller::User, "server.health.get", json!({})).data.unwrap();
     assert_eq!(health["version"], "9.8.7-test");
-    let setting = started.hub.call_as(Caller::User, "setting.get", json!({})).data.unwrap();
+    let setting = app.router().call_as(Caller::User, "setting.get", json!({})).data.unwrap();
     assert_eq!(setting["version"], "9.8.7-test");
 
     let missing_ops: Vec<&str> = vibevalley_protocol::ENDPOINTS
         .iter()
         .chain(vibevalley_protocol::NATIVE_ENDPOINTS.iter())
         .map(|e| e.op)
-        .filter(|op| !started.hub.answers(op))
+        .filter(|op| !app.router().answers(op))
         .collect();
     assert!(missing_ops.is_empty(), "unregistered endpoints: {missing_ops:?}");
 
@@ -167,20 +166,20 @@ fn every_contract_endpoint_and_subscription_is_registered_and_hub_drops_cleanly(
         "artifact.suggestion.follow",
         "issue.watch",
     ] {
-        assert!(started.hub.answers_subscription(sub), "unregistered subscription: {sub}");
+        assert!(app.router().answers_subscription(sub), "unregistered subscription: {sub}");
     }
 
-    let missing_cron = started.hub.call_as(Caller::User, "cron.update", json!({ "id": "missing" }));
+    let missing_cron = app.router().call_as(Caller::User, "cron.update", json!({ "id": "missing" }));
     assert_eq!(missing_cron.biz_code, vibevalley_protocol::BizCode::CronNotFound.code());
 
-    let opened = started.hub.call_as(Caller::User, "orchestrator.open", json!({}));
+    let opened = app.router().call_as(Caller::User, "orchestrator.open", json!({}));
     assert_eq!(opened.biz_code, 0, "{}", opened.message);
-    assert!(started.hub.read(|s| s.sessions.iter().any(|h| h.is_orchestrator())));
+    assert!(crate::support::board_sessions(app.test_internals().board).iter().any(|h| h.is_orchestrator()));
 
-    let weak = Arc::downgrade(&started.hub);
-    started.close();
-    drop(started);
-    assert_eq!(weak.strong_count(), 0, "Hub still held by strong Arc cycle after Started::close + drop");
+    let weak = Arc::downgrade(app.router());
+    app.close_blocking();
+    drop(app);
+    assert_eq!(weak.strong_count(), 0, "Router still held by strong Arc cycle after App::close_blocking + drop");
 }
 
 #[test]
@@ -188,28 +187,28 @@ fn sent_issue_hands_over_to_another_profile_and_split_renames_parent() {
     let dir = tempfile::tempdir().unwrap();
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    let started = vibevalley_server::start(vibevalley_server::ServerConfig {
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         orchestrator_listens: false,
         link_previews: false,
-        ..vibevalley_server::ServerConfig::under(dir.path())
+        ..vibevalley_server::Config::under(dir.path())
     })
     .unwrap();
-    let call = |op: &str, p| started.hub.call_as(Caller::User, op, p);
+    let call = |op: &str, p| app.router().call_as(Caller::User, op, p);
 
     let repo = call("repo.create", json!({ "name": "handover-repo" }));
     assert_eq!(repo.biz_code, 0, "{}", repo.message);
 
-    let mut alpha = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut alpha = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     alpha.runtime = "scripted".into();
     alpha.name = "Alpha".into();
-    let alpha = started.test_internals().agents.profiles.save(alpha).unwrap();
+    let alpha = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(alpha)).unwrap();
 
-    let mut beta = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut beta = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     beta.runtime = "scripted".into();
     beta.name = "Beta".into();
-    let beta = started.test_internals().agents.profiles.save(beta).unwrap();
+    let beta = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(beta)).unwrap();
 
     let created = call("issue.create", json!({ "title": "first title", "repo": "handover-repo", "agent": "Alpha" }))
         .data
@@ -233,15 +232,11 @@ fn sent_issue_hands_over_to_another_profile_and_split_renames_parent() {
     let work_id = work["id"].as_str().unwrap().to_string();
     assert_eq!(call("issue.status.update", json!({ "id": work_id, "status": "todo" })).biz_code, 0);
 
-    crate::support::wait_until_transition(&started.hub, std::time::Duration::from_secs(10), "issue InReview", || {
-        started
-            .test_internals()
-            .board
-            .issue(&work_id)
-            .filter(|i| i.status == vibevalley_protocol::IssueStatus::InReview)
+    crate::support::wait_until_transition(app.ctx(), std::time::Duration::from_secs(10), "issue InReview", || {
+        crate::support::board_issue(app.test_internals().board, &work_id).filter(|i| i.status == vibevalley_protocol::IssueStatus::InReview)
     });
     assert_eq!(
-        started.test_internals().board.issue(&work_id).unwrap().status,
+        crate::support::board_issue(app.test_internals().board, &work_id).unwrap().status,
         vibevalley_protocol::IssueStatus::InReview
     );
 
@@ -251,19 +246,15 @@ fn sent_issue_hands_over_to_another_profile_and_split_renames_parent() {
     );
     assert_eq!(handed.biz_code, 0, "{}", handed.message);
 
-    let updated = started.test_internals().board.issue(&work_id).unwrap();
+    let updated = crate::support::board_issue(app.test_internals().board, &work_id).unwrap();
     assert_eq!(updated.assignments.len(), 2);
     assert_eq!(updated.assignments[0].agent, alpha.id);
     assert!(updated.assignments[0].ended_at.is_some());
     assert_eq!(updated.assignments[1].agent, beta.id);
     assert!(updated.assignments[1].ended_at.is_none());
 
-    crate::support::wait_until_transition(&started.hub, std::time::Duration::from_secs(10), "handover issue InReview", || {
-        started
-            .test_internals()
-            .board
-            .issue(&work_id)
-            .filter(|i| i.status == vibevalley_protocol::IssueStatus::InReview)
+    crate::support::wait_until_transition(app.ctx(), std::time::Duration::from_secs(10), "handover issue InReview", || {
+        crate::support::board_issue(app.test_internals().board, &work_id).filter(|i| i.status == vibevalley_protocol::IssueStatus::InReview)
     });
-    started.close();
+    app.close_blocking();
 }

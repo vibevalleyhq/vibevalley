@@ -31,8 +31,14 @@ function mergeMessages(existing: readonly ChatMessage[], incoming: readonly Chat
 }
 
 function channelLabel(channel: Channel): string {
-  if (channel.type === "direct") return `@${channel.name ?? channel.title}`;
-  return `#${channel.name ?? channel.title}`;
+  const name = channel.name ?? channel.title;
+  switch (channel.type) {
+    case "direct":
+      return `@${name}`;
+    case "channel":
+    case "thread":
+      return `#${name}`;
+  }
 }
 
 export function ChannelsTab(props: {

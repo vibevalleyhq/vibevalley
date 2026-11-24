@@ -4,15 +4,15 @@
 //! `VIBEVALLEY_SERVER=<printed url> vibevalley issue list`.
 use std::sync::Arc;
 
-use vibevalley_server::transport::bridge::fake::FakeServer;
+use vibevalley_server::gateway::bridge::fake::FakeServer;
 
 fn main() {
     let fake = match std::env::args().nth(1) {
-        Some(dir) => FakeServer::from_dir(std::path::Path::new(&dir)).expect("fixtures"),
+        Some(dir) => vibevalley_runtime::rt::block_on(FakeServer::from_dir_async(std::path::Path::new(&dir))).expect("fixtures"),
         None => FakeServer::new(),
     };
     fake.respond("issue.list", serde_json::json!([]));
-    let listener = vibevalley_server::transport::http::serve(Arc::new(fake), "127.0.0.1:0".parse().unwrap()).expect("listen");
+    let listener = vibevalley_server::gateway::http::serve(Arc::new(fake), "127.0.0.1:0".parse().unwrap()).expect("listen");
     println!("{}", listener.url());
     std::thread::park();
 }

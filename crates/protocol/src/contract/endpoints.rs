@@ -1285,15 +1285,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Artifact"),
     },
     Endpoint {
-        op: "artifact.html.edit",
-        module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("ArtifactHtmlEdit"),
-        result: Some("Artifact"),
-    },
-    Endpoint {
         op: "artifact.update",
         module: "artifact",
         about: &["id"],
@@ -1321,64 +1312,64 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Preview"),
     },
     Endpoint {
-        op: "artifact.block.list",
+        op: "artifact.type.list",
         module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactBlockListInput"),
-        result: Some("BlockSnapshot"),
+        input: None,
+        result: Some("Vec<ArtifactTypeInfo>"),
     },
     Endpoint {
-        op: "artifact.submit",
+        op: "artifact.type.read",
         module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactSubmitInput"),
-        result: Some("BlockAck"),
+        input: Some("ArtifactTypeReadRequest"),
+        result: Some("ArtifactTypeGuide"),
     },
     Endpoint {
-        op: "artifact.block.create",
+        op: "artifact.file.list",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Session, Caller::Orchestrator],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactBlockCreateInput"),
-        result: Some("BlockOpResult"),
+        input: Some("ArtifactFileListRequest"),
+        result: Some("ArtifactFileListResult"),
     },
     Endpoint {
-        op: "artifact.block.update",
+        op: "artifact.file.get",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Session, Caller::Orchestrator],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactBlockUpdateInput"),
-        result: Some("BlockOpResult"),
+        input: Some("ArtifactFileGetRequest"),
+        result: Some("ArtifactFileContent"),
     },
     Endpoint {
-        op: "artifact.block.delete",
+        op: "artifact.file.write",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Session, Caller::Orchestrator],
-        dry_run: Some("artifact.block.previewDelete"),
-        input: Some("ArtifactBlockDeleteInput"),
-        result: Some("BlockOpResult"),
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("ArtifactFileWriteRequest"),
+        result: Some("ArtifactFileWriteResult"),
     },
     Endpoint {
-        op: "artifact.block.previewDelete",
+        op: "artifact.file.delete",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Session, Caller::Orchestrator],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactBlockDeleteInput"),
-        result: Some("Preview"),
+        input: Some("ArtifactFileDeleteRequest"),
+        result: Some("ArtifactFileDeleteResult"),
     },
     Endpoint {
         op: "artifact.suggestion.list",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
         input: Some("ArtifactSuggestionListInput"),
         result: Some("Vec<Suggestion>"),
@@ -1387,7 +1378,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
         op: "artifact.suggestion.create",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
         input: Some("ArtifactSuggestionCreateInput"),
         result: Some("Suggestion"),
@@ -1409,69 +1400,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: Some("ArtifactSuggestionAcceptInput"),
         result: Some("Suggestion"),
-    },
-    Endpoint {
-        op: "artifact.markdown.get",
-        module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("ArtifactMarkdownGetInput"),
-        result: Some("ArtifactMarkdown"),
-    },
-    Endpoint {
-        op: "artifact.type.list",
-        module: "artifact",
-        about: &[],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: None,
-        result: Some("Vec<ArtifactTypeInfo>"),
-    },
-    Endpoint {
-        op: "artifact.type.read",
-        module: "artifact",
-        about: &[],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("ArtifactTypeReadRequest"),
-        result: Some("ArtifactTypeGuide"),
-    },
-    Endpoint {
-        op: "artifact.entry.list",
-        module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("ArtifactEntryListRequest"),
-        result: Some("ArtifactEntrySnapshot"),
-    },
-    Endpoint {
-        op: "artifact.entry.get",
-        module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("ArtifactEntryGetRequest"),
-        result: Some("ArtifactEntry"),
-    },
-    Endpoint {
-        op: "artifact.entry.batch",
-        module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("ArtifactEntryBatchRequest"),
-        result: Some("ArtifactEntryBatchResult"),
-    },
-    Endpoint {
-        op: "artifact.outline.import",
-        module: "artifact",
-        about: &[],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("ArtifactOutlineImportRequest"),
-        result: Some("Artifact"),
     },
     Endpoint {
         op: "artifact.presence.update",
@@ -2727,36 +2655,28 @@ pub mod ops {
         type Input = t::ArtifactGetInput;
         type Result = t::Artifact;
     }
-    /// Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
-    /// to make the next one.
+    /// Reads the artifact's primary entry file content (optionally at a historical version snapshot).
     pub struct ArtifactContentGet;
     impl Op for ArtifactContentGet {
         const NAME: &'static str = "artifact.content.get";
         type Input = t::ArtifactReadRequest;
         type Result = t::ArtifactContent;
     }
-    /// Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card.
+    /// Creates a new directory-backed artifact seeded with starter files for its `artifact_type`.
     pub struct ArtifactCreate;
     impl Op for ArtifactCreate {
         const NAME: &'static str = "artifact.create";
         type Input = t::ArtifactRequest;
         type Result = t::Artifact;
     }
-    /// An html one's new version over the latest. the old ones stay.
+    /// Cuts a new immutable directory snapshot version over the latest state.
     pub struct ArtifactVersionCreate;
     impl Op for ArtifactVersionCreate {
         const NAME: &'static str = "artifact.version.create";
         type Input = t::ArtifactVersionRequest;
         type Result = t::Artifact;
     }
-    /// The user's words in place of some in an html one's page: the next version, the rest of its bytes as they were.
-    pub struct ArtifactHtmlEdit;
-    impl Op for ArtifactHtmlEdit {
-        const NAME: &'static str = "artifact.html.edit";
-        type Input = t::ArtifactHtmlEdit;
-        type Result = t::Artifact;
-    }
-    /// Its title, as the user renames it.
+    /// Updates an artifact's title or default design-system flag.
     pub struct ArtifactUpdate;
     impl Op for ArtifactUpdate {
         const NAME: &'static str = "artifact.update";
@@ -2775,46 +2695,47 @@ pub mod ops {
         type Input = t::ArtifactDeleteInput;
         type Result = t::Preview;
     }
-    /// A blocks artifact and every live block (no tombstones), in order.
-    pub struct ArtifactBlockList;
-    impl Op for ArtifactBlockList {
-        const NAME: &'static str = "artifact.block.list";
-        type Input = t::ArtifactBlockListInput;
-        type Result = t::BlockSnapshot;
+    /// All 12 artifact types and the workspace's standing default design-system if any.
+    pub struct ArtifactTypeList;
+    impl Op for ArtifactTypeList {
+        const NAME: &'static str = "artifact.type.list";
+        type Input = ();
+        type Result = Vec<t::ArtifactTypeInfo>;
     }
-    /// A batch of ops, as the user: taken in order, in one transaction, one batch at a time.
-    pub struct ArtifactSubmit;
-    impl Op for ArtifactSubmit {
-        const NAME: &'static str = "artifact.submit";
-        type Input = t::ArtifactSubmitInput;
-        type Result = t::BlockAck;
+    /// An artifact type's SKILL.md guide or one of its named reference chapters.
+    pub struct ArtifactTypeRead;
+    impl Op for ArtifactTypeRead {
+        const NAME: &'static str = "artifact.type.read";
+        type Input = t::ArtifactTypeReadRequest;
+        type Result = t::ArtifactTypeGuide;
     }
-    /// One block inserted, as one batch of one op.
-    pub struct ArtifactBlockCreate;
-    impl Op for ArtifactBlockCreate {
-        const NAME: &'static str = "artifact.block.create";
-        type Input = t::ArtifactBlockCreateInput;
-        type Result = t::BlockOpResult;
+    /// Lists files (`manifest.json`, `structure/*`, `asset/*`) inside an artifact directory.
+    pub struct ArtifactFileList;
+    impl Op for ArtifactFileList {
+        const NAME: &'static str = "artifact.file.list";
+        type Input = t::ArtifactFileListRequest;
+        type Result = t::ArtifactFileListResult;
     }
-    /// One block's words, type or attrs changed, as one batch.
-    pub struct ArtifactBlockUpdate;
-    impl Op for ArtifactBlockUpdate {
-        const NAME: &'static str = "artifact.block.update";
-        type Input = t::ArtifactBlockUpdateInput;
-        type Result = t::BlockOpResult;
+    /// Reads one file by relative path inside an artifact directory (or historical version snapshot).
+    pub struct ArtifactFileGet;
+    impl Op for ArtifactFileGet {
+        const NAME: &'static str = "artifact.file.get";
+        type Input = t::ArtifactFileGetRequest;
+        type Result = t::ArtifactFileContent;
     }
-    /// One block and its children put in their tombstones.
-    pub struct ArtifactBlockDelete;
-    impl Op for ArtifactBlockDelete {
-        const NAME: &'static str = "artifact.block.delete";
-        type Input = t::ArtifactBlockDeleteInput;
-        type Result = t::BlockOpResult;
+    /// Atomically writes one or more files into `structure/` or `asset/` with origin attribution and collab sync.
+    pub struct ArtifactFileWrite;
+    impl Op for ArtifactFileWrite {
+        const NAME: &'static str = "artifact.file.write";
+        type Input = t::ArtifactFileWriteRequest;
+        type Result = t::ArtifactFileWriteResult;
     }
-    pub struct ArtifactBlockPreviewDelete;
-    impl Op for ArtifactBlockPreviewDelete {
-        const NAME: &'static str = "artifact.block.previewDelete";
-        type Input = t::ArtifactBlockDeleteInput;
-        type Result = t::Preview;
+    /// Deletes a relative path under `structure/` or `asset/` with origin attribution and collab sync.
+    pub struct ArtifactFileDelete;
+    impl Op for ArtifactFileDelete {
+        const NAME: &'static str = "artifact.file.delete";
+        type Input = t::ArtifactFileDeleteRequest;
+        type Result = t::ArtifactFileDeleteResult;
     }
     /// The open and resolved suggestions on an artifact, oldest first.
     pub struct ArtifactSuggestionList;
@@ -2823,14 +2744,14 @@ pub mod ops {
         type Input = t::ArtifactSuggestionListInput;
         type Result = Vec<t::Suggestion>;
     }
-    /// A change an agent proposes to a block the user wrote.
+    /// A proposed edit to a file or structured target inside an artifact directory.
     pub struct ArtifactSuggestionCreate;
     impl Op for ArtifactSuggestionCreate {
         const NAME: &'static str = "artifact.suggestion.create";
         type Input = t::ArtifactSuggestionCreateInput;
         type Result = t::Suggestion;
     }
-    /// The user takes a suggestion; a block that moved on since it was read comes back stale, and is not changed.
+    /// Accepts a pending suggestion and applies it to the artifact directory and collab state.
     pub struct ArtifactSuggestionAccept;
     impl Op for ArtifactSuggestionAccept {
         const NAME: &'static str = "artifact.suggestion.accept";
@@ -2842,55 +2763,6 @@ pub mod ops {
         const NAME: &'static str = "artifact.suggestion.reject";
         type Input = t::ArtifactSuggestionAcceptInput;
         type Result = t::Suggestion;
-    }
-    /// A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored.
-    pub struct ArtifactMarkdownGet;
-    impl Op for ArtifactMarkdownGet {
-        const NAME: &'static str = "artifact.markdown.get";
-        type Input = t::ArtifactMarkdownGetInput;
-        type Result = t::ArtifactMarkdown;
-    }
-    /// All structured artifact types and the farm's standing default design-system if any.
-    pub struct ArtifactTypeList;
-    impl Op for ArtifactTypeList {
-        const NAME: &'static str = "artifact.type.list";
-        type Input = ();
-        type Result = Vec<t::ArtifactTypeInfo>;
-    }
-    /// A structured artifact type's SKILL.md guide or one of its named reference chapters.
-    pub struct ArtifactTypeRead;
-    impl Op for ArtifactTypeRead {
-        const NAME: &'static str = "artifact.type.read";
-        type Input = t::ArtifactTypeReadRequest;
-        type Result = t::ArtifactTypeGuide;
-    }
-    /// A store artifact's entries (filtered by path prefix when given), with values when requested.
-    pub struct ArtifactEntryList;
-    impl Op for ArtifactEntryList {
-        const NAME: &'static str = "artifact.entry.list";
-        type Input = t::ArtifactEntryListRequest;
-        type Result = t::ArtifactEntrySnapshot;
-    }
-    /// One store entry with its value and revision.
-    pub struct ArtifactEntryGet;
-    impl Op for ArtifactEntryGet {
-        const NAME: &'static str = "artifact.entry.get";
-        type Input = t::ArtifactEntryGetRequest;
-        type Result = t::ArtifactEntry;
-    }
-    /// An atomic batch of set, patch, delete or copy writes on a store artifact with per-entry optimistic concurrency.
-    pub struct ArtifactEntryBatch;
-    impl Op for ArtifactEntryBatch {
-        const NAME: &'static str = "artifact.entry.batch";
-        type Input = t::ArtifactEntryBatchRequest;
-        type Result = t::ArtifactEntryBatchResult;
-    }
-    /// Imports a `.md` document into a new `ArtifactType::Outline` blocks artifact.
-    pub struct ArtifactOutlineImport;
-    impl Op for ArtifactOutlineImport {
-        const NAME: &'static str = "artifact.outline.import";
-        type Input = t::ArtifactOutlineImportRequest;
-        type Result = t::Artifact;
     }
     /// Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite.
     pub struct ArtifactPresenceUpdate;
@@ -3170,13 +3042,6 @@ pub const SUBSCRIPTIONS: &[SubscriptionSpec] = &[
         event: "ArtifactEvent",
     },
     SubscriptionSpec {
-        name: "artifact.entry.follow",
-        module: "artifact",
-        can: &[Caller::User, Caller::Remote],
-        payload: "ArtifactFollowPayload",
-        event: "ArtifactEntryEvent",
-    },
-    SubscriptionSpec {
         name: "artifact.suggestion.follow",
         module: "artifact",
         can: &[Caller::User, Caller::Remote],
@@ -3232,13 +3097,6 @@ pub mod subscriptions {
         type Payload = t::ArtifactFollowPayload;
         type Event = t::ArtifactEvent;
     }
-    pub struct ArtifactEntryFollow;
-    impl Subscription for ArtifactEntryFollow {
-        const NAME: &'static str = "artifact.entry.follow";
-        const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
-        type Payload = t::ArtifactFollowPayload;
-        type Event = t::ArtifactEntryEvent;
-    }
     pub struct ArtifactSuggestionFollow;
     impl Subscription for ArtifactSuggestionFollow {
         const NAME: &'static str = "artifact.suggestion.follow";
@@ -3266,5 +3124,285 @@ pub mod subscriptions {
         const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
         type Payload = t::IssueGetInput;
         type Event = t::IssueWatch;
+    }
+}
+
+macro_rules! endpoint_ids {
+    ($($variant:ident => $op:literal),* $(,)?) => {
+        /// Compile-time exhaustive identifier for every endpoint in [`ENDPOINTS`].
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+        pub enum EndpointId {
+            $($variant,)*
+        }
+
+        impl EndpointId {
+            /// Every endpoint id in the exact order of [`ENDPOINTS`].
+            pub const ALL: &'static [EndpointId] = &[$(EndpointId::$variant,)*];
+
+            /// Maps an endpoint op string (e.g. `"issue.create"`) to its [`EndpointId`].
+            pub fn from_op(op: &str) -> Option<EndpointId> {
+                match op {
+                    $($op => Some(EndpointId::$variant),)*
+                    _ => None,
+                }
+            }
+
+            /// Returns the wire op string for this endpoint.
+            pub const fn as_op(self) -> &'static str {
+                match self {
+                    $(EndpointId::$variant => $op,)*
+                }
+            }
+
+            /// Returns the static [`Endpoint`] metadata for this endpoint.
+            pub const fn spec(self) -> &'static Endpoint {
+                &ENDPOINTS[self as usize]
+            }
+        }
+    };
+}
+
+endpoint_ids! {
+    // agent & skill
+    AgentList => "agent.list",
+    AgentValidate => "agent.validate",
+    AgentCreate => "agent.create",
+    AgentUpdate => "agent.update",
+    AgentDelete => "agent.delete",
+    AgentPreviewDelete => "agent.previewDelete",
+    AgentTemplateList => "agent.template.list",
+    AgentTemplateInstall => "agent.template.install",
+    AgentTemplateUpdate => "agent.template.update",
+    AgentTemplateAdd => "agent.template.add",
+    AgentTemplateDelete => "agent.template.delete",
+    AgentTemplatePreviewDelete => "agent.template.previewDelete",
+    SkillList => "skill.list",
+    SkillCreate => "skill.create",
+    SkillUpdate => "skill.update",
+    SkillDelete => "skill.delete",
+    SkillPreviewDelete => "skill.previewDelete",
+    // runtime
+    RuntimeList => "runtime.list",
+    RuntimeRefresh => "runtime.refresh",
+    RuntimeSettingUpdate => "runtime.setting.update",
+    // memory
+    MemoryList => "memory.list",
+    MemoryRecall => "memory.recall",
+    MemoryCreate => "memory.create",
+    MemorySearch => "memory.search",
+    MemoryDelete => "memory.delete",
+    MemoryPreviewDelete => "memory.previewDelete",
+    // repo & github
+    RepoPrSubmit => "repo.pr.submit",
+    GithubGet => "github.get",
+    GithubRefresh => "github.refresh",
+    RepoList => "repo.list",
+    RepoValidate => "repo.validate",
+    RepoCreate => "repo.create",
+    RepoLanguageList => "repo.language.list",
+    RepoTemplateList => "repo.template.list",
+    RepoActivityGet => "repo.activity.get",
+    // session
+    SessionStop => "session.stop",
+    SessionList => "session.list",
+    SessionGet => "session.get",
+    SessionEventList => "session.event.list",
+    SessionOpenWorkspace => "session.openWorkspace",
+    SessionCloseWorkspace => "session.closeWorkspace",
+    SessionSend => "session.send",
+    SessionRespondPermission => "session.respondPermission",
+    SessionRespondInteraction => "session.respondInteraction",
+    SessionSetConfig => "session.setConfig",
+    SessionChildTranscript => "session.childTranscript",
+    SessionBindingAttach => "session.binding.attach",
+    SessionBindingDetach => "session.binding.detach",
+    // issue
+    IssueConversationGet => "issue.conversation.get",
+    IssueCommentCreate => "issue.comment.create",
+    IssueDiffGet => "issue.diff.get",
+    IssueHistoryList => "issue.history.list",
+    IssueList => "issue.list",
+    IssueReview => "issue.review",
+    IssueSplit => "issue.split",
+    IssueGet => "issue.get",
+    IssueRunList => "issue.run.list",
+    IssueTimelineGet => "issue.timeline.get",
+    IssueCreate => "issue.create",
+    IssueUpdate => "issue.update",
+    IssueDelete => "issue.delete",
+    IssuePreviewDelete => "issue.previewDelete",
+    IssueStatusUpdate => "issue.status.update",
+    IssueStatusPreviewUpdate => "issue.status.previewUpdate",
+    IssueRefine => "issue.refine",
+    // cron
+    CronCreate => "cron.create",
+    CronList => "cron.list",
+    CronUpdate => "cron.update",
+    CronDelete => "cron.delete",
+    CronPreviewDelete => "cron.previewDelete",
+    // channel
+    ChannelMessageSend => "channel.message.send",
+    ChannelCreate => "channel.create",
+    ChannelUpdate => "channel.update",
+    ChannelDefaultSet => "channel.default.set",
+    ChannelMessageList => "channel.message.list",
+    ChannelMarkRead => "channel.markRead",
+    ChannelMessageUpdate => "channel.message.update",
+    ChannelMessageDelete => "channel.message.delete",
+    ChannelMessagePreviewDelete => "channel.message.previewDelete",
+    ChannelMessageSearch => "channel.message.search",
+    ChannelReactionSet => "channel.reaction.set",
+    ChannelPinSet => "channel.pin.set",
+    ChannelPinList => "channel.pin.list",
+    ChannelThreadCreate => "channel.thread.create",
+    ChannelArchiveSet => "channel.archive.set",
+    ChannelDelete => "channel.delete",
+    ChannelPreviewDelete => "channel.previewDelete",
+    ChannelDirectCreate => "channel.direct.create",
+    ChannelNotifySet => "channel.notify.set",
+    ChannelMarkUnread => "channel.markUnread",
+    ChannelList => "channel.list",
+    ChannelUnreadList => "channel.unread.list",
+    // connector
+    ConnectorList => "connector.list",
+    ConnectorLogin => "connector.login",
+    ConnectorVerify => "connector.verify",
+    ConnectorLogout => "connector.logout",
+    ConnectorChannelSet => "connector.channel.set",
+    // game
+    GameAchievementList => "game.achievement.list",
+    GameTitleSet => "game.title.set",
+    // media & library
+    MediaDialogueCreate => "media.dialogue.create",
+    MediaVoiceDesignCreate => "media.voiceDesign.create",
+    MediaCloneCreate => "media.clone.create",
+    MediaTranscriptionCreate => "media.transcription.create",
+    MediaAudioResume => "media.audio.resume",
+    MediaAudioPreviewCleanup => "media.audio.previewCleanup",
+    MediaAudioCleanup => "media.audio.cleanup",
+    MediaInputCreate => "media.input.create",
+    MediaInputAdopt => "media.input.adopt",
+    MediaInputGet => "media.input.get",
+    MediaInputList => "media.input.list",
+    MediaInputDelete => "media.input.delete",
+    MediaInputPreviewDelete => "media.input.previewDelete",
+    MediaImageCreate => "media.image.create",
+    MediaUnderstandingCreate => "media.understanding.create",
+    MediaUnderstandingAuthorize => "media.understanding.authorize",
+    MediaUnderstandingStart => "media.understanding.start",
+    MediaSpeechCreate => "media.speech.create",
+    MediaSpeechResume => "media.speech.resume",
+    MediaUnderstandingPreviewCleanup => "media.understanding.previewCleanup",
+    MediaUnderstandingCleanup => "media.understanding.cleanup",
+    MediaJobGet => "media.job.get",
+    MediaJobCancel => "media.job.cancel",
+    MediaJobPreviewRelease => "media.job.previewRelease",
+    MediaJobRelease => "media.job.release",
+    MediaJobDownload => "media.job.download",
+    MediaJobList => "media.job.list",
+    LibraryItemList => "library.item.list",
+    LibraryItemAdd => "library.item.add",
+    LibraryItemDelete => "library.item.delete",
+    LibraryItemPreviewDelete => "library.item.previewDelete",
+    // voice
+    VoiceHear => "voice.hear",
+    VoiceMossVerify => "voice.moss.verify",
+    VoiceGrantCreate => "voice.grant.create",
+    VoiceCallStart => "voice.call.start",
+    VoiceCallStop => "voice.call.stop",
+    VoiceCallHear => "voice.call.hear",
+    VoiceCallSay => "voice.call.say",
+    // artifact
+    ArtifactList => "artifact.list",
+    ArtifactGet => "artifact.get",
+    ArtifactContentGet => "artifact.content.get",
+    ArtifactCreate => "artifact.create",
+    ArtifactVersionCreate => "artifact.version.create",
+    ArtifactUpdate => "artifact.update",
+    ArtifactDelete => "artifact.delete",
+    ArtifactPreviewDelete => "artifact.previewDelete",
+    ArtifactTypeList => "artifact.type.list",
+    ArtifactTypeRead => "artifact.type.read",
+    ArtifactFileList => "artifact.file.list",
+    ArtifactFileGet => "artifact.file.get",
+    ArtifactFileWrite => "artifact.file.write",
+    ArtifactFileDelete => "artifact.file.delete",
+    ArtifactSuggestionList => "artifact.suggestion.list",
+    ArtifactSuggestionCreate => "artifact.suggestion.create",
+    ArtifactSuggestionAccept => "artifact.suggestion.accept",
+    ArtifactSuggestionReject => "artifact.suggestion.reject",
+    ArtifactPresenceUpdate => "artifact.presence.update",
+    ArtifactHistoryList => "artifact.history.list",
+    ArtifactHistoryPreview => "artifact.history.preview",
+    ArtifactHistoryRestore => "artifact.history.restore",
+    ArtifactHistoryFork => "artifact.history.fork",
+    ArtifactHistoryUndoOrigin => "artifact.history.undoOrigin",
+    ArtifactHistoryCompact => "artifact.history.compact",
+    // provider & setting
+    ProviderGet => "provider.get",
+    ProviderUpdate => "provider.update",
+    ProviderVoiceList => "provider.voice.list",
+    ProviderModelList => "provider.model.list",
+    SettingGet => "setting.get",
+    SettingValidate => "setting.validate",
+    SettingUpdate => "setting.update",
+    // orchestrator
+    OrchestratorOpen => "orchestrator.open",
+    OrchestratorStop => "orchestrator.stop",
+    OrchestratorEvalCreate => "orchestrator.eval.create",
+    OrchestratorApprovalList => "orchestrator.approval.list",
+    OrchestratorApprovalResolve => "orchestrator.approval.resolve",
+    // attachment & core
+    AttachmentCreate => "attachment.create",
+    AttachmentImportPath => "attachment.importPath",
+    ServerHealthGet => "server.health.get",
+    // debug
+    DebugSnapshot => "debug.snapshot",
+    DebugTimelineList => "debug.timeline.list",
+    DebugTimelineClear => "debug.timeline.clear",
+    DebugTrajectoryList => "debug.trajectory.list",
+    DebugTrajectoryGet => "debug.trajectory.get",
+    DebugGraph => "debug.graph",
+    DebugOverrideGet => "debug.override.get",
+    DebugOverrideSet => "debug.override.set",
+    DebugBundleExport => "debug.bundle.export",
+    // remote & machine
+    RemoteStatus => "remote.status",
+    RemoteEnable => "remote.enable",
+    RemoteDisable => "remote.disable",
+    RemotePairCreate => "remote.pair.create",
+    RemotePairExchange => "remote.pair.exchange",
+    RemoteDeviceRevoke => "remote.device.revoke",
+    RemoteWhoami => "remote.whoami",
+    MachineList => "machine.list",
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn endpoint_id_matches_endpoints_table_exhaustively() {
+        assert_eq!(EndpointId::ALL.len(), ENDPOINTS.len());
+
+        let mut seen = HashSet::new();
+        for (idx, ep) in ENDPOINTS.iter().enumerate() {
+            let id = EndpointId::from_op(ep.op).unwrap_or_else(|| panic!("missing EndpointId for {}", ep.op));
+            assert_eq!(id, EndpointId::ALL[idx], "order mismatch at index {idx} ({})", ep.op);
+            assert_eq!(id.as_op(), ep.op);
+            assert_eq!(id.spec().op, ep.op);
+            assert_eq!(id.spec(), ep);
+            assert!(seen.insert(id), "duplicate EndpointId for {}", ep.op);
+        }
+
+        for &id in EndpointId::ALL {
+            assert_eq!(EndpointId::from_op(id.as_op()), Some(id));
+            assert_eq!(id.spec().op, id.as_op());
+        }
+
+        assert_eq!(EndpointId::from_op(""), None);
+        assert_eq!(EndpointId::from_op("unknown.op"), None);
     }
 }

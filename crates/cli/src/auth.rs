@@ -4,13 +4,14 @@
 use std::convert::Infallible;
 use std::fmt;
 use std::fs;
-use std::io::{ErrorKind, Write};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
+use vibevalley_cli::{load_secret_json, save_secret_json};
 
 use crate::client::{Failure, exit};
 
@@ -208,69 +209,18 @@ pub fn parse_pair_url(raw: &str) -> Result<ParsedPairUrl, Failure> {
 
 /// Loads `$VIBEVALLEY_HOME/auth.json`, returning `Ok(None)` when absent.
 pub fn load(home: &Path) -> Result<Option<AuthConfig>, Failure> {
-    let path = auth_path(home);
-    let raw = match fs::read_to_string(&path) {
-        Ok(content) => content,
-        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(err) => {
-            return Err(Failure::new(exit::OTHER, "Auth", format!("failed to read {}: {err}", path.display())));
-        }
+    let Some(mut cfg) = load_secret_json::<AuthConfig>(&auth_path(home), "credentials")? else {
+        return Ok(None);
     };
-    let mut cfg: AuthConfig = serde_json::from_str(&raw).map_err(|err| {
-        Failure::new(
-            exit::OTHER,
-            "Auth",
-            format!("invalid credentials file {} (line {}, column {})", path.display(), err.line(), err.column()),
-        )
-    })?;
     cfg.server = normalize_server_url_lossy(&cfg.server);
     Ok(Some(cfg))
 }
 
 /// Persists `config` atomically to `$VIBEVALLEY_HOME/auth.json` with `0o600` permissions on Unix.
 pub fn save(home: &Path, config: &AuthConfig) -> Result<PathBuf, Failure> {
-    fs::create_dir_all(home).map_err(|err| Failure::new(exit::OTHER, "Auth", format!("failed to create home directory {}: {err}", home.display())))?;
     let mut stored = config.clone();
     stored.server = normalize_server_url(&stored.server)?;
-    let body = serde_json::to_string_pretty(&stored).map_err(|err| Failure::new(exit::OTHER, "Auth", format!("failed to encode credentials: {err}")))?;
-
-    let path = auth_path(home);
-    let tmp_name = format!(
-        ".auth.json.tmp.{}.{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    );
-    let tmp_path = home.join(tmp_name);
-
-    let write_res = (|| -> std::io::Result<()> {
-        let mut opts = fs::OpenOptions::new();
-        opts.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            opts.mode(0o600);
-        }
-        let mut file = opts.open(&tmp_path)?;
-        file.write_all(body.as_bytes())?;
-        file.write_all(b"\n")?;
-        file.sync_all()?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&tmp_path, fs::Permissions::from_mode(0o600))?;
-        }
-        fs::rename(&tmp_path, &path)?;
-        Ok(())
-    })();
-
-    if let Err(err) = write_res {
-        let _ = fs::remove_file(&tmp_path);
-        return Err(Failure::new(exit::OTHER, "Auth", format!("failed to write {}: {err}", path.display())));
-    }
-    Ok(path)
+    save_secret_json(home, AUTH_FILE, &stored, "credentials")
 }
 
 /// Removes `$VIBEVALLEY_HOME/auth.json`, returning `Ok(false)` cleanly when already absent.

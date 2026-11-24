@@ -15,21 +15,21 @@ use nsh_core::element::{ImageSrc, input};
 use nsh_core::keymap::Modifiers;
 use nsh_core::prelude::*;
 use vibevalley_i18n::t_in;
-use vibevalley_protocol::ArtifactEntry;
 
 use crate::engine::whiteboard::{
     AlignOp, ArrowCurve, BoardAction, BoardCommand, BoardDoc, DistributeAxis, ElementId, ElementKind, FramePaintInput, GridStyle, MilestoneKind,
     Modifiers as WbModifiers, Point2, PointerButton as WbPointerButton, PointerInput, Presence, PresenceColor, Rect2, STICKERS, ShapeKind, StickerCategory,
-    StrokeStyle, TemplateKind, TextAlign, TextVariant, WhiteboardController, WhiteboardPalette, ZOrderDir, apply_command, build_export_painter,
-    decode_board_entries, decode_presences_json, encode_element_json, export_json, export_json_canvas, export_svg, layout_card, measure_text_span,
-    merge_live_presences, paint::parse_hex_hsla, paint_board_frame_painter, paint_minimap_painter, resolve_sticker_svg, route_arrow, sample_polyline,
+    StrokeStyle, TemplateKind, TextAlign, TextVariant, WhiteboardController, WhiteboardEntry, WhiteboardPalette, ZOrderDir, apply_command,
+    build_export_painter, decode_board_entries, decode_presences_json, encode_element_json, export_json, export_json_canvas, export_svg, layout_card,
+    measure_text_span, merge_live_presences, paint::parse_hex_hsla, paint_board_frame_painter, paint_minimap_painter, resolve_sticker_svg, route_arrow,
+    sample_polyline,
 };
 use crate::theme::AdaptiveUi;
 
 /// Props of [`VvWhiteboard`].
 #[derive(Debug, Clone, Copy, PartialEq, Props)]
 pub struct VvWhiteboardProps {
-    /// Serialized JSON array of [`ArtifactEntry`] records stored on the artifact.
+    /// Serialized JSON array of whiteboard entry records stored on the artifact.
     pub entries_json: Prop<SharedString>,
     /// Optional serialized JSON array of extra live [`Presence`] objects (e.g. working agents).
     #[prop(default)]
@@ -51,7 +51,7 @@ pub struct VvWhiteboardProps {
 /// Payload emitted when local whiteboard edits need persistence via `artifact.entry.batch`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, JsObject)]
 pub struct VvWhiteboardBatchEvent {
-    /// Serialized JSON array of `ArtifactEntryWriteInput` operations (preserving `ifRev` guards).
+    /// Serialized JSON array of whiteboard write operations (preserving `ifRev` guards).
     pub writes_json: SharedString,
 }
 
@@ -719,7 +719,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                 return;
             }
 
-            let parsed_entries: Vec<ArtifactEntry> = serde_json::from_str(entries_raw.as_str()).unwrap_or_default();
+            let parsed_entries: Vec<WhiteboardEntry> = serde_json::from_str(entries_raw.as_str()).unwrap_or_default();
             let mut next_doc = decode_board_entries(&parsed_entries, seq);
             *store_presences.borrow_mut() = next_doc.presences.clone();
             merge_live_presences(&mut next_doc, live_presences);

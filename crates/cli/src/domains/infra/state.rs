@@ -152,33 +152,8 @@ pub fn run(client: &Client, cmd: StateCmd) -> Done {
 
     if let Some(slice_arg) = cmd.slice {
         let kind: SliceKind = slice_arg.into();
-        match kind {
-            SliceKind::Board => {
-                let s: BoardSlice = client.slice(kind)?;
-                client.output.show(&s, board_summary);
-            }
-            SliceKind::Sessions => {
-                let s: SessionsSlice = client.slice(kind)?;
-                client.output.show(&s, sessions_summary);
-            }
-            SliceKind::Collab => {
-                let s: CollabSlice = client.slice(kind)?;
-                client.output.show(&s, collab_summary);
-            }
-            SliceKind::Inbox => {
-                let s: InboxSlice = client.slice(kind)?;
-                client.output.show(&s, inbox_summary);
-            }
-            SliceKind::Ops => {
-                let s: OpsSlice = client.slice(kind)?;
-                client.output.show(&s, ops_summary);
-            }
-            SliceKind::Farm => {
-                let s: FarmFrame = client.slice(kind)?;
-                client.output.show(&s, farm_summary);
-            }
-        }
-        return Ok(());
+        let data = client.get_text(&format!("/api/v1/slice/{}?once=1", kind.as_str()))?;
+        return show_slice_json(client, kind, &data);
     }
 
     let board: BoardSlice = client.slice(SliceKind::Board)?;

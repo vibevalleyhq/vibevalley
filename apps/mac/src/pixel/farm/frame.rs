@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn reads_empty_bundle_and_incremental_slices() {
-        let f = Frame::from_bundle(vibevalley_server::transport::bridge::fake::empty_bundle(3));
+        let f = Frame::from_bundle(vibevalley_server::gateway::bridge::fake::empty_bundle(3));
         assert_eq!(f.seq, 3);
         assert!(f.sessions.is_empty());
 

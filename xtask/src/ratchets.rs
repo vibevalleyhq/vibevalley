@@ -4,15 +4,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::rust_scan::{
-    LineIndex, SourceFile, collect_cfg_test_submodules, is_excluded_by_cfg_test, is_ident_char, strip_rust_comments_and_literals, strip_rust_non_code,
-    walk_matching_files,
+    LineIndex, SourceFile, collect_cfg_test_submodules, is_excluded_by_cfg_test, is_ident_char, is_ident_start, strip_rust_comments_and_literals,
+    strip_rust_non_code, walk_matching_files,
 };
 
 const CONCURRENCY_DOC: &str = "docs/style/rust-async-concurrency.md";
+const SPINE_DOC: &str = "docs/architecture-topology.md";
+const NAMING_DOC: &str = "docs/style/naming.md";
 
 /// Shrink-only ceiling for non-test `rt::block_on(` calls under `crates/server/src/`.
 /// This ceiling may only decrease as sync wrappers migrate to async; never raise it.
-pub const SERVER_BLOCK_ON_CEILING: usize = 91;
+pub const SERVER_BLOCK_ON_CEILING: usize = 5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(clippy::enum_variant_names)]
@@ -23,6 +25,10 @@ pub enum RustRatchetRule {
     NoRichSyncTryCurrent,
     NoRawTcpHttpMock,
     NoBlockOnInAsyncServer,
+    NoAppHub,
+    NoEventBus,
+    NoAttachSlot,
+    SingularServerStoreNames,
 }
 
 impl RustRatchetRule {
@@ -34,6 +40,10 @@ impl RustRatchetRule {
             Self::NoRichSyncTryCurrent => "no-rich-sync-try-current",
             Self::NoRawTcpHttpMock => "no-raw-tcp-http-mock",
             Self::NoBlockOnInAsyncServer => "no-block-on-in-async-server",
+            Self::NoAppHub => "no-app-hub",
+            Self::NoEventBus => "no-event-bus",
+            Self::NoAttachSlot => "no-attach-slot",
+            Self::SingularServerStoreNames => "singular-server-store-names",
         }
     }
 }
@@ -288,7 +298,7 @@ fn check_pollster(file: &SourceFile, stripped_code: &str) -> Vec<RatchetViolatio
             file: file.path.clone(),
             line,
             message: format!("`pollster` is forbidden in crates/ and apps/mac/ ({})", index.snippet_at(line)),
-            fix: "Remove `pollster` from Cargo.toml and Rust code; use `vibevalley_runtime::rt::block_on` at sync boundaries or convert callers to async (`Hub::on_async`).".to_owned(),
+            fix: "Remove `pollster` from Cargo.toml and Rust code; use `vibevalley_runtime::rt::block_on` at sync boundaries or convert callers to async (`ServerDoor`).".to_owned(),
             see: CONCURRENCY_DOC,
             details: Vec::new(),
         });
@@ -335,8 +345,7 @@ fn check_mac_rt_handle(file: &SourceFile, stripped_rust: &str) -> Vec<RatchetVio
             file: file.path.clone(),
             line,
             message: format!("`rt::handle` is forbidden in `apps/mac/src/` ({})", index.snippet_at(line)),
-            fix: "Use async `Server::call_with_async`, `Hub::call_with`, or GPUI `cx.spawn` instead of reaching for `vibevalley_runtime::rt::handle`."
-                .to_owned(),
+            fix: "Use async `Server::call_with_async` or GPUI `cx.spawn` instead of reaching for `vibevalley_runtime::rt::handle`.".to_owned(),
             see: CONCURRENCY_DOC,
             details: Vec::new(),
         });
@@ -470,23 +479,241 @@ struct BlockOnSite {
     snippet: String,
 }
 
-fn collect_server_block_on_sites(files: &[SourceFile]) -> Vec<BlockOnSite> {
-    let server_src_files: Vec<&SourceFile> = files
-        .iter()
-        .filter(|f| f.path.starts_with("crates/server/src/") && f.path.ends_with(".rs"))
-        .collect();
-    let mut excluded_targets = BTreeSet::new();
+const LEGACY_ATTACH_SLOTS: &[&str] = &[
+    "attach_mcp",
+    "attach_remote_auth",
+    "attach_machine_bus",
+    "attach_media_inputs",
+    "attach_voice",
+    "attach_speech_streams",
+    "attach_observer",
+    "attach_fault_gate",
+    "attach_host_debug",
+    "attach_hub",
+];
 
-    for file in &server_src_files {
-        let stripped = strip_rust_comments_and_literals(&file.text);
-        for target in collect_cfg_test_submodules(&file.path, &file.text, &stripped) {
-            excluded_targets.insert(target);
+const BANNED_PLURAL_STORE_NAMES: &[&str] = &[
+    "Agents",
+    "Crons",
+    "Repos",
+    "Memories",
+    "Artifacts",
+    "Attachments",
+    "Connectors",
+    "Machines",
+    "Pulls",
+    "Sessions",
+];
+
+fn next_ident_after_keyword<'a>(source: &'a str, keyword: &str, cursor: &mut usize) -> Option<(usize, &'a str)> {
+    let bytes = source.as_bytes();
+    while let Some(rel) = source[*cursor..].find(keyword) {
+        let kw_start = *cursor + rel;
+        let kw_end = kw_start + keyword.len();
+        *cursor = kw_end;
+        if !has_word_boundary_before(bytes, kw_start) || !has_word_boundary_after(bytes, kw_end) {
+            continue;
+        }
+        let mut prev = kw_start;
+        while prev > 0 && bytes[prev - 1].is_ascii_whitespace() {
+            prev -= 1;
+        }
+        if prev > 0 && (bytes[prev - 1] == b'.' || (prev >= 2 && &bytes[prev - 2..prev] == b"::")) {
+            continue;
+        }
+        let mut p = kw_end;
+        while p < bytes.len() && bytes[p].is_ascii_whitespace() {
+            p += 1;
+        }
+        if p < bytes.len() && is_ident_start(bytes[p]) {
+            let ident_start = p;
+            p += 1;
+            while p < bytes.len() && is_ident_char(bytes[p]) {
+                p += 1;
+            }
+            return Some((ident_start, &source[ident_start..p]));
+        }
+    }
+    None
+}
+
+fn check_no_app_hub(file: &SourceFile, stripped_rust: &str) -> Vec<RatchetViolation> {
+    let index = LineIndex::new(&file.text);
+    let mut violations = Vec::new();
+    if file.path.starts_with("crates/server/src/app/hub/") || file.path == "crates/server/src/app/hub.rs" {
+        violations.push(RatchetViolation {
+            rule: RustRatchetRule::NoAppHub,
+            file: file.path.clone(),
+            line: 1,
+            message: format!("legacy `app/hub` module `{}` is forbidden", file.path),
+            fix: "Delete `crates/server/src/app/hub*`; compose domain stores directly in `app/mod.rs`, `app/bootstrap.rs`, and `app/door.rs`.".to_owned(),
+            see: SPINE_DOC,
+            details: Vec::new(),
+        });
+        return violations;
+    }
+
+    let mut seen_line = BTreeSet::new();
+    if file.path == "crates/server/src/app/mod.rs" {
+        let mut cursor = 0usize;
+        while let Some((offset, ident)) = next_ident_after_keyword(stripped_rust, "mod", &mut cursor) {
+            if ident == "hub" {
+                let line = index.line_at(offset);
+                if seen_line.insert(line) {
+                    violations.push(RatchetViolation {
+                        rule: RustRatchetRule::NoAppHub,
+                        file: file.path.clone(),
+                        line,
+                        message: format!("`mod hub` is forbidden in `crates/server/src/app/mod.rs` ({})", index.snippet_at(line)),
+                        fix: "Remove `mod hub;` and wire domain stores directly through `App` and `ServerDoor`.".to_owned(),
+                        see: SPINE_DOC,
+                        details: Vec::new(),
+                    });
+                }
+            }
         }
     }
 
+    for offset in find_prefixed_call_matches(stripped_rust, "", "app::hub", false) {
+        let line = index.line_at(offset);
+        if !seen_line.insert(line) {
+            continue;
+        }
+        violations.push(RatchetViolation {
+            rule: RustRatchetRule::NoAppHub,
+            file: file.path.clone(),
+            line,
+            message: format!("reference to removed `app::hub` spine module ({})", index.snippet_at(line)),
+            fix: "Import spine primitives from `crate::app::{live, outbox, port, refusal, runtime, slice, ticker}` instead of `app::hub`.".to_owned(),
+            see: SPINE_DOC,
+            details: Vec::new(),
+        });
+    }
+    violations
+}
+
+fn check_no_event_bus(file: &SourceFile, stripped_rust: &str) -> Vec<RatchetViolation> {
+    let index = LineIndex::new(&file.text);
+    let mut seen_line = BTreeSet::new();
+    let mut violations = Vec::new();
+    for offset in find_prefixed_call_matches(stripped_rust, "", "EventBus", false) {
+        let line = index.line_at(offset);
+        if !seen_line.insert(line) {
+            continue;
+        }
+        violations.push(RatchetViolation {
+            rule: RustRatchetRule::NoEventBus,
+            file: file.path.clone(),
+            line,
+            message: format!("legacy `EventBus` reference is forbidden ({})", index.snippet_at(line)),
+            fix: "Use typed narrow ports in `crates/server/src/app/port.rs`, `SliceProjector`, or `tokio::sync::broadcast` streams instead of `EventBus`."
+                .to_owned(),
+            see: SPINE_DOC,
+            details: Vec::new(),
+        });
+    }
+    violations
+}
+
+fn check_no_attach_slots(file: &SourceFile, stripped_rust: &str, non_test_code: Option<&str>) -> Vec<RatchetViolation> {
+    let index = LineIndex::new(&file.text);
+    let mut seen_line = BTreeSet::new();
+    let mut violations = Vec::new();
+
+    if let Some(code) = non_test_code
+        && (file.path == "crates/server/src/app.rs" || file.path.starts_with("crates/server/src/app/"))
+    {
+        let mut cursor = 0usize;
+        while let Some((offset, ident)) = next_ident_after_keyword(code, "fn", &mut cursor) {
+            if ident.starts_with("attach_") {
+                let line = index.line_at(offset);
+                if seen_line.insert(line) {
+                    violations.push(RatchetViolation {
+                        rule: RustRatchetRule::NoAttachSlot,
+                        file: file.path.clone(),
+                        line,
+                        message: format!(
+                            "late-binding `{ident}` slot in `crates/server/src/app/` is forbidden ({})",
+                            index.snippet_at(line)
+                        ),
+                        fix: "Inject dependencies eagerly at construction time in `app/bootstrap.rs` instead of adding late-binding `attach_*` slots."
+                            .to_owned(),
+                        see: SPINE_DOC,
+                        details: Vec::new(),
+                    });
+                }
+            }
+        }
+    }
+
+    for slot in LEGACY_ATTACH_SLOTS {
+        for offset in find_prefixed_call_matches(stripped_rust, "", slot, false) {
+            let line = index.line_at(offset);
+            if !seen_line.insert(line) {
+                continue;
+            }
+            violations.push(RatchetViolation {
+                rule: RustRatchetRule::NoAttachSlot,
+                file: file.path.clone(),
+                line,
+                message: format!("legacy late-binding slot `{slot}` is forbidden ({})", index.snippet_at(line)),
+                fix: "Pass dependencies directly to constructors in `app/bootstrap.rs` or `ServerConfig` instead of calling/defining `attach_*`.".to_owned(),
+                see: SPINE_DOC,
+                details: Vec::new(),
+            });
+        }
+    }
+    violations.sort_by_key(|v| v.line);
+    violations
+}
+
+fn check_singular_server_store_names(file: &SourceFile, non_test_code: &str) -> Vec<RatchetViolation> {
+    let index = LineIndex::new(&file.text);
+    let mut seen_line = BTreeSet::new();
+    let mut violations = Vec::new();
+    for kw in ["struct", "enum", "type"] {
+        let mut cursor = 0usize;
+        while let Some((offset, ident)) = next_ident_after_keyword(non_test_code, kw, &mut cursor) {
+            if BANNED_PLURAL_STORE_NAMES.contains(&ident) {
+                let line = index.line_at(offset);
+                if seen_line.insert(line) {
+                    violations.push(RatchetViolation {
+                        rule: RustRatchetRule::SingularServerStoreNames,
+                        file: file.path.clone(),
+                        line,
+                        message: format!("plural server store type `{kw} {ident}` is forbidden ({})", index.snippet_at(line)),
+                        fix: "Use singular `*Store` names (e.g. `ArtifactStore`, `IssueStore`, `AgentStore`) with no plural compatibility aliases.".to_owned(),
+                        see: NAMING_DOC,
+                        details: Vec::new(),
+                    });
+                }
+            }
+        }
+    }
+    violations.sort_by_key(|v| v.line);
+    violations
+}
+
+fn collect_server_excluded_cfg_test_targets(files: &[SourceFile]) -> BTreeSet<String> {
+    let mut excluded_targets = BTreeSet::new();
+    for file in files {
+        if file.path.starts_with("crates/server/src/") && file.path.ends_with(".rs") {
+            let stripped = strip_rust_comments_and_literals(&file.text);
+            for target in collect_cfg_test_submodules(&file.path, &file.text, &stripped) {
+                excluded_targets.insert(target);
+            }
+        }
+    }
+    excluded_targets
+}
+
+fn collect_server_block_on_sites(files: &[SourceFile], excluded_targets: &BTreeSet<String>) -> Vec<BlockOnSite> {
     let mut sites = Vec::new();
-    for file in server_src_files {
-        if is_excluded_by_cfg_test(&file.path, &excluded_targets) {
+    for file in files {
+        if !(file.path.starts_with("crates/server/src/") && file.path.ends_with(".rs")) {
+            continue;
+        }
+        if is_excluded_by_cfg_test(&file.path, excluded_targets) {
             continue;
         }
         let non_test_code = strip_rust_non_code(&file.text, &file.path);
@@ -513,6 +740,7 @@ fn run_ratchets(files: &[SourceFile], ceiling: usize) -> (usize, Vec<RatchetViol
         .collect();
     sorted.sort_by(|a, b| a.path.cmp(&b.path));
 
+    let excluded_server_tests = collect_server_excluded_cfg_test_targets(&sorted);
     let mut violations = Vec::new();
 
     for file in &sorted {
@@ -525,6 +753,17 @@ fn run_ratchets(files: &[SourceFile], ceiling: usize) -> (usize, Vec<RatchetViol
         }
         let stripped_rust = strip_rust_comments_and_literals(&file.text);
         violations.extend(check_pollster(file, &stripped_rust));
+        violations.extend(check_no_app_hub(file, &stripped_rust));
+
+        if file.path.starts_with("crates/server/") || file.path.starts_with("apps/mac/") {
+            violations.extend(check_no_event_bus(file, &stripped_rust));
+            let is_non_test_server_src = file.path.starts_with("crates/server/src/") && !is_excluded_by_cfg_test(&file.path, &excluded_server_tests);
+            let non_test_code = is_non_test_server_src.then(|| strip_rust_non_code(&file.text, &file.path));
+            violations.extend(check_no_attach_slots(file, &stripped_rust, non_test_code.as_deref()));
+            if let Some(code) = non_test_code.as_deref() {
+                violations.extend(check_singular_server_store_names(file, code));
+            }
+        }
 
         if is_thread_sleep_zeroed_zone(&file.path) {
             violations.extend(check_thread_sleep(file, &stripped_rust));
@@ -540,7 +779,7 @@ fn run_ratchets(files: &[SourceFile], ceiling: usize) -> (usize, Vec<RatchetViol
         }
     }
 
-    let block_on_sites = collect_server_block_on_sites(&sorted);
+    let block_on_sites = collect_server_block_on_sites(&sorted, &excluded_server_tests);
     if block_on_sites.len() > ceiling {
         let first = &block_on_sites[0];
         violations.push(RatchetViolation {
@@ -551,7 +790,7 @@ fn run_ratchets(files: &[SourceFile], ceiling: usize) -> (usize, Vec<RatchetViol
                 "`crates/server/src/` has {} non-test `rt::block_on(` call(s), exceeding shrink-only ceiling {ceiling}",
                 block_on_sites.len()
             ),
-            fix: "Convert the new caller to `async fn` / `Hub::on_async` instead of adding `rt::block_on(`, or migrate existing sites to async and lower `SERVER_BLOCK_ON_CEILING` in `xtask/src/ratchets.rs`.".to_owned(),
+            fix: "Convert the new caller to `async fn` / `ServerDoor` instead of adding `rt::block_on(`, or migrate existing sites to async and lower `SERVER_BLOCK_ON_CEILING` in `xtask/src/ratchets.rs`.".to_owned(),
             see: CONCURRENCY_DOC,
             details: block_on_sites.iter().map(|s| format!("{}:{}: {}", s.file, s.line, s.snippet)).collect(),
         });
@@ -846,12 +1085,12 @@ mod tests {
     }
 
     #[test]
-    fn block_on_ceiling_91_excludes_cfg_test() {
-        assert_eq!(SERVER_BLOCK_ON_CEILING, 91);
+    fn block_on_ceiling_excludes_cfg_test() {
+        assert_eq!(SERVER_BLOCK_ON_CEILING, 5);
 
         let files = vec![
             sf(
-                "crates/server/src/base.rs",
+                "crates/server/src/db/mod.rs",
                 "pub fn a() { vibevalley_runtime::rt::block_on(async {}); }\npub fn b() { rt::block_on(async {}); }\n// rt::block_on(ignored_comment)\n#[cfg(test)]\nmod tests { fn c() { vibevalley_runtime::rt::block_on(async {}); } }",
             ),
             sf("crates/server/src/transport/http/mod.rs", "#[cfg(test)]\nmod tests;\n"),
@@ -874,8 +1113,8 @@ mod tests {
         assert_eq!(
             violations[0].details,
             vec![
-                "crates/server/src/base.rs:1: pub fn a() { vibevalley_runtime::rt::block_on(async {}); }",
-                "crates/server/src/base.rs:2: pub fn b() { rt::block_on(async {}); }",
+                "crates/server/src/db/mod.rs:1: pub fn a() { vibevalley_runtime::rt::block_on(async {}); }",
+                "crates/server/src/db/mod.rs:2: pub fn b() { rt::block_on(async {}); }",
             ]
         );
     }
@@ -902,5 +1141,61 @@ mod tests {
             dirty.violations.iter().map(|v| v.rule).collect::<Vec<_>>(),
             vec![RustRatchetRule::NoRichSyncTryCurrent]
         );
+    }
+
+    #[test]
+    fn spine_guardrails_reject_hub_event_bus_attach_slots_and_plural_stores() {
+        let files = vec![
+            sf("crates/server/src/app/hub/mod.rs", "pub struct Hub;\n"),
+            sf("crates/server/src/app/mod.rs", "mod hub;\npub fn attach_custom(&self) {}\n"),
+            sf("crates/server/src/work/issue/mod.rs", "use crate::app::hub::Hub;\npub fn bus(b: EventBus) {}\n"),
+            sf(
+                "crates/server/src/content/artifact/mod.rs",
+                "pub struct ArtifactStore;\npub type Artifacts = ArtifactStore;\npub struct Sessions;\n",
+            ),
+            sf(
+                "apps/mac/src/hosted/mod.rs",
+                "fn ok(h: &Handle) { h.attach_clients(); remote.attach_headers(); }\nfn bad(app: &App) { app.attach_observer(); }\n",
+            ),
+            sf("crates/server/src/work/session/sessions.rs", "pub async fn attach_binding_async() {}\n"),
+            sf(
+                "crates/server/src/content/artifact/tests.rs",
+                "pub struct Artifacts;\n// EventBus and app::hub in comments are ignored\n",
+            ),
+            sf(
+                "crates/server/src/content/artifact/mod_with_cfg_test.rs",
+                "#[cfg(test)]\nmod tests { pub struct Memories; }\n",
+            ),
+        ];
+
+        let violations = audit_rust_ratchets(&files, None);
+        let tags: Vec<String> = violations.iter().map(|v| format!("{}@{}:{}", v.rule.as_str(), v.file, v.line)).collect();
+        assert_eq!(
+            tags,
+            vec![
+                "no-attach-slot@apps/mac/src/hosted/mod.rs:2",
+                "no-app-hub@crates/server/src/app/hub/mod.rs:1",
+                "no-app-hub@crates/server/src/app/mod.rs:1",
+                "no-attach-slot@crates/server/src/app/mod.rs:2",
+                "singular-server-store-names@crates/server/src/content/artifact/mod.rs:2",
+                "singular-server-store-names@crates/server/src/content/artifact/mod.rs:3",
+                "singular-server-store-names@crates/server/src/content/artifact/tests.rs:1",
+                "no-app-hub@crates/server/src/work/issue/mod.rs:1",
+                "no-event-bus@crates/server/src/work/issue/mod.rs:2",
+            ]
+        );
+    }
+
+    #[test]
+    fn singular_store_guardrail_ignores_cfg_test_external_submodules_and_comments() {
+        let files = vec![
+            sf("crates/server/src/content/mod.rs", "#[cfg(test)]\nmod tests;\n"),
+            sf("crates/server/src/content/tests.rs", "pub struct Artifacts;\n"),
+            sf(
+                "crates/server/src/content/library.rs",
+                "// struct Agents\nconst DOC: &str = \"struct Sessions; EventBus; app::hub; attach_mcp\";\npub struct LibraryStore;\n",
+            ),
+        ];
+        assert!(audit_rust_ratchets(&files, None).is_empty());
     }
 }

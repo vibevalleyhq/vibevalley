@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
-use std::process::Command;
 use std::sync::{Arc, Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use tokio::process::Command;
 
+use crate::BoxFuture;
 use crate::agent::BrainError;
 use crate::agent::ai::CancelToken;
 use crate::agent::ai::types::{ChatRequest, Delta, ToolCall, ToolSpec, Usage};
@@ -35,7 +36,7 @@ const PERMISSION_SIGNAL: &str = "permission.decision";
 /// Resolves the model client/tool configuration for a conversation and receives live events.
 pub trait BrainProvider: Send + Sync {
     /// Returns `Ok(None)` if the target runtime is temporarily detached and should sleep on `ATTACHED_SIGNAL`.
-    fn resolve_brain(&self, conversation: &str, provider: &str) -> Result<Option<Arc<Brain>>>;
+    fn resolve_brain<'a>(&'a self, conversation: &'a str, provider: &'a str) -> BoxFuture<'a, Result<Option<Arc<Brain>>>>;
     fn observe(&self, _conversation: &str, _task: &str, _event: AgentEvent) {}
 }
 
@@ -123,12 +124,22 @@ impl Tool for StandInStubTool {
         self.0.clone()
     }
 
-    fn execute(&self, _args: &Value) -> ToolOutput {
-        ToolOutput::error(format!(
-            "extension tool `{}` is currently unavailable after restart; reattach its extension before calling it",
-            self.0.name
-        ))
+    fn execute<'a>(&'a self, _args: &'a Value) -> BoxFuture<'a, ToolOutput> {
+        let name = self.0.name.clone();
+        Box::pin(std::future::ready(ToolOutput::error(format!(
+            "extension tool `{name}` is currently unavailable after restart; reattach its extension before calling it"
+        ))))
     }
+}
+
+#[derive(Clone, Copy)]
+enum GenPhase {
+    Prepare,
+    Generate,
+    ToolDispatch,
+    ToolJoin,
+    YieldCheck,
+    FollowUpCheck,
 }
 
 #[derive(Clone)]
@@ -185,15 +196,22 @@ impl Engine {
         self.provider.observe(conversation, task_id, event);
     }
 
-    fn clear_attached_signals(&self, task_id: &str) -> Result<()> {
+    async fn clear_attached_signals(&self, task_id: &str) -> Result<()> {
+        let tid = task_id.to_owned();
         let has_pending = self
             .store
-            .read(|tx| Ok(tx.signals(task_id, false)?.iter().any(|s| s.signal_name == ATTACHED_SIGNAL)))?;
+            .read_async(move |tx| Box::pin(async move { Ok(tx.signals_async(&tid, false).await?.iter().any(|s| s.signal_name == ATTACHED_SIGNAL)) }))
+            .await?;
         if has_pending {
-            self.store.write(|tx| {
-                while tx.consume_first_signal(task_id, ATTACHED_SIGNAL)?.is_some() {}
-                Ok(())
-            })?;
+            let tid = task_id.to_owned();
+            self.store
+                .write_async(move |tx| {
+                    Box::pin(async move {
+                        while tx.consume_first_signal_async(&tid, ATTACHED_SIGNAL).await?.is_some() {}
+                        Ok(())
+                    })
+                })
+                .await?;
         }
         Ok(())
     }
@@ -201,120 +219,163 @@ impl Engine {
     pub fn register(&self, s: &Scheduler) {
         *self.scheduler.lock().unwrap() = Some(s.clone());
         let code = self.clone();
-        crate::agent::codemode::register_with(s, move |tc, name, args| code.run_codemode_tool(tc, name, args));
+        crate::agent::codemode::register_with(s, move |tc, name, args| {
+            let code = code.clone();
+            async move { code.run_codemode_tool(&tc, &name, args).await }
+        });
 
-        for (phase, handler) in [
-            (
-                PHASE_PREPARE,
-                Self::phase_prepare as fn(&Self, &TaskContext, &mut Checkpoint) -> Result<Transition>,
-            ),
-            (PHASE_GENERATE, Self::phase_generate),
-            (PHASE_TOOL_DISPATCH, Self::phase_tool_dispatch),
-            (PHASE_TOOL_JOIN, Self::phase_tool_join),
-            (PHASE_YIELD_CHECK, Self::phase_yield_check),
-            (PHASE_FOLLOW_UP_CHECK, Self::phase_follow_up_check),
+        for (phase, kind) in [
+            (PHASE_PREPARE, GenPhase::Prepare),
+            (PHASE_GENERATE, GenPhase::Generate),
+            (PHASE_TOOL_DISPATCH, GenPhase::ToolDispatch),
+            (PHASE_TOOL_JOIN, GenPhase::ToolJoin),
+            (PHASE_YIELD_CHECK, GenPhase::YieldCheck),
+            (PHASE_FOLLOW_UP_CHECK, GenPhase::FollowUpCheck),
         ] {
             let engine = self.clone();
             s.register(KIND, phase, move |tc| {
-                let mut cp: Checkpoint = serde_json::from_value(tc.task.checkpoint.clone())?;
-                // A journal transaction can commit before the scheduler records the phase transition.
-                if let Some(next) = cp.next_phase.take() {
-                    return Ok(next_phase(&cp, &next));
-                }
-                let conv = &tc.task.conversation_id;
-                let provider = engine.store.read(|tx| Ok(tx.conversation(conv)?.provider_affinity))?;
-                if engine.provider.resolve_brain(conv, &provider)?.is_none() {
-                    return Ok(sleep(phase, &cp, ATTACHED_SIGNAL, None));
-                }
-                if conv.starts_with("worker:") {
-                    engine.clear_attached_signals(&tc.task.id)?;
-                }
-                match handler(&engine, tc, &mut cp) {
-                    Err(e) if !tc.is_cancelled() => {
-                        engine.settle_failed(tc, &cp, &e);
-                        Ok(Transition::Fail(e.to_string()))
+                let engine = engine.clone();
+                async move {
+                    let mut cp: Checkpoint = serde_json::from_value(tc.task.checkpoint.clone())?;
+                    // A journal transaction can commit before the scheduler records the phase transition.
+                    if let Some(next) = cp.next_phase.take() {
+                        return Ok(next_phase(&cp, &next));
                     }
-                    result => result,
+                    let conv = tc.task.conversation_id.clone();
+                    let conv_read = conv.clone();
+                    let provider = engine
+                        .store
+                        .read_async(move |tx| Box::pin(async move { Ok(tx.conversation_async(&conv_read).await?.provider_affinity) }))
+                        .await?;
+                    if engine.provider.resolve_brain(&conv, &provider).await?.is_none() {
+                        return Ok(sleep(phase, &cp, ATTACHED_SIGNAL, None));
+                    }
+                    if conv.starts_with("worker:") {
+                        engine.clear_attached_signals(&tc.task.id).await?;
+                    }
+                    let result = match kind {
+                        GenPhase::Prepare => engine.phase_prepare(&tc, &mut cp).await,
+                        GenPhase::Generate => engine.phase_generate(&tc, &mut cp).await,
+                        GenPhase::ToolDispatch => engine.phase_tool_dispatch(&tc, &mut cp).await,
+                        GenPhase::ToolJoin => engine.phase_tool_join(&tc, &mut cp).await,
+                        GenPhase::YieldCheck => engine.phase_yield_check(&tc, &mut cp).await,
+                        GenPhase::FollowUpCheck => engine.phase_follow_up_check(&tc, &mut cp).await,
+                    };
+                    match result {
+                        Err(e) if !tc.is_cancelled() => {
+                            engine.settle_failed(&tc, &cp, &e).await;
+                            Ok(Transition::Fail(e.to_string()))
+                        }
+                        other => other,
+                    }
                 }
             });
         }
 
         let tool_engine = self.clone();
-        s.register(TOOL_KIND, TOOL_RUN, move |tc| tool_engine.phase_tool_run(tc));
+        s.register(TOOL_KIND, TOOL_RUN, move |tc| {
+            let tool_engine = tool_engine.clone();
+            async move { tool_engine.phase_tool_run(&tc).await }
+        });
 
         self.extensions_snapshot().register_phases(s, self);
     }
 
-    pub fn submit(&self, r: Request<'_>) -> Result<(Submission, Task, bool)> {
-        self.submit_with(r, |_, _| Ok(()))
+    pub async fn submit(&self, r: Request<'_>) -> Result<(Submission, Task, bool)> {
+        self.submit_with(r, |_, _| Box::pin(std::future::ready(Ok(())))).await
     }
 
-    pub fn submit_with(&self, r: Request<'_>, placed: impl FnOnce(&mut Tx<'_>, &Task) -> Result<()>) -> Result<(Submission, Task, bool)> {
+    pub async fn submit_with<F>(&self, r: Request<'_>, placed: F) -> Result<(Submission, Task, bool)>
+    where
+        F: for<'a, 'b> FnOnce(&'a mut Tx<'b>, &'a Task) -> BoxFuture<'a, Result<()>> + Send + 'static,
+    {
         let started_ms = self.store.now_ms();
-        let out = self.store.write(|tx| {
-            match tx.conversation(r.conversation) {
-                Err(Error::Missing(_)) => {
-                    tx.create_owned_conversation(r.conversation, r.provider, r.owner_task.unwrap_or_default())?;
-                }
-                Ok(_) => (),
-                Err(e) => return Err(e),
-            }
-            if let Some(existing) = tx.submission_by_request(r.conversation, r.request_id)? {
-                let task = self.find_generation_task_for_submission(tx, r.conversation, &existing)?;
-                return Ok((existing, task, true));
-            }
-            let active = tx
-                .tasks_by_conversation(r.conversation)?
-                .into_iter()
-                .find(|t| t.kind == KIND && t.status != TaskStatus::Terminal);
-            if let Some(active_task) = active {
-                let sub = match r.when_busy {
-                    WhenBusy::Reject => {
-                        return Err(Error::Invalid("conversation already has an active generation".into()));
+        let conversation = r.conversation.to_owned();
+        let provider = r.provider.to_owned();
+        let request_id = r.request_id.to_owned();
+        let prompt = r.prompt.to_owned();
+        let source = r.source.to_owned();
+        let system = r.system.to_owned();
+        let trusted_intent = r.trusted_intent.map(str::to_owned);
+        let rubric = r.rubric;
+        let notify_task = r.notify_task.map(str::to_owned);
+        let owner_task = r.owner_task.map(str::to_owned);
+        let when_busy = r.when_busy;
+
+        let conv_write = conversation.clone();
+        let req_write = request_id.clone();
+        let out = self
+            .store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    match tx.conversation_async(&conv_write).await {
+                        Err(Error::Missing(_)) => {
+                            tx.create_owned_conversation_async(&conv_write, &provider, owner_task.as_deref().unwrap_or_default())
+                                .await?;
+                        }
+                        Ok(_) => (),
+                        Err(e) => return Err(e),
                     }
-                    WhenBusy::Steer => inbox::submit_steer(tx, r.conversation, r.request_id, r.prompt)?.0,
-                    WhenBusy::Queue => inbox::submit_follow_up(tx, r.conversation, r.request_id, r.prompt, r.notify_task)?.0,
-                };
-                return Ok((sub, active_task, false));
-            }
+                    if let Some(existing) = tx.submission_by_request_async(&conv_write, &req_write).await? {
+                        let task = find_generation_task_for_submission(tx, &conv_write, &existing).await?;
+                        return Ok((existing, task, true));
+                    }
+                    let active = tx
+                        .tasks_by_conversation_async(&conv_write)
+                        .await?
+                        .into_iter()
+                        .find(|t| t.kind == KIND && t.status != TaskStatus::Terminal);
+                    if let Some(active_task) = active {
+                        let sub = match when_busy {
+                            WhenBusy::Reject => {
+                                return Err(Error::Invalid("conversation already has an active generation".into()));
+                            }
+                            WhenBusy::Steer => inbox::submit_steer(tx, &conv_write, &req_write, &prompt).await?.0,
+                            WhenBusy::Queue => inbox::submit_follow_up(tx, &conv_write, &req_write, &prompt, notify_task.as_deref()).await?.0,
+                        };
+                        return Ok((sub, active_task, false));
+                    }
 
-            let payload = json!({
-                "text": r.prompt,
-                "source": r.source,
-                "trustedIntent": r.trusted_intent,
-            });
-            let (sub, _) = inbox::submit_prompt(tx, r.conversation, r.request_id, &payload, r.notify_task)?;
-            let sub = tx.set_submission_status(&sub.id, SubmissionStatus::Placed)?;
+                    let payload = json!({
+                        "text": prompt,
+                        "source": source,
+                        "trustedIntent": trusted_intent,
+                    });
+                    let (sub, _) = inbox::submit_prompt(tx, &conv_write, &req_write, &payload, notify_task.as_deref()).await?;
+                    let sub = tx.set_submission_status_async(&sub.id, SubmissionStatus::Placed).await?;
 
-            let mut t = Task::new(KIND, PHASE_PREPARE);
-            t.id = format!("gen-{}", sub.id);
-            t.is_model_task = true;
-            t.conversation_id = r.conversation.into();
-            t.owner_task_id = r.owner_task.unwrap_or_default().into();
-            t.checkpoint = json!(Checkpoint {
-                prompt: r.prompt.into(),
-                submission: sub.id.clone(),
-                request_id: r.request_id.into(),
-                rubric: r.rubric,
-                ..Default::default()
-            });
+                    let mut t = Task::new(KIND, PHASE_PREPARE);
+                    t.id = format!("gen-{}", sub.id);
+                    t.is_model_task = true;
+                    t.conversation_id = conv_write.clone();
+                    t.owner_task_id = owner_task.unwrap_or_default();
+                    t.checkpoint = json!(Checkpoint {
+                        prompt,
+                        submission: sub.id.clone(),
+                        request_id: req_write,
+                        rubric,
+                        ..Default::default()
+                    });
 
-            if !r.system.is_empty() {
-                let prior = tx.entries(r.conversation, 1)?.into_iter().rev().find(|e| e.kind == "pi.system");
-                if !prior.as_ref().is_some_and(|e| e.payload["text"] == r.system) {
-                    tx.append_entry(r.conversation, "pi.system", &json!({"text": r.system, "delta": prior.is_some()}))?;
-                }
-            }
-            tx.append_entry(r.conversation, "pi.user", &sub.payload)?;
-            let (task, _) = tx.create_task(t)?;
-            placed(tx, &task)?;
-            Ok((sub, task, false))
-        })?;
+                    if !system.is_empty() {
+                        let prior = tx.entries_async(&conv_write, 1).await?.into_iter().rev().find(|e| e.kind == "pi.system");
+                        if !prior.as_ref().is_some_and(|e| e.payload["text"] == system) {
+                            tx.append_entry_async(&conv_write, "pi.system", &json!({"text": system, "delta": prior.is_some()}))
+                                .await?;
+                        }
+                    }
+                    tx.append_entry_async(&conv_write, "pi.user", &sub.payload).await?;
+                    let (task, _) = tx.create_task_async(t).await?;
+                    placed(tx, &task).await?;
+                    Ok((sub, task, false))
+                })
+            })
+            .await?;
 
         let at_ms = self.store.now_ms();
         self.store.emit_telemetry(durable::TelemetryEvent::Submit {
-            conversation_id: r.conversation.into(),
-            request_id: r.request_id.into(),
+            conversation_id: conversation.clone(),
+            request_id,
             submission_id: out.0.id.clone(),
             status: out.0.status.as_str().into(),
             deduplicated: out.2,
@@ -322,32 +383,27 @@ impl Engine {
             at_ms,
         });
         if !out.2 && out.1.status != TaskStatus::Terminal && out.0.kind == inbox::KIND_PROMPT {
-            self.emit(r.conversation, &out.1.id, AgentEvent::AgentStart);
+            self.emit(&conversation, &out.1.id, AgentEvent::AgentStart);
         }
         Ok(out)
     }
 
-    fn find_generation_task_for_submission(&self, tx: &durable::Read<'_>, conv: &str, sub: &Submission) -> Result<Task> {
-        let direct_id = format!("gen-{}", sub.id);
-        if let Ok(task) = tx.task(&direct_id) {
-            return Ok(task);
-        }
-        tx.tasks_by_conversation(conv)?
-            .into_iter()
-            .filter(|t| t.kind == KIND)
-            .max_by_key(|t| t.created_at_ms)
-            .ok_or_else(|| Error::Missing(direct_id))
-    }
-
-    fn settle_failed(&self, tc: &TaskContext, cp: &Checkpoint, err: &Error) {
+    async fn settle_failed(&self, tc: &TaskContext, cp: &Checkpoint, err: &Error) {
         let payload = json!({ "error": err.to_string() });
-        let _ = self.store.write(|tx| {
-            tx.settle(&cp.submission, SubmissionStatus::Unanswered, &payload)?;
-            for fid in &cp.follow_up_submissions {
-                tx.settle(fid, SubmissionStatus::Unanswered, &payload)?;
-            }
-            Ok(())
-        });
+        let submission = cp.submission.clone();
+        let follow_ups = cp.follow_up_submissions.clone();
+        let _ = self
+            .store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    tx.settle_async(&submission, SubmissionStatus::Unanswered, &payload).await?;
+                    for fid in &follow_ups {
+                        tx.settle_async(fid, SubmissionStatus::Unanswered, &payload).await?;
+                    }
+                    Ok(())
+                })
+            })
+            .await;
         let outcome = if err.to_string().contains("model step limit reached") {
             TurnOutcome::TooLong
         } else {
@@ -365,14 +421,20 @@ impl Engine {
         );
     }
 
-    fn resolve_brain_required(&self, conv: &str, provider: &str) -> Result<Arc<Brain>> {
+    async fn resolve_brain_required(&self, conv: &str, provider: &str) -> Result<Arc<Brain>> {
         self.provider
-            .resolve_brain(conv, provider)?
+            .resolve_brain(conv, provider)
+            .await?
             .ok_or_else(|| Error::Invalid("worker runtime is detached".into()))
     }
 
-    fn make_hook_ctx<'a>(&'a self, tc: &'a TaskContext, cp: &'a Checkpoint, brain: Option<&'a Brain>, obs: &'a dyn Fn(AgentEvent)) -> DurableHookCtx<'a> {
-        // Store a temporary reference using a thread/local? Instead pass a closure via caller stack.
+    fn make_hook_ctx<'a>(
+        &'a self,
+        tc: &'a TaskContext,
+        cp: &'a Checkpoint,
+        brain: Option<&'a Brain>,
+        obs: &'a (dyn Fn(AgentEvent) + Send + Sync),
+    ) -> DurableHookCtx<'a> {
         DurableHookCtx {
             store: &self.store,
             scheduler: None,
@@ -386,7 +448,7 @@ impl Engine {
             last_output: &cp.last_output,
             submission_id: &cp.submission,
             request_id: &cp.request_id,
-            cancel: CancelToken::from_receiver(tc.cancellation()),
+            cancel: CancelToken::from_tokio(tc.cancel_token()),
             rubric: cp.rubric.as_ref(),
             observer: obs,
         }
@@ -399,17 +461,21 @@ impl Engine {
         Compactor::with_llm(self.store.clone(), brain.client.clone(), &brain.model)
     }
 
-    fn phase_prepare(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
+    async fn phase_prepare(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
         let conv = &tc.task.conversation_id;
-        let provider = self.store.read(|tx| Ok(tx.conversation(conv)?.provider_affinity))?;
-        let brain = self.resolve_brain_required(conv, &provider)?;
+        let conv_read = conv.clone();
+        let provider = self
+            .store
+            .read_async(move |tx| Box::pin(async move { Ok(tx.conversation_async(&conv_read).await?.provider_affinity) }))
+            .await?;
+        let brain = self.resolve_brain_required(conv, &provider).await?;
         let runner = self.extensions_snapshot();
         let sched = self.scheduler();
         let obs = |ev: AgentEvent| self.emit(conv, &tc.task.id, ev);
         let mut ctx = self.make_hook_ctx(tc, cp, Some(&brain), &obs);
         ctx.scheduler = sched.as_ref();
 
-        match runner.run_before_turn(&ctx)? {
+        match runner.run_before_turn(&ctx).await? {
             crate::agent::core::extension::HookOutcome::Continue => {}
             crate::agent::core::extension::HookOutcome::Park { signal, until_ms } => {
                 return Ok(sleep(PHASE_PREPARE, cp, &signal, until_ms));
@@ -421,11 +487,17 @@ impl Engine {
         }
 
         let compactor = self.effective_compactor(&brain);
-        let (est_tokens, prev_compaction_seq) = self.store.read(|tx| {
-            let entries = tx.visible_entries(conv)?;
-            let last_seq = entries.iter().rev().find(|e| e.kind == "pi.compaction").map(|e| e.seq);
-            Ok((crate::agent::compaction::estimate_tokens(&entries), last_seq))
-        })?;
+        let conv_read = conv.clone();
+        let (est_tokens, prev_compaction_seq) = self
+            .store
+            .read_async(move |tx| {
+                Box::pin(async move {
+                    let entries = tx.visible_entries_async(&conv_read).await?;
+                    let last_seq = entries.iter().rev().find(|e| e.kind == "pi.compaction").map(|e| e.seq);
+                    Ok((crate::agent::compaction::estimate_tokens(&entries), last_seq))
+                })
+            })
+            .await?;
 
         let level = if est_tokens >= compactor.hard_tokens { Level::Hard } else { Level::Soft };
         let compact_ctx = CompactCtx {
@@ -434,16 +506,24 @@ impl Engine {
             level,
             estimated_tokens: est_tokens,
         };
-        match runner.run_before_compact(&compact_ctx)? {
+        match runner.run_before_compact(&compact_ctx).await? {
             crate::agent::core::extension::HookOutcome::Continue => {
-                compactor.before_request(conv)?;
-                if let Some(entry) = self.store.read(|tx| {
-                    Ok(tx
-                        .visible_entries(conv)?
-                        .into_iter()
-                        .rev()
-                        .find(|e| e.kind == "pi.compaction" && Some(e.seq) != prev_compaction_seq))
-                })? {
+                compactor.before_request(conv).await?;
+                let conv_read = conv.clone();
+                if let Some(entry) = self
+                    .store
+                    .read_async(move |tx| {
+                        Box::pin(async move {
+                            Ok(tx
+                                .visible_entries_async(&conv_read)
+                                .await?
+                                .into_iter()
+                                .rev()
+                                .find(|e| e.kind == "pi.compaction" && Some(e.seq) != prev_compaction_seq))
+                        })
+                    })
+                    .await?
+                {
                     let lvl = entry.payload["level"].as_str().unwrap_or("soft").to_owned();
                     let summary = entry.payload["summary"].as_str().unwrap_or_default().to_owned();
                     self.emit(conv, &tc.task.id, AgentEvent::Compacted { level: lvl, summary });
@@ -459,10 +539,10 @@ impl Engine {
         Ok(next_phase(cp, PHASE_GENERATE))
     }
 
-    fn phase_generate(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
+    async fn phase_generate(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
         let conv = &tc.task.conversation_id;
-        let tr = Transcript::load(&self.store, conv)?;
-        let brain = self.resolve_brain_required(conv, &tr.provider_affinity)?;
+        let tr = Transcript::load(&self.store, conv).await?;
+        let brain = self.resolve_brain_required(conv, &tr.provider_affinity).await?;
         if cp.step >= brain.max_steps {
             return Err(Error::Invalid("model step limit reached".into()));
         }
@@ -475,8 +555,8 @@ impl Engine {
         let mut hook_ctx = self.make_hook_ctx(tc, cp, Some(&brain), &obs);
         hook_ctx.scheduler = sched.as_ref();
 
-        let messages = convert_to_llm(transform_context(tr.agent_messages(), &runner, &hook_ctx)?);
-        let tools = self.collect_tool_specs(conv, &brain, &runner)?;
+        let messages = convert_to_llm(transform_context(tr.agent_messages(), &runner, &hook_ctx).await?);
+        let tools = self.collect_tool_specs(conv, &brain, &runner).await?;
 
         let mut req = ChatRequest {
             model: brain.model.clone(),
@@ -486,16 +566,16 @@ impl Engine {
             ..Default::default()
         };
 
-        let cancel = CancelToken::from_receiver(tc.cancellation());
+        let cancel = CancelToken::from_tokio(tc.cancel_token());
         let mut stream_delta = |delta: Delta| match delta {
             Delta::Text(text) => self.emit(conv, &tc.task.id, AgentEvent::TextDelta { delta: text }),
             Delta::Reasoning(r) => self.emit(conv, &tc.task.id, AgentEvent::ReasoningDelta { delta: r }),
         };
 
-        let resp = match brain.client.complete_cancellable(&req, &cancel, &mut stream_delta) {
+        let resp = match brain.client.complete_cancellable(&req, &cancel, &mut stream_delta).await {
             Err(BrainError::ContextOverflow(_)) => {
                 let compactor = self.effective_compactor(&brain);
-                if let Some(entry) = compactor.compact(conv, Level::Overflow, None)? {
+                if let Some(entry) = compactor.compact(conv, Level::Overflow, None).await? {
                     let summary = entry.payload["summary"].as_str().unwrap_or_default().to_owned();
                     self.emit(
                         conv,
@@ -506,9 +586,9 @@ impl Engine {
                         },
                     );
                 }
-                let tr2 = Transcript::load(&self.store, conv)?;
-                req.messages = convert_to_llm(transform_context(tr2.agent_messages(), &runner, &hook_ctx)?);
-                brain.client.complete_cancellable(&req, &cancel, &mut stream_delta)
+                let tr2 = Transcript::load(&self.store, conv).await?;
+                req.messages = convert_to_llm(transform_context(tr2.agent_messages(), &runner, &hook_ctx).await?);
+                brain.client.complete_cancellable(&req, &cancel, &mut stream_delta).await
             }
             other => other,
         }
@@ -530,12 +610,19 @@ impl Engine {
         cp.pre_denied.clear();
 
         let next = if cp.calls.is_empty() { PHASE_YIELD_CHECK } else { PHASE_TOOL_DISPATCH };
-        self.store.write(|tx| {
-            let mut task = running(tc, tx)?;
-            tx.append_entry(conv, "pi.assistant", &payload)?;
-            usage_totals.record(tx, conv)?;
-            checkpoint_transition(&mut task, tx, cp, next)
-        })?;
+        let tc_write = tc.clone();
+        let conv_write = conv.clone();
+        let cp_write = cp.clone();
+        self.store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let mut task = running(&tc_write, tx).await?;
+                    tx.append_entry_async(&conv_write, "pi.assistant", &payload).await?;
+                    usage_totals.record(tx, &conv_write).await?;
+                    checkpoint_transition(&mut task, tx, &cp_write, next).await
+                })
+            })
+            .await?;
         self.emit(
             conv,
             &tc.task.id,
@@ -547,7 +634,7 @@ impl Engine {
         Ok(next_phase(cp, next))
     }
 
-    fn collect_tool_specs(&self, conv: &str, brain: &Brain, runner: &ExtensionRunner) -> Result<Vec<ToolSpec>> {
+    async fn collect_tool_specs(&self, conv: &str, brain: &Brain, runner: &ExtensionRunner) -> Result<Vec<ToolSpec>> {
         let mut specs = Vec::new();
         let mut seen = HashSet::new();
         for t in &brain.tools {
@@ -562,7 +649,11 @@ impl Engine {
                 specs.push(spec);
             }
         }
-        let standin = self.store.read(|tx| read_doc::<StandInDoc>(tx, CONVERSATION_SCOPE, conv))?;
+        let conv_read = conv.to_owned();
+        let standin = self
+            .store
+            .read_async(move |tx| Box::pin(async move { read_doc::<StandInDoc>(tx, CONVERSATION_SCOPE, &conv_read).await }))
+            .await?;
         for spec in standin.tool_specs {
             if seen.insert(spec.name.clone()) {
                 specs.push(spec);
@@ -571,24 +662,28 @@ impl Engine {
         Ok(specs)
     }
 
-    fn resolve_tool<'a>(&self, conv: &str, brain: &'a Brain, ext_tools: &'a [Box<dyn Tool>], name: &str) -> Result<Option<ResolvedTool<'a>>> {
+    async fn resolve_tool<'a>(&self, conv: &str, brain: &'a Brain, ext_tools: &'a [Box<dyn Tool>], name: &str) -> Result<Option<ResolvedTool<'a>>> {
         if let Some(t) = brain.tools.iter().find(|t| t.spec().name == name) {
             return Ok(Some(ResolvedTool::Borrowed(t.as_ref())));
         }
         if let Some(t) = ext_tools.iter().find(|t| t.spec().name == name) {
             return Ok(Some(ResolvedTool::Borrowed(t.as_ref())));
         }
-        let standin = self.store.read(|tx| read_doc::<StandInDoc>(tx, CONVERSATION_SCOPE, conv))?;
+        let conv_read = conv.to_owned();
+        let standin = self
+            .store
+            .read_async(move |tx| Box::pin(async move { read_doc::<StandInDoc>(tx, CONVERSATION_SCOPE, &conv_read).await }))
+            .await?;
         if let Some(spec) = standin.tool_specs.into_iter().find(|s| s.name == name) {
             return Ok(Some(ResolvedTool::Owned(Box::new(StandInStubTool(spec)))));
         }
         Ok(None)
     }
 
-    fn phase_tool_dispatch(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
+    async fn phase_tool_dispatch(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
         let conv = &tc.task.conversation_id;
-        let tr = Transcript::load(&self.store, conv)?;
-        let brain = self.resolve_brain_required(conv, &tr.provider_affinity)?;
+        let tr = Transcript::load(&self.store, conv).await?;
+        let brain = self.resolve_brain_required(conv, &tr.provider_affinity).await?;
         let runner = self.extensions_snapshot();
         let ext_tools = runner.tools();
         let sched = self.scheduler();
@@ -600,7 +695,7 @@ impl Engine {
             }
 
             if let Some(denied) = cp.pre_denied.remove(&call.id) {
-                self.record_denied_tool(tc, cp, &call, &denied.reason, denied.overridable)?;
+                self.record_denied_tool(tc, cp, &call, &denied.reason, denied.overridable).await?;
                 continue;
             }
 
@@ -622,7 +717,7 @@ impl Engine {
                             } else {
                                 decision.reason
                             };
-                            self.record_denied_tool(tc, cp, &call, &reason, true)?;
+                            self.record_denied_tool(tc, cp, &call, &reason, true).await?;
                             continue;
                         }
                     }
@@ -637,12 +732,12 @@ impl Engine {
             let args = match parse_call_args(&call.arguments) {
                 Ok(v) => v,
                 Err(e) => {
-                    self.record_denied_tool(tc, cp, &call, &format!("invalid arguments: {e}"), false)?;
+                    self.record_denied_tool(tc, cp, &call, &format!("invalid arguments: {e}"), false).await?;
                     continue;
                 }
             };
 
-            let resolved = self.resolve_tool(conv, &brain, &ext_tools, &call.name)?;
+            let resolved = self.resolve_tool(conv, &brain, &ext_tools, &call.name).await?;
             let is_mcp = resolved.as_ref().is_some_and(|t| t.as_tool().is_mcp());
 
             if cp.approved.as_deref() != Some(&call.id) {
@@ -657,16 +752,16 @@ impl Engine {
                     entries: &tr.entries,
                     output: None,
                 };
-                match runner.run_before_tool(&tool_ctx)? {
+                match runner.run_before_tool(&tool_ctx).await? {
                     crate::agent::core::extension::HookOutcome::Continue => {}
                     crate::agent::core::extension::HookOutcome::Park { signal, until_ms } => {
                         cp.parked = Some(call.id.clone());
                         cp.park_signal = Some(signal.clone());
-                        tc.checkpoint(&json!(cp))?;
+                        tc.checkpoint(&json!(cp)).await?;
                         return Ok(sleep(PHASE_TOOL_DISPATCH, cp, &signal, until_ms));
                     }
                     crate::agent::core::extension::HookOutcome::Deny { reason, overridable } => {
-                        self.record_denied_tool(tc, cp, &call, &reason, overridable)?;
+                        self.record_denied_tool(tc, cp, &call, &reason, overridable).await?;
                         continue;
                     }
                     crate::agent::core::extension::HookOutcome::Retry { .. } => {}
@@ -678,7 +773,7 @@ impl Engine {
             let first_safe = resolved.as_ref().is_some_and(|t| t.as_tool().replay_safe());
             if first_safe {
                 for next_call in cp.calls.iter().skip(cp.index + 1) {
-                    let next_tool = self.resolve_tool(conv, &brain, &ext_tools, &next_call.name)?;
+                    let next_tool = self.resolve_tool(conv, &brain, &ext_tools, &next_call.name).await?;
                     if !next_tool.as_ref().is_some_and(|t| t.as_tool().replay_safe()) {
                         break;
                     }
@@ -696,7 +791,7 @@ impl Engine {
                         entries: &tr.entries,
                         output: None,
                     };
-                    match runner.run_before_tool(&next_tool_ctx)? {
+                    match runner.run_before_tool(&next_tool_ctx).await? {
                         crate::agent::core::extension::HookOutcome::Continue => {
                             batch.push((next_call.clone(), next_args));
                         }
@@ -730,7 +825,7 @@ impl Engine {
                     request_id: cp.request_id.clone(),
                     iteration: cp.iteration,
                 });
-                let (spawned, _) = tc.spawn_child(child)?;
+                let (spawned, _) = tc.spawn_child(child).await?;
                 child_ids.push(spawned.id);
             }
             cp.batch_calls = child_ids.clone();
@@ -748,7 +843,7 @@ impl Engine {
         Ok(next_phase(cp, PHASE_PREPARE))
     }
 
-    fn record_denied_tool(&self, tc: &TaskContext, cp: &mut Checkpoint, call: &ToolCall, reason: &str, overridable: bool) -> Result<()> {
+    async fn record_denied_tool(&self, tc: &TaskContext, cp: &mut Checkpoint, call: &ToolCall, reason: &str, overridable: bool) -> Result<()> {
         let conv = &tc.task.conversation_id;
         cp.index += 1;
         let payload = json!({
@@ -758,13 +853,20 @@ impl Engine {
             "clientOverridable": overridable,
             "error": reason,
         });
-        self.store.write(|tx| {
-            let mut task = running(tc, tx)?;
-            tx.append_entry(conv, "pi.tool_result", &payload)?;
-            task.checkpoint = json!(cp);
-            tx.update_task(&task)?;
-            Ok(())
-        })?;
+        let tc_write = tc.clone();
+        let conv_write = conv.clone();
+        let cp_json = json!(cp);
+        self.store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let mut task = running(&tc_write, tx).await?;
+                    tx.append_entry_async(&conv_write, "pi.tool_result", &payload).await?;
+                    task.checkpoint = cp_json;
+                    tx.update_task_async(&task).await?;
+                    Ok(())
+                })
+            })
+            .await?;
         self.emit(
             conv,
             &tc.task.id,
@@ -777,11 +879,15 @@ impl Engine {
         Ok(())
     }
 
-    fn phase_tool_run(&self, tc: &TaskContext) -> Result<Transition> {
+    async fn phase_tool_run(&self, tc: &TaskContext) -> Result<Transition> {
         let t_cp: ToolTaskCheckpoint = serde_json::from_value(tc.task.checkpoint.clone())?;
         let conv = &tc.task.conversation_id;
-        let provider = self.store.read(|tx| Ok(tx.conversation(conv)?.provider_affinity))?;
-        let Some(brain) = self.provider.resolve_brain(conv, &provider)? else {
+        let conv_read = conv.clone();
+        let provider = self
+            .store
+            .read_async(move |tx| Box::pin(async move { Ok(tx.conversation_async(&conv_read).await?.provider_affinity) }))
+            .await?;
+        let Some(brain) = self.provider.resolve_brain(conv, &provider).await? else {
             return Ok(Transition::Sleep {
                 phase: TOOL_RUN.into(),
                 checkpoint: None,
@@ -790,7 +896,7 @@ impl Engine {
             });
         };
         if conv.starts_with("worker:") {
-            self.clear_attached_signals(&tc.task.id)?;
+            self.clear_attached_signals(&tc.task.id).await?;
         }
 
         if let Some(saved) = tc.task.memo.get("output") {
@@ -798,17 +904,17 @@ impl Engine {
         }
 
         let runner = self.extensions_snapshot();
-        if let Some(res) = runner.dispatch_tool(&t_cp.call, tc, self) {
+        if let Some(res) = runner.dispatch_tool(&t_cp.call, tc, self).await {
             return res;
         }
 
         let ext_tools = runner.tools();
-        let resolved = self.resolve_tool(conv, &brain, &ext_tools, &t_cp.call.name)?;
+        let resolved = self.resolve_tool(conv, &brain, &ext_tools, &t_cp.call.name).await?;
         let replay_safe = resolved.as_ref().is_some_and(|t| t.as_tool().replay_safe());
 
         if tc.task.memo.get("started").and_then(Value::as_bool) == Some(true) && !replay_safe {
             let mut msg = "interrupted: tool execution started before crash; inspect workspace before retrying".to_owned();
-            if let Some(status) = git_status_summary(brain.cwd.as_deref()) {
+            if let Some(status) = git_status_summary(brain.cwd.as_deref()).await {
                 msg.push_str("\nworkspace git status:\n");
                 msg.push_str(&status);
             }
@@ -820,11 +926,12 @@ impl Engine {
                 overridable: false,
             };
             let val = json!(record);
-            tc.memo("output", || Ok(val.clone()))?;
+            let val_memo = val.clone();
+            tc.memo("output", || async move { Ok(val_memo) }).await?;
             return Ok(Transition::Complete(val));
         }
 
-        tc.memo("started", || Ok(json!(true)))?;
+        tc.memo("started", || async { Ok(json!(true)) }).await?;
         self.emit(
             conv,
             &tc.task.id,
@@ -853,7 +960,7 @@ impl Engine {
         });
 
         let tool_ctx = ToolContext {
-            cancel: CancelToken::from_receiver(tc.cancellation()),
+            cancel: CancelToken::from_tokio(tc.cancel_token()),
             on_update: Some(on_update),
             conversation_id: conv.clone(),
             task_id: tc.task.id.clone(),
@@ -862,7 +969,7 @@ impl Engine {
         };
 
         let out = match resolved {
-            Some(t) => t.as_tool().execute_with_context(&t_cp.args, &tool_ctx),
+            Some(t) => t.as_tool().execute_with_context(&t_cp.args, &tool_ctx).await,
             None => ToolOutput::error(format!("unknown tool: {}", t_cp.call.name)),
         };
 
@@ -874,14 +981,15 @@ impl Engine {
             overridable: true,
         };
         let val = json!(record);
-        tc.memo("output", || Ok(val.clone()))?;
+        let val_memo = val.clone();
+        tc.memo("output", || async move { Ok(val_memo) }).await?;
         Ok(Transition::Complete(val))
     }
 
-    fn phase_tool_join(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
+    async fn phase_tool_join(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
         let conv = &tc.task.conversation_id;
-        let tr = Transcript::load(&self.store, conv)?;
-        let brain = self.resolve_brain_required(conv, &tr.provider_affinity)?;
+        let tr = Transcript::load(&self.store, conv).await?;
+        let brain = self.resolve_brain_required(conv, &tr.provider_affinity).await?;
         let runner = self.extensions_snapshot();
         let ext_tools = runner.tools();
         let sched = self.scheduler();
@@ -897,13 +1005,12 @@ impl Engine {
                 .cloned()
                 .ok_or_else(|| Error::Invalid("tool_join batch index out of bounds".into()))?;
             let args = parse_call_args(&call.arguments).unwrap_or(Value::Null);
-            let child = tc
-                .children
-                .iter()
-                .find(|c| c.id == *child_id)
-                .cloned()
-                .map(Ok)
-                .unwrap_or_else(|| self.store.read(|r| r.task(child_id)))?;
+            let child = if let Some(c) = tc.children.iter().find(|c| c.id == *child_id) {
+                c.clone()
+            } else {
+                let cid = child_id.clone();
+                self.store.read_async(move |r| Box::pin(async move { r.task_async(&cid).await })).await?
+            };
 
             let rec = if child.terminal_reason == "completed" {
                 if let Ok(parsed) = serde_json::from_value::<ToolOutputRecord>(child.result.clone()) {
@@ -936,7 +1043,10 @@ impl Engine {
                 text: rec.text.clone(),
                 is_error: rec.is_error,
             };
-            let is_mcp = self.resolve_tool(conv, &brain, &ext_tools, &call.name)?.is_some_and(|t| t.as_tool().is_mcp());
+            let is_mcp = self
+                .resolve_tool(conv, &brain, &ext_tools, &call.name)
+                .await?
+                .is_some_and(|t| t.as_tool().is_mcp());
             let mut hook_ctx = self.make_hook_ctx(tc, cp, Some(&brain), &obs);
             hook_ctx.scheduler = sched.as_ref();
             let after_ctx = ToolCallHookCtx {
@@ -948,7 +1058,7 @@ impl Engine {
                 entries: &tr.entries,
                 output: Some(&out),
             };
-            let _ = runner.run_after_tool(&after_ctx)?;
+            let _ = runner.run_after_tool(&after_ctx).await?;
             self.emit(
                 conv,
                 &tc.task.id,
@@ -961,79 +1071,94 @@ impl Engine {
             records.push((call, args, rec));
         }
 
-        let next = self.store.write(|tx| {
-            let mut task = running(tc, tx)?;
-            for (call, args, rec) in &records {
-                let mut payload = json!({
-                    "toolCallId": rec.call_id,
-                    "toolName": rec.tool_name,
-                    "ok": !rec.is_error,
-                });
-                if rec.is_error {
-                    payload["clientOverridable"] = json!(rec.overridable);
-                    payload["error"] = json!(rec.text);
-                } else {
-                    payload["output"] = json!(rec.text);
-                }
-                tx.append_entry(conv, "pi.tool_result", &payload)?;
-                if !rec.is_error {
-                    update_doc::<FileOpsDoc>(tx, CONVERSATION_SCOPE, conv, |ops| {
-                        record_tool_file_op(ops, &call.name, args);
-                        Ok(())
-                    })?;
-                }
-            }
+        let tc_write = tc.clone();
+        let conv_write = conv.clone();
+        let mut cp_write = cp.clone();
+        let (next, updated_cp) = self
+            .store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let mut task = running(&tc_write, tx).await?;
+                    for (call, args, rec) in &records {
+                        let mut payload = json!({
+                            "toolCallId": rec.call_id,
+                            "toolName": rec.tool_name,
+                            "ok": !rec.is_error,
+                        });
+                        if rec.is_error {
+                            payload["clientOverridable"] = json!(rec.overridable);
+                            payload["error"] = json!(rec.text);
+                        } else {
+                            payload["output"] = json!(rec.text);
+                        }
+                        tx.append_entry_async(&conv_write, "pi.tool_result", &payload).await?;
+                        if !rec.is_error {
+                            update_doc::<FileOpsDoc>(tx, CONVERSATION_SCOPE, &conv_write, |ops| {
+                                record_tool_file_op(ops, &call.name, args);
+                                Ok(())
+                            })
+                            .await?;
+                        }
+                    }
 
-            cp.index += batch_len;
-            cp.batch_calls.clear();
+                    cp_write.index += batch_len;
+                    cp_write.batch_calls.clear();
 
-            let steers = inbox::take_pending_steers(tx, conv)?;
-            let next_p = if !steers.is_empty() {
-                for skipped in cp.calls.iter().skip(cp.index) {
-                    tx.append_entry(
-                        conv,
-                        "pi.tool_result",
-                        &json!({
-                            "toolCallId": skipped.id,
-                            "toolName": skipped.name,
-                            "ok": false,
-                            "error": "skipped due to user steering",
-                        }),
-                    )?;
-                }
-                for steer in steers {
-                    tx.append_entry(conv, "pi.user", &steer.payload)?;
-                    tx.settle(&steer.id, SubmissionStatus::Done, &json!({ "steered": true }))?;
-                }
-                cp.calls.clear();
-                cp.index = 0;
-                cp.parked = None;
-                cp.park_signal = None;
-                cp.approved = None;
-                cp.pre_denied.clear();
-                PHASE_PREPARE
-            } else if cp.index < cp.calls.len() {
-                PHASE_TOOL_DISPATCH
-            } else {
-                cp.calls.clear();
-                cp.index = 0;
-                PHASE_PREPARE
-            };
+                    let steers = inbox::take_pending_steers(tx, &conv_write).await?;
+                    let next_p = if !steers.is_empty() {
+                        for skipped in cp_write.calls.iter().skip(cp_write.index) {
+                            tx.append_entry_async(
+                                &conv_write,
+                                "pi.tool_result",
+                                &json!({
+                                    "toolCallId": skipped.id,
+                                    "toolName": skipped.name,
+                                    "ok": false,
+                                    "error": "skipped due to user steering",
+                                }),
+                            )
+                            .await?;
+                        }
+                        for steer in steers {
+                            tx.append_entry_async(&conv_write, "pi.user", &steer.payload).await?;
+                            tx.settle_async(&steer.id, SubmissionStatus::Done, &json!({ "steered": true })).await?;
+                        }
+                        cp_write.calls.clear();
+                        cp_write.index = 0;
+                        cp_write.parked = None;
+                        cp_write.park_signal = None;
+                        cp_write.approved = None;
+                        cp_write.pre_denied.clear();
+                        PHASE_PREPARE
+                    } else if cp_write.index < cp_write.calls.len() {
+                        PHASE_TOOL_DISPATCH
+                    } else {
+                        cp_write.calls.clear();
+                        cp_write.index = 0;
+                        PHASE_PREPARE
+                    };
 
-            checkpoint_transition(&mut task, tx, cp, next_p)?;
-            Ok(next_p)
-        })?;
+                    checkpoint_transition(&mut task, tx, &cp_write, next_p).await?;
+                    Ok((next_p, cp_write))
+                })
+            })
+            .await?;
+        *cp = updated_cp;
 
         Ok(next_phase(cp, next))
     }
 
-    fn phase_yield_check(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
+    async fn phase_yield_check(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
         let conv = &tc.task.conversation_id;
         if let Some(done) = tc.task.memo.get("yielded") {
             return Ok(Transition::Complete(done.clone()));
         }
-        let provider = self.store.read(|tx| Ok(tx.conversation(conv)?.provider_affinity))?;
-        let brain = self.resolve_brain_required(conv, &provider)?;
+        let conv_read = conv.clone();
+        let provider = self
+            .store
+            .read_async(move |tx| Box::pin(async move { Ok(tx.conversation_async(&conv_read).await?.provider_affinity) }))
+            .await?;
+        let brain = self.resolve_brain_required(conv, &provider).await?;
         let runner = self.extensions_snapshot();
         let sched = self.scheduler();
         let obs = |ev: AgentEvent| self.emit(conv, &tc.task.id, ev);
@@ -1049,17 +1174,24 @@ impl Engine {
             max_iterations_reached: &mut max_iterations_reached,
         };
 
-        match runner.run_after_run(&mut run_end_ctx)? {
+        match runner.run_after_run(&mut run_end_ctx).await? {
             crate::agent::core::extension::HookOutcome::Park { signal, until_ms } => {
                 return Ok(sleep(PHASE_YIELD_CHECK, cp, &signal, until_ms));
             }
             crate::agent::core::extension::HookOutcome::Retry { feedback_entry } => {
                 cp.iteration += 1;
-                self.store.write(|tx| {
-                    let mut task = running(tc, tx)?;
-                    tx.append_entry(conv, "pi.user", &feedback_entry)?;
-                    checkpoint_transition(&mut task, tx, cp, PHASE_PREPARE)
-                })?;
+                let tc_write = tc.clone();
+                let conv_write = conv.clone();
+                let cp_write = cp.clone();
+                self.store
+                    .write_async(move |tx| {
+                        Box::pin(async move {
+                            let mut task = running(&tc_write, tx).await?;
+                            tx.append_entry_async(&conv_write, "pi.user", &feedback_entry).await?;
+                            checkpoint_transition(&mut task, tx, &cp_write, PHASE_PREPARE).await
+                        })
+                    })
+                    .await?;
                 return Ok(next_phase(cp, PHASE_PREPARE));
             }
             crate::agent::core::extension::HookOutcome::Deny { reason, .. } => {
@@ -1081,14 +1213,20 @@ impl Engine {
             result["maxIterationsReached"] = json!(max_iterations_reached);
         }
         cp.final_result = Some(result);
-        self.store.write(|tx| {
-            let mut task = running(tc, tx)?;
-            checkpoint_transition(&mut task, tx, cp, PHASE_FOLLOW_UP_CHECK)
-        })?;
+        let tc_write = tc.clone();
+        let cp_write = cp.clone();
+        self.store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let mut task = running(&tc_write, tx).await?;
+                    checkpoint_transition(&mut task, tx, &cp_write, PHASE_FOLLOW_UP_CHECK).await
+                })
+            })
+            .await?;
         Ok(next_phase(cp, PHASE_FOLLOW_UP_CHECK))
     }
 
-    fn phase_follow_up_check(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
+    async fn phase_follow_up_check(&self, tc: &TaskContext, cp: &mut Checkpoint) -> Result<Transition> {
         let conv = &tc.task.conversation_id;
         if let Some(done) = tc.task.memo.get("yielded") {
             return Ok(Transition::Complete(done.clone()));
@@ -1101,26 +1239,36 @@ impl Engine {
             })
         });
 
-        let follow_up_next = self.store.write(|tx| {
-            let mut task = running(tc, tx)?;
-            let follow_ups = inbox::take_pending_follow_ups(tx, conv)?;
-            if !follow_ups.is_empty() {
-                for fu in follow_ups {
-                    tx.append_entry(conv, "pi.user", &fu.payload)?;
-                    cp.follow_up_submissions.push(fu.id);
-                }
-                cp.final_result = None;
-                checkpoint_transition(&mut task, tx, cp, PHASE_PREPARE)?;
-                return Ok(true);
-            }
-            tx.settle(&cp.submission, SubmissionStatus::Done, &result)?;
-            for fid in &cp.follow_up_submissions {
-                tx.settle(fid, SubmissionStatus::Done, &result)?;
-            }
-            task.memo["yielded"] = result.clone();
-            tx.update_task(&task)?;
-            Ok(false)
-        })?;
+        let tc_write = tc.clone();
+        let conv_write = conv.clone();
+        let mut cp_write = cp.clone();
+        let res_write = result.clone();
+        let (follow_up_next, updated_cp) = self
+            .store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let mut task = running(&tc_write, tx).await?;
+                    let follow_ups = inbox::take_pending_follow_ups(tx, &conv_write).await?;
+                    if !follow_ups.is_empty() {
+                        for fu in follow_ups {
+                            tx.append_entry_async(&conv_write, "pi.user", &fu.payload).await?;
+                            cp_write.follow_up_submissions.push(fu.id);
+                        }
+                        cp_write.final_result = None;
+                        checkpoint_transition(&mut task, tx, &cp_write, PHASE_PREPARE).await?;
+                        return Ok((true, cp_write));
+                    }
+                    tx.settle_async(&cp_write.submission, SubmissionStatus::Done, &res_write).await?;
+                    for fid in &cp_write.follow_up_submissions {
+                        tx.settle_async(fid, SubmissionStatus::Done, &res_write).await?;
+                    }
+                    task.memo["yielded"] = res_write;
+                    tx.update_task_async(&task).await?;
+                    Ok((false, cp_write))
+                })
+            })
+            .await?;
+        *cp = updated_cp;
 
         if follow_up_next {
             return Ok(next_phase(cp, PHASE_PREPARE));
@@ -1152,11 +1300,11 @@ impl Engine {
         tc.task.memo.get("output").cloned().map(|saved| Ok(Transition::Complete(saved)))
     }
 
-    pub fn complete_dispatched_tool(&self, tc: &TaskContext, call: &ToolCall, text: String, is_error: bool) -> Result<Transition> {
+    pub async fn complete_dispatched_tool(&self, tc: &TaskContext, call: &ToolCall, text: String, is_error: bool) -> Result<Transition> {
         if tc.task.phase_name == crate::agent::codemode::RUN {
             let decoded = serde_json::from_str::<Value>(&text).unwrap_or_else(|_| Value::String(text.clone()));
             let cache = if is_error { json!({ "error": text }) } else { json!({ "value": decoded }) };
-            tc.memo("toolOutput", || Ok(cache))?;
+            tc.memo("toolOutput", || async move { Ok(cache) }).await?;
             return if is_error {
                 Err(Error::Invalid(text))
             } else {
@@ -1170,13 +1318,14 @@ impl Engine {
             "isError": is_error,
             "overridable": false,
         });
-        tc.memo("output", || Ok(record.clone()))?;
+        let record_memo = record.clone();
+        tc.memo("output", || async move { Ok(record_memo) }).await?;
         Ok(Transition::Complete(record))
     }
 
     /// Executes one JS-originated `call(name, args)` inside `pi.codemode.tool`
     /// through the shared governance, budget, extension dispatch, and Effect Sandwich pipeline.
-    pub fn run_codemode_tool(&self, tc: &TaskContext, name: &str, args: Value) -> Result<Transition> {
+    pub async fn run_codemode_tool(&self, tc: &TaskContext, name: &str, args: Value) -> Result<Transition> {
         let conv = &tc.task.conversation_id;
         let park = |signal: &str, until_ms: Option<i64>| Transition::Sleep {
             phase: crate::agent::codemode::RUN.into(),
@@ -1185,12 +1334,16 @@ impl Engine {
             signal: Some(signal.into()),
         };
 
-        let provider = self.store.read(|tx| Ok(tx.conversation(conv)?.provider_affinity))?;
-        let Some(brain) = self.provider.resolve_brain(conv, &provider)? else {
+        let conv_read = conv.clone();
+        let provider = self
+            .store
+            .read_async(move |tx| Box::pin(async move { Ok(tx.conversation_async(&conv_read).await?.provider_affinity) }))
+            .await?;
+        let Some(brain) = self.provider.resolve_brain(conv, &provider).await? else {
             return Ok(park(ATTACHED_SIGNAL, None));
         };
         if conv.starts_with("worker:") {
-            self.clear_attached_signals(&tc.task.id)?;
+            self.clear_attached_signals(&tc.task.id).await?;
         }
 
         if let Some(res) = self.check_dispatched_memo(tc) {
@@ -1204,7 +1357,7 @@ impl Engine {
         };
         let runner = self.extensions_snapshot();
         let ext_tools = runner.tools();
-        let tool = self.resolve_tool(conv, &brain, &ext_tools, name)?;
+        let tool = self.resolve_tool(conv, &brain, &ext_tools, name).await?;
 
         let cp = Checkpoint::default();
         let sched = self.scheduler();
@@ -1213,7 +1366,7 @@ impl Engine {
         if tc.task.memo["approved"] != true && tc.task.memo["toolStarted"] != true {
             let mut turn_ctx = self.make_hook_ctx(tc, &cp, Some(&brain), &obs);
             turn_ctx.scheduler = sched.as_ref();
-            match runner.run_before_turn(&turn_ctx)? {
+            match runner.run_before_turn(&turn_ctx).await? {
                 crate::agent::core::extension::HookOutcome::Continue => {}
                 crate::agent::core::extension::HookOutcome::Park { signal, until_ms } => {
                     return Ok(park(&signal, until_ms));
@@ -1239,12 +1392,12 @@ impl Engine {
                             decision.reason
                         }));
                     }
-                    tc.memo("approved", || Ok(json!(true)))?;
+                    tc.memo("approved", || async { Ok(json!(true)) }).await?;
                 } else {
                     return Ok(park(PERMISSION_SIGNAL, None));
                 }
             } else {
-                let tr = Transcript::load(&self.store, conv)?;
+                let tr = Transcript::load(&self.store, conv).await?;
                 let mut hook_ctx = self.make_hook_ctx(tc, &cp, Some(&brain), &obs);
                 hook_ctx.scheduler = sched.as_ref();
                 let call_ctx = ToolCallHookCtx {
@@ -1256,18 +1409,23 @@ impl Engine {
                     entries: &tr.entries,
                     output: None,
                 };
-                match runner.run_before_tool(&call_ctx)? {
+                match runner.run_before_tool(&call_ctx).await? {
                     crate::agent::core::extension::HookOutcome::Continue => {
-                        tc.memo("approved", || Ok(json!(true)))?;
+                        tc.memo("approved", || async { Ok(json!(true)) }).await?;
                     }
                     crate::agent::core::extension::HookOutcome::Deny { reason, .. } => return Err(Error::Invalid(reason)),
                     crate::agent::core::extension::HookOutcome::Park { signal, until_ms } => {
-                        self.store.write(|tx| {
-                            let mut t = running(tc, tx)?;
-                            t.checkpoint["parked"] = json!(true);
-                            tx.update_task(&t)?;
-                            Ok(())
-                        })?;
+                        let tc_write = tc.clone();
+                        self.store
+                            .write_async(move |tx| {
+                                Box::pin(async move {
+                                    let mut t = running(&tc_write, tx).await?;
+                                    t.checkpoint["parked"] = json!(true);
+                                    tx.update_task_async(&t).await?;
+                                    Ok(())
+                                })
+                            })
+                            .await?;
                         return Ok(park(&signal, until_ms));
                     }
                     crate::agent::core::extension::HookOutcome::Retry { .. } => {}
@@ -1275,7 +1433,7 @@ impl Engine {
             }
         }
 
-        if let Some(res) = runner.dispatch_tool(&synthetic_call, tc, self) {
+        if let Some(res) = runner.dispatch_tool(&synthetic_call, tc, self).await {
             return res;
         }
 
@@ -1283,20 +1441,20 @@ impl Engine {
 
         if tc.task.memo["toolStarted"] == true && !tool.as_tool().replay_safe() {
             let mut msg = "tool execution interrupted; inspect workspace before retrying".to_owned();
-            if let Some(status) = git_status_summary(brain.cwd.as_deref()) {
+            if let Some(status) = git_status_summary(brain.cwd.as_deref()).await {
                 msg.push_str("\nworkspace git status:\n");
                 msg.push_str(&status);
             }
             return Err(Error::Invalid(msg));
         }
 
-        tc.memo("toolStarted", || Ok(json!(true)))?;
+        tc.memo("toolStarted", || async { Ok(json!(true)) }).await?;
         let conv_owned = conv.clone();
         let task_owned = tc.task.id.clone();
         let name_owned = name.to_owned();
         let engine_ref = self.clone();
         let tool_ctx = ToolContext {
-            cancel: CancelToken::from_receiver(tc.cancellation()),
+            cancel: CancelToken::from_tokio(tc.cancel_token()),
             on_update: Some(Arc::new(move |upd: crate::agent::core::tool::ToolUpdate| {
                 engine_ref.emit(
                     &conv_owned,
@@ -1314,21 +1472,33 @@ impl Engine {
             scheduler: self.scheduler(),
         };
 
-        let out = tool.as_tool().execute_with_context(&args, &tool_ctx);
+        let out = tool.as_tool().execute_with_context(&args, &tool_ctx).await;
         let decoded = serde_json::from_str(&out.text).unwrap_or_else(|_| Value::String(out.text.clone()));
-        tc.memo("toolOutput", || {
-            Ok(if out.is_error {
-                json!({ "error": out.text })
-            } else {
-                json!({ "value": decoded })
-            })
-        })?;
+        let memo_val = if out.is_error {
+            json!({ "error": out.text })
+        } else {
+            json!({ "value": decoded })
+        };
+        tc.memo("toolOutput", || async move { Ok(memo_val) }).await?;
         if out.is_error {
             Err(Error::Invalid(out.text))
         } else {
             Ok(Transition::Complete(decoded))
         }
     }
+}
+
+async fn find_generation_task_for_submission(tx: &durable::Read<'_>, conv: &str, sub: &Submission) -> Result<Task> {
+    let direct_id = format!("gen-{}", sub.id);
+    if let Ok(task) = tx.task_async(&direct_id).await {
+        return Ok(task);
+    }
+    tx.tasks_by_conversation_async(conv)
+        .await?
+        .into_iter()
+        .filter(|t| t.kind == KIND)
+        .max_by_key(|t| t.created_at_ms)
+        .ok_or_else(|| Error::Missing(direct_id))
 }
 
 enum ResolvedTool<'a> {
@@ -1364,9 +1534,14 @@ fn record_tool_file_op(ops: &mut FileOps, tool_name: &str, args: &Value) {
     }
 }
 
-pub fn git_status_summary(cwd: Option<&Path>) -> Option<String> {
+pub async fn git_status_summary(cwd: Option<&Path>) -> Option<String> {
     let dir = cwd?;
-    let output = Command::new("git").args(["-C", &dir.to_string_lossy(), "status", "--short"]).output().ok()?;
+    let output = Command::new("git")
+        .args(["-C", &dir.to_string_lossy(), "status", "--short"])
+        .kill_on_drop(true)
+        .output()
+        .await
+        .ok()?;
     if !output.status.success() {
         return None;
     }
@@ -1384,15 +1559,15 @@ pub fn git_status_summary(cwd: Option<&Path>) -> Option<String> {
     Some(out)
 }
 
-fn running(tc: &TaskContext, tx: &Tx<'_>) -> Result<Task> {
-    let task = tx.task(&tc.task.id)?;
+async fn running(tc: &TaskContext, tx: &Tx<'_>) -> Result<Task> {
+    let task = tx.task_async(&tc.task.id).await?;
     if task.status != TaskStatus::Running || tc.is_cancelled() {
         return Err(Error::Invalid("phase no longer owns generation".into()));
     }
     Ok(task)
 }
 
-fn checkpoint_transition(task: &mut Task, tx: &mut Tx<'_>, cp: &Checkpoint, next: &str) -> Result<()> {
+async fn checkpoint_transition(task: &mut Task, tx: &mut Tx<'_>, cp: &Checkpoint, next: &str) -> Result<()> {
     let mut saved = cp.clone();
     saved.next_phase = Some(next.into());
     task.checkpoint = json!(saved);
@@ -1400,7 +1575,7 @@ fn checkpoint_transition(task: &mut Task, tx: &mut Tx<'_>, cp: &Checkpoint, next
     let task_id = task.id.clone();
     let phase = task.phase_name.clone();
     let at_ms = tx.now_ms;
-    tx.update_task(task)?;
+    tx.update_task_async(task).await?;
     tx.record_telemetry(durable::TelemetryEvent::Checkpoint { task_id, phase, at_ms });
     Ok(())
 }

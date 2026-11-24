@@ -30,7 +30,9 @@ use agent_client_protocol::{Agent, Builder, Client, ConnectionTo, Lines, Respond
 use base64::Engine;
 use parking_lot::Mutex;
 use serde_json::{Map, Value, json};
+use tokio::sync::{mpsc, oneshot};
 
+use crate::BoxFuture;
 use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
 use crate::oar::process::{AbortWatchdog, LineChild, Spawn, find_binary, run_capture};
 use crate::oar::record::{self, Recorder};
@@ -515,7 +517,7 @@ enum Command {
         model: Option<String>,
         effort: Option<String>,
         permission_mode: Option<PermissionMode>,
-        reply: flume::Sender<Result<()>>,
+        reply: oneshot::Sender<Result<()>>,
     },
     Cancel,
     Shutdown,
@@ -561,7 +563,7 @@ struct Shared {
     turn_start_step_idx: Mutex<Option<i64>>,
     children: Mutex<HashMap<String, Vec<String>>>,
     updates: Mutex<std::collections::VecDeque<String>>,
-    commands: flume::Sender<Command>,
+    commands: mpsc::UnboundedSender<Command>,
     cwd: PathBuf,
 }
 
@@ -596,59 +598,66 @@ impl Shared {
         paths.get(id).cloned().unwrap_or_else(|| if id != root { vec![id.into()] } else { vec![] })
     }
 
-    fn on_update(&self, params: &Value) {
-        let line = self
-            .updates
-            .lock()
-            .pop_front()
-            .unwrap_or_else(|| json!({"jsonrpc":"2.0","method":"session/update","params":params}).to_string());
-        if let Some(update) = params.get("update")
-            && str_of(update, "sessionUpdate") == Some("session_info_update")
-            && str_of(params, "sessionId").is_none_or(|id| self.acp_session.get().is_none_or(|root| root == id))
-            && let Some(title) = str_of(update, "title").map(str::trim).filter(|t| !t.is_empty())
-        {
-            *self.session_title.lock() = Some(title.to_string());
-        }
-        if self.turn.is_replaying() {
-            return;
-        }
-        let Some(core) = self.core.get() else { return };
-        let Some(update) = params.get("update") else { return };
-        let path = self.agent_path(params);
-        let update_kind = str_of(update, "sessionUpdate").unwrap_or_default();
-        let mut child_events = Vec::new();
-        if self.flavor == AcpFlavor::Antigravity
-            && path.is_empty()
-            && matches!(update_kind, "tool_call" | "tool_call_update")
-            && let Some(tool_id) = str_of(update, "toolCallId")
-        {
-            let title = str_of(update, "title").unwrap_or_default();
-            let kind = str_of(update, "kind").unwrap_or_default();
-            let status = str_of(update, "status").unwrap_or_default();
-            self.background.lock().on_tool_update(tool_id, title, kind, update.get("rawInput"), status);
-            let parent_id = self.acp_session.get().map(String::as_str).unwrap_or_default();
-            let (matched, mapped) = self.child_activity.lock().on_tool_update(parent_id, update);
-            if matched {
-                self.has_child_activity.store(true, Ordering::SeqCst);
-                child_events = mapped;
+    async fn on_update(&self, params: &Value) {
+        let detached_abort = {
+            let line = self
+                .updates
+                .lock()
+                .pop_front()
+                .unwrap_or_else(|| json!({"jsonrpc":"2.0","method":"session/update","params":params}).to_string());
+            if let Some(update) = params.get("update")
+                && str_of(update, "sessionUpdate") == Some("session_info_update")
+                && str_of(params, "sessionId").is_none_or(|id| self.acp_session.get().is_none_or(|root| root == id))
+                && let Some(title) = str_of(update, "title").map(str::trim).filter(|t| !t.is_empty())
+            {
+                *self.session_title.lock() = Some(title.to_string());
             }
-        }
-        let frame_type = format!("session/update/{update_kind}");
-        let _frame = core.record_raw(&frame_type, path.clone(), &line, params);
-        let events = self.projector.lock().update(update);
-        for kind in events.into_iter().chain(child_events) {
-            core.emit(path.clone(), kind);
-        }
-        if self.flavor == AcpFlavor::Antigravity
-            && path.is_empty()
-            && update_kind == "usage_update"
-            && let UsageOutcome::FinishDetached { abort_wanted } = self.turn.on_usage_update()
-        {
+            if self.turn.is_replaying() {
+                return;
+            }
+            let Some(core) = self.core.get() else { return };
+            let Some(update) = params.get("update") else { return };
+            let path = self.agent_path(params);
+            let update_kind = str_of(update, "sessionUpdate").unwrap_or_default();
+            let mut child_events = Vec::new();
+            if self.flavor == AcpFlavor::Antigravity
+                && path.is_empty()
+                && matches!(update_kind, "tool_call" | "tool_call_update")
+                && let Some(tool_id) = str_of(update, "toolCallId")
+            {
+                let title = str_of(update, "title").unwrap_or_default();
+                let kind = str_of(update, "kind").unwrap_or_default();
+                let status = str_of(update, "status").unwrap_or_default();
+                self.background.lock().on_tool_update(tool_id, title, kind, update.get("rawInput"), status);
+                let parent_id = self.acp_session.get().map(String::as_str).unwrap_or_default();
+                let (matched, mapped) = self.child_activity.lock().on_tool_update(parent_id, update);
+                if matched {
+                    self.has_child_activity.store(true, Ordering::SeqCst);
+                    child_events = mapped;
+                }
+            }
+            let frame_type = format!("session/update/{update_kind}");
+            let _frame = core.record_raw(&frame_type, path.clone(), &line, params);
+            let events = self.projector.lock().update(update);
+            for kind in events.into_iter().chain(child_events) {
+                core.emit(path.clone(), kind);
+            }
+            if self.flavor == AcpFlavor::Antigravity
+                && path.is_empty()
+                && update_kind == "usage_update"
+                && let UsageOutcome::FinishDetached { abort_wanted } = self.turn.on_usage_update()
+            {
+                Some(abort_wanted)
+            } else {
+                None
+            }
+        };
+        if let Some(abort_wanted) = detached_abort {
             self.background.lock().clear();
             let (reason, error) = if abort_wanted {
                 (StopReason::Aborted, None)
             } else {
-                self.check_silent_error(StopReason::Completed, None)
+                self.check_silent_error(StopReason::Completed, None).await
             };
             self.turn_finished(reason, error);
         }
@@ -774,7 +783,7 @@ impl Shared {
         }
     }
 
-    fn check_silent_error(&self, reason: StopReason, error: Option<String>) -> (StopReason, Option<String>) {
+    async fn check_silent_error(&self, reason: StopReason, error: Option<String>) -> (StopReason, Option<String>) {
         if self.flavor != AcpFlavor::Antigravity {
             return (reason, error);
         }
@@ -782,7 +791,7 @@ impl Shared {
         let (Some(path), Some(after_idx)) = (self.db_path.get(), start_idx) else {
             return (reason, error);
         };
-        if let Some(silent) = antigravity_db::detect_silent_error(path, after_idx) {
+        if let Some(silent) = antigravity_db::detect_silent_error(path, after_idx).await {
             if silent.invalid_thinking_signature
                 && let Some(core) = self.core.get()
             {
@@ -820,7 +829,7 @@ impl Shared {
         antigravity_swarm::read_child_transcript(base, conversation_id, limit)
     }
 
-    fn read_subagent(&self, thread_id: &str, _turn_id: Option<&str>) -> Result<SubagentSnapshot> {
+    async fn read_subagent(&self, thread_id: &str, _turn_id: Option<&str>) -> Result<SubagentSnapshot> {
         if self.flavor != AcpFlavor::Antigravity {
             return Err(AgentError::Unsupported {
                 option: "read_subagent".into(),
@@ -861,7 +870,7 @@ impl Shared {
         }
 
         if let Some(db_path) = self.db_path.get() {
-            let children = antigravity_db::list_invoked_subagents(db_path, antigravity_db::MAX_CHILDREN);
+            let children = antigravity_db::list_invoked_subagents(db_path, antigravity_db::MAX_CHILDREN).await;
             if let Some(child) = children
                 .into_iter()
                 .find(|c| c.conversation_id.as_deref() == Some(thread_id) || c.role.as_deref() == Some(thread_id))
@@ -1321,7 +1330,7 @@ fn stop_reason(reply: &Value) -> (StopReason, Option<String>) {
     }
 }
 
-fn dispatch_prompt(
+async fn dispatch_prompt(
     cx: &ConnectionTo<Agent>,
     shared: &Arc<Shared>,
     session_id: &str,
@@ -1330,7 +1339,10 @@ fn dispatch_prompt(
     let request = UntypedMessage::new("session/prompt", json!({ "sessionId": session_id, "prompt": blocks }))?;
     let start = shared.turn.begin_prompt();
     if shared.flavor == AcpFlavor::Antigravity && start.is_first {
-        let start_idx = shared.db_path.get().and_then(|p| antigravity_db::latest_step_index(p));
+        let start_idx = match shared.db_path.get() {
+            Some(p) => antigravity_db::latest_step_index(p).await,
+            None => None,
+        };
         *shared.turn_start_step_idx.lock() = start_idx;
     }
     let shared_cb = shared.clone();
@@ -1339,24 +1351,30 @@ fn dispatch_prompt(
         match result {
             Ok(reply) => {
                 let raw_stop = str_of(&reply, "stopReason").map(str::to_string);
-                let _frame = shared_cb
-                    .core
-                    .get()
-                    .map(|core| core.record_raw("session/prompt_result", vec![], &reply.to_string(), &reply));
                 match shared_cb.flavor {
                     AcpFlavor::Generic => {
+                        let _frame = shared_cb
+                            .core
+                            .get()
+                            .map(|core| core.record_raw("session/prompt_result", vec![], &reply.to_string(), &reply));
                         if let PromptOkOutcome::Finish { .. } = shared_cb.turn.on_prompt_ok(false) {
                             let (reason, error) = stop_reason(&reply);
                             shared_cb.turn_finished(reason, error);
                         }
                     }
                     AcpFlavor::Antigravity => {
+                        let (mut reason, mut error) = stop_reason(&reply);
+                        let check_silent = matches!(raw_stop.as_deref(), Some("end_turn" | "refusal"));
+                        // Check silent DB errors before acquiring `FrameGuard` so no guard crosses `.await`.
+                        if check_silent {
+                            (reason, error) = shared_cb.check_silent_error(reason, error).await;
+                        }
+                        let _frame = shared_cb
+                            .core
+                            .get()
+                            .map(|core| core.record_raw("session/prompt_result", vec![], &reply.to_string(), &reply));
                         if shared_cb.turn.try_finish_steered_prompt() {
                             return Ok(());
-                        }
-                        let (mut reason, mut error) = stop_reason(&reply);
-                        if matches!(raw_stop.as_deref(), Some("end_turn" | "refusal")) {
-                            (reason, error) = shared_cb.check_silent_error(reason, error);
                         }
                         let may_detach = reason == StopReason::Completed && shared_cb.background.lock().has_open();
                         match shared_cb.turn.on_prompt_ok(may_detach) {
@@ -1466,13 +1484,13 @@ async fn serve(
     shared: Arc<Shared>,
     opts: SessionOptions,
     probe_models: bool,
-    commands: flume::Receiver<Command>,
-    ready: flume::Sender<Result<Opened>>,
+    mut commands: mpsc::UnboundedReceiver<Command>,
+    ready: mpsc::Sender<Result<Opened>>,
 ) -> std::result::Result<(), agent_client_protocol::Error> {
     let opened = match handshake(&cx, &shared, &opts, probe_models).await {
         Ok(opened) => opened,
         Err(error) => {
-            let _ = ready.send(Err(error));
+            let _ = ready.try_send(Err(error));
             return Ok(());
         }
     };
@@ -1487,20 +1505,20 @@ async fn serve(
     *shared.available_modes.lock() = opened.available_modes.clone();
     *shared.config_options.lock() = opened.config_options.clone();
     shared.image_input.store(opened.image_input, Ordering::SeqCst);
-    if ready.send(Ok(opened)).is_err() {
+    if ready.send(Ok(opened)).await.is_err() {
         return Ok(());
     }
-    while let Ok(command) = commands.recv_async().await {
+    while let Some(command) = commands.recv().await {
         match command {
             Command::Prompt(blocks) => {
-                dispatch_prompt(&cx, &shared, &session_id, blocks)?;
+                dispatch_prompt(&cx, &shared, &session_id, blocks).await?;
             }
             Command::Steer(blocks) => match shared.flavor {
                 AcpFlavor::Generic => {
                     cx.send_notification(UntypedMessage::new("session/steer", json!({"sessionId": session_id, "prompt": blocks}))?)?;
                 }
                 AcpFlavor::Antigravity => {
-                    dispatch_prompt(&cx, &shared, &session_id, blocks)?;
+                    dispatch_prompt(&cx, &shared, &session_id, blocks).await?;
                 }
             },
             Command::SetConfig {
@@ -1530,17 +1548,17 @@ async fn serve(
 async fn run_connection(
     shared: Arc<Shared>,
     child: Arc<LineChild>,
-    incoming: flume::Receiver<Option<std::io::Result<String>>>,
+    incoming: mpsc::UnboundedReceiver<Option<std::io::Result<String>>>,
     opts: SessionOptions,
     probe_models: bool,
-    commands: flume::Receiver<Command>,
-    ready: flume::Sender<Result<Opened>>,
+    commands: mpsc::UnboundedReceiver<Command>,
+    ready: mpsc::Sender<Result<Opened>>,
 ) {
-    let incoming = Box::pin(futures_util::stream::unfold(incoming, |rx| async move {
-        rx.recv_async().await.ok().flatten().map(|line| (line, rx))
+    let incoming = Box::pin(futures_util::stream::unfold(incoming, |mut rx| async move {
+        rx.recv().await.flatten().map(|line| (line, rx))
     }));
     let outgoing = Box::pin(futures_util::sink::unfold(child, |child, line: String| async move {
-        child.write_line_async(&line).await.map_err(|e| std::io::Error::other(e.to_string()))?;
+        child.write_line(&line).await.map_err(|e| std::io::Error::other(e.to_string()))?;
         Ok::<_, std::io::Error>(child)
     }));
     let updates = shared.clone();
@@ -1552,7 +1570,7 @@ async fn run_connection(
         .on_receive_notification(
             async move |notification: UntypedMessage, _cx| {
                 if notification.method() == "session/update" {
-                    updates.on_update(notification.params());
+                    updates.on_update(notification.params()).await;
                 }
                 Ok(())
             },
@@ -1579,13 +1597,13 @@ async fn run_connection(
         message.push_str(child_error.trim());
     }
     if let Some(auth_msg) = shared.auth_notice.get() {
-        let _ = ready_failed.send(Err(AgentError::NotAvailable(auth_msg.clone())));
+        let _ = ready_failed.try_send(Err(AgentError::NotAvailable(auth_msg.clone())));
     } else {
         // Still waiting in `open`: the handshake never finished.
-        let _ = ready_failed.send(Err(AgentError::Protocol(message.clone())));
+        let _ = ready_failed.try_send(Err(AgentError::Protocol(message.clone())));
     }
     if let Some(child) = shared.child.get() {
-        child.kill_async().await;
+        child.kill().await;
     }
     if let Some(core) = shared.core.get() {
         core.observe_exit(shared.child.get().and_then(|c| c.status()));
@@ -1647,8 +1665,8 @@ impl AcpDriver {
 }
 
 impl Driver for AcpDriver {
-    fn read_subagent(&self, thread_id: &str, turn_id: Option<&str>) -> Result<SubagentSnapshot> {
-        self.shared.read_subagent(thread_id, turn_id)
+    fn read_subagent<'a>(&'a self, thread_id: &'a str, turn_id: Option<&'a str>) -> BoxFuture<'a, Result<SubagentSnapshot>> {
+        Box::pin(self.shared.read_subagent(thread_id, turn_id))
     }
 
     fn swarm_snapshot(&self) -> Option<SwarmSnapshot> {
@@ -1667,105 +1685,127 @@ impl Driver for AcpDriver {
         self.blocks(content).map(|_| ())
     }
 
-    fn start_turn(&self, content: Vec<ContentBlock>) -> Result<()> {
-        self.send(Command::Prompt(self.blocks(&content)?))
+    fn start_turn(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move { self.send(Command::Prompt(self.blocks(&content)?)) })
     }
 
-    fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
-        self.send(Command::Steer(self.blocks(&content)?))
+    fn steer(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move { self.send(Command::Steer(self.blocks(&content)?)) })
     }
 
-    fn abort(&self) -> Result<()> {
-        self.shared.turn.request_abort();
-        self.send(Command::Cancel)?;
-        if let (Some(core), Some(child)) = (self.shared.core.get(), self.shared.child.get()) {
-            self.shared.watchdog.arm(ABORT_GRACE, core.clone(), child.clone());
-        }
-        Ok(())
+    fn abort(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.shared.turn.request_abort();
+            self.send(Command::Cancel)?;
+            if let (Some(core), Some(child)) = (self.shared.core.get(), self.shared.child.get()) {
+                self.shared.watchdog.arm(ABORT_GRACE, core.clone(), child.clone());
+            }
+            Ok(())
+        })
     }
 
     /// ACP answers with one of the agent's own options; a denial's message
     /// has no field to travel in and is not delivered.
-    fn respond_permission(&self, request_id: &str, decision: &PermissionDecision) -> Result<()> {
-        let mut pending = self.shared.pending.lock();
-        let Some(entry) = pending.get(request_id) else {
-            return Err(rejected(rejection::UNKNOWN_REQUEST, format!("the agent no longer waits on `{request_id}`")));
-        };
-        // Refused before the request is taken, so it can be answered again.
-        let outcome = match entry.options.pick(decision)? {
-            Some(option) => RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(option)),
-            None => RequestPermissionOutcome::Cancelled,
-        };
-        let entry = pending.remove(request_id).expect("checked above");
-        entry
-            .responder
-            .respond(RequestPermissionResponse::new(outcome))
-            .map_err(|e| AgentError::Io(acp_error("permission answer", &e)))
+    fn respond_permission<'a>(&'a self, request_id: &'a str, decision: &'a PermissionDecision) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let mut pending = self.shared.pending.lock();
+            let Some(entry) = pending.get(request_id) else {
+                return Err(rejected(rejection::UNKNOWN_REQUEST, format!("the agent no longer waits on `{request_id}`")));
+            };
+            // Refused before the request is taken, so it can be answered again.
+            let outcome = match entry.options.pick(decision)? {
+                Some(option) => RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(option)),
+                None => RequestPermissionOutcome::Cancelled,
+            };
+            let entry = pending.remove(request_id).expect("checked above");
+            entry
+                .responder
+                .respond(RequestPermissionResponse::new(outcome))
+                .map_err(|e| AgentError::Io(acp_error("permission answer", &e)))
+        })
     }
 
-    fn respond_interaction(&self, request_id: &str, decision: &InteractionDecision) -> Result<()> {
-        let mut pending = self.shared.pending_interactions.lock();
-        let Some(entry) = pending.get(request_id) else {
-            return Err(rejected(
-                rejection::UNKNOWN_REQUEST,
-                format!("the agent no longer waits on interaction `{request_id}`"),
-            ));
-        };
-        let response = match decision {
-            InteractionDecision::Select { option_id } => {
-                if !entry.options.is_empty() && !entry.options.iter().any(|o| o.id == *option_id) {
-                    return Err(rejected(rejection::UNSUPPORTED, format!("unknown interaction option `{option_id}`")));
+    fn respond_interaction<'a>(&'a self, request_id: &'a str, decision: &'a InteractionDecision) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let mut pending = self.shared.pending_interactions.lock();
+            let Some(entry) = pending.get(request_id) else {
+                return Err(rejected(
+                    rejection::UNKNOWN_REQUEST,
+                    format!("the agent no longer waits on interaction `{request_id}`"),
+                ));
+            };
+            let response = match decision {
+                InteractionDecision::Select { option_id } => {
+                    if !entry.options.is_empty() && !entry.options.iter().any(|o| o.id == *option_id) {
+                        return Err(rejected(rejection::UNSUPPORTED, format!("unknown interaction option `{option_id}`")));
+                    }
+                    RequestPermissionResponse::new(RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(option_id.clone())))
                 }
-                RequestPermissionResponse::new(RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(option_id.clone())))
-            }
-            InteractionDecision::Custom { text } => {
-                if !entry.allow_custom {
-                    return Err(rejected(rejection::UNSUPPORTED, "this interaction does not accept custom free-text replies"));
+                InteractionDecision::Custom { text } => {
+                    if !entry.allow_custom {
+                        return Err(rejected(rejection::UNSUPPORTED, "this interaction does not accept custom free-text replies"));
+                    }
+                    let custom_id = entry
+                        .options
+                        .iter()
+                        .find(|o| {
+                            matches!(o.id.to_ascii_lowercase().as_str(), "custom" | "other" | "freeform")
+                                || o.kind
+                                    .as_deref()
+                                    .is_some_and(|k| matches!(k.to_ascii_lowercase().as_str(), "custom" | "other" | "freeform"))
+                        })
+                        .or_else(|| entry.options.first())
+                        .map(|o| o.id.clone())
+                        .unwrap_or_else(|| "custom".to_string());
+                    let mut meta = Map::new();
+                    meta.insert("customText".to_string(), json!(text));
+                    meta.insert("text".to_string(), json!(text));
+                    meta.insert("answer".to_string(), json!(text));
+                    RequestPermissionResponse::new(RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(custom_id).meta(meta.clone()))).meta(meta)
                 }
-                let custom_id = entry
-                    .options
-                    .iter()
-                    .find(|o| {
-                        matches!(o.id.to_ascii_lowercase().as_str(), "custom" | "other" | "freeform")
-                            || o.kind
-                                .as_deref()
-                                .is_some_and(|k| matches!(k.to_ascii_lowercase().as_str(), "custom" | "other" | "freeform"))
-                    })
-                    .or_else(|| entry.options.first())
-                    .map(|o| o.id.clone())
-                    .unwrap_or_else(|| "custom".to_string());
-                let mut meta = Map::new();
-                meta.insert("customText".to_string(), json!(text));
-                meta.insert("text".to_string(), json!(text));
-                meta.insert("answer".to_string(), json!(text));
-                RequestPermissionResponse::new(RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(custom_id).meta(meta.clone()))).meta(meta)
+                InteractionDecision::Cancel => RequestPermissionResponse::new(RequestPermissionOutcome::Cancelled),
+            };
+            let entry = pending.remove(request_id).expect("checked above");
+            entry
+                .responder
+                .respond(response)
+                .map_err(|e| AgentError::Io(acp_error("interaction answer", &e)))
+        })
+    }
+
+    fn set_config<'a>(&'a self, model: Option<&'a str>, effort: Option<&'a str>, permission_mode: Option<PermissionMode>) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let (reply_tx, reply_rx) = oneshot::channel();
+            self.send(Command::SetConfig {
+                model: model.map(str::to_string),
+                effort: effort.map(str::to_string),
+                permission_mode,
+                reply: reply_tx,
+            })?;
+            tokio::time::timeout(CONFIG_TIMEOUT, reply_rx)
+                .await
+                .map_err(|_| AgentError::Protocol("timed out waiting for session config update".into()))?
+                .map_err(|_| AgentError::Protocol("timed out waiting for session config update".into()))?
+        })
+    }
+
+    fn dispose(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            let _ = self.shared.commands.send(Command::Shutdown);
+            if let Some(child) = self.shared.child.get() {
+                child.kill().await;
+                if let Some(core) = self.shared.core.get() {
+                    core.observe_exit(child.status());
+                }
             }
-            InteractionDecision::Cancel => RequestPermissionResponse::new(RequestPermissionOutcome::Cancelled),
-        };
-        let entry = pending.remove(request_id).expect("checked above");
-        entry
-            .responder
-            .respond(response)
-            .map_err(|e| AgentError::Io(acp_error("interaction answer", &e)))
+            self.shared.watchdog.wake();
+        })
     }
 
-    fn set_config(&self, model: Option<&str>, effort: Option<&str>, permission_mode: Option<PermissionMode>) -> Result<()> {
-        let (reply_tx, reply_rx) = flume::bounded(1);
-        self.send(Command::SetConfig {
-            model: model.map(str::to_string),
-            effort: effort.map(str::to_string),
-            permission_mode,
-            reply: reply_tx,
-        })?;
-        reply_rx
-            .recv_timeout(CONFIG_TIMEOUT)
-            .map_err(|_| AgentError::Protocol("timed out waiting for session config update".into()))?
-    }
-
-    fn dispose(&self) {
+    fn signal_dispose(&self) {
         let _ = self.shared.commands.send(Command::Shutdown);
         if let Some(child) = self.shared.child.get() {
-            child.kill();
+            child.signal_kill();
             if let Some(core) = self.shared.core.get() {
                 core.observe_exit(child.status());
             }
@@ -1796,7 +1836,7 @@ impl AcpRuntime {
         AcpFlavor::of(&self.spec.id)
     }
 
-    fn connect(&self, opts: &SessionOptions, probe_models: bool) -> Result<Connected> {
+    async fn connect(&self, opts: &SessionOptions, probe_models: bool) -> Result<Connected> {
         let flavor = self.flavor();
         let binary = opts.binary(&self.spec.command)?;
         let spawn_args = match flavor {
@@ -1807,7 +1847,7 @@ impl AcpRuntime {
             AcpFlavor::Generic => opts.env.clone(),
             AcpFlavor::Antigravity => antigravity::spawn_env(opts),
         };
-        let (commands_tx, commands_rx) = flume::unbounded();
+        let (commands_tx, commands_rx) = mpsc::unbounded_channel();
         let shared = Arc::new(Shared {
             runtime_id: self.spec.id.clone(),
             flavor,
@@ -1838,34 +1878,39 @@ impl AcpRuntime {
             commands: commands_tx,
             cwd: opts.cwd.clone(),
         });
-        let (incoming_tx, incoming_rx) = flume::unbounded::<Option<std::io::Result<String>>>();
-        let (ready_tx, ready_rx) = flume::bounded(2);
+        let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Option<std::io::Result<String>>>();
+        let (ready_tx, mut ready_rx) = mpsc::channel(2);
         let on_line = {
             let incoming = incoming_tx.clone();
             let shared = shared.clone();
             let ready_auth = ready_tx.clone();
-            move |line: &str| {
-                if flavor == AcpFlavor::Antigravity
-                    && let Some(url) = antigravity::auth_url_line(line)
-                {
-                    let msg = format!("antigravity requires login before opening an ACP session; run `agy acp --login` (auth URL: {url})");
-                    let _ = shared.auth_notice.set(msg.clone());
-                    let _ = ready_auth.send(Err(AgentError::NotAvailable(msg)));
-                    if let Some(child) = shared.child.get() {
-                        child.kill();
+            move |line: String| {
+                let incoming = incoming.clone();
+                let shared = shared.clone();
+                let ready_auth = ready_auth.clone();
+                async move {
+                    if flavor == AcpFlavor::Antigravity
+                        && let Some(url) = antigravity::auth_url_line(&line)
+                    {
+                        let msg = format!("antigravity requires login before opening an ACP session; run `agy acp --login` (auth URL: {url})");
+                        let _ = shared.auth_notice.set(msg.clone());
+                        let _ = ready_auth.try_send(Err(AgentError::NotAvailable(msg)));
+                        if let Some(child) = shared.child.get() {
+                            child.kill().await;
+                        }
+                        return;
                     }
-                    return;
+                    if let Ok(v) = serde_json::from_str::<Value>(&line)
+                        && v["method"] == "session/update"
+                    {
+                        shared.updates.lock().push_back(line.clone());
+                    }
+                    let _ = incoming.send(Some(Ok(line)));
                 }
-                if let Ok(v) = serde_json::from_str::<Value>(line)
-                    && v["method"] == "session/update"
-                {
-                    shared.updates.lock().push_back(line.to_string());
-                }
-                let _ = incoming.send(Some(Ok(line.to_string())));
             }
         };
         // Closing the stream is how the connection learns the agent is gone.
-        let on_exit = move |_code: Option<i32>, _stderr: String| {
+        let on_exit = move |_code: Option<i32>, _stderr: String| async move {
             let _ = incoming_tx.send(None);
         };
         let child = LineChild::spawn(
@@ -1891,8 +1936,8 @@ impl AcpRuntime {
             commands_rx,
             ready_tx,
         ));
-        match ready_rx.recv_timeout(opts.request_timeout.unwrap_or(OPEN_TIMEOUT)) {
-            Ok(Ok(opened)) => {
+        match tokio::time::timeout(opts.request_timeout.unwrap_or(OPEN_TIMEOUT), ready_rx.recv()).await {
+            Ok(Some(Ok(opened))) => {
                 if flavor == AcpFlavor::Antigravity
                     && let Some((gemini_dir, app_data_dir)) = antigravity::resolve_db_dirs(&spawn_args, &spawn_env, opts.base_env.as_deref())
                 {
@@ -1910,12 +1955,12 @@ impl AcpRuntime {
                 }
                 Ok(Connected { shared, opened })
             }
-            Ok(Err(error)) => {
-                child.kill();
+            Ok(Some(Err(error))) => {
+                child.kill().await;
                 Err(error)
             }
-            Err(_) => {
-                child.kill();
+            Ok(None) | Err(_) => {
+                child.kill().await;
                 Err(AgentError::Protocol(format!("{} did not open a session in time", self.spec.id)))
             }
         }
@@ -1950,67 +1995,76 @@ impl Runtime for AcpRuntime {
         }
     }
 
-    fn installation(&self) -> Installation {
-        let Some(path) = find_binary(&self.spec.command) else {
-            return Installation::NotInstalled;
-        };
-        let version =
-            run_capture(&path, &["--version"], Duration::from_secs(15)).and_then(|out| out.lines().map(str::trim).find(|l| !l.is_empty()).map(str::to_string));
-        match self.flavor() {
-            AcpFlavor::Generic => Installation::Available { version, path },
-            AcpFlavor::Antigravity => antigravity::check_installation(path, version),
-        }
+    fn installation(&self) -> BoxFuture<'_, Installation> {
+        Box::pin(async move {
+            let Some(path) = find_binary(&self.spec.command) else {
+                return Installation::NotInstalled;
+            };
+            let version = run_capture(&path, &["--version"], Duration::from_secs(15))
+                .await
+                .and_then(|out| out.lines().map(str::trim).find(|l| !l.is_empty()).map(str::to_string));
+            match self.flavor() {
+                AcpFlavor::Generic => Installation::Available { version, path },
+                AcpFlavor::Antigravity => antigravity::check_installation(path, version),
+            }
+        })
     }
 
-    fn account_usage(&self) -> Result<crate::oar::AccountUsage> {
-        match self.flavor() {
-            AcpFlavor::Antigravity => {
-                let Some(path) = find_binary(&self.spec.command) else {
-                    return Ok(crate::oar::AccountUsage::Unsupported {
-                        reason: "not_installed".into(),
-                    });
-                };
-                antigravity::read_account_usage(&path)
+    fn account_usage(&self) -> BoxFuture<'_, Result<crate::oar::AccountUsage>> {
+        Box::pin(async move {
+            match self.flavor() {
+                AcpFlavor::Antigravity => {
+                    let Some(path) = find_binary(&self.spec.command) else {
+                        return Ok(crate::oar::AccountUsage::Unsupported {
+                            reason: "not_installed".into(),
+                        });
+                    };
+                    antigravity::read_account_usage(&path).await
+                }
+                AcpFlavor::Generic => Ok(crate::oar::AccountUsage::Unsupported {
+                    reason: "not_supported".into(),
+                }),
             }
-            AcpFlavor::Generic => Ok(crate::oar::AccountUsage::Unsupported {
-                reason: "not_supported".into(),
-            }),
-        }
+        })
     }
 
     /// Opens a throwaway session in the temp directory to read the agent's
     /// model list (ACP has no other way to ask).
-    fn list_models(&self) -> Result<Vec<ModelInfo>> {
-        let opts = SessionOptions {
-            cwd: std::env::temp_dir(),
-            ..Default::default()
-        };
-        let connected = self.connect(&opts, true)?;
-        let _ = connected.shared.commands.send(Command::Shutdown);
-        if let Some(child) = connected.shared.child.get() {
-            child.kill();
-        }
-        Ok(connected.opened.probed_models.unwrap_or_else(|| models_of(&connected.opened.session)))
+    fn list_models(&self) -> BoxFuture<'_, Result<Vec<ModelInfo>>> {
+        Box::pin(async move {
+            let opts = SessionOptions {
+                cwd: std::env::temp_dir(),
+                ..Default::default()
+            };
+            let connected = self.connect(&opts, true).await?;
+            let _ = connected.shared.commands.send(Command::Shutdown);
+            if let Some(child) = connected.shared.child.get() {
+                child.kill().await;
+            }
+            Ok(connected.opened.probed_models.unwrap_or_else(|| models_of(&connected.opened.session)))
+        })
     }
 
-    fn open(&self, mut opts: SessionOptions) -> Result<Arc<dyn Session>> {
-        opts.prepare(self.id())?;
-        let file = record::open_file(opts.record_to.as_deref())?;
-        let Connected { shared, opened } = self.connect(&opts, false)?;
-        let recorder = Recorder::start(file, &self.spec.id, &opened.session_id, &opts.cwd, opened.model.as_deref());
-        let core = SessionCore::new(&self.spec.id, &opened.session_id, recorder);
-        if opts.resume.is_some() && self.flavor() == AcpFlavor::Generic {
-            core.resume_meter(&Value::Null, "acp_resume_baseline_unknown");
-        }
-        core.emit_root(EventKind::SessionStarted {
-            session_id: opened.session_id.clone(),
-            model: opened.model.clone(),
-        });
-        let _ = shared.core.set(core.clone());
-        // The connection may have died between the handshake and here.
-        if shared.commands.is_disconnected() {
-            core.finish(Some(format!("{} closed the connection", self.spec.id)));
-        }
-        Ok(CoreSession::new(core, AcpDriver { shared }, self.capabilities()))
+    fn open(&self, mut opts: SessionOptions) -> BoxFuture<'_, Result<Arc<dyn Session>>> {
+        Box::pin(async move {
+            opts.prepare(self.id())?;
+            let file = record::open_file(opts.record_to.as_deref())?;
+            let Connected { shared, opened } = self.connect(&opts, false).await?;
+            let recorder = Recorder::start(file, &self.spec.id, &opened.session_id, &opts.cwd, opened.model.as_deref());
+            let core = SessionCore::new(&self.spec.id, &opened.session_id, recorder);
+            if opts.resume.is_some() && self.flavor() == AcpFlavor::Generic {
+                core.resume_meter(&Value::Null, "acp_resume_baseline_unknown");
+            }
+            core.emit_root(EventKind::SessionStarted {
+                session_id: opened.session_id.clone(),
+                model: opened.model.clone(),
+            });
+            let _ = shared.core.set(core.clone());
+            // The connection may have died between the handshake and here.
+            if shared.commands.is_closed() {
+                core.finish(Some(format!("{} closed the connection", self.spec.id)));
+            }
+            Ok(CoreSession::new(core, AcpDriver { shared }, self.capabilities()) as Arc<dyn Session>)
+        })
     }
 }

@@ -11,10 +11,6 @@
     "./catalogs": {
       "types": "./dist/catalog-translator.d.ts",
       "default": "./src/catalog-translator.ts"
-    },
-    "./format": {
-      "types": "./dist/format.d.ts",
-      "default": "./src/format.ts"
     }
   },
   "devDependencies": {

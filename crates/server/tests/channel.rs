@@ -5,21 +5,32 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::{Value, json};
-use vibevalley_protocol::{BizCode, Caller, Envelope};
-use vibevalley_server::Server;
+use vibevalley_protocol::{BizCode, Caller, CollabSlice, Envelope, InboxSlice, SliceKind};
+use vibevalley_server::channel::{DeliveryTargetKind, Posting};
+use vibevalley_server::{App, Config, Server, create_app_blocking};
 
-fn start(dir: &std::path::Path) -> vibevalley_server::Started {
+fn start(dir: &std::path::Path) -> App {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    vibevalley_server::start(vibevalley_server::ServerConfig {
+    create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        ..vibevalley_server::ServerConfig::under(dir)
+        ..Config::under(dir)
     })
     .unwrap()
+}
+
+fn collab_slice(app: &App) -> CollabSlice {
+    crate::support::block_on(app.ctx().feed.flush());
+    serde_json::from_str(&app.ctx().feed.snapshot_json(SliceKind::Collab)).unwrap()
+}
+
+fn inbox_slice(app: &App) -> InboxSlice {
+    crate::support::block_on(app.ctx().feed.flush());
+    serde_json::from_str(&app.ctx().feed.snapshot_json(SliceKind::Inbox)).unwrap()
 }
 
 fn ok(e: Envelope) -> Value {
@@ -31,9 +42,9 @@ fn ok(e: Envelope) -> Value {
 fn the_chat_through_its_endpoints() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
-    let started = start(dir.path());
-    let hub = started.hub.clone();
-    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+    let app = start(dir.path());
+    let router = app.router();
+    let call = |op: &str, p: Value| router.call_as(Caller::User, op, p);
 
     // A new farm: #general, the default, with the orchestrator in it, and its direct channel.
     let channels = ok(call("channel.list", json!(null)));
@@ -49,7 +60,7 @@ fn the_chat_through_its_endpoints() {
     );
     let gid = general["id"].as_str().unwrap().to_string();
 
-    let follow = hub.subscribe("channel.follow", json!({ "id": gid, "after": 0 })).unwrap();
+    let mut follow = router.subscribe("channel.follow", json!({ "id": gid, "after": 0 })).unwrap();
 
     // Said by name; a retry with the same key is the same message.
     ok(call(
@@ -65,16 +76,18 @@ fn the_chat_through_its_endpoints() {
     assert_eq!(first["actor"], json!({ "kind": "user", "id": "user", "name": "用户" }));
     let first_id = first["id"].as_str().unwrap().to_string();
 
-    let event: Value = follow.1.recv_timeout(Duration::from_secs(2)).unwrap();
+    let event: Value = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(2), follow.1.recv()).await })
+        .unwrap()
+        .unwrap();
     assert_eq!((event["_tag"].as_str(), event["message"]["number"].as_i64()), (Some("Message"), Some(1)));
 
     // The state keeps the chat.
-    let kept = crate::support::wait_until_transition(&hub, Duration::from_secs(5), "chat channel state updated", || {
-        let chat = hub.read(|s| s.chat.clone())?;
+    let kept = crate::support::wait_until_transition(app.ctx(), Duration::from_secs(5), "chat channel state updated", || {
+        let chat = collab_slice(&app).chat?;
         chat.channels.into_iter().find(|c| c.id == gid && c.last_number == Some(1) && c.read == Some(1))
     });
     assert_eq!((kept.last_number, kept.read), (Some(1), Some(1)));
-    assert_eq!(hub.read(|s| s.call), vibevalley_protocol::CallState::Live);
+    assert_eq!(app.ctx().live.call_snapshot().0, vibevalley_protocol::CallState::Live);
 
     // Channels: made, refused by name, renamed, placed.
     let dev = ok(call("channel.create", json!({ "name": "#dev", "description": "代码" })));
@@ -104,7 +117,7 @@ fn the_chat_through_its_endpoints() {
     assert_eq!(in_thread.as_array().unwrap().len(), 2);
     let listed = ok(call("channel.list", json!(null)));
     assert!(listed.as_array().unwrap().iter().all(|c| c["type"] != "thread"), "threads are not listed");
-    let chat = hub.read(|s| s.chat.clone()).unwrap();
+    let chat = collab_slice(&app).chat.unwrap();
     let t = chat.channels.iter().find(|c| c.id == thread).unwrap();
     assert_eq!((t.replies, t.title.as_str(), t.root_number), (2, "hello @助手", Some(1)));
 
@@ -139,33 +152,33 @@ fn the_chat_through_its_endpoints() {
     );
 
     // The follower saw every change, in revision order.
-    let revisions: Vec<i64> = follow.1.drain().map(|e| e["message"]["revision"].as_i64().unwrap()).collect();
+    let mut revisions = Vec::new();
+    while let Ok(e) = follow.1.try_recv() {
+        revisions.push(e["message"]["revision"].as_i64().unwrap());
+    }
     assert!(revisions.windows(2).all(|w| w[0] < w[1]) && revisions.len() >= 4, "{revisions:?}");
-    hub.unsubscribe(follow.0);
+    router.unsubscribe(follow.0);
 
     // Reads: what the orchestrator says is unread until read.
-    started
-        .test_internals()
-        .chat
-        .post(vibevalley_server::modules::collab::channel::Posting {
-            from: "orchestrator".into(),
-            channel: gid.clone(),
-            text: "收到 @用户".into(),
-            ..Default::default()
-        })
-        .unwrap();
+    crate::support::block_on(app.test_internals().channel.post_async(Posting {
+        from: "orchestrator".into(),
+        channel: gid.clone(),
+        text: "收到 @用户".into(),
+        ..Default::default()
+    }))
+    .unwrap();
     let unread = |id: &str| {
         let list = ok(call("channel.list", json!(null)));
         list.as_array().unwrap().iter().find(|c| c["id"] == id).unwrap()["unread"].as_i64()
     };
     assert_eq!(unread(&gid), Some(1));
-    crate::support::wait_until_transition(&hub, Duration::from_secs(5), "user mention in state", || {
-        hub.read(|s| s.chat.as_ref().is_some_and(|c| c.user_mentions.len() == 1)).then_some(())
+    crate::support::wait_until_transition(app.ctx(), Duration::from_secs(5), "user mention in state", || {
+        (collab_slice(&app).chat.is_some_and(|c| c.user_mentions.len() == 1)).then_some(())
     });
-    assert_eq!(hub.read(|s| s.chat.clone()).unwrap().user_mentions.len(), 1);
+    assert_eq!(collab_slice(&app).chat.unwrap().user_mentions.len(), 1);
     ok(call("channel.markRead", json!({ "id": gid, "number": 2 })));
     assert_eq!(unread(&gid), None);
-    assert!(hub.read(|s| s.chat.clone()).unwrap().user_mentions.is_empty());
+    assert!(collab_slice(&app).chat.unwrap().user_mentions.is_empty());
     ok(call("channel.markUnread", json!({ "id": gid, "number": 2 })));
     assert_eq!(unread(&gid), Some(1));
     assert_eq!(
@@ -196,17 +209,19 @@ fn the_chat_through_its_endpoints() {
     let preview = ok(call("channel.previewDelete", json!({ "id": gid })));
     assert!(preview["does"][0].as_str().unwrap().contains("#general"), "{preview}");
     ok(call("channel.delete", json!({ "id": gid })));
-    crate::support::wait_until_transition(&hub, Duration::from_secs(5), "deleted channel removed from state", || {
-        hub.read(|s| s.chat.as_ref().is_some_and(|c| c.channels.iter().all(|c| c.id != gid && c.id != thread)))
+    crate::support::wait_until_transition(app.ctx(), Duration::from_secs(5), "deleted channel removed from state", || {
+        collab_slice(&app)
+            .chat
+            .is_some_and(|chat| chat.channels.iter().all(|c| c.id != gid && c.id != thread))
             .then_some(())
     });
-    let chat = hub.read(|s| s.chat.clone()).unwrap();
+    let chat = collab_slice(&app).chat.unwrap();
     assert!(chat.channels.iter().all(|c| c.id != gid && c.id != thread));
 
     // A direct channel with a helper profile.
-    let mut helper = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.name = "小帮手".into();
-    let helper = started.test_internals().agents.profiles.save(helper).unwrap();
+    let helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let direct = ok(call("channel.direct.create", json!({ "agent": "小帮手" })));
     let listed = ok(call("channel.list", json!(null)));
     let d = listed.as_array().unwrap().iter().find(|c| c["id"] == direct).unwrap();
@@ -214,17 +229,24 @@ fn the_chat_through_its_endpoints() {
         (d["peer"].as_str(), d["title"].as_str()),
         (Some(format!("profile:{}", helper.id).as_str()), Some("小帮手"))
     );
+    app.close_blocking();
 
     // Everything is there when the chat opens again.
-    let hub2 = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
-    let db2 = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
-    let files = vibevalley_server::modules::content::attachment::Attachments::open(dir.path(), db2.clone());
-    let chat = vibevalley_server::modules::collab::channel::Chat::open(db2, &hub2, files, None, false).unwrap();
-    let list = chat.list().unwrap();
+    let app2 = start(dir.path());
+    let chat = app2.test_internals().channel;
+    let list = vibevalley_runtime::rt::block_on(chat.list_async()).unwrap();
     assert_eq!(list[0].id, dev);
-    assert_eq!(chat.history(&dev, None, None).unwrap().len(), 1);
-    assert!(hub2.read(|s| s.chat.clone()).unwrap().channels.iter().any(|c| c.id == dev));
-    assert_eq!(chat.events(0, 1000).unwrap().iter().filter(|e| e.kind == "removed").count(), 1);
+    assert_eq!(vibevalley_runtime::rt::block_on(chat.history_async(&dev, None, None)).unwrap().len(), 1);
+    assert!(collab_slice(&app2).chat.unwrap().channels.iter().any(|c| c.id == dev));
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(chat.events_async(0, 1000))
+            .unwrap()
+            .iter()
+            .filter(|e| e.kind == "removed")
+            .count(),
+        1
+    );
+    app2.close_blocking();
 }
 
 #[cfg(unix)]
@@ -232,22 +254,27 @@ fn the_chat_through_its_endpoints() {
 fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
     use std::os::unix::process::ExitStatusExt;
     use std::process::Command;
-    use vibevalley_server::modules::collab::channel::DeliveryTargetKind;
 
     const CHANNEL_CRASH_HOME: &str = "VV_TEST_CHANNEL_CRASH_HOME";
     let name = "channel::regression_send_key_thread_pages_and_observer_cursor_survive_sigkill";
     if let Some(home) = std::env::var_os(CHANNEL_CRASH_HOME) {
         let home = std::path::Path::new(&home);
         let server = start(home);
-        let call = |op, params| ok(server.hub.call_as(Caller::User, op, params));
-        let channel = server.test_internals().chat.default_channel();
+        let call = |op, params| ok(server.router().call_as(Caller::User, op, params));
+        let channel = server.test_internals().channel.default_channel();
         for text in ["one", "two", "three"] {
             call("channel.message.send", json!({"id":channel,"text":text,"sendKey":text}));
         }
-        let root = server.test_internals().chat.history(&channel, None, None).unwrap()[0].id.clone();
+        let root = vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&channel, None, None)).unwrap()[0]
+            .id
+            .clone();
         let thread = call("channel.thread.create", json!({"id":root}));
         call("channel.message.send", json!({"id":thread,"text":"first reply","sendKey":"thread-first"}));
-        let checkpoint = server.test_internals().chat.events(0, 100).unwrap().last().unwrap().seq;
+        let checkpoint = vibevalley_runtime::rt::block_on(server.test_internals().channel.events_async(0, 100))
+            .unwrap()
+            .last()
+            .unwrap()
+            .seq;
         std::fs::write(home.join("checkpoint"), checkpoint.to_string()).unwrap();
         call(
             "channel.message.send",
@@ -266,25 +293,22 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
     assert_eq!(result.signal(), Some(9));
     let checkpoint: i64 = std::fs::read_to_string(dir.path().join("checkpoint")).unwrap().trim().parse().unwrap();
     let server = start(dir.path());
-    let call = |op, params| ok(server.hub.call_as(Caller::User, op, params));
-    let channel = server.test_internals().chat.default_channel();
-    let last_two = server.test_internals().chat.history(&channel, None, Some(2)).unwrap();
+    let call = |op, params| ok(server.router().call_as(Caller::User, op, params));
+    let channel = server.test_internals().channel.default_channel();
+    let last_two = vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&channel, None, Some(2))).unwrap();
     assert_eq!(last_two.iter().map(|m| m.number).collect::<Vec<_>>(), [2, 3]);
-    let first = server.test_internals().chat.history(&channel, Some(2), Some(2)).unwrap();
+    let first = vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&channel, Some(2), Some(2))).unwrap();
     assert_eq!(first.len(), 1);
     let thread = call("channel.thread.create", json!({"id":first[0].id})).as_str().unwrap().to_owned();
-    let replies = server.test_internals().chat.history(&thread, None, Some(2)).unwrap();
+    let replies = vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&thread, None, Some(2))).unwrap();
     assert_eq!(
         replies.iter().map(|m| m.text.as_str()).collect::<Vec<_>>(),
         ["first reply", "second reply @助手"]
     );
-    let unseen = server.test_internals().chat.events(checkpoint, 10).unwrap();
+    let unseen = vibevalley_runtime::rt::block_on(server.test_internals().channel.events_async(checkpoint, 10)).unwrap();
     assert_eq!(unseen.len(), 1);
     assert_eq!(unseen[0].message_id, replies[1].id);
-    let pending: Vec<_> = server
-        .test_internals()
-        .chat
-        .pending_deliveries(DeliveryTargetKind::Orchestrator)
+    let pending: Vec<_> = vibevalley_runtime::rt::block_on(server.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
         .unwrap()
         .into_iter()
         .filter(|d| d.message_id == replies[1].id)
@@ -294,58 +318,57 @@ fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
         "channel.message.send",
         json!({"id":thread,"text":"second reply @助手","sendKey":"thread-second"}),
     );
-    assert_eq!(server.test_internals().chat.events(checkpoint, 10).unwrap(), unseen);
-    assert_eq!(server.test_internals().chat.history(&thread, None, Some(5)).unwrap().len(), 2);
-    let pending_after_retry: Vec<_> = server
-        .test_internals()
-        .chat
-        .pending_deliveries(DeliveryTargetKind::Orchestrator)
-        .unwrap()
-        .into_iter()
-        .filter(|d| d.message_id == replies[1].id)
-        .collect();
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(server.test_internals().channel.events_async(checkpoint, 10)).unwrap(),
+        unseen
+    );
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&thread, None, Some(5)))
+            .unwrap()
+            .len(),
+        2
+    );
+    let pending_after_retry: Vec<_> =
+        vibevalley_runtime::rt::block_on(server.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
+            .unwrap()
+            .into_iter()
+            .filter(|d| d.message_id == replies[1].id)
+            .collect();
     assert_eq!(pending_after_retry.len(), 1, "sendKey retry must not duplicate deliveries");
-    server.test_internals().chat.settle_delivery(pending[0].id, true).unwrap();
+    vibevalley_runtime::rt::block_on(server.test_internals().channel.settle_delivery_async(pending[0].id, true)).unwrap();
     assert!(
-        server
-            .test_internals()
-            .chat
-            .pending_deliveries(DeliveryTargetKind::Orchestrator)
+        vibevalley_runtime::rt::block_on(server.test_internals().channel.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
             .unwrap()
             .iter()
             .all(|d| d.message_id != replies[1].id)
     );
-    server.close();
+    server.close_blocking();
 }
 
 #[test]
 fn regression_deleted_unread_user_mention_clears_inbox_slice() {
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
-    let started = start(dir.path());
-    let hub = started.hub.clone();
-    let gid = started.test_internals().chat.default_channel();
+    let app = start(dir.path());
+    let gid = app.test_internals().channel.default_channel();
 
-    let (msg, _) = started
-        .test_internals()
-        .chat
-        .post(vibevalley_server::modules::collab::channel::Posting {
-            from: "orchestrator".into(),
-            channel: gid,
-            text: "请看一下 @用户".into(),
-            ..Default::default()
-        })
-        .unwrap();
+    let (msg, _) = crate::support::block_on(app.test_internals().channel.post_async(Posting {
+        from: "orchestrator".into(),
+        channel: gid,
+        text: "请看一下 @用户".into(),
+        ..Default::default()
+    }))
+    .unwrap();
     assert!(
-        hub.inbox_slice().items.iter().any(|item| item.kind == vibevalley_protocol::InboxKind::Mention),
+        inbox_slice(&app).items.iter().any(|item| item.kind == vibevalley_protocol::InboxKind::Mention),
         "unread @user mention must appear in InboxSlice"
     );
 
-    ok(hub.call_as(Caller::User, "channel.message.delete", json!({ "id": msg.id })));
+    ok(app.router().call_as(Caller::User, "channel.message.delete", json!({ "id": msg.id })));
     assert!(
-        hub.inbox_slice().items.iter().all(|item| item.kind != vibevalley_protocol::InboxKind::Mention),
+        inbox_slice(&app).items.iter().all(|item| item.kind != vibevalley_protocol::InboxKind::Mention),
         "deleting unread @user mention must immediately clear InboxSlice: {:?}",
-        hub.inbox_slice().items
+        inbox_slice(&app).items
     );
-    started.close();
+    app.close_blocking();
 }

@@ -48,8 +48,11 @@ struct CollectedBundle {
 }
 
 impl Store {
-    pub fn export_conversation_to(&self, conv_id: &str, dest: &Store, opts: ExportOptions) -> Result<ExportManifest> {
-        let bundle = self.read(|r| collect_bundle(r, conv_id, opts))?;
+    pub async fn export_conversation_to(&self, conv_id: &str, dest: &Store, opts: ExportOptions) -> Result<ExportManifest> {
+        let conv_id_owned = conv_id.to_owned();
+        let bundle = self
+            .read_async(move |r| Box::pin(async move { collect_bundle(r, &conv_id_owned, opts).await }))
+            .await?;
 
         let manifest = ExportManifest {
             root_conversation_id: conv_id.to_owned(),
@@ -62,45 +65,51 @@ impl Store {
             submissions_exported: bundle.submissions.len(),
         };
 
-        dest.write(|tx| {
-            for conv in &bundle.conversations {
-                tx.write.insert_conversation(conv)?;
-            }
-            for entry in &bundle.entries {
-                tx.write.insert_entry(entry)?;
-            }
-            for doc in &bundle.documents {
-                tx.write
-                    .put_document(&doc.scope_kind, &doc.scope_id, &doc.doc_kind, &doc.state, doc.updated_at_ms)?;
-            }
-            for sub in &bundle.submissions {
-                tx.write.insert_submission(sub)?;
-                match sub.status {
-                    SubmissionStatus::Queued => {}
-                    SubmissionStatus::Placed => {
-                        tx.write.set_submission_status(&sub.id, SubmissionStatus::Placed, sub.updated_at_ms)?;
-                    }
-                    SubmissionStatus::Done | SubmissionStatus::Unanswered => {
-                        tx.write.settle_submission(&sub.id, sub.status, &sub.result, sub.updated_at_ms)?;
+        dest.write_async(move |tx| {
+            Box::pin(async move {
+                for conv in &bundle.conversations {
+                    tx.write.insert_conversation_async(conv).await?;
+                }
+                for entry in &bundle.entries {
+                    tx.write.insert_entry_async(entry).await?;
+                }
+                for doc in &bundle.documents {
+                    tx.write
+                        .put_document_async(&doc.scope_kind, &doc.scope_id, &doc.doc_kind, &doc.state, doc.updated_at_ms)
+                        .await?;
+                }
+                for sub in &bundle.submissions {
+                    tx.write.insert_submission_async(sub).await?;
+                    match sub.status {
+                        SubmissionStatus::Queued => {}
+                        SubmissionStatus::Placed => {
+                            tx.write
+                                .set_submission_status_async(&sub.id, SubmissionStatus::Placed, sub.updated_at_ms)
+                                .await?;
+                        }
+                        SubmissionStatus::Done | SubmissionStatus::Unanswered => {
+                            tx.write.settle_submission_async(&sub.id, sub.status, &sub.result, sub.updated_at_ms).await?;
+                        }
                     }
                 }
-            }
-            for task in &bundle.tasks {
-                tx.write.insert_task(task)?;
-            }
-            for sig in &bundle.signals {
-                let _ = tx.write.insert_signal(sig)?;
-                if sig.consumed {
-                    let _ = tx.write.consume_first_signal(&sig.task_id, &sig.signal_name, sig.consumed_at_ms)?;
+                for task in &bundle.tasks {
+                    tx.write.insert_task_async(task).await?;
                 }
-            }
-            Ok(())
-        })?;
+                for sig in &bundle.signals {
+                    let _ = tx.write.insert_signal_async(sig).await?;
+                    if sig.consumed {
+                        let _ = tx.write.consume_first_signal_async(&sig.task_id, &sig.signal_name, sig.consumed_at_ms).await?;
+                    }
+                }
+                Ok(())
+            })
+        })
+        .await?;
 
         Ok(manifest)
     }
 
-    pub fn export_conversation_jsonl(&self, conv_id: &str, dest_dir: &Path, opts: ExportOptions) -> Result<ExportManifest> {
+    pub async fn export_conversation_jsonl(&self, conv_id: &str, dest_dir: &Path, opts: ExportOptions) -> Result<ExportManifest> {
         let dest = Store::jsonl_with_options(
             dest_dir,
             JsonlOptions {
@@ -108,14 +117,14 @@ impl Store {
                 read_only: false,
             },
         )?;
-        let manifest = self.export_conversation_to(conv_id, &dest, opts)?;
-        dest.close()?;
+        let manifest = self.export_conversation_to(conv_id, &dest, opts).await?;
+        dest.close().await?;
         Ok(manifest)
     }
 }
 
-fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Result<CollectedBundle> {
-    let root = r.conversation(conv_id)?;
+async fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Result<CollectedBundle> {
+    let root = r.conversation_async(conv_id).await?;
     if let Some(cut) = opts.at_seq
         && (cut < 0 || cut >= root.next_seq)
     {
@@ -135,7 +144,7 @@ fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Result<Co
     let mut signals: Vec<Signal> = Vec::new();
     let mut signal_ids: HashSet<String> = HashSet::new();
 
-    // 1. Collect ancestor lineage first so `visible_entries()` works identically in destination.
+    // 1. Collect ancestor lineage first so `visible_entries_async()` works identically in destination.
     let mut ancestor_chain: Vec<(Conversation, i64)> = Vec::new();
     let mut seen_ancestors = HashSet::from([root.id.clone()]);
     let mut cur = root.clone();
@@ -145,14 +154,14 @@ fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Result<Co
             return Err(Error::Invalid("conversation fork cycle".into()));
         }
         limit = limit.min(cur.fork_entry_seq);
-        let parent = r.conversation(&cur.parent_id)?;
+        let parent = r.conversation_async(&cur.parent_id).await?;
         let capped_max = (parent.next_seq - 1).min(limit).max(0);
         ancestor_chain.push((parent.clone(), capped_max));
         cur = parent;
     }
     for (mut anc, max_seq) in ancestor_chain.into_iter().rev() {
         let anc_entries = if max_seq >= 1 {
-            r.ops.entries_within(&anc.id, 1, max_seq)?
+            r.ops.entries_within_async(&anc.id, 1, max_seq).await?
         } else {
             Vec::new()
         };
@@ -167,7 +176,7 @@ fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Result<Co
                 entries.push(e);
             }
         }
-        for doc in r.documents_by_scope(CONVERSATION_SCOPE, &anc_id)? {
+        for doc in r.documents_by_scope_async(CONVERSATION_SCOPE, &anc_id).await? {
             if should_skip_doc(&doc.doc_kind, opts.at_seq.is_some()) {
                 continue;
             }
@@ -185,13 +194,13 @@ fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Result<Co
         sliced_root.head_seq = if cut == 0 { 1 } else { root.head_seq.min(cut) };
         conv_map.insert(sliced_root.id.clone(), sliced_root);
         if cut >= 1 {
-            for e in r.ops.entries_within(&root.id, 1, cut)? {
+            for e in r.ops.entries_within_async(&root.id, 1, cut).await? {
                 if entry_keys.insert((e.conversation_id.clone(), e.seq)) {
                     entries.push(e);
                 }
             }
         }
-        for doc in r.documents_by_scope(CONVERSATION_SCOPE, &root.id)? {
+        for doc in r.documents_by_scope_async(CONVERSATION_SCOPE, &root.id).await? {
             if should_skip_doc(&doc.doc_kind, true) {
                 continue;
             }
@@ -209,22 +218,22 @@ fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Result<Co
                 continue;
             }
             conv_map.insert(cid.clone(), c);
-            for e in r.entries(&cid, 1)? {
+            for e in r.entries_async(&cid, 1).await? {
                 if entry_keys.insert((e.conversation_id.clone(), e.seq)) {
                     entries.push(e);
                 }
             }
-            for doc in r.documents_by_scope(CONVERSATION_SCOPE, &cid)? {
+            for doc in r.documents_by_scope_async(CONVERSATION_SCOPE, &cid).await? {
                 if doc_keys.insert((doc.scope_kind.clone(), doc.scope_id.clone(), doc.doc_kind.clone())) {
                     documents.push(doc);
                 }
             }
-            for sub in r.submissions(&cid)? {
+            for sub in r.submissions_async(&cid).await? {
                 sub_map.insert(sub.id.clone(), sub);
             }
 
             let mut task_queue = VecDeque::new();
-            for t in r.tasks_by_conversation(&cid)? {
+            for t in r.tasks_by_conversation_async(&cid).await? {
                 let tid = t.id.clone();
                 if !task_map.contains_key(&tid) {
                     task_queue.push_back(t);
@@ -235,24 +244,24 @@ fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Result<Co
                 if task_map.contains_key(&tid) {
                     continue;
                 }
-                for child in r.children(&tid)? {
+                for child in r.children_async(&tid).await? {
                     if !task_map.contains_key(&child.id) {
                         task_queue.push_back(child);
                     }
                 }
                 if opts.include_children {
-                    for owned_conv in r.conversations_by_owner_task(&tid)? {
+                    for owned_conv in r.conversations_by_owner_task_async(&tid).await? {
                         if !conv_map.contains_key(&owned_conv.id) {
                             conv_queue.push_back(owned_conv);
                         }
                     }
                 }
-                for doc in r.documents_by_scope(TASK_SCOPE, &tid)? {
+                for doc in r.documents_by_scope_async(TASK_SCOPE, &tid).await? {
                     if doc_keys.insert((doc.scope_kind.clone(), doc.scope_id.clone(), doc.doc_kind.clone())) {
                         documents.push(doc);
                     }
                 }
-                for sig in r.signals(&tid, true)? {
+                for sig in r.signals_async(&tid, true).await? {
                     if signal_ids.insert(sig.id.clone()) {
                         signals.push(sig);
                     }

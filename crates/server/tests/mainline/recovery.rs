@@ -9,7 +9,7 @@ use vibevalley_protocol::{MessageKind, Outcome};
 use vibevalley_runtime::agent::durable::SubmissionStatus;
 use vibevalley_runtime::oar::Registry;
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step};
-use vibevalley_server::{ServerConfig, Started};
+use vibevalley_server::{App, Config, create_app_blocking};
 
 use super::{call, git, until};
 
@@ -18,7 +18,7 @@ const WINDOW_KEY: &str = "VV_TEST_ISSUE_REPLY_WINDOW";
 const FOLLOW_UP: &str = "save confirmed change";
 const UNKNOWN: &str = "save change before disconnect";
 
-fn launch(home: &Path, window: &str) -> (Started, vibevalley_server::transport::http::Listener) {
+fn launch(home: &Path, window: &str) -> (App, vibevalley_server::gateway::http::Listener) {
     let crash_after_commit = window == "git";
     let mut registry = Registry::new();
     registry.register(Arc::new(ScriptedRuntime::new(
@@ -69,39 +69,36 @@ fn launch(home: &Path, window: &str) -> (Started, vibevalley_server::transport::
             ])
         })),
     )));
-    let server = vibevalley_server::start(ServerConfig {
+    let server = create_app_blocking(Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        ..ServerConfig::under(home)
+        ..Config::under(home)
     })
     .unwrap();
-    let listener = vibevalley_server::transport::http::serve(server.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
-    server.test_internals().board.sessions().set_mcp_url(format!("{}/mcp", listener.url()));
+    let listener = vibevalley_server::gateway::http::serve(server.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    server.set_mcp_url(format!("{}/mcp", listener.url()));
     (server, listener)
 }
 
-fn issue_thread(server: &Started) -> (String, String) {
-    let issue = server.test_internals().board.issue("1").unwrap();
-    let thread = until(server, "issue thread", || server.test_internals().chat.issue_thread_id(&issue.id));
+fn issue_thread(server: &App) -> (String, String) {
+    let issue = crate::support::board_issue(server.test_internals().board, "1").unwrap();
+    let thread = until(server, "issue thread", || server.test_internals().channel.issue_thread_id(&issue.id));
     (issue.id, thread)
 }
 
-fn count_notes(server: &Started, thread: &str, summary: &str) -> usize {
-    server
-        .test_internals()
-        .chat
-        .history(thread, None, None)
+fn count_notes(server: &App, thread: &str, summary: &str) -> usize {
+    vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(thread, None, None))
         .unwrap()
         .iter()
         .filter(|m| m.kind == MessageKind::Report && m.text == summary)
         .count()
 }
 
-fn reply_id(server: &Started, thread: &str, key: &str) -> String {
-    let messages = server.test_internals().chat.history(thread, None, None).unwrap();
+fn reply_id(server: &App, thread: &str, key: &str) -> String {
+    let messages = vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(thread, None, None)).unwrap();
     let mut matches = messages.iter().filter(|m| m.send_key.as_deref() == Some(key));
     let id = matches.next().expect("reply persisted").id.clone();
     assert!(matches.next().is_none(), "duplicate chat reply: {key}");
@@ -140,42 +137,63 @@ fn regression_replies_and_reports_across_process_exit() {
         let url = listener.url();
         if window == "message" {
             call(&url, "repo.create", json!({"name":"demo"}));
-            let mut profile = server.test_internals().agents.profiles.install_template("reviewer").unwrap();
+            let mut profile = vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
             profile.runtime = "scripted".into();
             profile.name = "Worker".into();
-            server.test_internals().agents.profiles.save(profile).unwrap();
+            vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.save_async(profile)).unwrap();
             let issue = call(&url, "issue.create", json!({"title":"Write a file","repo":"demo","agent":"Worker"}));
             call(&url, "issue.status.update", json!({"id": issue["id"],"status":"todo"}));
             let (issue, thread) = issue_thread(&server);
             until(&server, "first report", || (count_notes(&server, &thread, "initial") == 1).then_some(()));
             // Hold the issue dispatcher before accepting the next chat write, leaving its delivery pending in SQLite.
-            server.test_internals().issue_chat.close();
+            vibevalley_runtime::rt::block_on(server.test_internals().issue_chat.close_async());
             comment(&url, &issue, FOLLOW_UP);
             assert!(
-                server
-                    .test_internals()
-                    .chat
-                    .history(&thread, None, None)
+                vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&thread, None, None))
                     .unwrap()
                     .iter()
                     .any(|m| m.send_key.as_deref() == Some(FOLLOW_UP))
             );
-            assert_eq!(server.test_internals().board.runs(&issue).unwrap().len(), 1);
+            assert_eq!(
+                vibevalley_runtime::rt::block_on(server.test_internals().board.runs_async(&issue))
+                    .unwrap()
+                    .len(),
+                1
+            );
             std::process::exit(81);
         }
         let (issue, thread) = issue_thread(&server);
-        let store = server.test_internals().board.sessions().durable_store();
+        let store = server.test_internals().runtime.durable_store();
         if matches!(window.as_str(), "report" | "posted") {
             let run = until(&server, "settled reply", || {
-                server.test_internals().board.runs(&issue).unwrap().into_iter().find(|r| r.summary == FOLLOW_UP)
+                vibevalley_runtime::rt::block_on(server.test_internals().board.runs_async(&issue))
+                    .unwrap()
+                    .into_iter()
+                    .find(|r| r.summary == FOLLOW_UP)
             });
             assert_eq!(run.outcome, Some(Outcome::Completed));
             let request = reply_id(&server, &thread, FOLLOW_UP);
             assert!(run.heard.contains(&request));
-            let sub = store.read(|tx| tx.submission_by_request(&format!("issue:{issue}"), &request)).unwrap().unwrap();
+            let conv = format!("issue:{issue}");
+            let req = request.clone();
+            let sub = vibevalley_runtime::rt::block_on(store.read_async(|tx| {
+                let conv = conv.clone();
+                let req = req.clone();
+                Box::pin(async move { tx.submission_by_request_async(&conv, &req).await })
+            }))
+            .unwrap()
+            .unwrap();
             assert_eq!(sub.status, SubmissionStatus::Done);
             assert_eq!(sub.result["runId"], run.id);
-            assert!(store.read(|tx| tx.document("run", &run.id, "issue.report")).unwrap().is_some());
+            let run_id = run.id.clone();
+            assert!(
+                vibevalley_runtime::rt::block_on(store.read_async(|tx| {
+                    let run_id = run_id.clone();
+                    Box::pin(async move { tx.document_async("run", &run_id, "issue.report").await })
+                }),)
+                .unwrap()
+                .is_some()
+            );
             if window == "posted" {
                 until(&server, "report posted before outbox acknowledgement", || {
                     (count_notes(&server, &thread, FOLLOW_UP) == 1).then_some(())
@@ -188,7 +206,12 @@ fn regression_replies_and_reports_across_process_exit() {
         assert_eq!(window, "git");
         until(&server, "replayed report", || (count_notes(&server, &thread, FOLLOW_UP) == 1).then_some(()));
         comment(&url, &issue, FOLLOW_UP);
-        assert_eq!(server.test_internals().board.runs(&issue).unwrap().len(), 2);
+        assert_eq!(
+            vibevalley_runtime::rt::block_on(server.test_internals().board.runs_async(&issue))
+                .unwrap()
+                .len(),
+            2
+        );
         comment(&url, &issue, UNKNOWN);
         until(&server, "scripted helper exits after the Git commit", || None::<()>);
     }
@@ -213,12 +236,12 @@ fn regression_replies_and_reports_across_process_exit() {
         &mut db,
         "CREATE TRIGGER hold_recovery BEFORE INSERT ON durable_document WHEN NEW.doc_kind='workspace.reconciliation' BEGIN SELECT RAISE(ABORT,'recovery held'); END;",
     );
-    let failed = vibevalley_server::start(ServerConfig {
+    let failed = create_app_blocking(Config {
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
         orchestrator_listens: false,
-        ..ServerConfig::under(home.path())
+        ..Config::under(home.path())
     });
     assert!(failed.err().expect("interrupted recovery should fail").to_string().contains("recovery held"));
     execute_sql(&mut db, "DROP TRIGGER hold_recovery");
@@ -229,7 +252,7 @@ fn regression_replies_and_reports_across_process_exit() {
         comment(&url, &issue, text);
         reply_id(&server, &thread, text);
     }
-    let runs = server.test_internals().board.runs(&issue).unwrap();
+    let runs = vibevalley_runtime::rt::block_on(server.test_internals().board.runs_async(&issue)).unwrap();
     assert_eq!(runs.len(), 3);
     assert_eq!(runs[2].outcome, Some(Outcome::Interrupted));
     let wire = call(&url, "issue.run.list", json!({"id":issue}));
@@ -238,7 +261,7 @@ fn regression_replies_and_reports_across_process_exit() {
     assert_eq!(wire[2]["needsReconciliation"], true);
     let session = call(&url, "session.get", json!({"id": runs[2].session}));
     assert_eq!(session["lastRun"]["needsReconciliation"], true);
-    let bundle = server.test_internals().board.bundle();
+    let bundle = crate::support::board_bundle(server.test_internals().board);
     assert!(
         bundle
             .sessions
@@ -254,23 +277,24 @@ fn regression_replies_and_reports_across_process_exit() {
 
     let request = reply_id(&server, &thread, UNKNOWN);
     assert!(runs[2].heard.contains(&request));
-    let unknown = server
-        .test_internals()
-        .board
-        .sessions()
-        .durable_store()
-        .read(|tx| tx.submission_by_request(&format!("issue:{issue}"), &request))
-        .unwrap()
-        .unwrap();
+    let conv = format!("issue:{issue}");
+    let req = request.clone();
+    let unknown = vibevalley_runtime::rt::block_on(server.test_internals().runtime.durable_store().read_async(|tx| {
+        let conv = conv.clone();
+        let req = req.clone();
+        Box::pin(async move { tx.submission_by_request_async(&conv, &req).await })
+    }))
+    .unwrap()
+    .unwrap();
     assert_eq!(unknown.status, SubmissionStatus::Unanswered);
     assert_eq!(unknown.result["runId"], runs[2].id);
     assert_eq!(count_notes(&server, &thread, FOLLOW_UP), 1);
     assert_eq!(count_notes(&server, &thread, UNKNOWN), 0);
-    let history = server.test_internals().chat.history(&thread, None, None).unwrap();
+    let history = vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&thread, None, None)).unwrap();
     let confirmed = history.iter().find(|m| m.kind == MessageKind::Report && m.text == FOLLOW_UP).unwrap();
     assert_eq!(confirmed.spent.as_ref().map(|s| s.tokens), Some(16));
     assert!(runs[2].spent.is_none(), "interrupted before its receipt");
-    let session = server.test_internals().board.session(&runs[2].session).unwrap();
+    let session = crate::support::board_session(server.test_internals().board, &runs[2].session).unwrap();
     let worktree = Path::new(session.cwd.as_deref().unwrap());
     assert_eq!(
         std::fs::read_to_string(worktree.join("delivery.txt")).unwrap(),
@@ -280,5 +304,5 @@ fn regression_replies_and_reports_across_process_exit() {
     for summary in [FOLLOW_UP, UNKNOWN] {
         assert_eq!(git_log.lines().filter(|s| *s == summary).count(), 1);
     }
-    server.close();
+    server.close_blocking();
 }

@@ -1,7 +1,16 @@
 import "../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
-import type { Artifact, ArtifactHistoryEntry, ArtifactId, BlockId, ChatMessage, OrchestratorApproval, Suggestion, SuggestionId } from "@vibevalley/protocol";
+import type {
+  Artifact,
+  ArtifactHistoryEntry,
+  ArtifactId,
+  ArtifactType,
+  ChatMessage,
+  OrchestratorApproval,
+  Suggestion,
+  SuggestionId,
+} from "@vibevalley/protocol";
 
 import { sampleChanges } from "../features/issue/model/issue.samples";
 import { responses as artifactResponses } from "../fixtures/artifacts";
@@ -202,65 +211,30 @@ test("orchestrator trajectory: polled approval can be granted", async () => {
   });
 });
 
-test("outline import: picks a .md file or accepts pasted markdown via artifact.outline.import and opens the outline artifact", async () => {
-  const imported: Artifact[] = [];
-  const sampleMd = "---\ntitle: Q4 Launch Roadmap\n---\n- TODO Ship native outline import\n- DONE Retire legacy pkm\n";
-  const sampleB64 = btoa(String.fromCharCode(...new TextEncoder().encode(sampleMd)));
-
-  const { app, fake } = await mountApp("/library", (f) => {
+test("directory artifact files: lists, edits, and saves via artifact.file.{list,get,write}", async () => {
+  const docsArtifact = (scenarios.typical.responses["artifact.list"] as Artifact[] | undefined)?.find((a) => a.artifactType === "docs");
+  if (!docsArtifact) throw new Error("typical scenario must provide a docs artifact");
+  const { app, fake } = await mountApp(`/artifacts/${docsArtifact.id}`, (f) => {
     for (const [op, handler] of Object.entries(artifactResponses)) {
       f.respond(op, handler);
     }
-    f.respond("host.pickFile", { path: "/tmp/q4-roadmap.md", name: "q4-roadmap.md", type: "text/markdown" });
-    f.respond("host.readFile", { data: sampleB64, name: "q4-roadmap.md", type: "text/markdown" });
-    f.respond("artifact.outline.import", (p: { markdown: string; title?: string; filename?: string }) => {
-      const made: Artifact = {
-        id: `art-outline-imported-${imported.length + 1}` as ArtifactId,
-        title: p.title?.trim() || "Q4 Launch Roadmap",
-        body: "blocks",
-        artifactType: "outline",
-        isDefault: false,
-        by: "user",
-        byName: "用户",
-        version: 0,
-        seq: 1,
-        versions: [],
-        at: SCENARIO_NOW,
-        updated: SCENARIO_NOW,
-      };
-      imported.push(made);
-      return made;
-    });
-    f.respond("artifact.get", (p: { id?: string }) => {
-      const hit = imported.find((a) => a.id === p?.id);
-      if (hit) return hit;
-      const fn = artifactResponses["artifact.get"] as (arg: unknown) => unknown;
-      return fn(p);
-    });
-    f.respond("artifact.block.list", (p: { id?: string }) => {
-      const hit = imported.find((a) => a.id === p?.id);
-      if (hit) return { artifact: hit, blocks: [] };
-      const fn = artifactResponses["artifact.block.list"] as (arg: unknown) => unknown;
-      return fn(p);
-    });
   });
 
-  await app.press("id:content-import-outline-btn");
-  await fake.pumpUntil(app, () => app.count("id:outline-import-modal") === 1);
-  expect(app.enabled("id:outline-import-submit")).toBe(false);
+  await fake.pumpUntil(app, () => app.count("id:artifact-directory-view") === 1 && app.count("id:artifact-docs-editor") === 1);
+  expect(fake.calls.some((c) => c.op === "artifact.file.list")).toBe(true);
+  expect(fake.calls.some((c) => c.op === "artifact.file.get")).toBe(true);
 
   fake.clearCalls();
-  await app.press("id:outline-import-pick-file");
-  await fake.pumpUntil(app, () => app.count("id:outline-import-filename") === 1);
-  expect(app.texts()).toContain("q4-roadmap.md");
-  expect(app.value("id:outline-import-markdown")).toContain("TODO Ship native outline import");
-  expect(app.enabled("id:outline-import-submit")).toBe(true);
-
-  await app.press("id:outline-import-submit");
-  await fake.pumpUntil(app, () => app.count("id:outline-import-modal") === 0 && app.count("id:artifacts") === 1 && app.count("id:artifact-blocks") === 1);
-  const importCall = fake.calls.find((c) => c.op === "artifact.outline.import");
-  expect(importCall?.payload).toEqual({ markdown: sampleMd, filename: "q4-roadmap.md" });
-  expect(app.value("id:artifact-title")).toBe("Q4 Launch Roadmap");
+  await app.clear("id:artifact-docs-editor");
+  await app.type("id:artifact-docs-editor", "# Updated Spec\n");
+  await fake.pump(app);
+  await app.press("id:artifact-file-save");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.file.write"));
+  const writeCall = fake.calls.find((c) => c.op === "artifact.file.write");
+  expect(writeCall?.payload).toMatchObject({
+    id: docsArtifact.id,
+    files: [{ path: "structure/index.md", content: "# Updated Spec\n" }],
+  });
 });
 
 test("regression: genui block inside channel message dispatches onGenUiAction with reactive state and toast feedback", async () => {
@@ -294,18 +268,17 @@ test("regression: genui block inside channel message dispatches onGenUiAction wi
   expect(app.texts()).toContain("Approve release: on");
 });
 
-test("content hub: binary sidebar, outline template creation via artifact.create, and context memory across places", async () => {
+test("content hub: 12-type sidebar, outline template creation via artifact.create, and context memory across places", async () => {
   const created: Artifact[] = [];
   const { app, fake } = await mountApp("/library", (f) => {
     for (const [op, handler] of Object.entries(artifactResponses)) {
       f.respond(op, handler);
     }
-    f.respond("artifact.create", (p: { title?: string; kind?: string; artifactType?: Artifact["artifactType"]; content?: string }) => {
+    f.respond("artifact.create", (p: { title?: string; artifactType?: ArtifactType; content?: string }) => {
       const made: Artifact = {
         id: `art-outline-created-${created.length + 1}` as ArtifactId,
         title: p.title ?? "未命名",
-        body: p.kind === "store" ? "store" : p.kind === "html" ? "html" : "blocks",
-        ...(p.artifactType ? { artifactType: p.artifactType } : {}),
+        artifactType: p.artifactType ?? "docs",
         isDefault: false,
         by: "user",
         byName: "用户",
@@ -324,33 +297,35 @@ test("content hub: binary sidebar, outline template creation via artifact.create
       const fn = artifactResponses["artifact.get"] as (arg: unknown) => unknown;
       return fn(p);
     });
-    f.respond("artifact.block.list", (p: { id?: string }) => {
+    f.respond("artifact.file.list", (p: { id?: string }) => {
       const hit = created.find((a) => a.id === p?.id);
-      if (hit) return { artifact: hit, blocks: [] };
-      const fn = artifactResponses["artifact.block.list"] as (arg: unknown) => unknown;
+      if (hit) return { artifactId: hit.id, seq: 1, files: [] };
+      const fn = artifactResponses["artifact.file.list"] as (arg: unknown) => unknown;
       return fn(p);
     });
   });
 
   expect(app.count("id:library-page")).toBe(1);
   expect(app.count("id:content-sidebar")).toBe(1);
-  expect(app.count("id:content-nav-notes")).toBe(0);
-  expect(app.count("id:content-nav-ai-generate")).toBe(0);
   expect(app.count("id:content-nav-artifact-outline")).toBe(1);
+  expect(app.count("id:content-nav-artifact-sheet")).toBe(1);
+  expect(app.count("id:content-nav-artifact-prototype")).toBe(1);
+  expect(app.count("id:content-nav-artifact-diagram")).toBe(1);
+  expect(app.count("id:content-nav-artifact-storyboard")).toBe(1);
 
   fake.clearCalls();
   await app.press("id:content-new-btn");
   await fake.pump(app);
   expect(app.count("id:content-template-modal")).toBe(1);
   await app.press("id:content-template-tpl-note-tech");
-  await fake.pumpUntil(app, () => app.count("id:artifacts") === 1 && app.count("id:artifact-blocks") === 1);
+  await fake.pumpUntil(app, () => app.count("id:artifacts") === 1 && app.count("id:artifact-directory-view") === 1);
   const createCall = fake.calls.find((c) => c.op === "artifact.create");
-  expect(createCall?.payload).toMatchObject({ kind: "markdown", artifactType: "outline" });
+  expect(createCall?.payload).toMatchObject({ artifactType: "outline" });
 
   fake.clearCalls();
   await app.press("id:content-new-note-btn");
   await fake.pumpUntil(app, () => created.length === 2 && app.value("id:artifact-title") === created[1]?.title);
-  expect(fake.calls.find((c) => c.op === "artifact.create")?.payload).toMatchObject({ kind: "markdown", artifactType: "outline" });
+  expect(fake.calls.find((c) => c.op === "artifact.create")?.payload).toMatchObject({ artifactType: "outline" });
 
   await app.press("id:content-nav-artifacts-all");
   await fake.pump(app);
@@ -372,18 +347,16 @@ test("content hub: binary sidebar, outline template creation via artifact.create
   expect(app.count("id:artifact-header")).toBe(1);
 });
 
-test("presence & durable-cursor suggestions: BlocksView renders live peer pills and accepts/rejects via Tab/Esc", async () => {
+test("presence & file suggestions: ArtifactDirectoryView renders live peer pills and accepts/rejects via Tab/Esc", async () => {
   const aid = "art-mine" as ArtifactId;
-  const snapFn = artifactResponses["artifact.block.list"] as (p: { id: string }) => { blocks: Array<{ id: BlockId }> };
-  const blockId1 = snapFn({ id: aid }).blocks[0]?.id ?? ("art-mine-b11" as BlockId);
   let resolved: { op: string; id: string } | undefined;
   const openSuggestion: Suggestion = {
     id: "sug-durable-1" as SuggestionId,
     artifactId: aid,
-    blockId: blockId1,
+    path: "structure/outline.json",
     author: "w1",
-    baseRev: 0, // Stale baseRev, but anchored with Loro durable cursors so still acceptable!
-    change: { text: [{ t: "发版前（已修订）", marks: {} }] },
+    baseRev: 1,
+    change: { content: '{"version":1,"rootIds":[],"nodes":{}}', summary: "发版前（已修订）" },
     status: "open",
     createdAt: SCENARIO_NOW,
     cursorStart: "c:start",
@@ -406,11 +379,23 @@ test("presence & durable-cursor suggestions: BlocksView renders live peer pills 
     });
   });
 
-  await fake.pumpUntil(app, () => app.count("id:artifact-blocks") === 1 && app.count("id:artifact-block") > 0);
+  await fake.pumpUntil(app, () => app.count("id:artifact-directory-view") === 1 && app.count("id:artifact-outline-view") === 1);
 
   await fake.emit(app, "artifact.presence.follow", {
     _tag: "Snapshot",
-    peers: [{ id: "session:w1", name: "老周", color: "coral", kind: "block_cursor", blockId: blockId1, offset: 1, status: "润色中", updatedAt: SCENARIO_NOW }],
+    peers: [
+      {
+        id: "session:w1",
+        name: "老周",
+        color: "coral",
+        kind: "cursor",
+        path: "structure/outline.json",
+        nodeId: "n_1",
+        offset: 1,
+        status: "润色中",
+        updatedAt: SCENARIO_NOW,
+      },
+    ],
   });
   await fake.pump(app);
   expect(app.count("id:artifact-presence-pill")).toBe(1);
@@ -443,7 +428,7 @@ test("presence & durable-cursor suggestions: BlocksView renders live peer pills 
   expect(resolved).toEqual({ op: "reject", id: "sug-durable-2" });
 });
 
-test("whiteboard presence: consumes artifact.presence.follow, publishes via artifact.presence.update, never writes presence/* to batch", async () => {
+test("whiteboard presence: consumes artifact.presence.follow, publishes via artifact.presence.update, never writes presence/* to file.write", async () => {
   const { app, fake } = await mountApp("/artifacts/art-launch-board", (f) => {
     for (const [op, handler] of Object.entries(artifactResponses)) {
       f.respond(op, handler);
@@ -468,10 +453,10 @@ test("whiteboard presence: consumes artifact.presence.follow, publishes via arti
   await app.press("id:wb-inspector-item-c-1");
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.presence.update"));
   expect(fake.calls.some((c) => c.op === "artifact.presence.update")).toBe(true);
-  const batchWrites = fake.calls
-    .filter((c) => c.op === "artifact.entry.batch")
-    .flatMap((c) => ((c.payload as { writes?: Array<{ path: string }> })?.writes ?? []).map((w) => w.path));
-  expect(batchWrites.some((p) => p.startsWith("presence/"))).toBe(false);
+  const writtenPaths = fake.calls
+    .filter((c) => c.op === "artifact.file.write")
+    .flatMap((c) => ((c.payload as { files?: Array<{ path: string }> })?.files ?? []).map((w) => w.path));
+  expect(writtenPaths.some((p) => p.startsWith("presence/"))).toBe(false);
 });
 
 test("timeline: scrubs history preview and executes restore, fork, and selective undoOrigin", async () => {
@@ -487,20 +472,19 @@ test("timeline: scrubs history preview and executes restore, fork, and selective
     f.respond("artifact.history.list", () => historyEntries);
     f.respond("artifact.history.preview", (p: { frontiers: string }) => ({
       artifactId: aid,
-      body: "blocks",
+      artifactType: "outline",
       frontiers: p.frontiers,
       entry: historyEntries.find((e) => e.frontiers === p.frontiers),
-      blocks: [
+      files: [
         {
-          id: "b-prev" as BlockId,
-          orderKey: "a0001",
-          type: "heading",
-          attrs: { level: 2 },
-          text: [{ t: "历史快照内容", marks: {} }],
           artifactId: aid,
-          rev: 1,
-          updatedBy: "user",
-          updated: SCENARIO_NOW - 300_000,
+          path: "structure/outline.json",
+          mime: "application/json",
+          encoding: "utf8",
+          content: "历史快照内容",
+          size: 18,
+          hash: "abc123",
+          updatedAt: SCENARIO_NOW - 300_000,
         },
       ],
     }));
@@ -535,7 +519,7 @@ test("timeline: scrubs history preview and executes restore, fork, and selective
   expect(fake.calls.find((c) => c.op === "artifact.history.fork")?.payload).toMatchObject({ id: aid, frontiers: "f-latest" });
 });
 
-test("whiteboard: renders launch timeline elements, adds/undoes nodes, edits inspector, exports SVG, and asks assistant", async () => {
+test("whiteboard: renders launch timeline elements, adds/undoes nodes via artifact.file.write, edits inspector, exports SVG, and asks assistant", async () => {
   const { app, fake } = await mountApp("/artifacts/art-launch-board", (f) => {
     for (const [op, handler] of Object.entries(artifactResponses)) {
       f.respond(op, handler);
@@ -554,13 +538,13 @@ test("whiteboard: renders launch timeline elements, adds/undoes nodes, edits ins
   fake.clearCalls();
   await app.press("id:wb-add-node");
   await fake.pumpUntil(app, () => app.texts().find((s) => s.endsWith("个元素")) !== countBefore);
-  expect(fake.calls.some((c) => c.op === "artifact.entry.batch")).toBe(true);
+  expect(fake.calls.some((c) => c.op === "artifact.file.write")).toBe(true);
 
   fake.clearCalls();
   expect(app.enabled("id:wb-undo")).toBe(true);
   await app.press("id:wb-undo");
   await fake.pumpUntil(app, () => app.texts().find((s) => s.endsWith("个元素")) === countBefore);
-  expect(fake.calls.some((c) => c.op === "artifact.entry.batch")).toBe(true);
+  expect(fake.calls.some((c) => c.op === "artifact.file.write")).toBe(true);
 
   await app.press("id:wb-inspector-toggle");
   expect(app.count("id:wb-inspector")).toBe(1);
@@ -571,8 +555,8 @@ test("whiteboard: renders launch timeline elements, adds/undoes nodes, edits ins
   fake.clearCalls();
   await app.press("id:wb-inspector-save");
   await fake.pump(app);
-  const patchCall = fake.calls.find((c) => c.op === "artifact.entry.batch");
-  expect(patchCall).toBeDefined();
+  const writeCall = fake.calls.find((c) => c.op === "artifact.file.write");
+  expect(writeCall).toBeDefined();
 
   await app.press("id:wb-chat");
   await fake.pump(app);

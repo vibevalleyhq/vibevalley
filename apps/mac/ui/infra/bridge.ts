@@ -219,7 +219,7 @@ export function onLive(listener: (event: unknown) => void): () => void {
   return onFrame("live", listener);
 }
 
-/** One of rpc.ts's subscriptions (`channel.follow`, ...). `ended` gets `null` when the server ended it,
+/** One of api.ts's subscriptions (`channel.follow`, ...). `ended` gets `null` when the server ended it,
  * or the refusal's envelope. Returns how to stop it. */
 export function subscribe(name: string, payload: unknown, on: (event: unknown) => void, ended?: (why: Envelope | null) => void): () => void {
   const id = nextId();

@@ -382,10 +382,8 @@ enum Artifact {
     Table,
     Id,
     Title,
-    Body,
     ArtifactType,
     IsDefault,
-    Display,
     ChannelId,
     MessageId,
     Issue,
@@ -402,40 +400,12 @@ enum ArtifactVersion {
     Table,
     ArtifactId,
     Version,
-    AttachmentId,
+    StorageId,
     Size,
     Note,
     ById,
     ByName,
     MessageId,
-    CreatedAt,
-}
-
-#[derive(DeriveIden)]
-enum ArtifactBlock {
-    Table,
-    Id,
-    ArtifactId,
-    ParentId,
-    OrderKey,
-    Type,
-    Attrs,
-    Spans,
-    Rev,
-    Deleted,
-    UpdatedBy,
-    UpdatedAt,
-}
-
-#[derive(DeriveIden)]
-enum ArtifactBlockRevision {
-    Table,
-    Id,
-    BlockId,
-    Rev,
-    Spans,
-    Actor,
-    Kind,
     CreatedAt,
 }
 
@@ -457,36 +427,20 @@ enum ArtifactSuggestion {
     Table,
     Id,
     ArtifactId,
-    BlockId,
+    Path,
     Author,
     Origin,
     AtRev,
+    BaseHash,
     Change,
     CursorStart,
     CursorEnd,
     StartOffset,
     EndOffset,
-    AnchorText,
-    ReplacementText,
     Status,
     CreatedAt,
     ResolvedAt,
     ResolvedBy,
-}
-
-#[derive(DeriveIden)]
-enum ArtifactEntry {
-    Table,
-    ArtifactId,
-    Path,
-    Kind,
-    Mime,
-    Value,
-    AttachmentId,
-    Size,
-    Rev,
-    UpdatedBy,
-    UpdatedAt,
 }
 
 #[derive(DeriveIden)]
@@ -1574,8 +1528,7 @@ async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbEr
                 .if_not_exists()
                 .col(text(Artifact::Id).primary_key())
                 .col(text(Artifact::Title))
-                .col(text(Artifact::Body).check(Expr::col(Artifact::Body).is_in(["blocks", "html", "store"])))
-                .col(text_null(Artifact::ArtifactType).check(Expr::col(Artifact::ArtifactType).is_in([
+                .col(text(Artifact::ArtifactType).check(Expr::col(Artifact::ArtifactType).is_in([
                     "docs",
                     "outline",
                     "slides",
@@ -1584,9 +1537,12 @@ async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbEr
                     "whiteboard",
                     "design",
                     "design-system",
+                    "sheet",
+                    "prototype",
+                    "diagram",
+                    "storyboard",
                 ])))
                 .col(boolean(Artifact::IsDefault).default(false))
-                .col(text_null(Artifact::Display).check(Expr::col(Artifact::Display).is_in(["page", "slides", "motion"])))
                 .col(text_null(Artifact::ChannelId))
                 .col(text_null(Artifact::MessageId))
                 .col(text_null(Artifact::Issue))
@@ -1600,12 +1556,6 @@ async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbEr
                     Expr::col(Artifact::IsDefault)
                         .eq(false)
                         .or(Expr::col(Artifact::ArtifactType).eq("design-system")),
-                )
-                .check(
-                    Expr::col(Artifact::Body)
-                        .eq("html")
-                        .and(Expr::col(Artifact::Display).is_not_null())
-                        .or(Expr::col(Artifact::Body).ne("html").and(Expr::col(Artifact::Display).is_null())),
                 )
                 .foreign_key(
                     ForeignKey::create()
@@ -1669,7 +1619,7 @@ async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbEr
                 .if_not_exists()
                 .col(text(ArtifactVersion::ArtifactId))
                 .col(big_integer(ArtifactVersion::Version))
-                .col(text(ArtifactVersion::AttachmentId))
+                .col(text(ArtifactVersion::StorageId))
                 .col(big_integer(ArtifactVersion::Size))
                 .col(text_null(ArtifactVersion::Note))
                 .col(text(ArtifactVersion::ById))
@@ -1690,95 +1640,12 @@ async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbEr
     manager
         .create_table(
             Table::create()
-                .table(ArtifactBlock::Table)
-                .if_not_exists()
-                .col(text(ArtifactBlock::Id).primary_key())
-                .col(text(ArtifactBlock::ArtifactId))
-                .col(text_null(ArtifactBlock::ParentId))
-                .col(text(ArtifactBlock::OrderKey))
-                .col(text(ArtifactBlock::Type).check(Expr::col(ArtifactBlock::Type).is_in([
-                    "paragraph",
-                    "heading",
-                    "bulleted",
-                    "numbered",
-                    "todo",
-                    "quote",
-                    "code",
-                    "divider",
-                    "image",
-                    "issue_ref",
-                    "memory_item",
-                ])))
-                .col(text(ArtifactBlock::Attrs).default("{}"))
-                .col(text(ArtifactBlock::Spans).default("[]"))
-                .col(big_integer(ArtifactBlock::Rev))
-                .col(boolean(ArtifactBlock::Deleted).default(false))
-                .col(text(ArtifactBlock::UpdatedBy))
-                .col(big_integer(ArtifactBlock::UpdatedAt))
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(ArtifactBlock::Table, ArtifactBlock::ArtifactId)
-                        .to(Artifact::Table, Artifact::Id)
-                        .on_delete(ForeignKeyAction::Cascade),
-                )
-                .to_owned(),
-        )
-        .await?;
-    manager
-        .create_index(
-            Index::create()
-                .if_not_exists()
-                .name("artifact_block_by_artifact")
-                .table(ArtifactBlock::Table)
-                .col(ArtifactBlock::ArtifactId)
-                .col(ArtifactBlock::OrderKey)
-                .col(ArtifactBlock::Id)
-                .to_owned(),
-        )
-        .await?;
-
-    manager
-        .create_table(
-            Table::create()
-                .table(ArtifactBlockRevision::Table)
-                .if_not_exists()
-                .col(text(ArtifactBlockRevision::Id).primary_key())
-                .col(text(ArtifactBlockRevision::BlockId))
-                .col(big_integer(ArtifactBlockRevision::Rev))
-                .col(text(ArtifactBlockRevision::Spans))
-                .col(text(ArtifactBlockRevision::Actor))
-                .col(text(ArtifactBlockRevision::Kind).check(Expr::col(ArtifactBlockRevision::Kind).is_in(["normal", "conflict"])))
-                .col(big_integer(ArtifactBlockRevision::CreatedAt))
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(ArtifactBlockRevision::Table, ArtifactBlockRevision::BlockId)
-                        .to(ArtifactBlock::Table, ArtifactBlock::Id)
-                        .on_delete(ForeignKeyAction::Cascade),
-                )
-                .to_owned(),
-        )
-        .await?;
-    manager
-        .create_index(
-            Index::create()
-                .if_not_exists()
-                .name("artifact_block_revision_by_block")
-                .table(ArtifactBlockRevision::Table)
-                .col(ArtifactBlockRevision::BlockId)
-                .col(ArtifactBlockRevision::Rev)
-                .to_owned(),
-        )
-        .await?;
-
-    manager
-        .create_table(
-            Table::create()
                 .table(ArtifactChange::Table)
                 .if_not_exists()
                 .col(text(ArtifactChange::ArtifactId))
                 .col(big_integer(ArtifactChange::Seq))
-                .col(text(ArtifactChange::Kind).check(Expr::col(ArtifactChange::Kind).is_in(["blocks", "entries"])))
-                .col(text_null(ArtifactChange::BatchId).unique_key())
+                .col(text(ArtifactChange::Kind).check(Expr::col(ArtifactChange::Kind).is_in(["files"])))
+                .col(text_null(ArtifactChange::BatchId))
                 .col(text(ArtifactChange::Actor))
                 .col(text(ArtifactChange::Targets))
                 .col(text(ArtifactChange::Payload))
@@ -1811,17 +1678,16 @@ async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbEr
                 .if_not_exists()
                 .col(text(ArtifactSuggestion::Id).primary_key())
                 .col(text(ArtifactSuggestion::ArtifactId))
-                .col(text(ArtifactSuggestion::BlockId))
+                .col(text(ArtifactSuggestion::Path))
                 .col(text(ArtifactSuggestion::Author))
                 .col(text_null(ArtifactSuggestion::Origin))
                 .col(big_integer(ArtifactSuggestion::AtRev))
+                .col(text_null(ArtifactSuggestion::BaseHash))
                 .col(text(ArtifactSuggestion::Change))
                 .col(text_null(ArtifactSuggestion::CursorStart))
                 .col(text_null(ArtifactSuggestion::CursorEnd))
                 .col(big_integer_null(ArtifactSuggestion::StartOffset))
                 .col(big_integer_null(ArtifactSuggestion::EndOffset))
-                .col(text_null(ArtifactSuggestion::AnchorText))
-                .col(text_null(ArtifactSuggestion::ReplacementText))
                 .col(
                     text(ArtifactSuggestion::Status)
                         .default("open")
@@ -1836,12 +1702,6 @@ async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbEr
                         .to(Artifact::Table, Artifact::Id)
                         .on_delete(ForeignKeyAction::Cascade),
                 )
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(ArtifactSuggestion::Table, ArtifactSuggestion::BlockId)
-                        .to(ArtifactBlock::Table, ArtifactBlock::Id)
-                        .on_delete(ForeignKeyAction::Cascade),
-                )
                 .to_owned(),
         )
         .await?;
@@ -1853,43 +1713,6 @@ async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbEr
                 .table(ArtifactSuggestion::Table)
                 .col(ArtifactSuggestion::ArtifactId)
                 .col(ArtifactSuggestion::CreatedAt)
-                .to_owned(),
-        )
-        .await?;
-
-    manager
-        .create_table(
-            Table::create()
-                .table(ArtifactEntry::Table)
-                .if_not_exists()
-                .col(text(ArtifactEntry::ArtifactId))
-                .col(text(ArtifactEntry::Path))
-                .col(text(ArtifactEntry::Kind).check(Expr::col(ArtifactEntry::Kind).is_in(["text", "json", "asset"])))
-                .col(text(ArtifactEntry::Mime))
-                .col(text_null(ArtifactEntry::Value))
-                .col(text_null(ArtifactEntry::AttachmentId))
-                .col(big_integer(ArtifactEntry::Size))
-                .col(big_integer(ArtifactEntry::Rev))
-                .col(text(ArtifactEntry::UpdatedBy))
-                .col(big_integer(ArtifactEntry::UpdatedAt))
-                .primary_key(Index::create().col(ArtifactEntry::ArtifactId).col(ArtifactEntry::Path))
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(ArtifactEntry::Table, ArtifactEntry::ArtifactId)
-                        .to(Artifact::Table, Artifact::Id)
-                        .on_delete(ForeignKeyAction::Cascade),
-                )
-                .to_owned(),
-        )
-        .await?;
-    manager
-        .create_index(
-            Index::create()
-                .if_not_exists()
-                .name("artifact_entry_by_artifact")
-                .table(ArtifactEntry::Table)
-                .col(ArtifactEntry::ArtifactId)
-                .col(ArtifactEntry::Path)
                 .to_owned(),
         )
         .await?;
@@ -2011,11 +1834,8 @@ impl MigrationTrait for Migration {
             RemoteConfig::Table.into_iden(),
             Memory::Table.into_iden(),
             ArtifactCollab::Table.into_iden(),
-            ArtifactEntry::Table.into_iden(),
             ArtifactSuggestion::Table.into_iden(),
             ArtifactChange::Table.into_iden(),
-            ArtifactBlockRevision::Table.into_iden(),
-            ArtifactBlock::Table.into_iden(),
             ArtifactVersion::Table.into_iden(),
             Artifact::Table.into_iden(),
             MediaJob::Table.into_iden(),

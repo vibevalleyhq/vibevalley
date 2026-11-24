@@ -22,14 +22,14 @@ use vibevalley_protocol::{
 };
 use vibevalley_runtime::machine::RuntimeRef as RtRuntimeRef;
 use vibevalley_runtime::oar::{ContentBlock, Event, EventKind, SessionOptions, StopReason, Usage};
-use vibevalley_server::transport::http::serve;
+use vibevalley_server::gateway::http::serve;
 
 type WsStream = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
-fn start_server(dir: &std::path::Path) -> vibevalley_server::Started {
+fn start_server(dir: &std::path::Path) -> vibevalley_server::App {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    vibevalley_server::start(vibevalley_server::ServerConfig {
+    vibevalley_server::create_app_blocking(vibevalley_server::Config {
         version: "3.0.0-machine-test".into(),
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
@@ -37,7 +37,7 @@ fn start_server(dir: &std::path::Path) -> vibevalley_server::Started {
         link_previews: false,
         tick_crons: false,
         debug_enabled: false,
-        ..vibevalley_server::ServerConfig::under(dir)
+        ..vibevalley_server::Config::under(dir)
     })
     .unwrap()
 }
@@ -47,15 +47,15 @@ fn http_client() -> reqwest::blocking::Client {
     reqwest::blocking::Client::builder().no_proxy().timeout(Duration::from_secs(5)).build().unwrap()
 }
 
-fn enable_remote(started: &vibevalley_server::Started) -> String {
+fn enable_remote(started: &vibevalley_server::App) -> String {
     let enabled = started
-        .hub
+        .router()
         .call_as(Caller::User, "remote.enable", json!({ "bindAddr": "127.0.0.1", "port": 0 }));
     assert_eq!(enabled.biz_code, 0, "{}", enabled.message);
     enabled.data.unwrap()["url"].as_str().unwrap().to_string()
 }
 
-fn pair_device(started: &vibevalley_server::Started, remote_url: &str, platform: &str, name: &str, scope: Option<&str>) -> String {
+fn pair_device(started: &vibevalley_server::App, remote_url: &str, platform: &str, name: &str, scope: Option<&str>) -> String {
     let code = started.test_internals().remote.pair_create_with_scope(scope).unwrap().code;
     let res = http_client()
         .post(format!("{remote_url}/api/v1/remote/pair/exchange"))
@@ -125,11 +125,16 @@ fn runtime_summary(id: &str, label: &str) -> MachineRuntimeSummary {
     }
 }
 
+fn sessions_slice(app: &vibevalley_server::App) -> vibevalley_protocol::SessionsSlice {
+    vibevalley_runtime::rt::block_on(app.ctx().feed.flush());
+    serde_json::from_str(&app.ctx().feed.snapshot_json(vibevalley_protocol::SliceKind::Sessions)).unwrap()
+}
+
 #[test]
 fn machine_ws_enforces_bearer_auth_and_machine_scope_on_loopback_and_remote() {
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path());
-    let local_listener = serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let local_listener = serve(started.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let remote_url = enable_remote(&started);
 
     let client_token = pair_device(&started, &remote_url, "ios", "Client iPhone", Some(SCOPE_REMOTE_CLIENT));
@@ -188,7 +193,7 @@ fn machine_ws_enforces_bearer_auth_and_machine_scope_on_loopback_and_remote() {
     assert_eq!(wrong_scope_resp.json::<Value>().unwrap()["bizCode"], BizCode::Forbidden.code());
 
     drop(local_listener);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -199,14 +204,14 @@ fn machine_hello_inventory_and_ephemeral_sandbox_disconnect_project_into_slices(
     let machine_token = pair_device(&started, &remote_url, "machine", "Fleet Runner", Some(SCOPE_REMOTE_MACHINE));
 
     // Local machine is always present immediately at boot.
-    let initial = started.hub.call_as(Caller::User, "machine.list", json!({}));
+    let initial = started.router().call_as(Caller::User, "machine.list", json!({}));
     assert_eq!(initial.biz_code, 0, "{}", initial.message);
     let list: Vec<vibevalley_protocol::MachineInfo> = serde_json::from_value(initial.data.unwrap()).unwrap();
     assert_eq!(list.len(), 1);
     assert_eq!(list[0].id, LOCAL_MACHINE_ID);
     assert!(list[0].here);
     assert_eq!(list[0].status, MachineStatus::Online);
-    assert!(started.hub.sessions_slice().machines.iter().any(|m| m.id == LOCAL_MACHINE_ID && m.here));
+    assert!(sessions_slice(&started).machines.iter().any(|m| m.id == LOCAL_MACHINE_ID && m.here));
 
     vibevalley_runtime::rt::block_on(async {
         // 1. Connect persistent remote machine `gpu-1`.
@@ -242,19 +247,22 @@ fn machine_hello_inventory_and_ephemeral_sandbox_disconnect_project_into_slices(
         )
         .await;
 
-        crate::support::wait_until_transition_async(&started.hub, Duration::from_secs(3), "gpu-1 inventory updated", || {
-            started
-                .hub
-                .sessions_slice()
-                .machines
-                .iter()
-                .any(|m| m.id == "gpu-1" && m.online && m.runtimes == vec!["claude", "codex"])
-                .then_some(())
+        crate::support::wait_until_transition_async(started.ctx(), Duration::from_secs(3), "gpu-1 inventory updated", || {
+            let mut found = false;
+            if let Ok(slice) =
+                serde_json::from_str::<vibevalley_protocol::SessionsSlice>(&started.ctx().feed.snapshot_json(vibevalley_protocol::SliceKind::Sessions))
+            {
+                found = slice
+                    .machines
+                    .iter()
+                    .any(|m| m.id == "gpu-1" && m.online && m.runtimes == vec!["claude", "codex"]);
+            }
+            found.then_some(())
         })
         .await;
 
         let listed: Vec<vibevalley_protocol::MachineInfo> =
-            serde_json::from_value(started.hub.call_as(Caller::User, "machine.list", json!({})).data.unwrap()).unwrap();
+            serde_json::from_value(started.router().call_as(Caller::User, "machine.list", json!({})).data.unwrap()).unwrap();
         let gpu = listed.iter().find(|m| m.id == "gpu-1").expect("gpu-1 in machine.list");
         assert_eq!(gpu.status, MachineStatus::Online);
         assert_eq!(gpu.runtimes.len(), 2);
@@ -277,35 +285,33 @@ fn machine_hello_inventory_and_ephemeral_sandbox_disconnect_project_into_slices(
         .await;
         assert!(matches!(recv_frame(&mut sbx_ws).await, MachineWireFrame::MachineHelloAck(_)));
 
-        crate::support::wait_until_transition_async(&started.hub, Duration::from_secs(3), "sbx-9 online", || {
-            started
-                .hub
-                .sessions_slice()
-                .machines
-                .iter()
-                .any(|m| m.id == "sbx-9" && m.ephemeral && m.online)
-                .then_some(())
+        crate::support::wait_until_transition_async(started.ctx(), Duration::from_secs(3), "sbx-9 online", || {
+            let slice: vibevalley_protocol::SessionsSlice =
+                serde_json::from_str(&started.ctx().feed.snapshot_json(vibevalley_protocol::SliceKind::Sessions)).ok()?;
+            slice.machines.iter().any(|m| m.id == "sbx-9" && m.ephemeral && m.online).then_some(())
         })
         .await;
 
         // 3. Disconnect ephemeral sandbox -> emitted `MachineRemoved` drops it completely.
         let _ = sbx_ws.close(None).await;
         drop(sbx_ws);
-        crate::support::wait_until_transition_async(&started.hub, Duration::from_secs(3), "sbx-9 removed", || {
-            (!started.hub.sessions_slice().machines.iter().any(|m| m.id == "sbx-9")).then_some(())
+        crate::support::wait_until_transition_async(started.ctx(), Duration::from_secs(3), "sbx-9 removed", || {
+            let slice: vibevalley_protocol::SessionsSlice =
+                serde_json::from_str(&started.ctx().feed.snapshot_json(vibevalley_protocol::SliceKind::Sessions)).ok()?;
+            (!slice.machines.iter().any(|m| m.id == "sbx-9")).then_some(())
         })
         .await;
         let after_sbx: Vec<vibevalley_protocol::MachineInfo> =
-            serde_json::from_value(started.hub.call_as(Caller::User, "machine.list", json!({})).data.unwrap()).unwrap();
+            serde_json::from_value(started.router().call_as(Caller::User, "machine.list", json!({})).data.unwrap()).unwrap();
         assert!(!after_sbx.iter().any(|m| m.id == "sbx-9"));
 
         // 4. Disconnect persistent `gpu-1` -> stays listed with `Offline`.
         let _ = gpu_ws.close(None).await;
         drop(gpu_ws);
-        crate::support::wait_until_transition_async(&started.hub, Duration::from_secs(3), "gpu-1 offline", || {
-            started
-                .hub
-                .sessions_slice()
+        crate::support::wait_until_transition_async(started.ctx(), Duration::from_secs(3), "gpu-1 offline", || {
+            let slice: vibevalley_protocol::SessionsSlice =
+                serde_json::from_str(&started.ctx().feed.snapshot_json(vibevalley_protocol::SliceKind::Sessions)).ok()?;
+            slice
                 .machines
                 .iter()
                 .any(|m| m.id == "gpu-1" && !m.online && m.status == Some(MachineStatus::Offline))
@@ -314,7 +320,7 @@ fn machine_hello_inventory_and_ephemeral_sandbox_disconnect_project_into_slices(
         .await;
     });
 
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -325,7 +331,7 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     let machine_token = pair_device(&started, &remote_url, "machine", "GPU Worker", Some(SCOPE_REMOTE_MACHINE));
 
     // Create a local repo with an `origin` remote URL so PR-first dispatch resolves `repo_ref`.
-    let repo_created = started.hub.call_as(Caller::User, "repo.create", json!({ "name": "demo" }));
+    let repo_created = started.router().call_as(Caller::User, "repo.create", json!({ "name": "demo" }));
     assert_eq!(repo_created.biz_code, 0, "{}", repo_created.message);
     let repo_path = dir.path().join("repos/demo");
     let git_status = std::process::Command::new("git")
@@ -337,10 +343,10 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     assert!(git_status.success());
 
     // Create an agent profile that targets remote runtime `"claude"` (not installed locally).
-    let mut profile = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut profile = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     profile.runtime = "claude".into();
     profile.name = "Remote Builder".into();
-    let profile = started.test_internals().agents.profiles.save(profile).unwrap();
+    let profile = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(profile)).unwrap();
 
     // Connect remote machine `gpu-dev` advertising `"claude"`.
     let mut ws = vibevalley_runtime::rt::block_on(async {
@@ -362,7 +368,7 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     });
 
     // Create an issue pinned to `machineId: "gpu-dev"` and dispatch it via `issue.status.update`.
-    let created = started.hub.call_as(
+    let created = started.router().call_as(
         Caller::User,
         "issue.create",
         json!({
@@ -377,7 +383,7 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     assert_eq!(created.data.as_ref().unwrap()["machineId"], "gpu-dev");
 
     // Dispatch on a background thread since `issue.status.update` waits for `session.opened` + `session.ack`.
-    let hub_dispatch = started.hub.clone();
+    let hub_dispatch = started.router().clone();
     let issue_id_for_dispatch = issue_id.clone();
     let dispatch_handle =
         std::thread::spawn(move || hub_dispatch.call_as(Caller::User, "issue.status.update", json!({ "id": issue_id_for_dispatch, "status": "todo" })));
@@ -476,17 +482,17 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     );
 
     // Confirm machine transitioned to Offline while session stayed alive.
-    crate::support::wait_until_transition(&started.hub, Duration::from_secs(3), "gpu-dev offline", || {
-        started
-            .hub
-            .sessions_slice()
-            .machines
-            .iter()
-            .any(|m| m.id == "gpu-dev" && !m.online)
-            .then_some(())
+    crate::support::wait_until_transition(started.ctx(), Duration::from_secs(3), "gpu-dev offline", || {
+        sessions_slice(&started).machines.iter().any(|m| m.id == "gpu-dev" && !m.online).then_some(())
     });
-    assert!(started.test_internals().board.sessions().is_live(&session_id));
-    assert_eq!(started.test_internals().board.session(&session_id).unwrap().machine.as_deref(), Some("gpu-dev"));
+    assert!(started.test_internals().runtime.session_engine().is_live(&session_id));
+    assert_eq!(
+        crate::support::board_session(started.test_internals().board, &session_id)
+            .unwrap()
+            .machine
+            .as_deref(),
+        Some("gpu-dev")
+    );
 
     // 5. RECONNECT with the same `machine_id = "gpu-dev"` -> expect `MachineSessionAttach { after_seq: 2 }`!
     vibevalley_runtime::rt::block_on(async {
@@ -599,15 +605,12 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     });
 
     // Wait for TurnFinished to settle the issue into InReview and verify NO duplicate `alpha-`!
-    crate::support::wait_until_transition(&started.hub, Duration::from_secs(3), "issue InReview", || {
-        started
-            .test_internals()
-            .board
-            .issue(&issue_id)
+    crate::support::wait_until_transition(started.ctx(), Duration::from_secs(3), "issue InReview", || {
+        crate::support::board_issue(started.test_internals().board, &issue_id)
             .is_some_and(|i| i.status == vibevalley_protocol::IssueStatus::InReview)
             .then_some(())
     });
-    let session = started.test_internals().board.session(&session_id).unwrap();
+    let session = crate::support::board_session(started.test_internals().board, &session_id).unwrap();
     let summary = session.last_run.as_ref().map(|r| r.summary.as_str()).unwrap_or("");
     assert_eq!(summary, "alpha-omega", "duplicate seq 2 must not be replayed into output");
 
@@ -629,23 +632,25 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
         assert!(matches!(recv_frame(&mut ws).await, MachineWireFrame::MachineHelloAck(_)));
         ws
     });
-    crate::support::wait_until_transition(&started.hub, Duration::from_secs(2), "gpu-ctrl registered", || {
-        started.test_internals().machines.registry().get("gpu-ctrl").map(|_| ())
+    crate::support::wait_until_transition(started.ctx(), Duration::from_secs(2), "gpu-ctrl registered", || {
+        started.test_internals().machine.registry().get("gpu-ctrl").map(|_| ())
     });
     let (_, rt) = started
         .test_internals()
-        .machines
+        .machine
         .registry()
         .resolve(&RtRuntimeRef::new("gpu-ctrl", "codex"))
         .expect("resolve gpu-ctrl/codex");
 
     let rt_thread = std::thread::spawn(move || {
-        let sess = rt.open(SessionOptions::default()).unwrap();
-        sess.steer(vec![ContentBlock::Text("focus tests".into())]).unwrap();
-        sess.queue(vec![ContentBlock::Text("then lint".into())]).unwrap();
-        sess.set_config(Some("o3"), Some("high"), None).unwrap();
-        sess.abort().unwrap();
-        sess.dispose();
+        vibevalley_runtime::rt::block_on(async move {
+            let sess = rt.open(SessionOptions::default()).await.unwrap();
+            sess.steer(vec![ContentBlock::Text("focus tests".into())]).await.unwrap();
+            sess.queue(vec![ContentBlock::Text("then lint".into())]).await.unwrap();
+            sess.set_config(Some("o3"), Some("high"), None).await.unwrap();
+            sess.abort().await.unwrap();
+            sess.dispose().await;
+        });
     });
 
     vibevalley_runtime::rt::block_on(async {
@@ -701,7 +706,8 @@ fn remote_session_disconnect_reconnect_replays_losslessly_and_skips_local_worktr
     });
     rt_thread.join().unwrap();
 
-    started.close();
+    drop(ws3);
+    started.close_blocking();
 }
 
 #[test]
@@ -712,7 +718,7 @@ fn machine_attachment_fetch_and_system_wake_hook_work_end_to_end() {
     let machine_token = pair_device(&started, &remote_url, "machine", "Attach Runner", Some(SCOPE_REMOTE_MACHINE));
 
     let payload = b"remote-machine-attachment-bytes";
-    let created = started.hub.call_as(
+    let created = started.router().call_as(
         Caller::User,
         "attachment.create",
         json!({
@@ -724,9 +730,9 @@ fn machine_attachment_fetch_and_system_wake_hook_work_end_to_end() {
     assert_eq!(created.biz_code, 0, "{}", created.message);
     let att_id = created.data.unwrap()["id"].as_str().unwrap().to_string();
 
-    let mut wake_a = started.hub.subscribe_wake();
-    let mut wake_b = started.hub.subscribe_wake();
-    assert_eq!(started.hub.wake_count(), 0);
+    let mut wake_a = started.ctx().task.subscribe_wake();
+    let mut wake_b = started.ctx().task.subscribe_wake();
+    assert_eq!(started.ctx().task.wake_count(), 0);
 
     vibevalley_runtime::rt::block_on(async {
         let mut ws = connect_ws(&ws_url(&remote_url, None), Some(&machine_token)).await.unwrap();
@@ -782,9 +788,9 @@ fn machine_attachment_fetch_and_system_wake_hook_work_end_to_end() {
             other => panic!("expected attachment.data error, got {other:?}"),
         }
 
-        // Trigger `Hub::on_system_wake()` -> both subscribers wake AND connected machine gets an immediate MachinePing!
-        started.hub.on_system_wake();
-        assert_eq!(started.hub.wake_count(), 1);
+        // Trigger `App::on_system_wake()` -> both subscribers wake AND connected machine gets an immediate MachinePing!
+        started.on_system_wake();
+        assert_eq!(started.ctx().task.wake_count(), 1);
         tokio::time::timeout(Duration::from_secs(2), wake_a.changed()).await.unwrap().unwrap();
         tokio::time::timeout(Duration::from_secs(2), wake_b.changed()).await.unwrap().unwrap();
         assert_eq!(*wake_a.borrow_and_update(), 1);
@@ -795,7 +801,7 @@ fn machine_attachment_fetch_and_system_wake_hook_work_end_to_end() {
             other => panic!("expected MachinePing on system wake, got {other:?}"),
         }
 
-        started.hub.on_system_wake();
+        started.on_system_wake();
         tokio::time::timeout(Duration::from_secs(2), wake_a.changed()).await.unwrap().unwrap();
         assert_eq!(*wake_a.borrow_and_update(), 2);
 
@@ -825,8 +831,8 @@ fn machine_attachment_fetch_and_system_wake_hook_work_end_to_end() {
     });
 
     // Clean shutdown with zero Arc cycles.
-    let weak_hub = Arc::downgrade(&started.hub);
-    started.close();
+    let weak_router = Arc::downgrade(started.router());
+    started.close_blocking();
     drop(started);
-    assert_eq!(weak_hub.strong_count(), 0, "Hub must drop cleanly after Started::close");
+    assert_eq!(weak_router.strong_count(), 0, "Router must drop cleanly after App::close");
 }

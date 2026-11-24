@@ -15,7 +15,7 @@
 当代码主要由 agent 编写与演进时，口头约定与长文档最先失效。设计模块与接口时，应把不变量依次推进三道防线：
 
 - **类型化（让非法状态不可表达）**：用结构体、enum（带数据的变体）、newtype（`Secret`）和返回 `Result` 的预期结果（合进去或冲突）把业务前提与输出承诺写进签名。门内不传 `serde_json::Value`，不按字符串分支，不用多个松散布尔拼状态，也不在成功返回值里夹带 `ok: bool`。
-- **静态化（让拓扑与归属在构建期确定）**：服务端的模块是 [modules/mod.rs](crates/server/src/modules/mod.rs) 里的 `pub mod`，每个模块对外一个窄的结构体（`Agents`、`Chat`、`Crons`…），在 [start.rs](crates/server/src/start.rs) 照次序建好并把端点注册到 `Hub`（`Hub::on::<O: Op>` 由契约的 `ops` 定入参和结果的类型）。不在运行期拼装依赖，不把整个服务端交给一个模块。
+- **静态化（让拓扑与归属在构建期确定）**：服务端的模块是 [lib.rs](crates/server/src/lib.rs) 里的 `pub mod`，每个模块对外一个窄的结构体（`Agents`、`Chat`、`Crons`…），在 [bootstrap.rs](crates/server/src/app.rs) 照次序建好并把端点注册到 `Hub`（`Hub::on::<O: Op>` 由契约的 `ops` 定入参和结果的类型）。不在运行期拼装依赖，不把整个服务端交给一个模块。
 - **可分析化（让架构边界可由编译器与检查对账）**：能交给类型和 clippy 的交给它们（`cargo xtask check` 带 `-D warnings`）；TS 一侧的约束写成 [lint](scripts/audit/oxlint-plugin.ts) 规则，无需启动运行时或通读上下文即可定位违规。
 
 ### 可控制、可观察、可关闭共同决定可测试性
@@ -63,7 +63,7 @@
 
 三者不必拆成三个服务。只有职责可独立命名且能降低耦合时才提取，保留在原业务模块内；不新建一个收集所有规则的技术层。
 
-以定时任务为例，[到期计算](crates/core/src/cron/mod.rs)与[服务执行](crates/server/src/modules/work/cron/mod.rs)分别承担日期决定和持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
+以定时任务为例，[到期计算](crates/core/src/cron/mod.rs)与[服务执行](crates/server/src/cron/mod.rs)分别承担日期决定和持久化、投递责任。测试直接调用 tick 能验证一次执行，不能单独证明周期驱动已接好；测试拨钟能验证调度，不能替代事务失败与恢复测试。
 
 提取纯决定时，应保留「读取、判断、提交」的并发边界。把判断挪到锁外可能引入过期快照；函数变纯不代表整个流程变正确。
 
@@ -71,15 +71,15 @@
 
 让不变量住进类型，在系统入口一次性完成解析（Parse, don't validate），不在业务内部散落防御性判断或裸字符串约定：
 
-- **进门一次解析**：HTTP、命令行、工具参数、配置、落盘 JSON 与厂商响应在边界经 serde 一步解成结构体和 enum：端点的入参是契约的类型（`Hub::on::<O>`，[lib.rs](crates/server/src/lib.rs)）；模型给的工具参数经 [tool/mod.rs](crates/server/src/modules/team/tool/mod.rs) 的 `args` 宽松解析一次（数字字符串、`null` 当缺省写在这一处）再成参数结构体；`settings.json` 在 [setting.rs](crates/server/src/modules/infra/setting.rs) 一次读成 `Stored`。格式错误当场失败，不兜底成默认值。
-- **密钥是 `Secret`**：钥匙和 token 包进 `Secret`（[setting.rs](crates/server/src/modules/infra/setting.rs)），`Debug` 只出提示，取原文要显式 `expose()`。
+- **进门一次解析**：HTTP、命令行、工具参数、配置、落盘 JSON 与厂商响应在边界经 serde 一步解成结构体和 enum：端点的入参是契约的类型（`Hub::on::<O>`，[lib.rs](crates/server/src/lib.rs)）；模型给的工具参数经 [tool/mod.rs](crates/server/src/agent/tool/mod.rs) 的 `args` 宽松解析一次（数字字符串、`null` 当缺省写在这一处）再成参数结构体；`settings.json` 在 [setting.rs](crates/server/src/setting.rs) 一次读成 `Stored`。格式错误当场失败，不兜底成默认值。
+- **密钥是 `Secret`**：钥匙和 token 包进 `Secret`（[setting.rs](crates/server/src/setting.rs)），`Debug` 只出提示，取原文要显式 `expose()`。
 - **契约一份**：线上的形状以 Rust 的 [contract](crates/protocol/src/contract/mod.rs) 类型为源，TS 类型由它生成；页面收到的帧、事件和接口结果按同一份手写的 Schema 解码（`packages/protocol` 的 `schema.ts`，测试对着生成的类型查）。闭合词集是 enum，不重复内联字面量。
 - **未解析引用与主键分离**：用户、命令行或模型传入的名称、编号与地址（如 `#41`、频道名、`vv://`）按引用建模，在所属模块的入口一次解析成 id；模块内部与存储层只传已解析的 id。
 - **存储区分「缺省」与「损坏」**：可空列读成 `Option`，非空的损坏立即报错，不静默吞成缺省；只有外部不可信的载荷才容错。
 
 ### 显式状态
 
-一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/mac/ui/infra/state/intent.ts)的 `IntentAt`、[媒体任务](crates/server/src/modules/content/media/jobs.rs)的 `Held`、[谁听见](crates/server/src/modules/collab/channel/dispatch.rs)的 `HeldBy`。Rust 里就是带数据的 enum，`match` 穷尽。
+一件事沿一条线走（签了、正在接、通话中；等着、就绪、关了），就用一个联合表示它：每个状态一个标签，只有这个状态才有的东西挂在这个状态上（失败的意图才有 `fault`，通话中的授权才有 agent id），存在一个 `let` 或信号里。例子：[意图](apps/mac/ui/infra/state/intent.ts)的 `IntentAt`、[媒体任务](crates/server/src/artifact/media/job.rs)的 `Held`、[谁听见](crates/server/src/channel/dispatch.rs)的 `HeldBy`。Rust 里就是带数据的 enum，`match` 穷尽。
 
 - **各管各的维度分开放。** 在任一状态下都可能为真的，不并进联合：表单的校验、提交、输入法组字（[表单](apps/mac/ui/infra/form/form.ts)）。硬并只会得到它们的乘积。
 - **永远同值的删掉副本。** 读源头，不另存一份跟着改。
@@ -91,7 +91,7 @@
 
 ### 错误与回滚契约
 
-- **三层错误各走其道**：外部 I/O 失败在调用处包成模块自己的错误类型并保留原因；业务拒绝返回契约的 `ApiError`（带 `BizCode`，可恢复时附带 `next`，见 [base.rs](crates/server/src/base.rs) 的 `missing`、`refused`）；内部数据自相矛盾是缺陷，不伪装成普通拒绝。
+- **三层错误各走其道**：外部 I/O 失败在调用处包成模块自己的错误类型并保留原因；业务拒绝返回契约的 `ApiError`（带 `BizCode`，可恢复时附带 `next`，见 [db/mod.rs](crates/server/src/db/mod.rs) 的 `missing`、`refused`）；内部数据自相矛盾是缺陷，不伪装成普通拒绝。
 - **内部失败是 `Result`，资源靠 `Drop`**：调用方要分辨的拒绝或故障是 `Result` 的错误 enum，不把 `refused: Option<String>` 塞进成功返回值。多步获取的资源用守卫对象（`Drop`）成对释放，失败时逆序回滚。
 - **线上只暴露闭合 `ApiError`，客户端无损转 `UiFault`**：内部细粒度的错误在服务端边界转为 `ApiError`，不泄漏到 HTTP 契约；客户端 `faultOf`（[apps/mac/ui/infra/api.ts](apps/mac/ui/infra/api.ts)）将全部 `ApiError`（含 `502`/`503`）归类为明确的业务拒绝并保留 `next`、`settings` 与 `retryable`。
 
@@ -154,8 +154,8 @@ Clock 的读取不应推进时间；同刻事件的顺序应由业务已有的�
 | 要表达或验证的边界 | 已有工具 | 使用限制 |
 |---|---|---|
 | 形状与进门解码 | Rust 结构体与 enum、serde、`Secret`；页面的 TypeScript 联合与 Zod（`satisfies Codec<T.X>`） | 类型不能独自表达事务、完成与取消语义 |
-| 依赖与组合 | [start.rs](crates/server/src/start.rs) 照次序建模块；集成测试起真的服务端（[tests/](crates/server/tests/issue.rs)） | 在服务建好前替换依赖；不另建一套测试业务装配 |
-| 外部 agent 与模型 | oar 的 scripted 运行时（[scripted.rs](crates/runtime/src/oar/scripted.rs)）、测试用替身 agent `pi`（[testing.rs](crates/server/src/testing.rs)） | 控制端口协议，不复制业务；意外调用应失败 |
+| 依赖与组合 | [bootstrap.rs](crates/server/src/app.rs) 照次序建模块；集成测试起真的服务端（[tests/](crates/server/tests/issue.rs)） | 在服务建好前替换依赖；不另建一套测试业务装配 |
+| 外部 agent 与模型 | oar 的 scripted 运行时（[scripted.rs](crates/runtime/src/oar/scripted.rs)）、测试用替身 agent `pi`（[runtime.rs](crates/server/src/fake/runtime.rs)） | 控制端口协议，不复制业务；意外调用应失败 |
 | 任务与资源（页面） | `AbortSignal`、作用域的 `cleanup` | 关闭语义由业务定义，工具只实现归属与释放；有界等待不替代完成契约 |
 | 页面的时间与交互 | `nsh/test` 的页面测试、应用的调试脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） | 页面的时间独立于服务端；截图不证明动态行为 |
 | 边界防退化 | `cargo xtask check`（clippy `-D warnings`）、`cargo xtask audit`、[lint](scripts/audit/oxlint-plugin.ts)、`mac:check` | 检查守住已确定的边界，不用行数或覆盖率指标代替设计判断 |

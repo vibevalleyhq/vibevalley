@@ -522,8 +522,8 @@ mod tests {
         Arc::new(ScriptedRuntime::new(id, Script::echo()))
     }
 
-    #[test]
-    fn local_machine_wraps_scripted_runtime_and_runs_session() {
+    #[tokio::test]
+    async fn local_machine_wraps_scripted_runtime_and_runs_session() {
         let mut oar_registry = Registry::new();
         oar_registry.register(scripted("scripted"));
         oar_registry.register(scripted("acp:opencode"));
@@ -562,13 +562,17 @@ mod tests {
                 cwd: std::env::temp_dir(),
                 ..Default::default()
             })
+            .await
             .expect("open scripted session");
-        let events = session.events();
-        session.prompt(vec![ContentBlock::Text("hello local".into())]).expect("prompt");
+        let mut events = session.events();
+        session.prompt(vec![ContentBlock::Text("hello local".into())]).await.expect("prompt");
 
         let mut echoed = String::new();
         loop {
-            let event = events.recv_timeout(Duration::from_secs(5)).expect("event before timeout");
+            let event = tokio::time::timeout(Duration::from_secs(5), events.recv())
+                .await
+                .expect("event before timeout")
+                .expect("channel open");
             match event.kind {
                 EventKind::TextDelta { text } => echoed.push_str(&text),
                 EventKind::TurnFinished { .. } => break,

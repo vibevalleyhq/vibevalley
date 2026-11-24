@@ -11,7 +11,7 @@ use crate::moves::status_moves;
 use crate::rules::{compare_text, is_busy};
 
 /// On duty: an orchestrator's standing session.
-fn is_on_duty(session: &Session) -> bool {
+pub(crate) fn is_on_duty(session: &Session) -> bool {
     session.is_orchestrator()
 }
 
@@ -198,10 +198,10 @@ struct Lookup<'a> {
     children: HashMap<&'a str, Vec<&'a Issue>>,
 }
 
-fn lookup_of(state: &SpaceState) -> Lookup<'_> {
+fn lookup_of<'a>(issues: &'a [Issue], sessions_slice: &'a [Session]) -> Lookup<'a> {
     let mut sessions = HashMap::new();
     let mut refining = HashMap::new();
-    for h in &state.sessions {
+    for h in sessions_slice {
         sessions.insert(h.id.as_str(), h);
         if h.is_refining()
             && let Some(issue) = h.issue_id()
@@ -213,7 +213,7 @@ fn lookup_of(state: &SpaceState) -> Lookup<'_> {
         }
     }
     let mut children: HashMap<&str, Vec<&Issue>> = HashMap::new();
-    for item in &state.issues {
+    for item in issues {
         if let Some(parent) = &item.parent {
             children.entry(parent.as_str()).or_default().push(item);
         }
@@ -267,15 +267,14 @@ fn status_with_lookup(t: &Issue, lookup: &Lookup) -> IssueStatus {
     Backlog
 }
 
-/// `withIssueStatuses`: every issue's status, drafting session, stage and
-/// moves brought up to date. False when none changed.
-pub(crate) fn with_issue_statuses(state: &mut SpaceState) -> bool {
-    if state.issues.is_empty() {
+/// Pure status/stage/refining/moves derivation over a slice of issues and sessions.
+pub(crate) fn apply_issue_statuses(issues: &mut [Issue], sessions: &[Session]) -> bool {
+    if issues.is_empty() {
         return false;
     }
-    let lookup = lookup_of(state);
+    let lookup = lookup_of(issues, sessions);
     let mut changes: Vec<(usize, Issue)> = Vec::new();
-    for (i, t) in state.issues.iter().enumerate() {
+    for (i, t) in issues.iter().enumerate() {
         let status = status_with_lookup(t, &lookup);
         let drafting = lookup.refining.get(t.id.as_str()).cloned();
         let session = t.latest_session_id().and_then(|id| lookup.sessions.get(id.as_str()).copied());
@@ -291,9 +290,15 @@ pub(crate) fn with_issue_statuses(state: &mut SpaceState) -> bool {
     }
     let changed = !changes.is_empty();
     for (i, next) in changes {
-        state.issues[i] = next;
+        issues[i] = next;
     }
     changed
+}
+
+/// `withIssueStatuses`: every issue's status, drafting session, stage and
+/// moves brought up to date. False when none changed.
+pub(crate) fn with_issue_statuses(state: &mut SpaceState) -> bool {
+    apply_issue_statuses(&mut state.issues, &state.sessions)
 }
 
 const KEEP_CLOSED_ISSUES: usize = 50;
@@ -315,11 +320,9 @@ pub fn issue_order(a: &Issue, b: &Issue) -> Ordering {
     }
 }
 
-/// `withIssue`: keeps the latest `KEEP_CLOSED_ISSUES` closed top-level
-/// issues; a sub-issue goes with its parent.
-pub(crate) fn with_issue(all: &mut Vec<Issue>, t: Issue) {
-    all.retain(|x| x.id != t.id);
-    all.push(t);
+/// Keeps the latest `KEEP_CLOSED_ISSUES` closed top-level issues (and their
+/// children) and sorts by [`issue_order`].
+pub(crate) fn retain_recent_closed_and_sort(all: &mut Vec<Issue>) {
     let mut closed: Vec<(String, i64)> = all
         .iter()
         .filter(|x| x.parent.is_none())
@@ -331,6 +334,14 @@ pub(crate) fn with_issue(all: &mut Vec<Issue>, t: Issue) {
         all.retain(|x| !drop.contains(&x.id) && !x.parent.as_ref().is_some_and(|p| drop.contains(p)));
     }
     all.sort_by(issue_order);
+}
+
+/// `withIssue`: keeps the latest `KEEP_CLOSED_ISSUES` closed top-level
+/// issues; a sub-issue goes with its parent.
+pub(crate) fn with_issue(all: &mut Vec<Issue>, t: Issue) {
+    all.retain(|x| x.id != t.id);
+    all.push(t);
+    retain_recent_closed_and_sort(all);
 }
 
 /// `pickIssues`: what a filter picks, newest first; waiting on the user,
@@ -414,10 +425,10 @@ fn issue_prompt_of(issue: &Issue) -> Option<IssuePromptKind> {
 
 /// Deterministic board summary folded into `BoardSlice`: identical lane counts
 /// for wide and narrow views, active worker slot usage, and per-issue metadata.
-pub(crate) fn board_summary(state: &SpaceState) -> BoardSummary {
-    let lookup = lookup_of(state);
+pub(crate) fn board_summary(issues: &[Issue], sessions: &[Session], channels: &[Channel]) -> BoardSummary {
+    let lookup = lookup_of(issues, sessions);
     let mut on_duty_agents: HashSet<&str> = HashSet::from([DEFAULT_ORCHESTRATOR]);
-    for s in &state.sessions {
+    for s in sessions {
         if is_on_duty(s)
             && let Some(agent) = s.profile_id()
             && !agent.is_empty()
@@ -425,19 +436,17 @@ pub(crate) fn board_summary(state: &SpaceState) -> BoardSummary {
             on_duty_agents.insert(agent);
         }
     }
-    if let Some(chat) = &state.chat {
-        for c in &chat.channels {
-            if let Some(orch) = c.orchestrator.as_deref()
-                && !orch.is_empty()
-            {
-                on_duty_agents.insert(orch);
-            }
+    for c in channels {
+        if let Some(orch) = c.orchestrator.as_deref()
+            && !orch.is_empty()
+        {
+            on_duty_agents.insert(orch);
         }
     }
 
     let mut lane_counts = BoardLaneCounts::default();
     let mut by_issue = BTreeMap::new();
-    for issue in &state.issues {
+    for issue in issues {
         let lane = issue_lane_of(issue.status);
         match lane {
             IssueLane::Todo => lane_counts.todo += 1,
@@ -479,7 +488,7 @@ pub(crate) fn board_summary(state: &SpaceState) -> BoardSummary {
         );
     }
 
-    let running_slots = state.sessions.iter().filter(|s| is_hired(s) && is_busy(s)).count() as i64;
+    let running_slots = sessions.iter().filter(|s| is_hired(s) && is_busy(s)).count() as i64;
 
     BoardSummary {
         lane_counts,

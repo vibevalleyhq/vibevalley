@@ -6,13 +6,13 @@
 use std::path::{Path, PathBuf};
 
 pub fn work_root() -> PathBuf {
-    vibevalley_server::ServerConfig::default_work_root()
+    vibevalley_server::Config::default_work_root()
 }
 
 /// The server's config for the farm at `home`, sharing environment overrides
 /// and bundle version with the standalone server.
-pub fn config(home: &Path, work_root: PathBuf) -> vibevalley_server::ServerConfig {
-    let mut config = vibevalley_server::ServerConfig::from_env(home, crate::update::bundle_version());
+pub fn config(home: &Path, work_root: PathBuf) -> vibevalley_server::Config {
+    let mut config = vibevalley_server::Config::from_env(home, crate::update::bundle_version());
     config.work_root = work_root;
     config
 }
@@ -30,21 +30,21 @@ pub fn opening_pixel_phase(phase: vibevalley_protocol::HostOpeningPhase) -> crat
 }
 
 pub struct Running {
-    started: vibevalley_server::Started,
-    listener: Option<vibevalley_server::transport::http::Listener>,
+    app: vibevalley_server::App,
+    listener: Option<vibevalley_server::gateway::http::Listener>,
     announced: Option<vibevalley_server::home::Announced>,
     wake_observer: Option<crate::host::SystemObserver>,
 }
 
 impl Running {
     pub fn new(
-        started: vibevalley_server::Started,
-        listener: Option<vibevalley_server::transport::http::Listener>,
+        app: vibevalley_server::App,
+        listener: Option<vibevalley_server::gateway::http::Listener>,
         announced: Option<vibevalley_server::home::Announced>,
         wake_observer: Option<crate::host::SystemObserver>,
     ) -> Self {
         Self {
-            started,
+            app,
             listener,
             announced,
             wake_observer,
@@ -56,7 +56,7 @@ impl Running {
         drop(self.wake_observer);
         drop(self.announced);
         drop(self.listener);
-        self.started.close();
+        self.app.close_blocking();
     }
 }
 
@@ -101,23 +101,20 @@ impl RunningServer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vibevalley_server::ServerConfig;
+    use vibevalley_server::Config;
 
     #[test]
     fn the_work_root_is_the_named_one_else_the_users_vibevalley_dev() {
         assert_eq!(
-            ServerConfig::work_root_from(Some("/tmp/space".into()), Some("/Users/u".into())),
+            Config::work_root_from(Some("/tmp/space".into()), Some("/Users/u".into())),
             PathBuf::from("/tmp/space")
         );
         assert_eq!(
-            ServerConfig::work_root_from(Some("".into()), Some("/Users/u".into())),
+            Config::work_root_from(Some("".into()), Some("/Users/u".into())),
             PathBuf::from("/Users/u/vibevalley-dev")
         );
-        assert_eq!(
-            ServerConfig::work_root_from(None, Some("/Users/u".into())),
-            PathBuf::from("/Users/u/vibevalley-dev")
-        );
-        assert_eq!(ServerConfig::work_root_from(None, None), PathBuf::from("/vibevalley-dev"));
+        assert_eq!(Config::work_root_from(None, Some("/Users/u".into())), PathBuf::from("/Users/u/vibevalley-dev"));
+        assert_eq!(Config::work_root_from(None, None), PathBuf::from("/vibevalley-dev"));
     }
 
     #[test]

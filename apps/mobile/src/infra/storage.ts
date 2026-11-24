@@ -124,18 +124,6 @@ export function createCoalescedStorage(backend: AsyncStorageBackend = nshStorage
 const defaultStorage = createCoalescedStorage();
 const volatileTokenStore = new Map<string, string>();
 
-async function readProfileRaw(key: string): Promise<string | undefined> {
-  return defaultStorage.getItem(key);
-}
-
-async function writeProfileRaw(key: string, value: string): Promise<void> {
-  await defaultStorage.setItem(key, value);
-}
-
-async function deleteProfileRaw(key: string): Promise<void> {
-  await defaultStorage.removeItem(key);
-}
-
 const HostErrorCodeSchema = z.object({ code: z.string() });
 
 function isUnavailableHostError(err: unknown): boolean {
@@ -259,7 +247,7 @@ export function createSecureTokenStore(): SecureTokenStore {
 }
 
 export async function loadCredentials(tokenStore: SecureTokenStore = createSecureTokenStore()): Promise<StoredCredentials | undefined> {
-  const rawProfile = await readProfileRaw(PROFILE_STORAGE_KEY);
+  const rawProfile = await defaultStorage.getItem(PROFILE_STORAGE_KEY);
   if (rawProfile === undefined || rawProfile.trim() === "") return undefined;
 
   let parsedProfileJson: unknown;
@@ -302,11 +290,11 @@ export async function saveCredentials(credentials: StoredCredentials, tokenStore
     serverName: checked.serverName,
   };
   await tokenStore.setToken(TOKEN_ACCOUNT_KEY, checked.token);
-  await writeProfileRaw(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  await defaultStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
 }
 
 export async function clearCredentials(tokenStore: SecureTokenStore = createSecureTokenStore()): Promise<void> {
-  await deleteProfileRaw(PROFILE_STORAGE_KEY);
+  await defaultStorage.removeItem(PROFILE_STORAGE_KEY);
   try {
     await tokenStore.deleteToken(TOKEN_ACCOUNT_KEY);
   } catch {

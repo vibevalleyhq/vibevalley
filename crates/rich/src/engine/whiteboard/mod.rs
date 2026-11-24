@@ -16,8 +16,9 @@ pub mod stickers;
 pub mod templates;
 
 pub use codec::{
-    CodecError, decode_board_entries, decode_element, decode_meta, decode_presence, decode_presences_json, encode_element_delete, encode_element_json,
-    encode_element_patch, encode_element_write, encode_meta_write, encode_presence_write, import_json_canvas, merge_live_presences,
+    CodecError, WhiteboardEntry, WhiteboardEntryKind, WhiteboardEntryOp, WhiteboardWriteInput, decode_board_entries, decode_element, decode_meta,
+    decode_presence, decode_presences_json, encode_element_delete, encode_element_json, encode_element_patch, encode_element_write, encode_meta_write,
+    encode_presence_write, import_json_canvas, merge_live_presences,
 };
 pub use export::{build_export_painter, export_json, export_json_canvas, export_svg};
 pub use geometry::{

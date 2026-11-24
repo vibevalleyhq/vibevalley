@@ -161,11 +161,6 @@ pub fn closed_text(issue: &Issue) -> String {
     }
 }
 
-/// `stageWantsUser`.
-pub fn stage_wants_user(s: IssueStageKind) -> bool {
-    s.wants_user()
-}
-
 /// `spanText`: seconds under a minute (at least one), else minutes.
 fn span_text(ms: i64) -> String {
     if ms < 60_000 {
@@ -288,7 +283,7 @@ pub(crate) fn phase_words(h: &Session, conflict: Option<&Conflict>) -> String {
 }
 
 /// `farmOf`: each repo has its own farm; sessions without one share one.
-pub(crate) fn farm_of(h: &Session) -> &str {
+pub fn farm_of(h: &Session) -> &str {
     h.repo_name().unwrap_or("")
 }
 

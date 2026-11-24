@@ -17,28 +17,34 @@ pub const TASK_SCOPE: &str = "task";
 pub trait DocSpec {
     const KIND: &'static str;
     const VERSION: u32;
-    type State: Serialize + DeserializeOwned + Default;
+    type State: Serialize + DeserializeOwned + Default + Send + Sync;
 }
 
-pub fn read_doc_opt<D: DocSpec>(tx: &Read<'_>, scope: &str, scope_id: &str) -> durable::Result<Option<D::State>> {
-    tx.document(scope, scope_id, D::KIND)?
+pub async fn read_doc_opt<D: DocSpec>(tx: &Read<'_>, scope: &str, scope_id: &str) -> durable::Result<Option<D::State>> {
+    tx.document_async(scope, scope_id, D::KIND)
+        .await?
         .map(|doc| serde_json::from_value(doc.state).map_err(Into::into))
         .transpose()
 }
 
-pub fn read_doc<D: DocSpec>(tx: &Read<'_>, scope: &str, scope_id: &str) -> durable::Result<D::State> {
-    Ok(read_doc_opt::<D>(tx, scope, scope_id)?.unwrap_or_default())
+pub async fn read_doc<D: DocSpec>(tx: &Read<'_>, scope: &str, scope_id: &str) -> durable::Result<D::State> {
+    Ok(read_doc_opt::<D>(tx, scope, scope_id).await?.unwrap_or_default())
 }
 
-pub fn write_doc<D: DocSpec>(tx: &mut Tx<'_>, scope: &str, scope_id: &str, state: &D::State) -> durable::Result<Document> {
+pub async fn write_doc<D: DocSpec>(tx: &mut Tx<'_>, scope: &str, scope_id: &str, state: &D::State) -> durable::Result<Document> {
     let value = serde_json::to_value(state)?;
-    tx.put_document(scope, scope_id, D::KIND, &value)
+    tx.put_document_async(scope, scope_id, D::KIND, &value).await
 }
 
-pub fn update_doc<D: DocSpec>(tx: &mut Tx<'_>, scope: &str, scope_id: &str, f: impl FnOnce(&mut D::State) -> durable::Result<()>) -> durable::Result<D::State> {
-    let mut state = read_doc::<D>(tx, scope, scope_id)?;
+pub async fn update_doc<D: DocSpec>(
+    tx: &mut Tx<'_>,
+    scope: &str,
+    scope_id: &str,
+    f: impl FnOnce(&mut D::State) -> durable::Result<()>,
+) -> durable::Result<D::State> {
+    let mut state = read_doc::<D>(tx, scope, scope_id).await?;
     f(&mut state)?;
-    write_doc::<D>(tx, scope, scope_id, &state)?;
+    write_doc::<D>(tx, scope, scope_id, &state).await?;
     Ok(state)
 }
 
@@ -114,19 +120,21 @@ impl UsageTotals {
         }
     }
 
-    pub fn record(self, tx: &mut Tx<'_>, conv: &str) -> durable::Result<()> {
+    pub async fn record(self, tx: &mut Tx<'_>, conv: &str) -> durable::Result<()> {
         update_doc::<UsageDoc>(tx, CONVERSATION_SCOPE, conv, |cur| {
             cur.add(self);
             Ok(())
-        })?;
+        })
+        .await?;
         Ok(())
     }
 
-    pub fn record_task(self, tx: &mut Tx<'_>, task_id: &str) -> durable::Result<()> {
+    pub async fn record_task(self, tx: &mut Tx<'_>, task_id: &str) -> durable::Result<()> {
         update_doc::<UsageDoc>(tx, TASK_SCOPE, task_id, |cur| {
             cur.add(self);
             Ok(())
-        })?;
+        })
+        .await?;
         Ok(())
     }
 }

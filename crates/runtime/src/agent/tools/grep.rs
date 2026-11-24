@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use super::truncate::{DEFAULT_MAX_BYTES, truncate_bytes};
 use super::workspace::Workspace;
 use super::{ReplayPolicy, ToolContext, TypedTool, TypedToolOutput};
+use crate::BoxFuture;
 
 const DEFAULT_MAX_RESULTS: usize = 100;
 const MAX_LINE_CHARS: usize = 500;
@@ -56,98 +57,100 @@ impl TypedTool for Grep {
         ReplayPolicy::Safe
     }
 
-    fn execute(&self, args: Self::Args, ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        if ctx.cancel.is_cancelled() {
-            return Err("aborted by the user".into());
-        }
-        if args.pattern.is_empty() {
-            return Err("pattern must not be empty".into());
-        }
-        let max_results = match args.max_results {
-            Some(0) => return Err("max_results must be at least 1".into()),
-            Some(n) => n,
-            None => DEFAULT_MAX_RESULTS,
-        };
-        let regex = RegexBuilder::new(&args.pattern)
-            .case_insensitive(args.case_insensitive.unwrap_or(false))
-            .build()
-            .map_err(|e| format!("invalid regex: {e}"))?;
-        let glob = args
-            .glob
-            .as_deref()
-            .filter(|g| !g.trim().is_empty())
-            .map(|g| Glob::new(g).map(|g| g.compile_matcher()))
-            .transpose()
-            .map_err(|e| format!("invalid glob: {e}"))?;
+    fn execute<'a>(&'a self, args: Self::Args, ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            if ctx.cancel.is_cancelled() {
+                return Err("aborted by the user".into());
+            }
+            if args.pattern.is_empty() {
+                return Err("pattern must not be empty".into());
+            }
+            let max_results = match args.max_results {
+                Some(0) => return Err("max_results must be at least 1".into()),
+                Some(n) => n,
+                None => DEFAULT_MAX_RESULTS,
+            };
+            let regex = RegexBuilder::new(&args.pattern)
+                .case_insensitive(args.case_insensitive.unwrap_or(false))
+                .build()
+                .map_err(|e| format!("invalid regex: {e}"))?;
+            let glob = args
+                .glob
+                .as_deref()
+                .filter(|g| !g.trim().is_empty())
+                .map(|g| Glob::new(g).map(|g| g.compile_matcher()))
+                .transpose()
+                .map_err(|e| format!("invalid glob: {e}"))?;
 
-        let root = args.path.as_deref().map(|p| self.0.resolve(p)).unwrap_or_else(|| self.0.cwd.clone());
-        if !root.exists() {
-            return Err(format!("{}: not found", root.display()));
-        }
+            let root = args.path.as_deref().map(|p| self.0.resolve(p)).unwrap_or_else(|| self.0.cwd.clone());
+            if !root.exists() {
+                return Err(format!("{}: not found", root.display()));
+            }
 
-        let mut lines = Vec::new();
-        let mut hit_limit = false;
+            let mut lines = Vec::new();
+            let mut hit_limit = false;
 
-        if root.is_file() {
-            search_file(
-                &root,
-                root.file_name().map(Path::new).unwrap_or(&root),
-                &regex,
-                glob.as_ref(),
-                max_results,
-                &mut lines,
-                &mut hit_limit,
-            );
-        } else {
-            let mut builder = WalkBuilder::new(&root);
-            builder
-                .hidden(false)
-                .ignore(false)
-                .git_ignore(true)
-                .git_global(true)
-                .git_exclude(true)
-                .parents(true)
-                // Respect .gitignore even in folders without an initialized .git directory.
-                .require_git(false)
-                .follow_links(false)
-                .sort_by_file_name(|a, b| a.cmp(b))
-                .filter_entry(|entry| entry.file_name() != ".git");
+            if root.is_file() {
+                search_file(
+                    &root,
+                    root.file_name().map(Path::new).unwrap_or(&root),
+                    &regex,
+                    glob.as_ref(),
+                    max_results,
+                    &mut lines,
+                    &mut hit_limit,
+                );
+            } else {
+                let mut builder = WalkBuilder::new(&root);
+                builder
+                    .hidden(false)
+                    .ignore(false)
+                    .git_ignore(true)
+                    .git_global(true)
+                    .git_exclude(true)
+                    .parents(true)
+                    // Respect .gitignore even in folders without an initialized .git directory.
+                    .require_git(false)
+                    .follow_links(false)
+                    .sort_by_file_name(|a, b| a.cmp(b))
+                    .filter_entry(|entry| entry.file_name() != ".git");
 
-            for entry in builder.build() {
-                if ctx.cancel.is_cancelled() {
-                    return Err("aborted by the user".into());
-                }
-                let Ok(entry) = entry else { continue };
-                if !entry.file_type().is_some_and(|t| t.is_file()) {
-                    continue;
-                }
-                let path = entry.path();
-                let rel = path.strip_prefix(&root).unwrap_or(path);
-                if search_file(path, rel, &regex, glob.as_ref(), max_results, &mut lines, &mut hit_limit) {
-                    break;
+                for entry in builder.build() {
+                    if ctx.cancel.is_cancelled() {
+                        return Err("aborted by the user".into());
+                    }
+                    let Ok(entry) = entry else { continue };
+                    if !entry.file_type().is_some_and(|t| t.is_file()) {
+                        continue;
+                    }
+                    let path = entry.path();
+                    let rel = path.strip_prefix(&root).unwrap_or(path);
+                    if search_file(path, rel, &regex, glob.as_ref(), max_results, &mut lines, &mut hit_limit) {
+                        break;
+                    }
                 }
             }
-        }
 
-        if lines.is_empty() {
-            return Ok(TypedToolOutput::ok_with("no matches found", GrepDetails { matches: 0, truncated: false }));
-        }
+            if lines.is_empty() {
+                return Ok(TypedToolOutput::ok_with("no matches found", GrepDetails { matches: 0, truncated: false }));
+            }
 
-        let match_count = lines.len();
-        let mut joined = lines.join("\n");
-        if hit_limit {
-            joined.push_str(&format!("\n... (truncated at {max_results} matches)"));
-        }
-        let truncated = truncate_bytes(&joined, DEFAULT_MAX_BYTES);
-        let is_truncated = hit_limit || truncated.truncated;
+            let match_count = lines.len();
+            let mut joined = lines.join("\n");
+            if hit_limit {
+                joined.push_str(&format!("\n... (truncated at {max_results} matches)"));
+            }
+            let truncated = truncate_bytes(&joined, DEFAULT_MAX_BYTES);
+            let is_truncated = hit_limit || truncated.truncated;
 
-        Ok(TypedToolOutput::ok_with(
-            truncated.text,
-            GrepDetails {
-                matches: match_count,
-                truncated: is_truncated,
-            },
-        ))
+            Ok(TypedToolOutput::ok_with(
+                truncated.text,
+                GrepDetails {
+                    matches: match_count,
+                    truncated: is_truncated,
+                },
+            ))
+        })
     }
 }
 

@@ -1,0 +1,26 @@
+# Workspace-wide Clippy semantic bans (zero-regression baseline).
+# Tighten this file immediately after each refactor wave zeroes out a category
+# (`cargo xtask diagnose --json` + `.agents/skills/vv-arch-loop/SKILL.md`).
+
+disallowed-methods = [
+  { path = "pollster::block_on", reason = "Use the process-shared Tokio runtime (`vibevalley_runtime::rt`) or async code; `pollster` is banned." },
+  { path = "futures::executor::block_on", reason = "Use the process-shared Tokio runtime (`vibevalley_runtime::rt`) instead of alternate blocking executors." },
+  { path = "futures_executor::block_on", reason = "Use the process-shared Tokio runtime (`vibevalley_runtime::rt`) instead of alternate blocking executors." },
+  { path = "smol::block_on", reason = "Use the process-shared Tokio runtime (`vibevalley_runtime::rt`) instead of alternate blocking executors." },
+  { path = "async_std::task::block_on", reason = "Use the process-shared Tokio runtime (`vibevalley_runtime::rt`) instead of alternate blocking executors." },
+  { path = "tokio::runtime::Runtime::new", reason = "Reuse `vibevalley_runtime::rt::handle()` instead of constructing ad-hoc Tokio runtimes." },
+  { path = "std::process::abort", reason = "Return typed errors or propagate graceful shutdown instead of aborting the process." },
+  { path = "tokio::task::block_in_place", reason = "Keep `block_in_place` restricted to `crates/runtime/src/rt.rs`." },
+
+  # --- Upcoming post-`flat-polish` bans (do NOT uncomment until xtask ceilings reach 0) ---
+  # { path = "std::thread::sleep", reason = "Use `tokio::time::sleep` in async code; remaining sites live in `crates/server/src/app/{fake/moss,slice}.rs` and `crates/files/src/watch.rs`." },
+  # { path = "flume::unbounded", reason = "Use `tokio::sync` channels (`mpsc`, `broadcast`, `watch`, `oneshot`) once `SERVER_FLUME_CEILING` and `RUNTIME_FLUME_CEILING` are cleared across `apps/mac`." },
+  # { path = "flume::bounded", reason = "Use `tokio::sync` channels (`mpsc`, `broadcast`, `watch`, `oneshot`) once `apps/mac` finishes migrating off `flume`." },
+]
+
+disallowed-types = [
+  # --- Upcoming post-`flat-polish` type bans (uncomment once workspace migrations complete) ---
+  # { path = "std::sync::Condvar", reason = "Use `tokio::sync::Notify` / `watch` / `mpsc` once `apps/mac/crates/terminal/src/pty.rs` migrates off blocking condvars." },
+  # { path = "flume::Sender", reason = "Use `tokio::sync` channel senders once `flume` is removed from `Cargo.toml`." },
+  # { path = "flume::Receiver", reason = "Use `tokio::sync` channel receivers once `flume` is removed from `Cargo.toml`." },
+]

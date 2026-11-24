@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import type { ArtifactEntryWriteInput, ArtifactType } from "@vibevalley/protocol";
+import type { ArtifactType } from "@vibevalley/protocol";
 
 import type { IconName } from "../../design/icons";
 import { api } from "../../infra/api";
@@ -7,6 +7,8 @@ import type { QueryClient } from "../../infra/query";
 import type { RouterController } from "../../infra/router/context";
 import { artifactTypeIcon, createTypedArtifact } from "../artifact";
 import { artifactHref } from "../artifact/ArtifactCard";
+import { buildOutlineFromMarkdown } from "../artifact/html";
+import { BOARD_FILE_PATH } from "../artifact/WhiteboardView";
 import type { TemplateCategory } from "./navigation";
 
 type NoteTemplateVariant = "blank" | "tech" | "meeting" | "daily";
@@ -30,6 +32,9 @@ type TemplateItemKey =
   | "artDesignSystem"
   | "artMotion"
   | "artHtml"
+  | "artSheet"
+  | "artDiagram"
+  | "artStoryboard"
   | "aiImage"
   | "aiSpeech"
   | "aiAudio";
@@ -45,7 +50,7 @@ interface TemplateBase {
 export type ContentTemplate =
   | (TemplateBase & { readonly kind: "note"; readonly variant: NoteTemplateVariant })
   | (TemplateBase & { readonly kind: "whiteboard"; readonly variant: WhiteboardTemplateVariant })
-  | (TemplateBase & { readonly kind: "deliverable"; readonly artifactType: Exclude<ArtifactType, "whiteboard"> | "html" })
+  | (TemplateBase & { readonly kind: "deliverable"; readonly artifactType: Exclude<ArtifactType, "whiteboard"> })
   | (TemplateBase & { readonly kind: "ai"; readonly makeTab: AiMediaMakeTab });
 
 export const TEMPLATE_CATEGORIES: readonly TemplateCategory[] = ["recommended", "note", "whiteboard", "deliverable", "ai"];
@@ -130,14 +135,72 @@ export const CONTENT_TEMPLATES: readonly ContentTemplate[] = [
     kind: "deliverable",
     artifactType: "motion",
   },
-  { id: "tpl-art-html", key: "artHtml", category: "deliverable", recommended: false, icon: "web", kind: "deliverable", artifactType: "html" },
+  {
+    id: "tpl-art-prototype",
+    key: "artHtml",
+    category: "deliverable",
+    recommended: false,
+    icon: artifactTypeIcon.prototype,
+    kind: "deliverable",
+    artifactType: "prototype",
+  },
+  {
+    id: "tpl-art-sheet",
+    key: "artSheet",
+    category: "deliverable",
+    recommended: false,
+    icon: artifactTypeIcon.sheet,
+    kind: "deliverable",
+    artifactType: "sheet",
+  },
+  {
+    id: "tpl-art-diagram",
+    key: "artDiagram",
+    category: "deliverable",
+    recommended: false,
+    icon: artifactTypeIcon.diagram,
+    kind: "deliverable",
+    artifactType: "diagram",
+  },
+  {
+    id: "tpl-art-storyboard",
+    key: "artStoryboard",
+    category: "deliverable",
+    recommended: false,
+    icon: artifactTypeIcon.storyboard,
+    kind: "deliverable",
+    artifactType: "storyboard",
+  },
   { id: "tpl-ai-image", key: "aiImage", category: "ai", recommended: true, icon: "image", kind: "ai", makeTab: "image" },
   { id: "tpl-ai-speech", key: "aiSpeech", category: "ai", recommended: false, icon: "record", kind: "ai", makeTab: "speech" },
   { id: "tpl-ai-audio", key: "aiAudio", category: "ai", recommended: false, icon: "audio", kind: "ai", makeTab: "audio" },
 ];
 
-export const templateName = (tpl: ContentTemplate): string => t(`web.library.content.templates.items.${tpl.key}.name`);
-export const templateDesc = (tpl: ContentTemplate): string => t(`web.library.content.templates.items.${tpl.key}.desc`);
+export const templateName = (tpl: ContentTemplate): string => {
+  switch (tpl.key) {
+    case "artSheet":
+      return "Workbook Sheet";
+    case "artDiagram":
+      return "Architecture Diagram";
+    case "artStoryboard":
+      return "Storyboard Shots";
+    default:
+      return t(`web.library.content.templates.items.${tpl.key}.name`);
+  }
+};
+
+export const templateDesc = (tpl: ContentTemplate): string => {
+  switch (tpl.key) {
+    case "artSheet":
+      return "Multi-sheet structured tables and CSV export";
+    case "artDiagram":
+      return "Nodes, edges, and architecture flows";
+    case "artStoryboard":
+      return "Shot list, framing, palette, and dialogue";
+    default:
+      return t(`web.library.content.templates.items.${tpl.key}.desc`);
+  }
+};
 
 function uniqueNoteTitle(base: string, existingTitles: readonly string[]): string {
   const taken = new Set(existingTitles.map((s) => s.trim().toLowerCase()));
@@ -183,12 +246,7 @@ interface SeedArrow {
   readonly label?: string;
 }
 
-function jsonSet(path: string, value: unknown): ArtifactEntryWriteInput {
-  return { op: "set", path, kind: "json", value: JSON.stringify(value) };
-}
-
-/** As crates/rich/src/engine/whiteboard/codec.rs: change them together. */
-function buildWhiteboardEntries(variant: WhiteboardTemplateVariant, title: string): ArtifactEntryWriteInput[] {
+function buildWhiteboardDocument(variant: WhiteboardTemplateVariant): Record<string, unknown> {
   const shapes: SeedShape[] = [];
   const arrows: SeedArrow[] = [];
 
@@ -383,34 +441,22 @@ function buildWhiteboardEntries(variant: WhiteboardTemplateVariant, title: strin
       break;
   }
 
-  return [
-    jsonSet("board/meta", { title, grid: "dots" }),
-    ...shapes.map((s) =>
-      jsonSet(`elements/${s.id}`, {
-        id: s.id,
-        type: "shape",
-        shape: s.shape,
-        x: s.x,
-        y: s.y,
-        w: s.w,
-        h: s.h,
-        title: s.title,
-        body: s.body,
-        fill: s.fill,
-      }),
-    ),
-    ...arrows.map((a) =>
-      jsonSet(`elements/${a.id}`, {
-        id: a.id,
-        type: "arrow",
-        curve: "smooth",
-        head: "arrow",
-        from: { id: a.fromId, side: a.fromSide },
-        to: { id: a.toId, side: a.toSide },
-        ...(a.label ? { label: a.label } : {}),
-      }),
-    ),
-  ];
+  const elements: Record<string, unknown> = {};
+  for (const s of shapes) {
+    elements[s.id] = { id: s.id, type: "shape", shape: s.shape, x: s.x, y: s.y, w: s.w, h: s.h, title: s.title, body: s.body, fill: s.fill };
+  }
+  for (const a of arrows) {
+    elements[a.id] = {
+      id: a.id,
+      type: "arrow",
+      curve: "smooth",
+      head: "arrow",
+      from: { id: a.fromId, side: a.fromSide },
+      to: { id: a.toId, side: a.toSide },
+      ...(a.label ? { label: a.label } : {}),
+    };
+  }
+  return { version: 1, grid: "dots", viewport: { x: 0, y: 0, zoom: 1 }, elements };
 }
 
 export async function createQuickBlankNote(deps: {
@@ -420,7 +466,8 @@ export async function createQuickBlankNote(deps: {
 }): Promise<void> {
   const baseTitle = t("web.library.content.templates.items.noteBlank.name");
   const title = uniqueNoteTitle(baseTitle, deps.existingNoteTitles);
-  const made = await createTypedArtifact("outline", title, { content: noteStarterMarkdown("blank") });
+  const outlineJson = `${JSON.stringify(buildOutlineFromMarkdown(title, noteStarterMarkdown("blank")), null, 2)}\n`;
+  const made = await createTypedArtifact("outline", title, { content: outlineJson });
   await deps.queries.invalidate({ prefix: ["artifacts"] });
   deps.router.navigate(artifactHref(made.id));
 }
@@ -437,17 +484,20 @@ export async function createFromTemplate(
   switch (tpl.kind) {
     case "note": {
       const title = uniqueNoteTitle(baseTitle, deps.existingNoteTitles);
-      const made = await createTypedArtifact("outline", title, { content: noteStarterMarkdown(tpl.variant) });
+      const outlineJson = `${JSON.stringify(buildOutlineFromMarkdown(title, noteStarterMarkdown(tpl.variant)), null, 2)}\n`;
+      const made = await createTypedArtifact("outline", title, { content: outlineJson });
       await deps.queries.invalidate({ prefix: ["artifacts"] });
       deps.router.navigate(artifactHref(made.id));
       return;
     }
     case "whiteboard": {
       const made = await createTypedArtifact("whiteboard", baseTitle);
-      const writes = buildWhiteboardEntries(tpl.variant, baseTitle);
-      if (writes.length > 0) {
-        await api.artifact.entry.batch({ id: made.id, writes });
-      }
+      const boardDoc = buildWhiteboardDocument(tpl.variant);
+      await api.artifact.file.write({
+        id: made.id,
+        files: [{ path: BOARD_FILE_PATH, content: `${JSON.stringify(boardDoc, null, 2)}\n`, mime: "application/json" }],
+        summary: `Apply ${tpl.variant} template`,
+      });
       await deps.queries.invalidate({ prefix: ["artifacts"] });
       deps.router.navigate(artifactHref(made.id));
       return;

@@ -3,24 +3,27 @@ import { z } from "zod";
 
 import type {
   Artifact,
-  ArtifactEntry,
-  ArtifactEntryBatchResult,
-  ArtifactEntryEvent,
-  ArtifactEntryWriteInput,
+  ArtifactEvent,
+  ArtifactFileContent,
+  ArtifactFileDeleteResult,
+  ArtifactFileMeta,
+  ArtifactFileWriteItem,
+  ArtifactFileWriteResult,
   ArtifactId,
   ArtifactPresence,
   ArtifactPresenceEvent,
   ArtifactType,
   ArtifactViewContext,
+  Suggestion,
+  SuggestionCreate,
+  SuggestionId,
 } from "@vibevalley/protocol";
-import { ArtifactEntryBatchResult as ArtifactEntryBatchResultSchema, artifactId } from "@vibevalley/protocol/schema";
 
 import { api, reasonOf } from "../../infra/api";
 import { saveFile } from "../../infra/attachmentFile";
-import { createExternal } from "../../infra/base/external";
-import { fetchArtifactView, followArtifactEntries, followArtifactPresence } from "../../infra/gateway";
+import { followArtifact, followArtifactPresence, followSuggestions } from "../../infra/gateway";
 import { transport } from "../../infra/transport";
-import type { ShellTheme } from "./shell";
+import { artifactSuffixOf } from "./html";
 
 /** Live state of whichever artifact viewer is currently mounted, attached to outgoing chat/reply messages. */
 export const activeArtifactViewContext = signal<ArtifactViewContext | undefined>(undefined);
@@ -49,16 +52,23 @@ export function useReportViewContext(id: () => ArtifactId, compute: () => Omit<A
   });
 }
 
-export interface StoreEntriesSnapshot {
+function isTextMime(mime: string, path: string): boolean {
+  if (mime.startsWith("text/") || mime === "application/json" || mime === "application/javascript" || mime === "image/svg+xml") return true;
+  return /\.(?:md|markdown|json|html|htm|css|js|mjs|ts|tsx|svg|csv|txt|yaml|yml)$/iu.test(path);
+}
+
+export interface DirectorySnapshot {
   readonly seq: number;
-  readonly entries: ReadonlyMap<string, ArtifactEntry>;
+  readonly files: ReadonlyMap<string, ArtifactFileMeta>;
+  readonly contents: ReadonlyMap<string, ArtifactFileContent>;
   readonly loading: boolean;
   readonly error: string | undefined;
 }
 
-export class StoreEntryClient {
+export class DirectoryArtifactClient {
   private readonly listeners = new Set<() => void>();
-  private map = new Map<string, ArtifactEntry>();
+  private filesMap = new Map<string, ArtifactFileMeta>();
+  private contentsMap = new Map<string, ArtifactFileContent>();
   private currentSeq = 0;
   private isLoading = true;
   private lastError: string | undefined;
@@ -66,9 +76,11 @@ export class StoreEntryClient {
   private disposed = false;
 
   readonly id: ArtifactId;
+  readonly version: number | undefined;
 
-  constructor(id: ArtifactId) {
+  constructor(id: ArtifactId, version?: number) {
     this.id = id;
+    this.version = version;
   }
 
   readonly subscribe = (fn: () => void): (() => void) => {
@@ -76,9 +88,10 @@ export class StoreEntryClient {
     return () => this.listeners.delete(fn);
   };
 
-  private snapshotCache: StoreEntriesSnapshot = {
+  private snapshotCache: DirectorySnapshot = {
     seq: 0,
-    entries: new Map(),
+    files: new Map(),
+    contents: new Map(),
     loading: true,
     error: undefined,
   };
@@ -86,27 +99,50 @@ export class StoreEntryClient {
   private notify() {
     this.snapshotCache = {
       seq: this.currentSeq,
-      entries: new Map(this.map),
+      files: new Map(this.filesMap),
+      contents: new Map(this.contentsMap),
       loading: this.isLoading,
       error: this.lastError,
     };
     for (const fn of this.listeners) fn();
   }
 
-  readonly get = (): StoreEntriesSnapshot => this.snapshotCache;
+  readonly get = (): DirectorySnapshot => this.snapshotCache;
 
   async load(): Promise<void> {
     this.isLoading = true;
     this.lastError = undefined;
     this.notify();
     try {
-      const snap = await api.artifact.entry.list({ id: this.id, includeValues: true });
+      const listed = await api.artifact.file.list({ id: this.id });
       if (this.disposed) return;
-      this.map = new Map(snap.entries.map((e) => [e.path, e]));
-      this.currentSeq = snap.seq;
+      this.filesMap = new Map(listed.files.map((f) => [f.path, f]));
+      this.currentSeq = listed.seq;
+
+      const textPaths = listed.files.filter((f) => isTextMime(f.mime, f.path)).map((f) => f.path);
+      const fetched = await Promise.all(
+        textPaths.map(async (path) => {
+          try {
+            return await api.artifact.file.get({
+              id: this.id,
+              path,
+              ...(this.version !== undefined ? { version: this.version } : {}),
+            });
+          } catch {
+            return undefined;
+          }
+        }),
+      );
+      if (this.disposed) return;
+      this.contentsMap = new Map();
+      for (const item of fetched) {
+        if (item) this.contentsMap.set(item.path, item);
+      }
       this.isLoading = false;
       this.notify();
-      this.startFollow();
+      if (this.version === undefined) {
+        this.startFollow();
+      }
     } catch (e) {
       if (this.disposed) return;
       this.isLoading = false;
@@ -117,50 +153,106 @@ export class StoreEntryClient {
 
   private startFollow() {
     this.stopFollow?.();
-    this.stopFollow = followArtifactEntries(String(this.id), this.currentSeq, (ev) => {
+    this.stopFollow = followArtifact(String(this.id), this.currentSeq, (ev) => {
       void this.handleEvent(ev);
     });
   }
 
-  private async handleEvent(ev: ArtifactEntryEvent): Promise<void> {
+  private async handleEvent(ev: ArtifactEvent): Promise<void> {
     if (this.disposed) return;
     if (ev._tag === "Reset") {
       await this.load();
       return;
     }
     for (const path of ev.deleted) {
-      this.map.delete(path);
+      this.filesMap.delete(path);
+      this.contentsMap.delete(path);
     }
-    for (const entry of ev.entries) {
-      if (entry.value === undefined && entry.kind !== "asset") {
-        try {
-          const full = await api.artifact.entry.get({ id: this.id, path: entry.path });
-          if (!this.disposed) this.map.set(entry.path, full);
-        } catch (e) {
-          this.lastError = reasonOf(e);
-          this.map.set(entry.path, entry);
-        }
-      } else {
-        this.map.set(entry.path, entry);
+    const toFetch: string[] = [];
+    for (const meta of ev.files) {
+      const prev = this.contentsMap.get(meta.path);
+      this.filesMap.set(meta.path, meta);
+      if (isTextMime(meta.mime, meta.path) && prev?.hash !== meta.hash) {
+        toFetch.push(meta.path);
+      }
+    }
+    if (toFetch.length > 0) {
+      const loaded = await Promise.all(
+        toFetch.map(async (path) => {
+          try {
+            return await api.artifact.file.get({ id: this.id, path });
+          } catch {
+            return undefined;
+          }
+        }),
+      );
+      if (this.disposed) return;
+      for (const item of loaded) {
+        if (item) this.contentsMap.set(item.path, item);
       }
     }
     if (ev.seq > this.currentSeq) this.currentSeq = ev.seq;
     this.notify();
   }
 
-  async batch(writes: ArtifactEntryWriteInput[], note?: string): Promise<ArtifactEntryBatchResult> {
-    const res = await api.artifact.entry.batch({
+  async readFile(path: string): Promise<ArtifactFileContent> {
+    const file = await api.artifact.file.get({
       id: this.id,
-      writes,
-      ...(note !== undefined ? { note } : {}),
+      path,
+      ...(this.version !== undefined ? { version: this.version } : {}),
     });
-    if (res.applied) {
-      for (const w of writes) {
-        if (w.op === "delete") this.map.delete(w.path);
+    if (!this.disposed) {
+      this.contentsMap.set(file.path, file);
+      this.notify();
+    }
+    return file;
+  }
+
+  async writeFiles(
+    files: readonly ArtifactFileWriteItem[],
+    opts?: { readonly origin?: string; readonly summary?: string; readonly announce?: boolean },
+  ): Promise<ArtifactFileWriteResult> {
+    const res = await api.artifact.file.write({
+      id: this.id,
+      files: [...files],
+      ...(opts?.origin !== undefined ? { origin: opts.origin } : {}),
+      ...(opts?.summary !== undefined ? { summary: opts.summary } : {}),
+      ...(opts?.announce !== undefined ? { announce: opts.announce } : {}),
+    });
+    if (!this.disposed) {
+      const byPath = new Map(files.map((f) => [f.path, f]));
+      for (const meta of res.files) {
+        this.filesMap.set(meta.path, meta);
+        const written = byPath.get(meta.path);
+        if (written) {
+          this.contentsMap.set(meta.path, {
+            artifactId: this.id,
+            path: meta.path,
+            mime: meta.mime,
+            encoding: written.encoding ?? "utf8",
+            content: written.content,
+            size: meta.size,
+            hash: meta.hash,
+            updatedAt: meta.updatedAt,
+          });
+        }
       }
-      for (const entry of res.entries) {
-        this.map.set(entry.path, entry);
-      }
+      if (res.seq > this.currentSeq) this.currentSeq = res.seq;
+      this.notify();
+    }
+    return res;
+  }
+
+  async deleteFile(path: string, opts?: { readonly origin?: string; readonly summary?: string }): Promise<ArtifactFileDeleteResult> {
+    const res = await api.artifact.file.delete({
+      id: this.id,
+      path,
+      ...(opts?.origin !== undefined ? { origin: opts.origin } : {}),
+      ...(opts?.summary !== undefined ? { summary: opts.summary } : {}),
+    });
+    if (!this.disposed) {
+      this.filesMap.delete(path);
+      this.contentsMap.delete(path);
       if (res.seq > this.currentSeq) this.currentSeq = res.seq;
       this.notify();
     }
@@ -175,213 +267,85 @@ export class StoreEntryClient {
   }
 }
 
-export function useStoreEntries(id: () => ArtifactId): {
-  readonly client: StoreEntryClient;
-  readonly snapshot: Accessor<StoreEntriesSnapshot>;
+export function useArtifactDirectory(
+  id: () => ArtifactId,
+  version?: () => number | undefined,
+): {
+  readonly client: Accessor<DirectoryArtifactClient>;
+  readonly snapshot: Accessor<DirectorySnapshot>;
 } {
-  const client = new StoreEntryClient(untracked(id));
-  void client.load();
-  cleanup(() => client.dispose());
-  const snapshot = createExternal(client.subscribe, client.get);
-  return { client, snapshot };
+  const initialClient = new DirectoryArtifactClient(untracked(id), version ? untracked(version) : undefined);
+  const clientSig = signal<DirectoryArtifactClient>(initialClient);
+  const snapshot = signal<DirectorySnapshot>(initialClient.get());
+
+  effect(() => {
+    const curId = id();
+    const curVer = version ? version() : undefined;
+    const client = new DirectoryArtifactClient(curId, curVer);
+    clientSig.set(client);
+    snapshot.set(client.get());
+    const unsub = client.subscribe(() => snapshot.set(client.get()));
+    void client.load();
+    return () => {
+      unsub();
+      client.dispose();
+    };
+  });
+
+  return { client: clientSig, snapshot };
 }
 
-export function useStoreViewHtml(
-  params: () =>
-    | {
-        readonly id: ArtifactId;
-        readonly theme?: ShellTheme;
-        readonly path?: string;
-        readonly elementId?: string;
-        readonly print?: boolean;
-        readonly seq?: number;
-      }
-    | undefined,
-): {
-  readonly html: Accessor<string | undefined>;
-  readonly loading: Accessor<boolean>;
-  readonly error: Accessor<string | undefined>;
-  readonly refetch: () => void;
-} {
-  const html = signal<string | undefined>(undefined);
-  const loading = signal(false);
-  const error = signal<string | undefined>(undefined);
-  const tick = signal(0);
+export interface ArtifactSuggestionsHandle {
+  readonly suggestions: Accessor<readonly Suggestion[]>;
+  readonly open: Accessor<readonly Suggestion[]>;
+  readonly accept: (suggestion: SuggestionId) => Promise<Suggestion>;
+  readonly reject: (suggestion: SuggestionId) => Promise<Suggestion>;
+  readonly create: (input: SuggestionCreate) => Promise<Suggestion>;
+}
 
-  let runId = 0;
+export function useArtifactSuggestions(id: () => ArtifactId): ArtifactSuggestionsHandle {
+  const suggestions = signal<readonly Suggestion[]>([]);
+
   effect(() => {
-    const p = params();
-    tick();
-    const myRun = ++runId;
-    if (!p) {
-      html.set(undefined);
-      loading.set(false);
-      error.set(undefined);
-      return;
-    }
-    loading.set(true);
-    error.set(undefined);
-    void fetchArtifactView({
-      id: String(p.id),
-      ...(p.theme !== undefined ? { theme: p.theme } : {}),
-      ...(p.path !== undefined ? { path: p.path } : {}),
-      ...(p.elementId !== undefined ? { elementId: p.elementId } : {}),
-      ...(p.print !== undefined ? { print: p.print } : {}),
-    }).then(
-      (page) => {
-        if (myRun !== runId) return;
-        html.set(page.content);
-        loading.set(false);
+    const currentId = id();
+    let active = true;
+    suggestions.set([]);
+    void api.artifact.suggestion.list({ id: currentId }).then(
+      (list) => {
+        if (active) suggestions.set(list);
       },
-      (err) => {
-        if (myRun !== runId) return;
-        error.set(reasonOf(err));
-        loading.set(false);
-      },
+      () => {},
     );
+    const stop = followSuggestions(String(currentId), (ev) => {
+      if (active) suggestions.set(ev.suggestions);
+    });
+    return () => {
+      active = false;
+      stop();
+    };
   });
 
-  return {
-    html,
-    loading,
-    error,
-    refetch: () => tick.set(untracked(tick) + 1),
+  const open = () => suggestions().filter((s) => s.status === "open");
+
+  const accept = async (suggestion: SuggestionId): Promise<Suggestion> => {
+    const res = await api.artifact.suggestion.accept({ id: untracked(id), suggestion });
+    suggestions.set(untracked(suggestions).map((s) => (s.id === suggestion ? res : s)));
+    return res;
   };
-}
 
-export interface InspectedColorSwatch {
-  readonly id: string;
-  readonly group: string;
-  readonly light: string;
-  readonly dark: string;
-  readonly note: string;
-  readonly contrastLight?: number;
-  readonly contrastDark?: number;
-}
+  const reject = async (suggestion: SuggestionId): Promise<Suggestion> => {
+    const res = await api.artifact.suggestion.reject({ id: untracked(id), suggestion });
+    suggestions.set(untracked(suggestions).map((s) => (s.id === suggestion ? res : s)));
+    return res;
+  };
 
-export interface InspectedTypeFamily {
-  readonly id: string;
-  readonly value: string;
-  readonly note: string;
-}
+  const create = async (input: SuggestionCreate): Promise<Suggestion> => {
+    const res = await api.artifact.suggestion.create({ id: untracked(id), ...input });
+    suggestions.set([...untracked(suggestions), res]);
+    return res;
+  };
 
-export interface InspectedTokenValue {
-  readonly id: string;
-  readonly value: string;
-}
-
-export interface InspectedTypeStyle {
-  readonly id: string;
-  readonly family: string;
-  readonly size: string;
-  readonly weight: string;
-  readonly lineHeight: string;
-  readonly letterSpacing: string;
-  readonly sample: string;
-}
-
-export interface InspectedTokensSpec {
-  readonly themes: readonly string[];
-  readonly defaultTheme: string;
-  readonly colors: readonly InspectedColorSwatch[];
-  readonly families: readonly InspectedTypeFamily[];
-  readonly scale: readonly InspectedTokenValue[];
-  readonly styles: readonly InspectedTypeStyle[];
-  readonly space: readonly InspectedTokenValue[];
-  readonly radius: readonly InspectedTokenValue[];
-  readonly css: string;
-}
-
-export const EMPTY_INSPECTED_TOKENS: InspectedTokensSpec = {
-  themes: ["light", "dark"],
-  defaultTheme: "light",
-  colors: [],
-  families: [],
-  scale: [],
-  styles: [],
-  space: [],
-  radius: [],
-  css: "",
-};
-
-const ArtifactPageData = z.object({ content: z.string() });
-const AttachmentPathData = z.object({ path: z.string() });
-
-/** Parses design-system tokens, computes WCAG contrast ratios, and compiles CSS via the Rust server. */
-export async function inspectDesignTokens(raw: string): Promise<InspectedTokensSpec> {
-  const env = await transport().call("artifact.tokens.inspect", { raw });
-  if (env.bizCode !== 0) throw new Error(env.message);
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Rust `artifact.tokens.inspect` returns InspectedTokensSpec
-  return env.data as InspectedTokensSpec;
-}
-
-/** Rewrites `data-props` defaults inside a `.dc.html` store entry via the Rust server. */
-export async function writeArtifactEntryProps(input: {
-  readonly id: ArtifactId;
-  readonly path: string;
-  readonly values: Readonly<Record<string, string | number | boolean>>;
-}): Promise<ArtifactEntryBatchResult> {
-  const env = await transport().call("artifact.entry.writeProps", input);
-  if (env.bizCode !== 0) throw new Error(env.message);
-  return ArtifactEntryBatchResultSchema.parse(env.data);
-}
-
-/** Fetches an HTML artifact's shell-wrapped page from the Rust server (`artifact.page`). */
-export function useArtifactPage(
-  params: () =>
-    | {
-        readonly id: string;
-        readonly version: number;
-        readonly theme: ShellTheme;
-      }
-    | undefined,
-): {
-  readonly html: Accessor<string | undefined>;
-  readonly loading: Accessor<boolean>;
-  readonly error: Accessor<string | undefined>;
-} {
-  const html = signal<string | undefined>(undefined);
-  const loading = signal(false);
-  const error = signal<string | undefined>(undefined);
-
-  let runId = 0;
-  effect(() => {
-    const p = params();
-    const myRun = ++runId;
-    if (!p) {
-      html.set(undefined);
-      loading.set(false);
-      error.set(undefined);
-      return;
-    }
-    loading.set(true);
-    error.set(undefined);
-    void transport()
-      .call("artifact.page", { id: p.id, version: p.version, shell: true, theme: p.theme })
-      .then(async (env) => {
-        if (env.bizCode === 0) return ArtifactPageData.parse(env.data).content;
-        // Fixtures that only stub `artifact.content.get` return RouteNotFound (100005).
-        if (env.bizCode === 100005) {
-          const raw = await api.artifact.content.get({ id: artifactId(p.id), version: p.version });
-          return raw.content;
-        }
-        throw new Error(env.message);
-      })
-      .then(
-        (content) => {
-          if (myRun !== runId) return;
-          html.set(content);
-          loading.set(false);
-        },
-        (err) => {
-          if (myRun !== runId) return;
-          error.set(reasonOf(err));
-          loading.set(false);
-        },
-      );
-  });
-
-  return { html, loading, error };
+  return { suggestions, open, accept, reject, create };
 }
 
 export function formatCellValue(val: unknown): string {
@@ -397,6 +361,8 @@ function utf8ToBase64(text: string): string {
   return btoa(pieces.join(""));
 }
 
+const AttachmentPathData = z.object({ path: z.string() });
+
 // Native save dialog via temp attachment; nsh has no browser download.
 export async function saveBase64File(filename: string, mime: string, base64: string): Promise<boolean> {
   const att = await api.attachment.create({ name: filename, type: mime, data: base64 });
@@ -411,10 +377,39 @@ export async function saveTextFile(filename: string, mime: string, text: string)
   return saveBase64File(filename, mime, utf8ToBase64(text));
 }
 
-export async function exportMarkdownFile(id: ArtifactId, title: string): Promise<boolean> {
-  const res = await api.artifact.markdown.get({ id });
-  const safeName = (title.trim() || "document").replace(/[\\/:*?"<>|]/gu, "-");
-  return saveTextFile(`${safeName}.md`, "text/markdown;charset=utf-8", res.markdown);
+export async function exportArtifactDirectory(artifact: Artifact, activeVersion?: number): Promise<boolean> {
+  const safeName = (artifact.title.trim() || "artifact").replace(/[\\/:*?"<>|]/gu, "-");
+  const suffix = artifactSuffixOf(artifact);
+  if (artifact.artifactType === "docs" || artifact.artifactType === "prototype") {
+    const res = await api.artifact.content.get({
+      id: artifact.id,
+      ...(activeVersion !== undefined && activeVersion > 0 ? { version: activeVersion } : {}),
+    });
+    const mime = artifact.artifactType === "prototype" ? "text/html;charset=utf-8" : "text/markdown;charset=utf-8";
+    return saveTextFile(`${safeName}${suffix}`, mime, res.content);
+  }
+  const listed = await api.artifact.file.list({ id: artifact.id });
+  const files = await Promise.all(
+    listed.files.map(async (f) => {
+      try {
+        return await api.artifact.file.get({
+          id: artifact.id,
+          path: f.path,
+          ...(activeVersion !== undefined && activeVersion > 0 ? { version: activeVersion } : {}),
+        });
+      } catch {
+        return undefined;
+      }
+    }),
+  );
+  const bundle = {
+    id: artifact.id,
+    title: artifact.title,
+    artifactType: artifact.artifactType,
+    seq: listed.seq,
+    files: files.filter((f): f is ArtifactFileContent => f !== undefined),
+  };
+  return saveTextFile(`${safeName}${suffix}`, "application/json;charset=utf-8", `${JSON.stringify(bundle, null, 2)}\n`);
 }
 
 export async function exportCsvFile(name: string, rows: readonly Record<string, unknown>[]): Promise<boolean> {
@@ -429,21 +424,6 @@ export async function exportCsvFile(name: string, rows: readonly Record<string, 
   };
   const lines = [cols.map(escapeCell).join(","), ...rows.map((r) => cols.map((c) => escapeCell(r[c])).join(","))];
   return saveTextFile(`${safeName}.csv`, "text/csv;charset=utf-8", lines.join("\n"));
-}
-
-function videoExtensionFor(mimeType: string): string {
-  const lower = mimeType.toLowerCase();
-  if (lower.includes("mp4")) return "mp4";
-  if (lower.includes("quicktime") || lower.includes("mov")) return "mov";
-  return "webm";
-}
-
-export async function saveVideoToLibrary(title: string, base64: string, mimeType: string): Promise<void> {
-  const safeTitle = (title.trim() || "motion").replace(/[\\/:*?"<>|]/gu, "-");
-  const mime = mimeType || "video/webm";
-  const filename = `${safeTitle}.${videoExtensionFor(mime)}`;
-  const att = await api.attachment.create({ name: filename, type: mime, data: base64 });
-  await api.library.item.add({ attachment: att.id, name: filename });
 }
 
 const presenceThrottleMs = 100;
@@ -536,38 +516,16 @@ export function useArtifactPresence(id: () => ArtifactId, opts?: { readonly enab
 }
 
 export async function createTypedArtifact(
-  choice: ArtifactType | "html",
+  artifactType: ArtifactType,
   title: string,
-  opts?: { readonly channel?: string; readonly issue?: string; readonly content?: string },
+  opts?: { readonly channel?: string; readonly issue?: string; readonly content?: string; readonly files?: readonly ArtifactFileWriteItem[] },
 ): Promise<Artifact> {
-  const scope = {
-    ...(opts?.channel ? { channel: opts.channel } : {}),
-    ...(opts?.issue ? { issue: opts.issue } : {}),
-  };
-  if (choice === "html") {
-    return api.artifact.create({
-      title,
-      kind: "html",
-      display: "page",
-      content:
-        opts?.content ??
-        `<!doctype html>\n<html lang="zh">\n<head><meta charset="utf-8" /><title>${title}</title></head>\n<body style="padding:32px"><h1>${title}</h1><p>Ready to edit.</p></body>\n</html>`,
-      ...scope,
-    });
-  }
-  if (choice === "docs" || choice === "outline") {
-    return api.artifact.create({
-      title,
-      kind: "markdown",
-      artifactType: choice,
-      ...(opts?.content !== undefined ? { content: opts.content } : {}),
-      ...scope,
-    });
-  }
   return api.artifact.create({
     title,
-    kind: "store",
-    artifactType: choice,
-    ...scope,
+    artifactType,
+    ...(opts?.content !== undefined ? { content: opts.content } : {}),
+    ...(opts?.files !== undefined ? { files: [...opts.files] } : {}),
+    ...(opts?.channel ? { channel: opts.channel } : {}),
+    ...(opts?.issue ? { issue: opts.issue } : {}),
   });
 }

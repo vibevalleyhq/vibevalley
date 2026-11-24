@@ -45,11 +45,7 @@ export default defineConfig({
       "packages:build": ["vp run --filter './packages/*' build", "vpx scripts/audit/built-types.ts"],
       "names:verify": "vpx scripts/docs/stale-names.ts",
       // The TS packages the native views and the generators use; the server and the command line are Rust (`cargo xtask check`).
-      "packages:check": [
-        "vp run packages:build",
-        "vp check",
-        "vp run --filter @vibevalley/protocol --filter @vibevalley/i18n --filter @vibevalley/testkit test",
-      ],
+      "packages:check": ["vp run packages:build", "vp check", "vp run --filter @vibevalley/protocol --filter @vibevalley/i18n test"],
       // Files, exports and dependencies nothing uses (knip.ts says what runs; scripts/audit/deadcode.ts says what to do).
       deadcode: "vpx scripts/audit/deadcode.ts",
       "mac:build-test": {
@@ -210,7 +206,6 @@ export default defineConfig({
           "apps/mac/ui/app/fakeHost.ts",
           "apps/mac/ui/infra/polyfill.ts",
           "packages/*/src/testing/**",
-          "packages/testkit/src/**",
         ],
         rules: {
           "typescript/no-unsafe-argument": "off",
@@ -238,7 +233,6 @@ export default defineConfig({
           "apps/mac/ui/app/fakeHost.ts",
           "packages/*/test/**",
           "packages/*/src/testing/**",
-          "packages/testkit/src/**",
         ],
         rules: { "typescript/no-unsafe-type-assertion": "off" },
       },

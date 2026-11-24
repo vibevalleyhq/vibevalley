@@ -15,7 +15,7 @@ import { Segmented } from "../../design/Segmented";
 import { CountPill } from "../../design/Tag";
 import { toast } from "../../design/toasts";
 import { api } from "../../infra/api";
-import { attachmentData } from "../../infra/attachment";
+import { attachmentData, decodeBase64Utf8 } from "../../infra/attachment";
 import { fileUrl, importLocalAttachment, localPathFromUri, useAttachmentFile } from "../../infra/attachmentFile";
 import { hostApi } from "../../infra/bridge";
 import { useCollabSlice, useOpsSlice } from "../../infra/frame";
@@ -23,8 +23,8 @@ import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
 import { useRouter, useSearchParams } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
-import { useArtifacts } from "../artifact";
-import { inferArtifactFromName } from "../artifact/html";
+import { artifactTypeLabel, useArtifacts } from "../artifact";
+import { buildOutlineFromMarkdown, inferArtifactFromName } from "../artifact/html";
 import {
   type ContentBucket,
   contentBrowseBucket,
@@ -85,38 +85,29 @@ const tileMin = 96;
 const tileMax = 280;
 
 const deliverableNameRe =
-  /\.(?:(?:slide|slides|visual|canvas|design|dashboard|motion|page)\.html|html|htm|whiteboard(?:\.json|\.html)?|(?:design-system|tokens)\.json|outline\.md|doc\.md|md|markdown)$/iu;
+  /\.(?:(?:slide|slides|visual|canvas|design|dashboard|motion|prototype|page)\.(?:json|html)|html|htm|whiteboard(?:\.json|\.html)?|(?:design-system|tokens|sheet|diagram|storyboard|outline)\.json|outline\.md|doc\.md|md|markdown)$/iu;
 const markdownFileRe = /\.(?:md|markdown)$/iu;
 
-function base64ToUtf8(b64: string): string {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
+function importDeliverable(filename: string, content: string, inOutlineBucket: boolean): Promise<Artifact> {
+  const inferred = inferArtifactFromName(filename, content);
+  if (inferred.artifactType === "outline" || (inOutlineBucket && markdownFileRe.test(filename))) {
+    const outlineContent = markdownFileRe.test(filename) ? `${JSON.stringify(buildOutlineFromMarkdown(inferred.title, content), null, 2)}\n` : content;
+    return api.artifact.create({
+      title: inferred.title,
+      artifactType: "outline",
+      content: outlineContent,
+    });
+  }
+  return api.artifact.create({
+    title: inferred.title,
+    artifactType: inferred.artifactType,
+    content,
+  });
 }
 
 function artifactTypeTitle(type: ArtifactTypeFilter | undefined): string {
   if (type === undefined) return t("web.library.content.artifactType.all");
-  switch (type) {
-    case "outline":
-      return t("web.library.content.artifactType.outline");
-    case "whiteboard":
-      return t("web.library.content.artifactType.whiteboard");
-    case "docs":
-      return t("web.library.content.artifactType.docs");
-    case "slides":
-      return t("web.library.content.artifactType.slides");
-    case "dashboard":
-      return t("web.library.content.artifactType.dashboard");
-    case "design":
-      return t("web.library.content.artifactType.design");
-    case "design-system":
-      return t("web.library.content.artifactType.designSystem");
-    case "motion":
-      return t("web.library.content.artifactType.motion");
-    case "html":
-      return t("web.library.content.artifactType.html");
-  }
+  return artifactTypeLabel(type);
 }
 
 function titleOfBucket(bucket: ContentBucket): string {
@@ -289,6 +280,17 @@ export function LibraryPage() {
     toast(nowPinned ? t("web.library.content.pinnedToast") : t("web.library.content.unpinnedToast"));
   };
 
+  const finishUpload = async (lastArtifact: Artifact | undefined, lastMedia: LibraryItem | undefined) => {
+    if (lastArtifact !== undefined) {
+      await queries.invalidate({ prefix: ["artifacts"] });
+      if (lastMedia === undefined) openArtifact(lastArtifact.id);
+    }
+    if (lastMedia !== undefined) {
+      void items.refetch();
+      selection.set(focusFile(lastMedia.attachment.id));
+    }
+  };
+
   const uploadEntries = (entries: readonly { name: string; type: string; data: Promise<string> }[]) =>
     entries.length === 0
       ? Promise.resolve()
@@ -300,19 +302,7 @@ export function LibraryPage() {
             const data = await entry.data;
             const filename = entry.name.trim() || "file";
             if (deliverableNameRe.test(filename)) {
-              const content = base64ToUtf8(data);
-              const inferred = inferArtifactFromName(filename, content);
-              if (inferred.artifactType === "outline" || (inOutlineBucket && markdownFileRe.test(filename))) {
-                lastArtifact = await api.artifact.outline.import({ markdown: content, filename });
-              } else {
-                lastArtifact = await api.artifact.create({
-                  title: inferred.title,
-                  kind: inferred.kind,
-                  ...(inferred.display !== undefined ? { display: inferred.display } : {}),
-                  ...(inferred.artifactType !== undefined ? { artifactType: inferred.artifactType } : {}),
-                  content,
-                });
-              }
+              lastArtifact = await importDeliverable(filename, decodeBase64Utf8(data), inOutlineBucket);
             } else {
               const kept = await api.attachment.create({
                 name: filename,
@@ -322,14 +312,7 @@ export function LibraryPage() {
               lastMedia = await api.library.item.add({ attachment: kept.id });
             }
           }
-          if (lastArtifact !== undefined) {
-            await queries.invalidate({ prefix: ["artifacts"] });
-            if (lastMedia === undefined) openArtifact(lastArtifact.id);
-          }
-          if (lastMedia !== undefined) {
-            void items.refetch();
-            selection.set(focusFile(lastMedia.attachment.id));
-          }
+          await finishUpload(lastArtifact, lastMedia);
         });
 
   const pickFiles = async () => {
@@ -351,32 +334,13 @@ export function LibraryPage() {
               const read = await hostApi.readFile(uri);
               if (read.bizCode !== 0 || !read.data) continue;
               const filename = read.data.name.trim() || basename || "file";
-              const content = base64ToUtf8(read.data.data);
-              const inferred = inferArtifactFromName(filename, content);
-              if (inferred.artifactType === "outline" || (inOutlineBucket && markdownFileRe.test(filename))) {
-                lastArtifact = await api.artifact.outline.import({ markdown: content, filename });
-              } else {
-                lastArtifact = await api.artifact.create({
-                  title: inferred.title,
-                  kind: inferred.kind,
-                  ...(inferred.display !== undefined ? { display: inferred.display } : {}),
-                  ...(inferred.artifactType !== undefined ? { artifactType: inferred.artifactType } : {}),
-                  content,
-                });
-              }
+              lastArtifact = await importDeliverable(filename, decodeBase64Utf8(read.data.data), inOutlineBucket);
             } else {
               const kept = await importLocalAttachment(uri);
               lastMedia = await api.library.item.add({ attachment: kept.id });
             }
           }
-          if (lastArtifact !== undefined) {
-            await queries.invalidate({ prefix: ["artifacts"] });
-            if (lastMedia === undefined) openArtifact(lastArtifact.id);
-          }
-          if (lastMedia !== undefined) {
-            void items.refetch();
-            selection.set(focusFile(lastMedia.attachment.id));
-          }
+          await finishUpload(lastArtifact, lastMedia);
         });
 
   const pick = (id: string, how: { readonly add: boolean; readonly range: boolean }) => {

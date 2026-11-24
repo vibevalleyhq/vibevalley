@@ -90,16 +90,7 @@
       "user": "我创建的"
     },
     "artifactType": {
-      "all": "全部作品",
-      "outline": "大纲笔记",
-      "whiteboard": "无限白板",
-      "docs": "协作文档",
-      "slides": "幻灯片",
-      "dashboard": "数据看板",
-      "design": "界面画板",
-      "designSystem": "设计体系",
-      "motion": "动态短片",
-      "html": "单页网页"
+      "all": "全部作品"
     },
     "inspector": {
       "openExternal": "系统打开",

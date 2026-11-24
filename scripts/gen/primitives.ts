@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { exportedValuesOf } from "@vibevalley/testkit/source";
+import { parseSync } from "vite";
 
 const root = join(import.meta.dirname, "../..");
 const out = join(root, "docs/reference/primitives.md");
@@ -10,8 +10,37 @@ const out = join(root, "docs/reference/primitives.md");
 export const folders: readonly { readonly dir: string; readonly what: string }[] = [
   { dir: "packages/protocol/src/rules", what: "规则：服务端和页面都跑的纯函数" },
   { dir: "apps/mac/ui/infra", what: "页面的纯地基、状态中间层与宿主适配" },
-  { dir: "packages/testkit/src", what: "测试共用：等待、金字塔、语法树" },
 ];
+
+interface AstNode {
+  readonly type: string;
+  readonly [key: string]: unknown;
+}
+
+const isNode = (v: unknown): v is AstNode => typeof v === "object" && v !== null && "type" in v && typeof v.type === "string";
+const nodes = (v: unknown): AstNode[] => (Array.isArray(v) ? v.filter(isNode) : []);
+const nodeName = (n: unknown): string | undefined =>
+  isNode(n) && n.type === "Identifier" && typeof n.name === "string"
+    ? n.name
+    : isNode(n) && n.type === "Literal" && typeof n.value === "string"
+      ? n.value
+      : undefined;
+
+/** The values a file declares and exports itself (no types), each with where its export statement starts. */
+function exportedValuesOf(path: string, source: string): { readonly name: string; readonly start: number }[] {
+  const program: unknown = parseSync(path, source, { lang: path.endsWith(".tsx") ? "tsx" : "ts" }).program;
+  if (!isNode(program)) throw new Error(`${path} parsed to no program`);
+  const out: { name: string; start: number }[] = [];
+  for (const statement of nodes(program.body)) {
+    if (statement.type !== "ExportNamedDeclaration" || isNode(statement.source)) continue;
+    const d = statement.declaration;
+    if (!isNode(d) || d.type === "TSTypeAliasDeclaration" || d.type === "TSInterfaceDeclaration") continue;
+    const names = d.type === "VariableDeclaration" ? nodes(d.declarations).map((v) => nodeName(v.id)) : [nodeName(d.id)];
+    const start = typeof statement.start === "number" ? statement.start : 0;
+    for (const name of names) if (name !== undefined) out.push({ name, start });
+  }
+  return out;
+}
 
 export interface Primitive {
   readonly name: string;

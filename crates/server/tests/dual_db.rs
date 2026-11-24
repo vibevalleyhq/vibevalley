@@ -17,11 +17,10 @@ use serde_json::{Value, json};
 use tokio::sync::Notify;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use vibevalley_protocol::{Caller, PublishPlatform, PullRequestState, SliceKind};
-use vibevalley_runtime::agent::durable::{Store as DurableStore, now_ms};
-use vibevalley_server::Server;
-use vibevalley_server::modules::collab::channel::Noticing;
-use vibevalley_server::modules::collab::connector::{Options as ConnectorOptions, Vendors};
-use vibevalley_server::modules::work::pull::UpsertPullInput;
+use vibevalley_runtime::agent::durable::now_ms;
+use vibevalley_server::channel::Noticing;
+use vibevalley_server::connector::{Options as ConnectorOptions, Vendors};
+use vibevalley_server::issue::pull::UpsertPullInput;
 
 struct EphemeralPostgres {
     data_dir: PathBuf,
@@ -199,7 +198,7 @@ impl MockWeixin {
     }
 }
 
-fn start_server(home: &Path, database_url: Option<String>, weixin_url: &str) -> vibevalley_server::Started {
+fn start_server(home: &Path, database_url: Option<String>, weixin_url: &str) -> vibevalley_server::App {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
     let vendors = Vendors {
@@ -207,7 +206,7 @@ fn start_server(home: &Path, database_url: Option<String>, weixin_url: &str) -> 
         ..Vendors::default()
     };
 
-    vibevalley_server::start(vibevalley_server::ServerConfig {
+    vibevalley_server::create_app_blocking(vibevalley_server::Config {
         version: "0.1.0-dual-db-test".into(),
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
@@ -221,13 +220,13 @@ fn start_server(home: &Path, database_url: Option<String>, weixin_url: &str) -> 
             moment: Duration::from_secs(2),
             ..ConnectorOptions::default()
         },
-        ..vibevalley_server::ServerConfig::under(home)
+        ..vibevalley_server::Config::under(home)
     })
     .unwrap()
 }
 
-fn ok(started: &vibevalley_server::Started, op: &str, payload: Value) -> Value {
-    let env = started.hub.call_as(Caller::User, op, payload);
+fn ok(started: &vibevalley_server::App, op: &str, payload: Value) -> Value {
+    let env = started.router().call_as(Caller::User, op, payload);
     assert_eq!(env.biz_code, 0, "{op} failed (biz={}): {}", env.biz_code, env.message);
     env.data.unwrap_or(Value::Null)
 }
@@ -240,9 +239,9 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     let started = start_server(home, database_url.clone(), &wx.base_url);
 
     // Install a scripted agent profile for memory / session exercises.
-    let mut reviewer = started.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut reviewer = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     reviewer.runtime = "scripted".into();
-    let reviewer = started.test_internals().agents.profiles.save(reviewer).unwrap();
+    let reviewer = vibevalley_runtime::rt::block_on(started.test_internals().agent.profile.store.save_async(reviewer)).unwrap();
 
     // 1. work/issue
     let created_issue = ok(
@@ -279,47 +278,44 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     ok(&started, "cron.update", json!({ "id": cron_id, "enabled": false }));
 
     // 4. work/pull
-    let pull_rec = started
-        .test_internals()
-        .pulls
-        .store()
-        .upsert(UpsertPullInput {
-            platform: PublishPlatform::Github,
-            repo: "acme/dual".into(),
-            number: 88,
-            url: "https://github.com/acme/dual/pull/88".into(),
-            branch: "feat/dual-db".into(),
-            base: "main".into(),
-            state: PullRequestState::Open,
-            issue_id: Some(issue_id.clone()),
-            at: now_ms(),
-        })
-        .unwrap();
-    started
-        .test_internals()
-        .pulls
-        .store()
-        .keep_event(&pull_rec.id, "ev-dual-1", Some("round-1"), Some(1))
-        .unwrap();
+    let pull_rec = vibevalley_runtime::rt::block_on(started.test_internals().pull.upsert_async(UpsertPullInput {
+        platform: PublishPlatform::Github,
+        repo: "acme/dual".into(),
+        number: 88,
+        url: "https://github.com/acme/dual/pull/88".into(),
+        branch: "feat/dual-db".into(),
+        base: "main".into(),
+        state: PullRequestState::Open,
+        issue_id: Some(issue_id.clone()),
+        at: now_ms(),
+    }))
+    .unwrap();
+    vibevalley_runtime::rt::block_on(
+        started
+            .test_internals()
+            .pull
+            .keep_event_async(&pull_rec.id, "ev-dual-1", Some("round-1"), Some(1)),
+    )
+    .unwrap();
 
     // 5. collab/channel + system_code suppression
     let eng_channel = ok(&started, "channel.create", json!({ "name": "dual-eng", "description": "Dual DB channel" }));
     let eng_id = eng_channel.as_str().unwrap().to_string();
 
-    started.test_internals().chat.notice(Noticing {
+    vibevalley_runtime::rt::block_on(started.test_internals().channel.notice_async(Noticing {
         channel: eng_id.clone(),
         text: "Welcome to dual-eng".into(),
         code: "dual_welcome".into(),
         send_key: "dual-welcome-1".into(),
         until_user_speaks: true,
-    });
-    started.test_internals().chat.notice(Noticing {
+    }));
+    vibevalley_runtime::rt::block_on(started.test_internals().channel.notice_async(Noticing {
         channel: eng_id.clone(),
         text: "Welcome to dual-eng".into(),
         code: "dual_welcome".into(),
         send_key: "dual-welcome-2".into(),
         until_user_speaks: true,
-    });
+    }));
     let notices = ok(&started, "channel.message.list", json!({ "id": eng_id }));
     let welcome_count = notices.as_array().unwrap().iter().filter(|m| m["text"] == "Welcome to dual-eng").count();
     assert_eq!(welcome_count, 1, "repeat system_code notice must be suppressed before user speaks");
@@ -378,37 +374,40 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
         json!({ "kind": "image", "mime": "image/png", "name": "in.png", "size": media_bytes.len() }),
     );
     let media_id = media_created["id"].as_str().unwrap().to_string();
-    started
-        .test_internals()
-        .media_inputs
-        .upload(&media_id, std::io::Cursor::new(media_bytes))
-        .unwrap();
+    vibevalley_runtime::rt::block_on(
+        started
+            .test_internals()
+            .storage
+            .media_input
+            .upload_async(&media_id, Box::new(std::io::Cursor::new(media_bytes.to_vec()))),
+    )
+    .unwrap();
     let media_got = ok(&started, "media.input.get", json!({ "id": media_id }));
     assert_eq!(media_got["phase"], "ready");
 
-    // 10. content/artifact (markdown + store entry batch)
+    // 10. content/artifact (docs + slides directory files)
     let md_art = ok(
         &started,
         "artifact.create",
-        json!({ "title": "Dual Markdown", "kind": "markdown", "content": "# Dual DB", "channel": eng_id }),
+        json!({ "title": "Dual Markdown", "artifactType": "docs", "content": "# Dual DB", "channel": eng_id }),
     );
     let md_art_id = md_art["id"].as_str().unwrap().to_string();
 
     let store_art = ok(
         &started,
         "artifact.create",
-        json!({ "title": "Dual Store", "kind": "store", "artifactType": "slides", "channel": eng_id }),
+        json!({ "title": "Dual Store", "artifactType": "slides", "channel": eng_id }),
     );
     let store_art_id = store_art["id"].as_str().unwrap().to_string();
-    let batch = ok(
+    let written = ok(
         &started,
-        "artifact.entry.batch",
+        "artifact.file.write",
         json!({
             "id": store_art_id,
-            "writes": [{ "op": "set", "path": "project/notes.txt", "kind": "text", "value": "persisted" }]
+            "files": [{ "path": "structure/notes.txt", "content": "persisted" }]
         }),
     );
-    assert_eq!(batch["applied"], true);
+    assert_eq!(written["seq"], 2);
 
     // 11. team/memory
     let mem = ok(
@@ -456,25 +455,26 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     assert_eq!(whoami["bizCode"], 0, "{whoami}");
     assert_eq!(whoami["data"]["device"]["id"], device_id);
 
-    // 13. durable store sharing the same ServerDb backend
-    let db = started.test_internals().db;
-    let durable = DurableStore::from_sea_orm_conns(db.write_conn().clone(), (!db.is_postgres()).then(|| db.read_conn().clone()), now_ms).unwrap();
-    durable
-        .write(|tx| {
-            tx.create_conversation("dual-conv", "deepseek-flash")?;
-            tx.append_entry("dual-conv", "pi.user", &json!({ "msg": "dual-db" }))?;
-            tx.put_document("dual", "e2e", "state", &json!({ "ok": true }))?;
+    // 13. durable store sharing the same Database backend
+    let durable = vibevalley_runtime::rt::block_on(started.test_internals().service.database().durable()).unwrap();
+    vibevalley_runtime::rt::block_on(durable.write_async(|tx| {
+        Box::pin(async move {
+            tx.create_conversation_async("dual-conv", "deepseek-flash").await?;
+            tx.append_entry_async("dual-conv", "pi.user", &json!({ "msg": "dual-db" })).await?;
+            tx.put_document_async("dual", "e2e", "state", &json!({ "ok": true })).await?;
             Ok(())
         })
-        .unwrap();
+    }))
+    .unwrap();
     drop(durable);
 
     // Verify slice feed snapshot works before shutdown.
-    let board_json = started.hub.slice_snapshot_json(SliceKind::Board);
+    vibevalley_runtime::rt::block_on(started.ctx().feed.flush());
+    let board_json = started.ctx().feed.snapshot_json(SliceKind::Board);
     assert!(board_json.contains("Dual DB Issue"));
 
     // Clean shutdown and reopen to prove full persistence across restart.
-    started.close();
+    started.close_blocking();
 
     let reopened = start_server(home, database_url, &wx.base_url);
 
@@ -487,9 +487,14 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     let crons = ok(&reopened, "cron.list", json!({}));
     assert!(crons.as_array().unwrap().iter().any(|c| c["id"] == cron_id && c["enabled"] == false));
 
-    let pull_reloaded = reopened.test_internals().pulls.find("acme/dual", 88).expect("pull persisted");
+    let pull_reloaded = reopened.test_internals().pull.find("acme/dual", 88).expect("pull persisted");
     assert_eq!(pull_reloaded.issue_id.as_deref(), Some(issue_id.as_str()));
-    assert_eq!(reopened.test_internals().pulls.store().known_events(&pull_reloaded.id).unwrap().len(), 1);
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(reopened.test_internals().pull.known_events_async(&pull_reloaded.id))
+            .unwrap()
+            .len(),
+        1
+    );
 
     let msgs = ok(&reopened, "channel.message.list", json!({ "id": eng_id }));
     assert!(msgs.to_string().contains("hello from dual db"));
@@ -507,14 +512,10 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
 
     let md_got = ok(&reopened, "artifact.get", json!({ "id": md_art_id }));
     assert_eq!(md_got["title"], "Dual Markdown");
-    let entries = ok(&reopened, "artifact.entry.list", json!({ "id": store_art_id, "includeValues": true }));
-    assert!(
-        entries["entries"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|e| e["path"] == "project/notes.txt" && e["value"] == "persisted")
-    );
+    let files = ok(&reopened, "artifact.file.list", json!({ "id": store_art_id, "prefix": "structure/" }));
+    assert!(files["files"].as_array().unwrap().iter().any(|f| f["path"] == "structure/notes.txt"));
+    let file_got = ok(&reopened, "artifact.file.get", json!({ "id": store_art_id, "path": "structure/notes.txt" }));
+    assert_eq!(file_got["content"], "persisted");
 
     let mems = ok(&reopened, "memory.list", json!({ "agent": reviewer.id }));
     assert!(mems["memories"].as_array().unwrap().iter().any(|m| m["id"] == mem_id));
@@ -528,15 +529,16 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
             .any(|d| d["id"] == device_id && d["name"] == "DualDB CLI")
     );
 
-    let db2 = reopened.test_internals().db;
-    let durable2 = DurableStore::from_sea_orm_conns(db2.write_conn().clone(), (!db2.is_postgres()).then(|| db2.read_conn().clone()), now_ms).unwrap();
-    let doc = durable2.read(|rd| rd.document("dual", "e2e", "state")).unwrap().unwrap();
+    let durable2 = vibevalley_runtime::rt::block_on(reopened.test_internals().service.database().durable()).unwrap();
+    let doc = vibevalley_runtime::rt::block_on(durable2.read_async(|rd| Box::pin(rd.document_async("dual", "e2e", "state"))))
+        .unwrap()
+        .unwrap();
     assert_eq!(doc.state, json!({ "ok": true }));
-    let entries2 = durable2.read(|rd| rd.entries("dual-conv", 0)).unwrap();
+    let entries2 = vibevalley_runtime::rt::block_on(durable2.read_async(|rd| Box::pin(rd.entries_async("dual-conv", 0)))).unwrap();
     assert_eq!(entries2.len(), 1);
     drop(durable2);
 
-    reopened.close();
+    reopened.close_blocking();
 }
 
 #[test]

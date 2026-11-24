@@ -8,7 +8,7 @@
 
 | 病 | 机理 | 处境 | 在哪 |
 |---|---|---|---|
-| 局部缝合 | 提炼要改没加载的文件，模型只在局部补，同一段控制流抄好几份 | 已有、以后做 | 工具只有一套（`crates/server/src/modules/team/tool/mod.rs`，宽松解析写一处），媒体各种类共用一个任务机（`modules/content/media/jobs.rs`）；收拢见提案「扩展点高阶骨架」 |
+| 局部缝合 | 提炼要改没加载的文件，模型只在局部补，同一段控制流抄好几份 | 已有、以后做 | 工具只有一套（`crates/server/src/agent/tool/mod.rs`，宽松解析写一处），媒体各种类共用一个任务机（`artifact/media/job.rs`）；收拢见提案「扩展点高阶骨架」 |
 | 只加不删 | 不确定旧导出还有没有人用，只加新的 | 已有、已做 | 「内部不留兼容」（`AGENTS.md`）；`vp run deadcode`（`knip.ts`、`scripts/audit/deadcode.ts`），CI 零容忍 |
 | 绕开约束 | 类型或测试挡路时 `as any`、空 `catch`、改断言 | 已有、已做 | `no-explicit-any`、`no-unsafe-*`；`regression: ` 测试删改要点名（`scripts/release/regression.ts`）；帮工的验收先红、合入时冻结（[工单](docs/subsystems/issue.md#模型和不变量)） |
 | 温室假设 | 默认内存无限、网络秒回，N+1、每个字重写一次盘 | 已有、已做、以后做 | 贵的东西归拥有它的模块；流按任意切片测见提案 |
@@ -39,15 +39,15 @@
 | 1.3 联合类型和名义类型 | 已有、以后做 | id 带品牌（`packages/protocol`）；单位写进名字（`…Ms`，[命名](docs/style/naming.md)） |
 | 1.4 处方式报错 | 已做、改写 | 单文件规则在 oxlint 插件，不加 ast-grep；Rust 侧靠类型与 clippy；常驻集合清点见提案；`@deprecated` 不做，旧的直接删 |
 | 1.5 死代码断头台 | 已做 | `vp run deadcode` |
-| 2.1 垂直特性切片 | 已有 | 服务端 `crates/server/src/modules/<概念>`（`modules/mod.rs`）；页面 `features/<概念>` 经 `index.ts`；`scripts/audit/file-names.test.ts` 拦 `utils` 这类名字；契约在 `packages/protocol`，不另设 contracts/ |
+| 2.1 垂直特性切片 | 已有 | 服务端 `crates/server/src/<概念>`；页面 `features/<概念>` 经 `index.ts`；`scripts/audit/file-names.test.ts` 拦 `utils` 这类名字；契约在 `packages/protocol`，不另设 contracts/ |
 | 2.2 高阶骨架 | 已有、以后做 | oar 起编码 agent（`crates/runtime/src/oar`）；媒体的任务机；骨架见提案 |
 | 2.3 单一状态机和事件总线 | 已有 | 会话事件读成事实，`Core::apply` 用 `crates/core/src/core.rs` 的 `reduce` 折；游戏只读事件（[农场的皮](docs/subsystems/farm.md)）；下层经订阅往上报，投递与会话持久化由各深模块自管 |
 | 2.4 三级上下文和原语词典 | 已有、已做、不做 | `CLAUDE.md` 只引 `AGENTS.md`；子目录的 `AGENTS.md` 和各包 README；[primitives.md](docs/reference/primitives.md) 从导出生成；不做 `@invariant`、`@primitive` 标记；重复代码 lint 见提案 |
 | 3.1 三层只读契约墙 | 已有、改写 | 形状只在 `packages/protocol`（`Codec<T.X>` 对不上就编不过，生成 Rust 类型）；`regression: ` 点名；`refactor/` 禁改契约见提案 |
 | 3.2 内存假实现和属性测试 | 已有、以后做 | 假的只在端口上（oar 的 scripted 运行时、替身农机 `pi`），git 和库用真的（[地基](docs/subsystems/foundation.md)）；`reduce` 的属性测试见提案 |
-| 3.3 确定性混沌和启动对账 | 已有、以后做 | 开机接回帮工（`crates/server/src/modules/work/session`），`crates/server/tests` 覆盖重启；流按任意切片测见提案 |
+| 3.3 确定性混沌和启动对账 | 已有、以后做 | 开机接回帮工（`crates/server/src/work/session`），`crates/server/tests` 覆盖重启；流按任意切片测见提案 |
 | 3.4 历史存档的黄金快照 | 不做 | 内部不留兼容，旧库开机时挪开；对外 HTTP 的 v1 例外 |
-| 3.5 故障胶囊和自愈飞轮 | 已有、以后做 | `crates/server/src/modules/work/session/journal.rs` 记轨迹；`regression: ` 测试受门禁保护 |
+| 3.5 故障胶囊和自愈飞轮 | 已有、以后做 | `crates/server/src/runtime/session/journal.rs` 记轨迹；`regression: ` 测试受门禁保护 |
 | 4.1 3+1 播种除草 | 改写 | 同铁律 5；jscpd 不做 |
 | 4.2 代数归约的重构指令 | 改写 | [SKILL.md](.agents/skills/vv-governance/SKILL.md#4-做一张纯重构的单)：行数不设门槛，没变少或变简单就不合 |
 | 4.3 跨文件重构用 codemod | 改写 | 同铁律 6；脚本出错就把碰过的文件从 `origin/main` 恢复重来 |

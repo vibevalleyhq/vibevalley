@@ -260,16 +260,6 @@ pub enum Fact {
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
-pub struct ServerEventSnapshot {
-    pub at: i64,
-    pub state: SpaceState,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(rename_all = "camelCase")]
 pub struct LiveEventSession {
     pub at: i64,
     #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::SessionId"))]
@@ -305,67 +295,6 @@ pub struct LiveEventRuntime {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(tag = "type")]
 pub enum LiveEvent {
-    #[serde(rename = "event")]
-    Event(LiveEventSession),
-    #[serde(rename = "notice")]
-    Notice(LiveEventNotice),
-    #[serde(rename = "runtime")]
-    Runtime(LiveEventRuntime),
-}
-
-/// Told apart by `type`.
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts-gen", derive(TS))]
-#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
-#[serde(tag = "type")]
-pub enum ServerEvent {
-    #[serde(rename = "callChanged")]
-    CallChanged(FactCallChanged),
-    #[serde(rename = "sessionToolChanged")]
-    SessionToolChanged(FactSessionToolChanged),
-    #[serde(rename = "sessionToolsReset")]
-    SessionToolsReset(FactSessionToolsReset),
-    #[serde(rename = "sessionSubagentsChanged")]
-    SessionSubagentsChanged(FactSessionSubagentsChanged),
-    #[serde(rename = "sessionPhaseChanged")]
-    SessionPhaseChanged(FactSessionPhaseChanged),
-    #[serde(rename = "messageChanged")]
-    MessageChanged(FactMessageChanged),
-    #[serde(rename = "channelChanged")]
-    ChannelChanged(FactChannelChanged),
-    #[serde(rename = "userMentionsChanged")]
-    UserMentionsChanged(FactUserMentionsChanged),
-    #[serde(rename = "sessionChanged")]
-    SessionChanged(FactSessionChanged),
-    #[serde(rename = "sessionReported")]
-    SessionReported(FactSessionReported),
-    #[serde(rename = "sessionLeft")]
-    SessionLeft(FactSessionLeft),
-    #[serde(rename = "progressChanged")]
-    ProgressChanged(FactProgressChanged),
-    #[serde(rename = "issueChanged")]
-    IssueChanged(FactIssueChanged),
-    #[serde(rename = "issueRemoved")]
-    IssueRemoved(FactIssueRemoved),
-    #[serde(rename = "channelRemoved")]
-    ChannelRemoved(FactChannelRemoved),
-    #[serde(rename = "cronChanged")]
-    CronChanged(FactCronChanged),
-    #[serde(rename = "cronRemoved")]
-    CronRemoved(FactCronRemoved),
-    #[serde(rename = "connectorChanged")]
-    ConnectorChanged(FactConnectorChanged),
-    #[serde(rename = "machineChanged")]
-    MachineChanged(FactMachineChanged),
-    #[serde(rename = "machineRemoved")]
-    MachineRemoved(FactMachineRemoved),
-    #[serde(rename = "mediaChanged")]
-    MediaChanged(FactMediaChanged),
-    #[serde(rename = "runtimeInboxChanged")]
-    RuntimeInboxChanged(FactRuntimeInboxChanged),
-    #[serde(rename = "snapshot")]
-    Snapshot(ServerEventSnapshot),
     #[serde(rename = "event")]
     Event(LiveEventSession),
     #[serde(rename = "notice")]
@@ -426,12 +355,10 @@ crate::typescript::module! {
     SliceBundle,
     Health,
     Fact,
-    ServerEventSnapshot,
     LiveEventSession,
     LiveEventNotice,
     LiveEventRuntime,
     LiveEvent,
-    ServerEvent,
     ChannelFollowPayload,
     ChannelReportsPayload,
     ArtifactFollowPayload,

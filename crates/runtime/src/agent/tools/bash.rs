@@ -12,6 +12,7 @@ use tokio::process::Command;
 use super::truncate::{DEFAULT_MAX_BYTES, truncate_bytes};
 use super::workspace::Workspace;
 use super::{ReplayPolicy, ToolContext, ToolUpdate, TypedTool, TypedToolOutput};
+use crate::BoxFuture;
 
 const MAX_CAPTURE_BYTES: usize = 4 * 1024 * 1024;
 const KILL_GRACE: Duration = Duration::from_millis(150);
@@ -88,18 +89,18 @@ impl TypedTool for Bash {
         ReplayPolicy::Unsafe
     }
 
-    fn execute(&self, args: Self::Args, ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        if ctx.cancel.is_cancelled() {
-            return Err("aborted by the user".into());
-        }
-        let timeout = args.timeout_secs.map(Duration::from_secs).unwrap_or(self.0.bash_timeout);
-        let cwd = self.0.cwd.clone();
-        let env = self.0.env.clone();
-        let command = args.command;
-        let cancel = ctx.cancel.clone();
-        let on_update = ctx.on_update.clone();
+    fn execute<'a>(&'a self, args: Self::Args, ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            if ctx.cancel.is_cancelled() {
+                return Err("aborted by the user".into());
+            }
+            let timeout = args.timeout_secs.map(Duration::from_secs).unwrap_or(self.0.bash_timeout);
+            let cwd = self.0.cwd.clone();
+            let env = self.0.env.clone();
+            let command = args.command;
+            let cancel = ctx.cancel.clone();
+            let on_update = ctx.on_update.clone();
 
-        let (outcome, captured) = crate::rt::block_on(async move {
             let mut child = Command::new("/bin/bash")
                 .arg("-c")
                 // Merge stderr into stdout for the entire script, not just the final command.
@@ -109,6 +110,7 @@ impl TypedTool for Bash {
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::null())
+                .kill_on_drop(true)
                 .process_group(0)
                 .spawn()
                 .map_err(|e| e.to_string())?;
@@ -116,12 +118,12 @@ impl TypedTool for Bash {
             let pid = child.id();
             let mut guard = ProcessGroupGuard::new(pid);
             let stdout = child.stdout.take();
-            let reader = crate::rt::spawn(read_stream(stdout, on_update));
+            let reader = crate::rt::current_or_global_handle().spawn(read_stream(stdout, on_update));
 
             let outcome = tokio::select! {
                 biased;
                 _ = cancel.cancelled() => {
-                    reap_process_group(&mut child, pid, KILL_GRACE).await;
+                    crate::oar::reap_process_group(&mut child, pid.unwrap_or(0), KILL_GRACE).await;
                     guard.disarm();
                     WaitOutcome::Cancelled
                 }
@@ -130,60 +132,59 @@ impl TypedTool for Bash {
                     match status {
                         Ok(status) => WaitOutcome::Exited(status),
                         Err(e) => {
-                            reap_process_group(&mut child, pid, KILL_GRACE).await;
+                            crate::oar::reap_process_group(&mut child, pid.unwrap_or(0), KILL_GRACE).await;
                             let _ = reader.await;
                             return Err(e.to_string());
                         }
                     }
                 }
                 _ = tokio::time::sleep(timeout) => {
-                    reap_process_group(&mut child, pid, KILL_GRACE).await;
+                    crate::oar::reap_process_group(&mut child, pid.unwrap_or(0), KILL_GRACE).await;
                     guard.disarm();
                     WaitOutcome::TimedOut
                 }
             };
 
             let captured = reader.await.unwrap_or_default();
-            Ok::<_, String>((outcome, captured))
-        })?;
 
-        if matches!(outcome, WaitOutcome::Cancelled) {
-            return Err("aborted by the user".into());
-        }
+            if matches!(outcome, WaitOutcome::Cancelled) {
+                return Err("aborted by the user".into());
+            }
 
-        let truncated = truncate_bytes(&captured, DEFAULT_MAX_BYTES);
-        match outcome {
-            WaitOutcome::Exited(status) if status.success() => Ok(TypedToolOutput::ok_with(
-                truncated.text,
-                BashDetails {
-                    exit_code: status.code(),
-                    timed_out: false,
-                    truncated: truncated.truncated,
-                },
-            )),
-            WaitOutcome::Exited(status) => {
-                let code = status.code().unwrap_or(-1);
-                Ok(TypedToolOutput {
-                    text: format!("{}\n(exit status {code})", truncated.text),
-                    details: Some(BashDetails {
-                        exit_code: Some(code),
+            let truncated = truncate_bytes(&captured, DEFAULT_MAX_BYTES);
+            match outcome {
+                WaitOutcome::Exited(status) if status.success() => Ok(TypedToolOutput::ok_with(
+                    truncated.text,
+                    BashDetails {
+                        exit_code: status.code(),
                         timed_out: false,
+                        truncated: truncated.truncated,
+                    },
+                )),
+                WaitOutcome::Exited(status) => {
+                    let code = status.code().unwrap_or(-1);
+                    Ok(TypedToolOutput {
+                        text: format!("{}\n(exit status {code})", truncated.text),
+                        details: Some(BashDetails {
+                            exit_code: Some(code),
+                            timed_out: false,
+                            truncated: truncated.truncated,
+                        }),
+                        is_error: true,
+                    })
+                }
+                WaitOutcome::TimedOut => Ok(TypedToolOutput {
+                    text: format!("{}\n(timed out after {timeout:?})", truncated.text),
+                    details: Some(BashDetails {
+                        exit_code: None,
+                        timed_out: true,
                         truncated: truncated.truncated,
                     }),
                     is_error: true,
-                })
-            }
-            WaitOutcome::TimedOut => Ok(TypedToolOutput {
-                text: format!("{}\n(timed out after {timeout:?})", truncated.text),
-                details: Some(BashDetails {
-                    exit_code: None,
-                    timed_out: true,
-                    truncated: truncated.truncated,
                 }),
-                is_error: true,
-            }),
-            WaitOutcome::Cancelled => unreachable!(),
-        }
+                WaitOutcome::Cancelled => unreachable!(),
+            }
+        })
     }
 }
 
@@ -255,35 +256,12 @@ fn emit_valid_utf8(pending: &mut Vec<u8>, cb: &(dyn Fn(ToolUpdate) + Send + Sync
     }
 }
 
-async fn reap_process_group(child: &mut tokio::process::Child, pid: Option<u32>, grace: Duration) {
-    let Some(pgid) = pid.and_then(|p| i32::try_from(p).ok()).filter(|&p| p > 0).map(Pid::from_raw) else {
-        let _ = child.kill().await;
-        let _ = child.wait().await;
-        return;
-    };
-    let _ = killpg(pgid, Signal::SIGTERM);
-    let exited = tokio::time::timeout(grace, child.wait()).await.is_ok();
-    if exited && killpg(pgid, None) == Err(Errno::ESRCH) {
-        return;
-    }
-    if exited {
-        // Give grandchildren a brief window to react to SIGTERM before escalating.
-        tokio::time::sleep(Duration::from_millis(25)).await;
-    }
-    if !exited || killpg(pgid, None) != Err(Errno::ESRCH) {
-        let _ = killpg(pgid, Signal::SIGKILL);
-        if !exited {
-            let _ = child.wait().await;
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn timeout_reaps_sigterm_ignoring_grandchild_in_process_group() {
+    #[tokio::test]
+    async fn timeout_reaps_sigterm_ignoring_grandchild_in_process_group() {
         let dir = tempfile::tempdir().unwrap();
         let pid_file = dir.path().join("grandchild.pid");
         let ws = Workspace {
@@ -300,19 +278,18 @@ mod tests {
                 },
                 &ToolContext::background(),
             )
+            .await
             .unwrap();
         assert!(out.is_error);
         assert!(out.details.unwrap().timed_out);
         let pid: i32 = std::fs::read_to_string(&pid_file).unwrap().trim().parse().unwrap();
         // Wait briefly for the kernel to complete SIGKILL teardown on the grandchild.
-        crate::rt::block_on(async {
-            tokio::time::timeout(Duration::from_secs(1), async {
-                while nix::sys::signal::kill(Pid::from_raw(pid), None) != Err(Errno::ESRCH) {
-                    tokio::time::sleep(Duration::from_millis(10)).await;
-                }
-            })
-            .await
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while nix::sys::signal::kill(Pid::from_raw(pid), None) != Err(Errno::ESRCH) {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
         })
+        .await
         .unwrap_or_else(|_| panic!("grandchild {pid} survived PGID reap"));
     }
 }

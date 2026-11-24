@@ -52,7 +52,7 @@ pub fn reserve_for_call() -> Result<CallAudio, String> {
 }
 
 pub fn dispatch<T: Serialize + 'static>(reply: crate::hosted::Replier, run: impl FnOnce() -> Result<T, String> + Send + 'static) {
-    use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
+    use vibevalley_server::gateway::bridge::{BizCode, Envelope, refusal};
     let answer = reply.clone();
     if worker()
         .try_send(Box::new(move || {

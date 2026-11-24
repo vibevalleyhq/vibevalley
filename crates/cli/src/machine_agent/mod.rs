@@ -7,8 +7,6 @@ pub mod session;
 pub mod worktree;
 
 use std::collections::{HashMap, HashSet};
-use std::fs;
-use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -33,7 +31,7 @@ pub use vibevalley_runtime::sandbox::Secret;
 use self::mcp_proxy::{LocalMcpProxy, PendingMcpMap, resolve_mcp_response};
 use self::session::ManagedSession;
 use self::worktree::WorktreeManager;
-use crate::{Failure, exit};
+use crate::{Failure, exit, load_secret_json, save_secret_json};
 
 pub const MACHINE_AUTH_FILE: &str = "machine-auth.json";
 const RECONNECT_MIN_DELAY: Duration = Duration::from_secs(1);
@@ -60,71 +58,12 @@ pub fn machine_auth_path(home: &Path) -> PathBuf {
 
 /// Loads `$VIBEVALLEY_HOME/machine-auth.json`, returning `Ok(None)` when absent.
 pub fn load_machine_auth(home: &Path) -> Result<Option<MachineAuthConfig>, Failure> {
-    let path = machine_auth_path(home);
-    let raw = match fs::read_to_string(&path) {
-        Ok(content) => content,
-        Err(err) if err.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(err) => {
-            return Err(Failure::new(exit::OTHER, "Auth", format!("failed to read {}: {err}", path.display())));
-        }
-    };
-    let cfg: MachineAuthConfig = serde_json::from_str(&raw).map_err(|err| {
-        Failure::new(
-            exit::OTHER,
-            "Auth",
-            format!(
-                "invalid machine credentials file {} (line {}, column {})",
-                path.display(),
-                err.line(),
-                err.column()
-            ),
-        )
-    })?;
-    Ok(Some(cfg))
+    load_secret_json(&machine_auth_path(home), "machine credentials")
 }
 
 /// Persists `config` atomically to `$VIBEVALLEY_HOME/machine-auth.json` with `0o600` permissions on Unix.
 pub fn save_machine_auth(home: &Path, config: &MachineAuthConfig) -> Result<PathBuf, Failure> {
-    fs::create_dir_all(home).map_err(|err| Failure::new(exit::OTHER, "Auth", format!("failed to create home directory {}: {err}", home.display())))?;
-    let body = serde_json::to_string_pretty(config).map_err(|err| Failure::new(exit::OTHER, "Auth", format!("failed to encode machine credentials: {err}")))?;
-
-    let path = machine_auth_path(home);
-    let tmp_name = format!(
-        ".machine-auth.json.tmp.{}.{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0)
-    );
-    let tmp_path = home.join(tmp_name);
-
-    let write_res = (|| -> std::io::Result<()> {
-        let mut opts = fs::OpenOptions::new();
-        opts.write(true).create_new(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            opts.mode(0o600);
-        }
-        let mut file = opts.open(&tmp_path)?;
-        file.write_all(body.as_bytes())?;
-        file.write_all(b"\n")?;
-        file.sync_all()?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&tmp_path, fs::Permissions::from_mode(0o600))?;
-        }
-        fs::rename(&tmp_path, &path)?;
-        Ok(())
-    })();
-
-    if let Err(err) = write_res {
-        let _ = fs::remove_file(&tmp_path);
-        return Err(Failure::new(exit::OTHER, "Auth", format!("failed to write {}: {err}", path.display())));
-    }
-    Ok(path)
+    save_secret_json(home, MACHINE_AUTH_FILE, config, "machine credentials")
 }
 
 /// Converts a normalized `http://` or `https://` server base URL into `<ws(s)://server>/api/v1/machine/ws`.
@@ -198,32 +137,37 @@ pub fn build_runtime_registry(filter: &[String], scripted: bool) -> Arc<Registry
 }
 
 /// Probes each runtime in `registry` in parallel with bounded per-runtime timeout and maps to `MachineRuntimeSummary`.
-pub fn probe_runtime_summaries(registry: &Registry) -> Vec<MachineRuntimeSummary> {
+pub async fn probe_runtime_summaries_async(registry: &Registry) -> Vec<MachineRuntimeSummary> {
     let runtimes = registry.list().to_vec();
-    let mut handles = Vec::with_capacity(runtimes.len());
-    for runtime in runtimes {
-        let handle = std::thread::Builder::new()
-            .name(format!("vv-probe-{}", runtime.id()))
-            .spawn(move || probe_single_runtime(&runtime))
-            .ok();
-        handles.push(handle);
+    let mut set = tokio::task::JoinSet::new();
+    for (idx, runtime) in runtimes.into_iter().enumerate() {
+        set.spawn(async move { (idx, probe_single_runtime_async(&runtime).await) });
     }
-    handles.into_iter().filter_map(|h| h.and_then(|jh| jh.join().ok())).collect()
+    let mut results = Vec::new();
+    while let Some(joined) = set.join_next().await {
+        if let Ok(item) = joined {
+            results.push(item);
+        }
+    }
+    results.sort_by_key(|(idx, _)| *idx);
+    results.into_iter().map(|(_, s)| s).collect()
 }
 
-fn probe_single_runtime(runtime: &Arc<dyn Runtime>) -> MachineRuntimeSummary {
+async fn probe_single_runtime_async(runtime: &Arc<dyn Runtime>) -> MachineRuntimeSummary {
     let bare_id = runtime.id().strip_prefix("acp:").unwrap_or(runtime.id()).to_string();
     let label = runtime.display_name().to_string();
     let caps = runtime.capabilities();
 
-    let rt_clone = runtime.clone();
-    let installation = run_with_timeout(RUNTIME_PROBE_TIMEOUT, move || rt_clone.installation()).unwrap_or(oar::Installation::NotInstalled);
+    let installation = tokio::time::timeout(RUNTIME_PROBE_TIMEOUT, runtime.installation())
+        .await
+        .unwrap_or(oar::Installation::NotInstalled);
     let available = matches!(installation, oar::Installation::Available { .. });
 
-    // Only call blocking `list_models()` eagerly for fast in-process runtimes (`scripted`) so daemon startup stays instant.
+    // Only call `list_models()` eagerly for fast in-process runtimes (`scripted`) so daemon startup stays instant.
     let models = if available && bare_id == "scripted" {
         runtime
             .list_models()
+            .await
             .unwrap_or_default()
             .into_iter()
             .map(|m| ModelEntry {
@@ -255,17 +199,6 @@ fn probe_single_runtime(runtime: &Arc<dyn Runtime>) -> MachineRuntimeSummary {
         capabilities,
         available,
     }
-}
-
-fn run_with_timeout<T: Send + 'static>(limit: Duration, f: impl FnOnce() -> T + Send + 'static) -> Option<T> {
-    let (tx, rx) = flume::bounded(1);
-    std::thread::Builder::new()
-        .name("vv-machine-probe".into())
-        .spawn(move || {
-            let _ = tx.send(f());
-        })
-        .ok()?;
-    rx.recv_timeout(limit).ok()
 }
 
 /// Active outbound WebSocket channel slot shared across event pumps and local `/mcp` proxies.
@@ -349,8 +282,8 @@ pub struct MachineAgent {
 }
 
 impl MachineAgent {
-    pub fn new(config: MachineAgentConfig, registry: Arc<Registry>, cancel: CancellationToken) -> Self {
-        let runtimes = probe_runtime_summaries(&registry);
+    pub async fn new_async(config: MachineAgentConfig, registry: Arc<Registry>, cancel: CancellationToken) -> Self {
+        let runtimes = probe_runtime_summaries_async(&registry).await;
         let worktrees = Arc::new(WorktreeManager::new(config.workdir.clone()));
         Self {
             config,
@@ -723,10 +656,9 @@ impl MachineAgent {
                 opts.effort = Some(effort);
             }
 
-            let open_result = tokio::task::spawn_blocking(move || runtime.open(opts)).await;
-            let oar_session = match open_result {
-                Ok(Ok(session)) => session,
-                Ok(Err(err)) => {
+            let oar_session = match runtime.open(opts).await {
+                Ok(session) => session,
+                Err(err) => {
                     proxy.shutdown();
                     if ephemeral && let Some(wt) = &owned_worktree {
                         let _ = worktrees.cleanup_worktree(wt);
@@ -740,32 +672,18 @@ impl MachineAgent {
                     }));
                     return;
                 }
-                Err(join_err) => {
-                    proxy.shutdown();
-                    if ephemeral && let Some(wt) = &owned_worktree {
-                        let _ = worktrees.cleanup_worktree(wt);
-                    }
-                    transport.send(MachineWireFrame::MachineSessionOpened(MachineSessionOpened {
-                        request_id: req.request_id,
-                        session_id: req.session_id,
-                        ok: false,
-                        workdir: None,
-                        error: Some(format!("runtime open panicked: {join_err}")),
-                    }));
-                    return;
-                }
             };
 
             if cancel.is_cancelled() {
                 proxy.shutdown();
-                oar_session.dispose();
+                oar_session.dispose().await;
                 if ephemeral && let Some(wt) = &owned_worktree {
                     let _ = worktrees.cleanup_worktree(wt);
                 }
                 return;
             }
 
-            let events_rx = oar_session.events_with_history();
+            let mut events_rx = oar_session.events_with_history();
             let managed = Arc::new(ManagedSession::new(
                 req.session_id.clone(),
                 workdir.clone(),
@@ -790,8 +708,8 @@ impl MachineAgent {
                     tokio::select! {
                         biased;
                         () = cancel.cancelled() => break,
-                        event = events_rx.recv_async() => {
-                            let Ok(ev) = event else { break };
+                        event = events_rx.recv() => {
+                            let Some(ev) = event else { break };
                             let wire = managed.record_and_forward(&ev, &transport);
                             if wire.terminal {
                                 break;
@@ -818,15 +736,7 @@ impl MachineAgent {
         let worktrees = self.worktrees.clone();
         let transport = self.transport.clone();
         tokio::spawn(async move {
-            let ack = tokio::task::spawn_blocking(move || managed.handle_input(&req, &worktrees))
-                .await
-                .unwrap_or_else(|e| MachineSessionAck {
-                    request_id: String::new(),
-                    session_id: String::new(),
-                    input_id: String::new(),
-                    ok: false,
-                    error: Some(format!("input dispatch panicked: {e}")),
-                });
+            let ack = managed.handle_input(&req, &worktrees).await;
             transport.send(MachineWireFrame::MachineSessionAck(ack));
         });
     }
@@ -845,15 +755,7 @@ impl MachineAgent {
 
         let transport = self.transport.clone();
         tokio::spawn(async move {
-            let ack = tokio::task::spawn_blocking(move || managed.handle_respond(&req))
-                .await
-                .unwrap_or_else(|e| MachineSessionAck {
-                    request_id: String::new(),
-                    session_id: String::new(),
-                    input_id: String::new(),
-                    ok: false,
-                    error: Some(format!("respond dispatch panicked: {e}")),
-                });
+            let ack = managed.handle_respond(&req).await;
             transport.send(MachineWireFrame::MachineSessionAck(ack));
         });
     }

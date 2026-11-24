@@ -1,17 +1,21 @@
-use super::telemetry::TelemetryEvent;
-use super::{Error, Read, Result, Signal, Store, Task, TaskStatus, Tx, WaitMode};
+use std::collections::{HashMap, HashSet};
+use std::future::Future;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use futures_util::FutureExt as _;
 use serde_json::{Value, json};
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
-};
-use tokio::sync::Notify;
+use tokio::sync::{Mutex as AsyncMutex, Notify, mpsc};
 use tokio_util::sync::CancellationToken;
 
+use super::telemetry::TelemetryEvent;
+use super::{Error, Read, Result, Signal, Store, Task, TaskStatus, Tx, WaitMode};
+use crate::BoxFuture;
+
 const WOKEN: &str = "__durable_woken_signal";
-type Phase = Arc<dyn Fn(&TaskContext) -> Result<Transition> + Send + Sync>;
+
+type Phase = Arc<dyn Fn(TaskContext) -> BoxFuture<'static, Result<Transition>> + Send + Sync>;
+
 pub enum Transition {
     Next {
         phase: String,
@@ -33,119 +37,131 @@ pub enum Transition {
     Fail(String),
 }
 
-struct CancelHandle {
-    token: CancellationToken,
-    // Dropping `tx` synchronously in `cancel()` wakes sync `flume::Selector` waiters
-    // immediately without async scheduling lag.
-    tx: Mutex<Option<flume::Sender<()>>>,
-    rx: flume::Receiver<()>,
-}
-
-impl CancelHandle {
-    fn new(parent: &CancellationToken) -> Arc<Self> {
-        let token = parent.child_token();
-        let (tx, rx) = flume::bounded(0);
-        let tx = if token.is_cancelled() { None } else { Some(tx) };
-        Arc::new(Self { token, tx: Mutex::new(tx), rx })
-    }
-
-    fn cancel(&self) {
-        self.token.cancel();
-        self.tx.lock().unwrap().take();
-    }
-}
-
+#[derive(Clone)]
 pub struct TaskContext {
     pub task: Task,
     pub store: Store,
     pub signal: Option<Signal>,
     pub children: Vec<Task>,
-    cancel: Arc<CancelHandle>,
+    cancel: CancellationToken,
 }
+
 impl TaskContext {
     pub fn is_cancelled(&self) -> bool {
-        self.cancel.token.is_cancelled()
+        self.cancel.is_cancelled()
     }
+
     pub fn cancel_token(&self) -> CancellationToken {
-        self.cancel.token.clone()
+        self.cancel.clone()
     }
-    /// Disconnection wakes a phase blocked on an external model or tool.
-    pub fn cancellation(&self) -> flume::Receiver<()> {
-        self.cancel.rx.clone()
-    }
-    fn live_task(&self, tx: &Read<'_>) -> Result<Task> {
-        let task = tx.task(&self.task.id)?;
+
+    async fn live_task(&self, tx: &Read<'_>) -> Result<Task> {
+        let task = tx.task_async(&self.task.id).await?;
         if self.is_cancelled() || task.status != TaskStatus::Running {
             return Err(Error::Invalid("phase is no longer running".into()));
         }
         Ok(task)
     }
-    pub fn checkpoint(&self, data: &Value) -> Result<()> {
-        self.store.write(|tx| {
-            let mut task = self.live_task(tx)?;
-            task.checkpoint = data.clone();
-            task.restart_count = 0;
-            let phase = task.phase_name.clone();
-            let task_id = task.id.clone();
-            let at_ms = tx.now_ms;
-            tx.update_task(&task)?;
-            tx.record_telemetry(TelemetryEvent::Checkpoint { task_id, phase, at_ms });
-            Ok(())
-        })
+
+    pub async fn checkpoint(&self, data: &Value) -> Result<()> {
+        let data = data.clone();
+        let tc = self.clone();
+        self.store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let mut task = tc.live_task(tx).await?;
+                    task.checkpoint = data;
+                    task.restart_count = 0;
+                    let phase = task.phase_name.clone();
+                    let task_id = task.id.clone();
+                    let at_ms = tx.now_ms;
+                    tx.update_task_async(&task).await?;
+                    tx.record_telemetry(TelemetryEvent::Checkpoint { task_id, phase, at_ms });
+                    Ok(())
+                })
+            })
+            .await
     }
-    pub fn memo(&self, key: &str, compute: impl FnOnce() -> Result<Value>) -> Result<Value> {
+
+    pub async fn memo<F, Fut>(&self, key: &str, compute: F) -> Result<Value>
+    where
+        F: FnOnce() -> Fut,
+        Fut: Future<Output = Result<Value>>,
+    {
         if key == WOKEN {
             return Err(Error::Invalid("reserved memo key".into()));
         }
-        if let Some(value) = self.store.read(|r| Ok(self.live_task(r)?.memo.get(key).cloned()))? {
+        let key_owned = key.to_owned();
+        let tc = self.clone();
+        if let Some(value) = self
+            .store
+            .read_async(move |r| Box::pin(async move { Ok(tc.live_task(r).await?.memo.get(&key_owned).cloned()) }))
+            .await?
+        {
             return Ok(value);
         }
-        let value = compute()?;
-        self.store.write(|tx| {
-            let mut task = self.live_task(tx)?;
-            if let Some(prev) = task.memo.get(key) {
-                return Ok(prev.clone());
-            }
-            task.memo
-                .as_object_mut()
-                .ok_or_else(|| Error::Invalid("task memo must be an object".into()))?
-                .insert(key.into(), value.clone());
-            tx.update_task(&task)?;
-            Ok(value)
-        })
+        let value = compute().await?;
+        let key_owned = key.to_owned();
+        let tc = self.clone();
+        self.store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let mut task = tc.live_task(tx).await?;
+                    if let Some(prev) = task.memo.get(&key_owned) {
+                        return Ok(prev.clone());
+                    }
+                    task.memo
+                        .as_object_mut()
+                        .ok_or_else(|| Error::Invalid("task memo must be an object".into()))?
+                        .insert(key_owned, value.clone());
+                    tx.update_task_async(&task).await?;
+                    Ok(value)
+                })
+            })
+            .await
     }
-    pub fn spawn_child(&self, mut task: Task) -> Result<(Task, bool)> {
+
+    pub async fn spawn_child(&self, mut task: Task) -> Result<(Task, bool)> {
         task.owner_task_id = self.task.id.clone();
         if task.conversation_id.is_empty() {
             task.conversation_id.clone_from(&self.task.conversation_id);
         }
-        self.store.write(|tx| {
-            self.live_task(tx)?;
-            tx.create_task(task)
-        })
+        let tc = self.clone();
+        self.store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    tc.live_task(tx).await?;
+                    tx.create_task_async(task).await
+                })
+            })
+            .await
     }
 }
 
 struct Runtime {
-    active: HashMap<String, Arc<CancelHandle>>,
+    active: HashMap<String, CancellationToken>,
     handlers: HashMap<(String, String), Phase>,
     started: bool,
 }
+
 struct Engine {
     store: Store,
     rt: Mutex<Runtime>,
+    /// Serializes `dispatch`, `recover`, and `abort` so `rt.active` stays consistent with durable state.
+    dispatch_lock: AsyncMutex<()>,
     idle: Notify,
     max_workers: usize,
     wake: Notify,
     shutdown: CancellationToken,
 }
+
 struct Owner {
     engine: Arc<Engine>,
     coordinator: Mutex<Option<tokio::task::JoinHandle<()>>>,
-    coord_is_current_thread: bool,
 }
+
 impl Owner {
-    fn close(&self) {
+    fn signal_shutdown(&self) -> Option<tokio::task::JoinHandle<()>> {
         let e = &self.engine;
         {
             let rt = e.rt.lock().unwrap();
@@ -155,25 +171,22 @@ impl Owner {
             }
         }
         e.wake.notify_one();
-        let coordinator = self.coordinator.lock().unwrap().take();
-        let on_current_thread = tokio::runtime::Handle::try_current().is_ok_and(|h| h.runtime_flavor() == tokio::runtime::RuntimeFlavor::CurrentThread);
-        if let Some(handle) = coordinator {
-            if self.coord_is_current_thread && on_current_thread {
-                // On a single-threaded runtime the coordinator is parked at an `.await` point;
-                // awaiting it synchronously would deadlock this thread.
-                handle.abort();
-            } else {
-                crate::rt::block_on(async move {
-                    let _ = handle.await;
-                });
-            }
+        self.coordinator.lock().unwrap().take()
+    }
+
+    async fn close_async(&self) {
+        if let Some(handle) = self.signal_shutdown() {
+            let _ = handle.await;
         }
-        crate::rt::block_on(wait_idle(e));
+        wait_idle(&self.engine).await;
     }
 }
+
 impl Drop for Owner {
     fn drop(&mut self) {
-        self.close();
+        if let Some(handle) = self.signal_shutdown() {
+            handle.abort();
+        }
     }
 }
 
@@ -191,6 +204,7 @@ async fn wait_idle(e: &Engine) {
 
 #[derive(Clone)]
 pub struct Scheduler(Arc<Owner>);
+
 impl Scheduler {
     pub fn new(store: Store, max_workers: usize) -> Self {
         let changes = store.subscribe_tasks().expect("scheduler requires an open durable store");
@@ -201,109 +215,159 @@ impl Scheduler {
                 handlers: HashMap::new(),
                 started: false,
             }),
+            dispatch_lock: AsyncMutex::new(()),
             idle: Notify::new(),
             max_workers: if max_workers == 0 { 32 } else { max_workers },
             wake: Notify::new(),
             shutdown: CancellationToken::new(),
         });
         let handle = crate::rt::current_or_global_handle();
-        let coord_is_current_thread = handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::CurrentThread;
         let e = Arc::clone(&engine);
         let coordinator = handle.spawn(run_scheduler(e, changes));
         Self(Arc::new(Owner {
             engine,
             coordinator: Mutex::new(Some(coordinator)),
-            coord_is_current_thread,
         }))
     }
+
     pub fn store(&self) -> &Store {
         &self.0.engine.store
     }
-    pub fn register(&self, kind: &str, phase: &str, handler: impl Fn(&TaskContext) -> Result<Transition> + Send + Sync + 'static) {
-        self.0.engine.rt.lock().unwrap().handlers.insert((kind.into(), phase.into()), Arc::new(handler));
+
+    pub fn register<F, Fut>(&self, kind: &str, phase: &str, handler: F)
+    where
+        F: Fn(TaskContext) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Transition>> + Send + 'static,
+    {
+        let boxed: Phase = Arc::new(move |tc| Box::pin(handler(tc)));
+        self.0.engine.rt.lock().unwrap().handlers.insert((kind.into(), phase.into()), boxed);
     }
-    pub fn start(&self, task: Task) -> Result<(Task, bool)> {
+
+    pub async fn start(&self, task: Task) -> Result<(Task, bool)> {
         let e = &self.0.engine;
-        let mut rt = e.rt.lock().unwrap();
         if e.shutdown.is_cancelled() {
             return Err(Error::Closed);
         }
-        let result = e.store.write(|tx| tx.create_task(task))?;
-        rt.started = true;
+        let result = e.store.write_async(move |tx| Box::pin(async move { tx.create_task_async(task).await })).await?;
+        e.rt.lock().unwrap().started = true;
         e.wake.notify_one();
         Ok(result)
     }
-    pub fn send_signal(&self, id: &str, name: &str, key: Option<&str>, payload: &Value) -> Result<(Signal, bool)> {
-        self.store().write(|tx| {
-            let signal = tx.send_signal(id, name, key, payload)?;
-            if let Ok(mut task) = tx.task(id)
-                && task.status == TaskStatus::Sleeping
-            {
-                wake_sleep(tx, &mut task)?;
-            }
-            Ok(signal)
-        })
+
+    pub async fn send_signal(&self, id: &str, name: &str, key: Option<&str>, payload: &Value) -> Result<(Signal, bool)> {
+        let id = id.to_owned();
+        let name = name.to_owned();
+        let key = key.map(str::to_owned);
+        let payload = payload.clone();
+        self.store()
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let signal = tx.send_signal_async(&id, &name, key.as_deref(), &payload).await?;
+                    if let Ok(mut task) = tx.task_async(&id).await
+                        && task.status == TaskStatus::Sleeping
+                    {
+                        wake_sleep(tx, &mut task).await?;
+                    }
+                    Ok(signal)
+                })
+            })
+            .await
     }
-    pub fn recover(&self) -> Result<()> {
+
+    pub async fn recover(&self) -> Result<()> {
         let e = &self.0.engine;
-        let mut rt = e.rt.lock().unwrap();
+        let _guard = e.dispatch_lock.lock().await;
         if e.shutdown.is_cancelled() {
             return Err(Error::Closed);
         }
-        let mut aborts = vec![];
-        e.store.write(|tx|{
-            for t in tx.active_tasks()? {
-                if rt.active.contains_key(&t.id){continue;}
-                let mut t=tx.task(&t.id)?;
-                match t.status {
-                    TaskStatus::Running|TaskStatus::Completing=>{
-                        if !t.is_model_task{
-                            t.restart_count=t.restart_count.saturating_add(1);
-                            if t.restart_count>=t.restart_limit{
-                                tx.update_task(&t)?;
-                                aborts.extend(abort_tree(tx,&t.id,"restart_limit")?);
-                                tx.alert(Some(&t.conversation_id),&json!({"kind":"restart_limit","taskId":t.id,"conversationId":t.conversation_id,"title":"Task restart limit tripped","message":format!("task {} crashed {} times without advancing checkpoint",t.id,t.restart_count),"createdAtMs":tx.now_ms}))?;
-                                continue;
-                            }
+        let active_ids: HashSet<String> = e.rt.lock().unwrap().active.keys().cloned().collect();
+        let aborts = e
+            .store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let mut aborts = vec![];
+                    for t in tx.active_tasks_async().await? {
+                        if active_ids.contains(&t.id) {
+                            continue;
                         }
-                        t.status=TaskStatus::Pending;tx.update_task(&t)?;
+                        let mut t = tx.task_async(&t.id).await?;
+                        match t.status {
+                            TaskStatus::Running | TaskStatus::Completing => {
+                                if !t.is_model_task {
+                                    t.restart_count = t.restart_count.saturating_add(1);
+                                    if t.restart_count >= t.restart_limit {
+                                        tx.update_task_async(&t).await?;
+                                        aborts.extend(abort_tree(tx, &t.id, "restart_limit").await?);
+                                        tx.alert_async(
+                                            Some(&t.conversation_id),
+                                            &json!({
+                                                "kind": "restart_limit",
+                                                "taskId": t.id,
+                                                "conversationId": t.conversation_id,
+                                                "title": "Task restart limit tripped",
+                                                "message": format!("task {} crashed {} times without advancing checkpoint", t.id, t.restart_count),
+                                                "createdAtMs": tx.now_ms
+                                            }),
+                                        )
+                                        .await?;
+                                        continue;
+                                    }
+                                }
+                                t.status = TaskStatus::Pending;
+                                tx.update_task_async(&t).await?;
+                            }
+                            TaskStatus::Sleeping => {
+                                wake_sleep(tx, &mut t).await?;
+                            }
+                            TaskStatus::Waiting => {
+                                wake_children(tx, &mut t).await?;
+                            }
+                            _ => {}
+                        }
                     }
-                    TaskStatus::Sleeping=>{wake_sleep(tx,&mut t)?;}
-                    TaskStatus::Waiting=>{wake_children(tx,&mut t)?;}
-                    _=>{}
-                }
-            } Ok(())
-        })?;
-        rt.started = true;
-        record_abort(&mut rt, aborts);
+                    Ok(aborts)
+                })
+            })
+            .await?;
+        {
+            let mut rt = e.rt.lock().unwrap();
+            rt.started = true;
+            record_abort(&mut rt, aborts);
+        }
         e.wake.notify_one();
         Ok(())
     }
-    pub fn abort(&self, id: &str) -> Result<()> {
+
+    pub async fn abort(&self, id: &str) -> Result<()> {
         let e = &self.0.engine;
-        let mut rt = e.rt.lock().unwrap();
+        let _guard = e.dispatch_lock.lock().await;
         if e.shutdown.is_cancelled() {
             return Err(Error::Closed);
         }
-        let order = e.store.write(|tx| abort_tree(tx, id, "aborted"))?;
+        let id = id.to_owned();
+        let order = e
+            .store
+            .write_async(move |tx| Box::pin(async move { abort_tree(tx, &id, "aborted").await }))
+            .await?;
+        let mut rt = e.rt.lock().unwrap();
         record_abort(&mut rt, order);
         Ok(())
     }
+
     pub fn wake(&self) {
         self.0.engine.wake.notify_one();
     }
+
     pub fn active_workers(&self) -> usize {
         self.0.engine.rt.lock().unwrap().active.len()
     }
+
     pub async fn wait_until_done(&self, id: &str, cancel: &CancellationToken) -> Result<Task> {
-        let changes = self.store().subscribe_tasks()?;
+        let mut changes = self.store().subscribe_tasks()?;
         let id_owned = id.to_owned();
         loop {
-            let store = self.store().clone();
             let task_id = id_owned.clone();
-            let t = tokio::task::spawn_blocking(move || store.read(|r| r.task(&task_id)))
-                .await
-                .map_err(|_| Error::Closed)??;
+            let t = self.store().read_async(move |r| Box::pin(async move { r.task_async(&task_id).await })).await?;
             if t.status == TaskStatus::Terminal {
                 return Ok(t);
             }
@@ -314,24 +378,24 @@ impl Scheduler {
                 biased;
                 _ = cancel.cancelled() => return Err(Error::Closed),
                 _ = self.0.engine.shutdown.cancelled() => return Err(Error::Closed),
-                msg = changes.recv_async() => {
-                    if msg.is_err() {
+                msg = changes.recv() => {
+                    if msg.is_none() {
                         return Err(Error::Closed);
                     }
                 }
             }
         }
     }
-    pub fn wait(&self, id: &str, timeout: Duration) -> Result<Task> {
+
+    pub async fn wait(&self, id: &str, timeout: Duration) -> Result<Task> {
         let never = CancellationToken::new();
-        crate::rt::block_on(async {
-            tokio::time::timeout(timeout, self.wait_until_done(id, &never))
-                .await
-                .map_err(|_| Error::Timeout)?
-        })
+        tokio::time::timeout(timeout, self.wait_until_done(id, &never))
+            .await
+            .map_err(|_| Error::Timeout)?
     }
-    pub fn close(&self) {
-        self.0.close();
+
+    pub async fn close(&self) {
+        self.0.close_async().await;
     }
 }
 
@@ -342,36 +406,38 @@ fn record_abort(rt: &mut Runtime, ids: Vec<String>) {
         }
     }
 }
-fn abort_tree(tx: &mut Tx<'_>, id: &str, reason: &str) -> Result<Vec<String>> {
+
+async fn abort_tree(tx: &mut Tx<'_>, id: &str, reason: &str) -> Result<Vec<String>> {
     let mut stack = vec![(id.to_owned(), false)];
     let mut order = vec![];
     let mut visited = HashSet::new();
     while let Some((next, post)) = stack.pop() {
         if !post {
             if visited.insert(next.clone()) {
-                let children = tx.children(&next)?;
+                let children = tx.children_async(&next).await?;
                 stack.push((next, true));
                 stack.extend(children.into_iter().rev().map(|c| (c.id, false)));
             }
         } else {
-            let mut task = tx.task(&next)?;
+            let mut task = tx.task_async(&next).await?;
             if task.status != TaskStatus::Terminal {
                 task.status = TaskStatus::Terminal;
                 task.terminal_reason = if next == id { reason.into() } else { "aborted".into() };
                 task.wake_until_ms = 0;
                 task.wait_signal_name.clear();
-                tx.update_task(&task)?;
+                tx.update_task_async(&task).await?;
                 order.push(next);
             }
         }
     }
     Ok(order)
 }
-fn wake_sleep(tx: &mut Tx<'_>, t: &mut Task) -> Result<bool> {
+
+async fn wake_sleep(tx: &mut Tx<'_>, t: &mut Task) -> Result<bool> {
     let sig = if t.wait_signal_name.is_empty() {
         None
     } else {
-        tx.consume_first_signal(&t.id, &t.wait_signal_name)?
+        tx.consume_first_signal_async(&t.id, &t.wait_signal_name).await?
     };
     if sig.is_none() && (t.wake_until_ms <= 0 || t.wake_until_ms > tx.now_ms) {
         return Ok(false);
@@ -385,14 +451,15 @@ fn wake_sleep(tx: &mut Tx<'_>, t: &mut Task) -> Result<bool> {
     t.status = TaskStatus::Pending;
     t.wake_until_ms = 0;
     t.wait_signal_name.clear();
-    tx.update_task(t)?;
+    tx.update_task_async(t).await?;
     Ok(true)
 }
-fn wake_children(tx: &mut Tx<'_>, t: &mut Task) -> Result<bool> {
+
+async fn wake_children(tx: &mut Tx<'_>, t: &mut Task) -> Result<bool> {
     let mut completed = 0;
     let mut failed = 0;
     for id in &t.wait_task_ids {
-        match tx.task(id) {
+        match tx.task_async(id).await {
             Ok(c) if c.status == TaskStatus::Terminal => {
                 if c.terminal_reason == "completed" {
                     completed += 1;
@@ -414,7 +481,7 @@ fn wake_children(tx: &mut Tx<'_>, t: &mut Task) -> Result<bool> {
     };
     if ready {
         t.status = TaskStatus::Pending;
-        tx.update_task(t)?;
+        tx.update_task_async(t).await?;
     }
     Ok(ready)
 }
@@ -424,18 +491,14 @@ enum DispatchStep {
     Stop,
 }
 
-async fn run_scheduler(e: Arc<Engine>, changes: flume::Receiver<()>) {
+async fn run_scheduler(e: Arc<Engine>, mut changes: mpsc::Receiver<()>) {
     loop {
-        let engine = Arc::clone(&e);
-        let step = tokio::task::spawn_blocking(move || {
-            let mut rt = engine.rt.lock().unwrap();
-            if engine.shutdown.is_cancelled() {
-                return DispatchStep::Stop;
-            }
-            if !rt.started {
-                return DispatchStep::Wait(None);
-            }
-            match dispatch(&engine, &mut rt) {
+        let step = if e.shutdown.is_cancelled() {
+            DispatchStep::Stop
+        } else if !e.rt.lock().unwrap().started {
+            DispatchStep::Wait(None)
+        } else {
+            match dispatch(&e).await {
                 Ok(t) => DispatchStep::Wait(t),
                 Err(Error::Closed) => DispatchStep::Stop,
                 Err(err) => {
@@ -443,11 +506,10 @@ async fn run_scheduler(e: Arc<Engine>, changes: flume::Receiver<()>) {
                     DispatchStep::Wait(Some(Duration::from_millis(100)))
                 }
             }
-        })
-        .await;
+        };
         let timeout = match step {
-            Ok(DispatchStep::Wait(t)) => t,
-            Ok(DispatchStep::Stop) | Err(_) => break,
+            DispatchStep::Wait(t) => t,
+            DispatchStep::Stop => break,
         };
         if e.shutdown.is_cancelled() {
             break;
@@ -459,8 +521,8 @@ async fn run_scheduler(e: Arc<Engine>, changes: flume::Receiver<()>) {
                     biased;
                     _ = e.shutdown.cancelled() => break,
                     _ = e.wake.notified() => {}
-                    msg = changes.recv_async() => {
-                        if msg.is_err() {
+                    msg = changes.recv() => {
+                        if msg.is_none() {
                             break;
                         }
                     }
@@ -472,8 +534,8 @@ async fn run_scheduler(e: Arc<Engine>, changes: flume::Receiver<()>) {
                     biased;
                     _ = e.shutdown.cancelled() => break,
                     _ = e.wake.notified() => {}
-                    msg = changes.recv_async() => {
-                        if msg.is_err() {
+                    msg = changes.recv() => {
+                        if msg.is_none() {
                             break;
                         }
                     }
@@ -483,49 +545,65 @@ async fn run_scheduler(e: Arc<Engine>, changes: flume::Receiver<()>) {
     }
 }
 
-fn dispatch(e: &Arc<Engine>, rt: &mut Runtime) -> Result<Option<Duration>> {
-    let capacity = e.max_workers.saturating_sub(rt.active.len());
-    let mut claimed = vec![];
-    let mut nearest: Option<i64> = None;
-    e.store.write(|tx| {
-        for mut task in tx.active_tasks()? {
-            if rt.active.contains_key(&task.id) {
-                continue;
-            }
-            match task.status {
-                TaskStatus::Sleeping => {
-                    if !wake_sleep(tx, &mut task)? && task.wake_until_ms > 0 {
-                        nearest = Some(nearest.map_or(task.wake_until_ms, |n| n.min(task.wake_until_ms)));
+async fn dispatch(e: &Arc<Engine>) -> Result<Option<Duration>> {
+    let _guard = e.dispatch_lock.lock().await;
+    let (active_ids, capacity) = {
+        let rt = e.rt.lock().unwrap();
+        let active_ids: HashSet<String> = rt.active.keys().cloned().collect();
+        let capacity = e.max_workers.saturating_sub(active_ids.len());
+        (active_ids, capacity)
+    };
+    let (claimed, nearest) = e
+        .store
+        .write_async(move |tx| {
+            Box::pin(async move {
+                let mut claimed = vec![];
+                let mut nearest: Option<i64> = None;
+                for mut task in tx.active_tasks_async().await? {
+                    if active_ids.contains(&task.id) {
+                        continue;
                     }
+                    match task.status {
+                        TaskStatus::Sleeping => {
+                            if !wake_sleep(tx, &mut task).await? && task.wake_until_ms > 0 {
+                                nearest = Some(nearest.map_or(task.wake_until_ms, |n| n.min(task.wake_until_ms)));
+                            }
+                        }
+                        TaskStatus::Waiting => {
+                            wake_children(tx, &mut task).await?;
+                        }
+                        _ => {}
+                    }
+                    if task.status != TaskStatus::Pending || claimed.len() >= capacity {
+                        continue;
+                    }
+                    task.status = TaskStatus::Running;
+                    tx.update_task_async(&task).await?;
+                    let signal = task.memo.get(WOKEN).map(|v| serde_json::from_value(v.clone())).transpose()?;
+                    let mut children = vec![];
+                    for id in &task.wait_task_ids {
+                        match tx.task_async(id).await {
+                            Ok(t) => children.push(t),
+                            Err(Error::Missing(_)) => {}
+                            Err(e) => return Err(e),
+                        }
+                    }
+                    claimed.push((task, signal, children));
                 }
-                TaskStatus::Waiting => {
-                    wake_children(tx, &mut task)?;
-                }
-                _ => {}
-            }
-            if task.status != TaskStatus::Pending || claimed.len() >= capacity {
-                continue;
-            }
-            task.status = TaskStatus::Running;
-            tx.update_task(&task)?;
-            let signal = task.memo.get(WOKEN).map(|v| serde_json::from_value(v.clone())).transpose()?;
-            let mut children = vec![];
-            for id in &task.wait_task_ids {
-                match tx.task(id) {
-                    Ok(t) => children.push(t),
-                    Err(Error::Missing(_)) => {}
-                    Err(e) => return Err(e),
-                }
-            }
-            claimed.push((task, signal, children));
-        }
-        Ok(())
-    })?;
+                Ok((claimed, nearest))
+            })
+        })
+        .await?;
+
+    let handle = crate::rt::current_or_global_handle();
     for (task, signal, children) in claimed {
-        let cancel = CancelHandle::new(&e.shutdown);
-        rt.active.insert(task.id.clone(), Arc::clone(&cancel));
-        let handler = rt.handlers.get(&(task.kind.clone(), task.phase_name.clone())).cloned();
-        let engine = e.clone();
+        let cancel = e.shutdown.child_token();
+        let handler = {
+            let mut rt = e.rt.lock().unwrap();
+            rt.active.insert(task.id.clone(), cancel.clone());
+            rt.handlers.get(&(task.kind.clone(), task.phase_name.clone())).cloned()
+        };
+        let engine = Arc::clone(e);
         let tc = TaskContext {
             task,
             signal,
@@ -533,15 +611,28 @@ fn dispatch(e: &Arc<Engine>, rt: &mut Runtime) -> Result<Option<Duration>> {
             store: e.store.clone(),
             cancel,
         };
-        thread::spawn(move || {
+        handle.spawn(async move {
             let started_ms = engine.store.now_ms();
             let attempt = tc.task.restart_count.saturating_add(1);
             let resumed = tc.task.restart_count > 0 || !tc.task.checkpoint.is_null();
             let has_handler = handler.is_some();
-            let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match handler {
-                Some(handler) => handler(&tc),
-                None => Err(Error::Invalid(format!("unregistered phase {}/{}", tc.task.kind, tc.task.phase_name))),
-            }));
+            let task_id = tc.task.id.clone();
+            let conversation_id = tc.task.conversation_id.clone();
+            let kind = tc.task.kind.clone();
+            let phase_name = tc.task.phase_name.clone();
+            let cancel_check = tc.cancel.clone();
+
+            let caught = match handler {
+                Some(handler) => {
+                    let fut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| handler(tc)));
+                    match fut {
+                        Ok(f) => std::panic::AssertUnwindSafe(f).catch_unwind().await,
+                        Err(panic) => Err(panic),
+                    }
+                }
+                None => Ok(Err(Error::Invalid(format!("unregistered phase {kind}/{phase_name}")))),
+            };
+
             let (outcome, outcome_label, mut error_kind) = match caught {
                 Ok(Ok(tr)) => {
                     let (label, ek) = match &tr {
@@ -560,36 +651,49 @@ fn dispatch(e: &Arc<Engine>, rt: &mut Runtime) -> Result<Option<Duration>> {
                 ),
                 Err(_) => (Transition::Fail("phase panicked".into()), "fail", Some("phase_panicked".to_owned())),
             };
+
             let mut final_outcome = outcome_label.to_owned();
-            let mut rt = engine.rt.lock().unwrap();
-            if !engine.shutdown.is_cancelled() && !tc.is_cancelled() {
-                match engine.store.write(|tx| advance(tx, &tc.task.id, outcome)) {
+            let aborted_order = if !engine.shutdown.is_cancelled() && !cancel_check.is_cancelled() {
+                let tid = task_id.clone();
+                match engine
+                    .store
+                    .write_async(move |tx| Box::pin(async move { advance(tx, &tid, outcome).await }))
+                    .await
+                {
                     Ok(order) => {
                         if !order.is_empty() && final_outcome != "fail" {
                             final_outcome = "aborted".into();
                         }
-                        record_abort(&mut rt, order);
+                        order
                     }
                     Err(err) => {
                         final_outcome = "fail".into();
                         error_kind = Some("advance_failed".into());
-                        eprintln!("durable phase {}: {err}", tc.task.id);
+                        eprintln!("durable phase {task_id}: {err}");
+                        vec![]
                     }
                 }
-            } else if tc.is_cancelled() {
-                final_outcome = "cancelled".into();
+            } else {
+                if cancel_check.is_cancelled() {
+                    final_outcome = "cancelled".into();
+                }
+                vec![]
+            };
+
+            {
+                let mut rt = engine.rt.lock().unwrap();
+                record_abort(&mut rt, aborted_order);
+                rt.active.remove(&task_id);
+                engine.idle.notify_waiters();
+                engine.wake.notify_one();
             }
-            rt.active.remove(&tc.task.id);
-            engine.idle.notify_waiters();
-            engine.wake.notify_one();
-            drop(rt);
 
             let at_ms = engine.store.now_ms();
             engine.store.emit_telemetry(TelemetryEvent::Phase {
-                task_id: tc.task.id.clone(),
-                conversation_id: tc.task.conversation_id.clone(),
-                kind: tc.task.kind.clone(),
-                phase: tc.task.phase_name.clone(),
+                task_id,
+                conversation_id,
+                kind,
+                phase: phase_name,
                 attempt,
                 resumed,
                 outcome: final_outcome,
@@ -602,8 +706,8 @@ fn dispatch(e: &Arc<Engine>, rt: &mut Runtime) -> Result<Option<Duration>> {
     Ok(nearest.map(|until| Duration::from_millis((until - e.store.now_ms()).max(0) as u64)))
 }
 
-fn advance(tx: &mut Tx<'_>, id: &str, outcome: Transition) -> Result<Vec<String>> {
-    let mut t = tx.task(id)?;
+async fn advance(tx: &mut Tx<'_>, id: &str, outcome: Transition) -> Result<Vec<String>> {
+    let mut t = tx.task_async(id).await?;
     if t.status != TaskStatus::Running {
         return Ok(vec![]);
     }
@@ -646,13 +750,13 @@ fn advance(tx: &mut Tx<'_>, id: &str, outcome: Transition) -> Result<Vec<String>
             t.terminal_reason = "completed".into();
             t.result = result;
             t.error_text.clear();
-            tx.update_task(&t)?;
+            tx.update_task_async(&t).await?;
             return Ok(vec![]);
         }
         Transition::Fail(err) => {
             t.error_text = err;
-            tx.update_task(&t)?;
-            return abort_tree(tx, id, "failed");
+            tx.update_task_async(&t).await?;
+            return abort_tree(tx, id, "failed").await;
         }
     };
     if checkpoint.is_some() || (!phase.is_empty() && t.phase_name != phase) {
@@ -664,13 +768,13 @@ fn advance(tx: &mut Tx<'_>, id: &str, outcome: Transition) -> Result<Vec<String>
     if let Some(data) = checkpoint {
         t.checkpoint = data;
     }
-    tx.update_task(&t)?;
+    tx.update_task_async(&t).await?;
     match t.status {
         TaskStatus::Sleeping => {
-            wake_sleep(tx, &mut t)?;
+            wake_sleep(tx, &mut t).await?;
         }
         TaskStatus::Waiting => {
-            wake_children(tx, &mut t)?;
+            wake_children(tx, &mut t).await?;
         }
         _ => {}
     }
@@ -681,12 +785,13 @@ fn advance(tx: &mut Tx<'_>, id: &str, outcome: Transition) -> Result<Vec<String>
 mod tests {
     use super::*;
     use std::time::Instant;
+    use tokio::sync::Mutex as AsyncMutex;
 
-    #[test]
-    fn settle_immediately_wakes_sleeping_task_without_polling() -> Result<()> {
+    #[tokio::test]
+    async fn settle_immediately_wakes_sleeping_task_without_polling() -> Result<()> {
         let store = Store::memory()?;
         let scheduler = Scheduler::new(store.clone(), 4);
-        scheduler.register("waiter", "wait", |tc| {
+        scheduler.register("waiter", "wait", |tc| async move {
             if tc.signal.as_ref().is_some_and(|s| s.signal_name == "pi.submission_settled") {
                 return Ok(Transition::Complete(json!({"woken": true})));
             }
@@ -700,91 +805,126 @@ mod tests {
 
         let mut parent = Task::new("waiter", "wait");
         parent.id = "parent-waiter".into();
-        let sub_id = store.write(|tx| {
-            tx.create_conversation("child-conv", "mock")?;
-            let (sub, _) = tx.submit("child-conv", "req-1", "prompt", &json!({"text":"hi"}), Some(&parent.id))?;
-            Ok(sub.id)
-        })?;
-        scheduler.start(parent)?;
+        let parent_id = parent.id.clone();
+        let sub_id = store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    tx.create_conversation_async("child-conv", "mock").await?;
+                    let (sub, _) = tx
+                        .submit_async("child-conv", "req-1", "prompt", &json!({"text":"hi"}), Some(&parent_id))
+                        .await?;
+                    Ok(sub.id)
+                })
+            })
+            .await?;
+        scheduler.start(parent).await?;
 
-        // Wait until parent has transitioned into Sleeping on pi.submission_settled.
-        let changes = store.subscribe_tasks()?;
+        let mut changes = store.subscribe_tasks()?;
         let deadline = Instant::now() + Duration::from_secs(2);
-        while store.read(|r| r.task("parent-waiter"))?.status != TaskStatus::Sleeping {
+        while store.read_async(|r| Box::pin(async move { r.task_async("parent-waiter").await })).await?.status != TaskStatus::Sleeping {
             assert!(Instant::now() < deadline, "parent failed to reach Sleeping");
-            let _ = changes.recv_timeout(Duration::from_millis(50));
+            let _ = tokio::time::timeout(Duration::from_millis(50), changes.recv()).await;
         }
 
-        // Settle child submission directly via tx.settle (no Scheduler::send_signal).
         let t0 = Instant::now();
-        store.write(|tx| tx.settle(&sub_id, super::super::SubmissionStatus::Done, &json!({"ok": 1})))?;
-        let done = scheduler.wait("parent-waiter", Duration::from_secs(2))?;
+        store
+            .write_async(move |tx| Box::pin(async move { tx.settle_async(&sub_id, super::super::SubmissionStatus::Done, &json!({"ok": 1})).await }))
+            .await?;
+        let done = scheduler.wait("parent-waiter", Duration::from_secs(2)).await?;
         assert_eq!(done.terminal_reason, "completed");
         assert_eq!(done.result, json!({"woken": true}));
         assert!(t0.elapsed() < Duration::from_secs(1), "wakeup took too long: {:?}", t0.elapsed());
+        scheduler.close().await;
         Ok(())
     }
 
-    #[test]
-    fn settle_before_sleep_wakes_task_immediately_upon_sleeping() -> Result<()> {
+    #[tokio::test]
+    async fn settle_before_sleep_wakes_task_immediately_upon_sleeping() -> Result<()> {
         let store = Store::memory()?;
         let scheduler = Scheduler::new(store.clone(), 4);
-        let (tx_ready, rx_ready) = flume::bounded(1);
-        let (tx_go, rx_go) = flume::bounded(1);
+        let (tx_ready, mut rx_ready) = mpsc::unbounded_channel();
+        let (tx_go, rx_go) = mpsc::unbounded_channel();
+        let rx_go = Arc::new(AsyncMutex::new(rx_go));
         scheduler.register("waiter", "wait", move |tc| {
-            if tc.signal.as_ref().is_some_and(|s| s.signal_name == "pi.submission_settled") {
-                return Ok(Transition::Complete(json!({"woken": true})));
+            let tx_ready = tx_ready.clone();
+            let rx_go = Arc::clone(&rx_go);
+            async move {
+                if tc.signal.as_ref().is_some_and(|s| s.signal_name == "pi.submission_settled") {
+                    return Ok(Transition::Complete(json!({"woken": true})));
+                }
+                let _ = tx_ready.send(());
+                let _ = rx_go.lock().await.recv().await;
+                Ok(Transition::Sleep {
+                    phase: "wait".into(),
+                    checkpoint: None,
+                    until_ms: None,
+                    signal: Some("pi.submission_settled".into()),
+                })
             }
-            let _ = tx_ready.send(());
-            let _ = rx_go.recv();
-            Ok(Transition::Sleep {
-                phase: "wait".into(),
-                checkpoint: None,
-                until_ms: None,
-                signal: Some("pi.submission_settled".into()),
-            })
         });
 
         let mut parent = Task::new("waiter", "wait");
         parent.id = "parent-early".into();
-        let sub_id = store.write(|tx| {
-            tx.create_conversation("child-early", "mock")?;
-            let (sub, _) = tx.submit("child-early", "req-early", "prompt", &json!({"text":"hi"}), Some(&parent.id))?;
-            Ok(sub.id)
-        })?;
-        scheduler.start(parent)?;
-        rx_ready.recv_timeout(Duration::from_secs(2)).expect("task started");
+        let parent_id = parent.id.clone();
+        let sub_id = store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    tx.create_conversation_async("child-early", "mock").await?;
+                    let (sub, _) = tx
+                        .submit_async("child-early", "req-early", "prompt", &json!({"text":"hi"}), Some(&parent_id))
+                        .await?;
+                    Ok(sub.id)
+                })
+            })
+            .await?;
+        scheduler.start(parent).await?;
+        tokio::time::timeout(Duration::from_secs(2), rx_ready.recv())
+            .await
+            .expect("task started")
+            .expect("channel open");
 
-        // Settle child BEFORE parent returns Transition::Sleep.
-        store.write(|tx| tx.settle(&sub_id, super::super::SubmissionStatus::Done, &json!({"ok": 1})))?;
+        store
+            .write_async(move |tx| Box::pin(async move { tx.settle_async(&sub_id, super::super::SubmissionStatus::Done, &json!({"ok": 1})).await }))
+            .await?;
         let _ = tx_go.send(());
 
-        let done = scheduler.wait("parent-early", Duration::from_secs(2))?;
+        let done = scheduler.wait("parent-early", Duration::from_secs(2)).await?;
         assert_eq!(done.terminal_reason, "completed");
         assert_eq!(done.result, json!({"woken": true}));
+        scheduler.close().await;
         Ok(())
     }
 
-    #[test]
-    fn abort_tree_terminates_children_before_parent() -> Result<()> {
+    #[tokio::test]
+    async fn abort_tree_terminates_children_before_parent() -> Result<()> {
         let store = Store::memory()?;
-        store.write(|tx| {
-            for (id, owner) in [("root", ""), ("child", "root"), ("grandchild", "child")] {
-                let mut t = Task::new("work", "run");
-                t.id = id.into();
-                t.owner_task_id = owner.into();
-                t.status = TaskStatus::Running;
-                tx.create_task(t)?;
-            }
-            Ok(())
-        })?;
-        let order = store.write(|tx| abort_tree(tx, "root", "restart_limit"))?;
+        store
+            .write_async(|tx| {
+                Box::pin(async move {
+                    for (id, owner) in [("root", ""), ("child", "root"), ("grandchild", "child")] {
+                        let mut t = Task::new("work", "run");
+                        t.id = id.into();
+                        t.owner_task_id = owner.into();
+                        t.status = TaskStatus::Running;
+                        tx.create_task_async(t).await?;
+                    }
+                    Ok(())
+                })
+            })
+            .await?;
+        let order = store
+            .write_async(|tx| Box::pin(async move { abort_tree(tx, "root", "restart_limit").await }))
+            .await?;
         assert_eq!(order, ["grandchild", "child", "root"]);
-        store.read(|r| {
-            assert_eq!(r.task("root")?.terminal_reason, "restart_limit");
-            assert_eq!(r.task("child")?.terminal_reason, "aborted");
-            assert_eq!(r.task("grandchild")?.terminal_reason, "aborted");
-            Ok(())
-        })
+        store
+            .read_async(|r| {
+                Box::pin(async move {
+                    assert_eq!(r.task_async("root").await?.terminal_reason, "restart_limit");
+                    assert_eq!(r.task_async("child").await?.terminal_reason, "aborted");
+                    assert_eq!(r.task_async("grandchild").await?.terminal_reason, "aborted");
+                    Ok(())
+                })
+            })
+            .await
     }
 }

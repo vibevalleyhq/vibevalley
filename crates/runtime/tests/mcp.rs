@@ -9,9 +9,9 @@ fn config() -> McpConfig {
     .unwrap()
 }
 
-#[test]
-fn a_stdio_server_s_tools_are_offered_and_called() {
-    let hub = McpHub::connect(&config());
+#[tokio::test]
+async fn a_stdio_server_s_tools_are_offered_and_called() {
+    let hub = McpHub::connect(&config()).await;
     assert_eq!(hub.failures.len(), 1, "{:?}", hub.failures);
     assert!(hub.failures[0].1.starts_with("连不上 MCP 服务 gone"));
     let tools = hub.tools();
@@ -21,9 +21,9 @@ fn a_stdio_server_s_tools_are_offered_and_called() {
     assert!(echo.spec().description.starts_with("（echo srv）"));
     assert_eq!(echo.spec().parameters["required"], json!(["text"]));
     assert!(echo.replay_safe(), "readOnlyHint makes it safe to replay");
-    let out = echo.execute(&json!({"text": "你好"}));
+    let out = echo.execute(&json!({"text": "你好"})).await;
     assert_eq!((out.is_error, out.text.as_str()), (false, "echo: 你好"));
-    let failed = tools[1].execute(&json!({}));
+    let failed = tools[1].execute(&json!({})).await;
     assert_eq!((failed.is_error, failed.text.as_str()), (true, "it broke"));
     assert!(!tools[1].replay_safe());
 }
@@ -42,8 +42,8 @@ fn names_and_content_follow_vibevalley() {
     assert!(McpConfig::read(std::path::Path::new("/no/such.json")).is_err());
 }
 
-#[test]
-fn an_http_server_s_tools_are_offered_and_called() {
+#[tokio::test]
+async fn an_http_server_s_tools_are_offered_and_called() {
     use std::convert::Infallible;
     use std::sync::{Arc, Mutex};
 
@@ -113,15 +113,12 @@ fn an_http_server_s_tools_are_offered_and_called() {
         }),
     );
 
-    let (addr, _guard) = vibevalley_runtime::rt::block_on(async move {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let cancel = CancellationToken::new();
-        let guard = cancel.clone().drop_guard();
-        tokio::spawn(async move {
-            let _ = axum::serve(listener, app).with_graceful_shutdown(cancel.cancelled_owned()).await;
-        });
-        (addr, guard)
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let cancel = CancellationToken::new();
+    let _guard = cancel.clone().drop_guard();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, app).with_graceful_shutdown(cancel.cancelled_owned()).await;
     });
 
     let cfg: McpConfig = serde_json::from_value(json!({"mcpServers": {
@@ -131,53 +128,73 @@ fn an_http_server_s_tools_are_offered_and_called() {
         }
     }}))
     .unwrap();
-    let hub = McpHub::connect(&cfg);
+    let hub = McpHub::connect(&cfg).await;
     assert!(hub.failures.is_empty(), "{:?}", hub.failures);
     let tools = hub.tools();
     assert_eq!(tools.len(), 1);
-    let out = tools[0].execute(&json!({}));
+    let out = tools[0].execute(&json!({})).await;
     assert_eq!((out.is_error, out.text.as_str()), (false, "pong"));
     assert!(errors.lock().unwrap().is_empty(), "{:?}", errors.lock().unwrap());
 }
 
-#[test]
-fn regression_cancelling_an_mcp_call_preserves_its_peer_and_dropping_the_last_tool_stops_the_child() {
-    use std::io::{BufRead, BufReader};
-    use std::net::TcpListener;
-    use std::process::{Command, Stdio};
+#[tokio::test]
+async fn regression_cancelling_an_mcp_call_preserves_its_peer_and_dropping_the_last_tool_stops_the_child() {
+    use std::process::Stdio;
     use std::time::{Duration, Instant};
 
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    use tokio::net::TcpListener;
+    use tokio::process::Command;
+    use tokio_util::sync::CancellationToken;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let cfg = serde_json::from_value(json!({"mcpServers": {"slow": {
         "command": env!("CARGO_BIN_EXE_vv_test_fixture"),
         "args": ["cancellable_mcp"],
         "env": {"MCP_TEST_PORT": listener.local_addr().unwrap().port().to_string()}
     }}}))
     .unwrap();
-    let hub = McpHub::connect(&cfg);
+    let hub = McpHub::connect(&cfg).await;
     assert!(hub.failures.is_empty(), "{:?}", hub.failures);
     let tool = hub.tools().pop().unwrap();
-    let (events, _) = listener.accept().unwrap();
-    events.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+    let (events, _) = listener.accept().await.unwrap();
     let mut lines = BufReader::new(events).lines();
-    let pid = lines.next().unwrap().unwrap();
-    let (cancel, cancelled) = flume::bounded(0);
-    std::thread::scope(|scope| {
-        let running = scope.spawn(|| tool.execute_cancellable(&json!({}), &cancelled));
-        let sent = lines.next().unwrap().unwrap();
-        let id = sent.strip_prefix("begin:").unwrap();
-        drop(cancel);
-        assert_eq!(lines.next().unwrap().unwrap(), format!("cancel:{id}"));
-        let result = running.join().unwrap();
-        assert!(result.is_error && result.text.contains("aborted"), "{result:?}");
+    let pid = tokio::time::timeout(Duration::from_secs(10), lines.next_line())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let cancel = CancellationToken::new();
+    let cancel_token = cancel.clone();
+    let tool: std::sync::Arc<dyn vibevalley_runtime::agent::Tool> = std::sync::Arc::from(tool);
+    let running_tool = tool.clone();
+    let running = tokio::spawn(async move {
+        let ctx = vibevalley_runtime::agent::ToolContext::with_cancel(vibevalley_runtime::agent::ai::CancelToken::from_tokio(cancel_token));
+        running_tool.execute_with_context(&json!({}), &ctx).await
     });
+    let sent = tokio::time::timeout(Duration::from_secs(10), lines.next_line())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let id = sent.strip_prefix("begin:").unwrap();
+    cancel.cancel();
+    let cancelled_line = tokio::time::timeout(Duration::from_secs(10), lines.next_line())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert_eq!(cancelled_line, format!("cancel:{id}"));
+    let result = running.await.unwrap();
+    assert!(result.is_error && result.text.contains("aborted"), "{result:?}");
     drop(hub);
-    assert_eq!(tool.execute(&json!({"ping":true})).text, "pong");
+    assert_eq!(tool.execute(&json!({"ping":true})).await.text, "pong");
     drop(tool);
-    assert!(lines.next().is_none(), "MCP process still owns its socket");
+    let eof = tokio::time::timeout(Duration::from_secs(10), lines.next_line()).await.unwrap().unwrap();
+    assert!(eof.is_none(), "MCP process still owns its socket");
     let deadline = Instant::now() + Duration::from_secs(5);
-    while Command::new("kill").args(["-0", &pid]).stderr(Stdio::null()).status().unwrap().success() {
+    while Command::new("kill").args(["-0", &pid]).stderr(Stdio::null()).status().await.unwrap().success() {
         assert!(Instant::now() < deadline, "MCP child {pid} was not reaped");
-        std::thread::yield_now();
+        tokio::task::yield_now().await;
     }
 }

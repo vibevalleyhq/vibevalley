@@ -249,7 +249,6 @@ export const catalogs = {
         deleteAsk: "删掉「{title}」？对话里的卡片还在。",
         deleted: "删掉了「{title}」",
         gone: "这份作品已经删掉了，或者没有这份作品。",
-        frame: "「{title}」第 {version} 稿",
         new: "新建",
         none: "还没有作品：写个标题新建一篇，或者让执行会话交一份上来。",
         all: "全部作品",
@@ -260,57 +259,9 @@ export const catalogs = {
         railHide: "收起旁注",
       },
       issue: { title: "作品" },
-      blocks: {
-        memoryItem: "记忆",
-        saving: "在存……",
-        saved: "都存好了",
-        blocks: "{n} 块",
-        helpersWriting: "执行会话在写",
-        append: "在末尾写一段",
-        user: "你",
-        done: "做完了",
-        notDone: "没做完",
-        writing: "{who} 在写",
-        wrote: "{who} 写的",
-        issue: "任务 {id}",
-        unknown: "这一块是「{type}」，这个版本的客户端还画不了，只能看不能改",
-        block: "块 {id}",
-        heading: "标题",
-        notSaved: "没存上：{why}",
-        changed: "这一块刚被别人改过",
-        conflict: "{why}：你写的没存上，留在修订里了",
-        image: "图片：{alt} {src}",
-        start: "从这里开始写……",
-      },
-      canvas: { label: "打开的作品", close: "关掉", openPage: "在作品页打开", quote: "带话" },
-      suggestions: {
-        title: "建议（{n}）",
-        by: "{name} 提的",
-        rev: "对着第 {rev} 版",
-        stale: "这一块后来改过，建议作废",
-        accept: "接受",
-        reject: "不要",
-        delete: "删掉这一块",
-        type: "改成 {type}",
-        types: {
-          paragraph: "段落",
-          heading: "标题",
-          bulleted: "无序列表",
-          numbered: "有序列表",
-          todo: "待办",
-          quote: "引用",
-          code: "代码",
-          divider: "分隔线",
-          image: "图片",
-          issueRef: "任务引用",
-          memoryItem: "记忆",
-        },
-        attrLevel: "级别",
-        attrChecked: "勾选",
-        attrLanguage: "语言",
-        attrs: "改属性：{attrs}",
-      },
-      body: { blocks: "一起写的", html: "网页", store: "结构化作品", slides: "幻灯片", motion: "动画" },
+      blocks: { saved: "都存好了", user: "你", start: "从这里开始写……" },
+      canvas: { label: "打开的作品", close: "关掉", openPage: "在作品页打开" },
+      suggestions: { title: "建议（{n}）", by: "{name} 提的", accept: "接受", reject: "不要", delete: "删掉这一块" },
       types: {
         defaultBadge: "默认体系",
         setDefault: "设为默认设计体系",
@@ -344,34 +295,7 @@ export const catalogs = {
         compact: "压缩历史",
         compacted: "已压缩历史快照",
       },
-      motion: {
-        play: "播放",
-        pause: "暂停",
-        prevFrame: "上一帧",
-        nextFrame: "下一帧",
-        loop: "循环播放",
-        exportVideo: "导出视频",
-        exporting: "正在导出…",
-        exported: "视频已存进媒体库",
-        exportFailed: "导出失败：{why}",
-        tooLong: "超过 60 秒的动画暂不在浏览器内录屏导出",
-        chapters: "章节",
-        time: "{at}s / {duration}s",
-      },
-      dashboard: {
-        sources: "数据源",
-        hideSources: "收起数据源",
-        verified: "{ok}/{total} 处数字已核对源表",
-        mismatches: "{n} 处数字与源表不一致",
-        noDatasets: "还没有结构化数据集",
-        rows: "{n} 行",
-        exportCsv: "导出 CSV",
-        highlightMarks: "在看板中高亮引用",
-        resetParams: "重置筛选",
-        editJson: "编辑数据 JSON",
-        saveDataset: "保存数据集",
-        savedDataset: "数据集已保存",
-      },
+      dashboard: { exportCsv: "导出 CSV" },
       whiteboard: {
         pan: "平移",
         select: "选择",
@@ -422,55 +346,11 @@ export const catalogs = {
         styleSolid: "实线",
         styleDashed: "虚线",
       },
-      design: {
-        canvas: "全部画板",
-        focus: "聚焦画板",
-        props: "交互属性调节",
-        noProps: "当前画板未声明可调属性（data-props）",
-        saveProps: "保存属性默认值",
-        savedProps: "属性已写回画板",
-        artboards: "{n} 个画板",
-        addArtboard: "新增画板",
-      },
-      designSystem: {
-        overview: "总览",
-        colors: "色彩与对比度",
-        typography: "字体与字阶",
-        components: "组件预览",
-        tokensJson: "令牌源码",
-        themeLight: "浅色预览",
-        themeDark: "深色预览",
-        saveTokens: "保存令牌",
-        savedTokens: "设计令牌已更新",
-        contrastPass: "AA 通过（{ratio}:1）",
-        contrastLow: "对比度偏低（{ratio}:1）",
-      },
-      slidesStore: {
-        addSlide: "加一页",
-        aspect16x9: "16:9 宽屏",
-        aspect4x3: "4:3 标准",
-        stepAt: "第 {at}/{pages} 页 · 片段 {frag}/{frags}",
-        editSlide: "编辑本页 HTML",
-        saveSlide: "保存本页",
-        savedSlide: "本页已保存",
-      },
-      edit: {
-        title: "改字",
-        hint: "选中页面里的字，就能在右边直接改掉它",
-        older: "这是旧的一稿：回到最新的一稿再改字",
-        to: "改成",
-        save: "存成新的一稿",
-        saved: "存成了第 {version} 稿",
-      },
-      slides: {
-        previous: "上一页",
-        next: "下一页",
-        at: "{at} / {pages}",
-        present: "全屏放映",
-        presenter: "演讲者视图",
-        thumbnails: "每一页",
-        slide: "第 {at} 页 {title}",
-      },
+      design: { noProps: "当前画板未声明可调属性（data-props）" },
+      designSystem: { components: "组件预览" },
+      slidesStore: { addSlide: "加一页" },
+      edit: { save: "存成新的一稿", saved: "存成了第 {version} 稿" },
+      slides: { previous: "上一页", next: "下一页", present: "全屏放映", presenter: "演讲者视图" },
       presenter: {
         missing: "没说要讲哪一份幻灯片：从作品的「演讲者视图」打开。",
         current: "这一页",
@@ -485,7 +365,6 @@ export const catalogs = {
         empty: "没有可演示的页",
         loadFailure: "演示页未能载入：{reason}",
       },
-      outline: { importTitle: "导入 Markdown 大纲", importAction: "导入 .md", pickFile: "选择 .md 文件", markdownLabel: "Markdown（.md）", submit: "导入大纲" },
     },
     "web.audio": {
       title: "音频工作台",
@@ -841,8 +720,6 @@ export const catalogs = {
         refuse: "不要",
       },
       messages: {
-        quotedBlock: "指着「{title}」的一块：{text}",
-        quotedGone: "已经删掉了",
         label: "消息",
         containing: "含「{text}」的消息",
         start: "消息的开头",
@@ -900,8 +777,6 @@ export const catalogs = {
         send: "发送",
         sendHint: "回车发送 · Shift+回车换行",
         replying: "回复 {name}",
-        quotedBlock: "指着这一块：{text}",
-        cancelQuote: "不指着这块了",
         cancelReply: "不回复了",
         attach: "附上文件",
         uploadFailed: "没传上去：{why}",
@@ -1852,18 +1727,7 @@ export const catalogs = {
         issueCreated: "已创建任务",
         back: "返回",
         source: { all: "全部来源", agent: "执行会话交付", user: "我创建的" },
-        artifactType: {
-          all: "全部作品",
-          outline: "大纲笔记",
-          whiteboard: "无限白板",
-          docs: "协作文档",
-          slides: "幻灯片",
-          dashboard: "数据看板",
-          design: "界面画板",
-          designSystem: "设计体系",
-          motion: "动态短片",
-          html: "单页网页",
-        },
+        artifactType: { all: "全部作品" },
         inspector: {
           openExternal: "系统打开",
           saveAs: "另存为",
@@ -3264,7 +3128,6 @@ export const catalogs = {
         deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
         deleted: 'Deleted "{title}"',
         gone: "This artifact was deleted, or there is no such artifact.",
-        frame: '"{title}" version {version}',
         new: "New",
         none: "No artifacts yet: give one a title to start it, or have a helper hand one in.",
         all: "All artifacts",
@@ -3275,57 +3138,9 @@ export const catalogs = {
         railHide: "Hide the side panel",
       },
       issue: { title: "Artifacts" },
-      blocks: {
-        memoryItem: "Memory",
-        saving: "Saving…",
-        saved: "All saved",
-        blocks: "{n, plural, one {# block} other {# blocks}}",
-        helpersWriting: "helpers writing",
-        append: "Write a paragraph at the end",
-        user: "You",
-        done: "Done",
-        notDone: "Not done",
-        writing: "{who} is writing",
-        wrote: "{who} wrote it",
-        issue: "Ticket {id}",
-        unknown: 'This block is a "{type}", which this version cannot draw yet: it can be read, not changed',
-        block: "Block {id}",
-        heading: "Heading",
-        notSaved: "Not saved: {why}",
-        changed: "Someone else just changed this block",
-        conflict: "{why}: what you wrote was not saved and stays in the revision",
-        image: "Image: {alt} {src}",
-        start: "Start writing here…",
-      },
-      canvas: { label: "Open artifact", close: "Close", openPage: "Open its page", quote: "Speak about it" },
-      suggestions: {
-        title: "Suggestions ({n})",
-        by: "From {name}",
-        rev: "on rev {rev}",
-        stale: "The block changed since; this suggestion is stale",
-        accept: "Accept",
-        reject: "Dismiss",
-        delete: "Delete this block",
-        type: "Change to {type}",
-        types: {
-          paragraph: "paragraph",
-          heading: "heading",
-          bulleted: "bulleted list",
-          numbered: "numbered list",
-          todo: "todo",
-          quote: "quote",
-          code: "code",
-          divider: "divider",
-          image: "image",
-          issueRef: "issue reference",
-          memoryItem: "memory",
-        },
-        attrLevel: "level",
-        attrChecked: "checked",
-        attrLanguage: "language",
-        attrs: "Change attrs: {attrs}",
-      },
-      body: { blocks: "Written together", html: "Web page", store: "Structured", slides: "Slides", motion: "Motion" },
+      blocks: { saved: "All saved", user: "You", start: "Start writing here…" },
+      canvas: { label: "Open artifact", close: "Close", openPage: "Open its page" },
+      suggestions: { title: "Suggestions ({n})", by: "From {name}", accept: "Accept", reject: "Dismiss", delete: "Delete this block" },
       types: {
         defaultBadge: "Default DS",
         setDefault: "Set as default design system",
@@ -3359,34 +3174,7 @@ export const catalogs = {
         compact: "Compact",
         compacted: "Compacted history snapshot",
       },
-      motion: {
-        play: "Play",
-        pause: "Pause",
-        prevFrame: "Previous frame",
-        nextFrame: "Next frame",
-        loop: "Loop",
-        exportVideo: "Export video",
-        exporting: "Exporting…",
-        exported: "Saved video to the media library",
-        exportFailed: "Export failed: {why}",
-        tooLong: "Clips over 60 seconds cannot be recorded in the browser",
-        chapters: "Chapters",
-        time: "{at}s / {duration}s",
-      },
-      dashboard: {
-        sources: "Sources",
-        hideSources: "Hide sources",
-        verified: "{ok}/{total} figures verified against datasets",
-        mismatches: "{n} figures differ from source datasets",
-        noDatasets: "No structured datasets yet",
-        rows: "{n} rows",
-        exportCsv: "Export CSV",
-        highlightMarks: "Highlight references",
-        resetParams: "Reset filters",
-        editJson: "Edit JSON",
-        saveDataset: "Save dataset",
-        savedDataset: "Dataset saved",
-      },
+      dashboard: { exportCsv: "Export CSV" },
       whiteboard: {
         pan: "Pan",
         select: "Select",
@@ -3437,55 +3225,11 @@ export const catalogs = {
         styleSolid: "Solid",
         styleDashed: "Dashed",
       },
-      design: {
-        canvas: "All artboards",
-        focus: "Focus artboard",
-        props: "Property levers",
-        noProps: "This artboard declares no adjustable props (data-props)",
-        saveProps: "Save defaults",
-        savedProps: "Props written back to artboard",
-        artboards: "{n} artboards",
-        addArtboard: "New artboard",
-      },
-      designSystem: {
-        overview: "Overview",
-        colors: "Colors & Contrast",
-        typography: "Typography",
-        components: "Components",
-        tokensJson: "Tokens JSON",
-        themeLight: "Light theme",
-        themeDark: "Dark theme",
-        saveTokens: "Save tokens",
-        savedTokens: "Design tokens updated",
-        contrastPass: "AA pass ({ratio}:1)",
-        contrastLow: "Low contrast ({ratio}:1)",
-      },
-      slidesStore: {
-        addSlide: "Add slide",
-        aspect16x9: "16:9 Widescreen",
-        aspect4x3: "4:3 Classic",
-        stepAt: "Slide {at}/{pages} · Step {frag}/{frags}",
-        editSlide: "Edit slide HTML",
-        saveSlide: "Save slide",
-        savedSlide: "Slide saved",
-      },
-      edit: {
-        title: "Change words",
-        hint: "Select words in the page to change them on the right",
-        older: "This is an older version: go to the latest to change words",
-        to: "Change to",
-        save: "Save as a new version",
-        saved: "Saved as version {version}",
-      },
-      slides: {
-        previous: "Previous slide",
-        next: "Next slide",
-        at: "{at} / {pages}",
-        present: "Present full screen",
-        presenter: "Presenter view",
-        thumbnails: "Slides",
-        slide: "Slide {at} {title}",
-      },
+      design: { noProps: "This artboard declares no adjustable props (data-props)" },
+      designSystem: { components: "Components" },
+      slidesStore: { addSlide: "Add slide" },
+      edit: { save: "Save as a new version", saved: "Saved as version {version}" },
+      slides: { previous: "Previous slide", next: "Next slide", present: "Present full screen", presenter: "Presenter view" },
       presenter: {
         missing: "No deck named: open the presenter view from an artifact's controls.",
         current: "This slide",
@@ -3499,13 +3243,6 @@ export const catalogs = {
         waiting: "Waiting for the slide deck",
         empty: "This deck has no slides",
         loadFailure: "Could not load the slide deck: {reason}",
-      },
-      outline: {
-        importTitle: "Import Markdown outline",
-        importAction: "Import .md",
-        pickFile: "Choose .md file",
-        markdownLabel: "Markdown (.md)",
-        submit: "Import outline",
       },
     },
     "web.audio": {
@@ -3881,8 +3618,6 @@ export const catalogs = {
         refuse: "Refuse",
       },
       messages: {
-        quotedBlock: "On a block of “{title}”: {text}",
-        quotedGone: "it was deleted",
         label: "Messages",
         containing: 'Messages with "{text}"',
         start: "The start of the messages",
@@ -3940,8 +3675,6 @@ export const catalogs = {
         send: "Send",
         sendHint: "Enter sends · Shift+Enter for a new line",
         replying: "Replying to {name}",
-        quotedBlock: "Pointing at: {text}",
-        cancelQuote: "Stop pointing at it",
         cancelReply: "Cancel the reply",
         attach: "Attach a file",
         uploadFailed: "Not uploaded: {why}",
@@ -4949,18 +4682,7 @@ export const catalogs = {
         issueCreated: "Ticket created",
         back: "Back",
         source: { all: "All sources", agent: "From helpers", user: "Created by me" },
-        artifactType: {
-          all: "All artifacts",
-          outline: "Outline notes",
-          whiteboard: "Whiteboard",
-          docs: "Docs",
-          slides: "Slides",
-          dashboard: "Dashboard",
-          design: "Design",
-          designSystem: "Design system",
-          motion: "Motion",
-          html: "Web page",
-        },
+        artifactType: { all: "All artifacts" },
         inspector: {
           openExternal: "Open externally",
           saveAs: "Save as",
@@ -6410,97 +6132,24 @@ export interface Messages {
   "web.agent.workdirTip": undefined;
   "web.agent.worktree": undefined;
   "web.agent.worktreeHint": undefined;
-  "web.artifact.blocks.append": undefined;
-  "web.artifact.blocks.block": { readonly id: string | number };
-  "web.artifact.blocks.blocks": { readonly n: number };
-  "web.artifact.blocks.changed": undefined;
-  "web.artifact.blocks.conflict": { readonly why: string | number };
-  "web.artifact.blocks.done": undefined;
-  "web.artifact.blocks.heading": undefined;
-  "web.artifact.blocks.helpersWriting": undefined;
-  "web.artifact.blocks.image": { readonly alt: string | number; readonly src: string | number };
-  "web.artifact.blocks.issue": { readonly id: string | number };
-  "web.artifact.blocks.memoryItem": undefined;
-  "web.artifact.blocks.notDone": undefined;
-  "web.artifact.blocks.notSaved": { readonly why: string | number };
   "web.artifact.blocks.saved": undefined;
-  "web.artifact.blocks.saving": undefined;
   "web.artifact.blocks.start": undefined;
-  "web.artifact.blocks.unknown": { readonly type: string | number };
   "web.artifact.blocks.user": undefined;
-  "web.artifact.blocks.writing": { readonly who: string | number };
-  "web.artifact.blocks.wrote": { readonly who: string | number };
-  "web.artifact.body.blocks": undefined;
-  "web.artifact.body.html": undefined;
-  "web.artifact.body.motion": undefined;
-  "web.artifact.body.slides": undefined;
-  "web.artifact.body.store": undefined;
   "web.artifact.canvas.close": undefined;
   "web.artifact.canvas.label": undefined;
   "web.artifact.canvas.openPage": undefined;
-  "web.artifact.canvas.quote": undefined;
   "web.artifact.card.open": { readonly title: string | number };
   "web.artifact.card.version": { readonly version: string | number };
-  "web.artifact.dashboard.editJson": undefined;
   "web.artifact.dashboard.exportCsv": undefined;
-  "web.artifact.dashboard.hideSources": undefined;
-  "web.artifact.dashboard.highlightMarks": undefined;
-  "web.artifact.dashboard.mismatches": { readonly n: string | number };
-  "web.artifact.dashboard.noDatasets": undefined;
-  "web.artifact.dashboard.resetParams": undefined;
-  "web.artifact.dashboard.rows": { readonly n: string | number };
-  "web.artifact.dashboard.saveDataset": undefined;
-  "web.artifact.dashboard.savedDataset": undefined;
-  "web.artifact.dashboard.sources": undefined;
-  "web.artifact.dashboard.verified": { readonly ok: string | number; readonly total: string | number };
-  "web.artifact.design.addArtboard": undefined;
-  "web.artifact.design.artboards": { readonly n: string | number };
-  "web.artifact.design.canvas": undefined;
-  "web.artifact.design.focus": undefined;
   "web.artifact.design.noProps": undefined;
-  "web.artifact.design.props": undefined;
-  "web.artifact.design.saveProps": undefined;
-  "web.artifact.design.savedProps": undefined;
-  "web.artifact.designSystem.colors": undefined;
   "web.artifact.designSystem.components": undefined;
-  "web.artifact.designSystem.contrastLow": { readonly ratio: string | number };
-  "web.artifact.designSystem.contrastPass": { readonly ratio: string | number };
-  "web.artifact.designSystem.overview": undefined;
-  "web.artifact.designSystem.saveTokens": undefined;
-  "web.artifact.designSystem.savedTokens": undefined;
-  "web.artifact.designSystem.themeDark": undefined;
-  "web.artifact.designSystem.themeLight": undefined;
-  "web.artifact.designSystem.tokensJson": undefined;
-  "web.artifact.designSystem.typography": undefined;
-  "web.artifact.edit.hint": undefined;
-  "web.artifact.edit.older": undefined;
   "web.artifact.edit.save": undefined;
   "web.artifact.edit.saved": { readonly version: string | number };
-  "web.artifact.edit.title": undefined;
-  "web.artifact.edit.to": undefined;
   "web.artifact.issue.title": undefined;
-  "web.artifact.motion.chapters": undefined;
-  "web.artifact.motion.exportFailed": { readonly why: string | number };
-  "web.artifact.motion.exportVideo": undefined;
-  "web.artifact.motion.exported": undefined;
-  "web.artifact.motion.exporting": undefined;
-  "web.artifact.motion.loop": undefined;
-  "web.artifact.motion.nextFrame": undefined;
-  "web.artifact.motion.pause": undefined;
-  "web.artifact.motion.play": undefined;
-  "web.artifact.motion.prevFrame": undefined;
-  "web.artifact.motion.time": { readonly at: string | number; readonly duration: string | number };
-  "web.artifact.motion.tooLong": undefined;
-  "web.artifact.outline.importAction": undefined;
-  "web.artifact.outline.importTitle": undefined;
-  "web.artifact.outline.markdownLabel": undefined;
-  "web.artifact.outline.pickFile": undefined;
-  "web.artifact.outline.submit": undefined;
   "web.artifact.page.all": undefined;
   "web.artifact.page.delete": undefined;
   "web.artifact.page.deleteAsk": { readonly title: string | number };
   "web.artifact.page.deleted": { readonly title: string | number };
-  "web.artifact.page.frame": { readonly title: string | number; readonly version: string | number };
   "web.artifact.page.gone": undefined;
   "web.artifact.page.more": undefined;
   "web.artifact.page.new": undefined;
@@ -6521,48 +6170,16 @@ export interface Messages {
   "web.artifact.presenter.notes": undefined;
   "web.artifact.presenter.restart": undefined;
   "web.artifact.presenter.waiting": undefined;
-  "web.artifact.slides.at": { readonly at: string | number; readonly pages: string | number };
   "web.artifact.slides.next": undefined;
   "web.artifact.slides.present": undefined;
   "web.artifact.slides.presenter": undefined;
   "web.artifact.slides.previous": undefined;
-  "web.artifact.slides.slide": { readonly at: string | number; readonly title: string | number };
-  "web.artifact.slides.thumbnails": undefined;
   "web.artifact.slidesStore.addSlide": undefined;
-  "web.artifact.slidesStore.aspect16x9": undefined;
-  "web.artifact.slidesStore.aspect4x3": undefined;
-  "web.artifact.slidesStore.editSlide": undefined;
-  "web.artifact.slidesStore.saveSlide": undefined;
-  "web.artifact.slidesStore.savedSlide": undefined;
-  "web.artifact.slidesStore.stepAt": {
-    readonly at: string | number;
-    readonly frag: string | number;
-    readonly frags: string | number;
-    readonly pages: string | number;
-  };
   "web.artifact.suggestions.accept": undefined;
-  "web.artifact.suggestions.attrChecked": undefined;
-  "web.artifact.suggestions.attrLanguage": undefined;
-  "web.artifact.suggestions.attrLevel": undefined;
-  "web.artifact.suggestions.attrs": { readonly attrs: string | number };
   "web.artifact.suggestions.by": { readonly name: string | number };
   "web.artifact.suggestions.delete": undefined;
   "web.artifact.suggestions.reject": undefined;
-  "web.artifact.suggestions.rev": { readonly rev: string | number };
-  "web.artifact.suggestions.stale": undefined;
   "web.artifact.suggestions.title": { readonly n: string | number };
-  "web.artifact.suggestions.type": { readonly type: string | number };
-  "web.artifact.suggestions.types.bulleted": undefined;
-  "web.artifact.suggestions.types.code": undefined;
-  "web.artifact.suggestions.types.divider": undefined;
-  "web.artifact.suggestions.types.heading": undefined;
-  "web.artifact.suggestions.types.image": undefined;
-  "web.artifact.suggestions.types.issueRef": undefined;
-  "web.artifact.suggestions.types.memoryItem": undefined;
-  "web.artifact.suggestions.types.numbered": undefined;
-  "web.artifact.suggestions.types.paragraph": undefined;
-  "web.artifact.suggestions.types.quote": undefined;
-  "web.artifact.suggestions.types.todo": undefined;
   "web.artifact.timeline.backToLive": undefined;
   "web.artifact.timeline.compact": undefined;
   "web.artifact.timeline.compacted": undefined;
@@ -7008,13 +6625,11 @@ export interface Messages {
   "web.channel.composer.artifactSelected": { readonly n: string | number };
   "web.channel.composer.artifactSlide": { readonly n: string | number };
   "web.channel.composer.attach": undefined;
-  "web.channel.composer.cancelQuote": undefined;
   "web.channel.composer.cancelReply": undefined;
   "web.channel.composer.clearContext": undefined;
   "web.channel.composer.command": undefined;
   "web.channel.composer.mention": undefined;
   "web.channel.composer.notSent": { readonly why: string | number };
-  "web.channel.composer.quotedBlock": { readonly text: string | number };
   "web.channel.composer.replying": { readonly name: string | number };
   "web.channel.composer.runningHint": undefined;
   "web.channel.composer.send": undefined;
@@ -7125,8 +6740,6 @@ export interface Messages {
   "web.channel.messages.notSent": undefined;
   "web.channel.messages.older": undefined;
   "web.channel.messages.pinned": undefined;
-  "web.channel.messages.quotedBlock": { readonly text: string | number; readonly title: string | number };
-  "web.channel.messages.quotedGone": undefined;
   "web.channel.messages.reactedBy": { readonly emoji: string | number; readonly names: string | number };
   "web.channel.messages.readFailed": { readonly why: string | number };
   "web.channel.messages.replyGone": undefined;
@@ -7987,15 +7600,6 @@ export interface Messages {
   "web.issue.trigger.refine": undefined;
   "web.issue.trigger.runtime": undefined;
   "web.library.content.artifactType.all": undefined;
-  "web.library.content.artifactType.dashboard": undefined;
-  "web.library.content.artifactType.design": undefined;
-  "web.library.content.artifactType.designSystem": undefined;
-  "web.library.content.artifactType.docs": undefined;
-  "web.library.content.artifactType.html": undefined;
-  "web.library.content.artifactType.motion": undefined;
-  "web.library.content.artifactType.outline": undefined;
-  "web.library.content.artifactType.slides": undefined;
-  "web.library.content.artifactType.whiteboard": undefined;
   "web.library.content.artifacts": undefined;
   "web.library.content.back": undefined;
   "web.library.content.exportArtifact": undefined;

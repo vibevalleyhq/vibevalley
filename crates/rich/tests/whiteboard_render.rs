@@ -8,14 +8,13 @@ use nsh_core::element::Root;
 use nsh_core::prelude::*;
 use nsh_core::{EventKind, EventPayload};
 use resvg::tiny_skia;
-use vibevalley_protocol::{ArtifactEntry, ArtifactEntryKind};
 use vibevalley_rich::engine::canvas::Canvas;
 use vibevalley_rich::engine::whiteboard::{
     BoardAction, BoardDoc, Camera, ElementId, ElementKind, ElementRecord, FramePaintInput, GridStyle, InkMode, LayerPaintInput, MilestoneKind, Modifiers,
     Point2, PointerButton, PointerInput, Presence, PresenceColor, PresenceKind, PresenceViewport, Rect2, ShapeKind, SnapAxis, SnapGuide, StrokePoint,
-    StrokeStyle, TemplateCopy, TemplateKind, TextAlign, TextVariant, TimelineMilestone, Tool, WbFill, WhiteboardController, WhiteboardPalette,
-    build_export_painter, build_template_doc, encode_element_json, export_json, export_json_canvas, export_svg, import_json_canvas, paint_board_frame,
-    paint_grid, paint_minimap, paint_overlay_layer, paint_static_layer,
+    StrokeStyle, TemplateCopy, TemplateKind, TextAlign, TextVariant, TimelineMilestone, Tool, WbFill, WhiteboardController, WhiteboardEntry,
+    WhiteboardEntryKind, WhiteboardPalette, build_export_painter, build_template_doc, encode_element_json, export_json, export_json_canvas, export_svg,
+    import_json_canvas, paint_board_frame, paint_grid, paint_minimap, paint_overlay_layer, paint_static_layer,
 };
 use vibevalley_rich::{
     VvWhiteboardBatchEvent, VvWhiteboardChatEvent, VvWhiteboardCursorEvent, VvWhiteboardExportEvent, VvWhiteboardViewportEvent, vv_whiteboard,
@@ -424,17 +423,17 @@ fn WhiteboardTestRoot() -> impl IntoElement {
 #[test]
 fn vv_whiteboard_component_mounts_and_emits_export_and_chat_events() {
     let doc = build_template_doc(TemplateKind::Timeline, &TemplateCopy::zh());
-    let mut entries: Vec<ArtifactEntry> = Vec::new();
+    let mut entries: Vec<WhiteboardEntry> = Vec::new();
     let meta_val = serde_json::json!({
         "title": doc.meta.title,
         "mode": "board",
         "grid": "architectural",
     })
     .to_string();
-    entries.push(ArtifactEntry {
+    entries.push(WhiteboardEntry {
         artifact_id: "art-wb-test".to_owned(),
         path: "board/meta".to_owned(),
-        kind: ArtifactEntryKind::Json,
+        kind: WhiteboardEntryKind::Json,
         mime: "application/json".to_owned(),
         size: meta_val.len() as i64,
         rev: 1,
@@ -445,10 +444,10 @@ fn vv_whiteboard_component_mounts_and_emits_export_and_chat_events() {
     });
     for el in &doc.elements {
         let encoded = encode_element_json(el);
-        entries.push(ArtifactEntry {
+        entries.push(WhiteboardEntry {
             artifact_id: "art-wb-test".to_owned(),
             path: format!("elements/{}", el.id.0),
-            kind: ArtifactEntryKind::Json,
+            kind: WhiteboardEntryKind::Json,
             mime: "application/json".to_owned(),
             size: encoded.len() as i64,
             rev: el.rev.max(1),
@@ -793,10 +792,10 @@ fn vv_whiteboard_borderless_inline_editor_commits_on_outside_click_and_cancels_o
         },
     );
     let encoded = encode_element_json(&card);
-    let entries = vec![ArtifactEntry {
+    let entries = vec![WhiteboardEntry {
         artifact_id: "art-inline-test".to_owned(),
         path: "elements/card-inline".to_owned(),
-        kind: ArtifactEntryKind::Json,
+        kind: WhiteboardEntryKind::Json,
         mime: "application/json".to_owned(),
         size: encoded.len() as i64,
         rev: 1,

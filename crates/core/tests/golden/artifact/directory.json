@@ -1,0 +1,58 @@
+{
+  "validPaths": [
+    { "path": "manifest.json", "zone": "manifest", "mime": "application/json", "encoding": "utf8" },
+    { "path": "structure/index.md", "zone": "structure", "mime": "text/markdown", "encoding": "utf8" },
+    { "path": "structure/slides/s01-cover.json", "zone": "structure", "mime": "application/json", "encoding": "utf8" },
+    { "path": "structure/index.html", "zone": "structure", "mime": "text/html", "encoding": "utf8" },
+    { "path": "structure/styles.css", "zone": "structure", "mime": "text/css", "encoding": "utf8" },
+    { "path": "structure/app.js", "zone": "structure", "mime": "text/javascript", "encoding": "utf8" },
+    { "path": "structure/diagram.mmd", "zone": "structure", "mime": "text/vnd.mermaid", "encoding": "utf8" },
+    { "path": "asset/hero.png", "zone": "asset", "mime": "image/png", "encoding": "base64" },
+    { "path": "asset/frames/sh01-key.webp", "zone": "asset", "mime": "image/webp", "encoding": "base64" },
+    { "path": "asset/audio/sh01-vo.wav", "zone": "asset", "mime": "audio/wav", "encoding": "base64" },
+    { "path": "asset/raw.csv", "zone": "asset", "mime": "text/csv", "encoding": "utf8" },
+    { "path": "asset/logo.svg", "zone": "asset", "mime": "image/svg+xml", "encoding": "utf8" }
+  ],
+  "invalidPaths": [
+    "",
+    "/",
+    "/structure/index.md",
+    "structure/",
+    "asset/",
+    "structure/../asset/a.png",
+    "structure/./index.md",
+    "../manifest.json",
+    "structure\\index.md",
+    "structure//index.md",
+    "C:/structure/index.md",
+    "structure/bad\u0000name.md",
+    "other/file.txt",
+    "readme.md"
+  ],
+  "typeEntries": [
+    { "type": "docs", "entry": "structure/index.md", "supportsDesignSystem": false },
+    { "type": "outline", "entry": "structure/outline.json", "supportsDesignSystem": false },
+    { "type": "slides", "entry": "structure/deck.json", "supportsDesignSystem": true },
+    { "type": "dashboard", "entry": "structure/dashboard.json", "supportsDesignSystem": true },
+    { "type": "motion", "entry": "structure/timeline.json", "supportsDesignSystem": true },
+    { "type": "whiteboard", "entry": "structure/board.json", "supportsDesignSystem": false },
+    { "type": "design", "entry": "structure/frames/main.json", "supportsDesignSystem": true },
+    { "type": "design-system", "entry": "structure/tokens.json", "supportsDesignSystem": false },
+    { "type": "sheet", "entry": "structure/workbook.json", "supportsDesignSystem": false },
+    { "type": "prototype", "entry": "structure/index.html", "supportsDesignSystem": true },
+    { "type": "diagram", "entry": "structure/diagram.json", "supportsDesignSystem": false },
+    { "type": "storyboard", "entry": "structure/shots.json", "supportsDesignSystem": false }
+  ],
+  "mergePatches": [
+    {
+      "current": "{\"title\":\"Old\",\"nested\":{\"a\":1,\"b\":2}}",
+      "patch": "{\"title\":\"New\",\"nested\":{\"b\":null,\"c\":3}}",
+      "expected": { "title": "New", "nested": { "a": 1, "c": 3 } }
+    },
+    {
+      "current": null,
+      "patch": "{\"version\":1}",
+      "expected": { "version": 1 }
+    }
+  ]
+}

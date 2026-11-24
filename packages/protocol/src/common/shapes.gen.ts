@@ -13,10 +13,7 @@ export type SessionId = Branded<"SessionId">;
 /** An artifact's id. */
 export type ArtifactId = Branded<"ArtifactId">;
 
-/** A block's id, within its artifact: a block op names the block it is for, never its artifact. */
-export type BlockId = Branded<"BlockId">;
-
-/** A suggested change to a block. */
+/** A suggested change to an artifact file. */
 export type SuggestionId = Branded<"SuggestionId">;
 
 export type MessageId = Branded<"MessageId">;

@@ -10,17 +10,21 @@ use vibevalley_protocol::{BizCode, Caller, IssueStageKind, IssueStatus};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, ToolCall, Usage};
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step};
 use vibevalley_runtime::oar::{McpServer, Registry};
-use vibevalley_server::{ServerConfig, Started};
+use vibevalley_server::{App, Config, create_app_blocking};
 
 struct Model(Mutex<VecDeque<Completion>>);
 
 impl ModelClient for Model {
-    fn complete(&self, _: &ChatRequest, on: &mut dyn FnMut(Delta)) -> vibevalley_runtime::agent::Result<Completion> {
+    fn complete<'a>(
+        &'a self,
+        _: &'a ChatRequest,
+        on: &'a mut (dyn FnMut(Delta) + Send),
+    ) -> vibevalley_runtime::BoxFuture<'a, vibevalley_runtime::agent::Result<Completion>> {
         let answer = self.0.lock().unwrap().pop_front().unwrap_or_else(|| answer(None));
         if let Some(text) = &answer.message.content {
             on(Delta::Text(text.clone()));
         }
-        Ok(answer)
+        Box::pin(async move { Ok(answer) })
     }
 }
 
@@ -58,11 +62,11 @@ fn call(url: &str, op: &str, input: Value) -> Value {
     envelope["data"].clone()
 }
 
-fn until<T>(server: &Started, what: &str, read: impl FnMut() -> Option<T>) -> T {
-    crate::support::wait_until_settled(Some(&server.hub), Duration::from_secs(20), what, read)
+fn until<T>(server: &App, what: &str, read: impl FnMut() -> Option<T>) -> T {
+    crate::support::wait_until_settled(Some(server.ctx()), Duration::from_secs(20), what, read)
 }
 
-fn config(home: &Path, model: Arc<Model>, clock: SharedClock) -> ServerConfig {
+fn config(home: &Path, model: Arc<Model>, clock: SharedClock) -> Config {
     let mut registry = Registry::new();
     registry.register(Arc::new(ScriptedRuntime::new("scripted", Script::computed(Arc::new(|ask| {
         let file = format!("round-{}.txt", ask.turn + 1);
@@ -95,14 +99,14 @@ fn config(home: &Path, model: Arc<Model>, clock: SharedClock) -> ServerConfig {
             }),
         ])
     })))));
-    ServerConfig {
+    Config {
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
         tick_crons: false,
         link_previews: false,
         model_client: Some(model),
         clock,
-        ..ServerConfig::under(home)
+        ..Config::under(home)
     }
 }
 
@@ -112,40 +116,34 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let dir = tempfile::tempdir().unwrap();
     let clock = Arc::new(ManualClock::new(1_700_000_000_000));
     let model = Arc::new(Model(Mutex::new(VecDeque::new())));
-    let server = vibevalley_server::start(config(dir.path(), model.clone(), clock.clone())).unwrap();
-    let listener = vibevalley_server::transport::http::serve(server.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let server = create_app_blocking(config(dir.path(), model.clone(), clock.clone())).unwrap();
+    let listener = vibevalley_server::gateway::http::serve(server.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let url = listener.url();
-    server.test_internals().board.sessions().set_mcp_url(format!("{url}/mcp"));
+    server.set_mcp_url(format!("{url}/mcp"));
     call(&url, "repo.create", json!({ "name": "demo" }));
-    let mut helper = server.test_internals().agents.profiles.install_template("reviewer").unwrap();
+    let mut helper = vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
     helper.runtime = "scripted".into();
     helper.name = "Worker".into();
-    server.test_internals().agents.profiles.save(helper).unwrap();
+    vibevalley_runtime::rt::block_on(server.test_internals().agent.profile.store.save_async(helper)).unwrap();
     let issue = call(&url, "issue.create", json!({ "title": "Write a file", "repo": "demo", "agent": "Worker" }));
     let id = issue["id"].as_str().unwrap().to_string();
     call(&url, "issue.status.update", json!({ "id": id, "status": "todo" }));
     let first = until(&server, "first report", || {
-        server.test_internals().board.issue(&id).filter(|i| i.stage.state == IssueStageKind::Reviewing)
+        crate::support::board_issue(server.test_internals().board, &id).filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
     let session = first.latest_session_id().unwrap().clone();
-    let worker = server.test_internals().board.session(&session).unwrap();
+    let worker = crate::support::board_session(server.test_internals().board, &session).unwrap();
     assert!(Path::new(worker.cwd.as_ref().unwrap()).starts_with(dir.path().join("worktrees")));
-    let thread = until(&server, "issue thread", || server.test_internals().chat.issue_thread_id(&id));
+    let thread = until(&server, "issue thread", || server.test_internals().channel.issue_thread_id(&id));
     until(&server, "report in issue thread", || {
-        server
-            .test_internals()
-            .chat
-            .history(&thread, None, None)
+        vibevalley_runtime::rt::block_on(server.test_internals().channel.history_async(&thread, None, None))
             .unwrap()
             .iter()
             .any(|m| m.text.contains("committed round-1.txt"))
             .then_some(())
     });
     until(&server, "report memory stored", || {
-        server
-            .test_internals()
-            .memories
-            .list(worker.profile.as_deref().unwrap())
+        vibevalley_runtime::rt::block_on(server.test_internals().agent.memory.list_async(worker.profile.as_deref().unwrap()))
             .unwrap()
             .iter()
             .any(|m| m.text == "The mainline uses real git")
@@ -157,7 +155,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
         json!({ "id": thread, "text": "Add the second file", "sendKey": "follow-up" }),
     );
     until(&server, "second report", || {
-        server.test_internals().board.session(&session).filter(|s| s.runs >= 2 && !s.phase.is_working())
+        crate::support::board_session(server.test_internals().board, &session).filter(|s| s.runs >= 2 && !s.phase.is_working())
     });
     let runs = call(&url, "issue.run.list", json!({ "id": id }));
     assert_eq!(runs.as_array().unwrap().len(), 2, "{runs}");
@@ -173,41 +171,42 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     let changes = call(&url, "issue.diff.get", json!({ "id": id }));
     assert!(changes.to_string().contains("round-2.txt"), "{changes}");
     call(&url, "issue.status.update", json!({ "id": id, "status": "done" }));
-    assert_eq!(server.test_internals().board.issue(&id).unwrap().status, IssueStatus::Done);
+    assert_eq!(
+        crate::support::board_issue(server.test_internals().board, &id).unwrap().status,
+        IssueStatus::Done
+    );
     assert!(dir.path().join("repos/demo/round-2.txt").exists());
     assert!(git(&dir.path().join("repos/demo"), &["log", "--oneline", "main"]).contains("round-2.txt"));
 
     let draft = call(&url, "issue.create", json!({ "title": "Draft permissions", "repo": "demo", "agent": "Worker" }));
-    let denied = server.hub.call_as(Caller::Session, "issue.refine", json!({ "id": draft["id"] }));
+    let denied = server.router().call_as(Caller::Session, "issue.refine", json!({ "id": draft["id"] }));
     assert_eq!(denied.biz_code, BizCode::Forbidden.code());
     call(
         &url,
         "issue.comment.create",
         json!({"id":draft["id"], "text":"For the implementer", "sendKey":"queued-before-draft"}),
     );
-    let allowed = server.hub.call_as(Caller::Orchestrator, "issue.refine", json!({ "id": draft["id"] }));
+    let allowed = server.router().call_as(Caller::Orchestrator, "issue.refine", json!({ "id": draft["id"] }));
     assert_eq!(allowed.biz_code, 0, "{allowed:?}");
     until(&server, "assistant draft finished", || {
-        server
-            .test_internals()
-            .board
-            .issue(draft["id"].as_str().unwrap())
-            .filter(|i| i.refining.is_none())
+        crate::support::board_issue(server.test_internals().board, draft["id"].as_str().unwrap()).filter(|i| i.refining.is_none())
     });
 
     let draft_id = draft["id"].as_str().unwrap();
-    let run = server.test_internals().board.runs(draft_id).unwrap().pop().unwrap();
-    assert!(run.heard.is_empty());
-    let queued = server
-        .test_internals()
-        .board
-        .sessions()
-        .durable_store()
-        .read(|tx| {
-            assert!(tx.document("run", &run.id, "issue.report")?.is_none());
-            tx.submissions(&format!("issue:{draft_id}"))
-        })
+    let run = vibevalley_runtime::rt::block_on(server.test_internals().board.runs_async(draft_id))
+        .unwrap()
+        .pop()
         .unwrap();
+    assert!(run.heard.is_empty());
+    let queued = vibevalley_runtime::rt::block_on(server.test_internals().runtime.durable_store().read_async(|tx| {
+        let run_id = run.id.clone();
+        let conv = format!("issue:{draft_id}");
+        Box::pin(async move {
+            assert!(tx.document_async("run", &run_id, "issue.report").await?.is_none());
+            tx.submissions_async(&conv).await
+        })
+    }))
+    .unwrap();
     assert_eq!(queued.len(), 1);
     assert_eq!(queued[0].status, vibevalley_runtime::agent::durable::SubmissionStatus::Queued);
 
@@ -225,20 +224,15 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     call(
         &url,
         "channel.message.send",
-        json!({ "id": server.test_internals().chat.default_channel(), "text": "Please dispatch the assistant task", "sendKey": "dispatch" }),
+        json!({ "id": server.test_internals().channel.default_channel(), "text": "Please dispatch the assistant task", "sendKey": "dispatch" }),
     );
     let assistant_issue = until(&server, "assistant dispatched", || {
-        server
-            .test_internals()
-            .board
-            .read(|s| s.issues.iter().find(|i| i.title == "Assistant task" && i.was_sent()).cloned())
+        crate::support::board_issues(server.test_internals().board)
+            .into_iter()
+            .find(|i| i.title == "Assistant task" && i.was_sent())
     });
     until(&server, "assistant task reported", || {
-        server
-            .test_internals()
-            .board
-            .issue(&assistant_issue.id)
-            .filter(|i| i.stage.state == IssueStageKind::Reviewing)
+        crate::support::board_issue(server.test_internals().board, &assistant_issue.id).filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
     let cron = call(
         &url,
@@ -246,53 +240,54 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
         json!({ "name": "Scheduled task", "text": "Write a scheduled file", "agent": "Worker", "repo": "demo", "when": { "kind": "once", "at": clock.now_ms() + 100 } }),
     );
     clock.advance(Duration::from_millis(150));
-    server.test_internals().crons.tick();
+    vibevalley_runtime::rt::block_on(server.test_internals().cron.tick_async());
     let scheduled = until(&server, "cron dispatched", || {
-        server
-            .test_internals()
-            .board
-            .read(|s| s.issues.iter().find(|i| i.cron.as_deref() == cron["id"].as_str() && i.was_sent()).cloned())
+        crate::support::board_issues(server.test_internals().board)
+            .into_iter()
+            .find(|i| i.cron.as_deref() == cron["id"].as_str() && i.was_sent())
     });
     until(&server, "cron reported", || {
-        server
-            .test_internals()
-            .board
-            .issue(&scheduled.id)
-            .filter(|i| i.stage.state == IssueStageKind::Reviewing)
+        crate::support::board_issue(server.test_internals().board, &scheduled.id).filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
-    server.test_internals().crons.tick();
-    assert_eq!(server.test_internals().board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 1);
-    server.close();
+    vibevalley_runtime::rt::block_on(server.test_internals().cron.tick_async());
+    assert_eq!(
+        crate::support::board_issues(server.test_internals().board)
+            .into_iter()
+            .filter(|i| i.cron.is_some())
+            .count(),
+        1
+    );
+    server.close_blocking();
     drop(listener);
     drop(server);
 
-    let reopened = vibevalley_server::start(config(dir.path(), model, Arc::new(ManualClock::new(clock.now_ms())))).unwrap();
-    assert_eq!(reopened.test_internals().board.issue(&id).unwrap().status, IssueStatus::Done);
-    assert_eq!(reopened.test_internals().board.runs(&id).unwrap().len(), 2);
+    let reopened = create_app_blocking(config(dir.path(), model, Arc::new(ManualClock::new(clock.now_ms())))).unwrap();
+    assert_eq!(
+        crate::support::board_issue(reopened.test_internals().board, &id).unwrap().status,
+        IssueStatus::Done
+    );
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(reopened.test_internals().board.runs_async(&id)).unwrap().len(),
+        2
+    );
     assert!(
-        reopened
-            .test_internals()
-            .memories
-            .list(worker.profile.as_deref().unwrap())
+        vibevalley_runtime::rt::block_on(reopened.test_internals().agent.memory.list_async(worker.profile.as_deref().unwrap()),)
             .unwrap()
             .iter()
             .any(|m| m.text == "The mainline uses real git")
     );
-    assert!(reopened.test_internals().board.past_session(&session).is_some());
+    assert!(vibevalley_runtime::rt::block_on(reopened.test_internals().runtime.past_session_async(&session)).is_some());
     assert!(
-        reopened
-            .test_internals()
-            .chat
-            .history(&thread, None, None)
+        vibevalley_runtime::rt::block_on(reopened.test_internals().channel.history_async(&thread, None, None))
             .unwrap()
             .iter()
             .any(|m| m.text == "Add the second file")
     );
     assert_eq!(
-        reopened.test_internals().board.issue(&scheduled.id).unwrap().stage.state,
+        crate::support::board_issue(reopened.test_internals().board, &scheduled.id).unwrap().stage.state,
         IssueStageKind::Reviewing
     );
-    reopened.close();
+    reopened.close_blocking();
 }
 
 mod recovery;

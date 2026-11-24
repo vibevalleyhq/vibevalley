@@ -51,11 +51,11 @@
 
 ## machine
 
-
+设备：本机与远程执行机器
 
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
 |---|---|---|---|---|---|---|
-| `machine.list` | cap.op.machine.list | `/api/v1/machine/list` | ✓ | ✓ |   |   |
+| `machine.list` | 列出当前可见的本机与远程执行设备 | `/api/v1/machine/list` | ✓ | ✓ |   |   |
 
 ## orchestrator
 
@@ -236,36 +236,28 @@ MOSS Live 语音通话
 
 ## artifact
 
-作品：一起写的，和交上来的网页
+作品：按目录组织、支持多人多代理实时协作的 12 类作品
 
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
 |---|---|---|---|---|---|---|
 | `artifact.list` | 列出某个频道或任务的作品，不指定就是全部 | `/api/v1/artifact/list` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.get` | 看一篇作品 | `/api/v1/artifact/get` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.content.get` | 读作品的正文：网页的一版，或块写成的 Markdown | `/api/v1/artifact/content/get` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.create` | 新建作品：空的一篇来一起写，或交上来一稿 | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.version.create` | 给网页作品交新的一版，旧的留着 | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.html.edit` | 在网页作品里换掉一段字，成为新的一版 | `/api/v1/artifact/html/edit` | ✓ | ✓ |   |   |
+| `artifact.content.get` | 读作品主入口文件内容（可指定历史版本快照） | `/api/v1/artifact/content/get` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.create` | 新建目录化作品并初始化对应类型的起始文件 | `/api/v1/artifact/create` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.version.create` | 为作品切出一个新的不可变目录版本快照，旧的留着 | `/api/v1/artifact/version/create` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.update` | 给作品改标题或默认设置 | `/api/v1/artifact/update` | ✓ | ✓ |   |   |
 | `artifact.delete` | 删掉一篇作品 | `/api/v1/artifact/delete` | ✓ | ✓ |   |   |
 | `artifact.previewDelete` | 试删一篇作品：说会删掉什么，不真删 | `/api/v1/artifact/previewDelete` | ✓ | ✓ |   |   |
-| `artifact.block.list` | 按顺序列出作品现有的每一块 | `/api/v1/artifact/block/list` | ✓ | ✓ |   |   |
-| `artifact.submit` | 以你的身份交一批块的操作，按顺序一次做完 | `/api/v1/artifact/submit` | ✓ | ✓ |   |   |
-| `artifact.block.create` | 在作品里插一块 | `/api/v1/artifact/block/create` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.block.update` | 改一块的字、类型或属性 | `/api/v1/artifact/block/update` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.block.delete` | 删掉作品里的一块和它的子块 | `/api/v1/artifact/block/delete` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.block.previewDelete` | 试删一块：说会删掉什么，不真删 | `/api/v1/artifact/block/previewDelete` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.suggestion.list` | 列出作品上的改写建议，没答的和答过的 | `/api/v1/artifact/suggestion/list` | ✓ | ✓ |   |   |
-| `artifact.suggestion.create` | 对你写的一块提改写建议 | `/api/v1/artifact/suggestion/create` | ✓ | ✓ |   |   |
+| `artifact.type.list` | 列出全部 12 种作品类型与当前默认设计体系 | `/api/v1/artifact/type/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.type.read` | 读取一种作品类型的规范或参考分册 | `/api/v1/artifact/type/read` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.file.list` | 列出作品目录中的文件（manifest.json、structure/* 与 asset/*） | `/api/v1/artifact/file/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.file.get` | 按相对路径读取作品目录中的一个文件（可指定历史版本快照） | `/api/v1/artifact/file/get` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.file.write` | 原子写入一个或多个文件到作品目录的 structure/ 或 asset/，记录来源并同步协作状态 | `/api/v1/artifact/file/write` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.file.delete` | 删除作品目录中 structure/ 或 asset/ 下的指定文件，记录来源并同步协作状态 | `/api/v1/artifact/file/delete` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.suggestion.list` | 列出作品上的改写建议，没答的和答过的 | `/api/v1/artifact/suggestion/list` | ✓ | ✓ | ✓ | ✓ |
+| `artifact.suggestion.create` | 对作品目录中的文件或目标提出改写建议 | `/api/v1/artifact/suggestion/create` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.suggestion.accept` | 接受一条改写建议 | `/api/v1/artifact/suggestion/accept` | ✓ | ✓ |   |   |
 | `artifact.suggestion.reject` | 拒绝一条改写建议 | `/api/v1/artifact/suggestion/reject` | ✓ | ✓ |   |   |
-| `artifact.markdown.get` | 把一起写的作品读成 Markdown | `/api/v1/artifact/markdown/get` | ✓ | ✓ |   |   |
-| `artifact.type.list` | 列出全部结构化作品类型与当前默认设计体系 | `/api/v1/artifact/type/list` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.type.read` | 读取一种作品类型的规范或参考分册 | `/api/v1/artifact/type/read` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.entry.list` | 列出结构化作品的条目（可按路径前缀筛） | `/api/v1/artifact/entry/list` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.entry.get` | 读取结构化作品的一个条目与当前版本号 | `/api/v1/artifact/entry/get` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.entry.batch` | 原子批量增改、合并或删除结构化作品的条目（带版本号校验） | `/api/v1/artifact/entry/batch` | ✓ | ✓ | ✓ | ✓ |
-| `artifact.outline.import` | 从 Markdown 导入一篇大纲作品 | `/api/v1/artifact/outline/import` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.presence.update` | 更新实时在场状态（光标、选区、高亮区域或视口），仅驻留内存不落库 | `/api/v1/artifact/presence/update` | ✓ | ✓ | ✓ | ✓ |
 | `artifact.history.list` | 列出作品的协作提交时间线，最新的在前 | `/api/v1/artifact/history/list` | ✓ | ✓ |   |   |
 | `artifact.history.preview` | 只读预览指定历史前沿上的作品快照 | `/api/v1/artifact/history/preview` | ✓ | ✓ |   |   |
@@ -379,4 +371,4 @@ GitHub 的检测：gh 装没装、登没登录
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
 |---|---|---|---|---|---|---|
 | `attachment.create` | 上传一个文件，给消息带上或放进媒体库 | `/api/v1/attachment/create` | ✓ | ✓ |   |   |
-| `attachment.importPath` | cap.op.attachment.importPath | `/api/v1/attachment/importPath` | ✓ |   |   |   |
+| `attachment.importPath` | 将本机常规文件直接导入附件存储（仅本机用户） | `/api/v1/attachment/importPath` | ✓ |   |   |   |

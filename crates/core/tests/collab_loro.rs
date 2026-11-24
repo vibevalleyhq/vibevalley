@@ -4,12 +4,11 @@
 use std::collections::HashSet;
 
 use serde_json::json;
-use vibevalley_core::artifact::shell::{presence_highlight_from_payloads, presence_highlight_script, with_shell};
+use vibevalley_core::artifact::{presence_highlight_from_payloads, presence_highlight_script};
 use vibevalley_core::collab::{
     CollabDoc, CommitMeta, DEFAULT_PRESENCE_TTL_MS, HTML_TEXT_KEY, PresenceHub, PresenceKind, PresencePayload, PresenceViewport, SuggestionSpan,
     coalesce_suggestions, decode_frontiers, decode_version_vector, encode_frontiers, encode_version_vector,
 };
-use vibevalley_protocol::ArtifactDisplay;
 
 fn sample_presence(id: &str, name: &str, updated_at: i64) -> PresencePayload {
     PresencePayload {
@@ -74,8 +73,7 @@ fn presence_hub_syncs_incrementally_evicts_ttl_and_projects_sandbox_highlight() 
     assert_eq!(cmd.vibevalley, "presence-highlight");
     assert_eq!(cmd.items.len(), 2);
     assert_eq!(cmd.items[0].selector.as_deref(), Some("[data-slide='2']"));
-    let html = with_shell("<p>hello</p>", ArtifactDisplay::Page, "light");
-    assert!(html.contains("presence-highlight"));
+    assert!(presence_highlight_script().contains("presence-highlight"));
     assert!(presence_highlight_script().contains("vv-presence-pulse"));
 }
 

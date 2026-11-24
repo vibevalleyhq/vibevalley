@@ -5,10 +5,10 @@ use gpui::{AppContext as _, Context, Entity, PathPromptOptions, Subscription, Wi
 use serde_json::{Value, json};
 use vibevalley_workspace::PaneKind;
 
+use crate::host::percent_decode;
 use crate::hosted::{Action, HostedEvent, HostedView};
 use crate::theme::{MotionChoice, ThemeChoice, Ui};
 
-use super::panes::percent_decode;
 use super::{Shell, update_menus};
 
 impl Shell {
@@ -217,7 +217,7 @@ impl Shell {
     /// (packages/protocol/src/host.ts) and VibeValley's terminal, decoded once into [`vibevalley_protocol::HostOp`].
     pub fn host_call(&mut self, op: vibevalley_protocol::HostOp, reply: crate::hosted::Replier, window: &mut Window, cx: &mut Context<Self>) {
         use vibevalley_protocol::{HostMotionChoice, HostOp, HostOpeningPhase, HostThemeChoice};
-        use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
+        use vibevalley_server::gateway::bridge::{BizCode, Envelope, refusal};
 
         let envelope = match op {
             HostOp::UpdateState => return crate::update::host_call(crate::update::UpdateOp::State, reply, cx),
@@ -604,7 +604,7 @@ impl Shell {
     }
 
     fn run_cli_op(&self, cli_op: CliOp, reply: crate::hosted::Replier, cx: &mut Context<Self>) {
-        use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
+        use vibevalley_server::gateway::bridge::{BizCode, Envelope, refusal};
         Self::bg(
             cx,
             move || {

@@ -1,0 +1,37 @@
+//! Dual-backend (SQLite + PostgreSQL) SeaORM entity models (one table per file).
+
+pub mod artifact;
+pub mod artifact_change;
+pub mod artifact_collab;
+pub mod artifact_suggestion;
+pub mod artifact_version;
+pub mod attachment;
+pub mod channel;
+pub mod channel_delivery;
+pub mod channel_event;
+pub mod channel_member;
+pub mod channel_mention;
+pub mod channel_message;
+pub mod channel_participant;
+pub mod channel_read_cursor;
+pub mod channel_seen;
+pub mod connector_account;
+pub mod connector_inbound;
+pub mod connector_outbox;
+pub mod cron;
+pub mod issue;
+pub mod media_input;
+pub mod media_input_pin;
+pub mod media_job;
+pub mod media_library_item;
+pub mod memory;
+pub mod outbox_item;
+pub mod pull;
+pub mod pull_event;
+pub mod remote_config;
+pub mod remote_device;
+pub mod seq_counter;
+pub mod session;
+pub mod session_event;
+pub mod session_mailbox;
+pub mod session_run;

@@ -4,10 +4,11 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::BoxFuture;
 use crate::agent::ai::CancelToken;
 use crate::agent::ai::types::{ToolCall, Usage};
 use crate::agent::compaction::Level;
-use crate::agent::core::doc::{CONVERSATION_SCOPE, DocSpec, read_doc, update_doc, write_doc};
+use crate::agent::core::doc::{CONVERSATION_SCOPE, DocSpec, read_doc, update_doc};
 use crate::agent::core::engine::Engine;
 use crate::agent::core::events::{AgentEvent, AgentMessage, Brain};
 use crate::agent::core::pipeline::PromptSection;
@@ -81,7 +82,7 @@ pub struct DurableHookCtx<'a> {
     pub request_id: &'a str,
     pub cancel: CancelToken,
     pub rubric: Option<&'a Rubric>,
-    pub(crate) observer: &'a dyn Fn(AgentEvent),
+    pub(crate) observer: &'a (dyn Fn(AgentEvent) + Send + Sync),
 }
 
 impl<'a> DurableHookCtx<'a> {
@@ -89,20 +90,31 @@ impl<'a> DurableHookCtx<'a> {
         (self.observer)(event);
     }
 
-    pub fn read_doc<D: DocSpec>(&self) -> durable::Result<D::State> {
-        self.read_doc_on::<D>(CONVERSATION_SCOPE, self.conversation_id)
+    pub async fn read_doc<D: DocSpec>(&self) -> durable::Result<D::State> {
+        self.read_doc_on::<D>(CONVERSATION_SCOPE, self.conversation_id).await
     }
 
-    pub fn read_doc_on<D: DocSpec>(&self, scope: &str, scope_id: &str) -> durable::Result<D::State> {
-        self.store.read(|tx| read_doc::<D>(tx, scope, scope_id))
+    pub async fn read_doc_on<D: DocSpec>(&self, scope: &str, scope_id: &str) -> durable::Result<D::State> {
+        let scope = scope.to_owned();
+        let scope_id = scope_id.to_owned();
+        self.store
+            .read_async(move |tx| Box::pin(async move { read_doc::<D>(tx, &scope, &scope_id).await }))
+            .await
     }
 
-    pub fn write_doc<D: DocSpec>(&self, state: &D::State) -> durable::Result<Document> {
-        self.store.write(|tx| write_doc::<D>(tx, CONVERSATION_SCOPE, self.conversation_id, state))
+    pub async fn write_doc<D: DocSpec>(&self, state: &D::State) -> durable::Result<Document> {
+        let conv = self.conversation_id.to_owned();
+        let value = serde_json::to_value(state)?;
+        self.store
+            .write_async(move |tx| Box::pin(async move { tx.put_document_async(CONVERSATION_SCOPE, &conv, D::KIND, &value).await }))
+            .await
     }
 
-    pub fn update_doc<D: DocSpec>(&self, f: impl FnOnce(&mut D::State) -> durable::Result<()>) -> durable::Result<D::State> {
-        self.store.write(|tx| update_doc::<D>(tx, CONVERSATION_SCOPE, self.conversation_id, f))
+    pub async fn update_doc<D: DocSpec>(&self, f: impl FnOnce(&mut D::State) -> durable::Result<()> + Send + 'static) -> durable::Result<D::State> {
+        let conv = self.conversation_id.to_owned();
+        self.store
+            .write_async(move |tx| Box::pin(async move { update_doc::<D>(tx, CONVERSATION_SCOPE, &conv, f).await }))
+            .await
     }
 }
 
@@ -159,32 +171,32 @@ pub trait Extension: Send + Sync {
 
     fn register_phases(&self, _scheduler: &Scheduler, _engine: &Engine) {}
 
-    fn dispatch_tool(&self, _call: &ToolCall, _tc: &TaskContext, _engine: &Engine) -> Option<durable::Result<Transition>> {
-        None
+    fn dispatch_tool<'a>(&'a self, _call: &'a ToolCall, _tc: &'a TaskContext, _engine: &'a Engine) -> BoxFuture<'a, Option<durable::Result<Transition>>> {
+        Box::pin(std::future::ready(None))
     }
 
-    fn on_before_turn(&self, _ctx: &DurableHookCtx<'_>) -> durable::Result<HookOutcome> {
-        Ok(HookOutcome::Continue)
+    fn on_before_turn<'a>(&'a self, _ctx: &'a DurableHookCtx<'_>) -> BoxFuture<'a, durable::Result<HookOutcome>> {
+        Box::pin(std::future::ready(Ok(HookOutcome::Continue)))
     }
 
-    fn on_context(&self, _ctx: &DurableHookCtx<'_>, _messages: &mut Vec<AgentMessage>) -> durable::Result<()> {
-        Ok(())
+    fn on_context<'a>(&'a self, _ctx: &'a DurableHookCtx<'_>, _messages: &'a mut Vec<AgentMessage>) -> BoxFuture<'a, durable::Result<()>> {
+        Box::pin(std::future::ready(Ok(())))
     }
 
-    fn on_before_tool(&self, _ctx: &ToolCallHookCtx<'_>) -> durable::Result<HookOutcome> {
-        Ok(HookOutcome::Continue)
+    fn on_before_tool<'a>(&'a self, _ctx: &'a ToolCallHookCtx<'_>) -> BoxFuture<'a, durable::Result<HookOutcome>> {
+        Box::pin(std::future::ready(Ok(HookOutcome::Continue)))
     }
 
-    fn on_after_tool(&self, _ctx: &ToolCallHookCtx<'_>) -> durable::Result<HookOutcome> {
-        Ok(HookOutcome::Continue)
+    fn on_after_tool<'a>(&'a self, _ctx: &'a ToolCallHookCtx<'_>) -> BoxFuture<'a, durable::Result<HookOutcome>> {
+        Box::pin(std::future::ready(Ok(HookOutcome::Continue)))
     }
 
-    fn on_before_compact(&self, _ctx: &CompactCtx<'_>) -> durable::Result<HookOutcome> {
-        Ok(HookOutcome::Continue)
+    fn on_before_compact<'a>(&'a self, _ctx: &'a CompactCtx<'_>) -> BoxFuture<'a, durable::Result<HookOutcome>> {
+        Box::pin(std::future::ready(Ok(HookOutcome::Continue)))
     }
 
-    fn on_after_run(&self, _ctx: &mut RunEndCtx<'_>) -> durable::Result<HookOutcome> {
-        Ok(HookOutcome::Continue)
+    fn on_after_run<'a>(&'a self, _ctx: &'a mut RunEndCtx<'_>) -> BoxFuture<'a, durable::Result<HookOutcome>> {
+        Box::pin(std::future::ready(Ok(HookOutcome::Continue)))
     }
 
     fn on_task_aborted(&self, _task_ids: &[String]) {}
@@ -239,18 +251,18 @@ impl ExtensionRunner {
         }
     }
 
-    pub fn dispatch_tool(&self, call: &ToolCall, tc: &TaskContext, engine: &Engine) -> Option<durable::Result<Transition>> {
+    pub async fn dispatch_tool(&self, call: &ToolCall, tc: &TaskContext, engine: &Engine) -> Option<durable::Result<Transition>> {
         for ext in &self.extensions {
-            if let Some(res) = ext.dispatch_tool(call, tc, engine) {
+            if let Some(res) = ext.dispatch_tool(call, tc, engine).await {
                 return Some(res);
             }
         }
         None
     }
 
-    pub fn run_before_turn(&self, ctx: &DurableHookCtx<'_>) -> durable::Result<HookOutcome> {
+    pub async fn run_before_turn(&self, ctx: &DurableHookCtx<'_>) -> durable::Result<HookOutcome> {
         for ext in &self.extensions {
-            let outcome = ext.on_before_turn(ctx)?;
+            let outcome = ext.on_before_turn(ctx).await?;
             if outcome != HookOutcome::Continue {
                 return Ok(outcome);
             }
@@ -258,16 +270,16 @@ impl ExtensionRunner {
         Ok(HookOutcome::Continue)
     }
 
-    pub fn run_context(&self, ctx: &DurableHookCtx<'_>, messages: &mut Vec<AgentMessage>) -> durable::Result<()> {
+    pub async fn run_context(&self, ctx: &DurableHookCtx<'_>, messages: &mut Vec<AgentMessage>) -> durable::Result<()> {
         for ext in &self.extensions {
-            ext.on_context(ctx, messages)?;
+            ext.on_context(ctx, messages).await?;
         }
         Ok(())
     }
 
-    pub fn run_before_tool(&self, ctx: &ToolCallHookCtx<'_>) -> durable::Result<HookOutcome> {
+    pub async fn run_before_tool(&self, ctx: &ToolCallHookCtx<'_>) -> durable::Result<HookOutcome> {
         for ext in &self.extensions {
-            let outcome = ext.on_before_tool(ctx)?;
+            let outcome = ext.on_before_tool(ctx).await?;
             if outcome != HookOutcome::Continue {
                 return Ok(outcome);
             }
@@ -275,9 +287,9 @@ impl ExtensionRunner {
         Ok(HookOutcome::Continue)
     }
 
-    pub fn run_after_tool(&self, ctx: &ToolCallHookCtx<'_>) -> durable::Result<HookOutcome> {
+    pub async fn run_after_tool(&self, ctx: &ToolCallHookCtx<'_>) -> durable::Result<HookOutcome> {
         for ext in &self.extensions {
-            let outcome = ext.on_after_tool(ctx)?;
+            let outcome = ext.on_after_tool(ctx).await?;
             if outcome != HookOutcome::Continue {
                 return Ok(outcome);
             }
@@ -285,9 +297,9 @@ impl ExtensionRunner {
         Ok(HookOutcome::Continue)
     }
 
-    pub fn run_before_compact(&self, ctx: &CompactCtx<'_>) -> durable::Result<HookOutcome> {
+    pub async fn run_before_compact(&self, ctx: &CompactCtx<'_>) -> durable::Result<HookOutcome> {
         for ext in &self.extensions {
-            let outcome = ext.on_before_compact(ctx)?;
+            let outcome = ext.on_before_compact(ctx).await?;
             if outcome != HookOutcome::Continue {
                 return Ok(outcome);
             }
@@ -295,9 +307,9 @@ impl ExtensionRunner {
         Ok(HookOutcome::Continue)
     }
 
-    pub fn run_after_run(&self, ctx: &mut RunEndCtx<'_>) -> durable::Result<HookOutcome> {
+    pub async fn run_after_run(&self, ctx: &mut RunEndCtx<'_>) -> durable::Result<HookOutcome> {
         for ext in &self.extensions {
-            let outcome = ext.on_after_run(ctx)?;
+            let outcome = ext.on_after_run(ctx).await?;
             if outcome != HookOutcome::Continue {
                 return Ok(outcome);
             }

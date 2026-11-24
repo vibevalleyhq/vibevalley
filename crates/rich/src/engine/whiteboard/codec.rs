@@ -2,7 +2,57 @@ use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use vibevalley_protocol::{ArtifactEntry, ArtifactEntryKind, ArtifactEntryOp, ArtifactEntryWriteInput};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WhiteboardEntryKind {
+    Text,
+    Json,
+    Asset,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WhiteboardEntryOp {
+    Set,
+    Patch,
+    Delete,
+    Copy,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WhiteboardEntry {
+    pub artifact_id: String,
+    pub path: String,
+    pub kind: WhiteboardEntryKind,
+    pub mime: String,
+    pub size: i64,
+    pub rev: i64,
+    pub updated_by: String,
+    pub updated: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WhiteboardWriteInput {
+    pub op: WhiteboardEntryOp,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<WhiteboardEntryKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mime: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub if_rev: Option<i64>,
+}
 
 use crate::engine::canvas::{Canvas, CanvasColor, End, Node as CanvasNode, PresetColor, Side};
 use crate::engine::whiteboard::model::{
@@ -142,7 +192,7 @@ struct WireElement {
     extra: BTreeMap<String, Value>,
 }
 
-pub fn decode_board_entries(entries: &[ArtifactEntry], seq: i64) -> BoardDoc {
+pub fn decode_board_entries(entries: &[WhiteboardEntry], seq: i64) -> BoardDoc {
     let mut doc = BoardDoc { seq, ..BoardDoc::default() };
 
     for entry in entries {
@@ -837,11 +887,11 @@ pub fn encode_element_json(el: &ElementRecord) -> String {
     serde_json::to_string(&compact_json(encode_element_value(el))).unwrap_or_else(|_| "{}".to_owned())
 }
 
-pub fn encode_element_write(el: &ElementRecord, include_if_rev: bool) -> ArtifactEntryWriteInput {
-    ArtifactEntryWriteInput {
-        op: ArtifactEntryOp::Set,
+pub fn encode_element_write(el: &ElementRecord, include_if_rev: bool) -> WhiteboardWriteInput {
+    WhiteboardWriteInput {
+        op: WhiteboardEntryOp::Set,
         path: format!("elements/{}", el.id),
-        kind: Some(ArtifactEntryKind::Json),
+        kind: Some(WhiteboardEntryKind::Json),
         value: Some(encode_element_json(el)),
         from: None,
         mime: None,
@@ -849,14 +899,14 @@ pub fn encode_element_write(el: &ElementRecord, include_if_rev: bool) -> Artifac
     }
 }
 
-pub fn encode_element_patch(before: &ElementRecord, after: &ElementRecord, include_if_rev: bool) -> ArtifactEntryWriteInput {
+pub fn encode_element_patch(before: &ElementRecord, after: &ElementRecord, include_if_rev: bool) -> WhiteboardWriteInput {
     let prev = compact_json(encode_element_value(before));
     let next = compact_json(encode_element_value(after));
     let diff = json_merge_diff(&prev, &next);
-    ArtifactEntryWriteInput {
-        op: ArtifactEntryOp::Patch,
+    WhiteboardWriteInput {
+        op: WhiteboardEntryOp::Patch,
         path: format!("elements/{}", after.id),
-        kind: Some(ArtifactEntryKind::Json),
+        kind: Some(WhiteboardEntryKind::Json),
         value: Some(serde_json::to_string(&diff).unwrap_or_else(|_| "{}".to_owned())),
         from: None,
         mime: None,
@@ -864,9 +914,9 @@ pub fn encode_element_patch(before: &ElementRecord, after: &ElementRecord, inclu
     }
 }
 
-pub fn encode_element_delete(id: &ElementId, rev: i64, include_if_rev: bool) -> ArtifactEntryWriteInput {
-    ArtifactEntryWriteInput {
-        op: ArtifactEntryOp::Delete,
+pub fn encode_element_delete(id: &ElementId, rev: i64, include_if_rev: bool) -> WhiteboardWriteInput {
+    WhiteboardWriteInput {
+        op: WhiteboardEntryOp::Delete,
         path: format!("elements/{id}"),
         kind: None,
         value: None,
@@ -876,7 +926,7 @@ pub fn encode_element_delete(id: &ElementId, rev: i64, include_if_rev: bool) -> 
     }
 }
 
-pub fn encode_meta_write(meta: &BoardMeta) -> ArtifactEntryWriteInput {
+pub fn encode_meta_write(meta: &BoardMeta) -> WhiteboardWriteInput {
     let grid = match meta.grid {
         GridStyle::Architectural => "architectural",
         GridStyle::Dots => "dots",
@@ -888,10 +938,10 @@ pub fn encode_meta_write(meta: &BoardMeta) -> ArtifactEntryWriteInput {
         background: meta.background.clone(),
         extra: BTreeMap::new(),
     };
-    ArtifactEntryWriteInput {
-        op: ArtifactEntryOp::Set,
+    WhiteboardWriteInput {
+        op: WhiteboardEntryOp::Set,
         path: "board/meta".to_owned(),
-        kind: Some(ArtifactEntryKind::Json),
+        kind: Some(WhiteboardEntryKind::Json),
         value: Some(serde_json::to_string(&compact_json(serde_json::to_value(wire).unwrap_or(Value::Null))).unwrap_or_else(|_| "{}".to_owned())),
         from: None,
         mime: None,
@@ -899,7 +949,7 @@ pub fn encode_meta_write(meta: &BoardMeta) -> ArtifactEntryWriteInput {
     }
 }
 
-pub fn encode_presence_write(presence: &Presence) -> ArtifactEntryWriteInput {
+pub fn encode_presence_write(presence: &Presence) -> WhiteboardWriteInput {
     let wire = WirePresence {
         id: Some(presence.id.clone()),
         name: Some(presence.name.clone()),
@@ -914,10 +964,10 @@ pub fn encode_presence_write(presence: &Presence) -> ArtifactEntryWriteInput {
         viewport: presence.viewport,
         updated_at: presence.updated_at,
     };
-    ArtifactEntryWriteInput {
-        op: ArtifactEntryOp::Set,
+    WhiteboardWriteInput {
+        op: WhiteboardEntryOp::Set,
         path: format!("presence/{}", presence.id),
-        kind: Some(ArtifactEntryKind::Json),
+        kind: Some(WhiteboardEntryKind::Json),
         value: Some(serde_json::to_string(&compact_json(serde_json::to_value(wire).unwrap_or(Value::Null))).unwrap_or_else(|_| "{}".to_owned())),
         from: None,
         mime: None,

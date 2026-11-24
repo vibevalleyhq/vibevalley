@@ -867,7 +867,7 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
                         const text = content();
                         const input = props.job.input?.name ?? props.job.id;
                         const title = partial() ? `${input} — ${t("web.audio.partialTitle")}` : input;
-                        void act.run(async () => saved.set((await api.artifact.create({ title, kind: "markdown", content: text })).id));
+                        void act.run(async () => saved.set((await api.artifact.create({ title, artifactType: "docs", content: text })).id));
                       }}
                     >
                       {partial() ? t("web.audio.savePartialTranscript") : t("web.audio.saveTranscript")}

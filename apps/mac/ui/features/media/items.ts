@@ -1,8 +1,6 @@
 import { t } from "@vibevalley/i18n";
 import {
   type Artifact,
-  type ArtifactBody,
-  type ArtifactDisplay,
   type ArtifactType,
   type LibraryFileKind,
   type LibraryItem,
@@ -45,10 +43,8 @@ const isArtifactFromSource = (artifact: Artifact, source: SourceFilter): boolean
   }
 };
 
-export const artifactMatchesType = (
-  a: { readonly body: ArtifactBody; readonly display?: ArtifactDisplay | undefined; readonly artifactType?: ArtifactType | undefined },
-  type: ArtifactTypeFilter | undefined,
-): boolean => type === undefined || artifactFacetOf(a) === type;
+export const artifactMatchesType = (a: { readonly artifactType: ArtifactType }, type: ArtifactTypeFilter | undefined): boolean =>
+  type === undefined || artifactFacetOf(a) === type;
 
 export const shownArtifacts = (
   all: readonly Artifact[],

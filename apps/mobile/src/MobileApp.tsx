@@ -135,14 +135,12 @@ export function MobileApp(props: MobileAppProps = {}) {
   });
   cleanup(() => stopBackHandler());
 
-  const inboxBadgeCount = computed(() => session.pendingPermissions().length + session.pendingInteractions().length + (session.inbox()?.items.length ?? 0));
-
   const activeSessionsCount = computed(() => (session.sessions()?.sessions ?? []).filter((s) => s.phase._tag === "working").length);
 
   const badgeForTab = (tab: MobileTabId): number => {
     switch (tab) {
       case "inbox":
-        return inboxBadgeCount();
+        return session.unreadInboxCount();
       case "sessions":
         return activeSessionsCount();
       case "channels":
@@ -222,6 +220,18 @@ export function MobileApp(props: MobileAppProps = {}) {
     </View>
   );
 
+  const renderHeader = (serverName: string, status: () => { readonly label: string; readonly tone: TagTone }, inline: boolean) => (
+    <View testID="mobile-header" class={`flex-row items-center justify-between gap-2.5 border-b border-line bg-side px-4 ${inline ? "py-2" : "py-2.5"}`}>
+      <View class={inline ? "min-w-0 flex-1 flex-row items-center gap-2.5" : "min-w-0 flex-1 gap-1"}>
+        <Text testID="server-name" class="truncate text-base font-bold text-ink">
+          {serverName}
+        </Text>
+        <StatusTag testID="connection-status" label={status().label} tone={status().tone} dot />
+      </View>
+      <PillButton testID="disconnect-button" size="sm" tone="plain" icon="close" label={t("web.remote.state.disconnect")} onPress={() => handleDisconnect()} />
+    </View>
+  );
+
   return (
     <If when={session.credentials()} else={<PairScreen session={session} layout={layout} />}>
       {(creds) => {
@@ -231,22 +241,7 @@ export function MobileApp(props: MobileAppProps = {}) {
             when={isDualPane()}
             else={
               <SafeScreen testID="mobile-home" bottomInset={!mobileAvailable}>
-                <View testID="mobile-header" class="flex-row items-center justify-between gap-2.5 border-b border-line bg-side px-4 py-2.5">
-                  <View class="min-w-0 flex-1 gap-1">
-                    <Text testID="server-name" class="truncate text-base font-bold text-ink">
-                      {creds().serverName}
-                    </Text>
-                    <StatusTag testID="connection-status" label={status().label} tone={status().tone} dot />
-                  </View>
-                  <PillButton
-                    testID="disconnect-button"
-                    size="sm"
-                    tone="plain"
-                    icon="close"
-                    label={t("web.remote.state.disconnect")}
-                    onPress={() => handleDisconnect()}
-                  />
-                </View>
+                {renderHeader(creds().serverName, status, false)}
 
                 {renderActiveTab()}
 
@@ -373,22 +368,7 @@ export function MobileApp(props: MobileAppProps = {}) {
                   paddingBottom: layout().safe.bottom,
                 }}
               >
-                <View testID="mobile-header" class="flex-row items-center justify-between gap-2.5 border-b border-line bg-side px-4 py-2">
-                  <View class="min-w-0 flex-1 flex-row items-center gap-2.5">
-                    <Text testID="server-name" class="truncate text-base font-bold text-ink">
-                      {creds().serverName}
-                    </Text>
-                    <StatusTag testID="connection-status" label={status().label} tone={status().tone} dot />
-                  </View>
-                  <PillButton
-                    testID="disconnect-button"
-                    size="sm"
-                    tone="plain"
-                    icon="close"
-                    label={t("web.remote.state.disconnect")}
-                    onPress={() => handleDisconnect()}
-                  />
-                </View>
+                {renderHeader(creds().serverName, status, true)}
 
                 {renderActiveTab()}
               </View>

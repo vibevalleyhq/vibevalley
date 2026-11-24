@@ -9,17 +9,22 @@ use std::time::Duration;
 use base64::Engine as _;
 use parking_lot::Mutex;
 use serde_json::{Value, json};
+use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
-    BizCode, Caller, Fact, InboxFrom, InboxFromRuntime, InboxItem, InboxKind, InboxTarget, InboxTargetRuntime, InboxWords, IssueFilter, RemotePlatform,
+    BizCode, Caller, InboxFrom, InboxFromRuntime, InboxItem, InboxKind, InboxSlice, InboxTarget, InboxTargetRuntime, InboxWords, IssueFilter, RemotePlatform,
     SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE, SettingsUpdate, SliceKind, ops,
 };
-use vibevalley_server::transport::api::{CallerContext, InvokeObserver, Server};
-use vibevalley_server::transport::http::serve;
+use vibevalley_server::gateway::api::{CallerContext, InvokeObserver, Server};
+use vibevalley_server::gateway::http::serve;
 
-fn start_server(dir: &std::path::Path) -> vibevalley_server::Started {
+fn start_server(dir: &std::path::Path) -> vibevalley_server::App {
+    start_server_with_observer(dir, None)
+}
+
+fn start_server_with_observer(dir: &std::path::Path, invoke_observer: Option<Arc<dyn InvokeObserver>>) -> vibevalley_server::App {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    vibevalley_server::start(vibevalley_server::ServerConfig {
+    vibevalley_server::create_app_blocking(vibevalley_server::Config {
         version: "2.3.4-spine-test".into(),
         registry: Some(Arc::new(registry)),
         probe_runtimes: false,
@@ -27,7 +32,8 @@ fn start_server(dir: &std::path::Path) -> vibevalley_server::Started {
         link_previews: false,
         tick_crons: false,
         debug_enabled: false,
-        ..vibevalley_server::ServerConfig::under(dir)
+        invoke_observer,
+        ..vibevalley_server::Config::under(dir)
     })
     .unwrap()
 }
@@ -37,16 +43,16 @@ fn http_client() -> reqwest::blocking::Client {
     reqwest::blocking::Client::builder().no_proxy().timeout(Duration::from_secs(5)).build().unwrap()
 }
 
-fn enable_and_pair(started: &vibevalley_server::Started, platform: &str, name: &str, scope: Option<&str>) -> (String, String, Value) {
+fn enable_and_pair(started: &vibevalley_server::App, platform: &str, name: &str, scope: Option<&str>) -> (String, String, Value) {
     let enabled = started
-        .hub
+        .router()
         .call_as(Caller::User, "remote.enable", json!({ "bindAddr": "127.0.0.1", "port": 0 }));
     assert_eq!(enabled.biz_code, 0, "{}", enabled.message);
     let remote_url = enabled.data.unwrap()["url"].as_str().unwrap().to_string();
     let code = match scope {
         Some(s) => started.test_internals().remote.pair_create_with_scope(Some(s)).unwrap().code,
         None => {
-            let pair = started.hub.call_as(Caller::User, "remote.pair.create", json!({}));
+            let pair = started.router().call_as(Caller::User, "remote.pair.create", json!({}));
             assert_eq!(pair.biz_code, 0, "{}", pair.message);
             pair.data.unwrap()["code"].as_str().unwrap().to_string()
         }
@@ -68,40 +74,28 @@ fn enable_and_pair(started: &vibevalley_server::Started, platform: &str, name: &
 fn single_server_db_shares_pool_wal_fk_and_reopens_cleanly() {
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path());
-    let db = started.test_internals().db.clone();
-    assert_eq!(db.path(), dir.path().join("server.db"));
+    let service = started.test_internals().service.clone();
+    assert_eq!(service.path(), Some(dir.path().join("server.db").as_path()));
+    assert!(!service.is_postgres());
 
-    // Verify WAL mode and foreign keys on the SQLite write connection.
-    let (journal, fk): (String, i64) = vibevalley_runtime::rt::block_on(async {
-        use sea_orm::{ConnectionTrait, DbBackend, Statement};
-        let conn = db.write_conn();
-        let journal_row = conn
-            .query_one_raw(Statement::from_string(DbBackend::Sqlite, "PRAGMA journal_mode"))
-            .await
-            .unwrap()
-            .unwrap();
-        let journal: String = journal_row.try_get_by_index(0).unwrap();
-        let fk_row = conn
-            .query_one_raw(Statement::from_string(DbBackend::Sqlite, "PRAGMA foreign_keys"))
-            .await
-            .unwrap()
-            .unwrap();
-        let fk: i64 = fk_row.try_get_by_index(0).unwrap();
-        (journal, fk)
+    // Verify WAL mode on the SQLite file.
+    let journal: String = vibevalley_runtime::rt::block_on(async {
+        use sqlx::Row;
+        let mut conn = crate::support::inspect_db(&dir.path().join("server.db"));
+        sqlx::query("PRAGMA journal_mode").fetch_one(&mut conn).await.unwrap().get(0)
     });
     assert_eq!(journal.to_lowercase(), "wal");
-    assert_eq!(fk, 1);
 
-    // Exercise writes across work/issue, collab/channel, content/attachment, content/artifact, team/memory, work/cron, infra/remote.
-    let issue = started.hub.call_as(Caller::User, "issue.create", json!({ "title": "Single DB task" }));
+    // Exercise writes across issue, channel, attachment, artifact, memory, cron, remote.
+    let issue = started.router().call_as(Caller::User, "issue.create", json!({ "title": "Single DB task" }));
     assert_eq!(issue.biz_code, 0, "{}", issue.message);
     let issue_id = issue.data.unwrap()["id"].as_str().unwrap().to_string();
 
-    let channel_id = started.hub.call_as(Caller::User, "channel.list", json!({})).data.unwrap()[0]["id"]
+    let channel_id = started.router().call_as(Caller::User, "channel.list", json!({})).data.unwrap()[0]["id"]
         .as_str()
         .unwrap()
         .to_string();
-    let att = started.hub.call_as(
+    let att = started.router().call_as(
         Caller::User,
         "attachment.create",
         json!({
@@ -113,17 +107,17 @@ fn single_server_db_shares_pool_wal_fk_and_reopens_cleanly() {
     assert_eq!(att.biz_code, 0, "{}", att.message);
     let att_id = att.data.unwrap()["id"].as_str().unwrap().to_string();
 
-    let sent = started.hub.call_as(
+    let sent = started.router().call_as(
         Caller::User,
         "channel.message.send",
         json!({ "id": channel_id, "text": "persisted across close", "attachments": [att_id] }),
     );
     assert_eq!(sent.biz_code, 0, "{}", sent.message);
 
-    let artifact = started.hub.call_as(
+    let artifact = started.router().call_as(
         Caller::User,
         "artifact.create",
-        json!({ "title": "Spec", "kind": "markdown", "content": "# Hello" }),
+        json!({ "title": "Spec", "artifactType": "docs", "content": "# Hello" }),
     );
     assert_eq!(artifact.biz_code, 0, "{}", artifact.message);
 
@@ -138,26 +132,26 @@ fn single_server_db_shares_pool_wal_fk_and_reopens_cleanly() {
         .collect();
     assert_eq!(db_files, vec!["server.db".to_string()]);
 
-    // Coordinated shutdown checkpoints WAL, closes pool, and drops Hub with zero Arc cycles.
-    drop(db);
-    let weak_hub = Arc::downgrade(&started.hub);
-    started.close();
+    // Coordinated shutdown checkpoints WAL, closes pool, and drops Router with zero Arc cycles.
+    drop(service);
+    let weak_router = Arc::downgrade(started.router());
+    started.close_blocking();
     drop(started);
-    assert_eq!(weak_hub.strong_count(), 0, "Hub must drop cleanly after Started::close");
+    assert_eq!(weak_router.strong_count(), 0, "Router must drop cleanly after App::close");
 
     // Reopen the same home and verify all persisted records survive intact.
     let reopened = start_server(dir.path());
-    let issues = reopened.hub.call_as(Caller::User, "issue.list", json!({})).data.unwrap();
+    let issues = reopened.router().call_as(Caller::User, "issue.list", json!({})).data.unwrap();
     assert!(issues.as_array().unwrap().iter().any(|i| i["id"] == issue_id));
     let msgs = reopened
-        .hub
+        .router()
         .call_as(Caller::User, "channel.message.list", json!({ "id": channel_id }))
         .data
         .unwrap();
     assert!(msgs.to_string().contains("persisted across close"));
-    let arts = reopened.hub.call_as(Caller::User, "artifact.list", json!({})).data.unwrap();
+    let arts = reopened.router().call_as(Caller::User, "artifact.list", json!({})).data.unwrap();
     assert!(arts.as_array().unwrap().iter().any(|a| a["title"] == "Spec"));
-    reopened.close();
+    reopened.close_blocking();
 }
 
 #[test]
@@ -180,21 +174,23 @@ fn hub_invoke_enforces_rbac_and_fires_observer() {
     }
 
     let dir = tempfile::tempdir().unwrap();
-    let started = start_server(dir.path());
     let observer = Arc::new(RecordingObserver {
         started: Mutex::new(vec![]),
         ended: Mutex::new(vec![]),
     });
-    started.hub.attach_observer(Some(observer.clone()));
+    let started = start_server_with_observer(dir.path(), Some(observer.clone()));
 
-    let issues = started.hub.invoke::<ops::IssueList>(&CallerContext::local(), IssueFilter::default()).unwrap();
+    let issues = started
+        .router()
+        .invoke::<ops::IssueList>(&CallerContext::local(), IssueFilter::default())
+        .unwrap();
     assert!(issues.is_empty());
 
-    let remote_issues = started.hub.invoke_as::<ops::IssueList>(Caller::Remote, IssueFilter::default()).unwrap();
+    let remote_issues = started.router().invoke_as::<ops::IssueList>(Caller::Remote, IssueFilter::default()).unwrap();
     assert!(remote_issues.is_empty());
 
     let denied = started
-        .hub
+        .router()
         .invoke::<ops::SettingUpdate>(&CallerContext::from_caller(Caller::Session), SettingsUpdate::default())
         .unwrap_err();
     assert_eq!(denied.biz_code, BizCode::Forbidden);
@@ -208,21 +204,20 @@ fn hub_invoke_enforces_rbac_and_fires_observer() {
     assert!(ends.contains(&(Caller::Remote, "issue.list".into(), 0)));
     assert!(ends.contains(&(Caller::Session, "setting.update".into(), BizCode::Forbidden.code())));
 
-    started.hub.attach_observer(None);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
 fn subscribe_with_enforces_subscription_rbac_and_http_subscribe_authenticates() {
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path());
-    let local_listener = serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
-    let channel_id = started.hub.call_as(Caller::User, "channel.list", json!({})).data.unwrap()[0]["id"]
+    let local_listener = serve(started.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let channel_id = started.router().call_as(Caller::User, "channel.list", json!({})).data.unwrap()[0]["id"]
         .as_str()
         .unwrap()
         .to_string();
 
-    // Direct Hub::subscribe_with enforces Subscription::CAN for every subscription.
+    // Direct Server::subscribe_with enforces Subscription::CAN for every subscription.
     let session_ctx = CallerContext::from_caller(Caller::Session);
     let orch_ctx = CallerContext::from_caller(Caller::Orchestrator);
     for (sub_name, payload) in [
@@ -231,7 +226,7 @@ fn subscribe_with_enforces_subscription_rbac_and_http_subscribe_authenticates() 
         ("issue.watch", json!({ "id": "i-missing" })),
     ] {
         for denied_ctx in [&session_ctx, &orch_ctx] {
-            let err = started.hub.subscribe_with(denied_ctx, sub_name, payload.clone()).unwrap_err();
+            let err = started.router().subscribe_with(denied_ctx, sub_name, payload.clone()).unwrap_err();
             assert_eq!(err.biz_code, BizCode::Forbidden.code(), "{sub_name} for {:?}: {err:?}", denied_ctx.caller);
         }
     }
@@ -239,10 +234,10 @@ fn subscribe_with_enforces_subscription_rbac_and_http_subscribe_authenticates() 
     // Allowed callers (User, Remote) can open subscriptions.
     for allowed_ctx in [CallerContext::local(), CallerContext::from_caller(Caller::Remote)] {
         let (sub_id, _rx) = started
-            .hub
+            .router()
             .subscribe_with(&allowed_ctx, "channel.follow", json!({ "id": channel_id, "after": 0 }))
             .unwrap();
-        started.hub.unsubscribe(sub_id);
+        started.router().unsubscribe(sub_id);
     }
 
     // HTTP remote listener must enforce Bearer auth on /api/v1/subscribe/* and /api/v1/issue/watch/*.
@@ -276,17 +271,17 @@ fn subscribe_with_enforces_subscription_rbac_and_http_subscribe_authenticates() 
     drop(authed_sub);
 
     drop(local_listener);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
 fn attachment_http_enforces_remote_auth_query_token_and_streams_byte_ranges() {
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path());
-    let local_listener = serve(started.hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let local_listener = serve(started.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
     let payload_bytes = b"0123456789abcdef";
 
-    let created = started.hub.call_as(
+    let created = started.router().call_as(
         Caller::User,
         "attachment.create",
         json!({
@@ -387,14 +382,18 @@ fn attachment_http_enforces_remote_auth_query_token_and_streams_byte_ranges() {
     assert_eq!(local_range.bytes().unwrap().as_ref(), b"4567");
 
     drop(local_listener);
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
 fn runtime_inbox_fact_folds_into_inbox_slice_and_clears() {
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path());
-    let before = started.hub.inbox_slice();
+    let inbox_slice = |app: &vibevalley_server::App| -> InboxSlice {
+        vibevalley_runtime::rt::block_on(app.ctx().feed.flush());
+        serde_json::from_str(&app.ctx().feed.snapshot_json(SliceKind::Inbox)).unwrap()
+    };
+    let before = inbox_slice(&started);
     assert!(!before.items.iter().any(|i| i.id == "runtime:test-budget-1"));
 
     let alert = InboxItem {
@@ -416,17 +415,19 @@ fn runtime_inbox_fact_folds_into_inbox_slice_and_clears() {
         },
     };
 
-    started.hub.apply(vec![Fact::runtime_inbox_changed(vibevalley_server::now(), vec![alert])]);
-    let after = started.hub.inbox_slice();
+    started.ctx().live.set_runtime_inbox(vec![alert]);
+    started.ctx().mark_dirty(SliceMask::INBOX);
+    let after = inbox_slice(&started);
     assert!(after.seq > before.seq);
     assert!(after.items.iter().any(|i| i.id == "runtime:test-budget-1"));
 
-    started.hub.apply(vec![Fact::runtime_inbox_changed(vibevalley_server::now(), vec![])]);
-    let cleared = started.hub.inbox_slice();
+    started.ctx().live.set_runtime_inbox(vec![]);
+    started.ctx().mark_dirty(SliceMask::INBOX);
+    let cleared = inbox_slice(&started);
     assert!(cleared.seq > after.seq);
     assert!(!cleared.items.iter().any(|i| i.id == "runtime:test-budget-1"));
 
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -434,23 +435,24 @@ fn slice_feed_caches_pre_encoded_json_arc_across_reads() {
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path());
 
-    let seq1 = started.hub.board_slice().seq;
-    let json1 = started.hub.slice_snapshot_json(SliceKind::Board);
-    let json2 = started.hub.slice_snapshot_json(SliceKind::Board);
+    let seq1 = started.router().slice_seqs()["board"];
+    let json1 = started.ctx().feed.snapshot_json(SliceKind::Board);
+    let json2 = started.ctx().feed.snapshot_json(SliceKind::Board);
     assert!(Arc::ptr_eq(&json1, &json2), "unchanged slice snapshot must reuse cached Arc<str>");
 
-    let created = started.hub.call_as(Caller::User, "issue.create", json!({ "title": "Cached JSON test" }));
+    let created = started.router().call_as(Caller::User, "issue.create", json!({ "title": "Cached JSON test" }));
     assert_eq!(created.biz_code, 0, "{}", created.message);
 
-    let seq3 = started.hub.board_slice().seq;
-    let json3 = started.hub.slice_snapshot_json(SliceKind::Board);
-    let json4 = started.hub.slice_snapshot_json(SliceKind::Board);
+    vibevalley_runtime::rt::block_on(started.ctx().feed.flush());
+    let seq3 = started.router().slice_seqs()["board"];
+    let json3 = started.ctx().feed.snapshot_json(SliceKind::Board);
+    let json4 = started.ctx().feed.snapshot_json(SliceKind::Board);
     assert!(seq3 > seq1);
     assert!(!Arc::ptr_eq(&json1, &json3));
     assert!(Arc::ptr_eq(&json3, &json4));
     assert!(json3.contains("Cached JSON test"));
 
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -458,7 +460,7 @@ fn remote_supports_all_six_platforms_and_persists_scopes() {
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path());
     let enabled = started
-        .hub
+        .router()
         .call_as(Caller::User, "remote.enable", json!({ "bindAddr": "127.0.0.1", "port": 0 }));
     assert_eq!(enabled.biz_code, 0, "{}", enabled.message);
 
@@ -502,7 +504,7 @@ fn remote_supports_all_six_platforms_and_persists_scopes() {
         .unwrap();
     assert_eq!(whoami["data"]["device"]["scope"], SCOPE_REMOTE_MACHINE);
 
-    started.close();
+    started.close_blocking();
 }
 
 #[test]
@@ -510,13 +512,13 @@ fn spine_exposes_live_voice_port_and_narrow_started_surface() {
     let dir = tempfile::tempdir().unwrap();
     let started = start_server(dir.path());
 
-    // Narrow Started surface supports setting MCP URL without exposing board internals.
+    // App exposes setting MCP URL without exposing board internals.
     started.set_mcp_url("http://127.0.0.1:1/mcp");
 
-    // Hub exposes LiveVoicePort purely through the spine trait without importing collab::voice.
-    let voice: vibevalley_server::SharedLiveVoice = started.hub.voice().expect("LiveVoicePort attached on Hub");
+    // Router exposes LiveVoicePort purely through the spine trait without importing channel/voice.
+    let voice: vibevalley_server::gateway::api::SharedLiveVoice = started.server().ports().voice.expect("LiveVoicePort attached on Router");
     assert!(voice.grant().is_err(), "grant without configured MOSS provider must return ApiError");
     voice.stop("nonexistent-agent");
 
-    started.close();
+    started.close_blocking();
 }

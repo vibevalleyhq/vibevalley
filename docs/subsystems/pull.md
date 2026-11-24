@@ -9,19 +9,19 @@
 | 已有分支的检出预检、按 SHA 推送及 GitHub PR / GitLab.com MR 创建或复用（`publish`） | 仓库新建与克隆、工单 worktree 创建与本地合并、`gh` 登录与仓库写权限缓存（[仓库](docs/subsystems/repo.md)） |
 | `pull` 与 `pull_event` 表持久化（`server.db`）、同步内存索引 `PullIndex`（按 `(repo, number)` 与 `issue_id` 读取） | 工单状态机、何时完成交付与路由规则（[工单](docs/subsystems/issue.md#完成和交付)） |
 | 开放 PR/MR 状态轮询（`refresh`），关联工单的 PR 变为 `merged` 或 `closed` 时通知 `Board::settle_pull` 结清 | 帮工的工作目录在谁手里、会话交接与轨迹记录（[帮工](docs/subsystems/session.md)） |
-| GitHub 开放 PR 的 GraphQL/REST 分页快照（`snapshot`）、失败 Actions job 日志提取、CI SHA-256 指纹比对与评审/评论轮询（`poll`） | `vv://github/...` 会话权限裁剪与分页缓存（[助手](docs/subsystems/orchestrator.md)、`crates/server/src/modules/team/mcp/resource.rs`） |
+| GitHub 开放 PR 的 GraphQL/REST 分页快照（`snapshot`）、失败 Actions job 日志提取、CI SHA-256 指纹比对与评审/评论轮询（`poll`） | `vv://github/...` 会话权限裁剪与分页缓存（[助手](docs/subsystems/orchestrator.md)、`crates/server/src/agent/mcp/resource.rs`） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/modules/work/pull/mod.rs` | `Pulls` 总入口：注册 `repo.pr.submit`、通过 `Board::use_pull_of_issue` 注入 `Issue.pull_request` 投影、驱动周期 `refresh` 与 `poll` |
-| `crates/server/src/modules/work/pull/store.rs` | `PullStore` 与同步内存索引 `PullIndex`：管理 `pull`、`pull_event` 读写并维护每张工单的当前 PR 投影 |
-| `crates/server/src/modules/work/pull/publish.rs` | `Publisher`：检出与远端校验、锁外 `.vibevalley/check`、按 `<SHA>:refs/heads/<branch>` 推送、GitHub（`gh`）与 GitLab.com（`glab`）查询和创建 |
-| `crates/server/src/modules/work/pull/snapshot.rs` | `Pulls::snapshot`：GitHub PR 检查、评审、评论与行内评审线程的 GraphQL/REST 分页快照、CI SHA-256 指纹与失败 Actions job 日志提取 |
-| `crates/server/src/modules/work/pull/poll.rs` | `Pulls::poll`：CI 指纹变化检测、跳过当前登录者自发评论，以及同轮机器人评审去重（`bot_round_key`、`bot_round`） |
-| `crates/server/src/db/entities/work_pull.rs`、`crates/server/src/db/migration/` | 表 `pull`（`unique (repo, number)`、可空 `issue_id references issue(id) on delete set null`）与 `pull_event`（`pull_id references pull(id) on delete cascade`）的 SeaORM 实体与迁移 |
-| `crates/server/src/modules/team/mcp/resource.rs` | 将 `vv://github/<repo>/pulls/<n>`（及 `/checks`、`/reviews`、`/comments`）接入 `Pulls::snapshot` |
+| `crates/server/src/issue/pull/mod.rs` | `Pulls` 总入口：注册 `repo.pr.submit`、通过 `Board::use_pull_of_issue` 注入 `Issue.pull_request` 投影、驱动周期 `refresh` 与 `poll` |
+| `crates/server/src/service/issue.rs` | `IssueService`（PR 查询与落库）与 `crates/server/src/issue/pull/mod.rs` 中的 `PullIndex`：管理 `pull`、`pull_event` 读写并维护每张工单的当前 PR 投影 |
+| `crates/server/src/issue/pull/publish.rs` | `Publisher`：检出与远端校验、锁外 `.vibevalley/check`、按 `<SHA>:refs/heads/<branch>` 推送、GitHub（`gh`）与 GitLab.com（`glab`）查询和创建 |
+| `crates/server/src/issue/pull/snapshot.rs` | `Pulls::snapshot`：GitHub PR 检查、评审、评论与行内评审线程的 GraphQL/REST 分页快照、CI SHA-256 指纹与失败 Actions job 日志提取 |
+| `crates/server/src/issue/pull/poll.rs` | `Pulls::poll`：CI 指纹变化检测、跳过当前登录者自发评论，以及同轮机器人评审去重（`bot_round_key`、`bot_round`） |
+| `crates/server/src/db/entity/pull.rs`、`crates/server/src/db/migration/` | 表 `pull`（`unique (repo, number)`、可空 `issue_id references issue(id) on delete set null`）与 `pull_event`（`pull_id references pull(id) on delete cascade`）的 SeaORM 实体与迁移 |
+| `crates/server/src/agent/mcp/resource.rs` | 将 `vv://github/<repo>/pulls/<n>`（及 `/checks`、`/reviews`、`/comments`）接入 `Pulls::snapshot` |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`repo.pr.submit`）。
 
@@ -50,14 +50,14 @@
 
 - **仓库（`repo`）**：读空间内仓库列表以归属检出路径，与 `repos` 共用 `gh` 远端解析约定。
 - **工单（`issue`）**：通过 `Board::use_pull_of_issue` 提供 `Issue.pull_request` 投影，状态变化与结清时调用 `Board::refresh_issue`、`Board::settle_pull`。
-- **MCP 资源（`mcp`）**：`crates/server/src/modules/team/mcp/resource.rs` 调用 `Pulls::snapshot` 为助手和帮工提供 `vv://github/<repo>/pulls/<n>`（及 `/checks`、`/reviews`、`/comments`）分页读取。
+- **MCP 资源（`mcp`）**：`crates/server/src/agent/mcp/resource.rs` 调用 `Pulls::snapshot` 为助手和帮工提供 `vv://github/<repo>/pulls/<n>`（及 `/checks`、`/reviews`、`/comments`）分页读取。
 
 ## 为什么这样
 
-- **PR 独立成模块，工单表不存 GitHub 细节**：分支发布既服务工单，也服务本机独立分支（`issue_id = null`），并支持 GitLab.com 发布；把 `pull` 与 `pull_event` 独立成 `modules/work/pull` 并通过回调挂载到 `Board`，使 `modules/work/issue` 完全不依赖平台 CLI 与轮询实现。
+- **PR 独立成模块，工单表不存 GitHub 细节**：分支发布既服务工单，也服务本机独立分支（`issue_id = null`），并支持 GitLab.com 发布；把 `pull` 与 `pull_event` 独立成 `work/pull` 并通过回调挂载到 `Board`，使 `work/issue` 完全不依赖平台 CLI 与轮询实现。
 - **`issue` 更新用 `ON CONFLICT DO UPDATE` 保护外键**：`pull.issue_id`（以及 `cron.issue_id`、`artifact.issue`）均带 `references issue(id) on delete set null`，工单表的 `PutIssue` 不使用 `INSERT OR REPLACE`（在 SQLite 中等价于删除后重建），避免每次更新工单时静默清空外键。
 
 ## 怎么验证
 
 - `crates/server/tests/publish.rs`：发布已有分支的预览、推送、门禁拒绝、只许用户发布与 `pull` 持久化测试。
-- `crates/server/src/modules/work/pull/` 模块单元测试：`PullIndex` 同步投影、`refresh` 状态结清、`poll` CI 指纹与同轮机器人评审去重、`snapshot` 分页与失败日志提取。
+- `crates/server/src/issue/pull/` 模块单元测试：`PullIndex` 同步投影、`refresh` 状态结清、`poll` CI 指纹与同轮机器人评审去重、`snapshot` 分页与失败日志提取。

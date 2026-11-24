@@ -71,11 +71,7 @@ pub fn parse_retry_after(value: &str) -> Option<Duration> {
 }
 
 /// Sleeps for `duration`, waking immediately with `false` if `cancel` triggers.
-pub fn sleep_interruptible(duration: Duration, cancel: &CancelToken) -> bool {
-    crate::rt::block_on(sleep_interruptible_async(duration, cancel))
-}
-
-pub(crate) async fn sleep_interruptible_async(duration: Duration, cancel: &CancelToken) -> bool {
+pub async fn sleep_interruptible(duration: Duration, cancel: &CancelToken) -> bool {
     if cancel.is_cancelled() {
         return false;
     }
@@ -95,16 +91,16 @@ mod tests {
     use crate::agent::ai::CancelHandle;
 
     #[tokio::test(start_paused = true)]
-    async fn sleep_interruptible_async_completes_and_cancels_on_virtual_clock() {
+    async fn sleep_interruptible_completes_and_cancels_on_virtual_clock() {
         let wall = std::time::Instant::now();
         let t0 = tokio::time::Instant::now();
-        assert!(sleep_interruptible_async(Duration::from_secs(30), &CancelToken::never()).await);
+        assert!(sleep_interruptible(Duration::from_secs(30), &CancelToken::never()).await);
         assert_eq!(t0.elapsed(), Duration::from_secs(30));
         assert!(wall.elapsed() < Duration::from_secs(1));
 
         let handle = CancelHandle::new();
         let token = handle.token();
-        let sleeper = tokio::spawn(async move { sleep_interruptible_async(Duration::from_secs(60), &token).await });
+        let sleeper = tokio::spawn(async move { sleep_interruptible(Duration::from_secs(60), &token).await });
         tokio::task::yield_now().await;
         tokio::time::advance(Duration::from_secs(5)).await;
         handle.cancel();

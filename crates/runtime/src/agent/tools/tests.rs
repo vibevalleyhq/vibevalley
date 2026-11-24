@@ -32,8 +32,8 @@ fn coding_and_read_only_toolsets_expose_expected_names_and_replay_policies() {
     assert!(ro.iter().all(|t| t.replay_safe()));
 }
 
-#[test]
-fn typed_tool_adapter_generates_json_schema_and_rejects_bad_args() {
+#[tokio::test]
+async fn typed_tool_adapter_generates_json_schema_and_rejects_bad_args() {
     let dir = tempfile::tempdir().unwrap();
     let ws = Workspace::new(dir.path());
     let adapter = TypedToolAdapter(ReadFile(ws));
@@ -45,11 +45,11 @@ fn typed_tool_adapter_generates_json_schema_and_rejects_bad_args() {
     assert!(spec.parameters["properties"].get("limit").is_some());
     assert_eq!(spec.parameters["required"], json!(["path"]));
 
-    let missing_path = adapter.execute(&json!({}));
+    let missing_path = adapter.execute(&json!({})).await;
     assert!(missing_path.is_error);
     assert!(missing_path.text.contains("invalid arguments for `read`"), "{}", missing_path.text);
 
-    let bad_offset = adapter.execute(&json!({"path": "a.txt", "offset": "not_a_number"}));
+    let bad_offset = adapter.execute(&json!({"path": "a.txt", "offset": "not_a_number"})).await;
     assert!(bad_offset.is_error);
     assert!(bad_offset.text.contains("invalid arguments for `read`"), "{}", bad_offset.text);
 }
@@ -75,8 +75,8 @@ fn truncate_lines_and_bytes_report_totals_and_continuation_hints() {
     assert!(!truncate_bytes(utf8_text, 1000).truncated);
 }
 
-#[test]
-fn read_reports_total_lines_slice_and_continuation_hint() {
+#[tokio::test]
+async fn read_reports_total_lines_slice_and_continuation_hint() {
     let dir = tempfile::tempdir().unwrap();
     let ws = Workspace::new(dir.path());
     let content: String = (1..=25).map(|i| format!("row {i}\n")).collect();
@@ -96,6 +96,7 @@ fn read_reports_total_lines_slice_and_continuation_hint() {
             },
             &ctx,
         )
+        .await
         .unwrap();
     assert!(first.text.contains("     1\trow 1\n"));
     assert!(first.text.contains("     5\trow 5\n"));
@@ -113,6 +114,7 @@ fn read_reports_total_lines_slice_and_continuation_hint() {
             },
             &ctx,
         )
+        .await
         .unwrap();
     assert!(tail.text.contains("    25\trow 25\n"));
     assert!(tail.text.contains("showing lines 21..25 of 25"));
@@ -128,37 +130,42 @@ fn read_reports_total_lines_slice_and_continuation_hint() {
             },
             &ctx,
         )
+        .await
         .unwrap();
     assert_eq!(empty.text, "(empty file, 0 lines)");
 
-    let past_eof = tool.execute(
-        super::read::ReadArgs {
-            path: "many.txt".into(),
-            offset: Some(26),
-            limit: None,
-        },
-        &ctx,
-    );
+    let past_eof = tool
+        .execute(
+            super::read::ReadArgs {
+                path: "many.txt".into(),
+                offset: Some(26),
+                limit: None,
+            },
+            &ctx,
+        )
+        .await;
     assert!(past_eof.unwrap_err().contains("25 lines total"));
 }
 
-#[test]
-fn write_creates_parent_directories() {
+#[tokio::test]
+async fn write_creates_parent_directories() {
     let dir = tempfile::tempdir().unwrap();
     let ws = Workspace::new(dir.path());
     let tool = TypedToolAdapter(WriteFile(ws));
     assert!(!tool.replay_safe());
 
-    let out = tool.execute(&json!({
-        "path": "nested/deep/file.txt",
-        "content": "hello\nworld\n"
-    }));
+    let out = tool
+        .execute(&json!({
+            "path": "nested/deep/file.txt",
+            "content": "hello\nworld\n"
+        }))
+        .await;
     assert!(!out.is_error, "{}", out.text);
     assert_eq!(std::fs::read_to_string(dir.path().join("nested/deep/file.txt")).unwrap(), "hello\nworld\n");
 }
 
-#[test]
-fn edit_enforces_uniqueness_and_supports_replace_all() {
+#[tokio::test]
+async fn edit_enforces_uniqueness_and_supports_replace_all() {
     let dir = tempfile::tempdir().unwrap();
     let ws = Workspace::new(dir.path());
     std::fs::write(dir.path().join("f.txt"), "foo bar foo baz").unwrap();
@@ -166,29 +173,31 @@ fn edit_enforces_uniqueness_and_supports_replace_all() {
     let tool = TypedToolAdapter(EditFile(ws));
     assert!(!tool.replay_safe());
 
-    let missing = tool.execute(&json!({"path": "f.txt", "old_text": "nope", "new_text": "x"}));
+    let missing = tool.execute(&json!({"path": "f.txt", "old_text": "nope", "new_text": "x"})).await;
     assert!(missing.is_error && missing.text.contains("not found"));
 
-    let ambiguous = tool.execute(&json!({"path": "f.txt", "old_text": "foo", "new_text": "qux"}));
+    let ambiguous = tool.execute(&json!({"path": "f.txt", "old_text": "foo", "new_text": "qux"})).await;
     assert!(ambiguous.is_error && ambiguous.text.contains("2 times"));
 
-    let unique = tool.execute(&json!({"path": "f.txt", "old_text": "bar", "new_text": "BAR"}));
+    let unique = tool.execute(&json!({"path": "f.txt", "old_text": "bar", "new_text": "BAR"})).await;
     assert!(!unique.is_error, "{}", unique.text);
     assert_eq!(std::fs::read_to_string(dir.path().join("f.txt")).unwrap(), "foo BAR foo baz");
 
-    let all = tool.execute(&json!({
-        "path": "f.txt",
-        "old_text": "foo",
-        "new_text": "qux",
-        "replace_all": true
-    }));
+    let all = tool
+        .execute(&json!({
+            "path": "f.txt",
+            "old_text": "foo",
+            "new_text": "qux",
+            "replace_all": true
+        }))
+        .await;
     assert!(!all.is_error, "{}", all.text);
     assert!(all.text.contains("2 replacement(s)"), "{}", all.text);
     assert_eq!(std::fs::read_to_string(dir.path().join("f.txt")).unwrap(), "qux BAR qux baz");
 }
 
-#[test]
-fn bash_streams_updates_respects_timeout_and_cancels_mid_run_under_500ms() {
+#[tokio::test]
+async fn bash_streams_updates_respects_timeout_and_cancels_mid_run_under_500ms() {
     let dir = tempfile::tempdir().unwrap();
     let ws = Workspace {
         bash_timeout: Duration::from_millis(300),
@@ -204,16 +213,16 @@ fn bash_streams_updates_respects_timeout_and_cancels_mid_run_under_500ms() {
         updates_ref.lock().unwrap().push(u.text);
     }));
 
-    let ok = tool.execute_with_context(&json!({"command": "echo hi; sleep 0.05; echo err >&2"}), &ctx);
+    let ok = tool.execute_with_context(&json!({"command": "echo hi; sleep 0.05; echo err >&2"}), &ctx).await;
     assert!(!ok.is_error, "{}", ok.text);
     assert_eq!(ok.text, "hi\nerr\n");
     let streamed = updates.lock().unwrap().concat();
     assert_eq!(streamed, "hi\nerr\n");
 
-    let fail = tool.execute(&json!({"command": "exit 3"}));
+    let fail = tool.execute(&json!({"command": "exit 3"})).await;
     assert!(fail.is_error && fail.text.contains("exit status 3"), "{}", fail.text);
 
-    let slow = tool.execute(&json!({"command": "sleep 5"}));
+    let slow = tool.execute(&json!({"command": "sleep 5"})).await;
     assert!(slow.is_error && slow.text.contains("timed out"), "{}", slow.text);
 
     let cancel_ws = Workspace {
@@ -222,30 +231,30 @@ fn bash_streams_updates_respects_timeout_and_cancels_mid_run_under_500ms() {
     };
     let cancel_tool = TypedToolAdapter(Bash(cancel_ws));
     let handle = CancelHandle::new();
-    let (ready_tx, ready_rx) = flume::bounded::<()>(1);
+    let (ready_tx, mut ready_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
     let mut cancel_ctx = ToolContext::with_cancel(handle.token());
     cancel_ctx.on_update = Some(Arc::new(move |u| {
         if u.text.contains("ready") {
-            let _ = ready_tx.try_send(());
+            let _ = ready_tx.send(());
         }
     }));
 
-    let cancel_at = std::thread::scope(|scope| {
-        let running = scope.spawn(|| cancel_tool.execute_with_context(&json!({"command": "echo ready; sleep 30"}), &cancel_ctx));
-        ready_rx.recv_timeout(Duration::from_secs(5)).expect("bash command started");
-        let started = Instant::now();
-        handle.cancel();
-        let out = running.join().unwrap();
-        let elapsed = started.elapsed();
-        assert!(out.is_error, "{out:?}");
-        assert_eq!(out.text, "aborted by the user");
-        elapsed
-    });
+    let running = tokio::spawn(async move { cancel_tool.execute_with_context(&json!({"command": "echo ready; sleep 30"}), &cancel_ctx).await });
+    tokio::time::timeout(Duration::from_secs(5), ready_rx.recv())
+        .await
+        .expect("bash command started")
+        .expect("sender alive");
+    let started = Instant::now();
+    handle.cancel();
+    let out = running.await.unwrap();
+    let cancel_at = started.elapsed();
+    assert!(out.is_error, "{out:?}");
+    assert_eq!(out.text, "aborted by the user");
     assert!(cancel_at < Duration::from_millis(500), "cancel took {cancel_at:?}");
 }
 
-#[test]
-fn grep_respects_gitignore_glob_case_insensitive_and_cancel() {
+#[tokio::test]
+async fn grep_respects_gitignore_glob_case_insensitive_and_cancel() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     std::fs::create_dir_all(root.join("src")).unwrap();
@@ -261,11 +270,13 @@ fn grep_respects_gitignore_glob_case_insensitive_and_cancel() {
     let tool = TypedToolAdapter(Grep(Workspace::new(root)));
     assert!(tool.replay_safe());
 
-    let rs_only = tool.execute(&json!({
-        "pattern": "needle",
-        "glob": "*.rs",
-        "case_insensitive": true
-    }));
+    let rs_only = tool
+        .execute(&json!({
+            "pattern": "needle",
+            "glob": "*.rs",
+            "case_insensitive": true
+        }))
+        .await;
     assert!(!rs_only.is_error, "{}", rs_only.text);
     assert!(rs_only.text.contains("src/main.rs:2:"), "{}", rs_only.text);
     assert!(rs_only.text.contains("src/lib.rs:1:"), "{}", rs_only.text);
@@ -274,22 +285,24 @@ fn grep_respects_gitignore_glob_case_insensitive_and_cancel() {
     assert!(!rs_only.text.contains("app.log"), "{}", rs_only.text);
     assert!(!rs_only.text.contains("bin.dat"), "{}", rs_only.text);
 
-    let limited = tool.execute(&json!({"pattern": "needle", "case_insensitive": true, "max_results": 1}));
+    let limited = tool.execute(&json!({"pattern": "needle", "case_insensitive": true, "max_results": 1})).await;
     assert!(!limited.is_error);
     assert!(limited.text.contains("truncated at 1 matches"), "{}", limited.text);
 
-    let none = tool.execute(&json!({"pattern": "definitely_missing_token"}));
+    let none = tool.execute(&json!({"pattern": "definitely_missing_token"})).await;
     assert!(!none.is_error);
     assert_eq!(none.text, "no matches found");
 
     let handle = CancelHandle::new();
     handle.cancel();
-    let cancelled = tool.execute_with_context(&json!({"pattern": "needle"}), &ToolContext::with_cancel(handle.token()));
+    let cancelled = tool
+        .execute_with_context(&json!({"pattern": "needle"}), &ToolContext::with_cancel(handle.token()))
+        .await;
     assert!(cancelled.is_error && cancelled.text.contains("aborted by the user"));
 }
 
-#[test]
-fn find_respects_gitignore_glob_and_cancel() {
+#[tokio::test]
+async fn find_respects_gitignore_glob_and_cancel() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     std::fs::create_dir_all(root.join("src/nested")).unwrap();
@@ -303,24 +316,26 @@ fn find_respects_gitignore_glob_and_cancel() {
     let tool = TypedToolAdapter(Find(Workspace::new(root)));
     assert!(tool.replay_safe());
 
-    let out = tool.execute(&json!({"pattern": "*.rs"}));
+    let out = tool.execute(&json!({"pattern": "*.rs"})).await;
     assert!(!out.is_error, "{}", out.text);
     assert!(out.text.contains("src/lib.rs"), "{}", out.text);
     assert!(out.text.contains("src/nested/mod.rs"), "{}", out.text);
     assert!(!out.text.contains("README.md"), "{}", out.text);
     assert!(!out.text.contains("target/out.rs"), "{}", out.text);
 
-    let capped = tool.execute(&json!({"pattern": "*.rs", "max_results": 1}));
+    let capped = tool.execute(&json!({"pattern": "*.rs", "max_results": 1})).await;
     assert!(capped.text.contains("truncated at 1 files"), "{}", capped.text);
 
     let handle = CancelHandle::new();
     handle.cancel();
-    let cancelled = tool.execute_with_context(&json!({"pattern": "*.rs"}), &ToolContext::with_cancel(handle.token()));
+    let cancelled = tool
+        .execute_with_context(&json!({"pattern": "*.rs"}), &ToolContext::with_cancel(handle.token()))
+        .await;
     assert!(cancelled.is_error && cancelled.text.contains("aborted by the user"));
 }
 
-#[test]
-fn ls_lists_sorted_entries_with_kinds_and_sizes() {
+#[tokio::test]
+async fn ls_lists_sorted_entries_with_kinds_and_sizes() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     std::fs::create_dir_all(root.join("zeta")).unwrap();
@@ -333,7 +348,7 @@ fn ls_lists_sorted_entries_with_kinds_and_sizes() {
     let tool = TypedToolAdapter(Ls(Workspace::new(root)));
     assert!(tool.replay_safe());
 
-    let out = tool.execute(&json!({}));
+    let out = tool.execute(&json!({})).await;
     assert!(!out.is_error, "{}", out.text);
     let lines: Vec<&str> = out.text.lines().collect();
     assert_eq!(
@@ -348,10 +363,10 @@ fn ls_lists_sorted_entries_with_kinds_and_sizes() {
         ]
     );
 
-    let capped = tool.execute(&json!({"max_entries": 2}));
+    let capped = tool.execute(&json!({"max_entries": 2})).await;
     assert!(capped.text.contains("showing 2 of 6 entries"), "{}", capped.text);
 
-    let empty = tool.execute(&json!({"path": "empty_dir"}));
+    let empty = tool.execute(&json!({"path": "empty_dir"})).await;
     assert!(!empty.is_error);
     assert_eq!(empty.text, "(empty directory)");
 }

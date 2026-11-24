@@ -33,7 +33,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)），与 `apps/mobile` 令牌一同由 [tokens.ts](scripts/gen/tokens.ts) 从 [tokens.json](design/tokens.json) 生成 |
 | `apps/mac/ui/features/setting/RemoteAccessPage.tsx` | Mac 设置页 `/settings/connections/remote`：桌面控制面连接模式（本地内置 / 远程控制面切换与重置）、远程访问开关、Tailscale 在线状态与地址、二维码配对（`host.qr`）与已配对设备撤销 |
 | `apps/mobile/` | 独立原生移动应用（`nsh/mobile`，iOS + Android 折叠屏／iPhone Duo 自适应）：基于 `@vibevalley/protocol/remote`（[transport.ts](packages/protocol/src/remote/transport.ts)）连接 Mac 远程门，含配对页、4 个一级标签（收件箱、频道、会话、任务；会话与任务行在指定机器时展示轻量机器徽标）、[layout.ts](apps/mobile/src/design/layout.ts) 自适应单／双栏布局与 `<Canvas>` + `Path2D` 97 枚 reicons 渲染 |
-| `crates/server/src/transport/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
+| `crates/server/src/gateway/bridge/` | 桥的 Rust 一半：`Hub` 把一个 `Server` 分给多个视图；`fake::FakeServer` 用样例状态和写好的回答顶替服务端 |
 | `packages/protocol/src/host.ts` | `Host` 接口：页面能向宿主要的东西 |
 | `apps/island/` | 刘海上的灵动岛（Swift）：一个单独的小程序，stdin 收工单摘要，stdout 说点了哪一行（[apps/island/README.md](apps/island/README.md)）；`apps/mac` 从包内带起它，退出时关闭 |
 
@@ -75,7 +75,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 
 ### 桥
 
-页面经 nsh 的 `host.post("action", …)` 发动作，Rust 经 `HostChannel` 的事件回（`crates/server/src/transport/bridge/mod.rs` 开头的表）：
+页面经 nsh 的 `host.post("action", …)` 发动作，Rust 经 `HostChannel` 的事件回（`crates/server/src/gateway/bridge/mod.rs` 开头的表）：
 
 | 页面（`apps/mac/ui/infra/bridge.ts`） | 动作 | 回来的事件 |
 |---|---|---|
@@ -85,7 +85,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | `subscribe(name, payload, on, ended)` | `subscribe`、`unsubscribe` | `sub:<id>`，每个事件一次，结束一次 |
 | `hostApi.<名字>` | `call`，`op` 是 `host.<名字>` | 外壳的 `Shell::host_call` 答 |
 
-- **`call` 不抛**：失败是 `bizCode` 非 0 的信封；没有宿主或超时回 `ServiceUnavailable`。关闭工作区对话标签页直接经 `Server::call("session.closeWorkspace", ...)` 停机回收，不经进程全局静态锁；音频与语音句柄经 `Server::speech_streams()` / `Server::voice() -> Option<SharedLiveVoice>`（`LiveVoicePort`）获取，桌面宿主 `apps/mac/src/` 不导入 `vibevalley_server::modules::*`（由 `cargo xtask audit` 守住），`LateServer` 同步转发 `subscribe_with`、`voice` 与 `remote_auth`，启动期经 `Started::set_mcp_url` 注入 `/mcp` 地址。
+- **`call` 不抛**：失败是 `bizCode` 非 0 的信封；没有宿主或超时回 `ServiceUnavailable`。关闭工作区对话标签页直接经 `Server::call("session.closeWorkspace", ...)` 停机回收，不经进程全局静态锁；音频与语音句柄经 `Server::speech_streams()` / `Server::voice() -> Option<SharedLiveVoice>`（`LiveVoicePort`）获取，桌面宿主 `apps/mac/src/` 不导入 `vibevalley_server::<domain>::*`（由 `cargo xtask audit` 守住），`LateServer` 同步转发 `subscribe_with`、`voice` 与 `remote_auth`，启动期经 `Started::set_mcp_url` 注入 `/mcp` 地址。
 - **工作台按 6 个一级入口与 5 栏设置组织**：左侧导航主栏（`places.ts`）固定收敛为对话（`/chat`）、工单（`/issues`）、代码仓库与工作区（`/repos`）、内容（`/library`）、团队（`/agents`）与设置（`/settings`）6 项一级位置；运行中心（`/runs`）作为次级入口随工单/团队下钻可达；设置页收拢为「通用 / 模型 / 语音 / 连接 / 关于」5 栏，所有面向用户的菜单与设置沿用日常中文词汇（如模型、成员、设置），避免内部工程缩写或农场隐喻外溢。
 - **统一二元内容中心与上下文记忆**：`/library` 与 `/artifacts/*` 共用嵌套布局 `ContentShell`（`apps/mac/ui/features/content/`），提供可折叠统一侧栏 `ContentSidebar`（收敛为「作品（含一等 `outline` 大纲笔记与 `.md` 导入）+ 素材」二元模型，`⌘\` 切换，全屏演示 `contentPresenting` 时自动收起）、统一搜索 `ContentSearchModal`、`.md` 大纲导入弹窗 `OutlineImportModal`（经 `hostApi.pickFile()` 选文件、拖放或粘贴调用 `artifact.outline.import`）与 19 套双语模板库 `TemplateModal`（`⌘N` 打开，笔记模板直接创建 `outline` 作品）。36px 顶栏 `<Desk>` 使用工作区同款 `sidebar` 面板图标切换侧栏（[icons.ts](apps/mac/ui/design/icons.ts)），`desk-content-search`、`desk-content-new` 与作品页 `artifact-back-library` 仅在侧栏收起（`!contentSidebarOpen`）时按需补位，避免与常驻侧栏同屏重复；作品详情页内置 `TimelineBar` 时间旅行抽屉。`ContentShell` 持续记录当前内容路径（剥离 `?make=`/`?nav`/`?understand` 瞬态参数），离开再点左栏「内容」或访问 `/content` 时经 `safeLastContentPath()` 恢复上次视图。
 - **工作台的请求只经 `Transport`**（`apps/mac/ui/infra/transport.ts`）：`VibeValleyApi.over` 直接在契约信封上收发，不绕合成的 HTTP `Request`/`Response`；应用里是桥（`bridged.ts` 的 `useBridge()`），测试和故事换成基于 `SliceBundle` 的替身（`infra/fixtures.ts`）；页面的代码不直接碰 `host`。

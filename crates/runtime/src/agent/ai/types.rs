@@ -177,12 +177,19 @@ pub struct Completion {
 
 /// Streams one completion; `on` sees text and reasoning as they arrive.
 pub trait ModelClient: Send + Sync {
-    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> Result<Completion>;
+    fn complete<'a>(&'a self, request: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> crate::BoxFuture<'a, Result<Completion>>;
 
-    fn complete_cancellable(&self, request: &ChatRequest, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
-        if cancel.is_cancelled() {
-            return Err(BrainError::Cancelled);
-        }
-        self.complete(request, on)
+    fn complete_cancellable<'a>(
+        &'a self,
+        request: &'a ChatRequest,
+        cancel: &'a CancelToken,
+        on: &'a mut (dyn FnMut(Delta) + Send),
+    ) -> crate::BoxFuture<'a, Result<Completion>> {
+        Box::pin(async move {
+            if cancel.is_cancelled() {
+                return Err(BrainError::Cancelled);
+            }
+            self.complete(request, on).await
+        })
     }
 }

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::BoxFuture;
 use crate::agent::core::doc::{
     CONVERSATION_SCOPE, DocSpec, GovernanceDoc, GovernanceState, OarSessionDoc, PendingApproval, PermissionEvaluation, read_doc, read_doc_opt, update_doc,
 };
@@ -188,7 +189,7 @@ pub fn evaluate(permissions: &Permissions, classifier: &dyn Classifier, entries:
     }
 }
 
-pub fn record_evaluation(tx: &mut Tx<'_>, conv: &str, task: &str, call_id: &str, args: &Value, eval: &Evaluation) -> Result<()> {
+pub async fn record_evaluation(tx: &mut Tx<'_>, conv: &str, task: &str, call_id: &str, args: &Value, eval: &Evaluation) -> Result<()> {
     if eval.client_overridable && eval.verdict != Verdict::Ask {
         return Ok(());
     }
@@ -218,10 +219,11 @@ pub fn record_evaluation(tx: &mut Tx<'_>, conv: &str, task: &str, call_id: &str,
             pending_alert = Some(pending);
         }
         Ok(())
-    })?;
+    })
+    .await?;
 
     if let Some(pending) = pending_alert {
-        tx.alert(
+        tx.alert_async(
             Some(conv),
             &json!({
                 "kind": "permission_park",
@@ -232,7 +234,8 @@ pub fn record_evaluation(tx: &mut Tx<'_>, conv: &str, task: &str, call_id: &str,
                 "payload": pending,
                 "createdAtMs": tx.now_ms,
             }),
-        )?;
+        )
+        .await?;
     }
     Ok(())
 }
@@ -246,41 +249,48 @@ pub struct Decision {
     pub reason: String,
 }
 
-pub fn resolve(store: &Store, _scheduler: &Scheduler, conv: &str, task: &str, decision: Decision) -> Result<()> {
-    store.write(|tx| {
-        let mut gov: GovernanceState = read_doc::<GovernanceDoc>(tx, SCOPE, conv)?;
-        let owner = tx.task(task)?;
-        if owner.conversation_id != conv {
-            return Err(Error::Invalid("task belongs to another conversation".into()));
-        }
-        let key = &decision.tool_call_id;
-        let signal = json!(decision);
-        if let Some(prior) = tx
-            .signals(task, true)?
-            .into_iter()
-            .find(|s| s.signal_name == PERMISSION_SIGNAL && s.signal_key == *key)
-        {
-            return if prior.payload == signal {
+pub async fn resolve(store: &Store, _scheduler: &Scheduler, conv: &str, task: &str, decision: Decision) -> Result<()> {
+    let conv = conv.to_owned();
+    let task = task.to_owned();
+    store
+        .write_async(move |tx| {
+            Box::pin(async move {
+                let mut gov: GovernanceState = read_doc::<GovernanceDoc>(tx, SCOPE, &conv).await?;
+                let owner = tx.task_async(&task).await?;
+                if owner.conversation_id != conv {
+                    return Err(Error::Invalid("task belongs to another conversation".into()));
+                }
+                let key = &decision.tool_call_id;
+                let signal = json!(decision);
+                if let Some(prior) = tx
+                    .signals_async(&task, true)
+                    .await?
+                    .into_iter()
+                    .find(|s| s.signal_name == PERMISSION_SIGNAL && s.signal_key == *key)
+                {
+                    return if prior.payload == signal {
+                        Ok(())
+                    } else {
+                        Err(Error::Invalid("a different decision was already recorded".into()))
+                    };
+                }
+                if gov.hard_denied_calls.get(&decision.tool_call_id) == Some(&true) {
+                    return Err(Error::Invalid("permission is not overridable".into()));
+                }
+                if owner.status == TaskStatus::Terminal {
+                    return Err(Error::Invalid("task has already ended".into()));
+                }
+                let expected_call_id = gov.pending_permissions.get(&task).map(|p| p.tool_call_id.as_str());
+                if expected_call_id != Some(key.as_str()) {
+                    return Err(Error::Invalid("permission decision belongs to another call".into()));
+                }
+                tx.send_signal_async(&task, PERMISSION_SIGNAL, Some(key), &signal).await?;
+                gov.pending_permissions.remove(&task);
+                crate::agent::core::doc::write_doc::<GovernanceDoc>(tx, SCOPE, &conv, &gov).await?;
                 Ok(())
-            } else {
-                Err(Error::Invalid("a different decision was already recorded".into()))
-            };
-        }
-        if gov.hard_denied_calls.get(&decision.tool_call_id) == Some(&true) {
-            return Err(Error::Invalid("permission is not overridable".into()));
-        }
-        if owner.status == TaskStatus::Terminal {
-            return Err(Error::Invalid("task has already ended".into()));
-        }
-        let expected_call_id = gov.pending_permissions.get(task).map(|p| p.tool_call_id.as_str());
-        if expected_call_id != Some(key.as_str()) {
-            return Err(Error::Invalid("permission decision belongs to another call".into()));
-        }
-        tx.send_signal(task, PERMISSION_SIGNAL, Some(key), &signal)?;
-        gov.pending_permissions.remove(task);
-        crate::agent::core::doc::write_doc::<GovernanceDoc>(tx, SCOPE, conv, &gov)?;
-        Ok(())
-    })
+            })
+        })
+        .await
 }
 
 pub fn permissions_for_mode(mode: &str, base: &Permissions) -> Permissions {
@@ -310,25 +320,25 @@ pub fn permissions_for_mode(mode: &str, base: &Permissions) -> Permissions {
     }
 }
 
-fn session_permission_mode(tx: &Read<'_>, conv: &str) -> Result<Option<String>> {
+async fn session_permission_mode(tx: &Read<'_>, conv: &str) -> Result<Option<String>> {
     let mut cur = conv.to_owned();
     let mut seen = HashSet::new();
     for _ in 0..8 {
         if !seen.insert(cur.clone()) {
             break;
         }
-        if let Some(oar) = read_doc_opt::<OarSessionDoc>(tx, SCOPE, &cur)?
+        if let Some(oar) = read_doc_opt::<OarSessionDoc>(tx, SCOPE, &cur).await?
             && !oar.permission_mode.is_empty()
         {
             return Ok(Some(oar.permission_mode));
         }
-        let Ok(record) = tx.conversation(&cur) else {
+        let Ok(record) = tx.conversation_async(&cur).await else {
             break;
         };
         if record.owner_task_id.is_empty() {
             break;
         }
-        let Ok(owner) = tx.task(&record.owner_task_id) else {
+        let Ok(owner) = tx.task_async(&record.owner_task_id).await else {
             break;
         };
         cur = owner.conversation_id;
@@ -360,8 +370,11 @@ impl GovernanceExtension {
         self
     }
 
-    fn effective_permissions(&self, store: &Store, conv: &str) -> Result<Permissions> {
-        let mode = store.read(|tx| session_permission_mode(tx, conv))?;
+    async fn effective_permissions(&self, store: &Store, conv: &str) -> Result<Permissions> {
+        let conv = conv.to_owned();
+        let mode = store
+            .read_async(move |tx| Box::pin(async move { session_permission_mode(tx, &conv).await }))
+            .await?;
         Ok(match mode.as_deref() {
             Some(mode) => permissions_for_mode(mode, &self.permissions),
             None => self.permissions.clone(),
@@ -374,33 +387,41 @@ impl Extension for GovernanceExtension {
         "governance"
     }
 
-    fn on_before_tool(&self, ctx: &ToolCallHookCtx<'_>) -> durable::Result<HookOutcome> {
-        let perms = self.effective_permissions(ctx.store, ctx.conversation_id)?;
-        let eval = evaluate(&perms, &*self.classifier, ctx.entries, ctx.tool_name, ctx.args, ctx.is_mcp);
-        if !eval.client_overridable || eval.verdict == Verdict::Ask {
-            ctx.store
-                .write(|tx| record_evaluation(tx, ctx.conversation_id, ctx.task_id, ctx.tool_call_id, ctx.args, &eval))?;
-        }
-
-        match eval.verdict {
-            Verdict::Allow => Ok(HookOutcome::Continue),
-            Verdict::Deny => Ok(HookOutcome::Deny {
-                reason: eval.reason,
-                overridable: eval.client_overridable,
-            }),
-            Verdict::Ask => {
-                ctx.emit(AgentEvent::PermissionRequested {
-                    task_id: ctx.task_id.to_owned(),
-                    tool_call_id: ctx.tool_call_id.to_owned(),
-                    tool_name: ctx.tool_name.to_owned(),
-                    arguments: ctx.args.to_string(),
-                    reason: eval.reason,
-                });
-                Ok(HookOutcome::Park {
-                    signal: PERMISSION_SIGNAL.into(),
-                    until_ms: None,
-                })
+    fn on_before_tool<'a>(&'a self, ctx: &'a ToolCallHookCtx<'_>) -> BoxFuture<'a, durable::Result<HookOutcome>> {
+        Box::pin(async move {
+            let perms = self.effective_permissions(ctx.store, ctx.conversation_id).await?;
+            let eval = evaluate(&perms, &*self.classifier, ctx.entries, ctx.tool_name, ctx.args, ctx.is_mcp);
+            if !eval.client_overridable || eval.verdict == Verdict::Ask {
+                let conv = ctx.conversation_id.to_owned();
+                let task = ctx.task_id.to_owned();
+                let call_id = ctx.tool_call_id.to_owned();
+                let args = ctx.args.clone();
+                let eval_write = eval.clone();
+                ctx.store
+                    .write_async(move |tx| Box::pin(async move { record_evaluation(tx, &conv, &task, &call_id, &args, &eval_write).await }))
+                    .await?;
             }
-        }
+
+            match eval.verdict {
+                Verdict::Allow => Ok(HookOutcome::Continue),
+                Verdict::Deny => Ok(HookOutcome::Deny {
+                    reason: eval.reason,
+                    overridable: eval.client_overridable,
+                }),
+                Verdict::Ask => {
+                    ctx.emit(AgentEvent::PermissionRequested {
+                        task_id: ctx.task_id.to_owned(),
+                        tool_call_id: ctx.tool_call_id.to_owned(),
+                        tool_name: ctx.tool_name.to_owned(),
+                        arguments: ctx.args.to_string(),
+                        reason: eval.reason,
+                    });
+                    Ok(HookOutcome::Park {
+                        signal: PERMISSION_SIGNAL.into(),
+                        until_ms: None,
+                    })
+                }
+            }
+        })
     }
 }

@@ -8,11 +8,13 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
+use futures_util::FutureExt as _;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex as AsyncMutex;
 
 use super::live::LiveHub;
 use super::memory::{JournalOp, MemoryRead, MemoryState, MemoryTx};
-use super::{StorageBackend, StorageRead, WriteCallback};
+use super::{BoxFuture, ReadAsyncOp, StorageBackend, WriteAsyncOp};
 use crate::agent::durable::{CommitStats, DocumentEvent, Error, Result, now_ms};
 
 const COMMITS_FILE: &str = "commits.jsonl";
@@ -67,7 +69,7 @@ struct JsonlState {
 struct JsonlInner {
     dir: PathBuf,
     opts: JsonlOptions,
-    state: Mutex<JsonlState>,
+    state: AsyncMutex<JsonlState>,
     lock_file: Mutex<Option<File>>,
     hub: LiveHub,
 }
@@ -122,7 +124,7 @@ impl JsonlStorage {
         Ok(Self(Arc::new(JsonlInner {
             dir,
             opts,
-            state: Mutex::new(JsonlState {
+            state: AsyncMutex::new(JsonlState {
                 mem,
                 next_tx_id,
                 stamp,
@@ -404,11 +406,78 @@ impl StorageBackend for JsonlStorage {
         self.0.hub.now_ms()
     }
 
-    fn read_dyn(&self, f: &mut dyn FnMut(&dyn StorageRead) -> Result<()>) -> Result<()> {
-        let mut state = self.0.state.lock().unwrap_or_else(|e| e.into_inner());
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
+    fn read_dyn_async<'a>(&'a self, op: &'a mut dyn ReadAsyncOp<'a>) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let mut state = self.0.state.lock().await;
+            if self.0.hub.is_closed() {
+                return Err(Error::Closed);
+            }
+            self.refresh_read_only(&mut state)?;
+            let reader = MemoryRead(&state.mem);
+            op.call(&reader).await
+        })
+    }
+
+    fn write_dyn_async<'a>(&'a self, op: &'a mut dyn WriteAsyncOp<'a>) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            if self.0.opts.read_only {
+                return Err(Error::Invalid("jsonl storage is open read-only".into()));
+            }
+            let mut state = self.0.state.lock().await;
+            if self.0.hub.is_closed() {
+                return Err(Error::Closed);
+            }
+            self.0.hub.record_request();
+            let now = self.0.hub.now_ms();
+            let staging = MemoryTx::new(&mut state.mem, true);
+            let outcome = std::panic::AssertUnwindSafe(op.call(&staging, &staging, None, now)).catch_unwind().await;
+            match outcome {
+                Ok(Ok(write_outcome)) => {
+                    let (ops, undo) = staging.into_parts();
+                    self.finish_commit(&mut state, ops, undo, now, write_outcome)
+                }
+                Ok(Err(err)) => {
+                    staging.rollback();
+                    self.0.hub.record_failure();
+                    Err(err)
+                }
+                Err(panic) => {
+                    staging.rollback();
+                    self.0.hub.record_failure();
+                    drop(state);
+                    std::panic::resume_unwind(panic)
+                }
+            }
+        })
+    }
+
+    fn stats(&self) -> CommitStats {
+        self.0.hub.stats()
+    }
+
+    fn subscribe_documents(&self) -> Result<tokio::sync::mpsc::UnboundedReceiver<DocumentEvent>> {
+        self.0.hub.subscribe_documents()
+    }
+
+    fn subscribe_tasks(&self) -> Result<tokio::sync::mpsc::Receiver<()>> {
+        self.0.hub.subscribe_tasks()
+    }
+
+    fn close(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            if self.0.hub.is_closed() {
+                return Ok(());
+            }
+            self.0.hub.mark_closed();
+            self.0.state.lock().await.open_files.clear();
+            self.0.lock_file.lock().unwrap_or_else(|e| e.into_inner()).take();
+            Ok(())
+        })
+    }
+}
+
+impl JsonlStorage {
+    fn refresh_read_only(&self, state: &mut JsonlState) -> Result<()> {
         if self.0.opts.read_only {
             let current_stamp = read_disk_stamp(&self.0.dir);
             if current_stamp != state.stamp {
@@ -418,72 +487,30 @@ impl StorageBackend for JsonlStorage {
                 state.stamp = new_stamp;
             }
         }
-        f(&MemoryRead(&state.mem))
+        Ok(())
     }
 
-    fn write_dyn(&self, f: &mut WriteCallback<'_>) -> Result<()> {
-        if self.0.opts.read_only {
-            return Err(Error::Invalid("jsonl storage is open read-only".into()));
-        }
-        let mut state = self.0.state.lock().unwrap_or_else(|e| e.into_inner());
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        self.0.hub.record_request();
-        let now = self.0.hub.now_ms();
-        let staging = MemoryTx::new(&mut state.mem, true);
-        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&staging, &staging, None, None, now)));
-        match outcome {
-            Ok(Ok(write_outcome)) => {
-                let (ops, undo) = staging.into_parts();
-                if !ops.is_empty() {
-                    let tx_id = state.next_tx_id;
-                    let JsonlState {
-                        mem, next_tx_id, open_files, ..
-                    } = &mut *state;
-                    if let Err(err) = persist_journal_ops(&self.0.dir, tx_id, now, &ops, self.0.opts.fsync, open_files) {
-                        mem.rollback(undo);
-                        self.0.hub.record_failure();
-                        return Err(err);
-                    }
-                    *next_tx_id = tx_id + 1;
-                }
-                self.0.hub.record_commit_and_publish(write_outcome.events, write_outcome.tasks_changed);
-                Ok(())
-            }
-            Ok(Err(err)) => {
-                staging.rollback();
+    fn finish_commit(
+        &self,
+        state: &mut JsonlState,
+        ops: Vec<JournalOp>,
+        undo: Vec<super::memory::UndoOp>,
+        now: i64,
+        write_outcome: super::WriteOutcome,
+    ) -> Result<()> {
+        if !ops.is_empty() {
+            let tx_id = state.next_tx_id;
+            let JsonlState {
+                mem, next_tx_id, open_files, ..
+            } = state;
+            if let Err(err) = persist_journal_ops(&self.0.dir, tx_id, now, &ops, self.0.opts.fsync, open_files) {
+                mem.rollback(undo);
                 self.0.hub.record_failure();
-                Err(err)
+                return Err(err);
             }
-            Err(panic) => {
-                staging.rollback();
-                self.0.hub.record_failure();
-                drop(state);
-                std::panic::resume_unwind(panic)
-            }
+            *next_tx_id = tx_id + 1;
         }
-    }
-
-    fn stats(&self) -> CommitStats {
-        self.0.hub.stats()
-    }
-
-    fn subscribe_documents(&self) -> Result<flume::Receiver<DocumentEvent>> {
-        self.0.hub.subscribe_documents()
-    }
-
-    fn subscribe_tasks(&self) -> Result<flume::Receiver<()>> {
-        self.0.hub.subscribe_tasks()
-    }
-
-    fn close(&self) -> Result<()> {
-        if self.0.hub.is_closed() {
-            return Ok(());
-        }
-        self.0.hub.mark_closed();
-        self.0.state.lock().unwrap_or_else(|e| e.into_inner()).open_files.clear();
-        self.0.lock_file.lock().unwrap_or_else(|e| e.into_inner()).take();
+        self.0.hub.record_commit_and_publish(write_outcome.events, write_outcome.tasks_changed);
         Ok(())
     }
 }

@@ -24,23 +24,25 @@ impl MockModel {
 }
 
 impl ModelClient for MockModel {
-    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> crate::agent::Result<Completion> {
-        self.seen.lock().unwrap().push(request.clone());
-        on(Delta::Text(self.reply.clone()));
-        Ok(Completion {
-            message: Message {
-                role: Role::Assistant,
-                content: Some(self.reply.clone()),
-                reasoning: None,
-                tool_calls: vec![],
-                tool_call_id: None,
-            },
-            finish: FinishReason::Stop,
-            usage: Usage {
-                input: 100,
-                output: 30,
-                cache_read: 0,
-            },
+    fn complete<'a>(&'a self, request: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> crate::BoxFuture<'a, crate::agent::Result<Completion>> {
+        Box::pin(async move {
+            self.seen.lock().unwrap().push(request.clone());
+            on(Delta::Text(self.reply.clone()));
+            Ok(Completion {
+                message: Message {
+                    role: Role::Assistant,
+                    content: Some(self.reply.clone()),
+                    reasoning: None,
+                    tool_calls: vec![],
+                    tool_call_id: None,
+                },
+                finish: FinishReason::Stop,
+                usage: Usage {
+                    input: 100,
+                    output: 30,
+                    cache_read: 0,
+                },
+            })
         })
     }
 }
@@ -97,8 +99,8 @@ fn extract_file_ops_tracks_reads_modifies_and_merges_prior_compactions() {
     assert_eq!(ops.modified.into_iter().collect::<Vec<_>>(), vec!["prev.rs", "src/lib.rs", "src/new.rs"]);
 }
 
-#[test]
-fn llm_summarizer_formats_structured_summary_and_file_ops() {
+#[tokio::test]
+async fn llm_summarizer_formats_structured_summary_and_file_ops() {
     let model = MockModel::new("## Goal\nShip compaction\n## Decisions\nUse SQLite");
     let summarizer = LlmSummarizer {
         client: model.clone(),
@@ -114,7 +116,9 @@ fn llm_summarizer_formats_structured_summary_and_file_ops() {
         payload: json!({"text": "compact please"}),
         created_at_ms: 0,
     }];
-    let out = crate::agent::compaction::Summarizer::summarize(&summarizer, Level::Manual, &entries, &ops).unwrap();
+    let out = crate::agent::compaction::Summarizer::summarize(&summarizer, Level::Manual, &entries, &ops)
+        .await
+        .unwrap();
     assert!(out.contains("## Goal"));
     assert!(out.contains("<file_ops>"));
     assert!(out.contains("- a.rs"));
@@ -122,86 +126,110 @@ fn llm_summarizer_formats_structured_summary_and_file_ops() {
     assert_eq!(render_file_ops(&FileOps::default()), "");
 }
 
-#[test]
-fn compactor_persists_summary_and_pi_file_ops_doc_and_checks_base_head() {
+#[tokio::test]
+async fn compactor_persists_summary_and_pi_file_ops_doc_and_checks_base_head() {
     let store = Store::memory().unwrap();
     store
-        .write(|tx| {
-            tx.create_conversation("conv", "deepseek-flash")?;
-            tx.append_entry("conv", "pi.user", &json!({"text": "first"}))?;
-            tx.append_entry(
-                "conv",
-                "pi.assistant",
-                &json!({
-                    "text": "checking",
-                    "toolCalls": [
-                        { "id": "t1", "toolName": "read", "argsJson": { "path": "Cargo.toml" } },
-                        { "id": "t2", "toolName": "edit", "argsJson": { "path": "src/lib.rs" } }
-                    ]
-                }),
-            )?;
-            tx.append_entry("conv", "pi.user", &json!({"text": "second"}))?;
-            tx.append_entry("conv", "pi.user", &json!({"text": "third"}))?;
-            Ok(())
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.create_conversation_async("conv", "deepseek-flash").await?;
+                tx.append_entry_async("conv", "pi.user", &json!({"text": "first"})).await?;
+                tx.append_entry_async(
+                    "conv",
+                    "pi.assistant",
+                    &json!({
+                        "text": "checking",
+                        "toolCalls": [
+                            { "id": "t1", "toolName": "read", "argsJson": { "path": "Cargo.toml" } },
+                            { "id": "t2", "toolName": "edit", "argsJson": { "path": "src/lib.rs" } }
+                        ]
+                    }),
+                )
+                .await?;
+                tx.append_entry_async("conv", "pi.user", &json!({"text": "second"})).await?;
+                tx.append_entry_async("conv", "pi.user", &json!({"text": "third"})).await?;
+                Ok(())
+            })
         })
+        .await
         .unwrap();
 
     let model = MockModel::new("## Goal\nTest\n## Decisions\nNone\n## Progress\nDone\n## Remaining\nMore\n## User Constraints\nKeep tests");
     let mut compactor = Compactor::with_llm(store.clone(), model.clone(), "deepseek-flash");
     compactor.keep_recent = 2;
-    let entry = compactor.compact("conv", Level::Manual, None).unwrap().unwrap();
+    let entry = compactor.compact("conv", Level::Manual, None).await.unwrap().unwrap();
     assert_eq!(entry.kind, "pi.compaction");
     assert!(entry.payload["summary"].as_str().unwrap().contains("<file_ops>"));
 
-    let doc = store.read(|r| r.document("conversation", "conv", "pi.file_ops")).unwrap().unwrap();
+    let doc = store
+        .read_async(|r| Box::pin(async move { r.document_async("conversation", "conv", "pi.file_ops").await }))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(doc.state["read"], json!(["Cargo.toml"]));
     assert_eq!(doc.state["modified"], json!(["src/lib.rs"]));
 
     // Overflow keeps at most 1 recent entry and merges prior file_ops across compactions.
     store
-        .write(|tx| {
-            tx.append_entry(
-                "conv",
-                "pi.assistant",
-                &json!({"toolCalls": [{ "id": "t3", "toolName": "write", "argsJson": { "path": "src/new.rs" } }]}),
-            )?;
-            tx.append_entry("conv", "pi.user", &json!({"text": "latest"}))?;
-            Ok(())
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.append_entry_async(
+                    "conv",
+                    "pi.assistant",
+                    &json!({"toolCalls": [{ "id": "t3", "toolName": "write", "argsJson": { "path": "src/new.rs" } }]}),
+                )
+                .await?;
+                tx.append_entry_async("conv", "pi.user", &json!({"text": "latest"})).await?;
+                Ok(())
+            })
         })
+        .await
         .unwrap();
-    let overflow = compactor.compact("conv", Level::Overflow, None).unwrap().unwrap();
+    let overflow = compactor.compact("conv", Level::Overflow, None).await.unwrap().unwrap();
     assert!(overflow.payload["summary"].as_str().unwrap().contains("Cargo.toml"));
     assert!(overflow.payload["summary"].as_str().unwrap().contains("src/new.rs"));
-    let visible = store.read(|r| r.visible_entries("conv")).unwrap();
+    let visible = store
+        .read_async(|r| Box::pin(async move { r.visible_entries_async("conv").await }))
+        .await
+        .unwrap();
     assert_eq!(visible.len(), 2); // summary + 1 kept recent entry
 
     // Subsequent hard compaction via before_request preserves prior file_ops across chained compactions.
     compactor.hard_tokens = 1;
     compactor.keep_recent = 0;
-    compactor.before_request("conv").unwrap();
-    let doc2 = store.read(|r| r.document("conversation", "conv", "pi.file_ops")).unwrap().unwrap();
+    compactor.before_request("conv").await.unwrap();
+    let doc2 = store
+        .read_async(|r| Box::pin(async move { r.document_async("conversation", "conv", "pi.file_ops").await }))
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(doc2.state["read"], json!(["Cargo.toml"]));
     assert_eq!(doc2.state["modified"], json!(["src/lib.rs", "src/new.rs"]));
 
     // Concurrent compaction advancing head_seq causes stale base_head to return None.
-    let stale = store.write(|tx| {
-        tx.append_entry("conv", "pi.user", &json!({"text": "after"}))?;
-        let conv = tx.conversation("conv")?;
-        assert!(
-            tx.compact(
-                "conv",
-                crate::agent::durable::Compaction {
-                    level: "manual",
-                    base_head: conv.head_seq - 1,
-                    from: conv.head_seq,
-                    cut: conv.next_seq - 1,
-                    summary: "stale",
-                    token_count: 1,
-                },
-            )?
-            .is_none()
-        );
-        Ok(())
-    });
+    let stale = store
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.append_entry_async("conv", "pi.user", &json!({"text": "after"})).await?;
+                let conv = tx.conversation_async("conv").await?;
+                assert!(
+                    tx.compact_async(
+                        "conv",
+                        crate::agent::durable::Compaction {
+                            level: "manual",
+                            base_head: conv.head_seq - 1,
+                            from: conv.head_seq,
+                            cut: conv.next_seq - 1,
+                            summary: "stale",
+                            token_count: 1,
+                        },
+                    )
+                    .await?
+                    .is_none()
+                );
+                Ok(())
+            })
+        })
+        .await;
     stale.unwrap();
 }

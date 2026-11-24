@@ -204,7 +204,7 @@ impl ManagedSession {
     }
 
     /// Executes `MachineSessionInput` idempotently by `input_id` and builds the correlated `MachineSessionAck`.
-    pub fn handle_input(&self, req: &MachineSessionInput, worktrees: &WorktreeManager) -> MachineSessionAck {
+    pub async fn handle_input(&self, req: &MachineSessionInput, worktrees: &WorktreeManager) -> MachineSessionAck {
         if let Some(previous) = self.state.lock().dedup.get(&req.input_id).cloned() {
             return MachineSessionAck {
                 request_id: req.request_id.clone(),
@@ -218,23 +218,24 @@ impl ManagedSession {
         let result: Result<(), String> = match req.kind {
             MachineInputKind::Prompt => {
                 let text = req.text.clone().unwrap_or_default();
-                self.oar_session.prompt(vec![ContentBlock::Text(text)]).map_err(|e| e.to_string())
+                self.oar_session.prompt(vec![ContentBlock::Text(text)]).await.map_err(|e| e.to_string())
             }
             MachineInputKind::Steer => {
                 let text = req.text.clone().unwrap_or_default();
-                self.oar_session.steer(vec![ContentBlock::Text(text)]).map_err(|e| e.to_string())
+                self.oar_session.steer(vec![ContentBlock::Text(text)]).await.map_err(|e| e.to_string())
             }
             MachineInputKind::Queue => {
                 let text = req.text.clone().unwrap_or_default();
-                self.oar_session.queue(vec![ContentBlock::Text(text)]).map_err(|e| e.to_string())
+                self.oar_session.queue(vec![ContentBlock::Text(text)]).await.map_err(|e| e.to_string())
             }
-            MachineInputKind::Abort => self.oar_session.abort().map_err(|e| e.to_string()),
+            MachineInputKind::Abort => self.oar_session.abort().await.map_err(|e| e.to_string()),
             MachineInputKind::SetConfig => self
                 .oar_session
                 .set_config(req.model.as_deref(), req.effort.as_deref(), None)
+                .await
                 .map_err(|e| e.to_string()),
             MachineInputKind::Dispose => {
-                self.dispose(worktrees);
+                self.dispose_async(worktrees).await;
                 Ok(())
             }
         };
@@ -255,23 +256,26 @@ impl ManagedSession {
     }
 
     /// Forwards a permission or interaction response to the live OAR `Session`.
-    pub fn handle_respond(&self, req: &MachineSessionRespond) -> MachineSessionAck {
+    pub async fn handle_respond(&self, req: &MachineSessionRespond) -> MachineSessionAck {
         let interaction_options = self.state.lock().pending_interactions.get(&req.target_id).cloned();
 
         let result = if let Some(options) = interaction_options {
             let decision = build_interaction_decision(req.allow, req.answer.as_deref(), &options);
-            self.oar_session.respond_interaction(&req.target_id, decision).map_err(|e| e.to_string())
+            self.oar_session.respond_interaction(&req.target_id, decision).await.map_err(|e| e.to_string())
         } else {
             let decision = if req.allow {
                 PermissionDecision::AllowOnce
             } else {
                 PermissionDecision::Deny { message: req.answer.clone() }
             };
-            match self.oar_session.respond_permission(&req.target_id, decision) {
+            match self.oar_session.respond_permission(&req.target_id, decision).await {
                 Ok(()) => Ok(()),
                 Err(perm_err) if req.answer.is_some() => {
                     let decision = build_interaction_decision(req.allow, req.answer.as_deref(), &[]);
-                    self.oar_session.respond_interaction(&req.target_id, decision).map_err(|_| perm_err.to_string())
+                    self.oar_session
+                        .respond_interaction(&req.target_id, decision)
+                        .await
+                        .map_err(|_| perm_err.to_string())
                 }
                 Err(err) => Err(err.to_string()),
             }
@@ -295,11 +299,26 @@ impl ManagedSession {
         }
     }
 
+    pub async fn dispose_async(&self, worktrees: &WorktreeManager) {
+        if self.disposed.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        self.oar_session.dispose().await;
+        if let Some(proxy) = self.mcp_proxy.lock().take() {
+            proxy.shutdown();
+        }
+        if self.ephemeral_workdir
+            && let Some(wt) = &self.owned_worktree
+        {
+            let _ = worktrees.cleanup_worktree(wt);
+        }
+    }
+
     pub fn dispose(&self, worktrees: &WorktreeManager) {
         if self.disposed.swap(true, Ordering::AcqRel) {
             return;
         }
-        self.oar_session.dispose();
+        self.oar_session.signal_dispose();
         if let Some(proxy) = self.mcp_proxy.lock().take() {
             proxy.shutdown();
         }

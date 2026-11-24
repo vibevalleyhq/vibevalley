@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use crate::BoxFuture;
 use crate::oar::core::{CoreSession, Driver, SessionCore, render_text};
 use crate::oar::{
     AgentError, Capabilities, ContentBlock, EventKind, FileChangeKind, PermissionDecision, PermissionMode, Result, Session, StopReason, SubagentStatus, Usage,
@@ -29,7 +30,7 @@ pub(crate) struct WorkerDriver {
 }
 
 impl WorkerDriver {
-    pub(crate) fn open(
+    pub(crate) async fn open(
         execution: SharedExecution,
         session: &str,
         brain: Brain,
@@ -124,43 +125,56 @@ impl WorkerDriver {
         let observer = Mutex::new(observer);
         let brain = Arc::new(brain);
 
+        let conv_write = conversation.clone();
+        let model_write = brain.model.clone();
+        let session_owned = session.to_owned();
+        let cwd_str = cwd.display().to_string();
         execution
             .store()
-            .write(|tx| {
-                match tx.conversation(&conversation) {
-                    Err(StoreError::Missing(_)) => {
-                        tx.create_conversation(&conversation, &brain.model)?;
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    match tx.conversation_async(&conv_write).await {
+                        Err(StoreError::Missing(_)) => {
+                            tx.create_conversation_async(&conv_write, &model_write).await?;
+                        }
+                        Ok(_) => (),
+                        Err(e) => return Err(e),
                     }
-                    Ok(_) => (),
-                    Err(e) => return Err(e),
-                }
-                write_doc::<OarSessionDoc>(
-                    tx,
-                    CONVERSATION_SCOPE,
-                    &conversation,
-                    &OarSessionState {
-                        runtime_id: "vibevalley".into(),
-                        vendor_session_id: session.into(),
-                        cwd: cwd.display().to_string(),
-                        permission_mode: permission_mode_str(permission_mode).into(),
-                        status: "open".into(),
-                    },
-                )?;
-                Ok(())
+                    write_doc::<OarSessionDoc>(
+                        tx,
+                        CONVERSATION_SCOPE,
+                        &conv_write,
+                        &OarSessionState {
+                            runtime_id: "vibevalley".into(),
+                            vendor_session_id: session_owned,
+                            cwd: cwd_str,
+                            permission_mode: permission_mode_str(permission_mode).into(),
+                            status: "open".into(),
+                        },
+                    )
+                    .await?;
+                    Ok(())
+                })
             })
+            .await
             .map_err(failed)?;
 
+        let conv_read = conversation.clone();
         let (unfinished, pending_approvals) = execution
             .store()
-            .read(|tx| {
-                let task = tx
-                    .tasks_by_conversation(&conversation)?
-                    .into_iter()
-                    .find(|t| t.kind == GENERATION_KIND && t.status != TaskStatus::Terminal);
-                let gov = read_doc_opt::<GovernanceDoc>(tx, CONVERSATION_SCOPE, &conversation)?;
-                let approvals: Vec<_> = gov.map(|g| g.pending_permissions.into_values().collect()).unwrap_or_default();
-                Ok((task, approvals))
+            .read_async(move |tx| {
+                Box::pin(async move {
+                    let task = tx
+                        .tasks_by_conversation_async(&conv_read)
+                        .await?
+                        .into_iter()
+                        .find(|t| t.kind == GENERATION_KIND && t.status != TaskStatus::Terminal);
+                    let gov = read_doc_opt::<GovernanceDoc>(tx, CONVERSATION_SCOPE, &conv_read).await?;
+                    let approvals: Vec<_> = gov.map(|g| g.pending_permissions.into_values().collect()).unwrap_or_default();
+                    Ok((task, approvals))
+                })
             })
+            .await
             .map_err(failed)?;
 
         // Register the resumed turn in `SessionCore` before `attach_worker` wakes any sleeping task
@@ -181,6 +195,7 @@ impl WorkerDriver {
         execution
             .harness
             .attach_worker(&conversation, brain.clone(), Arc::new(move |e| observer.lock().unwrap()(e)))
+            .await
             .map_err(failed)?;
 
         let cancel = CancellationToken::new();
@@ -269,16 +284,18 @@ impl WorkerDriver {
                     let store = shared.store().clone();
                     let terminal_reason = result.terminal_reason.clone();
                     let error_text = result.error_text.clone();
-                    let _ = tokio::task::spawn_blocking(move || {
-                        let _ = store.write(|tx| {
-                            tx.settle(
-                                &sub,
-                                SubmissionStatus::Unanswered,
-                                &serde_json::json!({ "reason": terminal_reason, "error": error_text }),
-                            )
-                        });
-                    })
-                    .await;
+                    let _ = store
+                        .write_async(move |tx| {
+                            Box::pin(async move {
+                                tx.settle_async(
+                                    &sub,
+                                    SubmissionStatus::Unanswered,
+                                    &serde_json::json!({ "reason": terminal_reason, "error": error_text }),
+                                )
+                                .await
+                            })
+                        })
+                        .await;
                 }
                 core.emit_root(EventKind::TurnFinished {
                     reason: if result.terminal_reason == "aborted" {
@@ -295,77 +312,108 @@ impl WorkerDriver {
 }
 
 impl Driver for WorkerDriver {
-    fn start_turn(&self, content: Vec<ContentBlock>) -> Result<()> {
-        let prompt = render_text(&content);
-        let span = self.core.span_id();
-        let key = if span.starts_with("work:") { span } else { uuid::Uuid::now_v7().to_string() };
-        let (_, task, _) = self
-            .execution
-            .harness
-            .submit(Request {
-                conversation: &self.conversation,
-                provider: &self.brain.model,
-                request_id: &key,
-                prompt: &prompt,
-                source: "agent",
-                system: &self.brain.system,
-                when_busy: WhenBusy::Reject,
-                ..Default::default()
-            })
-            .map_err(failed)?;
-        self.follow(task)
+    fn start_turn(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            let prompt = render_text(&content);
+            let span = self.core.span_id();
+            let key = if span.starts_with("work:") { span } else { uuid::Uuid::now_v7().to_string() };
+            let (_, task, _) = self
+                .execution
+                .harness
+                .submit(Request {
+                    conversation: &self.conversation,
+                    provider: &self.brain.model,
+                    request_id: &key,
+                    prompt: &prompt,
+                    source: "agent",
+                    system: &self.brain.system,
+                    when_busy: WhenBusy::Reject,
+                    ..Default::default()
+                })
+                .await
+                .map_err(failed)?;
+            self.follow(task)
+        })
     }
 
-    fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
-        let prompt = render_text(&content);
-        let key = uuid::Uuid::now_v7().to_string();
-        self.execution
-            .store()
-            .write(|tx| submit_steer(tx, &self.conversation, &key, &prompt))
-            .map_err(failed)?;
-        Ok(())
+    fn steer(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            let prompt = render_text(&content);
+            let key = uuid::Uuid::now_v7().to_string();
+            let conv = self.conversation.clone();
+            self.execution
+                .store()
+                .write_async(move |tx| Box::pin(async move { submit_steer(tx, &conv, &key, &prompt).await }))
+                .await
+                .map_err(failed)?;
+            Ok(())
+        })
     }
 
-    fn abort(&self) -> Result<()> {
-        if let Some(id) = self.active.lock().unwrap().as_deref() {
-            self.execution.scheduler.abort(id).map_err(failed)?;
-        }
-        Ok(())
+    fn abort(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            let active_id = self.active.lock().unwrap().clone();
+            if let Some(id) = active_id {
+                self.execution.scheduler.abort(&id).await.map_err(failed)?;
+            }
+            Ok(())
+        })
     }
 
-    fn respond_permission(&self, id: &str, decision: &PermissionDecision) -> Result<()> {
-        let task = self
-            .execution
-            .store()
-            .read(|tx| {
-                let gov = read_doc_opt::<GovernanceDoc>(tx, CONVERSATION_SCOPE, &self.conversation)?;
-                Ok(gov.and_then(|g| g.pending_permissions.into_values().find(|p| p.tool_call_id == id).map(|p| p.task_id)))
-            })
-            .map_err(failed)?
-            .or_else(|| self.active.lock().unwrap().clone())
-            .ok_or_else(|| AgentError::Rejected(format!("unknown_request: {id}")))?;
-        let (approved, reason) = match decision {
-            PermissionDecision::AllowOnce | PermissionDecision::AllowAlways => (true, String::new()),
-            PermissionDecision::Deny { message } => (false, message.clone().unwrap_or_default()),
-        };
-        resolve(
-            self.execution.store(),
-            &self.execution.scheduler,
-            &self.conversation,
-            &task,
-            Decision {
-                tool_call_id: id.into(),
-                approved,
-                reason,
-            },
-        )
-        .map_err(failed)
+    fn respond_permission<'a>(&'a self, id: &'a str, decision: &'a PermissionDecision) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let conv = self.conversation.clone();
+            let id_owned = id.to_owned();
+            let task = self
+                .execution
+                .store()
+                .read_async(move |tx| {
+                    Box::pin(async move {
+                        let gov = read_doc_opt::<GovernanceDoc>(tx, CONVERSATION_SCOPE, &conv).await?;
+                        Ok(gov.and_then(|g| g.pending_permissions.into_values().find(|p| p.tool_call_id == id_owned).map(|p| p.task_id)))
+                    })
+                })
+                .await
+                .map_err(failed)?
+                .or_else(|| self.active.lock().unwrap().clone())
+                .ok_or_else(|| AgentError::Rejected(format!("unknown_request: {id}")))?;
+            let (approved, reason) = match decision {
+                PermissionDecision::AllowOnce | PermissionDecision::AllowAlways => (true, String::new()),
+                PermissionDecision::Deny { message } => (false, message.clone().unwrap_or_default()),
+            };
+            resolve(
+                self.execution.store(),
+                &self.execution.scheduler,
+                &self.conversation,
+                &task,
+                Decision {
+                    tool_call_id: id.into(),
+                    approved,
+                    reason,
+                },
+            )
+            .await
+            .map_err(failed)
+        })
     }
 
-    fn dispose(&self) {
-        let _ = self.abort();
+    fn dispose(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            let _ = self.abort().await;
+            self.cancel.cancel();
+            self.execution.workers().detach(&self.conversation);
+        })
+    }
+
+    fn signal_dispose(&self) {
         self.cancel.cancel();
         self.execution.workers().detach(&self.conversation);
+        if let Some(id) = self.active.lock().unwrap().clone() {
+            let scheduler = self.execution.scheduler.clone();
+            crate::rt::current_or_global_handle().spawn(async move {
+                let _ = scheduler.abort(&id).await;
+            });
+        }
     }
 }
 

@@ -1,19 +1,41 @@
-# outline：树状大纲
+# outline：树状大纲与思维树
 
-`outline` 面向人与帮工快速梳理要点、拆解层次、会议纪要与脑暴的轻量单栏树状大纲。存储形态与 `docs` 同为 `body = "blocks"`（`artifact_create` 传 `artifactType: "outline"`，文件后缀约定 `.outline.md`），但强调**短句节点 + 无限缩进嵌套 + 折叠聚焦**，不同于成段叙述的长文 `docs`。
+`outline` 面向人与执行会话快速梳理要点、层次拆解、会议纪要与脑暴的轻量树状大纲。作品以独立目录存放在 `storage/`（`<storage>/artifact/<id>/`），核心树结构保存在 `structure/outline.json`，附件与插图存放在 `asset/`，强调**短句节点 + 无限缩进 + 折叠聚焦（zoom）**。
 
-## 核心工作流
+## 目录结构（Directory-per-Artifact）
 
-1. **创建或导入**：
-   - 新建：`artifact_create({ title, artifactType: "outline", content })` 用缩进列表导入初始树，或省略 `content` 先建空大纲再按层级插节点。
-   - 导入已有 `.md` / Logseq 笔记：`artifact_outline_import({ markdown, title, filename })`（帮工亦可传 `file` 读工作区 `.md` 文件），自动解析 YAML frontmatter、`key:: value` 属性、缩进树与 `TODO`/`DOING`/`DONE`/`CANCELED` 任务项并建为 `outline`。
-2. **用树表达层级（优先嵌套而非大段文字）**：
-   - 先用 `artifact_block_list({ id })` 读当前节点树与 `rev`；多节点创建、重排与编辑优先用 `artifact_block_batch({ id, ops })`（支持 `create`+`tempId`、`update`+`baseRev`、`move`、`delete`），单步改动可用 `artifact_block_create` / `update` / `delete`。
-   - 顶层节点代表主题或分组；通过 `parentId` 挂接子节点，`afterBlock` 控制同级顺序。
-   - 常规要点用 `bulleted`，可执行项用 `todo`（可切换 `checked`），引用原话用 `quote`；需要数据图或迷你交互试算时，可直接挂载 `type: "code"`、`language: "chart"` 或 `"genui"` 的原生渲染块。
-3. **尊重用户手写节点**：帮工修改用户手写的节点时，服务端会自动转为待确认建议（`suggestion`），等待用户接受或拒绝。
+```text
+<storage>/artifact/<id>/
+├── manifest.json          # id、artifactType: "outline"、title、entry: "structure/outline.json"
+├── structure/
+│   └── outline.json       # 扁平或嵌套树节点、属性、待办状态、折叠与标签
+└── asset/
+    └── ref-sketch.png     # 节点附件按相对路径 asset/<name> 引用
+```
+
+`structure/outline.json` 核心结构：
+```json
+{
+  "version": 1,
+  "rootIds": ["n_goals", "n_risks"],
+  "nodes": {
+    "n_goals": { "id": "n_goals", "text": "Q3 核心目标", "kind": "heading", "children": ["n_g1"], "props": { "owner": "Core" } },
+    "n_g1": { "id": "n_g1", "text": "完成目录化作品存储与实时协作切流", "kind": "todo", "checked": false, "children": [] },
+    "n_risks": { "id": "n_risks", "text": "关键风险与对策", "kind": "bullet", "children": [] }
+  }
+}
+```
+
+## 多人与多执行会话实时协作规则
+
+1. **按节点细粒度同步（`artifact_collab`）**：通过统一协作层按稳定节点 `id` 增删改、重排与移动子树；多个参与方同时展开不同分支时自动无冲突合并并同步落盘到 `structure/outline.json`，**严禁整棵树重建覆盖导致节点 ID 漂移**。
+2. **来源追踪（`artifact_change`）**：每条节点变更附带 `origin`，支持按轮次撤销某次脑暴扩写、对比历史分支或分叉新大纲；定稿前可用 `artifact_version` 留存快照。
+3. **尊重用户手写节点（`artifact_suggestion`）**：当需要改写、合并或删除用户刚写下的节点文本时，提交 `artifact_suggestion` 供用户确认；向分支末尾补充子要点可直接并发追加。
+4. **实时在场感知（Presence）**：先查看其他协作者当前聚焦的分支（zoom root）与选中节点，避开用户正在键入的节点，优先在相邻分支展开补充。
 
 ## 写作准则
 
-- **一行一事**：每个节点控制在 1 句以内，把原因、证据、子步骤下沉为子节点，方便用户折叠与聚焦（zoom）任意分支。
-- **结构清晰**：同级节点保持平行粒度；需要展开长段论述、完整方案或正式手册时改用 `docs`。
+- **一行一事**：每个节点控制在 1 句以内，把原因、证据、子步骤下沉为子节点，方便折叠与聚焦。
+- **语义清晰**：常规要点用 `bullet`、可执行项用 `todo`（配 `checked`）、关键引用用 `quote`、结构化属性写入 `props`；需长段叙述或正式 RFC 时改用 `docs`。
+
+按需延伸阅读：`artifact_type_read({ type: "outline", reference: "format" | "craft" })`。

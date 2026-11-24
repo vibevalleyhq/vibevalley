@@ -1419,7 +1419,6 @@ fn message(channel: &str, number: i64, actor: Actor, kind: MessageKind, text: &s
         attachments: vec![],
         embeds: vec![],
         artifact: None,
-        blocks: None,
         view_context: None,
     }
 }

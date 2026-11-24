@@ -1,13 +1,13 @@
 // VibeValley's infra/gateway.ts with the same exports. There each
 // subscription is an SSE stream (`subscriptionUrl`) read with fetch; in
 // VibeValley it is the transport's `subscribe` (the bridge's, ui/bridge.ts),
-// each event still decoded with rpc.ts's Schema. A refusal or a broken
+// each event still decoded with api.ts's Schema. A refusal or a broken
 // stream ends it; one the transport could not open at all is asked for again
 // after reconnectDelayMs, as there. The fetcher parameter is gone (no HTTP).
-import { z } from "zod";
+import type { z } from "zod";
 
-import type { ArtifactEntryEvent, ArtifactEvent, ArtifactId, ArtifactPresenceEvent, ChannelEvent, SuggestionEvent } from "@vibevalley/protocol";
-import { type SubscriptionName, subscriptions } from "@vibevalley/protocol/rpc";
+import type { ArtifactEvent, ArtifactId, ArtifactPresenceEvent, ChannelEvent, SuggestionEvent } from "@vibevalley/protocol";
+import { type SubscriptionName, subscriptions } from "@vibevalley/protocol/api";
 
 import { transport } from "./transport";
 
@@ -65,13 +65,9 @@ function subscribe<E>(name: SubscriptionName, payload: unknown, event: z.ZodType
 export const followChannel = (id: string, after: number, on: (e: ChannelEvent) => void, ended: () => void) =>
   subscribe("channel.follow", { id, after }, subscriptions["channel.follow"].event, on, ended);
 
-/** A blocks artifact's changes after this seq, then each batch from now on. */
-export const followArtifact = (id: string, after: number, on: (e: ArtifactEvent) => void, ended: () => void) =>
+/** An artifact directory's file changes after this seq, then each committed batch from now on. */
+export const followArtifact = (id: string, after: number, on: (e: ArtifactEvent) => void, ended?: () => void) =>
   subscribe("artifact.follow", { id, after }, subscriptions["artifact.follow"].event, on, ended);
-
-/** A store artifact's entry changes after this seq, then each batch from now on. */
-export const followArtifactEntries = (id: string, after: number, on: (e: ArtifactEntryEvent) => void, ended?: () => void) =>
-  subscribe("artifact.entry.follow", { id, after }, subscriptions["artifact.entry.follow"].event, on, ended);
 
 /** An artifact's suggestions as they now are, then the whole list after each change. */
 export const followSuggestions = (id: string, on: (e: SuggestionEvent) => void, ended?: () => void) =>
@@ -80,24 +76,3 @@ export const followSuggestions = (id: string, on: (e: SuggestionEvent) => void, 
 /** An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. */
 export const followArtifactPresence = (id: ArtifactId, on: (e: ArtifactPresenceEvent) => void, ended?: () => void) =>
   subscribe("artifact.presence.follow", { id }, subscriptions["artifact.presence.follow"].event, on, ended);
-
-const ArtifactPageSchema = z.object({
-  content: z.string(),
-  headers: z.record(z.string(), z.string()),
-});
-
-export interface ArtifactViewRequest {
-  readonly id: string;
-  readonly theme?: string;
-  readonly path?: string;
-  readonly elementId?: string;
-  readonly print?: boolean;
-  readonly origin?: string;
-}
-
-/** Fetches a store artifact's rendered HTML viewer document through the native `artifact.view` op. */
-export async function fetchArtifactView(input: ArtifactViewRequest): Promise<{ readonly content: string; readonly headers: Record<string, string> }> {
-  const envelope = await transport().call("artifact.view", input);
-  if (envelope.bizCode !== 0) throw new Error(envelope.message);
-  return ArtifactPageSchema.parse(envelope.data);
-}

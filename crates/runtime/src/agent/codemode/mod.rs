@@ -2,10 +2,14 @@
 mod instrument;
 mod vm;
 
-use crate::agent::durable::{Error, Result, Scheduler, Task, TaskContext, TaskStatus, Transition, WaitMode};
+use std::collections::{HashMap, HashSet};
+use std::future::Future;
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::{HashMap, HashSet};
+
+use crate::agent::durable::{Error, Result, Scheduler, Task, TaskContext, TaskStatus, Transition, WaitMode};
 
 pub const KIND: &str = "pi.codemode";
 pub const EXEC: &str = "codemode_exec";
@@ -62,28 +66,44 @@ enum Outcome {
     Sleep(String, i64),
 }
 
-pub fn register(scheduler: &Scheduler, tool: impl Fn(&TaskContext, &str, Value) -> Result<Value> + Send + Sync + 'static) {
-    register_with(scheduler, move |tc, name, args| Ok(Transition::Complete(tool(tc, name, args)?)));
+pub fn register<F, Fut>(scheduler: &Scheduler, tool: F)
+where
+    F: Fn(TaskContext, String, Value) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Result<Value>> + Send + 'static,
+{
+    let tool = Arc::new(tool);
+    register_with(scheduler, move |tc, name, args| {
+        let tool = Arc::clone(&tool);
+        async move { Ok(Transition::Complete(tool(tc, name, args).await?)) }
+    });
 }
 
 /// The caller may park a tool on the same permission or budget signal as generation.
-pub fn register_with(scheduler: &Scheduler, tool: impl Fn(&TaskContext, &str, Value) -> Result<Transition> + Send + Sync + 'static) {
+pub fn register_with<F, Fut>(scheduler: &Scheduler, tool: F)
+where
+    F: Fn(TaskContext, String, Value) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Result<Transition>> + Send + 'static,
+{
+    let tool = Arc::new(tool);
     scheduler.register(KIND, EXEC, exec);
-    scheduler.register(KIND, WAKE, |tc| {
+    scheduler.register(KIND, WAKE, |tc| async move {
         let sleep: Sleep = serde_json::from_value(tc.task.checkpoint.clone())?;
-        tc.memo(&sleep.sleep_key, || Ok(json!(true)))?;
+        tc.memo(&sleep.sleep_key, || async { Ok(json!(true)) }).await?;
         Ok(Transition::Next {
             phase: EXEC.into(),
             checkpoint: Some(serde_json::to_value(sleep.spec)?),
         })
     });
     scheduler.register(TOOL, RUN, move |tc| {
-        let call: Tool = serde_json::from_value(tc.task.checkpoint.clone())?;
-        tool(tc, &call.tool_name, call.args)
+        let tool = Arc::clone(&tool);
+        async move {
+            let call: Tool = serde_json::from_value(tc.task.checkpoint.clone())?;
+            tool(tc, call.tool_name, call.args).await
+        }
     });
 }
 
-fn exec(tc: &TaskContext) -> Result<Transition> {
+async fn exec(tc: TaskContext) -> Result<Transition> {
     let spec: CodeModeSpec = serde_json::from_value(tc.task.checkpoint.clone())?;
     let mut records = HashMap::new();
     let mut sleeps = HashSet::new();
@@ -98,7 +118,8 @@ fn exec(tc: &TaskContext) -> Result<Transition> {
             }
         }
     }
-    for child in tc.store.read(|r| r.children(&tc.task.id))? {
+    let tid = tc.task.id.clone();
+    for child in tc.store.read_async(move |r| Box::pin(async move { r.children_async(&tid).await })).await? {
         if child.kind != TOOL || child.status != TaskStatus::Terminal || records.contains_key(&child.dedup_key) {
             continue;
         }
@@ -115,16 +136,25 @@ fn exec(tc: &TaskContext) -> Result<Transition> {
             result: ok.then_some(child.result),
             error: (!ok).then_some(error),
         };
-        tc.memo(&child.dedup_key, || Ok(serde_json::to_value(&rec)?))?;
+        let rec_val = serde_json::to_value(&rec)?;
+        tc.memo(&child.dedup_key, || async move { Ok(rec_val) }).await?;
         records.insert(child.dedup_key, rec);
     }
-    match vm::execute(tc, &spec, records, sleeps).map_err(Error::Invalid)? {
+    let task_id = tc.task.id.clone();
+    let created_at_ms = tc.task.created_at_ms;
+    let cancel = tc.cancel_token();
+    let spec_for_vm = spec.clone();
+    let outcome = tokio::task::spawn_blocking(move || vm::execute(task_id, created_at_ms, cancel, &spec_for_vm, records, sleeps))
+        .await
+        .map_err(|e| Error::Invalid(format!("codemode vm task failed: {e}")))?
+        .map_err(Error::Invalid)?;
+    match outcome {
         Outcome::Complete(result) => Ok(Transition::Complete(serde_json::to_value(result)?)),
         Outcome::Tool(key, call) => {
             let mut child = Task::new(TOOL, RUN);
             child.dedup_key = key;
             child.checkpoint = serde_json::to_value(call)?;
-            let (child, _) = tc.spawn_child(child)?;
+            let (child, _) = tc.spawn_child(child).await?;
             Ok(Transition::Wait {
                 phase: EXEC.into(),
                 checkpoint: None,

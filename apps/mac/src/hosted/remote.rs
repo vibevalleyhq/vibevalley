@@ -1,4 +1,4 @@
-//! Remote Control Plane `Server` adapter: implements `vibevalley_server::transport::api::Server`
+//! Remote Control Plane `Server` adapter: implements `vibevalley_server::gateway::api::Server`
 //! over authenticated HTTP + SSE (`POST /api/v1/{op}`, `GET /api/v1/slice/{name}`,
 //! `GET /api/v1/live`, `GET /api/v1/subscribe/{name}`) so the desktop GUI mounts directly onto
 //! `BridgeHub` without starting a local embedded server.
@@ -14,16 +14,15 @@ use std::time::Duration;
 use futures_util::{Stream, StreamExt, TryStreamExt};
 use parking_lot::Mutex;
 use serde::Serialize;
-use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::broadcast;
 use tokio_util::codec::{FramedRead, LinesCodec, LinesCodecError};
 use tokio_util::io::StreamReader;
 use tokio_util::sync::{CancellationToken, DropGuard};
-use vibevalley_protocol::{BizCode, BoardSlice, CollabSlice, Envelope, FarmFrame, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceKind};
-use vibevalley_server::slice_feed::{Sequenced, SliceFeed, SliceSnapshot, SliceSubscription};
-use vibevalley_server::transport::api::{BoxFuture, CallerContext, Server, refusal};
-use vibevalley_server::transport::bridge::fake::empty_bundle;
+use vibevalley_protocol::{BizCode, Envelope, LiveEvent, SliceKind};
+use vibevalley_server::gateway::api::{BoxFuture, CallerContext, Server, refusal};
+use vibevalley_server::gateway::bridge::fake::empty_bundle;
+use vibevalley_server::{SliceFeed, SliceSubscription};
 
 use crate::hosted::connection::{Secret, is_loopback_url, normalize_url};
 
@@ -260,37 +259,23 @@ fn backoff_delay(attempt: usize) -> Duration {
     Duration::from_millis(BACKOFF_MS[idx])
 }
 
-fn slice_topic(kind: SliceKind) -> &'static str {
-    match kind {
-        SliceKind::Board => "slice:board",
-        SliceKind::Sessions => "slice:sessions",
-        SliceKind::Collab => "slice:collab",
-        SliceKind::Inbox => "slice:inbox",
-        SliceKind::Ops => "slice:ops",
-        SliceKind::Farm => "slice:farm",
-    }
-}
-
-struct RemoteSlice<T> {
+struct RemoteSlice {
     kind: SliceKind,
-    feed: Arc<SliceFeed<T>>,
+    feed: Arc<SliceFeed>,
     pump: Arc<Mutex<Option<CancellationToken>>>,
 }
 
-impl<T> RemoteSlice<T>
-where
-    T: Sequenced + Serialize + DeserializeOwned + Send + Sync + 'static,
-{
-    fn new(kind: SliceKind, initial: T) -> Self {
+impl RemoteSlice {
+    fn new<T: Serialize>(kind: SliceKind, initial_seq: i64, initial: &T) -> Self {
         Self {
             kind,
-            feed: Arc::new(SliceFeed::new(slice_topic(kind), initial)),
+            feed: Arc::new(SliceFeed::from_value(kind, initial_seq, initial)),
             pump: Arc::new(Mutex::new(None)),
         }
     }
 
-    fn subscribe(&self, server: &RemoteServer) -> watch::Receiver<Arc<SliceSnapshot<T>>> {
-        let rx = self.feed.subscribe();
+    fn subscribe(&self, server: &RemoteServer) -> SliceSubscription {
+        let sub = self.feed.subscribe();
         let mut guard = self.pump.lock();
         if guard.as_ref().is_none_or(CancellationToken::is_cancelled) {
             let cancel = server.shutdown.child_token();
@@ -321,11 +306,10 @@ where
                                 if !feed.has_watchers() {
                                     return SseStep::Stop;
                                 }
-                                match serde_json::from_str::<T>(&msg.data) {
-                                    Ok(slice) => {
-                                        let seq = parse_sse_seq(&msg, slice.seq());
-                                        feed.replace(slice);
-                                        feed.publish_forced();
+                                match serde_json::from_str::<Value>(&msg.data) {
+                                    Ok(val) => {
+                                        let seq = parse_sse_seq(&msg, val.get("seq").and_then(Value::as_i64).unwrap_or(0));
+                                        feed.publish(seq, msg.data);
                                         if feed.has_watchers() { SseStep::ContinueWithSeq(seq) } else { SseStep::Stop }
                                     }
                                     Err(err) => {
@@ -351,29 +335,29 @@ where
                 }
             });
         }
-        rx
+        sub
     }
 }
 
 struct RemoteSlices {
-    board: RemoteSlice<BoardSlice>,
-    sessions: RemoteSlice<SessionsSlice>,
-    collab: RemoteSlice<CollabSlice>,
-    inbox: RemoteSlice<InboxSlice>,
-    ops: RemoteSlice<OpsSlice>,
-    farm: RemoteSlice<FarmFrame>,
+    board: RemoteSlice,
+    sessions: RemoteSlice,
+    collab: RemoteSlice,
+    inbox: RemoteSlice,
+    ops: RemoteSlice,
+    farm: RemoteSlice,
 }
 
 impl RemoteSlices {
     fn new() -> Self {
         let bundle = empty_bundle(0);
         Self {
-            board: RemoteSlice::new(SliceKind::Board, bundle.board),
-            sessions: RemoteSlice::new(SliceKind::Sessions, bundle.sessions),
-            collab: RemoteSlice::new(SliceKind::Collab, bundle.collab),
-            inbox: RemoteSlice::new(SliceKind::Inbox, bundle.inbox),
-            ops: RemoteSlice::new(SliceKind::Ops, bundle.ops),
-            farm: RemoteSlice::new(SliceKind::Farm, bundle.farm),
+            board: RemoteSlice::new(SliceKind::Board, bundle.board.seq, &bundle.board),
+            sessions: RemoteSlice::new(SliceKind::Sessions, bundle.sessions.seq, &bundle.sessions),
+            collab: RemoteSlice::new(SliceKind::Collab, bundle.collab.seq, &bundle.collab),
+            inbox: RemoteSlice::new(SliceKind::Inbox, bundle.inbox.seq, &bundle.inbox),
+            ops: RemoteSlice::new(SliceKind::Ops, bundle.ops.seq, &bundle.ops),
+            farm: RemoteSlice::new(SliceKind::Farm, bundle.farm.seq, &bundle.farm),
         }
     }
 }
@@ -427,10 +411,10 @@ impl RemoteServer {
         })
     }
 
-    async fn call_http(&self, op: &str, payload: Value) -> Envelope {
-        let url = op_url(&self.base_url, op);
+    async fn call_http_inner(client: &reqwest::Client, base_url: &str, token: &Secret, op: &str, payload: Value) -> Envelope {
+        let url = op_url(base_url, op);
         let body = if payload.is_null() { Value::Object(Default::default()) } else { payload };
-        let req = attach_headers(self.client.post(&url).timeout(CALL_TIMEOUT).json(&body), &self.token);
+        let req = attach_headers(client.post(&url).timeout(CALL_TIMEOUT).json(&body), token);
         let response = match req.send().await {
             Ok(res) => res,
             Err(err) => return refusal(BizCode::ServiceUnavailable, format!("remote control plane unreachable: {err}")),
@@ -442,12 +426,14 @@ impl RemoteServer {
         };
         parse_envelope_or_fallback(status, &text)
     }
-    async fn slice_snapshot_json_http(&self, slice: SliceKind) -> Arc<str> {
-        let url = format!("{}/api/v1/slice/{}?once=1", self.base_url, slice.as_str());
-        let req = attach_headers(
-            self.client.get(&url).header("accept", "application/json").timeout(SNAPSHOT_TIMEOUT),
-            &self.token,
-        );
+
+    async fn call_http(&self, op: &str, payload: Value) -> Envelope {
+        Self::call_http_inner(&self.client, &self.base_url, &self.token, op, payload).await
+    }
+
+    async fn slice_snapshot_json_http_inner(client: &reqwest::Client, base_url: &str, token: &Secret, slice: SliceKind) -> Arc<str> {
+        let url = format!("{base_url}/api/v1/slice/{}?once=1", slice.as_str());
+        let req = attach_headers(client.get(&url).header("accept", "application/json").timeout(SNAPSHOT_TIMEOUT), token);
         let Ok(response) = req.send().await else {
             return Arc::<str>::from("null");
         };
@@ -464,15 +450,29 @@ impl RemoteServer {
         }
     }
 
+    async fn slice_snapshot_json_http(&self, slice: SliceKind) -> Arc<str> {
+        Self::slice_snapshot_json_http_inner(&self.client, &self.base_url, &self.token, slice).await
+    }
+
     #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
-    async fn subscribe_http(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+    #[allow(clippy::too_many_arguments)]
+    async fn subscribe_http_inner(
+        client: reqwest::Client,
+        base_url: String,
+        token: Secret,
+        subs: Arc<Mutex<HashMap<u64, CancellationToken>>>,
+        sub_id: u64,
+        shutdown: CancellationToken,
+        name: &str,
+        payload: Value,
+    ) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
         let payload_json = serde_json::to_string(&if payload.is_null() { Value::Object(Default::default()) } else { payload }).unwrap_or_else(|_| "{}".into());
 
-        let mut url = url::Url::parse(&format!("{}/api/v1/subscribe/{}", self.base_url, name))
+        let mut url = url::Url::parse(&format!("{base_url}/api/v1/subscribe/{name}"))
             .map_err(|e| refusal(BizCode::InvalidInput, format!("invalid subscription URL: {e}")))?;
         url.query_pairs_mut().append_pair("payload", &payload_json);
 
-        let req = attach_headers(self.client.get(url).header("accept", "text/event-stream"), &self.token);
+        let req = attach_headers(client.get(url).header("accept", "text/event-stream"), &token);
         let response = req
             .send()
             .await
@@ -488,35 +488,54 @@ impl RemoteServer {
             return Err(parse_envelope_or_fallback(status, &text));
         }
 
-        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
-        let cancel = self.shutdown.child_token();
-        let (tx, rx) = flume::unbounded::<Value>();
-        self.subs.lock().insert(sub_id, cancel.clone());
-        let subs = self.subs.clone();
+        let cancel = shutdown.child_token();
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Value>();
+        subs.lock().insert(sub_id, cancel.clone());
+        let subs_for_task = subs;
 
         vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
             let mut last_seq = None;
-            let mut is_closed = || tx.is_disconnected();
+            let mut is_closed = || tx.is_closed();
             let mut on_message = |msg: SseMessage| {
                 let tx = &tx;
                 async move {
                     if let Ok(val) = serde_json::from_str::<Value>(&msg.data) {
                         return if tx.send(val).is_ok() { SseStep::Continue } else { SseStep::Stop };
                     }
-                    if tx.is_disconnected() { SseStep::Stop } else { SseStep::Continue }
+                    if tx.is_closed() { SseStep::Stop } else { SseStep::Continue }
                 }
             };
             let _ = drain_sse_response(response, &cancel, &mut last_seq, &mut is_closed, &mut on_message).await;
-            subs.lock().remove(&sub_id);
+            subs_for_task.lock().remove(&sub_id);
         });
 
         Ok((sub_id, rx))
+    }
+
+    #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
+    async fn subscribe_http(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
+        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
+        Self::subscribe_http_inner(
+            self.client.clone(),
+            self.base_url.clone(),
+            self.token.clone(),
+            self.subs.clone(),
+            sub_id,
+            self.shutdown.clone(),
+            name,
+            payload,
+        )
+        .await
     }
 }
 
 impl Server for RemoteServer {
     fn call(&self, op: &str, payload: Value) -> Envelope {
-        vibevalley_runtime::rt::block_on(self.call_http(op, payload))
+        let client = self.client.clone();
+        let base_url = self.base_url.clone();
+        let token = self.token.clone();
+        let op = op.to_string();
+        vibevalley_runtime::rt::block_on(async move { Self::call_http_inner(&client, &base_url, &token, &op, payload).await })
     }
 
     fn call_with_async(self: Arc<Self>, _ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
@@ -524,7 +543,10 @@ impl Server for RemoteServer {
     }
 
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
-        let json = vibevalley_runtime::rt::block_on(self.slice_snapshot_json_http(slice));
+        let client = self.client.clone();
+        let base_url = self.base_url.clone();
+        let token = self.token.clone();
+        let json = vibevalley_runtime::rt::block_on(async move { Self::slice_snapshot_json_http_inner(&client, &base_url, &token, slice).await });
         serde_json::from_str(&json).unwrap_or(Value::Null)
     }
 
@@ -532,83 +554,66 @@ impl Server for RemoteServer {
         Box::pin(async move { self.slice_snapshot_json_http(slice).await })
     }
 
-    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
-        // Pump SSE on the Tokio runtime and deliver via flume so `receive` executes outside `rt::block_on`
-        // (BridgeHub's watch callback uses `rt::block_on` for Bounded-1 ack waiting).
-        let (tx, rx) = flume::bounded::<(i64, Value)>(1);
+    fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
+        // Pump SSE on the Tokio runtime and deliver via bounded mpsc so `receive` runs on the caller thread.
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<(i64, Value)>(1);
         let cancel = self.shutdown.child_token();
         let task_cancel = cancel.clone();
+        let stop_watch = stop.clone();
         let client = self.client.clone();
         let token = self.token.clone();
         let url = format!("{}/api/v1/slice/{}", self.base_url, slice.as_str());
 
         vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
             let mut last_seq = after_seq;
-            let _ = run_sse_loop(
-                client,
-                token,
-                url,
-                task_cancel.clone(),
-                &mut last_seq,
-                || tx.is_disconnected(),
-                |status| {
-                    tracing::warn!("remote slice stream {} refused with HTTP {}", slice.as_str(), status.as_u16());
-                },
-                |msg| {
-                    let tx = &tx;
-                    let cancel = &task_cancel;
-                    async move {
-                        let Ok(val) = serde_json::from_str::<Value>(&msg.data) else {
-                            return SseStep::Continue;
-                        };
-                        let seq = parse_sse_seq(&msg, val.get("seq").and_then(Value::as_i64).unwrap_or(0));
-                        let sent = tokio::select! {
-                            biased;
-                            _ = cancel.cancelled() => false,
-                            res = tx.send_async((seq, val)) => res.is_ok(),
-                        };
-                        if sent { SseStep::ContinueWithSeq(seq) } else { SseStep::Stop }
-                    }
-                },
-            )
-            .await;
+            tokio::select! {
+                biased;
+                _ = stop_watch.cancelled() => {}
+                _ = run_sse_loop(
+                    client,
+                    token,
+                    url,
+                    task_cancel.clone(),
+                    &mut last_seq,
+                    || tx.is_closed(),
+                    |status| {
+                        tracing::warn!("remote slice stream {} refused with HTTP {}", slice.as_str(), status.as_u16());
+                    },
+                    |msg| {
+                        let tx = &tx;
+                        let cancel = &task_cancel;
+                        async move {
+                            let Ok(val) = serde_json::from_str::<Value>(&msg.data) else {
+                                return SseStep::Continue;
+                            };
+                            let seq = parse_sse_seq(&msg, val.get("seq").and_then(Value::as_i64).unwrap_or(0));
+                            let sent = tokio::select! {
+                                biased;
+                                _ = cancel.cancelled() => false,
+                                res = tx.send((seq, val)) => res.is_ok(),
+                            };
+                            if sent { SseStep::ContinueWithSeq(seq) } else { SseStep::Stop }
+                        }
+                    },
+                ) => {}
+            }
         });
 
-        enum Step {
-            Stop,
-            Item(i64, Value),
-            Closed,
+        while !stop.is_cancelled() {
+            let Some((seq, val)) = rx.blocking_recv() else { break };
+            receive(seq, &val);
         }
-
-        loop {
-            let step = flume::Selector::new()
-                .recv(stop, |_| Step::Stop)
-                .recv(&rx, |res| match res {
-                    Ok((seq, val)) => Step::Item(seq, val),
-                    Err(_) => Step::Closed,
-                })
-                .wait();
-            match step {
-                Step::Item(seq, val) => receive(seq, &val),
-                Step::Stop | Step::Closed => {
-                    cancel.cancel();
-                    break;
-                }
-            }
-        }
+        cancel.cancel();
     }
 
     fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
         Some(match slice {
-            SliceKind::Board => SliceSubscription::Board(self.slices.board.subscribe(self)),
-            SliceKind::Sessions => SliceSubscription::Sessions(self.slices.sessions.subscribe(self)),
-            SliceKind::Collab => SliceSubscription::Collab(self.slices.collab.subscribe(self)),
-            SliceKind::Inbox => SliceSubscription::Inbox(self.slices.inbox.subscribe(self)),
-            SliceKind::Ops => SliceSubscription::Ops(self.slices.ops.subscribe(self)),
-            SliceKind::Farm => SliceSubscription::Farm {
-                rx: self.slices.farm.subscribe(self),
-                strip_initial_effects: false,
-            },
+            SliceKind::Board => self.slices.board.subscribe(self),
+            SliceKind::Sessions => self.slices.sessions.subscribe(self),
+            SliceKind::Collab => self.slices.collab.subscribe(self),
+            SliceKind::Inbox => self.slices.inbox.subscribe(self),
+            SliceKind::Ops => self.slices.ops.subscribe(self),
+            SliceKind::Farm => self.slices.farm.subscribe(self),
         })
     }
 
@@ -616,8 +621,8 @@ impl Server for RemoteServer {
         Box::pin(async move { self.subscribe_slice(slice) })
     }
 
-    fn live(&self) -> flume::Receiver<LiveEvent> {
-        let (tx, rx) = flume::unbounded::<LiveEvent>();
+    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<LiveEvent>();
         if let Some(mut live_rx) = self.subscribe_live() {
             let cancel = self.shutdown.child_token();
             vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
@@ -625,6 +630,7 @@ impl Server for RemoteServer {
                     let event = tokio::select! {
                         biased;
                         _ = cancel.cancelled() => break,
+                        _ = tx.closed() => break,
                         res = live_rx.recv() => match res {
                             Ok(ev) => ev,
                             Err(broadcast::error::RecvError::Lagged(_)) => continue,
@@ -704,8 +710,15 @@ impl Server for RemoteServer {
         Some(rx)
     }
 
-    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
-        vibevalley_runtime::rt::block_on(self.subscribe_http(name, payload))
+    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
+        let client = self.client.clone();
+        let base_url = self.base_url.clone();
+        let token = self.token.clone();
+        let subs = self.subs.clone();
+        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
+        let shutdown = self.shutdown.clone();
+        let name = name.to_string();
+        vibevalley_runtime::rt::block_on(async move { Self::subscribe_http_inner(client, base_url, token, subs, sub_id, shutdown, &name, payload).await })
     }
 
     fn subscribe_with_async(
@@ -713,7 +726,7 @@ impl Server for RemoteServer {
         _ctx: CallerContext,
         name: String,
         payload: Value,
-    ) -> BoxFuture<'static, Result<(u64, flume::Receiver<Value>), Envelope>> {
+    ) -> BoxFuture<'static, Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope>> {
         Box::pin(async move { self.subscribe_http(&name, payload).await })
     }
 
@@ -740,10 +753,10 @@ mod tests {
     use tokio::net::TcpListener;
     use tokio::sync::Notify;
     use vibevalley_protocol::{ApiError, BizCode, Issue, LiveEvent, NoticeLevel, RemoteDeviceSummary, RemotePlatform};
-    use vibevalley_server::transport::api::{RemoteAuth, RemoteDeviceIdentity};
-    use vibevalley_server::transport::bridge::fake::{FakeServer, empty_bundle};
-    use vibevalley_server::transport::bridge::{ClientIdentity, ClientKind, Hub as BridgeHub, Outlet};
-    use vibevalley_server::transport::http;
+    use vibevalley_server::gateway::api::{GatewayPorts, RemoteAuth, RemoteDeviceIdentity};
+    use vibevalley_server::gateway::bridge::fake::{FakeServer, empty_bundle};
+    use vibevalley_server::gateway::bridge::{Bridge as BridgeHub, ClientIdentity, ClientKind, Outlet};
+    use vibevalley_server::gateway::http;
 
     use super::*;
     use crate::hosted::connection::{ConnectionSaveRequest, configure_remote, exchange_pair_code};
@@ -770,16 +783,21 @@ mod tests {
             true
         }
 
-        fn verify_bearer(&self, token: &str) -> Result<RemoteDeviceIdentity, ApiError> {
-            if token == self.expected_token {
-                Ok(RemoteDeviceIdentity {
-                    device_id: "dev-mac".into(),
-                    name: "Mac Client".into(),
-                    scope: vibevalley_protocol::SCOPE_REMOTE_CLIENT.into(),
-                })
-            } else {
-                Err(ApiError::new(BizCode::Unauthorized, "invalid bearer token"))
-            }
+        fn verify_bearer_async(
+            self: Arc<Self>,
+            token: String,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<RemoteDeviceIdentity, ApiError>> + Send + 'static>> {
+            Box::pin(async move {
+                if token == self.expected_token {
+                    Ok(RemoteDeviceIdentity {
+                        device_id: "dev-mac".into(),
+                        name: "Mac Client".into(),
+                        scope: vibevalley_protocol::SCOPE_REMOTE_CLIENT.into(),
+                    })
+                } else {
+                    Err(ApiError::new(BizCode::Unauthorized, "invalid bearer token"))
+                }
+            })
         }
     }
 
@@ -818,17 +836,17 @@ mod tests {
             self.inner.slice_snapshot(slice)
         }
 
-        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+        fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
             self.inner.watch_slice(slice, after_seq, stop, receive);
         }
 
-        fn live(&self) -> flume::Receiver<LiveEvent> {
+        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
             let rx = self.inner.live();
             self.on_live.notify_waiters();
             rx
         }
 
-        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
             self.inner.subscribe(name, payload)
         }
 
@@ -836,8 +854,11 @@ mod tests {
             self.inner.unsubscribe(id);
         }
 
-        fn remote_auth(&self) -> Option<Arc<dyn RemoteAuth>> {
-            Some(self.auth.clone())
+        fn ports(&self) -> GatewayPorts {
+            GatewayPorts {
+                remote: Some(self.auth.clone()),
+                ..Default::default()
+            }
         }
     }
 
@@ -925,25 +946,24 @@ mod tests {
                 let part1 = part1.clone();
                 let part2 = part2.clone();
                 async move {
-                    let (tx, rx) = flume::bounded::<Result<Bytes, Infallible>>(2);
+                    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Bytes, Infallible>>(2);
                     tokio::spawn(async move {
-                        let _ = tx.send_async(Ok(Bytes::from(part1))).await;
+                        let _ = tx.send(Ok(Bytes::from(part1))).await;
                         tokio::time::sleep(Duration::from_millis(20)).await;
-                        let _ = tx.send_async(Ok(Bytes::from(part2))).await;
+                        let _ = tx.send(Ok(Bytes::from(part2))).await;
                     });
-                    (
-                        StatusCode::OK,
-                        [(header::CONTENT_TYPE, "text/event-stream")],
-                        Body::from_stream(rx.into_stream()),
-                    )
+                    let stream = futures_util::stream::unfold(rx, |mut rx| async move { rx.recv().await.map(|x| (x, rx)) });
+                    (StatusCode::OK, [(header::CONTENT_TYPE, "text/event-stream")], Body::from_stream(stream))
                 }
             }),
         );
         let (addr, _guard) = spawn_mock(app);
 
         let remote = RemoteServer::new(format!("http://{addr}"), Secret::new("vv_dev_utf8_test"), None).unwrap();
-        let live_rx = remote.live();
-        let received = live_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let mut live_rx = remote.live();
+        let received = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), live_rx.recv()).await })
+            .unwrap()
+            .unwrap();
         match received {
             LiveEvent::Notice(got) => {
                 assert!(!got.text.contains('\u{FFFD}'), "unexpected U+FFFD replacement char: {}", got.text);
@@ -1061,26 +1081,33 @@ mod tests {
         assert_eq!(snap["seq"], 1);
 
         // 4. watch_slice SSE receives initial snapshot + live update and stops cleanly.
-        let (stop_tx, stop_rx) = flume::bounded::<()>(0);
-        let (seen_tx, seen_rx) = flume::unbounded::<(i64, Value)>();
+        let stop = CancellationToken::new();
+        let stop_watch = stop.clone();
+        let (seen_tx, mut seen_rx) = tokio::sync::mpsc::unbounded_channel::<(i64, Value)>();
         let watcher_remote = RemoteServer::new(remote.base_url.clone(), Secret::new(token), None).unwrap();
         let handle = std::thread::spawn(move || {
-            watcher_remote.watch_slice(SliceKind::Board, None, &stop_rx, &mut |seq, val| {
+            watcher_remote.watch_slice(SliceKind::Board, None, &stop_watch, &mut |seq, val| {
                 let _ = seen_tx.send((seq, val.clone()));
             });
         });
 
-        let (initial_seq, _) = seen_rx.recv_timeout(Duration::from_secs(5)).expect("timed out waiting for initial SSE slice");
+        let (initial_seq, _) = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), seen_rx.recv()).await })
+            .ok()
+            .flatten()
+            .expect("timed out waiting for initial SSE slice");
         assert_eq!(initial_seq, 1);
 
         let mut next = empty_bundle(2);
         next.board.issues.push(Issue::new("i-remote", 1, "Remote Issue", 2));
         fake.swap_bundle(next);
 
-        let (updated_seq, updated_val) = seen_rx.recv_timeout(Duration::from_secs(5)).expect("timed out waiting for updated SSE slice");
+        let (updated_seq, updated_val) = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), seen_rx.recv()).await })
+            .ok()
+            .flatten()
+            .expect("timed out waiting for updated SSE slice");
         assert_eq!(updated_seq, 2);
         assert_eq!(updated_val["issues"][0]["id"], "i-remote");
-        drop(stop_tx);
+        stop.cancel();
         handle.join().unwrap();
 
         // 5. subscribe_slice + subscribe_live drive BridgeHub via zero-thread async fast paths.
@@ -1123,7 +1150,7 @@ mod tests {
         drop(client);
 
         // 6. live SSE receives LiveEvent.
-        let live_rx = remote.live();
+        let mut live_rx = remote.live();
         authed.wait_live_watchers("live SSE attach", 1);
         let expected_notice = LiveEvent::Notice(vibevalley_protocol::LiveEventNotice {
             at: 42,
@@ -1131,14 +1158,18 @@ mod tests {
             text: "hello remote".into(),
         });
         fake.push_live(expected_notice.clone());
-        let ev = live_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let ev = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), live_rx.recv()).await })
+            .unwrap()
+            .unwrap();
         assert_eq!(ev, expected_notice);
         drop(live_rx);
 
         // 7. subscribe SSE streams events, handles refusal, and unsubscribes cleanly.
-        let (sub_id, sub_rx) = remote.subscribe("channel.follow", json!({ "id": "general", "after": 0 })).unwrap();
+        let (sub_id, mut sub_rx) = remote.subscribe("channel.follow", json!({ "id": "general", "after": 0 })).unwrap();
         fake.emit("channel.follow", json!({ "seq": 10, "text": "ping" }));
-        let sub_ev = sub_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let sub_ev = vibevalley_runtime::rt::block_on(async { tokio::time::timeout(Duration::from_secs(5), sub_rx.recv()).await })
+            .unwrap()
+            .unwrap();
         assert_eq!(sub_ev["seq"], 10);
         remote.unsubscribe(sub_id);
 

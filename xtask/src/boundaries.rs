@@ -8,7 +8,7 @@ use crate::rust_scan::{
     walk_matching_files,
 };
 
-const TOPOLOGY_DOC: &str = "docs/architecture-topology.md";
+const TOPOLOGY_DOC: &str = "docs/architecture.md";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BoundaryRule {
@@ -16,7 +16,9 @@ pub enum BoundaryRule {
     MacNoServerModuleImport,
     ServerLayerDag,
     ServerModulesAcyclic,
-    DbEntitiesPrivacy,
+    SeaOrmBoundary,
+    OneTableOneEntityFile,
+    LegacyServerDirs,
 }
 
 impl BoundaryRule {
@@ -26,7 +28,9 @@ impl BoundaryRule {
             Self::MacNoServerModuleImport => "mac-no-server-module-import",
             Self::ServerLayerDag => "server-layer-dag",
             Self::ServerModulesAcyclic => "server-modules-acyclic",
-            Self::DbEntitiesPrivacy => "db-entities-privacy",
+            Self::SeaOrmBoundary => "no-sea-orm-outside-service",
+            Self::OneTableOneEntityFile => "one-table-one-entity-file",
+            Self::LegacyServerDirs => "no-legacy-dirs",
         }
     }
 }
@@ -60,19 +64,21 @@ impl Layer {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PeerDomain {
-    Work,
-    Collab,
-    Content,
-    TeamMemory,
+    Issue,
+    Artifact,
+    Memory,
+    Connector,
+    Voice,
 }
 
 impl PeerDomain {
     fn as_str(self) -> &'static str {
         match self {
-            Self::Work => "work",
-            Self::Collab => "collab",
-            Self::Content => "content",
-            Self::TeamMemory => "team/memory",
+            Self::Issue => "issue",
+            Self::Artifact => "artifact",
+            Self::Memory => "agent/memory",
+            Self::Connector => "connector",
+            Self::Voice => "voice",
         }
     }
 }
@@ -116,67 +122,62 @@ pub struct AuditBoundariesResult {
 }
 
 fn is_known_domain(domain: &str) -> bool {
-    matches!(domain, "work" | "team" | "collab" | "content" | "skin" | "infra")
+    matches!(
+        domain,
+        "setting"
+            | "provider"
+            | "repo"
+            | "storage"
+            | "debug"
+            | "machine"
+            | "runtime"
+            | "channel"
+            | "connector"
+            | "voice"
+            | "artifact"
+            | "issue"
+            | "agent"
+            | "cron"
+            | "game"
+    )
 }
 
-fn is_infra_domain_item(name: &str) -> bool {
-    matches!(name, "install_health" | "install_health_version")
-}
-
-fn is_l3_module(module_id: &str) -> bool {
-    matches!(module_id, "team/orchestrator" | "team/tool" | "team/mcp" | "work/cron" | "work/chat")
+fn is_server_internal_module(name: &str) -> bool {
+    is_known_domain(name) || matches!(name, "db" | "service" | "context" | "log" | "fake")
 }
 
 pub fn classify_server_module(module_id: &str) -> Option<ModuleClassification> {
-    let slash = module_id.find('/')?;
-    if slash == 0 || slash == module_id.len() - 1 {
-        return None;
-    }
-    let domain = &module_id[..slash];
-    let name = &module_id[slash + 1..];
-    if domain == "infra" {
-        return Some(ModuleClassification {
+    match module_id {
+        "setting" | "provider" | "repo" | "storage" | "debug" | "machine" | "runtime" | "channel" | "agent/profile" => Some(ModuleClassification {
             layer: Layer::L1,
             peer_domain: None,
-        });
-    }
-    if module_id == "content/attachment" || module_id == "team/agent" {
-        return Some(ModuleClassification {
-            layer: Layer::L1,
-            peer_domain: None,
-        });
-    }
-    if is_l3_module(module_id) || domain == "skin" {
-        return Some(ModuleClassification {
+        }),
+        "issue" => Some(ModuleClassification {
+            layer: Layer::L2,
+            peer_domain: Some(PeerDomain::Issue),
+        }),
+        "artifact" => Some(ModuleClassification {
+            layer: Layer::L2,
+            peer_domain: Some(PeerDomain::Artifact),
+        }),
+        "agent/memory" => Some(ModuleClassification {
+            layer: Layer::L2,
+            peer_domain: Some(PeerDomain::Memory),
+        }),
+        "connector" => Some(ModuleClassification {
+            layer: Layer::L2,
+            peer_domain: Some(PeerDomain::Connector),
+        }),
+        "voice" => Some(ModuleClassification {
+            layer: Layer::L2,
+            peer_domain: Some(PeerDomain::Voice),
+        }),
+        "cron" | "game" | "agent" | "agent/tool" | "agent/mcp" | "agent/orchestrator" => Some(ModuleClassification {
             layer: Layer::L3,
             peer_domain: None,
-        });
+        }),
+        _ => None,
     }
-    if domain == "work" {
-        return Some(ModuleClassification {
-            layer: Layer::L2,
-            peer_domain: Some(PeerDomain::Work),
-        });
-    }
-    if domain == "collab" {
-        return Some(ModuleClassification {
-            layer: Layer::L2,
-            peer_domain: Some(PeerDomain::Collab),
-        });
-    }
-    if domain == "content" && name != "attachment" {
-        return Some(ModuleClassification {
-            layer: Layer::L2,
-            peer_domain: Some(PeerDomain::Content),
-        });
-    }
-    if module_id == "team/memory" {
-        return Some(ModuleClassification {
-            layer: Layer::L2,
-            peer_domain: Some(PeerDomain::TeamMemory),
-        });
-    }
-    None
 }
 
 fn is_snake_case_module_name(name: &str) -> bool {
@@ -417,30 +418,69 @@ fn extract_path_refs(code: &str) -> Vec<PathRef> {
 }
 
 fn server_file_module_path(file_path: &str) -> Option<Vec<String>> {
-    let prefix = "crates/server/src/modules/";
+    let prefix = "crates/server/src/";
     let rest = file_path.strip_prefix(prefix)?.strip_suffix(".rs")?;
     let mut parts: Vec<String> = rest.split('/').map(str::to_owned).collect();
     if parts.last().is_some_and(|p| p == "mod") {
         parts.pop();
     }
-    let mut out = Vec::with_capacity(parts.len() + 1);
-    out.push("modules".to_owned());
-    out.extend(parts);
-    Some(out)
+    let domain = parts.first()?;
+    if !is_known_domain(domain) {
+        return None;
+    }
+    Some(parts)
 }
 
 fn server_module_id_of_file(file_path: &str) -> Option<String> {
     let mod_path = server_file_module_path(file_path)?;
-    if mod_path.len() < 3 {
-        return None;
+    let first = mod_path.first()?;
+    if first == "agent" {
+        return match mod_path.get(1) {
+            Some(sub) => Some(format!("agent/{sub}")),
+            None => Some("agent".to_owned()),
+        };
     }
-    Some(format!("{}/{}", mod_path[1], mod_path[2]))
+    Some(first.clone())
 }
 
 fn is_spine_file(file_path: &str) -> bool {
     file_path == "crates/server/src/lib.rs"
-        || file_path == "crates/server/src/ports.rs"
-        || (file_path.starts_with("crates/server/src/transport/") && file_path.ends_with(".rs"))
+        || (file_path.starts_with("crates/server/src/log/") && file_path.ends_with(".rs"))
+        || (file_path.starts_with("crates/server/src/db/") && file_path.ends_with(".rs"))
+        || (file_path.starts_with("crates/server/src/service/") && file_path.ends_with(".rs"))
+        || (file_path.starts_with("crates/server/src/context/") && file_path.ends_with(".rs"))
+        || (file_path.starts_with("crates/server/src/gateway/") && file_path.ends_with(".rs"))
+}
+
+fn spine_target_domain_path(file_path: &str, path_ref: &PathRef) -> Option<String> {
+    let segs = &path_ref.segments;
+    if segs.first().is_some_and(|s| s == "crate") && segs.get(1).is_some_and(|s| is_known_domain(s)) {
+        return Some(segs.join("::"));
+    }
+    if file_path == "crates/server/src/lib.rs"
+        && ((segs.first().is_some_and(|s| s == "self") && segs.get(1).is_some_and(|s| is_known_domain(s))) || segs.first().is_some_and(|s| is_known_domain(s)))
+    {
+        return Some(segs.join("::"));
+    }
+    if segs.first().is_some_and(|s| s == "super")
+        && let Some(rest) = file_path.strip_prefix("crates/server/src/").and_then(|r| r.strip_suffix(".rs"))
+    {
+        let mut base: Vec<String> = rest.split('/').map(str::to_owned).collect();
+        if base.last().is_some_and(|p| p == "mod") {
+            base.pop();
+        }
+        base.extend(path_ref.inline_mods.iter().cloned());
+        let mut idx = 0usize;
+        while segs.get(idx).is_some_and(|s| s == "super") {
+            base.pop()?;
+            idx += 1;
+        }
+        base.extend(segs[idx..].iter().cloned());
+        if base.first().is_some_and(|s| is_known_domain(s)) {
+            return Some(segs.join("::"));
+        }
+    }
+    None
 }
 
 fn is_mac_source_file(file_path: &str) -> bool {
@@ -454,10 +494,8 @@ enum TargetResolution {
 
 fn resolve_target_server_module(path_ref: &PathRef, file_mod_path: &[String]) -> Option<TargetResolution> {
     let segs = &path_ref.segments;
-    let resolved: Vec<String> = if segs.first().is_some_and(|s| s == "crate") && segs.get(1).is_some_and(|s| s == "modules") {
-        let mut out = vec!["modules".to_owned()];
-        out.extend(segs[2..].iter().cloned());
-        out
+    let resolved: Vec<String> = if segs.first().is_some_and(|s| s == "crate") {
+        segs[1..].to_vec()
     } else if segs.first().is_some_and(|s| s == "super") {
         let mut base = file_mod_path.to_vec();
         base.extend(path_ref.inline_mods.iter().cloned());
@@ -472,141 +510,207 @@ fn resolve_target_server_module(path_ref: &PathRef, file_mod_path: &[String]) ->
         return None;
     };
 
-    if resolved.first().is_none_or(|s| s != "modules") {
-        return None;
-    }
-    let domain = resolved.get(1)?;
-    let mod_name = resolved.get(2)?;
+    let domain = resolved.first()?;
     if !is_known_domain(domain) {
         return None;
     }
-    if mod_name == "*" {
+    let next = resolved.get(1);
+    if next.is_some_and(|s| s == "*") {
         return Some(TargetResolution::WildcardDomain(domain.clone()));
     }
-    if !is_snake_case_module_name(mod_name) {
-        return None;
+    if domain == "agent" {
+        if let Some(sub) = next
+            && is_snake_case_module_name(sub)
+            && matches!(sub.as_str(), "profile" | "memory" | "tool" | "mcp" | "orchestrator")
+        {
+            return Some(TargetResolution::Module(format!("agent/{sub}")));
+        }
+        return Some(TargetResolution::Module("agent".to_owned()));
     }
-    if domain == "infra" && is_infra_domain_item(mod_name) {
-        return None;
-    }
-    Some(TargetResolution::Module(format!("{domain}/{mod_name}")))
+    Some(TargetResolution::Module(domain.clone()))
 }
 
-fn db_entity_owner_allows(target: &str, rel_from_server_src: &str) -> Option<&'static str> {
-    if target.starts_with("work_") {
-        (!rel_from_server_src.starts_with("modules/work/")).then_some("modules/work/")
-    } else if target.starts_with("collab_") {
-        (!rel_from_server_src.starts_with("modules/collab/")).then_some("modules/collab/")
-    } else if target.starts_with("content_") {
-        (!rel_from_server_src.starts_with("modules/content/")).then_some("modules/content/")
-    } else if target == "team_memory" {
-        (!rel_from_server_src.starts_with("modules/team/memory/")).then_some("modules/team/memory/")
-    } else if target == "infra_remote" {
-        (!rel_from_server_src.starts_with("modules/infra/remote/")).then_some("modules/infra/remote/")
-    } else if target == "shared" {
-        (!(rel_from_server_src.starts_with("db/") || rel_from_server_src.starts_with("modules/work/"))).then_some("db/ or modules/work/")
-    } else {
-        Some("<classified owning domain>")
-    }
-}
+const LEGACY_SERVER_DIRS: &[&str] = &[
+    "app/",
+    "infra/",
+    "content/",
+    "collab/",
+    "team/",
+    "work/",
+    "skin/",
+    "transport/",
+    "fakes/",
+    "db/entities/",
+];
 
-fn check_db_entities_privacy(file_path: &str, code: &str, index: &LineIndex, violations: &mut Vec<BoundaryViolation>) {
+fn check_no_legacy_dirs(file_path: &str, violations: &mut Vec<BoundaryViolation>) {
     let Some(rel) = file_path.strip_prefix("crates/server/src/") else {
         return;
     };
-    if !rel.ends_with(".rs") || rel.starts_with("db/entities/") || rel.starts_with("db/migration/") {
+    if let Some(dir) = LEGACY_SERVER_DIRS.iter().find(|prefix| rel.starts_with(*prefix)) {
+        violations.push(BoundaryViolation {
+            rule: BoundaryRule::LegacyServerDirs,
+            file: file_path.to_owned(),
+            line: 1,
+            message: format!("legacy nested/plural directory `{dir}` is forbidden under `crates/server/src/`"),
+            fix: format!("Place server modules flat and singular under `crates/server/src/`. See {TOPOLOGY_DOC}."),
+            details: Vec::new(),
+        });
+    }
+}
+
+fn has_ident_boundaries(bytes: &[u8], start: usize, end: usize) -> bool {
+    let before = start == 0 || !is_ident_char(bytes[start - 1]);
+    let after = end >= bytes.len() || !is_ident_char(bytes[end]);
+    before && after
+}
+
+fn check_no_sea_orm_outside_service(file_path: &str, code: &str, index: &LineIndex, violations: &mut Vec<BoundaryViolation>) {
+    let Some(rel) = file_path.strip_prefix("crates/server/src/") else {
+        return;
+    };
+    if !rel.ends_with(".rs") || rel.starts_with("db/") || rel.starts_with("service/") {
         return;
     }
 
-    let mut cursor = 0usize;
-    while let Some(rel_idx) = code[cursor..].find("db::entities::") {
-        let start = cursor + rel_idx + "db::entities::".len();
-        let line = index.line_at(cursor + rel_idx);
-        let rest = &code[start..];
-        let trimmed_rest = rest.trim_start();
-        if let Some(after_brace) = trimmed_rest.strip_prefix('{')
-            && let Some(close) = after_brace.find('}')
-        {
-            let inner = &after_brace[..close];
-            let mut depth = 0usize;
-            for seg in inner.split(',') {
-                let trimmed = seg.trim();
-                if depth == 0 && !trimmed.is_empty() {
-                    let target: String = trimmed.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
-                    if target.is_empty() {
-                        violations.push(BoundaryViolation {
-                            rule: BoundaryRule::DbEntitiesPrivacy,
-                            file: file_path.to_owned(),
-                            line,
-                            message: format!("`{rel}` references `db::entities::{{...}}` without a domain module"),
-                            fix: "Import a concrete domain entity module from `crate::db::entities::<domain_table>` inside its owning domain.".to_owned(),
-                            details: Vec::new(),
-                        });
-                    } else if let Some(expected) = db_entity_owner_allows(&target, rel) {
-                        violations.push(BoundaryViolation {
-                            rule: BoundaryRule::DbEntitiesPrivacy,
-                            file: file_path.to_owned(),
-                            line,
-                            message: format!("accesses `db::entities::{target}` outside `{expected}`"),
-                            fix: format!("Keep `db::entities::{target}` private to `{expected}` and expose domain methods or ports."),
-                            details: Vec::new(),
-                        });
-                    }
-                }
-                depth = depth.saturating_add(seg.matches('{').count()).saturating_sub(seg.matches('}').count());
+    let bytes = code.as_bytes();
+    let mut seen_lines = BTreeSet::new();
+    for needle in ["sea_orm::", "sea_orm_migration::", "db::entity"] {
+        let mut cursor = 0usize;
+        while let Some(rel_idx) = code[cursor..].find(needle) {
+            let start = cursor + rel_idx;
+            let end = start + needle.len();
+            cursor = end;
+            let boundary_ok = if needle.ends_with("::") {
+                start == 0 || !is_ident_char(bytes[start - 1])
+            } else {
+                has_ident_boundaries(bytes, start, end)
+            };
+            if !boundary_ok {
+                continue;
             }
-            let consumed = rest.len() - after_brace.len() + close + 1;
-            cursor = start + consumed;
+            let line = index.line_at(start);
+            if seen_lines.insert(line) {
+                violations.push(BoundaryViolation {
+                    rule: BoundaryRule::SeaOrmBoundary,
+                    file: file_path.to_owned(),
+                    line,
+                    message: format!("`{needle}` referenced outside `crates/server/src/{{db,service}}/` ({})", index.snippet_at(line)),
+                    fix: "Move SeaORM / `db::entity` queries into `crates/server/src/service/` and call `ctx.db.*` methods instead.".to_owned(),
+                    details: Vec::new(),
+                });
+            }
+        }
+    }
+}
+
+fn strip_comments_keep_strings(code: &str) -> String {
+    let bytes = code.as_bytes();
+    let len = bytes.len();
+    let mut out = Vec::with_capacity(len);
+    let mut i = 0usize;
+
+    while i < len {
+        let ch = bytes[i];
+        if ch == b'/' && bytes.get(i + 1) == Some(&b'/') {
+            while i < len && bytes[i] != b'\n' {
+                out.push(b' ');
+                i += 1;
+            }
             continue;
         }
-
-        let target: String = trimmed_rest.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
-        if target.is_empty() {
-            violations.push(BoundaryViolation {
-                rule: BoundaryRule::DbEntitiesPrivacy,
-                file: file_path.to_owned(),
-                line,
-                message: format!("`{rel}` references `db::entities::` without a domain module"),
-                fix: "Import a concrete domain entity module from `crate::db::entities::<domain_table>` inside its owning domain.".to_owned(),
-                details: Vec::new(),
-            });
-        } else if let Some(expected) = db_entity_owner_allows(&target, rel) {
-            violations.push(BoundaryViolation {
-                rule: BoundaryRule::DbEntitiesPrivacy,
-                file: file_path.to_owned(),
-                line,
-                message: format!("accesses `db::entities::{target}` outside `{expected}`"),
-                fix: format!("Keep `db::entities::{target}` private to `{expected}` and expose domain methods or ports."),
-                details: Vec::new(),
-            });
-        }
-        cursor = start.min(code.len());
-    }
-
-    if rel.starts_with("db/") {
-        let mut db_cursor = 0usize;
-        while let Some(rel_idx) = code[db_cursor..].find("entities::") {
-            let abs_idx = db_cursor + rel_idx;
-            let prefix = &code[..abs_idx];
-            if !prefix.ends_with("db::") {
-                let start = abs_idx + "entities::".len();
-                let line = index.line_at(abs_idx);
-                let target: String = code[start..].chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
-                if !target.is_empty()
-                    && let Some(expected) = db_entity_owner_allows(&target, rel)
-                {
-                    violations.push(BoundaryViolation {
-                        rule: BoundaryRule::DbEntitiesPrivacy,
-                        file: file_path.to_owned(),
-                        line,
-                        message: format!("accesses `entities::{target}` outside `{expected}`"),
-                        fix: format!("Keep `entities::{target}` private to `{expected}`."),
-                        details: Vec::new(),
-                    });
+        if ch == b'/' && bytes.get(i + 1) == Some(&b'*') {
+            out.push(b' ');
+            out.push(b' ');
+            i += 2;
+            let mut depth = 1usize;
+            while i < len && depth > 0 {
+                if bytes[i] == b'/' && bytes.get(i + 1) == Some(&b'*') {
+                    depth += 1;
+                    out.extend_from_slice(b"  ");
+                    i += 2;
+                } else if bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/') {
+                    depth -= 1;
+                    out.extend_from_slice(b"  ");
+                    i += 2;
+                } else {
+                    out.push(if bytes[i] == b'\n' { b'\n' } else { b' ' });
+                    i += 1;
                 }
             }
-            db_cursor = abs_idx + "entities::".len();
+            continue;
         }
+        if ch == b'"' {
+            out.push(b'"');
+            i += 1;
+            while i < len {
+                let b = bytes[i];
+                out.push(b);
+                i += 1;
+                if b == b'\\' && i < len {
+                    out.push(bytes[i]);
+                    i += 1;
+                } else if b == b'"' {
+                    break;
+                }
+            }
+            continue;
+        }
+        out.push(ch);
+        i += 1;
+    }
+
+    String::from_utf8(out).expect("comment stripper preserves valid UTF-8")
+}
+
+fn check_one_table_one_entity_file(file_path: &str, raw: &str, index: &LineIndex, violations: &mut Vec<BoundaryViolation>) {
+    let Some(file_name) = file_path.strip_prefix("crates/server/src/db/entity/") else {
+        return;
+    };
+    if !file_name.ends_with(".rs") || file_name == "mod.rs" || file_name.contains('/') {
+        return;
+    }
+    let stem = file_name.trim_end_matches(".rs");
+    let stripped = strip_comments_keep_strings(raw);
+    let mut tables: Vec<(usize, String)> = Vec::new();
+    let mut cursor = 0usize;
+    while let Some(rel_idx) = stripped[cursor..].find("table_name") {
+        let start = cursor + rel_idx;
+        let line = index.line_at(start);
+        cursor = start + "table_name".len();
+        let after_kw = stripped[cursor..].trim_start();
+        if let Some(after_eq) = after_kw.strip_prefix('=') {
+            let after_eq = after_eq.trim_start();
+            if let Some(after_quote) = after_eq.strip_prefix('"')
+                && let Some(end_quote) = after_quote.find('"')
+            {
+                tables.push((line, after_quote[..end_quote].to_owned()));
+            }
+        }
+    }
+
+    if tables.len() != 1 {
+        let line = tables.first().map_or(1, |(l, _)| *l);
+        violations.push(BoundaryViolation {
+            rule: BoundaryRule::OneTableOneEntityFile,
+            file: file_path.to_owned(),
+            line,
+            message: format!(
+                "entity file `{file_name}` declares {} `table_name` attribute(s), expected exactly 1 (`{stem}`)",
+                tables.len()
+            ),
+            fix: format!("Keep one `Model` with `#[sea_orm(table_name = \"{stem}\")]` in `db/entity/{file_name}`."),
+            details: Vec::new(),
+        });
+    } else if tables[0].1 != stem {
+        violations.push(BoundaryViolation {
+            rule: BoundaryRule::OneTableOneEntityFile,
+            file: file_path.to_owned(),
+            line: tables[0].0,
+            message: format!("entity file `{file_name}` declares `table_name = \"{}\"` instead of `\"{stem}\"`", tables[0].1),
+            fix: format!("Rename the file or update `table_name` so `db/entity/{stem}.rs` owns table `{stem}`."),
+            details: Vec::new(),
+        });
     }
 }
 
@@ -808,16 +912,16 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
         let index = LineIndex::new(raw);
         let refs = extract_path_refs(code);
 
+        check_no_legacy_dirs(&file.path, &mut violations);
+        check_no_sea_orm_outside_service(&file.path, code, &index, &mut violations);
+        check_one_table_one_entity_file(&file.path, raw, &index, &mut violations);
+
         if is_spine_file(&file.path) {
             let mut seen_lines = BTreeSet::new();
             for path_ref in &refs {
-                let is_crate_modules = path_ref.segments.first().is_some_and(|s| s == "crate") && path_ref.segments.get(1).is_some_and(|s| s == "modules");
-                let is_self_modules_in_lib = file.path == "crates/server/src/lib.rs"
-                    && path_ref.segments.first().is_some_and(|s| s == "self")
-                    && path_ref.segments.get(1).is_some_and(|s| s == "modules");
-                if !is_crate_modules && !is_self_modules_in_lib {
+                let Some(target) = spine_target_domain_path(&file.path, path_ref) else {
                     continue;
-                }
+                };
                 let line = index.line_at(path_ref.offset);
                 if !seen_lines.insert(line) {
                     continue;
@@ -826,13 +930,9 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                     rule: BoundaryRule::SpineNoModuleImport,
                     file: file.path.clone(),
                     line,
-                    message: format!(
-                        "server spine/transport imports concrete module `{}` ({})",
-                        path_ref.segments.join("::"),
-                        index.snippet_at(line)
-                    ),
+                    message: format!("server spine/gateway imports concrete module `{target}` ({})", index.snippet_at(line)),
                     fix: format!(
-                        "Move the narrow port trait into crates/server/src/ports.rs or crates/server/src/transport/api/ and inject the implementation in start.rs. See {TOPOLOGY_DOC} Section 3.2.2."
+                        "Move the narrow port trait into `crates/server/src/context/port.rs` or `crates/server/src/gateway/api/` and wire implementations in `app.rs`. See {TOPOLOGY_DOC}."
                     ),
                     details: Vec::new(),
                 });
@@ -843,7 +943,8 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
         if is_mac_source_file(&file.path) {
             let mut seen_lines = BTreeSet::new();
             for path_ref in &refs {
-                if path_ref.segments.first().is_none_or(|s| s != "vibevalley_server") || path_ref.segments.get(1).is_none_or(|s| s != "modules") {
+                if path_ref.segments.first().is_none_or(|s| s != "vibevalley_server") || path_ref.segments.get(1).is_none_or(|s| !is_server_internal_module(s))
+                {
                     continue;
                 }
                 let line = index.line_at(path_ref.offset);
@@ -860,15 +961,13 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                         index.snippet_at(line)
                     ),
                     fix: format!(
-                        "Consume narrow ports from vibevalley_server::transport::api (e.g. SharedLiveVoice) or protocol types from vibevalley_protocol instead of vibevalley_server::modules::*. See {TOPOLOGY_DOC} Section 3.2.2."
+                        "Consume narrow ports from `vibevalley_server::gateway::api` or protocol types from `vibevalley_protocol` instead of `vibevalley_server::<domain>::*`. See {TOPOLOGY_DOC}."
                     ),
                     details: Vec::new(),
                 });
             }
             continue;
         }
-
-        check_db_entities_privacy(&file.path, code, &index, &mut violations);
 
         let Some(source_module) = server_module_id_of_file(&file.path) else {
             continue;
@@ -915,7 +1014,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                                 source_class.layer.as_str()
                             ),
                             fix: format!(
-                                "Replace wildcard domain imports with explicit L1 or same-domain imports, or route cross-domain calls through Hub::invoke / EventBus / ports.rs. See {TOPOLOGY_DOC} Section 3.2.1."
+                                "Replace wildcard domain imports with explicit L1 or same-domain imports, or route cross-domain calls through App / SliceProjector / app/port.rs. See {TOPOLOGY_DOC} Section 3.2.1."
                             ),
                             details: Vec::new(),
                         });
@@ -964,7 +1063,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                                 target_class.layer.as_str()
                             ),
                             fix: format!(
-                                "L1 modules must have zero upward dependencies; inject a narrow port trait from crates/server/src/ports.rs or subscribe via EventBus. See {TOPOLOGY_DOC} Section 3.2."
+                                "L1 modules must have zero upward dependencies; inject a narrow port trait from crates/server/src/app/port.rs or mark slices dirty via SliceProjector. See {TOPOLOGY_DOC} Section 3.2."
                             ),
                             details: Vec::new(),
                         });
@@ -975,7 +1074,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                             line,
                             message: format!("L2 module `{source_module}` imports L3 module `{target_module}` ({snippet})"),
                             fix: format!(
-                                "Invert the dependency with a narrow port trait in crates/server/src/ports.rs or move shared pure helpers down to L1 (infra/text). See {TOPOLOGY_DOC} Section 3.2."
+                                "Invert the dependency with a narrow port trait in crates/server/src/app/port.rs or move shared pure helpers down to L1 (infra/text). See {TOPOLOGY_DOC} Section 3.2."
                             ),
                             details: Vec::new(),
                         });
@@ -994,7 +1093,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                                 dst_peer.as_str()
                             ),
                             fix: format!(
-                                "L2 peer domains (work, collab, content, team/memory) must not import each other directly; use Hub::invoke<O>, EventBus, SpaceState, or a read-only port in crates/server/src/ports.rs. See {TOPOLOGY_DOC} Section 3.2.1."
+                                "L2 peer domains (work, collab, content, team/memory) must not import each other directly; use App, Outbox, LiveOverlay, SliceProjector, or a narrow port in crates/server/src/app/port.rs. See {TOPOLOGY_DOC} Section 3.2.1."
                             ),
                             details: Vec::new(),
                         });
@@ -1009,7 +1108,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
         let cycles = extract_cycles_from_scc(&scc, &graph);
         for cycle in cycles {
             let mut hops = Vec::with_capacity(cycle.len());
-            let mut primary_file = "crates/server/src/modules/mod.rs".to_owned();
+            let mut primary_file = "crates/server/src/lib.rs".to_owned();
             let mut primary_line = 1usize;
             for i in 0..cycle.len() {
                 let from = &cycle[i];
@@ -1031,7 +1130,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                 line: primary_line,
                 message: format!("directed cycle in server modules: {cycle_label}"),
                 fix: format!(
-                    "Break the module cycle by extracting shared data/ports downward or routing writes via Hub::invoke / EventBus so crates/server/src/modules/ forms a strict DAG. See {TOPOLOGY_DOC} Section 3.2.2."
+                    "Break the module cycle by extracting shared data/ports downward or routing writes via App / Outbox / SliceProjector so crates/server/src/ domain modules form a strict DAG. See {TOPOLOGY_DOC} Section 3.2.2."
                 ),
                 details: hops,
             });
@@ -1080,7 +1179,7 @@ pub fn run(root: &Path) -> Result<i32, String> {
         return Ok(1);
     }
     println!(
-        "module boundaries: {} files ok (spine, mac, L0-L3 DAG, acyclic, db::entities)",
+        "module boundaries: {} files ok (spine, mac, L0-L3 DAG, acyclic, service/entity, flat layout)",
         result.files_scanned
     );
     Ok(0)
@@ -1130,86 +1229,63 @@ mod tests {
 
     #[test]
     fn classifies_l1_l2_peer_domains_and_l3_modules() {
+        for l1 in [
+            "setting",
+            "provider",
+            "repo",
+            "storage",
+            "debug",
+            "machine",
+            "runtime",
+            "channel",
+            "agent/profile",
+        ] {
+            assert_eq!(
+                classify_server_module(l1),
+                Some(ModuleClassification {
+                    layer: Layer::L1,
+                    peer_domain: None
+                })
+            );
+        }
+
         assert_eq!(
-            classify_server_module("infra/setting"),
+            classify_server_module("issue"),
             Some(ModuleClassification {
-                layer: Layer::L1,
-                peer_domain: None
+                layer: Layer::L2,
+                peer_domain: Some(PeerDomain::Issue)
             })
         );
         assert_eq!(
-            classify_server_module("infra/text"),
+            classify_server_module("artifact"),
             Some(ModuleClassification {
-                layer: Layer::L1,
-                peer_domain: None
+                layer: Layer::L2,
+                peer_domain: Some(PeerDomain::Artifact)
             })
         );
         assert_eq!(
-            classify_server_module("content/attachment"),
+            classify_server_module("agent/memory"),
             Some(ModuleClassification {
-                layer: Layer::L1,
-                peer_domain: None
+                layer: Layer::L2,
+                peer_domain: Some(PeerDomain::Memory)
             })
         );
         assert_eq!(
-            classify_server_module("team/agent"),
+            classify_server_module("connector"),
             Some(ModuleClassification {
-                layer: Layer::L1,
-                peer_domain: None
+                layer: Layer::L2,
+                peer_domain: Some(PeerDomain::Connector)
+            })
+        );
+        assert_eq!(
+            classify_server_module("voice"),
+            Some(ModuleClassification {
+                layer: Layer::L2,
+                peer_domain: Some(PeerDomain::Voice)
             })
         );
 
-        assert_eq!(
-            classify_server_module("work/ledger"),
-            Some(ModuleClassification {
-                layer: Layer::L2,
-                peer_domain: Some(PeerDomain::Work)
-            })
-        );
-        assert_eq!(
-            classify_server_module("work/issue"),
-            Some(ModuleClassification {
-                layer: Layer::L2,
-                peer_domain: Some(PeerDomain::Work)
-            })
-        );
-        assert_eq!(
-            classify_server_module("collab/channel"),
-            Some(ModuleClassification {
-                layer: Layer::L2,
-                peer_domain: Some(PeerDomain::Collab)
-            })
-        );
-        assert_eq!(
-            classify_server_module("collab/voice"),
-            Some(ModuleClassification {
-                layer: Layer::L2,
-                peer_domain: Some(PeerDomain::Collab)
-            })
-        );
-        assert_eq!(
-            classify_server_module("content/artifact"),
-            Some(ModuleClassification {
-                layer: Layer::L2,
-                peer_domain: Some(PeerDomain::Content)
-            })
-        );
-        assert_eq!(
-            classify_server_module("content/media"),
-            Some(ModuleClassification {
-                layer: Layer::L2,
-                peer_domain: Some(PeerDomain::Content)
-            })
-        );
-        assert_eq!(
-            classify_server_module("team/memory"),
-            Some(ModuleClassification {
-                layer: Layer::L2,
-                peer_domain: Some(PeerDomain::TeamMemory)
-            })
-        );
-
-        for l3 in ["team/orchestrator", "team/tool", "team/mcp", "work/cron", "work/chat", "skin/game"] {
+        for l3 in ["cron", "game", "agent", "agent/tool", "agent/mcp", "agent/orchestrator"] {
             assert_eq!(
                 classify_server_module(l3),
                 Some(ModuleClassification {
@@ -1221,16 +1297,20 @@ mod tests {
     }
 
     #[test]
-    fn spine_no_module_import_fails_on_lib_ports_and_transport() {
+    fn spine_no_module_import_fails_on_lib_context_db_service_and_gateway() {
         let files = vec![
-            sf("crates/server/src/lib.rs", "use crate::modules::collab::voice::Voice;\npub struct Hub;"),
+            sf("crates/server/src/lib.rs", "use crate::voice::Voice;\npub struct Server;"),
             sf(
-                "crates/server/src/ports.rs",
-                "pub trait Recall { fn x(&self) -> crate::modules::team::memory::Hit; }",
+                "crates/server/src/context/port.rs",
+                "pub trait Recall { fn x(&self) -> crate::agent::memory::Note; }",
             ),
+            sf("crates/server/src/service/issue.rs", "use crate::issue::Board;\n"),
+            sf("crates/server/src/app.rs", "use crate::issue::Board;\n"),
+            sf("crates/server/src/router.rs", "use crate::artifact::Manager;\n"),
+            sf("crates/server/src/db/mod.rs", "pub fn bad() -> crate::runtime::Runtime { todo!() }"),
             sf(
-                "crates/server/src/transport/api/mod.rs",
-                "pub trait Server {\n    fn voice(&self) -> Option<Arc<crate::modules::collab::voice::Voice>>;\n}",
+                "crates/server/src/gateway/api/mod.rs",
+                "pub trait Server {\n    fn voice(&self) -> Option<Arc<crate::voice::Voice>>;\n}",
             ),
         ];
 
@@ -1239,25 +1319,24 @@ mod tests {
         assert_eq!(
             tags,
             vec![
+                "spine-no-module-import@crates/server/src/context/port.rs:1",
+                "spine-no-module-import@crates/server/src/db/mod.rs:1",
+                "spine-no-module-import@crates/server/src/gateway/api/mod.rs:2",
                 "spine-no-module-import@crates/server/src/lib.rs:1",
-                "spine-no-module-import@crates/server/src/ports.rs:1",
-                "spine-no-module-import@crates/server/src/transport/api/mod.rs:2",
+                "spine-no-module-import@crates/server/src/service/issue.rs:1",
             ]
         );
-        assert!(format_violations(&violations).contains("docs/architecture-topology.md"));
+        assert!(format_violations(&violations).contains("docs/architecture.md"));
     }
 
     #[test]
     fn spine_ignores_cfg_test_inline_and_external_submodules() {
         let files = vec![
-            sf("crates/server/src/transport/http/mod.rs", "use crate::Hub;\n#[cfg(test)]\nmod tests;"),
-            sf(
-                "crates/server/src/transport/http/tests.rs",
-                "use crate::modules::content::attachment::Attachments;\n",
-            ),
+            sf("crates/server/src/gateway/http/mod.rs", "use crate::Router;\n#[cfg(test)]\nmod tests;"),
+            sf("crates/server/src/gateway/http/tests.rs", "use crate::storage::Storage;\n"),
             sf(
                 "crates/server/src/lib.rs",
-                "pub mod ports;\n#[cfg(test)]\nmod tests { use crate::modules::infra::setting::Setting; }",
+                "pub mod context;\n#[cfg(test)]\nmod tests { use crate::setting::Setting; }",
             ),
         ];
         assert!(audit_files(&files).is_empty());
@@ -1266,10 +1345,10 @@ mod tests {
     #[test]
     fn mac_no_server_module_import_catches_use_and_inline_paths() {
         let files = vec![
-            sf("apps/mac/src/live_voice.rs", "use vibevalley_server::modules::collab::voice::Voice;\n"),
+            sf("apps/mac/src/live_voice.rs", "use vibevalley_server::voice::Voice;\n"),
             sf(
                 "apps/mac/src/hosted/late.rs",
-                "impl Server for LateServer {\n    fn voice(&self) -> Option<Arc<vibevalley_server::modules::collab::voice::Voice>> { None }\n}",
+                "impl Server for LateServer {\n    fn voice(&self) -> Option<Arc<vibevalley_server::db::Database>> { None }\n}",
             ),
         ];
         let violations = audit_files(&files);
@@ -1284,15 +1363,15 @@ mod tests {
     }
 
     #[test]
-    fn mac_allows_transport_api_and_ignores_comments() {
+    fn mac_allows_gateway_api_and_ignores_comments() {
         let files = vec![
             sf(
                 "apps/mac/src/live_voice.rs",
-                "use vibevalley_server::transport::api::SharedLiveVoice;\n// doc comment mentioning vibevalley_server::modules::collab::voice::Voice\npub fn start(_voice: SharedLiveVoice) {}",
+                "use vibevalley_server::gateway::api::SharedLiveVoice;\n// doc comment mentioning vibevalley_server::voice::Voice\npub fn start(_voice: SharedLiveVoice) {}",
             ),
             sf(
                 "apps/mac/src/hosted/late.rs",
-                "fn voice(&self) -> Option<vibevalley_server::transport::api::SharedLiveVoice> { None }",
+                "fn voice(&self) -> Option<vibevalley_server::gateway::api::SharedLiveVoice> { None }",
             ),
         ];
         assert!(audit_files(&files).is_empty());
@@ -1301,17 +1380,11 @@ mod tests {
     #[test]
     fn server_layer_dag_fails_on_upward_and_cross_domain_imports() {
         let files = vec![
-            sf("crates/server/src/modules/team/agent/mod.rs", "use crate::modules::team::memory::Memory;\n"),
-            sf(
-                "crates/server/src/modules/infra/setting.rs",
-                "use crate::modules::team::orchestrator::Orchestrator;\n",
-            ),
-            sf(
-                "crates/server/src/modules/collab/voice/mod.rs",
-                "use crate::modules::team::orchestrator::Orchestrator;\n",
-            ),
-            sf("crates/server/src/modules/content/artifact/mod.rs", "use crate::modules::work::issue::Board;\n"),
-            sf("crates/server/src/modules/work/issue/board.rs", "use crate::modules::collab::channel::Chat;\n"),
+            sf("crates/server/src/agent/profile/mod.rs", "use crate::agent::memory::Memory;\n"),
+            sf("crates/server/src/setting.rs", "use crate::agent::orchestrator::Orchestrator;\n"),
+            sf("crates/server/src/voice/mod.rs", "use crate::agent::orchestrator::Orchestrator;\n"),
+            sf("crates/server/src/artifact/mod.rs", "use crate::issue::Board;\n"),
+            sf("crates/server/src/issue/board.rs", "use crate::connector::Connector;\n"),
         ];
         let violations: Vec<String> = audit_files(&files)
             .into_iter()
@@ -1321,11 +1394,11 @@ mod tests {
         assert_eq!(
             violations,
             vec![
-                "crates/server/src/modules/collab/voice/mod.rs:1",
-                "crates/server/src/modules/content/artifact/mod.rs:1",
-                "crates/server/src/modules/infra/setting.rs:1",
-                "crates/server/src/modules/team/agent/mod.rs:1",
-                "crates/server/src/modules/work/issue/board.rs:1",
+                "crates/server/src/agent/profile/mod.rs:1",
+                "crates/server/src/artifact/mod.rs:1",
+                "crates/server/src/issue/board.rs:1",
+                "crates/server/src/setting.rs:1",
+                "crates/server/src/voice/mod.rs:1",
             ]
         );
     }
@@ -1333,11 +1406,8 @@ mod tests {
     #[test]
     fn resolves_relative_super_imports_and_grouped_use_trees() {
         let files = vec![
-            sf("crates/server/src/modules/work/session/sessions.rs", "use super::super::cron::Crons;\n"),
-            sf(
-                "crates/server/src/modules/content/attachment/mod.rs",
-                "use super::{library::Library, media::Media};\n",
-            ),
+            sf("crates/server/src/runtime/session/mod.rs", "use super::super::cron::Scheduler;\n"),
+            sf("crates/server/src/storage/mod.rs", "use super::{artifact::Manager, issue::Board};\n"),
         ];
         let violations = audit_files(&files);
         assert_eq!(violations.len(), 3);
@@ -1347,44 +1417,30 @@ mod tests {
     #[test]
     fn passes_valid_l0_to_l3_dag_and_excluded_cfg_test_files() {
         let files = vec![
-            sf("crates/server/src/modules/infra/setting.rs", "pub struct Setting;\n"),
-            sf("crates/server/src/modules/infra/text.rs", "use super::setting::Setting;\n"),
+            sf("crates/server/src/setting.rs", "pub struct Setting;\n"),
+            sf("crates/server/src/provider.rs", "use crate::setting::Setting;\n"),
+            sf("crates/server/src/storage/mod.rs", "pub struct Storage;\n"),
+            sf("crates/server/src/agent/profile/mod.rs", "use crate::runtime::Runtime;\n"),
+            sf("crates/server/src/runtime/mod.rs", "use crate::storage::Storage;\n"),
+            sf("crates/server/src/channel/mod.rs", "use crate::storage::Storage;\n"),
             sf(
-                "crates/server/src/modules/content/attachment/mod.rs",
-                "use crate::modules::infra::setting::Setting;\n",
-            ),
-            sf("crates/server/src/modules/team/agent/mod.rs", "use crate::modules::infra::text;\n"),
-            sf("crates/server/src/modules/work/ledger.rs", "use crate::modules::infra::setting::Setting;\n"),
-            sf(
-                "crates/server/src/modules/work/session/sessions.rs",
-                "use crate::modules::content::attachment::Attachments;\nuse crate::modules::team::agent::Agents;\nuse crate::modules::work::ledger::Ledger;\nmod inner { use super::Ledger; }",
+                "crates/server/src/issue/board.rs",
+                "use crate::channel::Chat;\nuse crate::repo::Repo;\nuse crate::runtime::Runtime;\n",
             ),
             sf(
-                "crates/server/src/modules/work/issue/board.rs",
-                "use crate::modules::work::{ledger::Ledger, session::Sessions};\nuse super::edits::apply;",
-            ),
-            sf("crates/server/src/modules/work/pull/mod.rs", "use crate::modules::work::issue::Board;\n"),
-            sf(
-                "crates/server/src/modules/collab/channel/mod.rs",
-                "use crate::modules::content::attachment::Attachments;\n",
+                "crates/server/src/artifact/mod.rs",
+                "use crate::setting::Setting;\nuse crate::storage::Storage;\n",
             ),
             sf(
-                "crates/server/src/modules/collab/connector/store.rs",
-                "use crate::modules::collab::channel::Chat;\n#[cfg(test)]\n#[path = \"store_test.rs\"]\nmod tests;",
+                "crates/server/src/connector/bridge.rs",
+                "use crate::channel::Chat;\n#[cfg(test)]\n#[path = \"bridge_test.rs\"]\nmod tests;",
             ),
-            sf(
-                "crates/server/src/modules/collab/connector/store_test.rs",
-                "use crate::modules::work::issue::Board;\n",
-            ),
-            sf("crates/server/src/modules/team/tool/mod.rs", "use crate::modules::team::agent::Agents;\n"),
-            sf("crates/server/src/modules/team/orchestrator/mod.rs", "use crate::modules::team::tool::Tools;\n"),
-            sf("crates/server/src/modules/team/mcp/mod.rs", "use crate::modules::team::tool::Tools;\n"),
-            sf("crates/server/src/modules/skin/game.rs", "use crate::modules::infra::setting::Setting;\n"),
-            sf("crates/server/src/modules/work/cron/mod.rs", "use crate::modules::work::issue::Board;\n"),
-            sf(
-                "crates/server/src/modules/work/chat.rs",
-                "use crate::modules::collab::channel::Chat;\nuse crate::modules::work::issue::Board;\n",
-            ),
+            sf("crates/server/src/connector/bridge_test.rs", "use crate::issue::Board;\n"),
+            sf("crates/server/src/agent/tool/mod.rs", "use crate::agent::profile::Profile;\n"),
+            sf("crates/server/src/agent/orchestrator/mod.rs", "use crate::agent::tool::ToolRegistry;\n"),
+            sf("crates/server/src/agent/mcp/mod.rs", "use crate::context::port::ToolDispatchPort;\n"),
+            sf("crates/server/src/game.rs", "use crate::repo::Repo;\n"),
+            sf("crates/server/src/cron/mod.rs", "use crate::issue::Board;\n"),
         ];
         assert!(audit_files(&files).is_empty());
     }
@@ -1392,59 +1448,68 @@ mod tests {
     #[test]
     fn detects_2_node_and_3_node_module_cycles() {
         let two_node = vec![
-            sf("crates/server/src/modules/work/issue/mod.rs", "use crate::modules::work::session::Sessions;\n"),
-            sf("crates/server/src/modules/work/session/mod.rs", "use crate::modules::work::issue::Board;\n"),
+            sf("crates/server/src/issue/mod.rs", "use crate::runtime::Runtime;\n"),
+            sf("crates/server/src/runtime/mod.rs", "use crate::issue::Board;\n"),
         ];
-        let violations = audit_files(&two_node);
+        let violations: Vec<_> = audit_files(&two_node)
+            .into_iter()
+            .filter(|v| v.rule == BoundaryRule::ServerModulesAcyclic)
+            .collect();
         assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].rule, BoundaryRule::ServerModulesAcyclic);
-        assert!(violations[0].message.contains("work/issue -> work/session -> work/issue"));
+        assert!(violations[0].message.contains("issue -> runtime -> issue"));
         let formatted = format_violations(&violations);
-        assert!(formatted.contains("crates/server/src/modules/work/issue/mod.rs:1"));
-        assert!(formatted.contains("crates/server/src/modules/work/session/mod.rs:1"));
+        assert!(formatted.contains("crates/server/src/issue/mod.rs:1"));
+        assert!(formatted.contains("crates/server/src/runtime/mod.rs:1"));
 
         let three_node = vec![
-            sf("crates/server/src/modules/team/orchestrator/mod.rs", "use crate::modules::team::tool::Tools;\n"),
-            sf("crates/server/src/modules/team/tool/mod.rs", "use crate::modules::team::mcp::Door;\n"),
-            sf(
-                "crates/server/src/modules/team/mcp/mod.rs",
-                "use crate::modules::team::orchestrator::Orchestrator;\n",
-            ),
+            sf("crates/server/src/agent/orchestrator/mod.rs", "use crate::agent::tool::ToolRegistry;\n"),
+            sf("crates/server/src/agent/tool/mod.rs", "use crate::agent::mcp::Resource;\n"),
+            sf("crates/server/src/agent/mcp/mod.rs", "use crate::agent::orchestrator::Orchestrator;\n"),
         ];
         let violations = audit_files(&three_node);
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].rule, BoundaryRule::ServerModulesAcyclic);
-        assert!(violations[0].message.contains("team/mcp -> team/orchestrator -> team/tool -> team/mcp"));
+        assert!(violations[0].message.contains("agent/mcp -> agent/orchestrator -> agent/tool -> agent/mcp"));
     }
 
     #[test]
-    fn enforces_db_entities_domain_privacy_ignoring_tests() {
+    fn enforces_sea_orm_boundary_one_table_per_entity_and_no_legacy_dirs() {
         let files = vec![
-            sf("crates/server/src/modules/work/issue/db.rs", "use crate::db::entities::work_issue::issue;\n"),
             sf(
-                "crates/server/src/modules/content/artifact/db.rs",
-                "use crate::db::entities::work_issue::issue;\n",
+                "crates/server/src/service/issue.rs",
+                "use sea_orm::EntityTrait;\nuse crate::db::entity::issue;\n",
             ),
+            sf("crates/server/src/issue/board.rs", "use sea_orm::EntityTrait;\nuse crate::db::entity::issue;\n"),
+            sf("crates/server/src/db/mod.rs", "#[cfg(test)]\nmod tests { use crate::db::entity::channel; }\n"),
+            sf("crates/server/src/db/entity/issue.rs", "#[sea_orm(table_name = \"issue\")]\npub struct Model;"),
             sf(
-                "crates/server/src/base.rs",
-                "#[cfg(test)]\nmod tests { use crate::db::entities::collab_channel::channel; }\n",
+                "crates/server/src/db/entity/wrong_name.rs",
+                "#[sea_orm(table_name = \"other\")]\npub struct Model;",
             ),
+            sf("crates/server/src/work/old.rs", "pub struct Old;\n"),
         ];
         let violations = audit_files(&files);
-        assert_eq!(violations.len(), 1);
-        assert_eq!(violations[0].rule, BoundaryRule::DbEntitiesPrivacy);
-        assert_eq!(violations[0].file, "crates/server/src/modules/content/artifact/db.rs");
+        let tags: Vec<String> = violations.iter().map(|v| format!("{}@{}:{}", v.rule.as_str(), v.file, v.line)).collect();
+        assert_eq!(
+            tags,
+            vec![
+                "one-table-one-entity-file@crates/server/src/db/entity/wrong_name.rs:1",
+                "no-sea-orm-outside-service@crates/server/src/issue/board.rs:1",
+                "no-sea-orm-outside-service@crates/server/src/issue/board.rs:2",
+                "no-legacy-dirs@crates/server/src/work/old.rs:1",
+            ]
+        );
     }
 
     #[test]
     fn audits_workspace_from_disk() {
         let dir = TempDir::new("vv-boundaries");
-        dir.write("crates/server/src/lib.rs", "pub mod ports;\n");
-        dir.write("crates/server/src/ports.rs", "pub trait LiveVoicePort {}\n");
-        dir.write("crates/server/src/transport/api/mod.rs", "pub trait Server {}\n");
-        dir.write("crates/server/src/modules/infra/setting.rs", "pub struct Setting;\n");
-        dir.write("crates/server/src/modules/work/ledger.rs", "use crate::modules::infra::setting::Setting;\n");
-        dir.write("apps/mac/src/live_voice.rs", "use vibevalley_server::transport::api::SharedLiveVoice;\n");
+        dir.write("crates/server/src/lib.rs", "pub mod context;\n");
+        dir.write("crates/server/src/context/port.rs", "pub trait LiveVoicePort {}\n");
+        dir.write("crates/server/src/gateway/api/mod.rs", "pub trait Server {}\n");
+        dir.write("crates/server/src/setting.rs", "pub struct Setting;\n");
+        dir.write("crates/server/src/repo.rs", "use crate::context::Context;\n");
+        dir.write("apps/mac/src/live_voice.rs", "use vibevalley_server::gateway::api::SharedLiveVoice;\n");
 
         let clean = audit_workspace(&dir.0).unwrap();
         assert_eq!(clean.files_scanned, 6);
@@ -1452,7 +1517,7 @@ mod tests {
 
         dir.write(
             "apps/mac/src/hosted/late.rs",
-            "fn voice(&self) -> Option<vibevalley_server::modules::collab::voice::Voice> { None }\n",
+            "fn voice(&self) -> Option<vibevalley_server::voice::Voice> { None }\n",
         );
         let dirty = audit_workspace(&dir.0).unwrap();
         assert_eq!(

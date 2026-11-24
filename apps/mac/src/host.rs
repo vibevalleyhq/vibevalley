@@ -43,6 +43,26 @@ pub fn worktree_file(worktree: &Path, relative: &Path) -> Option<(PathBuf, PathB
     (path.starts_with(&root) && path.is_file()).then_some((root, path))
 }
 
+/// `%XX` escapes of a `file:` URL's path decoded (spaces, CJK names).
+pub(crate) fn percent_decode(raw: &str) -> String {
+    let bytes = raw.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && let Some(hex) = raw.get(i + 1..i + 3)
+            && let Ok(byte) = u8::from_str_radix(hex, 16)
+        {
+            out.push(byte);
+            i += 3;
+            continue;
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 /// Whether this application is currently active in the macOS foreground.
 pub fn is_app_active() -> bool {
     use objc2_app_kit::NSApplication;
@@ -198,9 +218,9 @@ pub fn random_seed_hex() -> String {
 }
 
 /// Decodes a `host.*` wire call once at the boundary into a typed [`vibevalley_protocol::HostOp`].
-pub fn decode_host_op(op: &str, payload: Value) -> Result<vibevalley_protocol::HostOp, Box<vibevalley_server::transport::bridge::Envelope>> {
+pub fn decode_host_op(op: &str, payload: Value) -> Result<vibevalley_protocol::HostOp, Box<vibevalley_server::gateway::bridge::Envelope>> {
     use vibevalley_protocol::HostOp;
-    use vibevalley_server::transport::bridge::{BizCode, refusal};
+    use vibevalley_server::gateway::bridge::{BizCode, refusal};
 
     HostOp::from_wire(op, payload).map_err(|msg| {
         let code = if HostOp::is_known_op(op) {
@@ -214,10 +234,10 @@ pub fn decode_host_op(op: &str, payload: Value) -> Result<vibevalley_protocol::H
 
 /// Handles fast, stateless host ops (`host.sha256`, `host.randomBytes`, `host.qr`,
 /// `host.pixelManifest`) on either the engine thread or the shell fallback path.
-pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalley_server::transport::bridge::Envelope> {
+pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalley_server::gateway::bridge::Envelope> {
     use serde_json::json;
     use vibevalley_protocol::HostOp;
-    use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
+    use vibevalley_server::gateway::bridge::{BizCode, Envelope, refusal};
 
     match op {
         HostOp::Sha256(req) => Some(Envelope::ok(json!({ "hex": sha256_hex(&req.text) }))),
@@ -383,15 +403,13 @@ pub fn reveal(path: &Path) -> Result<(), String> {
 
 /// System lifecycle events observed natively via `NSWorkspace` and `Network.framework`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
-pub enum SystemEvent {
+enum SystemEvent {
     /// macOS woke from sleep (`NSWorkspaceDidWakeNotification`).
     Wake,
     /// Network interface or path status changed (`nw_path_monitor`).
     NetworkChanged { reachable: bool },
 }
 
-#[allow(dead_code)]
 #[link(name = "Network", kind = "framework")]
 unsafe extern "C" {
     fn nw_path_monitor_create() -> *mut c_void;
@@ -403,7 +421,6 @@ unsafe extern "C" {
     fn nw_release(obj: *mut c_void);
 }
 
-#[allow(dead_code)]
 unsafe extern "C" {
     fn dispatch_queue_create(label: *const c_char, attr: *const c_void) -> *mut c_void;
     fn dispatch_release(obj: *mut c_void);
@@ -413,7 +430,6 @@ const NW_PATH_STATUS_SATISFIED: i32 = 1;
 
 /// RAII handle that keeps native macOS sleep/wake (`NSWorkspaceDidWakeNotification`)
 /// and network-change (`nw_path_monitor`) observers registered until dropped.
-#[allow(dead_code)]
 pub struct SystemObserver {
     wake_token: *mut objc2::runtime::AnyObject,
     monitor: *mut c_void,
@@ -462,8 +478,7 @@ impl Drop for SystemObserver {
 
 /// Registers native macOS sleep/wake (`NSWorkspaceDidWakeNotification`) and
 /// network-path (`nw_path_monitor`) observers, invoking `on_event` on each event.
-#[allow(dead_code)]
-pub fn observe_system_events(on_event: impl Fn(SystemEvent) + Send + Sync + 'static) -> SystemObserver {
+fn observe_system_events(on_event: impl Fn(SystemEvent) + Send + Sync + 'static) -> SystemObserver {
     use block2::RcBlock;
     use objc2::rc::Retained;
     use objc2_app_kit::{NSWorkspace, NSWorkspaceDidWakeNotification};
@@ -523,7 +538,6 @@ pub fn observe_system_events(on_event: impl Fn(SystemEvent) + Send + Sync + 'sta
 
 /// Convenience hook for wiring macOS wake and network-recovery events directly into
 /// `Hub::on_system_wake()`.
-#[allow(dead_code)]
 pub fn observe_system_wake(on_wake: impl Fn() + Send + Sync + 'static) -> SystemObserver {
     observe_system_events(move |event| match event {
         SystemEvent::Wake | SystemEvent::NetworkChanged { reachable: true } => on_wake(),
@@ -1063,9 +1077,9 @@ mod tests {
         assert_eq!(qr_env.data.unwrap()["size"], 25);
 
         let unknown = decode_host_op("host.doesNotExist", serde_json::json!({})).unwrap_err();
-        assert_eq!(unknown.biz_code, vibevalley_server::transport::bridge::BizCode::RouteNotFound.code());
+        assert_eq!(unknown.biz_code, vibevalley_server::gateway::bridge::BizCode::RouteNotFound.code());
         let malformed = decode_host_op("host.sha256", serde_json::json!({})).unwrap_err();
-        assert_eq!(malformed.biz_code, vibevalley_server::transport::bridge::BizCode::InvalidInput.code());
+        assert_eq!(malformed.biz_code, vibevalley_server::gateway::bridge::BizCode::InvalidInput.code());
 
         let manifest = pixel_manifest().unwrap();
         assert!(manifest.len() > 700);

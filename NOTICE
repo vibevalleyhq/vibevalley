@@ -11,7 +11,7 @@ This product includes software from other projects:
 
 - agent-quickstart-nextjs
   (https://github.com/AgoraIO-Conversational-AI/agent-quickstart-nextjs),
-  MIT License. crates/server/src/modules/collab/voice/agora.rs adapts its token,
+  MIT License. crates/server/src/collab/voice/agora.rs adapts its token,
   invite and stop routes.
   Copyright (c) 2025 Agora Community
 
@@ -19,19 +19,19 @@ This product includes software from other projects:
   SIL Open Font License 1.1; assets/fonts/fusion-pixel-OFL.txt.
 
 - gse (https://github.com/go-ego/gse, v1.1.0), Apache License 2.0.
-  crates/server/src/modules/team/memory/gse.rs cuts Chinese as it does;
-  crates/server/src/modules/team/memory/data/zh_s.txt.gz is its data/dict/zh/s_1.txt,
+  crates/server/src/team/memory/gse.rs cuts Chinese as it does;
+  crates/server/src/team/memory/data/zh_s.txt.gz is its data/dict/zh/s_1.txt,
   compressed. That dictionary comes from jieba (https://github.com/fxsjy/jieba),
   MIT License.
   Copyright (c) 2013 Sun Junyi
 
 - openclaw-weixin (@tencent-weixin/openclaw-weixin 2.4.10), MIT License.
-  crates/server/src/modules/collab/connector/weixin.rs is written from it
+  crates/server/src/collab/connector/weixin.rs is written from it
   (iLink bot login, getupdates, sendmessage).
   Copyright (C) 2026 Tencent. All rights reserved.
 
 - botpy (https://github.com/tencent-connect/botpy), MIT License.
-  crates/server/src/modules/collab/connector/qq.rs is written from it
+  crates/server/src/collab/connector/qq.rs is written from it
   (the QQ bot's token, gateway and C2C replies).
   Copyright (c) 2021 Tencent
 

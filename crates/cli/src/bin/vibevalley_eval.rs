@@ -118,6 +118,10 @@ fn resolve_deepseek_client() -> Result<Arc<dyn ModelClient>, Failure> {
 }
 
 fn run(cli: EvalCli) -> Done {
+    vibevalley_runtime::rt::block_on(run_async(cli))
+}
+
+async fn run_async(cli: EvalCli) -> Done {
     let output = Output { json: cli.json };
     match cli.command {
         EvalCommand::Export {
@@ -136,7 +140,7 @@ fn run(cli: EvalCli) -> Done {
                 return Err(Failure::usage("InvalidValue", "--at-seq must be >= 0"));
             }
             let source_path = source.unwrap_or_else(|| vibevalley_protocol::home::home().join("server.db"));
-            let store = Store::open_any_read_only(&source_path).map_err(eval_err)?;
+            let store = Store::open_any_read_only(&source_path).await.map_err(eval_err)?;
             let manifest = store
                 .export_conversation_jsonl(
                     &conversation,
@@ -147,8 +151,9 @@ fn run(cli: EvalCli) -> Done {
                         fsync: true,
                     },
                 )
+                .await
                 .map_err(eval_err)?;
-            let _ = store.close();
+            let _ = store.close().await;
             output.show(&manifest, |m| {
                 format!(
                     "exported {} ({} conversations, {} entries, {} tasks, {} docs) -> {}",
@@ -168,16 +173,16 @@ fn run(cli: EvalCli) -> Done {
             timeline,
             html,
         } => {
-            let store = Store::open_any_read_only(&path).map_err(eval_err)?;
-            let conv = resolve_root_conversation(&store, conversation.as_deref()).map_err(eval_err)?;
+            let store = Store::open_any_read_only(&path).await.map_err(eval_err)?;
+            let conv = resolve_root_conversation(&store, conversation.as_deref()).await.map_err(eval_err)?;
             let telemetry = if path.is_dir() {
                 read_telemetry_jsonl(&path.join("telemetry.jsonl")).map_err(eval_err)?
             } else {
                 Vec::new()
             };
-            let metrics = analyze_store(&store, &conv, &telemetry).map_err(eval_err)?;
+            let metrics = analyze_store(&store, &conv, &telemetry).await.map_err(eval_err)?;
             if let Some(html_path) = html {
-                let rendered = export_html(&store, &conv, &telemetry).map_err(eval_err)?;
+                let rendered = export_html(&store, &conv, &telemetry).await.map_err(eval_err)?;
                 if let Some(parent) = Path::new(&html_path).parent()
                     && !parent.as_os_str().is_empty()
                 {
@@ -186,11 +191,11 @@ fn run(cli: EvalCli) -> Done {
                 fs::write(&html_path, rendered).map_err(eval_err)?;
             }
             let rendered_timeline = if timeline {
-                Some(render_timeline(&store, &conv).map_err(eval_err)?)
+                Some(render_timeline(&store, &conv).await.map_err(eval_err)?)
             } else {
                 None
             };
-            let _ = store.close();
+            let _ = store.close().await;
 
             if output.json {
                 if let Some(tl) = rendered_timeline {
@@ -227,7 +232,7 @@ fn run(cli: EvalCli) -> Done {
             let raw = fs::read_to_string(&spec).map_err(eval_err)?;
             let parsed: ReplaySpec = serde_json::from_str(&raw).map_err(|e| Failure::usage("InvalidValue", e.to_string()))?;
             let client = resolve_deepseek_client()?;
-            let outcome = run_replay(&parsed, &out, client).map_err(eval_err)?;
+            let outcome = run_replay(&parsed, &out, client).await.map_err(eval_err)?;
             output.show(&outcome, |o| {
                 format!(
                     "replay {}@seq{} passed={} turns={} cost=${:.6} -> {}",
@@ -260,7 +265,7 @@ fn run(cli: EvalCli) -> Done {
                 }
             }
             let client = resolve_deepseek_client()?;
-            let report = EvalRunner.run(&parsed, &out, move |_, _, _| client.clone()).map_err(eval_err)?;
+            let report = EvalRunner.run(&parsed, &out, move |_, _, _| client.clone()).await.map_err(eval_err)?;
             output.show(&report, |r| r.render_markdown());
             Ok(())
         }

@@ -122,8 +122,6 @@ pub struct ChatMessage {
     pub attachments: Vec<Attachment>,
     pub embeds: Vec<Embed>,
     pub artifact: Option<ArtifactCard>,
-    #[cfg_attr(feature = "ts-gen", ts(optional, type = "readonly QuotedBlock[]"))]
-    pub blocks: Option<Vec<QuotedBlock>>,
     pub view_context: Option<ArtifactViewContext>,
 }
 
@@ -266,7 +264,6 @@ pub enum ChannelEvent {
 pub struct SayRequest {
     pub id: String,
     pub text: String,
-    pub blocks: Option<Vec<BlockRef>>,
     pub view_context: Option<ArtifactViewContext>,
     pub reply_to: Option<i64>,
     pub attachments: Option<Vec<String>>,

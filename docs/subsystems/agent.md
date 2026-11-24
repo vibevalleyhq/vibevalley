@@ -19,11 +19,11 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/modules/team/agent/mod.rs` | `agent.*`、`skill.*`、`runtime.*` 端点；`Agents` 把档案和农机拼成一扇门 |
-| `crates/server/src/modules/team/agent/profile.rs` | 档案、技能与农机设置（`<家目录>/config.json`）、模板的读取、安装与更新（内置的和 `<家目录>/agent-templates/`） |
-| `crates/server/src/modules/team/agent/runtime.rs` | 农机：经 `vibevalley-runtime::oar` 的 `Registry` 探测安装、模型、额度，花费 |
-| `crates/server/src/modules/team/agent/presets.rs` | 农机预设、可派性校验、挑档案、额度文案；预设在 `crates/server/assets/agent/presets.json` |
-| `crates/server/src/modules/team/agent/drive.rs` | 工单板跑档案：把档案、农机、技能与记性变成开会话的参数 |
+| `crates/server/src/agent/profile/mod.rs` | `agent.*`、`skill.*`、`runtime.*` 端点；`Agents` 把档案和农机拼成一扇门 |
+| `crates/server/src/agent/profile/profile.rs` | 档案、技能与农机设置（`<家目录>/config.json`）、模板的读取、安装与更新（内置的和 `<家目录>/agent-templates/`） |
+| `crates/server/src/agent/profile/runtime.rs` | 农机：经 `vibevalley-runtime::oar` 的 `Registry` 探测安装、模型、额度，花费 |
+| `crates/server/src/agent/profile/preset.rs` | 农机预设、可派性校验、挑档案、额度文案；预设在 `crates/server/assets/agent/presets.json` |
+| `crates/server/src/agent/profile/drive.rs` | 工单板跑档案：把档案、农机、技能与记性变成开会话的参数 |
 | `crates/server/assets/agent/templates/`、`crates/server/assets/agent/skills/` | 内置模板（顺序见 `templates/index.json`）与 VibeValley 自带的技能，编进二进制 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`agent.*`、`skill.*`、`runtime.*`）。农机在线上仍是自己的概念（`runtime.*` 接口），服务端只有档案模块一扇门。
@@ -81,7 +81,7 @@
 
 ## 和谁打交道
 
-- **帮工（`modules/work/session`）**：经 `drive.rs` 的 `Drivers` 把档案变成农机与参数，读勾选的技能拼入提示。
+- **帮工（`work/session`）**：经 `drive.rs` 的 `Drivers` 把档案变成农机与参数，读勾选的技能拼入提示。
 - **助手与工具**：挑可派档案。
 - **hub**：推农机的 `live` 事件，发模型回退提醒。
 
@@ -101,5 +101,5 @@
 ## 怎么验证
 
 - `crates/server/tests/agent.rs`：删技能清引用、损坏配置留着、外观补齐、角色约束、新农场的档案、模板安装与更新、自带技能只读、农机经 hub、额度刷新。
-- `crates/server/src/modules/team/agent/presets.rs` 里的单元测试：预设、挑档案。
+- `crates/server/src/agent/profile/preset.rs` 里的单元测试：预设、挑档案。
 - `apps/mac/ui/app/scenarios.test.tsx`：档案、农机、仓库与工作台多密度虚拟时钟页面测试（`nsh/test`）。

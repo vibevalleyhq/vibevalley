@@ -2,6 +2,7 @@ import { computed, effect, host, keymap, Scroll, signal, Text, untracked, View }
 import { Input, Menu, MenuItem, MenuSeparator, TextView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
+import type { PhaseView } from "@vibevalley/protocol";
 
 import { Button } from "../design/Button";
 import { TextInput } from "../design/Field";
@@ -20,6 +21,7 @@ import {
   computeTelemetry,
   defaultThoughtLevelFor,
   extractToolTarget,
+  FALLBACK_RUNTIMES,
   fetchWorkspaceRuntimes,
   formatTokens,
   mergeChatSteps,
@@ -54,7 +56,7 @@ function actionIconFor(action: SessionEvent["action"]): IconName {
   return "bolt";
 }
 
-function phaseFromSessionTag(tag: string): ChatPhase {
+function phaseFromSessionTag(tag: PhaseView["_tag"]): ChatPhase {
   switch (tag) {
     case "working":
       return "working";
@@ -63,8 +65,6 @@ function phaseFromSessionTag(tag: string): ChatPhase {
     case "done":
     case "resting":
     case "closed":
-      return "ready";
-    default:
       return "ready";
   }
 }
@@ -424,6 +424,19 @@ function PermissionCard(props: { permission: SessionPermissionRequest; busy: boo
   );
 }
 
+function ContextBar(props: { cached: number; uncached: number; class: string }) {
+  return (
+    <View class={props.class}>
+      <If when={props.cached > 0}>
+        <View class="h-full bg-leaf" style={{ width: `${props.cached}%` }} />
+      </If>
+      <If when={props.uncached > 0}>
+        <View class="h-full bg-water" style={{ width: `${props.uncached}%` }} />
+      </If>
+    </View>
+  );
+}
+
 export function WorkspaceChatPane() {
   const { tabId, cwd, repo, sessionId: initialSessionId, runtime: initialRuntime } = readChatPaneParams();
 
@@ -529,21 +542,42 @@ export function WorkspaceChatPane() {
             return true;
           });
           steps.set(mergeChatSteps(prev, [step]));
-          if (step.type === "run/start") phase.set("working");
-          else if (step.type === "run/end") phase.set("ready");
-          else if (step.type === "run/error") phase.set("error");
-          else if (step.type === "interaction/request" && step.interaction !== undefined) {
-            const req = step.interaction;
-            pendingInteractions.set([...untracked(pendingInteractions).filter((i) => i.requestId !== req.requestId), req]);
-          } else if (step.type === "interaction/resolved" && step.interactionResolution !== undefined) {
-            const rid = step.interactionResolution.requestId;
-            pendingInteractions.set(untracked(pendingInteractions).filter((i) => i.requestId !== rid));
-          } else if (step.type === "permission/request" && step.permission !== undefined) {
-            const req = step.permission;
-            pendingPermissions.set([...untracked(pendingPermissions).filter((p) => p.requestId !== req.requestId), req]);
-          } else if (step.type === "permission/resolved" && step.permission !== undefined) {
-            const rid = step.permission.requestId;
-            pendingPermissions.set(untracked(pendingPermissions).filter((p) => p.requestId !== rid));
+          switch (step.type) {
+            case "run/start":
+              phase.set("working");
+              break;
+            case "run/end":
+              phase.set("ready");
+              break;
+            case "run/error":
+              phase.set("error");
+              break;
+            case "interaction/request":
+              if (step.interaction !== undefined) {
+                const req = step.interaction;
+                pendingInteractions.set([...untracked(pendingInteractions).filter((i) => i.requestId !== req.requestId), req]);
+              }
+              break;
+            case "interaction/resolved":
+              if (step.interactionResolution !== undefined) {
+                const rid = step.interactionResolution.requestId;
+                pendingInteractions.set(untracked(pendingInteractions).filter((i) => i.requestId !== rid));
+              }
+              break;
+            case "permission/request":
+              if (step.permission !== undefined) {
+                const req = step.permission;
+                pendingPermissions.set([...untracked(pendingPermissions).filter((p) => p.requestId !== req.requestId), req]);
+              }
+              break;
+            case "permission/resolved":
+              if (step.permission !== undefined) {
+                const rid = step.permission.requestId;
+                pendingPermissions.set(untracked(pendingPermissions).filter((p) => p.requestId !== rid));
+              }
+              break;
+            default:
+              break;
           }
           break;
         }
@@ -732,14 +766,7 @@ export function WorkspaceChatPane() {
   };
 
   const runtimeOptions = computed((): readonly { value: string; label: string; disabled?: boolean }[] => {
-    const list = runtimes();
-    if (list.length === 0) {
-      return [
-        { value: "antigravity", label: "Antigravity" },
-        { value: "claude", label: "Claude Code" },
-        { value: "codex", label: "Codex" },
-      ];
-    }
+    const list = runtimes().length === 0 ? FALLBACK_RUNTIMES : runtimes();
     return list.map((r) => ({ value: r.id, label: r.name, disabled: !r.available }));
   });
 
@@ -1003,14 +1030,7 @@ export function WorkspaceChatPane() {
                   {`${telemetry().contextPct}% · ${formatTokens(telemetry().contextUsed)}/${formatTokens(telemetry().contextWindow)}`}
                 </Text>
               </View>
-              <View class="h-1.5 flex-row overflow-hidden rounded-full bg-selected">
-                <If when={cachedBarPercent() > 0}>
-                  <View class="h-full bg-leaf" style={{ width: `${cachedBarPercent()}%` }} />
-                </If>
-                <If when={uncachedBarPercent() > 0}>
-                  <View class="h-full bg-water" style={{ width: `${uncachedBarPercent()}%` }} />
-                </If>
-              </View>
+              <ContextBar cached={cachedBarPercent()} uncached={uncachedBarPercent()} class="h-1.5 flex-row overflow-hidden rounded-full bg-selected" />
               <View class="flex-row flex-wrap gap-2">
                 <Text class="font-mono text-2xs text-ok-ink">{`${t("web.shell.chat.telemetryCached")} ${formatTokens(telemetry().cachedRead)}`}</Text>
                 <Text class="font-mono text-2xs text-water">{`${t("web.shell.chat.telemetryUncached")} ${formatTokens(telemetry().uncachedInput)}`}</Text>
@@ -1253,14 +1273,11 @@ export function WorkspaceChatPane() {
                     telemetryOpen() ? "bg-selected" : ""
                   }`}
                 >
-                  <View class="h-1.5 w-6 shrink-0 flex-row overflow-hidden rounded-full bg-selected">
-                    <If when={cachedBarPercent() > 0}>
-                      <View class="h-full bg-leaf" style={{ width: `${cachedBarPercent()}%` }} />
-                    </If>
-                    <If when={uncachedBarPercent() > 0}>
-                      <View class="h-full bg-water" style={{ width: `${uncachedBarPercent()}%` }} />
-                    </If>
-                  </View>
+                  <ContextBar
+                    cached={cachedBarPercent()}
+                    uncached={uncachedBarPercent()}
+                    class="h-1.5 w-6 shrink-0 flex-row overflow-hidden rounded-full bg-selected"
+                  />
                   <Text class={`font-mono text-2xs tabular-nums ${telemetryWarn() ? "text-warn-ink" : "text-faint"}`}>{`${telemetry().contextPct}%`}</Text>
                 </View>
               </If>

@@ -62,8 +62,6 @@ export type Health = { ok: boolean, version: string, };
  */
 export type Fact = FactCallChanged | FactSessionToolChanged | FactSessionToolsReset | FactSessionSubagentsChanged | FactSessionPhaseChanged | FactMessageChanged | FactChannelChanged | FactUserMentionsChanged | FactSessionChanged | FactSessionReported | FactSessionLeft | FactProgressChanged | FactIssueChanged | FactIssueRemoved | FactChannelRemoved | FactCronChanged | FactCronRemoved | FactConnectorChanged | FactMachineChanged | FactMachineRemoved | FactMediaChanged | FactRuntimeInboxChanged;
 
-export type ServerEventSnapshot = { "type": "snapshot", at: number, state: SpaceState, };
-
 export type LiveEventSession = { "type": "event", at: number, id: SessionId, activity: SessionEvent, };
 
 export type LiveEventNotice = { "type": "notice", at: number, level: NoticeLevel, text: string, };
@@ -74,11 +72,6 @@ export type LiveEventRuntime = { "type": "runtime", at: number, info: RuntimeInf
  * Told apart by `type`.
  */
 export type LiveEvent = LiveEventSession | LiveEventNotice | LiveEventRuntime;
-
-/**
- * Told apart by `type`.
- */
-export type ServerEvent = FactCallChanged | FactSessionToolChanged | FactSessionToolsReset | FactSessionSubagentsChanged | FactSessionPhaseChanged | FactMessageChanged | FactChannelChanged | FactUserMentionsChanged | FactSessionChanged | FactSessionReported | FactSessionLeft | FactProgressChanged | FactIssueChanged | FactIssueRemoved | FactChannelRemoved | FactCronChanged | FactCronRemoved | FactConnectorChanged | FactMachineChanged | FactMachineRemoved | FactMediaChanged | FactRuntimeInboxChanged | ServerEventSnapshot | LiveEventSession | LiveEventNotice | LiveEventRuntime;
 
 export type ChannelFollowPayload = { id: string, after: number, };
 
