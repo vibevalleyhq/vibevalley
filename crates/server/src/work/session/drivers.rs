@@ -1,6 +1,6 @@
-//! Who runs an issue's agent: the board asks a `Drivers` to turn the
+//! Who runs an issue's agent: the board asks a [`SessionDriver`] to turn the
 //! issue's assigned agent into a runtime and its options. Standalone, an
-//! agent is a runtime id (`RuntimeDrivers`); the server hands in profiles.
+//! agent is a runtime id ([`RuntimeDriver`]); the server hands in profiles.
 
 use std::sync::Arc;
 
@@ -8,10 +8,10 @@ use vibevalley_i18n::t;
 use vibevalley_protocol::{Agent, ApiError, BizCode, Deliverable, Issue, LOCAL_MACHINE_ID, MCPServer, Next, PersonaMode, RuntimeRef};
 use vibevalley_runtime::oar::{Installation, McpServer, Registry, Runtime};
 
-use crate::app::hub::ports::MemoryRecallPort;
-use crate::app::hub::refusal::LookIn;
+use crate::app::port::MemoryRecallPort;
+use crate::app::refusal::LookIn;
 use crate::infra::text::{PROMPTS, runtime_label, users_language};
-use crate::team::agent::{Agents, instructions};
+use crate::team::agent::{AgentStore, instructions};
 use crate::work::ledger::{BoardError, Result};
 
 /// Where a profile's persona goes (VibeValley `personaMode`).
@@ -55,7 +55,7 @@ impl Drive {
     }
 }
 
-pub trait Drivers: Send + Sync {
+pub trait SessionDriver: Send + Sync {
     /// Refuses an agent named on an issue that cannot be named.
     fn check(&self, agent: &str) -> Result<()>;
     /// What the agent runs `issue` on now; `None` is nobody assigned.
@@ -97,12 +97,12 @@ pub struct HelperPlace {
 }
 
 /// An agent is a runtime id; nobody assigned runs `claude`.
-pub struct RuntimeDrivers {
+pub struct RuntimeDriver {
     pub registry: Arc<Registry>,
     pub model: Option<String>,
 }
 
-impl Drivers for RuntimeDrivers {
+impl SessionDriver for RuntimeDriver {
     fn check(&self, agent: &str) -> Result<()> {
         self.registry.require(agent).map(|_| ()).map_err(BoardError::from)
     }
@@ -143,14 +143,14 @@ fn refusal(text: String, next: Vec<Next>) -> BoardError {
     BoardError::Api(ApiError::new(BizCode::IssueRefused, text).with_next(next))
 }
 
-/// Profile-backed session drivers (L2 `work/session` -> L1 `team/agent`, `infra/text` + `MemoryRecallPort`).
-pub struct AgentDrivers {
-    agents: Arc<Agents>,
+/// Profile-backed session driver (L2 `work/session` -> L1 `team/agent`, `infra/text` + `MemoryRecallPort`).
+pub struct AgentDriver {
+    agents: Arc<AgentStore>,
     memory: Option<Arc<dyn MemoryRecallPort>>,
 }
 
-impl AgentDrivers {
-    pub fn new(agents: Arc<Agents>, memory: Option<Arc<dyn MemoryRecallPort>>) -> Self {
+impl AgentDriver {
+    pub fn new(agents: Arc<AgentStore>, memory: Option<Arc<dyn MemoryRecallPort>>) -> Self {
         Self { agents, memory }
     }
 
@@ -201,7 +201,7 @@ impl AgentDrivers {
     }
 }
 
-impl Drivers for AgentDrivers {
+impl SessionDriver for AgentDriver {
     fn recall(&self, agent: &str, session: &str, repo: &str, input: &str) -> String {
         let Some(memory) = &self.memory else { return String::new() };
         let lines = memory.recall_text(agent, Some(session), repo, input);

@@ -4,7 +4,7 @@
 
 use vibevalley_protocol::{Outcome, Run, RunTrigger, RunTriggerKind, Spent};
 
-use super::sessions::Sessions;
+use super::sessions::SessionStore;
 use crate::work::ledger::{Result, Step, now};
 
 pub fn trigger_of(kind: RunTriggerKind, message: Option<String>) -> RunTrigger {
@@ -18,7 +18,7 @@ pub fn trigger_of(kind: RunTriggerKind, message: Option<String>) -> RunTrigger {
     }
 }
 
-impl Sessions {
+impl SessionStore {
     /// A round of `session` on `issue` starts now.
     pub(super) async fn begin_run_async(&self, session: &str, issue: &str, trigger: RunTrigger) -> Result<String> {
         // A round still open (the agent never said it ended) ends here.
@@ -63,7 +63,7 @@ impl Sessions {
             })
             .await?;
         self.0.extras.lock().insert(session.into(), saved_extra);
-        self.record(session, Step::RunStarted { run: id.clone() });
+        self.record_async(session, Step::RunStarted { run: id.clone() }).await;
         Ok(id)
     }
 

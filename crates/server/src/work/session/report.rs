@@ -1,5 +1,5 @@
 //! The structured report an agent hands back at the end of a round through
-//! the `issue_report` tool (`Sessions::report`). A round with no report is read
+//! the `issue_report` tool (`SessionStore::report`). A round with no report is read
 //! from what the agent said.
 
 use std::path::Path;

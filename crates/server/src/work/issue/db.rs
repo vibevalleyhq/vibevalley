@@ -9,13 +9,17 @@ use vibevalley_runtime::agent::durable::BoxFuture;
 
 use crate::db::column::{db_json as json, db_word as word, read_db_json as read_json, read_db_word as read_word};
 use crate::db::entities::work_issue::issue;
-use crate::work::ledger::IssueStore;
+use crate::work::ledger::IssuePersistence;
 
 pub struct SqliteIssueStore;
 
-impl IssueStore for SqliteIssueStore {
+impl IssuePersistence for SqliteIssueStore {
     fn all<'a>(&'a self, db: &'a DatabaseConnection) -> BoxFuture<'a, Result<Vec<Issue>, DbErr>> {
         Box::pin(all(db))
+    }
+
+    fn get<'a>(&'a self, db: &'a DatabaseConnection, id: &'a str) -> BoxFuture<'a, Result<Option<Issue>, DbErr>> {
+        Box::pin(get(db, id))
     }
 
     fn put<'a>(&'a self, tx: &'a DatabaseTransaction, issue: &'a Issue) -> BoxFuture<'a, Result<(), DbErr>> {
@@ -64,6 +68,10 @@ pub async fn all<C: ConnectionTrait>(db: &C) -> Result<Vec<Issue>, DbErr> {
         .into_iter()
         .map(read)
         .collect()
+}
+
+pub async fn get<C: ConnectionTrait>(db: &C, id: &str) -> Result<Option<Issue>, DbErr> {
+    issue::Entity::find_by_id(id).one(db).await?.map(read).transpose()
 }
 
 pub async fn put<C: ConnectionTrait>(db: &C, t: &Issue) -> Result<(), DbErr> {

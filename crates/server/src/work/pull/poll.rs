@@ -10,8 +10,8 @@ use tracing::Instrument;
 use tracing::instrument::WithSubscriber;
 use vibevalley_protocol::{PublishPlatform, PullRequestState};
 
-use crate::now;
-use crate::work::pull::Pulls;
+use crate::work::ledger::now;
+use crate::work::pull::PullStore;
 use crate::work::pull::publish::{HostRunner, HostedRepo, remote_pull_state};
 use crate::work::pull::snapshot::{GitHubCheck, GitHubPullSnapshot, checks_fingerprint, checks_verdict, failed_job_log, fetch_snapshot};
 use crate::work::pull::store::PullRecord;
@@ -19,7 +19,7 @@ use crate::work::pull::store::PullRecord;
 const POLL_CONCURRENCY: usize = 4;
 
 /// Polls every tracked `open` PR's remote state in parallel (bounded); settles linked issues on `merged` / `closed`.
-pub async fn refresh(pulls: &Pulls) {
+pub async fn refresh(pulls: &PullStore) {
     let _guard = pulls.refresh_lock.lock().await;
     let open = pulls.store.open_pulls();
     let mut targets: Vec<(usize, PullRecord, HostedRepo, HostRunner)> = Vec::with_capacity(open.len());
@@ -83,7 +83,7 @@ struct PollEvent {
 }
 
 /// Polls GitHub CI checks, reviews, and comments for every tracked `open` GitHub PR.
-pub async fn poll(pulls: &Pulls) {
+pub async fn poll(pulls: &PullStore) {
     let _guard = pulls.poll_lock.lock().await;
     let open = pulls.store.open_pulls();
     let mut targets: Vec<(usize, PullRecord, String)> = Vec::new();
@@ -163,13 +163,12 @@ async fn fetch_failed_job_logs(gh: &HostRunner, remote: &str, failed: &[&GitHubC
     logs.into_iter().map(|(_, log)| log).collect()
 }
 
-async fn poll_one(pulls: &Pulls, row: &PullRecord, remote: &str, current: GitHubPullSnapshot) {
+async fn poll_one(pulls: &PullStore, row: &PullRecord, remote: &str, current: GitHubPullSnapshot) {
     let at = now();
-    let linked_open = row
-        .issue_id
-        .as_deref()
-        .and_then(|id| pulls.board.as_ref().and_then(|b| b.issue(id)))
-        .filter(|issue| !issue.status.is_closed());
+    let linked_open = match (row.issue_id.as_deref(), pulls.board.as_ref()) {
+        (Some(id), Some(board)) => board.issue_async(id).await.ok().flatten().filter(|issue| !issue.status.is_closed()),
+        _ => None,
+    };
 
     let fingerprint = checks_fingerprint(&current.head, &current.checks);
     if fingerprint != row.check_fingerprint {

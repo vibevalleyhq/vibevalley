@@ -16,7 +16,7 @@ use serde::Deserialize;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, BranchCheck, BranchPublication, BranchPublicationState, PublishPlatform, PullRequestState, SubmitBranch};
 
-use crate::app::hub::refusal::refused as refuse;
+use crate::app::refusal::refused as refuse;
 
 /// What a `gh`/`glab` call answered: ok, its output, and whether the tool is missing.
 pub struct Answer {

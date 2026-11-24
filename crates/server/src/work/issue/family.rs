@@ -5,9 +5,9 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{Assignment, Deliverable, Fact, Issue, IssueConstraints, IssueStageKind as StageKind};
+use vibevalley_protocol::{Assignment, Deliverable, Issue, IssueConstraints, IssueStageKind as StageKind};
 
-use super::board::Board;
+use super::board::IssueStore;
 use crate::work::ledger::{BoardError, IssueChange, Result, now};
 use crate::work::workplace::{Joined, Leave, OnDisk, Workplace};
 
@@ -30,20 +30,20 @@ pub struct ChildDraft {
 /// At most this many children per split.
 pub const MAX_CHILDREN: usize = 12;
 
-impl Board {
+impl IssueStore {
     /// Splits an open issue into child issues, all queued: each goes once
     /// the siblings it needs are done.
     pub async fn split_async(&self, reference: &str, drafts: Vec<ChildDraft>) -> Result<Vec<Issue>> {
         let _work = self.0.work.lock().await;
-        let parent = self.stored(reference)?;
+        let parent = self.stored_async(reference).await?;
         if parent.status.is_closed() {
             return Err(BoardError::Other(format!("issue #{} is closed", parent.number)));
         }
         let Some(repo) = parent.repo.clone() else {
             return Err(BoardError::Other("only an issue with a repository can be split".into()));
         };
-        let state = self.state();
-        if state.issues.iter().any(|t| t.parent.as_ref() == Some(&parent.id)) {
+        let all_issues = self.issues_async().await?;
+        if all_issues.iter().any(|t| t.parent.as_ref() == Some(&parent.id)) {
             return Err(BoardError::Other(format!("issue #{} is split already", parent.number)));
         }
         let nodes: Vec<vibevalley_core::DagNode> = drafts
@@ -65,7 +65,7 @@ impl Board {
         if drafts.iter().any(|d| d.acceptance && d.check.as_deref().unwrap_or("").trim().is_empty()) {
             return Err(BoardError::Other("an acceptance child needs a check command".into()));
         }
-        if let Some(s) = self.on_board(&parent) {
+        if let Some(s) = self.on_board_async(&parent).await {
             if s.phase.is_working() {
                 return Err(BoardError::Other("the parent's session is working; split it when it rests".into()));
             }
@@ -82,13 +82,11 @@ impl Board {
         }
         let mut ids: HashMap<String, String> = HashMap::new();
         let mut made = Vec::new();
+        let mut children = Vec::new();
         let at = now();
+        let max_number = all_issues.iter().map(|t| t.number).max().unwrap_or(0);
         for d in &drafts {
-            let number = self
-                .0
-                .ledger
-                .next_async("issue", state.issues.iter().map(|t| t.number).max().unwrap_or(0))
-                .await?;
+            let number = self.0.ledger.next_async("issue", max_number).await?;
             let id = format!("i{number}");
             ids.insert(d.id.clone(), id.clone());
             let (title, description) = if d.title.trim().is_empty() {
@@ -122,29 +120,31 @@ impl Board {
                 }];
             }
             made.push(id);
-            self.0.ledger.apply_async(vec![Fact::issue_changed(at, child)]).await?;
+            children.push(child);
         }
+        self.0.ledger.put_issues_async(&children).await?;
         self.refresh_queue_locked_async().await;
-        Ok(made.iter().filter_map(|id| self.issue(id)).collect())
+        let updated = self.issues_async().await?;
+        Ok(made.into_iter().filter_map(|id| updated.iter().find(|i| i.id == id).cloned()).collect())
     }
 
     /// Children whose round is in review are checked and merged into their
     /// parent's branch.
     pub(super) async fn join_children_async(&self) -> Result<()> {
-        let reviewing: Vec<Issue> = self
-            .state()
-            .issues
-            .into_iter()
+        let issues = self.issues_async().await?;
+        let reviewing: Vec<Issue> = issues
+            .iter()
             .filter(|t| t.parent.is_some() && t.stage.state == StageKind::Reviewing)
+            .cloned()
             .collect();
         for child in reviewing {
-            self.join_one_async(&child).await?;
+            self.join_one_async(&child, &issues).await?;
         }
         Ok(())
     }
 
-    async fn join_one_async(&self, child: &Issue) -> Result<()> {
-        let Some(parent) = child.parent.as_deref().and_then(|p| self.issue(p)) else {
+    async fn join_one_async(&self, child: &Issue, all_issues: &[Issue]) -> Result<()> {
+        let Some(parent) = child.parent.as_deref().and_then(|p| all_issues.iter().find(|i| i.id == p)).cloned() else {
             return Ok(());
         };
         if parent.status.is_closed() {
@@ -152,13 +152,13 @@ impl Board {
         }
         let wp = &self.0.workplaces;
         let Some(main) = wp.main_repo(parent.repo.as_deref())? else { return Ok(()) };
-        let Some(session) = self.on_board(child) else { return Ok(()) };
+        let Some(session) = self.on_board_async(child).await else { return Ok(()) };
         // The parent's session is busy in the parent's worktree: wait.
-        let parent_session = self.on_board(&parent);
+        let parent_session = self.on_board_async(&parent).await;
         if parent_session.as_ref().is_some_and(|s| s.phase.is_working()) {
             return Ok(());
         }
-        let checks = vibevalley_core::child_checks(child, &self.state().issues);
+        let checks = vibevalley_core::child_checks(child, all_issues);
         let parent_worktree = parent_session.and_then(|s| s.cwd);
         let child_at = OnDisk {
             number: child.number,

@@ -1,6 +1,4 @@
-use vibevalley_protocol::{
-    FactSessionSubagentsChanged, Session, SessionSubagents, SubagentStatus, SubagentStep, SubagentStepStatus, SubagentThread, SubagentWait,
-};
+use vibevalley_protocol::{Session, SessionSubagents, SubagentStatus, SubagentStep, SubagentStepStatus, SubagentThread, SubagentWait};
 use vibevalley_runtime::oar::{Event, EventKind, SubagentStatus as ObservedStatus};
 
 use super::journal::tool_detail;
@@ -18,7 +16,7 @@ pub(super) fn relevant(event: &Event) -> bool {
     }
 }
 
-pub(super) fn observe(session: &Session, run: &str, root: &str, event: &Event) -> Option<FactSessionSubagentsChanged> {
+pub(super) fn observe(session: &Session, run: &str, root: &str, event: &Event) -> Option<SessionSubagents> {
     let at = i64::try_from(event.at_ms).unwrap_or(i64::MAX);
     let previous = session.subagents.as_ref();
     let mut summary = previous
@@ -158,11 +156,7 @@ pub(super) fn observe(session: &Session, run: &str, root: &str, event: &Event) -
         _ => return None,
     }
     let next = (!summary.threads.is_empty() || !summary.waits.is_empty()).then_some(summary);
-    (next.as_ref() != previous).then(|| FactSessionSubagentsChanged {
-        at,
-        id: session.id.clone(),
-        subagents: next,
-    })
+    (next.as_ref() != previous).then_some(next).flatten()
 }
 
 fn thread<'a>(summary: &'a mut SessionSubagents, id: &str, at: i64) -> &'a mut SubagentThread {

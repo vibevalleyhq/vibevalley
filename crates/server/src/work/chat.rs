@@ -1,10 +1,11 @@
 //! Issue and session channel bridge (`work/chat`, L3):
-//! connects `Board`/`Sessions` directly with `collab/channel::Chat`
-//! and dispatches per-issue / per-target lanes on `vibevalley_runtime::rt`.
+//! connects `IssueStore`/`SessionStore` directly with `collab/channel::Chat`,
+//! subscribing to `SessionStore` lifecycle events, durable `Outbox` reports,
+//! and dispatching per-issue / per-target lanes on `Runtime`.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
 use std::time::Duration;
 
 use parking_lot::Mutex;
@@ -12,21 +13,24 @@ use tokio::sync::{broadcast, oneshot};
 use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
-use vibevalley_core::Transition;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{
-    ApiError, ArtifactViewContext, ChannelType, Fact, FactSessionReported, MessageKind, NoticeLevel, Outcome, Session, SubjectKind, ops,
-};
+use vibevalley_protocol::{ApiError, Applied, ArtifactViewContext, BizCode, ChannelType, MessageKind, NoticeLevel, Outcome, Session, SubjectKind};
 
-use crate::Hub;
-use crate::app::hub::event_bus::Subscription;
+use crate::app::{
+    live::LiveOverlay,
+    outbox::Outbox,
+    refusal::{LookIn, missing, refused},
+    runtime::Runtime,
+};
 use crate::collab::channel::{
     ChannelDispatched, Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Saying, Seat, ThreadSubject, meta_of, profile_id,
 };
 use crate::infra::text::{format_artifact_view_context, head};
-use crate::team::agent::Agents;
-use crate::work::issue::Board;
+use crate::team::agent::AgentStore;
+use crate::work::issue::IssueStore;
+use crate::work::ledger::now;
 use crate::work::session::mailbox::{MailboxSource, MailboxStatus};
+use crate::work::session::{OUTBOX_SESSION_REPORTED, OutboxSessionReported, SessionLifecycleEvent};
 
 const HANDED_EMOJI: &str = "👀";
 const REPORT_MAX: usize = 1500;
@@ -89,15 +93,14 @@ enum IssueWake {
 
 type DeliveryWaiter = (u64, oneshot::Sender<()>);
 
-/// Bridges `Hub` session transitions and `Chat` deliveries onto
-/// issue threads and `Board::tell_message` asynchronously per issue.
+/// Bridges `SessionStore` lifecycle events, durable `Outbox` reports, and `Chat` deliveries onto
+/// issue threads and `IssueStore::tell_message_async` asynchronously per issue.
 pub struct IssueChat {
-    hub: Weak<Hub>,
-    board: Board,
+    live: Arc<LiveOverlay>,
+    board: IssueStore,
     channel: Arc<Chat>,
-    opening: Mutex<()>,
+    opening: tokio::sync::Mutex<()>,
     cancel: CancellationToken,
-    sub: Mutex<Option<Subscription>>,
     coordinator: Mutex<Option<TaskHandle<()>>>,
     lanes: Mutex<HashMap<String, flume::Sender<IssueWake>>>,
     lane_tasks: TaskTracker,
@@ -106,16 +109,15 @@ pub struct IssueChat {
 }
 
 impl IssueChat {
-    pub fn start(hub: &Arc<Hub>, board: Board, channel: Arc<Chat>) -> Arc<Self> {
+    pub fn start(runtime: &Arc<Runtime>, live: &Arc<LiveOverlay>, outbox: &Arc<Outbox>, board: IssueStore, channel: Arc<Chat>) -> Arc<Self> {
         let dispatches = channel.dispatches();
-        let cancel = hub.child_token();
+        let cancel = runtime.child_token();
         let ic = Arc::new(Self {
-            hub: Arc::downgrade(hub),
+            live: live.clone(),
             board,
             channel,
-            opening: Mutex::new(()),
+            opening: tokio::sync::Mutex::new(()),
             cancel: cancel.clone(),
-            sub: Mutex::new(None),
             coordinator: Mutex::new(None),
             lanes: Mutex::new(HashMap::new()),
             lane_tasks: TaskTracker::new(),
@@ -124,49 +126,60 @@ impl IssueChat {
         });
 
         let w = Arc::downgrade(&ic);
-        let sub = hub.subscribe_transitions("issue-watch", move |_, tr: &Transition| {
-            let Some(ic) = w.upgrade() else { return };
-            ic.on_transition(tr);
+        outbox.register(OUTBOX_SESSION_REPORTED, move |delivery| {
+            let w = w.clone();
+            async move {
+                let Some(ic) = w.upgrade() else { return Ok::<(), String>(()) };
+                let report: OutboxSessionReported =
+                    serde_json::from_value(delivery.payload).map_err(|e| format!("invalid {OUTBOX_SESSION_REPORTED} payload: {e}"))?;
+                ic.handle_report_async(&report).await.map_err(|e| e.to_string())
+            }
         });
-        *ic.sub.lock() = Some(sub);
 
         let w = Arc::downgrade(&ic);
+        let mut session_events = ic.board.sessions().subscribe_events();
         let task_cancel = cancel;
-        let coordinator = hub.spawn_task(async move {
+        let coordinator = runtime.spawn(async move {
             let Some(boot_ic) = w.upgrade() else { return };
-            let boot_sync = boot_ic.clone();
-            let _ = crate::spawn_blocking_traced(move || {
-                boot_sync.open_threads();
-                boot_sync.replay_reports();
-            })
-            .await;
+            boot_ic.open_threads_async().await;
+            boot_ic.replay_reports_async().await;
             boot_ic.replay_pending_deliveries_async().await;
             loop {
-                let dispatched = tokio::select! {
+                tokio::select! {
                     biased;
                     _ = task_cancel.cancelled() => return,
                     res = dispatches.recv_async() => match res {
-                        Ok(dispatched) => dispatched,
+                        Ok(dispatched) => {
+                            let Some(ic) = w.upgrade() else { return };
+                            if ic.cancel.is_cancelled() {
+                                return;
+                            }
+                            ic.route_dispatched_async(dispatched).await;
+                        }
                         Err(_) => return,
                     },
-                };
-                let Some(ic) = w.upgrade() else { return };
-                if ic.cancel.is_cancelled() {
-                    return;
+                    res = session_events.recv() => match res {
+                        Ok(SessionLifecycleEvent::Changed(session)) => {
+                            let Some(ic) = w.upgrade() else { return };
+                            if ic.cancel.is_cancelled() {
+                                return;
+                            }
+                            ic.ensure_session_thread_async(&session).await;
+                        }
+                        Ok(SessionLifecycleEvent::Left { .. }) => {}
+                        Err(broadcast::error::RecvError::Lagged(_)) => {
+                            let Some(ic) = w.upgrade() else { return };
+                            if ic.cancel.is_cancelled() {
+                                return;
+                            }
+                            ic.open_threads_async().await;
+                        }
+                        Err(broadcast::error::RecvError::Closed) => return,
+                    },
                 }
-                ic.route_dispatched_async(dispatched).await;
             }
         });
         *ic.coordinator.lock() = Some(coordinator);
-
-        let c = ic.clone();
-        hub.on_async::<ops::IssueCommentCreate, _, _>(move |ctx, input| {
-            let c = c.clone();
-            async move {
-                c.comment_async(&input.id, &input.text, input.send_key.as_deref().unwrap_or("")).await?;
-                Ok(vibevalley_protocol::Applied { seq: ctx.hub.seq() })
-            }
-        });
 
         ic
     }
@@ -174,10 +187,6 @@ impl IssueChat {
     pub async fn close_async(&self) {
         self.cancel.cancel();
         self.delivery_waiters.lock().clear();
-        let sub = self.sub.lock().take();
-        if let Some(sub) = sub {
-            sub.close_async().await;
-        }
         self.lanes.lock().clear();
         let coordinator = self.coordinator.lock().take();
         let timed_out = tokio::time::timeout(CHAT_CLOSE_GRACE, async {
@@ -199,31 +208,33 @@ impl IssueChat {
         }
     }
 
+    /// `issue.comment.create`: handler method for `app/door.rs` returning the current sequence number.
+    pub(crate) async fn comment_endpoint_async(&self, issue: &str, text: &str, send_key: Option<&str>) -> Result<Applied, ApiError> {
+        self.comment_async(issue, text, send_key.unwrap_or("")).await?;
+        Ok(Applied { seq: self.board.seq() })
+    }
+
     /// `issue.comment.create`: writes the user's words into the issue's thread
     /// and awaits its issue-lane delivery without blocking a worker thread so
     /// `BoardSlice` reflects the accepted comment (e.g. leaving `Asking`).
     pub async fn comment_async(&self, issue: &str, text: &str, send_key: &str) -> Result<(), ApiError> {
         let item = self
             .board
-            .issue(issue)
-            .ok_or_else(|| crate::app::hub::refusal::missing(t("server.issue.notFound", &[("id", issue.into())]), crate::app::hub::refusal::LookIn::Issue))?;
+            .issue_async(issue)
+            .await
+            .ok()
+            .flatten()
+            .ok_or_else(|| missing(t("server.issue.notFound", &[("id", issue.into())]), LookIn::Issue))?;
         if item.status.is_closed() {
-            return Err(crate::app::hub::refusal::refused(
-                vibevalley_protocol::BizCode::IssueRefused,
-                t("server.issue.closedReopen", &[]),
-            ));
+            return Err(refused(BizCode::IssueRefused, t("server.issue.closedReopen", &[])));
         }
         if text.trim().is_empty() {
-            return Err(crate::app::hub::refusal::refused(
-                vibevalley_protocol::BizCode::IssueRefused,
-                t("server.issue.wordsRequired", &[]),
-            ));
+            return Err(refused(BizCode::IssueRefused, t("server.issue.wordsRequired", &[])));
         }
-        let channel = item.latest_session_id().and_then(|s| {
-            self.hub
-                .upgrade()?
-                .read(|st| st.sessions.iter().find(|x| &x.id == s).and_then(|x| x.channel_id().map(str::to_string)))
-        });
+        let channel = match item.latest_session_id() {
+            Some(sid) => self.board.session_async(sid).await.and_then(|x| x.channel_id().map(str::to_string)),
+            None => None,
+        };
         let thread = self.channel.issue_thread_async(&item.id, &item.title, channel.as_deref()).await?;
         let (msg, _) = self
             .channel
@@ -317,72 +328,59 @@ impl IssueChat {
     }
 
     /// Ensures an issue session has its thread opened and seat recorded.
-    pub fn ensure_session_thread(&self, h: &Session) {
+    pub async fn ensure_session_thread_async(&self, h: &Session) {
         if !h.is_board_worker() || h.issue_id().is_none() {
             return;
         }
-        let _guard = self.opening.lock();
+        let _guard = self.opening.lock().await;
         if self.channel.home_of(&h.id).is_none()
-            && let Err(e) = self.open_thread_locked(h)
+            && let Err(e) = self.open_thread_locked_async(h).await
         {
             warn(&format!("{}'s thread", h.id), &e);
         }
     }
 
-    fn on_transition(&self, tr: &Transition) {
-        if self.cancel.is_cancelled() {
-            return;
+    pub(crate) async fn handle_report_async(&self, report: &OutboxSessionReported) -> Result<(), ApiError> {
+        let s = match self.board.session_async(&report.id).await {
+            Some(s) => s,
+            None => match self.board.past_session_async(&report.id).await {
+                Some(s) => s,
+                None => return Ok(()),
+            },
+        };
+        if !s.is_board_worker() || s.issue_id().is_none() {
+            return Ok(());
         }
-        match &tr.fact {
-            Fact::SessionChanged(f)
-                if f.session.is_board_worker() && f.session.issue_id().is_some() && !tr.before.sessions.iter().any(|s| s.id == f.session.id) =>
-            {
-                let _guard = self.opening.lock();
-                if let Err(e) = self.open_thread_locked(&f.session) {
-                    warn(&format!("{}'s thread", f.session.id), &e);
-                }
-            }
-            Fact::SessionReported(f) => {
-                let Some(s) = tr
-                    .after
-                    .sessions
-                    .iter()
-                    .chain(&tr.before.sessions)
-                    .find(|s| s.id == f.id && s.is_board_worker() && s.issue_id().is_some())
-                else {
-                    return;
-                };
-                if let Err(e) = self.post_report(s, f) {
-                    warn("the report", &e);
-                }
-            }
-            _ => {}
+        if let Err(e) = self.post_report_async(&s, report).await {
+            warn("the report", &e);
         }
+        Ok(())
     }
 
-    fn issue_sessions(&self) -> Vec<Session> {
-        self.hub
-            .upgrade()
-            .map(|h| h.read(|s| s.sessions.iter().filter(|x| x.is_board_worker() && x.issue_id().is_some()).cloned().collect()))
+    async fn issue_sessions_async(&self) -> Vec<Session> {
+        self.board
+            .sessions_async()
+            .await
             .unwrap_or_default()
+            .into_iter()
+            .filter(|x| x.is_board_worker() && x.issue_id().is_some())
+            .collect()
     }
 
-    fn on_issue(&self, issue: &str) -> Option<Session> {
-        self.issue_sessions()
+    async fn on_issue_async(&self, issue: &str) -> Option<Session> {
+        self.issue_sessions_async()
+            .await
             .into_iter()
             .filter(|h| h.issue_id() == Some(issue))
             .max_by_key(|h| h.hired_at)
     }
 
-    fn session_issue(&self, session_id: &str) -> Option<String> {
-        self.hub.upgrade().and_then(|h| {
-            h.read(|s| {
-                s.sessions
-                    .iter()
-                    .find(|x| x.id == session_id && x.is_board_worker())
-                    .and_then(|x| x.issue_id().map(str::to_string))
-            })
-        })
+    async fn session_issue_async(&self, session_id: &str) -> Option<String> {
+        self.board
+            .session_async(session_id)
+            .await
+            .filter(|x| x.is_board_worker())
+            .and_then(|x| x.issue_id().map(str::to_string))
     }
 
     fn channel_of_session(&self, h: &Session) -> String {
@@ -392,19 +390,19 @@ impl IssueChat {
         }
     }
 
-    fn open_threads(&self) {
-        let _guard = self.opening.lock();
-        for h in self.issue_sessions() {
-            if let Err(e) = self.open_thread_locked(&h) {
+    async fn open_threads_async(&self) {
+        let _guard = self.opening.lock().await;
+        for h in self.issue_sessions_async().await {
+            if let Err(e) = self.open_thread_locked_async(&h).await {
                 warn(&format!("{}'s thread", h.id), &e);
             }
         }
     }
 
-    fn open_thread_locked(&self, h: &Session) -> Result<(), ApiError> {
+    async fn open_thread_locked_async(&self, h: &Session) -> Result<(), ApiError> {
         let Some(issue) = h.issue_id() else { return Ok(()) };
         if let Some(thread) = self.channel.thread_about(SubjectKind::Issue, issue) {
-            return self.handed_on(h, &thread);
+            return self.handed_on_async(h, &thread).await;
         }
         let channel = self.channel_of_session(h);
         let what = if h.is_refining() {
@@ -430,44 +428,49 @@ impl IssueChat {
                 ("what", what.into()),
             ],
         );
-        self.channel.note(Note {
-            channel: channel.clone(),
-            from: self.channel.orchestrator_in(&channel),
-            kind: MessageKind::Dispatch,
-            text,
-            meta: Meta {
-                session: Some(h.id.clone()),
-                ..Meta::default()
-            },
-            topic: Some(ThreadSubject {
-                kind: SubjectKind::Issue,
-                id: issue.to_string(),
-                owner: h.id.clone(),
-            }),
-            member: None,
-            seat: Some(Seat {
-                id: h.id.clone(),
-                name: h.name.clone(),
-                agent: h.profile.clone(),
-                home: None,
-            }),
-        })?;
+        self.channel
+            .note_async(Note {
+                channel: channel.clone(),
+                from: self.channel.orchestrator_in(&channel),
+                kind: MessageKind::Dispatch,
+                text,
+                meta: Meta {
+                    session: Some(h.id.clone()),
+                    ..Meta::default()
+                },
+                topic: Some(ThreadSubject {
+                    kind: SubjectKind::Issue,
+                    id: issue.to_string(),
+                    owner: h.id.clone(),
+                }),
+                member: None,
+                seat: Some(Seat {
+                    id: h.id.clone(),
+                    name: h.name.clone(),
+                    agent: h.profile.clone(),
+                    home: None,
+                }),
+            })
+            .await?;
         Ok(())
     }
 
-    fn handed_on(&self, h: &Session, thread: &str) -> Result<(), ApiError> {
-        self.channel.seat(&Seat {
-            id: h.id.clone(),
-            name: h.name.clone(),
-            agent: h.profile.clone(),
-            home: Some(thread.to_string()),
-        })?;
+    async fn handed_on_async(&self, h: &Session, thread: &str) -> Result<(), ApiError> {
+        self.channel
+            .seat_async(&Seat {
+                id: h.id.clone(),
+                name: h.name.clone(),
+                agent: h.profile.clone(),
+                home: Some(thread.to_string()),
+            })
+            .await?;
         if self.channel.members_of(thread).contains(&h.id) {
             return Ok(());
         }
         let channel = self.channel_of_session(h);
-        self.channel.read_up_to(&h.id, &channel, self.channel.latest(&channel)?)?;
-        let nth = self.channel.dispatch_count(thread)? + 2;
+        let latest = self.channel.latest_async(&channel).await?;
+        self.channel.read_up_to_async(&h.id, &channel, latest).await?;
+        let nth = self.channel.dispatch_count_async(thread).await? + 2;
         let text = if h.is_refining() {
             t(
                 "server.channel.dispatch.redraft",
@@ -479,25 +482,30 @@ impl IssueChat {
                 &[("id", h.id.clone().into()), ("name", h.name.clone().into()), ("nth", nth.into())],
             )
         };
-        self.channel.note(Note {
-            channel: thread.to_string(),
-            from: self.channel.orchestrator_in(thread),
-            kind: MessageKind::Dispatch,
-            text,
-            meta: Meta {
-                session: Some(h.id.clone()),
-                ..Meta::default()
-            },
-            topic: None,
-            member: Some(h.id.clone()),
-            seat: None,
-        })?;
+        self.channel
+            .note_async(Note {
+                channel: thread.to_string(),
+                from: self.channel.orchestrator_in(thread),
+                kind: MessageKind::Dispatch,
+                text,
+                meta: Meta {
+                    session: Some(h.id.clone()),
+                    ..Meta::default()
+                },
+                topic: None,
+                member: Some(h.id.clone()),
+                seat: None,
+            })
+            .await?;
         Ok(())
     }
 
-    fn replay_reports(&self) {
+    async fn replay_reports_async(&self) {
         let store = self.board.sessions().durable_store();
-        let docs = match store.read(|r| r.documents_by_kind("run", "issue.report")) {
+        let docs = match store
+            .read_async(|r| Box::pin(async move { r.documents_by_kind_async("run", "issue.report").await }))
+            .await
+        {
             Ok(d) => d,
             Err(e) => {
                 eprintln!("vibevalley: report outbox: {e}");
@@ -527,35 +535,40 @@ impl IssueChat {
                 member: None,
                 seat: None,
             };
-            if let Err(e) = self.deliver_report(note, Some(&d.scope_id)) {
+            if let Err(e) = self.deliver_report_async(note, Some(&d.scope_id)).await {
                 warn("replay report", &e);
             }
         }
     }
 
-    fn deliver_report(&self, note: Note, run: Option<&str>) -> Result<(), ApiError> {
-        self.channel.note_once(note, run.map(|id| format!("report:{id}")))?;
+    async fn deliver_report_async(&self, note: Note, run: Option<&str>) -> Result<(), ApiError> {
+        self.channel.note_once_async(note, run.map(|id| format!("report:{id}"))).await?;
         if let Some(id) = run {
             self.board
                 .sessions()
                 .durable_store()
-                .write(|tx| tx.delete_document("run", id, "issue.report"))
-                .map_err(|e| ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?;
+                .write_with_async(id.to_string(), |tx, id| {
+                    Box::pin(async move { tx.delete_document_async("run", &id, "issue.report").await })
+                })
+                .await
+                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
         }
         Ok(())
     }
 
-    fn post_report(&self, h: &Session, f: &FactSessionReported) -> Result<(), ApiError> {
+    async fn post_report_async(&self, h: &Session, f: &OutboxSessionReported) -> Result<(), ApiError> {
         if h.is_refining() {
             let Some(thread) = h.issue_id().and_then(|i| self.channel.issue_thread_id(i)) else {
                 return Ok(());
             };
-            self.channel.notice(Noticing {
-                channel: thread,
-                text: f.summary.clone(),
-                code: "issue_refinement".into(),
-                ..Noticing::default()
-            });
+            self.channel
+                .notice_async(Noticing {
+                    channel: thread,
+                    text: f.summary.clone(),
+                    code: "issue_refinement".into(),
+                    ..Noticing::default()
+                })
+                .await;
             return Ok(());
         }
         if f.outcome == Outcome::Interrupted {
@@ -568,7 +581,7 @@ impl IssueChat {
         else {
             return Ok(());
         };
-        self.deliver_report(
+        self.deliver_report_async(
             Note {
                 channel: thread,
                 from: h.id.clone(),
@@ -585,7 +598,8 @@ impl IssueChat {
                 seat: None,
             },
             f.run.as_deref(),
-        )?;
+        )
+        .await?;
         Ok(())
     }
 
@@ -598,7 +612,7 @@ impl IssueChat {
         }
         if let Ok(pending) = self.channel.pending_deliveries_async(DeliveryTargetKind::Session).await {
             for d in pending.into_iter().filter(|d| d.wakes) {
-                if let Some(issue_id) = self.session_issue(&d.recipient_id) {
+                if let Some(issue_id) = self.session_issue_async(&d.recipient_id).await {
                     self.enqueue_lane(
                         issue_id.clone(),
                         IssueWake::Session {
@@ -618,7 +632,11 @@ impl IssueChat {
             match d.recipient_kind {
                 DeliveryTargetKind::Issue => {
                     let issue_id = d.recipient_id.clone();
-                    let owner = self.on_issue(&issue_id).map(|s| s.id).unwrap_or_else(|| format!("issue:{issue_id}"));
+                    let owner = self
+                        .on_issue_async(&issue_id)
+                        .await
+                        .map(|s| s.id)
+                        .unwrap_or_else(|| format!("issue:{issue_id}"));
                     let mail_key = format!("issue:{issue_id}:{}", d.message_id);
                     let _ = sessions
                         .enqueue_mailbox_async(
@@ -638,8 +656,8 @@ impl IssueChat {
                     );
                 }
                 DeliveryTargetKind::Session if d.wakes => {
-                    if let Some(issue_id) = self.session_issue(&d.recipient_id) {
-                        let owner = self.on_issue(&issue_id).map(|s| s.id).unwrap_or_else(|| d.recipient_id.clone());
+                    if let Some(issue_id) = self.session_issue_async(&d.recipient_id).await {
+                        let owner = self.on_issue_async(&issue_id).await.map(|s| s.id).unwrap_or_else(|| d.recipient_id.clone());
                         let mail_key = format!("issue:{issue_id}:{}", d.message_id);
                         let _ = sessions
                             .enqueue_mailbox_async(
@@ -749,7 +767,7 @@ impl IssueChat {
             let _ = self.channel.withdraw_delivery_async(delivery.id).await;
             return;
         };
-        let on = self.on_issue(&delivery.recipient_id).map(|h| h.id);
+        let on = self.on_issue_async(&delivery.recipient_id).await.map(|h| h.id);
         let mut text = c.row.body.trim().to_string();
         if let Some(vc) = view_context_of(&c) {
             text = format!("{}\n{text}", format_artifact_view_context(&vc));
@@ -797,9 +815,7 @@ impl IssueChat {
             }
             Err(e) => {
                 let _ = self.channel.settle_delivery_async(delivery.id, false).await;
-                if let Some(hub) = self.hub.upgrade() {
-                    hub.notice(NoticeLevel::Warn, e.to_string());
-                }
+                self.live.publish_notice(now(), NoticeLevel::Warn, e.to_string());
             }
         }
     }
@@ -856,9 +872,7 @@ impl IssueChat {
             }
             Err(e) => {
                 let _ = self.channel.settle_delivery_async(delivery.id, false).await;
-                if let Some(hub) = self.hub.upgrade() {
-                    hub.notice(NoticeLevel::Warn, e.to_string());
-                }
+                self.live.publish_notice(now(), NoticeLevel::Warn, e.to_string());
             }
         }
     }
@@ -873,71 +887,94 @@ struct DirectWake {
 /// Bridges session seating, direct-talk reports, and asynchronous per-target
 /// direct-channel talk onto `Chat`.
 pub struct SessionChat {
-    hub: Weak<Hub>,
-    board: Board,
+    board: IssueStore,
     channel: Arc<Chat>,
-    agents: Arc<Agents>,
+    agents: Arc<AgentStore>,
     cancel: CancellationToken,
-    sub: Mutex<Option<Subscription>>,
     coordinator: Mutex<Option<TaskHandle<()>>>,
     lanes: Mutex<HashMap<String, flume::Sender<DirectWake>>>,
     lane_tasks: TaskTracker,
 }
 
 impl SessionChat {
-    pub fn start(hub: &Arc<Hub>, board: Board, channel: Arc<Chat>, agents: Arc<Agents>, ensure_issue_thread: Arc<dyn Fn(&Session) + Send + Sync>) -> Arc<Self> {
+    pub fn start(
+        runtime: &Arc<Runtime>,
+        outbox: &Arc<Outbox>,
+        board: IssueStore,
+        channel: Arc<Chat>,
+        agents: Arc<AgentStore>,
+        issue_chat: Option<Arc<IssueChat>>,
+    ) -> Arc<Self> {
         let dispatches = channel.dispatches();
         let mut removals = channel.subscribe_removals();
-        let cancel = hub.child_token();
+        let cancel = runtime.child_token();
         let sc = Arc::new(Self {
-            hub: Arc::downgrade(hub),
-            board,
+            board: board.clone(),
             channel: channel.clone(),
             agents,
             cancel: cancel.clone(),
-            sub: Mutex::new(None),
             coordinator: Mutex::new(None),
             lanes: Mutex::new(HashMap::new()),
             lane_tasks: TaskTracker::new(),
         });
 
         {
-            let h = Arc::downgrade(hub);
+            let rt = runtime.clone();
+            let b = board.clone();
             let c = channel.clone();
+            let ic = issue_chat.as_ref().map(Arc::downgrade);
             channel.ensure_seated(move |who| {
-                let Some(hub) = h.upgrade() else { return };
                 if c.home_of(who).is_some() {
                     return;
                 }
-                let Some(session) = hub.read(|s| {
-                    s.sessions
-                        .iter()
-                        .find(|x| x.id == who && (x.is_board_worker() || x.is_direct_talker()))
-                        .cloned()
-                }) else {
-                    return;
-                };
-                if session.issue_id().is_some() {
-                    ensure_issue_thread(&session);
-                } else {
-                    seat_direct_session(&c, &session);
+                let who = who.to_string();
+                let b = b.clone();
+                let c = c.clone();
+                let ic = ic.clone();
+                rt.spawn(async move {
+                    let Some(session) = b.session_async(&who).await.filter(|x| x.is_board_worker() || x.is_direct_talker()) else {
+                        return;
+                    };
+                    if session.issue_id().is_some() {
+                        if let Some(ic) = ic.as_ref().and_then(std::sync::Weak::upgrade) {
+                            ic.ensure_session_thread_async(&session).await;
+                        }
+                    } else {
+                        seat_direct_session_async(&c, &session).await;
+                    }
+                });
+            });
+        }
+
+        {
+            let ic = issue_chat.as_ref().map(Arc::downgrade);
+            let sc_weak = Arc::downgrade(&sc);
+            outbox.register(OUTBOX_SESSION_REPORTED, move |delivery| {
+                let ic = ic.clone();
+                let sc_weak = sc_weak.clone();
+                async move {
+                    let report: OutboxSessionReported =
+                        serde_json::from_value(delivery.payload).map_err(|e| format!("invalid {OUTBOX_SESSION_REPORTED} payload: {e}"))?;
+                    if let Some(ic) = ic.as_ref().and_then(std::sync::Weak::upgrade) {
+                        ic.handle_report_async(&report).await.map_err(|e| e.to_string())?;
+                    }
+                    if let Some(sc) = sc_weak.upgrade() {
+                        sc.handle_report_async(&report).await;
+                    }
+                    Ok::<(), String>(())
                 }
             });
         }
 
         let w = Arc::downgrade(&sc);
-        let sub = hub.subscribe_transitions("session-chat", move |hub, tr: &Transition| {
-            let Some(sc) = w.upgrade() else { return };
-            sc.on_transition(hub, tr);
-        });
-        *sc.sub.lock() = Some(sub);
-
-        let w = Arc::downgrade(&sc);
+        let mut session_events = sc.board.sessions().subscribe_events();
         let task_cancel = cancel;
-        let coordinator = hub.spawn_task(async move {
+        let coordinator = runtime.spawn(async move {
             enum CoordinatorEvent {
                 Dispatched(ChannelDispatched),
                 Removed(String),
+                Lifecycle(SessionLifecycleEvent),
+                LaggedLifecycle,
                 Ignore,
                 Stop,
             }
@@ -956,6 +993,11 @@ impl SessionChat {
                         Err(broadcast::error::RecvError::Lagged(_)) => CoordinatorEvent::Ignore,
                         Err(broadcast::error::RecvError::Closed) => CoordinatorEvent::Stop,
                     },
+                    res = session_events.recv() => match res {
+                        Ok(ev) => CoordinatorEvent::Lifecycle(ev),
+                        Err(broadcast::error::RecvError::Lagged(_)) => CoordinatorEvent::LaggedLifecycle,
+                        Err(broadcast::error::RecvError::Closed) => CoordinatorEvent::Stop,
+                    },
                 };
                 let Some(sc) = w.upgrade() else { return };
                 if sc.cancel.is_cancelled() {
@@ -967,6 +1009,20 @@ impl SessionChat {
                     }
                     CoordinatorEvent::Removed(message_id) => {
                         sc.withdraw_message_mailbox_async(&message_id).await;
+                    }
+                    CoordinatorEvent::Lifecycle(SessionLifecycleEvent::Changed(session)) => {
+                        if session.is_direct_talker() && session.issue_id().is_none() {
+                            seat_direct_session_async(&sc.channel, &session).await;
+                        }
+                    }
+                    CoordinatorEvent::Lifecycle(SessionLifecycleEvent::Left { id, .. }) => {
+                        if let Err(e) = sc.channel.leave_async(&id).await {
+                            eprintln!("vibevalley-server: session-chat: leave {id}: {}", e.message);
+                        }
+                        sessions_left_async(&sc.board, &sc.channel).await;
+                    }
+                    CoordinatorEvent::LaggedLifecycle => {
+                        sc.sync_seats_async().await;
                     }
                     CoordinatorEvent::Ignore => {}
                     CoordinatorEvent::Stop => return,
@@ -980,10 +1036,6 @@ impl SessionChat {
 
     pub async fn close_async(&self) {
         self.cancel.cancel();
-        let sub = self.sub.lock().take();
-        if let Some(sub) = sub {
-            sub.close_async().await;
-        }
         self.lanes.lock().clear();
         let coordinator = self.coordinator.lock().take();
         let timed_out = tokio::time::timeout(CHAT_CLOSE_GRACE, async {
@@ -1005,14 +1057,16 @@ impl SessionChat {
         }
     }
 
-    async fn boot_async(self: &Arc<Self>) {
-        if let Some(hub) = self.hub.upgrade() {
-            let talks: Vec<Session> = hub.read(|s| s.sessions.iter().filter(|x| x.is_direct_talker() && x.issue_id().is_none()).cloned().collect());
-            for h in &talks {
-                seat_direct_session_async(&self.channel, h).await;
-            }
-            sessions_left_async(&hub, &self.channel).await;
+    async fn sync_seats_async(&self) {
+        let sessions = self.board.sessions_async().await.unwrap_or_default();
+        for h in sessions.iter().filter(|x| x.is_direct_talker() && x.issue_id().is_none()) {
+            seat_direct_session_async(&self.channel, h).await;
         }
+        sessions_left_async(&self.board, &self.channel).await;
+    }
+
+    async fn boot_async(self: &Arc<Self>) {
+        self.sync_seats_async().await;
         if let Ok(pending) = self.channel.pending_deliveries_async(DeliveryTargetKind::Direct).await {
             for d in pending {
                 self.enqueue_lane(d.recipient_id.clone(), DirectWake { delivery: d, committed: None });
@@ -1024,35 +1078,16 @@ impl SessionChat {
         let _ = self.board.sessions().withdraw_mailbox_by_message_async(message_id).await;
     }
 
-    fn on_transition(&self, hub: &Arc<Hub>, tr: &Transition) {
-        if self.cancel.is_cancelled() {
-            return;
-        }
-        match &tr.fact {
-            Fact::SessionChanged(f)
-                if f.session.is_direct_talker() && f.session.issue_id().is_none() && !tr.before.sessions.iter().any(|s| s.id == f.session.id) =>
-            {
-                seat_direct_session(&self.channel, &f.session);
-            }
-            Fact::SessionLeft(f) => {
-                if let Err(e) = self.channel.leave(&f.id) {
-                    eprintln!("vibevalley-server: session-chat: leave {}: {}", f.id, e.message);
-                }
-                sessions_left(hub, &self.channel);
-            }
-            Fact::SessionReported(f) => {
-                let Some(s) = tr
-                    .after
-                    .sessions
-                    .iter()
-                    .chain(&tr.before.sessions)
-                    .find(|s| s.id == f.id && s.is_direct_talker() && s.issue_id().is_none())
-                else {
-                    return;
-                };
-                post_talk_report(&self.channel, s, f);
-            }
-            _ => {}
+    pub(crate) async fn handle_report_async(&self, report: &OutboxSessionReported) {
+        let s = match self.board.session_async(&report.id).await {
+            Some(s) => s,
+            None => match self.board.past_session_async(&report.id).await {
+                Some(s) => s,
+                None => return,
+            },
+        };
+        if s.is_direct_talker() && s.issue_id().is_none() {
+            post_talk_report_async(&self.channel, &s, report).await;
         }
     }
 
@@ -1061,7 +1096,8 @@ impl SessionChat {
         for d in dispatched.deliveries {
             if d.recipient_kind == DeliveryTargetKind::Direct {
                 let mailbox_owner = sessions
-                    .talker(&d.recipient_id, &d.channel_id)
+                    .talker_async(&d.recipient_id, &d.channel_id)
+                    .await
                     .map(|s| s.id)
                     .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
                 let key = direct_mail_key(&d.recipient_id, &d.message_id);
@@ -1157,7 +1193,8 @@ impl SessionChat {
             return;
         }
         let mailbox_owner = sessions
-            .talker(&d.recipient_id, &d.channel_id)
+            .talker_async(&d.recipient_id, &d.channel_id)
+            .await
             .map(|s| s.id)
             .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
         let mail_entry = sessions
@@ -1244,32 +1281,15 @@ async fn seat_direct_session_async(channel: &Chat, h: &Session) {
     }
 }
 
-fn seat_direct_session(channel: &Chat, h: &Session) {
-    let Some(direct) = direct_of_session(channel, h) else { return };
-    if let Err(e) = channel.seat(&Seat {
-        id: h.id.clone(),
-        name: h.name.clone(),
-        agent: h.profile.clone(),
-        home: Some(direct.clone()),
-    }) {
-        eprintln!("vibevalley-server: session-chat: seat {}: {}", h.id, e.message);
-        return;
-    }
-    if !channel.members_of(&direct).contains(&h.id)
-        && let Err(e) = channel.add_follower(&direct, &h.id)
-    {
-        eprintln!("vibevalley-server: session-chat: follower {}: {}", h.id, e.message);
-    }
-}
-
-async fn sessions_left_async(hub: &Hub, channel: &Chat) {
-    let on: Vec<String> = hub.read(|s| {
-        s.sessions
-            .iter()
-            .filter(|h| h.is_board_worker() || h.is_direct_talker())
-            .map(|h| h.id.clone())
-            .collect()
-    });
+async fn sessions_left_async(board: &IssueStore, channel: &Chat) {
+    let on: Vec<String> = board
+        .sessions_async()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|h| h.is_board_worker() || h.is_direct_talker())
+        .map(|h| h.id)
+        .collect();
     for p in channel.participants() {
         let Some(agent) = p.agent_id.as_deref() else { continue };
         if p.id == profile_id(agent) || p.left_at.is_some() || on.contains(&p.id) {
@@ -1281,26 +1301,7 @@ async fn sessions_left_async(hub: &Hub, channel: &Chat) {
     }
 }
 
-fn sessions_left(hub: &Hub, channel: &Chat) {
-    let on: Vec<String> = hub.read(|s| {
-        s.sessions
-            .iter()
-            .filter(|h| h.is_board_worker() || h.is_direct_talker())
-            .map(|h| h.id.clone())
-            .collect()
-    });
-    for p in channel.participants() {
-        let Some(agent) = p.agent_id.as_deref() else { continue };
-        if p.id == profile_id(agent) || p.left_at.is_some() || on.contains(&p.id) {
-            continue;
-        }
-        if let Err(e) = channel.leave(&p.id) {
-            eprintln!("vibevalley-server: session-chat: leave {}: {}", p.id, e.message);
-        }
-    }
-}
-
-fn post_talk_report(channel: &Chat, h: &Session, f: &FactSessionReported) {
+async fn post_talk_report_async(channel: &Chat, h: &Session, f: &OutboxSessionReported) {
     if f.outcome == Outcome::Interrupted {
         return;
     }
@@ -1322,7 +1323,7 @@ fn post_talk_report(channel: &Chat, h: &Session, f: &FactSessionReported) {
         member: None,
         seat: None,
     };
-    if let Err(e) = channel.note_once(note, f.run.as_ref().map(|id| format!("report:{id}"))) {
+    if let Err(e) = channel.note_once_async(note, f.run.as_ref().map(|id| format!("report:{id}"))).await {
         eprintln!("vibevalley-server: session-chat: talk report {}: {}", h.id, e.message);
     }
 }
@@ -1332,129 +1333,131 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use super::*;
-    use crate::content::attachment::Attachments;
+    use crate::app::slice::SliceProjector;
+    use crate::content::attachment::AttachmentStore;
     use crate::db::ServerDb;
     use crate::work::ledger::BoardConfig;
-    use crate::work::session::RuntimeDrivers;
+    use crate::work::session::RuntimeDriver;
 
-    async fn test_issue_chat_async(dir: &std::path::Path) -> (Arc<ServerDb>, Arc<Hub>, Board, Arc<Chat>, Arc<IssueChat>) {
+    async fn test_issue_chat_async(dir: &std::path::Path) -> (Arc<ServerDb>, Arc<Runtime>, IssueStore, Arc<Chat>, Arc<IssueChat>) {
         let db = ServerDb::open(dir).unwrap();
-        let hub = Hub::new(vibevalley_core::empty_space_state());
-        let files = Attachments::open(dir, db.clone());
-        let channel = Chat::open(db.clone(), &hub, files, None, false).unwrap();
-        let board = Board::open_with_async(
+        let runtime = Arc::new(Runtime::new());
+        let live = Arc::new(LiveOverlay::new());
+        let projector = Arc::new(SliceProjector::new());
+        let outbox = Arc::new(Outbox::new(db.clone()));
+        let files = AttachmentStore::open(dir, db.clone());
+        let channel = Chat::open_async(db.clone(), runtime.clone(), live.clone(), projector.clone(), files, None, false)
+            .await
+            .unwrap();
+        let board = IssueStore::open_with_async(
             db.clone(),
-            Arc::new(RuntimeDrivers {
+            live.clone(),
+            projector,
+            outbox,
+            runtime.clone(),
+            None,
+            Arc::new(RuntimeDriver {
                 registry: Arc::new(vibevalley_runtime::oar::Registry::new()),
                 model: None,
             }),
             BoardConfig::under(dir),
-            Arc::new(Arc::downgrade(&hub)),
-            Some(Arc::downgrade(&hub)),
-            |_| {},
         )
         .await
         .unwrap();
         let ic = Arc::new(IssueChat {
-            hub: Arc::downgrade(&hub),
+            live,
             board: board.clone(),
             channel: channel.clone(),
-            opening: Mutex::new(()),
-            cancel: hub.child_token(),
-            sub: Mutex::new(None),
+            opening: tokio::sync::Mutex::new(()),
+            cancel: runtime.child_token(),
             coordinator: Mutex::new(None),
             lanes: Mutex::new(HashMap::new()),
             lane_tasks: TaskTracker::new(),
             next_waiter_id: AtomicU64::new(1),
             delivery_waiters: Mutex::new(HashMap::new()),
         });
-        (db, hub, board, channel, ic)
+        (db, runtime, board, channel, ic)
     }
 
-    #[test]
-    fn await_comment_delivery_wakes_on_settle_and_fast_paths_when_settled() {
+    #[tokio::test]
+    async fn await_comment_delivery_wakes_on_settle_and_fast_paths_when_settled() {
         let dir = tempfile::tempdir().unwrap();
-        vibevalley_runtime::rt::block_on(async {
-            let (db, hub, board, channel, ic) = test_issue_chat_async(dir.path()).await;
-            let thread = channel.issue_thread_async("i-1", "test issue", None).await.unwrap();
-            let (msg, _) = channel
-                .say_async(Saying {
-                    channel: Some(thread),
-                    text: "please check".into(),
-                    send_key: "comment-wait-1".into(),
-                    ..Saying::default()
-                })
+        let (db, runtime, board, channel, ic) = test_issue_chat_async(dir.path()).await;
+        let thread = channel.issue_thread_async("i-1", "test issue", None).await.unwrap();
+        let (msg, _) = channel
+            .say_async(Saying {
+                channel: Some(thread),
+                text: "please check".into(),
+                send_key: "comment-wait-1".into(),
+                ..Saying::default()
+            })
+            .await
+            .unwrap();
+
+        // 1. Active waiter wakes immediately when the lane settles the delivery.
+        let waiter_ic = ic.clone();
+        let msg_id = msg.id.clone();
+        let waiter = tokio::spawn(async move { waiter_ic.await_comment_delivery_for("i-1", &msg_id, COMMENT_DELIVERY_TIMEOUT).await });
+        while !ic.delivery_waiters.lock().contains_key(&msg.id) {
+            assert!(!waiter.is_finished(), "waiter exited before settlement while delivery was pending");
+            tokio::task::yield_now().await;
+        }
+        ic.notify_delivery_settled(&msg.id);
+        assert!(waiter.await.unwrap(), "notify_delivery_settled must wake active waiter");
+        assert!(ic.delivery_waiters.lock().is_empty());
+
+        // 2. Already-settled delivery in SQLite returns immediately without leaving a waiter.
+        let pending = channel.pending_deliveries_async(DeliveryTargetKind::Issue).await.unwrap();
+        assert!(!pending.is_empty());
+        for d in pending {
+            channel.settle_delivery_async(d.id, true).await.unwrap();
+        }
+        assert!(ic.await_comment_delivery_for("i-1", &msg.id, COMMENT_DELIVERY_TIMEOUT).await);
+        assert!(ic.delivery_waiters.lock().is_empty());
+
+        ic.close_async().await;
+        board.close();
+        let _ = runtime.shutdown(Duration::from_secs(1)).await;
+        db.close_async().await;
+    }
+
+    #[tokio::test]
+    async fn await_comment_delivery_obeys_virtual_timeout_and_cleans_waiter() {
+        let dir = tempfile::tempdir().unwrap();
+        let (db, runtime, board, _channel, ic) = test_issue_chat_async(dir.path()).await;
+
+        tokio::time::pause();
+        let (waiter_id, rx) = ic.register_delivery_waiter("m-stuck").expect("waiter registered");
+        let wall_start = Instant::now();
+        let waiter_ic = ic.clone();
+        let waiter = tokio::spawn(async move {
+            waiter_ic
+                .wait_for_delivery_signal("i-1", "m-stuck", waiter_id, rx, COMMENT_DELIVERY_TIMEOUT)
                 .await
-                .unwrap();
-
-            // 1. Active waiter wakes immediately when the lane settles the delivery.
-            let waiter_ic = ic.clone();
-            let msg_id = msg.id.clone();
-            let waiter = tokio::spawn(async move { waiter_ic.await_comment_delivery_for("i-1", &msg_id, COMMENT_DELIVERY_TIMEOUT).await });
-            while !ic.delivery_waiters.lock().contains_key(&msg.id) {
-                assert!(!waiter.is_finished(), "waiter exited before settlement while delivery was pending");
-                tokio::task::yield_now().await;
-            }
-            ic.notify_delivery_settled(&msg.id);
-            assert!(waiter.await.unwrap(), "notify_delivery_settled must wake active waiter");
-            assert!(ic.delivery_waiters.lock().is_empty());
-
-            // 2. Already-settled delivery in SQLite returns immediately without leaving a waiter.
-            let pending = channel.pending_deliveries_async(DeliveryTargetKind::Issue).await.unwrap();
-            assert!(!pending.is_empty());
-            for d in pending {
-                channel.settle_delivery_async(d.id, true).await.unwrap();
-            }
-            assert!(ic.await_comment_delivery_for("i-1", &msg.id, COMMENT_DELIVERY_TIMEOUT).await);
-            assert!(ic.delivery_waiters.lock().is_empty());
-
-            ic.close_async().await;
-            board.close();
-            hub.close_async().await;
-            db.close_async().await;
-        });
-    }
-
-    #[test]
-    fn await_comment_delivery_obeys_virtual_timeout_and_cleans_waiter() {
-        let dir = tempfile::tempdir().unwrap();
-        let (db, hub, board, _channel, ic) = vibevalley_runtime::rt::block_on(test_issue_chat_async(dir.path()));
-
-        let rt = tokio::runtime::Builder::new_current_thread().enable_all().start_paused(true).build().unwrap();
-        rt.block_on(async {
-            let (waiter_id, rx) = ic.register_delivery_waiter("m-stuck").expect("waiter registered");
-            let wall_start = Instant::now();
-            let waiter_ic = ic.clone();
-            let waiter = tokio::spawn(async move {
-                waiter_ic
-                    .wait_for_delivery_signal("i-1", "m-stuck", waiter_id, rx, COMMENT_DELIVERY_TIMEOUT)
-                    .await
-            });
-
-            tokio::task::yield_now().await;
-            tokio::time::advance(COMMENT_DELIVERY_TIMEOUT - Duration::from_millis(1)).await;
-            tokio::task::yield_now().await;
-            assert!(!waiter.is_finished(), "waiter must not time out before full 10s budget");
-
-            tokio::time::advance(Duration::from_millis(1)).await;
-            let settled = waiter.await.unwrap();
-            assert!(!settled, "unsettled pending delivery must time out");
-            assert!(
-                wall_start.elapsed() < Duration::from_secs(1),
-                "10s virtual timeout must complete instantaneously, took {:?}",
-                wall_start.elapsed()
-            );
-            assert!(
-                !ic.delivery_waiters.lock().contains_key("m-stuck"),
-                "timed-out waiter must be cleaned up from delivery_waiters"
-            );
         });
 
-        vibevalley_runtime::rt::block_on(async {
-            ic.close_async().await;
-            board.close();
-            hub.close_async().await;
-            db.close_async().await;
-        });
+        tokio::task::yield_now().await;
+        tokio::time::advance(COMMENT_DELIVERY_TIMEOUT - Duration::from_millis(1)).await;
+        tokio::task::yield_now().await;
+        assert!(!waiter.is_finished(), "waiter must not time out before full 10s budget");
+
+        tokio::time::advance(Duration::from_millis(1)).await;
+        let settled = waiter.await.unwrap();
+        assert!(!settled, "unsettled pending delivery must time out");
+        assert!(
+            wall_start.elapsed() < Duration::from_secs(1),
+            "10s virtual timeout must complete instantaneously, took {:?}",
+            wall_start.elapsed()
+        );
+        assert!(
+            !ic.delivery_waiters.lock().contains_key("m-stuck"),
+            "timed-out waiter must be cleaned up from delivery_waiters"
+        );
+        tokio::time::resume();
+
+        ic.close_async().await;
+        board.close();
+        let _ = runtime.shutdown(Duration::from_secs(1)).await;
+        db.close_async().await;
     }
 }

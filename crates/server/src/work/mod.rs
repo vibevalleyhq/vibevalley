@@ -13,16 +13,17 @@ mod tests {
 
     use sea_orm::DatabaseBackend;
     use vibevalley_protocol::{
-        ActorKind, Cron, CronWhen, CronWhenOnce, ExecutionPolicy, Fact, Issue, Outcome, PublishPlatform, PullRequestState, Run, RunTrigger, RunTriggerKind,
-        Session, SessionController, SessionEvent, SessionEventType, SessionPermissionMode, SessionSubagents,
+        ActorKind, Cron, CronWhen, CronWhenOnce, ExecutionPolicy, Issue, Outcome, PublishPlatform, PullRequestState, Run, RunTrigger, RunTriggerKind, Session,
+        SessionController, SessionEvent, SessionEventType, SessionPermissionMode, SessionSubagents, SliceMask,
     };
 
     use super::cron::db as cron_db;
     use super::issue::{SqliteIssueStore, db as issue_db};
-    use super::ledger::{Ledger, LocalFacts};
-    use super::pull::{PullStore, UpsertPullInput};
+    use super::ledger::Ledger;
+    use super::pull::{PullRepo, UpsertPullInput};
     use super::session::mailbox::{MailboxSource, MailboxStatus, SessionMailbox};
     use super::session::{SqliteSessionStore, db as session_db};
+    use crate::app::{live::LiveOverlay, outbox::Outbox, slice::SliceProjector};
     use crate::db::ServerDb;
     use crate::db::test_pg::EphemeralPostgres;
 
@@ -30,9 +31,14 @@ mod tests {
         assert_eq!(db.backend(), expected_backend);
 
         // 1. Ledger + issue + sequence persistence inside durable tx
+        let live = Arc::new(LiveOverlay::new());
+        let projector = Arc::new(SliceProjector::new());
+        let outbox = Arc::new(Outbox::new(db.clone()));
         let (ledger, opened) = Ledger::open_async(
             db.clone(),
-            Arc::new(LocalFacts::default()),
+            live.clone(),
+            projector.clone(),
+            outbox.clone(),
             Arc::new(SqliteIssueStore),
             Arc::new(SqliteSessionStore),
         )
@@ -48,10 +54,7 @@ mod tests {
         let mut iss1 = Issue::new("iss-1", n1, "First issue", 100);
         iss1.description = "details".into();
         let iss2 = Issue::new("iss-2", n2, "Second issue", 101);
-        ledger
-            .apply_async(vec![Fact::issue_changed(100, iss1.clone()), Fact::issue_changed(101, iss2)])
-            .await
-            .unwrap();
+        ledger.put_issues_async(&[iss1.clone(), iss2]).await.unwrap();
 
         // Queued words survive subsequent PutIssue ON CONFLICT DO UPDATE
         ledger
@@ -60,7 +63,7 @@ mod tests {
             .unwrap();
         let mut iss1_updated = iss1.clone();
         iss1_updated.title = "First issue updated".into();
-        ledger.apply_async(vec![Fact::issue_changed(102, iss1_updated)]).await.unwrap();
+        ledger.put_issues_async(&[iss1_updated]).await.unwrap();
         let kept = ledger.write_db_async(async |c| issue_db::take_words(c, "iss-1").await).await.unwrap();
         assert_eq!(kept, vec!["follow up".to_string()]);
         assert!(
@@ -75,7 +78,13 @@ mod tests {
         let s1 = Session::new("s-1", SessionController::IssueBoard, "Alice", "scripted", ExecutionPolicy::SandboxDir, 200);
         let s2 = Session::new("s-2", SessionController::User, "Bob", "scripted", ExecutionPolicy::SandboxDir, 201);
         ledger
-            .apply_async(vec![Fact::session_changed(200, s1.clone()), Fact::session_changed(201, s2.clone())])
+            .commit_tx_async(SliceMask::SESSIONS, move |tx, _, session_store| {
+                Box::pin(async move {
+                    session_store.put(tx, &s1, false).await?;
+                    session_store.put(tx, &s2, false).await?;
+                    Ok(((), false))
+                })
+            })
             .await
             .unwrap();
 
@@ -151,8 +160,16 @@ mod tests {
         assert_eq!(issue_runs.len(), 1);
 
         // Depart s-2 and verify past_session_async works
-        ledger.apply_async(vec![Fact::session_left(250, "s-2", None)]).await.unwrap();
-        assert!(ledger.session("s-2").is_none());
+        ledger
+            .commit_tx_async(SliceMask::SESSIONS, |tx, _, session_store| {
+                Box::pin(async move {
+                    session_store.leave(tx, "s-2", 250).await?;
+                    Ok(((), false))
+                })
+            })
+            .await
+            .unwrap();
+        assert!(ledger.session_async("s-2").await.unwrap().is_none());
         assert_eq!(ledger.past_session_async("s-2").await.map(|s| s.id), Some("s-2".into()));
 
         // Mailbox idempotency, claim_next, withdraw_by_message, settle
@@ -256,14 +273,14 @@ mod tests {
         assert!(!crons[0].cron.pending);
         assert_eq!(crons[0].issue_id.as_deref(), Some("iss-2"));
 
-        ledger.apply_async(vec![Fact::issue_removed(601, "iss-2")]).await.unwrap();
+        ledger.remove_issue_async("iss-2").await.unwrap();
         let crons_after_delete = cron_db::list(db.read_conn()).await.unwrap();
         assert_eq!(crons_after_delete[0].issue_id, None);
         cron_db::remove(db.write_conn(), "cron-1").await.unwrap();
         assert!(cron_db::list(db.read_conn()).await.unwrap().is_empty());
 
-        // 4. PullStore persistence + ON CONFLICT COALESCE + pull_event ON CONFLICT DO NOTHING
-        let pulls = PullStore::open_async(db.clone()).await.unwrap();
+        // 4. PullRepo persistence + ON CONFLICT COALESCE + pull_event ON CONFLICT DO NOTHING
+        let pulls = PullRepo::open_async(db.clone()).await.unwrap();
         let p = pulls
             .upsert_async(UpsertPullInput {
                 platform: PublishPlatform::Github,
@@ -303,27 +320,27 @@ mod tests {
         assert_eq!(known.len(), 1);
         assert_eq!(known[0].bot_round, Some(1));
 
-        let reopened_pulls = PullStore::open_async(db.clone()).await.unwrap();
+        let reopened_pulls = PullRepo::open_async(db.clone()).await.unwrap();
         assert_eq!(reopened_pulls.find("acme/app", 7).unwrap().check_revision, 1);
 
-        // 5. Reopen Ledger on fresh LocalFacts to verify end-to-end reload from DB
-        let (reloaded, _) = Ledger::open_async(db, Arc::new(LocalFacts::default()), Arc::new(SqliteIssueStore), Arc::new(SqliteSessionStore))
+        // 5. Reopen Ledger on fresh spine primitives to verify end-to-end reload from DB
+        let (reloaded, _) = Ledger::open_async(db, live, projector, outbox, Arc::new(SqliteIssueStore), Arc::new(SqliteSessionStore))
             .await
             .unwrap();
-        assert_eq!(reloaded.issue("iss-1").unwrap().title, "First issue updated");
-        assert!(reloaded.issue("iss-2").is_none());
-        let reloaded_s1 = reloaded.session("s-1").unwrap();
+        assert_eq!(reloaded.issue_async("iss-1").await.unwrap().unwrap().title, "First issue updated");
+        assert!(reloaded.issue_async("iss-2").await.unwrap().is_none());
+        let reloaded_s1 = reloaded.session_async("s-1").await.unwrap().unwrap();
         assert_eq!(reloaded_s1.subagents.as_ref().map(|s| s.run.as_str()), Some("r1"));
-        assert!(reloaded.session("s-2").is_none());
+        assert!(reloaded.session_async("s-2").await.unwrap().is_none());
     }
 
-    #[test]
-    fn work_domain_persists_across_sqlite_and_postgres() {
+    #[tokio::test]
+    async fn work_domain_persists_across_sqlite_and_postgres() {
         let dir = tempfile::tempdir().unwrap();
         let sqlite_url = format!("sqlite://{}", dir.path().join("work-sqlite.db").display());
         let sqlite_db = ServerDb::open_url(&sqlite_url).unwrap();
-        vibevalley_runtime::rt::block_on(verify_work_dual_db_async(sqlite_db.clone(), DatabaseBackend::Sqlite));
-        sqlite_db.close();
+        verify_work_dual_db_async(sqlite_db.clone(), DatabaseBackend::Sqlite).await;
+        sqlite_db.close_async().await;
 
         let Some(pg) = EphemeralPostgres::start() else {
             eprintln!("skipping postgres branch of work_domain_persists_across_sqlite_and_postgres: initdb/pg_ctl not found");
@@ -331,7 +348,7 @@ mod tests {
         };
         pg.create_database("work_wave3_dual");
         let pg_db = ServerDb::open_url(&pg.db_url("work_wave3_dual")).unwrap();
-        vibevalley_runtime::rt::block_on(verify_work_dual_db_async(pg_db.clone(), DatabaseBackend::Postgres));
-        pg_db.close();
+        verify_work_dual_db_async(pg_db.clone(), DatabaseBackend::Postgres).await;
+        pg_db.close_async().await;
     }
 }

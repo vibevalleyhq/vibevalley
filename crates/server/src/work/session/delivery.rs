@@ -1,4 +1,4 @@
-use super::{Sessions, db};
+use super::{SessionStore, db};
 use crate::work::ledger::Result;
 use serde_json::{Value, json};
 use vibevalley_protocol::{Millis, Outcome, Run, RunTriggerKind, Session};
@@ -10,7 +10,7 @@ pub(crate) fn delivery_conversation(issue: &str) -> String {
     format!("issue:{issue}")
 }
 
-impl Sessions {
+impl SessionStore {
     pub(super) async fn graded_output_async(&self, session: &Session, extra: &Extra) -> Result<Option<String>> {
         if session.runtime != vibevalley_runtime::agent::runtime::ID {
             return Ok(None);

@@ -1,4 +1,4 @@
-//! Generation-stamped live session handle table for [`super::Sessions`].
+//! Generation-stamped live session handle table for [`super::SessionStore`].
 //!
 //! Allocates monotonic generation numbers and inserts entries under the same
 //! mutex so concurrent `go_live` calls can never interleave and let an older
@@ -7,7 +7,10 @@
 
 use std::collections::HashMap;
 
-use crate::app::hub::loom_sync::Mutex;
+#[cfg(feature = "loom")]
+use loom::sync::Mutex;
+#[cfg(not(feature = "loom"))]
+use std::sync::Mutex;
 
 struct Entry<V> {
     generation: u64,
@@ -144,10 +147,10 @@ mod tests {
 
 #[cfg(all(test, feature = "loom"))]
 mod loom_models {
+    use loom::sync::Arc;
     use loom::thread;
 
     use super::SessionGenerationTable;
-    use crate::app::hub::loom_sync::Arc;
 
     #[test]
     fn concurrent_installs_and_old_pump_exit_preserve_monotonicity_and_handles() {

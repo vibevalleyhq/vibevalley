@@ -1,31 +1,67 @@
 //! The board's sessions at work: hiring a helper on an issue, each round it
-//! works, the words it is sent, its agent's events turned into facts,
-//! stopping it and letting it go. A work round's report goes onto its issue
-//! as an [`IssueChange::Reported`]; a draft's end and the moment after every
-//! round are the issue module's ([`Rounds`]); a direct talk ends here.
+//! works, the words it is sent, its agent's events turned into live state and
+//! persistent checkpoints, stopping it and letting it go.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock, Weak};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
 use tracing::instrument::WithSubscriber as _;
+use vibevalley_core::SliceMask;
+use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Caller, Deliverable, Doing, Fact, Issue, IssueAnswer, IssueReportMemoryScope, MemoryCreateInput, Millis, Outcome, Phase, PhaseWorking, Question,
-    RunTrigger, Session, SessionAction, Spent, ops,
+    ApiError, Deliverable, Doing, Issue, IssueAnswer, IssueReportMemoryScope, LastRun, MemoryCreateInput, Millis, Outcome, Phase, PhaseDone, PhaseFailed,
+    PhaseResting, PhaseWorking, Question, RunTrigger, Session, SessionAction, Spent,
 };
+use vibevalley_runtime::agent::durable::BoxFuture;
 use vibevalley_runtime::oar::{ContentBlock, EventKind, McpServer, PermissionDecision, PermissionMode, SessionOptions, StopReason};
 
-use super::drivers::{Drive, Drivers, HelperPlace, Persona};
+use super::drivers::{Drive, HelperPlace, Persona, SessionDriver};
 use super::gen_table::SessionGenerationTable;
+use super::journal::TrajectoryStore;
 use super::report::{Report, ReportQuestion, ReportStatus};
+use crate::app::live::LiveSessionSnapshot;
+use crate::app::outbox::Outbox;
+use crate::app::refusal::{LookIn, missing};
+use crate::app::runtime::Runtime;
 use crate::work::ledger::{BoardConfig, BoardError, IssueChange, Ledger, Result, Step, now};
 use crate::work::workplace::{Leave, Leaving, Workplace};
-use crate::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Hub};
+
+pub(crate) const OUTBOX_SESSION_REPORTED: &str = "work.session.reported";
+
+/// Durable report payload persisted via `Outbox` when a session round finishes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct OutboxSessionReported {
+    pub id: String,
+    pub at: Millis,
+    pub outcome: Outcome,
+    pub summary: String,
+    pub spent: Option<Spent>,
+    pub run: Option<String>,
+}
+
+/// Lifecycle notification for in-domain `work/chat` thread seating & dismissal.
+#[derive(Debug, Clone)]
+pub enum SessionLifecycleEvent {
+    Changed(Session),
+    Left { at: Millis, id: String },
+}
+
+pub type RememberHook = Arc<dyn Fn(MemoryCreateInput) -> BoxFuture<'static, std::result::Result<(), ApiError>> + Send + Sync>;
+
+pub(super) fn ended_phase(outcome: Outcome) -> Phase {
+    match outcome {
+        Outcome::Completed => Phase::Done(PhaseDone {}),
+        Outcome::Failed => Phase::Failed(PhaseFailed {}),
+        Outcome::Interrupted => Phase::Resting(PhaseResting {}),
+    }
+}
 
 /// What the board keeps of a session beyond the wire `Session`: the
 /// runtime's own session to resume, and the branch its work forked from.
@@ -87,15 +123,18 @@ pub(super) fn text(s: &str) -> Vec<ContentBlock> {
 }
 
 #[derive(Clone)]
-pub struct Sessions(pub(super) Arc<Inner>);
+pub struct SessionStore(pub(super) Arc<Inner>);
 
 pub(super) struct Inner {
     pub ledger: Arc<Ledger>,
     pub durable: vibevalley_runtime::agent::durable::Store,
-    pub drivers: Arc<dyn Drivers>,
+    pub drivers: Arc<dyn SessionDriver>,
     pub workplaces: Arc<Workplace>,
     pub config: Arc<BoardConfig>,
-    pub hub: Option<Weak<Hub>>,
+    pub runtime: Arc<Runtime>,
+    pub trajectories: Option<Arc<TrajectoryStore>>,
+    events: broadcast::Sender<SessionLifecycleEvent>,
+    on_remember: Mutex<Option<RememberHook>>,
     live: SessionGenerationTable<Arc<dyn vibevalley_runtime::oar::Session>>,
     pub(super) extras: Mutex<HashMap<String, Extra>>,
     door: Mutex<Door>,
@@ -107,15 +146,16 @@ pub(super) struct Inner {
     pub(super) workspaces: Mutex<HashMap<String, super::workspace::WorkspaceState>>,
 }
 
-impl Sessions {
+impl SessionStore {
     pub async fn new_async(
         durable: vibevalley_runtime::agent::durable::Store,
         ledger: Arc<Ledger>,
-        drivers: Arc<dyn Drivers>,
+        drivers: Arc<dyn SessionDriver>,
         workplaces: Arc<Workplace>,
         config: Arc<BoardConfig>,
-        hub: Option<Weak<Hub>>,
-    ) -> Result<Sessions> {
+        runtime: Arc<Runtime>,
+        trajectories: Option<Arc<TrajectoryStore>>,
+    ) -> Result<SessionStore> {
         let (extras, configs) = ledger
             .read_db_async(async |db| {
                 let extras = super::db::extras(db).await?;
@@ -133,13 +173,17 @@ impl Sessions {
                 },
             );
         }
-        Ok(Sessions(Arc::new(Inner {
+        let (events, _) = broadcast::channel(256);
+        Ok(SessionStore(Arc::new(Inner {
             durable,
             ledger,
             drivers,
             workplaces,
             config,
-            hub,
+            runtime,
+            trajectories,
+            events,
+            on_remember: Mutex::new(None),
             live: SessionGenerationTable::new(),
             extras: Mutex::new(extras),
             door: Mutex::new(Door::default()),
@@ -149,6 +193,24 @@ impl Sessions {
             talking: tokio::sync::Mutex::new(()),
             workspaces: Mutex::new(workspaces),
         })))
+    }
+
+    /// Registers the hook called when a session report saves new agent memories.
+    pub fn set_remember(&self, hook: RememberHook) {
+        *self.0.on_remember.lock() = Some(hook);
+    }
+
+    /// Subscribes to in-domain session lifecycle events (`Changed`, `Left`).
+    pub fn subscribe_events(&self) -> broadcast::Receiver<SessionLifecycleEvent> {
+        self.0.events.subscribe()
+    }
+
+    pub fn ledger(&self) -> &Arc<Ledger> {
+        &self.0.ledger
+    }
+
+    pub(super) fn emit_lifecycle(&self, event: SessionLifecycleEvent) {
+        let _ = self.0.events.send(event);
     }
 
     /// Who hears rounds end; set once.
@@ -164,8 +226,12 @@ impl Sessions {
         }
     }
 
-    pub fn session(&self, id: &str) -> Option<Session> {
-        self.0.ledger.session(id)
+    pub async fn session_async(&self, id: &str) -> Option<Session> {
+        self.0.ledger.session_async(id).await.ok().flatten()
+    }
+
+    pub async fn sessions_async(&self) -> Result<Vec<Session>> {
+        self.0.ledger.sessions_async().await
     }
 
     /// Whether this process drives the session now.
@@ -214,11 +280,7 @@ impl Sessions {
                     }
                 }
             };
-            if let Some(hub) = self.0.hub.as_ref().and_then(Weak::upgrade) {
-                hub.spawn_task(fut);
-            } else {
-                vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
-            }
+            self.0.runtime.spawn(fut);
         }
     }
 
@@ -275,15 +337,16 @@ impl Sessions {
         self.extra(session).base
     }
 
-    pub(crate) fn record_interrupted(&self, runs: Vec<(String, String)>) {
+    pub(crate) async fn record_interrupted_async(&self, runs: Vec<(String, String)>) {
         for (session, run) in runs {
-            self.record(
+            self.record_async(
                 &session,
                 Step::RunEnded {
                     run,
                     outcome: Outcome::Interrupted,
                 },
-            );
+            )
+            .await;
         }
     }
 
@@ -333,7 +396,7 @@ impl Sessions {
         self.go_live_async(agent.clone(), session.clone(), Some((issue.id.as_str(), started))).await?;
         let run = self.begin_run_async(&session.id, &issue.id, trigger).await?;
         let prompt = self.with_recall(&session, prompt);
-        self.record(&session.id, Step::Asked { text: prompt.clone() });
+        self.record_async(&session.id, Step::Asked { text: prompt.clone() }).await;
         if let Err(e) = Self::prompt_run_async(&agent, is_remote, &run, &prompt).await {
             let _ = self.dismiss_async(&session.id, Leave::Keep).await;
             return Err(e.into());
@@ -371,10 +434,13 @@ impl Sessions {
     }
 
     async fn restore_generation_async(&self, id: &str) -> Result<()> {
-        let session = self.session(id).ok_or_else(|| BoardError::Other(format!("missing session {id}")))?;
-        let issue = session
-            .issue_id()
-            .and_then(|i| self.0.ledger.issue(i))
+        let session = self.session_async(id).await.ok_or_else(|| BoardError::Other(format!("missing session {id}")))?;
+        let issue_id = session.issue_id().ok_or_else(|| BoardError::Other(format!("missing issue for {id}")))?;
+        let issue = self
+            .0
+            .ledger
+            .issue_async(issue_id)
+            .await?
             .ok_or_else(|| BoardError::Other(format!("missing issue for {id}")))?;
         let extra = self.extra(id);
         let run = extra.run.ok_or_else(|| BoardError::Other(format!("missing open run for {id}")))?;
@@ -500,16 +566,55 @@ impl Sessions {
             .as_ref()
             .filter(|s| s.disconnected_at.is_some() && s.root_thread_id == agent.id())
             .cloned();
-        let changed = Fact::session_changed(now(), session);
-        match issue.filter(|(i, _)| self.0.ledger.issue(i).is_some()) {
-            Some((issue, change)) => {
-                self.0.ledger.change_with_async(issue, change, |fact| vec![changed, fact]).await?;
+        let is_worker = vibevalley_core::status::is_farm_worker(&session);
+        let run_id = extra.run.clone();
+        let persisted_via_issue = if let Some((issue_id, change)) = issue {
+            if self.0.ledger.issue_async(issue_id).await?.is_some() {
+                let s = session.clone();
+                let e = extra.clone();
+                let sid = id.clone();
+                self.0
+                    .ledger
+                    .change_commit_async(issue_id, change, SliceMask::NONE, move |tx| {
+                        Box::pin(async move {
+                            super::db::put(tx.transaction(), &s, false).await?;
+                            super::db::put_extra(tx.transaction(), &sid, &e).await?;
+                            Ok(())
+                        })
+                    })
+                    .await?;
+                true
+            } else {
+                false
             }
-            None => self.0.ledger.apply_async(vec![changed]).await?,
+        } else {
+            false
+        };
+        if !persisted_via_issue {
+            let s = session.clone();
+            let e = extra.clone();
+            let sid = id.clone();
+            self.0
+                .ledger
+                .commit_tx_async(
+                    SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM,
+                    move |tx, _, session_db| {
+                        Box::pin(async move {
+                            session_db.put(tx, &s, false).await?;
+                            super::db::put_extra(tx, &sid, &e).await?;
+                            Ok(((), false))
+                        })
+                    },
+                )
+                .await?;
         }
-        // Persist extra columns after the `session` row exists in server.db.
-        self.0.ledger.write_db_async(async |db| super::db::put_extra(db, &id, &extra).await).await?;
-        let hub = self.0.hub.as_ref().and_then(Weak::upgrade);
+        self.sync_live_snapshot(&session, run_id.as_deref());
+        if is_worker {
+            let all_sessions = self.0.ledger.sessions_async().await?;
+            let others: Vec<&Session> = all_sessions.iter().filter(|x| x.id != session.id).collect();
+            self.0.ledger.live().ensure_play_station(&session, &others, None);
+        }
+        self.emit_lifecycle(SessionLifecycleEvent::Changed(session));
         if let Some(before) = previous {
             let me = self.clone();
             let session_id = id.clone();
@@ -523,23 +628,31 @@ impl Sessions {
                     eprintln!("could not reconcile subagents for {session_id}: {err}");
                 }
             };
-            if let Some(hub) = &hub {
-                hub.spawn_task(reconcile);
-            } else {
-                vibevalley_runtime::rt::current_or_global_handle().spawn(reconcile.in_current_span().with_current_subscriber());
-            }
+            self.0.runtime.spawn(reconcile.in_current_span().with_current_subscriber());
         }
         let me = self.clone();
-        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let cancel = self.0.runtime.child_token();
         let pump = async move {
             me.pump_async(id, generation, events, cancel).await;
         };
-        if let Some(hub) = &hub {
-            hub.spawn_task(pump);
-        } else {
-            vibevalley_runtime::rt::current_or_global_handle().spawn(pump.in_current_span().with_current_subscriber());
-        }
+        self.0.runtime.spawn(pump.in_current_span().with_current_subscriber());
         Ok(())
+    }
+
+    pub(super) fn sync_live_snapshot(&self, session: &Session, run_id: Option<&str>) {
+        self.0.ledger.live().set_session(
+            session.id.clone(),
+            LiveSessionSnapshot {
+                run_id: run_id.map(str::to_string),
+                phase: Some(session.phase.clone()),
+                channel: Some(session.channel_id().map(str::to_string)),
+                brief: (!session.brief.is_empty()).then(|| session.brief.clone()),
+                spent: session.spent.clone(),
+                tool_connections: session.tool_connections.clone(),
+                subagents: session.subagents.clone(),
+                last_event_at: Some(now()),
+            },
+        );
     }
 
     /// `withRecall`: what the agent remembers, set apart before the input.
@@ -568,15 +681,26 @@ impl Sessions {
                 // start: the room is counted by it. Apply `Answered` atomically
                 // so an `Asking` issue never flickers through `InReview`.
                 let phase = Phase::working(now(), SessionAction::Thinking, "");
+                let mut updated_session = session.clone();
+                updated_session.phase = phase.clone();
+                let s_for_tx = updated_session.clone();
+                let sid = session.id.clone();
                 self.0
                     .ledger
-                    .change_with_async(&issue.id, IssueChange::Answered, |fact| {
-                        vec![self.phase_changed(session.id.clone(), phase), fact]
+                    .change_commit_async(&issue.id, IssueChange::Answered, SliceMask::SESSIONS, move |tx| {
+                        Box::pin(async move {
+                            super::db::put(tx.transaction(), &s_for_tx, false).await?;
+                            Ok(())
+                        })
                     })
                     .await?;
+                self.0.ledger.live().update_session(&sid, |snap| {
+                    snap.phase = Some(phase);
+                    snap.last_event_at = Some(now());
+                });
                 let run = self.begin_run_async(&session.id, &issue.id, trigger).await?;
                 let words = self.with_recall(session, words);
-                self.record(&session.id, Step::Asked { text: words.clone() });
+                self.record_async(&session.id, Step::Asked { text: words.clone() }).await;
                 Self::prompt_run_async(&agent, session.machine.is_some(), &run, &words).await?;
                 self.0.ledger.change_async(&issue.id, IssueChange::Unqueued).await?;
                 Ok(session.id.clone())
@@ -593,12 +717,12 @@ impl Sessions {
     /// Words into the running turn of a working session this process
     /// drives (queued for after it when the runtime cannot steer); none when
     /// it is not working here.
-    pub fn steer(&self, session: &Session, words: &str) -> Option<Result<()>> {
+    pub async fn steer_async(&self, session: &Session, words: &str) -> Option<Result<()>> {
         if !session.phase.is_working() {
             return None;
         }
         let agent = self.0.live.get(&session.id)?;
-        self.record(&session.id, Step::Asked { text: words.to_string() });
+        self.record_async(&session.id, Step::Asked { text: words.to_string() }).await;
         Some(match agent.steer(text(words)) {
             Ok(()) => Ok(()),
             Err(_) => agent.queue(text(words)).map_err(BoardError::from),
@@ -615,30 +739,50 @@ impl Sessions {
 
     /// Attaches a context reference to an existing session.
     pub async fn attach_binding_async(&self, input: vibevalley_protocol::SessionBindingInput) -> Result<Session> {
-        let mut session = self.session(&input.id).ok_or_else(|| {
-            BoardError::Api(crate::app::hub::refusal::missing(
-                vibevalley_i18n::t("server.helperRef", &[("id", input.id.clone().into())]),
-                crate::app::hub::refusal::LookIn::Session,
-            ))
-        })?;
+        let mut session = self
+            .session_async(&input.id)
+            .await
+            .ok_or_else(|| BoardError::Api(missing(t("server.helperRef", &[("id", input.id.clone().into())]), LookIn::Session)))?;
         if session.attach_binding(input.binding) {
-            self.0.ledger.apply_async(vec![Fact::session_changed(now(), session.clone())]).await?;
+            self.persist_session_update_async(&session).await?;
         }
-        Ok(self.session(&session.id).unwrap_or(session))
+        Ok(self.session_async(&session.id).await.unwrap_or(session))
     }
 
     /// Detaches a context reference from an existing session.
     pub async fn detach_binding_async(&self, input: vibevalley_protocol::SessionBindingInput) -> Result<Session> {
-        let mut session = self.session(&input.id).ok_or_else(|| {
-            BoardError::Api(crate::app::hub::refusal::missing(
-                vibevalley_i18n::t("server.helperRef", &[("id", input.id.clone().into())]),
-                crate::app::hub::refusal::LookIn::Session,
-            ))
-        })?;
+        let mut session = self
+            .session_async(&input.id)
+            .await
+            .ok_or_else(|| BoardError::Api(missing(t("server.helperRef", &[("id", input.id.clone().into())]), LookIn::Session)))?;
         if session.detach_binding(&input.binding) {
-            self.0.ledger.apply_async(vec![Fact::session_changed(now(), session.clone())]).await?;
+            self.persist_session_update_async(&session).await?;
         }
-        Ok(self.session(&session.id).unwrap_or(session))
+        Ok(self.session_async(&session.id).await.unwrap_or(session))
+    }
+
+    pub(super) async fn persist_session_update_async(&self, session: &Session) -> Result<()> {
+        let s = session.clone();
+        self.0
+            .ledger
+            .commit_tx_async(
+                SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM,
+                move |tx, _, session_db| {
+                    Box::pin(async move {
+                        session_db.put(tx, &s, false).await?;
+                        Ok(((), false))
+                    })
+                },
+            )
+            .await?;
+        self.0.ledger.live().update_session(&session.id, |snap| {
+            snap.phase = Some(session.phase.clone());
+            snap.channel = Some(session.channel_id().map(str::to_string));
+            snap.brief = (!session.brief.is_empty()).then(|| session.brief.clone());
+            snap.last_event_at = Some(now());
+        });
+        self.emit_lifecycle(SessionLifecycleEvent::Changed(session.clone()));
+        Ok(())
     }
 
     /// Lets a session go: its agent stops, its open round ends, its
@@ -648,7 +792,7 @@ impl Sessions {
             let _ = agent.abort();
             agent.dispose();
         }
-        let session = self.session(session_id);
+        let session = self.session_async(session_id).await;
         if session.as_ref().is_some_and(|s| s.phase.is_working()) {
             self.end_run_async(session_id, Outcome::Interrupted, "", None).await?;
         }
@@ -668,11 +812,31 @@ impl Sessions {
         }
         let _ = std::fs::remove_file(self.report_path(session_id));
         self.0.door.lock().tokens.retain(|_, s| s != session_id);
-        if session.is_some() {
-            self.0.ledger.apply_async(vec![Fact::session_left(now(), session_id, None)]).await?;
+        let at = now();
+        if let Some(s) = session.clone() {
+            self.0
+                .ledger
+                .commit_tx_async(
+                    SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM,
+                    move |tx, _, session_db| {
+                        Box::pin(async move {
+                            session_db.put(tx, &s, true).await?;
+                            super::db::remove_extra(tx, &s.id).await?;
+                            Ok(((), false))
+                        })
+                    },
+                )
+                .await?;
+            self.0.ledger.live().remove_session(session_id);
+            self.0.ledger.live().remove_play(session_id);
+            self.emit_lifecycle(SessionLifecycleEvent::Left {
+                at,
+                id: session_id.to_string(),
+            });
+        } else {
+            self.0.ledger.write_db_async(async |db| super::db::remove_extra(db, session_id).await).await?;
         }
         self.0.extras.lock().remove(session_id);
-        self.0.ledger.write_db_async(async |db| super::db::remove_extra(db, session_id).await).await?;
         self.remove_workspace_meta(session_id);
         Ok(())
     }
@@ -743,7 +907,7 @@ impl Sessions {
         {
             eprintln!("could not record subagent progress for {session_id}: {error}");
         }
-        self.record(session_id, Step::Agent(event.clone()));
+        self.record_async(session_id, Step::Agent(event.clone())).await;
         match event.kind {
             EventKind::SessionStarted { session_id: vendor, model } if root => {
                 let _ = self.set_extra_async(session_id, |e| e.agent_session = Some(vendor)).await;
@@ -754,7 +918,7 @@ impl Sessions {
                 state.asked.clear();
                 state.failure = None;
                 let phase = Phase::working(now(), SessionAction::Thinking, "");
-                let _ = self.0.ledger.apply_async(vec![self.phase_changed(session_id, phase)]).await;
+                let _ = self.persist_phase_change_async(session_id, phase, None, None).await;
             }
             EventKind::TextDelta { text } if root => state.said.push_str(&text),
             EventKind::ToolCallStarted { name, input, .. } if root => {
@@ -780,7 +944,8 @@ impl Sessions {
                 summary,
             } => {
                 if self
-                    .session(session_id)
+                    .session_async(session_id)
+                    .await
                     .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User)
                 {
                     self.on_workspace_permission_requested(session_id, request_id, tool, input, summary);
@@ -800,7 +965,8 @@ impl Sessions {
                 allow_custom,
             } => {
                 if self
-                    .session(session_id)
+                    .session_async(session_id)
+                    .await
                     .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User)
                 {
                     self.on_workspace_interaction_requested(session_id, request_id, question, options, allow_custom);
@@ -818,7 +984,8 @@ impl Sessions {
             EventKind::TurnFinished { reason, usage } if root => {
                 state.observed_run = None;
                 let is_user = self
-                    .session(session_id)
+                    .session_async(session_id)
+                    .await
                     .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User);
                 if is_user {
                     self.on_workspace_turn_finished(session_id, &usage);
@@ -846,41 +1013,102 @@ impl Sessions {
             .await
     }
 
-    /// A phase change keeps the session where it talks: the fact carries
-    /// the channel, and an absent one would clear it.
-    pub(super) fn phase_changed(&self, id: impl Into<String>, phase: Phase) -> Fact {
-        let id = id.into();
-        let channel = self.session(&id).and_then(|s| s.channel_id().map(str::to_string));
-        Fact::session_phase_changed(now(), id, phase, channel)
+    /// Persists a lifecycle phase transition on SQLite (`work_session`) and updates `LiveOverlay`.
+    pub(super) async fn persist_phase_change_async(&self, id: &str, phase: Phase, brief: Option<String>, spent: Option<Spent>) -> Result<()> {
+        let at = now();
+        let updated = self
+            .0
+            .ledger
+            .commit_tx_async(
+                SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM,
+                |tx, _, session_db| {
+                    let id = id.to_string();
+                    let phase = phase.clone();
+                    let brief = brief.clone();
+                    let spent = spent.clone();
+                    Box::pin(async move {
+                        let Some(mut session) = session_db.get(self.0.ledger.db().read_conn(), &id).await? else {
+                            return Ok((None, false));
+                        };
+                        session.phase = phase;
+                        if let Some(b) = brief {
+                            session.brief = b;
+                        }
+                        if let Some(s) = spent {
+                            session.spent = Some(s);
+                        }
+                        session_db.put(tx, &session, false).await?;
+                        Ok((Some(session), false))
+                    })
+                },
+            )
+            .await?;
+        if let Some(session) = updated {
+            self.0.ledger.live().update_session(id, |snap| {
+                snap.phase = Some(session.phase.clone());
+                if brief.is_some() {
+                    snap.brief = Some(session.brief.clone());
+                }
+                if spent.is_some() {
+                    snap.spent = session.spent.clone();
+                }
+                snap.last_event_at = Some(at);
+            });
+            self.emit_lifecycle(SessionLifecycleEvent::Changed(session));
+        }
+        Ok(())
     }
 
-    fn working(&self, session_id: &str) -> Option<PhaseWorking> {
-        self.session(session_id).and_then(|s| match s.phase {
+    async fn working_async(&self, session_id: &str) -> Option<PhaseWorking> {
+        if let Some(live) = self.0.ledger.live().session(session_id)
+            && let Some(phase) = live.phase
+        {
+            return match phase {
+                Phase::Working(p) => Some(p),
+                _ => None,
+            };
+        }
+        self.session_async(session_id).await.and_then(|s| match s.phase {
             Phase::Working(p) => Some(p),
             _ => None,
         })
     }
 
     async fn set_doing_async(&self, session_id: &str, doing: Doing) {
-        let Some(p) = self.working(session_id) else { return };
-        let phase = Phase::Working(PhaseWorking { doing, quiet_since: None, ..p });
-        let _ = self.0.ledger.apply_async(vec![self.phase_changed(session_id, phase)]).await;
+        let Some(p) = self.working_async(session_id).await else { return };
+        let at = now();
+        let phase = Phase::Working(PhaseWorking {
+            doing: doing.clone(),
+            quiet_since: None,
+            ..p
+        });
+        self.0.ledger.live().update_session(session_id, |snap| {
+            snap.phase = Some(phase);
+            snap.last_event_at = Some(at);
+        });
+        self.0.ledger.live().record_play_working(session_id, at, true, &doing);
+        self.0.ledger.mark_dirty(SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
     }
 
     async fn set_quiet_async(&self, session_id: &str, quiet: Option<Millis>) {
-        let Some(p) = self.working(session_id) else { return };
+        let Some(p) = self.working_async(session_id).await else { return };
         if p.quiet_since.is_some() == quiet.is_some() {
             return;
         }
         let phase = Phase::Working(PhaseWorking { quiet_since: quiet, ..p });
-        let _ = self.0.ledger.apply_async(vec![self.phase_changed(session_id, phase)]).await;
+        self.0.ledger.live().update_session(session_id, |snap| {
+            snap.phase = Some(phase);
+        });
+        self.0.ledger.mark_dirty(SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
     }
 
     pub(crate) async fn review_work_async(&self, vendor: &str, run_id: &str, candidate: &str) -> Result<Option<(Issue, Report)>> {
         let Some(run) = self.0.ledger.read_db_async(async |db| super::db::run(db, run_id).await).await? else {
             return Ok(None);
         };
-        let Some(session) = self.session(&run.session) else { return Ok(None) };
+        let Some(session) = self.session_async(&run.session).await else {
+            return Ok(None);
+        };
         let extra = self.extra(&run.session);
         if session.is_refining()
             || run.outcome.is_some()
@@ -890,7 +1118,8 @@ impl Sessions {
         {
             return Ok(None);
         }
-        let Some(issue) = run.issue.as_deref().and_then(|id| self.0.ledger.issue(id)) else {
+        let Some(issue_id) = run.issue.as_deref() else { return Ok(None) };
+        let Some(issue) = self.0.ledger.issue_async(issue_id).await? else {
             return Ok(None);
         };
         if issue.criteria.iter().all(|line| line.trim().is_empty()) {
@@ -912,10 +1141,95 @@ impl Sessions {
         )))
     }
 
+    pub(crate) async fn settle_report_async(
+        &self,
+        session: &Session,
+        outcome: Outcome,
+        summary: String,
+        spent: Option<Spent>,
+        answer: Option<IssueAnswer>,
+        run_id: Option<String>,
+        issue_change: Option<(String, IssueChange)>,
+    ) -> Result<()> {
+        let at = now();
+        let next_runs = session.runs + 1;
+        let next_phase = ended_phase(outcome);
+        let session_id = session.id.clone();
+        let next_last_run = LastRun {
+            needs_reconciliation: false,
+            outcome,
+            summary: summary.clone(),
+            at,
+            spent: spent.clone(),
+            answer: answer.clone(),
+        };
+        let dirty = SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM;
+        let db = self.0.ledger.db().clone();
+        let outbox_payload = serde_json::to_value(OutboxSessionReported {
+            id: session_id.clone(),
+            at,
+            outcome,
+            summary: summary.clone(),
+            spent: spent.clone(),
+            run: run_id.clone(),
+        })
+        .unwrap_or(serde_json::Value::Null);
+
+        let updated = self
+            .0
+            .ledger
+            .commit_durable_async(dirty, move |tx, issue_db, session_db| {
+                Box::pin(async move {
+                    if let Some(id) = run_id.as_deref()
+                        && let Some(mut r) = super::db::run(tx.transaction(), id).await?
+                    {
+                        r.ended_at = Some(at);
+                        r.outcome = Some(outcome);
+                        r.summary = summary.clone();
+                        r.spent = spent.clone();
+                        super::db::put_run(tx.transaction(), &r).await?;
+                        super::db::clear_run(tx.transaction(), &session_id, id).await?;
+                        super::delivery::settle_run(tx, &r).await?;
+                    }
+                    if let Some((issue_id, change)) = issue_change
+                        && let Some(mut issue) = issue_db.get(db.read_conn(), &issue_id).await?
+                    {
+                        change.fold(&mut issue, at);
+                        issue_db.put(tx.transaction(), &issue).await?;
+                    }
+                    let Some(mut stored) = session_db.get(db.read_conn(), &session_id).await? else {
+                        return Ok((None, false));
+                    };
+                    stored.runs = next_runs;
+                    stored.phase = next_phase;
+                    stored.last_run = Some(next_last_run);
+                    if let Some(s) = spent {
+                        stored.spent = Some(s);
+                    }
+                    session_db.put(tx.transaction(), &stored, false).await?;
+                    let _ = Outbox::enqueue_in_tx(tx.transaction(), OUTBOX_SESSION_REPORTED, &outbox_payload).await?;
+                    Ok((Some(stored), true))
+                })
+            })
+            .await?;
+        if let Some(updated_session) = updated {
+            self.0.ledger.live().update_session(&updated_session.id, |snap| {
+                snap.phase = Some(updated_session.phase.clone());
+                snap.spent = updated_session.spent.clone();
+                snap.last_event_at = Some(at);
+            });
+            if let Some(eff) = vibevalley_core::game::session_failed_penalty(&updated_session, outcome) {
+                self.0.ledger.live().push_farm_effect(eff);
+            }
+            self.emit_lifecycle(SessionLifecycleEvent::Changed(updated_session));
+        }
+        Ok(())
+    }
+
     /// A round's end: a talk's answer, a draft for the issue module, or a
     /// work round's report onto its issue.
     async fn finish_async(&self, session_id: &str, reason: StopReason, spent: Option<Spent>, said: &str, asked: &[Question], failure: Option<&str>) {
-        let Some(session) = self.session(session_id) else { return };
+        let Some(session) = self.session_async(session_id).await else { return };
         if session.controller == vibevalley_protocol::SessionController::User && !session.is_board_worker() {
             self.finish_workspace_async(&session, reason, spent, said, failure).await;
             return;
@@ -924,7 +1238,13 @@ impl Sessions {
             self.finish_talk_async(&session, reason, said, spent).await;
             return;
         }
-        let Some(issue) = session.issue_id().and_then(|i| self.0.ledger.issue(i)) else {
+        let Some(issue_id) = session.issue_id() else {
+            if session.controller == vibevalley_protocol::SessionController::User {
+                self.finish_workspace_async(&session, reason, spent, said, failure).await;
+            }
+            return;
+        };
+        let Some(issue) = self.0.ledger.issue_async(issue_id).await.ok().flatten() else {
             if session.controller == vibevalley_protocol::SessionController::User {
                 self.finish_workspace_async(&session, reason, spent, said, failure).await;
             }
@@ -960,53 +1280,21 @@ impl Sessions {
             round.summary = vibevalley_core::text::clip(error, 400);
         }
         let run_id = extra.run;
-        let summary = round.summary.clone();
         let outcome = round.outcome;
-        let reported = Fact::SessionReported(vibevalley_protocol::FactSessionReported {
-            at: now(),
-            id: session_id.into(),
-            run: run_id.clone(),
-            outcome: round.outcome,
-            phase: None,
-            summary: round.summary,
-            runs: session.runs + 1,
-            spent: spent.clone(),
-            questions: vec![],
-            checks: round.checks.clone(),
-            answer: round.answer.clone(),
-        });
         let change = IssueChange::Reported {
             questions: (round.outcome != Outcome::Interrupted).then_some(round.questions),
             checks: round.checks,
-            answer: round.answer,
+            answer: round.answer.clone(),
         };
-        let run_id_for_tx = run_id.clone();
-        let session_id_owned = session_id.to_string();
-        let spent_for_tx = spent.clone();
-        let summary_for_tx = summary.clone();
         if let Err(error) = self
-            .0
-            .ledger
-            .change_commit_async(
-                &issue.id,
-                change,
-                |fact| vec![fact, reported],
-                move |tx| {
-                    Box::pin(async move {
-                        if let Some(id) = run_id_for_tx.as_deref()
-                            && let Some(mut r) = super::db::run(tx.transaction(), id).await?
-                        {
-                            r.ended_at = Some(now());
-                            r.outcome = Some(outcome);
-                            r.summary = summary_for_tx;
-                            r.spent = spent_for_tx;
-                            super::db::put_run(tx.transaction(), &r).await?;
-                            super::db::clear_run(tx.transaction(), &session_id_owned, id).await?;
-                            super::delivery::settle_run(tx, &r).await?;
-                        }
-                        Ok(())
-                    })
-                },
+            .settle_report_async(
+                &session,
+                outcome,
+                round.summary,
+                spent,
+                round.answer,
+                run_id.clone(),
+                Some((issue.id.clone(), change)),
             )
             .await
         {
@@ -1019,37 +1307,27 @@ impl Sessions {
             {
                 extra.run = None;
             }
-            self.record(session_id, Step::RunEnded { run: id, outcome });
+            self.record_async(session_id, Step::RunEnded { run: id, outcome }).await;
         }
+        let remember_hook = self.0.on_remember.lock().clone();
         if let Some(r) = report.as_ref().filter(|r| !r.remember.is_empty())
             && let Some(agent) = session.profile.clone()
-            && let Some(hub) = self.0.hub.as_ref().and_then(Weak::upgrade)
+            && let Some(hook) = remember_hook
         {
             let repo_name = session.repo_name().unwrap_or_default().to_string();
-            let ctx = CallerContext {
-                caller: Caller::Session,
-                principal: CallerPrincipal::LocalOwner,
-                client: Some(ClientIdentity {
-                    id: session_id.to_string(),
-                    kind: ClientKind::Internal,
-                    label: session_id.to_string(),
-                }),
-                trace_id: 0,
-            };
             for m in &r.remember {
                 let repo = match m.scope {
                     IssueReportMemoryScope::Repo => (!repo_name.is_empty()).then(|| repo_name.clone()),
                     IssueReportMemoryScope::All => None,
                 };
-                if let Err(e) = hub.invoke::<ops::MemoryCreate>(
-                    &ctx,
-                    MemoryCreateInput {
-                        agent: agent.clone(),
-                        text: m.text.clone(),
-                        repo,
-                        request_key: None,
-                    },
-                ) {
+                if let Err(e) = hook(MemoryCreateInput {
+                    agent: agent.clone(),
+                    text: m.text.clone(),
+                    repo,
+                    request_key: None,
+                })
+                .await
+                {
                     eprintln!("memory: {session_id}'s report note was not kept: {}", e.message);
                 }
             }
@@ -1143,17 +1421,19 @@ mod tests {
 
     use parking_lot::Mutex;
     use tracing::instrument::WithSubscriber as _;
-    use vibevalley_core::Applied;
-    use vibevalley_protocol::{ExecutionPolicy, Fact, Phase, Session, SessionAction, SessionController, SliceBundle, SpaceState};
+    use vibevalley_protocol::{ExecutionPolicy, Phase, Session, SessionAction, SessionController};
     use vibevalley_runtime::oar::{
         Capabilities, ContentBlock, ControlAction, ControlOutcome, ControlStatus, Event, EventKind, Installation, ModelInfo, PermissionDecision, Registry,
         Runtime, Session as OarSession, SessionOptions, SessionStatus, voyage,
     };
 
-    use super::Sessions;
-    use crate::Hub;
-    use crate::work::ledger::{BoardConfig, Facts, IssueStore, Ledger, LocalFacts, now};
-    use crate::work::session::RuntimeDrivers;
+    use super::SessionStore;
+    use crate::app::live::LiveOverlay;
+    use crate::app::outbox::Outbox;
+    use crate::app::runtime::Runtime as AppRuntime;
+    use crate::app::slice::SliceProjector;
+    use crate::work::ledger::{BoardConfig, IssuePersistence, Ledger, now};
+    use crate::work::session::RuntimeDriver;
     use crate::work::workplace::Workplace;
 
     #[derive(Clone, Default)]
@@ -1177,65 +1457,6 @@ mod tests {
 
         fn make_writer(&'a self) -> Self::Writer {
             BufWriter(self.0.clone())
-        }
-    }
-
-    struct QuietTrackingFacts {
-        inner: LocalFacts,
-        quiet_spans: Mutex<Vec<(Option<&'static str>, bool)>>,
-        quiet_set: Arc<tokio::sync::Notify>,
-        quiet_cleared: Arc<tokio::sync::Notify>,
-    }
-
-    impl QuietTrackingFacts {
-        fn new() -> Self {
-            Self {
-                inner: LocalFacts::default(),
-                quiet_spans: Mutex::new(Vec::new()),
-                quiet_set: Arc::new(tokio::sync::Notify::new()),
-                quiet_cleared: Arc::new(tokio::sync::Notify::new()),
-            }
-        }
-    }
-
-    impl Facts for QuietTrackingFacts {
-        fn apply(&self, facts: Vec<Fact>) -> Applied {
-            let quiet_events: Vec<(Option<&'static str>, bool)> = facts
-                .iter()
-                .filter_map(|fact| match fact {
-                    Fact::SessionPhaseChanged(changed) => match &changed.phase {
-                        Phase::Working(working) => {
-                            let current = tracing::Span::current();
-                            let span_name = current.metadata().map(|m| m.name());
-                            let is_quiet = working.quiet_since.is_some();
-                            tracing::debug!(is_quiet, "sessions.test.facts_apply");
-                            Some((span_name, is_quiet))
-                        }
-                        _ => None,
-                    },
-                    _ => None,
-                })
-                .collect();
-            let applied = self.inner.apply(facts);
-            if !quiet_events.is_empty() {
-                self.quiet_spans.lock().extend(quiet_events.iter().copied());
-                for (_, is_quiet) in quiet_events {
-                    if is_quiet {
-                        self.quiet_set.notify_one();
-                    } else {
-                        self.quiet_cleared.notify_one();
-                    }
-                }
-            }
-            applied
-        }
-
-        fn read(&self, f: &mut dyn FnMut(&SpaceState)) {
-            self.inner.read(f);
-        }
-
-        fn bundle(&self) -> SliceBundle {
-            self.inner.bundle()
         }
     }
 
@@ -1346,12 +1567,20 @@ mod tests {
 
     struct NoopIssueStore;
 
-    impl IssueStore for NoopIssueStore {
+    impl IssuePersistence for NoopIssueStore {
         fn all<'a>(
             &'a self,
             _db: &'a sea_orm::DatabaseConnection,
         ) -> vibevalley_runtime::agent::durable::BoxFuture<'a, std::result::Result<Vec<vibevalley_protocol::Issue>, sea_orm::DbErr>> {
             Box::pin(async { Ok(vec![]) })
+        }
+
+        fn get<'a>(
+            &'a self,
+            _db: &'a sea_orm::DatabaseConnection,
+            _id: &'a str,
+        ) -> vibevalley_runtime::agent::durable::BoxFuture<'a, std::result::Result<Option<vibevalley_protocol::Issue>, sea_orm::DbErr>> {
+            Box::pin(async { Ok(None) })
         }
 
         fn put<'a>(
@@ -1383,10 +1612,15 @@ mod tests {
         async {
             let dir = tempfile::tempdir().unwrap();
             let db = crate::db::ServerDb::open(dir.path()).unwrap();
-            let facts = Arc::new(QuietTrackingFacts::new());
+            let live = LiveOverlay::new();
+            let projector = SliceProjector::new();
+            let outbox = Outbox::new(db.clone());
+            let runtime = AppRuntime::new();
             let (ledger, _) = Ledger::open_async(
                 db.clone(),
-                facts.clone(),
+                live.clone(),
+                projector.clone(),
+                outbox,
                 Arc::new(NoopIssueStore),
                 Arc::new(super::super::db::SqliteSessionStore),
             )
@@ -1399,12 +1633,11 @@ mod tests {
             let workplaces = Arc::new(Workplace::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
             let mut registry = Registry::new();
             registry.register(Arc::new(StubRuntime));
-            let drivers = Arc::new(RuntimeDrivers {
+            let drivers = Arc::new(RuntimeDriver {
                 registry: Arc::new(registry),
                 model: None,
             });
-            let hub = Hub::new(vibevalley_core::empty_space_state());
-            let sessions = Sessions::new_async(durable, Arc::new(ledger), drivers, workplaces, config, Some(Arc::downgrade(&hub)))
+            let sessions = SessionStore::new_async(durable, Arc::new(ledger), drivers, workplaces, config, runtime.clone(), None)
                 .await
                 .unwrap();
 
@@ -1434,15 +1667,20 @@ mod tests {
             tokio::time::advance(Duration::from_secs(290)).await;
             tokio::task::yield_now().await;
             assert!(
-                matches!(sessions.session("w-quiet").unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_none()),
+                matches!(sessions.session_async("w-quiet").await.unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_none()),
                 "session must not be quiet before quiet_after elapses"
             );
 
-            // Advance past 300 virtual seconds: quiet timer fires via spawn_blocking_traced under session.pump span.
+            // Advance past 300 virtual seconds: quiet timer fires into LiveOverlay under session.pump span.
             tokio::time::advance(Duration::from_secs(15)).await;
-            facts.quiet_set.notified().await;
+            for _ in 0..8 {
+                tokio::task::yield_now().await;
+                if matches!(sessions.session_async("w-quiet").await.unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_some()) {
+                    break;
+                }
+            }
             assert!(
-                matches!(sessions.session("w-quiet").unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_some()),
+                matches!(sessions.session_async("w-quiet").await.unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_some()),
                 "session must become quiet once virtual quiet_after elapses"
             );
             assert!(
@@ -1451,7 +1689,7 @@ mod tests {
                 wall_start.elapsed()
             );
 
-            // Delivering a new event clears quiet_since via spawn_blocking_traced under the same session.pump span.
+            // Delivering a new event clears quiet_since under the same session.pump span.
             tx.send(Event {
                 seq: 1,
                 at_ms: now() as u64,
@@ -1459,25 +1697,25 @@ mod tests {
                 kind: EventKind::TextDelta { text: "progress".into() },
             })
             .unwrap();
-            facts.quiet_cleared.notified().await;
+            for _ in 0..8 {
+                tokio::task::yield_now().await;
+                if matches!(sessions.session_async("w-quiet").await.unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_none()) {
+                    break;
+                }
+            }
             assert!(
-                matches!(sessions.session("w-quiet").unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_none()),
+                matches!(sessions.session_async("w-quiet").await.unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_none()),
                 "event arrival must clear quiet_since"
             );
 
-            let recorded = facts.quiet_spans.lock().clone();
-            assert_eq!(recorded, vec![(Some("session.pump"), true), (Some("session.pump"), false)]);
-
             tokio::time::resume();
-            hub.close_async().await;
+            let _ = runtime.shutdown(Duration::from_secs(1)).await;
             db.close_async().await;
 
             let logs = String::from_utf8(buf.0.lock().clone()).unwrap();
             assert!(
-                logs.contains("session.pump{session_id=w-quiet generation=1}")
-                    && logs.contains("sessions.test.facts_apply is_quiet=true")
-                    && logs.contains("sessions.test.facts_apply is_quiet=false"),
-                "expected session.pump span around blocking facts_apply:\n{logs}"
+                logs.contains("session.pump{session_id=w-quiet generation=1}"),
+                "expected session.pump span in tracing output:\n{logs}"
             );
         }
         .with_subscriber(subscriber)

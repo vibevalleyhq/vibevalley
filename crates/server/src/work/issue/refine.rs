@@ -3,15 +3,15 @@
 //! which go onto the issue when its round ends.
 
 use vibevalley_core::Refusal;
-use vibevalley_protocol::{Fact, IssueStatus, Outcome, RunTriggerKind};
+use vibevalley_protocol::{IssueStatus, Outcome, RunTriggerKind};
 use vibevalley_runtime::oar::StopReason;
 
-use super::board::Board;
-use crate::work::ledger::{BoardError, IssueChange, Result, now};
+use super::board::IssueStore;
+use crate::work::ledger::{BoardError, IssueChange, Result};
 use crate::work::session::{DraftEnd, Hire, trigger_of};
 use crate::work::workplace::Leave;
 
-impl Board {
+impl IssueStore {
     /// Sends a drafting session to write the issue up from `words`.
     pub async fn refine_async(&self, reference: &str, words: &str) -> Result<String> {
         self.refine_with_async(reference, words, "").await
@@ -20,7 +20,7 @@ impl Board {
     /// `refine`, with the issue's discussion so far for the drafting prompt.
     pub async fn refine_with_async(&self, reference: &str, words: &str, discussion: &str) -> Result<String> {
         let _work = self.0.work.lock().await;
-        let issue = self.stored(reference)?;
+        let issue = self.stored_async(reference).await?;
         if issue.status != IssueStatus::Backlog {
             return Err(BoardError::Other("only an issue in the backlog is drafted".into()));
         }
@@ -28,7 +28,7 @@ impl Board {
             return Err(BoardError::Refused(Refusal::Drafting { name: r.name.clone() }));
         }
         let drive = self.0.drivers.drafter(&issue)?;
-        let (space, repo) = self.room(&issue, "");
+        let (space, repo) = self.room_async(&issue, "").await;
         if space == 0 || repo == 0 {
             return Err(BoardError::NoRoom("no room for a drafting session".into()));
         }
@@ -146,23 +146,7 @@ impl Board {
             Err(problem) if reason == StopReason::Completed => name("server.issue.refinement.unread", ("problem", problem)),
             Err(_) => name("server.issue.refinement.unfinished", ("summary", vibevalley_core::text::summary_of(&said))),
         };
-        let _ = self
-            .0
-            .ledger
-            .apply_async(vec![Fact::SessionReported(vibevalley_protocol::FactSessionReported {
-                at: now(),
-                id: session.id.clone(),
-                run: None,
-                outcome,
-                phase: None,
-                summary: told,
-                runs: session.runs + 1,
-                spent,
-                questions: vec![],
-                checks: vec![],
-                answer: None,
-            })])
-            .await;
+        let _ = sessions.settle_report_async(&session, outcome, told, spent, None, None, None).await;
         // Not under `work`: a draft only touches its own issue and session.
         if let Err(e) = sessions.dismiss_async(&session.id, Leave::Discard).await {
             eprintln!("vibevalley: draft session {}: {e}", session.id);
