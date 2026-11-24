@@ -7,7 +7,7 @@ export interface ArtifactTypeMeta {
 }
 
 /** Mirrors `crates/core/src/artifact/manifest.rs::ALL_SPECS`. */
-export const ARTIFACT_TYPE_META: Record<ArtifactType, ArtifactTypeMeta> = {
+const ARTIFACT_TYPE_META: Record<ArtifactType, ArtifactTypeMeta> = {
   docs: { entry: "structure/index.md", suffix: ".md", mime: "text/markdown" },
   outline: { entry: "structure/outline.json", suffix: ".outline.json", mime: "application/json" },
   slides: { entry: "structure/deck.json", suffix: ".slides.json", mime: "application/json" },

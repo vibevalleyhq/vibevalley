@@ -248,7 +248,6 @@
 | `setWidth` | `state/prefs.ts` | A pane's width; none puts it back to its default. |
 | `rememberPick` | `state/prefs.ts` | Who and where an issue was given to, for the next quick add and the farm's next job: "" for no one is the orchestrator's. |
 | `usePrefs` | `state/prefs.ts` | One of the choices, following it. |
-| `shownTheme` | `state/prefs.ts` | The theme the workbench shows: "system" worked out from the system's own. Read again when the choice changes. |
 | `createPersistentStorage` | `state/storage.ts` | Synchronous `localStorage`-compatible cache hydrated asynchronously at boot |
 | `setActiveStorageHydrated` | `state/storage.ts` |  |
 | `isStorageHydrated` | `state/storage.ts` | Reactive flag that turns `true` once boot hydration from native `Storage` settles. |

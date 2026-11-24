@@ -1,8 +1,5 @@
 import { type ArtifactPresence, userId } from "@vibevalley/protocol";
 
-/** The workbench theme the page is shown in: the frame cannot read the workbench's own setting. */
-export type ShellTheme = "light" | "dark";
-
 /** One live collaborator highlight rendered inside a sandboxed prototype WebView without relaxing CSP. */
 export interface PresenceHighlightItem {
   readonly id: string;

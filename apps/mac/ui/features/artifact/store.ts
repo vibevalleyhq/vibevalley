@@ -21,7 +21,6 @@ import type {
 
 import { api, reasonOf } from "../../infra/api";
 import { saveFile } from "../../infra/attachmentFile";
-import { createExternal } from "../../infra/base/external";
 import { followArtifact, followArtifactPresence, followSuggestions } from "../../infra/gateway";
 import { transport } from "../../infra/transport";
 import { artifactSuffixOf } from "./html";
@@ -530,6 +529,3 @@ export async function createTypedArtifact(
     ...(opts?.issue ? { issue: opts.issue } : {}),
   });
 }
-
-// Re-export createExternal so WhiteboardView or others can share if needed.
-export { createExternal };

@@ -11,6 +11,7 @@ import { IconButton } from "../../design/IconButton";
 import { Banner, Empty } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { toast } from "../../design/toasts";
+import { tone } from "../../design/tone";
 import { api } from "../../infra/api";
 import { useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
@@ -338,7 +339,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
       height: asNumber(obj?.height, 1080),
       fps: asNumber(obj?.fps, 30),
       duration: asNumber(obj?.duration, 6),
-      background: asString(obj?.background, "#151413"),
+      background: asString(obj?.background, tone("ink")),
       chapters: asRecordArray(obj?.chapters),
       scenes,
     };
@@ -355,7 +356,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
           name: asString(obj?.name, f.path),
           width: asNumber(obj?.width, 1280),
           height: asNumber(obj?.height, 800),
-          background: asString(obj?.background, "#fcfcfb"),
+          background: asString(obj?.background, tone("page")),
           nodes: asRecordArray(obj?.nodes),
         };
       }),
@@ -860,8 +861,8 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
                   {(c) => (
                     <View class="w-40 gap-1.5 rounded-lg border border-line bg-side p-2.5">
                       <View class="flex-row gap-1.5">
-                        <View class="h-8 flex-1 rounded-sm border border-line" style={{ backgroundColor: c().light || "#fcfcfb" }} />
-                        <View class="h-8 flex-1 rounded-sm border border-line" style={{ backgroundColor: c().dark || "#151413" }} />
+                        <View class="h-8 flex-1 rounded-sm border border-line bg-page" style={c().light ? { backgroundColor: c().light } : undefined} />
+                        <View class="h-8 flex-1 rounded-sm border border-line bg-ink" style={c().dark ? { backgroundColor: c().dark } : undefined} />
                       </View>
                       <Text class="truncate text-xs font-semibold text-ink">{c().name}</Text>
                       <Text class="truncate font-mono text-2xs text-muted">{`${c().light} / ${c().dark}`}</Text>

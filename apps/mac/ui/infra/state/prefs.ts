@@ -80,11 +80,3 @@ export const rememberPick = (agent: string, repo: string) => {
 
 /** One of the choices, following it. */
 export const usePrefs = <T>(select: (p: Prefs) => T): Accessor<T> => computed(() => select(prefs.get()));
-
-const dark = () => window.matchMedia("(prefers-color-scheme: dark)");
-
-/** The theme the workbench shows: "system" worked out from the system's own. Read again when the choice changes. */
-export const shownTheme = (): "light" | "dark" => {
-  const { theme } = prefs.get();
-  return theme === "system" ? (dark().matches ? "dark" : "light") : theme;
-};
