@@ -422,30 +422,36 @@ pub fn exchange_pair_code(base_url: &str, code: &str, device_name: &str) -> Resu
     }
     let client = builder.build().map_err(|e| format!("failed to build HTTP client: {e}"))?;
 
-    vibevalley_runtime::rt::block_on(async move {
-        let response = client
-            .post(&endpoint)
-            .header("x-vibevalley-client", REMOTE_CLIENT_HEADER)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| format!("failed to reach {normalized}: {e}"))?;
-        let status = response.status();
-        let text = response.text().await.map_err(|e| format!("failed to read pairing response: {e}"))?;
-        let envelope: Envelope = serde_json::from_str(&text).map_err(|_| {
-            let trimmed = text.trim();
-            if trimmed.is_empty() {
-                format!("pairing failed with HTTP {}", status.as_u16())
-            } else {
-                format!("pairing failed with HTTP {}: {trimmed}", status.as_u16())
+    let (tx, rx) = flume::bounded(1);
+    vibevalley_runtime::rt::handle().spawn(async move {
+        let res = async move {
+            let response = client
+                .post(&endpoint)
+                .header("x-vibevalley-client", REMOTE_CLIENT_HEADER)
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| format!("failed to reach {normalized}: {e}"))?;
+            let status = response.status();
+            let text = response.text().await.map_err(|e| format!("failed to read pairing response: {e}"))?;
+            let envelope: Envelope = serde_json::from_str(&text).map_err(|_| {
+                let trimmed = text.trim();
+                if trimmed.is_empty() {
+                    format!("pairing failed with HTTP {}", status.as_u16())
+                } else {
+                    format!("pairing failed with HTTP {}: {trimmed}", status.as_u16())
+                }
+            })?;
+            if envelope.biz_code != 0 {
+                return Err(envelope.message);
             }
-        })?;
-        if envelope.biz_code != 0 {
-            return Err(envelope.message);
+            let data = envelope.data.ok_or_else(|| "pairing response missing data".to_string())?;
+            serde_json::from_value(data).map_err(|e| format!("invalid pairing response shape: {e}"))
         }
-        let data = envelope.data.ok_or_else(|| "pairing response missing data".to_string())?;
-        serde_json::from_value(data).map_err(|e| format!("invalid pairing response shape: {e}"))
-    })
+        .await;
+        let _ = tx.send(res);
+    });
+    rx.recv().map_err(|_| "pairing request cancelled".to_string())?
 }
 
 /// Validates and persists a remote Control Plane target, exchanging a pairing code when no direct token is provided.

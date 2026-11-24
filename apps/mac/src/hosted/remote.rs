@@ -1,4 +1,4 @@
-//! Remote Control Plane `Server` adapter: implements `vibevalley_server::transport::api::Server`
+//! Remote Control Plane `Server` adapter: implements `vibevalley_server::gateway::api::Server`
 //! over authenticated HTTP + SSE (`POST /api/v1/{op}`, `GET /api/v1/slice/{name}`,
 //! `GET /api/v1/live`, `GET /api/v1/subscribe/{name}`) so the desktop GUI mounts directly onto
 //! `BridgeHub` without starting a local embedded server.
@@ -20,8 +20,8 @@ use tokio_util::codec::{FramedRead, LinesCodec, LinesCodecError};
 use tokio_util::io::StreamReader;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use vibevalley_protocol::{BizCode, Envelope, LiveEvent, SliceKind};
-use vibevalley_server::transport::api::{BoxFuture, CallerContext, Server, refusal};
-use vibevalley_server::transport::bridge::fake::empty_bundle;
+use vibevalley_server::gateway::api::{BoxFuture, CallerContext, Server, refusal};
+use vibevalley_server::gateway::bridge::fake::empty_bundle;
 use vibevalley_server::{SliceFeed, SliceSubscription};
 
 use crate::hosted::connection::{Secret, is_loopback_url, normalize_url};
@@ -411,10 +411,10 @@ impl RemoteServer {
         })
     }
 
-    async fn call_http(&self, op: &str, payload: Value) -> Envelope {
-        let url = op_url(&self.base_url, op);
+    async fn call_http_inner(client: &reqwest::Client, base_url: &str, token: &Secret, op: &str, payload: Value) -> Envelope {
+        let url = op_url(base_url, op);
         let body = if payload.is_null() { Value::Object(Default::default()) } else { payload };
-        let req = attach_headers(self.client.post(&url).timeout(CALL_TIMEOUT).json(&body), &self.token);
+        let req = attach_headers(client.post(&url).timeout(CALL_TIMEOUT).json(&body), token);
         let response = match req.send().await {
             Ok(res) => res,
             Err(err) => return refusal(BizCode::ServiceUnavailable, format!("remote control plane unreachable: {err}")),
@@ -426,12 +426,14 @@ impl RemoteServer {
         };
         parse_envelope_or_fallback(status, &text)
     }
-    async fn slice_snapshot_json_http(&self, slice: SliceKind) -> Arc<str> {
-        let url = format!("{}/api/v1/slice/{}?once=1", self.base_url, slice.as_str());
-        let req = attach_headers(
-            self.client.get(&url).header("accept", "application/json").timeout(SNAPSHOT_TIMEOUT),
-            &self.token,
-        );
+
+    async fn call_http(&self, op: &str, payload: Value) -> Envelope {
+        Self::call_http_inner(&self.client, &self.base_url, &self.token, op, payload).await
+    }
+
+    async fn slice_snapshot_json_http_inner(client: &reqwest::Client, base_url: &str, token: &Secret, slice: SliceKind) -> Arc<str> {
+        let url = format!("{base_url}/api/v1/slice/{}?once=1", slice.as_str());
+        let req = attach_headers(client.get(&url).header("accept", "application/json").timeout(SNAPSHOT_TIMEOUT), token);
         let Ok(response) = req.send().await else {
             return Arc::<str>::from("null");
         };
@@ -448,15 +450,28 @@ impl RemoteServer {
         }
     }
 
+    async fn slice_snapshot_json_http(&self, slice: SliceKind) -> Arc<str> {
+        Self::slice_snapshot_json_http_inner(&self.client, &self.base_url, &self.token, slice).await
+    }
+
     #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
-    async fn subscribe_http(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+    async fn subscribe_http_inner(
+        client: reqwest::Client,
+        base_url: String,
+        token: Secret,
+        subs: Arc<Mutex<HashMap<u64, CancellationToken>>>,
+        sub_id: u64,
+        shutdown: CancellationToken,
+        name: &str,
+        payload: Value,
+    ) -> Result<(u64, flume::Receiver<Value>), Envelope> {
         let payload_json = serde_json::to_string(&if payload.is_null() { Value::Object(Default::default()) } else { payload }).unwrap_or_else(|_| "{}".into());
 
-        let mut url = url::Url::parse(&format!("{}/api/v1/subscribe/{}", self.base_url, name))
+        let mut url = url::Url::parse(&format!("{base_url}/api/v1/subscribe/{name}"))
             .map_err(|e| refusal(BizCode::InvalidInput, format!("invalid subscription URL: {e}")))?;
         url.query_pairs_mut().append_pair("payload", &payload_json);
 
-        let req = attach_headers(self.client.get(url).header("accept", "text/event-stream"), &self.token);
+        let req = attach_headers(client.get(url).header("accept", "text/event-stream"), &token);
         let response = req
             .send()
             .await
@@ -472,11 +487,10 @@ impl RemoteServer {
             return Err(parse_envelope_or_fallback(status, &text));
         }
 
-        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
-        let cancel = self.shutdown.child_token();
+        let cancel = shutdown.child_token();
         let (tx, rx) = flume::unbounded::<Value>();
-        self.subs.lock().insert(sub_id, cancel.clone());
-        let subs = self.subs.clone();
+        subs.lock().insert(sub_id, cancel.clone());
+        let subs_for_task = subs;
 
         vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
             let mut last_seq = None;
@@ -491,16 +505,40 @@ impl RemoteServer {
                 }
             };
             let _ = drain_sse_response(response, &cancel, &mut last_seq, &mut is_closed, &mut on_message).await;
-            subs.lock().remove(&sub_id);
+            subs_for_task.lock().remove(&sub_id);
         });
 
         Ok((sub_id, rx))
+    }
+
+    #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
+    async fn subscribe_http(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
+        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
+        Self::subscribe_http_inner(
+            self.client.clone(),
+            self.base_url.clone(),
+            self.token.clone(),
+            self.subs.clone(),
+            sub_id,
+            self.shutdown.clone(),
+            name,
+            payload,
+        )
+        .await
     }
 }
 
 impl Server for RemoteServer {
     fn call(&self, op: &str, payload: Value) -> Envelope {
-        vibevalley_runtime::rt::block_on(self.call_http(op, payload))
+        let (tx, rx) = flume::bounded(1);
+        let client = self.client.clone();
+        let base_url = self.base_url.clone();
+        let token = self.token.clone();
+        let op = op.to_string();
+        vibevalley_runtime::rt::handle().spawn(async move {
+            let _ = tx.send(Self::call_http_inner(&client, &base_url, &token, &op, payload).await);
+        });
+        rx.recv().unwrap_or_else(|_| refusal(BizCode::ServiceUnavailable, "remote call cancelled"))
     }
 
     fn call_with_async(self: Arc<Self>, _ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
@@ -508,7 +546,14 @@ impl Server for RemoteServer {
     }
 
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
-        let json = vibevalley_runtime::rt::block_on(self.slice_snapshot_json_http(slice));
+        let (tx, rx) = flume::bounded(1);
+        let client = self.client.clone();
+        let base_url = self.base_url.clone();
+        let token = self.token.clone();
+        vibevalley_runtime::rt::handle().spawn(async move {
+            let _ = tx.send(Self::slice_snapshot_json_http_inner(&client, &base_url, &token, slice).await);
+        });
+        let json = rx.recv().unwrap_or_else(|_| Arc::<str>::from("null"));
         serde_json::from_str(&json).unwrap_or(Value::Null)
     }
 
@@ -517,8 +562,7 @@ impl Server for RemoteServer {
     }
 
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
-        // Pump SSE on the Tokio runtime and deliver via flume so `receive` executes outside `rt::block_on`
-        // (BridgeHub's watch callback uses `rt::block_on` for Bounded-1 ack waiting).
+        // Pump SSE on the Tokio runtime and deliver via bounded flume so `receive` runs on the caller thread.
         let (tx, rx) = flume::bounded::<(i64, Value)>(1);
         let cancel = self.shutdown.child_token();
         let task_cancel = cancel.clone();
@@ -686,7 +730,19 @@ impl Server for RemoteServer {
     }
 
     fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {
-        vibevalley_runtime::rt::block_on(self.subscribe_http(name, payload))
+        let (tx, rx) = flume::bounded(1);
+        let client = self.client.clone();
+        let base_url = self.base_url.clone();
+        let token = self.token.clone();
+        let subs = self.subs.clone();
+        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
+        let shutdown = self.shutdown.clone();
+        let name = name.to_string();
+        vibevalley_runtime::rt::handle().spawn(async move {
+            let _ = tx.send(Self::subscribe_http_inner(client, base_url, token, subs, sub_id, shutdown, &name, payload).await);
+        });
+        rx.recv()
+            .unwrap_or_else(|_| Err(refusal(BizCode::ServiceUnavailable, "remote subscription cancelled")))
     }
 
     fn subscribe_with_async(
@@ -721,10 +777,10 @@ mod tests {
     use tokio::net::TcpListener;
     use tokio::sync::Notify;
     use vibevalley_protocol::{ApiError, BizCode, Issue, LiveEvent, NoticeLevel, RemoteDeviceSummary, RemotePlatform};
-    use vibevalley_server::transport::api::{RemoteAuth, RemoteDeviceIdentity};
-    use vibevalley_server::transport::bridge::fake::{FakeServer, empty_bundle};
-    use vibevalley_server::transport::bridge::{ClientIdentity, ClientKind, Hub as BridgeHub, Outlet};
-    use vibevalley_server::transport::http;
+    use vibevalley_server::gateway::api::{GatewayPorts, RemoteAuth, RemoteDeviceIdentity};
+    use vibevalley_server::gateway::bridge::fake::{FakeServer, empty_bundle};
+    use vibevalley_server::gateway::bridge::{ClientIdentity, ClientKind, Hub as BridgeHub, Outlet};
+    use vibevalley_server::gateway::http;
 
     use super::*;
     use crate::hosted::connection::{ConnectionSaveRequest, configure_remote, exchange_pair_code};
@@ -822,8 +878,11 @@ mod tests {
             self.inner.unsubscribe(id);
         }
 
-        fn remote_auth(&self) -> Option<Arc<dyn RemoteAuth>> {
-            Some(self.auth.clone())
+        fn ports(&self) -> GatewayPorts {
+            GatewayPorts {
+                remote: Some(self.auth.clone()),
+                ..Default::default()
+            }
         }
     }
 
