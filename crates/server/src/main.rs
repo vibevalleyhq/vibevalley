@@ -1,20 +1,38 @@
 //! `vibevalley-server`: the farm's server on its own. `--ready-json`
-//! prints `{"url","pid"}` once it listens. The environment configures the
-//! rest via [`vibevalley_server::ServerConfig::from_env`]: `VIBEVALLEY_HOME`,
-//! `VIBEVALLEY_WORK_ROOT`, `VIBEVALLEY_PORT` (0: any), `DEEPSEEK_API_KEY`,
-//! `VIBEVALLEY_GIT_EMAILS`, `VIBEVALLEY_AGENT_STARTERS`, and
-//! `VIBEVALLEY_TEST_RUNTIMES=1`.
+//! prints `{"url","pid"}` once it listens, and `--database-url <URL>`
+//! overrides the database URL. The environment configures the rest via
+//! [`vibevalley_server::ServerConfig::from_env`]: `VIBEVALLEY_HOME`,
+//! `VIBEVALLEY_WORK_ROOT`, `VIBEVALLEY_PORT` (0: any),
+//! `VIBEVALLEY_DATABASE_URL`, `DEEPSEEK_API_KEY`, `VIBEVALLEY_GIT_EMAILS`,
+//! `VIBEVALLEY_AGENT_STARTERS`, and `VIBEVALLEY_TEST_RUNTIMES=1`.
 
 struct Flags {
     ready_json: bool,
+    database_url: Option<String>,
 }
 
 fn flags() -> Result<Flags, String> {
-    let mut f = Flags { ready_json: false };
-    for a in std::env::args().skip(1) {
-        match a.as_str() {
-            "--ready-json" => f.ready_json = true,
-            other => return Err(format!("unknown flag {other}")),
+    let mut f = Flags {
+        ready_json: false,
+        database_url: None,
+    };
+    let mut args = std::env::args().skip(1);
+    while let Some(a) = args.next() {
+        if a == "--ready-json" {
+            f.ready_json = true;
+        } else if a == "--database-url" {
+            let url = args
+                .next()
+                .filter(|v| !v.is_empty())
+                .ok_or_else(|| "--database-url requires a URL".to_string())?;
+            f.database_url = Some(url);
+        } else if let Some(url) = a.strip_prefix("--database-url=") {
+            if url.is_empty() {
+                return Err("--database-url requires a non-empty URL".to_string());
+            }
+            f.database_url = Some(url.to_string());
+        } else {
+            return Err(format!("unknown flag {a}"));
         }
     }
     Ok(f)
@@ -46,7 +64,10 @@ fn run() -> Result<(), String> {
         Some(p) => p.parse().map_err(|_| format!("VIBEVALLEY_PORT is not a port: {p}"))?,
         None => vibevalley_server::home::default_port(),
     };
-    let config = vibevalley_server::ServerConfig::from_env(home.clone(), env!("CARGO_PKG_VERSION"));
+    let mut config = vibevalley_server::ServerConfig::from_env(home.clone(), env!("CARGO_PKG_VERSION"));
+    if let Some(database_url) = flags.database_url {
+        config.database_url = Some(database_url);
+    }
     let started = vibevalley_server::start(config).map_err(|e| e.to_string())?;
     let addr = format!("127.0.0.1:{port}").parse().map_err(|e| format!("{e}"))?;
     let listener = vibevalley_server::transport::http::serve(started.hub.clone(), addr).map_err(|e| format!("listening on {addr}: {e}"))?;

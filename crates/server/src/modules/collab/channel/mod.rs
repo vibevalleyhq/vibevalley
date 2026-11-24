@@ -805,7 +805,7 @@ mod tests {
         drop(write_conn);
         drop(_write_mutex_guard);
         hub.close_async().await;
-        db.close();
+        db.close_async().await;
     }
 
     #[tokio::test]
@@ -892,6 +892,6 @@ mod tests {
         assert!(listed.iter().any(|c| c.id == cid));
 
         hub.close_async().await;
-        db.close();
+        db.close_async().await;
     }
 }

@@ -2,8 +2,13 @@ use vibevalley_runtime::agent::durable::Sqlite;
 
 use crate::modules::infra::column::optional;
 
+#[allow(dead_code)] // Consumed by Wave 3 domain callers.
+pub(crate) mod entities;
+pub(crate) mod error;
 pub(crate) mod generated;
+pub(crate) mod migration;
 
+#[allow(dead_code)] // Retained during Wave 2-3 transition; Wave 4 removes db/schema.
 pub mod schema {
     pub const SHARED: &str = include_str!("schema/shared.sql");
     pub const COLLAB_CHANNEL: &str = include_str!("schema/collab_channel.sql");
@@ -35,4 +40,25 @@ pub(crate) fn next_seq(db: &Sqlite<'_>, name: &str, at_least: i64) -> sqlx::Resu
         .await?;
         Ok(next)
     })
+}
+
+#[allow(dead_code)] // Consumed by Wave 3 domain callers.
+pub(crate) async fn next_seq_async(db: &impl sea_orm::ConnectionTrait, name: &str, at_least: i64) -> Result<i64, sea_orm::DbErr> {
+    use sea_orm::sea_query::{Expr, OnConflict};
+    use sea_orm::{ActiveValue::Set, EntityTrait, ExprTrait};
+
+    let model = entities::shared::seq_counter::ActiveModel {
+        name: Set(name.to_owned()),
+        last_number: Set(at_least + 1),
+    };
+    let current = Expr::col((entities::shared::seq_counter::Entity, entities::shared::seq_counter::Column::LastNumber));
+    let next_expr = Expr::expr(Expr::case(current.clone().gt(at_least), current).finally(at_least)).add(1);
+    let on_conflict = OnConflict::column(entities::shared::seq_counter::Column::Name)
+        .value(entities::shared::seq_counter::Column::LastNumber, next_expr)
+        .to_owned();
+    let saved = entities::shared::seq_counter::Entity::insert(model)
+        .on_conflict(on_conflict)
+        .exec_with_returning(db)
+        .await?;
+    Ok(saved.last_number)
 }

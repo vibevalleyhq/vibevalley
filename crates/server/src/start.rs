@@ -62,6 +62,8 @@ pub struct ServerConfig {
     pub connector: modules::collab::connector::Options,
     /// Enables DevTools diagnostics (`debug.*` endpoints, timeline observer, fault gate).
     pub debug_enabled: bool,
+    /// Optional database URL (`VIBEVALLEY_DATABASE_URL`, `--database-url`) overriding `<home>/server.db`.
+    pub database_url: Option<String>,
     /// Wall clock for domain timers/TTLs (`cron`, `remote`, `media`, `issue`, `game`).
     pub clock: vibevalley_core::SharedClock,
 }
@@ -102,6 +104,7 @@ impl ServerConfig {
             orchestrator_listens: true,
             connector: modules::collab::connector::Options::default(),
             debug_enabled: false,
+            database_url: None,
             clock: vibevalley_core::system_clock(),
         }
     }
@@ -125,6 +128,7 @@ impl ServerConfig {
             git_emails: csv("VIBEVALLEY_GIT_EMAILS"),
             poll_pulls: Some(env_str("VIBEVALLEY_GITHUB_PR_POLL_SECONDS").and_then(|s| s.parse::<u64>().ok()).unwrap_or(180)),
             debug_enabled: env_str("VIBEVALLEY_DEBUG").as_deref() == Some("1"),
+            database_url: env_str("VIBEVALLEY_DATABASE_URL"),
             ..Self::under(home)
         };
         if env_str("VIBEVALLEY_TEST_RUNTIMES").as_deref() == Some("1") {
@@ -439,9 +443,12 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         std::fs::create_dir_all(&dir).map_err(|e| failed("the work root")(&e))?;
     }
 
-    // L0: single shared SQLite pool + Hub spine
+    // L0: single shared database pool + Hub spine
     let mut shutdown = ShutdownList::default();
-    let db = ServerDb::open(&config.home).map_err(|e| failed("the database")(&e))?;
+    let db = match config.database_url.as_deref() {
+        Some(url) => ServerDb::open_url(url).map_err(|e| failed("the database")(&e))?,
+        None => ServerDb::open(&config.home).map_err(|e| failed("the database")(&e))?,
+    };
     shutdown.push_finalizer("db", {
         let db = db.clone();
         move || db.close()
