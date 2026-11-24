@@ -1,32 +1,42 @@
 # docs：协作文档
 
-`docs` 面向人与帮工共同撰写、反复修订的结构化长文（方案、复盘、调研、手册）。存储形态为 `body = "blocks"`（`artifact_create` 传 `artifactType: "docs"` 或 `kind: "markdown"`）。
+`docs` 面向人与执行会话共同撰写、反复修订的技术方案、PRD、RFC、调研报告与复盘手册。作品以独立目录存放在 `storage/`（`<storage>/artifact/<id>/`），正文按章节拆分为 `structure/*.md`，配图与附件放入 `asset/`，全类型共享统一实时协作引擎。
 
-## 核心工作流
+## 目录结构（Directory-per-Artifact）
 
-1. **创建**：`artifact_create({ title, artifactType: "docs", content })` 一次导入初始 Markdown 块树，或省略 `content` 先建空文档再逐块写入。
-2. **局部修订（严禁整篇重写）**：
-   - 先用 `artifact_block_list({ id })` 读最新块 ID、层级与 `rev`（或查看 `<artifact-view-context>` 里的 `selectedBlockIds`）。
-   - 多步改动优先用 `artifact_block_batch({ id, ops })` 一次提交 `create`（可用 `tempId` 让同批后续操作引用）/ `update`（带 `baseRev`）/ `move` / `delete`；单步改动也可直接调 `artifact_block_create`、`artifact_block_update`、`artifact_block_delete`。
-3. **尊重用户手写的块**：帮工对用户亲手写过的块调用 `artifact_block_update` / `delete` 或 `artifact_block_batch` 修改时，服务端会自动转为一条待确认建议（`suggestion`），不要反复硬写同一块。
+```text
+<storage>/artifact/<id>/
+├── manifest.json          # id、artifactType: "docs"、title、entry、sections 顺序
+├── structure/
+│   ├── index.md           # 摘要 / 结论先行与目录入口
+│   ├── 01-context.md      # 按主题拆分的独立章节 Markdown
+│   └── 02-architecture.md
+└── asset/
+    └── topology.png       # 相对路径引用：![拓扑](asset/topology.png)
+```
 
-## 原生可视化与交互块（`chart` / `genui`）
+`manifest.json` 示例：
+```json
+{
+  "id": "art_01",
+  "artifactType": "docs",
+  "title": "统一协作引擎技术方案",
+  "entry": "structure/index.md",
+  "sections": ["structure/index.md", "structure/01-context.md", "structure/02-architecture.md"]
+}
+```
 
-`docs` 中的代码块支持两种纯原生渲染器（用 `type: "code"`、`language: "chart"` 或 `"genui"`，或初始 Markdown 中用围栏代码块）：
+## 多人与多执行会话实时协作规则
 
-- **数据图表（```` ```chart ````）**：放入合法 JSON（`type`: `bar` | `line` | `area` | `scatter` | `bubble` | `pie` | `donut` | `combo` | `heatmap` | `boxplot` | `histogram` | `sparkline`；可选 `subtitle`、`xAxis`、`yAxis`、`legend`、`annotations`）：
-  ```json
-  {"type":"bar","title":"周吞吐量","categories":["W1","W2","W3"],"series":[{"name":"完成","data":[6,9,12]}],"showValues":true}
-  ```
-- **交互式声明 UI（```` ```genui ````）**：适合预算试算、参数对比、迷你仪表盘。顶层字段 `title`、`root_id`、`state`（初始状态字典）、`nodes`（扁平节点表，布局容器经 `children` 引用节点 ID；控件 `slider`/`switch`/`select`/`tabs` 用 `bind` 双向绑定 `state`；展示节点 `metric`/`text`/`badge`/`progress`/`callout`/`table`/`chart` 用 `{"expr":"..."}` 或 `${expr}` 响应变化）：
-  ```json
-  {"title":"成本试算","root_id":"root","state":{"seats":5,"price":20},"nodes":[{"id":"root","kind":"stack","gap":12,"children":["seats_in","total"]},{"id":"seats_in","kind":"slider","bind":"seats","label":"席位数","min":1,"max":50,"step":1},{"id":"total","kind":"metric","label":"月度成本","value":{"expr":"seats * price"},"format":"currency"}]}
-  ```
+1. **统一协作同步（`artifact_collab`）**：所有对 `structure/*.md` 的并发修订通过 `artifact_collab` CRDT 层无冲突合并并落盘到目录文件，**禁止整篇覆盖重写**；先读最新协作状态，再对目标章节/段落做局部编辑。
+2. **来源追踪（`artifact_change`）**：每次提交自动记录 `origin`（用户或执行会话轮次），支持时间轴回放、按来源撤销（undo-by-origin）、版本恢复与分叉；重要里程碑通过 `artifact_version` 生成不可变目录快照。
+3. **审阅建议流（`artifact_suggestion`）**：当待修改段落由用户亲手撰写或刚被用户编辑过时，通过 `artifact_suggestion` 发起审阅建议（含定位、理由与修改后文本），由用户接受或拒绝，绝不静默覆盖用户文字。
+4. **实时在场感知（Presence）**：动笔前检查实时光标与聚焦章节；多人或多执行会话并行写稿时优先分工到不同 `structure/*.md` 章节文件，避免在用户正在键入的同一段落抢写。
 
-## 写作与版式准则
+## 原生可视化块与写作准则
 
-- **结论先行**：首段用 2–3 句说清核心判断或决定，不堆砌寒暄铺垫。
-- **扫读节奏**：每 3–5 段用二级/三级标题分段；并列要点超过 3 项改用 `bulleted` / `numbered`；行动项用 `todo`；关键警示或原话用 `quote`。
-- **行内标记**：善用 `**加粗**` 标出句首锚点词，代码、路径、配置项一律用 `` `code` ``。
+- **原生图表（```` ```chart ````）与交互声明块（```` ```genui ````）**：在章节 Markdown 中直接用围栏代码块嵌入 JSON，分别渲染原生图表（`bar`/`line`/`area`/`scatter`/`pie`/`donut`/`combo`/`heatmap` 等）或交互试算器（`state` + `nodes` 表达式联动）。
+- **资产相对路径**：图片、附件一律存入 `asset/` 并使用 `asset/<name>` 引用，严禁外链防盗图或塞入超大 base64。
+- **结论先行**：`structure/index.md` 首段 2–3 句给出核心决定；每 3–5 段设二级/三级标题，行动项用 `- [ ]`，路径与标识符用 `` `code` ``。
 
-按需延伸阅读：`artifact_type_read({ type: "docs", reference: "structure" })`。
+按需延伸阅读：`artifact_type_read({ type: "docs", reference: "structure" | "craft" })`。

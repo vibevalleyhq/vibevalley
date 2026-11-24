@@ -1,19 +1,41 @@
-# outline: Tree Outline
+# outline: Hierarchical Tree Outline
 
-`outline` is a lightweight single-column nested tree outline for rapid structuring, meeting notes, breakdowns, and brainstorming (`body = "blocks"`, created via `artifact_create` with `artifactType: "outline"`, suffix `.outline.md`). Unlike long-form prose `docs`, it favors crisp one-line nodes, deep nesting, folding, and branch focus.
+`outline` is a lightweight infinite-nesting tree outline for rapid decomposition, brainstorming, meeting notes, and structured thinking. Stored as a directory in `storage/` (`<storage>/artifact/<id>/`), its tree lives in `structure/outline.json` with supporting files under `asset/`. Unlike prose-heavy `docs`, `outline` optimizes for crisp one-line nodes, deep nesting, folding, and branch zoom.
 
-## Workflow
+## Directory Layout
 
-1. **Create or import**:
-   - Create fresh: `artifact_create({ title, artifactType: "outline", content })` seeds an indented list tree, or omit `content` to start empty.
-   - Import Markdown / Logseq notes: `artifact_outline_import({ markdown, title, filename })` (helpers may pass workspace `file`), parsing YAML frontmatter, `key:: value` properties, nested indentation, and `TODO`/`DOING`/`DONE`/`CANCELED` task items into an `outline` artifact.
-2. **Model hierarchy with parent/child blocks**:
-   - Inspect current nodes and `rev` via `artifact_block_list({ id })`; prefer `artifact_block_batch({ id, ops })` for multi-node `create` (with `tempId`), `update` (with `baseRev`), `move`, and `delete`, or use `artifact_block_create` / `update` / `delete` for single edits.
-   - Use top-level nodes for themes or groups, `parentId` for nested children, and `afterBlock` for sibling ordering.
-   - Prefer `bulleted` for points and `todo` (with `checked`) for actionable items; embed `type: "code"` with `language: "chart"` or `"genui"` when a branch needs a native chart or interactive calculator.
-3. **Respect user-authored nodes**: Agent edits to nodes written by the user become tracked suggestions for approval.
+```text
+<storage>/artifact/<id>/
+├── manifest.json          # id, artifactType: "outline", title, entry: "structure/outline.json"
+├── structure/
+│   └── outline.json       # Stable-ID node map, rootIds order, node kinds, props, and children
+└── asset/
+    └── ref-sketch.png     # Referenced via relative path asset/<name>
+```
+
+Minimal `structure/outline.json`:
+```json
+{
+  "version": 1,
+  "rootIds": ["n_goals", "n_risks"],
+  "nodes": {
+    "n_goals": { "id": "n_goals", "text": "Q3 Objectives", "kind": "heading", "children": ["n_g1"], "props": { "owner": "Core" } },
+    "n_g1": { "id": "n_g1", "text": "Ship directory-per-artifact unified collab", "kind": "todo", "checked": false, "children": [] },
+    "n_risks": { "id": "n_risks", "text": "Key Risks & Mitigations", "kind": "bullet", "children": [] }
+  }
+}
+```
+
+## Multi-Human & Multi-Agent Collaboration Rules
+
+1. **Node-level CRDT sync (`artifact_collab`)**: Create, edit, reorder, and reparent nodes by stable `id` through `artifact_collab`. Never regenerate the whole JSON tree with fresh IDs—doing so breaks live cursors, zoom focus, and concurrent edits.
+2. **Origin-tracked changes (`artifact_change`)**: Every mutation records its `origin` so users can inspect, fork, or undo an agent's expansion pass cleanly. Save milestones with `artifact_version`.
+3. **Human-authored protection (`artifact_suggestion`)**: Propose tracked suggestions when rewording, merging, or deleting human-authored nodes; append supporting child nodes cleanly under open branches.
+4. **Live presence awareness**: Respect active human focus/zoom branches and cursors—work on sibling or unassigned branches when collaborating concurrently.
 
 ## Craft
 
-- **One thought per node**: Keep each node concise and push supporting details, evidence, or sub-steps into child nodes so users can fold or zoom into any branch cleanly.
-- **Know when to switch to `docs`**: Use `outline` for scannable trees and live decomposition; switch to `docs` for narrative essays, formal specs, or multi-paragraph prose.
+- **One thought per node**: Keep each node to a single crisp line; push rationale, examples, and sub-steps into child nodes so any branch folds and zooms cleanly.
+- **Know the boundary**: Use `bullet`, `todo`, `quote`, and `props` for structured trees; switch to `docs` when narrative paragraphs or formal specs are required.
+
+Further references: `artifact_type_read({ type: "outline", reference: "format" | "craft" })`.

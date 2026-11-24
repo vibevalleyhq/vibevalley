@@ -1,31 +1,42 @@
 # docs: Collaborative Document
 
-`docs` is for structured long-form writing edited together by humans and helpers (`body = "blocks"`, created via `artifact_create` with `artifactType: "docs"` or `kind: "markdown"`).
+`docs` is for technical specs, PRDs, RFCs, research memos, and postmortems co-authored by humans and agents. Each artifact is a directory managed by `storage/` (`<storage>/artifact/<id>/`) containing multi-section Markdown under `structure/*.md` and local media under `asset/`, backed by the unified real-time collaboration engine.
 
-## Workflow
+## Directory Layout
 
-1. **Create**: `artifact_create({ title, artifactType: "docs", content })` seeds initial Markdown blocks, or omit `content` to start an empty block document.
-2. **Surgical block edits (never rewrite whole documents)**:
-   - Read current block IDs, hierarchy, and `rev` via `artifact_block_list({ id })` (and check `selectedBlockIds` in `<artifact-view-context>` when present).
-   - Prefer `artifact_block_batch({ id, ops })` for multi-step `create` (supports `tempId` cross-references) / `update` (with `baseRev`) / `move` / `delete`; use `artifact_block_create`, `artifact_block_update`, or `artifact_block_delete` for single edits.
-3. **Respect user-authored blocks**: Agent edits to blocks written by the user automatically become tracked suggestions for user approval.
+```text
+<storage>/artifact/<id>/
+├── manifest.json          # id, artifactType: "docs", title, entry, ordered sections
+├── structure/
+│   ├── index.md           # Executive summary and entry section
+│   ├── 01-context.md      # Focused chapter Markdown files
+│   └── 02-architecture.md
+└── asset/
+    └── topology.png       # Referenced via relative path: ![Topology](asset/topology.png)
+```
 
-## Native Visual & Interactive Blocks (`chart` / `genui`)
+Example `manifest.json`:
+```json
+{
+  "id": "art_01",
+  "artifactType": "docs",
+  "title": "Unified Collaboration Engine RFC",
+  "entry": "structure/index.md",
+  "sections": ["structure/index.md", "structure/01-context.md", "structure/02-architecture.md"]
+}
+```
 
-Code blocks in `docs` support two pure-native renderers (`type: "code"` with `language: "chart"` or `"genui"`, or fenced Markdown blocks):
+## Multi-Human & Multi-Agent Collaboration Rules
 
-- **Data charts (```` ```chart ````)**: JSON spec with `type` (`bar`, `line`, `area`, `scatter`, `bubble`, `pie`, `donut`, `combo`, `heatmap`, `boxplot`, `histogram`, `sparkline`), `categories`, `series`, and optional `xAxis`/`yAxis`/`legend`/`annotations`:
-  ```json
-  {"type":"bar","title":"Weekly Throughput","categories":["W1","W2","W3"],"series":[{"name":"Done","data":[6,9,12]}],"showValues":true}
-  ```
-- **Interactive declarative UI (```` ```genui ````)**: Ideal for calculators, scenario explorers, and compact dashboards. Top-level fields: `title`, `root_id`, `state`, `nodes` (`stack`/`grid`/`card`/`tabs` containers reference child IDs; `slider`/`switch`/`select`/`tabs` bind to `state`; `metric`/`text`/`badge`/`progress`/`callout`/`table`/`chart` react via `{"expr":"..."}` or `${expr}`):
-  ```json
-  {"title":"Cost Estimator","root_id":"root","state":{"seats":5,"price":20},"nodes":[{"id":"root","kind":"stack","gap":12,"children":["seats_in","total"]},{"id":"seats_in","kind":"slider","bind":"seats","label":"Seats","min":1,"max":50,"step":1},{"id":"total","kind":"metric","label":"Monthly Total","value":{"expr":"seats * price"},"format":"currency"}]}
-  ```
+1. **Unified CRDT sync (`artifact_collab`)**: Concurrent edits to `structure/*.md` merge conflict-free through `artifact_collab` and materialize cleanly to disk. Never rewrite an entire document when only a paragraph or section changes.
+2. **Origin-tracked history (`artifact_change`)**: Every edit carries its `origin` (human or agent session/turn) for timeline replay, undo-by-origin, restore, and fork. Capture release milestones with immutable `artifact_version` directory snapshots.
+3. **Review suggestions (`artifact_suggestion`)**: When revising prose authored or recently edited by a human, propose a tracked suggestion (create / accept / reject) rather than silently clobbering their wording.
+4. **Live presence awareness**: Check active cursors and focused sections before editing. Partition concurrent agent writers across distinct `structure/*.md` files and avoid typing inside a paragraph currently held by a human.
 
-## Craft
+## Native Blocks & Craft
 
-- **Lead with the decision**: Put the conclusion or recommendation in the opening paragraph.
-- **Scannable rhythm**: Break sections with `heading` (levels 1–3), use `todo` for action items, `quote` for key callouts, and inline `` `code` `` for identifiers and paths.
+- **Native ```` ```chart ```` and ```` ```genui ```` blocks**: Embed structured JSON fenced blocks inside `structure/*.md` for native charts (`bar`, `line`, `area`, `scatter`, `pie`, `donut`, `combo`, `heatmap`, etc.) or interactive calculators (`state` + `nodes`).
+- **Local assets**: Store all images and supporting files in `asset/` and reference them with relative paths (`asset/<name>`). Never embed external hotlinks or multi-megabyte data URIs.
+- **Lead with the decision**: Put the core conclusion in the opening paragraph of `structure/index.md`; use H2/H3 rhythm, `- [ ]` task lists, and inline `` `code` `` for identifiers.
 
-Further reference: `artifact_type_read({ type: "docs", reference: "structure" })`.
+Further references: `artifact_type_read({ type: "docs", reference: "structure" | "craft" })`.

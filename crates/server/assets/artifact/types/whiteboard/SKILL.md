@@ -1,25 +1,42 @@
 # whiteboard：无限协作白板与叙事画布
 
-`whiteboard`（`body = "store"`，`artifactType: "whiteboard"`）由 `crates/rich` 的纯 Rust 原生组件 `VvWhiteboard`（`crates/rich/src/whiteboard.rs` 与 `engine/whiteboard/*`）在 GPUI 双层画布上直接渲染并交互，支持无限平移缩放、方格/点阵网格、网格与间距吸附、对齐/分布/整理（Tidy）、25 款手绘编辑风贴纸（6 分类）、高对比便签墙（`sticky`）与胶囊计划流（`pill`/`rounded`）、外部浮标分区容器（`container`）、弯曲时间轴丝带、压力感应 `pen` 与 `highlighter`、橡皮擦、正交/平滑连接线、协作光标气泡建议条（`presence.status`）、工作坊计时器、6 套双语起步模板（含启动工作坊 `workshop`）、小地图、JSON Canvas 1.0（`.canvas`）互通，以及 SVG / 2x PNG / JSON 导出；人与帮工可按元素 ID 并发新增、拖拽、改尺寸与局部修订。
+`whiteboard` 由原生双层画布渲染（支持无限平移缩放、方格/点阵网格、吸附对齐、25 款内置编辑风贴纸、卡片/便签、分区容器、弯曲时间轴丝带、压力感应画笔、正交/平滑连接线与 JSON Canvas 互通）。作品以独立目录存放在 `storage/`（`<storage>/artifact/<id>/`），画布结构存于 `structure/board.json`，贴图与插图附件存于 `asset/`。
 
-## 条目结构
+## 目录结构（Directory-per-Artifact）
 
-- `board/meta`（JSON）：`{ "title": "...", "mode": "board", "grid": "architectural" | "dots" | "none" }`（亦兼容布尔 `grid`）
-- `elements/<id>`（JSON）：每个画布元素一条独立记录，局部挪动或改字用 `artifact_entry_batch` 的 `patch`（带 `ifRev`）：
-  - **富文本标题/批注（`type: "text"`）**：`{ "id": "t1", "type": "text", "variant": "title" | "subtitle" | "callout" | "body", "x": 120, "y": 40, "w": 680, "h": 54, "label": "产品发布时间线", "highlight": "12 天", "icon": "⚠", "align": "left" | "center" }`（`title` 使用衬线展示字体；`highlight` 为内联高亮短语；`callout` 适合风险与阻塞提示）。
-  - **卡片与几何图形（`type: "shape"`）**：`{ "id": "n1", "type": "shape", "shape": "card" | "sticky" | "rect" | "diamond" | "ellipse" | "cylinder" | "triangle" | "pill", "x": 120, "y": 140, "w": 200, "h": 116, "title": "锁定范围", "body": "核心功能已拍板", "fill": "sun" | "peach" | "leaf" | "water" | "lavender" | "berry" | "wheat" | "side" | "page", "sticker": "berry-lock", "badge": "Day 1" }`（`sticker` 可填 25 款内置贴纸 ID、emoji 或净化后的 `stickerSvg` 浮在卡片上沿）。
-  - **时间线丝带（`type: "timeline"`）**：`{ "id": "tl1", "type": "timeline", "x": 80, "y": 290, "w": 840, "h": 90, "fill": "peach", "points": [{ "x": 80, "y": 350 }, { "x": 380, "y": 320 }, { "x": 680, "y": 308 }, { "x": 920, "y": 280 }], "milestones": [{ "t": 0.08, "label": "Day 1", "kind": "major" }, { "t": 0.45, "label": "4", "kind": "minor", "caption": "联调冲刺 4 天" }] }`（沿坐标平滑穿过里程碑大胶囊 `major` 与白色编号圆点 `minor`）。
-  - **分区容器（`type: "container"`）**：`{ "id": "z1", "type": "container", "x": 80, "y": 80, "w": 640, "h": 360, "title": "核心服务边界", "fill": "side" }`（支持子元素 `parentId` 跟随移动）
-  - **平滑/折线/直线连接器（`type: "arrow"`）**：`{ "id": "e1", "type": "arrow", "curve": "smooth" | "orthogonal" | "straight", "style": "solid" | "dashed", "head": "arrow" | "none", "from": { "id": "n1", "side": "s" }, "to": { "id": "tl1", "x": 200, "y": 340 }, "label": "SSE", "bends": [] }`
-  - **手绘轨迹（`type: "path"`）**：`{ "id": "p1", "type": "path", "mode": "pen" | "highlighter", "points": [{ "x": 100, "y": 120, "pressure": 0.7 }, { "x": 160, "y": 140, "pressure": 0.8 }], "stroke": "#a83a2c", "strokeWidth": 3 }`
-  - **独立贴纸或矢量插图（`type: "sticker" | "svg"`）**：`{ "id": "s1", "type": "sticker", "sticker": "truck", "x": 420, "y": 240, "w": 110, "h": 72, "label": "运输" }` 或 `type: "svg"` 带 `svg` 字段。
-  - **表格与扩展条**：`type: "table"`（`headers`、`rows`）与 `type: "html"`（小部件元数据条目）。
-  - **占座施工框（`type: "claim"`）**：帮工绘制复杂区域前先写一条 `claim` 框提示正在绘制，画完同批 `delete` 掉。
-- 实时协作光标与名牌走独立接口 `artifact.presence.update` / `artifact.presence.follow`（纯内存推送，不落盘，不写入 `elements/*` 或 `presence/*` 条目）。
+```text
+<storage>/artifact/<id>/
+├── manifest.json          # id、artifactType: "whiteboard"、title、entry: "structure/board.json"
+├── structure/
+│   └── board.json         # 画布元信息、分区容器、按稳定 id 索引的 elements 与 connectors
+└── asset/
+    └── sketch-hero.svg    # 外置插图/截图，在元素中写 asset/sketch-hero.svg
+```
+
+`structure/board.json` 核心结构：
+```json
+{
+  "version": 1,
+  "grid": "architectural",
+  "viewport": { "x": 0, "y": 0, "zoom": 1 },
+  "elements": {
+    "t1": { "id": "t1", "type": "text", "variant": "title", "x": 80, "y": 32, "w": 680, "h": 54, "label": "产品发布时间线", "highlight": "12 天" },
+    "n1": { "id": "n1", "type": "shape", "shape": "card", "x": 120, "y": 140, "w": 200, "h": 116, "title": "锁定范围", "body": "核心功能已拍板", "fill": "sun", "sticker": "berry-lock" },
+    "e1": { "id": "e1", "type": "arrow", "curve": "smooth", "from": { "id": "n1", "side": "e" }, "to": { "id": "n2", "side": "w" }, "label": "交付" }
+  }
+}
+```
+
+## 多人与多执行会话实时协作规则
+
+1. **按元素稳定 ID 并发同步（`artifact_collab`）**：所有移动、改尺寸、改文案、新增与连线变更均通过 `artifact_collab` 按 `elements[id]` 细粒度合并并同步落盘到 `structure/board.json`；**严禁整份重写 `elements` 导致其他人的并发拖拽丢失**。
+2. **来源追踪（`artifact_change`）**：每批画布编排均记录 `origin`，支持回放工作坊演进过程、按来源撤销某次自动排版或分叉方案；重要评审节点用 `artifact_version` 留存快照。
+3. **审阅建议流（`artifact_suggestion`）**：当需要删改用户亲手摆放或撰写的卡片/便签时，优先通过 `artifact_suggestion` 提出调整建议，或在旁边空白区新增对照方案而非直接抹除。
+4. **实时在场与施工框（Presence）**：协作光标、视口跟随与状态气泡通过实时 presence 广播（纯内存，**绝不写入 `structure/board.json`**）。执行会话绘制大片区域前先查看实时选区与空白坐标，必要时用临时 `claim` 框占座、画完即移除。
 
 ## 空间排版纪律
 
-- 先用 `title` + `subtitle`（带 `highlight`）定下画布叙事基调，再用暖色 `card` + 顶部 `sticker` 呈现关键里程碑或核心节点。
-- 卡片间距至少留 `64px–100px` 供平滑连线与贴纸溢出呼吸；`from.side`/`to.side`（`"n" | "s" | "e" | "w"`）顺着主轴接出，时间线引线可用 `"head": "none"` 保持轻盈。
+- 先用 `title` + `subtitle`（带 `highlight`）定下画布叙事基调，再用暖色 `card` + 顶部内置 `sticker` 呈现关键节点。
+- 卡片间距至少留 `64px–100px` 供平滑连线与贴纸溢出呼吸；同类节点放入 `container` 并设置 `parentId` 联动移动。
 
 按需延伸阅读：`artifact_type_read({ type: "whiteboard", reference: "elements" | "pictures" })`。
