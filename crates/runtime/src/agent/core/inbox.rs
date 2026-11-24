@@ -16,44 +16,45 @@ pub enum WhenBusy {
     Reject,
 }
 
-pub fn submit_prompt(tx: &mut Tx<'_>, conv: &str, request_id: &str, payload: &Value, notify_task: Option<&str>) -> Result<(Submission, bool)> {
-    tx.submit(conv, request_id, KIND_PROMPT, payload, notify_task)
+pub async fn submit_prompt(tx: &mut Tx<'_>, conv: &str, request_id: &str, payload: &Value, notify_task: Option<&str>) -> Result<(Submission, bool)> {
+    tx.submit_async(conv, request_id, KIND_PROMPT, payload, notify_task).await
 }
 
-pub fn submit_steer(tx: &mut Tx<'_>, conv: &str, request_id: &str, text: &str) -> Result<(Submission, bool)> {
+pub async fn submit_steer(tx: &mut Tx<'_>, conv: &str, request_id: &str, text: &str) -> Result<(Submission, bool)> {
     let payload = json!({
         "text": text,
         "source": "user",
         "steered": true,
     });
-    tx.submit(conv, request_id, KIND_STEER, &payload, None)
+    tx.submit_async(conv, request_id, KIND_STEER, &payload, None).await
 }
 
-pub fn submit_follow_up(tx: &mut Tx<'_>, conv: &str, request_id: &str, text: &str, notify_task: Option<&str>) -> Result<(Submission, bool)> {
+pub async fn submit_follow_up(tx: &mut Tx<'_>, conv: &str, request_id: &str, text: &str, notify_task: Option<&str>) -> Result<(Submission, bool)> {
     let payload = json!({
         "text": text,
         "source": "user",
     });
-    tx.submit(conv, request_id, KIND_FOLLOW_UP, &payload, notify_task)
+    tx.submit_async(conv, request_id, KIND_FOLLOW_UP, &payload, notify_task).await
 }
 
-pub fn take_pending_steers(tx: &mut Tx<'_>, conv: &str) -> Result<Vec<Submission>> {
-    take_queued_kind(tx, conv, KIND_STEER)
+pub async fn take_pending_steers(tx: &mut Tx<'_>, conv: &str) -> Result<Vec<Submission>> {
+    take_queued_kind(tx, conv, KIND_STEER).await
 }
 
-pub fn take_pending_follow_ups(tx: &mut Tx<'_>, conv: &str) -> Result<Vec<Submission>> {
-    take_queued_kind(tx, conv, KIND_FOLLOW_UP)
+pub async fn take_pending_follow_ups(tx: &mut Tx<'_>, conv: &str) -> Result<Vec<Submission>> {
+    take_queued_kind(tx, conv, KIND_FOLLOW_UP).await
 }
 
-fn take_queued_kind(tx: &mut Tx<'_>, conv: &str, kind: &str) -> Result<Vec<Submission>> {
+async fn take_queued_kind(tx: &mut Tx<'_>, conv: &str, kind: &str) -> Result<Vec<Submission>> {
     let queued: Vec<_> = tx
-        .submissions(conv)?
+        .submissions_async(conv)
+        .await?
         .into_iter()
         .filter(|s| s.kind == kind && s.status == SubmissionStatus::Queued)
         .collect();
     let mut placed = Vec::with_capacity(queued.len());
     for sub in queued {
-        placed.push(tx.set_submission_status(&sub.id, SubmissionStatus::Placed)?);
+        placed.push(tx.set_submission_status_async(&sub.id, SubmissionStatus::Placed).await?);
     }
     Ok(placed)
 }

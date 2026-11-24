@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::BoxFuture;
 use crate::agent::ToolSpec;
-use crate::agent::ai::CancelToken;
 use crate::agent::tools::{ReplayPolicy, Tool, ToolContext, ToolOutput, TypedTool, TypedToolOutput, typed_execute, typed_spec};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -154,18 +154,20 @@ impl TypedTool for LoadSkill {
         ReplayPolicy::Safe
     }
 
-    fn execute(&self, args: Self::Args, ctx: &ToolContext) -> Result<TypedToolOutput<Self::Details>, String> {
-        if ctx.cancel.is_cancelled() {
-            return Err("aborted by the user".into());
-        }
-        let skills = (self.skills)();
-        let text = read_skill(&skills, &args.name)?;
-        let path = skills
-            .iter()
-            .find(|s| s.name == args.name)
-            .map(|s| s.path.display().to_string())
-            .unwrap_or_default();
-        Ok(TypedToolOutput::ok_with(text, LoadSkillDetails { name: args.name, path }))
+    fn execute<'a>(&'a self, args: Self::Args, ctx: &'a ToolContext) -> BoxFuture<'a, Result<TypedToolOutput<Self::Details>, String>> {
+        Box::pin(async move {
+            if ctx.cancel.is_cancelled() {
+                return Err("aborted by the user".into());
+            }
+            let skills = (self.skills)();
+            let text = read_skill(&skills, &args.name)?;
+            let path = skills
+                .iter()
+                .find(|s| s.name == args.name)
+                .map(|s| s.path.display().to_string())
+                .unwrap_or_default();
+            Ok(TypedToolOutput::ok_with(text, LoadSkillDetails { name: args.name, path }))
+        })
     }
 }
 
@@ -178,16 +180,14 @@ impl Tool for LoadSkill {
         <Self as TypedTool>::replay(self) == ReplayPolicy::Safe
     }
 
-    fn execute(&self, args: &serde_json::Value) -> ToolOutput {
-        self.execute_with_context(args, &ToolContext::background())
+    fn execute<'a>(&'a self, args: &'a serde_json::Value) -> BoxFuture<'a, ToolOutput> {
+        Box::pin(async move {
+            let ctx = ToolContext::background();
+            self.execute_with_context(args, &ctx).await
+        })
     }
 
-    fn execute_cancellable(&self, args: &serde_json::Value, cancelled: &flume::Receiver<()>) -> ToolOutput {
-        let ctx = ToolContext::with_cancel(CancelToken::from_receiver(cancelled.clone()));
-        self.execute_with_context(args, &ctx)
-    }
-
-    fn execute_with_context(&self, args: &serde_json::Value, ctx: &ToolContext) -> ToolOutput {
-        typed_execute(self, args, ctx)
+    fn execute_with_context<'a>(&'a self, args: &'a serde_json::Value, ctx: &'a ToolContext) -> BoxFuture<'a, ToolOutput> {
+        Box::pin(typed_execute(self, args, ctx))
     }
 }

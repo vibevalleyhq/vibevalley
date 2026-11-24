@@ -11,10 +11,10 @@ use std::time::Duration;
 
 use vibevalley_runtime::oar::{ContentBlock, EventKind, Installation, PermissionMode, SessionOptions, SessionStatus, StopReason, default_runtimes};
 
-fn reply_ok(runtime: &str, model: Option<&str>) {
+async fn reply_ok(runtime: &str, model: Option<&str>) {
     let registry = default_runtimes();
     let runtime = registry.require(runtime).unwrap();
-    if !matches!(runtime.installation(), Installation::Available { .. }) {
+    if !matches!(runtime.installation().await, Installation::Available { .. }) {
         eprintln!("skipped: {} is not usable here", runtime.id());
         return;
     }
@@ -26,12 +26,16 @@ fn reply_ok(runtime: &str, model: Option<&str>) {
             permission_mode: PermissionMode::Plan,
             ..Default::default()
         })
+        .await
         .unwrap();
-    let events = session.events();
-    session.prompt(vec![ContentBlock::Text("Reply with the single word ok".into())]).unwrap();
+    let mut events = session.events();
+    session.prompt(vec![ContentBlock::Text("Reply with the single word ok".into())]).await.unwrap();
     let mut text = String::new();
     loop {
-        let event = events.recv_timeout(Duration::from_secs(180)).expect("an event within 3 minutes");
+        let event = tokio::time::timeout(Duration::from_secs(180), events.recv())
+            .await
+            .expect("an event within 3 minutes")
+            .expect("channel open");
         match event.kind {
             EventKind::TextDelta { text: t } => text.push_str(&t),
             EventKind::TurnFinished { reason, .. } => {
@@ -43,13 +47,13 @@ fn reply_ok(runtime: &str, model: Option<&str>) {
     }
     assert!(text.to_lowercase().contains("ok"), "{text:?}");
     assert_eq!(session.status(), SessionStatus::Idle);
-    session.dispose();
+    session.dispose().await;
 }
 
-fn abort_a_turn(runtime: &str, model: Option<&str>) {
+async fn abort_a_turn(runtime: &str, model: Option<&str>) {
     let registry = default_runtimes();
     let runtime = registry.require(runtime).unwrap();
-    if !matches!(runtime.installation(), Installation::Available { .. }) {
+    if !matches!(runtime.installation().await, Installation::Available { .. }) {
         return;
     }
     let dir = tempfile::tempdir().unwrap();
@@ -60,60 +64,68 @@ fn abort_a_turn(runtime: &str, model: Option<&str>) {
             permission_mode: PermissionMode::Plan,
             ..Default::default()
         })
+        .await
         .unwrap();
-    let events = session.events();
+    let mut events = session.events();
     session
         .prompt(vec![ContentBlock::Text("Count slowly from 1 to 500, one number per line.".into())])
+        .await
         .unwrap();
     // Abort once the model has started answering.
     loop {
-        let event = events.recv_timeout(Duration::from_secs(180)).expect("output");
+        let event = tokio::time::timeout(Duration::from_secs(180), events.recv())
+            .await
+            .expect("output")
+            .expect("channel open");
         if matches!(event.kind, EventKind::TextDelta { .. } | EventKind::ThinkingDelta { .. }) {
             break;
         }
     }
-    session.abort().unwrap();
+    session.abort().await.unwrap();
     loop {
-        let event = events.recv_timeout(Duration::from_secs(60)).expect("the turn ends after abort");
+        let event = tokio::time::timeout(Duration::from_secs(60), events.recv())
+            .await
+            .expect("the turn ends after abort")
+            .expect("channel open");
         if let EventKind::TurnFinished { reason, .. } = event.kind {
             assert_eq!(reason, StopReason::Aborted);
             break;
         }
     }
-    session.dispose();
+    session.dispose().await;
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "spends quota"]
-fn claude_replies() {
-    reply_ok("claude", Some("haiku"));
+async fn claude_replies() {
+    reply_ok("claude", Some("haiku")).await;
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "spends quota"]
-fn claude_aborts() {
-    abort_a_turn("claude", Some("haiku"));
+async fn claude_aborts() {
+    abort_a_turn("claude", Some("haiku")).await;
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "spends quota"]
-fn codex_replies() {
-    reply_ok("codex", None);
+async fn codex_replies() {
+    reply_ok("codex", None).await;
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "spends quota"]
-fn codex_aborts() {
-    abort_a_turn("codex", None);
+async fn codex_aborts() {
+    abort_a_turn("codex", None).await;
 }
 
 /// Reads the signed-in accounts' usage; sends no prompt, spends nothing.
-#[test]
+#[tokio::test]
 #[ignore]
-fn live_account_usage() {
+async fn live_account_usage() {
     let registry = default_runtimes();
     for id in ["claude", "codex"] {
-        let usage = registry.require(id).unwrap().account_usage().unwrap();
+        let usage = registry.require(id).unwrap().account_usage().await.unwrap();
         let wire = serde_json::to_value(&usage).unwrap();
         println!("{id}: {} windows={}", wire["kind"], wire["windows"].as_array().map(Vec::len).unwrap_or(0));
         assert!(matches!(

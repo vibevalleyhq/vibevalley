@@ -1,11 +1,12 @@
 use std::collections::VecDeque;
-use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Barrier, Mutex};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use serde_json::{Value, json};
 use tempfile::TempDir;
+use tokio::process::Command;
+use tokio::sync::Barrier;
 
 use super::doc::{
     AgentDoc, BudgetConfig, BudgetSnapshot, CONVERSATION_SCOPE, DocSpec, FileOpsDoc, GovernanceDoc, InboxDoc, OarSessionDoc, PendingApproval,
@@ -17,6 +18,7 @@ use super::extension::{Extension, ExtensionRunner, HookOutcome, Rubric, RubricVe
 use super::inbox;
 use super::pipeline::{PromptSection, Transcript, convert_to_llm};
 use super::tool::{Tool, ToolOutput};
+use crate::BoxFuture;
 use crate::agent::ai::ModelClient;
 use crate::agent::ai::types::{ChatRequest, Completion, Delta, FinishReason, Message, Role, ToolCall, ToolSpec, Usage};
 use crate::agent::codemode::CodeModeSpec;
@@ -24,7 +26,7 @@ use crate::agent::compaction::Compactor;
 use crate::agent::durable::{Scheduler, Store, SubmissionStatus, Task};
 use crate::agent::{BrainError, Result as AiResult};
 
-type ScriptedStep = Box<dyn FnOnce(&ChatRequest, &mut dyn FnMut(Delta)) -> AiResult<Completion> + Send>;
+type ScriptedStep = Box<dyn FnOnce(&ChatRequest, &mut (dyn FnMut(Delta) + Send)) -> AiResult<Completion> + Send>;
 
 struct ScriptedClient {
     responses: Mutex<VecDeque<ScriptedStep>>,
@@ -41,7 +43,7 @@ impl ScriptedClient {
 
     fn push_fn<F>(&self, f: F)
     where
-        F: FnOnce(&ChatRequest, &mut dyn FnMut(Delta)) -> AiResult<Completion> + Send + 'static,
+        F: FnOnce(&ChatRequest, &mut (dyn FnMut(Delta) + Send)) -> AiResult<Completion> + Send + 'static,
     {
         self.responses.lock().unwrap().push_back(Box::new(f));
     }
@@ -56,10 +58,12 @@ impl ScriptedClient {
 }
 
 impl ModelClient for ScriptedClient {
-    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> AiResult<Completion> {
-        self.requests.lock().unwrap().push(request.clone());
-        let next = self.responses.lock().unwrap().pop_front().expect("unexpected model call");
-        next(request, on)
+    fn complete<'a>(&'a self, request: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> BoxFuture<'a, AiResult<Completion>> {
+        Box::pin(async move {
+            self.requests.lock().unwrap().push(request.clone());
+            let next = self.responses.lock().unwrap().pop_front().expect("unexpected model call");
+            next(request, on)
+        })
     }
 }
 
@@ -82,18 +86,20 @@ impl Tool for BarrierSafeTool {
         true
     }
 
-    fn execute(&self, args: &Value) -> ToolOutput {
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        self.barrier.wait();
-        ToolOutput::ok(format!("ran {}:{}", self.name, args["path"].as_str().unwrap_or("")))
+    fn execute<'a>(&'a self, args: &'a Value) -> BoxFuture<'a, ToolOutput> {
+        Box::pin(async move {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.barrier.wait().await;
+            ToolOutput::ok(format!("ran {}:{}", self.name, args["path"].as_str().unwrap_or("")))
+        })
     }
 }
 
 struct UnsafeCounterTool {
     name: String,
     calls: Arc<AtomicUsize>,
-    started_tx: Option<flume::Sender<()>>,
-    release_rx: Option<flume::Receiver<()>>,
+    started_tx: Option<tokio::sync::mpsc::UnboundedSender<()>>,
+    release_rx: Option<tokio::sync::Mutex<tokio::sync::mpsc::UnboundedReceiver<()>>>,
 }
 
 impl Tool for UnsafeCounterTool {
@@ -109,15 +115,18 @@ impl Tool for UnsafeCounterTool {
         false
     }
 
-    fn execute(&self, _args: &Value) -> ToolOutput {
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        if let Some(tx) = &self.started_tx {
-            let _ = tx.send(());
-        }
-        if let Some(rx) = &self.release_rx {
-            let _ = rx.recv_timeout(Duration::from_secs(2));
-        }
-        ToolOutput::ok("executed")
+    fn execute<'a>(&'a self, _args: &'a Value) -> BoxFuture<'a, ToolOutput> {
+        Box::pin(async move {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(tx) = &self.started_tx {
+                let _ = tx.send(());
+            }
+            if let Some(rx) = &self.release_rx {
+                let mut rx = rx.lock().await;
+                let _ = tokio::time::timeout(Duration::from_secs(2), rx.recv()).await;
+            }
+            ToolOutput::ok("executed")
+        })
     }
 }
 
@@ -140,8 +149,8 @@ impl FixedBrainProvider {
 }
 
 impl BrainProvider for FixedBrainProvider {
-    fn resolve_brain(&self, _conv: &str, _provider: &str) -> crate::agent::durable::Result<Option<Arc<Brain>>> {
-        Ok(Some(self.brain.clone()))
+    fn resolve_brain<'a>(&'a self, _conv: &'a str, _provider: &'a str) -> BoxFuture<'a, crate::agent::durable::Result<Option<Arc<Brain>>>> {
+        Box::pin(std::future::ready(Ok(Some(self.brain.clone()))))
     }
 
     fn observe(&self, _conv: &str, _task: &str, event: AgentEvent) {
@@ -149,126 +158,143 @@ impl BrainProvider for FixedBrainProvider {
     }
 }
 
-#[test]
-fn doc_specs_roundtrip_and_inbox_compat() -> crate::agent::durable::Result<()> {
+#[tokio::test]
+async fn doc_specs_roundtrip_and_inbox_compat() -> crate::agent::durable::Result<()> {
     let store = Store::memory()?;
-    store.write(|tx| {
-        tx.create_conversation("c1", "mock")?;
-        write_doc::<AgentDoc>(
-            tx,
-            CONVERSATION_SCOPE,
-            "c1",
-            &super::doc::AgentState {
-                role: "worker".into(),
-                model: "deepseek-chat".into(),
-                read_only: false,
-                tools: vec!["read".into()],
-                max_iterations: Some(3),
-            },
-        )?;
-        write_doc::<InboxDoc>(
-            tx,
-            CONVERSATION_SCOPE,
-            "c1",
-            &super::doc::InboxState {
-                items: vec![json!({"kind": "alert", "title": "hi"})],
-            },
-        )?;
-        update_doc::<FileOpsDoc>(tx, CONVERSATION_SCOPE, "c1", |ops| {
-            ops.read.insert("src/lib.rs".into());
-            Ok(())
-        })?;
-        UsageTotals {
-            input_tokens: 100,
-            output_tokens: 20,
-            cache_read_tokens: 10,
-            cost_micros: Some(500),
-            ..Default::default()
-        }
-        .record(tx, "c1")?;
-        UsageTotals {
-            input_tokens: 5,
-            cost_micros: Some(10),
-            ..Default::default()
-        }
-        .record_task(tx, "t1")?;
-        update_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, "c1", |g| {
-            g.status = "active".into();
-            g.budget = Some(BudgetConfig { max_cost_micros: 1_000 });
-            g.budget_snapshot = Some(BudgetSnapshot {
-                spent_micros: 500,
-                max_cost_micros: 1_000,
-                reached: false,
-            });
-            g.pending_permissions.insert(
-                "t1".into(),
-                PendingApproval {
-                    task_id: "t1".into(),
-                    tool_call_id: "call-1".into(),
-                    tool_name: "bash".into(),
-                    args_json: json!({"cmd": "ls"}),
-                    evaluation: PermissionEvaluation {
-                        tool_name: "bash".into(),
-                        policy: "auto".into(),
-                        verdict: "ask".into(),
-                        reason: "needs approval".into(),
-                        client_overridable: true,
+    store
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.create_conversation_async("c1", "mock").await?;
+                write_doc::<AgentDoc>(
+                    tx,
+                    CONVERSATION_SCOPE,
+                    "c1",
+                    &super::doc::AgentState {
+                        role: "worker".into(),
+                        model: "deepseek-chat".into(),
+                        read_only: false,
+                        tools: vec!["read".into()],
+                        max_iterations: Some(3),
                     },
-                    requested_at_ms: 123,
-                },
-            );
-            Ok(())
-        })?;
-        update_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, "c1", |t| {
-            t.items.push(TodoItem {
-                id: "1".into(),
-                title: "first".into(),
-                brief: "do".into(),
-                after: vec![],
-                state: TodoState::Working,
-                result: None,
-                tries: 1,
-            });
-            Ok(())
-        })?;
-        write_doc::<OarSessionDoc>(
-            tx,
-            CONVERSATION_SCOPE,
-            "c1",
-            &super::doc::OarSessionState {
-                runtime_id: "vibevalley".into(),
-                vendor_session_id: "vs1".into(),
-                cwd: "/tmp".into(),
-                permission_mode: "ask".into(),
-                status: "running".into(),
-            },
-        )?;
-        write_doc::<StandInDoc>(
-            tx,
-            CONVERSATION_SCOPE,
-            "c1",
-            &super::doc::StandInState {
-                sections: vec![PromptSection::new("k", "v")],
-                tool_specs: vec![],
-            },
-        )?;
-        Ok(())
-    })?;
+                )
+                .await?;
+                write_doc::<InboxDoc>(
+                    tx,
+                    CONVERSATION_SCOPE,
+                    "c1",
+                    &super::doc::InboxState {
+                        items: vec![json!({"kind": "alert", "title": "hi"})],
+                    },
+                )
+                .await?;
+                update_doc::<FileOpsDoc>(tx, CONVERSATION_SCOPE, "c1", |ops| {
+                    ops.read.insert("src/lib.rs".into());
+                    Ok(())
+                })
+                .await?;
+                UsageTotals {
+                    input_tokens: 100,
+                    output_tokens: 20,
+                    cache_read_tokens: 10,
+                    cost_micros: Some(500),
+                    ..Default::default()
+                }
+                .record(tx, "c1")
+                .await?;
+                UsageTotals {
+                    input_tokens: 5,
+                    cost_micros: Some(10),
+                    ..Default::default()
+                }
+                .record_task(tx, "t1")
+                .await?;
+                update_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, "c1", |g| {
+                    g.status = "active".into();
+                    g.budget = Some(BudgetConfig { max_cost_micros: 1_000 });
+                    g.budget_snapshot = Some(BudgetSnapshot {
+                        spent_micros: 500,
+                        max_cost_micros: 1_000,
+                        reached: false,
+                    });
+                    g.pending_permissions.insert(
+                        "t1".into(),
+                        PendingApproval {
+                            task_id: "t1".into(),
+                            tool_call_id: "call-1".into(),
+                            tool_name: "bash".into(),
+                            args_json: json!({"cmd": "ls"}),
+                            evaluation: PermissionEvaluation {
+                                tool_name: "bash".into(),
+                                policy: "auto".into(),
+                                verdict: "ask".into(),
+                                reason: "needs approval".into(),
+                                client_overridable: true,
+                            },
+                            requested_at_ms: 123,
+                        },
+                    );
+                    Ok(())
+                })
+                .await?;
+                update_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, "c1", |t| {
+                    t.items.push(TodoItem {
+                        id: "1".into(),
+                        title: "first".into(),
+                        brief: "do".into(),
+                        after: vec![],
+                        state: TodoState::Working,
+                        result: None,
+                        tries: 1,
+                    });
+                    Ok(())
+                })
+                .await?;
+                write_doc::<OarSessionDoc>(
+                    tx,
+                    CONVERSATION_SCOPE,
+                    "c1",
+                    &super::doc::OarSessionState {
+                        runtime_id: "vibevalley".into(),
+                        vendor_session_id: "vs1".into(),
+                        cwd: "/tmp".into(),
+                        permission_mode: "ask".into(),
+                        status: "running".into(),
+                    },
+                )
+                .await?;
+                write_doc::<StandInDoc>(
+                    tx,
+                    CONVERSATION_SCOPE,
+                    "c1",
+                    &super::doc::StandInState {
+                        sections: vec![PromptSection::new("k", "v")],
+                        tool_specs: vec![],
+                    },
+                )
+                .await?;
+                Ok(())
+            })
+        })
+        .await?;
 
-    store.read(|tx| {
-        assert_eq!(read_doc::<AgentDoc>(tx, CONVERSATION_SCOPE, "c1")?.role, "worker");
-        assert_eq!(read_doc::<InboxDoc>(tx, CONVERSATION_SCOPE, "c1")?.items.len(), 1);
-        assert!(read_doc::<FileOpsDoc>(tx, CONVERSATION_SCOPE, "c1")?.read.contains("src/lib.rs"));
-        assert_eq!(read_doc::<UsageDoc>(tx, CONVERSATION_SCOPE, "c1")?.cost_micros, Some(500));
-        assert_eq!(read_doc::<UsageDoc>(tx, "task", "t1")?.input_tokens, 5);
-        let gov_raw = tx.document(CONVERSATION_SCOPE, "c1", GovernanceDoc::KIND)?.unwrap().state;
-        assert_eq!(gov_raw["budgetSnapshot"]["spentMicros"], 500);
-        assert_eq!(gov_raw["pendingPermissions"]["t1"]["toolCallId"], "call-1");
-        assert_eq!(read_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, "c1")?.items[0].state, TodoState::Working);
-        assert_eq!(read_doc::<OarSessionDoc>(tx, CONVERSATION_SCOPE, "c1")?.runtime_id, "vibevalley");
-        assert_eq!(read_doc::<StandInDoc>(tx, CONVERSATION_SCOPE, "c1")?.sections.len(), 1);
-        Ok(())
-    })?;
+    store
+        .read_async(|tx| {
+            Box::pin(async move {
+                assert_eq!(read_doc::<AgentDoc>(tx, CONVERSATION_SCOPE, "c1").await?.role, "worker");
+                assert_eq!(read_doc::<InboxDoc>(tx, CONVERSATION_SCOPE, "c1").await?.items.len(), 1);
+                assert!(read_doc::<FileOpsDoc>(tx, CONVERSATION_SCOPE, "c1").await?.read.contains("src/lib.rs"));
+                assert_eq!(read_doc::<UsageDoc>(tx, CONVERSATION_SCOPE, "c1").await?.cost_micros, Some(500));
+                assert_eq!(read_doc::<UsageDoc>(tx, "task", "t1").await?.input_tokens, 5);
+                let gov_raw = tx.document_async(CONVERSATION_SCOPE, "c1", GovernanceDoc::KIND).await?.unwrap().state;
+                assert_eq!(gov_raw["budgetSnapshot"]["spentMicros"], 500);
+                assert_eq!(gov_raw["pendingPermissions"]["t1"]["toolCallId"], "call-1");
+                assert_eq!(read_doc::<TodoDoc>(tx, CONVERSATION_SCOPE, "c1").await?.items[0].state, TodoState::Working);
+                assert_eq!(read_doc::<OarSessionDoc>(tx, CONVERSATION_SCOPE, "c1").await?.runtime_id, "vibevalley");
+                assert_eq!(read_doc::<StandInDoc>(tx, CONVERSATION_SCOPE, "c1").await?.sections.len(), 1);
+                Ok(())
+            })
+        })
+        .await?;
     Ok(())
 }
 
@@ -315,8 +341,8 @@ fn pipeline_convert_to_llm_preserves_cache_reasoning_and_tool_pairing() {
     assert_eq!(converted.len(), 7);
 }
 
-#[test]
-fn engine_runs_parallel_safe_tools_in_one_batch() -> crate::agent::durable::Result<()> {
+#[tokio::test]
+async fn engine_runs_parallel_safe_tools_in_one_batch() -> crate::agent::durable::Result<()> {
     let store = Store::memory()?;
     let scheduler = Scheduler::new(store.clone(), 8);
     let client = Arc::new(ScriptedClient::new());
@@ -373,38 +399,42 @@ fn engine_runs_parallel_safe_tools_in_one_batch() -> crate::agent::durable::Resu
     let provider = Arc::new(FixedBrainProvider::new(Arc::new(brain)));
     let engine = Engine::new(store.clone(), provider.clone()).with_compactor(Compactor::deterministic(store.clone()));
     engine.register(&scheduler);
-    scheduler.recover()?;
+    scheduler.recover().await?;
 
-    let (_, task, _) = engine.submit(Request {
-        conversation: "conv-par",
-        provider: "mock",
-        request_id: "r1",
-        prompt: "read two files",
-        source: "user",
-        system: "sys",
-        ..Default::default()
-    })?;
-    let done = scheduler.wait(&task.id, Duration::from_secs(4))?;
+    let (_, task, _) = engine
+        .submit(Request {
+            conversation: "conv-par",
+            provider: "mock",
+            request_id: "r1",
+            prompt: "read two files",
+            source: "user",
+            system: "sys",
+            ..Default::default()
+        })
+        .await?;
+    let done = scheduler.wait(&task.id, Duration::from_secs(4)).await?;
     assert_eq!(done.terminal_reason, "completed");
     assert_eq!(done.result["output"], "all read");
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 
-    let tr = Transcript::load(&store, "conv-par")?;
+    let tr = Transcript::load(&store, "conv-par").await?;
     let results: Vec<_> = tr.entries.iter().filter(|e| e.kind == "pi.tool_result").collect();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].payload["toolCallId"], "c1");
     assert_eq!(results[1].payload["toolCallId"], "c2");
 
-    let ops = store.read(|tx| read_doc::<FileOpsDoc>(tx, CONVERSATION_SCOPE, "conv-par"))?;
+    let ops = store
+        .read_async(|tx| Box::pin(async move { read_doc::<FileOpsDoc>(tx, CONVERSATION_SCOPE, "conv-par").await }))
+        .await?;
     assert!(ops.read.contains("a.rs"));
     assert!(ops.read.contains("b.rs"));
     Ok(())
 }
 
-#[test]
-fn engine_unsafe_effect_sandwich_blocks_reexecution_with_git_status() -> crate::agent::durable::Result<()> {
+#[tokio::test]
+async fn engine_unsafe_effect_sandwich_blocks_reexecution_with_git_status() -> crate::agent::durable::Result<()> {
     let dir = TempDir::new().unwrap();
-    Command::new("git").args(["init", "-q"]).current_dir(dir.path()).status().unwrap();
+    Command::new("git").args(["init", "-q"]).current_dir(dir.path()).status().await.unwrap();
     std::fs::write(dir.path().join("dirty.txt"), "uncommitted\n").unwrap();
 
     let store = Store::memory()?;
@@ -439,12 +469,16 @@ fn engine_unsafe_effect_sandwich_blocks_reexecution_with_git_status() -> crate::
     });
     crashed_tool.memo = json!({ "started": true });
 
-    store.write(|tx| {
-        tx.create_conversation("conv-git", "mock")?;
-        Ok(())
-    })?;
-    scheduler.start(crashed_tool)?;
-    let done = scheduler.wait("crashed-tool", Duration::from_secs(3))?;
+    store
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.create_conversation_async("conv-git", "mock").await?;
+                Ok(())
+            })
+        })
+        .await?;
+    scheduler.start(crashed_tool).await?;
+    let done = scheduler.wait("crashed-tool", Duration::from_secs(3)).await?;
     assert_eq!(done.terminal_reason, "completed");
     assert_eq!(exec_count.load(Ordering::SeqCst), 0);
     assert_eq!(done.result["isError"], true);
@@ -454,8 +488,8 @@ fn engine_unsafe_effect_sandwich_blocks_reexecution_with_git_status() -> crate::
     Ok(())
 }
 
-#[test]
-fn engine_tool_join_steering_skips_remaining_calls_and_pairs_ids() -> crate::agent::durable::Result<()> {
+#[tokio::test]
+async fn engine_tool_join_steering_skips_remaining_calls_and_pairs_ids() -> crate::agent::durable::Result<()> {
     let store = Store::memory()?;
     let scheduler = Scheduler::new(store.clone(), 4);
     let client = Arc::new(ScriptedClient::new());
@@ -487,8 +521,8 @@ fn engine_tool_join_steering_skips_remaining_calls_and_pairs_ids() -> crate::age
         usage: Usage::default(),
     });
 
-    let (started_tx, started_rx) = flume::bounded(1);
-    let (release_tx, release_rx) = flume::bounded(1);
+    let (started_tx, mut started_rx) = tokio::sync::mpsc::unbounded_channel();
+    let (release_tx, release_rx) = tokio::sync::mpsc::unbounded_channel();
     let first_calls = Arc::new(AtomicUsize::new(0));
     let second_calls = Arc::new(AtomicUsize::new(0));
 
@@ -497,7 +531,7 @@ fn engine_tool_join_steering_skips_remaining_calls_and_pairs_ids() -> crate::age
         name: "write_first".into(),
         calls: first_calls.clone(),
         started_tx: Some(started_tx),
-        release_rx: Some(release_rx),
+        release_rx: Some(tokio::sync::Mutex::new(release_rx)),
     }));
     brain.tools.push(Box::new(UnsafeCounterTool {
         name: "write_second".into(),
@@ -508,28 +542,36 @@ fn engine_tool_join_steering_skips_remaining_calls_and_pairs_ids() -> crate::age
 
     let engine = Engine::new(store.clone(), Arc::new(FixedBrainProvider::new(Arc::new(brain)))).with_compactor(Compactor::deterministic(store.clone()));
     engine.register(&scheduler);
-    scheduler.recover()?;
+    scheduler.recover().await?;
 
-    let (_, task, _) = engine.submit(Request {
-        conversation: "conv-steer",
-        provider: "mock",
-        request_id: "r1",
-        prompt: "start",
-        source: "user",
-        system: "sys",
-        ..Default::default()
-    })?;
+    let (_, task, _) = engine
+        .submit(Request {
+            conversation: "conv-steer",
+            provider: "mock",
+            request_id: "r1",
+            prompt: "start",
+            source: "user",
+            system: "sys",
+            ..Default::default()
+        })
+        .await?;
 
-    started_rx.recv_timeout(Duration::from_secs(2)).expect("c1 started");
-    let (steer_sub, _) = store.write(|tx| inbox::submit_steer(tx, "conv-steer", "steer-1", "pivot now"))?;
+    tokio::time::timeout(Duration::from_secs(2), started_rx.recv())
+        .await
+        .expect("c1 started")
+        .expect("sender open");
+    let (steer_sub, _) = store
+        .write_async(|tx| Box::pin(async move { inbox::submit_steer(tx, "conv-steer", "steer-1", "pivot now").await }))
+        .await?;
     let _ = release_tx.send(());
 
-    let done = scheduler.wait(&task.id, Duration::from_secs(3))?;
+    let done = scheduler.wait(&task.id, Duration::from_secs(3)).await?;
     assert_eq!(done.result["output"], "steered reply");
     assert_eq!(first_calls.load(Ordering::SeqCst), 1);
     assert_eq!(second_calls.load(Ordering::SeqCst), 0);
 
-    let updated_steer = store.read(|r| r.submission(&steer_sub.id))?;
+    let steer_id = steer_sub.id.clone();
+    let updated_steer = store.read_async(move |r| Box::pin(async move { r.submission_async(&steer_id).await })).await?;
     assert_eq!(updated_steer.status, SubmissionStatus::Done);
 
     let reqs = client.captured_requests();
@@ -553,24 +595,26 @@ impl Extension for RetryOnceExtension {
         "retry-once"
     }
 
-    fn on_after_run(&self, ctx: &mut RunEndCtx<'_>) -> crate::agent::durable::Result<HookOutcome> {
-        if !self.retried.swap(true, Ordering::SeqCst) {
-            return Ok(HookOutcome::Retry {
-                feedback_entry: json!({"text": "please refine", "source": "grader"}),
+    fn on_after_run<'a>(&'a self, ctx: &'a mut RunEndCtx<'_>) -> BoxFuture<'a, crate::agent::durable::Result<HookOutcome>> {
+        Box::pin(async move {
+            if !self.retried.swap(true, Ordering::SeqCst) {
+                return Ok(HookOutcome::Retry {
+                    feedback_entry: json!({"text": "please refine", "source": "grader"}),
+                });
+            }
+            *ctx.verdict = Some(RubricVerdict {
+                satisfied: true,
+                summary: "looks good".into(),
+                unmet_items: vec![],
+                iteration: ctx.iteration + 1,
             });
-        }
-        *ctx.verdict = Some(RubricVerdict {
-            satisfied: true,
-            summary: "looks good".into(),
-            unmet_items: vec![],
-            iteration: ctx.iteration + 1,
-        });
-        Ok(HookOutcome::Continue)
+            Ok(HookOutcome::Continue)
+        })
     }
 }
 
-#[test]
-fn engine_yield_retry_and_follow_up_settle_together() -> crate::agent::durable::Result<()> {
+#[tokio::test]
+async fn engine_yield_retry_and_follow_up_settle_together() -> crate::agent::durable::Result<()> {
     let store = Store::memory()?;
     let scheduler = Scheduler::new(store.clone(), 4);
     let client = Arc::new(ScriptedClient::new());
@@ -597,35 +641,47 @@ fn engine_yield_retry_and_follow_up_settle_together() -> crate::agent::durable::
             retried: AtomicBool::new(false),
         })]));
     engine.register(&scheduler);
-    scheduler.recover()?;
+    scheduler.recover().await?;
 
-    let (prompt_sub, task, _) = engine.submit(Request {
-        conversation: "conv-fu",
-        provider: "mock",
-        request_id: "r-main",
-        prompt: "go",
-        source: "user",
-        system: "sys",
-        rubric: Some(Rubric {
-            markdown: "check".into(),
-            max_iterations: 3,
-        }),
-        ..Default::default()
-    })?;
-    let (fu_sub, _) = store.write(|tx| inbox::submit_follow_up(tx, "conv-fu", "r-fu", "also do X", None))?;
+    let (prompt_sub, task, _) = engine
+        .submit(Request {
+            conversation: "conv-fu",
+            provider: "mock",
+            request_id: "r-main",
+            prompt: "go",
+            source: "user",
+            system: "sys",
+            rubric: Some(Rubric {
+                markdown: "check".into(),
+                max_iterations: 3,
+            }),
+            ..Default::default()
+        })
+        .await?;
+    let (fu_sub, _) = store
+        .write_async(|tx| Box::pin(async move { inbox::submit_follow_up(tx, "conv-fu", "r-fu", "also do X", None).await }))
+        .await?;
 
-    let done = scheduler.wait(&task.id, Duration::from_secs(3))?;
+    let done = scheduler.wait(&task.id, Duration::from_secs(3)).await?;
     assert_eq!(done.terminal_reason, "completed");
     assert_eq!(done.result["output"], "follow up final");
     assert_eq!(done.result["rubricVerdict"]["satisfied"], true);
 
-    assert_eq!(store.read(|r| r.submission(&prompt_sub.id))?.status, SubmissionStatus::Done);
-    assert_eq!(store.read(|r| r.submission(&fu_sub.id))?.status, SubmissionStatus::Done);
+    let pid = prompt_sub.id.clone();
+    let fid = fu_sub.id.clone();
+    assert_eq!(
+        store.read_async(move |r| Box::pin(async move { r.submission_async(&pid).await })).await?.status,
+        SubmissionStatus::Done
+    );
+    assert_eq!(
+        store.read_async(move |r| Box::pin(async move { r.submission_async(&fid).await })).await?.status,
+        SubmissionStatus::Done
+    );
     Ok(())
 }
 
-#[test]
-fn engine_context_overflow_retries_after_compaction() -> crate::agent::durable::Result<()> {
+#[tokio::test]
+async fn engine_context_overflow_retries_after_compaction() -> crate::agent::durable::Result<()> {
     let store = Store::memory()?;
     let scheduler = Scheduler::new(store.clone(), 4);
     let client = Arc::new(ScriptedClient::new());
@@ -642,25 +698,31 @@ fn engine_context_overflow_retries_after_compaction() -> crate::agent::durable::
     compactor.keep_recent = 1;
     let engine = Engine::new(store.clone(), provider.clone()).with_compactor(compactor);
     engine.register(&scheduler);
-    scheduler.recover()?;
+    scheduler.recover().await?;
 
-    store.write(|tx| {
-        tx.create_conversation("conv-ov", "mock")?;
-        tx.append_entry("conv-ov", "pi.user", &json!({"text": "old 1"}))?;
-        tx.append_entry("conv-ov", "pi.assistant", &json!({"text": "old 2"}))?;
-        Ok(())
-    })?;
+    store
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.create_conversation_async("conv-ov", "mock").await?;
+                tx.append_entry_async("conv-ov", "pi.user", &json!({"text": "old 1"})).await?;
+                tx.append_entry_async("conv-ov", "pi.assistant", &json!({"text": "old 2"})).await?;
+                Ok(())
+            })
+        })
+        .await?;
 
-    let (_, task, _) = engine.submit(Request {
-        conversation: "conv-ov",
-        provider: "mock",
-        request_id: "r-ov",
-        prompt: "new question",
-        source: "user",
-        system: "",
-        ..Default::default()
-    })?;
-    let done = scheduler.wait(&task.id, Duration::from_secs(3))?;
+    let (_, task, _) = engine
+        .submit(Request {
+            conversation: "conv-ov",
+            provider: "mock",
+            request_id: "r-ov",
+            prompt: "new question",
+            source: "user",
+            system: "",
+            ..Default::default()
+        })
+        .await?;
+    let done = scheduler.wait(&task.id, Duration::from_secs(3)).await?;
     assert_eq!(done.result["output"], "recovered after compact");
     assert!(
         provider
@@ -678,19 +740,21 @@ impl Extension for DenyWriteToolExtension {
         "deny-write"
     }
 
-    fn on_before_tool(&self, ctx: &ToolCallHookCtx<'_>) -> crate::agent::durable::Result<HookOutcome> {
-        if ctx.tool_name == "danger" {
-            return Ok(HookOutcome::Deny {
-                reason: "blocked by policy".into(),
-                overridable: false,
-            });
-        }
-        Ok(HookOutcome::Continue)
+    fn on_before_tool<'a>(&'a self, ctx: &'a ToolCallHookCtx<'_>) -> BoxFuture<'a, crate::agent::durable::Result<HookOutcome>> {
+        Box::pin(async move {
+            if ctx.tool_name == "danger" {
+                return Ok(HookOutcome::Deny {
+                    reason: "blocked by policy".into(),
+                    overridable: false,
+                });
+            }
+            Ok(HookOutcome::Continue)
+        })
     }
 }
 
-#[test]
-fn engine_run_codemode_tool_shares_before_tool_hooks() -> crate::agent::durable::Result<()> {
+#[tokio::test]
+async fn engine_run_codemode_tool_shares_before_tool_hooks() -> crate::agent::durable::Result<()> {
     let store = Store::memory()?;
     let scheduler = Scheduler::new(store.clone(), 4);
     let exec_calls = Arc::new(AtomicUsize::new(0));
@@ -719,30 +783,38 @@ fn engine_run_codemode_tool_shares_before_tool_hooks() -> crate::agent::durable:
         timeout_ms: 2000,
         ..Default::default()
     })?;
-    store.write(|tx| {
-        tx.create_conversation("conv-cm", "mock")?;
-        Ok(())
-    })?;
-    scheduler.start(cm)?;
-    let done = scheduler.wait("cm-1", Duration::from_secs(3))?;
+    store
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.create_conversation_async("conv-cm", "mock").await?;
+                Ok(())
+            })
+        })
+        .await?;
+    scheduler.start(cm).await?;
+    let done = scheduler.wait("cm-1", Duration::from_secs(3)).await?;
     assert_eq!(done.terminal_reason, "completed", "{}", done.error_text);
     assert_eq!(exec_calls.load(Ordering::SeqCst), 0);
     assert!(done.result["value"].as_str().unwrap_or_default().contains("blocked by policy"));
     Ok(())
 }
 
-#[test]
-fn unset_budget_and_allowed_governance_do_not_open_write_transactions() -> crate::agent::durable::Result<()> {
+#[tokio::test]
+async fn unset_budget_and_allowed_governance_do_not_open_write_transactions() -> crate::agent::durable::Result<()> {
     use crate::agent::extensions::budget::{BudgetExtension, check_budget_if_configured};
     use crate::agent::extensions::governance::GovernanceExtension;
 
     let store = Store::memory()?;
-    store.write(|tx| {
-        tx.create_conversation("c-clean", "mock")?;
-        Ok(())
-    })?;
+    store
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.create_conversation_async("c-clean", "mock").await?;
+                Ok(())
+            })
+        })
+        .await?;
     let stats_before = store.stats();
-    let snap = check_budget_if_configured(&store, "c-clean", "t-1")?;
+    let snap = check_budget_if_configured(&store, "c-clean", "t-1").await?;
     assert!(!snap.reached);
     assert_eq!(store.stats().requests, stats_before.requests, "unset budget must not open a write tx");
     assert_eq!(store.stats().committed_ops, stats_before.committed_ops);
@@ -779,23 +851,28 @@ fn unset_budget_and_allowed_governance_do_not_open_write_transactions() -> crate
     let engine = Engine::new(store.clone(), Arc::new(FixedBrainProvider::new(Arc::new(brain))))
         .with_extensions(ExtensionRunner::new(vec![Arc::new(BudgetExtension), Arc::new(GovernanceExtension::default())]));
     engine.register(&scheduler);
-    scheduler.recover()?;
+    scheduler.recover().await?;
 
-    let (_, task, _) = engine.submit(Request {
-        conversation: "c-clean",
-        provider: "mock",
-        request_id: "r-clean",
-        prompt: "read file",
-        source: "user",
-        system: "sys",
-        ..Default::default()
-    })?;
-    let done = scheduler.wait(&task.id, Duration::from_secs(3))?;
+    let (_, task, _) = engine
+        .submit(Request {
+            conversation: "c-clean",
+            provider: "mock",
+            request_id: "r-clean",
+            prompt: "read file",
+            source: "user",
+            system: "sys",
+            ..Default::default()
+        })
+        .await?;
+    let done = scheduler.wait(&task.id, Duration::from_secs(3)).await?;
     assert_eq!(done.terminal_reason, "completed");
     assert!(
-        store.read(|tx| tx.document(CONVERSATION_SCOPE, "c-clean", GovernanceDoc::KIND))?.is_none(),
+        store
+            .read_async(|tx| Box::pin(async move { tx.document_async(CONVERSATION_SCOPE, "c-clean", GovernanceDoc::KIND).await }))
+            .await?
+            .is_none(),
         "unset budget and allowed tool calls must not create pi.governance"
     );
-    scheduler.close();
+    scheduler.close().await;
     Ok(())
 }

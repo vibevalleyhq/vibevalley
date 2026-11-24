@@ -7,7 +7,8 @@ use serde_json::{Value, json};
 use tokio_util::codec::{FramedRead, LinesCodec};
 use tokio_util::io::StreamReader;
 
-use crate::agent::ai::retry::{RetryPolicy, parse_retry_after, sleep_interruptible_async};
+use crate::BoxFuture;
+use crate::agent::ai::retry::{RetryPolicy, parse_retry_after, sleep_interruptible};
 use crate::agent::ai::stream::{CancelToken, SseFold};
 use crate::agent::ai::types::{ChatRequest, Completion, Delta, Message, ModelClient};
 use crate::agent::{BrainError, Result};
@@ -85,42 +86,40 @@ impl OpenAiClient {
         self
     }
 
-    pub fn fetch_balance(&self) -> Result<AccountBalance> {
+    pub async fn fetch_balance(&self) -> Result<AccountBalance> {
         let key = (self.key)().filter(|k| !k.trim().is_empty()).ok_or(BrainError::NoKey)?;
         let url = format!("{}/user/balance", self.base_url);
-        let client = self.client.clone();
+        let client = &self.client;
         let retry = self.retry;
-        crate::rt::block_on(async move {
-            let mut backoff = retry.backoff();
-            loop {
-                match client.get(&url).header("Authorization", format!("Bearer {key}")).send().await {
-                    Ok(response) => {
-                        let status = response.status().as_u16();
-                        let retry_after = response.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(parse_retry_after);
-                        let text = response.text().await.map_err(|e| BrainError::Network(e.to_string()))?;
-                        if status >= 400 {
-                            if RetryPolicy::is_retryable_status(status)
-                                && let Some(default_delay) = backoff.next()
-                            {
-                                tokio::time::sleep(RetryPolicy::resolve_delay(default_delay, retry_after)).await;
-                                continue;
-                            }
-                            return Err(BrainError::Model(format!("HTTP {status}: {}", error_message(&text))));
-                        }
-                        return serde_json::from_str(&text).map_err(|e| BrainError::Model(format!("invalid balance response: {e}")));
-                    }
-                    Err(err) => {
-                        if RetryPolicy::is_retryable_error(&err)
-                            && let Some(delay) = backoff.next()
+        let mut backoff = retry.backoff();
+        loop {
+            match client.get(&url).header("Authorization", format!("Bearer {key}")).send().await {
+                Ok(response) => {
+                    let status = response.status().as_u16();
+                    let retry_after = response.headers().get("retry-after").and_then(|v| v.to_str().ok()).and_then(parse_retry_after);
+                    let text = response.text().await.map_err(|e| BrainError::Network(e.to_string()))?;
+                    if status >= 400 {
+                        if RetryPolicy::is_retryable_status(status)
+                            && let Some(default_delay) = backoff.next()
                         {
-                            tokio::time::sleep(delay).await;
+                            tokio::time::sleep(RetryPolicy::resolve_delay(default_delay, retry_after)).await;
                             continue;
                         }
-                        return Err(BrainError::Network(err.to_string()));
+                        return Err(BrainError::Model(format!("HTTP {status}: {}", error_message(&text))));
                     }
+                    return serde_json::from_str(&text).map_err(|e| BrainError::Model(format!("invalid balance response: {e}")));
+                }
+                Err(err) => {
+                    if RetryPolicy::is_retryable_error(&err)
+                        && let Some(delay) = backoff.next()
+                    {
+                        tokio::time::sleep(delay).await;
+                        continue;
+                    }
+                    return Err(BrainError::Network(err.to_string()));
                 }
             }
-        })
+        }
     }
 }
 
@@ -175,7 +174,7 @@ fn classify_http_error(status: u16, text: &str) -> BrainError {
     }
 }
 
-async fn fold_sse_response(response: reqwest::Response, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
+async fn fold_sse_response(response: reqwest::Response, cancel: &CancelToken, on: &mut (dyn FnMut(Delta) + Send)) -> Result<Completion> {
     let stream = response.bytes_stream().map_err(io::Error::other);
     let lines = FramedRead::new(StreamReader::new(stream), LinesCodec::new());
     tokio::pin!(lines);
@@ -204,7 +203,12 @@ async fn fold_sse_response(response: reqwest::Response, cancel: &CancelToken, on
 }
 
 impl OpenAiClient {
-    pub(crate) async fn complete_cancellable_async(&self, request: &ChatRequest, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
+    pub(crate) async fn complete_cancellable_async(
+        &self,
+        request: &ChatRequest,
+        cancel: &CancelToken,
+        on: &mut (dyn FnMut(Delta) + Send),
+    ) -> Result<Completion> {
         if cancel.is_cancelled() {
             return Err(BrainError::Cancelled);
         }
@@ -235,7 +239,7 @@ impl OpenAiClient {
                     if RetryPolicy::is_retryable_error(&err)
                         && let Some(delay) = backoff.next()
                     {
-                        if !sleep_interruptible_async(delay, cancel).await {
+                        if !sleep_interruptible(delay, cancel).await {
                             return Err(BrainError::Cancelled);
                         }
                         continue;
@@ -256,7 +260,7 @@ impl OpenAiClient {
                     && let Some(default_delay) = backoff.next()
                 {
                     let delay = RetryPolicy::resolve_delay(default_delay, retry_after);
-                    if !sleep_interruptible_async(delay, cancel).await {
+                    if !sleep_interruptible(delay, cancel).await {
                         return Err(BrainError::Cancelled);
                     }
                     continue;
@@ -269,12 +273,17 @@ impl OpenAiClient {
 }
 
 impl ModelClient for OpenAiClient {
-    fn complete(&self, request: &ChatRequest, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
-        self.complete_cancellable(request, &CancelToken::never(), on)
+    fn complete<'a>(&'a self, request: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> BoxFuture<'a, Result<Completion>> {
+        Box::pin(async move { self.complete_cancellable_async(request, &CancelToken::never(), on).await })
     }
 
-    fn complete_cancellable(&self, request: &ChatRequest, cancel: &CancelToken, on: &mut dyn FnMut(Delta)) -> Result<Completion> {
-        crate::rt::block_on(self.complete_cancellable_async(request, cancel, on))
+    fn complete_cancellable<'a>(
+        &'a self,
+        request: &'a ChatRequest,
+        cancel: &'a CancelToken,
+        on: &'a mut (dyn FnMut(Delta) + Send),
+    ) -> BoxFuture<'a, Result<Completion>> {
+        Box::pin(self.complete_cancellable_async(request, cancel, on))
     }
 }
 
@@ -285,8 +294,8 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn regression_deepseek_sse_preserves_multibyte_utf8_split_across_chunks() {
+    #[tokio::test]
+    async fn regression_deepseek_sse_preserves_multibyte_utf8_split_across_chunks() {
         let chinese = "你好深度求索：分片测试";
         let payload = format!("data: {{\"choices\":[{{\"index\":0,\"delta\":{{\"content\":\"{chinese}\"}}}}]}}\n\ndata: [DONE]\n\n");
         let raw = payload.as_bytes().to_vec();
@@ -296,27 +305,24 @@ mod tests {
         let part1 = raw[..split_at].to_vec();
         let part2 = raw[split_at..].to_vec();
 
-        let addr = crate::rt::block_on(async move {
-            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            tokio::spawn(async move {
-                let (mut sock, _) = listener.accept().await.unwrap();
-                let mut req_buf = vec![0u8; 4096];
-                let _ = sock.read(&mut req_buf).await;
-                sock.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n")
-                    .await
-                    .unwrap();
-                sock.write_all(format!("{:x}\r\n", part1.len()).as_bytes()).await.unwrap();
-                sock.write_all(&part1).await.unwrap();
-                sock.write_all(b"\r\n").await.unwrap();
-                sock.flush().await.unwrap();
-                tokio::time::sleep(Duration::from_millis(15)).await;
-                sock.write_all(format!("{:x}\r\n", part2.len()).as_bytes()).await.unwrap();
-                sock.write_all(&part2).await.unwrap();
-                sock.write_all(b"\r\n0\r\n\r\n").await.unwrap();
-                sock.flush().await.unwrap();
-            });
-            addr
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let (mut sock, _) = listener.accept().await.unwrap();
+            let mut req_buf = vec![0u8; 4096];
+            let _ = sock.read(&mut req_buf).await;
+            sock.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n")
+                .await
+                .unwrap();
+            sock.write_all(format!("{:x}\r\n", part1.len()).as_bytes()).await.unwrap();
+            sock.write_all(&part1).await.unwrap();
+            sock.write_all(b"\r\n").await.unwrap();
+            sock.flush().await.unwrap();
+            tokio::time::sleep(Duration::from_millis(15)).await;
+            sock.write_all(format!("{:x}\r\n", part2.len()).as_bytes()).await.unwrap();
+            sock.write_all(&part2).await.unwrap();
+            sock.write_all(b"\r\n0\r\n\r\n").await.unwrap();
+            sock.flush().await.unwrap();
         });
 
         let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-test".into())).with_retry(RetryPolicy::none());
@@ -332,6 +338,7 @@ mod tests {
                     streamed.push_str(&t);
                 }
             })
+            .await
             .unwrap();
         assert!(!streamed.contains('\u{FFFD}'));
         assert_eq!(streamed, chinese);

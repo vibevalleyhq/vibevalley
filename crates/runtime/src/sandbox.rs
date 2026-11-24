@@ -8,15 +8,17 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
+use tokio::process::Command;
 use uuid::Uuid;
 
-use crate::teardown_gate::TeardownGate;
+use crate::BoxFuture;
+use crate::teardown_gate::AsyncTeardownGate;
 
 /// Redacted credential wrapper: serializes transparently, never exposes raw bytes in `Debug` or `Display`.
 #[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -203,7 +205,7 @@ pub struct SandboxCommand {
 }
 
 impl SandboxCommand {
-    pub fn to_std_command(&self) -> Command {
+    pub fn to_command(&self) -> Command {
         let mut cmd = Command::new(&self.program);
         cmd.args(&self.args).stdin(Stdio::null());
         for (k, v) in &self.env {
@@ -226,10 +228,10 @@ impl fmt::Debug for SandboxCommand {
 /// Container runtime backend capable of launching and tearing down ephemeral sandbox machines.
 pub trait SandboxProvider: Send + Sync {
     fn name(&self) -> &str;
-    fn is_available(&self) -> bool;
-    fn spawn(&self, spec: &SandboxSpec) -> Result<SandboxHandle, SandboxError>;
-    fn terminate(&self, handle: &SandboxHandle) -> Result<(), SandboxError>;
-    fn is_running(&self, handle: &SandboxHandle) -> Result<bool, SandboxError>;
+    fn is_available(&self) -> BoxFuture<'_, bool>;
+    fn spawn<'a>(&'a self, spec: &'a SandboxSpec) -> BoxFuture<'a, Result<SandboxHandle, SandboxError>>;
+    fn terminate<'a>(&'a self, handle: &'a SandboxHandle) -> BoxFuture<'a, Result<(), SandboxError>>;
+    fn is_running<'a>(&'a self, handle: &'a SandboxHandle) -> BoxFuture<'a, Result<bool, SandboxError>>;
 }
 
 fn make_sandbox_id(machine_id: &str) -> String {
@@ -377,63 +379,72 @@ impl SandboxProvider for DockerSandboxProvider {
         "docker"
     }
 
-    fn is_available(&self) -> bool {
-        Command::new(&self.binary)
-            .args(["info", "--format", "{{.ServerVersion}}"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|s| s.success())
-    }
-
-    fn spawn(&self, spec: &SandboxSpec) -> Result<SandboxHandle, SandboxError> {
-        let sandbox_id = make_sandbox_id(&spec.machine_id);
-        let cmd = self.build_run_command(spec, &sandbox_id)?;
-        let output = cmd.to_std_command().output()?;
-        if !output.status.success() {
-            return Err(SandboxError::CommandFailed {
-                provider: self.name().into(),
-                command: "docker run".into(),
-                exit_code: output.status.code(),
-                stderr: sanitize_stderr(&String::from_utf8_lossy(&output.stderr), Some(&spec.one_time_token)),
-            });
-        }
-        let container_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let container_id = if container_id.is_empty() { sandbox_id.clone() } else { container_id };
-        Ok(SandboxHandle {
-            sandbox_id,
-            machine_id: spec.machine_id.trim().to_string(),
-            container_id,
-            provider: self.name().into(),
+    fn is_available(&self) -> BoxFuture<'_, bool> {
+        Box::pin(async move {
+            Command::new(&self.binary)
+                .args(["info", "--format", "{{.ServerVersion}}"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .await
+                .is_ok_and(|s| s.success())
         })
     }
 
-    fn terminate(&self, handle: &SandboxHandle) -> Result<(), SandboxError> {
-        let args = Self::build_terminate_args(&handle.container_id);
-        let output = Command::new(&self.binary).args(&args).stdin(Stdio::null()).output()?;
-        if !output.status.success() {
-            let stderr = sanitize_stderr(&String::from_utf8_lossy(&output.stderr), None);
-            if stderr.contains("No such container") {
-                return Ok(());
+    fn spawn<'a>(&'a self, spec: &'a SandboxSpec) -> BoxFuture<'a, Result<SandboxHandle, SandboxError>> {
+        Box::pin(async move {
+            let sandbox_id = make_sandbox_id(&spec.machine_id);
+            let cmd = self.build_run_command(spec, &sandbox_id)?;
+            let output = cmd.to_command().output().await?;
+            if !output.status.success() {
+                return Err(SandboxError::CommandFailed {
+                    provider: self.name().into(),
+                    command: "docker run".into(),
+                    exit_code: output.status.code(),
+                    stderr: sanitize_stderr(&String::from_utf8_lossy(&output.stderr), Some(&spec.one_time_token)),
+                });
             }
-            return Err(SandboxError::CommandFailed {
+            let container_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let container_id = if container_id.is_empty() { sandbox_id.clone() } else { container_id };
+            Ok(SandboxHandle {
+                sandbox_id,
+                machine_id: spec.machine_id.trim().to_string(),
+                container_id,
                 provider: self.name().into(),
-                command: "docker rm -f".into(),
-                exit_code: output.status.code(),
-                stderr,
-            });
-        }
-        Ok(())
+            })
+        })
     }
 
-    fn is_running(&self, handle: &SandboxHandle) -> Result<bool, SandboxError> {
-        let args = Self::build_inspect_args(&handle.container_id);
-        let output = Command::new(&self.binary).args(&args).stdin(Stdio::null()).output()?;
-        if !output.status.success() {
-            return Ok(false);
-        }
-        Ok(String::from_utf8_lossy(&output.stdout).trim() == "true")
+    fn terminate<'a>(&'a self, handle: &'a SandboxHandle) -> BoxFuture<'a, Result<(), SandboxError>> {
+        Box::pin(async move {
+            let args = Self::build_terminate_args(&handle.container_id);
+            let output = Command::new(&self.binary).args(&args).stdin(Stdio::null()).output().await?;
+            if !output.status.success() {
+                let stderr = sanitize_stderr(&String::from_utf8_lossy(&output.stderr), None);
+                if stderr.contains("No such container") {
+                    return Ok(());
+                }
+                return Err(SandboxError::CommandFailed {
+                    provider: self.name().into(),
+                    command: "docker rm -f".into(),
+                    exit_code: output.status.code(),
+                    stderr,
+                });
+            }
+            Ok(())
+        })
+    }
+
+    fn is_running<'a>(&'a self, handle: &'a SandboxHandle) -> BoxFuture<'a, Result<bool, SandboxError>> {
+        Box::pin(async move {
+            let args = Self::build_inspect_args(&handle.container_id);
+            let output = Command::new(&self.binary).args(&args).stdin(Stdio::null()).output().await?;
+            if !output.status.success() {
+                return Ok(false);
+            }
+            Ok(String::from_utf8_lossy(&output.stdout).trim() == "true")
+        })
     }
 }
 
@@ -501,74 +512,83 @@ impl SandboxProvider for AppleContainerSandboxProvider {
         "apple-container"
     }
 
-    fn is_available(&self) -> bool {
-        if !cfg!(target_os = "macos") {
-            return false;
-        }
-        Command::new(&self.binary)
-            .args(["--version"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|s| s.success())
-    }
-
-    fn spawn(&self, spec: &SandboxSpec) -> Result<SandboxHandle, SandboxError> {
-        let sandbox_id = make_sandbox_id(&spec.machine_id);
-        let cmd = self.build_run_command(spec, &sandbox_id)?;
-        let output = cmd.to_std_command().output()?;
-        if !output.status.success() {
-            return Err(SandboxError::CommandFailed {
-                provider: self.name().into(),
-                command: "container run".into(),
-                exit_code: output.status.code(),
-                stderr: sanitize_stderr(&String::from_utf8_lossy(&output.stderr), Some(&spec.one_time_token)),
-            });
-        }
-        let container_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let container_id = if container_id.is_empty() { sandbox_id.clone() } else { container_id };
-        Ok(SandboxHandle {
-            sandbox_id,
-            machine_id: spec.machine_id.trim().to_string(),
-            container_id,
-            provider: self.name().into(),
+    fn is_available(&self) -> BoxFuture<'_, bool> {
+        Box::pin(async move {
+            if !cfg!(target_os = "macos") {
+                return false;
+            }
+            Command::new(&self.binary)
+                .args(["--version"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .await
+                .is_ok_and(|s| s.success())
         })
     }
 
-    fn terminate(&self, handle: &SandboxHandle) -> Result<(), SandboxError> {
-        let args = Self::build_terminate_args(&handle.container_id);
-        let output = Command::new(&self.binary).args(&args).stdin(Stdio::null()).output()?;
-        if !output.status.success() {
-            let stderr = sanitize_stderr(&String::from_utf8_lossy(&output.stderr), None);
-            if stderr.to_ascii_lowercase().contains("not found") {
-                return Ok(());
+    fn spawn<'a>(&'a self, spec: &'a SandboxSpec) -> BoxFuture<'a, Result<SandboxHandle, SandboxError>> {
+        Box::pin(async move {
+            let sandbox_id = make_sandbox_id(&spec.machine_id);
+            let cmd = self.build_run_command(spec, &sandbox_id)?;
+            let output = cmd.to_command().output().await?;
+            if !output.status.success() {
+                return Err(SandboxError::CommandFailed {
+                    provider: self.name().into(),
+                    command: "container run".into(),
+                    exit_code: output.status.code(),
+                    stderr: sanitize_stderr(&String::from_utf8_lossy(&output.stderr), Some(&spec.one_time_token)),
+                });
             }
-            return Err(SandboxError::CommandFailed {
+            let container_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let container_id = if container_id.is_empty() { sandbox_id.clone() } else { container_id };
+            Ok(SandboxHandle {
+                sandbox_id,
+                machine_id: spec.machine_id.trim().to_string(),
+                container_id,
                 provider: self.name().into(),
-                command: "container delete --force".into(),
-                exit_code: output.status.code(),
-                stderr,
-            });
-        }
-        Ok(())
+            })
+        })
     }
 
-    fn is_running(&self, handle: &SandboxHandle) -> Result<bool, SandboxError> {
-        let args = Self::build_inspect_args(&handle.container_id);
-        let output = Command::new(&self.binary).args(&args).stdin(Stdio::null()).output()?;
-        if !output.status.success() {
-            return Ok(false);
-        }
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let Ok(value) = serde_json::from_str::<serde_json::Value>(&stdout) else {
-            return Ok(false);
-        };
-        let entry = value.as_array().and_then(|arr| arr.first()).unwrap_or(&value);
-        Ok(entry
-            .get("status")
-            .and_then(serde_json::Value::as_str)
-            .is_some_and(|status| status.eq_ignore_ascii_case("running")))
+    fn terminate<'a>(&'a self, handle: &'a SandboxHandle) -> BoxFuture<'a, Result<(), SandboxError>> {
+        Box::pin(async move {
+            let args = Self::build_terminate_args(&handle.container_id);
+            let output = Command::new(&self.binary).args(&args).stdin(Stdio::null()).output().await?;
+            if !output.status.success() {
+                let stderr = sanitize_stderr(&String::from_utf8_lossy(&output.stderr), None);
+                if stderr.to_ascii_lowercase().contains("not found") {
+                    return Ok(());
+                }
+                return Err(SandboxError::CommandFailed {
+                    provider: self.name().into(),
+                    command: "container delete --force".into(),
+                    exit_code: output.status.code(),
+                    stderr,
+                });
+            }
+            Ok(())
+        })
+    }
+
+    fn is_running<'a>(&'a self, handle: &'a SandboxHandle) -> BoxFuture<'a, Result<bool, SandboxError>> {
+        Box::pin(async move {
+            let args = Self::build_inspect_args(&handle.container_id);
+            let output = Command::new(&self.binary).args(&args).stdin(Stdio::null()).output().await?;
+            if !output.status.success() {
+                return Ok(false);
+            }
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let Ok(value) = serde_json::from_str::<serde_json::Value>(&stdout) else {
+                return Ok(false);
+            };
+            let entry = value.as_array().and_then(|arr| arr.first()).unwrap_or(&value);
+            Ok(entry
+                .get("status")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|status| status.eq_ignore_ascii_case("running")))
+        })
     }
 }
 
@@ -646,59 +666,65 @@ impl SandboxProvider for MockSandboxProvider {
         "mock"
     }
 
-    fn is_available(&self) -> bool {
-        self.state.lock().available
+    fn is_available(&self) -> BoxFuture<'_, bool> {
+        let available = self.state.lock().available;
+        Box::pin(async move { available })
     }
 
-    fn spawn(&self, spec: &SandboxSpec) -> Result<SandboxHandle, SandboxError> {
-        spec.validate()?;
-        let mut state = self.state.lock();
-        if !state.available {
-            return Err(SandboxError::ProviderUnavailable {
+    fn spawn<'a>(&'a self, spec: &'a SandboxSpec) -> BoxFuture<'a, Result<SandboxHandle, SandboxError>> {
+        Box::pin(async move {
+            spec.validate()?;
+            let mut state = self.state.lock();
+            if !state.available {
+                return Err(SandboxError::ProviderUnavailable {
+                    provider: self.name().into(),
+                    reason: "mock provider marked unavailable".into(),
+                });
+            }
+            if let Some(reason) = state.fail_spawn.take() {
+                return Err(SandboxError::CommandFailed {
+                    provider: self.name().into(),
+                    command: "mock spawn".into(),
+                    exit_code: Some(1),
+                    stderr: reason,
+                });
+            }
+            state.next_id += 1;
+            let seq = state.next_id;
+            let sandbox_id = format!("mock-sbx-{seq}");
+            let container_id = format!("mock-ctr-{seq}");
+            let handle = SandboxHandle {
+                sandbox_id,
+                machine_id: spec.machine_id.trim().to_string(),
+                container_id: container_id.clone(),
                 provider: self.name().into(),
-                reason: "mock provider marked unavailable".into(),
-            });
-        }
-        if let Some(reason) = state.fail_spawn.take() {
-            return Err(SandboxError::CommandFailed {
-                provider: self.name().into(),
-                command: "mock spawn".into(),
-                exit_code: Some(1),
-                stderr: reason,
-            });
-        }
-        state.next_id += 1;
-        let seq = state.next_id;
-        let sandbox_id = format!("mock-sbx-{seq}");
-        let container_id = format!("mock-ctr-{seq}");
-        let handle = SandboxHandle {
-            sandbox_id,
-            machine_id: spec.machine_id.trim().to_string(),
-            container_id: container_id.clone(),
-            provider: self.name().into(),
-        };
-        state.running.insert(container_id);
-        state.spawned.push((spec.clone(), handle.clone()));
-        Ok(handle)
+            };
+            state.running.insert(container_id);
+            state.spawned.push((spec.clone(), handle.clone()));
+            Ok(handle)
+        })
     }
 
-    fn terminate(&self, handle: &SandboxHandle) -> Result<(), SandboxError> {
-        let mut state = self.state.lock();
-        if let Some(reason) = state.fail_terminate.take() {
-            return Err(SandboxError::CommandFailed {
-                provider: self.name().into(),
-                command: "mock terminate".into(),
-                exit_code: Some(1),
-                stderr: reason,
-            });
-        }
-        state.running.remove(&handle.container_id);
-        state.terminated.push(handle.container_id.clone());
-        Ok(())
+    fn terminate<'a>(&'a self, handle: &'a SandboxHandle) -> BoxFuture<'a, Result<(), SandboxError>> {
+        Box::pin(async move {
+            let mut state = self.state.lock();
+            if let Some(reason) = state.fail_terminate.take() {
+                return Err(SandboxError::CommandFailed {
+                    provider: self.name().into(),
+                    command: "mock terminate".into(),
+                    exit_code: Some(1),
+                    stderr: reason,
+                });
+            }
+            state.running.remove(&handle.container_id);
+            state.terminated.push(handle.container_id.clone());
+            Ok(())
+        })
     }
 
-    fn is_running(&self, handle: &SandboxHandle) -> Result<bool, SandboxError> {
-        Ok(self.state.lock().running.contains(&handle.container_id))
+    fn is_running<'a>(&'a self, handle: &'a SandboxHandle) -> BoxFuture<'a, Result<bool, SandboxError>> {
+        let running = self.state.lock().running.contains(&handle.container_id);
+        Box::pin(async move { Ok(running) })
     }
 }
 
@@ -707,12 +733,12 @@ impl SandboxProvider for MockSandboxProvider {
 pub struct SandboxMachine {
     provider: Arc<dyn SandboxProvider>,
     handle: SandboxHandle,
-    teardown: TeardownGate,
+    teardown: Arc<AsyncTeardownGate>,
 }
 
 impl SandboxMachine {
-    pub fn launch(provider: Arc<dyn SandboxProvider>, spec: &SandboxSpec) -> Result<Self, SandboxError> {
-        let handle = provider.spawn(spec)?;
+    pub async fn launch(provider: Arc<dyn SandboxProvider>, spec: &SandboxSpec) -> Result<Self, SandboxError> {
+        let handle = provider.spawn(spec).await?;
         Ok(Self::from_handle(provider, handle))
     }
 
@@ -720,7 +746,7 @@ impl SandboxMachine {
         Self {
             provider,
             handle,
-            teardown: TeardownGate::new(),
+            teardown: Arc::new(AsyncTeardownGate::new()),
         }
     }
 
@@ -740,24 +766,32 @@ impl SandboxMachine {
         self.teardown.is_terminated()
     }
 
-    pub fn is_running(&self) -> Result<bool, SandboxError> {
+    pub async fn is_running(&self) -> Result<bool, SandboxError> {
         if self.is_terminated() {
             return Ok(false);
         }
-        self.provider.is_running(&self.handle)
+        self.provider.is_running(&self.handle).await
     }
 
     /// Idempotently terminates the container. Concurrent callers wait for an in-flight
     /// attempt rather than returning a premature `Ok(())`; if an attempt fails, the gate
     /// rolls back so a waiting or subsequent caller retries termination.
-    pub fn teardown(&self) -> Result<(), SandboxError> {
-        self.teardown.teardown_once(|| self.provider.terminate(&self.handle))
+    pub async fn teardown(&self) -> Result<(), SandboxError> {
+        self.teardown.teardown_once(|| self.provider.terminate(&self.handle)).await
     }
 }
 
 impl Drop for SandboxMachine {
     fn drop(&mut self) {
-        let _ = self.teardown();
+        if self.teardown.is_terminated() {
+            return;
+        }
+        let provider = Arc::clone(&self.provider);
+        let handle = self.handle.clone();
+        let teardown = Arc::clone(&self.teardown);
+        crate::rt::current_or_global_handle().spawn(async move {
+            let _ = teardown.teardown_once(|| provider.terminate(&handle)).await;
+        });
     }
 }
 
@@ -794,8 +828,8 @@ mod tests {
         spec
     }
 
-    #[test]
-    fn secret_and_sandbox_types_never_leak_token_in_debug_or_display() {
+    #[tokio::test]
+    async fn secret_and_sandbox_types_never_leak_token_in_debug_or_display() {
         let raw = "vv_dev_one_time_secret_token_9876543210";
         let spec = sample_spec();
         let spec_debug = format!("{spec:?}");
@@ -814,7 +848,7 @@ mod tests {
         assert_eq!(cmd.env.get("VIBEVALLEY_TOKEN").map(Secret::expose), Some(raw));
 
         let mock = Arc::new(MockSandboxProvider::new());
-        let machine = SandboxMachine::launch(mock, &spec).unwrap();
+        let machine = SandboxMachine::launch(mock, &spec).await.unwrap();
         let machine_debug = format!("{machine:?}");
         assert!(!machine_debug.contains(raw), "SandboxMachine Debug leaked token: {machine_debug}");
     }
@@ -935,63 +969,70 @@ mod tests {
         assert!(matches!(zero_timeout.validate(), Err(SandboxError::InvalidSpec(_))));
     }
 
-    #[test]
-    fn mock_provider_and_sandbox_machine_enforce_raii_drop_and_idempotent_teardown() {
+    #[tokio::test]
+    async fn mock_provider_and_sandbox_machine_enforce_raii_drop_and_idempotent_teardown() {
         let provider = Arc::new(MockSandboxProvider::new());
-        assert!(provider.is_available());
+        assert!(provider.is_available().await);
         let spec = sample_spec();
 
         // 1. Implicit RAII Drop tears down the container cleanly with zero leaks.
         let container_id_1 = {
-            let machine = SandboxMachine::launch(provider.clone(), &spec).unwrap();
+            let machine = SandboxMachine::launch(provider.clone(), &spec).await.unwrap();
             assert_eq!(machine.machine_id(), "sbx-ci-42");
             assert!(!machine.is_terminated());
-            assert!(machine.is_running().unwrap());
+            assert!(machine.is_running().await.unwrap());
             assert_eq!(provider.running_ids(), vec!["mock-ctr-1"]);
             machine.handle().container_id.clone()
         };
+        tokio::task::yield_now().await;
         assert_eq!(container_id_1, "mock-ctr-1");
         assert!(provider.running_ids().is_empty());
         assert_eq!(provider.terminated_ids(), vec!["mock-ctr-1"]);
 
         // 2. Explicit teardown is idempotent and subsequent Drop does NOT double-terminate.
         {
-            let machine = SandboxMachine::launch(provider.clone(), &spec).unwrap();
-            assert!(machine.is_running().unwrap());
-            machine.teardown().unwrap();
+            let machine = SandboxMachine::launch(provider.clone(), &spec).await.unwrap();
+            assert!(machine.is_running().await.unwrap());
+            machine.teardown().await.unwrap();
             assert!(machine.is_terminated());
-            assert!(!machine.is_running().unwrap());
-            machine.teardown().unwrap();
+            assert!(!machine.is_running().await.unwrap());
+            machine.teardown().await.unwrap();
         }
+        tokio::task::yield_now().await;
         assert_eq!(provider.terminated_ids(), vec!["mock-ctr-1", "mock-ctr-2"]);
 
         // 3. Failed explicit teardown keeps guard armed so Drop retries termination.
         provider.set_fail_terminate(Some("transient busy".into()));
         {
-            let machine = SandboxMachine::launch(provider.clone(), &spec).unwrap();
-            let err = machine.teardown().unwrap_err();
+            let machine = SandboxMachine::launch(provider.clone(), &spec).await.unwrap();
+            let err = machine.teardown().await.unwrap_err();
             assert!(matches!(err, SandboxError::CommandFailed { .. }));
             assert!(!machine.is_terminated());
         }
+        tokio::task::yield_now().await;
         assert!(provider.running_ids().is_empty());
         assert_eq!(provider.terminated_ids(), vec!["mock-ctr-1", "mock-ctr-2", "mock-ctr-3"]);
 
         // 4. Unavailable provider refuses spawn cleanly.
         provider.set_available(false);
-        assert!(matches!(SandboxMachine::launch(provider, &spec), Err(SandboxError::ProviderUnavailable { .. })));
+        assert!(matches!(
+            SandboxMachine::launch(provider, &spec).await,
+            Err(SandboxError::ProviderUnavailable { .. })
+        ));
     }
 
-    #[test]
-    fn regression_concurrent_teardown_never_returns_false_ok_when_first_attempt_fails() {
+    #[tokio::test]
+    async fn regression_concurrent_teardown_never_returns_false_ok_when_first_attempt_fails() {
         use std::sync::atomic::{AtomicUsize, Ordering};
+        use tokio::sync::{Mutex as AsyncMutex, oneshot};
 
         struct ScriptedTerminateProvider {
             failures_remaining: AtomicUsize,
             in_flight: AtomicUsize,
             max_in_flight: AtomicUsize,
             calls: AtomicUsize,
-            entered_tx: flume::Sender<()>,
-            release_rx: flume::Receiver<()>,
+            entered_tx: Mutex<Option<oneshot::Sender<()>>>,
+            release_rx: AsyncMutex<Option<oneshot::Receiver<()>>>,
         }
 
         impl SandboxProvider for ScriptedTerminateProvider {
@@ -999,120 +1040,128 @@ mod tests {
                 "scripted"
             }
 
-            fn is_available(&self) -> bool {
-                true
+            fn is_available(&self) -> BoxFuture<'_, bool> {
+                Box::pin(async { true })
             }
 
-            fn spawn(&self, spec: &SandboxSpec) -> Result<SandboxHandle, SandboxError> {
-                Ok(SandboxHandle {
-                    sandbox_id: "scripted-sbx-1".into(),
-                    machine_id: spec.machine_id.clone(),
-                    container_id: "scripted-ctr-1".into(),
-                    provider: self.name().into(),
+            fn spawn<'a>(&'a self, spec: &'a SandboxSpec) -> BoxFuture<'a, Result<SandboxHandle, SandboxError>> {
+                Box::pin(async move {
+                    Ok(SandboxHandle {
+                        sandbox_id: "scripted-sbx-1".into(),
+                        machine_id: spec.machine_id.clone(),
+                        container_id: "scripted-ctr-1".into(),
+                        provider: self.name().into(),
+                    })
                 })
             }
 
-            fn terminate(&self, _handle: &SandboxHandle) -> Result<(), SandboxError> {
-                let current = self.in_flight.fetch_add(1, Ordering::AcqRel) + 1;
-                self.max_in_flight.fetch_max(current, Ordering::AcqRel);
-                let attempt = self.calls.fetch_add(1, Ordering::AcqRel);
-                if attempt == 0 {
-                    let _ = self.entered_tx.send(());
-                    let _ = self.release_rx.recv();
-                }
-                self.in_flight.fetch_sub(1, Ordering::AcqRel);
-                let prev_failures = self.failures_remaining.try_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_sub(1));
-                if prev_failures.is_ok() {
-                    Err(SandboxError::CommandFailed {
-                        provider: self.name().into(),
-                        command: "scripted terminate".into(),
-                        exit_code: Some(1),
-                        stderr: "transient busy".into(),
-                    })
-                } else {
-                    Ok(())
-                }
+            fn terminate<'a>(&'a self, _handle: &'a SandboxHandle) -> BoxFuture<'a, Result<(), SandboxError>> {
+                Box::pin(async move {
+                    let current = self.in_flight.fetch_add(1, Ordering::AcqRel) + 1;
+                    self.max_in_flight.fetch_max(current, Ordering::AcqRel);
+                    let attempt = self.calls.fetch_add(1, Ordering::AcqRel);
+                    if attempt == 0 {
+                        if let Some(tx) = self.entered_tx.lock().take() {
+                            let _ = tx.send(());
+                        }
+                        if let Some(rx) = self.release_rx.lock().await.take() {
+                            let _ = rx.await;
+                        }
+                    }
+                    self.in_flight.fetch_sub(1, Ordering::AcqRel);
+                    let prev_failures = self.failures_remaining.try_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_sub(1));
+                    if prev_failures.is_ok() {
+                        Err(SandboxError::CommandFailed {
+                            provider: self.name().into(),
+                            command: "scripted terminate".into(),
+                            exit_code: Some(1),
+                            stderr: "transient busy".into(),
+                        })
+                    } else {
+                        Ok(())
+                    }
+                })
             }
 
-            fn is_running(&self, _handle: &SandboxHandle) -> Result<bool, SandboxError> {
-                Ok(true)
+            fn is_running<'a>(&'a self, _handle: &'a SandboxHandle) -> BoxFuture<'a, Result<bool, SandboxError>> {
+                Box::pin(async { Ok(true) })
             }
         }
 
         // Case 1: first two attempts fail; concurrent caller must NOT observe false Ok(()).
         {
-            let (entered_tx, entered_rx) = flume::bounded(1);
-            let (release_tx, release_rx) = flume::bounded(1);
+            let (entered_tx, entered_rx) = oneshot::channel();
+            let (release_tx, release_rx) = oneshot::channel();
             let provider = Arc::new(ScriptedTerminateProvider {
                 failures_remaining: AtomicUsize::new(2),
                 in_flight: AtomicUsize::new(0),
                 max_in_flight: AtomicUsize::new(0),
                 calls: AtomicUsize::new(0),
-                entered_tx,
-                release_rx,
+                entered_tx: Mutex::new(Some(entered_tx)),
+                release_rx: AsyncMutex::new(Some(release_rx)),
             });
-            let machine = Arc::new(SandboxMachine::launch(provider.clone(), &sample_spec()).unwrap());
+            let machine = Arc::new(SandboxMachine::launch(provider.clone(), &sample_spec()).await.unwrap());
 
             let m1 = Arc::clone(&machine);
-            let t1 = std::thread::spawn(move || m1.teardown());
-            entered_rx.recv().unwrap();
+            let t1 = tokio::spawn(async move { m1.teardown().await });
+            entered_rx.await.unwrap();
 
             assert!(!machine.is_terminated(), "must not report terminated while terminate is still in flight");
 
-            let (t2_started_tx, t2_started_rx) = flume::bounded(1);
+            let (t2_started_tx, t2_started_rx) = oneshot::channel();
             let m2 = Arc::clone(&machine);
-            let t2 = std::thread::spawn(move || {
+            let t2 = tokio::spawn(async move {
                 let _ = t2_started_tx.send(());
-                m2.teardown()
+                m2.teardown().await
             });
-            t2_started_rx.recv().unwrap();
-            std::thread::yield_now();
+            t2_started_rx.await.unwrap();
+            tokio::task::yield_now().await;
             release_tx.send(()).unwrap();
 
-            assert!(t1.join().unwrap().is_err());
-            assert!(t2.join().unwrap().is_err(), "concurrent caller must not return false Ok when teardown fails");
+            assert!(t1.await.unwrap().is_err());
+            assert!(t2.await.unwrap().is_err(), "concurrent caller must not return false Ok when teardown fails");
             assert_eq!(provider.max_in_flight.load(Ordering::Acquire), 1);
             assert_eq!(provider.calls.load(Ordering::Acquire), 2);
             assert!(!machine.is_terminated());
 
             // Third attempt succeeds and seals the gate.
-            machine.teardown().unwrap();
+            machine.teardown().await.unwrap();
             assert!(machine.is_terminated());
             assert_eq!(provider.calls.load(Ordering::Acquire), 3);
-            machine.teardown().unwrap();
+            machine.teardown().await.unwrap();
             assert_eq!(provider.calls.load(Ordering::Acquire), 3);
         }
 
         // Case 2: first attempt fails, waiting concurrent caller retries and succeeds.
         {
-            let (entered_tx, entered_rx) = flume::bounded(1);
-            let (release_tx, release_rx) = flume::bounded(1);
+            let (entered_tx, entered_rx) = oneshot::channel();
+            let (release_tx, release_rx) = oneshot::channel();
             let provider = Arc::new(ScriptedTerminateProvider {
                 failures_remaining: AtomicUsize::new(1),
                 in_flight: AtomicUsize::new(0),
                 max_in_flight: AtomicUsize::new(0),
                 calls: AtomicUsize::new(0),
-                entered_tx,
-                release_rx,
+                entered_tx: Mutex::new(Some(entered_tx)),
+                release_rx: AsyncMutex::new(Some(release_rx)),
             });
-            let machine = Arc::new(SandboxMachine::launch(provider.clone(), &sample_spec()).unwrap());
+            let machine = Arc::new(SandboxMachine::launch(provider.clone(), &sample_spec()).await.unwrap());
 
             let m1 = Arc::clone(&machine);
-            let t1 = std::thread::spawn(move || m1.teardown());
-            entered_rx.recv().unwrap();
+            let t1 = tokio::spawn(async move { m1.teardown().await });
+            entered_rx.await.unwrap();
 
-            let (t2_started_tx, t2_started_rx) = flume::bounded(1);
+            let (t2_started_tx, t2_started_rx) = oneshot::channel();
             let m2 = Arc::clone(&machine);
-            let t2 = std::thread::spawn(move || {
+            let t2 = tokio::spawn(async move {
                 let _ = t2_started_tx.send(());
-                m2.teardown()
+                m2.teardown().await
             });
-            t2_started_rx.recv().unwrap();
-            std::thread::yield_now();
+            t2_started_rx.await.unwrap();
+            tokio::task::yield_now().await;
             release_tx.send(()).unwrap();
 
-            assert!(t1.join().unwrap().is_err());
-            assert!(t2.join().unwrap().is_ok());
+            assert!(t1.await.unwrap().is_err());
+            assert!(t2.await.unwrap().is_ok());
             assert_eq!(provider.max_in_flight.load(Ordering::Acquire), 1);
             assert_eq!(provider.calls.load(Ordering::Acquire), 2);
             assert!(machine.is_terminated());

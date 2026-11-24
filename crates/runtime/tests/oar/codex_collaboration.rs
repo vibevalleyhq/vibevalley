@@ -5,19 +5,20 @@ use std::{
 };
 use vibevalley_runtime::oar::{ContentBlock, EventKind, SessionOptions, StopReason, SubagentStatus, ToolAction, tool_action};
 
-#[test]
-fn regression_codex_collaboration_survives_process_and_record_replay() {
+#[tokio::test]
+async fn regression_codex_collaboration_survives_process_and_record_replay() {
     let dir = tempfile::tempdir().unwrap();
     let record = dir.path().join("session.jsonl");
     let session = open_replay(
         dir.path(),
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/codex-collaboration.json"),
-    );
-    let rx = session.events();
-    session.prompt(vec![ContentBlock::Text("Review and test".into())]).unwrap();
+    )
+    .await;
+    let mut rx = session.events();
+    session.prompt(vec![ContentBlock::Text("Review and test".into())]).await.unwrap();
     let mut events = vec![];
     loop {
-        let e = rx.recv_timeout(Duration::from_secs(8)).unwrap();
+        let e = tokio::time::timeout(Duration::from_secs(8), rx.recv()).await.unwrap().unwrap();
         let done = e.agent_path.is_empty()
             && matches!(
                 e.kind,
@@ -31,7 +32,7 @@ fn regression_codex_collaboration_survives_process_and_record_replay() {
             break;
         }
     }
-    session.dispose();
+    session.dispose().await;
     let (_, history) = vibevalley_runtime::oar::read_record_with_header(&record).unwrap();
     assert!(history.windows(events.len()).any(|window| window == events.as_slice()));
     let created: Vec<_> = events
@@ -98,7 +99,7 @@ fn regression_codex_collaboration_survives_process_and_record_replay() {
     );
 }
 
-fn open_replay(dir: &Path, spec: &Path) -> std::sync::Arc<dyn vibevalley_runtime::oar::Session> {
+async fn open_replay(dir: &Path, spec: &Path) -> std::sync::Arc<dyn vibevalley_runtime::oar::Session> {
     vibevalley_runtime::oar::default_runtimes()
         .require("codex")
         .unwrap()
@@ -112,11 +113,12 @@ fn open_replay(dir: &Path, spec: &Path) -> std::sync::Arc<dyn vibevalley_runtime
             record_to: Some(dir.join("session.jsonl")),
             ..Default::default()
         })
+        .await
         .unwrap()
 }
 
-#[test]
-fn regression_installed_codex_v2_keeps_agent_paths_and_mailbox_waits_and_reads_only_the_requested_turn() {
+#[tokio::test]
+async fn regression_installed_codex_v2_keeps_agent_paths_and_mailbox_waits_and_reads_only_the_requested_turn() {
     use serde_json::{Value, json};
     let trace: Value = serde_json::from_str(include_str!("../fixtures/codex-0.170.0-collaboration.json")).unwrap();
     let mut calls: Value = serde_json::from_str(include_str!("../fixtures/go-codex.json")).unwrap();
@@ -134,15 +136,15 @@ fn regression_installed_codex_v2_keeps_agent_paths_and_mailbox_waits_and_reads_o
     let dir = tempfile::tempdir().unwrap();
     let spec = dir.path().join("responses.json");
     fs::write(&spec, calls.to_string()).unwrap();
-    let session = open_replay(dir.path(), &spec);
-    let rx = session.events();
-    session.prompt(vec![ContentBlock::Text("delegate".into())]).unwrap();
+    let session = open_replay(dir.path(), &spec).await;
+    let mut rx = session.events();
+    session.prompt(vec![ContentBlock::Text("delegate".into())]).await.unwrap();
     let mut spawned = vec![];
     let mut waits = vec![];
     let mut ended = vec![];
     let mut messages = vec![];
     loop {
-        let e = rx.recv_timeout(Duration::from_secs(8)).unwrap();
+        let e = tokio::time::timeout(Duration::from_secs(8), rx.recv()).await.unwrap().unwrap();
         match e.kind {
             EventKind::SubagentSpawned {
                 parent_thread_id,
@@ -189,13 +191,13 @@ fn regression_installed_codex_v2_keeps_agent_paths_and_mailbox_waits_and_reads_o
             .flat_map(|r| &r.events)
             .any(|e| e["kind"] == "subagent_status_changed" && e["threadId"] == "verify-thread" && e["status"] == "errored")
     );
-    let failed = session.read_subagent("verify-thread", Some("verify-turn")).unwrap();
+    let failed = session.read_subagent("verify-thread", Some("verify-turn")).await.unwrap();
     assert_eq!(failed.status, Some(SubagentStatus::Errored));
     assert_eq!(failed.agent_name.as_deref(), Some("/root/verify"));
     assert_eq!(failed.parent_thread_id.as_deref(), Some("root-thread"));
     assert_eq!(failed.message.as_deref(), Some("Fixture failure"));
-    assert_eq!(session.read_subagent("verify-thread", Some("other-turn")).unwrap().status, None);
-    assert_eq!(session.read_subagent("verify-thread", None).unwrap().status, None);
-    assert!(session.read_subagent("different-thread", Some("verify-turn")).is_err());
-    session.dispose();
+    assert_eq!(session.read_subagent("verify-thread", Some("other-turn")).await.unwrap().status, None);
+    assert_eq!(session.read_subagent("verify-thread", None).await.unwrap().status, None);
+    assert!(session.read_subagent("different-thread", Some("verify-turn")).await.is_err());
+    session.dispose().await;
 }

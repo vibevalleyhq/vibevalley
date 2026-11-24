@@ -1,5 +1,4 @@
 use std::io::BufRead;
-use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
 use serde_json::Value;
@@ -8,78 +7,31 @@ use tokio_util::sync::CancellationToken;
 use crate::agent::ai::types::{Completion, Delta, FinishReason, Message, Role, ToolCall, Usage};
 use crate::agent::{BrainError, Result};
 
-#[derive(Debug)]
-struct CancelInner {
-    token: CancellationToken,
-    /// Lazily bridged `flume::Receiver<()>` for legacy sync callers using `flume::Selector` / `recv_timeout`.
-    bridge_rx: OnceLock<flume::Receiver<()>>,
-}
-
 #[derive(Clone, Debug, Default)]
 pub struct CancelToken {
-    inner: Option<Arc<CancelInner>>,
+    token: Option<CancellationToken>,
 }
 
 impl CancelToken {
     pub fn never() -> Self {
-        Self { inner: None }
+        Self { token: None }
     }
 
     pub fn from_tokio(token: CancellationToken) -> Self {
-        Self {
-            inner: Some(Arc::new(CancelInner {
-                token,
-                bridge_rx: OnceLock::new(),
-            })),
-        }
-    }
-
-    pub fn from_receiver(rx: flume::Receiver<()>) -> Self {
-        let token = CancellationToken::new();
-        let bridge_rx = OnceLock::new();
-        let _ = bridge_rx.set(rx.clone());
-        if rx.is_disconnected() {
-            token.cancel();
-        } else {
-            let tok = token.clone();
-            crate::rt::spawn(async move {
-                let _ = rx.recv_async().await;
-                tok.cancel();
-            });
-        }
-        Self {
-            inner: Some(Arc::new(CancelInner { token, bridge_rx })),
-        }
+        Self { token: Some(token) }
     }
 
     pub fn token(&self) -> Option<&CancellationToken> {
-        self.inner.as_ref().map(|i| &i.token)
+        self.token.as_ref()
     }
 
     pub fn is_cancelled(&self) -> bool {
-        self.inner.as_ref().is_some_and(|i| i.token.is_cancelled())
+        self.token.as_ref().is_some_and(CancellationToken::is_cancelled)
     }
 
-    pub fn receiver(&self) -> Option<&flume::Receiver<()>> {
-        let inner = self.inner.as_ref()?;
-        Some(inner.bridge_rx.get_or_init(|| {
-            let (tx, rx) = flume::bounded(0);
-            if inner.token.is_cancelled() {
-                drop(tx);
-            } else {
-                let tok = inner.token.clone();
-                crate::rt::spawn(async move {
-                    tok.cancelled().await;
-                    drop(tx);
-                });
-            }
-            rx
-        }))
-    }
-
-    pub(crate) async fn cancelled(&self) {
-        match &self.inner {
-            Some(inner) => inner.token.cancelled().await,
+    pub async fn cancelled(&self) {
+        match &self.token {
+            Some(token) => token.cancelled().await,
             None => std::future::pending().await,
         }
     }

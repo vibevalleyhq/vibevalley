@@ -11,7 +11,7 @@ use serde_json::Value;
 use tokio::sync::Mutex as AsyncMutex;
 
 use super::live::{DocKey, LiveHub};
-use super::{BoxFuture, ReadAsyncOp, StorageBackend, StorageRead, StorageWrite, WriteAsyncOp, WriteCallback};
+use super::{BoxFuture, ReadAsyncOp, StorageBackend, StorageRead, StorageWrite, WriteAsyncOp};
 use crate::agent::durable::{
     CommitStats, Conversation, Document, DocumentEvent, Entry, Error, Result, Signal, Submission, SubmissionStatus, Task, TaskStatus, now_ms,
 };
@@ -545,7 +545,7 @@ impl MemoryState {
 
 pub(crate) struct MemoryRead<'a>(pub(crate) &'a MemoryState);
 
-impl StorageRead for MemoryRead<'_> {
+impl MemoryRead<'_> {
     fn document(&self, scope: &str, id: &str, kind: &str) -> Result<Option<Document>> {
         Ok(self.0.documents.get(&(scope.into(), id.into(), kind.into())).cloned())
     }
@@ -684,7 +684,9 @@ impl StorageRead for MemoryRead<'_> {
             .and_then(|&idx| self.0.signals.get(idx))
             .map(|(_, s)| s.clone()))
     }
+}
 
+impl StorageRead for MemoryRead<'_> {
     fn document_async<'a>(&'a self, scope: &'a str, id: &'a str, kind: &'a str) -> BoxFuture<'a, Result<Option<Document>>> {
         Box::pin(std::future::ready(self.document(scope, id, kind)))
     }
@@ -782,123 +784,66 @@ impl<'a> MemoryTx<'a> {
 }
 
 impl StorageRead for MemoryTx<'_> {
-    fn document(&self, scope: &str, id: &str, kind: &str) -> Result<Option<Document>> {
-        MemoryRead(&self.state.lock()).document(scope, id, kind)
-    }
-    fn documents_by_kind(&self, scope: &str, kind: &str) -> Result<Vec<Document>> {
-        MemoryRead(&self.state.lock()).documents_by_kind(scope, kind)
-    }
-    fn documents_by_scope(&self, scope: &str, id: &str) -> Result<Vec<Document>> {
-        MemoryRead(&self.state.lock()).documents_by_scope(scope, id)
-    }
-    fn conversation(&self, id: &str) -> Result<Option<Conversation>> {
-        MemoryRead(&self.state.lock()).conversation(id)
-    }
-    fn conversations(&self) -> Result<Vec<Conversation>> {
-        MemoryRead(&self.state.lock()).conversations()
-    }
-    fn conversations_by_owner_task(&self, owner_task_id: &str) -> Result<Vec<Conversation>> {
-        MemoryRead(&self.state.lock()).conversations_by_owner_task(owner_task_id)
-    }
-    fn entries_from(&self, conv: &str, from_seq: i64) -> Result<Vec<Entry>> {
-        MemoryRead(&self.state.lock()).entries_from(conv, from_seq)
-    }
-    fn entries_within(&self, conv: &str, first_seq: i64, last_seq: i64) -> Result<Vec<Entry>> {
-        MemoryRead(&self.state.lock()).entries_within(conv, first_seq, last_seq)
-    }
-    fn submission(&self, id: &str) -> Result<Option<Submission>> {
-        MemoryRead(&self.state.lock()).submission(id)
-    }
-    fn submission_by_request(&self, conv: &str, request_id: &str) -> Result<Option<Submission>> {
-        MemoryRead(&self.state.lock()).submission_by_request(conv, request_id)
-    }
-    fn submissions(&self, conv: &str) -> Result<Vec<Submission>> {
-        MemoryRead(&self.state.lock()).submissions(conv)
-    }
-    fn task(&self, id: &str) -> Result<Option<Task>> {
-        MemoryRead(&self.state.lock()).task(id)
-    }
-    fn task_by_dedup(&self, owner: &str, key: &str) -> Result<Option<Task>> {
-        MemoryRead(&self.state.lock()).task_by_dedup(owner, key)
-    }
-    fn tasks_by_conversation(&self, conv: &str) -> Result<Vec<Task>> {
-        MemoryRead(&self.state.lock()).tasks_by_conversation(conv)
-    }
-    fn children(&self, owner: &str) -> Result<Vec<Task>> {
-        MemoryRead(&self.state.lock()).children(owner)
-    }
-    fn tasks_by_status(&self, status: TaskStatus) -> Result<Vec<Task>> {
-        MemoryRead(&self.state.lock()).tasks_by_status(status)
-    }
-    fn active_tasks(&self) -> Result<Vec<Task>> {
-        MemoryRead(&self.state.lock()).active_tasks()
-    }
-    fn signals(&self, task_id: &str, include_consumed: bool) -> Result<Vec<Signal>> {
-        MemoryRead(&self.state.lock()).signals(task_id, include_consumed)
-    }
-    fn signal_by_key(&self, task_id: &str, name: &str, key: &str) -> Result<Option<Signal>> {
-        MemoryRead(&self.state.lock()).signal_by_key(task_id, name, key)
-    }
     fn document_async<'a>(&'a self, scope: &'a str, id: &'a str, kind: &'a str) -> BoxFuture<'a, Result<Option<Document>>> {
-        Box::pin(std::future::ready(self.document(scope, id, kind)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).document(scope, id, kind)))
     }
     fn documents_by_kind_async<'a>(&'a self, scope: &'a str, kind: &'a str) -> BoxFuture<'a, Result<Vec<Document>>> {
-        Box::pin(std::future::ready(self.documents_by_kind(scope, kind)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).documents_by_kind(scope, kind)))
     }
     fn documents_by_scope_async<'a>(&'a self, scope: &'a str, id: &'a str) -> BoxFuture<'a, Result<Vec<Document>>> {
-        Box::pin(std::future::ready(self.documents_by_scope(scope, id)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).documents_by_scope(scope, id)))
     }
     fn conversation_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Conversation>>> {
-        Box::pin(std::future::ready(self.conversation(id)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).conversation(id)))
     }
     fn conversations_async(&self) -> BoxFuture<'_, Result<Vec<Conversation>>> {
-        Box::pin(std::future::ready(self.conversations()))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).conversations()))
     }
     fn conversations_by_owner_task_async<'a>(&'a self, owner_task_id: &'a str) -> BoxFuture<'a, Result<Vec<Conversation>>> {
-        Box::pin(std::future::ready(self.conversations_by_owner_task(owner_task_id)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).conversations_by_owner_task(owner_task_id)))
     }
     fn entries_from_async<'a>(&'a self, conv: &'a str, from_seq: i64) -> BoxFuture<'a, Result<Vec<Entry>>> {
-        Box::pin(std::future::ready(self.entries_from(conv, from_seq)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).entries_from(conv, from_seq)))
     }
     fn entries_within_async<'a>(&'a self, conv: &'a str, first_seq: i64, last_seq: i64) -> BoxFuture<'a, Result<Vec<Entry>>> {
-        Box::pin(std::future::ready(self.entries_within(conv, first_seq, last_seq)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).entries_within(conv, first_seq, last_seq)))
     }
     fn submission_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Submission>>> {
-        Box::pin(std::future::ready(self.submission(id)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).submission(id)))
     }
     fn submission_by_request_async<'a>(&'a self, conv: &'a str, request_id: &'a str) -> BoxFuture<'a, Result<Option<Submission>>> {
-        Box::pin(std::future::ready(self.submission_by_request(conv, request_id)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).submission_by_request(conv, request_id)))
     }
     fn submissions_async<'a>(&'a self, conv: &'a str) -> BoxFuture<'a, Result<Vec<Submission>>> {
-        Box::pin(std::future::ready(self.submissions(conv)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).submissions(conv)))
     }
     fn task_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Task>>> {
-        Box::pin(std::future::ready(self.task(id)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).task(id)))
     }
     fn task_by_dedup_async<'a>(&'a self, owner: &'a str, key: &'a str) -> BoxFuture<'a, Result<Option<Task>>> {
-        Box::pin(std::future::ready(self.task_by_dedup(owner, key)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).task_by_dedup(owner, key)))
     }
     fn tasks_by_conversation_async<'a>(&'a self, conv: &'a str) -> BoxFuture<'a, Result<Vec<Task>>> {
-        Box::pin(std::future::ready(self.tasks_by_conversation(conv)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).tasks_by_conversation(conv)))
     }
     fn children_async<'a>(&'a self, owner: &'a str) -> BoxFuture<'a, Result<Vec<Task>>> {
-        Box::pin(std::future::ready(self.children(owner)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).children(owner)))
     }
     fn tasks_by_status_async(&self, status: TaskStatus) -> BoxFuture<'_, Result<Vec<Task>>> {
-        Box::pin(std::future::ready(self.tasks_by_status(status)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).tasks_by_status(status)))
     }
     fn active_tasks_async(&self) -> BoxFuture<'_, Result<Vec<Task>>> {
-        Box::pin(std::future::ready(self.active_tasks()))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).active_tasks()))
     }
     fn signals_async<'a>(&'a self, task_id: &'a str, include_consumed: bool) -> BoxFuture<'a, Result<Vec<Signal>>> {
-        Box::pin(std::future::ready(self.signals(task_id, include_consumed)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).signals(task_id, include_consumed)))
     }
     fn signal_by_key_async<'a>(&'a self, task_id: &'a str, name: &'a str, key: &'a str) -> BoxFuture<'a, Result<Option<Signal>>> {
-        Box::pin(std::future::ready(self.signal_by_key(task_id, name, key)))
+        Box::pin(std::future::ready(MemoryRead(&self.state.lock()).signal_by_key(task_id, name, key)))
     }
 }
 
-impl StorageWrite for MemoryTx<'_> {
+impl MemoryTx<'_> {
     fn put_document(&self, scope: &str, id: &str, kind: &str, state: &Value, now_ms: i64) -> Result<i64> {
         let rev = self
             .state
@@ -1038,7 +983,9 @@ impl StorageWrite for MemoryTx<'_> {
         let state = self.state.lock();
         Ok(state.signal_by_id.get(&id).and_then(|&idx| state.signals.get(idx)).map(|(_, s)| s.clone()))
     }
+}
 
+impl StorageWrite for MemoryTx<'_> {
     fn put_document_async<'a>(&'a self, scope: &'a str, id: &'a str, kind: &'a str, state: &'a Value, now_ms: i64) -> BoxFuture<'a, Result<i64>> {
         Box::pin(std::future::ready(self.put_document(scope, id, kind, state, now_ms)))
     }
@@ -1119,42 +1066,6 @@ impl StorageBackend for MemoryStorage {
         self.0.hub.now_ms()
     }
 
-    fn read_dyn(&self, f: &mut dyn FnMut(&dyn StorageRead) -> Result<()>) -> Result<()> {
-        let state = crate::rt::block_on(self.0.state.lock());
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        f(&MemoryRead(&state))
-    }
-
-    fn write_dyn(&self, f: &mut WriteCallback<'_>) -> Result<()> {
-        let mut state = crate::rt::block_on(self.0.state.lock());
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        self.0.hub.record_request();
-        let now = self.0.hub.now_ms();
-        let staging = MemoryTx::new(&mut state, false);
-        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&staging, &staging, None, now)));
-        match outcome {
-            Ok(Ok(write_outcome)) => {
-                self.0.hub.record_commit_and_publish(write_outcome.events, write_outcome.tasks_changed);
-                Ok(())
-            }
-            Ok(Err(err)) => {
-                staging.rollback();
-                self.0.hub.record_failure();
-                Err(err)
-            }
-            Err(panic) => {
-                staging.rollback();
-                self.0.hub.record_failure();
-                drop(state);
-                std::panic::resume_unwind(panic)
-            }
-        }
-    }
-
     fn read_dyn_async<'a>(&'a self, op: &'a mut dyn ReadAsyncOp<'a>) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let state = self.0.state.lock().await;
@@ -1200,19 +1111,21 @@ impl StorageBackend for MemoryStorage {
         self.0.hub.stats()
     }
 
-    fn subscribe_documents(&self) -> Result<flume::Receiver<DocumentEvent>> {
+    fn subscribe_documents(&self) -> Result<tokio::sync::mpsc::UnboundedReceiver<DocumentEvent>> {
         self.0.hub.subscribe_documents()
     }
 
-    fn subscribe_tasks(&self) -> Result<flume::Receiver<()>> {
+    fn subscribe_tasks(&self) -> Result<tokio::sync::mpsc::Receiver<()>> {
         self.0.hub.subscribe_tasks()
     }
 
-    fn close(&self) -> Result<()> {
-        if self.0.hub.is_closed() {
-            return Ok(());
-        }
-        self.0.hub.mark_closed();
-        Ok(())
+    fn close(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            if self.0.hub.is_closed() {
+                return Ok(());
+            }
+            self.0.hub.mark_closed();
+            Ok(())
+        })
     }
 }

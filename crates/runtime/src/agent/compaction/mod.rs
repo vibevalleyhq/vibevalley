@@ -8,9 +8,10 @@ pub mod summarizer;
 mod tests;
 
 use std::collections::HashSet;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Mutex};
 
 use serde_json::json;
+use tokio::sync::Notify;
 
 use crate::agent::durable::{self, Entry, Store};
 
@@ -59,7 +60,7 @@ pub fn estimate_tokens(entries: &[Entry]) -> usize {
 pub struct Compactor {
     store: Store,
     summarizer: Arc<dyn Summarizer>,
-    active: Arc<(Mutex<HashSet<String>>, Condvar)>,
+    active: Arc<(Mutex<HashSet<String>>, Notify)>,
     pub soft_tokens: usize,
     pub hard_tokens: usize,
     pub keep_recent: usize,
@@ -70,7 +71,7 @@ impl Compactor {
         Self {
             store,
             summarizer,
-            active: Default::default(),
+            active: Arc::new((Mutex::new(HashSet::new()), Notify::new())),
             soft_tokens: 88_000,
             hard_tokens: 120_000,
             keep_recent: 4,
@@ -90,8 +91,12 @@ impl Compactor {
         self
     }
 
-    pub fn compact(&self, conv: &str, level: Level, explicit: Option<i64>) -> durable::Result<Option<Entry>> {
-        let (current, entries) = self.store.read(|tx| Ok((tx.conversation(conv)?, tx.visible_entries(conv)?)))?;
+    pub async fn compact(&self, conv: &str, level: Level, explicit: Option<i64>) -> durable::Result<Option<Entry>> {
+        let conv_read = conv.to_owned();
+        let (current, entries) = self
+            .store
+            .read_async(move |tx| Box::pin(async move { Ok((tx.conversation_async(&conv_read).await?, tx.visible_entries_async(&conv_read).await?)) }))
+            .await?;
         let keep = if level == Level::Overflow {
             self.keep_recent.min(1)
         } else {
@@ -114,44 +119,64 @@ impl Compactor {
         }
         let from = selected.iter().map(|e| e.seq).min().unwrap_or(cut);
         let ops = extract_file_ops(&selected);
-        let summary = self.summarizer.summarize(level, &selected, &ops)?;
+        let summary = self.summarizer.summarize(level, &selected, &ops).await?;
         let token_count = estimate_str_tokens(&summary) as i64;
-        self.store.write(|tx| {
-            let committed = tx.compact(
-                conv,
-                durable::Compaction {
-                    level: level.name(),
-                    base_head: current.head_seq,
-                    from,
-                    cut,
-                    summary: &summary,
-                    token_count,
-                },
-            )?;
-            if committed.is_some() {
-                tx.put_document("conversation", conv, "pi.file_ops", &json!(ops))?;
-            }
-            Ok(committed)
-        })
+        let conv_write = conv.to_owned();
+        let base_head = current.head_seq;
+        self.store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let committed = tx
+                        .compact_async(
+                            &conv_write,
+                            durable::Compaction {
+                                level: level.name(),
+                                base_head,
+                                from,
+                                cut,
+                                summary: &summary,
+                                token_count,
+                            },
+                        )
+                        .await?;
+                    if committed.is_some() {
+                        tx.put_document_async("conversation", &conv_write, "pi.file_ops", &json!(ops)).await?;
+                    }
+                    Ok(committed)
+                })
+            })
+            .await
     }
 
-    pub fn before_request(&self, conv: &str) -> durable::Result<()> {
-        let tokens = self.store.read(|tx| Ok(estimate_tokens(&tx.visible_entries(conv)?)))?;
+    pub async fn before_request(&self, conv: &str) -> durable::Result<()> {
+        let conv_read = conv.to_owned();
+        let tokens = self
+            .store
+            .read_async(move |tx| Box::pin(async move { Ok(estimate_tokens(&tx.visible_entries_async(&conv_read).await?)) }))
+            .await?;
         if tokens >= self.hard_tokens {
-            self.compact(conv, Level::Hard, None)?;
+            self.compact(conv, Level::Hard, None).await?;
         } else if tokens >= self.soft_tokens && self.active.0.lock().unwrap().insert(conv.to_owned()) {
             let compactor = self.clone();
             let conv = conv.to_owned();
-            crate::rt::handle().spawn_blocking(move || {
-                let _ = compactor.compact(&conv, Level::Soft, None);
+            crate::rt::current_or_global_handle().spawn(async move {
+                let _ = compactor.compact(&conv, Level::Soft, None).await;
                 compactor.active.0.lock().unwrap().remove(&conv);
-                compactor.active.1.notify_all();
+                compactor.active.1.notify_waiters();
             });
         }
         Ok(())
     }
 
-    pub fn wait(&self) {
-        drop(self.active.1.wait_while(self.active.0.lock().unwrap(), |active| !active.is_empty()).unwrap());
+    pub async fn wait(&self) {
+        loop {
+            let notified = self.active.1.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            if self.active.0.lock().unwrap().is_empty() {
+                return;
+            }
+            notified.await;
+        }
     }
 }

@@ -21,21 +21,19 @@ use crate::agent::ai::retry::{RetryPolicy, parse_retry_after};
 use crate::agent::ai::stream::{CancelHandle, CancelToken, fold_stream};
 use crate::agent::ai::types::{ChatRequest, Delta, FinishReason, Message, ResponseFormat, Role, ToolCall, Usage};
 
-fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
-    crate::rt::block_on(async move {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let cancel = CancellationToken::new();
-        let guard = cancel.clone().drop_guard();
-        tokio::spawn(async move {
-            let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
-        });
-        (addr, guard)
-    })
+async fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let cancel = CancellationToken::new();
+    let guard = cancel.clone().drop_guard();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+    });
+    (addr, guard)
 }
 
-#[test]
-fn retry_policy_retries_429_with_retry_after_header_and_succeeds() {
+#[tokio::test]
+async fn retry_policy_retries_429_with_retry_after_header_and_succeeds() {
     let hits = Arc::new(AtomicUsize::new(0));
     let server_hits = hits.clone();
     let app = Router::new().fallback(move || {
@@ -58,7 +56,7 @@ fn retry_policy_retries_429_with_retry_after_header_and_succeeds() {
             }
         }
     });
-    let (addr, _guard) = spawn_mock(app);
+    let (addr, _guard) = spawn_mock(app).await;
 
     let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-test".into())).with_retry(RetryPolicy {
         max_retries: 2,
@@ -71,14 +69,14 @@ fn retry_policy_retries_429_with_retry_after_header_and_succeeds() {
         ..Default::default()
     };
     let start = Instant::now();
-    let completion = client.complete(&req, &mut |_| {}).unwrap();
+    let completion = client.complete(&req, &mut |_| {}).await.unwrap();
     assert!(start.elapsed() >= Duration::from_millis(900), "expected Retry-After: 1s to be honored");
     assert_eq!(completion.message.content.as_deref(), Some("ok"));
     assert_eq!(hits.load(Ordering::SeqCst), 2);
 }
 
-#[test]
-fn mid_stream_cancellation_returns_under_500ms() {
+#[tokio::test]
+async fn mid_stream_cancellation_returns_under_500ms() {
     let stream_cancel = CancellationToken::new();
     let stream_cancel_for_route = stream_cancel.clone();
     let app = Router::new().fallback(move || {
@@ -96,7 +94,7 @@ fn mid_stream_cancellation_returns_under_500ms() {
         });
         async move { Sse::new(stream) }
     });
-    let (addr, _guard) = spawn_mock(app);
+    let (addr, _guard) = spawn_mock(app).await;
     let _stream_guard = stream_cancel.drop_guard();
 
     let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-test".into())).with_retry(RetryPolicy::none());
@@ -115,14 +113,15 @@ fn mid_stream_cancellation_returns_under_500ms() {
                 handle.cancel();
             }
         })
+        .await
         .unwrap_err();
     assert!(matches!(err, BrainError::Cancelled), "expected Cancelled, got {err:?}");
     let elapsed = cancelled_at.expect("received first chunk").elapsed();
     assert!(elapsed < Duration::from_millis(500), "cancellation took {elapsed:?}");
 }
 
-#[test]
-fn cancel_aborts_retry_backoff_immediately() {
+#[tokio::test]
+async fn cancel_aborts_retry_backoff_immediately() {
     let handle = Arc::new(CancelHandle::new());
     let cancel_after_hit = handle.clone();
     let app = Router::new().fallback(move || {
@@ -139,7 +138,7 @@ fn cancel_aborts_retry_backoff_immediately() {
             )
         }
     });
-    let (addr, _guard) = spawn_mock(app);
+    let (addr, _guard) = spawn_mock(app).await;
 
     let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-test".into())).with_retry(RetryPolicy {
         max_retries: 3,
@@ -152,13 +151,13 @@ fn cancel_aborts_retry_backoff_immediately() {
         ..Default::default()
     };
     let start = Instant::now();
-    let err = client.complete_cancellable(&req, &handle.token(), &mut |_| {}).unwrap_err();
+    let err = client.complete_cancellable(&req, &handle.token(), &mut |_| {}).await.unwrap_err();
     assert!(matches!(err, BrainError::Cancelled), "expected Cancelled, got {err:?}");
     assert!(start.elapsed() < Duration::from_millis(500));
 }
 
-#[test]
-fn fetch_balance_parses_user_balance_endpoint() {
+#[tokio::test]
+async fn fetch_balance_parses_user_balance_endpoint() {
     let seen_auth = Arc::new(Mutex::new(None::<String>));
     let seen_for_route = seen_auth.clone();
     let app = Router::new().route(
@@ -175,10 +174,10 @@ fn fetch_balance_parses_user_balance_endpoint() {
             }
         }),
     );
-    let (addr, _guard) = spawn_mock(app);
+    let (addr, _guard) = spawn_mock(app).await;
 
     let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-bal".into())).with_retry(RetryPolicy::none());
-    let bal = client.fetch_balance().unwrap();
+    let bal = client.fetch_balance().await.unwrap();
     assert_eq!(seen_auth.lock().unwrap().as_deref(), Some("Bearer sk-bal"));
     assert!(bal.is_available);
     assert_eq!(bal.balance_infos.len(), 1);
@@ -229,8 +228,8 @@ fn request_body_serializes_response_format_max_tokens_temperature_and_effort() {
     assert_eq!(request_body(&text_req)["response_format"], json!({"type": "text"}));
 }
 
-#[test]
-fn catalog_models_pricing_and_stream_cancel() {
+#[tokio::test]
+async fn catalog_models_pricing_and_stream_cancel() {
     assert_eq!(DEFAULT_MODEL, "deepseek-flash");
     let specs = catalog();
     assert_eq!(specs.len(), 4);
@@ -271,6 +270,7 @@ fn catalog_models_pricing_and_stream_cancel() {
 
     let no_key = OpenAiClient::new("http://127.0.0.1:1", || None)
         .complete(&ChatRequest::default(), &mut |_| {})
+        .await
         .unwrap_err();
     assert!(matches!(no_key, BrainError::NoKey));
 }
@@ -288,25 +288,23 @@ fn retry_policy_backoff_doubles_caps_and_honors_retry_after() {
     assert_eq!(RetryPolicy::none().backoff().next(), None);
 }
 
-#[test]
-fn deepseek_https_client_initializes_rustls_platform_verifier_without_webpki() {
-    let (addr, _guard) = crate::rt::block_on(async move {
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let cancel = CancellationToken::new();
-        let guard = cancel.clone().drop_guard();
-        tokio::spawn(async move {
-            tokio::select! {
-                _ = cancel.cancelled() => {}
-                _ = listener.accept() => {}
-            }
-        });
-        (addr, guard)
+#[tokio::test]
+async fn deepseek_https_client_initializes_rustls_platform_verifier_without_webpki() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let cancel = CancellationToken::new();
+    let _guard = cancel.clone().drop_guard();
+    tokio::spawn(async move {
+        tokio::select! {
+            _ = cancel.cancelled() => {}
+            _ = listener.accept() => {}
+        }
     });
 
     let err = OpenAiClient::new(format!("https://{addr}"), || Some("sk-tls-test".into()))
         .with_retry(RetryPolicy::none())
         .fetch_balance()
+        .await
         .unwrap_err();
     match err {
         BrainError::Network(msg) => {

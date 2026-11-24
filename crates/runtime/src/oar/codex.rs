@@ -25,7 +25,9 @@ use std::time::Duration;
 use parking_lot::Mutex;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use tokio::sync::oneshot;
 
+use crate::BoxFuture;
 use crate::oar::core::{CoreSession, Driver, SessionCore, absolute, file_as_text, rejected, rejection};
 use crate::oar::process::{AbortWatchdog, LineChild, LoginCheck, LoginStatus, Spawn, probe_installation_with, require_binary};
 use crate::oar::record::{self, Recorder};
@@ -614,47 +616,50 @@ impl Shared {
         self.child.get().ok_or_else(|| AgentError::Io("codex is not running".into()))
     }
 
-    fn call_async(&self, method: &str, params: Value, callback: RpcCallback) -> Result<()> {
+    async fn call_async(&self, method: &str, params: Value, callback: RpcCallback) -> Result<()> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         self.calls.lock().insert(id, callback);
-        let sent = self
-            .child()
-            .and_then(|c| c.write_json(&json!({ "id": id, "method": method, "params": params })));
+        let sent = match self.child() {
+            Ok(c) => c.write_json(&json!({ "id": id, "method": method, "params": params })).await,
+            Err(e) => Err(e),
+        };
         if sent.is_err() {
             self.calls.lock().remove(&id);
         }
         sent
     }
 
-    fn call(&self, method: &str, params: Value) -> Result<Value> {
-        let (tx, rx) = flume::bounded(1);
-        self.call_async(method, params, Box::new(move |result| drop(tx.send(result))))?;
-        match rx.recv_timeout(self.timeout) {
-            Ok(Ok(value)) => Ok(value),
-            Ok(Err(message)) => Err(AgentError::Protocol(format!("codex {method}: {message}"))),
-            Err(_) => Err(AgentError::Protocol(format!("codex did not answer {method} in time"))),
+    async fn call(&self, method: &str, params: Value) -> Result<Value> {
+        let (tx, rx) = oneshot::channel();
+        self.call_async(method, params, Box::new(move |result| drop(tx.send(result)))).await?;
+        match tokio::time::timeout(self.timeout, rx).await {
+            Ok(Ok(Ok(value))) => Ok(value),
+            Ok(Ok(Err(message))) => Err(AgentError::Protocol(format!("codex {method}: {message}"))),
+            Ok(Err(_)) | Err(_) => Err(AgentError::Protocol(format!("codex did not answer {method} in time"))),
         }
     }
 
-    fn notify(&self, method: &str, params: Value) -> Result<()> {
-        self.child()?.write_json(&json!({ "method": method, "params": params }))
+    async fn notify(&self, method: &str, params: Value) -> Result<()> {
+        self.child()?.write_json(&json!({ "method": method, "params": params })).await
     }
 
-    fn reply(&self, id: &Value, body: std::result::Result<Value, (i64, &str)>) {
+    async fn reply(&self, id: &Value, body: std::result::Result<Value, (i64, &str)>) {
         let message = match body {
             Ok(result) => json!({ "id": id, "result": result }),
             Err((code, message)) => json!({ "id": id, "error": { "code": code, "message": message } }),
         };
         if let Ok(child) = self.child() {
-            let _ = child.write_json(&message);
+            let _ = child.write_json(&message).await;
         }
     }
 
-    fn interrupt(&self, session: &SessionState, turn_id: &str) {
-        let _ = self.call_async("turn/interrupt", json!({ "threadId": session.thread_id, "turnId": turn_id }), Box::new(|_| {}));
+    async fn interrupt(&self, session: &SessionState, turn_id: &str) {
+        let _ = self
+            .call_async("turn/interrupt", json!({ "threadId": session.thread_id, "turnId": turn_id }), Box::new(|_| {}))
+            .await;
     }
 
-    fn on_line(&self, line: &str) {
+    async fn on_line(&self, line: &str) {
         let Ok(message) = serde_json::from_str::<Value>(line) else { return };
         let method = str_of(&message, "method");
         let id = message.get("id").filter(|id| !id.is_null());
@@ -669,7 +674,7 @@ impl Shared {
                 };
                 callback(result);
             }
-            (Some(method), Some(id)) => self.on_server_request(method, id, message.get("params").unwrap_or(&Value::Null)),
+            (Some(method), Some(id)) => self.on_server_request(method, id, message.get("params").unwrap_or(&Value::Null)).await,
             (Some(method), None) => {
                 let params = message.get("params").cloned().unwrap_or(Value::Null);
                 let session = {
@@ -682,94 +687,101 @@ impl Shared {
                         }
                     }
                 };
-                self.on_notification(session, method, &params, line);
+                self.on_notification(session, method, &params, line).await;
             }
             (None, None) => {}
         }
     }
 
-    fn on_notification(&self, session: &SessionState, method: &str, params: &Value, line: &str) {
-        let (projected, path) = {
-            let mut projector = session.projector.lock();
-            let projected = projector.project(method, params);
-            let path = projector.path(params);
-            if let Some(events) = &projected {
-                for (child_path, event) in events {
-                    if let EventKind::SubagentSpawned {
-                        parent_thread_id, thread_id, ..
-                    } = event
-                        && projector.recorded_children.insert(thread_id.clone())
+    async fn on_notification(&self, session: &SessionState, method: &str, params: &Value, line: &str) {
+        let interrupt_turn_id = {
+            let (projected, path) = {
+                let mut projector = session.projector.lock();
+                let projected = projector.project(method, params);
+                let path = projector.path(params);
+                if let Some(events) = &projected {
+                    for (child_path, event) in events {
+                        if let EventKind::SubagentSpawned {
+                            parent_thread_id, thread_id, ..
+                        } = event
+                            && projector.recorded_children.insert(thread_id.clone())
+                        {
+                            session.core.child_session(parent_thread_id, thread_id, child_path);
+                        }
+                    }
+                    // Older record streams can relay a child's activity without a spawn.
+                    // Keep their voyage marker separate from confirmed creation facts.
+                    if let Some(child) = params.pointer("/subAgentActivity/agentThreadId").and_then(Value::as_str)
+                        && let Some(parent) = str_of(params, "threadId")
+                        && child != parent
+                        && !path.is_empty()
+                        && projector.recorded_children.insert(child.into())
                     {
-                        session.core.child_session(parent_thread_id, thread_id, child_path);
+                        session.core.child_session(parent, child, &path);
                     }
                 }
-                // Older record streams can relay a child's activity without a spawn.
-                // Keep their voyage marker separate from confirmed creation facts.
-                if let Some(child) = params.pointer("/subAgentActivity/agentThreadId").and_then(Value::as_str)
-                    && let Some(parent) = str_of(params, "threadId")
-                    && child != parent
-                    && !path.is_empty()
-                    && projector.recorded_children.insert(child.into())
-                {
-                    session.core.child_session(parent, child, &path);
+                (projected, path)
+            };
+            let root = path.is_empty();
+            if root {
+                let next_title = match method {
+                    "thread/name/updated" => str_of(params, "threadName").or_else(|| str_of(params, "name")),
+                    "thread/started" => params.pointer("/thread/name").and_then(Value::as_str),
+                    _ => None,
+                };
+                if let Some(title) = next_title.map(str::trim).filter(|t| !t.is_empty()) {
+                    *session.session_title.lock() = Some(title.to_string());
                 }
             }
-            (projected, path)
+            let _frame = session.core.record_raw(method, path, line, params);
+            let Some(events) = projected else { return };
+            let mut interrupt_turn_id = None;
+            if root && method == "turn/started" {
+                let turn_id = params.pointer("/turn/id").and_then(Value::as_str).map(str::to_string);
+                *session.turn_id.lock() = turn_id.clone();
+                // A turn codex started by itself still has a beginning.
+                let _ = session.core.begin_turn("");
+                if let Some(turn_id) = turn_id
+                    && session.abort_wanted.load(Ordering::SeqCst)
+                {
+                    interrupt_turn_id = Some(turn_id);
+                }
+            }
+            for (path, kind) in events {
+                if path.is_empty() && matches!(kind, EventKind::TurnFinished { .. }) {
+                    *session.turn_id.lock() = None;
+                    session.abort_wanted.store(false, Ordering::SeqCst);
+                    session.watchdog.on_turn_finished();
+                    session.approvals.lock().clear();
+                }
+                session.core.emit(path, kind);
+            }
+            if method == "serverRequest/resolved" {
+                // codex withdrew a request (the turn was interrupted, or another client answered).
+                let id = params
+                    .get("requestId")
+                    .map(|id| id.as_str().map(str::to_string).unwrap_or_else(|| id.to_string()));
+                if let Some(id) = id
+                    && session.approvals.lock().remove(&id).is_some()
+                {
+                    session.core.emit_root(EventKind::PermissionResolved {
+                        request_id: id,
+                        decision: PermissionDecision::Deny {
+                            message: Some("withdrawn by codex".into()),
+                        },
+                    });
+                }
+            }
+            interrupt_turn_id
         };
-        let root = path.is_empty();
-        if root {
-            let next_title = match method {
-                "thread/name/updated" => str_of(params, "threadName").or_else(|| str_of(params, "name")),
-                "thread/started" => params.pointer("/thread/name").and_then(Value::as_str),
-                _ => None,
-            };
-            if let Some(title) = next_title.map(str::trim).filter(|t| !t.is_empty()) {
-                *session.session_title.lock() = Some(title.to_string());
-            }
-        }
-        let _frame = session.core.record_raw(method, path, line, params);
-        let Some(events) = projected else { return };
-        if root && method == "turn/started" {
-            let turn_id = params.pointer("/turn/id").and_then(Value::as_str).map(str::to_string);
-            *session.turn_id.lock() = turn_id.clone();
-            // A turn codex started by itself still has a beginning.
-            let _ = session.core.begin_turn("");
-            if let Some(turn_id) = turn_id
-                && session.abort_wanted.load(Ordering::SeqCst)
-            {
-                self.interrupt(session, &turn_id);
-            }
-        }
-        for (path, kind) in events {
-            if path.is_empty() && matches!(kind, EventKind::TurnFinished { .. }) {
-                *session.turn_id.lock() = None;
-                session.abort_wanted.store(false, Ordering::SeqCst);
-                session.watchdog.on_turn_finished();
-                session.approvals.lock().clear();
-            }
-            session.core.emit(path, kind);
-        }
-        if method == "serverRequest/resolved" {
-            // codex withdrew a request (the turn was interrupted, or another client answered).
-            let id = params
-                .get("requestId")
-                .map(|id| id.as_str().map(str::to_string).unwrap_or_else(|| id.to_string()));
-            if let Some(id) = id
-                && session.approvals.lock().remove(&id).is_some()
-            {
-                session.core.emit_root(EventKind::PermissionResolved {
-                    request_id: id,
-                    decision: PermissionDecision::Deny {
-                        message: Some("withdrawn by codex".into()),
-                    },
-                });
-            }
+        if let Some(turn_id) = interrupt_turn_id {
+            self.interrupt(session, &turn_id).await;
         }
     }
 
-    fn on_server_request(&self, method: &str, id: &Value, params: &Value) {
+    async fn on_server_request(&self, method: &str, id: &Value, params: &Value) {
         let Some(session) = self.session.get() else {
-            self.reply(id, Err((-32601, "method not found")));
+            self.reply(id, Err((-32601, "method not found"))).await;
             return;
         };
         let request = session.projector.lock().server_request(method, params);
@@ -802,9 +814,9 @@ impl Shared {
             ServerRequest::Question { agent_path, text } => {
                 session.core.emit(agent_path, EventKind::Question { text });
                 // Answered empty: the contract answers a question with the next prompt.
-                self.reply(id, Ok(json!({ "answers": {} })));
+                self.reply(id, Ok(json!({ "answers": {} }))).await;
             }
-            ServerRequest::Unsupported => self.reply(id, Err((-32601, "method not found"))),
+            ServerRequest::Unsupported => self.reply(id, Err((-32601, "method not found"))).await,
         }
     }
 
@@ -859,11 +871,14 @@ impl CodexDriver {
 }
 
 impl Driver for CodexDriver {
-    fn read_subagent(&self, thread_id: &str, turn_id: Option<&str>) -> Result<crate::oar::SubagentSnapshot> {
-        let reply = self
-            .shared
-            .call("thread/read", json!({"threadId":thread_id,"includeTurns":turn_id.is_some()}))?;
-        subagents::read_snapshot(&reply, thread_id, turn_id)
+    fn read_subagent<'a>(&'a self, thread_id: &'a str, turn_id: Option<&'a str>) -> BoxFuture<'a, Result<crate::oar::SubagentSnapshot>> {
+        Box::pin(async move {
+            let reply = self
+                .shared
+                .call("thread/read", json!({"threadId":thread_id,"includeTurns":turn_id.is_some()}))
+                .await?;
+            subagents::read_snapshot(&reply, thread_id, turn_id)
+        })
     }
 
     fn session_title(&self) -> Option<String> {
@@ -874,100 +889,126 @@ impl Driver for CodexDriver {
         user_input(&self.session().cwd, content).map(|_| ())
     }
 
-    fn start_turn(&self, content: Vec<ContentBlock>) -> Result<()> {
-        let session = self.session();
-        let input = user_input(&session.cwd, &content)?;
-        let shared = self.shared.clone();
-        let mut params = json!({ "threadId": session.thread_id, "input": input });
-        if let Some(effort) = &session.effort {
-            params["effort"] = json!(effort);
-        }
-        if let Some(schema) = &session.output_schema {
-            params["outputSchema"] = schema.clone();
-        }
-        self.shared.call_async(
-            "turn/start",
-            params,
-            Box::new(move |result| {
-                let Some(session) = shared.session.get() else { return };
-                match result {
-                    Ok(reply) => {
-                        if let Some(turn_id) = reply.pointer("/turn/id").and_then(Value::as_str) {
-                            session.turn_id.lock().get_or_insert_with(|| turn_id.to_string());
+    fn start_turn(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            let session = self.session();
+            let input = user_input(&session.cwd, &content)?;
+            let shared = self.shared.clone();
+            let mut params = json!({ "threadId": session.thread_id, "input": input });
+            if let Some(effort) = &session.effort {
+                params["effort"] = json!(effort);
+            }
+            if let Some(schema) = &session.output_schema {
+                params["outputSchema"] = schema.clone();
+            }
+            self.shared
+                .call_async(
+                    "turn/start",
+                    params,
+                    Box::new(move |result| {
+                        let Some(session) = shared.session.get() else { return };
+                        match result {
+                            Ok(reply) => {
+                                if let Some(turn_id) = reply.pointer("/turn/id").and_then(Value::as_str) {
+                                    session.turn_id.lock().get_or_insert_with(|| turn_id.to_string());
+                                }
+                            }
+                            Err(message) => {
+                                session.core.emit_root(EventKind::Error {
+                                    message: format!("codex refused the turn: {message}"),
+                                });
+                                session.core.emit_root(EventKind::TurnFinished {
+                                    reason: StopReason::Error,
+                                    usage: Usage::default(),
+                                });
+                            }
                         }
-                    }
-                    Err(message) => {
-                        session.core.emit_root(EventKind::Error {
-                            message: format!("codex refused the turn: {message}"),
-                        });
-                        session.core.emit_root(EventKind::TurnFinished {
-                            reason: StopReason::Error,
-                            usage: Usage::default(),
-                        });
-                    }
-                }
-            }),
-        )
+                    }),
+                )
+                .await
+        })
     }
 
-    fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
-        let session = self.session();
-        let Some(turn_id) = session.turn_id.lock().clone() else {
-            return Err(rejected(rejection::NO_ACTIVE_TURN, "codex has not reported the running turn's id yet"));
-        };
-        let input = user_input(&session.cwd, &content)?;
-        let shared = self.shared.clone();
-        self.shared.call_async(
-            "turn/steer",
-            json!({ "threadId": session.thread_id, "expectedTurnId": turn_id, "input": input }),
-            Box::new(move |result| {
-                // Acceptance was already answered; a late refusal can only be reported as a fact.
-                if let (Err(message), Some(session)) = (result, shared.session.get()) {
-                    session.core.emit_root(EventKind::Error {
-                        message: format!("codex refused the steer: {message}"),
-                    });
-                }
-            }),
-        )
+    fn steer(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            let session = self.session();
+            let Some(turn_id) = session.turn_id.lock().clone() else {
+                return Err(rejected(rejection::NO_ACTIVE_TURN, "codex has not reported the running turn's id yet"));
+            };
+            let input = user_input(&session.cwd, &content)?;
+            let shared = self.shared.clone();
+            self.shared
+                .call_async(
+                    "turn/steer",
+                    json!({ "threadId": session.thread_id, "expectedTurnId": turn_id, "input": input }),
+                    Box::new(move |result| {
+                        // Acceptance was already answered; a late refusal can only be reported as a fact.
+                        if let (Err(message), Some(session)) = (result, shared.session.get()) {
+                            session.core.emit_root(EventKind::Error {
+                                message: format!("codex refused the steer: {message}"),
+                            });
+                        }
+                    }),
+                )
+                .await
+        })
     }
 
-    fn abort(&self) -> Result<()> {
-        let session = self.session();
-        session.abort_wanted.store(true, Ordering::SeqCst);
-        if let Some(turn_id) = session.turn_id.lock().clone() {
-            self.shared.interrupt(session, &turn_id);
-        }
-        if let Some(child) = self.shared.child.get() {
-            session.watchdog.arm(ABORT_GRACE, session.core.clone(), child.clone());
-        }
-        Ok(())
+    fn abort(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            let session = self.session();
+            session.abort_wanted.store(true, Ordering::SeqCst);
+            let turn_id = session.turn_id.lock().clone();
+            if let Some(turn_id) = turn_id {
+                self.shared.interrupt(session, &turn_id).await;
+            }
+            if let Some(child) = self.shared.child.get() {
+                session.watchdog.arm(ABORT_GRACE, session.core.clone(), child.clone());
+            }
+            Ok(())
+        })
     }
 
     /// codex has no field for a denial's message; it is not delivered.
-    fn respond_permission(&self, request_id: &str, decision: &PermissionDecision) -> Result<()> {
-        let Some(pending) = self.session().approvals.lock().remove(request_id) else {
-            return Err(rejected(rejection::UNKNOWN_REQUEST, format!("codex no longer waits on `{request_id}`")));
-        };
-        self.shared
-            .reply(&pending.native_id, Ok(decision_reply(&pending.method, &pending.params, decision)));
-        Ok(())
+    fn respond_permission<'a>(&'a self, request_id: &'a str, decision: &'a PermissionDecision) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let Some(pending) = self.session().approvals.lock().remove(request_id) else {
+                return Err(rejected(rejection::UNKNOWN_REQUEST, format!("codex no longer waits on `{request_id}`")));
+            };
+            self.shared
+                .reply(&pending.native_id, Ok(decision_reply(&pending.method, &pending.params, decision)))
+                .await;
+            Ok(())
+        })
     }
 
-    fn compact(&self) -> Result<()> {
-        self.shared
-            .call("thread/compact/start", json!({"threadId":self.session().thread_id}))
-            .map(|_| ())
+    fn compact(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            self.shared
+                .call("thread/compact/start", json!({"threadId":self.session().thread_id}))
+                .await
+                .map(|_| ())
+        })
     }
-    fn dispose(&self) {
+    fn dispose(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            if let Some(child) = self.shared.child.get() {
+                child.kill().await;
+                self.session().core.observe_exit(child.status());
+            }
+            self.session().watchdog.wake();
+        })
+    }
+    fn signal_dispose(&self) {
         if let Some(child) = self.shared.child.get() {
-            child.kill();
+            child.signal_kill();
             self.session().core.observe_exit(child.status());
         }
         self.session().watchdog.wake();
     }
 }
 
-fn connect(binary: &Path, cwd: &Path, opts: Option<&SessionOptions>) -> Result<Arc<Shared>> {
+async fn connect(binary: &Path, cwd: &Path, opts: Option<&SessionOptions>) -> Result<Arc<Shared>> {
     let shared = Arc::new(Shared {
         child: OnceLock::new(),
         next_id: AtomicU64::new(1),
@@ -979,11 +1020,14 @@ fn connect(binary: &Path, cwd: &Path, opts: Option<&SessionOptions>) -> Result<A
     });
     let on_line = {
         let shared = shared.clone();
-        move |line: &str| shared.on_line(line)
+        move |line: String| {
+            let shared = shared.clone();
+            async move { shared.on_line(&line).await }
+        }
     };
     let on_exit = {
         let shared = shared.clone();
-        move |code: Option<i32>, stderr: String| shared.on_exit(code, stderr)
+        move |code: Option<i32>, stderr: String| async move { shared.on_exit(code, stderr) }
     };
     let child = LineChild::spawn(
         Spawn {
@@ -999,7 +1043,7 @@ fn connect(binary: &Path, cwd: &Path, opts: Option<&SessionOptions>) -> Result<A
         on_exit,
     )?;
     let _ = shared.child.set(child.clone());
-    let initialized = shared
+    let initialized = match shared
         .call(
             "initialize",
             json!({
@@ -1007,9 +1051,13 @@ fn connect(binary: &Path, cwd: &Path, opts: Option<&SessionOptions>) -> Result<A
                 "capabilities": { "experimentalApi": true },
             }),
         )
-        .and_then(|_| shared.notify("initialized", json!({})));
+        .await
+    {
+        Ok(_) => shared.notify("initialized", json!({})).await,
+        Err(err) => Err(err),
+    };
     if let Err(error) = initialized {
-        child.kill();
+        child.kill().await;
         return Err(error);
     }
     Ok(shared)
@@ -1133,151 +1181,167 @@ impl Runtime for CodexRuntime {
         crate::oar::runtime_spec(ID).expect("codex runtime spec").capabilities
     }
 
-    fn installation(&self) -> Installation {
-        probe_installation_with(ID, Some(&LOGIN))
+    fn installation(&self) -> BoxFuture<'_, Installation> {
+        Box::pin(async { probe_installation_with(ID, Some(&LOGIN)).await })
     }
 
-    fn account_usage(&self) -> Result<AccountUsage> {
-        let binary = require_binary(ID)?;
-        let shared = connect(&binary, &std::env::temp_dir(), None)?;
-        // Account first: an API-key login has no subscription windows, and
-        // the rate-limit read would wrongly say to log in again.
-        let account = shared.call("account/read", json!({})).ok().and_then(|v| WireAccountRead::deserialize(&v).ok());
-        let result = if account.as_ref().is_some_and(non_subscription) {
-            Ok(AccountUsage::Unsupported {
-                reason: "unsupported_auth_mode".into(),
-            })
-        } else {
-            match shared.call("account/rateLimits/read", json!({})) {
-                Ok(limits) => usage_of(&limits, account.as_ref().and_then(email_of))
-                    .ok_or_else(|| AgentError::Protocol("codex returned no usable account usage windows".into())),
-                Err(AgentError::Protocol(m)) if m.to_lowercase().contains("auth") => Ok(AccountUsage::ReauthRequired {
-                    reason: "not_authenticated".into(),
-                }),
-                Err(e) => Err(e),
-            }
-        };
-        if let Some(child) = shared.child.get() {
-            child.kill();
-        }
-        result
-    }
-
-    fn list_models(&self) -> Result<Vec<ModelInfo>> {
-        let binary = require_binary(ID)?;
-        let shared = connect(&binary, &std::env::temp_dir(), None)?;
-        let mut models = Vec::new();
-        let mut cursor = Value::Null;
-        let result = loop {
-            let page_raw = match shared.call("model/list", json!({ "cursor": cursor, "limit": 100 })) {
-                Ok(page) => page,
-                Err(error) => break Err(error),
-            };
-            let page = WireModelListPage::deserialize(&page_raw).unwrap_or_default();
-            for model in page.data.into_iter().flatten() {
-                if model.hidden == Some(true) {
-                    continue;
+    fn account_usage(&self) -> BoxFuture<'_, Result<AccountUsage>> {
+        Box::pin(async {
+            let binary = require_binary(ID)?;
+            let shared = connect(&binary, &std::env::temp_dir(), None).await?;
+            // Account first: an API-key login has no subscription windows, and
+            // the rate-limit read would wrongly say to log in again.
+            let account = shared
+                .call("account/read", json!({}))
+                .await
+                .ok()
+                .and_then(|v| WireAccountRead::deserialize(&v).ok());
+            let result = if account.as_ref().is_some_and(non_subscription) {
+                Ok(AccountUsage::Unsupported {
+                    reason: "unsupported_auth_mode".into(),
+                })
+            } else {
+                match shared.call("account/rateLimits/read", json!({})).await {
+                    Ok(limits) => usage_of(&limits, account.as_ref().and_then(email_of))
+                        .ok_or_else(|| AgentError::Protocol("codex returned no usable account usage windows".into())),
+                    Err(AgentError::Protocol(m)) if m.to_lowercase().contains("auth") => Ok(AccountUsage::ReauthRequired {
+                        reason: "not_authenticated".into(),
+                    }),
+                    Err(e) => Err(e),
                 }
-                let Some(id) = model.model.or(model.id) else {
-                    continue;
+            };
+            if let Some(child) = shared.child.get() {
+                child.kill().await;
+            }
+            result
+        })
+    }
+
+    fn list_models(&self) -> BoxFuture<'_, Result<Vec<ModelInfo>>> {
+        Box::pin(async {
+            let binary = require_binary(ID)?;
+            let shared = connect(&binary, &std::env::temp_dir(), None).await?;
+            let mut models = Vec::new();
+            let mut cursor = Value::Null;
+            let result = loop {
+                let page_raw = match shared.call("model/list", json!({ "cursor": cursor, "limit": 100 })).await {
+                    Ok(page) => page,
+                    Err(error) => break Err(error),
                 };
-                let display_name = model.display_name.unwrap_or_else(|| id.clone());
-                let mut info = ModelInfo::new(id, display_name);
-                info.effort_levels = model
-                    .supported_reasoning_efforts
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|e| e.reasoning_effort)
-                    .collect();
-                info.default_effort = model.default_reasoning_effort;
-                info.is_default = model.is_default == Some(true);
-                models.push(info);
+                let page = WireModelListPage::deserialize(&page_raw).unwrap_or_default();
+                for model in page.data.into_iter().flatten() {
+                    if model.hidden == Some(true) {
+                        continue;
+                    }
+                    let Some(id) = model.model.or(model.id) else {
+                        continue;
+                    };
+                    let display_name = model.display_name.unwrap_or_else(|| id.clone());
+                    let mut info = ModelInfo::new(id, display_name);
+                    info.effort_levels = model
+                        .supported_reasoning_efforts
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|e| e.reasoning_effort)
+                        .collect();
+                    info.default_effort = model.default_reasoning_effort;
+                    info.is_default = model.is_default == Some(true);
+                    models.push(info);
+                }
+                cursor = page.next_cursor.unwrap_or(Value::Null);
+                if cursor.is_null() {
+                    break Ok(());
+                }
+            };
+            if let Some(child) = shared.child.get() {
+                child.kill().await;
             }
-            cursor = page.next_cursor.unwrap_or(Value::Null);
-            if cursor.is_null() {
-                break Ok(());
-            }
-        };
-        if let Some(child) = shared.child.get() {
-            child.kill();
-        }
-        result.map(|_| models)
+            result.map(|_| models)
+        })
     }
 
     /// Every `SessionOptions` field has a codex seam (see the module docs for
     /// `permission_mode`). A model codex does not end up running, or a
     /// `resume` id it does not know, fails the open before a session exists.
-    fn open(&self, mut opts: SessionOptions) -> Result<Arc<dyn Session>> {
-        opts.prepare(ID)?;
-        let binary = opts.binary(ID)?;
-        let file = record::open_file(opts.record_to.as_deref())?;
-        let shared = connect(&binary, &opts.cwd, Some(&opts))?;
-        let kill = |error: AgentError| {
-            if let Some(child) = shared.child.get() {
-                child.kill();
+    fn open(&self, mut opts: SessionOptions) -> BoxFuture<'_, Result<Arc<dyn Session>>> {
+        Box::pin(async move {
+            opts.prepare(ID)?;
+            let binary = opts.binary(ID)?;
+            let file = record::open_file(opts.record_to.as_deref())?;
+            let shared = connect(&binary, &opts.cwd, Some(&opts)).await?;
+            let (method, params) = open_request(&opts);
+            let reply = match shared.call(method, params).await {
+                Ok(reply) => reply,
+                Err(error) => {
+                    if let Some(child) = shared.child.get() {
+                        child.kill().await;
+                    }
+                    return Err(match (&opts.resume, error) {
+                        (Some(_), AgentError::Protocol(message)) => AgentError::Rejected(format!("session_not_found: {message}")),
+                        (_, error) => error,
+                    });
+                }
+            };
+            let opened = WireThreadOpenReply::deserialize(&reply).unwrap_or_default();
+            let Some(thread_id) = opened.thread.as_ref().and_then(|t| t.id.clone()) else {
+                if let Some(child) = shared.child.get() {
+                    child.kill().await;
+                }
+                return Err(AgentError::Protocol(format!("codex {method} returned no thread id")));
+            };
+            let model = opened.model;
+            if let (Some(wanted), Some(running)) = (&opts.model, &model)
+                && wanted != running
+            {
+                if let Some(child) = shared.child.get() {
+                    child.kill().await;
+                }
+                return Err(AgentError::Unsupported {
+                    option: "model".into(),
+                    reason: format!("codex runs `{running}` although `{wanted}` was requested"),
+                });
             }
-            error
-        };
-        let (method, params) = open_request(&opts);
-        let reply = shared.call(method, params).map_err(|error| {
-            kill(match (&opts.resume, error) {
-                (Some(_), AgentError::Protocol(message)) => AgentError::Rejected(format!("session_not_found: {message}")),
-                (_, error) => error,
-            })
-        })?;
-        let opened = WireThreadOpenReply::deserialize(&reply).unwrap_or_default();
-        let Some(thread_id) = opened.thread.as_ref().and_then(|t| t.id.clone()) else {
-            return Err(kill(AgentError::Protocol(format!("codex {method} returned no thread id"))));
-        };
-        let model = opened.model;
-        if let (Some(wanted), Some(running)) = (&opts.model, &model)
-            && wanted != running
-        {
-            return Err(kill(AgentError::Unsupported {
-                option: "model".into(),
-                reason: format!("codex runs `{running}` although `{wanted}` was requested"),
-            }));
-        }
-        let recorder = Recorder::start(file, ID, &thread_id, &opts.cwd, model.as_deref());
-        let core = SessionCore::new(ID, &thread_id, recorder);
-        if opts.resume.is_some() {
-            core.resume_meter(&reply, "missing_codex_resume_baseline");
-        }
-        core.emit_root(EventKind::SessionStarted {
-            session_id: thread_id.clone(),
-            model,
-        });
-        let initial_title = opened
-            .thread
-            .and_then(|t| t.name)
-            .as_deref()
-            .map(str::trim)
-            .filter(|t| !t.is_empty())
-            .map(str::to_string);
-        let _ = shared.session.set(SessionState {
-            core: core.clone(),
-            projector: Mutex::new(Projector::new(&thread_id)),
-            thread_id,
-            session_title: Mutex::new(initial_title),
-            turn_id: Mutex::new(None),
-            abort_wanted: AtomicBool::new(false),
-            watchdog: AbortWatchdog::new(),
-            approvals: Mutex::new(HashMap::new()),
-            cwd: opts.cwd.clone(),
-            output_schema: opts.output_schema.clone(),
-            effort: opts.effort.clone(),
-        });
-        if let Some(session) = shared.session.get() {
-            let held: Vec<(String, Value, String)> = std::mem::take(&mut *shared.early.lock());
-            for (method, params, line) in held {
-                shared.on_notification(session, &method, &params, &line);
+            let recorder = Recorder::start(file, ID, &thread_id, &opts.cwd, model.as_deref());
+            let core = SessionCore::new(ID, &thread_id, recorder);
+            if opts.resume.is_some() {
+                core.resume_meter(&reply, "missing_codex_resume_baseline");
             }
-            let exited = shared.exit.lock().clone();
-            if let Some(message) = exited {
-                session.watchdog.finish_on_exit(&session.core, message);
+            core.emit_root(EventKind::SessionStarted {
+                session_id: thread_id.clone(),
+                model,
+            });
+            let initial_title = opened
+                .thread
+                .and_then(|t| t.name)
+                .as_deref()
+                .map(str::trim)
+                .filter(|t| !t.is_empty())
+                .map(str::to_string);
+            let _ = shared.session.set(SessionState {
+                core: core.clone(),
+                projector: Mutex::new(Projector::new(&thread_id)),
+                thread_id,
+                session_title: Mutex::new(initial_title),
+                turn_id: Mutex::new(None),
+                abort_wanted: AtomicBool::new(false),
+                watchdog: AbortWatchdog::new(),
+                approvals: Mutex::new(HashMap::new()),
+                cwd: opts.cwd.clone(),
+                output_schema: opts.output_schema.clone(),
+                effort: opts.effort.clone(),
+            });
+            if let Some(session) = shared.session.get() {
+                let held: Vec<(String, Value, String)> = std::mem::take(&mut *shared.early.lock());
+                for (method, params, line) in held {
+                    shared.on_notification(session, &method, &params, &line).await;
+                }
+                let exited = shared.exit.lock().clone();
+                if let Some(message) = exited {
+                    session.watchdog.finish_on_exit(&session.core, message);
+                }
             }
-        }
-        Ok(CoreSession::new(core, CodexDriver { shared }, self.capabilities()))
+            Ok(CoreSession::new(core, CodexDriver { shared }, self.capabilities()) as Arc<dyn Session>)
+        })
     }
 }
 

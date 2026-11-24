@@ -14,7 +14,7 @@ use tokio::sync::Mutex as AsyncMutex;
 
 use super::live::LiveHub;
 use super::memory::{JournalOp, MemoryRead, MemoryState, MemoryTx};
-use super::{BoxFuture, ReadAsyncOp, StorageBackend, StorageRead, WriteAsyncOp, WriteCallback};
+use super::{BoxFuture, ReadAsyncOp, StorageBackend, WriteAsyncOp};
 use crate::agent::durable::{CommitStats, DocumentEvent, Error, Result, now_ms};
 
 const COMMITS_FILE: &str = "commits.jsonl";
@@ -406,46 +406,6 @@ impl StorageBackend for JsonlStorage {
         self.0.hub.now_ms()
     }
 
-    fn read_dyn(&self, f: &mut dyn FnMut(&dyn StorageRead) -> Result<()>) -> Result<()> {
-        let mut state = crate::rt::block_on(self.0.state.lock());
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        self.refresh_read_only(&mut state)?;
-        f(&MemoryRead(&state.mem))
-    }
-
-    fn write_dyn(&self, f: &mut WriteCallback<'_>) -> Result<()> {
-        if self.0.opts.read_only {
-            return Err(Error::Invalid("jsonl storage is open read-only".into()));
-        }
-        let mut state = crate::rt::block_on(self.0.state.lock());
-        if self.0.hub.is_closed() {
-            return Err(Error::Closed);
-        }
-        self.0.hub.record_request();
-        let now = self.0.hub.now_ms();
-        let staging = MemoryTx::new(&mut state.mem, true);
-        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&staging, &staging, None, now)));
-        match outcome {
-            Ok(Ok(write_outcome)) => {
-                let (ops, undo) = staging.into_parts();
-                self.finish_commit(&mut state, ops, undo, now, write_outcome)
-            }
-            Ok(Err(err)) => {
-                staging.rollback();
-                self.0.hub.record_failure();
-                Err(err)
-            }
-            Err(panic) => {
-                staging.rollback();
-                self.0.hub.record_failure();
-                drop(state);
-                std::panic::resume_unwind(panic)
-            }
-        }
-    }
-
     fn read_dyn_async<'a>(&'a self, op: &'a mut dyn ReadAsyncOp<'a>) -> BoxFuture<'a, Result<()>> {
         Box::pin(async move {
             let mut state = self.0.state.lock().await;
@@ -495,22 +455,24 @@ impl StorageBackend for JsonlStorage {
         self.0.hub.stats()
     }
 
-    fn subscribe_documents(&self) -> Result<flume::Receiver<DocumentEvent>> {
+    fn subscribe_documents(&self) -> Result<tokio::sync::mpsc::UnboundedReceiver<DocumentEvent>> {
         self.0.hub.subscribe_documents()
     }
 
-    fn subscribe_tasks(&self) -> Result<flume::Receiver<()>> {
+    fn subscribe_tasks(&self) -> Result<tokio::sync::mpsc::Receiver<()>> {
         self.0.hub.subscribe_tasks()
     }
 
-    fn close(&self) -> Result<()> {
-        if self.0.hub.is_closed() {
-            return Ok(());
-        }
-        self.0.hub.mark_closed();
-        crate::rt::block_on(self.0.state.lock()).open_files.clear();
-        self.0.lock_file.lock().unwrap_or_else(|e| e.into_inner()).take();
-        Ok(())
+    fn close(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            if self.0.hub.is_closed() {
+                return Ok(());
+            }
+            self.0.hub.mark_closed();
+            self.0.state.lock().await.open_files.clear();
+            self.0.lock_file.lock().unwrap_or_else(|e| e.into_inner()).take();
+            Ok(())
+        })
     }
 }
 

@@ -8,7 +8,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_swap::ArcSwapOption;
 use parking_lot::{Mutex, MutexGuard};
+use tokio::sync::mpsc;
 
+use crate::BoxFuture;
 use crate::oar::record::Recorder;
 use crate::oar::voyage::normalize_trace_id;
 use crate::oar::{
@@ -185,7 +187,7 @@ pub fn derive_status<'a>(events: impl IntoIterator<Item = &'a Event>) -> Session
 
 struct CoreState {
     next_seq: u64,
-    subscribers: Vec<flume::Sender<Event>>,
+    subscribers: Vec<mpsc::UnboundedSender<Event>>,
     /// The newest `HISTORY_LIMIT` events, for late subscribers. The record
     /// file, when one is set, keeps everything.
     history: std::collections::VecDeque<Event>,
@@ -199,7 +201,7 @@ struct CoreState {
     records: VecDeque<crate::oar::voyage::Record>,
     last_usage: Option<crate::oar::TokenTotals>,
     frames: std::collections::HashMap<std::thread::ThreadId, crate::oar::voyage::Record>,
-    record_subscribers: Vec<flume::Sender<crate::oar::voyage::Record>>,
+    record_subscribers: Vec<mpsc::UnboundedSender<crate::oar::voyage::Record>>,
     ended: bool,
     disposed: bool,
     unresumable: bool,
@@ -625,8 +627,8 @@ impl SessionCore {
         self.lock().fold.turn_active()
     }
 
-    pub(crate) fn subscribe(&self, with_history: bool) -> flume::Receiver<Event> {
-        let (tx, rx) = flume::unbounded();
+    pub(crate) fn subscribe(&self, with_history: bool) -> mpsc::UnboundedReceiver<Event> {
+        let (tx, rx) = mpsc::unbounded_channel();
         let mut state = self.lock();
         if with_history {
             for event in &state.history {
@@ -781,8 +783,8 @@ impl SessionCore {
 
 /// What an adapter supplies; `CoreSession` wraps it with the shared rules.
 pub trait Driver: Send + Sync + 'static {
-    fn read_subagent(&self, _thread_id: &str, _turn_id: Option<&str>) -> Result<crate::oar::SubagentSnapshot> {
-        Err(crate::oar::SubagentSnapshot::unsupported())
+    fn read_subagent<'a>(&'a self, _thread_id: &'a str, _turn_id: Option<&'a str>) -> BoxFuture<'a, Result<crate::oar::SubagentSnapshot>> {
+        Box::pin(async { Err(crate::oar::SubagentSnapshot::unsupported()) })
     }
     fn swarm_snapshot(&self) -> Option<crate::oar::SwarmSnapshot> {
         None
@@ -797,35 +799,45 @@ pub trait Driver: Send + Sync + 'static {
     fn check_content(&self, _content: &[ContentBlock]) -> Result<()> {
         Ok(())
     }
-    fn start_turn(&self, content: Vec<ContentBlock>) -> Result<()>;
-    fn steer(&self, content: Vec<ContentBlock>) -> Result<()>;
-    fn abort(&self) -> Result<()>;
-    fn compact(&self) -> Result<()> {
-        Err(AgentError::Unsupported {
-            option: "compact".into(),
-            reason: "runtime has no manual compaction".into(),
+    fn start_turn(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>>;
+    fn steer(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>>;
+    fn abort(&self) -> BoxFuture<'_, Result<()>>;
+    fn compact(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async {
+            Err(AgentError::Unsupported {
+                option: "compact".into(),
+                reason: "runtime has no manual compaction".into(),
+            })
         })
     }
-    fn stop_task(&self, _id: &str) -> Result<()> {
-        Err(AgentError::Unsupported {
-            option: "stop_task".into(),
-            reason: "runtime cannot stop individual tasks".into(),
+    fn stop_task<'a>(&'a self, _id: &'a str) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async {
+            Err(AgentError::Unsupported {
+                option: "stop_task".into(),
+                reason: "runtime cannot stop individual tasks".into(),
+            })
         })
     }
-    fn respond_permission(&self, request_id: &str, decision: &PermissionDecision) -> Result<()>;
-    fn respond_interaction(&self, _request_id: &str, _decision: &InteractionDecision) -> Result<()> {
-        Err(AgentError::Unsupported {
-            option: "respond_interaction".into(),
-            reason: "runtime has no interactive question channel".into(),
+    fn respond_permission<'a>(&'a self, request_id: &'a str, decision: &'a PermissionDecision) -> BoxFuture<'a, Result<()>>;
+    fn respond_interaction<'a>(&'a self, _request_id: &'a str, _decision: &'a InteractionDecision) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async {
+            Err(AgentError::Unsupported {
+                option: "respond_interaction".into(),
+                reason: "runtime has no interactive question channel".into(),
+            })
         })
     }
-    fn set_config(&self, _model: Option<&str>, _effort: Option<&str>, _permission_mode: Option<PermissionMode>) -> Result<()> {
-        Err(AgentError::Unsupported {
-            option: "set_config".into(),
-            reason: "runtime does not support live config updates".into(),
+    fn set_config<'a>(&'a self, _model: Option<&'a str>, _effort: Option<&'a str>, _permission_mode: Option<PermissionMode>) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async {
+            Err(AgentError::Unsupported {
+                option: "set_config".into(),
+                reason: "runtime does not support live config updates".into(),
+            })
         })
     }
-    fn dispose(&self);
+    fn dispose(&self) -> BoxFuture<'_, ()>;
+    /// Non-blocking signal to tear down driver resources on `Drop`.
+    fn signal_dispose(&self) {}
 }
 
 pub struct CoreSession<D: Driver> {
@@ -850,15 +862,17 @@ impl<D: Driver> CoreSession<D> {
         session
     }
 
-    fn drain_queue(&self) {
+    fn drain_queue(self: Arc<Self>) {
         if let Some(content) = self.core.next_queued() {
-            let _ = self.run_turn(content);
+            crate::rt::current_or_global_handle().spawn(async move {
+                let _ = self.run_turn(content).await;
+            });
         }
     }
 
     /// The turn's start is already recorded; a failed hand-over ends it.
-    fn run_turn(&self, content: Vec<ContentBlock>) -> Result<()> {
-        if let Err(error) = self.driver.start_turn(content) {
+    async fn run_turn(&self, content: Vec<ContentBlock>) -> Result<()> {
+        if let Err(error) = self.driver.start_turn(content).await {
             self.core.emit_root(EventKind::Error { message: error.to_string() });
             self.core.emit_root(EventKind::TurnFinished {
                 reason: StopReason::Error,
@@ -878,14 +892,14 @@ impl<D: Driver> CoreSession<D> {
 }
 
 impl<D: Driver> CoreSession<D> {
-    fn legacy_control(&self, action: crate::oar::ControlAction, content: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
-        let (_, error) = self.dispatch(action, content, "", "", "", opts)?;
+    async fn legacy_control(&self, action: crate::oar::ControlAction, content: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
+        let (_, error) = self.dispatch(action, content, "", "", "", opts).await?;
         match error {
             Some(e) => Err(e),
             None => Ok(()),
         }
     }
-    fn dispatch(
+    async fn dispatch(
         &self,
         action: crate::oar::ControlAction,
         content: Vec<ContentBlock>,
@@ -897,20 +911,27 @@ impl<D: Driver> CoreSession<D> {
         use crate::oar::{ControlAction as A, ControlStatus as S};
         let trace_id = normalize_trace_id(opts.trace_id);
         let result = match action {
-            A::Prompt => self
+            A::Prompt => match self
                 .check(&content)
                 .and_then(|_| self.core.begin_span(&render_text(&content), input_id, span_id, trace_id))
-                .and_then(|_| self.run_turn(content)),
-            A::Steer => self.steer_input(content),
-            A::Queue if self.capabilities.queue => self
+            {
+                Ok(()) => self.run_turn(content).await,
+                Err(err) => Err(err),
+            },
+            A::Steer => self.steer_input(content).await,
+            A::Queue if self.capabilities.queue => match self
                 .check(&content)
                 .and_then(|_| self.core.begin_turn_or_queue(&content, input_id, span_id, trace_id))
-                .and_then(|start| if start { self.run_turn(content) } else { Ok(()) }),
+            {
+                Ok(true) => self.run_turn(content).await,
+                Ok(false) => Ok(()),
+                Err(err) => Err(err),
+            },
             A::Queue => Err(AgentError::Unsupported {
                 option: "queue".into(),
                 reason: "runtime does not hold input".into(),
             }),
-            A::Abort => self.abort_input(),
+            A::Abort => self.abort_input().await,
             A::Withdraw => {
                 let mut state = self.core.lock();
                 if let Some(e) = SessionCore::unreachable(&state) {
@@ -927,22 +948,29 @@ impl<D: Driver> CoreSession<D> {
                 reason: "no manual compaction".into(),
             }),
             A::Compact | A::StopTask => {
-                let mut state = self.core.lock();
-                if let Some(e) = SessionCore::unreachable(&state) {
-                    Err(e)
-                } else if action == A::Compact && (state.fold.turn_active() || state.compacting) {
-                    Err(rejected("busy", "cannot compact during a turn"))
-                } else if action == A::StopTask && arg.trim().is_empty() {
-                    Err(rejected("invalid_task_id", "task identifier is empty"))
-                } else {
-                    if action == A::Compact {
-                        state.compacting = true;
-                        state.manual_compaction = true;
-                        state.span_id = format!("compact-{}", state.next_record_seq);
-                        state.trace_id = trace_id;
-                        self.core.compact_event(&mut state, true, "manual");
-                        drop(state);
-                        let result = self.driver.compact();
+                let precheck = {
+                    let mut state = self.core.lock();
+                    if let Some(e) = SessionCore::unreachable(&state) {
+                        Err(e)
+                    } else if action == A::Compact && (state.fold.turn_active() || state.compacting) {
+                        Err(rejected("busy", "cannot compact during a turn"))
+                    } else if action == A::StopTask && arg.trim().is_empty() {
+                        Err(rejected("invalid_task_id", "task identifier is empty"))
+                    } else {
+                        if action == A::Compact {
+                            state.compacting = true;
+                            state.manual_compaction = true;
+                            state.span_id = format!("compact-{}", state.next_record_seq);
+                            state.trace_id = trace_id;
+                            self.core.compact_event(&mut state, true, "manual");
+                        }
+                        Ok(())
+                    }
+                };
+                match precheck {
+                    Err(e) => Err(e),
+                    Ok(()) if action == A::Compact => {
+                        let result = self.driver.compact().await;
                         if result.is_err() {
                             let mut state = self.core.lock();
                             state.compacting = false;
@@ -952,10 +980,8 @@ impl<D: Driver> CoreSession<D> {
                             state.trace_id = None;
                         }
                         result
-                    } else {
-                        drop(state);
-                        self.driver.stop_task(arg)
                     }
+                    Ok(()) => self.driver.stop_task(arg).await,
                 }
             }
         };
@@ -1006,7 +1032,7 @@ impl<D: Driver> CoreSession<D> {
         Ok((outcome, result.err()))
     }
 
-    fn steer_input(&self, content: Vec<ContentBlock>) -> Result<()> {
+    async fn steer_input(&self, content: Vec<ContentBlock>) -> Result<()> {
         if !self.capabilities.steer {
             return Err(AgentError::Unsupported {
                 option: "steer".into(),
@@ -1023,10 +1049,10 @@ impl<D: Driver> CoreSession<D> {
                 return Err(rejected(rejection::NO_ACTIVE_TURN, "nothing is running; use prompt"));
             }
         }
-        self.driver.steer(content)
+        self.driver.steer(content).await
     }
 
-    fn abort_input(&self) -> Result<()> {
+    async fn abort_input(&self) -> Result<()> {
         {
             let mut state = self.core.lock();
             if let Some(error) = SessionCore::unreachable(&state) {
@@ -1037,7 +1063,7 @@ impl<D: Driver> CoreSession<D> {
             }
             state.queue.clear();
         }
-        self.driver.abort()
+        self.driver.abort().await
     }
 }
 
@@ -1046,31 +1072,42 @@ impl<D: Driver> Session for CoreSession<D> {
         self.core.session_id()
     }
 
-    fn control(&self, action: crate::oar::ControlAction, arg: &str, input_id: &str, span_id: &str) -> Result<crate::oar::ControlOutcome> {
+    fn control<'a>(
+        &'a self,
+        action: crate::oar::ControlAction,
+        arg: &'a str,
+        input_id: &'a str,
+        span_id: &'a str,
+    ) -> BoxFuture<'a, Result<crate::oar::ControlOutcome>> {
         self.control_with(action, arg, input_id, span_id, TurnOptions::default())
     }
-    fn control_with(
-        &self,
+    fn control_with<'a>(
+        &'a self,
         action: crate::oar::ControlAction,
-        arg: &str,
-        input_id: &str,
-        span_id: &str,
+        arg: &'a str,
+        input_id: &'a str,
+        span_id: &'a str,
         opts: TurnOptions,
-    ) -> Result<crate::oar::ControlOutcome> {
-        self.dispatch(action, vec![ContentBlock::Text(arg.into())], arg, input_id, span_id, opts)
-            .map(|(outcome, _)| outcome)
+    ) -> BoxFuture<'a, Result<crate::oar::ControlOutcome>> {
+        Box::pin(async move {
+            self.dispatch(action, vec![ContentBlock::Text(arg.into())], arg, input_id, span_id, opts)
+                .await
+                .map(|(outcome, _)| outcome)
+        })
     }
-    fn wait(&self) -> Result<()> {
-        let rx = self.events();
-        while let Ok(e) = rx.recv() {
-            if matches!(e.kind, EventKind::SessionEnded) {
-                break;
+    fn wait(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            let mut rx = self.events();
+            while let Some(e) = rx.recv().await {
+                if matches!(e.kind, EventKind::SessionEnded) {
+                    break;
+                }
             }
-        }
-        match self.core.lock().exit_error.clone() {
-            Some(e) => Err(AgentError::Io(e)),
-            None => Ok(()),
-        }
+            match self.core.lock().exit_error.clone() {
+                Some(e) => Err(AgentError::Io(e)),
+                None => Ok(()),
+            }
+        })
     }
     fn usage(&self) -> Option<crate::oar::TokenTotals> {
         self.core.lock().last_usage
@@ -1087,8 +1124,8 @@ impl<D: Driver> Session for CoreSession<D> {
         state.records.iter().cloned().collect()
     }
 
-    fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<crate::oar::voyage::Record> {
-        let (tx, rx) = flume::unbounded();
+    fn subscribe_records(&self, after: Option<u64>) -> mpsc::UnboundedReceiver<crate::oar::voyage::Record> {
+        let (tx, rx) = mpsc::unbounded_channel();
         let mut state = self.core.lock();
         let needs_history = after.is_none_or(|seq| seq + 1 < state.next_record_seq);
         if needs_history {
@@ -1120,7 +1157,7 @@ impl<D: Driver> Session for CoreSession<D> {
         Some(id)
     }
 
-    fn read_subagent(&self, thread_id: &str, turn_id: Option<&str>) -> Result<crate::oar::SubagentSnapshot> {
+    fn read_subagent<'a>(&'a self, thread_id: &'a str, turn_id: Option<&'a str>) -> BoxFuture<'a, Result<crate::oar::SubagentSnapshot>> {
         self.driver.read_subagent(thread_id, turn_id)
     }
     fn swarm_snapshot(&self) -> Option<crate::oar::SwarmSnapshot> {
@@ -1140,90 +1177,110 @@ impl<D: Driver> Session for CoreSession<D> {
         self.core.status()
     }
 
-    fn events(&self) -> flume::Receiver<Event> {
+    fn events(&self) -> mpsc::UnboundedReceiver<Event> {
         self.core.subscribe(false)
     }
 
-    fn events_with_history(&self) -> flume::Receiver<Event> {
+    fn events_with_history(&self) -> mpsc::UnboundedReceiver<Event> {
         self.core.subscribe(true)
     }
 
-    fn prompt(&self, content: Vec<ContentBlock>) -> Result<()> {
+    fn prompt(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
         self.prompt_with(content, TurnOptions::default())
     }
-    fn prompt_with(&self, content: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
-        self.legacy_control(crate::oar::ControlAction::Prompt, content, opts)
+    fn prompt_with(&self, content: Vec<ContentBlock>, opts: TurnOptions) -> BoxFuture<'_, Result<()>> {
+        Box::pin(self.legacy_control(crate::oar::ControlAction::Prompt, content, opts))
     }
-    fn steer(&self, content: Vec<ContentBlock>) -> Result<()> {
-        self.legacy_control(crate::oar::ControlAction::Steer, content, TurnOptions::default())
+    fn steer(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
+        Box::pin(self.legacy_control(crate::oar::ControlAction::Steer, content, TurnOptions::default()))
     }
-    fn queue(&self, content: Vec<ContentBlock>) -> Result<()> {
+    fn queue(&self, content: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
         self.queue_with(content, TurnOptions::default())
     }
-    fn queue_with(&self, content: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
-        self.legacy_control(crate::oar::ControlAction::Queue, content, opts)
+    fn queue_with(&self, content: Vec<ContentBlock>, opts: TurnOptions) -> BoxFuture<'_, Result<()>> {
+        Box::pin(self.legacy_control(crate::oar::ControlAction::Queue, content, opts))
     }
-    fn abort(&self) -> Result<()> {
-        self.legacy_control(crate::oar::ControlAction::Abort, vec![], TurnOptions::default())
+    fn abort(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(self.legacy_control(crate::oar::ControlAction::Abort, vec![], TurnOptions::default()))
     }
-    fn respond_permission(&self, request_id: &str, decision: PermissionDecision) -> Result<()> {
-        let path = {
-            let state = self.core.lock();
-            if let Some(error) = SessionCore::unreachable(&state) {
-                return Err(error);
-            }
-            state.fold.permission_path(request_id)
-        };
-        let Some(path) = path else {
-            return Err(rejected(rejection::UNKNOWN_REQUEST, format!("no permission request `{request_id}` is waiting")));
-        };
-        self.driver.respond_permission(request_id, &decision)?;
-        self.core.emit(
-            path,
-            EventKind::PermissionResolved {
-                request_id: request_id.to_string(),
-                decision,
-            },
-        );
-        Ok(())
-    }
-
-    fn respond_interaction(&self, request_id: &str, decision: InteractionDecision) -> Result<()> {
-        let path = {
-            let state = self.core.lock();
-            if let Some(error) = SessionCore::unreachable(&state) {
-                return Err(error);
-            }
-            state.fold.interaction_path(request_id)
-        };
-        let Some(path) = path else {
-            return Err(rejected(
-                rejection::UNKNOWN_REQUEST,
-                format!("no interaction request `{request_id}` is waiting"),
-            ));
-        };
-        self.driver.respond_interaction(request_id, &decision)?;
-        self.core.emit(
-            path,
-            EventKind::InteractionResolved {
-                request_id: request_id.to_string(),
-                decision,
-            },
-        );
-        Ok(())
+    fn respond_permission<'a>(&'a self, request_id: &'a str, decision: PermissionDecision) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let path = {
+                let state = self.core.lock();
+                if let Some(error) = SessionCore::unreachable(&state) {
+                    return Err(error);
+                }
+                state.fold.permission_path(request_id)
+            };
+            let Some(path) = path else {
+                return Err(rejected(rejection::UNKNOWN_REQUEST, format!("no permission request `{request_id}` is waiting")));
+            };
+            self.driver.respond_permission(request_id, &decision).await?;
+            self.core.emit(
+                path,
+                EventKind::PermissionResolved {
+                    request_id: request_id.to_string(),
+                    decision,
+                },
+            );
+            Ok(())
+        })
     }
 
-    fn set_config(&self, model: Option<&str>, effort: Option<&str>, permission_mode: Option<PermissionMode>) -> Result<()> {
-        {
-            let state = self.core.lock();
-            if let Some(error) = SessionCore::unreachable(&state) {
-                return Err(error);
-            }
-        }
-        self.driver.set_config(model, effort, permission_mode)
+    fn respond_interaction<'a>(&'a self, request_id: &'a str, decision: InteractionDecision) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let path = {
+                let state = self.core.lock();
+                if let Some(error) = SessionCore::unreachable(&state) {
+                    return Err(error);
+                }
+                state.fold.interaction_path(request_id)
+            };
+            let Some(path) = path else {
+                return Err(rejected(
+                    rejection::UNKNOWN_REQUEST,
+                    format!("no interaction request `{request_id}` is waiting"),
+                ));
+            };
+            self.driver.respond_interaction(request_id, &decision).await?;
+            self.core.emit(
+                path,
+                EventKind::InteractionResolved {
+                    request_id: request_id.to_string(),
+                    decision,
+                },
+            );
+            Ok(())
+        })
     }
 
-    fn dispose(&self) {
+    fn set_config<'a>(&'a self, model: Option<&'a str>, effort: Option<&'a str>, permission_mode: Option<PermissionMode>) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            {
+                let state = self.core.lock();
+                if let Some(error) = SessionCore::unreachable(&state) {
+                    return Err(error);
+                }
+            }
+            self.driver.set_config(model, effort, permission_mode).await
+        })
+    }
+
+    fn dispose(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            {
+                let mut state = self.core.lock();
+                if state.disposed {
+                    return;
+                }
+                state.disposed = true;
+            }
+            self.driver.dispose().await;
+            self.core.finish(None);
+        })
+    }
+
+    fn signal_dispose(&self) {
         {
             let mut state = self.core.lock();
             if state.disposed {
@@ -1231,7 +1288,7 @@ impl<D: Driver> Session for CoreSession<D> {
             }
             state.disposed = true;
         }
-        self.driver.dispose();
+        self.driver.signal_dispose();
         self.core.finish(None);
     }
 }
@@ -1239,7 +1296,7 @@ impl<D: Driver> Session for CoreSession<D> {
 impl<D: Driver> Drop for CoreSession<D> {
     fn drop(&mut self) {
         if !self.core.is_disposed() {
-            self.driver.dispose();
+            self.driver.signal_dispose();
             self.core.finish(None);
         }
     }

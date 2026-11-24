@@ -7,6 +7,7 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use tempfile::{Builder, TempDir};
 
+use crate::BoxFuture;
 use crate::oar::claude::{StreamLaunch, open_sdk};
 use crate::oar::process::probe_installation_with;
 use crate::oar::{AgentError, Capabilities, Installation, McpServer, ModelInfo, Result, Runtime, Session, SessionOptions};
@@ -102,67 +103,70 @@ impl Runtime for SdkRuntime {
     fn capabilities(&self) -> Capabilities {
         crate::oar::runtime_spec(self.id()).expect("sdk runtime spec").capabilities
     }
-    fn installation(&self) -> Installation {
-        probe_installation_with(self.command(), None)
+    fn installation(&self) -> BoxFuture<'_, Installation> {
+        Box::pin(async move { probe_installation_with(self.command(), None).await })
     }
-    fn list_models(&self) -> Result<Vec<ModelInfo>> {
-        Ok(vec![])
+    fn list_models(&self) -> BoxFuture<'_, Result<Vec<ModelInfo>>> {
+        Box::pin(async { Ok(vec![]) })
     }
 
-    fn open(&self, mut opts: SessionOptions) -> Result<Arc<dyn Session>> {
-        opts.prepare(self.command())?;
-        let binary = opts.binary(self.command())?;
-        let mut args: Vec<String> = ["--input-format", "stream-json", "--output-format", "stream-json"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-        for (flag, value) in [("--model", &opts.model), ("--resume", &opts.resume)] {
-            if let Some(v) = value {
-                args.extend([flag.into(), v.clone()]);
+    fn open(&self, mut opts: SessionOptions) -> BoxFuture<'_, Result<Arc<dyn Session>>> {
+        Box::pin(async move {
+            opts.prepare(self.command())?;
+            let binary = opts.binary(self.command())?;
+            let mut args: Vec<String> = ["--input-format", "stream-json", "--output-format", "stream-json"]
+                .into_iter()
+                .map(String::from)
+                .collect();
+            for (flag, value) in [("--model", &opts.model), ("--resume", &opts.resume)] {
+                if let Some(v) = value {
+                    args.extend([flag.into(), v.clone()]);
+                }
             }
-        }
-        if !opts.allowed_tools.is_empty() {
-            args.extend(["--allowed-tools".into(), opts.allowed_tools.join(",")]);
-        }
-        if !opts.additional_directories.is_empty() {
-            args.extend([
-                "--include-directories".into(),
-                opts.additional_directories.iter().map(|d| d.to_string_lossy()).collect::<Vec<_>>().join(","),
-            ]);
-        }
-        if !opts.disallowed_tools.is_empty() {
-            args.extend(["--disallowed-tools".into(), opts.disallowed_tools.join(",")]);
-        }
-        let (initialize, secrets) = match self {
-            Self::Qwen => {
-                args.push("--channel=SDK".into());
-                for (flag, value) in [("--system-prompt", &opts.system_prompt), ("--append-system-prompt", &opts.append_system_prompt)] {
-                    if let Some(v) = value {
-                        args.extend([flag.into(), v.clone()]);
+            if !opts.allowed_tools.is_empty() {
+                args.extend(["--allowed-tools".into(), opts.allowed_tools.join(",")]);
+            }
+            if !opts.additional_directories.is_empty() {
+                args.extend([
+                    "--include-directories".into(),
+                    opts.additional_directories.iter().map(|d| d.to_string_lossy()).collect::<Vec<_>>().join(","),
+                ]);
+            }
+            if !opts.disallowed_tools.is_empty() {
+                args.extend(["--disallowed-tools".into(), opts.disallowed_tools.join(",")]);
+            }
+            let (initialize, secrets) = match self {
+                Self::Qwen => {
+                    args.push("--channel=SDK".into());
+                    for (flag, value) in [("--system-prompt", &opts.system_prompt), ("--append-system-prompt", &opts.append_system_prompt)] {
+                        if let Some(v) = value {
+                            args.extend([flag.into(), v.clone()]);
+                        }
                     }
+                    let mut init = json!({"subtype":"initialize"});
+                    if !opts.mcp_servers.is_empty() {
+                        init["mcpServers"] = qwen_mcp(&opts);
+                    }
+                    (Some(init), None)
                 }
-                let mut init = json!({"subtype":"initialize"});
-                if !opts.mcp_servers.is_empty() {
-                    init["mcpServers"] = qwen_mcp(&opts);
+                Self::Qoder => {
+                    opts.env.retain(|(k, _)| k != "QODER_EXPOSE_TOKEN_USAGE");
+                    opts.env.push(("QODER_EXPOSE_TOKEN_USAGE".into(), "1".into()));
+                    (None, qoder_config(&opts, &mut args)?)
                 }
-                (Some(init), None)
-            }
-            Self::Qoder => {
-                opts.env.retain(|(k, _)| k != "QODER_EXPOSE_TOKEN_USAGE");
-                opts.env.push(("QODER_EXPOSE_TOKEN_USAGE".into(), "1".into()));
-                (None, qoder_config(&opts, &mut args)?)
-            }
-        };
-        open_sdk(
-            &binary,
-            &opts,
-            self.capabilities(),
-            StreamLaunch {
-                runtime: self.command(),
-                args,
-                initialize,
-                secrets,
-            },
-        )
+            };
+            open_sdk(
+                &binary,
+                &opts,
+                self.capabilities(),
+                StreamLaunch {
+                    runtime: self.command(),
+                    args,
+                    initialize,
+                    secrets,
+                },
+            )
+            .await
+        })
     }
 }

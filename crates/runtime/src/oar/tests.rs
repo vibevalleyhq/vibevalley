@@ -24,10 +24,13 @@ fn text(s: &str) -> Vec<ContentBlock> {
 }
 
 /// Events up to and including the first one `stop` accepts.
-fn until(rx: &flume::Receiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
+async fn until(rx: &mut tokio::sync::mpsc::UnboundedReceiver<Event>, stop: impl Fn(&EventKind) -> bool) -> Vec<Event> {
     let mut out = Vec::new();
     loop {
-        let event = rx.recv_timeout(WAIT).expect("event before timeout");
+        let event = tokio::time::timeout(WAIT, rx.recv())
+            .await
+            .expect("event before timeout")
+            .expect("channel open before stop event");
         let done = stop(&event.kind);
         out.push(event);
         if done {
@@ -52,129 +55,130 @@ fn texts(events: &[Event]) -> String {
 
 // ---- scripted runtime: session behavior ----------------------------------
 
-#[test]
-fn every_subscriber_gets_every_event_in_order() {
+#[tokio::test]
+async fn every_subscriber_gets_every_event_in_order() {
     let runtime = ScriptedRuntime::new("s", Script::echo());
-    let session = runtime.open(opts()).unwrap();
-    let a = session.events();
-    let b = session.events();
-    session.prompt(text("hello")).unwrap();
-    let ea = until(&a, turn_finished);
-    let eb = until(&b, turn_finished);
+    let session = runtime.open(opts()).await.unwrap();
+    let mut a = session.events();
+    let mut b = session.events();
+    session.prompt(text("hello")).await.unwrap();
+    let ea = until(&mut a, turn_finished).await;
+    let eb = until(&mut b, turn_finished).await;
     assert_eq!(ea, eb);
     assert_eq!(texts(&ea), "hello");
     assert!(ea.windows(2).all(|w| w[0].seq < w[1].seq), "seq strictly increases");
     assert!(ea.iter().all(|e| e.agent_path.is_empty()));
 }
 
-#[test]
-fn status_follows_the_turn() {
+#[tokio::test]
+async fn status_follows_the_turn() {
     let runtime = ScriptedRuntime::new("s", Script::new().turn(vec![Step::sleep_ms(200), Step::text("ok")]));
-    let session = runtime.open(opts()).unwrap();
-    let rx = session.events();
+    let session = runtime.open(opts()).await.unwrap();
+    let mut rx = session.events();
     assert_eq!(session.status(), SessionStatus::Idle);
-    session.prompt(text("go")).unwrap();
-    until(&rx, |k| matches!(k, EventKind::TurnStarted { .. }));
+    session.prompt(text("go")).await.unwrap();
+    until(&mut rx, |k| matches!(k, EventKind::TurnStarted { .. })).await;
     assert_eq!(session.status(), SessionStatus::Running);
-    let events = until(&rx, turn_finished);
+    let events = until(&mut rx, turn_finished).await;
     assert_eq!(session.status(), SessionStatus::Idle);
     assert_eq!(derive_status(&events), SessionStatus::Idle);
 }
 
-#[test]
-fn a_second_prompt_while_running_is_rejected_busy() {
+#[tokio::test]
+async fn a_second_prompt_while_running_is_rejected_busy() {
     let runtime = ScriptedRuntime::new("s", Script::new().turn(vec![Step::sleep_ms(500), Step::text("ok")]));
-    let session = runtime.open(opts()).unwrap();
-    let rx = session.events();
-    session.prompt(text("one")).unwrap();
-    until(&rx, |k| matches!(k, EventKind::TurnStarted { .. }));
-    let err = session.prompt(text("two")).unwrap_err();
+    let session = runtime.open(opts()).await.unwrap();
+    let mut rx = session.events();
+    session.prompt(text("one")).await.unwrap();
+    until(&mut rx, |k| matches!(k, EventKind::TurnStarted { .. })).await;
+    let err = session.prompt(text("two")).await.unwrap_err();
     assert_eq!(err.rejection_code(), Some(rejection::BUSY), "{err}");
-    until(&rx, turn_finished);
+    until(&mut rx, turn_finished).await;
 }
 
-#[test]
-fn queued_input_runs_after_the_current_turn() {
+#[tokio::test]
+async fn queued_input_runs_after_the_current_turn() {
     let runtime = ScriptedRuntime::new("s", Script::new().turn(vec![Step::sleep_ms(200), Step::text("{prompt}")]));
-    let session = runtime.open(opts()).unwrap();
-    let rx = session.events();
-    session.prompt(text("first")).unwrap();
-    session.queue(text("second")).unwrap();
-    let first = until(&rx, turn_finished);
-    let second = until(&rx, turn_finished);
+    let session = runtime.open(opts()).await.unwrap();
+    let mut rx = session.events();
+    session.prompt(text("first")).await.unwrap();
+    session.queue(text("second")).await.unwrap();
+    let first = until(&mut rx, turn_finished).await;
+    let second = until(&mut rx, turn_finished).await;
     assert_eq!(texts(&first), "first");
     assert_eq!(texts(&second), "second");
 }
 
-#[test]
-fn abort_ends_the_turn_as_aborted() {
+#[tokio::test]
+async fn abort_ends_the_turn_as_aborted() {
     let runtime = ScriptedRuntime::new("s", Script::new().turn(vec![Step::sleep_ms(5_000), Step::text("late")]));
-    let session = runtime.open(opts()).unwrap();
-    let rx = session.events();
-    session.prompt(text("go")).unwrap();
-    until(&rx, |k| matches!(k, EventKind::TurnStarted { .. }));
-    session.abort().unwrap();
-    let events = until(&rx, turn_finished);
+    let session = runtime.open(opts()).await.unwrap();
+    let mut rx = session.events();
+    session.prompt(text("go")).await.unwrap();
+    until(&mut rx, |k| matches!(k, EventKind::TurnStarted { .. })).await;
+    session.abort().await.unwrap();
+    let events = until(&mut rx, turn_finished).await;
     match &events.last().unwrap().kind {
         EventKind::TurnFinished { reason, .. } => assert_eq!(*reason, StopReason::Aborted),
         other => panic!("{other:?}"),
     }
     assert!(!texts(&events).contains("late"));
-    let err = session.abort().unwrap_err();
+    let err = session.abort().await.unwrap_err();
     assert_eq!(err.rejection_code(), Some(rejection::NO_ACTIVE_TURN), "{err}");
 }
 
-#[test]
-fn permission_waits_for_an_answer_and_denial_takes_the_denied_branch() {
+#[tokio::test]
+async fn permission_waits_for_an_answer_and_denial_takes_the_denied_branch() {
     let runtime = ScriptedRuntime::demo();
     for (decision, expect_file) in [
         (PermissionDecision::AllowOnce, true),
         (PermissionDecision::Deny { message: Some("no".into()) }, false),
     ] {
-        let session = runtime.open(opts()).unwrap();
-        let rx = session.events();
-        session.prompt(text("write a note")).unwrap();
-        let before = until(&rx, |k| matches!(k, EventKind::PermissionRequested { .. }));
+        let session = runtime.open(opts()).await.unwrap();
+        let mut rx = session.events();
+        session.prompt(text("write a note")).await.unwrap();
+        let before = until(&mut rx, |k| matches!(k, EventKind::PermissionRequested { .. })).await;
         let EventKind::PermissionRequested { request_id, tool, .. } = &before.last().unwrap().kind else {
             unreachable!()
         };
         assert_eq!(tool, "Write");
         assert_eq!(session.status(), SessionStatus::WaitingPermission);
-        session.respond_permission(request_id, decision.clone()).unwrap();
-        let after = until(&rx, turn_finished);
+        session.respond_permission(request_id, decision.clone()).await.unwrap();
+        let after = until(&mut rx, turn_finished).await;
         assert!(matches!(after[0].kind, EventKind::PermissionResolved { .. }));
         let wrote = after.iter().any(|e| matches!(e.kind, EventKind::FileChanged { .. }));
         assert_eq!(wrote, expect_file, "{decision:?}");
-        let err = session.respond_permission(request_id, PermissionDecision::AllowOnce).unwrap_err();
+        let err = session.respond_permission(request_id, PermissionDecision::AllowOnce).await.unwrap_err();
         assert_eq!(err.rejection_code(), Some(rejection::UNKNOWN_REQUEST), "{err}");
     }
 }
 
-#[test]
-fn subagent_events_carry_their_path() {
+#[tokio::test]
+async fn subagent_events_carry_their_path() {
     let runtime = ScriptedRuntime::demo();
-    let session = runtime.open(opts()).unwrap();
-    let rx = session.events();
-    session.prompt(text("x")).unwrap();
-    let before = until(&rx, |k| matches!(k, EventKind::PermissionRequested { .. }));
+    let session = runtime.open(opts()).await.unwrap();
+    let mut rx = session.events();
+    session.prompt(text("x")).await.unwrap();
+    let before = until(&mut rx, |k| matches!(k, EventKind::PermissionRequested { .. })).await;
     let EventKind::PermissionRequested { request_id, .. } = &before.last().unwrap().kind else {
         unreachable!()
     };
-    session.respond_permission(request_id, PermissionDecision::AllowOnce).unwrap();
-    let after = until(&rx, turn_finished);
+    session.respond_permission(request_id, PermissionDecision::AllowOnce).await.unwrap();
+    let after = until(&mut rx, turn_finished).await;
     let sub: Vec<_> = after.iter().filter(|e| !e.agent_path.is_empty()).collect();
     assert_eq!(sub.len(), 1);
     assert_eq!(sub[0].agent_path, vec!["task-1".to_string()]);
 }
 
-#[test]
-fn unsupported_options_are_refused_before_opening() {
+#[tokio::test]
+async fn unsupported_options_are_refused_before_opening() {
     let runtime = ScriptedRuntime::new("s", Script::echo());
     let err = runtime
         .open(SessionOptions {
             resume: Some("abc".into()),
             ..opts()
         })
+        .await
         .err()
         .expect("refused");
     assert!(matches!(&err, AgentError::Unsupported { option, .. } if option == "resume"), "{err}");
@@ -183,6 +187,7 @@ fn unsupported_options_are_refused_before_opening() {
             model: Some("no-such-model".into()),
             ..opts()
         })
+        .await
         .err()
         .expect("refused");
     assert!(matches!(&err, AgentError::Unsupported { option, .. } if option == "model"), "{err}");
@@ -191,13 +196,14 @@ fn unsupported_options_are_refused_before_opening() {
             cwd: PathBuf::from("/definitely/not/here"),
             ..opts()
         })
+        .await
         .err()
         .expect("refused");
     assert!(matches!(&err, AgentError::Unsupported { option, .. } if option == "cwd"), "{err}");
 }
 
-#[test]
-fn record_round_trips() {
+#[tokio::test]
+async fn record_round_trips() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("run.jsonl");
     let runtime = ScriptedRuntime::demo();
@@ -206,17 +212,18 @@ fn record_round_trips() {
             record_to: Some(path.clone()),
             ..opts()
         })
+        .await
         .unwrap();
-    let rx = session.events();
-    session.prompt(text("go")).unwrap();
-    let mut seen = until(&rx, |k| matches!(k, EventKind::PermissionRequested { .. }));
+    let mut rx = session.events();
+    session.prompt(text("go")).await.unwrap();
+    let mut seen = until(&mut rx, |k| matches!(k, EventKind::PermissionRequested { .. })).await;
     let EventKind::PermissionRequested { request_id, .. } = &seen.last().unwrap().kind else {
         unreachable!()
     };
-    session.respond_permission(request_id, PermissionDecision::AllowOnce).unwrap();
-    seen.extend(until(&rx, turn_finished));
-    session.dispose();
-    seen.extend(until(&rx, |k| matches!(k, EventKind::SessionEnded)));
+    session.respond_permission(request_id, PermissionDecision::AllowOnce).await.unwrap();
+    seen.extend(until(&mut rx, turn_finished).await);
+    session.dispose().await;
+    seen.extend(until(&mut rx, |k| matches!(k, EventKind::SessionEnded)).await);
 
     let read = read_record(&path).unwrap();
     // The receiver subscribed after open, so the record also holds what came
@@ -435,12 +442,12 @@ fn login_status_is_read_from_each_cli() {
     assert_eq!(claude_login_status(false, "connection reset"), LoginStatus::Unknown);
 }
 
-#[test]
+#[tokio::test]
 #[ignore = "probes the real CLIs on this machine"]
-fn installed_runtimes_report_their_login() {
+async fn installed_runtimes_report_their_login() {
     for id in ["claude", "codex"] {
         let runtime = default_runtimes().require(id).unwrap();
-        println!("{id}: {:?}", runtime.installation());
+        println!("{id}: {:?}", runtime.installation().await);
     }
 }
 
@@ -711,8 +718,8 @@ fn antigravity_usage_parses_real_payload_orders_windows_and_handles_errors() {
     }
 }
 
-#[test]
-fn antigravity_read_account_usage_and_acp_runtime_dispatch() {
+#[tokio::test]
+async fn antigravity_read_account_usage_and_acp_runtime_dispatch() {
     use std::os::unix::fs::PermissionsExt;
 
     let dir = tempfile::tempdir().unwrap();
@@ -736,7 +743,7 @@ EOF
     .unwrap();
     std::fs::set_permissions(&ok_script, PermissionsExt::from_mode(0o755)).unwrap();
 
-    let usage = crate::oar::acp::antigravity::read_account_usage(&ok_script).unwrap();
+    let usage = crate::oar::acp::antigravity::read_account_usage(&ok_script).await.unwrap();
     let AccountUsage::Available { windows, .. } = usage else {
         panic!("expected Available, got {usage:?}");
     };
@@ -752,7 +759,7 @@ EOF
     .unwrap();
     std::fs::set_permissions(&auth_script, PermissionsExt::from_mode(0o755)).unwrap();
     assert_eq!(
-        crate::oar::acp::antigravity::read_account_usage(&auth_script).unwrap(),
+        crate::oar::acp::antigravity::read_account_usage(&auth_script).await.unwrap(),
         AccountUsage::ReauthRequired {
             reason: "not_authenticated".into()
         }
@@ -760,7 +767,7 @@ EOF
 
     let generic = crate::oar::acp::AcpRuntime::new(crate::oar::acp::AcpAgentSpec::new("opencode", "OpenCode", "opencode", ["acp"]));
     assert_eq!(
-        generic.account_usage().unwrap(),
+        generic.account_usage().await.unwrap(),
         AccountUsage::Unsupported {
             reason: "not_supported".into()
         }
@@ -771,8 +778,8 @@ EOF
 fn regression_only_root_usage_reported_in_this_turn_is_charged() {
     use serde_json::json;
     let core = crate::oar::core::SessionCore::new("qwen", "meter", None);
-    let rx = core.subscribe(false);
-    let turn = |root: Option<Value>, child: Option<Value>| {
+    let mut rx = core.subscribe(false);
+    let mut turn = |root: Option<Value>, child: Option<Value>| {
         core.begin_turn("run").unwrap();
         for (path, payload) in [(vec![], root), (vec!["child".into()], child)] {
             if let Some(payload) = payload {
@@ -785,7 +792,7 @@ fn regression_only_root_usage_reported_in_this_turn_is_charged() {
             usage: Usage::default(),
         });
         loop {
-            if let EventKind::TurnFinished { usage, .. } = rx.recv_timeout(Duration::from_secs(2)).unwrap().kind {
+            if let EventKind::TurnFinished { usage, .. } = rx.try_recv().unwrap().kind {
                 break (usage.input_tokens, usage.output_tokens);
             }
         }
@@ -806,8 +813,8 @@ fn regression_only_root_usage_reported_in_this_turn_is_charged() {
 #[test]
 fn regression_cumulative_usage_requires_a_known_preceding_turn_boundary() {
     let core = crate::oar::core::SessionCore::new("claude", "cumulative", None);
-    let events = core.subscribe(false);
-    let turn = |totals: Option<(u64, u64)>| {
+    let mut events = core.subscribe(false);
+    let mut turn = |totals: Option<(u64, u64)>| {
         core.begin_turn("work").unwrap();
         if let Some((input, output)) = totals {
             let frame = serde_json::json!({"type":"result","modelUsage":{"model":{"inputTokens":input,"outputTokens":output}}});
@@ -818,7 +825,7 @@ fn regression_cumulative_usage_requires_a_known_preceding_turn_boundary() {
             usage: Usage::default(),
         });
         loop {
-            if let EventKind::TurnFinished { usage, .. } = events.recv_timeout(Duration::from_secs(2)).unwrap().kind {
+            if let EventKind::TurnFinished { usage, .. } = events.try_recv().unwrap().kind {
                 break (usage.input_tokens, usage.output_tokens);
             }
         }
@@ -835,7 +842,7 @@ fn regression_antigravity_external_accounting_uses_gemini_additive_totals_even_w
     let core = crate::oar::core::SessionCore::new("antigravity", "agy-meter", None);
     // Even if a caller marks the meter resumed, Antigravity stays in per-turn mode.
     core.resume_meter(&Value::Null, "acp_resume_baseline_unknown");
-    let rx = core.subscribe(false);
+    let mut rx = core.subscribe(false);
     core.begin_turn("first").unwrap();
     let frame = json!({
         "sessionId": "agy-meter",
@@ -858,7 +865,7 @@ fn regression_antigravity_external_accounting_uses_gemini_additive_totals_even_w
         usage: Usage::default(),
     });
     let usage = loop {
-        if let EventKind::TurnFinished { usage, .. } = rx.recv_timeout(Duration::from_secs(2)).unwrap().kind {
+        if let EventKind::TurnFinished { usage, .. } = rx.try_recv().unwrap().kind {
             break usage;
         }
     };
@@ -871,7 +878,7 @@ fn regression_antigravity_external_accounting_uses_gemini_additive_totals_even_w
     assert_eq!(usage.context_window_tokens, Some(1_000_000));
 }
 
-static OBSERVER_TEST_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+static OBSERVER_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 struct ClearObserverOnDrop;
 impl Drop for ClearObserverOnDrop {
@@ -880,9 +887,9 @@ impl Drop for ClearObserverOnDrop {
     }
 }
 
-#[test]
-fn observer_receives_events_outside_session_lock_and_stops_when_cleared() {
-    let _serial = OBSERVER_TEST_LOCK.lock();
+#[tokio::test]
+async fn observer_receives_events_outside_session_lock_and_stops_when_cleared() {
+    let _serial = OBSERVER_TEST_LOCK.lock().await;
     let _cleanup = ClearObserverOnDrop;
     set_observer(None);
     assert!(!has_observer());
@@ -896,14 +903,15 @@ fn observer_receives_events_outside_session_lock_and_stops_when_cleared() {
             resume: Some(expected_id.clone()),
             ..opts()
         })
+        .await
         .unwrap();
     assert_eq!(session.id(), expected_id);
-    let (obs_tx, obs_rx) = flume::unbounded::<(String, Event)>();
+    let (obs_tx, mut obs_rx) = tokio::sync::mpsc::unbounded_channel::<(String, Event)>();
 
     struct RecordingObserver {
         target_session: String,
         session: std::sync::Arc<dyn Session>,
-        tx: flume::Sender<(String, Event)>,
+        tx: tokio::sync::mpsc::UnboundedSender<(String, Event)>,
     }
     impl OarObserver for RecordingObserver {
         fn on_event(&self, session_id: &str, event: &Event) {
@@ -924,13 +932,16 @@ fn observer_receives_events_outside_session_lock_and_stops_when_cleared() {
     })));
     assert!(has_observer());
 
-    let rx = session.events();
-    session.prompt(text("hello")).unwrap();
-    until(&rx, turn_finished);
+    let mut rx = session.events();
+    session.prompt(text("hello")).await.unwrap();
+    until(&mut rx, turn_finished).await;
 
     let mut first_batch = Vec::new();
     loop {
-        let item = obs_rx.recv_timeout(WAIT).expect("observer event before timeout");
+        let item = tokio::time::timeout(WAIT, obs_rx.recv())
+            .await
+            .expect("observer event before timeout")
+            .expect("observer sender open");
         let done = turn_finished(&item.1.kind);
         first_batch.push(item);
         if done {
@@ -949,15 +960,15 @@ fn observer_receives_events_outside_session_lock_and_stops_when_cleared() {
     set_observer(None);
     assert!(!has_observer());
 
-    session.prompt(text("world")).unwrap();
-    until(&rx, turn_finished);
-    session.dispose();
-    until(&rx, |k| matches!(k, EventKind::SessionEnded));
+    session.prompt(text("world")).await.unwrap();
+    until(&mut rx, turn_finished).await;
+    session.dispose().await;
+    until(&mut rx, |k| matches!(k, EventKind::SessionEnded)).await;
 
     assert!(obs_rx.try_recv().is_err(), "cleared observer must not receive further events");
 
     // Regression: dropping an observer that owns the last `Arc<dyn Session>` inside `set_observer(None)` must not self-deadlock on `OBSERVER`.
-    let owned_session = runtime.open(opts()).unwrap();
+    let owned_session = runtime.open(opts()).await.unwrap();
     struct SessionOwningObserver(#[allow(dead_code)] std::sync::Arc<dyn Session>);
     impl OarObserver for SessionOwningObserver {
         fn on_event(&self, _session_id: &str, _event: &Event) {}
@@ -967,8 +978,8 @@ fn observer_receives_events_outside_session_lock_and_stops_when_cleared() {
     assert!(!has_observer());
 }
 
-#[test]
-fn trace_id_propagates_to_voyage_jsonl_and_omits_none_or_zero() {
+#[tokio::test]
+async fn trace_id_propagates_to_voyage_jsonl_and_omits_none_or_zero() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("traced.jsonl");
     let runtime = ScriptedRuntime::new("s", Script::new().turn(vec![Step::sleep_ms(50), Step::text("{prompt}")]));
@@ -977,24 +988,25 @@ fn trace_id_propagates_to_voyage_jsonl_and_omits_none_or_zero() {
             record_to: Some(path.clone()),
             ..opts()
         })
+        .await
         .unwrap();
-    let rx = session.events();
+    let mut rx = session.events();
 
-    session.prompt_with(text("turn-none"), TurnOptions::default()).unwrap();
-    until(&rx, turn_finished);
+    session.prompt_with(text("turn-none"), TurnOptions::default()).await.unwrap();
+    until(&mut rx, turn_finished).await;
 
-    session.prompt_with(text("turn-zero"), TurnOptions { trace_id: Some(0) }).unwrap();
-    until(&rx, turn_finished);
+    session.prompt_with(text("turn-zero"), TurnOptions { trace_id: Some(0) }).await.unwrap();
+    until(&mut rx, turn_finished).await;
 
-    session.prompt_with(text("turn-traced"), TurnOptions { trace_id: Some(777) }).unwrap();
-    session.queue_with(text("turn-queued"), TurnOptions { trace_id: Some(888) }).unwrap();
-    until(&rx, turn_finished);
-    until(&rx, turn_finished);
+    session.prompt_with(text("turn-traced"), TurnOptions { trace_id: Some(777) }).await.unwrap();
+    session.queue_with(text("turn-queued"), TurnOptions { trace_id: Some(888) }).await.unwrap();
+    until(&mut rx, turn_finished).await;
+    until(&mut rx, turn_finished).await;
 
-    session.prompt(text("turn-after")).unwrap();
-    until(&rx, turn_finished);
-    session.dispose();
-    until(&rx, |k| matches!(k, EventKind::SessionEnded));
+    session.prompt(text("turn-after")).await.unwrap();
+    until(&mut rx, turn_finished).await;
+    session.dispose().await;
+    until(&mut rx, |k| matches!(k, EventKind::SessionEnded)).await;
 
     let raw_jsonl = std::fs::read_to_string(&path).unwrap();
     let raw_lines: Vec<Value> = raw_jsonl.lines().skip(1).map(|l| serde_json::from_str(l).unwrap()).collect();
@@ -1055,8 +1067,8 @@ fn builtin_runtime_specs_match_default_registry_and_exclude_dsh() {
     }
 }
 
-#[test]
-fn core_session_records_read_back_from_disk_and_cap_in_memory_history() {
+#[tokio::test]
+async fn core_session_records_read_back_from_disk_and_cap_in_memory_history() {
     // When `record_to` is set, records are streamed to disk and read back on demand.
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("recorded.jsonl");
@@ -1066,10 +1078,11 @@ fn core_session_records_read_back_from_disk_and_cap_in_memory_history() {
             record_to: Some(path.clone()),
             ..opts()
         })
+        .await
         .unwrap();
-    let rx = session.events();
-    session.prompt(text("disk-backed")).unwrap();
-    until(&rx, turn_finished);
+    let mut rx = session.events();
+    session.prompt(text("disk-backed")).await.unwrap();
+    until(&mut rx, turn_finished).await;
     let from_disk = session.records();
     assert!(!from_disk.is_empty(), "records() must read back persisted records");
     assert!(
@@ -1077,8 +1090,8 @@ fn core_session_records_read_back_from_disk_and_cap_in_memory_history() {
             .iter()
             .any(|r| r.events.iter().any(|e| e["kind"] == "text_delta" && e["text"] == "disk-backed"))
     );
-    session.dispose();
-    until(&rx, |k| matches!(k, EventKind::SessionEnded));
+    session.dispose().await;
+    until(&mut rx, |k| matches!(k, EventKind::SessionEnded)).await;
 
     // When `record_to` is None, in-memory history stays bounded at 1024 records.
     let mut steps = Vec::with_capacity(1_100);
@@ -1086,13 +1099,13 @@ fn core_session_records_read_back_from_disk_and_cap_in_memory_history() {
         steps.push(Step::text(format!("chunk-{i}")));
     }
     let big_rt = ScriptedRuntime::new("s", Script::new().turn(steps));
-    let mem_session = big_rt.open(opts()).unwrap();
-    let mem_rx = mem_session.events();
-    mem_session.prompt(text("go")).unwrap();
-    until(&mem_rx, turn_finished);
+    let mem_session = big_rt.open(opts()).await.unwrap();
+    let mut mem_rx = mem_session.events();
+    mem_session.prompt(text("go")).await.unwrap();
+    until(&mut mem_rx, turn_finished).await;
     let capped = mem_session.records();
     assert_eq!(capped.len(), 1_024, "unrecorded history must be capped at 1024 records");
     assert!(capped.windows(2).all(|w| w[0].seq < w[1].seq), "retained tail remains strictly ordered");
-    mem_session.dispose();
-    until(&mem_rx, |k| matches!(k, EventKind::SessionEnded));
+    mem_session.dispose().await;
+    until(&mut mem_rx, |k| matches!(k, EventKind::SessionEnded)).await;
 }

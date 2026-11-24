@@ -1,3 +1,4 @@
+use crate::BoxFuture;
 use crate::oar::{
     AgentError, ContentBlock, ControlAction, ControlOutcome, Event, PermissionDecision, Registry, Result, Session, SessionOptions, SessionStatus, TurnOptions,
     voyage::Record,
@@ -7,6 +8,7 @@ use std::{
     collections::HashMap,
     sync::{Arc, Weak},
 };
+use tokio::sync::mpsc;
 
 const DEPTH: &str = "OAR_SUBAGENT_DEPTH";
 pub struct Pool {
@@ -47,7 +49,7 @@ impl Pool {
     pub fn active(&self) -> usize {
         self.slots.lock().active.len()
     }
-    pub fn spawn(self: &Arc<Self>, runtime: &str, mut options: SessionOptions) -> Result<Arc<dyn Session>> {
+    pub async fn spawn(self: &Arc<Self>, runtime: &str, mut options: SessionOptions) -> Result<Arc<dyn Session>> {
         let runtime = self.registry.require(runtime)?;
         let depth = match self.current_depth {
             Some(depth) => depth,
@@ -78,21 +80,25 @@ impl Pool {
         };
         options.env.retain(|(key, _)| key != DEPTH);
         options.env.push((DEPTH.into(), (depth + 1).to_string()));
-        let inner = match runtime.open(options) {
+        let inner = match runtime.open(options).await {
             Ok(session) => session,
             Err(error) => {
                 self.slots.lock().active.remove(&slot);
                 return Err(error);
             }
         };
-        {
+        let closed = {
             let mut slots = self.slots.lock();
             if slots.closed {
-                drop(slots);
-                inner.dispose();
-                return Err(AgentError::Rejected("pool_closed: child pool closed during launch".into()));
+                true
+            } else {
+                slots.active.insert(slot, Some(inner.clone()));
+                false
             }
-            slots.active.insert(slot, Some(inner.clone()));
+        };
+        if closed {
+            inner.dispose().await;
+            return Err(AgentError::Rejected("pool_closed: child pool closed during launch".into()));
         }
         Ok(Arc::new(Child {
             pool: Arc::downgrade(self),
@@ -100,20 +106,27 @@ impl Pool {
             inner,
         }))
     }
-    pub fn close(&self) {
+    pub async fn close(&self) {
         let children = {
             let mut slots = self.slots.lock();
             slots.closed = true;
             std::mem::take(&mut slots.active)
         };
         for child in children.into_values().flatten() {
-            child.dispose();
+            child.dispose().await;
         }
     }
 }
 impl Drop for Pool {
     fn drop(&mut self) {
-        self.close();
+        let children = {
+            let mut slots = self.slots.lock();
+            slots.closed = true;
+            std::mem::take(&mut slots.active)
+        };
+        for child in children.into_values().flatten() {
+            child.signal_dispose();
+        }
     }
 }
 
@@ -131,14 +144,15 @@ impl Child {
 }
 impl Drop for Child {
     fn drop(&mut self) {
-        self.dispose();
+        self.inner.signal_dispose();
+        self.release();
     }
 }
 impl Session for Child {
     fn id(&self) -> String {
         self.inner.id()
     }
-    fn read_subagent(&self, thread_id: &str, turn_id: Option<&str>) -> Result<crate::oar::SubagentSnapshot> {
+    fn read_subagent<'a>(&'a self, thread_id: &'a str, turn_id: Option<&'a str>) -> BoxFuture<'a, Result<crate::oar::SubagentSnapshot>> {
         self.inner.read_subagent(thread_id, turn_id)
     }
     fn swarm_snapshot(&self) -> Option<crate::oar::SwarmSnapshot> {
@@ -156,52 +170,60 @@ impl Session for Child {
     fn status(&self) -> SessionStatus {
         self.inner.status()
     }
-    fn events(&self) -> flume::Receiver<Event> {
+    fn events(&self) -> mpsc::UnboundedReceiver<Event> {
         self.inner.events()
     }
-    fn events_with_history(&self) -> flume::Receiver<Event> {
+    fn events_with_history(&self) -> mpsc::UnboundedReceiver<Event> {
         self.inner.events_with_history()
     }
     fn records(&self) -> Vec<Record> {
         self.inner.records()
     }
-    fn subscribe_records(&self, after: Option<u64>) -> flume::Receiver<Record> {
+    fn subscribe_records(&self, after: Option<u64>) -> mpsc::UnboundedReceiver<Record> {
         self.inner.subscribe_records(after)
     }
-    fn control(&self, op: ControlAction, arg: &str, id: &str, span: &str) -> Result<ControlOutcome> {
+    fn control<'a>(&'a self, op: ControlAction, arg: &'a str, id: &'a str, span: &'a str) -> BoxFuture<'a, Result<ControlOutcome>> {
         self.inner.control(op, arg, id, span)
     }
-    fn control_with(&self, op: ControlAction, arg: &str, id: &str, span: &str, opts: TurnOptions) -> Result<ControlOutcome> {
+    fn control_with<'a>(&'a self, op: ControlAction, arg: &'a str, id: &'a str, span: &'a str, opts: TurnOptions) -> BoxFuture<'a, Result<ControlOutcome>> {
         self.inner.control_with(op, arg, id, span, opts)
     }
-    fn prompt(&self, c: Vec<ContentBlock>) -> Result<()> {
+    fn prompt(&self, c: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
         self.inner.prompt(c)
     }
-    fn prompt_with(&self, c: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
+    fn prompt_with(&self, c: Vec<ContentBlock>, opts: TurnOptions) -> BoxFuture<'_, Result<()>> {
         self.inner.prompt_with(c, opts)
     }
-    fn steer(&self, c: Vec<ContentBlock>) -> Result<()> {
+    fn steer(&self, c: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
         self.inner.steer(c)
     }
-    fn queue(&self, c: Vec<ContentBlock>) -> Result<()> {
+    fn queue(&self, c: Vec<ContentBlock>) -> BoxFuture<'_, Result<()>> {
         self.inner.queue(c)
     }
-    fn queue_with(&self, c: Vec<ContentBlock>, opts: TurnOptions) -> Result<()> {
+    fn queue_with(&self, c: Vec<ContentBlock>, opts: TurnOptions) -> BoxFuture<'_, Result<()>> {
         self.inner.queue_with(c, opts)
     }
-    fn abort(&self) -> Result<()> {
+    fn abort(&self) -> BoxFuture<'_, Result<()>> {
         self.inner.abort()
     }
-    fn respond_permission(&self, r: &str, d: PermissionDecision) -> Result<()> {
+    fn respond_permission<'a>(&'a self, r: &'a str, d: PermissionDecision) -> BoxFuture<'a, Result<()>> {
         self.inner.respond_permission(r, d)
     }
-    fn wait(&self) -> Result<()> {
-        let result = self.inner.wait();
-        self.release();
-        result
+    fn wait(&self) -> BoxFuture<'_, Result<()>> {
+        Box::pin(async move {
+            let result = self.inner.wait().await;
+            self.release();
+            result
+        })
     }
-    fn dispose(&self) {
-        self.inner.dispose();
+    fn dispose(&self) -> BoxFuture<'_, ()> {
+        Box::pin(async move {
+            self.inner.dispose().await;
+            self.release();
+        })
+    }
+    fn signal_dispose(&self) {
+        self.inner.signal_dispose();
         self.release();
     }
 }

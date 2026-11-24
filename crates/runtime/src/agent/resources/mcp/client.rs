@@ -85,15 +85,16 @@ impl Client {
         .await
     }
 
-    pub(super) fn call(&self, name: String, arguments: JsonObject, cancel: &CancelToken) -> Result<CallToolResult, String> {
+    pub(super) async fn call(&self, name: String, arguments: JsonObject, cancel: &CancelToken) -> Result<CallToolResult, String> {
         let peer = self.0.peer().clone();
-        crate::rt::block_on(run_with_timeout(
+        run_with_timeout(
             async move {
                 peer.call_tool(CallToolRequestParams::new(name).with_arguments(arguments))
                     .await
                     .map_err(|e| e.to_string())
             },
             cancel,
-        ))
+        )
+        .await
     }
 }

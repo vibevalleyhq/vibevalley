@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use serde_json::{Value, json};
 
+use crate::BoxFuture;
 use crate::agent::ai::types::{ChatRequest, Message, ResponseFormat};
 use crate::agent::core::doc::{AgentDoc, AgentState, CONVERSATION_SCOPE, GovernanceDoc, UsageTotals, update_doc, write_doc};
 use crate::agent::core::extension::{DurableHookCtx, Extension, HookOutcome, RunEndCtx};
@@ -30,11 +31,11 @@ struct PreparedReview {
     limit: u32,
 }
 
-fn saved_review(tx: &Read<'_>, reference: &str, fallback: u32) -> Result<Option<PreparedReview>> {
-    let Some(agent) = crate::agent::core::doc::read_doc_opt::<AgentDoc>(tx, CONVERSATION_SCOPE, reference)? else {
+async fn saved_review(tx: &Read<'_>, reference: &str, fallback: u32) -> Result<Option<PreparedReview>> {
+    let Some(agent) = crate::agent::core::doc::read_doc_opt::<AgentDoc>(tx, CONVERSATION_SCOPE, reference).await? else {
         return Ok(None);
     };
-    let entries = tx.entries(reference, 1)?;
+    let entries = tx.entries_async(reference, 1).await?;
     let system = entries
         .iter()
         .find(|e| e.kind == "pi.system")
@@ -79,13 +80,17 @@ impl GraderExtension {
         Self { provider }
     }
 
-    fn prepare_review(&self, ctx: &DurableHookCtx<'_>, reference: &str, n: u32) -> Result<Option<PreparedReview>> {
+    async fn prepare_review(&self, ctx: &DurableHookCtx<'_>, reference: &str, n: u32) -> Result<Option<PreparedReview>> {
         let conv = ctx.conversation_id;
         if ctx.rubric.is_none() && !conv.starts_with("worker:") {
             return Ok(None);
         }
         let fallback = ctx.rubric.map(|r| r.max_iterations).filter(|&m| m > 0).unwrap_or(DEFAULT_ITERATIONS);
-        let saved = ctx.store.read(|tx| saved_review(tx, reference, fallback))?;
+        let ref_read = reference.to_owned();
+        let saved = ctx
+            .store
+            .read_async(move |tx| Box::pin(async move { saved_review(tx, &ref_read, fallback).await }))
+            .await?;
         if saved.is_some() {
             return Ok(saved);
         }
@@ -112,33 +117,42 @@ impl GraderExtension {
             "candidateOutput": ctx.last_output,
             "iteration": n,
         });
-        ctx.store.write(|tx| {
-            let task = tx.task(ctx.task_id)?;
-            if task.status != TaskStatus::Running || ctx.tc.is_cancelled() {
-                return Err(Error::Invalid("phase no longer owns generation".into()));
-            }
-            let provider = tx.conversation(conv)?.provider_affinity;
-            tx.create_owned_conversation(reference, &provider, ctx.task_id)?;
-            tx.append_entry(reference, "pi.system", &json!({ "text": GRADER_SYSTEM }))?;
-            tx.append_entry(reference, "pi.user", &input)?;
-            write_doc::<AgentDoc>(
-                tx,
-                CONVERSATION_SCOPE,
-                reference,
-                &AgentState {
-                    role: "outcome_grader".into(),
-                    model: String::new(),
-                    read_only: true,
-                    tools: vec![],
-                    max_iterations: Some(limit),
-                },
-            )?;
-            Ok(Some(PreparedReview {
-                system: GRADER_SYSTEM.to_owned(),
-                input,
-                limit,
-            }))
-        })
+        let task_id = ctx.task_id.to_owned();
+        let tc = ctx.tc.clone();
+        let conv_owned = conv.to_owned();
+        let ref_write = reference.to_owned();
+        ctx.store
+            .write_async(move |tx| {
+                Box::pin(async move {
+                    let task = tx.task_async(&task_id).await?;
+                    if task.status != TaskStatus::Running || tc.is_cancelled() {
+                        return Err(Error::Invalid("phase no longer owns generation".into()));
+                    }
+                    let provider = tx.conversation_async(&conv_owned).await?.provider_affinity;
+                    tx.create_owned_conversation_async(&ref_write, &provider, &task_id).await?;
+                    tx.append_entry_async(&ref_write, "pi.system", &json!({ "text": GRADER_SYSTEM })).await?;
+                    tx.append_entry_async(&ref_write, "pi.user", &input).await?;
+                    write_doc::<AgentDoc>(
+                        tx,
+                        CONVERSATION_SCOPE,
+                        &ref_write,
+                        &AgentState {
+                            role: "outcome_grader".into(),
+                            model: String::new(),
+                            read_only: true,
+                            tools: vec![],
+                            max_iterations: Some(limit),
+                        },
+                    )
+                    .await?;
+                    Ok(Some(PreparedReview {
+                        system: GRADER_SYSTEM.to_owned(),
+                        input,
+                        limit,
+                    }))
+                })
+            })
+            .await
     }
 }
 
@@ -147,83 +161,112 @@ impl Extension for GraderExtension {
         "grader"
     }
 
-    fn on_after_run(&self, ctx: &mut RunEndCtx<'_>) -> durable::Result<HookOutcome> {
-        let conv = ctx.conversation_id;
-        let n = ctx.iteration + 1;
-        let reference = format!("{}:grader:{n}", ctx.task_id);
-        let Some(review) = self.prepare_review(&ctx.hook, &reference, n)? else {
-            return Ok(HookOutcome::Continue);
-        };
-
-        let existing = ctx.store.read(|tx| tx.document(CONVERSATION_SCOPE, &reference, "pi.verdict"))?;
-        let verdict: RubricVerdict = if let Some(doc) = existing {
-            serde_json::from_value(doc.state)?
-        } else {
-            let budget = check_budget_if_configured(ctx.store, conv, ctx.task_id)?;
-            if budget.reached {
-                return Ok(HookOutcome::Park {
-                    signal: BUDGET_SIGNAL.into(),
-                    until_ms: None,
-                });
-            }
-            let brain = ctx.brain.ok_or_else(|| Error::Invalid("grader requires a resolved brain".into()))?;
-            let req = ChatRequest {
-                model: brain.model.clone(),
-                messages: vec![Message::system(review.system), Message::user(review.input.to_string())],
-                tools: vec![],
-                effort: brain.effort.clone(),
-                response_format: Some(ResponseFormat::JsonObject),
-                ..Default::default()
+    fn on_after_run<'a>(&'a self, ctx: &'a mut RunEndCtx<'_>) -> BoxFuture<'a, durable::Result<HookOutcome>> {
+        Box::pin(async move {
+            let conv = ctx.conversation_id.to_owned();
+            let task_id = ctx.task_id.to_owned();
+            let n = ctx.iteration + 1;
+            let reference = format!("{task_id}:grader:{n}");
+            let Some(review) = self.prepare_review(&ctx.hook, &reference, n).await? else {
+                return Ok(HookOutcome::Continue);
             };
-            let response = brain
-                .client
-                .complete_cancellable(&req, &ctx.cancel, &mut |_| {})
-                .map_err(|e| Error::Invalid(e.to_string()))?;
-            let raw = response.message.content.unwrap_or_default();
-            let clean = strip_json_fences(&raw);
-            let mut verdict: RubricVerdict = serde_json::from_str(clean)?;
-            verdict.iteration = n;
-            ctx.store.write(|tx| {
-                let task = tx.task(ctx.task_id)?;
-                if task.status != TaskStatus::Running || ctx.tc.is_cancelled() {
-                    return Err(Error::Invalid("phase no longer owns generation".into()));
+
+            let ref_read = reference.clone();
+            let existing = ctx
+                .store
+                .read_async(move |tx| Box::pin(async move { tx.document_async(CONVERSATION_SCOPE, &ref_read, "pi.verdict").await }))
+                .await?;
+            let verdict: RubricVerdict = if let Some(doc) = existing {
+                serde_json::from_value(doc.state)?
+            } else {
+                let budget = check_budget_if_configured(ctx.store, &conv, &task_id).await?;
+                if budget.reached {
+                    return Ok(HookOutcome::Park {
+                        signal: BUDGET_SIGNAL.into(),
+                        until_ms: None,
+                    });
                 }
-                tx.append_entry(&reference, "pi.assistant", &json!({ "text": raw }))?;
-                UsageTotals::from_usage(&brain.model, response.usage).record(tx, &reference)?;
-                tx.put_document(CONVERSATION_SCOPE, &reference, "pi.verdict", &json!(verdict))?;
-                Ok(())
-            })?;
-            verdict
-        };
+                let brain = ctx.brain.ok_or_else(|| Error::Invalid("grader requires a resolved brain".into()))?;
+                let req = ChatRequest {
+                    model: brain.model.clone(),
+                    messages: vec![Message::system(review.system), Message::user(review.input.to_string())],
+                    tools: vec![],
+                    effort: brain.effort.clone(),
+                    response_format: Some(ResponseFormat::JsonObject),
+                    ..Default::default()
+                };
+                let mut noop = |_| {};
+                let response = brain
+                    .client
+                    .complete_cancellable(&req, &ctx.cancel, &mut noop)
+                    .await
+                    .map_err(|e| Error::Invalid(e.to_string()))?;
+                let raw = response.message.content.unwrap_or_default();
+                let clean = strip_json_fences(&raw);
+                let mut verdict: RubricVerdict = serde_json::from_str(clean)?;
+                verdict.iteration = n;
+                let tc = ctx.tc.clone();
+                let tid = task_id.clone();
+                let ref_write = reference.clone();
+                let model = brain.model.clone();
+                let usage = response.usage;
+                let verdict_write = verdict.clone();
+                ctx.store
+                    .write_async(move |tx| {
+                        Box::pin(async move {
+                            let task = tx.task_async(&tid).await?;
+                            if task.status != TaskStatus::Running || tc.is_cancelled() {
+                                return Err(Error::Invalid("phase no longer owns generation".into()));
+                            }
+                            tx.append_entry_async(&ref_write, "pi.assistant", &json!({ "text": raw })).await?;
+                            UsageTotals::from_usage(&model, usage).record(tx, &ref_write).await?;
+                            tx.put_document_async(CONVERSATION_SCOPE, &ref_write, "pi.verdict", &json!(verdict_write))
+                                .await?;
+                            Ok(())
+                        })
+                    })
+                    .await?;
+                verdict
+            };
 
-        ctx.store.write(|tx| {
-            let task = tx.task(ctx.task_id)?;
-            if task.status != TaskStatus::Running || ctx.tc.is_cancelled() {
-                return Err(Error::Invalid("phase no longer owns generation".into()));
+            let tc = ctx.tc.clone();
+            let tid = task_id.clone();
+            let conv_write = conv.clone();
+            let verdict_write = verdict.clone();
+            ctx.store
+                .write_async(move |tx| {
+                    Box::pin(async move {
+                        let task = tx.task_async(&tid).await?;
+                        if task.status != TaskStatus::Running || tc.is_cancelled() {
+                            return Err(Error::Invalid("phase no longer owns generation".into()));
+                        }
+                        update_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, &conv_write, |gov| {
+                            gov.last_rubric_verdict = Some(verdict_write.clone());
+                            gov.rubric_history.push(verdict_write);
+                            Ok(())
+                        })
+                        .await?;
+                        Ok(())
+                    })
+                })
+                .await?;
+
+            let revision = !verdict.satisfied && n < review.limit;
+            *ctx.verdict = Some(verdict.clone());
+            if revision {
+                Ok(HookOutcome::Retry {
+                    feedback_entry: json!({
+                        "text": format!("Outcome grader rejected submission: {}. Unmet items: {:?}", verdict.summary, verdict.unmet_items),
+                        "source": "outcome_grader",
+                        "kind": "outcome_revision",
+                        "iteration": n,
+                        "unmetItems": verdict.unmet_items,
+                    }),
+                })
+            } else {
+                *ctx.max_iterations_reached = !verdict.satisfied && n >= review.limit;
+                Ok(HookOutcome::Continue)
             }
-            update_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, conv, |gov| {
-                gov.last_rubric_verdict = Some(verdict.clone());
-                gov.rubric_history.push(verdict.clone());
-                Ok(())
-            })?;
-            Ok(())
-        })?;
-
-        let revision = !verdict.satisfied && n < review.limit;
-        *ctx.verdict = Some(verdict.clone());
-        if revision {
-            Ok(HookOutcome::Retry {
-                feedback_entry: json!({
-                    "text": format!("Outcome grader rejected submission: {}. Unmet items: {:?}", verdict.summary, verdict.unmet_items),
-                    "source": "outcome_grader",
-                    "kind": "outcome_revision",
-                    "iteration": n,
-                    "unmetItems": verdict.unmet_items,
-                }),
-            })
-        } else {
-            *ctx.max_iterations_reached = !verdict.satisfied && n >= review.limit;
-            Ok(HookOutcome::Continue)
-        }
+        })
     }
 }

@@ -30,8 +30,11 @@ pub struct Transcript {
 }
 
 impl Transcript {
-    pub fn load(store: &Store, conv: &str) -> Result<Self> {
-        let (conversation, entries) = store.read(|tx| Ok((tx.conversation(conv)?, tx.visible_entries(conv)?)))?;
+    pub async fn load(store: &Store, conv: &str) -> Result<Self> {
+        let conv_owned = conv.to_owned();
+        let (conversation, entries) = store
+            .read_async(move |tx| Box::pin(async move { Ok((tx.conversation_async(&conv_owned).await?, tx.visible_entries_async(&conv_owned).await?)) }))
+            .await?;
         Ok(Self {
             conversation_id: conv.into(),
             provider_affinity: conversation.provider_affinity,
@@ -115,8 +118,12 @@ impl Transcript {
     }
 }
 
-pub fn system_delta(store: &Store, conversation: &str, text: &str, tools: &[ToolSpec]) -> Result<Entry> {
-    store.write(|tx| tx.append_entry(conversation, "pi.system", &json!({"text": text, "delta": true, "tools": tools})))
+pub async fn system_delta(store: &Store, conversation: &str, text: &str, tools: &[ToolSpec]) -> Result<Entry> {
+    let conversation = conversation.to_owned();
+    let payload = json!({"text": text, "delta": true, "tools": tools});
+    store
+        .write_async(move |tx| Box::pin(async move { tx.append_entry_async(&conversation, "pi.system", &payload).await }))
+        .await
 }
 
 pub fn model_payload(message: &Message) -> Value {
@@ -140,8 +147,8 @@ pub fn model_payload(message: &Message) -> Value {
     })
 }
 
-pub fn transform_context(mut messages: Vec<AgentMessage>, extensions: &ExtensionRunner, ctx: &DurableHookCtx<'_>) -> Result<Vec<AgentMessage>> {
-    extensions.run_context(ctx, &mut messages)?;
+pub async fn transform_context(mut messages: Vec<AgentMessage>, extensions: &ExtensionRunner, ctx: &DurableHookCtx<'_>) -> Result<Vec<AgentMessage>> {
+    extensions.run_context(ctx, &mut messages).await?;
     Ok(messages)
 }
 

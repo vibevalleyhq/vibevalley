@@ -34,36 +34,38 @@ pub struct TaskGraph {
 
 impl Store {
     /// Collects the execution graph of tasks, child tasks, and owned subagent conversations.
-    pub fn task_graph(&self, root_conversation_id: Option<&str>) -> Result<TaskGraph> {
-        self.read(|r| build_task_graph(r, root_conversation_id))
+    pub async fn task_graph(&self, root_conversation_id: Option<&str>) -> Result<TaskGraph> {
+        let root_owned = root_conversation_id.map(str::to_owned);
+        self.read_async(move |r| Box::pin(async move { build_task_graph(r, root_owned.as_deref()).await }))
+            .await
     }
 }
 
-fn build_task_graph(r: &Read<'_>, root_conversation_id: Option<&str>) -> Result<TaskGraph> {
+async fn build_task_graph(r: &Read<'_>, root_conversation_id: Option<&str>) -> Result<TaskGraph> {
     let mut tasks_by_id: HashMap<String, Task> = HashMap::new();
     let mut queue = VecDeque::new();
     let mut seen_convs = HashSet::new();
 
     if let Some(root) = root_conversation_id {
-        if r.conversation(root).is_ok() {
+        if r.conversation_async(root).await.is_ok() {
             seen_convs.insert(root.to_owned());
         }
-        for t in r.tasks_by_conversation(root)? {
+        for t in r.tasks_by_conversation_async(root).await? {
             let id = t.id.clone();
             if tasks_by_id.insert(id.clone(), t).is_none() {
                 queue.push_back(id);
             }
         }
         while let Some(task_id) = queue.pop_front() {
-            for child in r.children(&task_id)? {
+            for child in r.children_async(&task_id).await? {
                 let cid = child.id.clone();
                 if tasks_by_id.insert(cid.clone(), child).is_none() {
                     queue.push_back(cid);
                 }
             }
-            for child_conv in r.conversations_by_owner_task(&task_id)? {
+            for child_conv in r.conversations_by_owner_task_async(&task_id).await? {
                 if seen_convs.insert(child_conv.id.clone()) {
-                    for t in r.tasks_by_conversation(&child_conv.id)? {
+                    for t in r.tasks_by_conversation_async(&child_conv.id).await? {
                         let tid = t.id.clone();
                         if tasks_by_id.insert(tid.clone(), t).is_none() {
                             queue.push_back(tid);
@@ -73,22 +75,22 @@ fn build_task_graph(r: &Read<'_>, root_conversation_id: Option<&str>) -> Result<
             }
         }
     } else {
-        for conv in r.conversations()? {
+        for conv in r.conversations_async().await? {
             if seen_convs.insert(conv.id.clone()) {
-                for t in r.tasks_by_conversation(&conv.id)? {
+                for t in r.tasks_by_conversation_async(&conv.id).await? {
                     tasks_by_id.insert(t.id.clone(), t);
                 }
             }
         }
-        for t in r.active_tasks()? {
+        for t in r.active_tasks_async().await? {
             tasks_by_id.insert(t.id.clone(), t);
         }
     }
 
     let mut nodes = Vec::with_capacity(tasks_by_id.len());
     for task in tasks_by_id.into_values() {
-        let owned_conversations = r.conversations_by_owner_task(&task.id)?.into_iter().map(|c| c.id).collect();
-        let children = r.children(&task.id)?.into_iter().map(|c| c.id).collect();
+        let owned_conversations = r.conversations_by_owner_task_async(&task.id).await?.into_iter().map(|c| c.id).collect();
+        let children = r.children_async(&task.id).await?.into_iter().map(|c| c.id).collect();
         let aborted = task.terminal_reason == "aborted" || task.terminal_reason == "restart_limit";
         let background = !task.owner_task_id.is_empty();
         nodes.push(TaskGraphNode {

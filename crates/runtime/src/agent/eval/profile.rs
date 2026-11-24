@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+use crate::BoxFuture;
 use crate::agent::ai::ModelClient;
 use crate::agent::ai::models::DEFAULT_MODEL;
 use crate::agent::core::doc::{BudgetConfig, CONVERSATION_SCOPE, GovernanceDoc, update_doc};
@@ -110,20 +111,27 @@ pub fn mount_profile_extensions(harness: &Harness, profile: &EvalProfile, _works
     harness.with_experiments(&profile.experiments, None);
 }
 
-pub(crate) fn configure_profile_budget(store: &Store, conv_id: &str, profile: &EvalProfile) -> Result<()> {
+pub(crate) async fn configure_profile_budget(store: &Store, conv_id: &str, profile: &EvalProfile) -> Result<()> {
     let Some(max_cost_micros) = profile.max_cost_micros else {
         return Ok(());
     };
-    store.write(|tx| {
-        if tx.conversation(conv_id).is_err() {
-            tx.create_conversation(conv_id, &profile.model)?;
-        }
-        update_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, conv_id, |gov| {
-            gov.budget = Some(BudgetConfig { max_cost_micros });
-            Ok(())
-        })?;
-        Ok(())
-    })
+    let conv_id = conv_id.to_owned();
+    let model = profile.model.clone();
+    store
+        .write_async(move |tx| {
+            Box::pin(async move {
+                if tx.conversation_async(&conv_id).await.is_err() {
+                    tx.create_conversation_async(&conv_id, &model).await?;
+                }
+                update_doc::<GovernanceDoc>(tx, CONVERSATION_SCOPE, &conv_id, |gov| {
+                    gov.budget = Some(BudgetConfig { max_cost_micros });
+                    Ok(())
+                })
+                .await?;
+                Ok(())
+            })
+        })
+        .await
 }
 
 pub(crate) struct EvalBrainProvider {
@@ -143,12 +151,12 @@ impl EvalBrainProvider {
 }
 
 impl BrainProvider for EvalBrainProvider {
-    fn resolve_brain(&self, _conv: &str, provider: &str) -> Result<Option<Arc<Brain>>> {
+    fn resolve_brain<'a>(&'a self, _conv: &'a str, provider: &'a str) -> BoxFuture<'a, Result<Option<Arc<Brain>>>> {
         let model = if provider.is_empty() { self.profile.model.as_str() } else { provider };
         let mut brain = Brain::new(self.client.clone(), model, &self.profile.system_prompt);
         brain.effort = self.profile.effort.clone();
         brain.cwd = Some(self.workspace.clone());
         brain.tools = build_profile_tools(&self.profile, &self.workspace);
-        Ok(Some(Arc::new(brain)))
+        Box::pin(std::future::ready(Ok(Some(Arc::new(brain)))))
     }
 }
