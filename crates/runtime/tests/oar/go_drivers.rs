@@ -1,13 +1,15 @@
 use serde_json::Value;
-use std::{fs, os::unix::fs::PermissionsExt, path::Path, time::Duration};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use vibevalley_runtime::oar::{ControlAction, ControlStatus, EventKind, SessionOptions, StopReason};
 
 #[test]
 fn all_go_driver_families_replay_through_child_processes() {
     let directory = tempfile::tempdir().unwrap();
-    let executable = directory.path().join("replay");
-    fs::write(&executable, include_bytes!("../fixtures/cli_replay.py")).unwrap();
-    fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
+    let executable = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     let registry = vibevalley_runtime::oar::default_runtimes();
     for (id, family, resume) in [
         ("claude", "claude", Some("092b52de-330b-4d1d-abde-1dee9e56a8df")),
@@ -27,7 +29,10 @@ fn all_go_driver_families_replay_through_child_processes() {
                 bin_path: Some(executable.clone()),
                 cwd: directory.path().into(),
                 resume: resume.map(String::from),
-                env: vec![("OAR_REPLAY_FILE".into(), fixture.to_string_lossy().into_owned())],
+                env: vec![
+                    ("VV_FIXTURE".into(), "cli_replay".into()),
+                    ("OAR_REPLAY_FILE".into(), fixture.to_string_lossy().into_owned()),
+                ],
                 record_to: Some(directory.path().join(format!("{id}.jsonl"))),
                 ..Default::default()
             })

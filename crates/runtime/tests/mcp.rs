@@ -1,12 +1,9 @@
-use std::path::PathBuf;
-
 use serde_json::json;
 use vibevalley_runtime::agent::resources::mcp::{McpConfig, McpHub, content_text, tool_name};
 
 fn config() -> McpConfig {
-    let script = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/echo_mcp.py");
     serde_json::from_value(json!({"mcpServers": {
-        "echo srv": {"command": "python3", "args": ["-I", script]},
+        "echo srv": {"command": env!("CARGO_BIN_EXE_vv_test_fixture"), "args": ["echo_mcp"]},
         "gone": {"command": "/definitely/not/a/binary"}
     }}))
     .unwrap()
@@ -151,9 +148,10 @@ fn regression_cancelling_an_mcp_call_preserves_its_peer_and_dropping_the_last_to
     use std::time::{Duration, Instant};
 
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/cancellable_mcp.py");
     let cfg = serde_json::from_value(json!({"mcpServers": {"slow": {
-        "command": "python3", "args": ["-I", fixture], "env": {"MCP_TEST_PORT": listener.local_addr().unwrap().port().to_string()}
+        "command": env!("CARGO_BIN_EXE_vv_test_fixture"),
+        "args": ["cancellable_mcp"],
+        "env": {"MCP_TEST_PORT": listener.local_addr().unwrap().port().to_string()}
     }}}))
     .unwrap();
     let hub = McpHub::connect(&cfg);
