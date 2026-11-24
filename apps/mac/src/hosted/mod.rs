@@ -22,12 +22,12 @@ pub use bridge::{Action, Outbox, Panel};
 
 mod late;
 
-pub type ClientsProvider = dyn Fn() -> Vec<vibevalley_server::transport::bridge::ClientSnapshot> + Send + Sync;
+pub type ClientsProvider = dyn Fn() -> Vec<vibevalley_server::gateway::bridge::ClientSnapshot> + Send + Sync;
 
 /// The server every hosted view talks to (`call`, slices, `live`,
 /// subscriptions), shared app-wide.
 pub struct BridgeHub(
-    pub vibevalley_server::transport::bridge::Hub,
+    pub vibevalley_server::gateway::bridge::Hub,
     #[allow(dead_code, reason = "keeps weak client snapshot provider alive for the app lifetime")] Arc<ClientsProvider>,
 );
 
@@ -243,8 +243,8 @@ struct FailedFeeds {
 
 impl FailedFeeds {
     fn new() -> Self {
-        use vibevalley_server::{SliceFeed, transport::bridge::SliceKind};
-        let bundle = vibevalley_server::transport::bridge::fake::empty_bundle(0);
+        use vibevalley_server::{SliceFeed, gateway::bridge::SliceKind};
+        let bundle = vibevalley_server::gateway::bridge::fake::empty_bundle(0);
         Self {
             board: SliceFeed::from_value(SliceKind::Board, bundle.board.seq, &bundle.board),
             sessions: SliceFeed::from_value(SliceKind::Sessions, bundle.sessions.seq, &bundle.sessions),
@@ -255,8 +255,8 @@ impl FailedFeeds {
         }
     }
 
-    fn feed(&self, slice: vibevalley_server::transport::bridge::SliceKind) -> &vibevalley_server::SliceFeed {
-        use vibevalley_server::transport::bridge::SliceKind;
+    fn feed(&self, slice: vibevalley_server::gateway::bridge::SliceKind) -> &vibevalley_server::SliceFeed {
+        use vibevalley_server::gateway::bridge::SliceKind;
         match slice {
             SliceKind::Board => &self.board,
             SliceKind::Sessions => &self.sessions,
@@ -284,8 +284,8 @@ impl FailedServer {
         }
     }
 
-    fn unavailable(&self) -> vibevalley_server::transport::bridge::Envelope {
-        use vibevalley_server::transport::bridge::{ApiError, BizCode, Envelope};
+    fn unavailable(&self) -> vibevalley_server::gateway::bridge::Envelope {
+        use vibevalley_server::gateway::bridge::{ApiError, BizCode, Envelope};
         Envelope::failure(&ApiError::new(
             BizCode::ServiceUnavailable,
             format!("VibeValley server unavailable: {}", self.reason),
@@ -293,41 +293,36 @@ impl FailedServer {
     }
 }
 
-impl vibevalley_server::transport::bridge::Server for FailedServer {
-    fn call(&self, _op: &str, _payload: Value) -> vibevalley_server::transport::bridge::Envelope {
+impl vibevalley_server::gateway::bridge::Server for FailedServer {
+    fn call(&self, _op: &str, _payload: Value) -> vibevalley_server::gateway::bridge::Envelope {
         self.unavailable()
     }
 
-    fn call_with(
-        &self,
-        _ctx: &vibevalley_server::transport::bridge::CallerContext,
-        _op: &str,
-        _payload: Value,
-    ) -> vibevalley_server::transport::bridge::Envelope {
+    fn call_with(&self, _ctx: &vibevalley_server::gateway::bridge::CallerContext, _op: &str, _payload: Value) -> vibevalley_server::gateway::bridge::Envelope {
         self.unavailable()
     }
 
     fn call_with_async(
         self: Arc<Self>,
-        _ctx: vibevalley_server::transport::bridge::CallerContext,
+        _ctx: vibevalley_server::gateway::bridge::CallerContext,
         _op: String,
         _payload: Value,
-    ) -> vibevalley_server::transport::api::BoxFuture<'static, vibevalley_server::transport::bridge::Envelope> {
+    ) -> vibevalley_server::gateway::api::BoxFuture<'static, vibevalley_server::gateway::bridge::Envelope> {
         let envelope = self.unavailable();
         Box::pin(async move { envelope })
     }
 
-    fn slice_snapshot(&self, slice: vibevalley_server::transport::bridge::SliceKind) -> Value {
+    fn slice_snapshot(&self, slice: vibevalley_server::gateway::bridge::SliceKind) -> Value {
         self.feeds.feed(slice).snapshot_value()
     }
 
-    fn slice_snapshot_json(&self, slice: vibevalley_server::transport::bridge::SliceKind) -> Arc<str> {
+    fn slice_snapshot_json(&self, slice: vibevalley_server::gateway::bridge::SliceKind) -> Arc<str> {
         self.feeds.feed(slice).snapshot_json()
     }
 
     fn watch_slice(
         &self,
-        slice: vibevalley_server::transport::bridge::SliceKind,
+        slice: vibevalley_server::gateway::bridge::SliceKind,
         after_seq: Option<i64>,
         stop: &flume::Receiver<()>,
         receive: &mut dyn FnMut(i64, &Value),
@@ -335,30 +330,30 @@ impl vibevalley_server::transport::bridge::Server for FailedServer {
         self.feeds.feed(slice).watch_since(after_seq, stop, receive);
     }
 
-    fn subscribe_slice(&self, slice: vibevalley_server::transport::bridge::SliceKind) -> Option<vibevalley_server::SliceSubscription> {
+    fn subscribe_slice(&self, slice: vibevalley_server::gateway::bridge::SliceKind) -> Option<vibevalley_server::SliceSubscription> {
         Some(self.feeds.feed(slice).subscribe())
     }
 
-    fn live(&self) -> flume::Receiver<vibevalley_server::transport::bridge::LiveEvent> {
+    fn live(&self) -> flume::Receiver<vibevalley_server::gateway::bridge::LiveEvent> {
         let (_tx, rx) = flume::bounded(0);
         rx
     }
 
-    fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<vibevalley_server::transport::bridge::LiveEvent>> {
+    fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<vibevalley_server::gateway::bridge::LiveEvent>> {
         let (_tx, rx) = tokio::sync::broadcast::channel(1);
         Some(rx)
     }
 
-    fn subscribe(&self, _name: &str, _payload: Value) -> Result<(u64, flume::Receiver<Value>), vibevalley_server::transport::bridge::Envelope> {
+    fn subscribe(&self, _name: &str, _payload: Value) -> Result<(u64, flume::Receiver<Value>), vibevalley_server::gateway::bridge::Envelope> {
         Err(self.unavailable())
     }
 
     fn subscribe_with(
         &self,
-        _ctx: &vibevalley_server::transport::bridge::CallerContext,
+        _ctx: &vibevalley_server::gateway::bridge::CallerContext,
         _name: &str,
         _payload: Value,
-    ) -> Result<(u64, flume::Receiver<Value>), vibevalley_server::transport::bridge::Envelope> {
+    ) -> Result<(u64, flume::Receiver<Value>), vibevalley_server::gateway::bridge::Envelope> {
         Err(self.unavailable())
     }
 
@@ -392,13 +387,13 @@ impl BridgeHub {
             }
         })
         .detach();
-        let server: Arc<dyn vibevalley_server::transport::bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
+        let server: Arc<dyn vibevalley_server::gateway::bridge::Server> = match std::env::var_os("VIBEVALLEY_FAKE_SERVER") {
             Some(dir) => {
                 drop(running_tx);
                 cx.set_global(ActiveDesktopConnection(Arc::new(connection::Mode::Embedded)));
-                let fake = vibevalley_server::transport::bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir));
+                let fake = vibevalley_server::gateway::bridge::fake::FakeServer::from_dir(std::path::Path::new(&dir));
                 let _ = ready.send_replace(Some(fake.as_ref().map(|_| ()).map_err(ToString::to_string)));
-                Arc::new(fake.unwrap_or_else(|_| vibevalley_server::transport::bridge::fake::FakeServer::new()))
+                Arc::new(fake.unwrap_or_else(|_| vibevalley_server::gateway::bridge::fake::FakeServer::new()))
             }
             None => match connection::resolve(&server_home()) {
                 Ok(resolved) if matches!(resolved.mode, connection::Mode::Remote { .. }) => {
@@ -425,22 +420,27 @@ impl BridgeHub {
                     cx.set_global(ActiveDesktopConnection(Arc::new(connection::Mode::Embedded)));
                     Arc::new(late::LateServer::spawn(move || {
                         let home = server_home();
-                        let mut config = crate::serving::config(&home, crate::serving::work_root());
+                        let mut config: vibevalley_server::Config = crate::serving::config(&home, crate::serving::work_root());
                         config.host_debug = Some(Arc::new(host_debug_for_boot.clone()));
-                        match vibevalley_server::start(config) {
-                            Ok(started) => {
-                                let server = started.server();
+                        let (boot_tx, boot_rx) = flume::bounded(1);
+                        vibevalley_runtime::rt::handle().spawn(async move {
+                            let _ = boot_tx.send(vibevalley_server::create_app(config).await);
+                        });
+                        match boot_rx.recv() {
+                            Ok(Ok(app)) => {
+                                let app: vibevalley_server::App = app;
+                                let server = app.server();
                                 let preference =
                                     port_preference_from(std::env::var("VIBEVALLEY_PORT").ok().as_deref(), vibevalley_protocol::home::default_port());
                                 // The loopback API: the CLI finds it through server.json, the helpers' MCP door is on it.
                                 let (listener, announced) = match preference.and_then(|pref| {
-                                    bind_preferred_or_ephemeral(pref, |addr| vibevalley_server::transport::http::serve(server.clone(), addr))
+                                    bind_preferred_or_ephemeral(pref, |addr| vibevalley_server::gateway::http::serve(server.clone(), addr))
                                         .map_err(|e| format!("vibevalley http: {e}"))
                                 }) {
                                     Ok(listener) => {
                                         let url = listener.url();
                                         host_debug_for_boot.set_boot_info(url.clone(), boot_started.elapsed().as_millis() as u64);
-                                        started.set_mcp_url(format!("{url}/mcp"));
+                                        app.set_mcp_url(format!("{url}/mcp"));
                                         match vibevalley_server::home::announce(&home, &url) {
                                             Ok(announced) => {
                                                 let _ = ready.send_replace(Some(Ok(())));
@@ -457,16 +457,23 @@ impl BridgeHub {
                                         (None, None)
                                     }
                                 };
-                                let door = started.door.clone();
-                                let wake_observer = crate::host::observe_system_wake(move || door.on_system_wake());
-                                let running = crate::serving::Running::new(started, listener, announced, Some(wake_observer));
+                                let wake_task = app.ctx().task.clone();
+                                let wake_observer = crate::host::observe_system_wake(move || {
+                                    wake_task.notify_wake();
+                                });
+                                let running = crate::serving::Running::new(app, listener, announced, Some(wake_observer));
                                 if let Err(flume::SendError(running)) = running_tx.send(running) {
                                     running.shutdown();
                                 }
                                 server
                             }
-                            Err(e) => {
+                            Ok(Err(e)) => {
                                 let reason = format!("vibevalley server: {e}");
+                                let _ = ready.send_replace(Some(Err(reason.clone())));
+                                Arc::new(FailedServer::new(reason))
+                            }
+                            Err(_) => {
+                                let reason = "vibevalley server: boot task cancelled".to_string();
                                 let _ = ready.send_replace(Some(Err(reason.clone())));
                                 Arc::new(FailedServer::new(reason))
                             }
@@ -482,7 +489,7 @@ impl BridgeHub {
                 }
             },
         };
-        let bridge = vibevalley_server::transport::bridge::Hub::new(server, BRIDGE_CONCURRENCY);
+        let bridge = vibevalley_server::gateway::bridge::Hub::new(server, BRIDGE_CONCURRENCY);
         let bridge_for_clients = bridge.clone();
         let clients_provider: Arc<ClientsProvider> = Arc::new(move || bridge_for_clients.clients_snapshot());
         host_debug.attach_clients(&clients_provider);
@@ -492,7 +499,7 @@ impl BridgeHub {
 
 struct ChannelOutlet(nsh_engine::HostChannel);
 
-impl vibevalley_server::transport::bridge::Outlet for ChannelOutlet {
+impl vibevalley_server::gateway::bridge::Outlet for ChannelOutlet {
     fn send(&self, event: &str, data: Value) {
         let _ = self.0.send(event.to_string(), data);
     }
@@ -512,7 +519,7 @@ impl std::fmt::Debug for Replier {
 }
 
 impl Replier {
-    pub fn send(self, envelope: vibevalley_server::transport::bridge::Envelope) {
+    pub fn send(self, envelope: vibevalley_server::gateway::bridge::Envelope) {
         let _ = self
             .channel
             .send(format!("reply:{}", self.id), serde_json::to_value(envelope).unwrap_or(Value::Null));
@@ -520,8 +527,8 @@ impl Replier {
 }
 
 /// Handles desktop Control Plane connection inspection and switching without touching `crates/protocol`.
-fn handle_desktop_connection_op(op: &str, payload: Value, home: &std::path::Path, active: &connection::Mode) -> vibevalley_server::transport::bridge::Envelope {
-    use vibevalley_server::transport::bridge::{BizCode, Envelope, refusal};
+fn handle_desktop_connection_op(op: &str, payload: Value, home: &std::path::Path, active: &connection::Mode) -> vibevalley_server::gateway::bridge::Envelope {
+    use vibevalley_server::gateway::bridge::{BizCode, Envelope, refusal};
 
     let reply_snapshot = || match connection::snapshot(home, active) {
         Ok(snap) => Envelope::ok(serde_json::to_value(snap).unwrap_or(Value::Null)),
@@ -739,7 +746,7 @@ pub struct HostedView {
     applied: HashMap<String, u64>,
     ready: bool,
     errors: Vec<String>,
-    _bridge: Option<std::sync::Arc<vibevalley_server::transport::bridge::Client>>,
+    _bridge: Option<std::sync::Arc<vibevalley_server::gateway::bridge::Client>>,
 }
 
 pub fn ensure_ui_sets() {
@@ -825,10 +832,10 @@ impl HostedView {
                         Ok(vibevalley_protocol::HostOp::PixelDir) => {
                             if !id.is_empty() {
                                 let env = if has_pixel_dir {
-                                    vibevalley_server::transport::bridge::Envelope::ok(json!({ "path": pixel_dir }))
+                                    vibevalley_server::gateway::bridge::Envelope::ok(json!({ "path": pixel_dir }))
                                 } else {
-                                    vibevalley_server::transport::bridge::refusal(
-                                        vibevalley_server::transport::bridge::BizCode::NotFound,
+                                    vibevalley_server::gateway::bridge::refusal(
+                                        vibevalley_server::gateway::bridge::BizCode::NotFound,
                                         "the pixel art is not installed",
                                     )
                                 };
@@ -981,7 +988,7 @@ impl HostedView {
 
 /// Handles the server half of the bridge on the engine thread; `false` for
 /// actions the shell handles (including `call`s of `host.*` ops).
-fn route_to_bridge(bridge: &vibevalley_server::transport::bridge::Client, v: &Value) -> bool {
+fn route_to_bridge(bridge: &vibevalley_server::gateway::bridge::Client, v: &Value) -> bool {
     let s = |k: &str| v[k].as_str().unwrap_or_default().to_string();
     match v["type"].as_str() {
         Some("call") if !s("op").starts_with("host.") => bridge.call(&s("id"), s("op"), v["payload"].clone()),
@@ -1189,8 +1196,8 @@ mod tests {
         use std::sync::Arc;
         use std::time::Duration;
         use tokio::sync::Notify;
-        use vibevalley_server::transport::bridge::fake::{FakeServer, empty_bundle};
-        use vibevalley_server::transport::bridge::{Hub, Outlet, SliceKind};
+        use vibevalley_server::gateway::bridge::fake::{FakeServer, empty_bundle};
+        use vibevalley_server::gateway::bridge::{Hub, Outlet, SliceKind};
 
         #[derive(Default)]
         struct Recorder {
@@ -1278,8 +1285,8 @@ mod tests {
 
     #[test]
     fn shell_debug_handle_bridges_snapshots_into_server_with_bounded_frames_and_clients() {
-        use vibevalley_server::transport::bridge::fake::FakeServer;
-        use vibevalley_server::transport::bridge::{CallerContext, Envelope, Hub as Bridge, LiveEvent, Outlet, Server, SliceKind};
+        use vibevalley_server::gateway::bridge::fake::FakeServer;
+        use vibevalley_server::gateway::bridge::{CallerContext, Envelope, Hub as Bridge, LiveEvent, Outlet, Server, SliceKind};
         use vibevalley_server::{HostDebugBridge, SharedHostDebug};
 
         struct NoopOutlet;
@@ -1434,7 +1441,7 @@ mod tests {
 
     #[test]
     fn failed_server_reports_service_unavailable_with_root_cause_and_empty_slices() {
-        use vibevalley_server::transport::bridge::{BizCode, CallerContext, Server, SliceKind};
+        use vibevalley_server::gateway::bridge::{BizCode, CallerContext, Server, SliceKind};
 
         let root_cause = "vibevalley server: no such column: source_job_id";
         let server = Arc::new(FailedServer::new(root_cause));
@@ -1494,9 +1501,9 @@ mod tests {
         use std::sync::atomic::{AtomicUsize, Ordering};
         use std::time::Duration;
         use tokio::sync::Notify;
-        use vibevalley_server::transport::api::BoxFuture;
-        use vibevalley_server::transport::bridge::fake::FakeServer;
-        use vibevalley_server::transport::bridge::{CallerContext, Envelope, Hub as Bridge, Outlet, Server, SliceKind};
+        use vibevalley_server::gateway::api::BoxFuture;
+        use vibevalley_server::gateway::bridge::fake::FakeServer;
+        use vibevalley_server::gateway::bridge::{CallerContext, Envelope, Hub as Bridge, Outlet, Server, SliceKind};
 
         struct SlowOpenServer {
             inner: FakeServer,
@@ -1543,7 +1550,7 @@ mod tests {
             fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
                 self.inner.watch_slice(slice, after_seq, stop, receive);
             }
-            fn live(&self) -> flume::Receiver<vibevalley_server::transport::bridge::LiveEvent> {
+            fn live(&self) -> flume::Receiver<vibevalley_server::gateway::bridge::LiveEvent> {
                 self.inner.live()
             }
             fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope> {

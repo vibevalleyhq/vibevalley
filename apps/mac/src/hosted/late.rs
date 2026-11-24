@@ -1,8 +1,8 @@
 //! The real server, started off the UI thread: the bridge needs a server at
-//! launch, and `vibevalley_server::start` blocks (files, runtime probes). Until it
-//! is up, async slice and live subscribers await [`Server::ready_async`] on the
-//! shared Tokio runtime before entering the zero-thread `WatchStream` /
-//! `broadcast::Receiver` fast paths.
+//! launch, and `vibevalley_server::create_app` boots off the UI thread (files,
+//! runtime probes). Until it is up, async slice and live subscribers await
+//! [`Server::ready_async`] on the shared Tokio runtime before entering the
+//! zero-thread `WatchStream` / `broadcast::Receiver` fast paths.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -12,14 +12,15 @@ use parking_lot::Mutex;
 use serde_json::Value;
 use tokio::sync::{broadcast, watch};
 use vibevalley_server::SliceSubscription;
-use vibevalley_server::transport::api::{BoxFuture, refusal};
-use vibevalley_server::transport::bridge::{BizCode, CallerContext, Envelope, LiveEvent, Server, SliceKind};
+use vibevalley_server::gateway::api::{BoxFuture, GatewayPorts, refusal};
+use vibevalley_server::gateway::bridge::{BizCode, CallerContext, Envelope, LiveEvent, Server, SliceKind};
 
 #[derive(Clone)]
 pub struct LateServer {
     cell: Arc<OnceLock<Arc<dyn Server>>>,
-    ready_tx: Arc<Mutex<Option<watch::Sender<bool>>>>,
+    ready_tx: Arc<Mutex<Option<(watch::Sender<bool>, flume::Sender<()>)>>>,
     ready: watch::Receiver<bool>,
+    ready_flume: flume::Receiver<()>,
 }
 
 impl Default for LateServer {
@@ -32,19 +33,22 @@ impl LateServer {
     /// Creates an unattached proxy whose async subscribers wait until [`Self::attach`] runs.
     pub fn new() -> LateServer {
         let (tx, ready) = watch::channel(false);
+        let (flume_tx, ready_flume) = flume::bounded(0);
         LateServer {
             cell: Arc::new(OnceLock::new()),
-            ready_tx: Arc::new(Mutex::new(Some(tx))),
+            ready_tx: Arc::new(Mutex::new(Some((tx, flume_tx)))),
             ready,
+            ready_flume,
         }
     }
 
     /// Installs the underlying server once and wakes all waiting callers and stream subscribers.
     pub fn attach(&self, server: Arc<dyn Server>) {
         if self.cell.set(server).is_ok()
-            && let Some(tx) = self.ready_tx.lock().take()
+            && let Some((tx, flume_tx)) = self.ready_tx.lock().take()
         {
             let _ = tx.send(true);
+            drop(flume_tx);
         }
     }
 
@@ -120,14 +124,7 @@ impl Server for LateServer {
 
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
         if self.cell.get().is_none() {
-            let mut ready = self.ready.clone();
-            vibevalley_runtime::rt::block_on(async {
-                tokio::select! {
-                    biased;
-                    _ = stop.recv_async() => {}
-                    _ = ready.wait_for(|is_ready| *is_ready) => {}
-                }
-            });
+            flume::Selector::new().recv(stop, |_| ()).recv(&self.ready_flume, |_| ()).wait();
         }
         if !stop.is_disconnected()
             && let Some(server) = self.cell.get()
@@ -246,16 +243,8 @@ impl Server for LateServer {
         }
     }
 
-    fn media_inputs(&self) -> Option<vibevalley_server::transport::api::media::SharedMediaInputs> {
-        self.cell.get().and_then(|s| s.media_inputs())
-    }
-
-    fn speech_streams(&self) -> Option<vibevalley_server::transport::api::media::SharedSpeechStreams> {
-        self.cell.get().and_then(|s| s.speech_streams())
-    }
-
-    fn mcp(&self) -> Option<vibevalley_server::transport::api::SharedMcp> {
-        self.cell.get().and_then(|s| s.mcp())
+    fn ports(&self) -> GatewayPorts {
+        self.cell.get().map(|s| s.ports()).unwrap_or_default()
     }
 
     fn host_debug(&self) -> Option<vibevalley_server::SharedHostDebug> {
@@ -264,18 +253,6 @@ impl Server for LateServer {
 
     fn fault_gate(&self) -> Option<vibevalley_server::SharedFaultGate> {
         self.cell.get().and_then(|s| s.fault_gate())
-    }
-
-    fn voice(&self) -> Option<vibevalley_server::transport::api::SharedLiveVoice> {
-        self.cell.get().and_then(|s| s.voice())
-    }
-
-    fn remote_auth(&self) -> Option<vibevalley_server::transport::api::SharedRemoteAuth> {
-        self.cell.get().and_then(|s| s.remote_auth())
-    }
-
-    fn machine_bus(&self) -> Option<vibevalley_server::transport::api::SharedMachineBus> {
-        self.cell.get().and_then(|s| s.machine_bus())
     }
 }
 
@@ -287,8 +264,8 @@ mod tests {
     use serde_json::json;
     use tokio::sync::Notify;
     use vibevalley_protocol::Issue;
-    use vibevalley_server::transport::bridge::fake::{FakeServer, empty_bundle};
-    use vibevalley_server::transport::bridge::{ClientIdentity, ClientKind, Hub as BridgeHub, Outlet};
+    use vibevalley_server::gateway::bridge::fake::{FakeServer, empty_bundle};
+    use vibevalley_server::gateway::bridge::{ClientIdentity, ClientKind, Hub as BridgeHub, Outlet};
 
     #[derive(Default)]
     struct Recorder {
@@ -631,13 +608,13 @@ mod tests {
     #[test]
     fn machine_bus_forwards_after_attach() {
         struct DummyMachineBus;
-        impl vibevalley_server::transport::api::MachineBus for DummyMachineBus {
-            fn accept_connection(&self, _conn: vibevalley_server::transport::api::MachineConnection) {}
+        impl vibevalley_server::gateway::api::MachineBus for DummyMachineBus {
+            fn accept_connection(&self, _conn: vibevalley_server::gateway::api::MachineConnection) {}
         }
 
         struct MachineBusServer {
             inner: Arc<FakeServer>,
-            bus: vibevalley_server::transport::api::SharedMachineBus,
+            bus: vibevalley_server::gateway::api::SharedMachineBus,
         }
 
         impl Server for MachineBusServer {
@@ -665,14 +642,17 @@ mod tests {
                 self.inner.unsubscribe(id);
             }
 
-            fn machine_bus(&self) -> Option<vibevalley_server::transport::api::SharedMachineBus> {
-                Some(self.bus.clone())
+            fn ports(&self) -> GatewayPorts {
+                GatewayPorts {
+                    machine: Some(self.bus.clone()),
+                    ..Default::default()
+                }
             }
         }
 
         let late = LateServer::new();
         assert!(late.machine_bus().is_none());
-        let bus: vibevalley_server::transport::api::SharedMachineBus = Arc::new(DummyMachineBus);
+        let bus: vibevalley_server::gateway::api::SharedMachineBus = Arc::new(DummyMachineBus);
         late.attach(Arc::new(MachineBusServer {
             inner: Arc::new(FakeServer::new()),
             bus: bus.clone(),
