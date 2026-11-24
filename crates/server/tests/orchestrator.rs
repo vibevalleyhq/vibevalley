@@ -245,7 +245,7 @@ fn the_orchestrator_hears_the_user_and_records_an_issue() {
         json!({ "name": "早会", "text": "看看昨天的活", "when": { "kind": "once", "at": at } }),
     );
     clock.advance(Duration::from_millis(150));
-    started.test_internals().crons.tick();
+    vibevalley_runtime::rt::block_on(started.test_internals().crons.tick_async());
     model.wait_seen("the cron's turn", |seen| {
         seen.iter()
             .any(|r| r.messages.last().and_then(|m| m.content.clone()).is_some_and(|c| c.contains("[来源：定时]")))
@@ -433,7 +433,7 @@ fn crash_restores_the_builtin_worker_in_the_same_issue_run() {
         std::fs::read(std::path::Path::new(session.cwd.as_deref().unwrap()).join("durable-count.txt")).unwrap(),
         b"x"
     );
-    let runs = start.test_internals().board.runs(&issue.id).unwrap();
+    let runs = vibevalley_runtime::rt::block_on(start.test_internals().board.runs_async(&issue.id)).unwrap();
     assert_eq!(runs.len(), 1);
     assert_eq!(runs[0].summary, "recovered same worker");
     assert_eq!(session.runs, 1);

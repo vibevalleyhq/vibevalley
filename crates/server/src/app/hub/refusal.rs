@@ -136,17 +136,24 @@ impl<T: Clone> RequestKeys<T> {
     }
 }
 
-impl<T: Clone> AsyncRequestKeys<T> {
-    pub async fn once(&self, key: Option<&str>, work: impl Future<Output = Result<T, ApiError>>) -> Result<T, ApiError> {
-        let Some(key) = key.filter(|k| !k.is_empty()) else { return work.await };
-        validate_key(key)?;
-        // Held while working: a duplicate waits for the first answer.
-        let mut seen = self.seen.lock().await;
-        if let Some(done) = cached_answer(&seen, key) {
-            return Ok(done);
+impl<T: Clone + Send> AsyncRequestKeys<T> {
+    pub fn once<'a>(
+        &'a self,
+        key: Option<&str>,
+        work: impl Future<Output = Result<T, ApiError>> + Send + 'a,
+    ) -> impl Future<Output = Result<T, ApiError>> + Send + 'a {
+        let key = key.filter(|k| !k.is_empty()).map(str::to_owned);
+        async move {
+            let Some(key) = key else { return work.await };
+            validate_key(&key)?;
+            // Held while working: a duplicate waits for the first answer.
+            let mut seen = self.seen.lock().await;
+            if let Some(done) = cached_answer(&seen, &key) {
+                return Ok(done);
+            }
+            let done = work.await?;
+            record_answer(&mut seen, &key, &done);
+            Ok(done)
         }
-        let done = work.await?;
-        record_answer(&mut seen, key, &done);
-        Ok(done)
     }
 }

@@ -46,7 +46,7 @@ pub struct Pulls {
 impl Pulls {
     /// Opens `pull` and `pull_event` on the shared `ServerDb` and wires
     /// `Issue.pull_request` projection onto `board` when present.
-    pub fn open(
+    pub async fn open_async(
         db: Arc<ServerDb>,
         publisher: Arc<Publisher>,
         repos: Option<Arc<Repos>>,
@@ -54,10 +54,10 @@ impl Pulls {
         gh: Option<HostRun>,
         glab: Option<HostRun>,
     ) -> Result<Arc<Pulls>, ApiError> {
-        let store = PullStore::open(db)?;
+        let store = PullStore::open_async(db).await?;
         if let Some(board) = &board {
             let idx = store.index();
-            board.use_pull_of_issue(Arc::new(move |issue_id| idx.lock().of_issue(issue_id)));
+            board.use_pull_of_issue_async(Arc::new(move |issue_id| idx.lock().of_issue(issue_id))).await;
         }
         Ok(Arc::new(Pulls {
             store,
@@ -200,27 +200,17 @@ impl Pulls {
                     at: now(),
                 })
                 .await?;
-            if let (Some(board), Some(id)) = (self.board.clone(), issue_id.map(str::to_owned)) {
-                let _ = crate::spawn_blocking_traced(move || board.refresh_issue(&id)).await;
+            if let (Some(board), Some(id)) = (self.board.as_ref(), issue_id) {
+                board.refresh_issue_async(id).await;
             }
         }
         Ok(out)
-    }
-
-    /// Sync shim for synchronous callers (e.g. `team/tool/issue`).
-    pub fn publish(&self, req: &SubmitBranch, issue_id: Option<&str>) -> Result<BranchPublication, ApiError> {
-        crate::work::block_on(self.publish_async(req, issue_id))
     }
 
     /// Fetches a GitHub pull request snapshot (`checks`, `reviews`, `comments`).
     pub async fn snapshot_async(&self, repo: &str, number: i64) -> Result<GitHubPullSnapshot, ApiError> {
         let remote = self.github_remote_async(repo).await?;
         snapshot::fetch_snapshot(&self.gh, &remote, number).await
-    }
-
-    /// Sync shim for synchronous callers (e.g. `team/mcp/resource`).
-    pub fn snapshot(&self, repo: &str, number: i64) -> Result<GitHubPullSnapshot, ApiError> {
-        crate::work::block_on(self.snapshot_async(repo, number))
     }
 
     pub async fn refresh_async(&self) {
@@ -369,22 +359,24 @@ mod tests {
         let hub = Hub::new(vibevalley_core::empty_space_state());
         let mut reg = Registry::new();
         reg.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-        let board = Board::open_on(
+        let board = Board::open_on_async(
             &dir.path().join("server.db"),
             Arc::new(reg),
             BoardConfig::under(dir.path()),
             Arc::new(Arc::downgrade(&hub)),
         )
+        .await
         .unwrap();
 
         let issue = board
-            .create(NewIssue {
+            .create_async(NewIssue {
                 title: "Ship PR".into(),
                 description: "Deliver via followed PR".into(),
                 agent: "scripted".into(),
                 deliver: Deliverable::Change,
                 ..Default::default()
             })
+            .await
             .unwrap();
 
         let pr_state = Arc::new(Mutex::new("OPEN".to_string()));
@@ -448,40 +440,48 @@ mod tests {
         });
 
         let db = ServerDb::open(dir.path()).unwrap();
-        let pulls = Pulls::open(db.clone(), Arc::new(Publisher::default()), None, Some(board.clone()), Some(gh.clone()), None).unwrap();
+        let pulls = Pulls::open_async(db.clone(), Arc::new(Publisher::default()), None, Some(board.clone()), Some(gh.clone()), None)
+            .await
+            .unwrap();
 
         // Upsert linked PR and standalone PR (issue_id = None)
-        let linked = crate::work::block_on(pulls.store().upsert_async(UpsertPullInput {
-            platform: PublishPlatform::Github,
-            repo: "acme/demo".into(),
-            number: 9,
-            url: "https://github.com/acme/demo/pull/9".into(),
-            branch: "vibevalley/issue-1".into(),
-            base: "main".into(),
-            state: PullRequestState::Open,
-            issue_id: Some(issue.id.clone()),
-            at: 1000,
-        }))
-        .unwrap();
-        let standalone = crate::work::block_on(pulls.store().upsert_async(UpsertPullInput {
-            platform: PublishPlatform::Github,
-            repo: "acme/demo".into(),
-            number: 10,
-            url: "https://github.com/acme/demo/pull/10".into(),
-            branch: "feat/standalone".into(),
-            base: "main".into(),
-            state: PullRequestState::Open,
-            issue_id: None,
-            at: 1001,
-        }))
-        .unwrap();
+        let linked = pulls
+            .store()
+            .upsert_async(UpsertPullInput {
+                platform: PublishPlatform::Github,
+                repo: "acme/demo".into(),
+                number: 9,
+                url: "https://github.com/acme/demo/pull/9".into(),
+                branch: "vibevalley/issue-1".into(),
+                base: "main".into(),
+                state: PullRequestState::Open,
+                issue_id: Some(issue.id.clone()),
+                at: 1000,
+            })
+            .await
+            .unwrap();
+        let standalone = pulls
+            .store()
+            .upsert_async(UpsertPullInput {
+                platform: PublishPlatform::Github,
+                repo: "acme/demo".into(),
+                number: 10,
+                url: "https://github.com/acme/demo/pull/10".into(),
+                branch: "feat/standalone".into(),
+                base: "main".into(),
+                state: PullRequestState::Open,
+                issue_id: None,
+                at: 1001,
+            })
+            .await
+            .unwrap();
         assert_eq!(standalone.issue_id, None);
-        board.refresh_issue(&issue.id);
+        board.refresh_issue_async(&issue.id).await;
         assert_eq!(board.issue(&issue.id).unwrap().pull_request.as_ref().map(|p| p.number), Some(9));
 
         // Updating the issue MUST NOT null pull.issue_id (regression test for PutIssue ON CONFLICT DO UPDATE)
-        board.move_to(&issue.id, IssueStatus::Todo, None).unwrap();
-        let reopened_store = PullStore::open(db.clone()).unwrap();
+        board.move_to_async(&issue.id, IssueStatus::Todo, None).await.unwrap();
+        let reopened_store = PullStore::open_async(db.clone()).await.unwrap();
         assert_eq!(reopened_store.find("acme/demo", 9).unwrap().issue_id.as_deref(), Some(issue.id.as_str()));
 
         // Snapshot via MCP resource_read (`vv://github/acme/demo/pulls/9` and `/checks`)
@@ -490,7 +490,7 @@ mod tests {
         let trajectories = Trajectories::open(db, &hub);
         let resources = Resources::with_pulls(board.clone(), chat, trajectories, pulls.clone());
         let page = resources
-            .read(
+            .read_async(
                 None,
                 &ResourceReadArgs {
                     uri: "vv://github/acme/demo/pulls/9/checks".into(),
@@ -498,6 +498,7 @@ mod tests {
                     limit: None,
                 },
             )
+            .await
             .unwrap();
         assert!(page.contains("deadbeef") && page.contains("FAILURE"), "{page}");
 
@@ -528,13 +529,14 @@ mod tests {
 
         // Closing an issue's PR settles as Dismissed
         let issue2 = board
-            .create(NewIssue {
+            .create_async(NewIssue {
                 title: "Close PR".into(),
                 description: "Deliver via followed PR".into(),
                 agent: "scripted".into(),
                 deliver: Deliverable::Change,
                 ..Default::default()
             })
+            .await
             .unwrap();
         pulls
             .store()
@@ -551,7 +553,7 @@ mod tests {
             })
             .await
             .unwrap();
-        board.refresh_issue(&issue2.id);
+        board.refresh_issue_async(&issue2.id).await;
         *pr_state.lock() = "CLOSED".into();
         pulls.refresh_async().await;
         assert_eq!(board.issue(&issue2.id).unwrap().canceled, Some(IssueCanceled::Dismissed));
@@ -588,7 +590,7 @@ mod tests {
                 missing: false,
             }
         });
-        let pulls = Pulls::open(db, Arc::new(Publisher::default()), None, None, Some(gh), None).unwrap();
+        let pulls = Pulls::open_async(db, Arc::new(Publisher::default()), None, None, Some(gh), None).await.unwrap();
         pulls
             .store()
             .upsert_async(UpsertPullInput {

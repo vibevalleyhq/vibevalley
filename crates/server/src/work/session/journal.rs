@@ -563,14 +563,14 @@ impl Trajectories {
             loop {
                 if task_cancel.is_cancelled() {
                     if let Some(t) = weak.upgrade() {
-                        let _ = tokio::task::spawn_blocking(move || t.finish_all()).await;
+                        t.finish_all_async().await;
                     }
                     return;
                 }
                 let deadline = {
                     let Some(t) = weak.upgrade() else { return };
                     if t.hub.strong_count() == 0 {
-                        let _ = tokio::task::spawn_blocking(move || t.finish_all()).await;
+                        t.finish_all_async().await;
                         return;
                     }
                     t.next_deadline()
@@ -596,14 +596,18 @@ impl Trajectories {
                 };
                 let Some(t) = weak.upgrade() else { return };
                 if stop || t.hub.strong_count() == 0 {
-                    let _ = tokio::task::spawn_blocking(move || t.finish_all()).await;
+                    t.finish_all_async().await;
                     return;
                 }
-                let _ = tokio::task::spawn_blocking(move || t.flush(false)).await;
+                t.flush_async(false).await;
             }
         });
         *t.worker.lock() = Some((cancel, handle));
         t
+    }
+
+    fn block_on<F: std::future::Future>(future: F) -> F::Output {
+        vibevalley_runtime::rt::block_on(future)
     }
 
     fn next_deadline(&self) -> Option<Instant> {
@@ -615,14 +619,14 @@ impl Trajectories {
     }
 
     fn load_tail(&self, id: &str) -> Vec<SessionEvent> {
-        crate::work::block_on(super::db::list_events_tail(self.db.read_conn(), id, "", KEEP_EVENTS as i64)).unwrap_or_default()
+        Self::block_on(super::db::list_events_tail(self.db.read_conn(), id, "", KEEP_EVENTS as i64)).unwrap_or_default()
     }
 
-    fn persist_dirty(&self, writes: Vec<(String, Vec<SessionEvent>)>) {
+    async fn persist_dirty_async(&self, writes: Vec<(String, Vec<SessionEvent>)>) {
         if writes.is_empty() {
             return;
         }
-        if let Err(e) = crate::work::block_on(async {
+        if let Err(e) = async {
             use sea_orm::{DatabaseBackend, SqliteTransactionMode, TransactionOptions, TransactionTrait as _};
             let w = self.db.write_conn();
             let opts = TransactionOptions {
@@ -634,23 +638,24 @@ impl Trajectories {
                 super::db::upsert_events(&tx, &id, &events).await?;
             }
             tx.commit().await
-        }) {
+        }
+        .await
+        {
             eprintln!("vibevalley: persisting session events: {e}");
         }
     }
 
-    fn flush_session(&self, id: &str) {
+    async fn flush_session_async(&self, id: &str) {
         let dirty = {
             let mut open = self.open.lock();
             open.get_mut(id).map(|j| j.take_dirty_for_save(false)).unwrap_or_default()
         };
         if !dirty.is_empty() {
-            self.persist_dirty(vec![(id.to_string(), dirty)]);
+            self.persist_dirty_async(vec![(id.to_string(), dirty)]).await;
         }
     }
 
-    /// Pushes what is due and writes out changed events to SQLite.
-    pub fn flush(&self, all: bool) {
+    pub async fn flush_async(&self, all: bool) {
         let mut pushes = Vec::new();
         let mut writes = Vec::new();
         {
@@ -670,7 +675,12 @@ impl Trajectories {
                 hub.session_event(&id, e);
             }
         }
-        self.persist_dirty(writes);
+        self.persist_dirty_async(writes).await;
+    }
+
+    /// Pushes what is due and writes out changed events to SQLite.
+    pub fn flush(&self, all: bool) {
+        Self::block_on(self.flush_async(all));
     }
 
     fn with<R>(&self, id: &str, f: impl FnOnce(&mut Journal) -> R) -> Option<R> {
@@ -691,14 +701,14 @@ impl Trajectories {
     }
 
     /// A session's log, oldest first; a run's only when `run` is given.
-    pub fn events(&self, id: &str, run: Option<&str>) -> Option<Vec<SessionEvent>> {
+    pub async fn events_async(&self, id: &str, run: Option<&str>) -> Option<Vec<SessionEvent>> {
         if !known_id(id) {
             return None;
         }
-        self.flush_session(id);
+        self.flush_session_async(id).await;
         let is_open = self.open.lock().contains_key(id);
         let run_id = run.filter(|r| !r.is_empty()).unwrap_or("");
-        let (has_any, events) = crate::work::block_on(async {
+        let (has_any, events) = async {
             let r = self.db.read_conn();
             let max_seq = super::db::max_event_seq(r, id).await?;
             if max_seq < 0 && !is_open {
@@ -706,21 +716,27 @@ impl Trajectories {
             }
             let rows = super::db::list_events_tail(r, id, run_id, 1_000_000).await?;
             Ok((true, rows))
-        })
+        }
+        .await
         .ok()?;
         has_any.then_some(events)
     }
 
+    /// A session's log, oldest first; a run's only when `run` is given.
+    pub fn events(&self, id: &str, run: Option<&str>) -> Option<Vec<SessionEvent>> {
+        Self::block_on(self.events_async(id, run))
+    }
+
     /// Cursor-paged events for `session.event.list`.
-    pub fn events_page(&self, input: &vibevalley_protocol::SessionEventListInput) -> Option<vibevalley_protocol::SessionEventPage> {
+    pub async fn events_page_async(&self, input: &vibevalley_protocol::SessionEventListInput) -> Option<vibevalley_protocol::SessionEventPage> {
         if !known_id(&input.id) {
             return None;
         }
-        self.flush_session(&input.id);
+        self.flush_session_async(&input.id).await;
         let limit = input.limit.unwrap_or(200).clamp(1, 1000);
         let run_id = input.run.as_deref().unwrap_or("");
         let fetch = limit + 1;
-        let mut events = crate::work::block_on(async {
+        let mut events = async {
             let r = self.db.read_conn();
             if let Some(after) = input.after_seq {
                 super::db::list_events_after(r, &input.id, run_id, after, fetch).await
@@ -729,7 +745,8 @@ impl Trajectories {
             } else {
                 super::db::list_events_tail(r, &input.id, run_id, fetch).await
             }
-        })
+        }
+        .await
         .unwrap_or_default();
         let has_more = events.len() > limit as usize;
         if has_more {
@@ -751,7 +768,7 @@ impl Trajectories {
     }
 
     /// Seals and flushes a session's open log to SQLite.
-    pub fn finish(&self, id: &str) {
+    pub async fn finish_async(&self, id: &str) {
         let Some(mut j) = self.open.lock().remove(id) else { return };
         j.close();
         let pushes = j.due(true);
@@ -762,14 +779,14 @@ impl Trajectories {
             }
         }
         if !dirty.is_empty() {
-            self.persist_dirty(vec![(id.to_string(), dirty)]);
+            self.persist_dirty_async(vec![(id.to_string(), dirty)]).await;
         }
     }
 
-    fn finish_all(&self) {
+    async fn finish_all_async(&self) {
         let ids: Vec<String> = self.open.lock().keys().cloned().collect();
         for id in ids {
-            self.finish(&id);
+            self.finish_async(&id).await;
         }
     }
 
@@ -781,16 +798,7 @@ impl Trajectories {
             cancel.cancel();
             let _ = handle.await;
         }
-        self.finish_all();
-    }
-
-    /// Seals and flushes every open log.
-    pub fn close(&self) {
-        if let Some((cancel, handle)) = self.worker.lock().take() {
-            cancel.cancel();
-            let _ = crate::work::block_on(handle);
-        }
-        self.finish_all();
+        self.finish_all_async().await;
     }
 
     /// The open log of `id`, for writing to it.
@@ -809,7 +817,7 @@ impl Trajectories {
             return;
         }
         self.open.lock().remove(id);
-        let _ = crate::work::block_on(super::db::delete_events(self.db.write_conn(), id));
+        let _ = Self::block_on(super::db::delete_events(self.db.write_conn(), id));
     }
 
     /// Takes one of the board's steps for session `id` working in `cwd`.
@@ -968,90 +976,95 @@ mod tests {
         let db = crate::db::ServerDb::open(home.path()).unwrap();
         let hub = Hub::new(vibevalley_core::Core::default().state().clone());
 
-        // Idle close returns immediately without polling delay.
-        let idle = Trajectories::open(db.clone(), &hub);
-        assert!(idle.next_deadline().is_none());
-        let start = std::time::Instant::now();
-        idle.close();
-        assert!(start.elapsed() < Duration::from_secs(1));
+        vibevalley_runtime::rt::block_on(async {
+            // Idle close returns immediately without polling delay.
+            let idle = Trajectories::open(db.clone(), &hub);
+            assert!(idle.next_deadline().is_none());
+            let start = std::time::Instant::now();
+            idle.close_async().await;
+            assert!(start.elapsed() < Duration::from_secs(1));
 
-        let tr = Trajectories::open(db.clone(), &hub);
-        let live = hub.live();
-        tr.step("w1", "", Step::Asked { text: "hello".into() });
-        assert!(tr.next_deadline().is_some());
+            let tr = Trajectories::open(db.clone(), &hub);
+            let live = hub.live();
+            tr.step("w1", "", Step::Asked { text: "hello".into() });
+            assert!(tr.next_deadline().is_some());
 
-        let deadline = std::time::Instant::now() + Duration::from_secs(2);
-        let mut saw_push = false;
-        while std::time::Instant::now() < deadline {
-            match live.recv_timeout(Duration::from_millis(50)) {
-                Ok(LiveEvent::Event(ev)) if ev.id == "w1" && ev.activity.text == "hello" => {
-                    saw_push = true;
-                    break;
+            let deadline = std::time::Instant::now() + Duration::from_secs(2);
+            let mut saw_push = false;
+            while std::time::Instant::now() < deadline {
+                match live.recv_timeout(Duration::from_millis(50)) {
+                    Ok(LiveEvent::Event(ev)) if ev.id == "w1" && ev.activity.text == "hello" => {
+                        saw_push = true;
+                        break;
+                    }
+                    Ok(_) => {}
+                    Err(flume::RecvTimeoutError::Timeout) => {}
+                    Err(flume::RecvTimeoutError::Disconnected) => break,
                 }
-                Ok(_) => {}
-                Err(flume::RecvTimeoutError::Timeout) => {}
-                Err(flume::RecvTimeoutError::Disconnected) => break,
             }
-        }
-        assert!(saw_push, "event-driven journal worker should flush pending push at PUSH_AFTER");
-        tr.close();
-        assert!(home.path().join("server.db").is_file());
-        assert!(!home.path().join("events").exists());
+            assert!(saw_push, "event-driven journal worker should flush pending push at PUSH_AFTER");
+            tr.close_async().await;
+            assert!(home.path().join("server.db").is_file());
+            assert!(!home.path().join("events").exists());
 
-        // Cursor pagination beyond the hot RAM window (KEEP_EVENTS = 240).
-        let tr2 = Trajectories::open(db.clone(), &hub);
-        for i in 1..=260 {
-            tr2.step("w-long", "", Step::Asked { text: format!("step-{i}") });
-        }
-        let page1 = tr2
-            .events_page(&vibevalley_protocol::SessionEventListInput {
-                id: "w-long".into(),
-                run: None,
-                before_seq: None,
-                after_seq: None,
-                limit: Some(100),
-            })
-            .unwrap();
-        assert_eq!(page1.events.len(), 100);
-        assert!(page1.has_more);
-        assert_eq!(page1.oldest_seq, Some(160));
-        assert_eq!(page1.newest_seq, Some(259));
+            // Cursor pagination beyond the hot RAM window (KEEP_EVENTS = 240).
+            let tr2 = Trajectories::open(db.clone(), &hub);
+            for i in 1..=260 {
+                tr2.step("w-long", "", Step::Asked { text: format!("step-{i}") });
+            }
+            let page1 = tr2
+                .events_page_async(&vibevalley_protocol::SessionEventListInput {
+                    id: "w-long".into(),
+                    run: None,
+                    before_seq: None,
+                    after_seq: None,
+                    limit: Some(100),
+                })
+                .await
+                .unwrap();
+            assert_eq!(page1.events.len(), 100);
+            assert!(page1.has_more);
+            assert_eq!(page1.oldest_seq, Some(160));
+            assert_eq!(page1.newest_seq, Some(259));
 
-        let page2 = tr2
-            .events_page(&vibevalley_protocol::SessionEventListInput {
-                id: "w-long".into(),
-                run: None,
-                before_seq: page1.oldest_seq,
-                after_seq: None,
-                limit: Some(200),
-            })
-            .unwrap();
-        assert_eq!(page2.events.len(), 160);
-        assert!(!page2.has_more);
-        assert_eq!(page2.oldest_seq, Some(0));
-        assert_eq!(page2.newest_seq, Some(159));
-        tr2.close();
+            let page2 = tr2
+                .events_page_async(&vibevalley_protocol::SessionEventListInput {
+                    id: "w-long".into(),
+                    run: None,
+                    before_seq: page1.oldest_seq,
+                    after_seq: None,
+                    limit: Some(200),
+                })
+                .await
+                .unwrap();
+            assert_eq!(page2.events.len(), 160);
+            assert!(!page2.has_more);
+            assert_eq!(page2.oldest_seq, Some(0));
+            assert_eq!(page2.newest_seq, Some(159));
+            tr2.close_async().await;
 
-        // Evicted burst (>240 steps closed directly without prior flush) still persists completely to SQLite.
-        let tr3 = Trajectories::open(db.clone(), &hub);
-        for i in 0..265 {
-            tr3.step("w-burst", "", Step::Asked { text: format!("burst-{i}") });
-        }
-        tr3.close();
-        let tr4 = Trajectories::open(db, &hub);
-        let burst = tr4
-            .events_page(&vibevalley_protocol::SessionEventListInput {
-                id: "w-burst".into(),
-                run: None,
-                before_seq: None,
-                after_seq: None,
-                limit: Some(500),
-            })
-            .unwrap();
-        assert_eq!(burst.events.len(), 265);
-        assert_eq!(burst.oldest_seq, Some(0));
-        assert_eq!(burst.newest_seq, Some(264));
-        tr4.close();
+            // Evicted burst (>240 steps closed directly without prior flush) still persists completely to SQLite.
+            let tr3 = Trajectories::open(db.clone(), &hub);
+            for i in 0..265 {
+                tr3.step("w-burst", "", Step::Asked { text: format!("burst-{i}") });
+            }
+            tr3.close_async().await;
+            let tr4 = Trajectories::open(db, &hub);
+            let burst = tr4
+                .events_page_async(&vibevalley_protocol::SessionEventListInput {
+                    id: "w-burst".into(),
+                    run: None,
+                    before_seq: None,
+                    after_seq: None,
+                    limit: Some(500),
+                })
+                .await
+                .unwrap();
+            assert_eq!(burst.events.len(), 265);
+            assert_eq!(burst.oldest_seq, Some(0));
+            assert_eq!(burst.newest_seq, Some(264));
+            tr4.close_async().await;
+        });
     }
 
     #[tokio::test(start_paused = true)]

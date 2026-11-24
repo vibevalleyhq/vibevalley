@@ -141,6 +141,12 @@ impl ServerConfig {
 }
 
 type Closer = (&'static str, Box<dyn FnOnce() + Send>);
+type AsyncCloser = (&'static str, std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>);
+
+enum Finalizer {
+    Sync(Closer),
+    Async(AsyncCloser),
+}
 
 /// Ordered shutdown registry populated beside each module's construction in [`start`].
 ///
@@ -152,7 +158,8 @@ type Closer = (&'static str, Box<dyn FnOnce() + Send>);
 pub(crate) struct ShutdownList {
     pre_drain: Vec<Closer>,
     concurrent: Vec<Closer>,
-    finalizers: Vec<Closer>,
+    concurrent_async: Vec<AsyncCloser>,
+    finalizers: Vec<Finalizer>,
 }
 
 impl ShutdownList {
@@ -164,41 +171,68 @@ impl ShutdownList {
         self.concurrent.push((name, Box::new(close)));
     }
 
+    pub(crate) fn push_concurrent_async(&mut self, name: &'static str, close: impl std::future::Future<Output = ()> + Send + 'static) {
+        self.concurrent_async.push((name, Box::pin(close)));
+    }
+
     pub(crate) fn push_finalizer(&mut self, name: &'static str, close: impl FnOnce() + Send + 'static) {
-        self.finalizers.push((name, Box::new(close)));
+        self.finalizers.push(Finalizer::Sync((name, Box::new(close))));
+    }
+
+    pub(crate) fn push_finalizer_async(&mut self, name: &'static str, close: impl std::future::Future<Output = ()> + Send + 'static) {
+        self.finalizers.push(Finalizer::Async((name, Box::pin(close))));
     }
 
     /// Runs all registered shutdown phases once and returns whether the concurrent drain timed out.
-    pub(crate) fn drain(&mut self, grace: std::time::Duration) -> bool {
+    pub(crate) async fn drain_async(&mut self, grace: std::time::Duration) -> bool {
         for (name, close) in self.pre_drain.drain(..) {
             tracing::trace!(module = name, "server.close pre-drain");
             close();
         }
 
         let concurrent = std::mem::take(&mut self.concurrent);
-        let timed_out = if concurrent.is_empty() {
+        let concurrent_async = std::mem::take(&mut self.concurrent_async);
+        let timed_out = if concurrent.is_empty() && concurrent_async.is_empty() {
             false
         } else {
-            vibevalley_runtime::rt::block_on(async move {
-                let mut set = tokio::task::JoinSet::new();
-                for (name, close) in concurrent.into_iter().rev() {
-                    set.spawn_blocking(move || {
-                        tracing::trace!(module = name, "server.close draining module");
-                        close();
-                    });
-                }
-                tokio::time::timeout(grace, async { while set.join_next().await.is_some() {} }).await.is_err()
-            })
+            let mut set = tokio::task::JoinSet::new();
+            for (name, close) in concurrent.into_iter().rev() {
+                set.spawn_blocking(move || {
+                    tracing::trace!(module = name, "server.close draining module");
+                    close();
+                });
+            }
+            for (name, close) in concurrent_async.into_iter().rev() {
+                set.spawn(async move {
+                    tracing::trace!(module = name, "server.close draining module");
+                    close.await;
+                });
+            }
+            tokio::time::timeout(grace, async { while set.join_next().await.is_some() {} }).await.is_err()
         };
         if timed_out {
             tracing::warn!(timeout_secs = grace.as_secs(), "server.close timed out waiting for modules to drain");
         }
 
-        for (name, close) in self.finalizers.drain(..).rev() {
-            tracing::trace!(module = name, "server.close finalizer");
-            close();
+        for finalizer in self.finalizers.drain(..).rev() {
+            match finalizer {
+                Finalizer::Sync((name, close)) => {
+                    tracing::trace!(module = name, "server.close finalizer");
+                    close();
+                }
+                Finalizer::Async((name, close)) => {
+                    tracing::trace!(module = name, "server.close finalizer");
+                    close.await;
+                }
+            }
         }
         timed_out
+    }
+
+    /// Runs all registered shutdown phases once and returns whether the concurrent drain timed out.
+    #[cfg(test)]
+    pub(crate) fn drain(&mut self, grace: std::time::Duration) -> bool {
+        vibevalley_runtime::rt::block_on(self.drain_async(grace))
     }
 }
 
@@ -306,15 +340,19 @@ impl Started {
         }
     }
 
+    pub async fn close_async(&self) {
+        const SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
+        let mut shutdown = std::mem::take(&mut *self.shutdown.lock());
+        shutdown.drain_async(SHUTDOWN_GRACE).await;
+    }
+
     /// Lets the farm go, so `start()` can open the same home again in this
     /// process: cancels the root shutdown token immediately, drains modules
     /// concurrently (bounded by a grace timeout), flushes trajectories and
     /// tracked hub tasks, and checkpoints WAL (`TRUNCATE`) + optimizes before
     /// closing the shared `ServerDb`.
     pub fn close(&self) {
-        const SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_secs(10);
-        let mut shutdown = std::mem::take(&mut *self.shutdown.lock());
-        shutdown.drain(SHUTDOWN_GRACE);
+        vibevalley_runtime::rt::block_on(self.close_async());
     }
 }
 
@@ -437,6 +475,11 @@ impl infra::debug::DebugDataSource for ServerDebugSources {
 
 /// Builds the whole server bottom-up (L0 -> L1 -> L2 -> L3). Blocking; call off the UI thread.
 pub fn start(config: ServerConfig) -> Result<Started, StartError> {
+    vibevalley_runtime::rt::block_on(start_async(config))
+}
+
+/// Async version of [`start`].
+pub async fn start_async(config: ServerConfig) -> Result<Started, StartError> {
     let boot_started = std::time::Instant::now();
     crate::install_tls();
     std::fs::create_dir_all(&config.home).map_err(|e| failed("the home")(&e))?;
@@ -522,9 +565,9 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
 
     // Skin observer starts on the empty state so loaded facts replay cleanly.
     let game = skin::game::Game::open_with_clock(&config.home, &hub, config.clock.clone());
-    shutdown.push_concurrent("game", {
+    shutdown.push_concurrent_async("game", {
         let g = game.clone();
-        move || g.close()
+        async move { g.close_async().await }
     });
     skin::game::install(&hub, game.clone());
 
@@ -548,9 +591,9 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     content::artifact::install(&hub, artifacts.clone());
 
     let library = content::library::Library::open(db.clone(), attachments.clone());
-    shutdown.push_concurrent("library", {
+    shutdown.push_concurrent_async("library", {
         let l = library.clone();
-        move || l.close()
+        async move { l.close_async().await }
     });
     content::library::install(&hub, library.clone(), Some(chat.clone()));
 
@@ -601,12 +644,12 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     game.count_commits(repos.clone(), config.git_emails.clone());
 
     let trajectories = work::session::Trajectories::open(db.clone(), &hub);
-    shutdown.push_finalizer("trajectories", {
+    shutdown.push_finalizer_async("trajectories", {
         let t = trajectories.clone();
-        move || t.close()
+        async move { t.close_async().await }
     });
     let drivers = Arc::new(work::session::AgentDrivers::new(agents.clone(), Some(memories.clone())));
-    let board = Board::open_with(
+    let board = Board::open_with_async(
         db.clone(),
         drivers,
         board_config,
@@ -620,6 +663,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
             });
         },
     )
+    .await
     .map_err(|e| failed("the board")(&e))?;
     shutdown.push_concurrent("board", {
         let b = board.clone();
@@ -634,19 +678,20 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     work::session::install(&hub, board.sessions().clone(), trajectories.clone(), Some(attachments.clone()));
 
     let publisher = config.publisher.clone().unwrap_or_else(|| Arc::new(work::pull::Publisher::default()));
-    let pulls =
-        work::pull::Pulls::open(db.clone(), publisher, Some(repos.clone()), Some(board.clone()), None, None).map_err(|e| failed("the pulls")(&e.message))?;
-    shutdown.push_concurrent("pulls", {
+    let pulls = work::pull::Pulls::open_async(db.clone(), publisher, Some(repos.clone()), Some(board.clone()), None, None)
+        .await
+        .map_err(|e| failed("the pulls")(&e.message))?;
+    shutdown.push_concurrent_async("pulls", {
         let p = pulls.clone();
-        move || p.close()
+        async move { p.close_async().await }
     });
     work::pull::install(&hub, pulls.clone(), config.poll_pulls);
 
     // L3: work/chat, team/mcp, team/tool, team/orchestrator, work/cron + collab/voice & collab/connector
     let issue_chat = work::chat::IssueChat::start(&hub, board.clone(), chat.clone());
-    shutdown.push_concurrent("issue_chat", {
+    shutdown.push_concurrent_async("issue_chat", {
         let ic = issue_chat.clone();
-        move || ic.close()
+        async move { ic.close_async().await }
     });
     let session_chat = {
         let ic = issue_chat.clone();
@@ -658,9 +703,9 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
             Arc::new(move |session| ic.ensure_session_thread(session)),
         )
     };
-    shutdown.push_concurrent("session_chat", {
+    shutdown.push_concurrent_async("session_chat", {
         let sc = session_chat.clone();
-        move || sc.close()
+        async move { sc.close_async().await }
     });
 
     let resources = team::mcp::Resources::with_pulls(board.clone(), chat.clone(), trajectories.clone(), pulls.clone());
@@ -695,9 +740,9 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         listen_chat: config.orchestrator_listens,
     })
     .map_err(|e| failed("durable execution")(&e))?;
-    shutdown.push_concurrent("orchestrator", {
+    shutdown.push_concurrent_async("orchestrator", {
         let o = orchestrator.clone();
-        move || o.close()
+        async move { o.close_async().await }
     });
     let _ = execution.set(vibevalley_runtime::agent::harness::SharedExecution::new(orchestrator.execution.harness.clone()));
     hub.runtime_inbox
@@ -710,7 +755,7 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
     team::orchestrator::install(&hub, orchestrator.clone());
 
     let cron_orchestrator: Option<Arc<dyn CronOrchestratorPort>> = config.orchestrator_listens.then(|| orchestrator.clone() as Arc<dyn CronOrchestratorPort>);
-    let crons = work::cron::Crons::open_with_clock(
+    let crons = work::cron::Crons::open_with_clock_async(
         db.clone(),
         &hub,
         board.clone(),
@@ -719,14 +764,15 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
         cron_orchestrator,
         config.clock.clone(),
     )
+    .await
     .map_err(|e| failed("the crons")(&e.message))?;
-    shutdown.push_concurrent("crons", {
+    shutdown.push_concurrent_async("crons", {
         let c = crons.clone();
-        move || c.close()
+        async move { c.close_async().await }
     });
     work::cron::install(&hub, crons.clone(), config.tick_crons);
 
-    board.refresh_queue().map_err(|e| failed("the queue")(&e))?;
+    board.refresh_queue_async().await.map_err(|e| failed("the queue")(&e))?;
 
     let voice = collab::voice::Voice::open(collab::voice::Parts {
         hub: Arc::downgrade(&hub),
@@ -745,9 +791,9 @@ pub fn start(config: ServerConfig) -> Result<Started, StartError> {
 
     let connectors =
         collab::connector::Connectors::open(db.clone(), &hub, chat.clone(), config.connector.clone()).map_err(|e| failed("the connectors")(&e.message))?;
-    shutdown.push_concurrent("connectors", {
+    shutdown.push_concurrent_async("connectors", {
         let c = connectors.clone();
-        move || c.close()
+        async move { c.close_async().await }
     });
     collab::connector::install(&hub, connectors.clone());
 

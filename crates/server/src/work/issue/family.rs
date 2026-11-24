@@ -33,8 +33,8 @@ pub const MAX_CHILDREN: usize = 12;
 impl Board {
     /// Splits an open issue into child issues, all queued: each goes once
     /// the siblings it needs are done.
-    pub fn split(&self, reference: &str, drafts: Vec<ChildDraft>) -> Result<Vec<Issue>> {
-        let _work = self.0.work.lock();
+    pub async fn split_async(&self, reference: &str, drafts: Vec<ChildDraft>) -> Result<Vec<Issue>> {
+        let _work = self.0.work.lock().await;
         let parent = self.stored(reference)?;
         if parent.status.is_closed() {
             return Err(BoardError::Other(format!("issue #{} is closed", parent.number)));
@@ -84,7 +84,11 @@ impl Board {
         let mut made = Vec::new();
         let at = now();
         for d in &drafts {
-            let number = self.0.ledger.next("issue", state.issues.iter().map(|t| t.number).max().unwrap_or(0))?;
+            let number = self
+                .0
+                .ledger
+                .next_async("issue", state.issues.iter().map(|t| t.number).max().unwrap_or(0))
+                .await?;
             let id = format!("i{number}");
             ids.insert(d.id.clone(), id.clone());
             let (title, description) = if d.title.trim().is_empty() {
@@ -118,15 +122,15 @@ impl Board {
                 }];
             }
             made.push(id);
-            self.0.ledger.apply(vec![Fact::issue_changed(at, child)])?;
+            self.0.ledger.apply_async(vec![Fact::issue_changed(at, child)]).await?;
         }
-        self.refresh_queue_locked();
+        self.refresh_queue_locked_async().await;
         Ok(made.iter().filter_map(|id| self.issue(id)).collect())
     }
 
     /// Children whose round is in review are checked and merged into their
     /// parent's branch.
-    pub(super) fn join_children(&self) -> Result<()> {
+    pub(super) async fn join_children_async(&self) -> Result<()> {
         let reviewing: Vec<Issue> = self
             .state()
             .issues
@@ -134,12 +138,12 @@ impl Board {
             .filter(|t| t.parent.is_some() && t.stage.state == StageKind::Reviewing)
             .collect();
         for child in reviewing {
-            self.join_one(&child)?;
+            self.join_one_async(&child).await?;
         }
         Ok(())
     }
 
-    fn join_one(&self, child: &Issue) -> Result<()> {
+    async fn join_one_async(&self, child: &Issue) -> Result<()> {
         let Some(parent) = child.parent.as_deref().and_then(|p| self.issue(p)) else {
             return Ok(());
         };
@@ -170,11 +174,11 @@ impl Board {
         match joined {
             None => {}
             Some(Joined::Stuck { why, conflict }) => {
-                self.change(&child.id, IssueChange::Stuck { why, conflict })?;
+                self.change_async(&child.id, IssueChange::Stuck { why, conflict }).await?;
             }
             Some(Joined::Merged { frozen }) => {
-                self.0.sessions.dismiss(&session.id, Leave::Discard)?;
-                self.change(&child.id, IssueChange::MergedIntoParent { frozen })?;
+                self.0.sessions.dismiss_async(&session.id, Leave::Discard).await?;
+                self.change_async(&child.id, IssueChange::MergedIntoParent { frozen }).await?;
             }
         }
         Ok(())

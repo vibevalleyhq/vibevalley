@@ -5,25 +5,25 @@ use sea_orm::{
     QuerySelect, SqliteTransactionMode, TransactionOptions, TransactionTrait, Update,
 };
 use vibevalley_protocol::Issue;
+use vibevalley_runtime::agent::durable::BoxFuture;
 
 use crate::db::column::{db_json as json, db_word as word, read_db_json as read_json, read_db_word as read_word};
 use crate::db::entities::work_issue::issue;
-use crate::work::block_on;
 use crate::work::ledger::IssueStore;
 
 pub struct SqliteIssueStore;
 
 impl IssueStore for SqliteIssueStore {
-    fn all(&self, db: &DatabaseConnection) -> Result<Vec<Issue>, DbErr> {
-        block_on(all(db))
+    fn all<'a>(&'a self, db: &'a DatabaseConnection) -> BoxFuture<'a, Result<Vec<Issue>, DbErr>> {
+        Box::pin(all(db))
     }
 
-    fn put(&self, tx: &DatabaseTransaction, issue: &Issue) -> Result<(), DbErr> {
-        block_on(put(tx, issue))
+    fn put<'a>(&'a self, tx: &'a DatabaseTransaction, issue: &'a Issue) -> BoxFuture<'a, Result<(), DbErr>> {
+        Box::pin(put(tx, issue))
     }
 
-    fn remove(&self, tx: &DatabaseTransaction, id: &str) -> Result<(), DbErr> {
-        block_on(remove(tx, id))
+    fn remove<'a>(&'a self, tx: &'a DatabaseTransaction, id: &'a str) -> BoxFuture<'a, Result<(), DbErr>> {
+        Box::pin(remove(tx, id))
     }
 }
 

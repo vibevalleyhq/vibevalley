@@ -867,12 +867,14 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
     assert_eq!(wrong.biz_code, BizCode::SessionRefused.code());
 
     // Dismissing the workspace session emits `missing` to `session.watch`.
-    server
-        .test_internals()
-        .board
-        .sessions()
-        .dismiss(&sid, vibevalley_server::work::workplace::Leave::Keep)
-        .unwrap();
+    vibevalley_runtime::rt::block_on(
+        server
+            .test_internals()
+            .board
+            .sessions()
+            .dismiss_async(&sid, vibevalley_server::work::workplace::Leave::Keep),
+    )
+    .unwrap();
     let miss = recv_until(&rx, "missing event after dismiss", |v| v["kind"] == "missing" && v["session"] == sid.as_str());
     assert_eq!(miss["session"], sid.as_str());
 

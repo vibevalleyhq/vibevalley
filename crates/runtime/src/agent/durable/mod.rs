@@ -16,7 +16,10 @@ pub use export::{ExportManifest, ExportOptions};
 pub use graph::{TaskGraph, TaskGraphNode};
 pub use rows::*;
 pub use scheduler::*;
-pub use storage::{DbTx, JsonlOptions, JsonlStorage, MemoryStorage, SeaOrmStorage, StorageBackend, StorageRead, StorageWrite, WriteCallback, WriteOutcome};
+pub use storage::{
+    BoxFuture, DbTx, JsonlOptions, JsonlStorage, MemoryStorage, ReadAsyncOp, SeaOrmStorage, StorageBackend, StorageRead, StorageWrite, WriteAsyncOp,
+    WriteCallback, WriteOutcome,
+};
 pub use store::{Read, Store, Tx};
 pub use telemetry::{JsonlTelemetrySink, MemoryTelemetrySink, NoopTelemetrySink, TelemetryEvent, TelemetrySink, read_telemetry_jsonl};
 

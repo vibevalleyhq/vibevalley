@@ -109,7 +109,7 @@ fn a_log_is_kept_read_back_and_only_grows() {
         j.tool_ended("c1", "a\nb", true, &[]);
         j.run_ended("r7", vibevalley_protocol::Outcome::Completed);
     });
-    tr.finish("w1");
+    vibevalley_runtime::rt::block_on(tr.finish_async("w1"));
     let kept = tr.events("w1", None).unwrap();
     let types: Vec<String> = kept
         .iter()
@@ -130,7 +130,7 @@ fn a_log_is_kept_read_back_and_only_grows() {
         j.said("还没说完", &[]);
         j.note(vibevalley_protocol::SessionEventType::RunError, "停了", &[]);
     });
-    tr.finish("w1");
+    vibevalley_runtime::rt::block_on(tr.finish_async("w1"));
     let after = tr.events("w1", None).unwrap();
     assert_eq!(&after[..5], &kept[..]);
     assert_eq!(after.len(), 7);

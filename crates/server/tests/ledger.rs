@@ -12,12 +12,12 @@ fn regression_failed_batch_changes_neither_database_nor_core() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("server.db");
     let server_db = ServerDb::open_at(&path).unwrap();
-    let (ledger, _) = Ledger::open(
+    let (ledger, _) = vibevalley_runtime::rt::block_on(Ledger::open_async(
         server_db,
         Arc::new(LocalFacts::default()),
         Arc::new(SqliteIssueStore),
         Arc::new(SqliteSessionStore),
-    )
+    ))
     .unwrap();
     let mut db = inspect_db(&path);
     execute_sql(
@@ -25,10 +25,10 @@ fn regression_failed_batch_changes_neither_database_nor_core() {
         "create trigger refuse_second before insert on issue when new.id = 'second' begin select raise(abort, 'refused'); end;",
     );
     let before = ledger.bundle();
-    let result = ledger.apply(vec![
+    let result = vibevalley_runtime::rt::block_on(ledger.apply_async(vec![
         Fact::issue_changed(1, Issue::new("first", 1, "First", 1)),
         Fact::issue_changed(1, Issue::new("second", 2, "Second", 1)),
-    ]);
+    ]));
     assert!(result.is_err());
     assert_eq!(ledger.bundle(), before);
     assert_eq!(
@@ -42,24 +42,24 @@ fn regression_invalid_stored_enum_fails_open_instead_of_losing_the_issue() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("server.db");
     let server_db = ServerDb::open_at(&path).unwrap();
-    let (ledger, _) = Ledger::open(
+    let (ledger, _) = vibevalley_runtime::rt::block_on(Ledger::open_async(
         server_db.clone(),
         Arc::new(LocalFacts::default()),
         Arc::new(SqliteIssueStore),
         Arc::new(SqliteSessionStore),
-    )
+    ))
     .unwrap();
-    ledger.apply(vec![Fact::issue_changed(1, Issue::new("first", 1, "First", 1))]).unwrap();
+    vibevalley_runtime::rt::block_on(ledger.apply_async(vec![Fact::issue_changed(1, Issue::new("first", 1, "First", 1))])).unwrap();
     let mut db = inspect_db(&path);
     execute_sql(&mut db, "update issue set priority = 'unknown'");
-    assert!(Ledger::snapshot(&path, &SqliteIssueStore, &SqliteSessionStore).is_err());
+    assert!(vibevalley_runtime::rt::block_on(Ledger::snapshot_async(&path, &SqliteIssueStore, &SqliteSessionStore)).is_err());
     assert!(
-        Ledger::open(
+        vibevalley_runtime::rt::block_on(Ledger::open_async(
             server_db,
             Arc::new(LocalFacts::default()),
             Arc::new(SqliteIssueStore),
             Arc::new(SqliteSessionStore),
-        )
+        ))
         .is_err()
     );
 }

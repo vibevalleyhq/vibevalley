@@ -199,10 +199,6 @@ impl IssueChat {
         }
     }
 
-    pub fn close(&self) {
-        vibevalley_runtime::rt::block_on(self.close_async());
-    }
-
     /// `issue.comment.create`: writes the user's words into the issue's thread
     /// and awaits its issue-lane delivery without blocking a worker thread so
     /// `BoardSlice` reflects the accepted comment (e.g. leaving `Asking`).
@@ -617,19 +613,22 @@ impl IssueChat {
     }
 
     async fn route_dispatched_async(self: &Arc<Self>, dispatched: ChannelDispatched) {
-        let sessions = self.board.sessions().clone();
+        let sessions = self.board.sessions();
         for d in dispatched.deliveries {
             match d.recipient_kind {
                 DeliveryTargetKind::Issue => {
                     let issue_id = d.recipient_id.clone();
                     let owner = self.on_issue(&issue_id).map(|s| s.id).unwrap_or_else(|| format!("issue:{issue_id}"));
                     let mail_key = format!("issue:{issue_id}:{}", d.message_id);
-                    let sessions = sessions.clone();
-                    let msg_id = d.message_id.clone();
-                    let body = dispatched.committed.row.body.clone();
-                    let _ =
-                        crate::spawn_blocking_traced(move || sessions.enqueue_mailbox(&owner, &mail_key, MailboxSource::IssueComment, Some(&msg_id), &body))
-                            .await;
+                    let _ = sessions
+                        .enqueue_mailbox_async(
+                            &owner,
+                            &mail_key,
+                            MailboxSource::IssueComment,
+                            Some(&d.message_id),
+                            &dispatched.committed.row.body,
+                        )
+                        .await;
                     self.enqueue_lane(
                         issue_id,
                         IssueWake::Issue {
@@ -642,13 +641,15 @@ impl IssueChat {
                     if let Some(issue_id) = self.session_issue(&d.recipient_id) {
                         let owner = self.on_issue(&issue_id).map(|s| s.id).unwrap_or_else(|| d.recipient_id.clone());
                         let mail_key = format!("issue:{issue_id}:{}", d.message_id);
-                        let sessions = sessions.clone();
-                        let msg_id = d.message_id.clone();
-                        let body = dispatched.committed.row.body.clone();
-                        let _ = crate::spawn_blocking_traced(move || {
-                            sessions.enqueue_mailbox(&owner, &mail_key, MailboxSource::IssueComment, Some(&msg_id), &body)
-                        })
-                        .await;
+                        let _ = sessions
+                            .enqueue_mailbox_async(
+                                &owner,
+                                &mail_key,
+                                MailboxSource::IssueComment,
+                                Some(&d.message_id),
+                                &dispatched.committed.row.body,
+                            )
+                            .await;
                         self.enqueue_lane(
                             issue_id.clone(),
                             IssueWake::Session {
@@ -736,9 +737,7 @@ impl IssueChat {
         };
 
         if !self.channel.delivery_is_pending_async(delivery.id).await.unwrap_or(false) {
-            let sessions = self.board.sessions().clone();
-            let msg_id = delivery.message_id.clone();
-            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+            let _ = self.board.sessions().withdraw_mailbox_by_message_async(&delivery.message_id).await;
             return;
         }
         let c = match committed {
@@ -746,9 +745,7 @@ impl IssueChat {
             None => self.channel.committed_of_async(&delivery.message_id).await.ok().flatten().map(Arc::new),
         };
         let Some(c) = c else {
-            let sessions = self.board.sessions().clone();
-            let msg_id = delivery.message_id.clone();
-            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+            let _ = self.board.sessions().withdraw_mailbox_by_message_async(&delivery.message_id).await;
             let _ = self.channel.withdraw_delivery_async(delivery.id).await;
             return;
         };
@@ -780,12 +777,9 @@ impl IssueChat {
         if !earlier_lines.is_empty() {
             text = format!("{text}\n\n{}", wake_input(&earlier_lines));
         }
-        let board = self.board.clone();
-        let recipient_id = delivery.recipient_id.clone();
-        let msg_id = delivery.message_id.clone();
-        let tell_res = crate::spawn_blocking_traced(move || board.tell_message(&recipient_id, &text, &msg_id)).await;
+        let tell_res = self.board.tell_message_async(&delivery.recipient_id, &text, &delivery.message_id).await;
         match tell_res {
-            Ok(Ok(())) => {
+            Ok(()) => {
                 let _ = self.channel.settle_delivery_async(delivery.id, true).await;
                 for (did, _) in &earlier_ids {
                     let _ = self.channel.settle_delivery_async(*did, true).await;
@@ -801,12 +795,6 @@ impl IssueChat {
                     }
                 }
             }
-            Ok(Err(e)) => {
-                let _ = self.channel.settle_delivery_async(delivery.id, false).await;
-                if let Some(hub) = self.hub.upgrade() {
-                    hub.notice(NoticeLevel::Warn, e.to_string());
-                }
-            }
             Err(e) => {
                 let _ = self.channel.settle_delivery_async(delivery.id, false).await;
                 if let Some(hub) = self.hub.upgrade() {
@@ -818,9 +806,7 @@ impl IssueChat {
 
     async fn deliver_to_session_async(&self, delivery: QueuedDelivery, issue_id: &str, committed: Option<Arc<Committed>>) {
         if !self.channel.delivery_is_pending_async(delivery.id).await.unwrap_or(false) {
-            let sessions = self.board.sessions().clone();
-            let msg_id = delivery.message_id.clone();
-            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+            let _ = self.board.sessions().withdraw_mailbox_by_message_async(&delivery.message_id).await;
             return;
         }
         let pending = self
@@ -852,13 +838,10 @@ impl IssueChat {
         if lines.is_empty() {
             return;
         }
-        let board = self.board.clone();
-        let issue = issue_id.to_string();
         let body = wake_input(&lines);
-        let msg_id = delivery.message_id.clone();
-        let tell_res = crate::spawn_blocking_traced(move || board.tell_message(&issue, &body, &msg_id)).await;
+        let tell_res = self.board.tell_message_async(issue_id, &body, &delivery.message_id).await;
         match tell_res {
-            Ok(Ok(())) => {
+            Ok(()) => {
                 for (did, _) in &settled_ids {
                     let _ = self.channel.settle_delivery_async(*did, true).await;
                 }
@@ -869,12 +852,6 @@ impl IssueChat {
                     if let Err(e) = self.channel.react_async(&mid, &delivery.recipient_id, HANDED_EMOJI, true).await {
                         warn("👀", &e);
                     }
-                }
-            }
-            Ok(Err(e)) => {
-                let _ = self.channel.settle_delivery_async(delivery.id, false).await;
-                if let Some(hub) = self.hub.upgrade() {
-                    hub.notice(NoticeLevel::Warn, e.to_string());
                 }
             }
             Err(e) => {
@@ -989,7 +966,7 @@ impl SessionChat {
                         sc.route_dispatched_async(dispatched).await;
                     }
                     CoordinatorEvent::Removed(message_id) => {
-                        let _ = crate::spawn_blocking_traced(move || sc.withdraw_message_mailbox(&message_id)).await;
+                        sc.withdraw_message_mailbox_async(&message_id).await;
                     }
                     CoordinatorEvent::Ignore => {}
                     CoordinatorEvent::Stop => return,
@@ -1028,10 +1005,6 @@ impl SessionChat {
         }
     }
 
-    pub fn close(&self) {
-        vibevalley_runtime::rt::block_on(self.close_async());
-    }
-
     async fn boot_async(self: &Arc<Self>) {
         if let Some(hub) = self.hub.upgrade() {
             let talks: Vec<Session> = hub.read(|s| s.sessions.iter().filter(|x| x.is_direct_talker() && x.issue_id().is_none()).cloned().collect());
@@ -1047,8 +1020,8 @@ impl SessionChat {
         }
     }
 
-    fn withdraw_message_mailbox(&self, message_id: &str) {
-        let _ = self.board.sessions().withdraw_mailbox_by_message(message_id);
+    async fn withdraw_message_mailbox_async(&self, message_id: &str) {
+        let _ = self.board.sessions().withdraw_mailbox_by_message_async(message_id).await;
     }
 
     fn on_transition(&self, hub: &Arc<Hub>, tr: &Transition) {
@@ -1084,7 +1057,7 @@ impl SessionChat {
     }
 
     async fn route_dispatched_async(self: &Arc<Self>, dispatched: ChannelDispatched) {
-        let sessions = self.board.sessions().clone();
+        let sessions = self.board.sessions();
         for d in dispatched.deliveries {
             if d.recipient_kind == DeliveryTargetKind::Direct {
                 let mailbox_owner = sessions
@@ -1092,13 +1065,15 @@ impl SessionChat {
                     .map(|s| s.id)
                     .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
                 let key = direct_mail_key(&d.recipient_id, &d.message_id);
-                let sessions_for_enqueue = sessions.clone();
-                let msg_id = d.message_id.clone();
-                let body = dispatched.committed.row.body.clone();
-                let _ = crate::spawn_blocking_traced(move || {
-                    sessions_for_enqueue.enqueue_mailbox(&mailbox_owner, &key, MailboxSource::ChannelDirect, Some(&msg_id), &body)
-                })
-                .await;
+                let _ = sessions
+                    .enqueue_mailbox_async(
+                        &mailbox_owner,
+                        &key,
+                        MailboxSource::ChannelDirect,
+                        Some(&d.message_id),
+                        &dispatched.committed.row.body,
+                    )
+                    .await;
                 self.enqueue_lane(
                     d.recipient_id.clone(),
                     DirectWake {
@@ -1162,10 +1137,9 @@ impl SessionChat {
     async fn on_direct_async(&self, wake: DirectWake) {
         let d = wake.delivery;
         let mail_key = direct_mail_key(&d.recipient_id, &d.message_id);
-        let sessions = self.board.sessions().clone();
+        let sessions = self.board.sessions();
         if !self.channel.delivery_is_pending_async(d.id).await.unwrap_or(false) {
-            let key = mail_key.clone();
-            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox(&key)).await;
+            let _ = sessions.withdraw_mailbox_async(&mail_key).await;
             return;
         }
         let c = match wake.committed {
@@ -1173,36 +1147,24 @@ impl SessionChat {
             None => self.channel.committed_of_async(&d.message_id).await.ok().flatten().map(Arc::new),
         };
         let Some(c) = c else {
-            let key = mail_key.clone();
-            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox(&key)).await;
+            let _ = sessions.withdraw_mailbox_async(&mail_key).await;
             let _ = self.channel.withdraw_delivery_async(d.id).await;
             return;
         };
         if c.row.deleted_at.is_some() {
-            let key = mail_key.clone();
-            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox(&key)).await;
+            let _ = sessions.withdraw_mailbox_async(&mail_key).await;
             let _ = self.channel.withdraw_delivery_async(d.id).await;
             return;
         }
-        let recipient_id = d.recipient_id.clone();
-        let channel_id = d.channel_id.clone();
-        let msg_id = d.message_id.clone();
-        let body = c.row.body.clone();
-        let key_for_claim = mail_key.clone();
-        let sessions_for_claim = sessions.clone();
-        let (mail_entry, claimed) = crate::spawn_blocking_traced(move || {
-            let mailbox_owner = sessions_for_claim
-                .talker(&recipient_id, &channel_id)
-                .map(|s| s.id)
-                .unwrap_or_else(|| format!("profile:{recipient_id}"));
-            let mail_entry = sessions_for_claim
-                .enqueue_mailbox(&mailbox_owner, &key_for_claim, MailboxSource::ChannelDirect, Some(&msg_id), &body)
-                .ok();
-            let claimed = sessions_for_claim.claim_mailbox_by_key(&key_for_claim).unwrap_or(false);
-            (mail_entry, claimed)
-        })
-        .await
-        .unwrap_or((None, false));
+        let mailbox_owner = sessions
+            .talker(&d.recipient_id, &d.channel_id)
+            .map(|s| s.id)
+            .unwrap_or_else(|| format!("profile:{}", d.recipient_id));
+        let mail_entry = sessions
+            .enqueue_mailbox_async(&mailbox_owner, &mail_key, MailboxSource::ChannelDirect, Some(&d.message_id), &c.row.body)
+            .await
+            .ok();
+        let claimed = sessions.claim_mailbox_by_key_async(&mail_key).await.unwrap_or(false);
         if !claimed
             && mail_entry
                 .as_ref()
@@ -1221,21 +1183,15 @@ impl SessionChat {
         }
         let outcome = match self.agents.profiles.agent(&d.recipient_id) {
             Some(a) if !a.enabled => TalkOutcome::Err(t("server.channel.profileDisabled", &[("name", a.name.into())])),
-            _ => {
-                let sessions_for_talk = sessions.clone();
-                let recipient = d.recipient_id.clone();
-                let chan = d.channel_id.clone();
-                match crate::spawn_blocking_traced(move || sessions_for_talk.talk(&recipient, &chan, &words)).await {
-                    Ok(Ok(sid)) => TalkOutcome::Ok(sid),
-                    Ok(Err(e)) => TalkOutcome::Err(e.to_string()),
-                    Err(e) => TalkOutcome::Err(e.to_string()),
-                }
-            }
+            _ => match sessions.talk_async(&d.recipient_id, &d.channel_id, &words).await {
+                Ok(sid) => TalkOutcome::Ok(sid),
+                Err(e) => TalkOutcome::Err(e.to_string()),
+            },
         };
         let why = match outcome {
             TalkOutcome::Ok(sid) => {
                 if let Some(id) = settle_id {
-                    let _ = crate::spawn_blocking_traced(move || sessions.settle_mailbox(id, true, Some(&sid))).await;
+                    let _ = sessions.settle_mailbox_async(id, true, Some(&sid)).await;
                 }
                 let _ = self.channel.settle_delivery_async(d.id, true).await;
                 return;
@@ -1243,8 +1199,7 @@ impl SessionChat {
             TalkOutcome::Err(why) => why,
         };
         if let Some(id) = settle_id {
-            let why_c = why.clone();
-            let _ = crate::spawn_blocking_traced(move || sessions.settle_mailbox(id, false, Some(&why_c))).await;
+            let _ = sessions.settle_mailbox_async(id, false, Some(&why)).await;
         }
         let _ = self.channel.settle_delivery_async(d.id, false).await;
         self.channel
@@ -1382,12 +1337,12 @@ mod tests {
     use crate::work::ledger::BoardConfig;
     use crate::work::session::RuntimeDrivers;
 
-    fn test_issue_chat(dir: &std::path::Path) -> (Arc<ServerDb>, Arc<Hub>, Board, Arc<Chat>, Arc<IssueChat>) {
+    async fn test_issue_chat_async(dir: &std::path::Path) -> (Arc<ServerDb>, Arc<Hub>, Board, Arc<Chat>, Arc<IssueChat>) {
         let db = ServerDb::open(dir).unwrap();
         let hub = Hub::new(vibevalley_core::empty_space_state());
         let files = Attachments::open(dir, db.clone());
         let channel = Chat::open(db.clone(), &hub, files, None, false).unwrap();
-        let board = Board::open_with(
+        let board = Board::open_with_async(
             db.clone(),
             Arc::new(RuntimeDrivers {
                 registry: Arc::new(vibevalley_runtime::oar::Registry::new()),
@@ -1398,6 +1353,7 @@ mod tests {
             Some(Arc::downgrade(&hub)),
             |_| {},
         )
+        .await
         .unwrap();
         let ic = Arc::new(IssueChat {
             hub: Arc::downgrade(&hub),
@@ -1418,9 +1374,8 @@ mod tests {
     #[test]
     fn await_comment_delivery_wakes_on_settle_and_fast_paths_when_settled() {
         let dir = tempfile::tempdir().unwrap();
-        let (db, hub, board, channel, ic) = test_issue_chat(dir.path());
-
         vibevalley_runtime::rt::block_on(async {
+            let (db, hub, board, channel, ic) = test_issue_chat_async(dir.path()).await;
             let thread = channel.issue_thread_async("i-1", "test issue", None).await.unwrap();
             let (msg, _) = channel
                 .say_async(Saying {
@@ -1452,18 +1407,18 @@ mod tests {
             }
             assert!(ic.await_comment_delivery_for("i-1", &msg.id, COMMENT_DELIVERY_TIMEOUT).await);
             assert!(ic.delivery_waiters.lock().is_empty());
-        });
 
-        ic.close();
-        board.close();
-        hub.close();
-        db.close();
+            ic.close_async().await;
+            board.close();
+            hub.close_async().await;
+            db.close_async().await;
+        });
     }
 
     #[test]
     fn await_comment_delivery_obeys_virtual_timeout_and_cleans_waiter() {
         let dir = tempfile::tempdir().unwrap();
-        let (db, hub, board, _channel, ic) = test_issue_chat(dir.path());
+        let (db, hub, board, _channel, ic) = vibevalley_runtime::rt::block_on(test_issue_chat_async(dir.path()));
 
         let rt = tokio::runtime::Builder::new_current_thread().enable_all().start_paused(true).build().unwrap();
         rt.block_on(async {
@@ -1495,9 +1450,11 @@ mod tests {
             );
         });
 
-        ic.close();
-        board.close();
-        hub.close();
-        db.close();
+        vibevalley_runtime::rt::block_on(async {
+            ic.close_async().await;
+            board.close();
+            hub.close_async().await;
+            db.close_async().await;
+        });
     }
 }

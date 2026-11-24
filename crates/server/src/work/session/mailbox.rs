@@ -174,7 +174,7 @@ impl SessionMailbox {
 }
 
 impl super::sessions::Sessions {
-    pub fn enqueue_mailbox(
+    pub async fn enqueue_mailbox_async(
         &self,
         session_id: &str,
         idempotency_key: &str,
@@ -185,36 +185,52 @@ impl super::sessions::Sessions {
         let at = crate::work::ledger::now();
         self.0
             .ledger
-            .write_db(async |db| SessionMailbox::enqueue(db, session_id, idempotency_key, source, source_message_id, payload, at).await)
+            .write_db_async(async |db| SessionMailbox::enqueue(db, session_id, idempotency_key, source, source_message_id, payload, at).await)
+            .await
     }
 
-    pub fn withdraw_mailbox(&self, idempotency_key: &str) -> crate::work::ledger::Result<bool> {
+    pub async fn withdraw_mailbox_async(&self, idempotency_key: &str) -> crate::work::ledger::Result<bool> {
         let at = crate::work::ledger::now();
-        self.0.ledger.write_db(async |db| SessionMailbox::withdraw(db, idempotency_key, at).await)
+        self.0
+            .ledger
+            .write_db_async(async |db| SessionMailbox::withdraw(db, idempotency_key, at).await)
+            .await
     }
 
-    pub fn withdraw_mailbox_by_message(&self, message_id: &str) -> crate::work::ledger::Result<u64> {
+    pub async fn withdraw_mailbox_by_message_async(&self, message_id: &str) -> crate::work::ledger::Result<u64> {
         let at = crate::work::ledger::now();
-        self.0.ledger.write_db(async |db| SessionMailbox::withdraw_by_message(db, message_id, at).await)
+        self.0
+            .ledger
+            .write_db_async(async |db| SessionMailbox::withdraw_by_message(db, message_id, at).await)
+            .await
     }
 
-    pub fn claim_next_mailbox(&self, session_id: &str) -> crate::work::ledger::Result<Option<MailboxEntry>> {
+    pub async fn claim_next_mailbox_async(&self, session_id: &str) -> crate::work::ledger::Result<Option<MailboxEntry>> {
         let at = crate::work::ledger::now();
-        self.0.ledger.write_db(async |db| SessionMailbox::claim_next(db, session_id, at).await)
+        self.0
+            .ledger
+            .write_db_async(async |db| SessionMailbox::claim_next(db, session_id, at).await)
+            .await
     }
 
-    pub fn claim_mailbox_by_key(&self, idempotency_key: &str) -> crate::work::ledger::Result<bool> {
+    pub async fn claim_mailbox_by_key_async(&self, idempotency_key: &str) -> crate::work::ledger::Result<bool> {
         let at = crate::work::ledger::now();
-        self.0.ledger.write_db(async |db| SessionMailbox::claim_by_key(db, idempotency_key, at).await)
+        self.0
+            .ledger
+            .write_db_async(async |db| SessionMailbox::claim_by_key(db, idempotency_key, at).await)
+            .await
     }
 
-    pub fn settle_mailbox(&self, id: i64, ok: bool, result: Option<&str>) -> crate::work::ledger::Result<()> {
+    pub async fn settle_mailbox_async(&self, id: i64, ok: bool, result: Option<&str>) -> crate::work::ledger::Result<()> {
         let at = crate::work::ledger::now();
-        self.0.ledger.write_db(async |db| SessionMailbox::settle(db, id, ok, result, at).await)
+        self.0
+            .ledger
+            .write_db_async(async |db| SessionMailbox::settle(db, id, ok, result, at).await)
+            .await
     }
 
-    pub fn mailbox_entries(&self, session_id: &str) -> crate::work::ledger::Result<Vec<MailboxEntry>> {
-        self.0.ledger.read_db(async |db| SessionMailbox::list(db, session_id).await)
+    pub async fn mailbox_entries_async(&self, session_id: &str) -> crate::work::ledger::Result<Vec<MailboxEntry>> {
+        self.0.ledger.read_db_async(async |db| SessionMailbox::list(db, session_id).await).await
     }
 }
 
@@ -230,7 +246,7 @@ mod tests {
         let w = server_db.write_conn();
         let r = server_db.read_conn();
 
-        crate::work::block_on(async {
+        vibevalley_runtime::rt::block_on(async {
             let a = SessionMailbox::enqueue(w, "s1", "k1", MailboxSource::WorkspaceUser, None, "hello", 10)
                 .await
                 .unwrap();

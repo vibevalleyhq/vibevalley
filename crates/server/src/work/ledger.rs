@@ -17,11 +17,13 @@ use crate::db::ServerDb;
 use parking_lot::Mutex;
 use sea_orm::{DatabaseConnection, DatabaseTransaction, DbErr};
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::{Applied, Core, Refusal};
 use vibevalley_protocol::{
     Assignment, Conflict, CriterionCheck, Execution, ExecutionPolicy, Fact, Finding, Issue, IssueAnswer, IssueCanceled, Landing, LastRun, Millis, Outcome,
     Phase, PullRequest, Question, Run, Session, SessionSubagents, SliceBundle, SpaceState,
 };
+use vibevalley_runtime::agent::durable::BoxFuture;
 use vibevalley_runtime::oar::PermissionMode;
 
 pub use crate::app::hub::ports::Facts;
@@ -387,28 +389,35 @@ pub struct ReopenInterrupt {
 /// Narrow SeaORM issue persistence port injected by `work/issue` so `work/ledger`
 /// stays strictly below `work/issue` in the module DAG.
 pub trait IssueStore: Send + Sync {
-    fn all(&self, db: &DatabaseConnection) -> std::result::Result<Vec<Issue>, DbErr>;
-    fn put(&self, tx: &DatabaseTransaction, issue: &Issue) -> std::result::Result<(), DbErr>;
-    fn remove(&self, tx: &DatabaseTransaction, id: &str) -> std::result::Result<(), DbErr>;
+    fn all<'a>(&'a self, db: &'a DatabaseConnection) -> BoxFuture<'a, std::result::Result<Vec<Issue>, DbErr>>;
+    fn put<'a>(&'a self, tx: &'a DatabaseTransaction, issue: &'a Issue) -> BoxFuture<'a, std::result::Result<(), DbErr>>;
+    fn remove<'a>(&'a self, tx: &'a DatabaseTransaction, id: &'a str) -> BoxFuture<'a, std::result::Result<(), DbErr>>;
 }
 
 /// Narrow SeaORM session persistence & reopen-recovery port injected by
 /// `work/session` so `work/ledger` stays strictly below `work/session`.
 pub trait SessionStore: Send + Sync {
-    fn all(&self, db: &DatabaseConnection) -> std::result::Result<Vec<Session>, DbErr>;
-    fn past(&self, db: &DatabaseConnection, id: &str) -> std::result::Result<Option<Session>, DbErr>;
-    fn put(&self, tx: &DatabaseTransaction, s: &Session, departed: bool) -> std::result::Result<(), DbErr>;
-    fn put_subagents(&self, tx: &DatabaseTransaction, summary: &SessionSubagents) -> std::result::Result<(), DbErr>;
-    fn active_run(&self, tx: &DatabaseTransaction, session: &str, run: &str, root: &str) -> std::result::Result<bool, DbErr>;
-    fn run(&self, db: &DatabaseConnection, id: &str) -> std::result::Result<Option<Run>, DbErr>;
-    fn recoverable_ids(&self, db: &DatabaseConnection, durable: &vibevalley_runtime::agent::durable::Store, stored: &[Session]) -> Result<HashSet<String>>;
-    fn interrupt_on_reopen(
-        &self,
-        tx: &mut vibevalley_runtime::agent::durable::Tx<'_>,
-        session: &Session,
+    fn all<'a>(&'a self, db: &'a DatabaseConnection) -> BoxFuture<'a, std::result::Result<Vec<Session>, DbErr>>;
+    fn past<'a>(&'a self, db: &'a DatabaseConnection, id: &'a str) -> BoxFuture<'a, std::result::Result<Option<Session>, DbErr>>;
+    fn put<'a>(&'a self, tx: &'a DatabaseTransaction, s: &'a Session, departed: bool) -> BoxFuture<'a, std::result::Result<(), DbErr>>;
+    fn put_subagents<'a>(&'a self, tx: &'a DatabaseTransaction, summary: &'a SessionSubagents) -> BoxFuture<'a, std::result::Result<(), DbErr>>;
+    fn active_run<'a>(&'a self, tx: &'a DatabaseTransaction, session: &'a str, run: &'a str, root: &'a str) -> BoxFuture<'a, std::result::Result<bool, DbErr>>;
+    fn run<'a>(&'a self, db: &'a DatabaseConnection, id: &'a str) -> BoxFuture<'a, std::result::Result<Option<Run>, DbErr>>;
+    fn recoverable_ids<'a>(
+        &'a self,
+        db: &'a DatabaseConnection,
+        durable: &'a vibevalley_runtime::agent::durable::Store,
+        stored: &'a [Session],
+    ) -> BoxFuture<'a, Result<HashSet<String>>>;
+    fn interrupt_on_reopen<'a, 'tx>(
+        &'a self,
+        tx: &'a mut vibevalley_runtime::agent::durable::Tx<'tx>,
+        session: &'a Session,
         at: Millis,
-        summary: &str,
-    ) -> vibevalley_runtime::agent::durable::Result<Option<ReopenInterrupt>>;
+        summary: &'a str,
+    ) -> BoxFuture<'a, vibevalley_runtime::agent::durable::Result<Option<ReopenInterrupt>>>
+    where
+        'tx: 'a;
 }
 
 pub struct Ledger {
@@ -418,7 +427,7 @@ pub struct Ledger {
     sessions: Arc<dyn SessionStore>,
     facts: Arc<dyn Facts>,
     /// Held across every apply and every read-modify-apply of an issue.
-    write: Mutex<()>,
+    write: AsyncMutex<()>,
     cron_of_issue: Mutex<Option<CronOfIssue>>,
     pull_of_issue: Mutex<Option<PullOfIssue>>,
 }
@@ -433,10 +442,10 @@ fn loaded(sessions: Vec<Session>, issues: Vec<Issue>) -> Vec<Fact> {
 impl Ledger {
     /// The board as stored, without taking it: for reading while another
     /// process holds it.
-    pub fn snapshot(path: &Path, issues: &dyn IssueStore, sessions: &dyn SessionStore) -> Result<SliceBundle> {
+    pub async fn snapshot_async(path: &Path, issues: &dyn IssueStore, sessions: &dyn SessionStore) -> Result<SliceBundle> {
         let server_db = ServerDb::open_config(&crate::db::DatabaseConfig::Sqlite { path: path.to_path_buf() })?;
-        let stored_sessions = sessions.all(server_db.read_conn())?;
-        let stored_issues = issues.all(server_db.read_conn())?;
+        let stored_sessions = sessions.all(server_db.read_conn()).await?;
+        let stored_issues = issues.all(server_db.read_conn()).await?;
         server_db.close();
         let facts = LocalFacts::default();
         facts.apply(loaded(stored_sessions, stored_issues));
@@ -446,11 +455,16 @@ impl Ledger {
     /// Loads what is stored into `facts`. A working session was interrupted:
     /// it rests now, its run counted. A session whose worktree is gone is
     /// dropped and its issue listed as lost.
-    pub fn open(db: Arc<ServerDb>, facts: Arc<dyn Facts>, issue_store: Arc<dyn IssueStore>, session_store: Arc<dyn SessionStore>) -> Result<(Ledger, Opened)> {
+    pub async fn open_async(
+        db: Arc<ServerDb>,
+        facts: Arc<dyn Facts>,
+        issue_store: Arc<dyn IssueStore>,
+        session_store: Arc<dyn SessionStore>,
+    ) -> Result<(Ledger, Opened)> {
         let durable = db.durable()?;
-        let stored = session_store.all(db.read_conn())?;
-        let issues = issue_store.all(db.read_conn())?;
-        let recoverable_ids = session_store.recoverable_ids(db.read_conn(), &durable, &stored)?;
+        let stored = session_store.all(db.read_conn()).await?;
+        let issues = issue_store.all(db.read_conn()).await?;
+        let recoverable_ids = session_store.recoverable_ids(db.read_conn(), &durable, &stored).await?;
         let mut sessions = Vec::new();
         let mut opened = Opened::default();
         for mut session in stored {
@@ -470,27 +484,41 @@ impl Ledger {
                 }
                 session.phase = Phase::resting();
                 session.runs += 1;
-                let run = durable.write(|tx| {
-                    let recovery = session_store.interrupt_on_reopen(tx, &session, at, summary)?;
-                    session.last_run = Some(LastRun {
-                        needs_reconciliation: recovery.as_ref().is_some_and(|r| r.needs_reconciliation),
-                        outcome: Outcome::Interrupted,
-                        summary: summary.into(),
-                        at,
-                        spent: None,
-                        answer: None,
-                    });
-                    if let Some(children) = &session.subagents {
-                        session_store.put_subagents(tx.transaction(), children)?;
-                    }
-                    session_store.put(tx.transaction(), &session, lost)?;
-                    Ok(recovery.map(|r| r.run_id))
-                })?;
+                let (updated_session, run) = durable
+                    .write_with_async((&session_store, session, at, summary, lost), |tx, ctx| {
+                        let session_store = ctx.0.clone();
+                        let mut session = ctx.1.clone();
+                        let at = ctx.2;
+                        let summary = ctx.3;
+                        let lost = ctx.4;
+                        Box::pin(async move {
+                            let recovery = session_store.interrupt_on_reopen(tx, &session, at, summary).await?;
+                            session.last_run = Some(LastRun {
+                                needs_reconciliation: recovery.as_ref().is_some_and(|r| r.needs_reconciliation),
+                                outcome: Outcome::Interrupted,
+                                summary: summary.into(),
+                                at,
+                                spent: None,
+                                answer: None,
+                            });
+                            if let Some(children) = &session.subagents {
+                                session_store.put_subagents(tx.transaction(), children).await?;
+                            }
+                            session_store.put(tx.transaction(), &session, lost).await?;
+                            Ok((session, recovery.map(|r| r.run_id)))
+                        })
+                    })
+                    .await?;
+                session = updated_session;
                 if let Some(run) = run {
                     opened.interrupted.push((session.id.clone(), run));
                 }
             } else if lost {
-                durable.write(|tx| Ok(session_store.put(tx.transaction(), &session, true)?))?;
+                durable
+                    .write_with_async((&session_store, &session), |tx, &(session_store, session)| {
+                        Box::pin(async move { Ok(session_store.put(tx.transaction(), session, true).await?) })
+                    })
+                    .await?;
             }
             if lost {
                 opened.lost.extend(session.issue_id().map(String::from));
@@ -505,7 +533,7 @@ impl Ledger {
             issues: issue_store,
             sessions: session_store,
             facts,
-            write: Mutex::new(()),
+            write: AsyncMutex::new(()),
             cron_of_issue: Mutex::new(None),
             pull_of_issue: Mutex::new(None),
         };
@@ -513,8 +541,8 @@ impl Ledger {
     }
 
     /// Registers the owner-backed `Issue.cron` projection and syncs current issues.
-    pub fn use_cron_of_issue(&self, lookup: CronOfIssue) {
-        let _write = self.write.lock();
+    pub async fn use_cron_of_issue_async(&self, lookup: CronOfIssue) {
+        let _write = self.write.lock().await;
         *self.cron_of_issue.lock() = Some(lookup.clone());
         let at = now();
         let mut facts = Vec::new();
@@ -531,8 +559,8 @@ impl Ledger {
     }
 
     /// Registers the owner-backed `Issue.pull_request` projection and syncs current issues.
-    pub fn use_pull_of_issue(&self, lookup: PullOfIssue) {
-        let _write = self.write.lock();
+    pub async fn use_pull_of_issue_async(&self, lookup: PullOfIssue) {
+        let _write = self.write.lock().await;
         *self.pull_of_issue.lock() = Some(lookup.clone());
         let at = now();
         let mut facts = Vec::new();
@@ -549,8 +577,8 @@ impl Ledger {
     }
 
     /// Re-projects `cron` and `pull_request` onto `id` from their owners without touching SQLite.
-    pub fn refresh_issue(&self, id: &str) {
-        let _write = self.write.lock();
+    pub async fn refresh_issue_async(&self, id: &str) {
+        let _write = self.write.lock().await;
         let Some(mut issue) = self.issue(id) else { return };
         let mut changed = false;
         if let Some(lookup) = self.cron_of_issue.lock().clone() {
@@ -572,12 +600,12 @@ impl Ledger {
         }
     }
 
-    pub(crate) fn read_db<R>(&self, query: impl AsyncFnOnce(&DatabaseConnection) -> std::result::Result<R, DbErr>) -> Result<R> {
-        Ok(crate::work::block_on(query(self.db.read_conn()))?)
+    pub(crate) async fn read_db_async<R>(&self, query: impl AsyncFnOnce(&DatabaseConnection) -> std::result::Result<R, DbErr>) -> Result<R> {
+        Ok(query(self.db.read_conn()).await?)
     }
 
-    pub(crate) fn write_db<R>(&self, query: impl AsyncFnOnce(&DatabaseConnection) -> std::result::Result<R, DbErr>) -> Result<R> {
-        Ok(crate::work::block_on(query(self.db.write_conn()))?)
+    pub(crate) async fn write_db_async<R>(&self, query: impl AsyncFnOnce(&DatabaseConnection) -> std::result::Result<R, DbErr>) -> Result<R> {
+        Ok(query(self.db.write_conn()).await?)
     }
 
     pub fn bundle(&self) -> SliceBundle {
@@ -610,89 +638,94 @@ impl Ledger {
     }
 
     /// A session that left the board, as it was when it did.
-    pub fn past_session(&self, id: &str) -> Option<Session> {
-        self.sessions.past(self.db.read_conn(), id).ok().flatten()
+    pub async fn past_session_async(&self, id: &str) -> Option<Session> {
+        self.sessions.past(self.db.read_conn(), id).await.ok().flatten()
     }
 
     /// Stores `facts`, folds them in as one commit.
-    pub fn apply(&self, facts: Vec<Fact>) -> Result<()> {
-        let _write = self.write.lock();
-        self.apply_locked(facts, |_| Ok(()))
+    pub async fn apply_async(&self, facts: Vec<Fact>) -> Result<()> {
+        let _write = self.write.lock().await;
+        self.apply_locked_async(facts, |_| Box::pin(async { Ok(()) })).await
     }
 
     /// `change` made to issue `id`; the issue as it is after.
-    pub fn change(&self, id: &str, change: IssueChange) -> Result<Issue> {
-        self.change_with(id, change, |fact| vec![fact])
+    pub async fn change_async(&self, id: &str, change: IssueChange) -> Result<Issue> {
+        self.change_with_async(id, change, |fact| vec![fact]).await
     }
 
     /// `change` made to issue `id`, committed as the facts `batch` makes
     /// around the issue's own.
-    pub fn change_with(&self, id: &str, change: IssueChange, batch: impl FnOnce(Fact) -> Vec<Fact>) -> Result<Issue> {
-        self.change_commit(id, change, batch, |_| Ok(()))
+    pub async fn change_with_async(&self, id: &str, change: IssueChange, batch: impl FnOnce(Fact) -> Vec<Fact>) -> Result<Issue> {
+        self.change_commit_async(id, change, batch, |_| Box::pin(async { Ok(()) })).await
     }
 
-    pub(crate) fn change_commit(
-        &self,
-        id: &str,
-        change: IssueChange,
-        batch: impl FnOnce(Fact) -> Vec<Fact>,
-        also: impl FnOnce(&mut vibevalley_runtime::agent::durable::Tx<'_>) -> vibevalley_runtime::agent::durable::Result<()>,
-    ) -> Result<Issue> {
+    pub(crate) async fn change_commit_async<F>(&self, id: &str, change: IssueChange, batch: impl FnOnce(Fact) -> Vec<Fact>, also: F) -> Result<Issue>
+    where
+        F: for<'call, 'tx> FnOnce(&'call mut vibevalley_runtime::agent::durable::Tx<'tx>) -> BoxFuture<'call, vibevalley_runtime::agent::durable::Result<()>>
+            + Send,
+    {
         let id = {
-            let _write = self.write.lock();
+            let _write = self.write.lock().await;
             let mut issue = self.issue(id).ok_or_else(|| BoardError::NoIssue(id.into()))?;
             let at = now();
             change.fold(&mut issue, at);
             let id = issue.id.clone();
-            self.apply_locked(batch(Fact::issue_changed(at, issue)), also)?;
+            self.apply_locked_async(batch(Fact::issue_changed(at, issue)), also).await?;
             id
         };
         self.issue(&id).ok_or(BoardError::NoIssue(id))
     }
 
-    fn apply_locked(
-        &self,
-        facts: Vec<Fact>,
-        also: impl FnOnce(&mut vibevalley_runtime::agent::durable::Tx<'_>) -> vibevalley_runtime::agent::durable::Result<()>,
-    ) -> Result<()> {
-        let mut prospective = self.state();
-        self.durable.write(|write| {
-            also(write)?;
-            let tx = write.transaction();
-            for fact in &facts {
-                match fact {
-                    Fact::IssueChanged(vibevalley_protocol::FactIssueChanged { issue, .. }) => self.issues.put(tx, issue)?,
-                    Fact::IssueRemoved(vibevalley_protocol::FactIssueRemoved { id, .. }) => self.issues.remove(tx, id)?,
-                    Fact::SessionSubagentsChanged(f) => {
-                        if let Some(summary) = &f.subagents {
-                            self.sessions.put_subagents(tx, summary)?;
-                        }
-                    }
-                    Fact::SessionLeft(vibevalley_protocol::FactSessionLeft { id, closed, at, .. }) => {
-                        if let Some(mut past) = prospective.sessions.iter().find(|s| &s.id == id).cloned() {
-                            if let Some(closed) = closed {
-                                past.phase = Phase::Closed(vibevalley_protocol::PhaseClosed { at: *at, closed: *closed });
+    async fn apply_locked_async<F>(&self, facts: Vec<Fact>, also: F) -> Result<()>
+    where
+        F: for<'call, 'tx> FnOnce(&'call mut vibevalley_runtime::agent::durable::Tx<'tx>) -> BoxFuture<'call, vibevalley_runtime::agent::durable::Result<()>>
+            + Send,
+    {
+        let prospective = self.state();
+        let also = Mutex::new(Some(also));
+        self.durable
+            .write_with_async((self, &facts, prospective, &also), |tx, &(ledger, facts, ref prospective, also)| {
+                let mut prospective = prospective.clone();
+                let also = also.lock().take().expect("apply_locked_async calls once");
+                Box::pin(async move {
+                    also(tx).await?;
+                    let db_tx = tx.transaction();
+                    for fact in facts {
+                        match fact {
+                            Fact::IssueChanged(vibevalley_protocol::FactIssueChanged { issue, .. }) => ledger.issues.put(db_tx, issue).await?,
+                            Fact::IssueRemoved(vibevalley_protocol::FactIssueRemoved { id, .. }) => ledger.issues.remove(db_tx, id).await?,
+                            Fact::SessionSubagentsChanged(f) => {
+                                if let Some(summary) = &f.subagents {
+                                    ledger.sessions.put_subagents(db_tx, summary).await?;
+                                }
                             }
-                            self.sessions.put(tx, &past, true)?;
+                            Fact::SessionLeft(vibevalley_protocol::FactSessionLeft { id, closed, at, .. }) => {
+                                if let Some(mut past) = prospective.sessions.iter().find(|s| &s.id == id).cloned() {
+                                    if let Some(closed) = closed {
+                                        past.phase = Phase::Closed(vibevalley_protocol::PhaseClosed { at: *at, closed: *closed });
+                                    }
+                                    ledger.sessions.put(db_tx, &past, true).await?;
+                                }
+                            }
+                            _ => {}
+                        }
+                        vibevalley_core::reduce(&mut prospective, fact);
+                        let id = match fact {
+                            Fact::SessionChanged(vibevalley_protocol::FactSessionChanged { session, .. }) => Some(&session.id),
+                            Fact::SessionPhaseChanged(vibevalley_protocol::FactSessionPhaseChanged { id, .. })
+                            | Fact::SessionReported(vibevalley_protocol::FactSessionReported { id, .. }) => Some(id),
+                            _ => None,
+                        };
+                        if let Some(id) = id
+                            && let Some(session) = prospective.sessions.iter().find(|s| &s.id == id)
+                        {
+                            ledger.sessions.put(db_tx, session, false).await?;
                         }
                     }
-                    _ => {}
-                }
-                vibevalley_core::reduce(&mut prospective, fact);
-                let id = match fact {
-                    Fact::SessionChanged(vibevalley_protocol::FactSessionChanged { session, .. }) => Some(&session.id),
-                    Fact::SessionPhaseChanged(vibevalley_protocol::FactSessionPhaseChanged { id, .. })
-                    | Fact::SessionReported(vibevalley_protocol::FactSessionReported { id, .. }) => Some(id),
-                    _ => None,
-                };
-                if let Some(id) = id
-                    && let Some(session) = prospective.sessions.iter().find(|s| &s.id == id)
-                {
-                    self.sessions.put(tx, session, false)?;
-                }
-            }
-            Ok(())
-        })?;
+                    Ok(())
+                })
+            })
+            .await?;
         self.publish(facts);
         Ok(())
     }
@@ -701,39 +734,44 @@ impl Ledger {
         self.facts.apply(facts);
     }
 
-    pub(crate) fn update_subagents(
+    pub(crate) async fn update_subagents_async(
         &self,
         session_id: &str,
         run: &str,
         root: &str,
         observe: impl FnOnce(&Session) -> Option<vibevalley_protocol::FactSessionSubagentsChanged>,
     ) -> Result<()> {
-        let _write = self.write.lock();
+        let _write = self.write.lock().await;
         let Some(fact) = self.session(session_id).as_ref().and_then(observe) else {
             return Ok(());
         };
-        let current = self.durable.write(|tx| {
-            let db = tx.transaction();
-            let active = self.sessions.active_run(db, session_id, run, root)?;
-            if active && let Some(summary) = &fact.subagents {
-                self.sessions.put_subagents(db, summary)?;
-            }
-            Ok(active)
-        })?;
+        let current = self
+            .durable
+            .write_with_async((self, session_id, run, root, &fact), |tx, &(ledger, session_id, run, root, fact)| {
+                Box::pin(async move {
+                    let db = tx.transaction();
+                    let active = ledger.sessions.active_run(db, session_id, run, root).await?;
+                    if active && let Some(summary) = &fact.subagents {
+                        ledger.sessions.put_subagents(db, summary).await?;
+                    }
+                    Ok(active)
+                })
+            })
+            .await?;
         if current {
             self.publish(vec![Fact::SessionSubagentsChanged(fact)]);
         }
         Ok(())
     }
 
-    pub(crate) fn reconcile_subagents(
+    pub(crate) async fn reconcile_subagents_async(
         &self,
         session: &str,
         before: &vibevalley_protocol::SessionSubagents,
         after: vibevalley_protocol::SessionSubagents,
     ) -> Result<()> {
-        let _write = self.write.lock();
-        let stored = self.sessions.run(self.db.read_conn(), &before.run)?;
+        let _write = self.write.lock().await;
+        let stored = self.sessions.run(self.db.read_conn(), &before.run).await?;
         if !stored.is_some_and(|r| r.session == session && r.subagents.as_ref() == Some(before)) {
             return Ok(());
         }
@@ -743,16 +781,21 @@ impl Ledger {
                 id: session.into(),
                 subagents: Some(after),
             };
-            self.apply_locked(vec![Fact::SessionSubagentsChanged(fact)], |_| Ok(()))
+            self.apply_locked_async(vec![Fact::SessionSubagentsChanged(fact)], |_| Box::pin(async { Ok(()) }))
+                .await
         } else {
-            self.durable.write(|tx| Ok(self.sessions.put_subagents(tx.transaction(), &after)?))?;
+            self.durable
+                .write_with_async((self, &after), |tx, &(ledger, after)| {
+                    Box::pin(async move { Ok(ledger.sessions.put_subagents(tx.transaction(), after).await?) })
+                })
+                .await?;
             Ok(())
         }
     }
 
     /// The next number of `counter`, above `at_least`.
-    pub fn next(&self, counter: &str, at_least: i64) -> Result<i64> {
-        let _write = self.write.lock();
-        self.write_db(async |db| crate::db::next_seq_async(db, counter, at_least).await)
+    pub async fn next_async(&self, counter: &str, at_least: i64) -> Result<i64> {
+        let _write = self.write.lock().await;
+        self.write_db_async(async |db| crate::db::next_seq_async(db, counter, at_least).await).await
     }
 }

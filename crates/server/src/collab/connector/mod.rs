@@ -211,11 +211,6 @@ impl Connectors {
             let _ = handle.await;
         }
     }
-
-    /// Every account's work stopped, and waited for.
-    pub fn close(&self) {
-        vibevalley_runtime::rt::block_on(self.close_async());
-    }
 }
 
 /// What the farm says for the user goes to every app (each checks it is its channel's); a read or newer words

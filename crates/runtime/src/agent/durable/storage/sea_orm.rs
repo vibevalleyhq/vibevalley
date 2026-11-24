@@ -4,6 +4,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use futures_util::FutureExt as _;
 use sea_orm::{
     AccessMode, ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DatabaseTransaction, DbBackend, SqliteTransactionMode, SqlxSqliteConnector,
     TransactionOptions, TransactionTrait,
@@ -11,10 +12,11 @@ use sea_orm::{
 use sea_orm_migration::MigratorTrait;
 use serde_json::Value;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
+use tokio::sync::Mutex as AsyncMutex;
 
 use super::live::LiveHub;
 use super::ops;
-use super::{StorageBackend, StorageRead, StorageWrite, WriteCallback};
+use super::{BoxFuture, ReadAsyncOp, StorageBackend, StorageRead, StorageWrite, WriteAsyncOp, WriteCallback};
 use crate::agent::durable::migration::Migrator;
 use crate::agent::durable::{
     CommitStats, Conversation, Document, DocumentEvent, Entry, Error, Result, Signal, Submission, SubmissionStatus, Task, TaskStatus, now_ms,
@@ -37,7 +39,7 @@ impl<'a> DbTx<'a> {
 struct SeaOrmInner {
     write_conn: Mutex<Option<DatabaseConnection>>,
     read_conn: Mutex<Option<DatabaseConnection>>,
-    write_lock: Mutex<()>,
+    write_lock: AsyncMutex<()>,
     backend: DbBackend,
     owns_conns: bool,
     read_only: bool,
@@ -146,7 +148,7 @@ impl SeaOrmStorage {
         Ok(Self(Arc::new(SeaOrmInner {
             write_conn: Mutex::new(Some(write_conn)),
             read_conn: Mutex::new(read_conn),
-            write_lock: Mutex::new(()),
+            write_lock: AsyncMutex::new(()),
             backend,
             owns_conns: true,
             read_only: false,
@@ -172,7 +174,7 @@ impl SeaOrmStorage {
         Ok(Self(Arc::new(SeaOrmInner {
             write_conn: Mutex::new(None),
             read_conn: Mutex::new(Some(read_conn)),
-            write_lock: Mutex::new(()),
+            write_lock: AsyncMutex::new(()),
             backend,
             owns_conns: true,
             read_only: true,
@@ -199,7 +201,7 @@ impl SeaOrmStorage {
         Ok(Self(Arc::new(SeaOrmInner {
             write_conn: Mutex::new(Some(write)),
             read_conn: Mutex::new(read),
-            write_lock: Mutex::new(()),
+            write_lock: AsyncMutex::new(()),
             backend,
             owns_conns,
             read_only,
@@ -257,13 +259,7 @@ impl StorageBackend for SeaOrmStorage {
 
     fn read_dyn(&self, f: &mut dyn FnMut(&dyn StorageRead) -> Result<()>) -> Result<()> {
         let conn = self.clone_read_conn()?;
-        let opts = match self.0.backend {
-            DbBackend::Postgres => TransactionOptions {
-                access_mode: Some(AccessMode::ReadOnly),
-                ..Default::default()
-            },
-            _ => TransactionOptions::default(),
-        };
+        let opts = self.read_tx_options();
         let txn = block_on(conn.begin_with_options(opts))?;
         let reader = SeaOrmTx(&txn);
         let outcome = f(&reader);
@@ -283,17 +279,11 @@ impl StorageBackend for SeaOrmStorage {
         if self.0.read_only {
             return Err(Error::Invalid("sea-orm storage is open read-only".into()));
         }
-        let _write_guard = self.0.write_lock.lock().unwrap_or_else(|e| e.into_inner());
+        let _write_guard = block_on(self.0.write_lock.lock());
         let conn = self.clone_write_conn()?;
         self.0.hub.record_request();
 
-        let opts = match self.0.backend {
-            DbBackend::Sqlite => TransactionOptions {
-                sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
-                ..Default::default()
-            },
-            _ => TransactionOptions::default(),
-        };
+        let opts = self.write_tx_options();
         let txn = block_on(conn.begin_with_options(opts))?;
         let now = self.now_ms();
         let outcome = {
@@ -324,6 +314,71 @@ impl StorageBackend for SeaOrmStorage {
         }
     }
 
+    fn read_dyn_async<'a>(&'a self, op: &'a mut dyn ReadAsyncOp<'a>) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let conn = self.clone_read_conn()?;
+            let txn = conn.begin_with_options(self.read_tx_options()).await?;
+            let outcome = {
+                let reader = SeaOrmTx(&txn);
+                std::panic::AssertUnwindSafe(op.call(&reader)).catch_unwind().await
+            };
+            match outcome {
+                Ok(Ok(())) => {
+                    txn.commit().await?;
+                    Ok(())
+                }
+                Ok(Err(err)) => {
+                    let _ = txn.rollback().await;
+                    Err(err)
+                }
+                Err(panic) => {
+                    let _ = txn.rollback().await;
+                    std::panic::resume_unwind(panic);
+                }
+            }
+        })
+    }
+
+    fn write_dyn_async<'a>(&'a self, op: &'a mut dyn WriteAsyncOp<'a>) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            if self.0.read_only {
+                return Err(Error::Invalid("sea-orm storage is open read-only".into()));
+            }
+            let _write_guard = self.0.write_lock.lock().await;
+            let conn = self.clone_write_conn()?;
+            self.0.hub.record_request();
+
+            let txn = conn.begin_with_options(self.write_tx_options()).await?;
+            let now = self.now_ms();
+            let outcome = {
+                let view = SeaOrmTx(&txn);
+                let db_tx = DbTx::new(&txn);
+                std::panic::AssertUnwindSafe(op.call(&view, &view, Some(&db_tx), now)).catch_unwind().await
+            };
+
+            match outcome {
+                Ok(Ok(write_outcome)) => {
+                    if let Err(err) = txn.commit().await {
+                        self.0.hub.record_failure();
+                        return Err(Error::Commit(err.to_string()));
+                    }
+                    self.0.hub.record_commit_and_publish(write_outcome.events, write_outcome.tasks_changed);
+                    Ok(())
+                }
+                Ok(Err(err)) => {
+                    let _ = txn.rollback().await;
+                    self.0.hub.record_failure();
+                    Err(err)
+                }
+                Err(panic) => {
+                    let _ = txn.rollback().await;
+                    self.0.hub.record_failure();
+                    std::panic::resume_unwind(panic);
+                }
+            }
+        })
+    }
+
     fn stats(&self) -> CommitStats {
         self.0.hub.stats()
     }
@@ -340,7 +395,7 @@ impl StorageBackend for SeaOrmStorage {
         if self.0.hub.is_closed() {
             return Ok(());
         }
-        let _write_guard = self.0.write_lock.lock().unwrap_or_else(|e| e.into_inner());
+        let _write_guard = block_on(self.0.write_lock.lock());
         if self.0.hub.is_closed() {
             return Ok(());
         }
@@ -361,29 +416,53 @@ impl StorageBackend for SeaOrmStorage {
     }
 }
 
+impl SeaOrmStorage {
+    fn read_tx_options(&self) -> TransactionOptions {
+        match self.0.backend {
+            DbBackend::Postgres => TransactionOptions {
+                access_mode: Some(AccessMode::ReadOnly),
+                ..Default::default()
+            },
+            _ => TransactionOptions::default(),
+        }
+    }
+
+    fn write_tx_options(&self) -> TransactionOptions {
+        match self.0.backend {
+            DbBackend::Sqlite => TransactionOptions {
+                sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
+                ..Default::default()
+            },
+            _ => TransactionOptions::default(),
+        }
+    }
+}
+
 struct SeaOrmTx<'a>(&'a DatabaseTransaction);
 
 impl SeaOrmTx<'_> {
     /// Wraps each write operation in a nested savepoint on PostgreSQL so a caught SQL
     /// constraint error (e.g. duplicate `create_conversation`) does not abort the outer tx (`25P02`).
     fn write_op<T>(&self, f: impl for<'c> AsyncFnOnce(&'c DatabaseTransaction) -> Result<T>) -> Result<T> {
-        block_on(async {
-            if self.0.get_database_backend() == DbBackend::Postgres {
-                let sp = self.0.begin().await?;
-                match f(&sp).await {
-                    Ok(val) => {
-                        sp.commit().await?;
-                        Ok(val)
-                    }
-                    Err(err) => {
-                        let _ = sp.rollback().await;
-                        Err(err)
-                    }
+        block_on(self.write_op_async(f))
+    }
+
+    async fn write_op_async<T>(&self, f: impl for<'c> AsyncFnOnce(&'c DatabaseTransaction) -> Result<T>) -> Result<T> {
+        if self.0.get_database_backend() == DbBackend::Postgres {
+            let sp = self.0.begin().await?;
+            match f(&sp).await {
+                Ok(val) => {
+                    sp.commit().await?;
+                    Ok(val)
                 }
-            } else {
-                f(self.0).await
+                Err(err) => {
+                    let _ = sp.rollback().await;
+                    Err(err)
+                }
             }
-        })
+        } else {
+            f(self.0).await
+        }
     }
 }
 
@@ -463,6 +542,82 @@ impl StorageRead for SeaOrmTx<'_> {
     fn signal_by_key(&self, task_id: &str, name: &str, key: &str) -> Result<Option<Signal>> {
         block_on(ops::signal_by_key(self.0, task_id, name, key))
     }
+
+    fn document_async<'a>(&'a self, scope: &'a str, id: &'a str, kind: &'a str) -> BoxFuture<'a, Result<Option<Document>>> {
+        Box::pin(ops::document(self.0, scope, id, kind))
+    }
+
+    fn documents_by_kind_async<'a>(&'a self, scope: &'a str, kind: &'a str) -> BoxFuture<'a, Result<Vec<Document>>> {
+        Box::pin(ops::documents_by_kind(self.0, scope, kind))
+    }
+
+    fn documents_by_scope_async<'a>(&'a self, scope: &'a str, id: &'a str) -> BoxFuture<'a, Result<Vec<Document>>> {
+        Box::pin(ops::documents_by_scope(self.0, scope, id))
+    }
+
+    fn conversation_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Conversation>>> {
+        Box::pin(ops::conversation(self.0, id))
+    }
+
+    fn conversations_async(&self) -> BoxFuture<'_, Result<Vec<Conversation>>> {
+        Box::pin(ops::conversations(self.0))
+    }
+
+    fn conversations_by_owner_task_async<'a>(&'a self, owner_task_id: &'a str) -> BoxFuture<'a, Result<Vec<Conversation>>> {
+        Box::pin(ops::conversations_by_owner_task(self.0, owner_task_id))
+    }
+
+    fn entries_from_async<'a>(&'a self, conv: &'a str, from_seq: i64) -> BoxFuture<'a, Result<Vec<Entry>>> {
+        Box::pin(ops::entries_from(self.0, conv, from_seq))
+    }
+
+    fn entries_within_async<'a>(&'a self, conv: &'a str, first_seq: i64, last_seq: i64) -> BoxFuture<'a, Result<Vec<Entry>>> {
+        Box::pin(ops::entries_within(self.0, conv, first_seq, last_seq))
+    }
+
+    fn submission_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Submission>>> {
+        Box::pin(ops::submission(self.0, id))
+    }
+
+    fn submission_by_request_async<'a>(&'a self, conv: &'a str, request_id: &'a str) -> BoxFuture<'a, Result<Option<Submission>>> {
+        Box::pin(ops::submission_by_request(self.0, conv, request_id))
+    }
+
+    fn submissions_async<'a>(&'a self, conv: &'a str) -> BoxFuture<'a, Result<Vec<Submission>>> {
+        Box::pin(ops::submissions(self.0, conv))
+    }
+
+    fn task_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Task>>> {
+        Box::pin(ops::task(self.0, id))
+    }
+
+    fn task_by_dedup_async<'a>(&'a self, owner: &'a str, key: &'a str) -> BoxFuture<'a, Result<Option<Task>>> {
+        Box::pin(ops::task_by_dedup(self.0, owner, key))
+    }
+
+    fn tasks_by_conversation_async<'a>(&'a self, conv: &'a str) -> BoxFuture<'a, Result<Vec<Task>>> {
+        Box::pin(ops::tasks_by_conversation(self.0, conv))
+    }
+
+    fn children_async<'a>(&'a self, owner: &'a str) -> BoxFuture<'a, Result<Vec<Task>>> {
+        Box::pin(ops::children(self.0, owner))
+    }
+
+    fn tasks_by_status_async(&self, status: TaskStatus) -> BoxFuture<'_, Result<Vec<Task>>> {
+        Box::pin(ops::tasks_by_status(self.0, status))
+    }
+
+    fn active_tasks_async(&self) -> BoxFuture<'_, Result<Vec<Task>>> {
+        Box::pin(ops::active_tasks(self.0))
+    }
+
+    fn signals_async<'a>(&'a self, task_id: &'a str, include_consumed: bool) -> BoxFuture<'a, Result<Vec<Signal>>> {
+        Box::pin(ops::signals(self.0, task_id, include_consumed))
+    }
+
+    fn signal_by_key_async<'a>(&'a self, task_id: &'a str, name: &'a str, key: &'a str) -> BoxFuture<'a, Result<Option<Signal>>> {
+        Box::pin(ops::signal_by_key(self.0, task_id, name, key))
+    }
 }
 
 impl StorageWrite for SeaOrmTx<'_> {
@@ -520,5 +675,61 @@ impl StorageWrite for SeaOrmTx<'_> {
 
     fn consume_first_signal(&self, task_id: &str, name: &str, now_ms: i64) -> Result<Option<Signal>> {
         self.write_op(async |tx| ops::consume_first_signal(tx, task_id, name, now_ms).await)
+    }
+
+    fn put_document_async<'a>(&'a self, scope: &'a str, id: &'a str, kind: &'a str, state: &'a Value, now_ms: i64) -> BoxFuture<'a, Result<i64>> {
+        Box::pin(self.write_op_async(async move |tx| ops::put_document(tx, scope, id, kind, state, now_ms).await))
+    }
+
+    fn delete_document_async<'a>(&'a self, scope: &'a str, id: &'a str, kind: &'a str) -> BoxFuture<'a, Result<()>> {
+        Box::pin(self.write_op_async(async move |tx| ops::delete_document(tx, scope, id, kind).await))
+    }
+
+    fn insert_conversation_async<'a>(&'a self, conv: &'a Conversation) -> BoxFuture<'a, Result<()>> {
+        Box::pin(self.write_op_async(async move |tx| ops::insert_conversation(tx, conv).await))
+    }
+
+    fn advance_sequence_async<'a>(&'a self, conv: &'a str, now_ms: i64) -> BoxFuture<'a, Result<Option<i64>>> {
+        Box::pin(self.write_op_async(async move |tx| ops::advance_sequence(tx, conv, now_ms).await))
+    }
+
+    fn insert_entry_async<'a>(&'a self, entry: &'a Entry) -> BoxFuture<'a, Result<()>> {
+        Box::pin(self.write_op_async(async move |tx| ops::insert_entry(tx, entry).await))
+    }
+
+    fn set_head_async<'a>(&'a self, conv: &'a str, head_seq: i64) -> BoxFuture<'a, Result<()>> {
+        Box::pin(self.write_op_async(async move |tx| ops::set_head(tx, conv, head_seq).await))
+    }
+
+    fn reset_head_async<'a>(&'a self, conv: &'a str) -> BoxFuture<'a, Result<()>> {
+        Box::pin(self.write_op_async(async move |tx| ops::reset_head(tx, conv).await))
+    }
+
+    fn insert_submission_async<'a>(&'a self, sub: &'a Submission) -> BoxFuture<'a, Result<()>> {
+        Box::pin(self.write_op_async(async move |tx| ops::insert_submission(tx, sub).await))
+    }
+
+    fn set_submission_status_async<'a>(&'a self, id: &'a str, status: SubmissionStatus, now_ms: i64) -> BoxFuture<'a, Result<()>> {
+        Box::pin(self.write_op_async(async move |tx| ops::set_submission_status(tx, id, status, now_ms).await))
+    }
+
+    fn settle_submission_async<'a>(&'a self, id: &'a str, status: SubmissionStatus, result: &'a Value, now_ms: i64) -> BoxFuture<'a, Result<()>> {
+        Box::pin(self.write_op_async(async move |tx| ops::settle_submission(tx, id, status, result, now_ms).await))
+    }
+
+    fn insert_task_async<'a>(&'a self, task: &'a Task) -> BoxFuture<'a, Result<()>> {
+        Box::pin(self.write_op_async(async move |tx| ops::insert_task(tx, task).await))
+    }
+
+    fn update_task_async<'a>(&'a self, task: &'a Task, now_ms: i64) -> BoxFuture<'a, Result<bool>> {
+        Box::pin(self.write_op_async(async move |tx| ops::update_task(tx, task, now_ms).await))
+    }
+
+    fn insert_signal_async<'a>(&'a self, signal: &'a Signal) -> BoxFuture<'a, Result<Signal>> {
+        Box::pin(self.write_op_async(async move |tx| ops::insert_signal(tx, signal).await))
+    }
+
+    fn consume_first_signal_async<'a>(&'a self, task_id: &'a str, name: &'a str, now_ms: i64) -> BoxFuture<'a, Result<Option<Signal>>> {
+        Box::pin(self.write_op_async(async move |tx| ops::consume_first_signal(tx, task_id, name, now_ms).await))
     }
 }

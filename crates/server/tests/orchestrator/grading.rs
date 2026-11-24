@@ -100,7 +100,7 @@ fn regression_issue_criteria_grade_the_builtin_worker_with_only_its_own_delivery
     }
     assert!(json!(requests[3].messages).to_string().contains("use the required content"));
     drop(requests);
-    let runs = s.test_internals().board.runs(&id).unwrap();
+    let runs = vibevalley_runtime::rt::block_on(s.test_internals().board.runs_async(&id)).unwrap();
     assert_eq!(runs.len(), 1);
     let work = std::path::PathBuf::from(s.test_internals().board.session(&run.session).unwrap().cwd.unwrap());
     assert_eq!(std::fs::read_to_string(work.join("graded.txt")).unwrap(), "required-content");

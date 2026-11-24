@@ -20,21 +20,19 @@ fn new(title: &str, repo: Option<&Path>) -> NewIssue {
 fn an_unsent_issue_is_edited_placed_and_deleted() {
     let w = world(vec![HookRuntime::new("t", quick(), |turn| turn.done("ok"))], |_| {});
     let main = repo(w.dir.path(), "app");
-    let a = w.board.create(new("First", Some(&main))).unwrap();
-    let b = w.board.create(new("Second", Some(&main))).unwrap();
-    let edited = w
-        .board
-        .edit(
-            &b.id,
-            &IssueUpdate {
-                title: Some("Renamed\nwith more words".into()),
-                criteria: Some(vec![" one ".into(), "".into()]),
-                agent: Some("".into()),
-                before: Some(a.id.clone()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let a = block_on(w.board.create_async(new("First", Some(&main)))).unwrap();
+    let b = block_on(w.board.create_async(new("Second", Some(&main)))).unwrap();
+    let edited = block_on(w.board.edit_async(
+        &b.id,
+        &IssueUpdate {
+            title: Some("Renamed\nwith more words".into()),
+            criteria: Some(vec![" one ".into(), "".into()]),
+            agent: Some("".into()),
+            before: Some(a.id.clone()),
+            ..Default::default()
+        },
+    ))
+    .unwrap();
     assert_eq!(edited.title, "Renamed");
     assert_eq!(edited.description, "with more words");
     assert_eq!(edited.criteria, vec!["one".to_string()]);
@@ -43,7 +41,7 @@ fn an_unsent_issue_is_edited_placed_and_deleted() {
     let rank = |id: &str| ranks.iter().find(|r| r.0 == id).unwrap().1.unwrap_or(0);
     assert!(rank(&b.id) < rank(&a.id), "{ranks:?}");
 
-    w.board.remove(&b.id).unwrap();
+    block_on(w.board.remove_async(&b.id)).unwrap();
     assert!(w.board.issue(&b.id).is_none());
     assert!(w.board.issue(&a.id).is_some());
 }
@@ -60,42 +58,40 @@ fn a_sent_issue_keeps_what_was_asked_and_its_runs_make_the_timeline() {
         |_| {},
     );
     let main = repo(w.dir.path(), "app");
-    let issue = w.board.create(new("Make f", Some(&main))).unwrap();
-    w.board.move_to(&issue.id, IssueStatus::Todo, None).unwrap();
+    let issue = block_on(w.board.create_async(new("Make f", Some(&main)))).unwrap();
+    block_on(w.board.move_to_async(&issue.id, IssueStatus::Todo, None)).unwrap();
     wait_stage(&w.board, &issue.id, StageKind::Reviewing);
 
-    let refused = w.board.edit(
+    let refused = block_on(w.board.edit_async(
         &issue.id,
         &IssueUpdate {
             description: Some("more".into()),
             ..Default::default()
         },
-    );
+    ));
     assert!(matches!(refused, Err(BoardError::Other(_))), "{refused:?}");
-    assert!(w.board.remove(&issue.id).is_err());
-    let renamed = w
-        .board
-        .edit(
-            &issue.id,
-            &IssueUpdate {
-                title: Some("Make f now".into()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    assert!(block_on(w.board.remove_async(&issue.id)).is_err());
+    let renamed = block_on(w.board.edit_async(
+        &issue.id,
+        &IssueUpdate {
+            title: Some("Make f now".into()),
+            ..Default::default()
+        },
+    ))
+    .unwrap();
     assert_eq!(renamed.title, "Make f now");
 
     // Failing needs words; failing with findings sends another round.
-    assert!(w.board.review(&issue.id, false, &[], "", None).is_err());
-    w.board.review(&issue.id, false, &["it is wrong".into()], "", None).unwrap();
+    assert!(block_on(w.board.review_async(&issue.id, false, &[], "", None)).is_err());
+    block_on(w.board.review_async(&issue.id, false, &["it is wrong".into()], "", None)).unwrap();
     let back = wait_issue(&w.board, &issue.id, "second round handed back", |i| {
         i.stage.state == StageKind::Reviewing && i.findings.len() == 1
     });
     assert!(!back.findings[0].resolved);
-    let passed = w.board.review(&issue.id, true, &[], "", None).unwrap();
+    let passed = block_on(w.board.review_async(&issue.id, true, &[], "", None)).unwrap();
     assert!(passed.reviewed_at.is_some() && passed.findings[0].resolved);
 
-    let runs = w.board.runs(&issue.id).unwrap();
+    let runs = block_on(w.board.runs_async(&issue.id)).unwrap();
     assert_eq!(runs.len(), 2, "{runs:?}");
     assert_eq!(runs[0].triggered_by.kind, RunTriggerKind::Issue);
     assert_eq!(runs[1].triggered_by.kind, RunTriggerKind::Comment);

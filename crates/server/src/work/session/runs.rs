@@ -20,11 +20,11 @@ pub fn trigger_of(kind: RunTriggerKind, message: Option<String>) -> RunTrigger {
 
 impl Sessions {
     /// A round of `session` on `issue` starts now.
-    pub(super) fn begin_run(&self, session: &str, issue: &str, trigger: RunTrigger) -> Result<String> {
+    pub(super) async fn begin_run_async(&self, session: &str, issue: &str, trigger: RunTrigger) -> Result<String> {
         // A round still open (the agent never said it ended) ends here.
-        self.end_run(session, Outcome::Interrupted, "", None)?;
-        let id = format!("r{}", self.0.ledger.next("run", 0)?);
-        let mut run = Run {
+        self.end_run_async(session, Outcome::Interrupted, "", None).await?;
+        let id = format!("r{}", self.0.ledger.next_async("run", 0).await?);
+        let run = Run {
             needs_reconciliation: false,
             subagents: None,
             id: id.clone(),
@@ -38,57 +38,76 @@ impl Sessions {
             summary: String::new(),
             spent: None,
         };
-        {
-            let mut extras = self.0.extras.lock();
-            let mut extra = extras.get(session).cloned().unwrap_or_default();
-            extra.run = Some(id.clone());
-            self.0.durable.write(|tx| {
-                if run.triggered_by.kind != RunTriggerKind::Refine {
-                    for sub in tx
-                        .submissions(&super::delivery::delivery_conversation(issue))?
-                        .into_iter()
-                        .filter(|s| s.status == vibevalley_runtime::agent::durable::SubmissionStatus::Queued)
-                    {
-                        super::delivery::bind(tx, &mut run, &sub)?;
+        let mut extra = self.extra(session);
+        extra.run = Some(id.clone());
+        let saved_extra = self
+            .0
+            .durable
+            .write_with_async((session, issue, run, extra), |tx, ctx| {
+                let (session, issue, mut run, extra) = (ctx.0, ctx.1, ctx.2.clone(), ctx.3.clone());
+                Box::pin(async move {
+                    if run.triggered_by.kind != RunTriggerKind::Refine {
+                        for sub in tx
+                            .submissions_async(&super::delivery::delivery_conversation(issue))
+                            .await?
+                            .into_iter()
+                            .filter(|s| s.status == vibevalley_runtime::agent::durable::SubmissionStatus::Queued)
+                        {
+                            super::delivery::bind(tx, &mut run, &sub).await?;
+                        }
                     }
-                }
-                crate::work::block_on(async {
                     super::db::put_run(tx.transaction(), &run).await?;
-                    super::db::put_extra(tx.transaction(), session, &extra).await
-                })?;
-                Ok(())
-            })?;
-            extras.insert(session.into(), extra);
-        }
+                    super::db::put_extra(tx.transaction(), session, &extra).await?;
+                    Ok(extra)
+                })
+            })
+            .await?;
+        self.0.extras.lock().insert(session.into(), saved_extra);
         self.record(session, Step::RunStarted { run: id.clone() });
         Ok(id)
     }
 
     /// The open round of `session`, if any, ends with `outcome`.
-    pub fn end_run(&self, session: &str, outcome: Outcome, summary: &str, spent: Option<Spent>) -> Result<()> {
-        let mut extras = self.0.extras.lock();
-        let mut extra = extras.get(session).cloned().unwrap_or_default();
-        let Some(id) = extra.run.take() else { return Ok(()) };
-        self.0.durable.write(|tx| {
-            if let Some(mut run) = crate::work::block_on(super::db::run(tx.transaction(), &id))? {
-                run.ended_at = Some(now());
-                run.outcome = Some(outcome);
-                run.summary = summary.into();
-                run.spent = spent;
-                crate::work::block_on(super::db::put_run(tx.transaction(), &run))?;
-                super::delivery::settle_run(tx, &run)?;
+    pub async fn end_run_async(&self, session: &str, outcome: Outcome, summary: &str, spent: Option<Spent>) -> Result<()> {
+        let Some((id, extra)) = ({
+            let extras = self.0.extras.lock();
+            let mut extra = extras.get(session).cloned().unwrap_or_default();
+            extra.run.take().map(|id| (id, extra))
+        }) else {
+            return Ok(());
+        };
+        let saved_extra = self
+            .0
+            .durable
+            .write_with_async((session, id.as_str(), outcome, summary, spent, extra), |tx, ctx| {
+                let (session, id, outcome, summary, spent, extra) = (ctx.0, ctx.1, ctx.2, ctx.3, ctx.4.clone(), ctx.5.clone());
+                Box::pin(async move {
+                    if let Some(mut run) = super::db::run(tx.transaction(), id).await? {
+                        run.ended_at = Some(now());
+                        run.outcome = Some(outcome);
+                        run.summary = summary.into();
+                        run.spent = spent;
+                        super::db::put_run(tx.transaction(), &run).await?;
+                        super::delivery::settle_run(tx, &run).await?;
+                    }
+                    super::db::put_extra(tx.transaction(), session, &extra).await?;
+                    Ok(extra)
+                })
+            })
+            .await?;
+        {
+            let mut extras = self.0.extras.lock();
+            let current = extras.entry(session.into()).or_default();
+            if current.run.as_deref() == Some(&id) {
+                current.run = saved_extra.run;
             }
-            crate::work::block_on(super::db::put_extra(tx.transaction(), session, &extra))?;
-            Ok(())
-        })?;
-        extras.insert(session.into(), extra);
-        drop(extras);
+        }
         self.record(session, Step::RunEnded { run: id, outcome });
         Ok(())
     }
 
     /// The issue's runs, oldest first.
-    pub fn runs(&self, issue: &str) -> Result<Vec<Run>> {
-        self.0.ledger.read_db(async |db| super::db::runs(db, issue).await)
+    pub async fn runs_async(&self, issue: &str) -> Result<Vec<Run>> {
+        self.0.ledger.read_db_async(async |db| super::db::runs(db, issue).await).await
     }
 }

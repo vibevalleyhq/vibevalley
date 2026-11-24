@@ -33,10 +33,40 @@ async fn run_ticker(cancel: tokio_util::sync::CancellationToken, interval: Durat
     }
 }
 
+async fn run_async_ticker(
+    cancel: tokio_util::sync::CancellationToken,
+    interval: Duration,
+    immediate: bool,
+    mut tick: impl FnMut() -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>> + Send + 'static,
+) {
+    let period = if interval.is_zero() { Duration::from_millis(1) } else { interval };
+    let mut timer = if immediate {
+        tokio::time::interval(period)
+    } else {
+        tokio::time::interval_at(tokio::time::Instant::now() + period, period)
+    };
+    timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return,
+            _ = timer.tick() => {}
+        }
+        if cancel.is_cancelled() || !tick().await {
+            return;
+        }
+    }
+}
+
 impl Ticker {
-    pub(crate) fn spawn_on(hub: &crate::Hub, interval: Duration, immediate: bool, tick: impl FnMut() -> bool + Send + 'static) -> Self {
+    pub(crate) fn spawn_async_on(
+        hub: &crate::Hub,
+        interval: Duration,
+        immediate: bool,
+        tick: impl FnMut() -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>> + Send + 'static,
+    ) -> Self {
         let cancel = hub.child_token();
-        let handle = hub.spawn_task(run_ticker(cancel.clone(), interval, immediate, tick));
+        let handle = hub.spawn_task(run_async_ticker(cancel.clone(), interval, immediate, tick));
         Self { cancel, handle }
     }
 

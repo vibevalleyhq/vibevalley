@@ -478,10 +478,9 @@ impl Orchestrator {
         use crate::work::session::mailbox::{MailboxSource, MailboxStatus};
 
         const HANDED_EMOJI: &str = "👀";
-        let sessions = self.board.sessions().clone();
+        let sessions = self.board.sessions();
         if !chat.delivery_is_pending_async(d.id).await.unwrap_or(false) {
-            let msg_id = d.message_id.clone();
-            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+            let _ = sessions.withdraw_mailbox_by_message_async(&d.message_id).await;
             return;
         }
         if !self.agents.profiles.is_orchestrator(&d.recipient_id) {
@@ -497,16 +496,14 @@ impl Orchestrator {
                     &owned
                 }
                 None => {
-                    let msg_id = d.message_id.clone();
-                    let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+                    let _ = sessions.withdraw_mailbox_by_message_async(&d.message_id).await;
                     let _ = chat.withdraw_delivery_async(d.id).await;
                     return;
                 }
             },
         };
         if c.row.deleted_at.is_some() {
-            let msg_id = d.message_id.clone();
-            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+            let _ = sessions.withdraw_mailbox_by_message_async(&d.message_id).await;
             let _ = chat.withdraw_delivery_async(d.id).await;
             return;
         }
@@ -518,20 +515,11 @@ impl Orchestrator {
             return;
         }
         let mail_key = format!("orchestrator:{}:{}", d.recipient_id, d.message_id);
-        let recipient_id = d.recipient_id.clone();
-        let msg_id = d.message_id.clone();
-        let body = c.row.body.clone();
-        let sessions_for_claim = sessions.clone();
-        let key_for_claim = mail_key.clone();
-        let (mail_entry, claimed) = crate::spawn_blocking_traced(move || {
-            let mail_entry = sessions_for_claim
-                .enqueue_mailbox(&recipient_id, &key_for_claim, MailboxSource::ChannelOrchestrator, Some(&msg_id), &body)
-                .ok();
-            let claimed = sessions_for_claim.claim_mailbox_by_key(&key_for_claim).unwrap_or(false);
-            (mail_entry, claimed)
-        })
-        .await
-        .unwrap_or((None, false));
+        let mail_entry = sessions
+            .enqueue_mailbox_async(&d.recipient_id, &mail_key, MailboxSource::ChannelOrchestrator, Some(&d.message_id), &c.row.body)
+            .await
+            .ok();
+        let claimed = sessions.claim_mailbox_by_key_async(&mail_key).await.unwrap_or(false);
         if !claimed
             && mail_entry
                 .as_ref()
@@ -581,9 +569,7 @@ impl Orchestrator {
         let heard = crate::spawn_blocking_traced(move || o.hear(input)).await.unwrap_or(false);
         if heard {
             if let Some(id) = settle_id {
-                let sessions = sessions.clone();
-                let recipient = d.recipient_id.clone();
-                let _ = crate::spawn_blocking_traced(move || sessions.settle_mailbox(id, true, Some(&recipient))).await;
+                let _ = sessions.settle_mailbox_async(id, true, Some(&d.recipient_id)).await;
             }
             let _ = chat.settle_delivery_async(d.id, true).await;
             if let Err(e) = chat.react_async(&c.row.id, &d.recipient_id, HANDED_EMOJI, true).await {
@@ -591,8 +577,7 @@ impl Orchestrator {
             }
         } else if !self.closed.load(Ordering::Acquire) {
             if let Some(id) = settle_id {
-                let sessions = sessions.clone();
-                let _ = crate::spawn_blocking_traced(move || sessions.settle_mailbox(id, false, Some("rejected"))).await;
+                let _ = sessions.settle_mailbox_async(id, false, Some("rejected")).await;
             }
             let _ = chat.settle_delivery_async(d.id, false).await;
         }
@@ -611,10 +596,6 @@ impl Orchestrator {
         for me in self.instances.lock().values() {
             me.more.notify_waiters();
         }
-    }
-
-    pub fn close(&self) {
-        vibevalley_runtime::rt::block_on(self.close_async());
     }
 
     fn model_of(&self, id: &str) -> Result<String, String> {

@@ -122,7 +122,7 @@
 ## 怎么验证
 
 - `make rust`（`cargo xtask check`）：格式、clippy 与全部 Rust 测试。
-- `make rust-audit`（`cargo xtask audit`）：静态校验脊柱、桌面宿主与服务端 `L0`–`L3` 分层边界、零循环依赖、零 `pollster`、仅缩减 `rt::block_on(` 上限（`SERVER_BLOCK_ON_CEILING = 73`）与零睡眠边界。
+- `make rust-audit`（`cargo xtask audit`）：静态校验脊柱、桌面宿主与服务端 `L0`–`L3` 分层边界、零循环依赖、零 `pollster`、仅缩减 `rt::block_on(` 上限（`SERVER_BLOCK_ON_CEILING = 71`）与零睡眠边界。
 - `make protocol`（`cargo xtask protocol`）：生成的线上类型与 golden 是最新的。
 - `vp check`、`vp run packages:check`、`vp run mac:check`、`vp run mobile:check`：TS 与原生页面（桌面与移动端）。
 - `vp run docs:verify`：生成物（含 `icons.ts --check`）、词典、旧名字与文档链接。

@@ -15,7 +15,8 @@ use vibevalley_runtime::agent::core::engine::{BrainProvider, KIND as GENERATION_
 use vibevalley_runtime::agent::core::tool::{Tool, ToolOutput};
 use vibevalley_runtime::agent::durable::conformance::{run_reopen_conformance, run_storage_conformance};
 use vibevalley_runtime::agent::durable::{
-    CommitStats, DocumentEvent, JsonlOptions, MemoryStorage, Result as DurableResult, StorageBackend, StorageRead, Store, TaskStatus, WriteCallback,
+    BoxFuture, CommitStats, DocumentEvent, JsonlOptions, MemoryStorage, ReadAsyncOp, Result as DurableResult, StorageBackend, StorageRead, Store, TaskStatus,
+    TelemetryEvent, TelemetrySink, WriteAsyncOp, WriteCallback,
 };
 use vibevalley_runtime::agent::experiments::ExperimentFlags;
 use vibevalley_runtime::agent::extensions::OarPolicy;
@@ -173,7 +174,8 @@ fn sea_orm_postgres_storage_passes_conformance() -> DurableResult<()> {
     let reopen_url = pg.db_url("durable_reopen");
     run_reopen_conformance(|| Store::connect(&reopen_url))?;
 
-    // Verify Tx::transaction() executes inside the same PostgreSQL transaction as durable ops.
+    // Verify Tx::transaction() executes inside the same PostgreSQL transaction as durable ops,
+    // including native async `write_async` / `read_async` + savepoint recovery (`25P02`) + rollback.
     let store = Store::connect(&reopen_url)?;
     let err: DurableResult<()> = store.write(|tx| {
         let db_tx = tx.transaction();
@@ -183,7 +185,59 @@ fn sea_orm_postgres_storage_passes_conformance() -> DurableResult<()> {
     });
     assert!(err.is_err());
     assert!(store.read(|r| r.document("global", "pg-tx", "pi.aborted"))?.is_none());
+
+    vibevalley_runtime::rt::block_on(async { verify_async_store_tx(&store, sea_orm::DbBackend::Postgres).await })?;
     store.close()?;
+    Ok(())
+}
+
+async fn verify_async_store_tx(store: &Store, expected_backend: sea_orm::DbBackend) -> DurableResult<()> {
+    let err: DurableResult<()> = store
+        .write_async(|tx| {
+            Box::pin(async move {
+                let db_tx = tx.transaction();
+                assert_eq!(db_tx.get_database_backend(), expected_backend);
+                sea_orm::ConnectionTrait::execute_unprepared(db_tx, "SELECT 1").await?;
+                tx.create_conversation_async("async-conv-aborted", "deepseek-flash").await?;
+                tx.put_document_async("global", "async-tx", "pi.aborted", &json!({"ok": false})).await?;
+                Err(vibevalley_runtime::agent::durable::Error::Invalid("async rollback".into()))
+            })
+        })
+        .await;
+    assert!(err.is_err());
+    assert!(
+        store
+            .read_async(|r| Box::pin(r.document_async("global", "async-tx", "pi.aborted")))
+            .await?
+            .is_none()
+    );
+
+    // Trigger duplicate conversation constraint inside `write_async` and verify outer tx commits via savepoint (`25P02`).
+    store
+        .write_async(|tx| {
+            Box::pin(async move {
+                tx.create_conversation_async("async-conv-1", "deepseek-flash").await?;
+                let dup = tx.create_conversation_async("async-conv-1", "deepseek-flash").await;
+                assert!(dup.is_err());
+                let entry = tx.append_entry_async("async-conv-1", "pi.user", &json!({"text": "after-savepoint"})).await?;
+                assert_eq!(entry.seq, 1);
+                tx.put_document_async("global", "async-tx", "pi.committed", &json!({"ok": true})).await?;
+                Ok(())
+            })
+        })
+        .await?;
+
+    let saved = store
+        .read_async(|r| {
+            Box::pin(async move {
+                let entries = r.entries_async("async-conv-1", 1).await?;
+                let doc = r.document_async("global", "async-tx", "pi.committed").await?;
+                Ok((entries, doc))
+            })
+        })
+        .await?;
+    assert_eq!(saved.0.len(), 1);
+    assert_eq!(saved.1.unwrap().state, json!({"ok": true}));
     Ok(())
 }
 
@@ -585,6 +639,12 @@ impl StorageBackend for CustomMemoryWrapper {
     fn write_dyn(&self, f: &mut WriteCallback<'_>) -> DurableResult<()> {
         self.0.write_dyn(f)
     }
+    fn read_dyn_async<'a>(&'a self, op: &'a mut dyn ReadAsyncOp<'a>) -> BoxFuture<'a, DurableResult<()>> {
+        self.0.read_dyn_async(op)
+    }
+    fn write_dyn_async<'a>(&'a self, op: &'a mut dyn WriteAsyncOp<'a>) -> BoxFuture<'a, DurableResult<()>> {
+        self.0.write_dyn_async(op)
+    }
     fn stats(&self) -> CommitStats {
         self.0.stats()
     }
@@ -708,4 +768,86 @@ fn memory_and_jsonl_undo_rollback_preserves_state_and_indices_on_error_and_panic
         })?;
     }
     Ok(())
+}
+
+#[test]
+fn sqlite_and_memory_and_jsonl_write_async_and_telemetry_flush_parity() -> DurableResult<()> {
+    #[derive(Default)]
+    struct CaptureTelemetry(Mutex<Vec<TelemetryEvent>>);
+    impl TelemetrySink for CaptureTelemetry {
+        fn record(&self, event: &TelemetryEvent) {
+            self.0.lock().unwrap().push(event.clone());
+        }
+    }
+
+    let dir = tempdir().unwrap();
+    let sqlite_path = dir.path().join("async.db");
+    let jsonl_dir = dir.path().join("jsonl");
+    let stores: [(&str, Store); 3] = [
+        ("sqlite", Store::open(&sqlite_path)?),
+        ("memory", Store::from_backend(Arc::new(MemoryStorage::new()))),
+        (
+            "jsonl",
+            Store::jsonl_with_options(
+                &jsonl_dir,
+                JsonlOptions {
+                    fsync: false,
+                    read_only: false,
+                },
+            )?,
+        ),
+    ];
+
+    for (label, store) in &stores {
+        let sink = Arc::new(CaptureTelemetry::default());
+        store.set_telemetry(sink.clone());
+
+        vibevalley_runtime::rt::block_on(async {
+            let err: DurableResult<()> = store
+                .write_async(|tx| {
+                    Box::pin(async move {
+                        tx.create_conversation_async("c-async", "deepseek-flash").await?;
+                        tx.append_entry_async("c-async", "pi.user", &json!({"text": "rolled-back"})).await?;
+                        tx.submit_async("c-async", "req-abort", "prompt", &json!({}), None).await?;
+                        Err(vibevalley_runtime::agent::durable::Error::Invalid("abort".into()))
+                    })
+                })
+                .await;
+            assert!(err.is_err(), "{label}");
+            assert!(sink.0.lock().unwrap().is_empty(), "{label} telemetry must not flush on rollback");
+
+            store
+                .write_async(|tx| {
+                    Box::pin(async move {
+                        tx.create_conversation_async("c-async", "deepseek-flash").await?;
+                        tx.append_entry_async("c-async", "pi.user", &json!({"text": "ok"})).await?;
+                        let (sub, _) = tx.submit_async("c-async", "req-1", "prompt", &json!({}), None).await?;
+                        tx.settle_async(&sub.id, vibevalley_runtime::agent::durable::SubmissionStatus::Done, &json!({"done": true}))
+                            .await?;
+                        Ok(())
+                    })
+                })
+                .await?;
+
+            let entries = store.read_async(|r| Box::pin(r.entries_async("c-async", 1))).await?;
+            assert_eq!(entries.len(), 1, "{label}");
+            Ok::<_, vibevalley_runtime::agent::durable::Error>(())
+        })?;
+
+        let events = sink.0.lock().unwrap();
+        assert_eq!(events.len(), 3, "{label} expected entry + submit + settle telemetry events");
+    }
+
+    verify_async_store_tx(&stores[0].1, sea_orm::DbBackend::Sqlite).pipe_block_on()?;
+    Ok(())
+}
+
+trait PipeBlockOn {
+    fn pipe_block_on(self) -> DurableResult<()>;
+}
+
+impl<F: std::future::Future<Output = DurableResult<()>> + Send> PipeBlockOn for F {
+    fn pipe_block_on(self) -> DurableResult<()> {
+        vibevalley_runtime::rt::block_on(self)
+    }
 }

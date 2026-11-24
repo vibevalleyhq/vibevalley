@@ -404,7 +404,7 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
         .to_string();
     let owner = format!("profile:{}", helper.id);
     crate::support::wait_until_settled(Some(&started.hub), Duration::from_secs(30), "second message queued in mailbox", || {
-        let entries = started.test_internals().board.sessions().mailbox_entries(&owner).ok()?;
+        let entries = vibevalley_runtime::rt::block_on(started.test_internals().board.sessions().mailbox_entries_async(&owner)).ok()?;
         entries.into_iter().find(|e| e.payload == "撤回这条" && e.status == MailboxStatus::Pending)
     });
 
@@ -414,7 +414,7 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
         Duration::from_secs(30),
         "deleted channel message withdraws pending mailbox entry",
         || {
-            let entries = started.test_internals().board.sessions().mailbox_entries(&owner).ok()?;
+            let entries = vibevalley_runtime::rt::block_on(started.test_internals().board.sessions().mailbox_entries_async(&owner)).ok()?;
             entries.into_iter().find(|e| e.payload == "撤回这条" && e.status == MailboxStatus::Withdrawn)
         },
     );
@@ -433,7 +433,7 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
             (reports == 1 && pending.is_empty()).then_some(())
         },
     );
-    let entries = started.test_internals().board.sessions().mailbox_entries(&owner).unwrap();
+    let entries = vibevalley_runtime::rt::block_on(started.test_internals().board.sessions().mailbox_entries_async(&owner)).unwrap();
     assert_eq!(entries.iter().find(|e| e.payload == "撤回这条").unwrap().status, MailboxStatus::Withdrawn);
     started.close();
 }
@@ -473,27 +473,24 @@ fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_
         .to_string();
 
     let sessions = started.test_internals().board.sessions();
-    sessions
-        .enqueue_mailbox(
-            "profile:direct-1",
-            "direct:direct-1:msg",
-            MailboxSource::ChannelDirect,
-            Some(&msg_id),
-            "待撤回消息",
-        )
+    vibevalley_runtime::rt::block_on(sessions.enqueue_mailbox_async(
+        "profile:direct-1",
+        "direct:direct-1:msg",
+        MailboxSource::ChannelDirect,
+        Some(&msg_id),
+        "待撤回消息",
+    ))
+    .unwrap();
+    vibevalley_runtime::rt::block_on(sessions.enqueue_mailbox_async("issue:42", "issue:42:msg", MailboxSource::IssueComment, Some(&msg_id), "待撤回消息"))
         .unwrap();
-    sessions
-        .enqueue_mailbox("issue:42", "issue:42:msg", MailboxSource::IssueComment, Some(&msg_id), "待撤回消息")
-        .unwrap();
-    sessions
-        .enqueue_mailbox(
-            "orchestrator",
-            "orchestrator:orchestrator:msg",
-            MailboxSource::ChannelOrchestrator,
-            Some(&msg_id),
-            "待撤回消息",
-        )
-        .unwrap();
+    vibevalley_runtime::rt::block_on(sessions.enqueue_mailbox_async(
+        "orchestrator",
+        "orchestrator:orchestrator:msg",
+        MailboxSource::ChannelOrchestrator,
+        Some(&msg_id),
+        "待撤回消息",
+    ))
+    .unwrap();
 
     call("channel.message.delete", json!({ "id": msg_id }));
     crate::support::wait_until_settled(
@@ -501,14 +498,15 @@ fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_
         Duration::from_secs(30),
         "all three pending mailbox rows withdrawn by source_message_id",
         || {
-            let direct_w = sessions
-                .mailbox_entries("profile:direct-1")
+            let direct_w = vibevalley_runtime::rt::block_on(sessions.mailbox_entries_async("profile:direct-1"))
                 .ok()?
                 .iter()
                 .any(|e| e.status == MailboxStatus::Withdrawn);
-            let issue_w = sessions.mailbox_entries("issue:42").ok()?.iter().any(|e| e.status == MailboxStatus::Withdrawn);
-            let orch_w = sessions
-                .mailbox_entries("orchestrator")
+            let issue_w = vibevalley_runtime::rt::block_on(sessions.mailbox_entries_async("issue:42"))
+                .ok()?
+                .iter()
+                .any(|e| e.status == MailboxStatus::Withdrawn);
+            let orch_w = vibevalley_runtime::rt::block_on(sessions.mailbox_entries_async("orchestrator"))
                 .ok()?
                 .iter()
                 .any(|e| e.status == MailboxStatus::Withdrawn);

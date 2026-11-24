@@ -28,7 +28,7 @@ fn crons_are_kept_refused_and_run_when_due() {
     let started = server(dir.path());
     let hub = started.hub.clone();
     let clock = Arc::new(ManualClock::new(1_700_000_000_000));
-    let crons = Crons::open_with_clock(
+    let crons = vibevalley_runtime::rt::block_on(Crons::open_with_clock_async(
         started.test_internals().db.clone(),
         &hub,
         started.test_internals().board.clone(),
@@ -36,7 +36,7 @@ fn crons_are_kept_refused_and_run_when_due() {
         Some(started.test_internals().chat.clone()),
         None,
         clock.clone(),
-    )
+    ))
     .unwrap();
     cron::install(&hub, crons.clone(), false);
     let call = |op: &str, p| hub.call_as(Caller::User, op, p);
@@ -88,10 +88,10 @@ fn crons_are_kept_refused_and_run_when_due() {
     );
     let once = once.data.unwrap_or_else(|| panic!("{}", once.message));
     assert_eq!(once["agent"], helper.id.as_str());
-    crons.tick();
+    vibevalley_runtime::rt::block_on(crons.tick_async());
     assert_eq!(started.test_internals().board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 0);
     clock.advance(Duration::from_secs(60));
-    crons.tick();
+    vibevalley_runtime::rt::block_on(crons.tick_async());
     let made = started
         .test_internals()
         .board
@@ -103,26 +103,23 @@ fn crons_are_kept_refused_and_run_when_due() {
     assert!(!after.enabled && after.last_run == Some(at));
     // Run once: the next tick makes nothing new.
     clock.advance(Duration::from_secs(60));
-    crons.tick();
+    vibevalley_runtime::rt::block_on(crons.tick_async());
     assert_eq!(started.test_internals().board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 1);
     assert!(!dir.path().join("crons.json").exists(), "crons must live in server.db, not crons.json");
 
     // Updating the issue preserves cron.issue_id (PutIssue ON CONFLICT DO UPDATE, not INSERT OR REPLACE).
-    started
-        .test_internals()
-        .board
-        .edit(
-            &made.id,
-            &vibevalley_protocol::IssueUpdate {
-                title: Some("say hi updated".into()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    vibevalley_runtime::rt::block_on(started.test_internals().board.edit_async(
+        &made.id,
+        &vibevalley_protocol::IssueUpdate {
+            title: Some("say hi updated".into()),
+            ..Default::default()
+        },
+    ))
+    .unwrap();
     assert_eq!(crons.issue_of(once["id"].as_str().unwrap()).as_deref(), Some(made.id.as_str()));
 
     call("cron.delete", json!({ "id": id })).data.unwrap_or_default();
-    crons.close();
+    vibevalley_runtime::rt::block_on(crons.close_async());
     started.test_internals().board.close();
     drop(started);
 
@@ -134,7 +131,7 @@ fn crons_are_kept_refused_and_run_when_due() {
     let reloaded = again.test_internals().board.issue(&made.id).unwrap();
     assert_eq!(reloaded.cron.as_deref(), once["id"].as_str());
     // Deleting the cron clears Issue.cron on the linked issue.
-    again.test_internals().crons.remove(once["id"].as_str().unwrap()).unwrap();
+    vibevalley_runtime::rt::block_on(again.test_internals().crons.remove_async(once["id"].as_str().unwrap())).unwrap();
     assert_eq!(again.test_internals().board.issue(&made.id).unwrap().cron, None);
     again.test_internals().board.close();
 }

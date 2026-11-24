@@ -210,15 +210,6 @@ impl Game {
         }
     }
 
-    pub fn close(&self) {
-        let prev = self.sub.lock().take();
-        drop(prev);
-        if let Some((cancel, handle)) = self.counter.lock().take() {
-            cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(handle);
-        }
-    }
-
     /// `setCommits`.
     pub fn set_commits(&self, repos: &[vibevalley_protocol::Repo]) {
         let Some(hub) = self.hub.upgrade() else { return };

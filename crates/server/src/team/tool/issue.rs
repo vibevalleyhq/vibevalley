@@ -4,7 +4,7 @@ use serde::Deserialize;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     CriterionCheck, Deliverable, Issue, IssueAnswer, IssueDiffGetInput, IssueFilter, IssueRefineInput, IssueReportMemory, IssueRequest, IssueReviewInput,
-    IssueStatus, IssueStatusUpdateInput, IssueTimeline, IssueUpdateInput, MandateStrength, SessionStopInput, SubmitBranch, ops,
+    IssueRunListInput, IssueStatus, IssueStatusUpdateInput, IssueTimeline, IssueUpdateInput, MandateStrength, SessionStopInput, SubmitBranch, ops,
 };
 
 use super::{ToolBox, Who, given};
@@ -12,6 +12,10 @@ use crate::infra::text;
 use crate::now;
 use crate::work::issue::ChildDraft;
 use crate::work::session::{Report, ReportQuestion, ReportStatus};
+
+fn block_on<F: std::future::Future>(fut: F) -> F::Output {
+    vibevalley_runtime::rt::block_on(fut)
+}
 
 const PRIORITIES: &str = "Expected one of: 紧急, 高, 普通, 中, 低, urgent, high, medium, low";
 
@@ -68,14 +72,14 @@ pub struct IdArgs {
     id: String,
 }
 
-pub fn get(f: &ToolBox, _: &Who, a: IdArgs) -> Result<String, String> {
+pub fn get(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
     let item = match f.issue(&a.id) {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
     let timeline: Option<IssueTimeline> = f
-        .board
-        .runs(&item.id)
+        .hub()?
+        .invoke::<ops::IssueRunList>(&f.ctx(who), IssueRunListInput { id: item.id.clone() })
         .ok()
         .map(|runs| vibevalley_core::brief::milestones_of(&item, &runs, |s| f.board.session(s).map(|s| s.name)));
     let at = now();
@@ -165,7 +169,7 @@ pub fn comment(f: &ToolBox, _: &Who, a: CommentArgs) -> Result<String, String> {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    Ok(match crate::work::issue::comment(&f.board, &item.id, &a.text) {
+    Ok(match block_on(crate::work::issue::comment_async(&f.board, &item.id, &a.text)) {
         Ok(_) => match f.worker_of(&item) {
             Some(w) => format!("已经在 #{} 的工单串里跟 {} 说了", item.number, w.name),
             None => text::nobody_on(item.number),
@@ -479,16 +483,14 @@ pub struct SplitArgs {
 pub fn split(f: &ToolBox, who: &Who, a: SplitArgs) -> Result<String, String> {
     let (_, mut issue) = helper_issue(f, who)?;
     if let Some(title) = given(&a.title) {
-        issue = f
-            .board
-            .edit(
-                &issue.id,
-                &vibevalley_protocol::IssueUpdate {
-                    title: Some(title.into()),
-                    ..Default::default()
-                },
-            )
-            .map_err(|e| e.to_string())?;
+        issue = block_on(f.board.edit_async(
+            &issue.id,
+            &vibevalley_protocol::IssueUpdate {
+                title: Some(title.into()),
+                ..Default::default()
+            },
+        ))
+        .map_err(|e| e.to_string())?;
     }
     let drafts = a
         .tasks
@@ -504,7 +506,7 @@ pub fn split(f: &ToolBox, who: &Who, a: SplitArgs) -> Result<String, String> {
             agent: given(&t.agent).map(String::from),
         })
         .collect();
-    let children = f.board.split(&issue.id, drafts).map_err(|e| e.to_string())?;
+    let children = block_on(f.board.split_async(&issue.id, drafts)).map_err(|e| e.to_string())?;
     let lines: Vec<String> = children.iter().map(|c| format!("- #{} {}", c.number, c.title)).collect();
     Ok(format!("#{} 拆成了 {} 张子工单：\n{}", issue.number, children.len(), lines.join("\n")))
 }
@@ -588,7 +590,7 @@ fn submit(f: &ToolBox, who: &Who, summary: Option<&str>) -> Result<String, Strin
         body,
         dry_run: None,
     };
-    let data = f.pulls.publish(&req, Some(&issue.id)).map_err(|e| e.message)?;
+    let data = block_on(f.pulls.publish_async(&req, Some(&issue.id))).map_err(|e| e.message)?;
     Ok(data.url.unwrap_or(data.branch))
 }
 

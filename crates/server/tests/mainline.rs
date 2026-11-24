@@ -196,7 +196,10 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
     });
 
     let draft_id = draft["id"].as_str().unwrap();
-    let run = server.test_internals().board.runs(draft_id).unwrap().pop().unwrap();
+    let run = vibevalley_runtime::rt::block_on(server.test_internals().board.runs_async(draft_id))
+        .unwrap()
+        .pop()
+        .unwrap();
     assert!(run.heard.is_empty());
     let queued = server
         .test_internals()
@@ -246,7 +249,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
         json!({ "name": "Scheduled task", "text": "Write a scheduled file", "agent": "Worker", "repo": "demo", "when": { "kind": "once", "at": clock.now_ms() + 100 } }),
     );
     clock.advance(Duration::from_millis(150));
-    server.test_internals().crons.tick();
+    vibevalley_runtime::rt::block_on(server.test_internals().crons.tick_async());
     let scheduled = until(&server, "cron dispatched", || {
         server
             .test_internals()
@@ -260,7 +263,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
             .issue(&scheduled.id)
             .filter(|i| i.stage.state == IssueStageKind::Reviewing)
     });
-    server.test_internals().crons.tick();
+    vibevalley_runtime::rt::block_on(server.test_internals().crons.tick_async());
     assert_eq!(server.test_internals().board.read(|s| s.issues.iter().filter(|i| i.cron.is_some()).count()), 1);
     server.close();
     drop(listener);
@@ -268,7 +271,10 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
 
     let reopened = vibevalley_server::start(config(dir.path(), model, Arc::new(ManualClock::new(clock.now_ms())))).unwrap();
     assert_eq!(reopened.test_internals().board.issue(&id).unwrap().status, IssueStatus::Done);
-    assert_eq!(reopened.test_internals().board.runs(&id).unwrap().len(), 2);
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(reopened.test_internals().board.runs_async(&id)).unwrap().len(),
+        2
+    );
     assert!(
         reopened
             .test_internals()
@@ -278,7 +284,7 @@ fn regression_mainline_dispatch_report_follow_up_merge_schedule_and_reopen() {
             .iter()
             .any(|m| m.text == "The mainline uses real git")
     );
-    assert!(reopened.test_internals().board.past_session(&session).is_some());
+    assert!(vibevalley_runtime::rt::block_on(reopened.test_internals().board.past_session_async(&session)).is_some());
     assert!(
         reopened
             .test_internals()

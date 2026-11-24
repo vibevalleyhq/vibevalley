@@ -57,10 +57,7 @@ impl ReviewProvider for Bound {
             return Ok(request.explicit());
         };
         let o = self.orchestrator.upgrade().ok_or(Error::Closed)?;
-        let Some((issue, report)) = o
-            .board
-            .sessions()
-            .review_work(vendor, run, request.candidate)
+        let Some((issue, report)) = vibevalley_runtime::rt::block_on(o.board.sessions().review_work_async(vendor, run, request.candidate))
             .map_err(|e| Error::Invalid(e.to_string()))?
         else {
             return Ok(None);

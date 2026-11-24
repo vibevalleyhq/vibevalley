@@ -96,28 +96,25 @@ pub fn install(hub: &Arc<Hub>, sessions: Sessions, trajectories: Arc<Trajectorie
     let tr = trajectories.clone();
     hub.on_async::<ops::SessionEventList, _, _>(move |_, input| {
         let tr = tr.clone();
-        async move { run_blocking(move || Ok(tr.events_page(&input).unwrap_or_default())).await }
+        async move { Ok(tr.events_page_async(&input).await.unwrap_or_default()) }
     });
     let s = sessions.clone();
     hub.on_async::<ops::SessionStop, _, _>(move |_, input| {
         let s = s.clone();
-        async move { run_blocking(move || stop(&s, &input.id)).await }
+        async move { stop(&s, &input.id) }
     });
 
     let s = sessions.clone();
     hub.on_async::<ops::SessionOpenWorkspace, _, _>(move |_, input| {
         let s = s.clone();
-        async move { run_blocking(move || s.open_workspace(input).map_err(session_error)).await }
+        async move { s.open_workspace_async(input).await.map_err(session_error) }
     });
     let s = sessions.clone();
     hub.on_async::<ops::SessionCloseWorkspace, _, _>(move |_, input| {
         let s = s.clone();
         async move {
-            run_blocking(move || {
-                s.close_workspace(&input.id);
-                Ok(())
-            })
-            .await
+            s.close_workspace_async(&input.id).await;
+            Ok(())
         }
     });
     let s = sessions.clone();
@@ -127,23 +124,23 @@ pub fn install(hub: &Arc<Hub>, sessions: Sessions, trajectories: Arc<Trajectorie
         let att = att.clone();
         async move {
             let trace_id = (ctx.trace_id != 0).then_some(ctx.trace_id);
-            run_blocking(move || s.send_workspace_with_trace(input, att.as_deref(), trace_id).map_err(session_error)).await
+            s.send_workspace_with_trace_async(input, att.as_deref(), trace_id).await.map_err(session_error)
         }
     });
     let s = sessions.clone();
     hub.on_async::<ops::SessionRespondPermission, _, _>(move |_, input| {
         let s = s.clone();
-        async move { run_blocking(move || s.respond_permission(input).map_err(session_error)).await }
+        async move { s.respond_permission(input).map_err(session_error) }
     });
     let s = sessions.clone();
     hub.on_async::<ops::SessionRespondInteraction, _, _>(move |_, input| {
         let s = s.clone();
-        async move { run_blocking(move || s.respond_interaction(input).map_err(session_error)).await }
+        async move { s.respond_interaction(input).map_err(session_error) }
     });
     let s = sessions.clone();
     hub.on_async::<ops::SessionSetConfig, _, _>(move |_, input| {
         let s = s.clone();
-        async move { run_blocking(move || s.set_workspace_config(input).map_err(session_error)).await }
+        async move { s.set_workspace_config_async(input).await.map_err(session_error) }
     });
     let s = sessions.clone();
     hub.on_async::<ops::SessionChildTranscript, _, _>(move |_, input| {
@@ -153,12 +150,12 @@ pub fn install(hub: &Arc<Hub>, sessions: Sessions, trajectories: Arc<Trajectorie
     let s = sessions.clone();
     hub.on_async::<ops::SessionBindingAttach, _, _>(move |_, input| {
         let s = s.clone();
-        async move { run_blocking(move || s.attach_binding(input).map_err(session_error)).await }
+        async move { s.attach_binding_async(input).await.map_err(session_error) }
     });
     let s = sessions.clone();
     hub.on_async::<ops::SessionBindingDetach, _, _>(move |_, input| {
         let s = s.clone();
-        async move { run_blocking(move || s.detach_binding(input).map_err(session_error)).await }
+        async move { s.detach_binding_async(input).await.map_err(session_error) }
     });
 
     let s = sessions;
@@ -217,8 +214,8 @@ pub(crate) fn stop(sessions: &Sessions, id: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn workspace_state_event(session: Session, sessions: &Sessions) -> SessionWatchEvent {
-    let title = sessions.session_title(&session.id);
+async fn workspace_state_event_async(session: Session, sessions: &Sessions) -> SessionWatchEvent {
+    let title = sessions.session_title_async(&session.id).await;
     let snap = sessions.workspace_snapshot(&session.id);
     let swarm = sessions.swarm_snapshot(&session.id);
     SessionWatchEvent::State {
@@ -232,10 +229,6 @@ fn workspace_state_event(session: Session, sessions: &Sessions) -> SessionWatchE
         tokens: snap.tokens,
         swarm,
     }
-}
-
-async fn load_workspace_state_event(session: Session, sessions: Sessions) -> Option<SessionWatchEvent> {
-    tokio::task::spawn_blocking(move || workspace_state_event(session, &sessions)).await.ok()
 }
 
 #[allow(clippy::too_many_arguments, reason = "watch task carries hub, session streams, cancel token, and sink")]
@@ -252,25 +245,20 @@ async fn watch_session(
     sink: Sink,
 ) {
     let id = initial.id.clone();
-    let history: Vec<_> = {
-        let tr = trajectories.clone();
-        let sid = id.clone();
-        tokio::task::spawn_blocking(move || tr.events(&sid, None).unwrap_or_default())
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|e| after_seq.is_none_or(|after| e.seq > after))
-            .collect()
-    };
+    let history: Vec<_> = trajectories
+        .events_async(&id, None)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|e| after_seq.is_none_or(|after| e.seq > after))
+        .collect();
     if !sink.send(&SessionWatchEvent::History {
         session: id.clone(),
         events: history,
     }) {
         return;
     }
-    let Some(first_state) = load_workspace_state_event(initial, sessions.clone()).await else {
-        return;
-    };
+    let first_state = workspace_state_event_async(initial, &sessions).await;
     if sink.stopped() || cancel.is_cancelled() || !sink.send(&first_state) {
         return;
     }
@@ -332,9 +320,7 @@ async fn watch_session(
                     }
                     continue;
                 };
-                let Some(state) = load_workspace_state_event(session, sessions.clone()).await else {
-                    return;
-                };
+                let state = workspace_state_event_async(session, &sessions).await;
                 if sink.stopped() || cancel.is_cancelled() {
                     return;
                 }
@@ -448,11 +434,7 @@ async fn watch_issue(
                     if loaded && ids.contains(id) && !(settled && !was_settled) {
                         continue;
                     }
-                    let tr = trajectories.clone();
-                    let sid = id.clone();
-                    let history = tokio::task::spawn_blocking(move || tr.events(&sid, None).unwrap_or_default())
-                        .await
-                        .unwrap_or_default();
+                    let history = trajectories.events_async(id, None).await.unwrap_or_default();
                     let history = history[history.len().saturating_sub(HISTORY)..].to_vec();
                     match history.first().map(|e| e.seq) {
                         Some(first) if first > 0 => rows.push(IssueWatch::Gap {

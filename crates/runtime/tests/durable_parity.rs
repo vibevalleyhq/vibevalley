@@ -485,3 +485,53 @@ fn regression_domain_write_and_settlement_share_the_outer_commit() -> Result<()>
     assert_eq!(domain_rows, 1);
     Ok(())
 }
+
+#[test]
+fn async_write_shares_outer_commit_and_flushes_telemetry_on_commit_only() -> Result<()> {
+    #[derive(Default)]
+    struct CaptureTelemetry(std::sync::Mutex<Vec<TelemetryEvent>>);
+    impl TelemetrySink for CaptureTelemetry {
+        fn record(&self, event: &TelemetryEvent) {
+            self.0.lock().unwrap().push(event.clone());
+        }
+    }
+
+    let dir = tempdir().unwrap();
+    let file = dir.path().join("server.db");
+    let store = Store::open(&file)?;
+    execute(
+        &file,
+        "CREATE TABLE expected_async (id TEXT PRIMARY KEY);
+        CREATE TABLE domain_async (id TEXT PRIMARY KEY REFERENCES expected_async(id) DEFERRABLE INITIALLY DEFERRED);",
+    )?;
+    let sink = Arc::new(CaptureTelemetry::default());
+    store.set_telemetry(sink.clone());
+
+    let (submission, _) = vibevalley_runtime::rt::block_on(
+        store.write_async(|tx| Box::pin(async move { tx.submit_async("issue-async", "reply", "prompt", &json!({}), None).await })),
+    )?;
+    assert_eq!(sink.0.lock().unwrap().len(), 1);
+
+    let events = store.subscribe_documents()?;
+    let settle_async = || {
+        let sub_id = submission.id.as_str();
+        vibevalley_runtime::rt::block_on(store.write_with_async(sub_id, |tx, sub_id| {
+            Box::pin(async move {
+                sea_orm::ConnectionTrait::execute_unprepared(tx.transaction(), "INSERT INTO domain_async VALUES ('run')").await?;
+                tx.settle_async(sub_id, SubmissionStatus::Done, &json!("delivered")).await?;
+                tx.put_document_async("run", "run", "issue.report", &json!("report")).await?;
+                Ok(())
+            })
+        }))
+    };
+
+    assert!(settle_async().is_err());
+    assert!(events.try_recv().is_err());
+    assert_eq!(sink.0.lock().unwrap().len(), 1);
+
+    execute(&file, "INSERT INTO expected_async VALUES ('run')")?;
+    settle_async()?;
+    assert_eq!(events.try_recv().unwrap().document.state, json!("report"));
+    assert_eq!(sink.0.lock().unwrap().len(), 2);
+    Ok(())
+}

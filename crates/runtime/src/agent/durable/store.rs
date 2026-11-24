@@ -6,7 +6,10 @@ use std::sync::{Arc, RwLock};
 
 use serde_json::{Value, json};
 
-use super::storage::{DbTx, JsonlOptions, JsonlStorage, MemoryStorage, SeaOrmStorage, StorageBackend, StorageRead, StorageWrite, WriteOutcome};
+use super::storage::{
+    BoxFuture, DbTx, JsonlOptions, JsonlStorage, MemoryStorage, ReadAsyncOp, SeaOrmStorage, StorageBackend, StorageRead, StorageWrite, WriteAsyncOp,
+    WriteOutcome,
+};
 use super::telemetry::{NoopTelemetrySink, TelemetryEvent, TelemetrySink};
 use super::{CommitStats, Document, DocumentEvent, Error, Result};
 
@@ -172,6 +175,213 @@ impl Store {
         Ok(out.expect("write_dyn completed without value"))
     }
 
+    pub async fn read_async<T, F>(&self, f: F) -> Result<T>
+    where
+        F: for<'call, 'tx> FnOnce(&'call Read<'tx>) -> BoxFuture<'call, Result<T>> + Send,
+        T: Send,
+    {
+        struct Op<'env, F, T> {
+            f: Option<F>,
+            out: &'env mut Option<T>,
+        }
+        impl<'env, T, F> ReadAsyncOp<'env> for Op<'env, F, T>
+        where
+            F: for<'call, 'tx> FnOnce(&'call Read<'tx>) -> BoxFuture<'call, Result<T>> + Send,
+            T: Send,
+        {
+            fn call<'tx>(&'tx mut self, ops: &'tx dyn StorageRead) -> BoxFuture<'tx, Result<()>>
+            where
+                'env: 'tx,
+            {
+                let fun = self.f.take().expect("read_dyn_async calls closure once");
+                let out = &mut *self.out;
+                Box::pin(async move {
+                    let read = Read { ops };
+                    let val = fun(&read).await?;
+                    *out = Some(val);
+                    Ok(())
+                })
+            }
+        }
+        let mut out = None;
+        let mut op = Op { f: Some(f), out: &mut out };
+        self.backend.read_dyn_async(&mut op).await?;
+        Ok(out.expect("read_dyn_async completed without value"))
+    }
+
+    pub async fn read_with_async<C, T, F>(&self, ctx: C, f: F) -> Result<T>
+    where
+        C: Send + Sync,
+        F: for<'call, 'tx> FnOnce(&'call Read<'tx>, &'call C) -> BoxFuture<'call, Result<T>> + Send,
+        T: Send,
+    {
+        struct Op<'env, C, F, T> {
+            ctx: C,
+            f: Option<F>,
+            out: &'env mut Option<T>,
+        }
+        impl<'env, C, T, F> ReadAsyncOp<'env> for Op<'env, C, F, T>
+        where
+            C: Send + Sync,
+            F: for<'call, 'tx> FnOnce(&'call Read<'tx>, &'call C) -> BoxFuture<'call, Result<T>> + Send,
+            T: Send,
+        {
+            fn call<'tx>(&'tx mut self, ops: &'tx dyn StorageRead) -> BoxFuture<'tx, Result<()>>
+            where
+                'env: 'tx,
+            {
+                let fun = self.f.take().expect("read_dyn_async calls closure once");
+                let ctx = &self.ctx;
+                let out = &mut *self.out;
+                Box::pin(async move {
+                    let read = Read { ops };
+                    let val = fun(&read, ctx).await?;
+                    *out = Some(val);
+                    Ok(())
+                })
+            }
+        }
+        let mut out = None;
+        let mut op = Op {
+            ctx,
+            f: Some(f),
+            out: &mut out,
+        };
+        self.backend.read_dyn_async(&mut op).await?;
+        Ok(out.expect("read_dyn_async completed without value"))
+    }
+
+    pub async fn write_async<T, F>(&self, f: F) -> Result<T>
+    where
+        F: for<'call, 'tx> FnOnce(&'call mut Tx<'tx>) -> BoxFuture<'call, Result<T>> + Send,
+        T: Send,
+    {
+        struct Op<'env, F, T> {
+            f: Option<F>,
+            out: &'env mut Option<T>,
+            telemetry: &'env mut Vec<TelemetryEvent>,
+        }
+        impl<'env, T, F> WriteAsyncOp<'env> for Op<'env, F, T>
+        where
+            F: for<'call, 'tx> FnOnce(&'call mut Tx<'tx>) -> BoxFuture<'call, Result<T>> + Send,
+            T: Send,
+        {
+            fn call<'tx>(
+                &'tx mut self,
+                ops: &'tx dyn StorageRead,
+                write: &'tx dyn StorageWrite,
+                db_tx: Option<&'tx DbTx<'tx>>,
+                now_ms: i64,
+            ) -> BoxFuture<'tx, Result<WriteOutcome>>
+            where
+                'env: 'tx,
+            {
+                let fun = self.f.take().expect("write_dyn_async calls closure once");
+                self.telemetry.clear();
+                let out = &mut *self.out;
+                let telemetry = &mut *self.telemetry;
+                Box::pin(async move {
+                    let mut tx = Tx {
+                        read: Read { ops },
+                        write,
+                        db_tx,
+                        now_ms,
+                        events: Vec::new(),
+                        tasks_changed: false,
+                        telemetry_events: Vec::new(),
+                    };
+                    let val = fun(&mut tx).await?;
+                    *out = Some(val);
+                    *telemetry = tx.telemetry_events;
+                    Ok(WriteOutcome {
+                        events: tx.events,
+                        tasks_changed: tx.tasks_changed,
+                    })
+                })
+            }
+        }
+        let mut out = None;
+        let mut staged_telemetry = Vec::new();
+        let mut op = Op {
+            f: Some(f),
+            out: &mut out,
+            telemetry: &mut staged_telemetry,
+        };
+        self.backend.write_dyn_async(&mut op).await?;
+        for event in staged_telemetry {
+            self.emit_telemetry(event);
+        }
+        Ok(out.expect("write_dyn_async completed without value"))
+    }
+
+    pub async fn write_with_async<C, T, F>(&self, ctx: C, f: F) -> Result<T>
+    where
+        C: Send + Sync,
+        F: for<'call, 'tx> FnOnce(&'call mut Tx<'tx>, &'call C) -> BoxFuture<'call, Result<T>> + Send,
+        T: Send,
+    {
+        struct Op<'env, C, F, T> {
+            ctx: C,
+            f: Option<F>,
+            out: &'env mut Option<T>,
+            telemetry: &'env mut Vec<TelemetryEvent>,
+        }
+        impl<'env, C, T, F> WriteAsyncOp<'env> for Op<'env, C, F, T>
+        where
+            C: Send + Sync,
+            F: for<'call, 'tx> FnOnce(&'call mut Tx<'tx>, &'call C) -> BoxFuture<'call, Result<T>> + Send,
+            T: Send,
+        {
+            fn call<'tx>(
+                &'tx mut self,
+                ops: &'tx dyn StorageRead,
+                write: &'tx dyn StorageWrite,
+                db_tx: Option<&'tx DbTx<'tx>>,
+                now_ms: i64,
+            ) -> BoxFuture<'tx, Result<WriteOutcome>>
+            where
+                'env: 'tx,
+            {
+                let fun = self.f.take().expect("write_dyn_async calls closure once");
+                self.telemetry.clear();
+                let ctx = &self.ctx;
+                let out = &mut *self.out;
+                let telemetry = &mut *self.telemetry;
+                Box::pin(async move {
+                    let mut tx = Tx {
+                        read: Read { ops },
+                        write,
+                        db_tx,
+                        now_ms,
+                        events: Vec::new(),
+                        tasks_changed: false,
+                        telemetry_events: Vec::new(),
+                    };
+                    let val = fun(&mut tx, ctx).await?;
+                    *out = Some(val);
+                    *telemetry = tx.telemetry_events;
+                    Ok(WriteOutcome {
+                        events: tx.events,
+                        tasks_changed: tx.tasks_changed,
+                    })
+                })
+            }
+        }
+        let mut out = None;
+        let mut staged_telemetry = Vec::new();
+        let mut op = Op {
+            ctx,
+            f: Some(f),
+            out: &mut out,
+            telemetry: &mut staged_telemetry,
+        };
+        self.backend.write_dyn_async(&mut op).await?;
+        for event in staged_telemetry {
+            self.emit_telemetry(event);
+        }
+        Ok(out.expect("write_dyn_async completed without value"))
+    }
+
     pub fn stats(&self) -> CommitStats {
         self.backend.stats()
     }
@@ -202,6 +412,18 @@ impl Read<'_> {
     pub fn documents_by_scope(&self, scope: &str, id: &str) -> Result<Vec<Document>> {
         self.ops.documents_by_scope(scope, id)
     }
+
+    pub async fn document_async(&self, scope: &str, id: &str, kind: &str) -> Result<Option<Document>> {
+        self.ops.document_async(scope, id, kind).await
+    }
+
+    pub async fn documents_by_kind_async(&self, scope: &str, kind: &str) -> Result<Vec<Document>> {
+        self.ops.documents_by_kind_async(scope, kind).await
+    }
+
+    pub async fn documents_by_scope_async(&self, scope: &str, id: &str) -> Result<Vec<Document>> {
+        self.ops.documents_by_scope_async(scope, id).await
+    }
 }
 
 impl<'a> Tx<'a> {
@@ -216,8 +438,8 @@ impl<'a> Tx<'a> {
 
     /// Domain writes through this view join the current SeaORM operation transaction.
     /// Panics if the `Store` is not backed by `SeaOrmStorage`.
-    pub fn transaction(&self) -> &sea_orm::DatabaseTransaction {
-        self.db_tx().expect("Tx::transaction() requires a SeaOrmStorage-backed Store").inner()
+    pub fn transaction(&self) -> &'a sea_orm::DatabaseTransaction {
+        self.db_tx.expect("Tx::transaction() requires a SeaOrmStorage-backed Store").inner()
     }
 
     pub fn put_document(&mut self, scope: &str, id: &str, kind: &str, state: &Value) -> Result<Document> {
@@ -225,6 +447,18 @@ impl<'a> Tx<'a> {
             return Err(Error::Invalid("document key is empty".into()));
         }
         let rev = self.write.put_document(scope, id, kind, state, self.now_ms)?;
+        Ok(self.record_put_document(scope, id, kind, state, rev))
+    }
+
+    pub async fn put_document_async(&mut self, scope: &str, id: &str, kind: &str, state: &Value) -> Result<Document> {
+        if [scope, id, kind].contains(&"") {
+            return Err(Error::Invalid("document key is empty".into()));
+        }
+        let rev = self.write.put_document_async(scope, id, kind, state, self.now_ms).await?;
+        Ok(self.record_put_document(scope, id, kind, state, rev))
+    }
+
+    fn record_put_document(&mut self, scope: &str, id: &str, kind: &str, state: &Value, rev: i64) -> Document {
         let document = Document {
             scope_kind: scope.into(),
             scope_id: id.into(),
@@ -238,20 +472,32 @@ impl<'a> Tx<'a> {
             retired: false,
             durable: true,
         });
-        Ok(document)
+        document
     }
 
     pub fn delete_document(&mut self, scope: &str, id: &str, kind: &str) -> Result<()> {
-        if let Some(mut doc) = self.document(scope, id, kind)? {
+        if let Some(doc) = self.document(scope, id, kind)? {
             self.write.delete_document(scope, id, kind)?;
-            doc.updated_at_ms = self.now_ms;
-            self.events.push(DocumentEvent {
-                document: doc,
-                retired: true,
-                durable: true,
-            });
+            self.record_delete_document(doc);
         }
         Ok(())
+    }
+
+    pub async fn delete_document_async(&mut self, scope: &str, id: &str, kind: &str) -> Result<()> {
+        if let Some(doc) = self.document_async(scope, id, kind).await? {
+            self.write.delete_document_async(scope, id, kind).await?;
+            self.record_delete_document(doc);
+        }
+        Ok(())
+    }
+
+    fn record_delete_document(&mut self, mut doc: Document) {
+        doc.updated_at_ms = self.now_ms;
+        self.events.push(DocumentEvent {
+            document: doc,
+            retired: true,
+            durable: true,
+        });
     }
 
     pub fn alert(&mut self, conversation: Option<&str>, value: &Value) -> Result<Document> {
@@ -262,5 +508,15 @@ impl<'a> Tx<'a> {
             .ok_or_else(|| Error::Invalid("inbox items must be an array".into()))?
             .push(value.clone());
         self.put_document(scope, id, "pi.inbox", &data)
+    }
+
+    pub async fn alert_async(&mut self, conversation: Option<&str>, value: &Value) -> Result<Document> {
+        let (scope, id) = conversation.filter(|s| !s.is_empty()).map_or(("global", "inbox"), |c| ("conversation", c));
+        let mut data = self.document_async(scope, id, "pi.inbox").await?.map_or(json!({"items":[]}), |d| d.state);
+        data["items"]
+            .as_array_mut()
+            .ok_or_else(|| Error::Invalid("inbox items must be an array".into()))?
+            .push(value.clone());
+        self.put_document_async(scope, id, "pi.inbox", &data).await
     }
 }

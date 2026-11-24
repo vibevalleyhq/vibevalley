@@ -23,76 +23,82 @@ impl Board {
     /// open; the rest is what the helper was asked, so only before it is
     /// sent. An empty `agent` leaves it unassigned; `before` places it on
     /// the board before that issue ("" last).
-    pub fn edit(&self, reference: &str, upd: &IssueUpdate) -> Result<Issue> {
-        let _work = self.0.work.lock();
-        let was = self.stored(reference)?;
-        let while_open = upd.description.is_none()
-            && upd.repo.is_none()
-            && upd.agent.is_none()
-            && upd.machine_id.is_none()
-            && upd.criteria.is_none()
-            && upd.before.is_none();
-        if while_open {
-            if was.status.is_closed() {
-                return Err(refused("server.issue.closed", &[]));
+    pub fn edit_async<'a>(
+        &'a self,
+        reference: &'a str,
+        upd: &'a IssueUpdate,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Issue>> + Send + 'a>> {
+        Box::pin(async move {
+            let _work = self.0.work.lock().await;
+            let was = self.stored(reference)?;
+            let while_open = upd.description.is_none()
+                && upd.repo.is_none()
+                && upd.agent.is_none()
+                && upd.machine_id.is_none()
+                && upd.criteria.is_none()
+                && upd.before.is_none();
+            if while_open {
+                if was.status.is_closed() {
+                    return Err(refused("server.issue.closed", &[]));
+                }
+            } else if was.executions().next().is_some() {
+                return Err(refused("server.issue.started", &[]));
             }
-        } else if was.executions().next().is_some() {
-            return Err(refused("server.issue.started", &[]));
-        }
-        let (title, description) = issue_words(
-            upd.title.as_deref().unwrap_or(&was.title),
-            upd.description.as_deref().unwrap_or(&was.description),
-        )
-        .ok_or_else(|| refused("server.issue.noTitle", &[]))?;
-        let repo = match upd.repo.as_deref().map(str::trim) {
-            None => was.repo.clone(),
-            Some("") => None,
-            Some(path) => {
-                let dir = self.0.workplaces.repo_dir(path);
-                let found = Repo::discover(&dir)?.ok_or(BoardError::NotARepo(dir))?;
-                Some(self.0.workplaces.repo_ref(found.root()))
+            let (title, description) = issue_words(
+                upd.title.as_deref().unwrap_or(&was.title),
+                upd.description.as_deref().unwrap_or(&was.description),
+            )
+            .ok_or_else(|| refused("server.issue.noTitle", &[]))?;
+            let repo = match upd.repo.as_deref().map(str::trim) {
+                None => was.repo.clone(),
+                Some("") => None,
+                Some(path) => {
+                    let dir = self.0.workplaces.repo_dir(path);
+                    let found = Repo::discover(&dir)?.ok_or(BoardError::NotARepo(dir))?;
+                    Some(self.0.workplaces.repo_ref(found.root()))
+                }
+            };
+            if let Some(agent) = upd.agent.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
+                self.0.drivers.check(agent)?;
             }
-        };
-        if let Some(agent) = upd.agent.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
-            self.0.drivers.check(agent)?;
-        }
-        let at = now();
-        let mut issue = was.clone();
-        issue.title = title;
-        issue.description = description;
-        issue.repo = repo;
-        if let Some(p) = upd.priority {
-            issue.priority = p;
-        }
-        if let Some(c) = &upd.criteria {
-            issue.criteria = vibevalley_core::refine::kept(c);
-        }
-        if let Some(d) = upd.deliver {
-            issue.deliver = d;
-        }
-        if let Some(agent) = upd.agent.as_deref().map(str::trim) {
-            assign(&mut issue, agent, at);
-        }
-        if let Some(machine) = upd.machine_id.as_deref().map(str::trim) {
-            issue.machine_id = (!machine.is_empty()).then(|| machine.to_string());
-        }
-        let mut facts = vec![Fact::issue_changed(at, issue)];
-        if let Some(before) = &upd.before {
-            facts.extend(self.placed(&was.id, before).into_iter().map(|i| Fact::issue_changed(at, i)));
-        }
-        // The placing reads the edit's fields from the issue it is given.
-        let mut merged: Vec<Fact> = Vec::new();
-        for f in facts {
-            if let Fact::IssueChanged(c) = &f
-                && let Some(Fact::IssueChanged(earlier)) = merged.iter_mut().find(|m| matches!(m, Fact::IssueChanged(e) if e.issue.id == c.issue.id))
-            {
-                earlier.issue.rank = c.issue.rank;
-                continue;
+            let at = now();
+            let mut issue = was.clone();
+            issue.title = title;
+            issue.description = description;
+            issue.repo = repo;
+            if let Some(p) = upd.priority {
+                issue.priority = p;
             }
-            merged.push(f);
-        }
-        self.0.ledger.apply(merged)?;
-        self.stored(&was.id)
+            if let Some(c) = &upd.criteria {
+                issue.criteria = vibevalley_core::refine::kept(c);
+            }
+            if let Some(d) = upd.deliver {
+                issue.deliver = d;
+            }
+            if let Some(agent) = upd.agent.as_deref().map(str::trim) {
+                assign(&mut issue, agent, at);
+            }
+            if let Some(machine) = upd.machine_id.as_deref().map(str::trim) {
+                issue.machine_id = (!machine.is_empty()).then(|| machine.to_string());
+            }
+            let mut facts = vec![Fact::issue_changed(at, issue)];
+            if let Some(before) = &upd.before {
+                facts.extend(self.placed(&was.id, before).into_iter().map(|i| Fact::issue_changed(at, i)));
+            }
+            // The placing reads the edit's fields from the issue it is given.
+            let mut merged: Vec<Fact> = Vec::new();
+            for f in facts {
+                if let Fact::IssueChanged(c) = &f
+                    && let Some(Fact::IssueChanged(earlier)) = merged.iter_mut().find(|m| matches!(m, Fact::IssueChanged(e) if e.issue.id == c.issue.id))
+                {
+                    earlier.issue.rank = c.issue.rank;
+                    continue;
+                }
+                merged.push(f);
+            }
+            self.0.ledger.apply_async(merged).await?;
+            self.stored(&was.id)
+        })
     }
 
     /// The unsent issues reranked so `id` stands before `before` ("" or
@@ -133,14 +139,14 @@ impl Board {
 
     /// Deletes an issue never sent: a draft being written goes home, its
     /// checkout is cleared.
-    pub fn remove(&self, reference: &str) -> Result<()> {
-        let _work = self.0.work.lock();
+    pub async fn remove_async(&self, reference: &str) -> Result<()> {
+        let _work = self.0.work.lock().await;
         let issue = self.stored(reference)?;
         if issue.executions().next().is_some() {
             return Err(refused("server.issue.started", &[]));
         }
         if let Some(r) = &issue.refining {
-            self.0.sessions.dismiss(&r.session, Leave::Discard)?;
+            self.0.sessions.dismiss_async(&r.session, Leave::Discard).await?;
         }
         if let Some(main) = self.0.workplaces.main_repo(issue.repo.as_deref())?
             && !self.0.workplaces.discard(&main, issue.number)?
@@ -150,52 +156,61 @@ impl Board {
                 &[("n", issue.number.into()), ("why", t("server.issue.does.cleanWorktree", &[]).into())],
             ));
         }
-        let _ = self.take_words(&issue.id);
-        self.0.ledger.apply(vec![Fact::issue_removed(now(), issue.id.clone())])
+        let _ = self.take_words_async(&issue.id).await;
+        self.0.ledger.apply_async(vec![Fact::issue_removed(now(), issue.id.clone())]).await
     }
 
     /// The verdict on what was handed back: a pass marks it reviewed (the
     /// user completes it by moving it to done); a fail records the findings
     /// and sends them to the session for another round.
-    pub fn review(&self, reference: &str, pass: bool, findings: &[String], text: &str, seen: Option<&ReviewRevision>) -> Result<Issue> {
-        let _work = pass.then(|| self.0.work.lock());
-        let issue = self.stored(reference)?;
-        if issue.status != IssueStatus::InReview {
-            return Err(refused("server.issue.nothingToAccept", &[]));
-        }
-        if pass {
-            let revision = if issue.deliver == Deliverable::Change && issue.repo.is_some() && issue.parent.is_none() {
-                let c = self.changes(&issue.id)?;
-                if seen.is_some_and(|seen| seen != &c.revision) {
-                    return Err(refused("server.issue.reviewChanged", &[]));
-                }
-                let repo = Repo::discover(&c.worktree)?.ok_or_else(|| BoardError::NotARepo(c.worktree.clone()))?;
-                repo.retain_review(&c.revision.base_commit, &c.revision.tree)?;
-                Some(c.revision)
-            } else {
-                None
-            };
-            return self.change(&issue.id, IssueChange::Reviewed(revision));
-        }
-        let fresh = vibevalley_core::refine::kept(findings);
-        let text = text.trim();
-        if fresh.is_empty() && text.is_empty() {
-            return Err(refused("server.issue.failNeedsFindings", &[]));
-        }
-        let at = now();
-        let mut all = issue.findings.clone();
-        for f in fresh {
-            all.push(Finding {
-                id: format!("f{}", self.0.ledger.next("finding", 0)?),
-                text: f,
-                at,
-                resolved: false,
-            });
-        }
-        let words = failed_text(&all, text);
-        self.change(&issue.id, IssueChange::Failed { findings: all })?;
-        self.tell(&issue.id, &words)?;
-        self.stored(&issue.id)
+    pub fn review_async<'a>(
+        &'a self,
+        reference: &'a str,
+        pass: bool,
+        findings: &'a [String],
+        text: &'a str,
+        seen: Option<&'a ReviewRevision>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Issue>> + Send + 'a>> {
+        Box::pin(async move {
+            let _work = if pass { Some(self.0.work.lock().await) } else { None };
+            let issue = self.stored(reference)?;
+            if issue.status != IssueStatus::InReview {
+                return Err(refused("server.issue.nothingToAccept", &[]));
+            }
+            if pass {
+                let revision = if issue.deliver == Deliverable::Change && issue.repo.is_some() && issue.parent.is_none() {
+                    let c = self.changes(&issue.id)?;
+                    if seen.is_some_and(|seen| seen != &c.revision) {
+                        return Err(refused("server.issue.reviewChanged", &[]));
+                    }
+                    let repo = Repo::discover(&c.worktree)?.ok_or_else(|| BoardError::NotARepo(c.worktree.clone()))?;
+                    repo.retain_review(&c.revision.base_commit, &c.revision.tree)?;
+                    Some(c.revision)
+                } else {
+                    None
+                };
+                return self.change_async(&issue.id, IssueChange::Reviewed(revision)).await;
+            }
+            let fresh = vibevalley_core::refine::kept(findings);
+            let text = text.trim();
+            if fresh.is_empty() && text.is_empty() {
+                return Err(refused("server.issue.failNeedsFindings", &[]));
+            }
+            let at = now();
+            let mut all = issue.findings.clone();
+            for f in fresh {
+                all.push(Finding {
+                    id: format!("f{}", self.0.ledger.next_async("finding", 0).await?),
+                    text: f,
+                    at,
+                    resolved: false,
+                });
+            }
+            let words = failed_text(&all, text);
+            self.change_async(&issue.id, IssueChange::Failed { findings: all }).await?;
+            self.tell_async(&issue.id, &words).await?;
+            self.stored(&issue.id)
+        })
     }
 }
 
@@ -223,70 +238,78 @@ pub(super) fn assign(issue: &mut Issue, agent: &str, at: i64) {
 }
 
 impl Board {
-    pub fn hand_over_and_move(&self, reference: &str, agent: &str, words: Option<&str>, findings: &[String]) -> Result<vibevalley_core::Move> {
-        let _work = self.0.work.lock();
-        let issue = self.stored(reference)?;
-        let agent = agent.trim();
-        self.0.drivers.check(agent)?;
-        let words = words.map(str::trim).filter(|w| !w.is_empty()).map(String::from);
-        if issue.delivered == Some(vibevalley_protocol::Landing::MergedIntoParent) {
-            return Err(BoardError::Refused(vibevalley_core::Refusal::InGraph));
-        }
-        let mv = if issue.status == IssueStatus::Todo {
-            vibevalley_core::Move::Start
-        } else {
-            vibevalley_core::status_move(&issue, IssueStatus::Todo).map_err(BoardError::Refused)?
-        };
-        let mut send_words = match mv {
-            vibevalley_core::Move::Start => words,
-            vibevalley_core::Move::Round | vibevalley_core::Move::Reopen => {
-                let required = mv == vibevalley_core::Move::Reopen || issue.stage.state == vibevalley_protocol::IssueStageKind::Reviewing;
-                match words {
-                    Some(w) => Some(w),
-                    None if required => return Err(BoardError::WordsRequired),
-                    None => Some(super::board::default_words(&issue)),
+    pub fn hand_over_and_move_async<'a>(
+        &'a self,
+        reference: &'a str,
+        agent: &'a str,
+        words: Option<&'a str>,
+        findings: &'a [String],
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<vibevalley_core::Move>> + Send + 'a>> {
+        Box::pin(async move {
+            let _work = self.0.work.lock().await;
+            let issue = self.stored(reference)?;
+            let agent = agent.trim();
+            self.0.drivers.check(agent)?;
+            let words = words.map(str::trim).filter(|w| !w.is_empty()).map(String::from);
+            if issue.delivered == Some(vibevalley_protocol::Landing::MergedIntoParent) {
+                return Err(BoardError::Refused(vibevalley_core::Refusal::InGraph));
+            }
+            let mv = if issue.status == IssueStatus::Todo {
+                vibevalley_core::Move::Start
+            } else {
+                vibevalley_core::status_move(&issue, IssueStatus::Todo).map_err(BoardError::Refused)?
+            };
+            let mut send_words = match mv {
+                vibevalley_core::Move::Start => words,
+                vibevalley_core::Move::Round | vibevalley_core::Move::Reopen => {
+                    let required = mv == vibevalley_core::Move::Reopen || issue.stage.state == vibevalley_protocol::IssueStageKind::Reviewing;
+                    match words {
+                        Some(w) => Some(w),
+                        None if required => return Err(BoardError::WordsRequired),
+                        None => Some(super::board::default_words(&issue)),
+                    }
                 }
+                _ => {
+                    return Err(BoardError::Refused(vibevalley_core::Refusal::Cannot {
+                        from: issue.status,
+                        to: IssueStatus::Todo,
+                    }));
+                }
+            };
+            if mv == vibevalley_core::Move::Round && issue.stage.state == vibevalley_protocol::IssueStageKind::Reviewing {
+                let fresh = vibevalley_core::refine::kept(findings);
+                let text = send_words.as_deref().unwrap_or("");
+                if fresh.is_empty() && text.is_empty() {
+                    return Err(refused("server.issue.failNeedsFindings", &[]));
+                }
+                let at = now();
+                let mut all = issue.findings.clone();
+                for f in fresh {
+                    all.push(Finding {
+                        id: format!("f{}", self.0.ledger.next_async("finding", 0).await?),
+                        text: f,
+                        at,
+                        resolved: false,
+                    });
+                }
+                send_words = Some(failed_text(&all, if findings.is_empty() { text } else { "" }));
+                self.change_async(&issue.id, IssueChange::Failed { findings: all }).await?;
             }
-            _ => {
-                return Err(BoardError::Refused(vibevalley_core::Refusal::Cannot {
-                    from: issue.status,
-                    to: IssueStatus::Todo,
-                }));
+            if let Some(s) = self.on_board(&issue) {
+                self.0.sessions.dismiss_async(&s.id, Leave::KeepBranch).await?;
             }
-        };
-        if mv == vibevalley_core::Move::Round && issue.stage.state == vibevalley_protocol::IssueStageKind::Reviewing {
-            let fresh = vibevalley_core::refine::kept(findings);
-            let text = send_words.as_deref().unwrap_or("");
-            if fresh.is_empty() && text.is_empty() {
-                return Err(refused("server.issue.failNeedsFindings", &[]));
-            }
-            let at = now();
-            let mut all = issue.findings.clone();
-            for f in fresh {
-                all.push(Finding {
-                    id: format!("f{}", self.0.ledger.next("finding", 0)?),
-                    text: f,
-                    at,
-                    resolved: false,
-                });
-            }
-            send_words = Some(failed_text(&all, if findings.is_empty() { text } else { "" }));
-            self.change(&issue.id, IssueChange::Failed { findings: all })?;
-        }
-        if let Some(s) = self.on_board(&issue) {
-            self.0.sessions.dismiss(&s.id, Leave::KeepBranch)?;
-        }
-        self.change(&issue.id, IssueChange::Assigned(agent.to_string()))?;
-        let kind = if mv == vibevalley_core::Move::Start {
-            self.change(&issue.id, IssueChange::Queued)?;
-            vibevalley_protocol::RunTriggerKind::Issue
-        } else {
-            self.change(&issue.id, IssueChange::Reopened)?;
-            vibevalley_protocol::RunTriggerKind::Comment
-        };
-        self.send(&issue.id, send_words, kind)?;
-        self.refresh_queue_locked();
-        Ok(mv)
+            self.change_async(&issue.id, IssueChange::Assigned(agent.to_string())).await?;
+            let kind = if mv == vibevalley_core::Move::Start {
+                self.change_async(&issue.id, IssueChange::Queued).await?;
+                vibevalley_protocol::RunTriggerKind::Issue
+            } else {
+                self.change_async(&issue.id, IssueChange::Reopened).await?;
+                vibevalley_protocol::RunTriggerKind::Comment
+            };
+            self.send_async(&issue.id, send_words, kind).await?;
+            self.refresh_queue_locked_async().await;
+            Ok(mv)
+        })
     }
 
     /// Why one more session cannot start on `issue` now (`noRoom`), or ""

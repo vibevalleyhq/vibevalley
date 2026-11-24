@@ -7,70 +7,89 @@ use sea_orm::{
 };
 use vibevalley_protocol::{Millis, Run, Session, SessionEvent, SessionPermissionMode, SessionSubagents};
 use vibevalley_runtime::agent::durable::entities::durable_document;
-use vibevalley_runtime::agent::durable::{Store as DurableStore, Tx};
+use vibevalley_runtime::agent::durable::{BoxFuture, Store as DurableStore, Tx};
 
 use super::sessions::Extra;
 use crate::db::column::{db_json as json, db_word as word, read_db_json as read_json, read_db_word as read_word};
 use crate::db::entities::work_session::{session, session_event, session_run};
-use crate::work::block_on;
 use crate::work::ledger::{ReopenInterrupt, Result as LedgerResult, SessionStore};
 
 pub struct SqliteSessionStore;
 
 impl SessionStore for SqliteSessionStore {
-    fn all(&self, db: &DatabaseConnection) -> Result<Vec<Session>, DbErr> {
-        block_on(all(db))
+    fn all<'a>(&'a self, db: &'a DatabaseConnection) -> BoxFuture<'a, Result<Vec<Session>, DbErr>> {
+        Box::pin(all(db))
     }
 
-    fn past(&self, db: &DatabaseConnection, id: &str) -> Result<Option<Session>, DbErr> {
-        block_on(past(db, id))
+    fn past<'a>(&'a self, db: &'a DatabaseConnection, id: &'a str) -> BoxFuture<'a, Result<Option<Session>, DbErr>> {
+        Box::pin(past(db, id))
     }
 
-    fn put(&self, tx: &DatabaseTransaction, s: &Session, departed: bool) -> Result<(), DbErr> {
-        block_on(put(tx, s, departed))
+    fn put<'a>(&'a self, tx: &'a DatabaseTransaction, s: &'a Session, departed: bool) -> BoxFuture<'a, Result<(), DbErr>> {
+        Box::pin(put(tx, s, departed))
     }
 
-    fn put_subagents(&self, tx: &DatabaseTransaction, summary: &SessionSubagents) -> Result<(), DbErr> {
-        block_on(put_subagents(tx, summary))
+    fn put_subagents<'a>(&'a self, tx: &'a DatabaseTransaction, summary: &'a SessionSubagents) -> BoxFuture<'a, Result<(), DbErr>> {
+        Box::pin(put_subagents(tx, summary))
     }
 
-    fn active_run(&self, tx: &DatabaseTransaction, session_id: &str, run_id: &str, root: &str) -> Result<bool, DbErr> {
-        block_on(active_run(tx, session_id, run_id, root))
+    fn active_run<'a>(&'a self, tx: &'a DatabaseTransaction, session_id: &'a str, run_id: &'a str, root: &'a str) -> BoxFuture<'a, Result<bool, DbErr>> {
+        Box::pin(active_run(tx, session_id, run_id, root))
     }
 
-    fn run(&self, db: &DatabaseConnection, id: &str) -> Result<Option<Run>, DbErr> {
-        block_on(run(db, id))
+    fn run<'a>(&'a self, db: &'a DatabaseConnection, id: &'a str) -> BoxFuture<'a, Result<Option<Run>, DbErr>> {
+        Box::pin(run(db, id))
     }
 
-    fn recoverable_ids(&self, db: &DatabaseConnection, durable: &DurableStore, stored: &[Session]) -> LedgerResult<HashSet<String>> {
-        let all_extras = block_on(extras(db))?;
-        let mut out = HashSet::new();
-        for s in stored {
-            if s.phase.is_working()
-                && !s.is_refining()
-                && s.runtime == vibevalley_runtime::agent::runtime::ID
-                && let Some(extra) = all_extras.get(&s.id)
-                && let (Some(run_id), Some(vendor)) = (extra.run.as_deref(), extra.agent_session.as_deref())
-                && durable
-                    .read(|tx| tx.submission_by_request(&vibevalley_runtime::agent::harness::worker_conversation(vendor), &format!("work:{run_id}")))?
-                    .is_some()
-            {
-                out.insert(s.id.clone());
+    fn recoverable_ids<'a>(
+        &'a self,
+        db: &'a DatabaseConnection,
+        durable: &'a DurableStore,
+        stored: &'a [Session],
+    ) -> BoxFuture<'a, LedgerResult<HashSet<String>>> {
+        Box::pin(async move {
+            let all_extras = extras(db).await?;
+            let mut out = HashSet::new();
+            for s in stored {
+                if s.phase.is_working()
+                    && !s.is_refining()
+                    && s.runtime == vibevalley_runtime::agent::runtime::ID
+                    && let Some(extra) = all_extras.get(&s.id)
+                    && let (Some(run_id), Some(vendor)) = (extra.run.as_deref(), extra.agent_session.as_deref())
+                {
+                    let conv = vibevalley_runtime::agent::harness::worker_conversation(vendor);
+                    let req = format!("work:{run_id}");
+                    if durable
+                        .read_with_async((conv.as_str(), req.as_str()), |tx, &(conv, req)| {
+                            Box::pin(tx.submission_by_request_async(conv, req))
+                        })
+                        .await?
+                        .is_some()
+                    {
+                        out.insert(s.id.clone());
+                    }
+                }
             }
-        }
-        Ok(out)
+            Ok(out)
+        })
     }
 
-    fn interrupt_on_reopen(
-        &self,
-        tx: &mut Tx<'_>,
-        s: &Session,
+    fn interrupt_on_reopen<'a, 'tx>(
+        &'a self,
+        tx: &'a mut Tx<'tx>,
+        s: &'a Session,
         at: Millis,
-        summary: &str,
-    ) -> vibevalley_runtime::agent::durable::Result<Option<ReopenInterrupt>> {
-        let all_extras = block_on(extras(tx.transaction()))?;
-        Ok(super::delivery::interrupt_on_reopen(tx, s, all_extras.get(&s.id), at, summary)?
-            .map(|(run_id, needs_reconciliation)| ReopenInterrupt { run_id, needs_reconciliation }))
+        summary: &'a str,
+    ) -> BoxFuture<'a, vibevalley_runtime::agent::durable::Result<Option<ReopenInterrupt>>>
+    where
+        'tx: 'a,
+    {
+        Box::pin(async move {
+            let all_extras = extras(tx.transaction()).await?;
+            Ok(super::delivery::interrupt_on_reopen(tx, s, all_extras.get(&s.id), at, summary)
+                .await?
+                .map(|(run_id, needs_reconciliation)| ReopenInterrupt { run_id, needs_reconciliation }))
+        })
     }
 }
 
@@ -245,6 +264,7 @@ pub async fn put<C: ConnectionTrait>(db: &C, s: &Session, departed: bool) -> Res
     Ok(())
 }
 
+#[cfg(test)]
 pub async fn config<C: ConnectionTrait>(db: &C, id: &str) -> Result<Option<SessionConfig>, DbErr> {
     let row = session::Entity::find_by_id(id.to_owned())
         .select_only()
@@ -266,6 +286,36 @@ pub async fn config<C: ConnectionTrait>(db: &C, id: &str) -> Result<Option<Sessi
         })
     })
     .transpose()
+}
+
+pub async fn configs<C: ConnectionTrait>(db: &C) -> Result<HashMap<String, SessionConfig>, DbErr> {
+    let rows = session::Entity::find()
+        .select_only()
+        .columns([
+            session::Column::Id,
+            session::Column::Title,
+            session::Column::Model,
+            session::Column::Effort,
+            session::Column::PermissionMode,
+        ])
+        .into_tuple::<(String, Option<String>, Option<String>, Option<String>, Option<String>)>()
+        .all(db)
+        .await?;
+    let mut out = HashMap::new();
+    for (id, title, model, effort, permission_mode) in rows {
+        if title.is_some() || model.is_some() || effort.is_some() || permission_mode.is_some() {
+            out.insert(
+                id,
+                SessionConfig {
+                    title,
+                    model,
+                    effort,
+                    permission_mode: permission_mode.map(read_word).transpose()?,
+                },
+            );
+        }
+    }
+    Ok(out)
 }
 
 pub async fn put_config<C: ConnectionTrait>(db: &C, id: &str, cfg: &SessionConfig) -> Result<(), DbErr> {

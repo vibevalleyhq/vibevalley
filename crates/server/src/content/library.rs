@@ -191,10 +191,6 @@ impl Library {
         }
     }
 
-    pub fn close(&self) {
-        vibevalley_runtime::rt::block_on(self.close_async());
-    }
-
     async fn found_async(&self, id: &str) -> Result<LibraryItem, ApiError> {
         let mut query = item_select();
         query.and_where(Expr::col((media_library_item::Entity, media_library_item::Column::AttachmentId)).eq(id));

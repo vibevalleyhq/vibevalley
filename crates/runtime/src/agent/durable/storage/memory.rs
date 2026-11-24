@@ -1,15 +1,17 @@
 //! Pure Rust in-memory `StorageBackend` implementation (`MemoryStorage`).
 //! Also provides the deterministic `MemoryState` / `MemoryTx` model shared with `JsonlStorage`.
 
-use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use futures_util::FutureExt as _;
+use parking_lot::Mutex as SyncMutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio::sync::Mutex as AsyncMutex;
 
 use super::live::{DocKey, LiveHub};
-use super::{StorageBackend, StorageRead, StorageWrite, WriteCallback};
+use super::{BoxFuture, ReadAsyncOp, StorageBackend, StorageRead, StorageWrite, WriteAsyncOp, WriteCallback};
 use crate::agent::durable::{
     CommitStats, Conversation, Document, DocumentEvent, Entry, Error, Result, Signal, Submission, SubmissionStatus, Task, TaskStatus, now_ms,
 };
@@ -682,31 +684,89 @@ impl StorageRead for MemoryRead<'_> {
             .and_then(|&idx| self.0.signals.get(idx))
             .map(|(_, s)| s.clone()))
     }
+
+    fn document_async<'a>(&'a self, scope: &'a str, id: &'a str, kind: &'a str) -> BoxFuture<'a, Result<Option<Document>>> {
+        Box::pin(std::future::ready(self.document(scope, id, kind)))
+    }
+    fn documents_by_kind_async<'a>(&'a self, scope: &'a str, kind: &'a str) -> BoxFuture<'a, Result<Vec<Document>>> {
+        Box::pin(std::future::ready(self.documents_by_kind(scope, kind)))
+    }
+    fn documents_by_scope_async<'a>(&'a self, scope: &'a str, id: &'a str) -> BoxFuture<'a, Result<Vec<Document>>> {
+        Box::pin(std::future::ready(self.documents_by_scope(scope, id)))
+    }
+    fn conversation_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Conversation>>> {
+        Box::pin(std::future::ready(self.conversation(id)))
+    }
+    fn conversations_async(&self) -> BoxFuture<'_, Result<Vec<Conversation>>> {
+        Box::pin(std::future::ready(self.conversations()))
+    }
+    fn conversations_by_owner_task_async<'a>(&'a self, owner_task_id: &'a str) -> BoxFuture<'a, Result<Vec<Conversation>>> {
+        Box::pin(std::future::ready(self.conversations_by_owner_task(owner_task_id)))
+    }
+    fn entries_from_async<'a>(&'a self, conv: &'a str, from_seq: i64) -> BoxFuture<'a, Result<Vec<Entry>>> {
+        Box::pin(std::future::ready(self.entries_from(conv, from_seq)))
+    }
+    fn entries_within_async<'a>(&'a self, conv: &'a str, first_seq: i64, last_seq: i64) -> BoxFuture<'a, Result<Vec<Entry>>> {
+        Box::pin(std::future::ready(self.entries_within(conv, first_seq, last_seq)))
+    }
+    fn submission_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Submission>>> {
+        Box::pin(std::future::ready(self.submission(id)))
+    }
+    fn submission_by_request_async<'a>(&'a self, conv: &'a str, request_id: &'a str) -> BoxFuture<'a, Result<Option<Submission>>> {
+        Box::pin(std::future::ready(self.submission_by_request(conv, request_id)))
+    }
+    fn submissions_async<'a>(&'a self, conv: &'a str) -> BoxFuture<'a, Result<Vec<Submission>>> {
+        Box::pin(std::future::ready(self.submissions(conv)))
+    }
+    fn task_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Task>>> {
+        Box::pin(std::future::ready(self.task(id)))
+    }
+    fn task_by_dedup_async<'a>(&'a self, owner: &'a str, key: &'a str) -> BoxFuture<'a, Result<Option<Task>>> {
+        Box::pin(std::future::ready(self.task_by_dedup(owner, key)))
+    }
+    fn tasks_by_conversation_async<'a>(&'a self, conv: &'a str) -> BoxFuture<'a, Result<Vec<Task>>> {
+        Box::pin(std::future::ready(self.tasks_by_conversation(conv)))
+    }
+    fn children_async<'a>(&'a self, owner: &'a str) -> BoxFuture<'a, Result<Vec<Task>>> {
+        Box::pin(std::future::ready(self.children(owner)))
+    }
+    fn tasks_by_status_async(&self, status: TaskStatus) -> BoxFuture<'_, Result<Vec<Task>>> {
+        Box::pin(std::future::ready(self.tasks_by_status(status)))
+    }
+    fn active_tasks_async(&self) -> BoxFuture<'_, Result<Vec<Task>>> {
+        Box::pin(std::future::ready(self.active_tasks()))
+    }
+    fn signals_async<'a>(&'a self, task_id: &'a str, include_consumed: bool) -> BoxFuture<'a, Result<Vec<Signal>>> {
+        Box::pin(std::future::ready(self.signals(task_id, include_consumed)))
+    }
+    fn signal_by_key_async<'a>(&'a self, task_id: &'a str, name: &'a str, key: &'a str) -> BoxFuture<'a, Result<Option<Signal>>> {
+        Box::pin(std::future::ready(self.signal_by_key(task_id, name, key)))
+    }
 }
 
 pub(crate) struct MemoryTx<'a> {
-    pub(crate) state: RefCell<&'a mut MemoryState>,
-    pub(crate) undo: RefCell<Vec<UndoOp>>,
-    pub(crate) ops: RefCell<Vec<JournalOp>>,
+    pub(crate) state: SyncMutex<&'a mut MemoryState>,
+    pub(crate) undo: SyncMutex<Vec<UndoOp>>,
+    pub(crate) ops: SyncMutex<Vec<JournalOp>>,
     record_ops: bool,
 }
 
 impl<'a> MemoryTx<'a> {
     pub(crate) fn new(state: &'a mut MemoryState, record_ops: bool) -> Self {
         Self {
-            state: RefCell::new(state),
-            undo: RefCell::new(Vec::new()),
-            ops: RefCell::new(Vec::new()),
+            state: SyncMutex::new(state),
+            undo: SyncMutex::new(Vec::new()),
+            ops: SyncMutex::new(Vec::new()),
             record_ops,
         }
     }
 
     fn record(&self, op: JournalOp) -> Result<()> {
-        let mut state = self.state.borrow_mut();
-        let mut undo = self.undo.borrow_mut();
+        let mut state = self.state.lock();
+        let mut undo = self.undo.lock();
         state.apply_op_with_undo(&op, &mut undo)?;
         if self.record_ops {
-            self.ops.borrow_mut().push(op);
+            self.ops.lock().push(op);
         }
         Ok(())
     }
@@ -723,61 +783,118 @@ impl<'a> MemoryTx<'a> {
 
 impl StorageRead for MemoryTx<'_> {
     fn document(&self, scope: &str, id: &str, kind: &str) -> Result<Option<Document>> {
-        MemoryRead(&self.state.borrow()).document(scope, id, kind)
+        MemoryRead(&self.state.lock()).document(scope, id, kind)
     }
     fn documents_by_kind(&self, scope: &str, kind: &str) -> Result<Vec<Document>> {
-        MemoryRead(&self.state.borrow()).documents_by_kind(scope, kind)
+        MemoryRead(&self.state.lock()).documents_by_kind(scope, kind)
     }
     fn documents_by_scope(&self, scope: &str, id: &str) -> Result<Vec<Document>> {
-        MemoryRead(&self.state.borrow()).documents_by_scope(scope, id)
+        MemoryRead(&self.state.lock()).documents_by_scope(scope, id)
     }
     fn conversation(&self, id: &str) -> Result<Option<Conversation>> {
-        MemoryRead(&self.state.borrow()).conversation(id)
+        MemoryRead(&self.state.lock()).conversation(id)
     }
     fn conversations(&self) -> Result<Vec<Conversation>> {
-        MemoryRead(&self.state.borrow()).conversations()
+        MemoryRead(&self.state.lock()).conversations()
     }
     fn conversations_by_owner_task(&self, owner_task_id: &str) -> Result<Vec<Conversation>> {
-        MemoryRead(&self.state.borrow()).conversations_by_owner_task(owner_task_id)
+        MemoryRead(&self.state.lock()).conversations_by_owner_task(owner_task_id)
     }
     fn entries_from(&self, conv: &str, from_seq: i64) -> Result<Vec<Entry>> {
-        MemoryRead(&self.state.borrow()).entries_from(conv, from_seq)
+        MemoryRead(&self.state.lock()).entries_from(conv, from_seq)
     }
     fn entries_within(&self, conv: &str, first_seq: i64, last_seq: i64) -> Result<Vec<Entry>> {
-        MemoryRead(&self.state.borrow()).entries_within(conv, first_seq, last_seq)
+        MemoryRead(&self.state.lock()).entries_within(conv, first_seq, last_seq)
     }
     fn submission(&self, id: &str) -> Result<Option<Submission>> {
-        MemoryRead(&self.state.borrow()).submission(id)
+        MemoryRead(&self.state.lock()).submission(id)
     }
     fn submission_by_request(&self, conv: &str, request_id: &str) -> Result<Option<Submission>> {
-        MemoryRead(&self.state.borrow()).submission_by_request(conv, request_id)
+        MemoryRead(&self.state.lock()).submission_by_request(conv, request_id)
     }
     fn submissions(&self, conv: &str) -> Result<Vec<Submission>> {
-        MemoryRead(&self.state.borrow()).submissions(conv)
+        MemoryRead(&self.state.lock()).submissions(conv)
     }
     fn task(&self, id: &str) -> Result<Option<Task>> {
-        MemoryRead(&self.state.borrow()).task(id)
+        MemoryRead(&self.state.lock()).task(id)
     }
     fn task_by_dedup(&self, owner: &str, key: &str) -> Result<Option<Task>> {
-        MemoryRead(&self.state.borrow()).task_by_dedup(owner, key)
+        MemoryRead(&self.state.lock()).task_by_dedup(owner, key)
     }
     fn tasks_by_conversation(&self, conv: &str) -> Result<Vec<Task>> {
-        MemoryRead(&self.state.borrow()).tasks_by_conversation(conv)
+        MemoryRead(&self.state.lock()).tasks_by_conversation(conv)
     }
     fn children(&self, owner: &str) -> Result<Vec<Task>> {
-        MemoryRead(&self.state.borrow()).children(owner)
+        MemoryRead(&self.state.lock()).children(owner)
     }
     fn tasks_by_status(&self, status: TaskStatus) -> Result<Vec<Task>> {
-        MemoryRead(&self.state.borrow()).tasks_by_status(status)
+        MemoryRead(&self.state.lock()).tasks_by_status(status)
     }
     fn active_tasks(&self) -> Result<Vec<Task>> {
-        MemoryRead(&self.state.borrow()).active_tasks()
+        MemoryRead(&self.state.lock()).active_tasks()
     }
     fn signals(&self, task_id: &str, include_consumed: bool) -> Result<Vec<Signal>> {
-        MemoryRead(&self.state.borrow()).signals(task_id, include_consumed)
+        MemoryRead(&self.state.lock()).signals(task_id, include_consumed)
     }
     fn signal_by_key(&self, task_id: &str, name: &str, key: &str) -> Result<Option<Signal>> {
-        MemoryRead(&self.state.borrow()).signal_by_key(task_id, name, key)
+        MemoryRead(&self.state.lock()).signal_by_key(task_id, name, key)
+    }
+    fn document_async<'a>(&'a self, scope: &'a str, id: &'a str, kind: &'a str) -> BoxFuture<'a, Result<Option<Document>>> {
+        Box::pin(std::future::ready(self.document(scope, id, kind)))
+    }
+    fn documents_by_kind_async<'a>(&'a self, scope: &'a str, kind: &'a str) -> BoxFuture<'a, Result<Vec<Document>>> {
+        Box::pin(std::future::ready(self.documents_by_kind(scope, kind)))
+    }
+    fn documents_by_scope_async<'a>(&'a self, scope: &'a str, id: &'a str) -> BoxFuture<'a, Result<Vec<Document>>> {
+        Box::pin(std::future::ready(self.documents_by_scope(scope, id)))
+    }
+    fn conversation_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Conversation>>> {
+        Box::pin(std::future::ready(self.conversation(id)))
+    }
+    fn conversations_async(&self) -> BoxFuture<'_, Result<Vec<Conversation>>> {
+        Box::pin(std::future::ready(self.conversations()))
+    }
+    fn conversations_by_owner_task_async<'a>(&'a self, owner_task_id: &'a str) -> BoxFuture<'a, Result<Vec<Conversation>>> {
+        Box::pin(std::future::ready(self.conversations_by_owner_task(owner_task_id)))
+    }
+    fn entries_from_async<'a>(&'a self, conv: &'a str, from_seq: i64) -> BoxFuture<'a, Result<Vec<Entry>>> {
+        Box::pin(std::future::ready(self.entries_from(conv, from_seq)))
+    }
+    fn entries_within_async<'a>(&'a self, conv: &'a str, first_seq: i64, last_seq: i64) -> BoxFuture<'a, Result<Vec<Entry>>> {
+        Box::pin(std::future::ready(self.entries_within(conv, first_seq, last_seq)))
+    }
+    fn submission_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Submission>>> {
+        Box::pin(std::future::ready(self.submission(id)))
+    }
+    fn submission_by_request_async<'a>(&'a self, conv: &'a str, request_id: &'a str) -> BoxFuture<'a, Result<Option<Submission>>> {
+        Box::pin(std::future::ready(self.submission_by_request(conv, request_id)))
+    }
+    fn submissions_async<'a>(&'a self, conv: &'a str) -> BoxFuture<'a, Result<Vec<Submission>>> {
+        Box::pin(std::future::ready(self.submissions(conv)))
+    }
+    fn task_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Task>>> {
+        Box::pin(std::future::ready(self.task(id)))
+    }
+    fn task_by_dedup_async<'a>(&'a self, owner: &'a str, key: &'a str) -> BoxFuture<'a, Result<Option<Task>>> {
+        Box::pin(std::future::ready(self.task_by_dedup(owner, key)))
+    }
+    fn tasks_by_conversation_async<'a>(&'a self, conv: &'a str) -> BoxFuture<'a, Result<Vec<Task>>> {
+        Box::pin(std::future::ready(self.tasks_by_conversation(conv)))
+    }
+    fn children_async<'a>(&'a self, owner: &'a str) -> BoxFuture<'a, Result<Vec<Task>>> {
+        Box::pin(std::future::ready(self.children(owner)))
+    }
+    fn tasks_by_status_async(&self, status: TaskStatus) -> BoxFuture<'_, Result<Vec<Task>>> {
+        Box::pin(std::future::ready(self.tasks_by_status(status)))
+    }
+    fn active_tasks_async(&self) -> BoxFuture<'_, Result<Vec<Task>>> {
+        Box::pin(std::future::ready(self.active_tasks()))
+    }
+    fn signals_async<'a>(&'a self, task_id: &'a str, include_consumed: bool) -> BoxFuture<'a, Result<Vec<Signal>>> {
+        Box::pin(std::future::ready(self.signals(task_id, include_consumed)))
+    }
+    fn signal_by_key_async<'a>(&'a self, task_id: &'a str, name: &'a str, key: &'a str) -> BoxFuture<'a, Result<Option<Signal>>> {
+        Box::pin(std::future::ready(self.signal_by_key(task_id, name, key)))
     }
 }
 
@@ -785,7 +902,7 @@ impl StorageWrite for MemoryTx<'_> {
     fn put_document(&self, scope: &str, id: &str, kind: &str, state: &Value, now_ms: i64) -> Result<i64> {
         let rev = self
             .state
-            .borrow()
+            .lock()
             .documents
             .get(&(scope.into(), id.into(), kind.into()))
             .map_or(1, |d| d.rev + 1);
@@ -801,7 +918,7 @@ impl StorageWrite for MemoryTx<'_> {
     }
 
     fn delete_document(&self, scope: &str, id: &str, kind: &str) -> Result<()> {
-        if self.state.borrow().documents.contains_key(&(scope.into(), id.into(), kind.into())) {
+        if self.state.lock().documents.contains_key(&(scope.into(), id.into(), kind.into())) {
             self.record(JournalOp::DeleteDocument {
                 scope_kind: scope.into(),
                 scope_id: id.into(),
@@ -816,7 +933,7 @@ impl StorageWrite for MemoryTx<'_> {
     }
 
     fn advance_sequence(&self, conv: &str, now_ms: i64) -> Result<Option<i64>> {
-        let Some(next_seq) = self.state.borrow().conversations.get(conv).map(|c| c.next_seq + 1) else {
+        let Some(next_seq) = self.state.lock().conversations.get(conv).map(|c| c.next_seq + 1) else {
             return Ok(None);
         };
         self.record(JournalOp::AdvanceSequence {
@@ -832,7 +949,7 @@ impl StorageWrite for MemoryTx<'_> {
     }
 
     fn set_head(&self, conv: &str, head_seq: i64) -> Result<()> {
-        if self.state.borrow().conversations.contains_key(conv) {
+        if self.state.lock().conversations.contains_key(conv) {
             self.record(JournalOp::SetHead {
                 conversation_id: conv.into(),
                 head_seq,
@@ -842,7 +959,7 @@ impl StorageWrite for MemoryTx<'_> {
     }
 
     fn reset_head(&self, conv: &str) -> Result<()> {
-        let Some(head_seq) = self.state.borrow().conversations.get(conv).map(|c| c.next_seq) else {
+        let Some(head_seq) = self.state.lock().conversations.get(conv).map(|c| c.next_seq) else {
             return Ok(());
         };
         self.record(JournalOp::ResetHead {
@@ -856,7 +973,7 @@ impl StorageWrite for MemoryTx<'_> {
     }
 
     fn set_submission_status(&self, id: &str, status: SubmissionStatus, now_ms: i64) -> Result<()> {
-        if self.state.borrow().submissions.contains_key(id) {
+        if self.state.lock().submissions.contains_key(id) {
             self.record(JournalOp::SetSubmissionStatus {
                 id: id.into(),
                 status,
@@ -867,7 +984,7 @@ impl StorageWrite for MemoryTx<'_> {
     }
 
     fn settle_submission(&self, id: &str, status: SubmissionStatus, result: &Value, now_ms: i64) -> Result<()> {
-        if self.state.borrow().submissions.contains_key(id) {
+        if self.state.lock().submissions.contains_key(id) {
             self.record(JournalOp::SettleSubmission {
                 id: id.into(),
                 status,
@@ -883,7 +1000,7 @@ impl StorageWrite for MemoryTx<'_> {
     }
 
     fn update_task(&self, task: &Task, now_ms: i64) -> Result<bool> {
-        if !self.state.borrow().tasks.contains_key(&task.id) {
+        if !self.state.lock().tasks.contains_key(&task.id) {
             return Ok(false);
         }
         let mut updated = task.clone();
@@ -893,7 +1010,7 @@ impl StorageWrite for MemoryTx<'_> {
     }
 
     fn insert_signal(&self, signal: &Signal) -> Result<Signal> {
-        let insert_seq = self.state.borrow().next_signal_seq + 1;
+        let insert_seq = self.state.lock().next_signal_seq + 1;
         self.record(JournalOp::InsertSignal {
             insert_seq,
             signal: signal.clone(),
@@ -903,7 +1020,7 @@ impl StorageWrite for MemoryTx<'_> {
 
     fn consume_first_signal(&self, task_id: &str, name: &str, now_ms: i64) -> Result<Option<Signal>> {
         let candidate_id = {
-            let state = self.state.borrow();
+            let state = self.state.lock();
             state
                 .pending_signals
                 .get(&(task_id.to_owned(), name.to_owned()))
@@ -918,13 +1035,56 @@ impl StorageWrite for MemoryTx<'_> {
             id: id.clone(),
             consumed_at_ms: now_ms,
         })?;
-        let state = self.state.borrow();
+        let state = self.state.lock();
         Ok(state.signal_by_id.get(&id).and_then(|&idx| state.signals.get(idx)).map(|(_, s)| s.clone()))
+    }
+
+    fn put_document_async<'a>(&'a self, scope: &'a str, id: &'a str, kind: &'a str, state: &'a Value, now_ms: i64) -> BoxFuture<'a, Result<i64>> {
+        Box::pin(std::future::ready(self.put_document(scope, id, kind, state, now_ms)))
+    }
+    fn delete_document_async<'a>(&'a self, scope: &'a str, id: &'a str, kind: &'a str) -> BoxFuture<'a, Result<()>> {
+        Box::pin(std::future::ready(self.delete_document(scope, id, kind)))
+    }
+    fn insert_conversation_async<'a>(&'a self, conv: &'a Conversation) -> BoxFuture<'a, Result<()>> {
+        Box::pin(std::future::ready(self.insert_conversation(conv)))
+    }
+    fn advance_sequence_async<'a>(&'a self, conv: &'a str, now_ms: i64) -> BoxFuture<'a, Result<Option<i64>>> {
+        Box::pin(std::future::ready(self.advance_sequence(conv, now_ms)))
+    }
+    fn insert_entry_async<'a>(&'a self, entry: &'a Entry) -> BoxFuture<'a, Result<()>> {
+        Box::pin(std::future::ready(self.insert_entry(entry)))
+    }
+    fn set_head_async<'a>(&'a self, conv: &'a str, head_seq: i64) -> BoxFuture<'a, Result<()>> {
+        Box::pin(std::future::ready(self.set_head(conv, head_seq)))
+    }
+    fn reset_head_async<'a>(&'a self, conv: &'a str) -> BoxFuture<'a, Result<()>> {
+        Box::pin(std::future::ready(self.reset_head(conv)))
+    }
+    fn insert_submission_async<'a>(&'a self, sub: &'a Submission) -> BoxFuture<'a, Result<()>> {
+        Box::pin(std::future::ready(self.insert_submission(sub)))
+    }
+    fn set_submission_status_async<'a>(&'a self, id: &'a str, status: SubmissionStatus, now_ms: i64) -> BoxFuture<'a, Result<()>> {
+        Box::pin(std::future::ready(self.set_submission_status(id, status, now_ms)))
+    }
+    fn settle_submission_async<'a>(&'a self, id: &'a str, status: SubmissionStatus, result: &'a Value, now_ms: i64) -> BoxFuture<'a, Result<()>> {
+        Box::pin(std::future::ready(self.settle_submission(id, status, result, now_ms)))
+    }
+    fn insert_task_async<'a>(&'a self, task: &'a Task) -> BoxFuture<'a, Result<()>> {
+        Box::pin(std::future::ready(self.insert_task(task)))
+    }
+    fn update_task_async<'a>(&'a self, task: &'a Task, now_ms: i64) -> BoxFuture<'a, Result<bool>> {
+        Box::pin(std::future::ready(self.update_task(task, now_ms)))
+    }
+    fn insert_signal_async<'a>(&'a self, signal: &'a Signal) -> BoxFuture<'a, Result<Signal>> {
+        Box::pin(std::future::ready(self.insert_signal(signal)))
+    }
+    fn consume_first_signal_async<'a>(&'a self, task_id: &'a str, name: &'a str, now_ms: i64) -> BoxFuture<'a, Result<Option<Signal>>> {
+        Box::pin(std::future::ready(self.consume_first_signal(task_id, name, now_ms)))
     }
 }
 
 struct MemoryInner {
-    state: Mutex<MemoryState>,
+    state: AsyncMutex<MemoryState>,
     hub: LiveHub,
 }
 
@@ -938,7 +1098,7 @@ impl MemoryStorage {
 
     pub fn with_clock(clock: impl Fn() -> i64 + Send + Sync + 'static) -> Self {
         Self(Arc::new(MemoryInner {
-            state: Mutex::new(MemoryState::default()),
+            state: AsyncMutex::new(MemoryState::default()),
             hub: LiveHub::new(Arc::new(clock)),
         }))
     }
@@ -960,7 +1120,7 @@ impl StorageBackend for MemoryStorage {
     }
 
     fn read_dyn(&self, f: &mut dyn FnMut(&dyn StorageRead) -> Result<()>) -> Result<()> {
-        let state = self.0.state.lock().unwrap_or_else(|e| e.into_inner());
+        let state = crate::rt::block_on(self.0.state.lock());
         if self.0.hub.is_closed() {
             return Err(Error::Closed);
         }
@@ -968,7 +1128,7 @@ impl StorageBackend for MemoryStorage {
     }
 
     fn write_dyn(&self, f: &mut WriteCallback<'_>) -> Result<()> {
-        let mut state = self.0.state.lock().unwrap_or_else(|e| e.into_inner());
+        let mut state = crate::rt::block_on(self.0.state.lock());
         if self.0.hub.is_closed() {
             return Err(Error::Closed);
         }
@@ -993,6 +1153,47 @@ impl StorageBackend for MemoryStorage {
                 std::panic::resume_unwind(panic)
             }
         }
+    }
+
+    fn read_dyn_async<'a>(&'a self, op: &'a mut dyn ReadAsyncOp<'a>) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let state = self.0.state.lock().await;
+            if self.0.hub.is_closed() {
+                return Err(Error::Closed);
+            }
+            let reader = MemoryRead(&state);
+            op.call(&reader).await
+        })
+    }
+
+    fn write_dyn_async<'a>(&'a self, op: &'a mut dyn WriteAsyncOp<'a>) -> BoxFuture<'a, Result<()>> {
+        Box::pin(async move {
+            let mut state = self.0.state.lock().await;
+            if self.0.hub.is_closed() {
+                return Err(Error::Closed);
+            }
+            self.0.hub.record_request();
+            let now = self.0.hub.now_ms();
+            let staging = MemoryTx::new(&mut state, false);
+            let outcome = std::panic::AssertUnwindSafe(op.call(&staging, &staging, None, now)).catch_unwind().await;
+            match outcome {
+                Ok(Ok(write_outcome)) => {
+                    self.0.hub.record_commit_and_publish(write_outcome.events, write_outcome.tasks_changed);
+                    Ok(())
+                }
+                Ok(Err(err)) => {
+                    staging.rollback();
+                    self.0.hub.record_failure();
+                    Err(err)
+                }
+                Err(panic) => {
+                    staging.rollback();
+                    self.0.hub.record_failure();
+                    drop(state);
+                    std::panic::resume_unwind(panic)
+                }
+            }
+        })
     }
 
     fn stats(&self) -> CommitStats {

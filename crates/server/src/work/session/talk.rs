@@ -26,29 +26,29 @@ impl Sessions {
 
     /// The user's words to `agent` in `channel`: its talking session's next
     /// round, hiring one the first time.
-    pub fn talk(&self, agent: &str, channel: &str, words: &str) -> Result<String> {
-        let _talking = self.0.talking.lock();
+    pub async fn talk_async(&self, agent: &str, channel: &str, words: &str) -> Result<String> {
+        let _talking = self.0.talking.lock().await;
         if let Some(session) = self.talker(agent, channel) {
             if let Some(live) = self.live_agent(&session.id) {
                 let phase = Phase::working(now(), SessionAction::Thinking, "");
-                self.0.ledger.apply(vec![self.phase_changed(session.id.clone(), phase)])?;
+                self.0.ledger.apply_async(vec![self.phase_changed(session.id.clone(), phase)]).await?;
                 let words = self.with_recall(&session, words.to_string());
                 self.record(&session.id, Step::Asked { text: words.clone() });
                 live.prompt(text(&words))?;
                 return Ok(session.id);
             }
-            return self.open_talk(agent, channel, words, Some(session));
+            return self.open_talk_async(agent, channel, words, Some(session)).await;
         }
-        self.open_talk(agent, channel, words, None)
+        self.open_talk_async(agent, channel, words, None).await
     }
 
-    fn open_talk(&self, agent: &str, channel: &str, words: &str, again: Option<Session>) -> Result<String> {
+    async fn open_talk_async(&self, agent: &str, channel: &str, words: &str, again: Option<Session>) -> Result<String> {
         let drive = self.0.drivers.drive(Some(agent), &Issue::new("", 0, words, now()))?;
         let resuming = again.is_some();
         let mut session = match again {
             Some(s) => s,
             None => {
-                let number = self.0.ledger.next("session", 0)?;
+                let number = self.0.ledger.next_async("session", 0).await?;
                 let id = format!("w{number}");
                 let mut s = Session::new(
                     &id,
@@ -115,17 +115,24 @@ impl Sessions {
             system_prompt,
             ..Default::default()
         };
-        let agent = drive.runtime.open(opts)?;
+        let runtime = drive.runtime.clone();
+        let agent = crate::spawn_blocking_traced(move || runtime.open(opts))
+            .await
+            .map_err(|e| BoardError::Other(e.to_string()))??;
         session.phase = Phase::working(now(), SessionAction::Thinking, "");
-        self.go_live(agent.clone(), session.clone(), None)?;
+        self.go_live_async(agent.clone(), session.clone(), None).await?;
         let prompt = self.with_recall(&session, prompt);
         self.record(&session.id, Step::Asked { text: prompt.clone() });
-        agent.prompt(text(&prompt)).map_err(BoardError::from)?;
+        let prompt_agent = agent.clone();
+        crate::spawn_blocking_traced(move || prompt_agent.prompt(text(&prompt)))
+            .await
+            .map_err(|e| BoardError::Other(e.to_string()))?
+            .map_err(BoardError::from)?;
         Ok(session.id)
     }
 
     /// A talking round's end: what it said, whole, as its report.
-    pub(super) fn finish_talk(&self, session: &Session, reason: StopReason, said: &str, spent: Option<vibevalley_protocol::Spent>) {
+    pub(super) async fn finish_talk_async(&self, session: &Session, reason: StopReason, said: &str, spent: Option<vibevalley_protocol::Spent>) {
         let outcome = match reason {
             StopReason::Aborted => Outcome::Interrupted,
             StopReason::Error | StopReason::MaxTurns => Outcome::Failed,
@@ -140,18 +147,22 @@ impl Sessions {
             "Did not finish.".into()
         };
         let runs = session.runs + 1;
-        let _ = self.0.ledger.apply(vec![Fact::SessionReported(vibevalley_protocol::FactSessionReported {
-            at: now(),
-            id: session.id.clone(),
-            run: None,
-            outcome,
-            phase: None,
-            summary,
-            runs,
-            spent,
-            questions: vec![],
-            checks: vec![],
-            answer: None,
-        })]);
+        let _ = self
+            .0
+            .ledger
+            .apply_async(vec![Fact::SessionReported(vibevalley_protocol::FactSessionReported {
+                at: now(),
+                id: session.id.clone(),
+                run: None,
+                outcome,
+                phase: None,
+                summary,
+                runs,
+                spent,
+                questions: vec![],
+                checks: vec![],
+                answer: None,
+            })])
+            .await;
     }
 }

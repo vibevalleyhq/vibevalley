@@ -329,81 +329,89 @@ impl Workplace {
     /// An accepted issue's work delivered as `deliver` says: a change is
     /// committed, checked and merged into the main branch; a branch is
     /// kept when it has commits over `base`.
-    pub fn land(
-        &self,
-        main: &Repo,
-        delivery: Delivery<'_>,
-        base: impl FnOnce() -> Result<String>,
-        mut save: impl FnMut(ProjectCheckReceipt) -> Result<()>,
-    ) -> Result<Landed> {
-        let Delivery {
-            work: issue,
-            kind,
-            has_children,
-            evidence,
-        } = delivery;
-        let branch = issue_branch(issue.number);
-        match kind {
-            Deliverable::PullRequest => Ok(Landed::Landed(Landing::Submitted)),
-            Deliverable::Answer => Ok(Landed::Landed(Landing::None)),
-            Deliverable::Branch => {
-                let base = base()?;
-                let has = git::branch_exists(main.root(), &branch)? && git::commits_between(main.root(), &base, &branch)? > 0;
-                Ok(Landed::Landed(if has { Landing::Kept } else { Landing::None }))
-            }
-            Deliverable::Change => {
-                let target = base()?;
-                let checkout = self.checkout(main, issue.number, issue.worktree, has_children)?;
-                let reviewed = evidence.and_then(|e| e.reviews.last());
-                let checked = evidence.and_then(|e| e.check.as_ref());
-                let current_tree = checkout.as_ref().map(Repo::worktree_tree).transpose()?;
-                if let Some(tree) = &current_tree
-                    && reviewed.is_some_and(|r| &r.revision.tree != tree)
-                {
-                    return Err(BoardError::Other(vibevalley_i18n::t("server.issue.reviewChanged", &[])));
+    pub fn land_async<'a>(
+        &'a self,
+        main: &'a Repo,
+        delivery: Delivery<'a>,
+        base: impl FnOnce() -> Result<String> + Send + 'a,
+        mut save: impl FnMut(ProjectCheckReceipt) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> + Send + 'a,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Landed>> + Send + 'a>> {
+        Box::pin(async move {
+            let Delivery {
+                work: issue,
+                kind,
+                has_children,
+                evidence,
+            } = delivery;
+            let branch = issue_branch(issue.number);
+            match kind {
+                Deliverable::PullRequest => Ok(Landed::Landed(Landing::Submitted)),
+                Deliverable::Answer => Ok(Landed::Landed(Landing::None)),
+                Deliverable::Branch => {
+                    let base = base()?;
+                    let has = git::branch_exists(main.root(), &branch)? && git::commits_between(main.root(), &base, &branch)? > 0;
+                    Ok(Landed::Landed(if has { Landing::Kept } else { Landing::None }))
                 }
-                if let Some(last) = checked
-                    && self.was_published(main, &branch, current_tree.as_deref(), last)?
-                {
-                    return Ok(Landed::Merged(last.candidate_commit.clone()));
-                }
-                let place = checkout.ok_or_else(|| BoardError::Other("never sent: there is no work to merge".into()))?;
-                if place.status()?.branch.as_deref() != Some(&branch) {
-                    return Err(BoardError::Other(format!("expected the issue checkout to be on {branch}")));
-                }
-                place.commit_all(&format!("Issue #{}: {}", issue.number, issue.title))?;
-                let message = format!("Merge issue #{}: {}", issue.number, issue.title);
-                let record = |rev: vibevalley_git::MergeRevision, result: &std::result::Result<bool, String>| -> Result<()> {
-                    if reviewed.is_some_and(|r| r.revision.tree != rev.source_tree) || place.worktree_tree()? != rev.source_tree {
+                Deliverable::Change => {
+                    let target = base()?;
+                    let checkout = self.checkout(main, issue.number, issue.worktree, has_children)?;
+                    let reviewed = evidence.and_then(|e| e.reviews.last());
+                    let checked = evidence.and_then(|e| e.check.as_ref());
+                    let current_tree = checkout.as_ref().map(Repo::worktree_tree).transpose()?;
+                    if let Some(tree) = &current_tree
+                        && reviewed.is_some_and(|r| &r.revision.tree != tree)
+                    {
                         return Err(BoardError::Other(vibevalley_i18n::t("server.issue.reviewChanged", &[])));
                     }
-                    let status = match result {
-                        Ok(true) => ProjectCheckStatus::Passed,
-                        Ok(false) => ProjectCheckStatus::NotConfigured,
-                        Err(_) => ProjectCheckStatus::Failed,
+                    if let Some(last) = checked
+                        && self.was_published(main, &branch, current_tree.as_deref(), last)?
+                    {
+                        return Ok(Landed::Merged(last.candidate_commit.clone()));
+                    }
+                    let place = checkout.ok_or_else(|| BoardError::Other("never sent: there is no work to merge".into()))?;
+                    if place.status()?.branch.as_deref() != Some(&branch) {
+                        return Err(BoardError::Other(format!("expected the issue checkout to be on {branch}")));
+                    }
+                    place.commit_all(&format!("Issue #{}: {}", issue.number, issue.title))?;
+                    let message = format!("Merge issue #{}: {}", issue.number, issue.title);
+                    let place_ref = &place;
+                    let target_ref = &target;
+                    let record = |rev: vibevalley_git::MergeRevision,
+                                  result: &std::result::Result<bool, String>|
+                     -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + '_>> {
+                        if reviewed.is_some_and(|r| r.revision.tree != rev.source_tree) || place_ref.worktree_tree().ok() != Some(rev.source_tree.clone()) {
+                            return Box::pin(async { Err(BoardError::Other(vibevalley_i18n::t("server.issue.reviewChanged", &[]))) });
+                        }
+                        let status = match result {
+                            Ok(true) => ProjectCheckStatus::Passed,
+                            Ok(false) => ProjectCheckStatus::NotConfigured,
+                            Err(_) => ProjectCheckStatus::Failed,
+                        };
+                        save(ProjectCheckReceipt {
+                            target_branch: target_ref.clone(),
+                            target_commit: rev.target,
+                            source_tree: rev.source_tree,
+                            candidate_commit: rev.candidate,
+                            candidate_tree: rev.tree,
+                            status,
+                            command: (status != ProjectCheckStatus::NotConfigured).then(|| ".vibevalley/check".into()),
+                            output: result.as_ref().err().cloned(),
+                        })
                     };
-                    save(ProjectCheckReceipt {
-                        target_branch: target.clone(),
-                        target_commit: rev.target,
-                        source_tree: rev.source_tree,
-                        candidate_commit: rev.candidate,
-                        candidate_tree: rev.tree,
-                        status,
-                        command: (status != ProjectCheckStatus::NotConfigured).then(|| ".vibevalley/check".into()),
-                        output: result.as_ref().err().cloned(),
-                    })
-                };
-                Ok(match main.merge_verified(&target, &branch, &message, check::run_project_check, record)? {
-                    VerifiedMerge::Conflict(paths) => Landed::Conflict(Conflict {
-                        base: target,
-                        files: paths.into_iter().map(|f| f.to_string_lossy().into_owned()).collect(),
-                    }),
-                    VerifiedMerge::CheckFailed(output) => Landed::CheckFailed(output),
-                    VerifiedMerge::UpToDate => Landed::Landed(Landing::None),
-                    VerifiedMerge::Merged(commit) => Landed::Merged(commit),
-                })
+                    Ok(
+                        match main.merge_verified_async(&target, &branch, &message, check::run_project_check, record).await? {
+                            VerifiedMerge::Conflict(paths) => Landed::Conflict(Conflict {
+                                base: target,
+                                files: paths.into_iter().map(|f| f.to_string_lossy().into_owned()).collect(),
+                            }),
+                            VerifiedMerge::CheckFailed(output) => Landed::CheckFailed(output),
+                            VerifiedMerge::UpToDate => Landed::Landed(Landing::None),
+                            VerifiedMerge::Merged(commit) => Landed::Merged(commit),
+                        },
+                    )
+                }
             }
-        }
+        })
     }
 
     pub fn was_published(&self, main: &Repo, branch: &str, worktree_tree: Option<&str>, last: &ProjectCheckReceipt) -> Result<bool> {

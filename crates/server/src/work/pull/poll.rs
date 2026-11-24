@@ -67,8 +67,8 @@ pub async fn refresh(pulls: &Pulls) {
         if pulls.store.set_state_async(&row.id, state, now()).await.is_err() {
             continue;
         }
-        if let (Some(board), Some(issue_id)) = (pulls.board.clone(), row.issue_id.clone()) {
-            let _ = crate::spawn_blocking_traced(move || board.settle_pull(&issue_id, state)).await;
+        if let (Some(board), Some(issue_id)) = (pulls.board.as_ref(), row.issue_id.as_deref()) {
+            let _ = board.settle_pull_async(issue_id, state).await;
         }
     }
 }
@@ -214,9 +214,7 @@ async fn poll_one(pulls: &Pulls, row: &PullRecord, remote: &str, current: GitHub
                     .join("\n")
             };
             let key = format!("{}#{}:ci:{revision}", row.repo, row.number);
-            let board = board.clone();
-            let issue_id = issue.id.clone();
-            let _ = crate::spawn_blocking_traced(move || board.tell_message(&issue_id, &text, &key)).await;
+            let _ = board.tell_message_async(&issue.id, &text, &key).await;
         }
     }
 
@@ -295,11 +293,7 @@ async fn poll_one(pulls: &Pulls, row: &PullRecord, remote: &str, current: GitHub
         if let (Some(board), Some(issue)) = (&pulls.board, &linked_open)
             && !event.text.is_empty()
         {
-            let board = board.clone();
-            let issue_id = issue.id.clone();
-            let text = event.text;
-            let key = event.key;
-            let _ = crate::spawn_blocking_traced(move || board.tell_message(&issue_id, &text, &key)).await;
+            let _ = board.tell_message_async(&issue.id, &event.text, &event.key).await;
         }
     }
 }

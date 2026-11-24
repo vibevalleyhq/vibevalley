@@ -16,7 +16,7 @@ fn call(hub: &Hub, op: &str, payload: Value) -> Value {
 fn served(w: &World) -> Arc<Hub> {
     let hub = Hub::new(empty_space_state());
     vibevalley_server::infra::install_health(&hub);
-    let board = Board::open_on(&w.store, w.registry.clone(), config(w.dir.path()), hub.clone()).unwrap();
+    let board = block_on(Board::open_on_async(&w.store, w.registry.clone(), config(w.dir.path()), hub.clone())).unwrap();
     vibevalley_server::work::issue::install(&hub, board);
     hub
 }

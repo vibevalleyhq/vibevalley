@@ -12,7 +12,6 @@ use crate::db::ServerDb;
 use crate::db::column::{db_word as word, read_db_word as read_word};
 use crate::db::entities::work_pull::{pull, pull_event};
 use crate::db::error::internal_db;
-use crate::work::block_on;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PullRecord {
@@ -164,18 +163,17 @@ pub struct PullStore {
 }
 
 impl PullStore {
-    pub fn open(db: Arc<ServerDb>) -> Result<PullStore, ApiError> {
-        let rows: Vec<PullRecord> = block_on(async {
-            pull::Entity::find()
-                .order_by_asc(pull::Column::CreatedAt)
-                .order_by_asc(pull::Column::Id)
-                .all(db.read_conn())
-                .await?
-                .into_iter()
-                .map(record_of)
-                .collect::<Result<Vec<_>, DbErr>>()
-        })
-        .map_err(internal_db)?;
+    pub async fn open_async(db: Arc<ServerDb>) -> Result<PullStore, ApiError> {
+        let rows: Vec<PullRecord> = pull::Entity::find()
+            .order_by_asc(pull::Column::CreatedAt)
+            .order_by_asc(pull::Column::Id)
+            .all(db.read_conn())
+            .await
+            .map_err(internal_db)?
+            .into_iter()
+            .map(record_of)
+            .collect::<Result<Vec<_>, DbErr>>()
+            .map_err(internal_db)?;
         let mut index = PullIndex::default();
         index.load(rows);
         Ok(PullStore {

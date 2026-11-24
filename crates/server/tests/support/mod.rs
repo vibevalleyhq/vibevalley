@@ -339,10 +339,14 @@ pub fn config(dir: &Path) -> BoardConfig {
     config
 }
 
+pub fn block_on<F: std::future::Future>(fut: F) -> F::Output {
+    vibevalley_runtime::rt::block_on(fut)
+}
+
 pub fn open_board(store: &Path, registry: Arc<Registry>, config: BoardConfig) -> Result<(Board, Arc<Hub>), BoardError> {
     let hub = Hub::new(empty_space_state());
     let data_dir = config.data_dir.clone();
-    let board = Board::open_on(store, registry, config, hub.clone())?;
+    let board = block_on(Board::open_on_async(store, registry, config, hub.clone()))?;
     register_board_hub(&data_dir, &hub);
     Ok((board, hub))
 }

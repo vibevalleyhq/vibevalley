@@ -149,7 +149,7 @@ fn regression_replies_and_reports_across_process_exit() {
             let (issue, thread) = issue_thread(&server);
             until(&server, "first report", || (count_notes(&server, &thread, "initial") == 1).then_some(()));
             // Hold the issue dispatcher before accepting the next chat write, leaving its delivery pending in SQLite.
-            server.test_internals().issue_chat.close();
+            vibevalley_runtime::rt::block_on(server.test_internals().issue_chat.close_async());
             comment(&url, &issue, FOLLOW_UP);
             assert!(
                 server
@@ -160,14 +160,22 @@ fn regression_replies_and_reports_across_process_exit() {
                     .iter()
                     .any(|m| m.send_key.as_deref() == Some(FOLLOW_UP))
             );
-            assert_eq!(server.test_internals().board.runs(&issue).unwrap().len(), 1);
+            assert_eq!(
+                vibevalley_runtime::rt::block_on(server.test_internals().board.runs_async(&issue))
+                    .unwrap()
+                    .len(),
+                1
+            );
             std::process::exit(81);
         }
         let (issue, thread) = issue_thread(&server);
         let store = server.test_internals().board.sessions().durable_store();
         if matches!(window.as_str(), "report" | "posted") {
             let run = until(&server, "settled reply", || {
-                server.test_internals().board.runs(&issue).unwrap().into_iter().find(|r| r.summary == FOLLOW_UP)
+                vibevalley_runtime::rt::block_on(server.test_internals().board.runs_async(&issue))
+                    .unwrap()
+                    .into_iter()
+                    .find(|r| r.summary == FOLLOW_UP)
             });
             assert_eq!(run.outcome, Some(Outcome::Completed));
             let request = reply_id(&server, &thread, FOLLOW_UP);
@@ -188,7 +196,12 @@ fn regression_replies_and_reports_across_process_exit() {
         assert_eq!(window, "git");
         until(&server, "replayed report", || (count_notes(&server, &thread, FOLLOW_UP) == 1).then_some(()));
         comment(&url, &issue, FOLLOW_UP);
-        assert_eq!(server.test_internals().board.runs(&issue).unwrap().len(), 2);
+        assert_eq!(
+            vibevalley_runtime::rt::block_on(server.test_internals().board.runs_async(&issue))
+                .unwrap()
+                .len(),
+            2
+        );
         comment(&url, &issue, UNKNOWN);
         until(&server, "scripted helper exits after the Git commit", || None::<()>);
     }
@@ -229,7 +242,7 @@ fn regression_replies_and_reports_across_process_exit() {
         comment(&url, &issue, text);
         reply_id(&server, &thread, text);
     }
-    let runs = server.test_internals().board.runs(&issue).unwrap();
+    let runs = vibevalley_runtime::rt::block_on(server.test_internals().board.runs_async(&issue)).unwrap();
     assert_eq!(runs.len(), 3);
     assert_eq!(runs[2].outcome, Some(Outcome::Interrupted));
     let wire = call(&url, "issue.run.list", json!({"id":issue}));

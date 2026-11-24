@@ -218,7 +218,15 @@ fn only_the_user_publishes() {
     let dir = tempfile::tempdir().unwrap();
     let hub = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
     let db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
-    let pulls = vibevalley_server::work::pull::Pulls::open(db, Arc::new(farm().publisher), None, None, None, None).unwrap();
+    let pulls = vibevalley_runtime::rt::block_on(vibevalley_server::work::pull::Pulls::open_async(
+        db,
+        Arc::new(farm().publisher),
+        None,
+        None,
+        None,
+        None,
+    ))
+    .unwrap();
     vibevalley_server::work::pull::install(&hub, pulls, None);
     let asked = json!({ "cwd": "/tmp", "branch": "fix", "sha": "0", "base": "main", "title": "t", "body": "" });
     let e = hub.call_as(Caller::Remote, "repo.pr.submit", asked);
@@ -400,10 +408,7 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
             }),
     )
     .unwrap();
-    let merged = started
-        .test_internals()
-        .board
-        .settle_pull(change_id, PullRequestState::Merged)
+    let merged = vibevalley_runtime::rt::block_on(started.test_internals().board.settle_pull_async(change_id, PullRequestState::Merged))
         .unwrap()
         .unwrap();
     assert_eq!(merged.delivered, Some(Landing::PullRequest));
