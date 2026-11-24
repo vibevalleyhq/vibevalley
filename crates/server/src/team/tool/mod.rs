@@ -11,23 +11,27 @@ mod memory;
 mod plan;
 
 use std::path::PathBuf;
-use std::sync::{Arc, LazyLock, Weak};
+use std::sync::{Arc, LazyLock};
 
 use parking_lot::Mutex;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use vibevalley_protocol::{Caller, Issue, Session};
+use vibevalley_protocol::{Issue, IssueFilter, Session};
 
-use crate::app::hub::ports::{ResourcePort, ToolSpecWire};
+use crate::app::port::{CronToolPort, ResourcePort, ToolDispatchPort, ToolSpecWire};
+use crate::app::runtime::Runtime;
 use crate::collab::channel::Chat;
 use crate::content::artifact::ArtifactStore;
+use crate::content::library::LibraryStore;
 use crate::content::media::jobs::MediaStore;
 use crate::infra::text;
-use crate::team::agent::Agents;
-use crate::work::issue::Board;
-use crate::work::pull::Pulls;
-use crate::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, Hub};
+use crate::team::agent::AgentStore;
+use crate::team::memory::MemoryStore;
+use crate::work::issue::IssueStore;
+use crate::work::pull::PullStore;
+use crate::work::repo::RepoStore;
+use crate::work::session::SessionStore;
 
 /// A tool as the model sees it.
 #[derive(Deserialize, Clone)]
@@ -64,71 +68,49 @@ pub enum Who {
     Helper(Box<Session>),
 }
 
-/// Dissolved tool dispatcher: routes cross-domain RPCs through `Hub::invoke_async`,
-/// reads `vv://` resources through `ResourcePort`, and keeps only the narrow
-/// L1/L2 handles needed for non-RPC actor-scoped operations (zero L3 imports).
+/// Typed tool dispatcher calling directly into injected domain stores and narrow ports.
 pub struct ToolBox {
-    pub hub: Weak<Hub>,
+    pub runtime: Arc<Runtime>,
     pub resources: Arc<dyn ResourcePort>,
-    pub agents: Arc<Agents>,
-    pub board: Board,
+    pub crons: Arc<dyn CronToolPort>,
+    pub agents: Arc<AgentStore>,
+    pub memory: Arc<MemoryStore>,
+    pub issues: Arc<IssueStore>,
+    pub sessions: Arc<SessionStore>,
+    pub repos: Arc<RepoStore>,
     pub chat: Arc<Chat>,
-    pub pulls: Arc<Pulls>,
+    pub pulls: Arc<PullStore>,
     pub media: Arc<MediaStore>,
     pub artifacts: Arc<ArtifactStore>,
+    pub library: Arc<LibraryStore>,
     pub repos_root: PathBuf,
 }
 
 impl ToolBox {
-    pub(crate) fn hub(&self) -> Result<Arc<Hub>, String> {
-        self.hub.upgrade().ok_or_else(|| "server closed".to_string())
-    }
-    /// Builds the authenticated internal `CallerContext` for a tool invocation.
-    pub(crate) fn ctx(&self, who: &Who) -> CallerContext {
-        match who {
-            Who::Orchestrator(r) => CallerContext {
-                caller: Caller::Orchestrator,
-                principal: CallerPrincipal::LocalOwner,
-                client: Some(ClientIdentity {
-                    id: r.agent.clone(),
-                    kind: ClientKind::Internal,
-                    label: r.channel.clone(),
-                }),
-                trace_id: 0,
-            },
-            Who::Helper(h) => CallerContext {
-                caller: Caller::Session,
-                principal: CallerPrincipal::LocalOwner,
-                client: Some(ClientIdentity {
-                    id: h.id.clone(),
-                    kind: ClientKind::Internal,
-                    label: h.name.clone(),
-                }),
-                trace_id: 0,
-            },
-        }
-    }
-
     /// An issue by id, `#n`, number, or the id or name of a helper on it.
-    fn issue(&self, key: &str) -> Result<Issue, String> {
+    pub(super) async fn issue_async(&self, key: &str) -> Result<Issue, String> {
         let key = key.trim();
         let k = key.trim_start_matches('#');
-        let found = self.hub()?.read(|s| {
-            s.issues.iter().find(|i| i.id == key || i.number.to_string() == k).cloned().or_else(|| {
-                let on = s.sessions.iter().filter(|h| h.id == k || h.name == k).max_by_key(|h| h.hired_at)?;
-                s.issues.iter().find(|i| Some(i.id.as_str()) == on.issue_id()).cloned()
-            })
-        });
-        found.ok_or_else(|| text::no_issue(key))
+        let issues = self.issues.list_async(&IssueFilter::default()).await.map_err(|e| e.message)?;
+        if let Some(found) = issues.iter().find(|i| i.id == key || i.number.to_string() == k).cloned() {
+            return Ok(found);
+        }
+        let sessions = self.sessions.list_async().await;
+        if let Some(on) = sessions.iter().filter(|h| h.id == k || h.name == k).max_by_key(|h| h.hired_at)
+            && let Some(found) = issues.into_iter().find(|i| Some(i.id.as_str()) == on.issue_id())
+        {
+            return Ok(found);
+        }
+        Err(text::no_issue(key))
     }
 
-    fn worker_of(&self, issue: &Issue) -> Option<Session> {
+    pub(super) async fn worker_of_async(&self, issue: &Issue) -> Option<Session> {
         let last = issue.latest_session_id()?;
-        self.hub.upgrade()?.read(|s| s.sessions.iter().find(|h| &h.id == last).cloned())
+        self.sessions.get_async(last).await
     }
 
-    fn who_of(&self, issue: &Issue) -> String {
-        if let Some(w) = self.worker_of(issue) {
+    pub(super) async fn who_of_async(&self, issue: &Issue) -> String {
+        if let Some(w) = self.worker_of_async(issue).await {
             return w.name;
         }
         match issue.assigned_agent() {
@@ -138,20 +120,26 @@ impl ToolBox {
         }
     }
 
-    fn number_of(&self, session: &Session) -> Option<i64> {
-        let issue = session.issue_id()?;
-        self.hub.upgrade()?.read(|s| s.issues.iter().find(|i| i.id == issue).map(|i| i.number))
+    async fn number_of_async(&self, session: &Session) -> Option<i64> {
+        let issue_id = session.issue_id()?;
+        let issues = self.issues.list_async(&IssueFilter::default()).await.ok()?;
+        issues.into_iter().find(|i| i.id == issue_id).map(|i| i.number)
     }
 
     /// Every helper on the farm.
-    pub fn roster(&self) -> Vec<Session> {
-        let Some(hub) = self.hub.upgrade() else { return vec![] };
-        hub.read(|s| s.sessions.iter().filter(|h| vibevalley_core::status::is_farm_worker(h)).cloned().collect())
+    pub async fn roster_async(&self) -> Vec<Session> {
+        self.sessions
+            .list_async()
+            .await
+            .into_iter()
+            .filter(vibevalley_core::status::is_farm_worker)
+            .collect()
     }
 
-    pub fn session_line(&self, h: &Session) -> String {
-        text::session_line(h, crate::now(), self.number_of(h))
+    pub async fn session_line_async(&self, h: &Session) -> String {
+        text::session_line(h, crate::now(), self.number_of_async(h).await)
     }
+
     pub fn helper_tools_wire(&self) -> Vec<ToolSpecWire> {
         helper()
             .into_iter()
@@ -163,9 +151,9 @@ impl ToolBox {
             .collect()
     }
 
-    pub fn session_for_token(&self, token: &str) -> Option<Session> {
-        let id = self.board.sessions().who(token)?;
-        self.board.session(&id)
+    pub async fn session_for_token_async(&self, token: &str) -> Option<Session> {
+        let id = self.sessions.who(token)?;
+        self.sessions.get_async(&id).await
     }
 
     pub async fn call_helper_async(&self, session: Session, name: &str, args: &Value) -> Result<String, String> {
@@ -174,6 +162,20 @@ impl ToolBox {
             Some(t) => t.run_async(self, &Who::Helper(Box::new(session)), args).await,
             None => Err(format!("没成：没有 {name} 这个工具")),
         }
+    }
+}
+
+impl ToolDispatchPort for ToolBox {
+    fn helper_tools(&self) -> Vec<ToolSpecWire> {
+        self.helper_tools_wire()
+    }
+
+    fn session_for_token<'a>(&'a self, token: &'a str) -> crate::BoxFuture<'a, Option<Session>> {
+        Box::pin(self.session_for_token_async(token))
+    }
+
+    fn call_helper_async<'a>(&'a self, session: Session, name: &'a str, args: &'a Value) -> crate::BoxFuture<'a, Result<String, String>> {
+        Box::pin(ToolBox::call_helper_async(self, session, name, args))
     }
 }
 
@@ -372,10 +374,19 @@ impl vibevalley_runtime::agent::Tool for Held {
     }
 
     fn execute(&self, args: &Value) -> vibevalley_runtime::agent::ToolOutput {
+        let tool = self.tool.clone();
+        let tools = self.tools.clone();
         let route = self.route.lock().clone();
-        match vibevalley_runtime::rt::block_on(self.tool.run_async(&self.tools, &Who::Orchestrator(route), args)) {
-            Ok(text) => vibevalley_runtime::agent::ToolOutput::ok(text),
-            Err(why) => vibevalley_runtime::agent::ToolOutput::error(why),
+        let raw = args.clone();
+        let (tx, rx) = flume::bounded(1);
+        tools.runtime.spawn(async move {
+            let res = tool.run_async(&tools, &Who::Orchestrator(route), &raw).await;
+            let _ = tx.send(res);
+        });
+        match rx.recv() {
+            Ok(Ok(text)) => vibevalley_runtime::agent::ToolOutput::ok(text),
+            Ok(Err(why)) => vibevalley_runtime::agent::ToolOutput::error(why),
+            Err(_) => vibevalley_runtime::agent::ToolOutput::error("tool task cancelled"),
         }
     }
 }

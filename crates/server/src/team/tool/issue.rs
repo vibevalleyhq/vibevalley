@@ -3,8 +3,8 @@
 use serde::Deserialize;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    CriterionCheck, Deliverable, Issue, IssueAnswer, IssueDiffGetInput, IssueFilter, IssueRefineInput, IssueReportMemory, IssueRequest, IssueReviewInput,
-    IssueRunListInput, IssueStatus, IssueStatusUpdateInput, IssueTimeline, IssueUpdateInput, MandateStrength, SessionStopInput, SubmitBranch, ops,
+    CriterionCheck, Deliverable, Issue, IssueAnswer, IssueFilter, IssueRefineInput, IssueReportMemory, IssueRequest, IssueReviewInput, IssueStatus,
+    IssueStatusUpdateInput, IssueTimeline, IssueUpdateInput, MandateStrength, SubmitBranch,
 };
 
 use super::{ToolBox, Who, given};
@@ -12,10 +12,6 @@ use crate::infra::text;
 use crate::now;
 use crate::work::issue::ChildDraft;
 use crate::work::session::{Report, ReportQuestion, ReportStatus};
-
-fn block_on<F: std::future::Future>(fut: F) -> F::Output {
-    vibevalley_runtime::rt::block_on(fut)
-}
 
 const PRIORITIES: &str = "Expected one of: 紧急, 高, 普通, 中, 低, urgent, high, medium, low";
 
@@ -30,7 +26,7 @@ pub struct ListArgs {
     limit: Option<i64>,
 }
 
-pub async fn list(f: &ToolBox, who: &Who, a: ListArgs) -> Result<String, String> {
+pub async fn list(f: &ToolBox, _who: &Who, a: ListArgs) -> Result<String, String> {
     let status = match given(&a.status) {
         Some(st) => Some(text::status_named(st).ok_or_else(|| format!("Expected one of: {}", text::STATUS_WORDS))?),
         None => None,
@@ -43,7 +39,7 @@ pub async fn list(f: &ToolBox, who: &Who, a: ListArgs) -> Result<String, String>
         closed: a.closed,
         wants_user: a.wants_user,
     };
-    let found = f.hub()?.invoke_async::<ops::IssueList>(&f.ctx(who), filter).await.map_err(|e| e.message)?;
+    let found = f.issues.list_async(&filter).await.map_err(|e| e.message)?;
     if found.is_empty() {
         return Ok(if a.wants_user == Some(true) {
             "没有在等用户的工单。"
@@ -54,12 +50,11 @@ pub async fn list(f: &ToolBox, who: &Who, a: ListArgs) -> Result<String, String>
     }
     let limit = a.limit.filter(|l| *l > 0).map(|l| l as usize).unwrap_or(20);
     let at = now();
-    let mut out = found
-        .iter()
-        .take(limit)
-        .map(|i| text::issue_line(i, &f.who_of(i), at))
-        .collect::<Vec<_>>()
-        .join("\n");
+    let mut lines = Vec::with_capacity(found.len().min(limit));
+    for i in found.iter().take(limit) {
+        lines.push(text::issue_line(i, &f.who_of_async(i).await, at));
+    }
+    let mut out = lines.join("\n");
     if found.len() > limit {
         out += &format!("\n（还有 {} 张没列）", found.len() - limit);
     }
@@ -73,19 +68,21 @@ pub struct IdArgs {
 }
 
 pub async fn get(f: &ToolBox, _: &Who, a: IdArgs) -> Result<String, String> {
-    let item = match f.issue(&a.id) {
+    let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
+    let sessions = f.sessions.list_async().await;
+    let session_names: std::collections::HashMap<&str, &str> = sessions.iter().map(|s| (s.id.as_str(), s.name.as_str())).collect();
     let timeline: Option<IssueTimeline> = f
-        .board
+        .issues
         .runs_async(&item.id)
         .await
         .ok()
-        .map(|runs| vibevalley_core::brief::milestones_of(&item, &runs, |s| f.board.session(s).map(|s| s.name)));
+        .map(|runs| vibevalley_core::brief::milestones_of(&item, &runs, |s| session_names.get(s).map(|n| (*n).to_string())));
     let at = now();
-    let mut lines = vec![text::issue_detail(&item, &f.who_of(&item), timeline.as_ref(), at)];
-    if let Some(w) = f.worker_of(&item) {
+    let mut lines = vec![text::issue_detail(&item, &f.who_of_async(&item).await, timeline.as_ref(), at)];
+    if let Some(w) = f.worker_of_async(&item).await {
         lines.push(text::session_line(&w, at, Some(item.number)));
         lines.push(format!("目录：{}", w.cwd.clone().unwrap_or_default()));
         let last = w.last_run.as_ref().map(|r| r.summary.clone()).filter(|t| !t.is_empty());
@@ -97,21 +94,15 @@ pub async fn get(f: &ToolBox, _: &Who, a: IdArgs) -> Result<String, String> {
     Ok(lines.join("\n"))
 }
 
-pub async fn diff(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
-    let item = match f.issue(&a.id) {
+pub async fn diff(f: &ToolBox, _who: &Who, a: IdArgs) -> Result<String, String> {
+    let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    Ok(
-        match f
-            .hub()?
-            .invoke_async::<ops::IssueDiffGet>(&f.ctx(who), IssueDiffGetInput { id: item.id, since_tree: None })
-            .await
-        {
-            Ok(changes) => text::changes_text(&changes),
-            Err(why) => format!("看不了改动：{}", why.message),
-        },
-    )
+    Ok(match f.issues.diff_async(&item.id, None).await {
+        Ok(changes) => text::changes_text(&changes),
+        Err(why) => format!("看不了改动：{}", why.message),
+    })
 }
 
 #[derive(Deserialize)]
@@ -131,8 +122,8 @@ pub struct ReviewArgs {
     text: Option<String>,
 }
 
-pub async fn review(f: &ToolBox, who: &Who, a: ReviewArgs) -> Result<String, String> {
-    let item = match f.issue(&a.id) {
+pub async fn review(f: &ToolBox, _who: &Who, a: ReviewArgs) -> Result<String, String> {
+    let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
@@ -147,17 +138,15 @@ pub async fn review(f: &ToolBox, who: &Who, a: ReviewArgs) -> Result<String, Str
         findings,
         text: a.text,
     };
-    Ok(
-        match f.hub()?.invoke_async::<ops::IssueReview>(&f.ctx(who), input).await.map_err(|e| e.message) {
-            Ok(done) if a.pass => format!("#{} 验收过了，等用户点完成", done.number),
-            Ok(done) => format!(
-                "#{} 没过验收，{} 处要修，已经交回给帮工",
-                done.number,
-                done.findings.iter().filter(|x| !x.resolved).count()
-            ),
-            Err(why) => why,
-        },
-    )
+    Ok(match f.issues.review_async(input).await.map_err(|e| e.message) {
+        Ok(done) if a.pass => format!("#{} 验收过了，等用户点完成", done.number),
+        Ok(done) => format!(
+            "#{} 没过验收，{} 处要修，已经交回给帮工",
+            done.number,
+            done.findings.iter().filter(|x| !x.resolved).count()
+        ),
+        Err(why) => why,
+    })
 }
 
 #[derive(Deserialize)]
@@ -169,12 +158,12 @@ pub struct CommentArgs {
 }
 
 pub async fn comment(f: &ToolBox, _: &Who, a: CommentArgs) -> Result<String, String> {
-    let item = match f.issue(&a.id) {
+    let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    Ok(match crate::work::issue::comment_async(&f.board, &item.id, &a.text).await {
-        Ok(_) => match f.worker_of(&item) {
+    Ok(match f.issues.comment_async(&item.id, &a.text).await {
+        Ok(_) => match f.worker_of_async(&item).await {
             Some(w) => format!("已经在 #{} 的工单串里跟 {} 说了", item.number, w.name),
             None => text::nobody_on(item.number),
         },
@@ -182,32 +171,33 @@ pub async fn comment(f: &ToolBox, _: &Who, a: CommentArgs) -> Result<String, Str
     })
 }
 
-pub async fn stop(f: &ToolBox, who: &Who, a: IdArgs) -> Result<String, String> {
-    let item = match f.issue(&a.id) {
+pub async fn stop(f: &ToolBox, _who: &Who, a: IdArgs) -> Result<String, String> {
+    let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
-    let Some(w) = f.worker_of(&item) else {
+    let Some(w) = f.worker_of_async(&item).await else {
         return Ok(text::nobody_on(item.number));
     };
-    Ok(
-        match f.hub()?.invoke_async::<ops::SessionStop>(&f.ctx(who), SessionStopInput { id: w.id }).await {
-            Ok(()) => format!("#{} 这一轮叫停了", item.number),
-            Err(why) => why.message,
-        },
-    )
+    Ok(match f.sessions.stop_async(&w.id).await {
+        Ok(()) => format!("#{} 这一轮叫停了", item.number),
+        Err(why) => why.message,
+    })
 }
 
 #[derive(Deserialize)]
 pub struct Nothing {}
 
 pub async fn sessions(f: &ToolBox, _: &Who, _: Nothing) -> Result<String, String> {
-    let all = f.roster();
-    Ok(if all.is_empty() {
-        "现在没有在场的帮工。".into()
-    } else {
-        all.iter().map(|h| f.session_line(h)).collect::<Vec<_>>().join("\n")
-    })
+    let all = f.roster_async().await;
+    if all.is_empty() {
+        return Ok("现在没有在场的帮工。".into());
+    }
+    let mut lines = Vec::with_capacity(all.len());
+    for h in &all {
+        lines.push(f.session_line_async(h).await);
+    }
+    Ok(lines.join("\n"))
 }
 
 /// Who the orchestrator's issue goes to: the one it names, else for a start or a draft the best fit.
@@ -240,8 +230,8 @@ pub struct UpdateArgs {
     agent: Option<String>,
 }
 
-pub async fn update(f: &ToolBox, who: &Who, a: UpdateArgs) -> Result<String, String> {
-    let item = match f.issue(&a.id) {
+pub async fn update(f: &ToolBox, _who: &Who, a: UpdateArgs) -> Result<String, String> {
+    let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
@@ -264,11 +254,8 @@ pub async fn update(f: &ToolBox, who: &Who, a: UpdateArgs) -> Result<String, Str
         };
         req.agent = Some(profile.id);
     }
-    Ok(match f.hub()?.invoke_async::<ops::IssueUpdate>(&f.ctx(who), req).await.map_err(|e| e.message) {
-        Ok(applied) => {
-            let done = f.issue(&applied.id).unwrap_or(item);
-            format!("改好了：{}", text::slice_from(&text::issue_line(&done, &f.who_of(&done), now()), 2))
-        }
+    Ok(match f.issues.update_async(req).await.map_err(|e| e.message) {
+        Ok(done) => format!("改好了：{}", text::slice_from(&text::issue_line(&done, &f.who_of_async(&done).await, now()), 2)),
         Err(why) => format!("没改：{why}"),
     })
 }
@@ -284,7 +271,7 @@ pub struct StatusArgs {
 }
 
 pub async fn status(f: &ToolBox, who: &Who, a: StatusArgs) -> Result<String, String> {
-    let item = match f.issue(&a.id) {
+    let item = match f.issue_async(&a.id).await {
         Ok(i) => i,
         Err(why) => return Ok(why),
     };
@@ -304,19 +291,16 @@ pub async fn status(f: &ToolBox, who: &Who, a: StatusArgs) -> Result<String, Str
         Ok(None) => {}
         Err(why) => return Ok(format!("没挪：{why}")),
     }
-    Ok(
-        match f.hub()?.invoke_async::<ops::IssueStatusUpdate>(&f.ctx(who), req).await.map_err(|e| e.message) {
-            Ok(applied) => {
-                let done = f.issue(&applied.id).unwrap_or(item);
-                if to == IssueStatus::Done && done.status == IssueStatus::Done {
-                    format!("#{} {}", done.number, text::closed(&done))
-                } else {
-                    format!("挪好了：{}", text::slice_from(&text::issue_line(&done, &f.who_of(&done), now()), 2))
-                }
+    Ok(match f.issues.status_async(&req).await.map_err(|e| e.message) {
+        Ok(done) => {
+            if to == IssueStatus::Done && done.status == IssueStatus::Done {
+                format!("#{} {}", done.number, text::closed(&done))
+            } else {
+                format!("挪好了：{}", text::slice_from(&text::issue_line(&done, &f.who_of_async(&done).await, now()), 2))
             }
-            Err(why) => format!("没挪：{why}"),
-        },
-    )
+        }
+        Err(why) => format!("没挪：{why}"),
+    })
 }
 
 #[derive(Deserialize)]
@@ -383,9 +367,7 @@ pub async fn create(f: &ToolBox, who: &Who, a: CreateArgs) -> Result<String, Str
         Ok(None) => {}
         Err(why) => return Ok(format!("没记：{why}")),
     }
-    let ctx = f.ctx(who);
-    let hub = f.hub()?;
-    let applied = match hub.invoke_async::<ops::IssueCreate>(&ctx, req).await.map_err(|e| e.message) {
+    let applied = match f.issues.create_from_request_async(&req).await.map_err(|e| e.message) {
         Ok(i) => i,
         Err(why) => return Ok(format!("没记下：{why}")),
     };
@@ -397,14 +379,12 @@ pub async fn create(f: &ToolBox, who: &Who, a: CreateArgs) -> Result<String, Str
     let noted = format!("记下了：#{}「{}」{answer}", applied.number, vibevalley_core::rules::short_title(&applied.title));
     if a.draft {
         return Ok(
-            match hub
-                .invoke_async::<ops::IssueRefine>(
-                    &ctx,
-                    IssueRefineInput {
-                        id: applied.id.clone(),
-                        ..Default::default()
-                    },
-                )
+            match f
+                .issues
+                .refine_async(&IssueRefineInput {
+                    id: applied.id.clone(),
+                    ..Default::default()
+                })
                 .await
                 .map_err(|e| e.message)
             {
@@ -416,19 +396,17 @@ pub async fn create(f: &ToolBox, who: &Who, a: CreateArgs) -> Result<String, Str
     if !a.start {
         return Ok(format!("{noted}，在备选里，没开工"));
     }
-    if let Err(why) = hub
-        .invoke_async::<ops::IssueStatusUpdate>(
-            &ctx,
-            IssueStatusUpdateInput {
-                revision: None,
-                id: applied.id.clone(),
-                status: IssueStatus::Todo,
-                text: None,
-                agent: None,
-                edit: None,
-                request_key: None,
-            },
-        )
+    if let Err(why) = f
+        .issues
+        .status_async(&IssueStatusUpdateInput {
+            revision: None,
+            id: applied.id.clone(),
+            status: IssueStatus::Todo,
+            text: None,
+            agent: None,
+            edit: None,
+            request_key: None,
+        })
         .await
         .map_err(|e| e.message)
     {
@@ -436,10 +414,10 @@ pub async fn create(f: &ToolBox, who: &Who, a: CreateArgs) -> Result<String, Str
             "{noted}，在备选里；没开工：{why}。要再开工用 issue_status_update 挪到待办，不要再建一张"
         ));
     }
-    let Some(now_item) = f.issue(&applied.id).ok() else {
+    let Ok(now_item) = f.issue_async(&applied.id).await else {
         return Ok(format!("{noted}，在 #{} 排进待办：有空位就开工", channel.name));
     };
-    Ok(match f.worker_of(&now_item) {
+    Ok(match f.worker_of_async(&now_item).await {
         Some(h) => format!(
             "{noted}，已在 #{} 派 {}（{}）去 {}{}",
             channel.name,
@@ -453,15 +431,12 @@ pub async fn create(f: &ToolBox, who: &Who, a: CreateArgs) -> Result<String, Str
 }
 
 /// The helper calling, and the issue it works on.
-fn helper_issue(f: &ToolBox, who: &Who) -> Result<(vibevalley_protocol::Session, Issue), String> {
+async fn helper_issue_async(f: &ToolBox, who: &Who) -> Result<(vibevalley_protocol::Session, Issue), String> {
     let Who::Helper(me) = who else {
         return Err("这个工具只给帮工用".into());
     };
     let id = me.issue_id().ok_or("当前不是正在处理工单的帮工会话")?;
-    let issue = f
-        .hub()?
-        .read(|s| s.issues.iter().find(|i| i.id == id).cloned())
-        .ok_or("当前不是正在处理工单的帮工会话")?;
+    let issue = f.issues.get_async(id).await.ok().ok_or("当前不是正在处理工单的帮工会话")?;
     Ok(((**me).clone(), issue))
 }
 
@@ -491,10 +466,10 @@ pub struct SplitArgs {
 }
 
 pub async fn split(f: &ToolBox, who: &Who, a: SplitArgs) -> Result<String, String> {
-    let (_, mut issue) = helper_issue(f, who)?;
+    let (_, mut issue) = helper_issue_async(f, who).await?;
     if let Some(title) = given(&a.title) {
         issue = f
-            .board
+            .issues
             .edit_async(
                 &issue.id,
                 &vibevalley_protocol::IssueUpdate {
@@ -519,7 +494,7 @@ pub async fn split(f: &ToolBox, who: &Who, a: SplitArgs) -> Result<String, Strin
             agent: given(&t.agent).map(String::from),
         })
         .collect();
-    let children = f.board.split_async(&issue.id, drafts).await.map_err(|e| e.to_string())?;
+    let children = f.issues.split_async(&issue.id, drafts).await.map_err(|e| e.to_string())?;
     let lines: Vec<String> = children.iter().map(|c| format!("- #{} {}", c.number, c.title)).collect();
     Ok(format!("#{} 拆成了 {} 张子工单：\n{}", issue.number, children.len(), lines.join("\n")))
 }
@@ -540,7 +515,7 @@ pub struct ReportArgs {
 }
 
 pub async fn report(f: &ToolBox, who: &Who, a: ReportArgs) -> Result<String, String> {
-    let Ok((me, _)) = helper_issue(f, who) else {
+    let Ok((me, _)) = helper_issue_async(f, who).await else {
         return Ok("当前不是正在处理工单的帮工会话，不能交回。 ".into());
     };
     if a.pr_submit {
@@ -554,9 +529,10 @@ pub async fn report(f: &ToolBox, who: &Who, a: ReportArgs) -> Result<String, Str
         checks: a.checks,
         remember: a.remember,
     };
-    let board = f.board.clone();
+    let sessions = f.sessions.clone();
     let session_id = me.id.clone();
-    crate::spawn_blocking_traced(move || board.sessions().report(&session_id, &report))
+    f.runtime
+        .spawn_blocking(move || sessions.report(&session_id, &report))
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())?;
@@ -574,7 +550,7 @@ pub async fn pr_submit(f: &ToolBox, who: &Who, a: PrArgs) -> Result<String, Stri
 
 /// `submitPullRequest`: only on the user's explicit word, on an issue that delivers by pull request.
 async fn submit(f: &ToolBox, who: &Who, summary: Option<&str>) -> Result<String, String> {
-    let (me, issue) = helper_issue(f, who).map_err(|_| t("server.issue.prSubmitNotCurrent", &[]))?;
+    let (me, issue) = helper_issue_async(f, who).await.map_err(|_| t("server.issue.prSubmitNotCurrent", &[]))?;
     if issue.mandate.strength != MandateStrength::Explicit || !issue.mandate.auto_submit_pr {
         return Err(t("server.issue.prSubmitNotAllowed", &[]));
     }
@@ -611,7 +587,7 @@ async fn submit(f: &ToolBox, who: &Who, summary: Option<&str>) -> Result<String,
         cwd,
         branch,
         sha,
-        base: f.board.sessions().base_branch(&me.id).unwrap_or_else(|| "main".into()),
+        base: f.sessions.base_branch(&me.id).unwrap_or_else(|| "main".into()),
         title,
         body,
         dry_run: None,

@@ -10,23 +10,25 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use parking_lot::Mutex;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DbErr, EntityTrait, ExprTrait, QueryFilter, QueryOrder};
+use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ActorKind, ApiError, BizCode, Caller, Fact, Memory, MemoryFound, MemoryKind, MemoryList, MemoryScope, MemorySearch, MemorySourceInfo, Outcome, Preview,
-    RecallPreview, ops,
+    ActorKind, ApiError, BizCode, Caller, Memory, MemoryFound, MemoryKind, MemoryList, MemoryScope, MemorySearch, MemorySourceInfo, Outcome, Preview,
+    RecallPreview, Session, ops,
 };
 
-use crate::app::hub::ports::MemoryRecallPort;
-use crate::app::hub::refusal::AsyncRequestKeys;
+use crate::app::outbox::Outbox;
+use crate::app::port::MemoryRecallPort;
+use crate::app::refusal::AsyncRequestKeys;
 use crate::db::ServerDb;
 use crate::db::begin_write_tx;
 use crate::db::column::{db_word, read_db_word};
 use crate::db::entities::team_memory::memory;
-use crate::team::agent::Agents;
-use crate::{Hub, now};
+use crate::now;
+use crate::team::agent::AgentStore;
+use crate::transport::api::BoxFuture;
 
 mod gse;
 mod rules;
@@ -45,12 +47,18 @@ fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::MemoryRefused, text)
 }
 
-fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    vibevalley_runtime::rt::block_on(future)
+/// Bridges the synchronous `MemoryPort` trait called on runtime OS worker threads
+/// onto the global Tokio runtime without invoking `rt::block_on`.
+fn run_sync_port<T: Send + 'static>(future: impl std::future::Future<Output = T> + Send + 'static) -> T {
+    let (tx, rx) = flume::bounded(1);
+    vibevalley_runtime::rt::handle().spawn(async move {
+        let _ = tx.send(future.await);
+    });
+    rx.recv().expect("memory port task cancelled")
 }
 
 /// Who writes a note: the user, an orchestrator, or a session (kept with it).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum By {
     User,
     Orchestrator,
@@ -67,7 +75,7 @@ pub struct Note {
 }
 
 /// One finished run, as the memory keeps it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinishedRun {
     pub agent: String,
     pub session: String,
@@ -78,10 +86,10 @@ pub struct FinishedRun {
     pub summary: String,
 }
 
-pub struct Memories {
+pub struct MemoryStore {
     db: Arc<ServerDb>,
-    agents: Arc<Agents>,
-    sub: Mutex<Option<crate::app::hub::event_bus::Subscription>>,
+    agents: Arc<AgentStore>,
+    create_keys: AsyncRequestKeys<Memory>,
 }
 
 fn to_wire(x: m::Memory) -> Memory {
@@ -108,23 +116,13 @@ fn to_wire(x: m::Memory) -> Memory {
     }
 }
 
-impl Memories {
-    pub fn open(db: Arc<ServerDb>, agents: Arc<Agents>) -> Arc<Memories> {
-        Arc::new(Memories {
+impl MemoryStore {
+    pub fn open(db: Arc<ServerDb>, agents: Arc<AgentStore>) -> Arc<MemoryStore> {
+        Arc::new(MemoryStore {
             db,
             agents,
-            sub: Mutex::new(None),
+            create_keys: AsyncRequestKeys::default(),
         })
-    }
-
-    pub fn close(&self) {
-        let prev = self.sub.lock().take();
-        drop(prev);
-    }
-
-    /// An agent's own memories, newest first.
-    pub fn list(&self, agent: &str) -> Result<Vec<m::Memory>, ApiError> {
-        block_on(self.list_async(agent))
     }
 
     pub async fn list_async(&self, agent: &str) -> Result<Vec<m::Memory>, ApiError> {
@@ -185,10 +183,6 @@ impl Memories {
             .collect()
     }
 
-    pub fn write(&self, n: &Note) -> Result<Memory, ApiError> {
-        block_on(self.write_async(n))
-    }
-
     pub async fn write_async(&self, n: &Note) -> Result<Memory, ApiError> {
         Self::insert_note(self.db.write_conn(), n).await
     }
@@ -240,11 +234,7 @@ impl Memories {
         }))
     }
 
-    /// `rewrite`: the agent's own notes replaced; the user's stay.
-    pub fn rewrite(&self, agent: &str, texts: &[String], by: By) -> Result<usize, ApiError> {
-        block_on(self.rewrite_async(agent, texts, by))
-    }
-
+    /// `rewrite_async`: the agent's own notes replaced; the user's stay.
     pub async fn rewrite_async(&self, agent: &str, texts: &[String], by: By) -> Result<usize, ApiError> {
         let txn = begin_write_tx(self.db.write_conn()).await.map_err(db_failed)?;
         let res: Result<usize, ApiError> = async {
@@ -315,10 +305,6 @@ impl Memories {
 
     /// What a run on `agent` recalls (`recallable`); with `peek` nothing is
     /// counted and a cue with no repo recalls nothing.
-    pub fn recall(&self, agent: &str, session: Option<&str>, repo: &str, text: &str, peek: bool) -> Vec<(String, String)> {
-        block_on(self.recall_async(agent, session, repo, text, peek))
-    }
-
     pub async fn recall_async(&self, agent: &str, session: Option<&str>, repo: &str, text: &str, peek: bool) -> Vec<(String, String)> {
         if peek && repo.is_empty() {
             return vec![];
@@ -347,19 +333,16 @@ impl Memories {
     }
 
     /// The lines a run is told; "" when none.
-    pub fn recalled_text(&self, agent: &str, session: Option<&str>, repo: &str, text: &str) -> String {
-        self.recall(agent, session, repo, text, false)
+    pub async fn recalled_text_async(&self, agent: &str, session: Option<&str>, repo: &str, text: &str) -> String {
+        self.recall_async(agent, session, repo, text, false)
+            .await
             .into_iter()
             .map(|(_, l)| l)
             .collect::<Vec<_>>()
             .join("\n")
     }
 
-    /// `keep`: a finished round's issue memory, then the oldest past the limit go.
-    pub fn keep(&self, run: &FinishedRun) {
-        block_on(self.keep_async(run));
-    }
-
+    /// `keep_async`: a finished round's issue memory, then the oldest past the limit go.
     pub async fn keep_async(&self, run: &FinishedRun) {
         if run.outcome == Outcome::Interrupted {
             return;
@@ -476,23 +459,139 @@ impl Memories {
             by,
         })
     }
+
+    pub async fn keep_session_reported_async(&self, session: &Session) {
+        if !(session.is_board_worker() || session.is_direct_talker()) {
+            return;
+        }
+        let Some(agent) = session.profile.clone() else { return };
+        let summary = session.last_run.as_ref().map(|l| l.summary.clone()).unwrap_or_default();
+        let outcome = session.last_run.as_ref().map(|l| l.outcome).unwrap_or(Outcome::Completed);
+        self.keep_async(&FinishedRun {
+            agent,
+            session: session.id.clone(),
+            issue: session.issue_id().map(String::from),
+            repo: session.repo_name().unwrap_or_default().to_string(),
+            brief: session.brief.clone(),
+            outcome,
+            summary,
+        })
+        .await;
+    }
+
+    /// Registers `memory.session_reported` on the durable [`Outbox`] so committed
+    /// session reports can persist round learnings asynchronously.
+    pub(crate) fn register_outbox(self: &Arc<Self>, outbox: &Outbox) {
+        let store = Arc::downgrade(self);
+        outbox.register("memory.session_reported", move |delivery| {
+            let store = store.clone();
+            async move {
+                let Some(store) = store.upgrade() else {
+                    return Ok::<(), String>(());
+                };
+                if let Ok(session) = serde_json::from_value::<Session>(delivery.payload.clone()) {
+                    store.keep_session_reported_async(&session).await;
+                } else if let Ok(run) = serde_json::from_value::<FinishedRun>(delivery.payload) {
+                    store.keep_async(&run).await;
+                }
+                Ok(())
+            }
+        });
+    }
+
+    pub(crate) async fn list_for_door_async(&self, input: vibevalley_protocol::MemoryListInput) -> Result<MemoryList, ApiError> {
+        Ok(MemoryList {
+            memories: self.listed_async(&input.agent).await.into_iter().map(to_wire).collect(),
+            sources: self.sources(),
+        })
+    }
+
+    pub(crate) async fn recall_for_door_async(&self, input: vibevalley_protocol::MemoryRecallInput) -> Result<RecallPreview, ApiError> {
+        let lines: Vec<String> = self
+            .recall_async(
+                &input.agent,
+                None,
+                input.repo.as_deref().unwrap_or(""),
+                input.text.as_deref().unwrap_or(""),
+                true,
+            )
+            .await
+            .into_iter()
+            .map(|(_, l)| l)
+            .collect();
+        let chars = lines.iter().map(|l| l.encode_utf16().count() as i64 + 1).sum();
+        Ok(RecallPreview {
+            lines,
+            chars,
+            limit: m::RECALL_CHARS as i64,
+        })
+    }
+
+    pub(crate) async fn create_for_caller_async(
+        &self,
+        caller: Caller,
+        client_id: Option<&str>,
+        input: vibevalley_protocol::MemoryCreateInput,
+    ) -> Result<Memory, ApiError> {
+        let by = match caller {
+            Caller::Session => By::Session(client_id.unwrap_or_default().to_string()),
+            Caller::Orchestrator => By::Orchestrator,
+            Caller::User | Caller::Remote => By::User,
+        };
+        self.create_keys
+            .once(input.request_key.as_deref(), async move {
+                self.write_async(&Note {
+                    agent: input.agent.clone(),
+                    text: input.text.clone(),
+                    repo: input.repo.clone().unwrap_or_default(),
+                    by,
+                })
+                .await
+            })
+            .await
+    }
+
+    pub(crate) async fn search_for_door_async(&self, input: vibevalley_protocol::MemorySearchInput) -> Result<MemorySearch, ApiError> {
+        let agent = input
+            .agent
+            .as_deref()
+            .map(|a| self.agents.profiles.named(a).map(|p| p.id).unwrap_or_else(|| a.to_string()));
+        Ok(self
+            .search_async(
+                agent.as_deref().unwrap_or(""),
+                input.repo.as_deref().unwrap_or(""),
+                input.text.as_deref().unwrap_or(""),
+                0,
+            )
+            .await)
+    }
+
+    pub(crate) async fn delete_for_door_async(&self, input: vibevalley_protocol::MemoryDeleteInput) -> Result<(), ApiError> {
+        self.forget_async(&input.agent, &input.memory).await
+    }
+
+    pub(crate) async fn preview_delete_for_door_async(&self, input: vibevalley_protocol::MemoryDeleteInput) -> Result<Preview, ApiError> {
+        self.preview_forget_async(&input.agent, &input.memory).await
+    }
 }
 
-impl MemoryRecallPort for Memories {
-    fn recall_text(&self, agent: &str, session: Option<&str>, repo: &str, query: &str) -> String {
-        self.recalled_text(agent, session, repo, query)
+impl MemoryRecallPort for MemoryStore {
+    fn recall_text<'a>(&'a self, agent: &'a str, session: Option<&'a str>, repo: &'a str, query: &'a str) -> BoxFuture<'a, String> {
+        Box::pin(self.recalled_text_async(agent, session, repo, query))
     }
 }
 
 struct AgentMemory {
-    store: Arc<Memories>,
+    store: Arc<MemoryStore>,
     agent: String,
     by: By,
 }
 
 impl vibevalley_runtime::agent::extensions::memory::MemoryPort for AgentMemory {
     fn prompt(&self) -> String {
-        let notes = self.store.list(&self.agent).unwrap_or_default();
+        let store = self.store.clone();
+        let agent = self.agent.clone();
+        let notes = run_sync_port(async move { store.list_async(&agent).await.unwrap_or_default() });
         let lines: Vec<String> = notes
             .iter()
             .rev()
@@ -503,33 +602,38 @@ impl vibevalley_runtime::agent::extensions::memory::MemoryPort for AgentMemory {
     }
 
     fn remember(&self, note: &str) -> Result<(), String> {
-        self.store
-            .write(&Note {
-                agent: self.agent.clone(),
-                text: note.into(),
-                repo: String::new(),
-                by: self.by.clone(),
-            })
-            .map(|_| ())
-            .map_err(|e| e.message)
+        let store = self.store.clone();
+        let note = Note {
+            agent: self.agent.clone(),
+            text: note.into(),
+            repo: String::new(),
+            by: self.by.clone(),
+        };
+        run_sync_port(async move { store.write_async(&note).await.map(|_| ()).map_err(|e| e.message) })
     }
 
     fn rewrite(&self, content: &str) -> Result<usize, String> {
-        let users: HashSet<String> = self
-            .store
-            .list(&self.agent)
-            .map_err(|e| e.message)?
-            .into_iter()
-            .filter(|n| n.author == m::ActorKind::User)
-            .map(|n| n.text)
-            .collect();
-        let notes: Vec<String> = content
-            .lines()
-            .map(|l| l.trim().trim_start_matches("- ").trim().to_string())
-            .filter(|l| !l.is_empty())
-            .filter(|l| !users.contains(l) && !l.strip_prefix(m::FROM_USER).is_some_and(|rest| users.contains(rest.trim())))
-            .collect();
-        self.store.rewrite(&self.agent, &notes, self.by.clone()).map_err(|e| e.message)
+        let store = self.store.clone();
+        let agent = self.agent.clone();
+        let by = self.by.clone();
+        let content = content.to_string();
+        run_sync_port(async move {
+            let users: HashSet<String> = store
+                .list_async(&agent)
+                .await
+                .map_err(|e| e.message)?
+                .into_iter()
+                .filter(|n| n.author == m::ActorKind::User)
+                .map(|n| n.text)
+                .collect();
+            let notes: Vec<String> = content
+                .lines()
+                .map(|l| l.trim().trim_start_matches("- ").trim().to_string())
+                .filter(|l| !l.is_empty())
+                .filter(|l| !users.contains(l) && !l.strip_prefix(m::FROM_USER).is_some_and(|rest| users.contains(rest.trim())))
+                .collect();
+            store.rewrite_async(&agent, &notes, by).await.map_err(|e| e.message)
+        })
     }
 }
 
@@ -574,138 +678,25 @@ pub fn found_text(result: &MemorySearch, agent: &str, repo: &str, text: &str) ->
     lines.join("\n")
 }
 
-/// The `memory.*` endpoints, and what finished rounds teach their profiles.
-pub fn install(hub: &Arc<Hub>, memories: Arc<Memories>) {
-    let s = memories.clone();
-    hub.on_async::<ops::MemoryList, _, _>(move |_, input| {
-        let s = s.clone();
-        async move {
-            Ok(MemoryList {
-                memories: s.listed_async(&input.agent).await.into_iter().map(to_wire).collect(),
-                sources: s.sources(),
-            })
-        }
-    });
-    let s = memories.clone();
-    hub.on_async::<ops::MemoryRecall, _, _>(move |_, input| {
-        let s = s.clone();
-        async move {
-            let lines: Vec<String> = s
-                .recall_async(
-                    &input.agent,
-                    None,
-                    input.repo.as_deref().unwrap_or(""),
-                    input.text.as_deref().unwrap_or(""),
-                    true,
-                )
-                .await
-                .into_iter()
-                .map(|(_, l)| l)
-                .collect();
-            let chars = lines.iter().map(|l| l.encode_utf16().count() as i64 + 1).sum();
-            Ok(RecallPreview {
-                lines,
-                chars,
-                limit: m::RECALL_CHARS as i64,
-            })
-        }
-    });
-    let s = memories.clone();
-    let keys = Arc::new(AsyncRequestKeys::<Memory>::default());
-    hub.on_async::<ops::MemoryCreate, _, _>(move |ctx, input| {
-        let s = s.clone();
-        let keys = keys.clone();
-        let by = match ctx.caller {
-            Caller::Session => By::Session(ctx.client.as_ref().map(|c| c.id.clone()).unwrap_or_default()),
-            Caller::Orchestrator => By::Orchestrator,
-            Caller::User | Caller::Remote => By::User,
-        };
-        async move {
-            keys.once(input.request_key.as_deref(), async move {
-                s.write_async(&Note {
-                    agent: input.agent.clone(),
-                    text: input.text.clone(),
-                    repo: input.repo.clone().unwrap_or_default(),
-                    by,
-                })
-                .await
-            })
-            .await
-        }
-    });
-    let s = memories.clone();
-    hub.on_async::<ops::MemorySearch, _, _>(move |_, input| {
-        let s = s.clone();
-        async move {
-            let agent = input
-                .agent
-                .as_deref()
-                .map(|a| s.agents.profiles.named(a).map(|p| p.id).unwrap_or_else(|| a.to_string()));
-            Ok(s.search_async(
-                agent.as_deref().unwrap_or(""),
-                input.repo.as_deref().unwrap_or(""),
-                input.text.as_deref().unwrap_or(""),
-                0,
-            )
-            .await)
-        }
-    });
-    let s = memories.clone();
-    hub.on_async::<ops::MemoryDelete, _, _>(move |_, input| {
-        let s = s.clone();
-        async move { s.forget_async(&input.agent, &input.memory).await }
-    });
-    let s = memories.clone();
-    hub.on_async::<ops::MemoryPreviewDelete, _, _>(move |_, input| {
-        let s = s.clone();
-        async move { s.preview_forget_async(&input.agent, &input.memory).await }
-    });
-
-    // A round that reported: what it did is kept for its profile on the async bus thread.
-    let s = Arc::downgrade(&memories);
-    let sub = hub.subscribe_transitions("memory", move |_, tr| {
-        let Fact::SessionReported(r) = &tr.fact else { return };
-        let Some(store) = s.upgrade() else { return };
-        let Some(h) = tr.after.sessions.iter().find(|h| h.id == r.id) else { return };
-        if !(h.is_board_worker() || h.is_direct_talker()) {
-            return;
-        }
-        let Some(agent) = h.profile.clone() else { return };
-        let summary = h.last_run.as_ref().map(|l| l.summary.clone()).unwrap_or_default();
-        let outcome = h.last_run.as_ref().map(|l| l.outcome).unwrap_or(Outcome::Completed);
-        let run = FinishedRun {
-            agent,
-            session: h.id.clone(),
-            issue: h.issue_id().map(String::from),
-            repo: h.repo_name().unwrap_or_default().to_string(),
-            brief: h.brief.clone(),
-            outcome,
-            summary,
-        };
-        store.keep(&run);
-    });
-    let prev = memories.sub.lock().replace(sub);
-    drop(prev);
-}
-
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
-    use vibevalley_core::empty_space_state;
-    use vibevalley_protocol::{FactSessionChanged, FactSessionReported, Session};
+    use vibevalley_protocol::{Session, SessionLastRun};
 
     use super::*;
+    use crate::app::live::LiveOverlay;
+    use crate::app::runtime::Runtime;
 
     #[tokio::test]
     async fn session_reported_keeps_issue_worker_and_skips_workspace_sessions() {
         let home = tempfile::tempdir().unwrap();
         let db = ServerDb::open(home.path()).unwrap();
-        let hub = Hub::new(empty_space_state());
+        let runtime = Arc::new(Runtime::new());
+        let live = Arc::new(LiveOverlay::new());
         let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
-        let agents = Agents::open(&hub, home.path(), &[], registry, false).unwrap();
-        let memories = Memories::open(db, agents);
-        install(&hub, memories.clone());
+        let agents = AgentStore::open(&runtime, live, home.path(), &[], registry, false).unwrap();
+        let memories = MemoryStore::open(db.clone(), agents);
+        let outbox = Arc::new(Outbox::new(db.clone()));
+        memories.register_outbox(&outbox);
 
         // Workspace chat session reports: must be skipped cleanly.
         let mut ws = Session::new(
@@ -720,22 +711,15 @@ mod tests {
             1,
         );
         ws.brief = "workspace chat".into();
-        hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: 1, session: ws })]);
-        hub.apply(vec![Fact::SessionReported(FactSessionReported {
-            at: 2,
-            id: "ws1".into(),
-            run: None,
+        ws.last_run = Some(SessionLastRun {
             outcome: Outcome::Completed,
-            phase: None,
+            at: 2,
             summary: "workspace reply".into(),
             runs: 1,
-            spent: None,
-            questions: vec![],
-            checks: vec![],
-            answer: None,
-        })]);
+        });
+        memories.keep_session_reported_async(&ws).await;
 
-        // Issue worker reports: kept directly on the async bus thread.
+        // Issue worker reports: persisted into memory.
         let mut worker = Session::new(
             "w1",
             vibevalley_protocol::SessionController::IssueBoard,
@@ -753,47 +737,30 @@ mod tests {
             refining: None,
         });
         worker.brief = "fix bug".into();
-        hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: 3, session: worker })]);
-        hub.apply(vec![Fact::SessionReported(FactSessionReported {
-            at: 4,
-            id: "w1".into(),
-            run: None,
+        worker.last_run = Some(SessionLastRun {
             outcome: Outcome::Completed,
-            phase: None,
+            at: 4,
             summary: "fixed it".into(),
             runs: 1,
-            spent: None,
-            questions: vec![],
-            checks: vec![],
-            answer: None,
-        })]);
+        });
+        memories.keep_session_reported_async(&worker).await;
 
-        // Memories persists directly to SQLite on the EventBus worker without emitting a follow-up Hub fact.
-        tokio::time::timeout(Duration::from_secs(3), async {
-            let mut tick = tokio::time::interval(Duration::from_millis(2));
-            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-            loop {
-                tick.tick().await;
-                if !memories.list("backend").unwrap().is_empty() {
-                    break;
-                }
-            }
-        })
-        .await
-        .expect("issue memory was not recorded");
-
-        assert!(memories.list("antigravity").unwrap().is_empty(), "workspace session leaked into memory");
-        assert_eq!(memories.list("backend").unwrap().len(), 1);
-        memories.close();
-        hub.close_bus_async().await;
+        assert!(
+            memories.list_async("antigravity").await.unwrap().is_empty(),
+            "workspace session leaked into memory"
+        );
+        assert_eq!(memories.list_async("backend").await.unwrap().len(), 1);
+        runtime.shutdown().await;
+        db.close();
     }
 
     async fn verify_memory_dual_db(db: Arc<ServerDb>, home: &std::path::Path, expected_backend: sea_orm::DatabaseBackend) {
         assert_eq!(db.backend(), expected_backend);
-        let hub = Hub::new(empty_space_state());
+        let runtime = Arc::new(Runtime::new());
+        let live = Arc::new(LiveOverlay::new());
         let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
-        let agents = Agents::open(&hub, home, &[], registry, false).unwrap();
-        let memories = Memories::open(db, agents);
+        let agents = AgentStore::open(&runtime, live, home, &[], registry, false).unwrap();
+        let memories = MemoryStore::open(db, agents);
 
         // Blank note is refused.
         let blank_err = memories
@@ -918,8 +885,7 @@ mod tests {
         let gone = memories.forget_async("backend", &user_note.id).await.unwrap_err();
         assert_eq!(gone.biz_code, BizCode::MemoryNotFound);
 
-        memories.close();
-        hub.close_async().await;
+        runtime.shutdown().await;
     }
 
     #[test]
@@ -929,7 +895,7 @@ mod tests {
         let sqlite_home = tempfile::tempdir().unwrap();
         let sqlite_url = format!("sqlite://{}", sqlite_home.path().join("memory.db").display());
         let sqlite_db = ServerDb::open_url(&sqlite_url).unwrap();
-        block_on(verify_memory_dual_db(sqlite_db.clone(), sqlite_home.path(), sea_orm::DatabaseBackend::Sqlite));
+        vibevalley_runtime::rt::block_on(verify_memory_dual_db(sqlite_db.clone(), sqlite_home.path(), sea_orm::DatabaseBackend::Sqlite));
         sqlite_db.close();
 
         let Some(pg) = crate::db::test_pg::EphemeralPostgres::start() else {
@@ -939,7 +905,7 @@ mod tests {
         pg.create_database("team_memory_dual");
         let pg_home = tempfile::tempdir().unwrap();
         let pg_db = ServerDb::open_url(&pg.db_url("team_memory_dual")).unwrap();
-        block_on(verify_memory_dual_db(pg_db.clone(), pg_home.path(), sea_orm::DatabaseBackend::Postgres));
+        vibevalley_runtime::rt::block_on(verify_memory_dual_db(pg_db.clone(), pg_home.path(), sea_orm::DatabaseBackend::Postgres));
         pg_db.close();
     }
 }

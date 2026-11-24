@@ -1,10 +1,10 @@
-//! What the helpers' profiles remember (routed via `Hub::invoke_async` with zero `team/memory` import).
+//! What the helpers' profiles remember (direct async calls into [`MemoryStore`]).
 
 use serde::Deserialize;
-use vibevalley_protocol::{MemoryCreateInput, MemorySearchInput, ops};
 
 use super::{ToolBox, Who, given};
 use crate::infra::text;
+use crate::team::memory::{By, Note};
 
 #[derive(Deserialize)]
 pub struct Args {
@@ -60,18 +60,7 @@ pub async fn search(f: &ToolBox, who: &Who, a: Args) -> Result<String, String> {
         Ok(s) => s,
         Err(why) => return Ok(text::failed(&why)),
     };
-    let found = f
-        .hub()?
-        .invoke_async::<ops::MemorySearch>(
-            &f.ctx(who),
-            MemorySearchInput {
-                agent: (!agent.is_empty()).then(|| agent.clone()),
-                repo: (!repo.is_empty()).then(|| repo.clone()),
-                text: (!a.text.is_empty()).then(|| a.text.clone()),
-            },
-        )
-        .await
-        .map_err(|e| e.message)?;
+    let found = f.memory.search_async(&agent, &repo, &a.text, 0).await;
     Ok(text::memory_found_text(&found, &agent, &repo, &a.text))
 }
 
@@ -80,17 +69,18 @@ pub async fn create(f: &ToolBox, who: &Who, a: Args) -> Result<String, String> {
         Ok(s) => s,
         Err(why) => return Ok(text::failed(&why)),
     };
+    let by = match who {
+        Who::Helper(me) => By::Session(me.id.clone()),
+        Who::Orchestrator(_) => By::Orchestrator,
+    };
     let m = match f
-        .hub()?
-        .invoke_async::<ops::MemoryCreate>(
-            &f.ctx(who),
-            MemoryCreateInput {
-                agent: agent.clone(),
-                text: a.text,
-                repo: (!repo.is_empty()).then_some(repo),
-                request_key: None,
-            },
-        )
+        .memory
+        .write_async(&Note {
+            agent: agent.clone(),
+            text: a.text,
+            repo,
+            by,
+        })
         .await
     {
         Ok(m) => m,

@@ -1,7 +1,7 @@
 //! Channels and threads.
 
 use serde::Deserialize;
-use vibevalley_protocol::{Actor, AgentRole, ChannelRequest, ChannelUpdateInput, ops};
+use vibevalley_protocol::{Actor, AgentRole, ChannelUpdate};
 
 use super::{ToolBox, Who, given};
 use crate::collab::channel::{AddressedMessage, ReadOptions, Speaking, Spoken};
@@ -144,8 +144,8 @@ pub async fn unread(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String
     Ok(lines.join("\n"))
 }
 
-pub async fn channels(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
-    let list = f.hub()?.invoke_async::<ops::ChannelList>(&f.ctx(who), ()).await.map_err(|e| e.message)?;
+pub async fn channels(f: &ToolBox, _who: &Who, _: Nothing) -> Result<String, String> {
+    let list = f.chat.list_async().await.map_err(|e| e.message)?;
     Ok(list
         .iter()
         .map(|c| {
@@ -168,28 +168,18 @@ pub struct OpenArgs {
     repo: String,
 }
 
-pub async fn open(f: &ToolBox, who: &Who, a: OpenArgs) -> Result<String, String> {
-    let id = f
-        .hub()?
-        .invoke_async::<ops::ChannelCreate>(
-            &f.ctx(who),
-            ChannelRequest {
-                name: a.name.trim().to_string(),
-                description: (!a.description.trim().is_empty()).then(|| a.description.trim().to_string()),
-                repo: (!a.repo.trim().is_empty()).then(|| a.repo.trim().to_string()),
-            },
-        )
+pub async fn open(f: &ToolBox, _who: &Who, a: OpenArgs) -> Result<String, String> {
+    let info = f
+        .chat
+        .open_channel_async(a.name.trim(), a.description.trim(), a.repo.trim())
         .await
         .map_err(|e| e.message)?;
-    let found = f.chat.channels().into_iter().find(|c| c.id == id);
-    let name = found.as_ref().map(|c| c.name.as_str()).unwrap_or(a.name.trim());
-    let repo_val = found.as_ref().map(|c| c.repo.as_str()).unwrap_or(a.repo.trim());
-    let repo = if repo_val.is_empty() {
+    let repo = if info.repo.is_empty() {
         String::new()
     } else {
-        format!("，默认仓库 {repo_val}")
+        format!("，默认仓库 {}", info.repo)
     };
-    Ok(format!("开好了 #{name}{repo}。"))
+    Ok(format!("开好了 #{}{repo}。", info.name))
 }
 
 #[derive(Deserialize)]
@@ -200,21 +190,20 @@ pub struct UpdateArgs {
     repo: Option<String>,
 }
 
-pub async fn update(f: &ToolBox, who: &Who, a: UpdateArgs) -> Result<String, String> {
+pub async fn update(f: &ToolBox, _who: &Who, a: UpdateArgs) -> Result<String, String> {
     let id = a.id.trim();
     let c = f
         .chat
         .channel_by_name(id)
         .or_else(|| f.chat.channels().into_iter().find(|c| c.id == id))
         .ok_or_else(|| format!("没有 {id} 这个频道"))?;
-    f.hub()?
-        .invoke_async::<ops::ChannelUpdate>(
-            &f.ctx(who),
-            ChannelUpdateInput {
-                id: c.id.clone(),
+    f.chat
+        .update_channel_async(
+            &c.id,
+            ChannelUpdate {
+                name: None,
                 description: a.description,
                 repo: a.repo,
-                name: None,
                 category: None,
                 before: None,
                 members: None,

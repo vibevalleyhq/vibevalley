@@ -1,26 +1,30 @@
 //! The farm's ledger (VibeValley `modules/game/game.ts`): every entry the
-//! facts make is kept in `<home>/ledger.jsonl` and folded into the state's
-//! `progress` (`vibevalley_core::progress`). `game.achievement.list`,
-//! `game.title.set`.
-//!
-//! The user's commits are counted now, every two minutes and 15 s after a
-//! session reports (`count`, `refresh`; `Game::count_commits`). Not yet:
-//! the voice entry.
+//! farm events make is kept in `<home>/ledger.jsonl`, folded into `progress`
+//! (`vibevalley_core::progress`), reflected into `LiveOverlay`, and marked
+//! dirty on `SliceProjector`.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
-use vibevalley_core::progress::{Folded, catch_up, entries_for, progress_fold, progress_step};
-use vibevalley_core::{SharedClock, Transition, system_clock};
-use vibevalley_protocol::{Fact, FactProgressChanged, FactProgressChangedStation, LedgerEntry, LedgerEntryTitled, ops};
+use vibevalley_core::progress::{Folded, family_entry, progress_fold, progress_step};
+use vibevalley_core::{SharedClock, SliceMask, system_clock};
+use vibevalley_protocol::{
+    AchievementList, Actor, AgentRole, ApiError, BizCode, ChooseTitleRequest, Doing, Issue, IssueStatus, LedgerEntry, LedgerEntryCalled, LedgerEntryConflicted,
+    LedgerEntryFailed, LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired, LedgerEntryMoment, LedgerEntryReviewed, LedgerEntryTitled, LedgerEntryTold,
+    Outcome, Session, SessionClose,
+};
 
-use crate::Hub;
-use crate::app::hub::event_bus::Subscription;
+use crate::app::live::LiveOverlay;
+use crate::app::outbox::Outbox;
+use crate::app::runtime::Runtime;
+use crate::app::slice::SliceProjector;
+use crate::db::ServerDb;
+use crate::work::repo::RepoStore;
 
 const COUNT_EVERY: std::time::Duration = std::time::Duration::from_secs(120);
 const COUNT_AFTER_RUN: std::time::Duration = std::time::Duration::from_secs(15);
@@ -28,26 +32,19 @@ const COUNT_AFTER_RUN: std::time::Duration = std::time::Duration::from_secs(15);
 /// The next session hired within this long goes to the planted station.
 const WANT_STATION_FOR_MS: i64 = 10_000;
 
-pub struct Game {
+pub struct GameStore {
     file: PathBuf,
-    hub: Weak<Hub>,
+    _db: Arc<ServerDb>,
+    runtime: Arc<Runtime>,
+    live: Arc<LiveOverlay>,
+    projector: Arc<SliceProjector>,
     clock: SharedClock,
     folded: Mutex<Folded>,
     wanted: Mutex<Option<(i64, i64)>>,
     /// Asks the counting task for a count soon.
     soon: Arc<Notify>,
     counter: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
-    sub: Mutex<Option<Subscription>>,
     asked: std::sync::atomic::AtomicU64,
-}
-
-fn session_is_farm_worker(t: &Transition, id: &str) -> bool {
-    t.after
-        .sessions
-        .iter()
-        .chain(&t.before.sessions)
-        .find(|s| s.id == id)
-        .is_some_and(vibevalley_core::status::is_farm_worker)
 }
 
 /// The ledger's entries that still read as a `LedgerEntry`.
@@ -98,95 +95,52 @@ where
     }
 }
 
-impl Game {
-    /// The ledger under `home`, folded into the hub's state; from now on
-    /// each fact's entries are kept.
-    pub fn open(home: &Path, hub: &Arc<Hub>) -> Arc<Game> {
-        Self::open_with_clock(home, hub, system_clock())
+impl GameStore {
+    /// Opens the farm ledger under `home`, folds existing entries into `progress`,
+    /// and seeds `live` without hydrating from SQL via `Hub`.
+    pub fn open(home: &Path, db: Arc<ServerDb>, runtime: Arc<Runtime>, live: Arc<LiveOverlay>, projector: Arc<SliceProjector>) -> Arc<GameStore> {
+        Self::open_with_clock(home, db, runtime, live, projector, system_clock())
     }
 
-    /// Same as [`Game::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
-    pub fn open_with_clock(home: &Path, hub: &Arc<Hub>, clock: SharedClock) -> Arc<Game> {
+    /// Same as [`GameStore::open`], injecting an explicit wall [`SharedClock`](vibevalley_core::SharedClock).
+    pub fn open_with_clock(
+        home: &Path,
+        db: Arc<ServerDb>,
+        runtime: Arc<Runtime>,
+        live: Arc<LiveOverlay>,
+        projector: Arc<SliceProjector>,
+        clock: SharedClock,
+    ) -> Arc<GameStore> {
         let file = home.join("ledger.jsonl");
         let folded = progress_fold(&read_ledger(&file));
-        hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
-            at: clock.now_ms(),
-            progress: Some(folded.progress.clone()),
-            news: None,
-            commits: None,
-            station: None,
-        })]);
-        let game = Arc::new(Game {
+        live.set_progress(Some(folded.progress.clone()));
+        projector.mark_dirty(SliceMask::FARM);
+        Arc::new(GameStore {
             file,
-            hub: Arc::downgrade(hub),
+            _db: db,
+            runtime,
+            live,
+            projector,
             clock,
             folded: Mutex::new(folded),
             wanted: Mutex::new(None),
             soon: Arc::new(Notify::new()),
             counter: Mutex::new(None),
-            sub: Mutex::new(None),
-            asked: Default::default(),
-        });
-        for e in hub.read(catch_up) {
-            game.record(e);
-        }
-        let g = Arc::downgrade(&game);
-        let sub = hub.subscribe_transitions("game", move |hub, t| {
-            let Some(game) = g.upgrade() else { return };
-            game.on_transition(hub, t);
-        });
-        let prev = game.sub.lock().replace(sub);
-        drop(prev);
-        game
+            asked: std::sync::atomic::AtomicU64::new(0),
+        })
     }
 
-    fn on_transition(&self, hub: &Arc<Hub>, t: &Transition) {
-        match &t.fact {
-            Fact::ProgressChanged(f) if f.commits.is_none() && f.station.is_none() => return,
-            Fact::SessionChanged(f) if !vibevalley_core::status::is_farm_worker(&f.session) => return,
-            Fact::SessionReported(f) if !session_is_farm_worker(t, &f.id) => return,
-            Fact::SessionPhaseChanged(f) if !session_is_farm_worker(t, &f.id) => return,
-            Fact::SessionLeft(f) if !session_is_farm_worker(t, &f.id) => return,
-            _ => {}
-        }
-        if let Fact::SessionChanged(f) = &t.fact
-            && vibevalley_core::status::is_hired(&f.session)
-        {
-            let wish = self.wanted.lock().take();
-            if let Some((station, until)) = wish
-                && until > f.at
-            {
-                hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
-                    at: self.clock.now_ms(),
-                    progress: None,
-                    news: None,
-                    commits: None,
-                    station: Some(FactProgressChangedStation {
-                        id: f.session.id.clone(),
-                        station,
-                    }),
-                })]);
-            }
-        }
-        if matches!(t.fact, Fact::SessionReported(_)) {
-            self.count_soon();
-        }
-        for e in entries_for(&t.before, &t.fact, &t.after) {
-            self.record(e);
-        }
+    pub fn progress(&self) -> vibevalley_protocol::Progress {
+        self.folded.lock().progress.clone()
     }
 
-    /// `boot`'s counting: the user's commits under the repos counted now,
-    /// every two minutes, and once 15 s after runs report (several runs
-    /// share one count). One task counts, so an older count never lands
-    /// after a newer one.
-    pub fn count_commits(self: &Arc<Game>, repos: Arc<crate::work::repo::Repos>, git_emails: Vec<String>) {
-        let Some(hub) = self.hub.upgrade() else { return };
-        let cancel = hub.child_token();
+    /// Starts the background commit counter loop for the configured repositories.
+    pub fn count_commits(self: &Arc<Self>, repos: Arc<RepoStore>, git_emails: Vec<String>) {
+        let cancel = self.runtime.child_token();
         let task_cancel = cancel.clone();
         let soon = self.soon.clone();
         let g = Arc::downgrade(self);
-        let handle = hub.spawn_task(run_commit_counter_loop(soon, task_cancel, move || {
+        let handle = self.runtime.spawn(run_commit_counter_loop(soon, task_cancel, move || {
             let g = g.clone();
             let repos = repos.clone();
             let emails = git_emails.clone();
@@ -201,8 +155,6 @@ impl Game {
     }
 
     pub async fn close_async(&self) {
-        let prev = self.sub.lock().take();
-        drop(prev);
         let counter = self.counter.lock().take();
         if let Some((cancel, handle)) = counter {
             cancel.cancel();
@@ -210,24 +162,25 @@ impl Game {
         }
     }
 
-    /// `setCommits`.
+    /// Updates live commit totals, pushes level-up farm effects, and marks `BOARD | FARM` dirty.
     pub fn set_commits(&self, repos: &[vibevalley_protocol::Repo]) {
-        let Some(hub) = self.hub.upgrade() else { return };
         let total = repos.iter().map(|r| r.commits).sum();
         let next = vibevalley_protocol::CommitCount { total, repos: repos.to_vec() };
-        if hub.read(|s| match &s.commits {
+        let prev = self.live.commits_snapshot();
+        let unchanged = match &prev {
             None => repos.is_empty(),
-            Some(prev) => prev == &next,
-        }) {
+            Some(prev_commits) => prev_commits == &next,
+        };
+        if unchanged {
             return;
         }
-        hub.apply(vec![Fact::ProgressChanged(FactProgressChanged {
-            at: self.clock.now_ms(),
-            progress: None,
-            news: None,
-            commits: Some(next),
-            station: None,
-        })]);
+        let prev_total = prev.as_ref().map(|c| c.total);
+        self.live.set_commits(Some(next.clone()));
+        let effects = vibevalley_core::game::progress_effects(prev_total, None, None, Some(&next));
+        if !effects.is_empty() {
+            self.live.push_farm_effects(effects);
+        }
+        self.projector.mark_dirty(SliceMask::BOARD | SliceMask::FARM);
     }
 
     /// How many runs' ends asked for a count.
@@ -240,13 +193,13 @@ impl Game {
         self.soon.notify_one();
     }
 
-    /// Keeps one entry (stamped now) and folds it in; one that is not kept
-    /// is left out, and the farm goes on.
+    /// Appends one ledger entry, folds it into `progress`, updates `LiveOverlay`,
+    /// pushes progress burst effects, and marks `SliceMask::FARM` dirty.
     pub fn record(&self, entry: LedgerEntry) {
         let at = self.clock.now_ms();
         let entry = entry.with_at(at);
         let Ok(line) = serde_json::to_string(&entry) else { return };
-        let fact = {
+        let (progress, news) = {
             let mut folded = self.folded.lock();
             let kept = std::fs::OpenOptions::new()
                 .create(true)
@@ -257,25 +210,165 @@ impl Game {
                 return;
             }
             let (next, news) = progress_step(&folded, &entry);
-            let told = news.coins.unwrap_or(0) != 0 || !news.unlocked.is_empty();
             let progress = next.progress.clone();
             *folded = next;
-            Fact::ProgressChanged(FactProgressChanged {
-                at,
-                progress: Some(progress),
-                news: told.then_some(news),
-                commits: None,
-                station: None,
-            })
+            (progress, news)
         };
-        if let Some(hub) = self.hub.upgrade() {
-            hub.apply(vec![fact]);
+        self.live.set_progress(Some(progress.clone()));
+        let told = news.coins.unwrap_or(0) != 0 || !news.unlocked.is_empty();
+        let effects = vibevalley_core::game::progress_effects(None, told.then_some(&news), Some(&progress), None);
+        if !effects.is_empty() {
+            self.live.push_farm_effects(effects);
         }
+        self.projector.mark_dirty(SliceMask::FARM);
+    }
+
+    /// Records a newly hired session on the farm, assigning its station (honouring
+    /// any active `want` window) and appending `LedgerEntry::Hired`.
+    pub fn on_session_hired(&self, session: &Session, other_sessions: &[&Session]) {
+        if !vibevalley_core::status::is_hired(session) {
+            return;
+        }
+        let now_ms = self.clock.now_ms();
+        let prefer = self.wanted.lock().take().and_then(|(station, until)| (until > now_ms).then_some(station));
+        self.live.ensure_play_station(session, other_sessions, prefer);
+        self.record(LedgerEntry::Hired(LedgerEntryHired {
+            at: 0,
+            session: session.id.clone(),
+            agent: session.profile.clone().filter(|a| !a.is_empty()),
+        }));
+    }
+
+    /// Records live farm working telemetry for an active farm worker session.
+    pub fn on_session_working(&self, session: &Session, was_working: bool, doing: &Doing) {
+        if !vibevalley_core::status::is_farm_worker(session) {
+            return;
+        }
+        self.live.record_play_working(&session.id, self.clock.now_ms(), was_working, doing);
+        self.projector.mark_dirty(SliceMask::FARM);
+    }
+
+    /// Reacts to a finished worker round: debounces commit counting, records
+    /// `LedgerEntry::Failed` + penalty effect when a hired worker fails, and
+    /// marks `SliceMask::FARM` dirty.
+    pub fn on_session_reported(&self, session: &Session, outcome: Outcome) {
+        if !vibevalley_core::status::is_farm_worker(session) {
+            return;
+        }
+        self.count_soon();
+        if vibevalley_core::status::is_hired(session) {
+            if let Some(penalty) = vibevalley_core::game::session_failed_penalty(session, outcome) {
+                self.live.push_farm_effect(penalty);
+            }
+            if outcome == Outcome::Failed {
+                self.record(LedgerEntry::Failed(LedgerEntryFailed {
+                    at: 0,
+                    session: session.id.clone(),
+                    agent: session.profile.clone().filter(|a| !a.is_empty()),
+                }));
+                return;
+            }
+        }
+        self.projector.mark_dirty(SliceMask::FARM);
+    }
+
+    /// Cleans up a departed session's station and records `LedgerEntry::Harvested`
+    /// when a hired worker merged commits.
+    pub fn on_session_left(&self, session: &Session, closed: Option<SessionClose>, merged_commits: Option<i64>) {
+        if !vibevalley_core::status::is_farm_worker(session) {
+            return;
+        }
+        self.live.remove_play(&session.id);
+        if vibevalley_core::status::is_hired(session)
+            && closed == Some(SessionClose::Merged)
+            && let Some(commits) = merged_commits.filter(|m| *m > 0)
+        {
+            self.record(LedgerEntry::Harvested(LedgerEntryHarvested {
+                at: 0,
+                session: session.id.clone(),
+                agent: session.profile.clone().filter(|a| !a.is_empty()),
+                repo: session.repo_name().unwrap_or_default().to_string(),
+                runtime: session.runtime.clone(),
+                commits,
+                cny: session.spent.as_ref().and_then(|s| s.cny),
+                runs: session.runs,
+            }));
+            return;
+        }
+        self.projector.mark_dirty(SliceMask::FARM);
+    }
+
+    pub fn on_call_live(&self) {
+        self.record(LedgerEntry::Opened(LedgerEntryMoment { at: 0 }));
+    }
+
+    pub fn on_issue_conflicted(&self, session_id: impl Into<String>) {
+        self.record(LedgerEntry::Conflicted(LedgerEntryConflicted {
+            at: 0,
+            session: session_id.into(),
+        }));
+    }
+
+    pub fn on_issue_split(&self) {
+        self.record(LedgerEntry::Split(LedgerEntryMoment { at: 0 }));
+    }
+
+    pub fn on_family_done(&self, parent_id: &str, children: &[&Issue]) {
+        self.record(family_entry(parent_id, children));
+    }
+
+    /// Records ledger entries produced by user/worker channel messages (told/called/handoff).
+    pub fn on_message_posted(&self, actor: &Actor, thread_worker_session_id: Option<&str>, mentioned_session_ids: &[String], has_answers: bool) {
+        if matches!(actor, Actor::User { .. }) {
+            if let Some(session_id) = thread_worker_session_id {
+                self.record(LedgerEntry::Told(LedgerEntryTold {
+                    at: 0,
+                    session: session_id.to_string(),
+                }));
+            }
+            for session_id in mentioned_session_ids {
+                self.record(LedgerEntry::Called(LedgerEntryCalled {
+                    at: 0,
+                    session: session_id.clone(),
+                }));
+            }
+        } else if vibevalley_core::rules::actor_role_of(actor) == Some(AgentRole::Worker) && has_answers {
+            self.record(LedgerEntry::Handoff(LedgerEntryHandoff {
+                at: 0,
+                session: match actor {
+                    Actor::Agent { id, .. } => id.clone(),
+                    _ => String::new(),
+                },
+            }));
+        }
+    }
+
+    /// Registers `game.session_reported` on the durable [`Outbox`] so committed
+    /// session reports also drive farm effects asynchronously if dispatched via outbox.
+    pub(crate) fn register_outbox(self: &Arc<Self>, outbox: &Outbox) {
+        #[derive(serde::Deserialize)]
+        struct ReportedPayload {
+            session: Session,
+            outcome: Outcome,
+        }
+        let game = Arc::downgrade(self);
+        outbox.register("game.session_reported", move |delivery| {
+            let game = game.clone();
+            async move {
+                let Some(game) = game.upgrade() else {
+                    return Ok::<(), String>(());
+                };
+                if let Ok(payload) = serde_json::from_value::<ReportedPayload>(delivery.payload) {
+                    game.on_session_reported(&payload.session, payload.outcome);
+                }
+                Ok(())
+            }
+        });
     }
 
     /// Records that the user inspected a live session's diff.
     pub fn reviewed(&self, session: impl Into<String>) {
-        self.record(LedgerEntry::Reviewed(vibevalley_protocol::LedgerEntryReviewed {
+        self.record(LedgerEntry::Reviewed(LedgerEntryReviewed {
             at: 0,
             session: session.into(),
         }));
@@ -294,63 +387,35 @@ impl Game {
     pub fn want(&self, station: i64) {
         *self.wanted.lock() = Some((station, self.clock.now_ms() + WANT_STATION_FOR_MS));
     }
-}
 
-pub fn install(hub: &Hub, game: Arc<Game>) {
-    hub.on::<ops::GameAchievementList>(|ctx, ()| {
+    pub(crate) async fn achievements_async(&self) -> Result<AchievementList, ApiError> {
         let items = vibevalley_core::game::achievements()
             .iter()
             .map(vibevalley_core::game::achievement_in_words)
             .collect();
-        let standings = ctx.hub.read(|s| vibevalley_core::game::standings_of(s.progress.as_ref()));
-        Ok(vibevalley_protocol::AchievementList { items, standings })
-    });
-    hub.on_async::<ops::GameTitleSet, _, _>(move |_, req| {
-        let game = game.clone();
-        async move {
-            crate::spawn_blocking_traced(move || game.choose_title(req.achievement, req.tier))
-                .await
-                .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?;
-            Ok(())
-        }
-    });
+        let progress = self.progress();
+        let standings = vibevalley_core::game::standings_of(Some(&progress));
+        Ok(AchievementList { items, standings })
+    }
+
+    pub(crate) async fn set_title_async(self: &Arc<Self>, req: ChooseTitleRequest) -> Result<(), ApiError> {
+        let game = self.clone();
+        self.runtime
+            .spawn_blocking(move || game.choose_title(req.achievement, req.tier))
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::{Duration, Instant};
 
-    use vibevalley_core::{ManualClock, empty_space_state};
-    use vibevalley_protocol::{
-        ContextRef, Doing, ExecutionPolicy, FactSessionChanged, FactSessionPhaseChanged, FactSessionReported, LedgerEntryHarvested, Outcome, Phase,
-        PhaseWorking, Session, SessionAction, SessionController, SessionPermissionMode,
-    };
+    use vibevalley_core::ManualClock;
+    use vibevalley_protocol::{ContextRef, ExecutionPolicy, Phase, PhaseWorking, SessionAction, SessionController, SessionPermissionMode};
 
     use super::*;
-    use crate::now;
-
-    async fn until_async<T>(hub: &Hub, what: &str, mut f: impl FnMut() -> Option<T>) -> T {
-        let notify = Arc::new(Notify::new());
-        let wake = notify.clone();
-        let sub = hub.subscribe_transitions("test-game-wait", move |_, _| {
-            wake.notify_one();
-        });
-        let res = tokio::time::timeout(Duration::from_secs(3), async {
-            loop {
-                let notified = notify.notified();
-                tokio::pin!(notified);
-                notified.as_mut().enable();
-                if let Some(v) = f() {
-                    return v;
-                }
-                notified.await;
-            }
-        })
-        .await
-        .ok();
-        sub.close_async().await;
-        res.unwrap_or_else(|| panic!("timed out waiting for {what}"))
-    }
 
     fn working_phase(since: i64) -> Phase {
         Phase::Working(PhaseWorking {
@@ -383,7 +448,7 @@ mod tests {
         s
     }
 
-    fn issue_worker(id: &str, issue: &str, working: bool) -> Session {
+    fn issue_worker(id: &str, issue: &str, working: bool, at: i64) -> Session {
         let mut s = Session::new(
             id,
             SessionController::IssueBoard,
@@ -393,7 +458,7 @@ mod tests {
                 repo: "demo".into(),
                 branch: None,
             },
-            1,
+            at,
         );
         s.profile = Some("backend".into());
         s.attach_binding(ContextRef::Issue {
@@ -401,7 +466,7 @@ mod tests {
             refining: None,
         });
         if working {
-            s.phase = working_phase(1);
+            s.phase = working_phase(at);
         }
         s
     }
@@ -409,8 +474,11 @@ mod tests {
     #[tokio::test]
     async fn workspace_sessions_are_filtered_from_station_agents_streak_and_full_house() {
         let home = tempfile::tempdir().unwrap();
-        let hub = Hub::new(empty_space_state());
-        let game = Game::open(home.path(), &hub);
+        let db = ServerDb::open(home.path()).unwrap();
+        let runtime = Arc::new(Runtime::new());
+        let live = Arc::new(LiveOverlay::new());
+        let projector = Arc::new(SliceProjector::new());
+        let game = GameStore::open(home.path(), db.clone(), runtime.clone(), live.clone(), projector.clone());
 
         // Seed an active streak and a planted station wish.
         game.record(LedgerEntry::Harvested(LedgerEntryHarvested {
@@ -426,47 +494,24 @@ mod tests {
         game.want(4);
 
         // Open 6 working workspace sessions and fail one of them.
+        let mut ws_list = Vec::new();
         for i in 1..=6 {
             let ws = workspace_session(&format!("ws{i}"), true);
-            hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: now(), session: ws })]);
+            game.on_session_hired(&ws, &[]);
+            game.on_session_working(&ws, false, &Doing::default());
+            ws_list.push(ws);
         }
-        hub.apply(vec![Fact::SessionReported(FactSessionReported {
-            at: now(),
-            id: "ws1".into(),
-            run: None,
-            outcome: Outcome::Failed,
-            phase: None,
-            summary: "failed workspace chat".into(),
-            runs: 1,
-            spent: None,
-            questions: vec![],
-            checks: vec![],
-            answer: None,
-        })]);
+        game.on_session_reported(&ws_list[0], Outcome::Failed);
 
-        // Now hire a real issue worker and move it to Working so we have a causal barrier on the bus.
-        let real = issue_worker("w1", "i1", false);
-        hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: now(), session: real })]);
-        hub.apply(vec![Fact::SessionPhaseChanged(FactSessionPhaseChanged {
-            at: now(),
-            id: "w1".into(),
-            phase: working_phase(now()),
-            channel: None,
-            spent: None,
-            brief: None,
-        })]);
+        // Now hire a real issue worker and move it to Working.
+        let real = issue_worker("w1", "i1", false, 10);
+        let others: Vec<&Session> = ws_list.iter().collect();
+        game.on_session_hired(&real, &others);
+        game.on_session_working(&real, false, &Doing::default());
 
-        // The real worker claims the planted station (ws1..ws6 did NOT steal it) and tallies `backend`.
-        until_async(&hub, "real worker station & tally", || {
-            hub.read(|s| {
-                let station_ok = s.plays.as_ref().and_then(|p| p.get("w1")).map(|p| p.station) == Some(4);
-                let hired_ok = s.progress.as_ref().and_then(|p| p.agents.get("backend")).is_some_and(|t| t.hired == 1);
-                (station_ok && hired_ok).then_some(())
-            })
-        })
-        .await;
-
-        let progress = hub.read(|s| s.progress.clone().unwrap());
+        assert_eq!(live.plays_snapshot().get("w1").map(|p| p.station), Some(4));
+        let progress = game.progress();
+        assert_eq!(progress.agents.get("backend").map(|t| t.hired), Some(1));
         assert!(
             !progress.agents.contains_key("antigravity"),
             "workspace session leaked into agents: {:?}",
@@ -476,30 +521,18 @@ mod tests {
         assert_eq!(progress.counts.get("full_house"), None, "workspace sessions triggered FULL_HOUSE");
         assert_eq!(game.asked(), 0, "workspace report triggered commit count");
 
-        // A real worker failure DOES reset streak, tally failed, and bump asked().
-        hub.apply(vec![Fact::SessionReported(FactSessionReported {
-            at: now(),
-            id: "w1".into(),
-            run: None,
-            outcome: Outcome::Failed,
-            phase: None,
-            summary: "failed issue".into(),
-            runs: 1,
-            spent: None,
-            questions: vec![],
-            checks: vec![],
-            answer: None,
-        })]);
-        until_async(&hub, "real worker failure resets streak", || {
-            hub.read(|s| {
-                let p = s.progress.as_ref()?;
-                (p.streak == 0 && p.agents.get("backend").is_some_and(|t| t.failed == 1) && game.asked() == 1).then_some(())
-            })
-        })
-        .await;
+        // A real worker failure DOES reset streak, tally failed, bump asked(), and emit a penalty effect.
+        let effects_before = live.farm_effect_seq();
+        game.on_session_reported(&real, Outcome::Failed);
+        let progress = game.progress();
+        assert_eq!(progress.streak, 0);
+        assert_eq!(progress.agents.get("backend").map(|t| t.failed), Some(1));
+        assert_eq!(game.asked(), 1);
+        assert!(!live.drain_farm_effects(effects_before).is_empty());
 
         game.close_async().await;
-        hub.close_bus_async().await;
+        runtime.shutdown().await;
+        db.close();
     }
 
     #[tokio::test(start_paused = true)]
@@ -566,55 +599,34 @@ mod tests {
     #[tokio::test]
     async fn want_station_window_uses_injected_clock_without_sleeping() {
         let home = tempfile::tempdir().unwrap();
-        let hub = Hub::new(empty_space_state());
+        let db = ServerDb::open(home.path()).unwrap();
+        let runtime = Arc::new(Runtime::new());
+        let live = Arc::new(LiveOverlay::new());
+        let projector = Arc::new(SliceProjector::new());
         let clock = Arc::new(ManualClock::new(1_700_000_000_000));
-        let game = Game::open_with_clock(home.path(), &hub, clock.clone());
+        let game = GameStore::open_with_clock(home.path(), db.clone(), runtime.clone(), live.clone(), projector.clone(), clock.clone());
 
         // Plant a station wish at t0, advance 9_999ms (still within WANT_STATION_FOR_MS = 10_000ms).
         game.want(4);
         let at_inside = clock.advance(Duration::from_millis((WANT_STATION_FOR_MS - 1) as u64));
-        hub.apply(vec![Fact::SessionChanged(FactSessionChanged {
-            at: at_inside,
-            session: issue_worker("w-in", "i1", false),
-        })]);
-        until_async(&hub, "station claimed inside window", || {
-            hub.read(|s| (s.plays.as_ref().and_then(|p| p.get("w-in")).map(|p| p.station) == Some(4)).then_some(()))
-        })
-        .await;
+        let w_in = issue_worker("w-in", "i1", false, at_inside);
+        game.on_session_hired(&w_in, &[]);
+        assert_eq!(live.plays_snapshot().get("w-in").map(|p| p.station), Some(4));
 
         // Plant another wish and advance past WANT_STATION_FOR_MS; the wish must expire without assigning station 5.
         game.want(5);
         let at_expired = clock.advance(Duration::from_millis(WANT_STATION_FOR_MS as u64));
-        hub.apply(vec![Fact::SessionChanged(FactSessionChanged {
-            at: at_expired,
-            session: issue_worker("w-out", "i2", false),
-        })]);
-        // Send a phase change as causal barrier so we know the game transition handler processed w-out.
-        hub.apply(vec![Fact::SessionPhaseChanged(FactSessionPhaseChanged {
-            at: at_expired,
-            id: "w-out".into(),
-            phase: working_phase(at_expired),
-            channel: None,
-            spent: None,
-            brief: None,
-        })]);
-        until_async(&hub, "second worker hired tally processed", || {
-            hub.read(|s| {
-                s.progress
-                    .as_ref()
-                    .and_then(|p| p.agents.get("backend"))
-                    .is_some_and(|t| t.hired == 2)
-                    .then_some(())
-            })
-        })
-        .await;
+        let w_out = issue_worker("w-out", "i2", false, at_expired);
+        game.on_session_hired(&w_out, &[&w_in]);
+        assert_eq!(game.progress().agents.get("backend").map(|t| t.hired), Some(2));
         assert_ne!(
-            hub.read(|s| s.plays.as_ref().and_then(|p| p.get("w-out")).map(|p| p.station)),
+            live.plays_snapshot().get("w-out").map(|p| p.station),
             Some(5),
             "expired station wish must not be applied"
         );
 
         game.close_async().await;
-        hub.close_bus_async().await;
+        runtime.shutdown().await;
+        db.close();
     }
 }
