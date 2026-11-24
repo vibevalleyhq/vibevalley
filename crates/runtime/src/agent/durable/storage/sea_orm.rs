@@ -32,10 +32,6 @@ impl<'a> DbTx<'a> {
     pub fn inner(&self) -> &'a DatabaseTransaction {
         self.0
     }
-
-    pub fn query<T>(&self, f: impl AsyncFnOnce(&'a DatabaseTransaction) -> std::result::Result<T, sea_orm::DbErr>) -> std::result::Result<T, sea_orm::DbErr> {
-        block_on(f(self.0))
-    }
 }
 
 struct SeaOrmInner {
@@ -303,7 +299,7 @@ impl StorageBackend for SeaOrmStorage {
         let outcome = {
             let view = SeaOrmTx(&txn);
             let db_tx = DbTx::new(&txn);
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&view, &view, None, Some(&db_tx), now)))
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&view, &view, Some(&db_tx), now)))
         };
 
         match outcome {

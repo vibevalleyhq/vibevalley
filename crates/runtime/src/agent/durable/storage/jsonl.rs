@@ -432,7 +432,7 @@ impl StorageBackend for JsonlStorage {
         self.0.hub.record_request();
         let now = self.0.hub.now_ms();
         let staging = MemoryTx::new(&mut state.mem, true);
-        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&staging, &staging, None, None, now)));
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&staging, &staging, None, now)));
         match outcome {
             Ok(Ok(write_outcome)) => {
                 let (ops, undo) = staging.into_parts();

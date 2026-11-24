@@ -1,5 +1,5 @@
-//! Cross-backend storage conformance tests for `SqliteStorage`, `MemoryStorage`,
-//! `JsonlStorage` (including crash repair, torn lines, read-only snapshots,
+//! Cross-backend storage conformance tests for `SeaOrmStorage` (SQLite + PostgreSQL),
+//! `MemoryStorage`, `JsonlStorage` (including crash repair, torn lines, read-only snapshots,
 //! and full agent harness workflows), and custom external backends.
 
 use std::collections::VecDeque;
@@ -15,8 +15,7 @@ use vibevalley_runtime::agent::core::engine::{BrainProvider, KIND as GENERATION_
 use vibevalley_runtime::agent::core::tool::{Tool, ToolOutput};
 use vibevalley_runtime::agent::durable::conformance::{run_reopen_conformance, run_storage_conformance};
 use vibevalley_runtime::agent::durable::{
-    CommitStats, DocumentEvent, JsonlOptions, MemoryStorage, Result as DurableResult, SeaOrmStorage, SqliteStorage, StorageBackend, StorageRead, Store,
-    TaskStatus, WriteCallback,
+    CommitStats, DocumentEvent, JsonlOptions, MemoryStorage, Result as DurableResult, StorageBackend, StorageRead, Store, TaskStatus, WriteCallback,
 };
 use vibevalley_runtime::agent::experiments::ExperimentFlags;
 use vibevalley_runtime::agent::extensions::OarPolicy;
@@ -31,25 +30,15 @@ use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime, Step};
 const WAIT: Duration = Duration::from_secs(10);
 
 #[test]
-fn sqlite_storage_passes_conformance() -> DurableResult<()> {
-    run_storage_conformance(|| Ok(Store::from_backend(Arc::new(SqliteStorage::memory()?))))?;
-    let dir = tempdir().unwrap();
-    let db = dir.path().join("server.db");
-    run_reopen_conformance(|| Store::open(&db))?;
-    Ok(())
-}
-
-#[test]
 fn sea_orm_sqlite_storage_passes_conformance() -> DurableResult<()> {
-    run_storage_conformance(|| Ok(Store::from_backend(Arc::new(SeaOrmStorage::sqlite_memory()?))))?;
+    run_storage_conformance(Store::sqlite_memory)?;
     let dir = tempdir().unwrap();
     let db = dir.path().join("seaorm.db");
-    run_reopen_conformance(|| Ok(Store::from_backend(Arc::new(SeaOrmStorage::open_sqlite(&db)?))))?;
+    run_reopen_conformance(|| Store::open(&db))?;
 
     // Verify Tx::transaction() / Tx::db_tx() runs in the same atomic transaction on SeaOrmStorage.
-    let store = Store::from_backend(Arc::new(SeaOrmStorage::open_sqlite(&db)?));
+    let store = Store::open(&db)?;
     let res: DurableResult<()> = store.write(|tx| {
-        assert!(tx.sqlite_connection().is_none());
         let db_tx = tx.transaction();
         assert_eq!(db_tx.get_database_backend(), sea_orm::DbBackend::Sqlite);
         tx.put_document("global", "seaorm-tx", "pi.aborted", &json!({"ok": false}))?;
@@ -187,7 +176,6 @@ fn sea_orm_postgres_storage_passes_conformance() -> DurableResult<()> {
     // Verify Tx::transaction() executes inside the same PostgreSQL transaction as durable ops.
     let store = Store::connect(&reopen_url)?;
     let err: DurableResult<()> = store.write(|tx| {
-        assert!(tx.sqlite_connection().is_none());
         let db_tx = tx.transaction();
         assert_eq!(db_tx.get_database_backend(), sea_orm::DbBackend::Postgres);
         tx.put_document("global", "pg-tx", "pi.aborted", &json!({"ok": false}))?;

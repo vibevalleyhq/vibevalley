@@ -82,7 +82,7 @@ const RULES: readonly Rule[] = [
     name: "fact for something that is not a fact of the core state",
     pattern:
       /\b(RuntimeFacts|runtimeFacts|FactsCard|ChannelRouteFact|RowFacts|rowFacts|SideEvent\w*|eventFacts|FactContext|unknownFacts|ServerEventStep|ServerEventNotice|ServerEventRuntime|TriggerKind|TriggerKindValues)\b/u,
-    says: "a fact is only a change to the core state: RuntimeSupport (runtimeSupport, supportOf), ChannelRouteInput, RowKeys, ServerEvent (Fact | ServerEventSnapshot | LiveEvent), reactionTo and ReactionContext (session/reaction.ts)",
+    says: "a fact is only a change to the core state: RuntimeSupport (runtimeSupport, supportOf), ChannelRouteInput, RowKeys, Fact | LiveEvent, reactionTo and ReactionContext (session/reaction.ts)",
   },
   {
     name: "a toggle, now an explicit set",
@@ -158,7 +158,7 @@ const RULES: readonly Rule[] = [
     // The browser's Worker (new Worker, a value typed : Worker) is not the old name.
     pattern:
       /\b(FarmState|SiteFrame|SiteEvent|AgentProfile|WorkStep|ActionStep\w*|CanMerge|Foreman|(?<!new |: |typeof |Object\.defineProperty\(window, ")Worker)\b/u,
-    says: "SpaceState, SliceBundle / *Slice, ServerEvent, Agent, Activity, PlayAction (a session play's history), canHarvest, Orchestrator, Session; a Web Worker stays (new Worker)",
+    says: "SpaceState, SliceBundle / *Slice, Fact, LiveEvent, Agent, Activity, PlayAction (a session play's history), canHarvest, Orchestrator, Session; a Web Worker stays (new Worker)",
   },
   {
     name: "the old helper agent role",

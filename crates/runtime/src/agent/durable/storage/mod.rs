@@ -5,16 +5,14 @@ pub mod live;
 pub mod memory;
 mod ops;
 pub mod sea_orm;
-pub mod sqlite;
 
 pub use jsonl::{JsonlOptions, JsonlStorage};
 pub use memory::MemoryStorage;
 pub use sea_orm::{DbTx, SeaOrmStorage};
-pub use sqlite::SqliteStorage;
 
 use serde_json::Value;
 
-use super::{CommitStats, Conversation, Document, DocumentEvent, Entry, Result, Signal, Sqlite, Submission, SubmissionStatus, Task, TaskStatus};
+use super::{CommitStats, Conversation, Document, DocumentEvent, Entry, Result, Signal, Submission, SubmissionStatus, Task, TaskStatus};
 
 #[derive(Debug, Default, Clone)]
 pub struct WriteOutcome {
@@ -71,8 +69,7 @@ pub trait StorageWrite: StorageRead {
     fn consume_first_signal(&self, task_id: &str, name: &str, now_ms: i64) -> Result<Option<Signal>>;
 }
 
-pub type WriteCallback<'a> =
-    dyn for<'tx> FnMut(&'tx dyn StorageRead, &'tx dyn StorageWrite, Option<&'tx Sqlite<'tx>>, Option<&'tx DbTx<'tx>>, i64) -> Result<WriteOutcome> + 'a;
+pub type WriteCallback<'a> = dyn for<'tx> FnMut(&'tx dyn StorageRead, &'tx dyn StorageWrite, Option<&'tx DbTx<'tx>>, i64) -> Result<WriteOutcome> + 'a;
 
 /// Pluggable backend implementing ACID transactions and pub/sub hints.
 pub trait StorageBackend: Send + Sync {

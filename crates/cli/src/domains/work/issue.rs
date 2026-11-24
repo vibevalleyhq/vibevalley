@@ -507,7 +507,7 @@ fn wait_for_issue(client: &Client, issue: &Issue, timeout: Option<i64>) -> Done 
             serde_json::json!({ "issue": issue.number, "status": now.status, "stage": now.stage.state })
         );
         let settled = matches!(now.status, IssueStatus::InReview | IssueStatus::Done | IssueStatus::Canceled);
-        Ok(!(settled || vibevalley_core::rules::stage_wants_user(now.stage.state)))
+        Ok(!(settled || now.stage.state.wants_user()))
     });
     match res {
         Err(f) if f.tag == "Timeout" => Err(Failure::new(

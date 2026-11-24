@@ -456,8 +456,10 @@ fn regression_domain_write_and_settlement_share_the_outer_commit() -> Result<()>
     let events = store.subscribe_documents()?;
     let settle = || {
         store.write(|tx| {
-            tx.connection()
-                .query(async |db| sqlx::query("INSERT INTO domain_result VALUES ('run')").execute(db).await.map(|_| ()))?;
+            vibevalley_runtime::rt::block_on(sea_orm::ConnectionTrait::execute_unprepared(
+                tx.transaction(),
+                "INSERT INTO domain_result VALUES ('run')",
+            ))?;
             tx.settle(&submission.id, SubmissionStatus::Done, &json!("delivered"))?;
             tx.put_document("run", "run", "issue.report", &json!("report"))?;
             Ok(())

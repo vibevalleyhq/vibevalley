@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use vibevalley_core::rules::{session_ids_of, stage_wants_user};
+use vibevalley_core::rules::session_ids_of;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, BizCode, Issue, IssueStageKind, IssueWatch, LiveEvent, Session, SessionId, SessionWatchEvent, SliceKind, ops, subscriptions,
@@ -431,7 +431,7 @@ async fn watch_issue(
                 let all = session_ids_of(&issue);
                 let total = all.len();
                 let selected = last(all);
-                let settled = stage_wants_user(issue.stage.state) || matches!(issue.stage.state, IssueStageKind::Done | IssueStageKind::Canceled);
+                let settled = issue.stage.state.wants_user() || matches!(issue.stage.state, IssueStageKind::Done | IssueStageKind::Canceled);
                 let state = IssueWatch::State {
                     sessions: sessions.iter().filter(|s| selected.contains(&s.id)).cloned().collect(),
                     session_ids: selected.clone(),

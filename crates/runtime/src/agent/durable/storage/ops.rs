@@ -1,7 +1,6 @@
 //! Shared SeaORM/SeaQuery operations for `StorageRead` and `StorageWrite`.
 //!
-//! Written once against `sea_orm::ConnectionTrait` so `SeaOrmStorage` (SQLite + PostgreSQL)
-//! and the Wave 1–3 `SqliteStorage` transition bridge share the exact same query logic.
+//! Written once against `sea_orm::ConnectionTrait` for `SeaOrmStorage` (SQLite + PostgreSQL).
 
 use sea_orm::sea_query::{Expr, Func, OnConflict, Order, Query, SubQueryStatement};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, FromQueryResult, QueryFilter, QueryOrder, Update};

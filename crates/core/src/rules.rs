@@ -161,11 +161,6 @@ pub fn closed_text(issue: &Issue) -> String {
     }
 }
 
-/// `stageWantsUser`.
-pub fn stage_wants_user(s: IssueStageKind) -> bool {
-    s.wants_user()
-}
-
 /// `spanText`: seconds under a minute (at least one), else minutes.
 fn span_text(ms: i64) -> String {
     if ms < 60_000 {

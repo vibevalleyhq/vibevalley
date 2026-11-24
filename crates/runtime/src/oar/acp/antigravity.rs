@@ -3,7 +3,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -1131,71 +1130,25 @@ pub(crate) fn usage_of(raw: &str) -> Result<AccountUsage> {
 /// Runs `agy --print /usage --output-format json` in a clean temp directory with
 /// auto-update disabled and a bounded async timeout + process-group reaper.
 pub(crate) fn read_account_usage(binary: &Path) -> Result<AccountUsage> {
-    use tokio::io::AsyncReadExt as _;
-    use tokio::process::Command;
-
-    let binary = binary.to_path_buf();
-    let (status, stdout, stderr) = crate::rt::block_on(async move {
-        let mut child = Command::new(&binary)
-            .args(["--print", "/usage", "--output-format", "json"])
-            .current_dir(std::env::temp_dir())
-            .env("AGY_CLI_DISABLE_AUTO_UPDATE", "1")
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .process_group(0)
-            .spawn()
-            .map_err(|e| AgentError::NotAvailable(format!("cannot start {}: {e}", binary.display())))?;
-        let pid = child.id().unwrap_or(0);
-        let stdout_task = child.stdout.take().map(|mut stdout| {
-            crate::rt::spawn(async move {
-                let mut bytes = Vec::new();
-                let _ = stdout.read_to_end(&mut bytes).await;
-                String::from_utf8_lossy(&bytes).into_owned()
-            })
-        });
-        let stderr_task = child.stderr.take().map(|mut stderr| {
-            crate::rt::spawn(async move {
-                let mut bytes = Vec::new();
-                let _ = stderr.read_to_end(&mut bytes).await;
-                String::from_utf8_lossy(&bytes).into_owned()
-            })
-        });
-
-        let status = match tokio::time::timeout(USAGE_TIMEOUT, child.wait()).await {
-            Ok(Ok(status)) => status,
-            Ok(Err(e)) => {
-                let _ = crate::oar::process::reap_process_group(&mut child, pid, Duration::from_millis(200)).await;
-                if let Some(h) = stdout_task {
-                    h.abort();
-                }
-                if let Some(h) = stderr_task {
-                    h.abort();
-                }
-                return Err(AgentError::Io(format!("failed waiting for antigravity usage query: {e}")));
-            }
-            Err(_) => {
-                let _ = crate::oar::process::reap_process_group(&mut child, pid, Duration::from_millis(200)).await;
-                if let Some(h) = stdout_task {
-                    h.abort();
-                }
-                if let Some(h) = stderr_task {
-                    h.abort();
-                }
-                return Err(AgentError::Io("antigravity did not answer the usage query in time".into()));
-            }
-        };
-
-        let stdout = match stdout_task {
-            Some(h) => h.await.unwrap_or_default(),
-            None => String::new(),
-        };
-        let stderr = match stderr_task {
-            Some(h) => h.await.unwrap_or_default(),
-            None => String::new(),
-        };
-        Ok((status, stdout, stderr))
+    let mut cmd = tokio::process::Command::new(binary);
+    cmd.args(["--print", "/usage", "--output-format", "json"])
+        .current_dir(std::env::temp_dir())
+        .env("AGY_CLI_DISABLE_AUTO_UPDATE", "1");
+    let output = crate::rt::block_on(crate::oar::process::run_output_with_timeout(cmd, USAGE_TIMEOUT, None)).map_err(|e| {
+        if matches!(e.kind(), std::io::ErrorKind::NotFound | std::io::ErrorKind::PermissionDenied) {
+            AgentError::NotAvailable(format!("cannot start {}: {e}", binary.display()))
+        } else {
+            AgentError::Io(format!("failed waiting for antigravity usage query: {e}"))
+        }
     })?;
+    if output.timed_out {
+        return Err(AgentError::Io("antigravity did not answer the usage query in time".into()));
+    }
+    let status = output
+        .status
+        .ok_or_else(|| AgentError::Io("antigravity usage query exited without status".into()))?;
+    let stdout = output.stdout_lossy();
+    let stderr = output.stderr_lossy();
 
     if !stdout.trim().is_empty() {
         match usage_of(&stdout) {

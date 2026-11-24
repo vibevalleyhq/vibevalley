@@ -7,7 +7,6 @@ pub mod graph;
 pub mod migration;
 mod rows;
 mod scheduler;
-mod sqlite;
 pub mod storage;
 mod store;
 mod task;
@@ -17,10 +16,7 @@ pub use export::{ExportManifest, ExportOptions};
 pub use graph::{TaskGraph, TaskGraphNode};
 pub use rows::*;
 pub use scheduler::*;
-pub use sqlite::Sqlite;
-pub use storage::{
-    DbTx, JsonlOptions, JsonlStorage, MemoryStorage, SeaOrmStorage, SqliteStorage, StorageBackend, StorageRead, StorageWrite, WriteCallback, WriteOutcome,
-};
+pub use storage::{DbTx, JsonlOptions, JsonlStorage, MemoryStorage, SeaOrmStorage, StorageBackend, StorageRead, StorageWrite, WriteCallback, WriteOutcome};
 pub use store::{Read, Store, Tx};
 pub use telemetry::{JsonlTelemetrySink, MemoryTelemetrySink, NoopTelemetrySink, TelemetryEvent, TelemetrySink, read_telemetry_jsonl};
 

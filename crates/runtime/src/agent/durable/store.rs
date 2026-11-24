@@ -6,9 +6,9 @@ use std::sync::{Arc, RwLock};
 
 use serde_json::{Value, json};
 
-use super::storage::{DbTx, JsonlOptions, JsonlStorage, MemoryStorage, SeaOrmStorage, SqliteStorage, StorageBackend, StorageRead, StorageWrite, WriteOutcome};
+use super::storage::{DbTx, JsonlOptions, JsonlStorage, MemoryStorage, SeaOrmStorage, StorageBackend, StorageRead, StorageWrite, WriteOutcome};
 use super::telemetry::{NoopTelemetrySink, TelemetryEvent, TelemetrySink};
-use super::{CommitStats, Document, DocumentEvent, Error, Result, Sqlite};
+use super::{CommitStats, Document, DocumentEvent, Error, Result};
 
 pub struct Read<'a> {
     pub(crate) ops: &'a dyn StorageRead,
@@ -17,7 +17,6 @@ pub struct Read<'a> {
 pub struct Tx<'a> {
     pub(crate) read: Read<'a>,
     pub(crate) write: &'a dyn StorageWrite,
-    pub(crate) sqlite: Option<&'a Sqlite<'a>>,
     pub(crate) db_tx: Option<&'a DbTx<'a>>,
     pub now_ms: i64,
     pub(crate) events: Vec<DocumentEvent>,
@@ -46,10 +45,6 @@ impl Store {
         }
     }
 
-    pub fn from_sqlite_pools(write_pool: sqlx::SqlitePool, read_pool: Option<sqlx::SqlitePool>) -> Result<Self> {
-        Ok(Self::from_backend(Arc::new(SqliteStorage::from_pools(write_pool, read_pool, super::now_ms)?)))
-    }
-
     pub fn connect(url: &str) -> Result<Self> {
         Ok(Self::from_backend(Arc::new(SeaOrmStorage::connect(url)?)))
     }
@@ -67,11 +62,11 @@ impl Store {
     }
 
     pub fn open(path: &Path) -> Result<Self> {
-        Ok(Self::from_backend(Arc::new(SqliteStorage::open(path)?)))
+        Ok(Self::from_backend(Arc::new(SeaOrmStorage::open_sqlite(path)?)))
     }
 
     pub fn open_read_only(path: &Path) -> Result<Self> {
-        Ok(Self::from_backend(Arc::new(SqliteStorage::open_read_only(path)?)))
+        Ok(Self::from_backend(Arc::new(SeaOrmStorage::open_sqlite_read_only(path)?)))
     }
 
     pub fn open_any_read_only(path: &Path) -> Result<Self> {
@@ -83,11 +78,11 @@ impl Store {
     }
 
     pub fn open_with_clock(path: Option<&Path>, clock: impl Fn() -> i64 + Send + Sync + 'static) -> Result<Self> {
-        Ok(Self::from_backend(Arc::new(SqliteStorage::open_with_clock(path, clock)?)))
+        Ok(Self::from_backend(Arc::new(SeaOrmStorage::open_sqlite_with_clock(path, clock)?)))
     }
 
     pub fn sqlite_memory() -> Result<Self> {
-        Ok(Self::from_backend(Arc::new(SqliteStorage::memory()?)))
+        Ok(Self::from_backend(Arc::new(SeaOrmStorage::sqlite_memory()?)))
     }
 
     pub fn memory() -> Result<Self> {
@@ -151,13 +146,12 @@ impl Store {
         let mut f = Some(f);
         let mut out = None;
         let mut staged_telemetry = Vec::new();
-        self.backend.write_dyn(&mut |ops, write, sqlite, db_tx, now_ms| {
+        self.backend.write_dyn(&mut |ops, write, db_tx, now_ms| {
             let fun = f.take().expect("write_dyn calls closure once");
             staged_telemetry.clear();
             let mut tx = Tx {
                 read: Read { ops },
                 write,
-                sqlite,
                 db_tx,
                 now_ms,
                 events: Vec::new(),
@@ -215,11 +209,6 @@ impl<'a> Tx<'a> {
         self.telemetry_events.push(event);
     }
 
-    /// Returns the underlying SQLite connection when running on `SqliteStorage`.
-    pub fn sqlite_connection(&self) -> Option<&Sqlite<'a>> {
-        self.sqlite
-    }
-
     /// Returns the active SeaORM transaction when running on `SeaOrmStorage`.
     pub fn db_tx(&self) -> Option<&DbTx<'a>> {
         self.db_tx
@@ -229,12 +218,6 @@ impl<'a> Tx<'a> {
     /// Panics if the `Store` is not backed by `SeaOrmStorage`.
     pub fn transaction(&self) -> &sea_orm::DatabaseTransaction {
         self.db_tx().expect("Tx::transaction() requires a SeaOrmStorage-backed Store").inner()
-    }
-
-    /// Domain writes through this view join the current operation's savepoint.
-    /// Panics if the `Store` is not backed by SQLite.
-    pub fn connection(&self) -> &Sqlite<'a> {
-        self.sqlite_connection().expect("Tx::connection() requires a SQLite-backed Store")
     }
 
     pub fn put_document(&mut self, scope: &str, id: &str, kind: &str, state: &Value) -> Result<Document> {

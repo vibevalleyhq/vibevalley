@@ -491,7 +491,6 @@ pub fn round_trip(name: &str, value: serde_json::Value) -> Option<Result<serde_j
         "RuntimeSettings" => rt::<vibevalley_protocol::RuntimeSettings>(value),
         "RuntimeSupport" => rt::<vibevalley_protocol::RuntimeSupport>(value),
         "SayRequest" => rt::<vibevalley_protocol::SayRequest>(value),
-        "ServerEvent" => rt::<vibevalley_protocol::ServerEvent>(value),
         "Session" => rt::<vibevalley_protocol::Session>(value),
         "SessionAction" => rt::<vibevalley_protocol::SessionAction>(value),
         "SessionBindingInput" => rt::<vibevalley_protocol::SessionBindingInput>(value),

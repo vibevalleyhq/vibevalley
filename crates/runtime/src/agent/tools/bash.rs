@@ -121,7 +121,7 @@ impl TypedTool for Bash {
             let outcome = tokio::select! {
                 biased;
                 _ = cancel.cancelled() => {
-                    reap_process_group(&mut child, pid, KILL_GRACE).await;
+                    crate::oar::reap_process_group(&mut child, pid.unwrap_or(0), KILL_GRACE).await;
                     guard.disarm();
                     WaitOutcome::Cancelled
                 }
@@ -130,14 +130,14 @@ impl TypedTool for Bash {
                     match status {
                         Ok(status) => WaitOutcome::Exited(status),
                         Err(e) => {
-                            reap_process_group(&mut child, pid, KILL_GRACE).await;
+                            crate::oar::reap_process_group(&mut child, pid.unwrap_or(0), KILL_GRACE).await;
                             let _ = reader.await;
                             return Err(e.to_string());
                         }
                     }
                 }
                 _ = tokio::time::sleep(timeout) => {
-                    reap_process_group(&mut child, pid, KILL_GRACE).await;
+                    crate::oar::reap_process_group(&mut child, pid.unwrap_or(0), KILL_GRACE).await;
                     guard.disarm();
                     WaitOutcome::TimedOut
                 }
@@ -251,29 +251,6 @@ fn emit_valid_utf8(pending: &mut Vec<u8>, cb: &(dyn Fn(ToolUpdate) + Send + Sync
                 }
                 pending.drain(..bad_len);
             }
-        }
-    }
-}
-
-async fn reap_process_group(child: &mut tokio::process::Child, pid: Option<u32>, grace: Duration) {
-    let Some(pgid) = pid.and_then(|p| i32::try_from(p).ok()).filter(|&p| p > 0).map(Pid::from_raw) else {
-        let _ = child.kill().await;
-        let _ = child.wait().await;
-        return;
-    };
-    let _ = killpg(pgid, Signal::SIGTERM);
-    let exited = tokio::time::timeout(grace, child.wait()).await.is_ok();
-    if exited && killpg(pgid, None) == Err(Errno::ESRCH) {
-        return;
-    }
-    if exited {
-        // Give grandchildren a brief window to react to SIGTERM before escalating.
-        tokio::time::sleep(Duration::from_millis(25)).await;
-    }
-    if !exited || killpg(pgid, None) != Err(Errno::ESRCH) {
-        let _ = killpg(pgid, Signal::SIGKILL);
-        if !exited {
-            let _ = child.wait().await;
         }
     }
 }
