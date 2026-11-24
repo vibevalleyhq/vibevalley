@@ -101,11 +101,7 @@ pub fn install(hub: &Hub, agents: Arc<Agents>) {
         let f = f.clone();
         move |_, i| {
             let f = f.clone();
-            async move {
-                crate::spawn_blocking_traced(move || f.refresh(&i.id).ok_or_else(|| no_runtime(&i.id)))
-                    .await
-                    .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-            }
+            async move { f.refresh_async(&i.id).await.ok_or_else(|| no_runtime(&i.id)) }
         }
     });
     hub.on_async::<ops::RuntimeSettingUpdate, _, _>({

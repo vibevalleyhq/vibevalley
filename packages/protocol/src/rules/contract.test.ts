@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
-import { edgesOf, exportsOf } from "@vibevalley/testkit/source";
+import { edgesOf, exportsOf } from "../test-source";
 
 const root = join(import.meta.dirname, "../../../..");
 const here = import.meta.dirname;

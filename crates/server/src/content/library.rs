@@ -662,7 +662,7 @@ mod tests {
         let home = tempfile::tempdir().unwrap();
         let db = ServerDb::open(home.path()).unwrap();
         let files = Attachments::open(home.path(), db.clone());
-        let attachment = files.keep(b"image", "image.png", "image/png").unwrap();
+        let attachment = vibevalley_runtime::rt::block_on(files.keep_async(b"image".to_vec(), "image.png".to_string(), "image/png".to_string())).unwrap();
         let job: MediaJob = serde_json::from_value(serde_json::json!({
             "kind":"image","id":"job","prompt":"p","model":"m","connection":"c","revision":1,
             "source":{"kind":"user"},"phase":"ready","phaseText":"","problem":"","canCancel":false,

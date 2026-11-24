@@ -76,10 +76,6 @@ impl<T: Serialize> SliceSnapshot<T> {
         }
     }
 
-    pub fn generation(&self) -> u64 {
-        self.generation
-    }
-
     pub fn wire(&self) -> &Value {
         self.wire.get_or_init(|| serde_json::to_value(self.slice.as_ref()).expect("slice serializes"))
     }
@@ -172,44 +168,6 @@ impl SliceSubscription {
             SliceSubscription::Inbox(rx) => rx.changed().await.is_ok(),
             SliceSubscription::Ops(rx) => rx.changed().await.is_ok(),
             SliceSubscription::Farm { rx, .. } => rx.changed().await.is_ok(),
-        }
-    }
-
-    /// Converts this subscription into a `WatchStream`-backed stream of `(seq, json_value)` frames.
-    pub fn into_watch_stream(self, after_seq: Option<i64>) -> std::pin::Pin<Box<dyn Stream<Item = (i64, Value)> + Send>> {
-        fn wrap<T: Sequenced + Serialize + Send + Sync + 'static>(
-            rx: watch::Receiver<Arc<SliceSnapshot<T>>>,
-            after_seq: Option<i64>,
-            strip_initial_effects: bool,
-        ) -> std::pin::Pin<Box<dyn Stream<Item = (i64, Value)> + Send>> {
-            use futures_util::StreamExt;
-            let (initial_seq, initial_gen) = {
-                let initial = rx.borrow();
-                (initial.seq, initial.generation)
-            };
-            let skip_initial = after_seq == Some(initial_seq);
-            let stream = if skip_initial { WatchStream::from_changes(rx) } else { WatchStream::new(rx) };
-            let mut seen_gen = skip_initial.then_some(initial_gen);
-            let mut initial = !skip_initial && after_seq.is_none();
-            Box::pin(stream.filter_map(move |snap| {
-                let out = if seen_gen == Some(snap.generation) {
-                    None
-                } else {
-                    seen_gen = Some(snap.generation);
-                    let strip = initial && strip_initial_effects;
-                    initial = false;
-                    Some(wire_of(&snap, strip))
-                };
-                std::future::ready(out)
-            }))
-        }
-        match self {
-            SliceSubscription::Board(rx) => wrap(rx, after_seq, false),
-            SliceSubscription::Sessions(rx) => wrap(rx, after_seq, false),
-            SliceSubscription::Collab(rx) => wrap(rx, after_seq, false),
-            SliceSubscription::Inbox(rx) => wrap(rx, after_seq, false),
-            SliceSubscription::Ops(rx) => wrap(rx, after_seq, false),
-            SliceSubscription::Farm { rx, strip_initial_effects } => wrap(rx, after_seq, strip_initial_effects),
         }
     }
 

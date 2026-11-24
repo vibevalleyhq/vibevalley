@@ -24,7 +24,7 @@ export interface Transport {
   /** Each frame of `kind` as it comes; returns how to stop. */
   readonly slice: <K extends SliceKind>(kind: K, listener: (data: SliceMap[K]) => void) => () => void;
   readonly live: (listener: (event: LiveEvent) => void) => () => void;
-  /** One of rpc.ts's subscriptions (`channel.follow`, ...): each event as it comes, `ended` once when the server ends
+  /** One of api.ts's subscriptions (`channel.follow`, ...): each event as it comes, `ended` once when the server ends
    * or refuses it (null: ended, else the refusal's envelope). Returns how to stop it. */
   readonly subscribe?: (name: string, payload: unknown, on: (event: unknown) => void, ended: (why: Envelope | null) => void) => () => void;
 }

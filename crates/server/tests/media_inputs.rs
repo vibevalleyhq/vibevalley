@@ -38,7 +38,7 @@ fn ok(h: &Hub, op: &str, p: Value) -> Value {
 #[test]
 fn protocol_adopts_a_kept_attachment_and_delete_preserves_its_bytes() {
     let (_dir, _db, inputs, files, hub) = setup();
-    let file = files.keep(&png(), "猫.png", "image/png").unwrap();
+    let file = vibevalley_runtime::rt::block_on(files.keep_async(png(), "猫.png".into(), "image/png".into())).unwrap();
     let r = ok(&hub, "media.input.adopt", json!({"attachment":file.id}));
     assert_eq!(r["phase"], "ready");
     assert_eq!(r["hash"], file.id);
@@ -46,7 +46,10 @@ fn protocol_adopts_a_kept_attachment_and_delete_preserves_its_bytes() {
     assert_eq!(ok(&hub, "media.input.get", json!({"id":id})), r);
     assert_eq!(ok(&hub, "media.input.list", Value::Null).as_array().unwrap().len(), 1);
     assert_eq!(ok(&hub, "media.input.previewDelete", json!({"id":id}))["does"].as_array().unwrap().len(), 1);
-    assert_eq!(std::fs::read(inputs.content(id).unwrap().path).unwrap(), png());
+    assert_eq!(
+        std::fs::read(vibevalley_runtime::rt::block_on(inputs.content_async(id)).unwrap().path).unwrap(),
+        png()
+    );
     ok(&hub, "media.input.delete", json!({"id":id}));
     ok(&hub, "media.input.delete", json!({"id":id}));
     assert!(files.path_of(&file.id).is_file());
@@ -75,7 +78,10 @@ fn invalid_metadata_sizes_and_disguised_files_are_refused_and_upload_can_retry()
     let r = inputs.create(&request()).unwrap();
     for bytes in [vec![0; 24], png()[..20].to_vec(), vec![1; 25]] {
         assert!(inputs.upload(&r.id, Cursor::new(bytes)).is_err());
-        assert_eq!(inputs.get(&r.id).unwrap().phase, MediaInputPhase::Failed);
+        assert_eq!(
+            vibevalley_runtime::rt::block_on(inputs.get_async(&r.id)).unwrap().phase,
+            MediaInputPhase::Failed
+        );
     }
     let ready = inputs.upload(&r.id, Cursor::new(png())).unwrap();
     assert_eq!(ready.phase, MediaInputPhase::Ready);
@@ -88,18 +94,18 @@ fn pins_admission_rollback_expiry_and_restart() {
     inputs.upload(&r.id, Cursor::new(png())).unwrap();
     let bad = inputs.pin(&[r.id.clone(), "missing".into()], "job");
     assert!(bad.is_err());
-    assert!(inputs.get(&r.id).unwrap().can_delete);
+    assert!(vibevalley_runtime::rt::block_on(inputs.get_async(&r.id)).unwrap().can_delete);
     inputs.pin(&[r.id.clone(), r.id.clone()], "job").unwrap();
-    assert!(!inputs.get(&r.id).unwrap().can_delete);
+    assert!(!vibevalley_runtime::rt::block_on(inputs.get_async(&r.id)).unwrap().can_delete);
     assert!(vibevalley_runtime::rt::block_on(inputs.delete_async(&r.id)).is_err());
     let mut conn = database(dir.path());
     vibevalley_runtime::rt::block_on(sqlx::query("update media_input set expires_at=0").execute(&mut conn)).unwrap();
     inputs.sweep().unwrap();
-    assert!(inputs.content(&r.id).is_ok());
+    assert!(vibevalley_runtime::rt::block_on(inputs.content_async(&r.id)).is_ok());
     let restored = Inputs::open(dir.path(), db.clone(), files.clone()).unwrap();
-    assert!(!restored.get(&r.id).unwrap().can_delete);
-    restored.release("job").unwrap();
-    assert!(restored.content(&r.id).is_err());
+    assert!(!vibevalley_runtime::rt::block_on(restored.get_async(&r.id)).unwrap().can_delete);
+    vibevalley_runtime::rt::block_on(restored.release_async("job")).unwrap();
+    assert!(vibevalley_runtime::rt::block_on(restored.content_async(&r.id)).is_err());
     restored.sweep().unwrap();
     assert!(restored.list().unwrap().is_empty());
     let interrupted = restored.create(&request()).unwrap();
@@ -110,7 +116,10 @@ fn pins_admission_rollback_expiry_and_restart() {
     )
     .unwrap();
     let reopened = Inputs::open(dir.path(), db, files).unwrap();
-    assert_eq!(reopened.get(&interrupted.id).unwrap().phase, MediaInputPhase::Failed);
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(reopened.get_async(&interrupted.id)).unwrap().phase,
+        MediaInputPhase::Failed
+    );
 }
 #[test]
 fn quota_and_corrupted_content() {
@@ -129,7 +138,7 @@ fn quota_and_corrupted_content() {
     let input = inputs.create(&request()).unwrap();
     let ready = inputs.upload(&input.id, Cursor::new(png())).unwrap();
     std::fs::write(files.path_of(ready.hash.as_ref().unwrap()), vec![1; 24]).unwrap();
-    assert!(inputs.content(&input.id).is_err());
+    assert!(vibevalley_runtime::rt::block_on(inputs.content_async(&input.id)).is_err());
     for _ in 1..256 {
         inputs.create(&request()).unwrap();
     }
@@ -171,7 +180,7 @@ fn active_upload_cannot_be_deleted_or_pinned() {
         )
     });
     rx.recv_timeout(std::time::Duration::from_secs(2)).unwrap();
-    assert!(!inputs.get(&r.id).unwrap().can_delete);
+    assert!(!vibevalley_runtime::rt::block_on(inputs.get_async(&r.id)).unwrap().can_delete);
     assert!(vibevalley_runtime::rt::block_on(inputs.delete_async(&r.id)).is_err());
     assert!(inputs.pin(&[r.id], "job").is_err());
     go.send(()).unwrap();
@@ -264,7 +273,10 @@ fn real_http_upload_preview_ranges_and_origin_checks() {
             .status()
             .is_success()
     );
-    assert_eq!(inputs.get(&interrupted.id).unwrap().phase, MediaInputPhase::Failed);
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(inputs.get_async(&interrupted.id)).unwrap().phase,
+        MediaInputPhase::Failed
+    );
     assert!(
         client
             .put(&retry)
@@ -275,7 +287,10 @@ fn real_http_upload_preview_ranges_and_origin_checks() {
             .status()
             .is_success()
     );
-    assert_eq!(inputs.get(&interrupted.id).unwrap().phase, MediaInputPhase::Ready);
+    assert_eq!(
+        vibevalley_runtime::rt::block_on(inputs.get_async(&interrupted.id)).unwrap().phase,
+        MediaInputPhase::Ready
+    );
 }
 
 #[test]
@@ -288,7 +303,7 @@ fn failed_promotion_keeps_hash_and_refuses_changed_retry() {
     )
     .unwrap();
     assert!(inputs.upload(&r.id, Cursor::new(png())).is_err());
-    let failed = inputs.get(&r.id).unwrap();
+    let failed = vibevalley_runtime::rt::block_on(inputs.get_async(&r.id)).unwrap();
     assert_eq!(failed.phase, MediaInputPhase::Failed);
     assert!(failed.hash.is_some());
     vibevalley_runtime::rt::block_on(sqlx::query("drop trigger fail_attachment").execute(&mut db)).unwrap();

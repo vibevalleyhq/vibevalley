@@ -772,11 +772,12 @@ fn store_entry_batch_ops_optimistic_concurrency_and_sanitization() {
     let hub = started.hub.clone();
     let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
 
-    let png = started
-        .test_internals()
-        .attachments
-        .keep(&[0x89, 0x50, 0x4e, 0x47], "logo.png", "image/png")
-        .unwrap();
+    let png = vibevalley_runtime::rt::block_on(started.test_internals().attachments.keep_async(
+        vec![0x89, 0x50, 0x4e, 0x47],
+        "logo.png".into(),
+        "image/png".into(),
+    ))
+    .unwrap();
     let board = ok(call(
         "artifact.create",
         json!({

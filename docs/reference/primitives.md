@@ -58,6 +58,7 @@
 | `sha256Hex` | `api.ts` | Lowercase hex SHA-256 digest of UTF-8 `text`, computed in Rust with WebCrypto fallback for headless tests. |
 | `createRequestKey` | `api.ts` | The request key of one thing the user may send again (a form's create, a button's). a new one after. |
 | `attachmentData` | `attachment.ts` | A file's bytes as attachment.create takes them: base64. |
+| `decodeBase64Utf8` | `attachment.ts` | Decodes a base64 UTF-8 attachment payload back into a string. |
 | `fileUrl` | `attachmentFile.ts` |  |
 | `useAttachmentFile` | `attachmentFile.ts` | Where the server keeps the file (path, type), once it said. |
 | `useAttachmentUrl` | `attachmentFile.ts` | The file's `file:` URL once the server said where it is. |
@@ -105,7 +106,7 @@
 | `frame` | `bridge.ts` |  |
 | `frameRev` | `bridge.ts` | The frame's revision (reactive): goes up by one per frame this view received. |
 | `onLive` | `bridge.ts` | Every LiveEvent from now on. Returns how to stop listening. |
-| `subscribe` | `bridge.ts` | One of rpc.ts's subscriptions (`channel.follow`, ...). `ended` gets `null` when the server ended it, |
+| `subscribe` | `bridge.ts` | One of api.ts's subscriptions (`channel.follow`, ...). `ended` gets `null` when the server ended it, |
 | `hostApi` | `bridge.ts` | The host's capabilities (packages/protocol's Host, desktop flavour) and the terminal. |
 | `act` | `bridge.ts` | Intent for the shell (VibeValley's own panels): open a file, stage, switch project... |
 | `viewName` | `bridge.ts` | Which surface this view shows (set by Rust before the bundle loads). |
@@ -262,19 +263,3 @@
 | `transport` | `transport.ts` |  |
 | `setTransport` | `transport.ts` | Swaps the transport (at start-up: the bridge, or a story's fixtures). |
 | `onTransportChange` | `transport.ts` |  |
-
-## `packages/testkit/src`
-
-测试共用：等待、金字塔、语法树
-
-| 名字 | 文件 | 说的是 |
-|---|---|---|
-| `pyramid` | `pyramid.ts` | The layers of the files under root (a package's folder). |
-| `programOf` | `source.ts` | The file's program; path's extension says whether it is TSX. |
-| `edgesOf` | `source.ts` | Every import, export … from and dynamic import() of a string. |
-| `importsOf` | `source.ts` | What a file imports for its values: imports and re-exports that are not type-only, side-effect and dynamic ones. |
-| `exportsOf` | `source.ts` | The names a file exports itself (declarations and `export { … }` without a source), types included. |
-| `exportedValuesOf` | `source.ts` | The values a file declares and exports itself (no types), each with where its export statement starts. |
-| `readsOf` | `source.ts` | The fields read off what object.method() returns: right off the call (`core.state().issues`, `?.` too), through a const it is kept in (`const s = core.state(). |
-| `analyzeSource` | `source.ts` |  |
-| `calls` | `source.ts` | Whether the file calls object.method(…) anywhere. |

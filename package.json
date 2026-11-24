@@ -21,7 +21,6 @@
     "@types/node": "catalog:",
     "@vibevalley/i18n": "workspace:*",
     "@vibevalley/protocol": "workspace:*",
-    "@vibevalley/testkit": "workspace:*",
     "knip": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

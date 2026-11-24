@@ -36,7 +36,7 @@
 
 ### 仓库和包
 
-- **Rust 为准**：服务端（`vibevalley-server`）、命令行（`vibevalley-cli`）、原生应用（`apps/mac`）都是 Rust；TS 承接桌面工作台（`apps/mac/ui`）、独立原生移动端（`apps/mobile`，`nsh/mobile`，iOS 优先、Android 就绪）、4 个共用包（`packages/{protocol,i18n,testkit,tsrs}`）、官网（`apps/site`）与脚本，不维护浏览器应用与 Electron 桌面壳。
+- **Rust 为准**：服务端（`vibevalley-server`）、命令行（`vibevalley-cli`）、原生应用（`apps/mac`）都是 Rust；TS 承接桌面工作台（`apps/mac/ui`）、独立原生移动端（`apps/mobile`，`nsh/mobile`，iOS 优先、Android 就绪）、2 个共用包（`packages/{protocol,i18n}`）、官网（`apps/site`）与脚本，不维护浏览器应用与 Electron 桌面壳。
 - **一个 Cargo 工作区（17 个成员）**：成员按层组织为 `crates/*`（`protocol`、`i18n`、`core`、`git`、`files`、`runtime`、`rich`、`server`、`cli`）、`crates/engines/{onig,pele,shiki}`、`apps/mac`、桌面支撑 `apps/mac/crates/{pixel,terminal,workspace}` 与 `xtask`（包名仍保留 `vibevalley-*`，使 `core` 不遮蔽 `::core`），版本与 edition 写在根 `Cargo.toml` 的 `[workspace.package]`，依赖各 crate 自己写；`cargo xtask check` 跑 `cargo fmt --check`、`cargo clippy -D warnings` 与 `cargo test`。
 - **TS 依赖版本集中**：版本在 `pnpm-workspace.yaml` 的 catalog，各包写 `catalog:`（`scripts/audit/catalog.test.ts` 查）。
 - **跨包走包名**：TS 跨包写 `@vibevalley/*`（`no-cross-package-path` 查）；`apps/mac/ui` 经 `nsh.json` 的别名解析它们；`packages/*` 的类型导出指向 `dist/*.d.ts`（`vp run packages:build`）。
@@ -122,7 +122,7 @@
 ## 怎么验证
 
 - `make rust`（`cargo xtask check`）：格式、clippy 与全部 Rust 测试。
-- `make rust-audit`（`cargo xtask audit`）：静态校验脊柱、桌面宿主与服务端 `L0`–`L3` 分层边界、零循环依赖、零 `pollster`、仅缩减 `rt::block_on(` 上限（`SERVER_BLOCK_ON_CEILING = 78`）与零睡眠边界。
+- `make rust-audit`（`cargo xtask audit`）：静态校验脊柱、桌面宿主与服务端 `L0`–`L3` 分层边界、零循环依赖、零 `pollster`、仅缩减 `rt::block_on(` 上限（`SERVER_BLOCK_ON_CEILING = 73`）与零睡眠边界。
 - `make protocol`（`cargo xtask protocol`）：生成的线上类型与 golden 是最新的。
 - `vp check`、`vp run packages:check`、`vp run mac:check`、`vp run mobile:check`：TS 与原生页面（桌面与移动端）。
 - `vp run docs:verify`：生成物（含 `icons.ts --check`）、词典、旧名字与文档链接。

@@ -48,17 +48,7 @@ impl Attachments {
         self.root.join(id)
     }
 
-    /// `attach`: an upload, as base64, kept.
-    pub fn attach(&self, upload: &AttachmentUpload) -> Result<Attachment, ApiError> {
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(upload.data.trim())
-            .map_err(|e| ApiError::new(BizCode::InvalidInput, format!("data: {e}")))?;
-        if bytes.len() > ATTACHMENT_MAX {
-            return Err(file_too_big());
-        }
-        self.keep(&bytes, &upload.name, &upload.r#type)
-    }
-
+    /// `attach_async`: an upload, as base64, kept.
     pub async fn attach_async(&self, upload: AttachmentUpload) -> Result<Attachment, ApiError> {
         let root = self.root.clone();
         let data = upload.data;
@@ -82,11 +72,6 @@ impl Attachments {
     }
 
     /// Streams a local regular file directly from disk into CAS without base64 framing (`Caller::User` only).
-    pub fn import_path(&self, input: &AttachmentImportPathInput) -> Result<Attachment, ApiError> {
-        let (id, name, mime, size) = stream_import_to_cas(&self.root, input)?;
-        self.record(&id, &name, &mime, size)
-    }
-
     pub async fn import_path_async(&self, input: AttachmentImportPathInput) -> Result<Attachment, ApiError> {
         let root = self.root.clone();
         let (id, name, mime, size) = tokio::task::spawn_blocking(move || stream_import_to_cas(&root, &input))
@@ -95,16 +80,7 @@ impl Attachments {
         self.record_async(&id, &name, &mime, size).await
     }
 
-    /// `keep`: bytes kept once by their sha256; no size limit.
-    pub fn keep(&self, bytes: &[u8], name: &str, kind: &str) -> Result<Attachment, ApiError> {
-        if bytes.is_empty() {
-            return Err(refused(t("server.attachment.emptyFile", &[])));
-        }
-        let id = Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect::<String>();
-        write_once_at(&self.root, &id, bytes).map_err(|e| refused(e.to_string()))?;
-        self.record(&id, name, kind, bytes.len() as i64)
-    }
-
+    /// `keep_async`: bytes kept once by their sha256; no size limit.
     pub async fn keep_async(&self, bytes: Vec<u8>, name: String, kind: String) -> Result<Attachment, ApiError> {
         if bytes.is_empty() {
             return Err(refused(t("server.attachment.emptyFile", &[])));
@@ -136,10 +112,6 @@ impl Attachments {
         .await
         .map_err(internal)??;
         self.record_async(&hash, &name, &kind, size).await
-    }
-
-    fn record(&self, id: &str, given: &str, given_type: &str, size: i64) -> Result<Attachment, ApiError> {
-        vibevalley_runtime::rt::block_on(self.record_async(id, given, given_type, size))
     }
 
     async fn record_async(&self, id: &str, given: &str, given_type: &str, size: i64) -> Result<Attachment, ApiError> {

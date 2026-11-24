@@ -1,13 +1,13 @@
 // VibeValley's infra/gateway.ts with the same exports. There each
 // subscription is an SSE stream (`subscriptionUrl`) read with fetch; in
 // VibeValley it is the transport's `subscribe` (the bridge's, ui/bridge.ts),
-// each event still decoded with rpc.ts's Schema. A refusal or a broken
+// each event still decoded with api.ts's Schema. A refusal or a broken
 // stream ends it; one the transport could not open at all is asked for again
 // after reconnectDelayMs, as there. The fetcher parameter is gone (no HTTP).
 import { z } from "zod";
 
 import type { ArtifactEntryEvent, ArtifactEvent, ArtifactId, ArtifactPresenceEvent, ChannelEvent, SuggestionEvent } from "@vibevalley/protocol";
-import { type SubscriptionName, subscriptions } from "@vibevalley/protocol/rpc";
+import { type SubscriptionName, subscriptions } from "@vibevalley/protocol/api";
 
 import { transport } from "./transport";
 

@@ -108,10 +108,6 @@ impl Chat {
     }
 
     /// Every channel and direct channel, the default first.
-    pub fn list(&self) -> Result<Vec<Channel>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.list_async())
-    }
-
     pub async fn list_async(&self) -> Result<Vec<Channel>, ApiError> {
         let model = self.snapshot.load_full();
         let conn = self.db.read_conn();

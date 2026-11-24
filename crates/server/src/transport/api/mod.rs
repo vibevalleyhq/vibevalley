@@ -194,10 +194,6 @@ pub struct MachineConnection {
 pub trait MachineBus: Send + Sync + 'static {
     fn accept_connection(&self, conn: MachineConnection);
 
-    fn mcp_tunnel(&self, server: &dyn Server, req: vibevalley_protocol::MachineMcpRequest) -> vibevalley_protocol::MachineMcpResponse {
-        dispatch_mcp_tunnel(server, req)
-    }
-
     fn mcp_tunnel_async(
         self: Arc<Self>,
         server: Arc<dyn Server>,
@@ -211,31 +207,6 @@ pub type SharedMachineBus = Arc<dyn MachineBus>;
 
 /// Executes a reverse-tunneled MCP JSON-RPC HTTP request against `server.mcp()`,
 /// preserving the same single/batch semantics and device-token guard as `POST /mcp`.
-pub fn dispatch_mcp_tunnel(server: &dyn Server, req: vibevalley_protocol::MachineMcpRequest) -> vibevalley_protocol::MachineMcpResponse {
-    let reply = |status: u16, body: String| vibevalley_protocol::MachineMcpResponse {
-        request_id: req.request_id.clone(),
-        status,
-        content_type: "application/json".to_string(),
-        body,
-    };
-    let (door, message) = match validate_mcp_tunnel(server, &req) {
-        Ok(pair) => pair,
-        Err(resp) => return resp,
-    };
-    let answered = match message {
-        Value::Array(batch) => {
-            let answers: Vec<Value> = batch.into_iter().filter_map(|m| door.message(&req.session_token, m)).collect();
-            if answers.is_empty() { None } else { Some(Value::Array(answers)) }
-        }
-        one => door.message(&req.session_token, one),
-    };
-    match answered {
-        Some(answer) => reply(200, serde_json::to_string(&answer).unwrap_or_default()),
-        None => reply(202, String::new()),
-    }
-}
-
-/// Async counterpart of [`dispatch_mcp_tunnel`] using [`Mcp::message_async`].
 pub async fn dispatch_mcp_tunnel_async(server: Arc<dyn Server>, req: vibevalley_protocol::MachineMcpRequest) -> vibevalley_protocol::MachineMcpResponse {
     let reply = |status: u16, body: String| vibevalley_protocol::MachineMcpResponse {
         request_id: req.request_id.clone(),
@@ -369,7 +340,7 @@ pub trait Server: Send + Sync + 'static {
     fn subscribe_live(&self) -> Option<tokio::sync::broadcast::Receiver<LiveEvent>> {
         None
     }
-    /// One of `rpc.ts`'s subscriptions. `Err` is a refusal before the first
+    /// One of `api.ts`'s subscriptions. `Err` is a refusal before the first
     /// event. The stream ends when the server drops its sender.
     #[allow(clippy::result_large_err, reason = "the approved contract returns the refusal envelope itself")]
     fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, flume::Receiver<Value>), Envelope>;

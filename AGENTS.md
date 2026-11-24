@@ -31,12 +31,11 @@ assets/                    全部的图、像素字、指针和像素村的地�
 packages/protocol/         页面用的契约：src/<概念>/shapes.gen.ts 和 endpoints.gen.ts 是生成的；Zod（schema.ts）、端点表（api.ts）、双端规则（rules/）、
                            纯 Web Fetch 远程传输层（@vibevalley/protocol/remote：remote/transport.ts）、client.ts、宿主接口（host.ts）是手写的
 packages/i18n/             页面里 t("key")：src/catalogs.ts 由 i18n:gen 从 crates/i18n/locales 写出
-packages/testkit/、tsrs/   测试共用的；vp check 用的 TypeScript（tsrs）
 design/                    生图提示词、脚本和切图规则；原图在单独的仓库 vibevalley-art，design/art.sh 链接进来
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
 .agents/notes/             Agent Notes：具体的计划，做完沉淀进 docs/subsystems
 .agents/skills/            仓库自己的 skill：验收（vv-acceptance）等；.claude/skills 链接到这里
-scripts/                   gen/（生成物写出）、audit/（lint 插件、死代码、注释审查）、docs/（Note、链接、术语与旧名检查）、release/（发版、回归与验收沙箱 verify-server.ts）
+scripts/                   gen/（生成物写出）、audit/（lint 插件、死代码、注释审查）、docs/（Note、链接、术语与旧名检查）、release/（发版、回归与验收沙箱 verify-server.ts）、tsrs/（vp check 用的 TypeScript）
 ```
 
 每个包的约定在它的 README。

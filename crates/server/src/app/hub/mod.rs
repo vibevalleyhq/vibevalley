@@ -508,19 +508,9 @@ impl Hub {
         vibevalley_core::sessions_slice(core.state(), self.dirty_seq(SliceKind::Sessions))
     }
 
-    pub fn collab_slice(&self) -> CollabSlice {
-        let core = self.core.lock();
-        vibevalley_core::collab_slice(core.state(), self.dirty_seq(SliceKind::Collab))
-    }
-
     pub fn inbox_slice(&self) -> InboxSlice {
         let core = self.core.lock();
         vibevalley_core::inbox_slice(core.state(), self.dirty_seq(SliceKind::Inbox))
-    }
-
-    pub fn ops_slice(&self) -> OpsSlice {
-        let core = self.core.lock();
-        vibevalley_core::ops_slice(core.state(), self.dirty_seq(SliceKind::Ops))
     }
 
     pub fn farm_frame(&self) -> FarmFrame {

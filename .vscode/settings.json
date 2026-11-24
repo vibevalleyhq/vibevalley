@@ -1,6 +1,6 @@
 {
   "js/ts.experimental.useTsgo": true,
-  "js/ts.tsdk.path": "./packages/tsrs/tsdk",
+  "js/ts.tsdk.path": "./scripts/tsrs/tsdk",
   "js/ts.tsdk.promptToUseWorkspaceVersion": true,
-  "js/ts.tsdk.additionalLocations": ["./packages/tsrs/tsdk"]
+  "js/ts.tsdk.additionalLocations": ["./scripts/tsrs/tsdk"]
 }

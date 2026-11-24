@@ -3,9 +3,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { expect, test } from "vite-plus/test";
 import { z } from "zod";
 
-import { programOf } from "@vibevalley/testkit/source";
-
 import * as S from "./schema";
+import { programOf } from "./test-source";
 
 interface TypeNode {
   readonly type: string;

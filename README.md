@@ -93,7 +93,7 @@ crates/            Rust 核心：protocol、core、runtime（oar 与自研引擎
 apps/mac/          原生 macOS 应用：GPUI 外壳、PTY 终端与像素农场（Rust），工作台与工作区页面（nsh TSX）
 apps/island/       刘海灵动岛小程序（Swift）
 apps/site/         官网 vibevalley.dev（Vite + Solid 2 静态生成）
-packages/          页面共享 TS 包：生成的契约与 Zod 校验、词典目录、测试工具与 tsrs
+packages/          页面共享 TS 包：生成的契约与 Zod 校验、词典目录
 assets/ · design/  像素素材、字体、地图与设计令牌（design/tokens.json）
 docs/ · .agents/   文档（docs/README.md）、架构提案（Agent Notes）与校验脚本（scripts/）
 ```

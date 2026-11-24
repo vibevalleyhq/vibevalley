@@ -18,12 +18,12 @@ import type {
   SessionWatchEvent,
   SessionWorkspace,
 } from "@vibevalley/protocol";
-import { RuntimeInfo as RuntimeInfoSchema } from "@vibevalley/protocol/runtime/schema";
 import {
+  RuntimeInfo as RuntimeInfoSchema,
   SessionChildTranscript as SessionChildTranscriptSchema,
   SessionWatchEvent as SessionWatchEventSchema,
   SessionWorkspace as SessionWorkspaceSchema,
-} from "@vibevalley/protocol/session/schema";
+} from "@vibevalley/protocol/schema";
 
 import { computeTelemetry, extractToolTarget, formatTokens, mergeSteps, shownEvents } from "../features/session/runs";
 import { transport } from "../infra/transport";

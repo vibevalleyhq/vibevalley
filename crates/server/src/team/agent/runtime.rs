@@ -514,10 +514,6 @@ impl Fleet {
         info
     }
 
-    fn lookup(&self, id: &str) -> RuntimeInfo {
-        vibevalley_runtime::rt::block_on(self.lookup_async(id))
-    }
-
     fn probe_later(self: &Arc<Self>, id: &str) {
         if self.cancel.is_cancelled() || !self.probing.lock().insert(id.to_string()) {
             return;
@@ -595,7 +591,14 @@ impl Fleet {
         if !self.known(id) || self.cancel.is_cancelled() {
             return None;
         }
-        Some(self.lookup(id))
+        Some(vibevalley_runtime::rt::block_on(self.lookup_async(id)))
+    }
+
+    pub async fn refresh_async(&self, id: &str) -> Option<RuntimeInfo> {
+        if !self.known(id) || self.cancel.is_cancelled() {
+            return None;
+        }
+        Some(self.lookup_async(id).await)
     }
 
     /// What is kept in the farm's language, else a new probe.

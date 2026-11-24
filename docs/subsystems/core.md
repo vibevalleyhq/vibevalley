@@ -65,7 +65,7 @@
 | `GET /api/v1/slice/{name}`（`name` ∈ `board` \| `sessions` \| `collab` \| `inbox` \| `ops` \| `farm`） | `BoardSlice` / `SessionsSlice` / `CollabSlice` / `InboxSlice` / `OpsSlice` / `FarmFrame` | 带 `Accept: application/json` 或 `?once=1` 直接返回当前 JSON 快照；SSE 首帧推送最新切片（支持 `Last-Event-ID` 或 `?after=<seq>` 续读跳过已收序号） | 经 `SliceFeed<T>`（`tokio::sync::watch` + `WatchStream`）脏合并推送（`id: <seq>\ndata: <json>\n\n`），无阻塞线程开销；`farm` 携带窗口内有序 `effects` | HTTP 客户端、CLI |
 | `GET /api/v1/live`（别名 `/api/v1/events`） | `LiveEvent` | 无 | 经 `Hub::subscribe_live()`（有界 `tokio::sync::broadcast`）推送 `SessionEvent`、`Notice`、`Runtime` | 页面 |
 | `GET /api/v1/issue/watch/:id` | `IssueWatch` | 工单状态与保留的轨迹 | 状态、轨迹和缺口（[观察执行](docs/subsystems/issue.md#观察执行)） | `issue watch` |
-| `GET /api/v1/subscribe/<名字>?payload=<JSON>` | 各订阅的 `event`（`SUBSCRIPTIONS` 与 `packages/protocol/src/rpc.ts` 定义，均声明 `Subscription::CAN`） | 经 `Server::subscribe_with` 校验 `CallerContext` 与 `CAN`，通过后补齐 `after` 之后的变化 | 之后的每次变化 | 页面与远程客户端：`channel.follow`、`channel.reports`、`artifact.follow`、`artifact.entry.follow`、`artifact.suggestion.follow`、`artifact.presence.follow`、`session.watch`、`issue.watch` |
+| `GET /api/v1/subscribe/<名字>?payload=<JSON>` | 各订阅的 `event`（`SUBSCRIPTIONS` 与 `packages/protocol/src/api.ts` 定义，均声明 `Subscription::CAN`） | 经 `Server::subscribe_with` 校验 `CallerContext` 与 `CAN`，通过后补齐 `after` 之后的变化 | 之后的每次变化 | 页面与远程客户端：`channel.follow`、`channel.reports`、`artifact.follow`、`artifact.entry.follow`、`artifact.suggestion.follow`、`artifact.presence.follow`、`session.watch`、`issue.watch` |
 
 订阅流的调用方无权（不满足 `Subscription::CAN`）返回 `403`（`BizCode::Forbidden`），入参解不开或第一条事件之前被拒绝回普通 JSON 错误信封，不是流；开始推送以后出错只结束流。
 

@@ -229,9 +229,6 @@ impl Inputs {
         let inner = self.inner.lock().await;
         found_read(&self.db, &inner, id).await
     }
-    pub fn get(&self, id: &str) -> Result<MediaInput, ApiError> {
-        vibevalley_runtime::rt::block_on(self.get_async(id))
-    }
     pub async fn list_async(&self) -> Result<Vec<MediaInput>, ApiError> {
         let uploading: HashSet<String> = self.inner.lock().await.uploading.clone();
         let conn = self.db.read_conn();
@@ -551,9 +548,6 @@ impl Inputs {
             name: r.name,
         })
     }
-    pub fn content(&self, id: &str) -> Result<AttachmentFile, ApiError> {
-        vibevalley_runtime::rt::block_on(self.content_async(id))
-    }
 
     pub(super) async fn pin_in_async<C: ConnectionTrait>(&self, db: &C, ids: &[String], holder: &str) -> Result<(), ApiError> {
         if ids.is_empty() || ids.len() > 5 {
@@ -606,9 +600,6 @@ impl Inputs {
             .await
             .map_err(storage)?;
         Ok(())
-    }
-    pub fn release(&self, holder: &str) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.release_async(holder))
     }
 }
 async fn remove_dir_async(path: PathBuf) -> Result<(), ApiError> {
@@ -726,11 +717,11 @@ mod tests {
         // Just before expiry, the input stays readable and survives sweep.
         clock.advance(Duration::from_millis((LIFETIME - 1) as u64));
         inputs.sweep().unwrap();
-        assert!(inputs.content(&ready.id).is_ok());
+        assert!(vibevalley_runtime::rt::block_on(inputs.content_async(&ready.id)).is_ok());
 
         // At expiry, content is refused and sweep deletes the unpinned record.
         clock.advance(Duration::from_millis(1));
-        assert!(inputs.content(&ready.id).is_err());
+        assert!(vibevalley_runtime::rt::block_on(inputs.content_async(&ready.id)).is_err());
         inputs.sweep().unwrap();
         assert!(inputs.list().unwrap().is_empty());
 
@@ -747,9 +738,9 @@ mod tests {
         inputs.pin(std::slice::from_ref(&pinned.id), "job-1").unwrap();
         clock.advance(Duration::from_millis(LIFETIME as u64));
         inputs.sweep().unwrap();
-        assert!(inputs.content(&pinned.id).is_ok());
-        inputs.release("job-1").unwrap();
-        assert!(inputs.content(&pinned.id).is_err());
+        assert!(vibevalley_runtime::rt::block_on(inputs.content_async(&pinned.id)).is_ok());
+        vibevalley_runtime::rt::block_on(inputs.release_async("job-1")).unwrap();
+        assert!(vibevalley_runtime::rt::block_on(inputs.content_async(&pinned.id)).is_err());
         inputs.sweep().unwrap();
         assert!(inputs.list().unwrap().is_empty());
 

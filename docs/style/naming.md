@@ -24,7 +24,6 @@
 
 | 性质 | 谁查 |
 |---|---|
-| 纯不纯、能在哪一层测 | 测试金字塔按 import 认层（`@vibevalley/testkit/pyramid`） |
 | 页面和服务端都跑 | `packages/protocol/src/rules/contract.test.ts` |
 | 页面的分层 | lint 的 `vibevalley/page-layers` |
 
@@ -78,7 +77,7 @@
 |---|---|---|
 | 服务端的模块 | 单数，概念的词 | `crates/server/src/work/issue/`、`collab/channel/` |
 | 页面的 feature | 和服务端的模块同名 | `apps/mac/ui/features/issue` |
-| 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/testkit` 是 `@vibevalley/testkit` |
+| 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/protocol` 是 `@vibevalley/protocol` |
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
 | 测试 | 挨着被测的文件 | `outline.test.ts` |

@@ -220,7 +220,7 @@ fn the_chat_through_its_endpoints() {
     let db2 = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
     let files = vibevalley_server::content::attachment::Attachments::open(dir.path(), db2.clone());
     let chat = vibevalley_server::collab::channel::Chat::open(db2, &hub2, files, None, false).unwrap();
-    let list = chat.list().unwrap();
+    let list = vibevalley_runtime::rt::block_on(chat.list_async()).unwrap();
     assert_eq!(list[0].id, dev);
     assert_eq!(chat.history(&dev, None, None).unwrap().len(), 1);
     assert!(hub2.read(|s| s.chat.clone()).unwrap().channels.iter().any(|c| c.id == dev));

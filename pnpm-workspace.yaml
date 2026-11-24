@@ -3,6 +3,7 @@ packages:
   - apps/*
   - packages/*
   - apps/mac/ui
+  - scripts/tsrs
 
 # Every version the workspace's packages use, written once: their package.json say "catalog:". With catalogMode strict,
 # pnpm add puts a new version here and writes "catalog:" there; scripts/audit/catalog.test.ts refuses a version written
@@ -42,8 +43,8 @@ overrides:
   "framer-motion>react-dom": "-"
   vite@*: "catalog:"
   vitest@*: "catalog:"
-  # oxlint's type-aware lint and type check on tsrs instead of tsgolint (packages/tsrs/README.md).
-  oxlint-tsgolint: "link:packages/tsrs"
+  # oxlint's type-aware lint and type check on tsrs instead of tsgolint (scripts/tsrs/README.md).
+  oxlint-tsgolint: "link:scripts/tsrs"
 
 # Vite+'s core stands in for vite, so a package asking for vite or vitest takes it whatever range it asks.
 peerDependencyRules:

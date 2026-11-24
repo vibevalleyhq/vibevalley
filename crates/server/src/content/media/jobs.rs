@@ -1305,21 +1305,21 @@ impl Jobs {
         if response.status != 200 || kind != "image/png" {
             return Err(format!("{} {kind}", response.status));
         }
-        let files = self.files.clone();
         let stop_read = stop.clone();
-        let id = id.to_string();
-        crate::spawn_blocking_traced(move || {
+        let bytes = crate::spawn_blocking_traced(move || {
             let bytes = vendor::read_max(&mut response.body, ATTACHMENT_MAX, Some(&stop_read)).map_err(|e| format!("{e:?}"))?;
             if !super::png::valid(&bytes, width, height) {
-                return Err("not the image asked for".into());
+                return Err("not the image asked for".to_string());
             }
-            files
-                .keep(&bytes, &format!("moss-{id}.png"), "image/png")
-                .map(|a| (Some(a), None, None))
-                .map_err(|e| e.message)
+            Ok(bytes)
         })
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())??;
+        self.files
+            .keep_async(bytes, format!("moss-{id}.png"), "image/png".to_string())
+            .await
+            .map(|a| (Some(a), None, None))
+            .map_err(|e| e.message)
     }
 
     async fn fetch_audio_async(&self, url: &str, format: MediaAudioFormat, id: &str, stop: &Stop) -> Result<Kept, String> {
@@ -1390,13 +1390,7 @@ impl Jobs {
     /// Bytes kept for a job: an attachment, or past an attachment's size a pinned input released with the job.
     async fn keep_bytes_async(&self, id: &str, bytes: Vec<u8>, name: &str, kind: &str) -> Result<(Option<Attachment>, Option<MediaInputReference>), String> {
         if bytes.len() <= ATTACHMENT_MAX {
-            let files = self.files.clone();
-            let name = name.to_string();
-            let kind = kind.to_string();
-            let a = crate::spawn_blocking_traced(move || files.keep(&bytes, &name, &kind))
-                .await
-                .map_err(|e| e.to_string())?
-                .map_err(|e| e.message)?;
+            let a = self.files.keep_async(bytes, name.to_string(), kind.to_string()).await.map_err(|e| e.message)?;
             return Ok((Some(a), None));
         }
         let input = self

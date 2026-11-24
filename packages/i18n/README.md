@@ -6,7 +6,7 @@ What is said to a model is not here: it is in `crates/server/assets`.
 | Where | What |
 |---|---|
 | `crates/i18n/locales/<locale>/<namespace>.json` | the catalogs, one file per host and module (`web.setting`, `server.issue`, `cli`, `desktop`, `shared`); zh is the source; the Rust server embeds its own (`server.*`, `cli`, `shared`) |
-| `src/index.ts` | `t(key, params?)`, `list(items)`, `currentLocale`, `setLocale` |
+| `src/index.ts` | `t(key, params?)`, `list(items)`, `currentLocale`, `setLocale`, `format`, `placeholders`, `placeholderKinds` |
 | `src/format.ts` | `{name}`, `{n, plural, …}` (`#` is the count), `{n, selectordinal, …}`, `{flag, select, true {…} other {…}}` |
 | `src/catalogs.ts` | written by `vp run i18n:gen`: the catalogs as data, and every key with its params' types |
 | `crates/i18n/same.json` | messages every language says the same way (a language's own name) |
