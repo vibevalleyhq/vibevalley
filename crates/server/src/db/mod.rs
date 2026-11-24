@@ -1,26 +1,49 @@
-//! Unified dual-backend database door (`ServerDb`, SQLite + PostgreSQL),
-//! schema entities, migrations, and shared column serialization helpers.
+//! Low-level dual-backend database layer (SQLite + PostgreSQL):
+//! connection pools ([`Database`]), schema migrations (`migration/`),
+//! one-table-per-file SeaORM entities (`entity/`), column serialization helpers,
+//! opaque errors ([`DbError`]), and transaction handle ([`Tx`]).
+//!
+//! Business-oriented data operations live in `crate::service::Service`.
+//! No module outside `crate::db` and `crate::service` imports `sea_orm::` or `db::entity`.
 
+use std::future::Future;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
 use sea_orm::sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use sea_orm::{
-    ConnectOptions, ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, SqliteTransactionMode, SqlxSqliteConnector,
-    TransactionOptions, TransactionTrait,
+    ConnectOptions, ConnectionTrait, Database as SeaDatabase, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, SqliteTransactionMode,
+    SqlxSqliteConnector, TransactionOptions, TransactionTrait,
 };
 use sea_orm_migration::MigratorTrait;
+use vibevalley_core::SliceMask;
 
 pub(crate) mod column;
-pub(crate) mod entities;
-pub(crate) mod error;
-pub(crate) mod migration;
+pub(crate) mod entity;
+pub mod error;
+pub mod migration;
+
+pub use error::{DbError, DbResult, internal_db};
+
+/// Active database write transaction passed to `*_in_tx` methods on `crate::service::Service` sub-services.
+pub type Tx = DatabaseTransaction;
+
+/// Boxed `Send` future used by transaction callbacks.
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 const READ_POOL_MAX_CONNECTIONS: u32 = 6;
 const WRITE_POOL_MAX_CONNECTIONS: u32 = 1;
 const DEFAULT_POSTGRES_MAX_CONNECTIONS: u32 = 16;
+
+/// Database engine backing a [`Database`] instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DbBackend {
+    Sqlite,
+    Postgres,
+}
 
 fn redact_db_url(raw: &str) -> String {
     if let Ok(mut parsed) = url::Url::parse(raw) {
@@ -38,14 +61,14 @@ fn redact_db_url(raw: &str) -> String {
     raw.to_owned()
 }
 
-fn parse_sqlite_url(url: &str) -> Result<PathBuf, DbErr> {
+fn parse_sqlite_url(url: &str) -> DbResult<PathBuf> {
     let raw = url
         .strip_prefix("sqlite://")
         .or_else(|| url.strip_prefix("sqlite:"))
-        .ok_or_else(|| DbErr::Custom("expected sqlite: database URL".into()))?;
+        .ok_or_else(|| DbError::custom("expected sqlite: database URL"))?;
     let path_part = raw.split('?').next().unwrap_or(raw);
     if path_part.is_empty() || path_part == ":memory:" {
-        return Err(DbErr::Custom("sqlite URL must reference a database file path".into()));
+        return Err(DbError::custom("sqlite URL must reference a database file path"));
     }
     Ok(PathBuf::from(path_part))
 }
@@ -70,10 +93,10 @@ impl std::fmt::Debug for DatabaseConfig {
 }
 
 impl DatabaseConfig {
-    pub fn from_url(url: &str) -> Result<Self, DbErr> {
+    pub fn from_url(url: &str) -> DbResult<Self> {
         let trimmed = url.trim();
         if trimmed.starts_with("postgres://") || trimmed.starts_with("postgresql://") {
-            let _ = url::Url::parse(trimmed).map_err(|e| DbErr::Custom(format!("invalid postgres URL ({}): {e}", redact_db_url(trimmed))))?;
+            let _ = url::Url::parse(trimmed).map_err(|e| DbError::custom(format!("invalid postgres URL ({}): {e}", redact_db_url(trimmed))))?;
             return Ok(Self::Postgres {
                 url: trimmed.to_owned(),
                 max_connections: DEFAULT_POSTGRES_MAX_CONNECTIONS,
@@ -84,7 +107,7 @@ impl DatabaseConfig {
                 path: parse_sqlite_url(trimmed)?,
             });
         }
-        Err(DbErr::Custom(format!("unsupported database URL scheme: {}", redact_db_url(trimmed))))
+        Err(DbError::custom(format!("unsupported database URL scheme: {}", redact_db_url(trimmed))))
     }
 }
 
@@ -93,11 +116,11 @@ enum DbBackendState {
     Postgres,
 }
 
-/// Single shared dual-backend database door (`ServerDb`):
+/// Single shared dual-backend database handle:
 /// - On SQLite: split WAL-mode pools (`write_pool` max=1, `read_pool` max=6 read-only)
 ///   wrapped into SeaORM `DatabaseConnection`s via `SqlxSqliteConnector`.
 /// - On PostgreSQL: pooled SeaORM `DatabaseConnection` shared by readers and writers.
-pub struct ServerDb {
+pub struct Database {
     config: DatabaseConfig,
     backend_state: DbBackendState,
     read_conn: DatabaseConnection,
@@ -105,76 +128,74 @@ pub struct ServerDb {
     durable: Mutex<Option<vibevalley_runtime::agent::durable::Store>>,
 }
 
-impl ServerDb {
-    /// Opens `<home>/server.db` with split read/write connections and initializes all schemas once.
-    pub fn open(home: &Path) -> Result<Arc<Self>, DbErr> {
-        Self::open_at(&home.join("server.db"))
+impl Database {
+    /// Opens `<home>/server.db` with split read/write connections and runs all migrations.
+    pub async fn open(home: &Path) -> DbResult<Arc<Self>> {
+        Self::open_at(&home.join("server.db")).await
     }
 
-    /// Opens `path` with split read/write connections and initializes all schemas once.
-    pub fn open_at(path: &Path) -> Result<Arc<Self>, DbErr> {
-        Self::open_config(&DatabaseConfig::Sqlite { path: path.to_path_buf() })
+    /// Opens `path` with split read/write connections and runs all migrations.
+    pub async fn open_at(path: &Path) -> DbResult<Arc<Self>> {
+        Self::open_config(&DatabaseConfig::Sqlite { path: path.to_path_buf() }).await
     }
 
     /// Opens a SQLite or PostgreSQL database from a URL (`sqlite:...`, `postgres://...`, `postgresql://...`).
-    pub fn open_url(url: &str) -> Result<Arc<Self>, DbErr> {
+    pub async fn open_url(url: &str) -> DbResult<Arc<Self>> {
         let config = DatabaseConfig::from_url(url)?;
-        Self::open_config(&config)
+        Self::open_config(&config).await
     }
 
-    /// Opens a SQLite or PostgreSQL database from [`DatabaseConfig`] and runs both server and durable migrations.
-    pub fn open_config(config: &DatabaseConfig) -> Result<Arc<Self>, DbErr> {
+    /// Opens a SQLite or PostgreSQL database from [`DatabaseConfig`] and runs server and durable migrations.
+    pub async fn open_config(config: &DatabaseConfig) -> DbResult<Arc<Self>> {
         let config_owned = config.clone();
         if let DatabaseConfig::Sqlite { path } = &config_owned
             && let Some(parent) = path.parent()
             && !parent.as_os_str().is_empty()
         {
-            let _ = std::fs::create_dir_all(parent);
+            let _ = tokio::fs::create_dir_all(parent).await;
         }
 
-        let (backend_state, read_conn, write_conn) = vibevalley_runtime::rt::block_on(async {
-            match &config_owned {
-                DatabaseConfig::Sqlite { path } => {
-                    let write_options = SqliteConnectOptions::new()
-                        .filename(path)
-                        .create_if_missing(true)
-                        .busy_timeout(Duration::from_secs(5))
-                        .journal_mode(SqliteJournalMode::Wal)
-                        .synchronous(SqliteSynchronous::Normal)
-                        .foreign_keys(true);
-                    let write_pool = SqlitePoolOptions::new()
-                        .max_connections(WRITE_POOL_MAX_CONNECTIONS)
-                        .min_connections(1)
-                        .connect_with(write_options)
-                        .await
-                        .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
-                    let write_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool);
-                    crate::db::migration::Migrator::up(&write_conn, None).await?;
-                    vibevalley_runtime::agent::durable::migration::Migrator::up(&write_conn, None).await?;
+        let (backend_state, read_conn, write_conn) = match &config_owned {
+            DatabaseConfig::Sqlite { path } => {
+                let write_options = SqliteConnectOptions::new()
+                    .filename(path)
+                    .create_if_missing(true)
+                    .busy_timeout(Duration::from_secs(5))
+                    .journal_mode(SqliteJournalMode::Wal)
+                    .synchronous(SqliteSynchronous::Normal)
+                    .foreign_keys(true);
+                let write_pool = SqlitePoolOptions::new()
+                    .max_connections(WRITE_POOL_MAX_CONNECTIONS)
+                    .min_connections(1)
+                    .connect_with(write_options)
+                    .await
+                    .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
+                let write_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool);
+                crate::db::migration::Migrator::up(&write_conn, None).await?;
+                vibevalley_runtime::agent::durable::migration::Migrator::up(&write_conn, None).await?;
 
-                    let read_options = SqliteConnectOptions::new().filename(path).read_only(true).busy_timeout(Duration::from_secs(5));
-                    let read_pool = SqlitePoolOptions::new()
-                        .max_connections(READ_POOL_MAX_CONNECTIONS)
-                        .min_connections(1)
-                        .connect_with(read_options)
-                        .await
-                        .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
-                    let read_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(read_pool);
+                let read_options = SqliteConnectOptions::new().filename(path).read_only(true).busy_timeout(Duration::from_secs(5));
+                let read_pool = SqlitePoolOptions::new()
+                    .max_connections(READ_POOL_MAX_CONNECTIONS)
+                    .min_connections(1)
+                    .connect_with(read_options)
+                    .await
+                    .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
+                let read_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(read_pool);
 
-                    Ok::<_, DbErr>((DbBackendState::Sqlite { path: path.clone() }, read_conn, write_conn))
-                }
-                DatabaseConfig::Postgres { url, max_connections } => {
-                    let mut opts = ConnectOptions::new(url);
-                    opts.max_connections((*max_connections).max(1)).sqlx_logging(false);
-                    let conn = Database::connect(opts).await.inspect_err(|err| {
-                        tracing::error!(url = %redact_db_url(url), error = %err, "failed to connect to postgres database");
-                    })?;
-                    crate::db::migration::Migrator::up(&conn, None).await?;
-                    vibevalley_runtime::agent::durable::migration::Migrator::up(&conn, None).await?;
-                    Ok::<_, DbErr>((DbBackendState::Postgres, conn.clone(), conn))
-                }
+                (DbBackendState::Sqlite { path: path.clone() }, read_conn, write_conn)
             }
-        })?;
+            DatabaseConfig::Postgres { url, max_connections } => {
+                let mut opts = ConnectOptions::new(url);
+                opts.max_connections((*max_connections).max(1)).sqlx_logging(false);
+                let conn = SeaDatabase::connect(opts).await.inspect_err(|err| {
+                    tracing::error!(url = %redact_db_url(url), error = %err, "failed to connect to postgres database");
+                })?;
+                crate::db::migration::Migrator::up(&conn, None).await?;
+                vibevalley_runtime::agent::durable::migration::Migrator::up(&conn, None).await?;
+                (DbBackendState::Postgres, conn.clone(), conn)
+            }
+        };
 
         Ok(Arc::new(Self {
             config: config_owned,
@@ -185,16 +206,19 @@ impl ServerDb {
         }))
     }
 
-    pub fn write_conn(&self) -> &DatabaseConnection {
+    pub(crate) fn write_conn(&self) -> &DatabaseConnection {
         &self.write_conn
     }
 
-    pub fn read_conn(&self) -> &DatabaseConnection {
+    pub(crate) fn read_conn(&self) -> &DatabaseConnection {
         &self.read_conn
     }
 
-    pub fn backend(&self) -> DatabaseBackend {
-        self.write_conn.get_database_backend()
+    pub fn backend(&self) -> DbBackend {
+        match self.write_conn.get_database_backend() {
+            DatabaseBackend::Postgres => DbBackend::Postgres,
+            _ => DbBackend::Sqlite,
+        }
     }
 
     pub fn is_postgres(&self) -> bool {
@@ -205,16 +229,16 @@ impl ServerDb {
         &self.config
     }
 
-    pub fn path(&self) -> &Path {
+    pub fn path(&self) -> Option<&Path> {
         match &self.backend_state {
-            DbBackendState::Sqlite { path } => path,
-            DbBackendState::Postgres => panic!("ServerDb::path() is only available on SQLite"),
+            DbBackendState::Sqlite { path } => Some(path.as_path()),
+            DbBackendState::Postgres => None,
         }
     }
 
-    /// Returns the process-wide `durable::Store` handle backed by this `ServerDb`
+    /// Returns the process-wide `durable::Store` handle backed by this [`Database`]
     /// via `Store::from_sea_orm_conns`.
-    pub(crate) fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
+    pub fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
         let mut slot = self.durable.lock();
         if let Some(store) = slot.as_ref() {
             return Ok(store.clone());
@@ -235,7 +259,7 @@ impl ServerDb {
 
     /// Coordinated async database shutdown: closes the durable store handle, then closes
     /// SQLite connections (with WAL `TRUNCATE` + `PRAGMA optimize`) or the PostgreSQL pool.
-    pub async fn close_async(&self) {
+    pub async fn close(&self) {
         if let Some(store) = self.durable.lock().take() {
             let _ = store.close();
         }
@@ -251,246 +275,107 @@ impl ServerDb {
         }
     }
 
-    /// Coordinated database shutdown: closes the durable store handle, then closes
-    /// SQLite connections (with WAL `TRUNCATE` + `PRAGMA optimize`) or the PostgreSQL pool.
-    pub fn close(&self) {
-        vibevalley_runtime::rt::block_on(self.close_async());
+    /// Alias for [`Self::close`].
+    pub async fn close_async(&self) {
+        self.close().await;
     }
 
-    /// Runs an async SeaORM write transaction whose closure returns `(T, SliceMask)`.
+    /// Opens an explicit write transaction (`BEGIN IMMEDIATE` on SQLite).
+    pub async fn begin_tx(&self) -> DbResult<Tx> {
+        begin_write_tx(&self.write_conn).await
+    }
+
+    /// Runs an async write transaction, committing on `Ok` and rolling back on `Err`.
+    pub async fn transaction<T, E>(&self, f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<T, E>> + Send) -> Result<T, E>
+    where
+        E: From<DbError>,
+    {
+        self.transaction_with(E::from, f).await
+    }
+
+    /// Runs an async write transaction like [`Self::transaction`] with an explicit [`DbError`] mapper.
+    pub async fn transaction_with<T, E>(
+        &self,
+        mut map_err: impl FnMut(DbError) -> E,
+        f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<T, E>> + Send,
+    ) -> Result<T, E> {
+        let tx = begin_write_tx(&self.write_conn).await.map_err(&mut map_err)?;
+        match f(&tx).await {
+            Ok(val) => {
+                commit_tx(tx).await.map_err(map_err)?;
+                Ok(val)
+            }
+            Err(err) => {
+                let _ = rollback_tx(tx).await;
+                Err(err)
+            }
+        }
+    }
+
+    /// Runs an async write transaction whose closure returns `(T, SliceMask)`.
     /// Commits only on `Ok` and rolls back on `Err`, guaranteeing dirty slice masks are
     /// never surfaced from a failed or rolled-back transaction.
-    #[allow(dead_code)]
-    pub(crate) async fn write_dirty<T, E>(
-        &self,
-        f: impl for<'a> FnOnce(&'a DatabaseTransaction) -> crate::transport::api::BoxFuture<'a, Result<(T, vibevalley_core::SliceMask), E>> + Send,
-    ) -> Result<(T, vibevalley_core::SliceMask), E>
+    pub async fn write_dirty<T, E>(&self, f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<(T, SliceMask), E>> + Send) -> Result<(T, SliceMask), E>
     where
-        E: From<DbErr>,
+        E: From<DbError>,
     {
         self.write_dirty_with(E::from, f).await
     }
 
-    /// Runs an async SeaORM write transaction like [`Self::write_dirty`] with an explicit `DbErr` mapper.
-    #[allow(dead_code)]
-    pub(crate) async fn write_dirty_with<T, E>(
+    /// Runs an async write transaction like [`Self::write_dirty`] with an explicit [`DbError`] mapper.
+    pub async fn write_dirty_with<T, E>(
         &self,
-        mut map_err: impl FnMut(DbErr) -> E,
-        f: impl for<'a> FnOnce(&'a DatabaseTransaction) -> crate::transport::api::BoxFuture<'a, Result<(T, vibevalley_core::SliceMask), E>> + Send,
-    ) -> Result<(T, vibevalley_core::SliceMask), E> {
+        mut map_err: impl FnMut(DbError) -> E,
+        f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<(T, SliceMask), E>> + Send,
+    ) -> Result<(T, SliceMask), E> {
         let tx = begin_write_tx(&self.write_conn).await.map_err(&mut map_err)?;
         match f(&tx).await {
             Ok((val, dirty)) => {
-                tx.commit().await.map_err(map_err)?;
+                commit_tx(tx).await.map_err(map_err)?;
                 Ok((val, dirty))
             }
             Err(err) => {
-                let _ = tx.rollback().await;
-                Err(err)
-            }
-        }
-    }
-}
-
-#[allow(dead_code)]
-pub(crate) const OUTBOX_STATUS_PENDING: &str = "pending";
-#[allow(dead_code)]
-pub(crate) const OUTBOX_STATUS_PROCESSING: &str = "processing";
-#[allow(dead_code)]
-pub(crate) const OUTBOX_STATUS_DONE: &str = "done";
-#[allow(dead_code)]
-pub(crate) const OUTBOX_STATUS_FAILED: &str = "failed";
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct OutboxItemRow {
-    pub id: i64,
-    pub topic: String,
-    pub payload_json: String,
-    pub status: String,
-    pub attempts: i64,
-    pub available_at: i64,
-    pub created_at: i64,
-    pub last_error: Option<String>,
-}
-
-impl From<entities::shared::outbox_item::Model> for OutboxItemRow {
-    fn from(model: entities::shared::outbox_item::Model) -> Self {
-        Self {
-            id: model.id,
-            topic: model.topic,
-            payload_json: model.payload_json,
-            status: model.status,
-            attempts: model.attempts,
-            available_at: model.available_at,
-            created_at: model.created_at,
-            last_error: model.last_error,
-        }
-    }
-}
-
-#[allow(dead_code)]
-impl ServerDb {
-    pub(crate) async fn insert_outbox_item_in_tx(tx: &DatabaseTransaction, topic: &str, payload_json: &str, now_ms: i64) -> Result<i64, DbErr> {
-        use sea_orm::{ActiveModelTrait, ActiveValue::Set};
-
-        let saved = entities::shared::outbox_item::ActiveModel {
-            topic: Set(topic.to_owned()),
-            payload_json: Set(payload_json.to_owned()),
-            status: Set(OUTBOX_STATUS_PENDING.to_owned()),
-            attempts: Set(0),
-            available_at: Set(now_ms),
-            created_at: Set(now_ms),
-            last_error: Set(None),
-            ..Default::default()
-        }
-        .insert(tx)
-        .await?;
-        Ok(saved.id)
-    }
-
-    /// Requeues any rows left in `processing` from an unclean shutdown back to `pending`.
-    pub(crate) async fn recover_processing_outbox(&self, now_ms: i64) -> Result<u64, DbErr> {
-        use sea_orm::sea_query::Expr;
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-
-        let res = entities::shared::outbox_item::Entity::update_many()
-            .col_expr(entities::shared::outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_PENDING))
-            .col_expr(entities::shared::outbox_item::Column::AvailableAt, Expr::value(now_ms))
-            .filter(entities::shared::outbox_item::Column::Status.eq(OUTBOX_STATUS_PROCESSING))
-            .exec(&self.write_conn)
-            .await?;
-        Ok(res.rows_affected)
-    }
-
-    /// Atomically claims up to `limit` due `pending` outbox rows, marking them `processing`
-    /// and incrementing `attempts`.
-    pub(crate) async fn claim_pending_outbox(&self, now_ms: i64, limit: u64) -> Result<Vec<OutboxItemRow>, DbErr> {
-        use sea_orm::sea_query::Expr;
-        use sea_orm::{ColumnTrait, EntityTrait, ExprTrait, QueryFilter, QueryOrder, QuerySelect};
-
-        if limit == 0 {
-            return Ok(Vec::new());
-        }
-        let tx = begin_write_tx(&self.write_conn).await?;
-        let outcome: Result<Vec<OutboxItemRow>, DbErr> = async {
-            let candidates = entities::shared::outbox_item::Entity::find()
-                .filter(entities::shared::outbox_item::Column::Status.eq(OUTBOX_STATUS_PENDING))
-                .filter(entities::shared::outbox_item::Column::AvailableAt.lte(now_ms))
-                .order_by_asc(entities::shared::outbox_item::Column::AvailableAt)
-                .order_by_asc(entities::shared::outbox_item::Column::Id)
-                .limit(limit)
-                .all(&tx)
-                .await?;
-            if candidates.is_empty() {
-                return Ok(Vec::new());
-            }
-            let ids: Vec<i64> = candidates.into_iter().map(|row| row.id).collect();
-            let mut claimed = entities::shared::outbox_item::Entity::update_many()
-                .col_expr(entities::shared::outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_PROCESSING))
-                .col_expr(
-                    entities::shared::outbox_item::Column::Attempts,
-                    Expr::col(entities::shared::outbox_item::Column::Attempts).add(1i64),
-                )
-                .filter(entities::shared::outbox_item::Column::Id.is_in(ids))
-                .filter(entities::shared::outbox_item::Column::Status.eq(OUTBOX_STATUS_PENDING))
-                .exec_with_returning(&tx)
-                .await?;
-            claimed.sort_by_key(|row| (row.available_at, row.id));
-            Ok(claimed.into_iter().map(OutboxItemRow::from).collect())
-        }
-        .await;
-        match outcome {
-            Ok(rows) => {
-                tx.commit().await?;
-                Ok(rows)
-            }
-            Err(err) => {
-                let _ = tx.rollback().await;
+                let _ = rollback_tx(tx).await;
                 Err(err)
             }
         }
     }
 
-    pub(crate) async fn next_pending_outbox_at(&self) -> Result<Option<i64>, DbErr> {
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
-
-        let row = entities::shared::outbox_item::Entity::find()
-            .filter(entities::shared::outbox_item::Column::Status.eq(OUTBOX_STATUS_PENDING))
-            .order_by_asc(entities::shared::outbox_item::Column::AvailableAt)
-            .order_by_asc(entities::shared::outbox_item::Column::Id)
-            .limit(1)
-            .one(&self.read_conn)
-            .await?;
-        Ok(row.map(|m| m.available_at))
+    /// Atomically allocates the next monotonic counter value strictly above `at_least`.
+    pub async fn next_seq(&self, name: &str, at_least: i64) -> DbResult<i64> {
+        next_seq_impl(&self.write_conn, name, at_least).await
     }
 
-    pub(crate) async fn complete_outbox_item(&self, id: i64) -> Result<(), DbErr> {
-        use sea_orm::sea_query::Expr;
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-
-        entities::shared::outbox_item::Entity::update_many()
-            .col_expr(entities::shared::outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_DONE))
-            .col_expr(entities::shared::outbox_item::Column::LastError, Expr::value(Option::<String>::None))
-            .filter(entities::shared::outbox_item::Column::Id.eq(id))
-            .exec(&self.write_conn)
-            .await?;
-        Ok(())
-    }
-
-    pub(crate) async fn reschedule_outbox_item(&self, id: i64, available_at: i64, error: &str) -> Result<(), DbErr> {
-        use sea_orm::sea_query::Expr;
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-
-        entities::shared::outbox_item::Entity::update_many()
-            .col_expr(entities::shared::outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_PENDING))
-            .col_expr(entities::shared::outbox_item::Column::AvailableAt, Expr::value(available_at))
-            .col_expr(entities::shared::outbox_item::Column::LastError, Expr::value(Some(error.to_owned())))
-            .filter(entities::shared::outbox_item::Column::Id.eq(id))
-            .exec(&self.write_conn)
-            .await?;
-        Ok(())
-    }
-
-    pub(crate) async fn fail_outbox_item(&self, id: i64, error: &str) -> Result<(), DbErr> {
-        use sea_orm::sea_query::Expr;
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-
-        entities::shared::outbox_item::Entity::update_many()
-            .col_expr(entities::shared::outbox_item::Column::Status, Expr::value(OUTBOX_STATUS_FAILED))
-            .col_expr(entities::shared::outbox_item::Column::LastError, Expr::value(Some(error.to_owned())))
-            .filter(entities::shared::outbox_item::Column::Id.eq(id))
-            .exec(&self.write_conn)
-            .await?;
-        Ok(())
-    }
-
-    #[cfg(test)]
-    pub(crate) async fn list_outbox_items(&self) -> Result<Vec<OutboxItemRow>, DbErr> {
-        use sea_orm::{EntityTrait, QueryOrder};
-
-        let rows = entities::shared::outbox_item::Entity::find()
-            .order_by_asc(entities::shared::outbox_item::Column::Id)
-            .all(&self.read_conn)
-            .await?;
-        Ok(rows.into_iter().map(OutboxItemRow::from).collect())
+    /// Atomically allocates the next monotonic counter value strictly above `at_least` inside `tx`.
+    pub async fn next_seq_in_tx(&self, tx: &Tx, name: &str, at_least: i64) -> DbResult<i64> {
+        next_seq_impl(tx, name, at_least).await
     }
 }
 
-pub(crate) async fn next_seq_async(db: &impl sea_orm::ConnectionTrait, name: &str, at_least: i64) -> Result<i64, DbErr> {
+/// Commits an explicit [`Tx`] opened via [`Database::begin_tx`].
+pub async fn commit_tx(tx: Tx) -> DbResult<()> {
+    tx.commit().await.map_err(DbError::from)
+}
+
+/// Rolls back an explicit [`Tx`] opened via [`Database::begin_tx`].
+pub async fn rollback_tx(tx: Tx) -> DbResult<()> {
+    tx.rollback().await.map_err(DbError::from)
+}
+
+async fn next_seq_impl(db: &impl ConnectionTrait, name: &str, at_least: i64) -> DbResult<i64> {
     use sea_orm::sea_query::{Expr, OnConflict};
     use sea_orm::{ActiveValue::Set, EntityTrait, ExprTrait};
 
-    let model = entities::shared::seq_counter::ActiveModel {
+    let model = entity::seq_counter::ActiveModel {
         name: Set(name.to_owned()),
         last_number: Set(at_least + 1),
     };
-    let current = Expr::col((entities::shared::seq_counter::Entity, entities::shared::seq_counter::Column::LastNumber));
+    let current = Expr::col((entity::seq_counter::Entity, entity::seq_counter::Column::LastNumber));
     let next_expr = Expr::expr(Expr::case(current.clone().gt(at_least), current).finally(at_least)).add(1);
-    let on_conflict = OnConflict::column(entities::shared::seq_counter::Column::Name)
-        .value(entities::shared::seq_counter::Column::LastNumber, next_expr)
+    let on_conflict = OnConflict::column(entity::seq_counter::Column::Name)
+        .value(entity::seq_counter::Column::LastNumber, next_expr)
         .to_owned();
-    let saved = entities::shared::seq_counter::Entity::insert(model)
+    let saved = entity::seq_counter::Entity::insert(model)
         .on_conflict(on_conflict)
         .exec_with_returning(db)
         .await?;
@@ -498,7 +383,7 @@ pub(crate) async fn next_seq_async(db: &impl sea_orm::ConnectionTrait, name: &st
 }
 
 /// Opens a write transaction, using `BEGIN IMMEDIATE` on SQLite so writers serialize at begin.
-pub(crate) async fn begin_write_tx(conn: &DatabaseConnection) -> Result<DatabaseTransaction, DbErr> {
+pub(crate) async fn begin_write_tx(conn: &DatabaseConnection) -> DbResult<Tx> {
     let opts = match conn.get_database_backend() {
         DatabaseBackend::Sqlite => TransactionOptions {
             sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
@@ -506,25 +391,7 @@ pub(crate) async fn begin_write_tx(conn: &DatabaseConnection) -> Result<Database
         },
         _ => TransactionOptions::default(),
     };
-    conn.begin_with_options(opts).await
-}
-
-pub(crate) async fn write_tx<T, E>(
-    db: &DatabaseConnection,
-    map_err: fn(DbErr) -> E,
-    f: impl for<'a> FnOnce(&'a DatabaseTransaction) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, E>> + Send + 'a>> + Send,
-) -> Result<T, E> {
-    let tx = begin_write_tx(db).await.map_err(map_err)?;
-    match f(&tx).await {
-        Ok(val) => {
-            tx.commit().await.map_err(map_err)?;
-            Ok(val)
-        }
-        Err(err) => {
-            let _ = tx.rollback().await;
-            Err(err)
-        }
-    }
+    conn.begin_with_options(opts).await.map_err(DbError::from)
 }
 
 #[cfg(test)]
@@ -604,16 +471,13 @@ pub(crate) mod test_pg {
             })
         }
 
-        pub(crate) fn create_database(&self, db_name: &str) {
+        pub(crate) async fn create_database(&self, db_name: &str) {
             let admin_url = format!("postgres://postgres@127.0.0.1:{}/postgres", self.port);
-            let name = db_name.to_owned();
-            vibevalley_runtime::rt::block_on(async move {
-                let db = Database::connect(&admin_url).await.expect("connect postgres admin db");
-                db.execute_unprepared(&format!("CREATE DATABASE \"{name}\""))
-                    .await
-                    .expect("create test database");
-                db.close().await.expect("close admin db");
-            });
+            let db = Database::connect(&admin_url).await.expect("connect postgres admin db");
+            db.execute_unprepared(&format!("CREATE DATABASE \"{db_name}\""))
+                .await
+                .expect("create test database");
+            db.close().await.expect("close admin db");
         }
 
         pub(crate) fn db_url(&self, db_name: &str) -> String {
@@ -636,317 +500,23 @@ pub(crate) mod test_pg {
 mod tests {
     use std::time::{Duration, Instant};
 
+    use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait, PaginatorTrait};
+
     use super::*;
 
-    #[test]
-    fn concurrent_reads_succeed_immediately_while_write_tx_holds_begin_immediate() {
-        use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait, PaginatorTrait};
-
-        use crate::db::begin_write_tx;
-        use crate::db::entities::collab_channel::channel;
-
-        fn make_channel(id: &str, name: &str, default: bool, created_at: i64) -> channel::ActiveModel {
-            channel::ActiveModel {
-                id: Set(id.into()),
-                channel_type: Set("channel".into()),
-                is_default: Set(default),
-                root_id: Set(None),
-                root_number: Set(None),
-                subject_kind: Set(None),
-                subject_id: Set(None),
-                last_number: Set(None),
-                reply_count: Set(0),
-                created_at: Set(created_at),
-                name: Set(Some(name.into())),
-                description: Set(None),
-                repo: Set(None),
-                parent_id: Set(None),
-                peer_id: Set(None),
-                revision: Set(1),
-                category: Set(None),
-                position: Set(None),
-                archived_at: Set(None),
-                notify: Set("all".into()),
-            }
-        }
-
-        let dir = tempfile::tempdir().unwrap();
-        let db = ServerDb::open(dir.path()).unwrap();
-
-        vibevalley_runtime::rt::block_on(async {
-            make_channel("c1", "general", true, 100).insert(db.write_conn()).await.unwrap();
-        });
-
-        // Hold an open BEGIN IMMEDIATE write transaction with an uncommitted row.
-        let write_tx = vibevalley_runtime::rt::block_on(async {
-            let tx = begin_write_tx(db.write_conn()).await.unwrap();
-            make_channel("c2", "pending", false, 200).insert(&tx).await.unwrap();
-            tx
-        });
-
-        // Multiple concurrent read_conn() calls must succeed immediately against the WAL snapshot
-        // without blocking on the active write transaction or hitting SQLite busy_timeout.
-        let started = Instant::now();
-        let mut threads = Vec::new();
-        for _ in 0..6 {
-            let db = db.clone();
-            threads.push(std::thread::spawn(move || {
-                vibevalley_runtime::rt::block_on(async { channel::Entity::find().count(db.read_conn()).await.unwrap() })
-            }));
-        }
-        let counts: Vec<u64> = threads.into_iter().map(|t| t.join().unwrap()).collect();
-        let elapsed = started.elapsed();
-        assert_eq!(counts, vec![1; 6], "readers must see committed WAL snapshot while writer holds BEGIN IMMEDIATE");
-        assert!(
-            elapsed < Duration::from_secs(1),
-            "concurrent read_conn queries took too long while write tx open: {elapsed:?}"
-        );
-
-        // Verify read_conn enforces read_only(true).
-        let write_on_read_conn = vibevalley_runtime::rt::block_on(async { make_channel("c3", "illegal", false, 300).insert(db.read_conn()).await });
-        assert!(write_on_read_conn.is_err(), "read_conn must reject writes");
-
-        // Commit the write transaction.
-        vibevalley_runtime::rt::block_on(write_tx.commit()).unwrap();
-
-        // New reads immediately see the committed write.
-        let after = vibevalley_runtime::rt::block_on(async { channel::Entity::find().count(db.read_conn()).await.unwrap() });
-        assert_eq!(after, 2);
-
-        // Coordinated shutdown closes read_conn first, checkpoints WAL (TRUNCATE), and closes write_conn.
-        db.close();
-        drop(db);
-
-        let reopened = ServerDb::open(dir.path()).unwrap();
-        let persisted = vibevalley_runtime::rt::block_on(async { channel::Entity::find().count(reopened.read_conn()).await.unwrap() });
-        assert_eq!(persisted, 2);
-        reopened.close();
-    }
-
-    #[test]
-    fn async_write_and_read_conns_work_inside_send_futures() {
-        use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
-
-        use crate::db::entities::collab_channel::channel;
-
-        let dir = tempfile::tempdir().unwrap();
-        let db = ServerDb::open(dir.path()).unwrap();
-        let db_task = db.clone();
-        let count = vibevalley_runtime::rt::block_on(async move {
-            vibevalley_runtime::rt::spawn(async move {
-                channel::ActiveModel {
-                    id: Set("async-c1".into()),
-                    channel_type: Set("channel".into()),
-                    is_default: Set(false),
-                    root_id: Set(None),
-                    root_number: Set(None),
-                    subject_kind: Set(None),
-                    subject_id: Set(None),
-                    last_number: Set(None),
-                    reply_count: Set(0),
-                    created_at: Set(100),
-                    name: Set(Some("async".into())),
-                    description: Set(None),
-                    repo: Set(None),
-                    parent_id: Set(None),
-                    peer_id: Set(None),
-                    revision: Set(1),
-                    category: Set(None),
-                    position: Set(None),
-                    archived_at: Set(None),
-                    notify: Set("all".into()),
-                }
-                .insert(db_task.write_conn())
-                .await?;
-
-                channel::Entity::find()
-                    .filter(channel::Column::Id.eq("async-c1"))
-                    .count(db_task.read_conn())
-                    .await
-            })
-            .await
-            .unwrap()
-        })
-        .unwrap();
-        assert_eq!(count, 1);
-        db.close();
-    }
-
-    #[test]
-    fn concurrent_server_db_and_durable_writes_serialize_without_busy_or_deadlock() {
-        use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait, PaginatorTrait};
-
-        use crate::db::begin_write_tx;
-        use crate::db::entities::collab_channel::channel;
-
-        let dir = tempfile::tempdir().unwrap();
-        let db = ServerDb::open(dir.path()).unwrap();
-        let durable = db.durable().unwrap();
-
-        let server_threads = 4;
-        let durable_threads = 4;
-        let reader_threads = 2;
-        let ops_per_thread = 25;
-        let barrier = Arc::new(std::sync::Barrier::new(server_threads + durable_threads + reader_threads));
-
-        std::thread::scope(|scope| {
-            for t in 0..server_threads {
-                let db = db.clone();
-                let barrier = barrier.clone();
-                scope.spawn(move || {
-                    barrier.wait();
-                    for i in 0..ops_per_thread {
-                        let id = format!("ch-{t}-{i}");
-                        let name = format!("channel-{t}-{i}");
-                        vibevalley_runtime::rt::block_on(async {
-                            let tx = begin_write_tx(db.write_conn()).await?;
-                            channel::ActiveModel {
-                                id: Set(id),
-                                channel_type: Set("channel".into()),
-                                is_default: Set(false),
-                                root_id: Set(None),
-                                root_number: Set(None),
-                                subject_kind: Set(None),
-                                subject_id: Set(None),
-                                last_number: Set(None),
-                                reply_count: Set(0),
-                                created_at: Set((t * ops_per_thread + i) as i64),
-                                name: Set(Some(name)),
-                                description: Set(None),
-                                repo: Set(None),
-                                parent_id: Set(None),
-                                peer_id: Set(None),
-                                revision: Set(1),
-                                category: Set(None),
-                                position: Set(None),
-                                archived_at: Set(None),
-                                notify: Set("all".into()),
-                            }
-                            .insert(&tx)
-                            .await?;
-                            tx.commit().await
-                        })
-                        .expect("ServerDb::write_conn write must serialize cleanly without SQLITE_BUSY");
-                    }
-                });
-            }
-
-            for t in 0..durable_threads {
-                let durable = durable.clone();
-                let barrier = barrier.clone();
-                scope.spawn(move || {
-                    barrier.wait();
-                    for i in 0..ops_per_thread {
-                        let doc_id = format!("doc-{t}-{i}");
-                        let payload = serde_json::json!({ "thread": t, "iter": i });
-                        durable
-                            .write(|tx| {
-                                tx.put_document("stress", &doc_id, "item", &payload)?;
-                                Ok(())
-                            })
-                            .expect("durable.write must serialize cleanly without SQLITE_BUSY");
-                    }
-                });
-            }
-
-            for _ in 0..reader_threads {
-                let db = db.clone();
-                let durable = durable.clone();
-                let barrier = barrier.clone();
-                scope.spawn(move || {
-                    barrier.wait();
-                    for _ in 0..ops_per_thread {
-                        let _ = vibevalley_runtime::rt::block_on(async { channel::Entity::find().count(db.read_conn()).await })
-                            .expect("concurrent ServerDb::read_conn must succeed");
-                        let _ = durable
-                            .read(|r| r.documents_by_kind("stress", "item"))
-                            .expect("concurrent durable.read must succeed");
-                    }
-                });
-            }
-        });
-
-        let channel_count = vibevalley_runtime::rt::block_on(async { channel::Entity::find().count(db.read_conn()).await }).unwrap();
-        assert_eq!(channel_count, (server_threads * ops_per_thread) as u64);
-
-        let durable_docs = durable.read(|r| r.documents_by_kind("stress", "item")).unwrap();
-        assert_eq!(durable_docs.len(), durable_threads * ops_per_thread);
-
-        // Writer connection must remain usable after durable writes finish.
-        let tx = vibevalley_runtime::rt::block_on(begin_write_tx(db.write_conn())).expect("write_conn must not be starved by durable");
-        vibevalley_runtime::rt::block_on(tx.rollback()).unwrap();
-
-        db.close();
-    }
-
-    async fn verify_dual_db_core(db: &Arc<ServerDb>, expected_backend: DatabaseBackend) {
-        use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
-
-        use crate::db::entities::{
-            collab_channel::{channel, channel_delivery, channel_event, channel_message, channel_participant},
-            collab_connector::{connector_account, connector_inbound, connector_outbox},
-            content_artifact::artifact,
-            content_attachment::attachment,
-            content_library::media_library_item,
-            content_media::{media_input, media_input_pin, media_job},
-            infra_remote::{remote_config, remote_device},
-            team_memory::memory,
-            work_cron::cron,
-            work_issue::issue,
-            work_pull::{pull, pull_event},
-            work_session::{session, session_event, session_mailbox, session_run},
-        };
-        use crate::db::error::{is_fk_violation, is_unique_violation};
-        use crate::db::next_seq_async;
-
-        assert_eq!(db.backend(), expected_backend);
-        assert_eq!(db.is_postgres(), expected_backend == DatabaseBackend::Postgres);
-
-        let w = db.write_conn();
-        let r = db.read_conn();
-
-        assert_eq!(next_seq_async(w, "issue", 0).await.unwrap(), 1);
-        assert_eq!(next_seq_async(w, "issue", 0).await.unwrap(), 2);
-        assert_eq!(next_seq_async(w, "issue", 10).await.unwrap(), 11);
-        assert_eq!(next_seq_async(w, "issue", 5).await.unwrap(), 12);
-
-        let durable = db.durable().unwrap();
-        durable
-            .write(|tx| {
-                tx.create_conversation("conv-core", "deepseek-flash")?;
-                tx.append_entry("conv-core", "pi.user", &serde_json::json!({"text": "hi"}))?;
-                tx.put_document("global", "core", "pi.state", &serde_json::json!({"ok": true}))?;
-                Ok(())
-            })
-            .unwrap();
-        let doc = durable.read(|rd| rd.document("global", "core", "pi.state")).unwrap().unwrap();
-        assert_eq!(doc.state, serde_json::json!({"ok": true}));
-
-        channel_participant::ActiveModel {
-            id: Set("system".into()),
-            kind: Set("system".into()),
-            name: Set("System".into()),
-            agent_id: Set(None),
-            home_id: Set(None),
-            joined_at: Set(100),
-            left_at: Set(None),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        channel::ActiveModel {
-            id: Set("ch-1".into()),
+    fn make_channel(id: &str, name: &str, default: bool, created_at: i64) -> entity::channel::ActiveModel {
+        entity::channel::ActiveModel {
+            id: Set(id.into()),
             channel_type: Set("channel".into()),
-            is_default: Set(true),
+            is_default: Set(default),
             root_id: Set(None),
             root_number: Set(None),
             subject_kind: Set(None),
             subject_id: Set(None),
-            last_number: Set(Some(1)),
+            last_number: Set(None),
             reply_count: Set(0),
-            created_at: Set(100),
-            name: Set(Some("general".into())),
+            created_at: Set(created_at),
+            name: Set(Some(name.into())),
             description: Set(None),
             repo: Set(None),
             parent_id: Set(None),
@@ -957,437 +527,49 @@ mod tests {
             archived_at: Set(None),
             notify: Set("all".into()),
         }
-        .insert(w)
-        .await
-        .unwrap();
+    }
 
-        channel_message::ActiveModel {
-            id: Set("m-1".into()),
-            channel_id: Set("ch-1".into()),
-            number: Set(1),
-            sender_id: Set("system".into()),
-            kind: Set("notice".into()),
-            body: Set("hello".into()),
-            meta: Set(Some(r#"{"code":"welcome"}"#.into())),
-            system_code: Set(Some("welcome".into())),
-            send_key: Set(Some("sk-1".into())),
-            created_at: Set(101),
-            revision: Set(1),
-            reply_number: Set(None),
-            edited_at: Set(None),
-            deleted_at: Set(None),
-            pinned_at: Set(None),
-            reactions: Set(None),
+    #[tokio::test]
+    async fn concurrent_reads_succeed_immediately_while_write_tx_holds_begin_immediate() {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::open(dir.path()).await.unwrap();
+
+        make_channel("c1", "general", true, 100).insert(db.write_conn()).await.unwrap();
+
+        let write_tx = db.begin_tx().await.unwrap();
+        make_channel("c2", "pending", false, 200).insert(&write_tx).await.unwrap();
+
+        let started = Instant::now();
+        let mut tasks = Vec::new();
+        for _ in 0..6 {
+            let db = db.clone();
+            tasks.push(tokio::spawn(
+                async move { entity::channel::Entity::find().count(db.read_conn()).await.unwrap() },
+            ));
         }
-        .insert(w)
-        .await
-        .unwrap();
-
-        let by_code = channel_message::Entity::find()
-            .filter(channel_message::Column::ChannelId.eq("ch-1"))
-            .filter(channel_message::Column::SystemCode.eq("welcome"))
-            .one(r)
-            .await
-            .unwrap()
-            .expect("message found by system_code");
-        assert_eq!(by_code.id, "m-1");
-
-        let ev = channel_event::ActiveModel {
-            kind: Set("posted".into()),
-            channel_id: Set("ch-1".into()),
-            message_id: Set("m-1".into()),
-            at: Set(101),
-            ..Default::default()
+        let mut counts = Vec::new();
+        for task in tasks {
+            counts.push(task.await.unwrap());
         }
-        .insert(w)
-        .await
-        .unwrap();
-        assert!(ev.seq > 0);
+        let elapsed = started.elapsed();
+        assert_eq!(counts, vec![1; 6], "readers must see committed WAL snapshot while writer holds BEGIN IMMEDIATE");
+        assert!(
+            elapsed < Duration::from_secs(1),
+            "concurrent reads took too long while write tx open: {elapsed:?}"
+        );
 
-        let del = channel_delivery::ActiveModel {
-            message_id: Set("m-1".into()),
-            channel_id: Set("ch-1".into()),
-            recipient_kind: Set("orchestrator".into()),
-            recipient_id: Set("orch".into()),
-            reason: Set("channel".into()),
-            wakes: Set(true),
-            held_by: Set(None),
-            status: Set("pending".into()),
-            created_at: Set(101),
-            settled_at: Set(None),
-            ..Default::default()
-        }
-        .insert(w)
-        .await
-        .unwrap();
-        assert!(del.id > 0);
-        assert!(del.wakes);
+        let write_on_read = make_channel("c3", "illegal", false, 300).insert(db.read_conn()).await;
+        assert!(write_on_read.is_err(), "read_conn must reject writes");
 
-        // Unique violation check via session_mailbox.idempotency_key
-        let mb = session_mailbox::ActiveModel {
-            session_id: Set("s-1".into()),
-            idempotency_key: Set("idem-1".into()),
-            source: Set("channel".into()),
-            source_message_id: Set(Some("m-1".into())),
-            payload: Set("{}".into()),
-            status: Set("pending".into()),
-            created_at: Set(100),
-            updated_at: Set(100),
-            result: Set(None),
-            ..Default::default()
-        }
-        .insert(w)
-        .await
-        .unwrap();
-        assert!(mb.id > 0);
+        commit_tx(write_tx).await.unwrap();
+        assert_eq!(entity::channel::Entity::find().count(db.read_conn()).await.unwrap(), 2);
 
-        let dup_mb = session_mailbox::ActiveModel {
-            session_id: Set("s-1".into()),
-            idempotency_key: Set("idem-1".into()),
-            source: Set("channel".into()),
-            source_message_id: Set(None),
-            payload: Set("{}".into()),
-            status: Set("pending".into()),
-            created_at: Set(101),
-            updated_at: Set(101),
-            result: Set(None),
-            ..Default::default()
-        }
-        .insert(w)
-        .await
-        .unwrap_err();
-        assert!(is_unique_violation(&dup_mb), "expected unique violation, got {dup_mb:?}");
+        db.close().await;
+        drop(db);
 
-        // FK violation check via cron.issue_id -> issue.id
-        let fk_err = cron::ActiveModel {
-            id: Set("cron-bad".into()),
-            name: Set("bad".into()),
-            body: Set("ping".into()),
-            channel_id: Set("ch-1".into()),
-            agent: Set(None),
-            repo: Set(None),
-            issue_id: Set(Some("missing-issue".into())),
-            spec: Set("* * * * *".into()),
-            tz: Set("UTC".into()),
-            enabled: Set(true),
-            created_at: Set(100),
-            last_run: Set(None),
-            set_by: Set("user".into()),
-            pending: Set(false),
-        }
-        .insert(w)
-        .await
-        .unwrap_err();
-        assert!(is_fk_violation(&fk_err), "expected fk violation, got {fk_err:?}");
-
-        // Touch remaining domain entity models to confirm schema parity across backends.
-        issue::ActiveModel {
-            id: Set("iss-1".into()),
-            number: Set(1),
-            title: Set("t".into()),
-            description: Set("d".into()),
-            repo: Set(None),
-            machine_id: Set(None),
-            priority: Set("medium".into()),
-            rank: Set(None),
-            deliver: Set("merge".into()),
-            parent: Set(None),
-            created_at: Set(100),
-            queued_at: Set(None),
-            closed_at: Set(None),
-            reviewed_at: Set(None),
-            canceled: Set(None),
-            delivered: Set(None),
-            mandate: Set("{}".into()),
-            constraints: Set(None),
-            conflict: Set(None),
-            last_run: Set(None),
-            answer: Set(None),
-            delivery_evidence: Set(None),
-            queued_words: Set("[]".into()),
-            blocked_by: Set("[]".into()),
-            criteria: Set("[]".into()),
-            checks: Set("[]".into()),
-            findings: Set("[]".into()),
-            questions: Set("[]".into()),
-            assignments: Set("[]".into()),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        session::ActiveModel {
-            id: Set("s-1".into()),
-            controller: Set("issue".into()),
-            role: Set(None),
-            name: Set("worker".into()),
-            profile: Set(None),
-            runtime: Set("scripted".into()),
-            brief: Set("b".into()),
-            cwd: Set(None),
-            policy: Set("{}".into()),
-            bindings: Set("{}".into()),
-            hired_at: Set(100),
-            runs: Set(0),
-            last_run: Set(None),
-            spent: Set(None),
-            tool_connections: Set(None),
-            machine: Set(None),
-            phase: Set("idle".into()),
-            departed: Set(false),
-            title: Set(None),
-            model: Set(None),
-            effort: Set(None),
-            permission_mode: Set(None),
-            agent_session: Set(None),
-            base: Set(None),
-            run: Set(None),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        session_run::ActiveModel {
-            id: Set("r1".into()),
-            session: Set("s-1".into()),
-            issue: Set(Some("iss-1".into())),
-            triggered_by: Set("user".into()),
-            heard: Set("hi".into()),
-            started_at: Set(100),
-            ended_at: Set(None),
-            outcome: Set(None),
-            summary: Set("".into()),
-            spent: Set(None),
-            subagent_summary: Set(None),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        session_event::ActiveModel {
-            session_id: Set("s-1".into()),
-            seq: Set(0),
-            run_id: Set(Some("r1".into())),
-            payload: Set("{}".into()),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        pull::ActiveModel {
-            id: Set("p-1".into()),
-            platform: Set("github".into()),
-            repo: Set("o/r".into()),
-            number: Set(42),
-            url: Set("https://github.com/o/r/pull/42".into()),
-            branch: Set("b".into()),
-            base: Set("main".into()),
-            state: Set("open".into()),
-            issue_id: Set(Some("iss-1".into())),
-            check_fingerprint: Set("".into()),
-            check_revision: Set(0),
-            created_at: Set(100),
-            updated_at: Set(100),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        pull_event::ActiveModel {
-            pull_id: Set("p-1".into()),
-            key: Set("k1".into()),
-            bot_round_key: Set(None),
-            bot_round: Set(None),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        connector_account::ActiveModel {
-            connector: Set("qq".into()),
-            secrets: Set("{}".into()),
-            user_id: Set(None),
-            pair_code: Set(None),
-            cursor: Set("".into()),
-            reply_context: Set(None),
-            last_inbound: Set(None),
-            paused_until: Set(None),
-            connected_at: Set(100),
-            channel_id: Set(None),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        let inb = connector_inbound::ActiveModel {
-            connector: Set("qq".into()),
-            ext_id: Set("e1".into()),
-            from_id: Set("u1".into()),
-            body: Set("hi".into()),
-            reply: Set("{}".into()),
-            quoted: Set("{}".into()),
-            message_id: Set(None),
-            created_at: Set(100),
-            delivered: Set(false),
-            ..Default::default()
-        }
-        .insert(w)
-        .await
-        .unwrap();
-        assert!(inb.seq > 0);
-
-        let outb = connector_outbox::ActiveModel {
-            connector: Set("qq".into()),
-            message_id: Set("m-1".into()),
-            body: Set("yo".into()),
-            state: Set("pending".into()),
-            ext_id: Set(None),
-            error: Set(None),
-            created_at: Set(100),
-            sent_at: Set(None),
-            ..Default::default()
-        }
-        .insert(w)
-        .await
-        .unwrap();
-        assert!(outb.seq > 0);
-
-        attachment::ActiveModel {
-            id: Set("att-1".into()),
-            name: Set("a.png".into()),
-            content_type: Set("image/png".into()),
-            size: Set(12),
-            created_at: Set(100),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        media_library_item::ActiveModel {
-            attachment_id: Set("att-1".into()),
-            kind: Set("uploaded".into()),
-            origin: Set("{}".into()),
-            added_at: Set(100),
-            last_at: Set(100),
-            source_job_id: Set(None),
-            removed_at: Set(None),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        media_input::ActiveModel {
-            id: Set("mi-1".into()),
-            metadata: Set("{}".into()),
-            size: Set(12),
-            phase: Set("ready".into()),
-            hash: Set(None),
-            created_at: Set(100),
-            expires_at: Set(200),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        media_input_pin::ActiveModel {
-            input_id: Set("mi-1".into()),
-            holder: Set("h1".into()),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        media_job::ActiveModel {
-            id: Set("mj-1".into()),
-            kind: Set("image".into()),
-            phase: Set("queued".into()),
-            data: Set("{}".into()),
-            created_at: Set(100),
-            updated_at: Set(100),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        artifact::ActiveModel {
-            id: Set("art-1".into()),
-            title: Set("Doc".into()),
-            body: Set("blocks".into()),
-            artifact_type: Set(Some("docs".into())),
-            is_default: Set(false),
-            display: Set(None),
-            channel_id: Set(Some("ch-1".into())),
-            message_id: Set(None),
-            issue: Set(Some("iss-1".into())),
-            by_id: Set("user".into()),
-            by_name: Set("User".into()),
-            version: Set(1),
-            seq: Set(0),
-            created_at: Set(100),
-            updated_at: Set(100),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        memory::ActiveModel {
-            id: Set("mem-1".into()),
-            agent: Set("laozhou".into()),
-            kind: Set("note".into()),
-            body: Set("remember".into()),
-            repo: Set(None),
-            session: Set(None),
-            author: Set("user".into()),
-            created_at: Set(100),
-            updated_at: Set(100),
-            recalled: Set(0),
-            recalled_at: Set(None),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        remote_config::ActiveModel {
-            id: Set(1),
-            enabled: Set(false),
-            bind_addr: Set(None),
-            port: Set(8791),
-            updated_at: Set(100),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        remote_device::ActiveModel {
-            id: Set("dev-1".into()),
-            name: Set("iPhone".into()),
-            platform: Set("ios".into()),
-            token_hash: Set("hash-1".into()),
-            scope: Set("full".into()),
-            created_at: Set(100),
-            last_seen_at: Set(None),
-            revoked_at: Set(None),
-        }
-        .insert(w)
-        .await
-        .unwrap();
-
-        let (outbox_id, dirty) = db
-            .write_dirty(|tx| {
-                Box::pin(async move {
-                    let id = ServerDb::insert_outbox_item_in_tx(tx, "dual_db.ping", r#"{"ok":true}"#, 100).await?;
-                    Ok::<_, DbErr>((id, vibevalley_core::SliceMask::OPS))
-                })
-            })
-            .await
-            .unwrap();
-        assert!(outbox_id > 0);
-        assert_eq!(dirty, vibevalley_core::SliceMask::OPS);
-        let claimed = db.claim_pending_outbox(100, 8).await.unwrap();
-        assert_eq!(claimed.len(), 1);
-        assert_eq!(claimed[0].id, outbox_id);
-        assert_eq!(claimed[0].attempts, 1);
-        db.complete_outbox_item(outbox_id).await.unwrap();
+        let reopened = Database::open(dir.path()).await.unwrap();
+        assert_eq!(entity::channel::Entity::find().count(reopened.read_conn()).await.unwrap(), 2);
+        reopened.close().await;
     }
 
     #[test]
@@ -1409,50 +591,27 @@ mod tests {
         assert!(DatabaseConfig::from_url("mysql://localhost/db").is_err());
     }
 
-    #[test]
-    fn sqlite_open_url_migrates_server_and_durable_schemas_and_runs_core_ops() {
+    #[tokio::test]
+    async fn sqlite_open_url_migrates_and_allocates_monotonic_sequences() {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("core.db");
         let url = format!("sqlite://{}", db_path.display());
 
-        let db = ServerDb::open_url(&url).unwrap();
-        assert_eq!(db.path(), db_path);
-        vibevalley_runtime::rt::block_on(verify_dual_db_core(&db, DatabaseBackend::Sqlite));
-        db.close();
+        let db = Database::open_url(&url).await.unwrap();
+        assert_eq!(db.backend(), DbBackend::Sqlite);
+        assert!(!db.is_postgres());
+        assert_eq!(db.path(), Some(db_path.as_path()));
+
+        assert_eq!(db.next_seq("issue", 0).await.unwrap(), 1);
+        assert_eq!(db.next_seq("issue", 0).await.unwrap(), 2);
+        assert_eq!(db.next_seq("issue", 10).await.unwrap(), 11);
+        assert_eq!(db.next_seq("issue", 5).await.unwrap(), 12);
+
+        db.close().await;
         drop(db);
 
-        // Reopen idempotently with ServerDb::open_config.
-        let reopened = ServerDb::open_config(&DatabaseConfig::Sqlite { path: db_path }).unwrap();
-        assert_eq!(
-            vibevalley_runtime::rt::block_on(crate::db::next_seq_async(reopened.write_conn(), "issue", 0)).unwrap(),
-            13
-        );
-        reopened.close();
-    }
-
-    #[test]
-    fn postgres_open_url_migrates_server_and_durable_schemas_and_runs_core_ops() {
-        let Some(pg) = crate::db::test_pg::EphemeralPostgres::start() else {
-            eprintln!("skipping postgres_open_url_migrates_server_and_durable_schemas_and_runs_core_ops: initdb/pg_ctl not found");
-            return;
-        };
-        pg.create_database("server_core_wave2");
-        let url = pg.db_url("server_core_wave2");
-
-        let db = ServerDb::open_url(&url).unwrap();
-        vibevalley_runtime::rt::block_on(verify_dual_db_core(&db, DatabaseBackend::Postgres));
-        db.close();
-        drop(db);
-
-        // Reopen idempotently with ServerDb::open_config and confirm both migration tables coexist.
-        let reopened = ServerDb::open_config(&DatabaseConfig::Postgres { url, max_connections: 8 }).unwrap();
-        assert_eq!(
-            vibevalley_runtime::rt::block_on(crate::db::next_seq_async(reopened.write_conn(), "issue", 0)).unwrap(),
-            13
-        );
-        let durable = reopened.durable().unwrap();
-        let doc = durable.read(|rd| rd.document("global", "core", "pi.state")).unwrap().unwrap();
-        assert_eq!(doc.state, serde_json::json!({"ok": true}));
-        reopened.close();
+        let reopened = Database::open_config(&DatabaseConfig::Sqlite { path: db_path }).await.unwrap();
+        assert_eq!(reopened.next_seq("issue", 0).await.unwrap(), 13);
+        reopened.close().await;
     }
 }

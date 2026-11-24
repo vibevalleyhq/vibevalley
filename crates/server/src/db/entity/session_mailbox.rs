@@ -1,22 +1,22 @@
-// Staged spine entity wired into `Outbox` during direct cutover.
-#![allow(dead_code)]
-
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "outbox_item")]
+#[sea_orm(table_name = "session_mailbox")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    pub topic: String,
+    pub session_id: String,
+    #[sea_orm(unique)]
+    pub idempotency_key: String,
+    pub source: String,
+    pub source_message_id: Option<String>,
     #[sea_orm(column_type = "Text")]
-    pub payload_json: String,
+    pub payload: String,
     pub status: String,
-    pub attempts: i64,
-    pub available_at: i64,
     pub created_at: i64,
+    pub updated_at: i64,
     #[sea_orm(column_type = "Text", nullable)]
-    pub last_error: Option<String>,
+    pub result: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
