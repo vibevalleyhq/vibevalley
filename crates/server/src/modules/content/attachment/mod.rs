@@ -8,12 +8,13 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use base64::Engine;
+use sea_orm::{ActiveValue::Set, EntityTrait};
 use sha2::{Digest, Sha256};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentImportPathInput, AttachmentUpload, BizCode, native_ops, ops};
 
 use crate::base::{ServerDb, internal};
-use crate::db::generated::content_attachment as queries;
+use crate::db::entities::content_attachment::attachment;
 use crate::{Hub, now};
 
 /// `attachmentMax`: 25 MB.
@@ -137,33 +138,7 @@ impl Attachments {
     }
 
     fn record(&self, id: &str, given: &str, given_type: &str, size: i64) -> Result<Attachment, ApiError> {
-        let name = if given.trim().is_empty() { "file" } else { given.trim() };
-        let kind = if given_type.trim().is_empty() {
-            "application/octet-stream"
-        } else {
-            given_type.trim()
-        };
-        self.db
-            .run(async |c| {
-                queries::keep_attachment(
-                    c,
-                    queries::KeepAttachmentParams {
-                        id: id.into(),
-                        name: name.into(),
-                        r#type: kind.into(),
-                        size,
-                        created_at: now(),
-                    },
-                )
-                .await
-            })
-            .map_err(internal)?;
-        Ok(Attachment {
-            id: id.into(),
-            name: name.into(),
-            r#type: kind.into(),
-            size,
-        })
+        vibevalley_runtime::rt::block_on(self.record_async(id, given, given_type, size))
     }
 
     async fn record_async(&self, id: &str, given: &str, given_type: &str, size: i64) -> Result<Attachment, ApiError> {
@@ -173,19 +148,18 @@ impl Attachments {
         } else {
             given_type.trim()
         };
-        let mut conn = self.db.write_pool().acquire().await.map_err(internal)?;
-        queries::keep_attachment(
-            &mut *conn,
-            queries::KeepAttachmentParams {
-                id: id.into(),
-                name: name.into(),
-                r#type: kind.into(),
-                size,
-                created_at: now(),
-            },
-        )
-        .await
-        .map_err(internal)?;
+        let model = attachment::ActiveModel {
+            id: Set(id.into()),
+            name: Set(name.into()),
+            content_type: Set(kind.into()),
+            size: Set(size),
+            created_at: Set(now()),
+        };
+        attachment::Entity::insert(model)
+            .on_conflict_do_nothing_on([attachment::Column::Id])
+            .exec(self.db.write_conn())
+            .await
+            .map_err(internal)?;
         Ok(Attachment {
             id: id.into(),
             name: name.into(),
@@ -195,33 +169,17 @@ impl Attachments {
     }
 
     fn by_id(&self, id: &str) -> Result<Option<Attachment>, ApiError> {
-        match self
-            .db
-            .read(async |c| queries::get_attachment(c, queries::GetAttachmentParams { id: id.into() }).await)
-        {
-            Ok(row) => Ok(Some(Attachment {
-                id: row.id,
-                name: row.name,
-                r#type: row.r#type,
-                size: row.size,
-            })),
-            Err(sqlx::Error::RowNotFound) => Ok(None),
-            Err(error) => Err(internal(error)),
-        }
+        vibevalley_runtime::rt::block_on(self.by_id_async(id))
     }
 
     pub async fn by_id_async(&self, id: &str) -> Result<Option<Attachment>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.map_err(internal)?;
-        match queries::get_attachment(&mut *conn, queries::GetAttachmentParams { id: id.into() }).await {
-            Ok(row) => Ok(Some(Attachment {
-                id: row.id,
-                name: row.name,
-                r#type: row.r#type,
-                size: row.size,
-            })),
-            Err(sqlx::Error::RowNotFound) => Ok(None),
-            Err(error) => Err(internal(error)),
-        }
+        let row = attachment::Entity::find_by_id(id.to_owned()).one(self.db.read_conn()).await.map_err(internal)?;
+        Ok(row.map(|row| Attachment {
+            id: row.id,
+            name: row.name,
+            r#type: row.content_type,
+            size: row.size,
+        }))
     }
 
     /// `of`: the attachments with these ids, each once; one not kept is

@@ -1,14 +1,19 @@
 //! Input reservations, uploads and job pins (`media/inputs.ts`). The mutex
 //! protects admission and pins, never a streaming read or attachment write.
-use super::{q, validate};
+use super::validate;
 use crate::{
     Hub,
     base::{ServerDb, Ticker},
-    modules::content::attachment::Attachments,
+    db::entities::content_media::{media_input, media_input_pin},
+    modules::content::{attachment::Attachments, begin_write_tx},
 };
 use parking_lot::Mutex as SyncMutex;
+use sea_orm::sea_query::{Alias, Expr, Func, Query};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, Condition, ConnectionTrait, EntityTrait, ExprTrait, FromQueryResult, QueryFilter, QueryOrder, QuerySelect,
+    Update,
+};
 use sha2::{Digest, Sha256};
-use sqlx::{Connection, SqliteConnection};
 use std::{
     collections::HashSet,
     io::{Read, Write},
@@ -29,6 +34,11 @@ pub(super) fn refused(key: &str) -> ApiError {
 fn storage(_: impl std::fmt::Display) -> ApiError {
     refused("inputStorage")
 }
+#[derive(FromQueryResult)]
+struct QuotaRow {
+    bytes: i64,
+    entries: i64,
+}
 struct Inner {
     uploading: HashSet<String>,
 }
@@ -40,7 +50,7 @@ pub struct Inputs {
     sweeper: SyncMutex<Option<Ticker>>,
     clock: SharedClock,
 }
-fn input(row: q::GetInputRow, can_delete: bool) -> Result<MediaInput, ApiError> {
+fn input(row: media_input::Model, can_delete: bool) -> Result<MediaInput, ApiError> {
     let m: MediaInputRequest = serde_json::from_str(&row.metadata).map_err(storage)?;
     let phase = MediaInputPhase::ALL
         .into_iter()
@@ -59,18 +69,20 @@ fn input(row: q::GetInputRow, can_delete: bool) -> Result<MediaInput, ApiError> 
         can_delete,
     })
 }
-async fn find_db(db: &mut SqliteConnection, id: &str) -> Result<Option<MediaInput>, ApiError> {
-    let row = match q::get_input(&mut *db, q::GetInputParams { id: id.into() }).await {
-        Ok(row) => row,
-        Err(sqlx::Error::RowNotFound) => return Ok(None),
-        Err(e) => return Err(storage(e)),
+async fn find_db<C: ConnectionTrait>(db: &C, id: &str) -> Result<Option<MediaInput>, ApiError> {
+    let Some(row) = media_input::Entity::find_by_id(id.to_owned()).one(db).await.map_err(storage)? else {
+        return Ok(None);
     };
-    let free = q::get_pin(db, q::GetPinParams { input_id: id.into() }).await.map_err(storage)?.pinned == 0;
+    let free = media_input_pin::Entity::find()
+        .filter(media_input_pin::Column::InputId.eq(id))
+        .one(db)
+        .await
+        .map_err(storage)?
+        .is_none();
     input(row, free).map(Some)
 }
 async fn find_read(db: &ServerDb, inner: &Inner, id: &str) -> Result<Option<MediaInput>, ApiError> {
-    let mut conn = db.read_pool().acquire().await.map_err(storage)?;
-    let mut record = find_db(&mut conn, id).await?;
+    let mut record = find_db(db.read_conn(), id).await?;
     if let Some(r) = &mut record {
         r.can_delete &= !inner.uploading.contains(id);
     }
@@ -80,8 +92,7 @@ async fn found_read(db: &ServerDb, inner: &Inner, id: &str) -> Result<MediaInput
     find_read(db, inner, id).await?.ok_or_else(|| refused("inputMissing"))
 }
 async fn find_write(db: &ServerDb, inner: &Inner, id: &str) -> Result<Option<MediaInput>, ApiError> {
-    let mut conn = db.write_pool().acquire().await.map_err(storage)?;
-    let mut record = find_db(&mut conn, id).await?;
+    let mut record = find_db(db.write_conn(), id).await?;
     if let Some(r) = &mut record {
         r.can_delete &= !inner.uploading.contains(id);
     }
@@ -91,16 +102,13 @@ async fn found_write(db: &ServerDb, inner: &Inner, id: &str) -> Result<MediaInpu
     find_write(db, inner, id).await?.ok_or_else(|| refused("inputMissing"))
 }
 async fn phase_async(db: &ServerDb, id: &str, p: &str) -> Result<(), ApiError> {
-    let mut conn = db.write_pool().acquire().await.map_err(storage)?;
-    q::set_input_phase(
-        &mut *conn,
-        q::SetInputPhaseParams {
-            id: id.into(),
-            phase: p.into(),
-        },
-    )
-    .await
-    .map_err(storage)
+    Update::many(media_input::Entity)
+        .col_expr(media_input::Column::Phase, Expr::value(p))
+        .filter(media_input::Column::Id.eq(id))
+        .exec(db.write_conn())
+        .await
+        .map_err(storage)?;
+    Ok(())
 }
 fn stage_upload_blocking(staging: &Path, r: &MediaInput, mut source: Box<dyn Read + Send>) -> Result<(PathBuf, String), ApiError> {
     let directory = staging.join(&r.id);
@@ -223,11 +231,22 @@ impl Inputs {
     }
     pub async fn list_async(&self) -> Result<Vec<MediaInput>, ApiError> {
         let uploading: HashSet<String> = self.inner.lock().await.uploading.clone();
-        let mut conn = self.db.read_pool().acquire().await.map_err(storage)?;
-        let rows = q::list_inputs(&mut *conn).await.map_err(storage)?;
-        let pins = q::pinned_inputs(&mut *conn).await.map_err(storage)?;
-        drop(conn);
-        let pinned: HashSet<_> = pins.into_iter().map(|r| r.input_id).collect();
+        let conn = self.db.read_conn();
+        let rows = media_input::Entity::find()
+            .order_by_desc(media_input::Column::CreatedAt)
+            .order_by_asc(media_input::Column::Id)
+            .all(conn)
+            .await
+            .map_err(storage)?;
+        let pins: Vec<String> = media_input_pin::Entity::find()
+            .select_only()
+            .column(media_input_pin::Column::InputId)
+            .distinct()
+            .into_tuple()
+            .all(conn)
+            .await
+            .map_err(storage)?;
+        let pinned: HashSet<String> = pins.into_iter().collect();
         rows.into_iter()
             .map(|row| {
                 let free = !pinned.contains(&row.id) && !uploading.contains(&row.id);
@@ -243,28 +262,51 @@ impl Inputs {
         self.sweep_async().await?;
         let id = uuid::Uuid::now_v7().to_string();
         let time = self.clock.now_ms();
+        let metadata = serde_json::to_string(r).map_err(storage)?;
         let _inner = self.inner.lock().await;
-        let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
-        let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(storage)?;
-        let quota = q::input_quota(&mut *tx).await.map_err(storage)?;
-        if quota.entries >= 256 || quota.bytes + r.size > QUOTA {
-            return Err(refused("inputQuota"));
+        let tx = begin_write_tx(self.db.write_conn()).await.map_err(storage)?;
+        let outcome: Result<MediaInput, ApiError> = async {
+            let quota_stmt = Query::select()
+                .expr_as(
+                    Expr::expr(Func::coalesce([Expr::col(media_input::Column::Size).sum(), Expr::val(0i64)])).cast_as(Alias::new("BIGINT")),
+                    "bytes",
+                )
+                .expr_as(Expr::col(media_input::Column::Id).count(), "entries")
+                .from(media_input::Entity)
+                .to_owned();
+            let quota = QuotaRow::find_by_statement(tx.get_database_backend().build(&quota_stmt))
+                .one(&tx)
+                .await
+                .map_err(storage)?
+                .unwrap_or(QuotaRow { bytes: 0, entries: 0 });
+            if quota.entries >= 256 || quota.bytes + r.size > QUOTA {
+                return Err(refused("inputQuota"));
+            }
+            media_input::ActiveModel {
+                id: Set(id.clone()),
+                metadata: Set(metadata),
+                size: Set(r.size),
+                phase: Set("reserved".into()),
+                hash: Set(None),
+                created_at: Set(time),
+                expires_at: Set(time + LIFETIME),
+            }
+            .insert(&tx)
+            .await
+            .map_err(storage)?;
+            find_db(&tx, &id).await?.ok_or_else(|| refused("inputMissing"))
         }
-        q::reserve_input(
-            &mut *tx,
-            q::ReserveInputParams {
-                id: id.clone(),
-                metadata: serde_json::to_string(r).map_err(storage)?,
-                size: r.size,
-                created_at: time,
-                expires_at: time + LIFETIME,
-            },
-        )
-        .await
-        .map_err(storage)?;
-        let created = find_db(&mut tx, &id).await?.ok_or_else(|| refused("inputMissing"))?;
-        tx.commit().await.map_err(storage)?;
-        Ok(created)
+        .await;
+        match outcome {
+            Ok(created) => {
+                tx.commit().await.map_err(storage)?;
+                Ok(created)
+            }
+            Err(err) => {
+                let _ = tx.rollback().await;
+                Err(err)
+            }
+        }
     }
     pub fn create(&self, r: &MediaInputRequest) -> Result<MediaInput, ApiError> {
         vibevalley_runtime::rt::block_on(self.create_async(r))
@@ -273,19 +315,26 @@ impl Inputs {
         if !r.can_delete {
             return Err(refused("inputBusy"));
         }
-        {
-            let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
-            if q::mark_input_deleting(&mut *conn, q::MarkInputDeletingParams { id: r.id.clone() })
-                .await
-                .map_err(storage)?
-                == 0
-            {
-                return Err(refused("inputBusy"));
-            }
+        let pinned_subquery = Query::select()
+            .expr(Expr::val(1))
+            .from(media_input_pin::Entity)
+            .and_where(Expr::col((media_input_pin::Entity, media_input_pin::Column::InputId)).equals((media_input::Entity, media_input::Column::Id)))
+            .to_owned();
+        let res = Update::many(media_input::Entity)
+            .col_expr(media_input::Column::Phase, Expr::value("deleting"))
+            .filter(media_input::Column::Id.eq(&r.id))
+            .filter(Expr::exists(pinned_subquery).not())
+            .exec(self.db.write_conn())
+            .await
+            .map_err(storage)?;
+        if res.rows_affected == 0 {
+            return Err(refused("inputBusy"));
         }
         remove_dir_async(self.staging.join(&r.id)).await?;
-        let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
-        q::forget_input(&mut *conn, q::ForgetInputParams { id: r.id.clone() }).await.map_err(storage)?;
+        media_input::Entity::delete_by_id(r.id.clone())
+            .exec(self.db.write_conn())
+            .await
+            .map_err(storage)?;
         Ok(())
     }
     pub async fn delete_async(&self, id: &str) -> Result<(), ApiError> {
@@ -312,19 +361,25 @@ impl Inputs {
     }
     pub async fn sweep_async(&self) -> Result<(), ApiError> {
         let inner = self.inner.lock().await;
-        let ids = {
-            let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
-            q::expired_inputs(
-                &mut *conn,
-                q::ExpiredInputsParams {
-                    expires_at: self.clock.now_ms(),
-                },
+        let pinned_subquery = Query::select()
+            .expr(Expr::val(1))
+            .from(media_input_pin::Entity)
+            .and_where(Expr::col((media_input_pin::Entity, media_input_pin::Column::InputId)).equals((media_input::Entity, media_input::Column::Id)))
+            .to_owned();
+        let ids: Vec<String> = media_input::Entity::find()
+            .select_only()
+            .column(media_input::Column::Id)
+            .filter(
+                Condition::any()
+                    .add(media_input::Column::ExpiresAt.lte(self.clock.now_ms()))
+                    .add(media_input::Column::Phase.eq("deleting")),
             )
+            .filter(Expr::exists(pinned_subquery).not())
+            .into_tuple()
+            .all(self.db.write_conn())
             .await
-            .map_err(storage)?
-        };
-        for row in ids {
-            let id = row.id;
+            .map_err(storage)?;
+        for id in ids {
             let r = found_write(&self.db, &inner, &id).await?;
             if r.can_delete
                 && let Err(error) = self.remove_async(&r).await
@@ -340,11 +395,19 @@ impl Inputs {
     async fn restore_async(&self) -> Result<(), ApiError> {
         let _inner = self.inner.lock().await;
         remove_dir_async(self.staging.clone()).await?;
-        let rows = {
-            let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
-            q::interrupt_uploads(&mut *conn).await.map_err(storage)?;
-            q::list_inputs(&mut *conn).await.map_err(storage)?
-        };
+        let conn = self.db.write_conn();
+        Update::many(media_input::Entity)
+            .col_expr(media_input::Column::Phase, Expr::value("failed"))
+            .filter(media_input::Column::Phase.eq("uploading"))
+            .exec(conn)
+            .await
+            .map_err(storage)?;
+        let rows = media_input::Entity::find()
+            .order_by_desc(media_input::Column::CreatedAt)
+            .order_by_asc(media_input::Column::Id)
+            .all(conn)
+            .await
+            .map_err(storage)?;
         for row in rows {
             let r = input(row, false)?;
             if r.phase == MediaInputPhase::Ready {
@@ -401,30 +464,23 @@ impl Inputs {
             .map_err(storage)??;
         {
             let _inner = self.inner.lock().await;
-            let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
-            q::save_input_hash(
-                &mut *conn,
-                q::SaveInputHashParams {
-                    id: r.id.clone(),
-                    hash: Some(hash.clone()),
-                },
-            )
-            .await
-            .map_err(storage)?;
+            Update::many(media_input::Entity)
+                .col_expr(media_input::Column::Hash, Expr::value(Some(hash.clone())))
+                .filter(media_input::Column::Id.eq(&r.id))
+                .exec(self.db.write_conn())
+                .await
+                .map_err(storage)?;
         }
         self.files.keep_staged_async(path, hash, r.size, r.name.clone(), r.mime.clone()).await?;
         {
             let _inner = self.inner.lock().await;
-            let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
-            q::input_ready(
-                &mut *conn,
-                q::InputReadyParams {
-                    id: r.id.clone(),
-                    expires_at: self.clock.now_ms() + LIFETIME,
-                },
-            )
-            .await
-            .map_err(storage)?;
+            Update::many(media_input::Entity)
+                .col_expr(media_input::Column::Phase, Expr::value("ready"))
+                .col_expr(media_input::Column::ExpiresAt, Expr::value(self.clock.now_ms() + LIFETIME))
+                .filter(media_input::Column::Id.eq(&r.id))
+                .exec(self.db.write_conn())
+                .await
+                .map_err(storage)?;
         }
         Ok(())
     }
@@ -499,12 +555,12 @@ impl Inputs {
         vibevalley_runtime::rt::block_on(self.content_async(id))
     }
 
-    pub(super) async fn pin_in_async(&self, db: &mut SqliteConnection, ids: &[String], holder: &str) -> Result<(), ApiError> {
+    pub(super) async fn pin_in_async<C: ConnectionTrait>(&self, db: &C, ids: &[String], holder: &str) -> Result<(), ApiError> {
         if ids.is_empty() || ids.len() > 5 {
             return Err(refused("inputInvalid"));
         }
         for id in ids {
-            let r = find_db(&mut *db, id).await?.ok_or_else(|| refused("inputMissing"))?;
+            let r = find_db(db, id).await?.ok_or_else(|| refused("inputMissing"))?;
             let has_file = match r.hash.as_ref() {
                 Some(h) => tokio::fs::metadata(self.files.path_of(h)).await.is_ok_and(|m| m.is_file()),
                 None => false,
@@ -512,36 +568,44 @@ impl Inputs {
             if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= self.clock.now_ms()) || !has_file {
                 return Err(refused("inputMissing"));
             }
-            q::pin_input(
-                &mut *db,
-                q::PinInputParams {
-                    input_id: id.clone(),
-                    holder: holder.into(),
-                },
-            )
-            .await
-            .map_err(storage)?;
+            let model = media_input_pin::ActiveModel {
+                input_id: Set(id.clone()),
+                holder: Set(holder.into()),
+            };
+            media_input_pin::Entity::insert(model)
+                .on_conflict_do_nothing_on([media_input_pin::Column::InputId, media_input_pin::Column::Holder])
+                .exec(db)
+                .await
+                .map_err(storage)?;
         }
         Ok(())
     }
 
     pub async fn pin_async(&self, ids: &[String], holder: &str) -> Result<(), ApiError> {
         let _inner = self.inner.lock().await;
-        let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
-        let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(storage)?;
-        self.pin_in_async(&mut tx, ids, holder).await?;
-        tx.commit().await.map_err(storage)?;
-        Ok(())
+        let tx = begin_write_tx(self.db.write_conn()).await.map_err(storage)?;
+        match self.pin_in_async(&tx, ids, holder).await {
+            Ok(()) => {
+                tx.commit().await.map_err(storage)?;
+                Ok(())
+            }
+            Err(err) => {
+                let _ = tx.rollback().await;
+                Err(err)
+            }
+        }
     }
     pub fn pin(&self, ids: &[String], holder: &str) -> Result<(), ApiError> {
         vibevalley_runtime::rt::block_on(self.pin_async(ids, holder))
     }
     pub async fn release_async(&self, holder: &str) -> Result<(), ApiError> {
         let _inner = self.inner.lock().await;
-        let mut conn = self.db.write_pool().acquire().await.map_err(storage)?;
-        q::release_pins(&mut *conn, q::ReleasePinsParams { holder: holder.into() })
+        media_input_pin::Entity::delete_many()
+            .filter(media_input_pin::Column::Holder.eq(holder))
+            .exec(self.db.write_conn())
             .await
-            .map_err(storage)
+            .map_err(storage)?;
+        Ok(())
     }
     pub fn release(&self, holder: &str) -> Result<(), ApiError> {
         vibevalley_runtime::rt::block_on(self.release_async(holder))
@@ -616,10 +680,10 @@ pub fn install(hub: &Hub, inputs: Arc<Inputs>) {
 
 impl crate::transport::api::media::MediaInputs for Inputs {
     fn upload(&self, id: &str, source: Box<dyn Read + Send>) -> Result<MediaInput, ApiError> {
-        vibevalley_runtime::rt::block_on(self.upload_async(id, source))
+        Inputs::upload(self, id, source)
     }
     fn content(&self, id: &str) -> Result<AttachmentFile, ApiError> {
-        vibevalley_runtime::rt::block_on(self.content_async(id))
+        Inputs::content(self, id)
     }
     fn upload_async(self: Arc<Self>, id: String, source: Box<dyn Read + Send>) -> crate::BoxFuture<'static, Result<MediaInput, ApiError>> {
         Box::pin(async move { Inputs::upload_async(&self, &id, source).await })

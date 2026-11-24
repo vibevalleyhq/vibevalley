@@ -3,7 +3,7 @@
 //! helper brought in, one item per file in `server.db`'s
 //! `media_library_item` (joined with the attachments' table).
 //!
-//! What the farm hears is recorded on its own event bus worker thread so
+//! What the farm hears is recorded on its own async worker tasks so
 //! recording never runs inside a chat write transaction.
 
 use std::path::{Path, PathBuf};
@@ -11,27 +11,41 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
+use sea_orm::sea_query::{Alias, Condition, Expr, Func, LikeExpr, OnConflict, Order, Query};
+use sea_orm::{ActiveValue::Set, ColumnTrait, DbErr, EntityTrait, ExprTrait, FromQueryResult, QueryFilter, Update};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Actor, ApiError, Attachment, BizCode, Fact, JobKind, LibraryAddRequest, LibraryItem, LibraryListRequest, LibraryOrigin, LibraryOriginFetchedFrom,
-    MediaAudioJob, MediaJob, MediaPhase, MessageKind, Preview, ops,
+    Actor, ApiError, Attachment, BizCode, Fact, JobKind, LibraryAddRequest, LibraryFileKind, LibraryItem, LibraryListRequest, LibraryOrigin,
+    LibraryOriginFetchedFrom, LibrarySort, MediaAudioJob, MediaJob, MediaPhase, MessageKind, Preview, ops,
 };
 
 use crate::base::{LookIn, ServerDb, missing};
-use crate::db::generated::content_library as q;
+use crate::db::entities::{content_attachment::attachment, content_library::media_library_item};
 use crate::modules::content::attachment::{ATTACHMENT_MAX, Attachments};
+use crate::modules::content::write_tx;
 use crate::modules::infra::http::{PublicDownload, PublicDownloadError};
 use crate::{Hub, now};
 
-const LIST_MAX: i64 = 500;
+const LIST_MAX: u64 = 500;
 const DOWNLOAD: Duration = Duration::from_secs(60);
 
 fn refused(text: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::LibraryRefused, text.into())
 }
 
-fn db_failed(e: sqlx::Error) -> ApiError {
+fn db_failed(e: DbErr) -> ApiError {
     ApiError::new(BizCode::InternalError, format!("library: {e}"))
+}
+
+#[derive(Debug, FromQueryResult)]
+struct LibraryRow {
+    attachment_id: String,
+    origin: String,
+    added_at: i64,
+    last_at: i64,
+    name: String,
+    content_type: String,
+    size: i64,
 }
 
 /// Who puts a file in: the user (uploads only), or a helper or assistant
@@ -88,12 +102,12 @@ fn origin_kind(o: &LibraryOrigin) -> &'static str {
     }
 }
 
-fn item_of(row: q::GetItemRow) -> LibraryItem {
+fn item_of(row: LibraryRow) -> LibraryItem {
     LibraryItem {
         attachment: Attachment {
             id: row.attachment_id,
             name: row.name,
-            r#type: row.r#type,
+            r#type: row.content_type,
             size: row.size,
         },
         origin: serde_json::from_str(&row.origin).unwrap_or(LibraryOrigin::Uploaded { channel: None, message: None }),
@@ -102,42 +116,51 @@ fn item_of(row: q::GetItemRow) -> LibraryItem {
     }
 }
 
-struct LibraryHandle {
-    db: Arc<ServerDb>,
-    files: Arc<Attachments>,
+fn item_select() -> sea_orm::sea_query::SelectStatement {
+    Query::select()
+        .column((media_library_item::Entity, media_library_item::Column::AttachmentId))
+        .column((media_library_item::Entity, media_library_item::Column::Origin))
+        .column((media_library_item::Entity, media_library_item::Column::AddedAt))
+        .column((media_library_item::Entity, media_library_item::Column::LastAt))
+        .column((attachment::Entity, attachment::Column::Name))
+        .expr_as(Expr::col((attachment::Entity, attachment::Column::ContentType)), "content_type")
+        .column((attachment::Entity, attachment::Column::Size))
+        .from(media_library_item::Entity)
+        .inner_join(
+            attachment::Entity,
+            Expr::col((attachment::Entity, attachment::Column::Id)).equals((media_library_item::Entity, media_library_item::Column::AttachmentId)),
+        )
+        .and_where(Expr::col((media_library_item::Entity, media_library_item::Column::RemovedAt)).is_null())
+        .to_owned()
 }
 
-impl LibraryHandle {
-    fn found(&self, id: &str) -> Result<LibraryItem, ApiError> {
-        match self.db.run(async |db| q::get_item(db, q::GetItemParams { attachment_id: id.into() }).await) {
-            Ok(row) => Ok(item_of(row)),
-            Err(sqlx::Error::RowNotFound) => Err(missing(t("server.library.noItem", &[("id", id.into())]), LookIn::Library)),
-            Err(error) => Err(db_failed(error)),
+fn media_type_condition(media_type: &str) -> sea_orm::sea_query::SimpleExpr {
+    let lower_type = Func::lower(Expr::col((attachment::Entity, attachment::Column::ContentType)));
+    Condition::any()
+        .add(Expr::expr(lower_type.clone()).eq(media_type))
+        .add(Expr::expr(lower_type).like(format!("{media_type}/%")))
+        .into()
+}
+
+fn escape_like(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    for ch in raw.chars() {
+        match ch {
+            '\\' | '%' | '_' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
         }
     }
-
-    fn keep(&self, id: &str, origin: &LibraryOrigin, at: i64) -> Result<(), ApiError> {
-        self.db
-            .run(async |db| {
-                q::keep_item(
-                    db,
-                    q::KeepItemParams {
-                        attachment_id: id.into(),
-                        kind: origin_kind(origin).into(),
-                        origin: serde_json::to_string(origin).expect("JSON"),
-                        added_at: at,
-                    },
-                )
-                .await
-            })
-            .map_err(db_failed)
-    }
+    out
 }
 
 pub struct Library {
     db: Arc<ServerDb>,
     files: Arc<Attachments>,
     sub: Mutex<Option<crate::event_bus::Subscription>>,
+    fact_task: Mutex<Option<(tokio_util::sync::CancellationToken, tokio::task::JoinHandle<()>)>>,
     edit_task: Mutex<Option<(tokio_util::sync::CancellationToken, tokio::task::JoinHandle<()>)>>,
 }
 
@@ -147,6 +170,7 @@ impl Library {
             db,
             files,
             sub: Mutex::new(None),
+            fact_task: Mutex::new(None),
             edit_task: Mutex::new(None),
         })
     }
@@ -154,6 +178,11 @@ impl Library {
     pub async fn close_async(&self) {
         let prev = self.sub.lock().take();
         drop(prev);
+        let fact_task = self.fact_task.lock().take();
+        if let Some((cancel, handle)) = fact_task {
+            cancel.cancel();
+            let _ = handle.await;
+        }
         let edit_task = self.edit_task.lock().take();
         if let Some((cancel, handle)) = edit_task {
             cancel.cancel();
@@ -162,58 +191,89 @@ impl Library {
     }
 
     pub fn close(&self) {
-        let prev = self.sub.lock().take();
-        drop(prev);
-        if let Some((cancel, handle)) = self.edit_task.lock().take() {
-            cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(handle);
-        }
+        vibevalley_runtime::rt::block_on(self.close_async());
     }
 
-    fn found(&self, id: &str) -> Result<LibraryItem, ApiError> {
-        LibraryHandle {
-            db: self.db.clone(),
-            files: self.files.clone(),
-        }
-        .found(id)
+    async fn found_async(&self, id: &str) -> Result<LibraryItem, ApiError> {
+        let mut query = item_select();
+        query.and_where(Expr::col((media_library_item::Entity, media_library_item::Column::AttachmentId)).eq(id));
+        let conn = self.db.read_conn();
+        let row = LibraryRow::find_by_statement(conn.get_database_backend().build(&query))
+            .one(conn)
+            .await
+            .map_err(db_failed)?;
+        row.map(item_of)
+            .ok_or_else(|| missing(t("server.library.noItem", &[("id", id.into())]), LookIn::Library))
     }
 
     /// A later arrival only moves `last_at`.
-    fn keep(&self, id: &str, origin: &LibraryOrigin, at: i64) -> Result<(), ApiError> {
-        LibraryHandle {
-            db: self.db.clone(),
-            files: self.files.clone(),
-        }
-        .keep(id, origin, at)
+    async fn keep_async(&self, id: &str, origin: &LibraryOrigin, at: i64) -> Result<(), ApiError> {
+        let model = media_library_item::ActiveModel {
+            attachment_id: Set(id.into()),
+            kind: Set(origin_kind(origin).into()),
+            origin: Set(serde_json::to_string(origin).expect("JSON")),
+            added_at: Set(at),
+            last_at: Set(at),
+            source_job_id: Set(None),
+            removed_at: Set(None),
+        };
+        let excluded = Alias::new("excluded");
+        let was_removed = Expr::col((media_library_item::Entity, media_library_item::Column::RemovedAt)).is_not_null();
+        let existing_kind = Expr::col((media_library_item::Entity, media_library_item::Column::Kind));
+        let excluded_kind = Expr::col((excluded.clone(), media_library_item::Column::Kind));
+        let existing_origin = Expr::col((media_library_item::Entity, media_library_item::Column::Origin));
+        let excluded_origin = Expr::col((excluded.clone(), media_library_item::Column::Origin));
+        let existing_last = Expr::col((media_library_item::Entity, media_library_item::Column::LastAt));
+        let excluded_last = Expr::col((excluded, media_library_item::Column::LastAt));
+        let on_conflict = OnConflict::column(media_library_item::Column::AttachmentId)
+            .value(
+                media_library_item::Column::Kind,
+                Expr::case(was_removed.clone(), excluded_kind).finally(existing_kind),
+            )
+            .value(
+                media_library_item::Column::Origin,
+                Expr::case(was_removed, excluded_origin).finally(existing_origin),
+            )
+            .value(
+                media_library_item::Column::LastAt,
+                Expr::case(existing_last.clone().gte(excluded_last.clone()), existing_last).finally(excluded_last),
+            )
+            .value(media_library_item::Column::RemovedAt, Expr::val(Option::<i64>::None))
+            .to_owned();
+        media_library_item::Entity::insert(model)
+            .on_conflict(on_conflict)
+            .exec(self.db.write_conn())
+            .await
+            .map_err(db_failed)?;
+        Ok(())
     }
 
     /// What a ready media job made, once per job.
-    fn record_made(&self, jobs: &[MediaJob]) -> Result<(), ApiError> {
+    pub(crate) async fn record_made_async(&self, jobs: &[MediaJob]) -> Result<(), ApiError> {
         for job in jobs {
             let Some((id, job_kind, attachment, updated_at)) = ready_made(job) else {
                 continue;
             };
             let origin = LibraryOrigin::Generated { job: id.into(), job_kind };
-            self.db
-                .run(async |db| {
-                    q::keep_generated(
-                        db,
-                        q::KeepGeneratedParams {
-                            attachment_id: attachment.into(),
-                            kind: origin_kind(&origin).into(),
-                            origin: serde_json::to_string(&origin).expect("JSON"),
-                            added_at: updated_at,
-                            source_job_id: Some(id.into()),
-                        },
-                    )
-                    .await
-                })
+            let model = media_library_item::ActiveModel {
+                attachment_id: Set(attachment.into()),
+                kind: Set(origin_kind(&origin).into()),
+                origin: Set(serde_json::to_string(&origin).expect("JSON")),
+                added_at: Set(updated_at),
+                last_at: Set(updated_at),
+                source_job_id: Set(Some(id.into())),
+                removed_at: Set(None),
+            };
+            media_library_item::Entity::insert(model)
+                .on_conflict_do_nothing()
+                .exec(self.db.write_conn())
+                .await
                 .map_err(db_failed)?;
         }
         Ok(())
     }
 
-    fn record_said(&self, message: &vibevalley_protocol::ChatMessage) -> Result<(), ApiError> {
+    pub(crate) async fn record_said_async(&self, message: &vibevalley_protocol::ChatMessage) -> Result<(), ApiError> {
         if !matches!(message.actor, Actor::User { .. }) || message.kind != MessageKind::Chat {
             return Ok(());
         }
@@ -223,31 +283,53 @@ impl Library {
                 channel: Some(message.channel.clone()),
                 message: Some(message.id.clone()),
             };
-            self.keep(&a.id, &origin, at)?;
+            self.keep_async(&a.id, &origin, at).await?;
         }
         Ok(())
     }
 
-    pub fn list(&self, req: &LibraryListRequest) -> Result<Vec<LibraryItem>, ApiError> {
-        let kind = req.origin.map(|o| o.as_str()).unwrap_or("");
-        let top = req.r#type.map(|t| t.as_str()).unwrap_or("");
+    pub async fn list_async(&self, req: &LibraryListRequest) -> Result<Vec<LibraryItem>, ApiError> {
+        let mut query = item_select();
+        if let Some(kind) = req.origin {
+            query.and_where(Expr::col((media_library_item::Entity, media_library_item::Column::Kind)).eq(kind.as_str()));
+        }
+        if let Some(media_type) = req.r#type {
+            match media_type {
+                LibraryFileKind::Other => {
+                    let known = Condition::any()
+                        .add(media_type_condition("image"))
+                        .add(media_type_condition("audio"))
+                        .add(media_type_condition("video"));
+                    query.and_where(known.not().into());
+                }
+                LibraryFileKind::Image | LibraryFileKind::Audio | LibraryFileKind::Video => {
+                    query.and_where(media_type_condition(media_type.as_str()));
+                }
+            }
+        }
         let text = req.text.as_deref().unwrap_or("").trim().to_lowercase();
-        let sort = req.sort.map(|s| s.as_str()).unwrap_or("recent");
-        let rows = self
-            .db
-            .run(async |db| {
-                q::list_items(
-                    db,
-                    q::ListItemsParams {
-                        kind: kind.into(),
-                        media_type: top.into(),
-                        search: text,
-                        sort: sort.into(),
-                        item_limit: LIST_MAX,
-                    },
-                )
-                .await
-            })
+        if !text.is_empty() {
+            let pattern = format!("%{}%", escape_like(&text));
+            query.and_where(Expr::expr(Func::lower(Expr::col((attachment::Entity, attachment::Column::Name)))).like(LikeExpr::new(pattern).escape('\\')));
+        }
+        match req.sort.unwrap_or(LibrarySort::Recent) {
+            LibrarySort::Name => {
+                query.order_by_expr(Func::lower(Expr::col((attachment::Entity, attachment::Column::Name))).into(), Order::Asc);
+            }
+            LibrarySort::Size => {
+                query.order_by((attachment::Entity, attachment::Column::Size), Order::Desc);
+            }
+            LibrarySort::Recent => {}
+        }
+        query
+            .order_by((media_library_item::Entity, media_library_item::Column::LastAt), Order::Desc)
+            .order_by((media_library_item::Entity, media_library_item::Column::AttachmentId), Order::Asc)
+            .limit(LIST_MAX);
+
+        let conn = self.db.read_conn();
+        let rows = LibraryRow::find_by_statement(conn.get_database_backend().build(&query))
+            .all(conn)
+            .await
             .map_err(db_failed)?;
         Ok(rows.into_iter().map(item_of).collect())
     }
@@ -266,15 +348,10 @@ impl Library {
                 return Err(refused(t("server.library.agentAttachment", &[])));
             }
             let id = id.to_string();
-            let me = self.clone_shallow();
-            return crate::spawn_blocking_traced(move || {
-                let at = now();
-                me.files.of(std::slice::from_ref(&id))?;
-                me.keep(&id, &LibraryOrigin::Uploaded { channel: None, message: None }, at)?;
-                me.found(&id)
-            })
-            .await
-            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?;
+            let at = now();
+            self.files.of_async(std::slice::from_ref(&id)).await?;
+            self.keep_async(&id, &LibraryOrigin::Uploaded { channel: None, message: None }, at).await?;
+            return self.found_async(&id).await;
         }
         let AddedBy::Agent { agent, session, dir } = by else {
             return Err(refused(t("server.library.userFetch", &[])));
@@ -292,70 +369,15 @@ impl Library {
                 (bytes, name, String::new())
             }
         };
-        let agent = agent.clone();
-        let session = session.clone();
-        let me = self.clone_shallow();
-        crate::spawn_blocking_traced(move || {
-            let at = now();
-            let name = if name.is_empty() { found_name } else { name };
-            let kind = if kind.is_empty() { type_of_name(&name).to_string() } else { kind };
-            let attachment = me.files.keep(&bytes, &name, &kind)?;
-            let from = match url {
-                Some(url) => LibraryOriginFetchedFrom::Url { url },
-                None => LibraryOriginFetchedFrom::Path { path },
-            };
-            me.keep(&attachment.id, &LibraryOrigin::Fetched { agent, session, from }, at)?;
-            me.found(&attachment.id)
-        })
-        .await
-        .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-    }
-
-    fn clone_shallow(&self) -> LibraryHandle {
-        LibraryHandle {
-            db: self.db.clone(),
-            files: self.files.clone(),
-        }
-    }
-
-    pub fn add(&self, req: &LibraryAddRequest, by: &AddedBy) -> Result<LibraryItem, ApiError> {
-        let sources = [given(&req.attachment), given(&req.url), given(&req.path)]
-            .iter()
-            .filter(|s| s.is_some())
-            .count();
-        if sources != 1 {
-            return Err(refused(t("server.library.oneSource", &[])));
-        }
         let at = now();
-        let name = given(&req.name).map(|n| n.trim().to_string()).unwrap_or_default();
-        if let Some(id) = given(&req.attachment) {
-            if !matches!(by, AddedBy::User) {
-                return Err(refused(t("server.library.agentAttachment", &[])));
-            }
-            self.files.of(&[id.to_string()])?;
-            self.keep(id, &LibraryOrigin::Uploaded { channel: None, message: None }, at)?;
-            return self.found(id);
-        }
-        let AddedBy::Agent { agent, session, dir } = by else {
-            return Err(refused(t("server.library.userFetch", &[])));
-        };
-        let url = given(&req.url).map(|u| u.trim().to_string());
-        let path = req.path.clone().unwrap_or_default();
-        let (bytes, found_name, kind) = match &url {
-            Some(u) => download(u)?,
-            None => {
-                let (bytes, name) = work_file(dir.as_deref(), &path)?;
-                (bytes, name, String::new())
-            }
-        };
         let name = if name.is_empty() { found_name } else { name };
         let kind = if kind.is_empty() { type_of_name(&name).to_string() } else { kind };
-        let attachment = self.files.keep(&bytes, &name, &kind)?;
+        let attachment = self.files.keep_async(bytes, name, kind).await?;
         let from = match url {
             Some(url) => LibraryOriginFetchedFrom::Url { url },
             None => LibraryOriginFetchedFrom::Path { path },
         };
-        self.keep(
+        self.keep_async(
             &attachment.id,
             &LibraryOrigin::Fetched {
                 agent: agent.clone(),
@@ -363,30 +385,42 @@ impl Library {
                 from,
             },
             at,
-        )?;
-        self.found(&attachment.id)
+        )
+        .await?;
+        self.found_async(&attachment.id).await
     }
 
-    pub fn remove(&self, id: &str) -> Result<(), ApiError> {
-        self.found(id)?;
+    pub fn add(&self, req: &LibraryAddRequest, by: &AddedBy) -> Result<LibraryItem, ApiError> {
+        vibevalley_runtime::rt::block_on(self.add_async(req, by))
+    }
+
+    pub async fn remove_async(&self, id: &str) -> Result<(), ApiError> {
+        self.found_async(id).await?;
         let at = now();
-        self.db
-            .run(async |db| {
-                q::soft_remove_generated_item(
-                    &mut *db,
-                    q::SoftRemoveGeneratedItemParams {
-                        attachment_id: id.into(),
-                        removed_at: Some(at),
-                    },
-                )
-                .await?;
-                q::delete_non_generated_item(db, q::DeleteNonGeneratedItemParams { attachment_id: id.into() }).await
+        let id = id.to_owned();
+        write_tx(self.db.write_conn(), db_failed, |tx| {
+            Box::pin(async move {
+                Update::many(media_library_item::Entity)
+                    .col_expr(media_library_item::Column::RemovedAt, Expr::value(Some(at)))
+                    .filter(media_library_item::Column::AttachmentId.eq(&id))
+                    .filter(media_library_item::Column::SourceJobId.is_not_null())
+                    .exec(tx)
+                    .await
+                    .map_err(db_failed)?;
+                media_library_item::Entity::delete_many()
+                    .filter(media_library_item::Column::AttachmentId.eq(&id))
+                    .filter(media_library_item::Column::SourceJobId.is_null())
+                    .exec(tx)
+                    .await
+                    .map_err(db_failed)?;
+                Ok(())
             })
-            .map_err(db_failed)
+        })
+        .await
     }
 
-    pub fn preview_remove(&self, id: &str) -> Result<Preview, ApiError> {
-        let item = self.found(id)?;
+    pub async fn preview_remove_async(&self, id: &str) -> Result<Preview, ApiError> {
+        let item = self.found_async(id).await?;
         Ok(Preview {
             does: vec![t("server.library.preview.remove", &[("name", item.attachment.name.into())])],
         })
@@ -419,13 +453,6 @@ async fn download_async(address: &str) -> Result<(Vec<u8>, String, String), ApiE
     let fetched = PublicDownload::get_bytes_async(address, DOWNLOAD, ATTACHMENT_MAX)
         .await
         .map_err(|e| map_download_err(address, e))?;
-    Ok(downloaded_tuple(fetched))
-}
-
-/// A file from a public https address: its bytes, its name (the last path
-/// segment, else the host) and the type the server said.
-fn download(address: &str) -> Result<(Vec<u8>, String, String), ApiError> {
-    let fetched = PublicDownload::get_bytes(address, DOWNLOAD, ATTACHMENT_MAX).map_err(|e| map_download_err(address, e))?;
     Ok(downloaded_tuple(fetched))
 }
 
@@ -512,11 +539,7 @@ pub fn install(hub: &Hub, library: Arc<Library>, channel_events: Option<Arc<dyn 
     let l = library.clone();
     hub.on_async::<ops::LibraryItemList, _, _>(move |_, r| {
         let l = l.clone();
-        async move {
-            crate::spawn_blocking_traced(move || l.list(&r))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { l.list_async(&r).await }
     });
     let l = library.clone();
     hub.on_async::<ops::LibraryItemAdd, _, _>(move |ctx, r| {
@@ -551,41 +574,54 @@ pub fn install(hub: &Hub, library: Arc<Library>, channel_events: Option<Arc<dyn 
     let l = library.clone();
     hub.on_async::<ops::LibraryItemDelete, _, _>(move |_, r| {
         let l = l.clone();
-        async move {
-            crate::spawn_blocking_traced(move || l.remove(&r.id))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { l.remove_async(&r.id).await }
     });
     let l = library.clone();
     hub.on_async::<ops::LibraryItemPreviewDelete, _, _>(move |_, r| {
         let l = l.clone();
-        async move {
-            crate::spawn_blocking_traced(move || l.preview_remove(&r.id))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { l.preview_remove_async(&r.id).await }
     });
 
-    let weak = Arc::downgrade(&library);
+    let (fact_tx, mut fact_rx) = tokio::sync::mpsc::unbounded_channel::<Fact>();
     let sub = hub.subscribe_transitions("library", move |_, tr| {
-        let Some(l) = weak.upgrade() else { return };
-        match &tr.fact {
-            Fact::MediaChanged(m) => {
-                if let Err(e) = l.record_made(&m.jobs) {
-                    eprintln!("vibevalley-server: library: recording: {}", e.message);
-                }
-            }
-            Fact::MessageChanged(m) => {
-                if let Err(e) = l.record_said(&m.message) {
-                    eprintln!("vibevalley-server: library: recording: {}", e.message);
-                }
-            }
-            _ => {}
+        if matches!(tr.fact, Fact::MediaChanged(_) | Fact::MessageChanged(_)) {
+            let _ = fact_tx.send(tr.fact.clone());
         }
     });
     let prev = library.sub.lock().replace(sub);
     drop(prev);
+
+    let weak = Arc::downgrade(&library);
+    let cancel = hub.child_token();
+    let task_cancel = cancel.clone();
+    let handle = hub.spawn_task(async move {
+        while let Some(fact) = tokio::select! {
+            biased;
+            _ = task_cancel.cancelled() => None,
+            msg = fact_rx.recv() => msg,
+        } {
+            let Some(l) = weak.upgrade() else { return };
+            match fact {
+                Fact::MediaChanged(m) => {
+                    if let Err(e) = l.record_made_async(&m.jobs).await {
+                        eprintln!("vibevalley-server: library: recording: {}", e.message);
+                    }
+                }
+                Fact::MessageChanged(m) => {
+                    if let Err(e) = l.record_said_async(&m.message).await {
+                        eprintln!("vibevalley-server: library: recording: {}", e.message);
+                    }
+                }
+                _ => {}
+            }
+        }
+    });
+    if let Some((old_cancel, old_handle)) = library.fact_task.lock().replace((cancel, handle)) {
+        old_cancel.cancel();
+        hub.spawn_task(async move {
+            let _ = old_handle.await;
+        });
+    }
 
     if let Some(port) = channel_events {
         let mut rx = port.subscribe_edited_messages();
@@ -604,12 +640,9 @@ pub fn install(hub: &Hub, library: Arc<Library>, channel_events: Option<Arc<dyn 
                     },
                 };
                 let Some(l) = weak.upgrade() else { return };
-                let _ = crate::spawn_blocking_traced(move || {
-                    if let Err(e) = l.record_said(&message) {
-                        eprintln!("vibevalley-server: library: recording: {}", e.message);
-                    }
-                })
-                .await;
+                if let Err(e) = l.record_said_async(&message).await {
+                    eprintln!("vibevalley-server: library: recording: {}", e.message);
+                }
             }
         });
         if let Some((old_cancel, old_handle)) = library.edit_task.lock().replace((cancel, handle)) {
@@ -623,6 +656,8 @@ pub fn install(hub: &Hub, library: Arc<Library>, channel_events: Option<Arc<dyn 
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::ConnectionTrait;
+
     use super::*;
 
     #[test]
@@ -639,20 +674,23 @@ mod tests {
         .unwrap();
         let library = Library::open(db.clone(), files.clone());
         let admin = |sql: &'static str| {
-            db.run(async |conn| sqlx::raw_sql(sql).execute(&mut *conn).await).unwrap();
+            vibevalley_runtime::rt::block_on(db.write_conn().execute_unprepared(sql)).unwrap();
         };
         admin("CREATE TRIGGER refuse_media_item BEFORE INSERT ON media_library_item BEGIN SELECT RAISE(ABORT, 'item failed'); END;");
-        assert!(library.record_made(std::slice::from_ref(&job)).is_err());
+        assert!(vibevalley_runtime::rt::block_on(library.record_made_async(std::slice::from_ref(&job))).is_err());
         drop(library);
         let library = Library::open(db.clone(), files.clone());
         admin("DROP TRIGGER refuse_media_item;");
-        library.record_made(std::slice::from_ref(&job)).unwrap();
-        let stored = library.found(&attachment.id).unwrap();
+        vibevalley_runtime::rt::block_on(library.record_made_async(std::slice::from_ref(&job))).unwrap();
+        let stored = vibevalley_runtime::rt::block_on(library.found_async(&attachment.id)).unwrap();
         assert_eq!(stored.attachment, attachment);
         assert!(matches!(stored.origin,LibraryOrigin::Generated{ref job,..} if job=="job"));
-        library.remove(&attachment.id).unwrap();
-        library.record_made(&[job]).unwrap();
-        assert_eq!(library.found(&attachment.id).unwrap_err().biz_code, BizCode::LibraryNotFound);
+        vibevalley_runtime::rt::block_on(library.remove_async(&attachment.id)).unwrap();
+        vibevalley_runtime::rt::block_on(library.record_made_async(&[job])).unwrap();
+        assert_eq!(
+            vibevalley_runtime::rt::block_on(library.found_async(&attachment.id)).unwrap_err().biz_code,
+            BizCode::LibraryNotFound
+        );
         assert_eq!(std::fs::read(files.file(&attachment.id).unwrap().path).unwrap(), b"image");
         db.close();
     }

@@ -9,7 +9,7 @@
 
 mod blocks;
 mod collab;
-mod db;
+pub(super) mod db;
 mod entries;
 mod types;
 
@@ -19,7 +19,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
-use sqlx::{Connection, SqliteConnection};
+use sea_orm::{ConnectionTrait, DbErr};
 use tokio::sync::{Mutex as AsyncMutex, broadcast};
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::artifact::{
@@ -42,6 +42,7 @@ use entries::EntryChange;
 
 use crate::base::{LookIn, ServerDb, missing};
 use crate::modules::content::attachment::Attachments;
+use crate::modules::content::begin_write_tx;
 use crate::ports::{ChannelAnnouncePort, ChannelQuotePort};
 use crate::{Hub, now};
 
@@ -54,7 +55,7 @@ fn refused(text: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::ArtifactRefused, text.into())
 }
 
-fn q(e: sqlx::Error) -> ApiError {
+fn q(e: DbErr) -> ApiError {
     crate::base::internal(e)
 }
 
@@ -120,12 +121,10 @@ impl BlockQuoter {
 impl ChannelQuotePort for BlockQuoter {
     fn quote(&self, refs: &[BlockRef]) -> Vec<QuotedBlock> {
         vibevalley_runtime::rt::block_on(async {
-            let Ok(mut conn) = self.db.read_pool().acquire().await else {
-                return vec![];
-            };
+            let conn = self.db.read_conn();
             let mut out = vec![];
             for r in refs {
-                let row = match db::artifact(&mut conn, &r.artifact_id).await {
+                let row = match db::artifact(conn, &r.artifact_id).await {
                     Ok(Some(row)) => row,
                     Ok(None) => continue,
                     Err(e) => {
@@ -133,7 +132,7 @@ impl ChannelQuotePort for BlockQuoter {
                         continue;
                     }
                 };
-                let blocks = match db::blocks(&mut conn, &r.artifact_id).await {
+                let blocks = match db::blocks(conn, &r.artifact_id).await {
                     Ok(b) => b,
                     Err(e) => {
                         eprintln!("vibevalley-server: quoting a block failed: {e}");
@@ -228,13 +227,8 @@ impl Artifacts {
                     return;
                 }
                 let before = now() - blocks::KEPT_DAYS * blocks::DAY_MS;
-                match a.db.write_pool().acquire().await {
-                    Ok(mut conn) => {
-                        if let Err(e) = db::prune(&mut conn, before).await {
-                            eprintln!("vibevalley-server: artifact.prune failed: {e}");
-                        }
-                    }
-                    Err(e) => eprintln!("vibevalley-server: artifact.prune failed: {e}"),
+                if let Err(e) = db::prune(a.db.write_conn(), before).await {
+                    eprintln!("vibevalley-server: artifact.prune failed: {e}");
                 }
             }
         });
@@ -249,14 +243,14 @@ impl Artifacts {
         }
     }
 
-    async fn found(&self, db: &mut SqliteConnection, id: &str) -> Result<ArtifactRow, ApiError> {
+    async fn found<C: ConnectionTrait>(&self, db: &C, id: &str) -> Result<ArtifactRow, ApiError> {
         db::artifact(db, id)
             .await
             .map_err(q)?
             .ok_or_else(|| missing(t("server.artifact.missing", &[("id", id.into())]), LookIn::Artifact))
     }
 
-    async fn assemble(&self, db: &mut SqliteConnection, row: ArtifactRow) -> Result<Wire, ApiError> {
+    async fn assemble<C: ConnectionTrait>(&self, db: &C, row: ArtifactRow) -> Result<Wire, ApiError> {
         let versions = if row.body == "html" {
             db::versions(db, &row.id).await.map_err(q)?
         } else {
@@ -273,7 +267,7 @@ impl Artifacts {
             title: row.title,
             body,
             artifact_type: row.artifact_type.as_deref().and_then(artifact_type_of),
-            is_default: row.is_default != 0,
+            is_default: row.is_default,
             display: row.display.as_deref().and_then(display_of),
             channel: row.channel_id,
             said: match (row.said_channel, row.said_number) {
@@ -304,18 +298,18 @@ impl Artifacts {
     }
 
     async fn get_now_async(&self, id: &str) -> Result<Wire, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        let row = self.found(&mut db, id).await?;
-        self.assemble(&mut db, row).await
+        let conn = self.db.read_conn();
+        let row = self.found(conn, id).await?;
+        self.assemble(conn, row).await
     }
 
     pub async fn list_async(&self, req: &ArtifactListRequest) -> Result<Vec<Wire>, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
+        let conn = self.db.read_conn();
         let channel = req.channel.as_deref().filter(|c| !c.is_empty());
         let rows = match (req.issue.as_deref().filter(|i| !i.is_empty()), channel) {
-            (Some(issue), _) => db::artifacts_for_issue(&mut db, issue).await,
-            (None, Some(channel)) => db::artifacts_in_channel(&mut db, channel).await,
-            (None, None) => db::artifacts(&mut db, LISTED_MAX).await,
+            (Some(issue), _) => db::artifacts_for_issue(conn, issue).await,
+            (None, Some(channel)) => db::artifacts_in_channel(conn, channel).await,
+            (None, None) => db::artifacts(conn, LISTED_MAX).await,
         }
         .map_err(q)?;
         // Both given: the issue's, in that channel; filtered by artifact_type when set.
@@ -325,7 +319,7 @@ impl Artifacts {
             .filter(|r| channel.is_none_or(|c| r.channel_id.as_deref() == Some(c)))
             .filter(|r| req.artifact_type.is_none_or(|ty| r.artifact_type.as_deref() == Some(ty.as_str())))
         {
-            out.push(self.assemble(&mut db, r).await?);
+            out.push(self.assemble(conn, r).await?);
         }
         Ok(out)
     }
@@ -342,7 +336,7 @@ impl Artifacts {
         vibevalley_runtime::rt::block_on(self.get_async(id))
     }
 
-    async fn version_of(&self, db: &mut SqliteConnection, id: &str, version: Option<i64>) -> Result<(ArtifactRow, db::VersionRow), ApiError> {
+    async fn version_of<C: ConnectionTrait>(&self, db: &C, id: &str, version: Option<i64>) -> Result<(ArtifactRow, db::VersionRow), ApiError> {
         let row = self.found(db, id).await?;
         let n = version.unwrap_or(row.version);
         let Some(v) = db::version(db, id, n).await.map_err(q)? else {
@@ -374,10 +368,7 @@ impl Artifacts {
     /// An html one's version as made; a blocks one's Markdown now; a store one's
     /// manifest summary, its version its seq.
     pub async fn content_async(&self, id: &str, version: Option<i64>) -> Result<(ArtifactContent, ArtifactBody), ApiError> {
-        let row = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found(&mut db, id).await?
-        };
+        let row = self.found(self.db.read_conn(), id).await?;
         if row.body == "blocks" {
             return Ok((
                 ArtifactContent {
@@ -397,22 +388,19 @@ impl Artifacts {
                 ArtifactBody::Store,
             ));
         }
-        let (row, v) = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.version_of(&mut db, id, version).await?
-        };
+        let (row, v) = self.version_of(self.db.read_conn(), id, version).await?;
         let content = self.page_of_async(&row, &v).await?;
         Ok((ArtifactContent { version: v.version, content }, ArtifactBody::Html))
     }
 
     /// An html version's file on disk; none when there is none.
     pub async fn file_async(&self, id: &str, version: i64) -> Option<PathBuf> {
-        let mut db = self.db.read_pool().acquire().await.ok()?;
-        let row = db::artifact(&mut db, id).await.ok()??;
+        let conn = self.db.read_conn();
+        let row = db::artifact(conn, id).await.ok()??;
         if row.body != "html" {
             return None;
         }
-        db::version(&mut db, id, version).await.ok()?.map(|v| self.files.path_of(&v.attachment_id))
+        db::version(conn, id, version).await.ok()?.map(|v| self.files.path_of(&v.attachment_id))
     }
 
     /// `keep`: a version's bytes as an attachment.
@@ -525,71 +513,76 @@ impl Artifacts {
         };
         let initial = {
             let at = now();
-            let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
-            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-            db::add_artifact(
-                &mut tx,
-                db::NewArtifact {
-                    id: id.clone(),
-                    title: effective_title.clone(),
-                    body: if html { "html" } else { "blocks" }.into(),
-                    artifact_type: final_type.map(|ty| ty.as_str().into()),
-                    is_default: 0,
-                    display: display.map(|d| d.as_str().into()),
-                    channel_id: Some(channel.clone()),
-                    issue: req.issue.clone(),
-                    by_id: maker.by.clone(),
-                    by_name: by_name.clone(),
-                    version,
-                    created_at: at,
-                },
-            )
-            .await
-            .map_err(q)?;
-            if html {
-                db::add_version(
-                    &mut tx,
-                    db::NewVersion {
-                        artifact_id: id.clone(),
-                        version: 1,
-                        attachment_id: file.clone(),
-                        size: bytes.len() as i64,
-                        note: note.map(str::to_owned),
+            let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+            let outcome: Result<Option<BlockAck>, ApiError> = async {
+                db::add_artifact(
+                    &tx,
+                    db::NewArtifact {
+                        id: id.clone(),
+                        title: effective_title.clone(),
+                        body: if html { "html" } else { "blocks" }.into(),
+                        artifact_type: final_type.map(|ty| ty.as_str().into()),
+                        is_default: false,
+                        display: display.map(|d| d.as_str().into()),
+                        channel_id: Some(channel.clone()),
+                        issue: req.issue.clone(),
                         by_id: maker.by.clone(),
-                        by_name,
+                        by_name: by_name.clone(),
+                        version,
                         created_at: at,
                     },
                 )
                 .await
                 .map_err(q)?;
-                let meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
-                self.sync_html_to_collab_async(&mut tx, &id, None, content, &meta).await?;
+                if html {
+                    db::add_version(
+                        &tx,
+                        db::NewVersion {
+                            artifact_id: id.clone(),
+                            version: 1,
+                            attachment_id: file.clone(),
+                            size: bytes.len() as i64,
+                            note: note.map(str::to_owned),
+                            by_id: maker.by.clone(),
+                            by_name,
+                            created_at: at,
+                        },
+                    )
+                    .await
+                    .map_err(q)?;
+                    let meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
+                    self.sync_html_to_collab_async(&tx, &id, None, content, &meta).await?;
+                }
+                let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
+                if html {
+                    Ok(None)
+                } else {
+                    self.fill_with_meta_async(&tx, &id, content, &maker.by, &fill_meta).await
+                }
             }
-            let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned), at);
-            let ack = if html {
-                None
-            } else {
-                self.fill_with_meta_async(&mut tx, &id, content, &maker.by, &fill_meta).await?
-            };
-            tx.commit().await.map_err(q)?;
-            ack
+            .await;
+            match outcome {
+                Ok(ack) => {
+                    tx.commit().await.map_err(q)?;
+                    ack
+                }
+                Err(err) => {
+                    let _ = tx.rollback().await;
+                    return Err(err);
+                }
+            }
         };
         let text = Self::words(t("server.artifact.made", &[("title", effective_title.as_str().into())]), note);
         let said = match self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new()) {
             Ok(msg) => msg,
             Err(err) => {
-                if let Ok(mut conn) = self.db.write_pool().acquire().await {
-                    let _ = db::delete_artifact(&mut conn, &id).await;
-                }
+                let _ = db::delete_artifact(self.db.write_conn(), &id).await;
                 return Err(err);
             }
         };
-        {
-            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-            db::artifact_said(&mut db, &id, &said.id).await.map_err(q)?;
-            if html {
-                db::version_announced(&mut db, &id, 1, &said.id).await.map_err(q)?;
-            }
+        db::artifact_said(self.db.write_conn(), &id, &said.id).await.map_err(q)?;
+        if html {
+            db::version_announced(self.db.write_conn(), &id, 1, &said.id).await.map_err(q)?;
         }
         if let Some(ack) = initial {
             self.publish_change(&id, &ack);
@@ -632,31 +625,40 @@ impl Artifacts {
         };
 
         {
-            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-            if is_default {
-                db::clear_default_design_system(&mut tx, at).await.map_err(q)?;
+            let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+            let outcome: Result<(), ApiError> = async {
+                if is_default {
+                    db::clear_default_design_system(&tx, at).await.map_err(q)?;
+                }
+                db::add_artifact(
+                    &tx,
+                    db::NewArtifact {
+                        id: id.clone(),
+                        title: title.into(),
+                        body: "store".into(),
+                        artifact_type: artifact_type.map(|ty| ty.as_str().into()),
+                        is_default,
+                        display: None,
+                        channel_id: resolved_channel.clone(),
+                        issue: req.issue.clone(),
+                        by_id: maker.by.clone(),
+                        by_name: initial_name,
+                        version: 0,
+                        created_at: at,
+                    },
+                )
+                .await
+                .map_err(q)?;
+                Ok(())
             }
-            db::add_artifact(
-                &mut tx,
-                db::NewArtifact {
-                    id: id.clone(),
-                    title: title.into(),
-                    body: "store".into(),
-                    artifact_type: artifact_type.map(|ty| ty.as_str().into()),
-                    is_default: i64::from(is_default),
-                    display: None,
-                    channel_id: resolved_channel.clone(),
-                    issue: req.issue.clone(),
-                    by_id: maker.by.clone(),
-                    by_name: initial_name,
-                    version: 0,
-                    created_at: at,
-                },
-            )
-            .await
-            .map_err(q)?;
-            tx.commit().await.map_err(q)?;
+            .await;
+            match outcome {
+                Ok(()) => tx.commit().await.map_err(q)?,
+                Err(err) => {
+                    let _ = tx.rollback().await;
+                    return Err(err);
+                }
+            }
         }
 
         let mut seq = 0;
@@ -692,8 +694,7 @@ impl Artifacts {
             };
             let text = Self::words(t("server.artifact.made", &[("title", title.into())]), note);
             let said = self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new())?;
-            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-            db::artifact_said(&mut db, &id, &said.id).await.map_err(q)?;
+            db::artifact_said(self.db.write_conn(), &id, &said.id).await.map_err(q)?;
         }
 
         self.get_now_async(&id).await
@@ -714,15 +715,15 @@ impl Artifacts {
         } else {
             maker.by.clone()
         };
-        let mut db = self.db.write_pool().acquire().await.map_err(q)?;
+        let conn = self.db.write_conn();
         db::add_artifact(
-            &mut db,
+            conn,
             db::NewArtifact {
                 id: id.clone(),
                 title: title.into(),
                 body: "blocks".into(),
                 artifact_type: artifact_type.map(|ty| ty.as_str().into()),
-                is_default: 0,
+                is_default: false,
                 display: None,
                 channel_id: channel,
                 issue,
@@ -734,8 +735,8 @@ impl Artifacts {
         )
         .await
         .map_err(q)?;
-        let row = self.found(&mut db, &id).await?;
-        self.assemble(&mut db, row).await
+        let row = self.found(conn, &id).await?;
+        self.assemble(conn, row).await
     }
 
     /// Imports a `.md` document (standard Markdown, YAML frontmatter, or Logseq outline)
@@ -774,33 +775,41 @@ impl Artifacts {
             maker.by.clone()
         };
         let initial = {
-            let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
-            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-            db::add_artifact(
-                &mut tx,
-                db::NewArtifact {
-                    id: id.clone(),
-                    title: effective_title.clone(),
-                    body: "blocks".into(),
-                    artifact_type: Some(ArtifactType::Outline.as_str().into()),
-                    is_default: 0,
-                    display: None,
-                    channel_id: resolved_channel.clone(),
-                    issue: req.issue.clone(),
-                    by_id: maker.by.clone(),
-                    by_name,
-                    version: 0,
-                    created_at: at,
-                },
-            )
-            .await
-            .map_err(q)?;
-            let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned).or_else(|| Some("import outline".into())), at);
-            let ack = self
-                .fill_md_blocks_with_meta_async(&mut tx, &id, imported.blocks, &maker.by, &fill_meta)
-                .await?;
-            tx.commit().await.map_err(q)?;
-            ack
+            let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+            let outcome: Result<Option<BlockAck>, ApiError> = async {
+                db::add_artifact(
+                    &tx,
+                    db::NewArtifact {
+                        id: id.clone(),
+                        title: effective_title.clone(),
+                        body: "blocks".into(),
+                        artifact_type: Some(ArtifactType::Outline.as_str().into()),
+                        is_default: false,
+                        display: None,
+                        channel_id: resolved_channel.clone(),
+                        issue: req.issue.clone(),
+                        by_id: maker.by.clone(),
+                        by_name,
+                        version: 0,
+                        created_at: at,
+                    },
+                )
+                .await
+                .map_err(q)?;
+                let fill_meta = collab::commit_meta_for_maker(maker, note.map(str::to_owned).or_else(|| Some("import outline".into())), at);
+                self.fill_md_blocks_with_meta_async(&tx, &id, imported.blocks, &maker.by, &fill_meta).await
+            }
+            .await;
+            match outcome {
+                Ok(ack) => {
+                    tx.commit().await.map_err(q)?;
+                    ack
+                }
+                Err(err) => {
+                    let _ = tx.rollback().await;
+                    return Err(err);
+                }
+            }
         };
         if should_announce && let Some(channel) = resolved_channel {
             let card = ArtifactCard {
@@ -816,14 +825,11 @@ impl Artifacts {
             let said = match self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new()) {
                 Ok(msg) => msg,
                 Err(err) => {
-                    if let Ok(mut conn) = self.db.write_pool().acquire().await {
-                        let _ = db::delete_artifact(&mut conn, &id).await;
-                    }
+                    let _ = db::delete_artifact(self.db.write_conn(), &id).await;
                     return Err(err);
                 }
             };
-            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-            db::artifact_said(&mut db, &id, &said.id).await.map_err(q)?;
+            db::artifact_said(self.db.write_conn(), &id, &said.id).await.map_err(q)?;
         }
 
         if let Some(ack) = initial {
@@ -853,10 +859,10 @@ impl Artifacts {
 
     async fn version_locked_async(&self, maker: &Maker, req: &ArtifactVersionRequest, explicit_meta: Option<&CommitMeta>) -> Result<Wire, ApiError> {
         let (row, prior_version) = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            let row = self.found(&mut db, &req.id).await?;
+            let conn = self.db.read_conn();
+            let row = self.found(conn, &req.id).await?;
             let prior = if row.body == "html" && row.version > 0 {
-                db::version(&mut db, &row.id, row.version).await.map_err(q)?
+                db::version(conn, &row.id, row.version).await.map_err(q)?
             } else {
                 None
             };
@@ -896,30 +902,37 @@ impl Artifacts {
         };
         {
             let at = now();
-            let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
-            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-            db::add_version(
-                &mut tx,
-                db::NewVersion {
-                    artifact_id: row.id.clone(),
-                    version: next,
-                    attachment_id: file.clone(),
-                    size: bytes.len() as i64,
-                    note: note.map(str::to_owned),
-                    by_id: maker.by.clone(),
-                    by_name,
-                    created_at: at,
-                },
-            )
-            .await
-            .map_err(q)?;
-            db::artifact_versioned(&mut tx, &row.id, next, at).await.map_err(q)?;
-            let meta = explicit_meta
-                .cloned()
-                .unwrap_or_else(|| collab::commit_meta_for_maker(maker, note.map(str::to_owned), at));
-            self.sync_html_to_collab_async(&mut tx, &row.id, prior_html.as_deref(), &req.content, &meta)
-                .await?;
-            tx.commit().await.map_err(q)?;
+            let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+            let outcome: Result<(), ApiError> = async {
+                db::add_version(
+                    &tx,
+                    db::NewVersion {
+                        artifact_id: row.id.clone(),
+                        version: next,
+                        attachment_id: file,
+                        size: bytes.len() as i64,
+                        note: note.map(str::to_owned),
+                        by_id: maker.by.clone(),
+                        by_name,
+                        created_at: at,
+                    },
+                )
+                .await
+                .map_err(q)?;
+                db::artifact_versioned(&tx, &row.id, next, at).await.map_err(q)?;
+                let meta = explicit_meta
+                    .cloned()
+                    .unwrap_or_else(|| collab::commit_meta_for_maker(maker, note.map(str::to_owned), at));
+                self.sync_html_to_collab_async(&tx, &row.id, prior_html.as_deref(), &req.content, &meta).await
+            }
+            .await;
+            match outcome {
+                Ok(()) => tx.commit().await.map_err(q)?,
+                Err(err) => {
+                    let _ = tx.rollback().await;
+                    return Err(err);
+                }
+            }
         }
         let text = Self::words(
             t("server.artifact.versioned", &[("title", row.title.as_str().into()), ("version", next.into())]),
@@ -933,10 +946,7 @@ impl Artifacts {
             maker.run.clone(),
             String::new(),
         )?;
-        {
-            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-            db::version_announced(&mut db, &row.id, next, &said.id).await.map_err(q)?;
-        }
+        db::version_announced(self.db.write_conn(), &row.id, next, &said.id).await.map_err(q)?;
         self.get_now_async(&row.id).await
     }
 
@@ -980,10 +990,7 @@ impl Artifacts {
             return self.get_now_async(&req.id).await;
         }
         let _rows = self.rows.lock().await;
-        let (row, v) = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.version_of(&mut db, &req.id, Some(req.version)).await?
-        };
+        let (row, v) = self.version_of(self.db.read_conn(), &req.id, Some(req.version)).await?;
         if row.body != "html" {
             return Err(refused(t("server.artifact.notHtml", &[("title", row.title.as_str().into())])));
         }
@@ -1015,8 +1022,8 @@ impl Artifacts {
     /// Its title, how an html one is shown, or whether a design-system is the farm's default.
     pub async fn update_async(&self, req: &ArtifactUpdateRequest) -> Result<Wire, ApiError> {
         let _rows = self.rows.lock().await;
-        let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-        let row = self.found(&mut db, &req.id).await?;
+        let conn = self.db.write_conn();
+        let row = self.found(conn, &req.id).await?;
         if let Some(title) = &req.title {
             let problem = artifact_problem(Some(title), None, None);
             if !problem.is_empty() {
@@ -1030,29 +1037,36 @@ impl Artifacts {
             return Err(refused(t("server.artifact.defaultDesignSystemOnly", &[])));
         }
         let at = now();
-        let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-        if let Some(title) = &req.title {
-            db::artifact_renamed(&mut tx, &req.id, title.trim(), at).await.map_err(q)?;
-        }
-        if let Some(display) = req.display {
-            db::artifact_shown(&mut tx, &req.id, display.as_str(), at).await.map_err(q)?;
-        }
-        if let Some(is_default) = req.is_default {
-            if is_default {
-                db::clear_default_design_system(&mut tx, at).await.map_err(q)?;
+        let tx = begin_write_tx(conn).await.map_err(q)?;
+        let outcome: Result<(), ApiError> = async {
+            if let Some(title) = &req.title {
+                db::artifact_renamed(&tx, &req.id, title.trim(), at).await.map_err(q)?;
             }
-            db::set_artifact_default(&mut tx, &req.id, is_default, at).await.map_err(q)?;
+            if let Some(display) = req.display {
+                db::artifact_shown(&tx, &req.id, display.as_str(), at).await.map_err(q)?;
+            }
+            if let Some(is_default) = req.is_default {
+                if is_default {
+                    db::clear_default_design_system(&tx, at).await.map_err(q)?;
+                }
+                db::set_artifact_default(&tx, &req.id, is_default, at).await.map_err(q)?;
+            }
+            Ok(())
         }
-        tx.commit().await.map_err(q)?;
-        let row = self.found(&mut db, &req.id).await?;
-        self.assemble(&mut db, row).await
+        .await;
+        match outcome {
+            Ok(()) => tx.commit().await.map_err(q)?,
+            Err(err) => {
+                let _ = tx.rollback().await;
+                return Err(err);
+            }
+        }
+        let row = self.found(conn, &req.id).await?;
+        self.assemble(conn, row).await
     }
 
     pub async fn preview_remove_async(&self, id: &str) -> Result<Preview, ApiError> {
-        let row = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found(&mut db, id).await?
-        };
+        let row = self.found(self.db.read_conn(), id).await?;
         let what = if row.body == "html" {
             t(
                 "server.artifact.preview.remove",
@@ -1078,9 +1092,9 @@ impl Artifacts {
     /// It and its versions, blocks, or entries go; the versions' attachments stay.
     pub async fn remove_async(&self, id: &str) -> Result<(), ApiError> {
         let _rows = self.rows.lock().await;
-        let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-        self.found(&mut db, id).await?;
-        db::delete_artifact(&mut db, id).await.map_err(q)?;
+        let conn = self.db.write_conn();
+        self.found(conn, id).await?;
+        db::delete_artifact(conn, id).await.map_err(q)?;
         self.drop_presence_state(id);
         Ok(())
     }
