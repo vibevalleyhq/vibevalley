@@ -1,24 +1,25 @@
 # 命名
 
-文件、文件夹、类型、函数、接口、表、词典的键和测试的标记都照这一篇起名。叫法用哪个词（工单还是 ticket，界面上叫什么）见 [用语表](docs/README.md#用语) 和 [code.md](docs/style/code.md#叫法)；本篇管名字怎么起。
+文件、文件夹、类型、函数、接口、表、词典的键和测试的标记都照这一篇起名。叫法用哪个词（任务还是 ticket，界面上叫什么）见 [用语表](docs/README.md#用语) 和 [code.md](docs/style/code.md#叫法)；本篇管名字怎么起。
 
 ## 三条原则
 
-1. **能区分**：名字说出这里和别处不同的那件事。检验办法：把名字换到另一个模块的另一个文件上，它还成立，就是坏名字。`rules.ts`、`utils.ts`、`data.ts`、`state.ts` 放在哪个模块都成立；`moves.ts`（工单能往哪挪）、`recall.ts`（下回想起什么）、`lease.ts`（家目录的租约）只在一处成立。
-2. **在调用处正好够用**：名字是在调用处读的，调用处已经写了的不重复，没写的要补上。具名导出在调用处只剩函数名，所以写 `issueTitle`，不写 `title`；服务的方法前面有服务，所以写 `issues.edit`，不写 `issues.editIssue`。
+1. **能区分**：名字说出这里和别处不同的那件事。检验办法：把名字换到另一个模块的另一个文件上，它还成立，就是坏名字。`rules.ts`、`utils.ts`、`data.ts`、`state.ts` 放在哪个模块都成立；`moves.ts`（任务能往哪挪）、`recall.ts`（下回想起什么）、`lease.ts`（家目录的租约）只在一处成立。
+2. **在调用处正好够用**：名字是在调用处读的，调用处已经写了的不重复，没写的要补上。具名导出在调用处只剩函数名，所以写 `issueTitle`，不写 `title`；服务的方法前面有服务，所以写 `issue.edit`，不写 `issue.editIssue`。
 3. **一词一义**：一个词在整个仓库只指一样东西，一样东西只用一个词。同一个意思两个模块各起一个名字，是重复；同一个词指两样东西，是双关，读的人得看上下文才知道是哪个。
 
 ## 用哪一类词
 
-业务里的东西用业务的词（用语表）：`Issue`、`Session`、`moves`、`recall`。技术机制用技术上的通名：`lease`（租约）、`breaker`（熔断）、`cursor`、`relay`、`queue`。两类词都说得出「这里是什么」；不用的是两类都不是的：
+业务里的东西用业务的词（用语表）：`Issue`、`Session`、`moves`、`recall`。技术机制用通用直白的工程词：`App`、`Router`、`Context`、`TaskGroup`、`LiveState`、`Outbox`、`StateFeed`、`DbService`、`Storage`、`GatewayPorts`、`lease`（租约）、`breaker`（熔断）、`cursor`、`relay`、`queue`。不用自造隐喻或生僻黑话，也不用没有归属的空词：
 
-| 不用 | 它说的是 | 换成 |
+| 不用 | 问题 | 换成 |
 |---|---|---|
-| `rules.ts` | 能在测试的规则层测 | 它决定的事：`due.ts`、`patrol.ts`、`report.ts`；解析某个概念的，合进那个概念的文件（工单的细化在 `crates/core/src/refine.rs`） |
-| `state.ts`、`data.ts`、`hooks.ts` | 在框架里的角色 | 它管的东西：`groups.ts`、`calendar.ts`、`lanes.ts` |
+| `rules.ts` | 只说能在测试的规则层测 | 它决定的事：`due.ts`、`patrol.ts`、`report.ts`；解析某个概念的，合进那个概念的文件（任务的细化在 `crates/core/src/refine.rs`） |
+| `state.ts`、`data.ts`、`hooks.ts` | 只说在框架里的角色 | 它管的东西：`groups.ts`、`calendar.ts`、`lanes.ts` |
 | `utils`、`helpers`、`common`、`misc`、`lib` | 没有归属 | 用它的概念；两个模块都用的，放进下层拥有它的模块 |
-| `text.ts` | 形式是文字 | 说给谁、说什么：`digest.ts`、`mentions.ts` |
-| `XManager`、`XHandler`、`XService`、`XUtil` | 角色 | 服务按它管的东西叫（`Issue`），函数按它做的事叫 |
+| `text.ts`（前端泛用） | 只说形式是文字 | 说给谁、说什么：`digest.ts`、`mentions.ts` |
+| `XManager`、`XHandler`、`XService`、`XUtil` | 重复领域前缀或空泛角色后缀 | 服务端深业务域用 `<domain>::Service`（调用处读作 `issue::Service`），单概念或基础模块用朴素单数名（`Storage`、`Setting`、`Provider`、`Repo`、`Game`），函数按它做的事叫 |
+| 隐喻式自造架构黑话 | 读的人要靠上下文猜它是什么 | 通用工程名：组合根叫 `App`，路由门叫 `Router`，共享上下文叫 `Context`，瞬态叫 `LiveState`，切片推送叫 `StateFeed`，错误模块叫 `error.rs`，任务工作树叫 `worktree` |
 
 代码的技术性质不进名字，交给检查：
 
@@ -33,13 +34,13 @@
 
 ## 单数和复数
 
-单个服务、Store、模块与结构体字段一律用单数；复数只用于集合、计数或返回列表的接口和函数（`issue.list`、`issues: Vec<Issue>`）。复数说的是「好几个」，读的人会照着去遍历它；一个服务、一个模块字段用复数，就让读的人以为手里是一组。
+单个服务、模块、目录与结构体字段一律用单数；复数只用于集合、计数或返回列表的接口和函数（`issue.list`、`issues: Vec<Issue>`）。复数说的是「好几个」，读的人会照着去遍历它；一个服务、一个模块字段用复数，就让读的人以为手里是一组。
 
 | 复数是必要的 | 复数是多余的 |
 |---|---|
-| `issues: Issue[]`、`issues: Vec<Issue>`、`SpaceState.issues` | 单个服务/Store：`IssueStore`、`AgentStore`、`RepoStore`、`CronStore`（不用 `Issues`、`Agents`、`Repos`、`Crons`） |
-| `issue.list`、`repo.list`（返回好几个） | 组合根与依赖字段：`app.issue`、`app.session`、`app.agent`（不用 `app.issues`、`app.agents`） |
-| `runsOf(session)`、`questionsOf(issue)`（返回好几个） | 只放一样东西的文件 `memories.ts`（写 `store.ts`） |
+| `issues: Issue[]`、`issues: Vec<Issue>` | 单个领域服务与基础模块：`issue::Service`、`agent::Service`、`channel::Service`、`Storage`、`Setting`、`Provider`、`Repo`、`Game`（不用 `Issues`、`Agents`、`Repos`、`Crons`，也不写重复前缀 `IssueService`） |
+| `issue.list`、`repo.list`（返回好几个） | 组合根、上下文与依赖字段：`app.issue`、`app.runtime`、`app.agent`、`ctx.db`、`ctx.task`、`ctx.live`、`ctx.outbox`、`ctx.feed`（不用 `app.issues`、`app.agents`） |
+| `runsOf(session)`、`questionsOf(issue)`（返回好几个） | 服务端模块目录：`crates/server/src/issue/`、`crates/server/src/db/entity/`、`crates/server/src/fake/`（不用 `entities/`、`fakes/`、`memories.ts`） |
 | 一个数：`maxTasks`、`keepClosedIssues`、`autoRetries` | 返回一样东西的函数用复数名 |
 | 在内存里装着一组的：`Assignments`、`Deliveries`、`Trajectories` | |
 
@@ -57,9 +58,9 @@
 | 检查一份输入 | `xProblem`：没问题返回 `""`，有问题返回用户读的理由 | `cronProblem`、`channelNameProblem` |
 | 给用户看的一句话 | `xText` | `quotaText`、`dueText` |
 | 只说会怎样、不改东西 | `previewX` | `previewDelete`、`previewForget` |
-| 改东西 | 动词 | `issues.edit`、`channels.react` |
-| 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channels.create`、`agents.delete`、`previewDelete` |
-| 一个模块往外说发生了什么 | 事实（`Fact`），经 `Hub::apply` 折进核心状态，别的模块读转变（`Watcher`）；成员用领域里的过去时 | `FactCronChanged`、`FactCronRemoved` |
+| 改东西 | 动词 | `issue.edit`、`channel.react` |
+| 新建、删掉 | `create`、`delete`（和接口的动词同一个词；不用 `open`、`remove`） | `channel.create`、`agent.delete`、`previewDelete` |
+| 写库并驱动切片与外部投递 | `ctx.db` 提交事务返回 `SliceMask`，同事务写 `Outbox`，提交后调 `ctx.mark_dirty(mask)` | `SliceMask::BOARD`、`Outbox` |
 
 两条容易犯的：
 
@@ -75,17 +76,17 @@
 
 | 什么 | 形状 | 例子 |
 |---|---|---|
-| 服务端的模块 | 单数，概念的词 | `crates/server/src/work/issue/`、`collab/channel/` |
+| 服务端的模块 | 单数，平铺于 `crates/server/src/` 顶层，概念的词 | `crates/server/src/runtime/`、`crates/server/src/issue/`、`crates/server/src/channel/` |
 | 页面的 feature | 和服务端的模块同名 | `apps/mac/ui/features/issue` |
 | 包 | `@vibevalley/<文件夹>`（`scripts/audit/catalog.test.ts` 查） | `packages/protocol` 是 `@vibevalley/protocol` |
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
-| 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
+| 其他文件 | 小驼峰（TS）或蛇形小写（Rust） | `moves.ts`、`worktree` |
 | 测试 | 挨着被测的文件 | `outline.test.ts` |
-| 服务端模块对外的结构体 | 单数，按它管的东西或 `*Store` 叫，不用复数，不叫 `XService`、`XManager` | `IssueStore`、`AgentStore`、`RepoStore`、`CronStore`、`Chat` |
+| 服务端模块对外的结构体 | 单数：深业务域为 `<domain>::Service`，单概念与基础模块用朴素单数名；不用复数，不写 `XManager`/`XHandler`/`XUtil` | `issue::Service`、`agent::Service`、`runtime::Service`、`Storage`、`Setting`、`Provider`、`Repo`、`Game`、`DbService` |
 | 带牌子的 id（页面） | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |
 
-服务端模块和线上的形状撞名时，线上的形状用契约里的名字（`vibevalley_protocol::Issue`），模块内的服务或存取结构体用 `*Store`（如 `IssueStore`、`AgentStore`、`RepoStore`、`CronStore`）或模块路径（如 `issue::Store`）消歧，不用复数；组合根与依赖结构体字段同样用单数（`app.issue`、`app.session`、`app.agent`）；别的库撞名的，导入时起别名（`use … as`）。
+服务端业务域模块和契约形状撞名时，契约形状保留原名（`vibevalley_protocol::Issue`），深业务域主结构体统一为 `<domain>::Service`（在调用处通过模块路径消歧，如 `issue::Service`、`channel::Service`、`artifact::Service`），单概念与基础模块用朴素单数名（`Storage`、`Setting`、`Provider`、`Repo`、`Game`），组合根与上下文的依赖字段一律用单数（`app.issue`、`app.runtime`、`app.agent`、`ctx.db`）；别的库撞名的，导入时起别名（`use … as`）。
 
 ## 线上和存盘的形状
 
@@ -105,9 +106,9 @@
 | 词 | 指的是 | 也被用来指 |
 |---|---|---|
 | rules | 测试金字塔的规则层 | 业务的纯函数（按它决定的事起名，不叫 `rules.ts`）；lint 规则（`scripts/audit/oxlint-plugin.ts`）；写给 agent 的规矩用「规矩」，不用 rules |
-| open | 形容词，还没了结（`openQuestions`、`openFindings`） | 动词新建（`openChannel`、`openBranch`）：改叫 `create`；农场上线（`Core.open`）：改叫 `goLive`；一个帮工的投递（`openDeliveries`）：改叫 `deliveriesOf` |
-| input | 媒体的输入文件（`Media.inputs`、接口 `media.input.*`） | 交给帮工的信（`returnInput`）：改叫 envelope；喂给模型的文字（`wakeInput`）：改叫 prompt；一封信给模型看的上下文（`InputContext`）：改叫 `EnvelopeContext` |
-| orchestrator | 职务：助手能做什么、该做什么（`T.AgentRole`、`Agent.isOrchestrator`，工具和权限） | 会话怎么来（一直当值）：改问 `isOnDuty`，雇来的问 `isHired`；在哪干：改问 `Agent.isHosted`；频道没有负责人：频道和串都有成员（`members`，记在 `channel_member`），这里的助手问 `orchestratorIn`；话是谁说的：actor 是 `agent`，带 `role`（[角色只管职责](docs/subsystems/agent.md#模型和不变量)） |
+| open | 形容词，还没了结（`openQuestions`、`openFindings`） | 动词新建（`openChannel`、`openBranch`）：改叫 `create`；农场上线（`Core.open`）：改叫 `goLive`；一个执行会话的投递（`openDeliveries`）：改叫 `deliveriesOf` |
+| input | 媒体的输入文件（`Media.inputs`、接口 `media.input.*`） | 交给执行会话的信（`returnInput`）：改叫 envelope；喂给模型的文字（`wakeInput`）：改叫 prompt；一封信给模型看的上下文（`InputContext`）：改叫 `EnvelopeContext` |
+| orchestrator | 职务：主助手能做什么、该做什么（`T.AgentRole`、`Agent.isOrchestrator`，工具和权限） | 会话怎么来（一直当值）：改问 `isOnDuty`，雇来的问 `isHired`；在哪干：改问 `Agent.isHosted`；频道没有负责人：频道和话题都有成员（`members`，记在 `channel_member`），这里的主助手问 `orchestratorIn`；话是谁说的：actor 是 `agent`，带 `role`（[角色只管职责](docs/subsystems/agent.md#模型和不变量)） |
 
 已经分开的：语音的授予是 `voice.grant.*`、通话是 `voice.call.*`（`VoiceCall`），不再借 session 和 agent；校验一份输入是 `validate`（`setting.validate`、`repo.validate`、`agent.validate`，结果是 `Validation`），试一把钥匙是 `voice.moss.verify`，check 只指跑一遍检查（`vp check`、仓库的 `.vibevalley/check`、验收标准的 `CriterionCheck`）。
 

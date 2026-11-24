@@ -5,22 +5,19 @@ VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，
 ## 目录
 
 ```
-crates/protocol/           契约与环境约定（vibevalley-protocol）：src/contract/ 一个概念一个文件，typescript.rs 写出 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts；home.rs 为家目录与 server.json 约定
+crates/protocol/           契约与环境约定（vibevalley-protocol）：src/contract/ 一个概念一个文件（含 202 EndpointId），native.rs 为 7 个 NativeEndpointId，typescript.rs 写出 packages/protocol 的 shapes.gen.ts 和 endpoints.gen.ts；home.rs 为家目录与 server.json 约定
 crates/i18n/               对用户说的话（vibevalley-i18n）：locales/<语言>/<宿主.模块>.json 的词典，Rust 里 t("key")
-crates/core/               核心状态与纯规则（vibevalley-core）：reduce、SliceMask 与按域切片投影（board/sessions/collab/inbox/ops/farm）、任务状态和阶段、收件箱、巡查、农场画面、简报起草、定时任务（cron/）与作品引擎（artifact/）
+crates/core/               纯领域规则与切片投影（vibevalley-core）：projection.rs 6 路切片投影（board/sessions/collab/inbox/ops/farm）、任务状态和阶段、收件箱、巡查、农场画面、简报起草、定时任务（cron/）与作品引擎（artifact/）
 crates/git/ · files/       仓库 Git 封装（vibevalley-git）与工作区文件搜索和监听（vibevalley-files）
 crates/runtime/            运行时与自研 agent（vibevalley-runtime）：rt（进程共享 Tokio 运行时）、oar/ 驱动（Claude Code、Codex、ACP、scripted；含基于 arc-swap 的零开销 OarObserver 与 oar-voyage/3 记录）与 agent/ 模型请求（DeepSeek，reqwest + backon）、持久执行引擎、工具、对话循环和内置 vibevalley 运行时
 crates/engines/            底层引擎：纯 Rust 正则（onig）、语法高亮（shiki）与图谱渲染（pele），供 crates/rich 使用
 crates/rich/               原生富内容组件与辅助（vibevalley-rich）：Markdown、代码块、图谱、画布、图表、GenUI 与拼音匹配（engine/ 含 canvas、chart、genui、pinyin）
-crates/server/             服务端（二进制 vibevalley-server）：顶层分为 6 个业务域（work：issue、session、workplace、repo、cron、pull、ledger；
-                           team：agent、orchestrator、memory、tool、mcp；collab：channel、connector、voice；
-                           content：attachment、library、media、artifact；skin：game；infra：setting、provider、http、debug、remote、machine；
-                           任务板拆成 work/issue（状态与交付）、work/session（领域无关 AgentSession、session_mailbox 与游标轨迹 session_event）、work/workplace（worktree 与合并），都只经 work/ledger 写），
-                           src/app/ 收拢运行时内核与装配（hub/ 含 Hub、EventBus、SliceFeed、SliceWakeGate、RuntimeInboxObserver、ports、refusal、ticker；bootstrap.rs 按 L0–L3 组装；fakes/{runtime,moss}.rs 为测试替身），
-                           src/db/ 集中管理 ServerDb、column.rs 序列化辅助与双后端（SQLite + PostgreSQL）SeaORM 实体与迁移（含 shared 共享 seq_counter 与 infra_remote 远程配置/设备表），
-                           src/transport/ 收拢接口契约（api）、进程内桥（bridge）与 HTTP 门（http，含默认关闭的受认证远程监听门），
-                           lib.rs 为薄 crate 门面，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
-crates/cli/                命令行（二进制 vibevalley，clap）：按五大业务域（work/team/collab/content/infra）组织的纯 HTTP 客户端；评测另拆为可选二进制 vibevalley-eval（--features eval）
+crates/server/             服务端（二进制 vibevalley-server）：扁平单数目录、浅层顶层装配：
+                           入口与路由：main.rs → log::init → create_app(config)（app.rs：App、create_app、App::close）→ gateway::serve；router.rs 为 ~200 行薄入口门（check_can、trace_id span、FaultGate、InvokeObserver、订阅表与 202 EndpointId + 7 NativeEndpointId 编译期穷尽分发，非 RPC 流拆出为 GatewayPorts）；
+                           共享地基：log/（init、span、spawn_traced、spawn_blocking_traced、observer）、db/（双后端 SQLite/PostgreSQL Database、migration/、pub(super) entity/ 与统一查询层 db/service/ 的 DbService，db/ 之外零 sea_orm::）、context/（共享 Context：db、task TaskGroup、live LiveState、outbox Outbox、feed StateFeed、clock SharedClock，加 error.rs、http.rs、text.rs 与最小破环 port.rs）、storage/（统一文件/附件/媒体输入存储 Storage），以及顶层基础文件 setting.rs、provider.rs、repo.rs；
+                           外部接入：gateway/（api/、bridge/、http/、remote/，收拢进程内桥、Axum HTTP/SSE 门与默认关闭的受认证远程监听门，不导入业务域）；
+                           扁平深业务域（全单数，主结构体为 <domain>::Service 或朴素单数名）：runtime/（session/ + worktree/，经 SessionDriver 与 agent/ 解耦）、agent/（profile/、memory/、tool/、mcp/、orchestrator/）、issue/（board、edit、family、refine、pull/、chat）、artifact/（block、entry、collab、library、media/），以及 channel/、connector/、cron/、voice/、machine/、debug/、game.rs、fake/；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
+crates/cli/                命令行（二进制 vibevalley，clap）：按业务域组织的纯 HTTP 客户端；评测另拆为可选二进制 vibevalley-eval（--features eval）
 apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳（src/shell/*）、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
                            crates/ 是桌面独占支撑 crate（pixel、terminal、workspace）；
                            ui/ 是 nsh 跑的 TSX：app（含 6 项主导航，详见 docs/subsystems/app.md）、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含大纲与作品前端引擎、5 栏设置与远程访问面板）、farm、infra
@@ -51,7 +48,7 @@ cargo run -p vibevalley-cli -- issue list                       # 命令行：is
 make rust                                                       # 或 cargo xtask check：改完 crates/、xtask/ 或 apps/mac/src，跑 fmt、clippy（-D warnings）与测试
 make rust-changed                                               # 或 cargo xtask changed：只检查相对 origin/main 改到的 Rust crate 及其反向依赖
 make rust-loom                                                  # 或 cargo xtask loom：对并发状态机内核跑 loom 穷举模型检验（--features loom --profile loom）
-make rust-audit                                                 # 或 cargo xtask audit：检查 Rust 模块边界（L0-L3 DAG）与异步并发棘轮（xtask/src/{boundaries,ratchets}.rs）
+make rust-audit                                                 # 或 cargo xtask audit：检查 Rust 模块边界（扁平 DAG、gateway/ 隔离与 db/ 私有边界）与异步并发棘轮（xtask/src/{boundaries,ratchets}.rs）
 make protocol-write                                             # 或 cargo xtask protocol --write：改了 crates/protocol/src/contract，重写 shapes.gen.ts 和 endpoints.gen.ts
 make goldens                                                    # 或 cargo xtask goldens --check：跑 artifact golden 测试
 make protocol                                                   # 或 cargo xtask protocol：生成的 TS 契约和 golden 是不是最新，和提交的不同就失败
@@ -75,7 +72,7 @@ vp run release alpha|beta|final                                 # beta/final 先
 
 Rust 照 `rust-toolchain.toml`，Node 24（`.node-version`），Vite+（`vp`：pnpm 12、格式、lint、类型、测试、任务）。先跑和改动有关的最窄的检查。服务端不自动重载：改了 `crates/` 要重新构建、重启它。
 
-一件事的主线：oar 的会话事件 → 服务端读成事实 → `vibevalley-core` 的 `reduce` 折进核心状态并输出脏掩码 `SliceMask` → 各域独立切片（`board`、`sessions`、`collab`、`inbox`、`ops` 与 `farm`）经 `SliceFeed` 与桥推给应用里的页面（HTTP 门上是 `GET /api/v1/slice/{name}` 的 SSE 或快照）；执行会话和主助手的每一步记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
+一件事的主线：oar 的会话事件或外部请求 → 经 `gateway/` 与 `router.rs` 分发至目标域处理器 → 经 `db/service/`（`DbService`）事务落库（外部投递同事务写入 `Outbox`）并返回脏掩码 `SliceMask`（实时运行流与农场特效进 `LiveState`）→ `StateFeed` 调 `vibevalley-core` 纯投影函数更新 6 路域切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）并经 `gateway/bridge/` 或 HTTP `GET /api/v1/slice/{name}` 推给客户端；执行会话和主助手的每一步记成轨迹（[architecture.md](docs/architecture.md)、[子系统](docs/subsystems/README.md)）。
 
 ## 怎么让 agent 做对
 
@@ -91,25 +88,26 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 ## 规矩
 
 - **Rust 为准，速度优先**：服务端的行为以 Rust 为准；成本高、价值低的就砍掉或简化，记进[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「砍掉的」。
-- **先有概念，再有皮**：服务端按实际概念分模块（[概念](docs/concepts.md)）；农场只画它们，游戏规则只读事件算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）。
-- **核心状态只有一份**：执行会话或农场的新状态加进契约的形状与事实，在 `vibevalley-core` 的 `reduce` 里折叠，只经事实施加，不在服务端或页面另存一份（[核心状态](docs/subsystems/core.md)）。
+- **先有概念，再有皮**：服务端按实际概念平铺单数模块（[概念](docs/concepts.md)）；农场只画它们，游戏规则只读事件算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）。
+- **单一持久化真源与切片投影**：持久化状态只经 `crates/server/src/db/`（`DbService`）落库，不维护内存影子库；外部投递同事务写入 `Outbox`，运行中流与农场特效留在 `LiveState`，前端 6 路切片由 `StateFeed` 按 `SliceMask` 调用 `vibevalley-core` 纯投影函数生成（[核心状态](docs/subsystems/core.md)）。
+- **数据库边界收口在 `db/`**：`crates/server/src/db/entity/` 设为 `pub(super)`，全部 SeaORM 查询收拢在 `crates/server/src/db/service/`（`DbService`），`crates/server/src/db/` 之外禁止出现 `sea_orm::` 导入。
 - **边界解码一次，门内全是类型**：HTTP、文件、厂商响应、模型给的工具参数，各在进门处用 serde 解码成结构体和 enum；门内不传 `serde_json::Value`、不按字符串分支；钥匙包进 `Secret`（打印只出提示）；页面在边界用 Zod 解码（`satisfies Codec<T.X>`）（[类型驱动与进门解码](docs/style/module-design.md)）。
 - **深模块**：每个模块对外一个窄接口；不靠一个带 `kind` 的入口复用多种操作（[模块设计](docs/style/module-design.md)）。
 - **Rust 异步与并发**：共用单一 `vibevalley-runtime::rt`，异步函数与 `Drop` 禁 `rt::block_on`（用 `close_async`），测试用 `start_paused` + `ManualClock` 及 `--features loom` 内核，`crates/rich` 重计算离线程卸载（[Rust 异步并发规范](docs/style/rust-async-concurrency.md)，`cargo xtask audit`）。
-- **封闭的联合穷尽处理**：Rust 的 `match` 不写吞掉新成员的 `_`；TS 按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员（`switch-exhaustiveness-check` 查）。
+- **封闭的联合穷尽处理**：Rust 的 `match` 不写吞掉新成员的 `_`（`router.rs` 对 202 `EndpointId` 与 7 `NativeEndpointId` 穷尽分发）；TS 按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员（`switch-exhaustiveness-check` 查）。
 - **契约改在 Rust**：形状和接口表改 `crates/protocol/src/contract`，TS 的类型由它生成；页面要用的同改手写的 `schema.ts` 与 `api.ts`，它们的测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
 - **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`cargo xtask protocol --write`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、artifact 的 golden（`cargo xtask goldens`）和生成的参考表由脚本写出，`cargo xtask protocol` 和 `vp run docs:verify` 查是不是最新。宿主 `state.db` 与服务端、持久执行统一使用 `SeaORM` + `SeaQuery`（服务端与持久执行同时支持 SQLite 与 PostgreSQL）。
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层、旧数据兜底或迁移脚本；对外 HTTP `v1` 是唯一例外（[接口版本](docs/subsystems/core.md)）。
-- **页面不折事实**：页面只读按域推来的切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）并写画面摆法，请求只经 `Transport`；缺数据就补进契约与 `reduce` 或调接口问服务端（[客户端](docs/subsystems/app.md)）。
+- **页面不折状态**：页面只读按域推来的切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）并写画面摆法，请求只经 `Transport`；缺数据就补进契约与纯投影或调接口问服务端（[客户端](docs/subsystems/app.md)）。
 - **页面守 `nsh` 响应式**：动态 JSX 分支用 `<If>`、列表用带稳定 `key` 的 `<Each>` 或 `<List>`，不解构 `props`、不提前求值访问器、多处派生用 `computed()`（[NSH TSX 规范](docs/style/nsh-tsx.md)）。
-- **处理函数要薄**：HTTP 门、桥和页面组件只做转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。
+- **处理函数要薄**：`gateway/` 的 HTTP 门、进程内桥、`router.rs` 和页面组件只做鉴权、转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。
 - **执行会话没有权限确认**：服务端只听 `127.0.0.1`，执行会话只在工作区开工（[执行会话](docs/subsystems/session.md)）。
 - **包之间只经包名**：TS 跨包只经 `package.json` 的 `exports` 写 `@vibevalley/*`（`no-cross-package-path` 查）；Rust 跨 crate 只经 `Cargo.toml` 的依赖。
 - **图标分两套**：工作台用 `crates/rich/src/icon.rs` 原生 `VvIcon` 渲染的 97 枚 reicon 线条图标（TS 侧由 `apps/mac/ui/design/icons.ts` 声明 `IconName`，经 `<Icon name>` 使用；无原生 `VvIcon` 的载体及 `apps/mobile` 使用 `scripts/gen/icons.ts` 单源生成的 `iconPaths.gen.ts` 与 `<Canvas>` + `Path2D` 矢量回退），像素皮与头像、引擎 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
 - **界面照田间工作台**：工作台、工作区外壳、移动端和原生壳面的颜色、圆角、字号、阴影和缓动一律走 `design/tokens.json`（由 `vp run tokens:gen` 同步写出 `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json`、`apps/mac/src/theme_tokens.rs` 及 `apps/mobile` 令牌）；照 [设计系统](docs/design/README.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)，class 写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
 - **密钥**：家目录的 `settings.json` 不进仓库；日志、快照和文档里不出现真实密钥。
 - **话放在哪**：对用户的话进 `crates/i18n/locales/{zh,en}/<宿主.模块>.json`，Rust 调 `vibevalley_i18n::t`，TS 调 `t("key")`（`vpx scripts/gen/i18n.ts check` 查漏翻）；对模型的话用中文写进 `crates/server/assets`（[话放在哪](docs/subsystems/foundation.md)）。
-- **代码风格**：代码和接口用实际业务概念，种地双关只留在农场的皮里（`stale-names.ts` 查，[用语表](docs/README.md#用语)）；命名站在领域视角说管什么事，不用 `utils`、`state` 一类泛词，单个服务、Store、模块与结构体字段优先用单数（如 `IssueStore`、`app.issue`），复数只用于集合、计数与列表接口（[命名](docs/style/naming.md)）；英文注释只写不看就会改错的约束与原因（[代码风格](docs/style/code.md)）。
+- **代码风格**：代码和接口用实际业务概念，种地双关只留在农场的皮里（`stale-names.ts` 查，[用语表](docs/README.md#用语)）；命名站在领域视角说管什么事，不用 `utils`、`state` 一类泛词和自造架构黑话，服务端顶层业务域与结构体一律用单数（深业务域为 `<domain>::Service`，基础模块为 `Storage`/`Setting`/`Provider`/`Repo`/`Game`，依赖字段为 `app.issue`/`ctx.db`），复数只用于集合、计数与列表接口（[命名](docs/style/naming.md)）；英文注释只写不看就会改错的约束与原因（[代码风格](docs/style/code.md)）。
 - **测试**：行为在能发现出错的最低层测；服务端的测试在 `crates/*/tests`，用 scripted 引擎与真 git 离线跑；页面的测试用 `nsh/test` 喂样例的 `Transport`，像素场景在 CPU 上画出来查；不写硬编码睡眠等待（TS 由 `no-test-sleep` 查）；修缺陷补 `regression` 测试。
 - **改完要验证**：先跑最窄的静态与单元检查；改了接口、服务、页面或像素场景，照 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 在真实程序上验收并附上证据。
 - **分支、提交和 PR**：同批改动默认合一个 PR，只经 squash 合入 `main`；分支 `<类>/<主题>`，提交与 PR 用英文写改完后的行为（标题不超过 100 字符、不带 agent 署名，commit-msg hook 与 CI 查），操作照 [vv-pr](.agents/skills/vv-pr/SKILL.md)（[分支、提交和 PR](docs/development.md)）。

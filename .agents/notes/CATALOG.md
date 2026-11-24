@@ -16,7 +16,7 @@
 
 ### architecture
 
-- 2026-11-24 [第一性原理服务端脊柱重构（框架、目录、模板与彻底切换）](.agents/notes/proposed/architecture/2026-11-24-first-principles-server-spine.md)
+- 2026-11-24 [服务端扁平化与单数架构重构](.agents/notes/proposed/architecture/2026-11-24-first-principles-server-spine.md)
 - 2026-11-23 [Tailscale 与 nsh 原生移动远程控制：真机分发与远程推送](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)
 - 2026-11-22 [对话页次级标签收敛与素材组织方式](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)
 - 2026-11-22 [Loro 协作内容引擎：远端同步、流式合批与白板本地副本](.agents/notes/proposed/architecture/2026-11-22-loro-collaborative-content-engine.md)
