@@ -13,20 +13,21 @@ Status: proposed
 
 ## Proposal
 
-采用一步到位直接切换（Direct Cutover），不保留 `Hub`、兼容垫片或双模过渡桥，将 `crates/server` 收敛为扁平、全单数、浅层装配的四块结构，所有命名使用通用工程词，不造生僻概念名。
+采用一步到位直接切换（Direct Cutover），不保留 `Hub`、兼容垫片或双模过渡桥，将 `crates/server` 收敛为扁平、全单数、浅层装配结构；同步落地[作品目录化存储、统一实时协同引擎与 12 类产品技能体系](.agents/notes/proposed/architecture/2026-11-24-artifact-unified-collab.md)，合并在单一 PR `refactor/server-flat-architecture` 中交付。所有命名使用通用工程词，不造生僻概念名。
 
 ### 1. 入口与浅层装配
 
 - **启动链路**：`main.rs` → `log::init(...)` → `create_app(config).await?` → `gateway::serve(...)`。
 - **`app.rs`**：提供不可变组合根 `App`、`create_app(config)` 与 `App::close()`（取代 `app/bootstrap.rs`、`Started` 与 `Hub`），按无环依赖顺序构造全部基础服务与业务域，停机时统一取消 `TaskGroup` 并关闭数据库连接池。
-- **`router.rs`**：约 200 行薄入口门 `Router`，集中处理 `check_can` 权限校验、`trace_id` span、`FaultGate`、`InvokeObserver` 与订阅表鉴权，对 `crates/protocol` 生成的 202 个 `EndpointId` 与 7 个 `NativeEndpointId` 做编译期穷尽 `match` 分发并直委各域处理器；非 RPC 流与端口拆出为薄 `GatewayPorts`，彻底删除运行时 handler `HashMap` 与所有 `attach_*` 晚绑定槽位。
+- **`router.rs`**：约 200 行薄入口门 `Router`，集中处理 `check_can` 权限校验、`trace_id` span、`FaultGate`、`InvokeObserver` 与订阅表鉴权，对 `crates/protocol` 生成的全部 `EndpointId` 与 `NativeEndpointId` 做编译期穷尽 `match` 分发并直委各域处理器；非 RPC 流与端口拆出为薄 `GatewayPorts`，彻底删除运行时 handler `HashMap` 与所有 `attach_*` 晚绑定槽位。
 
-### 2. 共享地基与可观测性
+### 2. 共享地基、数据服务与可观测性
 
 - **`log/`**：统一日志与追踪初始化（`init`）、请求 span 与跨任务上下文传播（`span`、`spawn_traced`、`spawn_blocking_traced`）以及调用观察接口（`observer`：`InvokeObserver`）。
-- **`db/`**：双后端（SQLite / PostgreSQL）`Database` 连接池、`migration/`、仅模块内可见的 `pub(super) mod entity;` 与统一查询服务层 `db/service/`（`DbService` 聚合 `outbox`、`storage`、`channel`、`connector`、`artifact`、`session`、`issue`、`memory`、`cron`、`remote`）。**硬规矩：`crates/server/src/db/` 之外禁止出现任何 `sea_orm::` 导入或实体访问。**
-- **`context/`**：共享上下文 `Context`（字段名 `ctx`，持有 `db: Arc<DbService>`、`task: TaskGroup`、`live: Arc<LiveState>`、`outbox: Arc<Outbox>`、`feed: Arc<StateFeed>`、`clock: SharedClock` 及 HTTP/下载客户端），并收拢 `error.rs`（业务错误与 `RequestKeys` 幂等键）、`http.rs`、`text.rs` 与仅用于打破循环的最小 `port.rs`（如 `SessionDriver`）。
-- **`storage/`**：统一文件、附件与媒体输入存储（`Storage`），消除跨域探入旧 `content/attachment`。
+- **`db/`**：双后端（SQLite / PostgreSQL）`Database` 连接池、`migration/` 与严格**一表一文件**的实体定义 `crates/server/src/db/entity/<table_name>.rs`（作品目录化与统一协同删除 3 张旧表后，全仓共 35 个表实体文件）。
+- **独立顶层 `service/`**：`crates/server/src/service/`（聚合结构体 `Service`，挂载于 `Context::service`，即 `ctx.service`）收拢全部业务视角持久化查询，按单数领域拆分：`outbox`、`storage`、`channel`、`connector`、`artifact`、`session`、`issue`、`memory`、`cron`、`remote`。**硬规矩：`crates/server/src/{db,service}/` 之外禁止出现任何 `sea_orm::` 或 `db::entity` 导入。**
+- **`context/`**：共享上下文 `Context`（字段名 `ctx`，持有 `service: Arc<Service>`、`task: TaskGroup`、`live: Arc<LiveState>`、`outbox: Arc<Outbox>`、`feed: Arc<StateFeed>`、`clock: SharedClock` 及 HTTP/下载客户端），并收拢 `error.rs`（业务错误与 `RequestKeys` 幂等键）、`http.rs`、`text.rs` 与仅用于打破循环的最小 `port.rs`（如 `SessionDriver`）。
+- **`storage/`**：统一文件、附件、媒体输入与作品目录（`<storage>/artifact/<artifact_id>/{manifest.json,structure/,asset/}`）存储（`Storage`），消除跨域探入旧 `content/attachment`。
 - **顶层基础文件**：`setting.rs`（`Setting`）、`provider.rs`（`Provider`）、`repo.rs`（`Repo`）。
 
 ### 3. 外部接入层（`gateway/`）
@@ -43,17 +44,17 @@ Status: proposed
 | `runtime/` | `session/`、`worktree/` | 纯执行会话运行时与 git worktree 管理，经 `SessionDriver` 与 `agent/` 解耦 |
 | `agent/` | `profile/`、`memory/`、`tool/`、`mcp/`、`orchestrator/` | 角色档案、记忆、工具、MCP 与主助手 |
 | `issue/` | `board`、`edit`、`family`、`refine`、`pull/`、`chat` | 任务板、编辑、父子任务、起草、PR 与任务话题 |
-| `artifact/` | `block`、`entry`、`collab`、`library`、`media/` | 块文档、结构化条目、协同、媒体库与媒体任务 |
+| `artifact/` | `mod.rs`、`collab`、`types`、`library`、`media/` | 作品目录化存储（`storage/`）+ 统一多人/多 Agent 实时协同引擎（5 表，覆盖 12 类 `ArtifactType`，删 `block.rs`/`entry.rs`，详见[作品统一协同方案](.agents/notes/proposed/architecture/2026-11-24-artifact-unified-collab.md)）、12 类技能指南、媒体库与媒体任务 |
 | 其余扁平域 | `channel/`、`connector/`、`cron/`、`voice/`、`machine/`、`debug/`、`game.rs`、`fake/` | 频道、连接器、定时任务、语音、运行机器、诊断包、游戏账本与测试替身 |
 
 ### 5. 数据流、纯投影与落地顺序
 
-- **单一真源与切片投影**：持久化写入只经 `ctx.db`（`DbService`）落库并在同一事务写入 `Outbox`（`outbox_item` 表），返回脏掩码 `SliceMask` 后调用 `ctx.mark_dirty(mask)`；`StateFeed` 对脏切片做单航班合并，调用 `crates/core/src/projection.rs` 纯函数与 `LiveState` 瞬态流生成 6 路切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）写入 `tokio::sync::watch`。运行中会话流、心跳与农场特效只进 `LiveState`，不入库。
+- **单一真源与切片投影**：持久化写入只经 `ctx.service`（`Service`）落库并在同一事务写入 `Outbox`（`outbox_item` 表），返回脏掩码 `SliceMask` 后调用 `ctx.mark_dirty(mask)`；`StateFeed` 对脏切片做单航班合并，调用 `crates/core/src/projection.rs` 纯函数与 `LiveState` 瞬态流生成 6 路切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）写入 `tokio::sync::watch`。运行中会话流、心跳与农场特效只进 `LiveState`，不入库。
 - **落地顺序**：
-  1. 锁定架构、核心状态与[命名规范](docs/style/naming.md)文档。
-  2. 抽出全部 SeaORM 查询进入 `crates/server/src/db/service/`，并将 `db/entity/` 设为 `pub(super)`。
+  1. 锁定架构、作品目录化与统一实时协同方案、核心状态与[命名规范](docs/style/naming.md)文档。
+  2. 建立严格一表一文件的 `crates/server/src/db/entity/<table_name>.rs`（35 表），并抽出全部业务视角 SeaORM 查询进入独立顶层 `crates/server/src/service/`（`Service`）。
   3. 建立 `NativeEndpointId`、`log/`、`context/`、`storage/` 与顶层基础文件（`setting.rs`、`provider.rs`、`repo.rs`、`fake/`）。
-  4. 扁平迁移 `runtime/`、`agent/`、`issue/`、`artifact/`、`channel/`、`connector/`、`cron/`、`voice/`、`machine/`、`debug/`、`game.rs` 与 `gateway/`。
+  4. 扁平迁移 `runtime/`、`agent/`、`issue/`、`artifact/`（目录化存储 + 统一协同 + 12 类技能 + 并列 `library`/`media/`）、`channel/`、`connector/`、`cron/`、`voice/`、`machine/`、`debug/`、`game.rs` 与 `gateway/`。
   5. 切换 `main.rs`、`app.rs` 与 `router.rs`，删除旧 `app/`、`transport/`、`work/`、`team/`、`collab/`、`content/`、`skin/`、`infra/` 及内存影子状态与 `EventBus`。
   6. 更新 `xtask` 静态边界检查与 `SERVER_BLOCK_ON_CEILING` 棘轮，跑通 SQLite + PostgreSQL 双后端与全仓验证。
 
@@ -61,20 +62,22 @@ Status: proposed
 
 **保留多级分组目录（`work/`、`team/`、`collab/`、`content/`、`skin/`、`infra/`）**：多一层人工分类目录会拉长导入路径，并制造跨组共享模块（如附件、仓库、远程访问）的归属歧义；平铺顶层单数模块在目录层面直接反映真实依赖边界，配合 `xtask` DAG 检查更清晰。
 
-**允许各业务域直接调用 `sea_orm::`**：查询语句和双后端兼容细节分散到十余个业务域后，静态审计与查询优化成本倍增；集中到 `db/service/` 并将 `entity/` 设为 `pub(super)`，让编译器直接守住数据访问边界。
+**将业务查询塞入 `db/service/` 或允许业务域直连 `sea_orm::`**：允许业务域直调 `sea_orm::` 会使查询与双后端兼容细节分散到十余个模块；而将业务查询藏在 `db/service/` 下会混淆「连接/迁移/表实体（基础设施）」与「业务视角持久化组合查询（数据服务）」的职责边界。独立顶层 `crates/server/src/service/` 与 `db/` 并列，同时用静态门禁禁止 `{db,service}/` 之外导入 `sea_orm::` 或 `db::entity`，既分层清晰又守住数据边界。
+
+**按领域把多张表合写在一个 entity 文件里**：多表合文件会制造合并冲突并弱化表与文件的一一对应关系；严格一表一文件（`db/entity/<table_name>.rs`）让建表迁移、表名与 Rust 实体零歧义对齐。
 
 **渐进式 / 双模过渡桥**：在过渡期同时维护 `Hub` 垫片、新旧两套路由与半影子状态会成倍增加双写漂移风险；服务端内部受[不留兼容](AGENTS.md#规矩)约束，直接切换成本更低。
 
 ## Acceptance criteria
 
-- `crates/server/src/` 完成扁平单数布局：`main.rs`、`app.rs`、`router.rs`、`log/`、`db/`、`context/`、`storage/`、`setting.rs`、`provider.rs`、`repo.rs`、`gateway/` 与全部顶层业务域到位；旧 `app/`、`transport/`、`work/`、`team/`、`collab/`、`content/`、`skin/`、`infra/` 全部删除。
-- `crates/server/src/db/` 之外零 `sea_orm::` 导入，且 `db/entity/` 为 `pub(super)`。
-- `router.rs` 对 202 个 `EndpointId` 与 7 个 `NativeEndpointId` 实现编译期穷尽 `match` 分发，零运行时 handler `HashMap` 与 `attach_*` 晚绑定槽位。
-- `xtask/src/ratchets.rs` 中 `SERVER_BLOCK_ON_CEILING` 降至仅保留同步宿主与启动边界；`xtask/src/boundaries.rs` 守住扁平模块 DAG、`gateway/` 隔离与 `db/` 私有边界。
+- `crates/server/src/` 完成扁平单数布局：`main.rs`、`app.rs`、`router.rs`、`log/`、`db/`（严格一表一文件 `db/entity/<table_name>.rs`，共 35 表）、独立顶层 `service/`（`Service` 挂载于 `Context::service`）、`context/`、`storage/`、`setting.rs`、`provider.rs`、`repo.rs`、`gateway/` 与全部顶层业务域到位；旧 `app/`、`transport/`、`work/`、`team/`、`collab/`、`content/`、`skin/`、`infra/` 全部删除。
+- `crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入。
+- `router.rs` 对全部 `EndpointId` 与 `NativeEndpointId` 实现编译期穷尽 `match` 分发，零运行时 handler `HashMap` 与 `attach_*` 晚绑定槽位。
+- `xtask/src/ratchets.rs` 中 `SERVER_BLOCK_ON_CEILING` 降至仅保留同步宿主与启动边界；`xtask/src/boundaries.rs` 守住扁平模块 DAG、`gateway/` 隔离与 `{db,service}/` 数据访问边界。
 - SQLite 与 PostgreSQL 双后端测试全绿；`make verify`、`make rust-loom`、`vp run mac:check`、`vp run mobile:check`、`vp run site:check`、`vp run docs:verify` 与 `vp run deadcode` 全部通过。
 
 ## Risks
 
-- **PostgreSQL 切片重投影延迟**：移除内存影子库后，脏切片重投影直接经 `DbService` 查询当域视图；通过合理索引、`SliceMask` 单航班合并去抖及高频瞬态走 `LiveState` 控制延迟。
+- **PostgreSQL 切片重投影延迟**：移除内存影子库后，脏切片重投影直接经 `ctx.service` 查询当域视图；通过合理索引、`SliceMask` 单航班合并去抖及高频瞬态走 `LiveState` 控制延迟。
 - **像素农场特效时序**：农场特效改为经 `LiveState` 突发注入 `FarmFrame`；通过 CPU 像素场景确定性测试校验帧序列不回退。
-- **对外契约与回归兼容**：扁平化重组须保持对外 HTTP `v1` 线缆契约、SSE `Last-Event-ID` 续读与全流程回归测试（`scripts/release/regression.ts`）零破坏。
+- **对外契约与回归兼容**：扁平化重组须保持保留接口的对外 HTTP `v1` 线缆契约、SSE `Last-Event-ID` 续读与全流程回归测试（`scripts/release/regression.ts`）零破坏。
