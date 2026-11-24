@@ -12,7 +12,7 @@ const CONCURRENCY_DOC: &str = "docs/style/rust-async-concurrency.md";
 
 /// Shrink-only ceiling for non-test `rt::block_on(` calls under `crates/server/src/`.
 /// This ceiling may only decrease as sync wrappers migrate to async; never raise it.
-pub const SERVER_BLOCK_ON_CEILING: usize = 71;
+pub const SERVER_BLOCK_ON_CEILING: usize = 47;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[allow(clippy::enum_variant_names)]
@@ -847,7 +847,7 @@ mod tests {
 
     #[test]
     fn block_on_ceiling_excludes_cfg_test() {
-        assert_eq!(SERVER_BLOCK_ON_CEILING, 71);
+        assert_eq!(SERVER_BLOCK_ON_CEILING, 47);
 
         let files = vec![
             sf(

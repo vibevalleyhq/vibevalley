@@ -1,7 +1,6 @@
 //! The helpers' MCP door (`gateway/mcp`): JSON-RPC over `POST /mcp`. Each
 //! helper's token, minted by the board when it starts the helper, names it;
-//! its tools are served via `crate::app::hub::ports::ToolDispatchPort` (zero concrete
-//! dependency on `team/tool`).
+//! its tools are dispatched asynchronously through [`ToolBox`].
 
 pub mod resource;
 
@@ -10,10 +9,11 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use crate::app::hub::ports::{ToolDispatchPort, ToolSpecWire};
+use crate::app::hub::ports::ToolSpecWire;
+use crate::team::tool::ToolBox;
 use crate::transport::api::Mcp;
 
-pub use resource::{ResourceReadArgs, Resources};
+pub use resource::{ResourceReadArgs, ResourceStore, Resources};
 
 const UNKNOWN_CALLER: &str = "没认出你是谁：这些工具只给执行会话用";
 const PROTOCOL: &str = "2025-06-18";
@@ -44,18 +44,18 @@ struct ToolCallParams {
 }
 
 pub struct Door {
-    dispatch: Arc<dyn ToolDispatchPort>,
+    dispatch: Arc<ToolBox>,
     tools: Vec<ToolSpecWire>,
     version: String,
 }
 
 impl Door {
-    pub fn new(dispatch: Arc<dyn ToolDispatchPort>, version: String) -> Arc<Door> {
-        let tools = dispatch.helper_tools();
+    pub fn new(dispatch: Arc<ToolBox>, version: String) -> Arc<Door> {
+        let tools = dispatch.helper_tools_wire();
         Arc::new(Door { dispatch, tools, version })
     }
 
-    fn result(&self, token: &str, method: &str, params: Value) -> Result<Value, (i64, String)> {
+    async fn result_async(&self, token: &str, method: &str, params: Value) -> Result<Value, (i64, String)> {
         match method {
             "initialize" => {
                 let init: InitializeParams = serde_json::from_value(params).unwrap_or_default();
@@ -89,7 +89,7 @@ impl Door {
                     Value::Object(map) => Value::Object(map),
                     _ => Value::Object(Map::new()),
                 };
-                let called = self.dispatch.call_helper(me, &call.name, &args);
+                let called = self.dispatch.call_helper_async(me, &call.name, &args).await;
                 let (text, error) = match called {
                     Ok(text) => (text, false),
                     Err(why) if why.starts_with("没成：") => (why, true),
@@ -104,12 +104,24 @@ impl Door {
 }
 
 impl Mcp for Door {
-    fn message(&self, token: &str, message: Value) -> Option<Value> {
+    fn message(&self, _token: &str, message: Value) -> Option<Value> {
         let req: RpcRequest = serde_json::from_value(message).ok()?;
         let id = req.id.filter(|id| !id.is_null())?;
-        Some(match self.result(token, &req.method, req.params) {
-            Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
-            Err((code, why)) => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": why } }),
+        Some(json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": { "code": -32603, "message": "sync Mcp::message is unsupported; use Mcp::message_async" },
+        }))
+    }
+
+    fn message_async(self: Arc<Self>, token: String, message: Value) -> crate::BoxFuture<'static, Option<Value>> {
+        Box::pin(async move {
+            let req: RpcRequest = serde_json::from_value(message).ok()?;
+            let id = req.id.filter(|id| !id.is_null())?;
+            Some(match self.result_async(&token, &req.method, req.params).await {
+                Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
+                Err((code, why)) => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": why } }),
+            })
         })
     }
 }

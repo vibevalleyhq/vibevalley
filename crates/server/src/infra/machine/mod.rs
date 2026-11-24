@@ -77,7 +77,7 @@ fn valid_remote_machine_id(id: &str) -> bool {
 
 /// Manages local + remote/sandbox execution machines and implements the
 /// spine [`MachineBus`] trait consumed by `transport::http::machine_ws`.
-pub struct MachineManager {
+pub struct MachineStore {
     hub: Weak<Hub>,
     registry: Arc<MachineRegistry>,
     local_registry: Arc<Registry>,
@@ -90,7 +90,11 @@ pub struct MachineManager {
     cancel: CancellationToken,
 }
 
-impl MachineManager {
+/// Temporary compatibility alias for unowned callers until spine cutover.
+#[doc(hidden)]
+pub type MachineManager = MachineStore;
+
+impl MachineStore {
     pub fn open(hub: &Arc<Hub>, local_registry: Arc<Registry>, attachments: Arc<dyn AttachmentReadPort>, server_version: String) -> Arc<Self> {
         let local_name = "Local".to_string();
         let local_joined_at = now();
@@ -424,9 +428,9 @@ impl MachineManager {
     }
 }
 
-/// Thin `Arc<MachineManager>` wrapper implementing `MachineBus` so `accept_connection`
-/// can spawn connection loops with a self-owned `Arc<MachineManager>`.
-pub struct MachineBusAdapter(pub Arc<MachineManager>);
+/// Thin `Arc<MachineStore>` wrapper implementing `MachineBus` so `accept_connection`
+/// can spawn connection loops with a self-owned `Arc<MachineStore>`.
+pub struct MachineBusAdapter(pub Arc<MachineStore>);
 
 impl MachineBus for MachineBusAdapter {
     fn accept_connection(&self, conn: MachineConnection) {
@@ -439,6 +443,6 @@ impl MachineBus for MachineBusAdapter {
     }
 }
 
-pub fn install(hub: &Hub, machines: Arc<MachineManager>) {
+pub fn install(hub: &Hub, machines: Arc<MachineStore>) {
     hub.on::<ops::MachineList>(move |_, ()| Ok(machines.list()));
 }

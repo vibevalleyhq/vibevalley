@@ -1,4 +1,4 @@
-//! What the helpers' profiles remember (routed via `Hub::invoke` with zero `team/memory` import).
+//! What the helpers' profiles remember (routed via `Hub::invoke_async` with zero `team/memory` import).
 
 use serde::Deserialize;
 use vibevalley_protocol::{MemoryCreateInput, MemorySearchInput, ops};
@@ -55,14 +55,14 @@ fn profile(f: &ToolBox, key: &str) -> Result<String, String> {
     }
 }
 
-pub fn search(f: &ToolBox, who: &Who, a: Args) -> Result<String, String> {
+pub async fn search(f: &ToolBox, who: &Who, a: Args) -> Result<String, String> {
     let (agent, repo) = match scope(f, who, &a, false) {
         Ok(s) => s,
         Err(why) => return Ok(text::failed(&why)),
     };
     let found = f
         .hub()?
-        .invoke::<ops::MemorySearch>(
+        .invoke_async::<ops::MemorySearch>(
             &f.ctx(who),
             MemorySearchInput {
                 agent: (!agent.is_empty()).then(|| agent.clone()),
@@ -70,24 +70,29 @@ pub fn search(f: &ToolBox, who: &Who, a: Args) -> Result<String, String> {
                 text: (!a.text.is_empty()).then(|| a.text.clone()),
             },
         )
+        .await
         .map_err(|e| e.message)?;
     Ok(text::memory_found_text(&found, &agent, &repo, &a.text))
 }
 
-pub fn create(f: &ToolBox, who: &Who, a: Args) -> Result<String, String> {
+pub async fn create(f: &ToolBox, who: &Who, a: Args) -> Result<String, String> {
     let (agent, repo) = match scope(f, who, &a, true) {
         Ok(s) => s,
         Err(why) => return Ok(text::failed(&why)),
     };
-    let m = match f.hub()?.invoke::<ops::MemoryCreate>(
-        &f.ctx(who),
-        MemoryCreateInput {
-            agent: agent.clone(),
-            text: a.text,
-            repo: (!repo.is_empty()).then_some(repo),
-            request_key: None,
-        },
-    ) {
+    let m = match f
+        .hub()?
+        .invoke_async::<ops::MemoryCreate>(
+            &f.ctx(who),
+            MemoryCreateInput {
+                agent: agent.clone(),
+                text: a.text,
+                repo: (!repo.is_empty()).then_some(repo),
+                request_key: None,
+            },
+        )
+        .await
+    {
         Ok(m) => m,
         Err(e) if matches!(who, Who::Helper(_)) => return Err(e.message),
         Err(e) => return Ok(text::failed(&e.message)),

@@ -76,13 +76,13 @@ fn the_watch_routes_the_chat_to_a_session() {
 
     // The report lands in the thread from the session.
     crate::support::wait_until_channel_event(&chat, Duration::from_secs(30), "the report", || {
-        let rows = chat.issue_messages(&id).ok()?;
+        let rows = vibevalley_runtime::rt::block_on(chat.issue_messages_async(&id)).ok()?;
         rows.iter().any(|m| m.from == session.id).then_some(())
     });
 
     // A comment is said in the thread and delivered asynchronously to the session: a new round, 👀 on it.
     call("issue.comment.create", json!({ "id": id, "text": "再说一遍" }));
-    let rows = chat.issue_messages(&id).unwrap();
+    let rows = vibevalley_runtime::rt::block_on(chat.issue_messages_async(&id)).unwrap();
     let mine = rows.iter().rev().find(|m| m.text == "再说一遍").unwrap_or_else(|| panic!("{rows:?}"));
     crate::support::wait_until_channel_event(&chat, Duration::from_secs(30), "👀 on the comment", || {
         let seen = call("channel.message.list", json!({ "id": thread }));
@@ -220,20 +220,14 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
 
     // Deleting a message withdraws its pending deliveries immediately.
     assert!(
-        started
-            .test_internals()
-            .chat
-            .pending_deliveries(DeliveryTargetKind::Orchestrator)
+        vibevalley_runtime::rt::block_on(started.test_internals().chat.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
             .unwrap()
             .iter()
             .any(|d| d.message_id == fast_id)
     );
     call("channel.message.delete", json!({ "id": fast_id }));
     assert!(
-        !started
-            .test_internals()
-            .chat
-            .pending_deliveries(DeliveryTargetKind::Orchestrator)
+        !vibevalley_runtime::rt::block_on(started.test_internals().chat.pending_deliveries_async(DeliveryTargetKind::Orchestrator))
             .unwrap()
             .iter()
             .any(|d| d.message_id == fast_id)
@@ -245,7 +239,11 @@ fn regression_slow_session_wakeup_does_not_block_chat_say_in_other_channels() {
         let rows = call("channel.message.list", json!({ "id": direct }));
         rows.as_array()?.iter().any(|m| m["kind"] == "report").then_some(())
     });
-    assert!(started.test_internals().chat.pending_deliveries(DeliveryTargetKind::Direct).unwrap().is_empty());
+    assert!(
+        vibevalley_runtime::rt::block_on(started.test_internals().chat.pending_deliveries_async(DeliveryTargetKind::Direct))
+            .unwrap()
+            .is_empty()
+    );
     started.close();
 }
 
@@ -429,7 +427,7 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
         || {
             let rows = call("channel.message.list", json!({ "id": direct }));
             let reports = rows.as_array()?.iter().filter(|m| m["kind"] == "report").count();
-            let pending = started.test_internals().chat.pending_deliveries(DeliveryTargetKind::Direct).ok()?;
+            let pending = vibevalley_runtime::rt::block_on(started.test_internals().chat.pending_deliveries_async(DeliveryTargetKind::Direct)).ok()?;
             (reports == 1 && pending.is_empty()).then_some(())
         },
     );

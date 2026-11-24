@@ -312,12 +312,29 @@ impl Voice {
         Ok(())
     }
 
+    pub async fn heard_async(&self, agent: &str, text: &str, picked: Option<&str>, send_key: Option<&str>) -> Result<(), ApiError> {
+        self.call(agent)?;
+        self.chat
+            .say_async(Saying {
+                text: text.into(),
+                send_key: send_key.unwrap_or("").into(),
+                source: Some("voice".into()),
+                picked: picked.filter(|a| !a.is_empty()).map(|a| Picked {
+                    agent: Some(a.into()),
+                    repo: None,
+                }),
+                ..Default::default()
+            })
+            .await?;
+        Ok(())
+    }
+
     /// `voice.hear`: records spoken user words on the sole active call.
-    pub fn heard_current(&self, text: &str, picked: Option<&str>, send_key: Option<&str>) -> Result<(), ApiError> {
+    pub async fn heard_current_async(&self, text: &str, picked: Option<&str>, send_key: Option<&str>) -> Result<(), ApiError> {
         let live = self.live_calls();
         match live.as_slice() {
             [] => Err(failed(t("server.voice.noCall", &[]))),
-            [only] => self.heard(only, text, picked, send_key),
+            [only] => self.heard_async(only, text, picked, send_key).await,
             _ => Err(failed(t("server.voice.manyCalls", &[]))),
         }
     }
@@ -333,6 +350,25 @@ impl Voice {
                 spoken: true,
                 ..Default::default()
             })
+        {
+            self.warn("voice: the orchestrator's spoken words were not kept", e.message);
+        }
+        Ok(())
+    }
+
+    pub async fn said_async(&self, agent: &str, text: &str) -> Result<(), ApiError> {
+        let call = self.call(agent)?;
+        if text.trim() != call.greeting
+            && let Err(e) = self
+                .chat
+                .post_async(Posting {
+                    from: DEFAULT_ORCHESTRATOR.into(),
+                    channel: self.chat.default_channel(),
+                    text: text.into(),
+                    spoken: true,
+                    ..Default::default()
+                })
+                .await
         {
             self.warn("voice: the orchestrator's spoken words were not kept", e.message);
         }
@@ -417,14 +453,14 @@ impl Voice {
 
     /// `voice.moss.verify`: whether MOSS Live takes the bound account's key;
     /// the problem is "" when it does. Captures and sends no audio.
-    pub fn verify_moss(&self) -> Validation {
+    pub async fn verify_moss_async(&self) -> Validation {
         let Ok(account) = self.live_account() else {
             return Validation {
                 problem: t("server.voice.moss.noKey", &[]),
             };
         };
         let why = |key: &str, why: String| t(key, &[("why", why.into())]);
-        let problem = match self.realtime.verify(&account.key, &account.model) {
+        let problem = match self.realtime.verify_async(&account.key, &account.model).await {
             Verdict::Ok => String::new(),
             Verdict::Refused(w) => why("server.voice.moss.refused", w),
             Verdict::Unreachable(w) => why("server.voice.moss.unreachable", w),
@@ -651,65 +687,28 @@ impl LiveVoicePort for Voice {
 
 pub fn install(hub: &Hub, voice: Arc<Voice>) {
     let v = voice.clone();
-    hub.on_async::<ops::VoiceGrantCreate, _, _>(move |_, ()| {
-        let v = v.clone();
-        async move {
-            crate::spawn_blocking_traced(move || v.grant())
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
-    });
+    hub.on::<ops::VoiceGrantCreate>(move |_, ()| v.grant());
     let v = voice.clone();
-    hub.on_async::<ops::VoiceCallStart, _, _>(move |_, s| {
-        let v = v.clone();
-        async move {
-            crate::spawn_blocking_traced(move || v.start(&s.channel, &s.uid, s.about.as_deref()))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
-    });
+    hub.on::<ops::VoiceCallStart>(move |_, s| v.start(&s.channel, &s.uid, s.about.as_deref()));
     let v = voice.clone();
-    hub.on_async::<ops::VoiceCallStop, _, _>(move |_, c| {
-        let v = v.clone();
-        async move {
-            crate::spawn_blocking_traced(move || v.stop(&c.agent_id))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
-    });
+    hub.on::<ops::VoiceCallStop>(move |_, c| v.stop(&c.agent_id));
     let v = voice.clone();
     hub.on_async::<ops::VoiceCallHear, _, _>(move |_, h| {
         let v = v.clone();
-        async move {
-            crate::spawn_blocking_traced(move || v.heard(&h.agent_id, &h.text, h.agent.as_deref(), h.send_key.as_deref()))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { v.heard_async(&h.agent_id, &h.text, h.agent.as_deref(), h.send_key.as_deref()).await }
     });
     let v = voice.clone();
     hub.on_async::<ops::VoiceHear, _, _>(move |_, h| {
         let v = v.clone();
-        async move {
-            crate::spawn_blocking_traced(move || v.heard_current(&h.text, h.agent.as_deref(), h.send_key.as_deref()))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { v.heard_current_async(&h.text, h.agent.as_deref(), h.send_key.as_deref()).await }
     });
     let v = voice.clone();
     hub.on_async::<ops::VoiceCallSay, _, _>(move |_, s| {
         let v = v.clone();
-        async move {
-            crate::spawn_blocking_traced(move || v.said(&s.agent_id, &s.text))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { v.said_async(&s.agent_id, &s.text).await }
     });
     hub.on_async::<ops::VoiceMossVerify, _, _>(move |_, ()| {
         let voice = voice.clone();
-        async move {
-            crate::spawn_blocking_traced(move || Ok(voice.verify_moss()))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
+        async move { Ok(voice.verify_moss_async().await) }
     });
 }

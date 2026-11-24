@@ -149,7 +149,7 @@ impl Cache {
     }
 }
 
-pub struct Resources {
+pub struct ResourceStore {
     board: Board,
     chat: Arc<Chat>,
     trajectories: Arc<Trajectories>,
@@ -157,9 +157,13 @@ pub struct Resources {
     cache: Mutex<Cache>,
 }
 
-impl Resources {
-    pub fn new(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>) -> Arc<Resources> {
-        Arc::new(Resources {
+/// Temporary compatibility alias until remaining unowned callers migrate.
+#[doc(hidden)]
+pub type Resources = ResourceStore;
+
+impl ResourceStore {
+    pub fn new(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>) -> Arc<ResourceStore> {
+        Arc::new(ResourceStore {
             board,
             chat,
             trajectories,
@@ -168,8 +172,8 @@ impl Resources {
         })
     }
 
-    pub fn with_pulls(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>, pulls: Arc<Pulls>) -> Arc<Resources> {
-        Arc::new(Resources {
+    pub fn with_pulls(board: Board, chat: Arc<Chat>, trajectories: Arc<Trajectories>, pulls: Arc<Pulls>) -> Arc<ResourceStore> {
+        Arc::new(ResourceStore {
             board,
             chat,
             trajectories,
@@ -184,6 +188,7 @@ impl Resources {
         vibevalley_runtime::rt::block_on(self.read_async(reader, args))
     }
 
+    /// Async implementation of [`Self::read`].
     pub async fn read_async(&self, reader: Option<&Session>, args: &ResourceReadArgs) -> Result<String, String> {
         let uri = args.uri.trim().to_string();
         let r = parse(&uri).ok_or_else(|| invalid_uri(&uri))?;
@@ -300,9 +305,9 @@ impl Resources {
     }
 }
 
-impl crate::app::hub::ports::ResourcePort for Resources {
+impl crate::app::hub::ports::ResourcePort for ResourceStore {
     fn read(&self, reader: Option<&Session>, uri: &str, offset: Option<i64>, limit: Option<i64>) -> Result<String, String> {
-        Resources::read(
+        ResourceStore::read(
             self,
             reader,
             &ResourceReadArgs {

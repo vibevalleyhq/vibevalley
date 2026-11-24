@@ -193,7 +193,12 @@ fn generation_is_idempotent_download_retries_without_generating_again_and_librar
     assert_eq!(backend.generations.load(Ordering::SeqCst), 1);
     assert_eq!(backend.downloads.load(Ordering::SeqCst), 2);
     assert_eq!(
-        std::fs::read(s.test_internals().attachments.file(ready["attachment"]["id"].as_str().unwrap()).unwrap().path).unwrap(),
+        std::fs::read(
+            vibevalley_runtime::rt::block_on(s.test_internals().attachments.file_async(ready["attachment"]["id"].as_str().unwrap()))
+                .unwrap()
+                .path
+        )
+        .unwrap(),
         png()
     );
     let items = crate::support::wait_until_settled(Some(&s.hub), Duration::from_secs(3), "library item recorded", || {

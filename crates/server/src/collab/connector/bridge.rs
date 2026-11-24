@@ -217,11 +217,6 @@ impl Bridge {
         status
     }
 
-    pub fn status(&self) -> ConnectorStatus {
-        let pending = self.env.store.count_pending(self.id()).unwrap_or(0);
-        self.status_core(pending)
-    }
-
     pub async fn status_async(&self) -> ConnectorStatus {
         let pending = self.env.store.count_pending_async(self.id()).await.unwrap_or(0);
         self.status_core(pending)
@@ -236,14 +231,6 @@ impl Bridge {
         *told = Some(status.clone());
         drop(told);
         hub.apply(vec![Fact::ConnectorChanged(FactConnectorChanged { at: now(), status })]);
-    }
-
-    /// Says the status to the core when a part of it changed.
-    fn tell(&self) {
-        if self.env.hub.upgrade().is_none() {
-            return;
-        }
-        self.publish_status(self.status());
     }
 
     async fn tell_async(&self) {
@@ -262,12 +249,6 @@ impl Bridge {
         }
         s.error = e;
         true
-    }
-
-    fn set_err(&self, e: impl Into<String>) {
-        if self.record_err(e) {
-            self.tell();
-        }
     }
 
     async fn set_err_async(&self, e: impl Into<String>) {
@@ -292,31 +273,16 @@ impl Bridge {
         }
     }
 
-    fn apply_loaded(&self, account: Option<Account>, err: Option<String>) {
-        self.record_loaded(account, err);
-        self.tell();
-    }
-
     async fn apply_loaded_async(&self, account: Option<Account>, err: Option<String>) {
         self.record_loaded(account, err);
         self.tell_async().await;
-    }
-
-    fn reload(&self) -> Result<(), StoreFailed> {
-        self.reload_with_err(None)
-    }
-
-    /// Updates account and error under one lock so observers never see a torn status (e.g. `paused` with empty `error`).
-    fn reload_with_err(&self, err: Option<String>) -> Result<(), StoreFailed> {
-        let account = self.env.store.account(self.id())?;
-        self.apply_loaded(account, err);
-        Ok(())
     }
 
     async fn reload_async(&self) -> Result<(), StoreFailed> {
         self.reload_with_err_async(None).await
     }
 
+    /// Updates account and error under one lock so observers never see a torn status (e.g. `paused` with empty `error`).
     async fn reload_with_err_async(&self, err: Option<String>) -> Result<(), StoreFailed> {
         let account = self.env.store.account_async(self.id()).await?;
         self.apply_loaded_async(account, err).await;
@@ -623,7 +589,7 @@ impl Bridge {
         .await
     }
 
-    fn accept(&self, messages: Vec<Inbound>, cursor: &str) -> Result<(), AppFailed> {
+    async fn accept_async(&self, messages: Vec<Inbound>, cursor: String) -> Result<(), AppFailed> {
         let named: Vec<Inbound> = messages
             .into_iter()
             .map(|m| {
@@ -637,7 +603,7 @@ impl Bridge {
                 }
             })
             .collect();
-        match self.env.store.accept(self.id(), &named, cursor, now()) {
+        match self.env.store.accept_async(self.id(), &named, &cursor, now()).await {
             Ok(true) => {
                 self.wake();
                 Ok(())
@@ -645,7 +611,7 @@ impl Bridge {
             Ok(false) => Err(AppFailed::failed(t("server.connector.stopped", &[]))),
             Err(e) => {
                 if !self.closing() {
-                    self.set_err(e.0.clone());
+                    self.set_err_async(e.0.clone()).await;
                 }
                 Err(AppFailed::failed(e.0))
             }
@@ -687,7 +653,9 @@ impl Bridge {
                         continue;
                     }
                 };
-                let accept = |messages: Vec<Inbound>, cursor: &str| self.accept(messages, cursor);
+                let accept = |messages: Vec<Inbound>, cursor: String| -> super::adapter::BoxFuture<'_, Result<(), AppFailed>> {
+                    Box::pin(self.accept_async(messages, cursor))
+                };
                 let io = Receiving { cursor, accept: &accept };
                 let ended = tokio::select! {
                     biased;
@@ -754,6 +722,7 @@ impl Bridge {
         let cancel = self.child_cancel();
         let (b, c) = (self.clone(), cancel.clone());
         let login = self.spawn_task(async move {
+            let (tell_tx, mut tell_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
             let progress = |p: Progress| {
                 {
                     let mut shown = b.shown.lock();
@@ -764,14 +733,27 @@ impl Bridge {
                     shown.signing_in = Some(SigningIn { progress: p, code });
                 }
                 b.progressed.notify_waiters();
-                b.tell();
+                let _ = tell_tx.send(());
             };
             let code = || b.shown.lock().signing_in.as_ref().map(|x| x.code.clone()).unwrap_or_default();
             let io = LoginIo {
                 progress: &progress,
                 code: &code,
             };
-            if let Some(result) = b.app.login(&input, &io, &c).await {
+            let result = {
+                let login_fut = b.app.login(&input, &io, &c);
+                tokio::pin!(login_fut);
+                loop {
+                    tokio::select! {
+                        res = &mut login_fut => break res,
+                        Some(()) = tell_rx.recv() => {
+                            while tell_rx.try_recv().is_ok() {}
+                            b.tell_async().await;
+                        }
+                    }
+                }
+            };
+            if let Some(result) = result {
                 b.logged_in(&c, result).await;
             }
         });
@@ -829,8 +811,8 @@ impl Bridge {
         self.tell_async().await;
     }
 
-    pub fn load(&self) {
-        if let Err(e) = self.reload() {
+    pub async fn load_async(&self) {
+        if let Err(e) = self.reload_async().await {
             eprintln!("vibevalley-server: connector: {}: {}", self.id().as_str(), e.0);
         }
     }

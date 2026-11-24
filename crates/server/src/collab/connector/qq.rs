@@ -254,7 +254,7 @@ impl Qq {
                         beat = Some(tokio::time::interval_at(tokio::time::Instant::now() + heartbeat, heartbeat));
                     }
                 }
-                Event::Message(m) => (io.accept)(vec![m], "")?,
+                Event::Message(m) => (io.accept)(vec![m], String::new()).await?,
                 Event::Reconnect => return Err(AppFailed::failed(t("server.connector.qq.reconnect", &[]))),
                 Event::Invalid => return Err(AppFailed::failed(t("server.connector.qq.invalid", &[]))),
                 Event::Other => {}

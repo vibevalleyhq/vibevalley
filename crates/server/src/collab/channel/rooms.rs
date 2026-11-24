@@ -38,12 +38,8 @@ impl Chat {
         Ok(place)
     }
 
-    /// `read`: an agent reads a place; a read of the newest moves its
+    /// `read_async`: an agent reads a place; a read of the newest moves its
     /// cursor.
-    pub fn read(&self, who: &str, opt: ReadOptions) -> Result<ReadResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.read_async(who, opt))
-    }
-
     pub async fn read_async(&self, who: &str, opt: ReadOptions) -> Result<ReadResult, ApiError> {
         self.prepare_seat(who);
         let mut inner = self.locked().await;
@@ -93,11 +89,7 @@ impl Chat {
         Ok(ReadResult { target, messages, older })
     }
 
-    /// `unread`: a hint for the one asking; a failure is none, logged.
-    pub fn unread(&self, who: &str, channel: Option<&str>) -> Vec<ChannelUnread> {
-        vibevalley_runtime::rt::block_on(self.unread_async(who, channel))
-    }
-
+    /// `unread_async`: a hint for the one asking; a failure is none, logged.
     pub async fn unread_async(&self, who: &str, channel: Option<&str>) -> Vec<ChannelUnread> {
         self.prepare_seat(who);
         let model = self.snapshot.load_full();
@@ -118,11 +110,7 @@ impl Chat {
         Ok(out)
     }
 
-    /// `history`: a place's messages before a number, oldest first.
-    pub fn history(&self, channel: &str, before: Option<i64>, limit: Option<i64>) -> Result<Vec<ChatMessage>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.history_async(channel, before, limit))
-    }
-
+    /// `history_async`: a place's messages before a number, oldest first.
     pub async fn history_async(&self, channel: &str, before: Option<i64>, limit: Option<i64>) -> Result<Vec<ChatMessage>, ApiError> {
         let at = if self.model().channel(channel).is_some() {
             channel.to_string()
@@ -197,10 +185,6 @@ impl Chat {
     }
 
     /// The events after `after`, oldest first, at most n.
-    pub fn events(&self, after: i64, n: i64) -> Result<Vec<EventRow>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.events_async(after, n))
-    }
-
     pub async fn events_async(&self, after: i64, n: i64) -> Result<Vec<EventRow>, ApiError> {
         db::events_after(self.db.read_conn(), after, n).await.q()
     }
@@ -224,10 +208,6 @@ impl Chat {
         rx
     }
 
-    pub fn pending_deliveries(&self, kind: DeliveryTargetKind) -> Result<Vec<QueuedDelivery>, ApiError> {
-        vibevalley_runtime::rt::block_on(self.pending_deliveries_async(kind))
-    }
-
     pub async fn pending_deliveries_async(&self, kind: DeliveryTargetKind) -> Result<Vec<QueuedDelivery>, ApiError> {
         Ok(db::pending_deliveries_by_kind(self.db.read_conn(), kind.as_str())
             .await
@@ -248,10 +228,6 @@ impl Chat {
 
     pub async fn delivery_is_pending_async(&self, id: i64) -> Result<bool, ApiError> {
         db::delivery_is_pending(self.db.read_conn(), id).await.q()
-    }
-
-    pub fn settle_delivery(&self, id: i64, delivered: bool) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.settle_delivery_async(id, delivered))
     }
 
     pub async fn settle_delivery_async(&self, id: i64, delivered: bool) -> Result<(), ApiError> {
@@ -410,7 +386,7 @@ impl Chat {
     }
 
     /// A refusal of removals: what still points at a channel.
-    pub fn guard_removal(&self, guard: impl Fn(&str) -> Vec<String> + Send + Sync + 'static) {
+    pub fn guard_removal(&self, guard: impl Fn(String) -> crate::BoxFuture<'static, Vec<String>> + Send + Sync + 'static) {
         self.guards.write().push(Arc::new(guard));
     }
 
@@ -640,7 +616,10 @@ impl Chat {
         }
         let topics = db::topic_threads_in(conn, id).await.q()?;
         let guards = self.guards.read().clone();
-        let mut why: Vec<String> = guards.iter().flat_map(|g| g(id)).collect();
+        let mut why: Vec<String> = Vec::new();
+        for g in guards {
+            why.extend(g(id.to_owned()).await);
+        }
         if self.hub.upgrade().is_some_and(|h| {
             h.read(|s| {
                 s.sessions

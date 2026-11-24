@@ -5,7 +5,7 @@ use include_dir::{Dir, include_dir};
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{ApiError, ArtifactType, ArtifactTypeGuide, ArtifactTypeInfo, ArtifactTypeReadRequest};
 
-use super::{Artifacts, db, q, refused};
+use super::{ArtifactStore, db, q, refused};
 
 static TYPES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/assets/artifact/types");
 
@@ -65,7 +65,7 @@ fn read_asset(path: &str) -> Result<String, ApiError> {
     Ok(strip_frontmatter(raw))
 }
 
-impl Artifacts {
+impl ArtifactStore {
     pub async fn list_types_async(&self) -> Result<Vec<ArtifactTypeInfo>, ApiError> {
         let def = db::default_design_system_artifact(self.db.read_conn()).await.map_err(q)?;
         let mut out = Vec::with_capacity(ArtifactType::ALL.len());

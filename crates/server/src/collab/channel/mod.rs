@@ -45,7 +45,7 @@ use self::types::{Write, Written, new_id};
 use self::words::ChatTarget;
 use crate::app::hub::ports::{ChannelAnnouncePort, ChannelQuotePort};
 use crate::app::hub::refusal::{LookIn, internal, missing, refused as refuse};
-use crate::content::attachment::Attachments;
+use crate::content::attachment::AttachmentStore;
 use crate::db::ServerDb;
 use crate::{Hub, now};
 
@@ -76,14 +76,14 @@ fn no_channel(id: &str) -> ApiError {
     missing(t("server.channel.noChannel", &[("id", id.into())]), LookIn::Channel)
 }
 
-type Guard = Arc<dyn Fn(&str) -> Vec<String> + Send + Sync>;
+type Guard = Arc<dyn Fn(String) -> crate::BoxFuture<'static, Vec<String>> + Send + Sync>;
 type Seater = Arc<dyn Fn(&str) + Send + Sync>;
 
 /// The chat.
 pub struct Chat {
     hub: Weak<Hub>,
     db: Arc<ServerDb>,
-    files: Arc<Attachments>,
+    files: Arc<AttachmentStore>,
     /// Lock-free atomic snapshot of the committed in-memory [`ChatModel`],
     /// used by read-only queries alongside [`ServerDb::read_conn`]
     /// without contending on `inner`.
@@ -115,7 +115,7 @@ impl Chat {
     pub fn open(
         db: Arc<ServerDb>,
         hub: &Arc<Hub>,
-        files: Arc<Attachments>,
+        files: Arc<AttachmentStore>,
         quoter: Option<Arc<dyn ChannelQuotePort>>,
         embeds: bool,
     ) -> Result<Arc<Chat>, ApiError> {
@@ -125,7 +125,7 @@ impl Chat {
     pub(in crate::collab) async fn open_async(
         db: Arc<ServerDb>,
         hub: &Arc<Hub>,
-        files: Arc<Attachments>,
+        files: Arc<AttachmentStore>,
         quoter: Option<Arc<dyn ChannelQuotePort>>,
         embeds: bool,
     ) -> Result<Arc<Chat>, ApiError> {
@@ -761,7 +761,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
         let hub = Hub::new(vibevalley_core::empty_space_state());
-        let files = Attachments::open(dir.path(), db.clone());
+        let files = AttachmentStore::open(dir.path(), db.clone());
         let chat = Chat::open_async(db.clone(), &hub, files, None, false).await.unwrap();
         let gid = chat.default_channel();
 
@@ -818,7 +818,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
         let hub = Hub::new(vibevalley_core::empty_space_state());
-        let files = Attachments::open(dir.path(), db.clone());
+        let files = AttachmentStore::open(dir.path(), db.clone());
         let chat = Chat::open_async(db.clone(), &hub, files, None, false).await.unwrap();
         let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
         let agents = crate::team::agent::Agents::open(&hub, dir.path(), &[], registry, false).unwrap();

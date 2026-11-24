@@ -38,8 +38,8 @@ use super::understanding::Authorization;
 use super::vendor::{self, Account, Moss, Outcome, Task, TaskKind};
 use crate::Hub;
 use crate::app::hub::ports::ChannelAnnouncePort;
-use crate::content::attachment::{ATTACHMENT_MAX, Attachments};
-use crate::content::media::inputs::Inputs;
+use crate::content::attachment::{ATTACHMENT_MAX, AttachmentStore};
+use crate::content::media::inputs::MediaInputStore;
 use crate::db::ServerDb;
 use crate::db::begin_write_tx;
 use crate::db::entities::content_media::media_job;
@@ -525,14 +525,14 @@ pub struct Parts {
     pub db: Arc<ServerDb>,
     pub hub: Weak<Hub>,
     pub setting: Arc<Setting>,
-    pub files: Arc<Attachments>,
-    pub inputs: Arc<Inputs>,
+    pub files: Arc<AttachmentStore>,
+    pub inputs: Arc<MediaInputStore>,
     pub channel: Arc<dyn ChannelAnnouncePort>,
     pub vendor: Arc<dyn Fetch>,
     pub download: Download,
 }
 
-pub struct Jobs {
+pub struct MediaStore {
     db: Arc<ServerDb>,
     held: Mutex<HashMap<String, Held>>,
     runs: Mutex<HashMap<String, Running>>,
@@ -544,27 +544,31 @@ pub struct Jobs {
     pub(super) moss: Moss,
     download: Download,
     setting: Arc<Setting>,
-    files: Arc<Attachments>,
-    pub(super) inputs: Arc<Inputs>,
+    files: Arc<AttachmentStore>,
+    pub(super) inputs: Arc<MediaInputStore>,
     pub(super) channel: Arc<dyn ChannelAnnouncePort>,
     hub: Weak<Hub>,
     clock: SharedClock,
     closed: AtomicBool,
-    me: OnceLock<Weak<Jobs>>,
+    me: OnceLock<Weak<MediaStore>>,
     streams: Mutex<HashMap<String, Stream>>,
     /// Cancelled at close, which ends the minute's sweep and delayed stream cleanup.
     cancel: CancellationToken,
 }
 
-impl Jobs {
-    pub fn open(p: Parts) -> Result<Arc<Jobs>, ApiError> {
+/// Temporary compatibility alias for unowned callers until spine cutover.
+#[doc(hidden)]
+pub type Jobs = MediaStore;
+
+impl MediaStore {
+    pub fn open(p: Parts) -> Result<Arc<MediaStore>, ApiError> {
         Self::open_with_clock(p, system_clock())
     }
 
-    /// Same as [`Jobs::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
-    pub fn open_with_clock(p: Parts, clock: SharedClock) -> Result<Arc<Jobs>, ApiError> {
+    /// Same as [`MediaStore::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    pub fn open_with_clock(p: Parts, clock: SharedClock) -> Result<Arc<MediaStore>, ApiError> {
         let cancel = p.hub.upgrade().map(|h| h.child_token()).unwrap_or_default();
-        let jobs = Arc::new(Jobs {
+        let jobs = Arc::new(MediaStore {
             db: p.db,
             held: Mutex::default(),
             runs: Mutex::default(),
@@ -871,10 +875,6 @@ impl Jobs {
         self.admit_async(r, Some(Held::Image { account, body })).await.map(|r| image_view(&r))
     }
 
-    pub fn image(&self, request: MediaImageRequest, source: MediaSource) -> Result<MediaImageJob, ApiError> {
-        vibevalley_runtime::rt::block_on(self.image_async(request, source))
-    }
-
     /// The account `u` is bound to in the settings now.
     pub(super) fn bound(&self, u: Use) -> Result<Account, ApiError> {
         let unbound = || {
@@ -940,10 +940,6 @@ impl Jobs {
             self.now_ms(),
         );
         self.admit_async(r, Some(Held::Speech { account, body })).await.map(|r| speech_view(&r))
-    }
-
-    pub fn speech(&self, request: MediaSpeechRequest, source: MediaSource) -> Result<MediaSpeechJob, ApiError> {
-        vibevalley_runtime::rt::block_on(self.speech_async(request, source))
     }
 
     /// Starts what can run now: each kind's oldest waiting job while the kind has a free slot.
@@ -1849,7 +1845,7 @@ fn speech_view(r: &Record) -> MediaSpeechJob {
     }
 }
 
-pub fn install(hub: &Hub, jobs: Arc<Jobs>) {
+pub fn install(hub: &Hub, jobs: Arc<MediaStore>) {
     let user_only = |caller: Caller| if caller == Caller::User { Ok(()) } else { Err(refused("userRequired")) };
     let j = jobs.clone();
     hub.on_async::<ops::MediaImageCreate, _, _>(move |ctx, r| {
@@ -1974,7 +1970,7 @@ pub fn install(hub: &Hub, jobs: Arc<Jobs>) {
     });
 }
 
-impl crate::transport::api::media::SpeechStreams for Jobs {
+impl crate::transport::api::media::SpeechStreams for MediaStore {
     fn claim(&self, id: &str) -> Result<crate::transport::api::media::SpeechClaim, ApiError> {
         let events = {
             let mut streams = self.streams.lock();
@@ -2031,11 +2027,11 @@ mod tests {
             version: "0.1.0-test".into(),
             deepseek_api_key: String::new(),
         });
-        let files = Attachments::open(dir.path(), db.clone());
+        let files = AttachmentStore::open(dir.path(), db.clone());
         let chat = Chat::open(db.clone(), &hub, files.clone(), None, false).unwrap();
-        let inputs = Inputs::open(dir.path(), db.clone(), files.clone()).unwrap();
+        let inputs = MediaInputStore::open(dir.path(), db.clone(), files.clone()).unwrap();
         let (vendor, download) = crate::app::fakes::moss::network();
-        let jobs = Jobs::open(Parts {
+        let jobs = MediaStore::open(Parts {
             db: db.clone(),
             hub: Arc::downgrade(&hub),
             setting,
@@ -2069,7 +2065,7 @@ mod tests {
         );
         rec.phase = Phase::Generating;
         vibevalley_runtime::rt::block_on(async {
-            Jobs::save_db(db.write_conn(), &mut rec, 1_700_000_000_000).await.unwrap();
+            MediaStore::save_db(db.write_conn(), &mut rec, 1_700_000_000_000).await.unwrap();
         });
         let (tx, rx) = flume::bounded(16);
         jobs.streams.lock().insert(job_id.into(), Stream { tx, rx, claimed: false });

@@ -50,7 +50,7 @@ pub struct ReadArgs {
     limit: Option<i64>,
 }
 
-pub fn read(f: &ToolBox, who: &Who, a: ReadArgs) -> Result<String, String> {
+pub async fn read(f: &ToolBox, who: &Who, a: ReadArgs) -> Result<String, String> {
     let (me, target) = match who {
         Who::Orchestrator(r) => {
             let target = given(&a.id).map(String::from).unwrap_or_else(|| f.chat.address_of(&r.channel).1);
@@ -64,7 +64,7 @@ pub fn read(f: &ToolBox, who: &Who, a: ReadArgs) -> Result<String, String> {
         before: a.before.filter(|b| *b != 0),
         limit: a.limit.filter(|b| *b != 0),
     };
-    Ok(match f.chat.read(&me, opt) {
+    Ok(match f.chat.read_async(&me, opt).await {
         Ok(r) => match r.messages.first() {
             None if a.unread => format!("{} 里没有你没读的消息", r.target),
             None => format!("{} 里还没有话", r.target),
@@ -95,13 +95,13 @@ pub struct SendArgs {
     reply_to: Option<i64>,
 }
 
-pub fn send(f: &ToolBox, who: &Who, a: SendArgs) -> Result<String, String> {
+pub async fn send(f: &ToolBox, who: &Who, a: SendArgs) -> Result<String, String> {
     let Who::Helper(me) = who else {
         return Err("助手的话就是它的回答，不用这个工具发".into());
     };
     let spoken = f
         .chat
-        .speak(Speaking {
+        .speak_async(Speaking {
             from: me.id.clone(),
             text: a.text,
             run: None,
@@ -110,6 +110,7 @@ pub fn send(f: &ToolBox, who: &Who, a: SendArgs) -> Result<String, String> {
             confirm: a.confirm,
             reply: a.reply_to,
         })
+        .await
         .map_err(|e| e.message)?;
     Ok(spoken_text(&spoken))
 }
@@ -117,12 +118,12 @@ pub fn send(f: &ToolBox, who: &Who, a: SendArgs) -> Result<String, String> {
 #[derive(Deserialize)]
 pub struct Nothing {}
 
-pub fn unread(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
+pub async fn unread(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
     let me = match who {
         Who::Orchestrator(r) => f.chat.orchestrator_in(&r.channel),
         Who::Helper(h) => h.id.clone(),
     };
-    let rows = f.chat.unread(&me, None);
+    let rows = f.chat.unread_async(&me, None).await;
     let Some(first) = rows.first() else {
         return Ok("没有没读的消息。".into());
     };
@@ -143,8 +144,8 @@ pub fn unread(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
     Ok(lines.join("\n"))
 }
 
-pub fn channels(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
-    let list = f.hub()?.invoke::<ops::ChannelList>(&f.ctx(who), ()).map_err(|e| e.message)?;
+pub async fn channels(f: &ToolBox, who: &Who, _: Nothing) -> Result<String, String> {
+    let list = f.hub()?.invoke_async::<ops::ChannelList>(&f.ctx(who), ()).await.map_err(|e| e.message)?;
     Ok(list
         .iter()
         .map(|c| {
@@ -167,10 +168,10 @@ pub struct OpenArgs {
     repo: String,
 }
 
-pub fn open(f: &ToolBox, who: &Who, a: OpenArgs) -> Result<String, String> {
+pub async fn open(f: &ToolBox, who: &Who, a: OpenArgs) -> Result<String, String> {
     let id = f
         .hub()?
-        .invoke::<ops::ChannelCreate>(
+        .invoke_async::<ops::ChannelCreate>(
             &f.ctx(who),
             ChannelRequest {
                 name: a.name.trim().to_string(),
@@ -178,6 +179,7 @@ pub fn open(f: &ToolBox, who: &Who, a: OpenArgs) -> Result<String, String> {
                 repo: (!a.repo.trim().is_empty()).then(|| a.repo.trim().to_string()),
             },
         )
+        .await
         .map_err(|e| e.message)?;
     let found = f.chat.channels().into_iter().find(|c| c.id == id);
     let name = found.as_ref().map(|c| c.name.as_str()).unwrap_or(a.name.trim());
@@ -198,7 +200,7 @@ pub struct UpdateArgs {
     repo: Option<String>,
 }
 
-pub fn update(f: &ToolBox, who: &Who, a: UpdateArgs) -> Result<String, String> {
+pub async fn update(f: &ToolBox, who: &Who, a: UpdateArgs) -> Result<String, String> {
     let id = a.id.trim();
     let c = f
         .chat
@@ -206,7 +208,7 @@ pub fn update(f: &ToolBox, who: &Who, a: UpdateArgs) -> Result<String, String> {
         .or_else(|| f.chat.channels().into_iter().find(|c| c.id == id))
         .ok_or_else(|| format!("没有 {id} 这个频道"))?;
     f.hub()?
-        .invoke::<ops::ChannelUpdate>(
+        .invoke_async::<ops::ChannelUpdate>(
             &f.ctx(who),
             ChannelUpdateInput {
                 id: c.id.clone(),
@@ -218,6 +220,7 @@ pub fn update(f: &ToolBox, who: &Who, a: UpdateArgs) -> Result<String, String> {
                 members: None,
             },
         )
+        .await
         .map_err(|e| e.message)?;
     Ok(format!("改好了 #{}。", c.name))
 }
