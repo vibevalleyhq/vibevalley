@@ -30,34 +30,36 @@ fn prod_lines(text: &str) -> Vec<(usize, &str)> {
 
 #[test]
 fn server_modules_respect_layer_and_skin_boundaries() {
-    let modules_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/modules");
+    let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
+    let domains = ["work", "team", "collab", "content", "skin", "infra"];
     let mut violations = Vec::new();
 
-    for path in rs_files(&modules_dir) {
-        let rel = path.strip_prefix(&modules_dir).unwrap().to_string_lossy().replace('\\', "/");
-        let text = std::fs::read_to_string(&path).unwrap();
-        let top = rel.split('/').next().unwrap_or("");
+    for top in domains {
+        for path in rs_files(&src_dir.join(top)) {
+            let rel = path.strip_prefix(&src_dir).unwrap().to_string_lossy().replace('\\', "/");
+            let text = std::fs::read_to_string(&path).unwrap();
 
-        for (line_no, line) in prod_lines(&text) {
-            if top != "skin" && (line.contains("crate::modules::skin::") || line.contains("modules::skin::")) {
-                violations.push(format!(
-                    "{rel}:{line_no} imports `skin` from a non-skin domain — pass a callback or subscribe to Hub transitions in start.rs"
-                ));
-            }
-            if top == "infra" {
-                for domain in ["work", "team", "collab", "content", "skin"] {
-                    let pat = format!("crate::modules::{domain}::");
-                    if line.contains(&pat) {
-                        violations.push(format!(
-                            "{rel}:{line_no} imports upward into `{domain}` from `infra` — keep `infra` free of business domain dependencies"
-                        ));
+            for (line_no, line) in prod_lines(&text) {
+                if top != "skin" && line.contains("crate::skin::") {
+                    violations.push(format!(
+                        "{rel}:{line_no} imports `skin` from a non-skin domain — pass a callback or subscribe to Hub transitions in app/bootstrap.rs"
+                    ));
+                }
+                if top == "infra" {
+                    for domain in ["work", "team", "collab", "content", "skin"] {
+                        let pat = format!("crate::{domain}::");
+                        if line.contains(&pat) {
+                            violations.push(format!(
+                                "{rel}:{line_no} imports upward into `{domain}` from `infra` — keep `infra` free of business domain dependencies"
+                            ));
+                        }
                     }
                 }
-            }
-            if rel.starts_with("collab/voice/") && line.contains("crate::modules::content::media::") {
-                violations.push(format!(
-                    "{rel}:{line_no} imports `content::media` from `collab/voice` — use shared primitives in `modules::infra::{{http, provider}}`"
-                ));
+                if rel.starts_with("collab/voice/") && line.contains("crate::content::media::") {
+                    violations.push(format!(
+                        "{rel}:{line_no} imports `content::media` from `collab/voice` — use shared primitives in `infra::{{http, provider}}`"
+                    ));
+                }
             }
         }
     }
@@ -74,17 +76,17 @@ fn server_db_entities_are_private_to_their_owning_domain() {
 
     fn owner_allows(target: &str, rel: &str) -> Option<&'static str> {
         if target.starts_with("work_") {
-            (!rel.starts_with("modules/work/")).then_some("modules/work/")
+            (!rel.starts_with("work/")).then_some("work/")
         } else if target.starts_with("collab_") {
-            (!rel.starts_with("modules/collab/")).then_some("modules/collab/")
+            (!rel.starts_with("collab/")).then_some("collab/")
         } else if target.starts_with("content_") {
-            (!rel.starts_with("modules/content/")).then_some("modules/content/")
+            (!rel.starts_with("content/")).then_some("content/")
         } else if target == "team_memory" {
-            (!rel.starts_with("modules/team/memory/")).then_some("modules/team/memory/")
+            (!rel.starts_with("team/memory/")).then_some("team/memory/")
         } else if target == "infra_remote" {
-            (!rel.starts_with("modules/infra/remote/")).then_some("modules/infra/remote/")
+            (!rel.starts_with("infra/remote/")).then_some("infra/remote/")
         } else if target == "shared" {
-            (!(rel.starts_with("db/") || rel.starts_with("modules/work/"))).then_some("db/ or modules/work/")
+            (!(rel.starts_with("db/") || rel.starts_with("work/"))).then_some("db/ or work/")
         } else {
             Some("<classified owning domain>")
         }
@@ -161,7 +163,9 @@ fn server_db_entities_are_private_to_their_owning_domain() {
 #[test]
 fn server_spine_and_transport_never_import_domain_modules() {
     let src_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut files = vec![src_dir.join("lib.rs"), src_dir.join("ports.rs")];
+    let mut files = vec![src_dir.join("lib.rs"), src_dir.join("app/mod.rs")];
+    files.extend(rs_files(&src_dir.join("app/hub")));
+    files.extend(rs_files(&src_dir.join("db")));
     files.extend(rs_files(&src_dir.join("transport")));
     let mut violations = Vec::new();
 
@@ -169,8 +173,11 @@ fn server_spine_and_transport_never_import_domain_modules() {
         let rel = path.strip_prefix(&src_dir).unwrap().to_string_lossy().replace('\\', "/");
         let text = std::fs::read_to_string(&path).unwrap();
         for (line_no, line) in prod_lines(&text) {
-            if line.contains("crate::modules::") {
-                violations.push(format!("{rel}:{line_no} references `crate::modules::` from L0 spine/transport"));
+            for domain in ["work", "team", "collab", "content", "skin", "infra"] {
+                let pat = format!("crate::{domain}::");
+                if line.contains(&pat) {
+                    violations.push(format!("{rel}:{line_no} references `{pat}` from L0 spine/transport"));
+                }
             }
         }
     }

@@ -25,7 +25,7 @@ use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{BoardSlice, CollabSlice, FarmFrame, InboxSlice, OpsSlice, SessionsSlice, SliceBundle, SliceKind};
 
-use crate::slice_feed::{SliceFeed, SliceSubscription};
+use crate::app::hub::slice_feed::{SliceFeed, SliceSubscription};
 use crate::transport::api::{BizCode, CallerContext, ClientIdentity, Envelope, LiveEvent, Server, refusal};
 
 struct FakeFeeds {
@@ -302,7 +302,7 @@ impl Server for FakeServer {
     }
 
     fn live(&self) -> flume::Receiver<LiveEvent> {
-        crate::bridge_live_receiver(self.live.subscribe(), CancellationToken::new())
+        crate::app::hub::bridge_live_receiver(self.live.subscribe(), CancellationToken::new())
     }
 
     fn subscribe_live(&self) -> Option<broadcast::Receiver<LiveEvent>> {

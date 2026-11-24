@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use crate::support::{execute_sql, inspect_db};
 use vibevalley_protocol::{Fact, Issue};
-use vibevalley_server::base::ServerDb;
-use vibevalley_server::modules::work::issue::SqliteIssueStore;
-use vibevalley_server::modules::work::ledger::{Ledger, LocalFacts};
-use vibevalley_server::modules::work::session::SqliteSessionStore;
+use vibevalley_server::db::ServerDb;
+use vibevalley_server::work::issue::SqliteIssueStore;
+use vibevalley_server::work::ledger::{Ledger, LocalFacts};
+use vibevalley_server::work::session::SqliteSessionStore;
 
 #[test]
 fn regression_failed_batch_changes_neither_database_nor_core() {

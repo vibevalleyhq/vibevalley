@@ -19,9 +19,9 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use vibevalley_protocol::{Caller, PublishPlatform, PullRequestState, SliceKind};
 use vibevalley_runtime::agent::durable::{Store as DurableStore, now_ms};
 use vibevalley_server::Server;
-use vibevalley_server::modules::collab::channel::Noticing;
-use vibevalley_server::modules::collab::connector::{Options as ConnectorOptions, Vendors};
-use vibevalley_server::modules::work::pull::UpsertPullInput;
+use vibevalley_server::collab::channel::Noticing;
+use vibevalley_server::collab::connector::{Options as ConnectorOptions, Vendors};
+use vibevalley_server::work::pull::UpsertPullInput;
 
 struct EphemeralPostgres {
     data_dir: PathBuf,

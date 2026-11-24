@@ -417,30 +417,64 @@ fn extract_path_refs(code: &str) -> Vec<PathRef> {
 }
 
 fn server_file_module_path(file_path: &str) -> Option<Vec<String>> {
-    let prefix = "crates/server/src/modules/";
+    let prefix = "crates/server/src/";
     let rest = file_path.strip_prefix(prefix)?.strip_suffix(".rs")?;
     let mut parts: Vec<String> = rest.split('/').map(str::to_owned).collect();
     if parts.last().is_some_and(|p| p == "mod") {
         parts.pop();
     }
-    let mut out = Vec::with_capacity(parts.len() + 1);
-    out.push("modules".to_owned());
-    out.extend(parts);
-    Some(out)
+    let domain = parts.first()?;
+    if !is_known_domain(domain) {
+        return None;
+    }
+    Some(parts)
 }
 
 fn server_module_id_of_file(file_path: &str) -> Option<String> {
     let mod_path = server_file_module_path(file_path)?;
-    if mod_path.len() < 3 {
+    if mod_path.len() < 2 {
         return None;
     }
-    Some(format!("{}/{}", mod_path[1], mod_path[2]))
+    Some(format!("{}/{}", mod_path[0], mod_path[1]))
 }
 
 fn is_spine_file(file_path: &str) -> bool {
     file_path == "crates/server/src/lib.rs"
-        || file_path == "crates/server/src/ports.rs"
+        || file_path == "crates/server/src/app/mod.rs"
+        || (file_path.starts_with("crates/server/src/app/hub/") && file_path.ends_with(".rs"))
+        || (file_path.starts_with("crates/server/src/db/") && file_path.ends_with(".rs"))
         || (file_path.starts_with("crates/server/src/transport/") && file_path.ends_with(".rs"))
+}
+
+fn spine_target_domain_path(file_path: &str, path_ref: &PathRef) -> Option<String> {
+    let segs = &path_ref.segments;
+    if segs.first().is_some_and(|s| s == "crate") && segs.get(1).is_some_and(|s| is_known_domain(s)) {
+        return Some(segs.join("::"));
+    }
+    if file_path == "crates/server/src/lib.rs"
+        && ((segs.first().is_some_and(|s| s == "self") && segs.get(1).is_some_and(|s| is_known_domain(s))) || segs.first().is_some_and(|s| is_known_domain(s)))
+    {
+        return Some(segs.join("::"));
+    }
+    if segs.first().is_some_and(|s| s == "super")
+        && let Some(rest) = file_path.strip_prefix("crates/server/src/").and_then(|r| r.strip_suffix(".rs"))
+    {
+        let mut base: Vec<String> = rest.split('/').map(str::to_owned).collect();
+        if base.last().is_some_and(|p| p == "mod") {
+            base.pop();
+        }
+        base.extend(path_ref.inline_mods.iter().cloned());
+        let mut idx = 0usize;
+        while segs.get(idx).is_some_and(|s| s == "super") {
+            base.pop()?;
+            idx += 1;
+        }
+        base.extend(segs[idx..].iter().cloned());
+        if base.first().is_some_and(|s| is_known_domain(s)) {
+            return Some(segs.join("::"));
+        }
+    }
+    None
 }
 
 fn is_mac_source_file(file_path: &str) -> bool {
@@ -454,10 +488,8 @@ enum TargetResolution {
 
 fn resolve_target_server_module(path_ref: &PathRef, file_mod_path: &[String]) -> Option<TargetResolution> {
     let segs = &path_ref.segments;
-    let resolved: Vec<String> = if segs.first().is_some_and(|s| s == "crate") && segs.get(1).is_some_and(|s| s == "modules") {
-        let mut out = vec!["modules".to_owned()];
-        out.extend(segs[2..].iter().cloned());
-        out
+    let resolved: Vec<String> = if segs.first().is_some_and(|s| s == "crate") {
+        segs[1..].to_vec()
     } else if segs.first().is_some_and(|s| s == "super") {
         let mut base = file_mod_path.to_vec();
         base.extend(path_ref.inline_mods.iter().cloned());
@@ -472,11 +504,8 @@ fn resolve_target_server_module(path_ref: &PathRef, file_mod_path: &[String]) ->
         return None;
     };
 
-    if resolved.first().is_none_or(|s| s != "modules") {
-        return None;
-    }
-    let domain = resolved.get(1)?;
-    let mod_name = resolved.get(2)?;
+    let domain = resolved.first()?;
+    let mod_name = resolved.get(1)?;
     if !is_known_domain(domain) {
         return None;
     }
@@ -494,17 +523,17 @@ fn resolve_target_server_module(path_ref: &PathRef, file_mod_path: &[String]) ->
 
 fn db_entity_owner_allows(target: &str, rel_from_server_src: &str) -> Option<&'static str> {
     if target.starts_with("work_") {
-        (!rel_from_server_src.starts_with("modules/work/")).then_some("modules/work/")
+        (!rel_from_server_src.starts_with("work/")).then_some("work/")
     } else if target.starts_with("collab_") {
-        (!rel_from_server_src.starts_with("modules/collab/")).then_some("modules/collab/")
+        (!rel_from_server_src.starts_with("collab/")).then_some("collab/")
     } else if target.starts_with("content_") {
-        (!rel_from_server_src.starts_with("modules/content/")).then_some("modules/content/")
+        (!rel_from_server_src.starts_with("content/")).then_some("content/")
     } else if target == "team_memory" {
-        (!rel_from_server_src.starts_with("modules/team/memory/")).then_some("modules/team/memory/")
+        (!rel_from_server_src.starts_with("team/memory/")).then_some("team/memory/")
     } else if target == "infra_remote" {
-        (!rel_from_server_src.starts_with("modules/infra/remote/")).then_some("modules/infra/remote/")
+        (!rel_from_server_src.starts_with("infra/remote/")).then_some("infra/remote/")
     } else if target == "shared" {
-        (!(rel_from_server_src.starts_with("db/") || rel_from_server_src.starts_with("modules/work/"))).then_some("db/ or modules/work/")
+        (!(rel_from_server_src.starts_with("db/") || rel_from_server_src.starts_with("work/"))).then_some("db/ or work/")
     } else {
         Some("<classified owning domain>")
     }
@@ -808,16 +837,14 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
         let index = LineIndex::new(raw);
         let refs = extract_path_refs(code);
 
+        check_db_entities_privacy(&file.path, code, &index, &mut violations);
+
         if is_spine_file(&file.path) {
             let mut seen_lines = BTreeSet::new();
             for path_ref in &refs {
-                let is_crate_modules = path_ref.segments.first().is_some_and(|s| s == "crate") && path_ref.segments.get(1).is_some_and(|s| s == "modules");
-                let is_self_modules_in_lib = file.path == "crates/server/src/lib.rs"
-                    && path_ref.segments.first().is_some_and(|s| s == "self")
-                    && path_ref.segments.get(1).is_some_and(|s| s == "modules");
-                if !is_crate_modules && !is_self_modules_in_lib {
+                let Some(target) = spine_target_domain_path(&file.path, path_ref) else {
                     continue;
-                }
+                };
                 let line = index.line_at(path_ref.offset);
                 if !seen_lines.insert(line) {
                     continue;
@@ -826,13 +853,9 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                     rule: BoundaryRule::SpineNoModuleImport,
                     file: file.path.clone(),
                     line,
-                    message: format!(
-                        "server spine/transport imports concrete module `{}` ({})",
-                        path_ref.segments.join("::"),
-                        index.snippet_at(line)
-                    ),
+                    message: format!("server spine/transport imports concrete module `{target}` ({})", index.snippet_at(line)),
                     fix: format!(
-                        "Move the narrow port trait into crates/server/src/ports.rs or crates/server/src/transport/api/ and inject the implementation in start.rs. See {TOPOLOGY_DOC} Section 3.2.2."
+                        "Move the narrow port trait into crates/server/src/app/hub/ports.rs or crates/server/src/transport/api/ and inject the implementation in app/bootstrap.rs. See {TOPOLOGY_DOC} Section 3.2.2."
                     ),
                     details: Vec::new(),
                 });
@@ -843,7 +866,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
         if is_mac_source_file(&file.path) {
             let mut seen_lines = BTreeSet::new();
             for path_ref in &refs {
-                if path_ref.segments.first().is_none_or(|s| s != "vibevalley_server") || path_ref.segments.get(1).is_none_or(|s| s != "modules") {
+                if path_ref.segments.first().is_none_or(|s| s != "vibevalley_server") || path_ref.segments.get(1).is_none_or(|s| !is_known_domain(s)) {
                     continue;
                 }
                 let line = index.line_at(path_ref.offset);
@@ -860,15 +883,13 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                         index.snippet_at(line)
                     ),
                     fix: format!(
-                        "Consume narrow ports from vibevalley_server::transport::api (e.g. SharedLiveVoice) or protocol types from vibevalley_protocol instead of vibevalley_server::modules::*. See {TOPOLOGY_DOC} Section 3.2.2."
+                        "Consume narrow ports from vibevalley_server::transport::api (e.g. SharedLiveVoice) or protocol types from vibevalley_protocol instead of vibevalley_server::<domain>::*. See {TOPOLOGY_DOC} Section 3.2.2."
                     ),
                     details: Vec::new(),
                 });
             }
             continue;
         }
-
-        check_db_entities_privacy(&file.path, code, &index, &mut violations);
 
         let Some(source_module) = server_module_id_of_file(&file.path) else {
             continue;
@@ -964,7 +985,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                                 target_class.layer.as_str()
                             ),
                             fix: format!(
-                                "L1 modules must have zero upward dependencies; inject a narrow port trait from crates/server/src/ports.rs or subscribe via EventBus. See {TOPOLOGY_DOC} Section 3.2."
+                                "L1 modules must have zero upward dependencies; inject a narrow port trait from crates/server/src/app/hub/ports.rs or subscribe via EventBus. See {TOPOLOGY_DOC} Section 3.2."
                             ),
                             details: Vec::new(),
                         });
@@ -975,7 +996,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                             line,
                             message: format!("L2 module `{source_module}` imports L3 module `{target_module}` ({snippet})"),
                             fix: format!(
-                                "Invert the dependency with a narrow port trait in crates/server/src/ports.rs or move shared pure helpers down to L1 (infra/text). See {TOPOLOGY_DOC} Section 3.2."
+                                "Invert the dependency with a narrow port trait in crates/server/src/app/hub/ports.rs or move shared pure helpers down to L1 (infra/text). See {TOPOLOGY_DOC} Section 3.2."
                             ),
                             details: Vec::new(),
                         });
@@ -994,7 +1015,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                                 dst_peer.as_str()
                             ),
                             fix: format!(
-                                "L2 peer domains (work, collab, content, team/memory) must not import each other directly; use Hub::invoke<O>, EventBus, SpaceState, or a read-only port in crates/server/src/ports.rs. See {TOPOLOGY_DOC} Section 3.2.1."
+                                "L2 peer domains (work, collab, content, team/memory) must not import each other directly; use Hub::invoke<O>, EventBus, SpaceState, or a read-only port in crates/server/src/app/hub/ports.rs. See {TOPOLOGY_DOC} Section 3.2.1."
                             ),
                             details: Vec::new(),
                         });
@@ -1009,7 +1030,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
         let cycles = extract_cycles_from_scc(&scc, &graph);
         for cycle in cycles {
             let mut hops = Vec::with_capacity(cycle.len());
-            let mut primary_file = "crates/server/src/modules/mod.rs".to_owned();
+            let mut primary_file = "crates/server/src/lib.rs".to_owned();
             let mut primary_line = 1usize;
             for i in 0..cycle.len() {
                 let from = &cycle[i];
@@ -1031,7 +1052,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
                 line: primary_line,
                 message: format!("directed cycle in server modules: {cycle_label}"),
                 fix: format!(
-                    "Break the module cycle by extracting shared data/ports downward or routing writes via Hub::invoke / EventBus so crates/server/src/modules/ forms a strict DAG. See {TOPOLOGY_DOC} Section 3.2.2."
+                    "Break the module cycle by extracting shared data/ports downward or routing writes via Hub::invoke / EventBus so crates/server/src/ domain modules form a strict DAG. See {TOPOLOGY_DOC} Section 3.2.2."
                 ),
                 details: hops,
             });
@@ -1223,14 +1244,15 @@ mod tests {
     #[test]
     fn spine_no_module_import_fails_on_lib_ports_and_transport() {
         let files = vec![
-            sf("crates/server/src/lib.rs", "use crate::modules::collab::voice::Voice;\npub struct Hub;"),
+            sf("crates/server/src/lib.rs", "use crate::collab::voice::Voice;\npub struct Hub;"),
             sf(
-                "crates/server/src/ports.rs",
-                "pub trait Recall { fn x(&self) -> crate::modules::team::memory::Hit; }",
+                "crates/server/src/app/hub/ports.rs",
+                "pub trait Recall { fn x(&self) -> crate::team::memory::Hit; }",
             ),
+            sf("crates/server/src/db/mod.rs", "pub fn bad() -> crate::work::ledger::Ledger { todo!() }"),
             sf(
                 "crates/server/src/transport/api/mod.rs",
-                "pub trait Server {\n    fn voice(&self) -> Option<Arc<crate::modules::collab::voice::Voice>>;\n}",
+                "pub trait Server {\n    fn voice(&self) -> Option<Arc<crate::collab::voice::Voice>>;\n}",
             ),
         ];
 
@@ -1239,8 +1261,9 @@ mod tests {
         assert_eq!(
             tags,
             vec![
+                "spine-no-module-import@crates/server/src/app/hub/ports.rs:1",
+                "spine-no-module-import@crates/server/src/db/mod.rs:1",
                 "spine-no-module-import@crates/server/src/lib.rs:1",
-                "spine-no-module-import@crates/server/src/ports.rs:1",
                 "spine-no-module-import@crates/server/src/transport/api/mod.rs:2",
             ]
         );
@@ -1251,13 +1274,10 @@ mod tests {
     fn spine_ignores_cfg_test_inline_and_external_submodules() {
         let files = vec![
             sf("crates/server/src/transport/http/mod.rs", "use crate::Hub;\n#[cfg(test)]\nmod tests;"),
-            sf(
-                "crates/server/src/transport/http/tests.rs",
-                "use crate::modules::content::attachment::Attachments;\n",
-            ),
+            sf("crates/server/src/transport/http/tests.rs", "use crate::content::attachment::Attachments;\n"),
             sf(
                 "crates/server/src/lib.rs",
-                "pub mod ports;\n#[cfg(test)]\nmod tests { use crate::modules::infra::setting::Setting; }",
+                "pub mod app;\n#[cfg(test)]\nmod tests { use crate::infra::setting::Setting; }",
             ),
         ];
         assert!(audit_files(&files).is_empty());
@@ -1266,10 +1286,10 @@ mod tests {
     #[test]
     fn mac_no_server_module_import_catches_use_and_inline_paths() {
         let files = vec![
-            sf("apps/mac/src/live_voice.rs", "use vibevalley_server::modules::collab::voice::Voice;\n"),
+            sf("apps/mac/src/live_voice.rs", "use vibevalley_server::collab::voice::Voice;\n"),
             sf(
                 "apps/mac/src/hosted/late.rs",
-                "impl Server for LateServer {\n    fn voice(&self) -> Option<Arc<vibevalley_server::modules::collab::voice::Voice>> { None }\n}",
+                "impl Server for LateServer {\n    fn voice(&self) -> Option<Arc<vibevalley_server::collab::voice::Voice>> { None }\n}",
             ),
         ];
         let violations = audit_files(&files);
@@ -1288,7 +1308,7 @@ mod tests {
         let files = vec![
             sf(
                 "apps/mac/src/live_voice.rs",
-                "use vibevalley_server::transport::api::SharedLiveVoice;\n// doc comment mentioning vibevalley_server::modules::collab::voice::Voice\npub fn start(_voice: SharedLiveVoice) {}",
+                "use vibevalley_server::transport::api::SharedLiveVoice;\n// doc comment mentioning vibevalley_server::collab::voice::Voice\npub fn start(_voice: SharedLiveVoice) {}",
             ),
             sf(
                 "apps/mac/src/hosted/late.rs",
@@ -1301,17 +1321,11 @@ mod tests {
     #[test]
     fn server_layer_dag_fails_on_upward_and_cross_domain_imports() {
         let files = vec![
-            sf("crates/server/src/modules/team/agent/mod.rs", "use crate::modules::team::memory::Memory;\n"),
-            sf(
-                "crates/server/src/modules/infra/setting.rs",
-                "use crate::modules::team::orchestrator::Orchestrator;\n",
-            ),
-            sf(
-                "crates/server/src/modules/collab/voice/mod.rs",
-                "use crate::modules::team::orchestrator::Orchestrator;\n",
-            ),
-            sf("crates/server/src/modules/content/artifact/mod.rs", "use crate::modules::work::issue::Board;\n"),
-            sf("crates/server/src/modules/work/issue/board.rs", "use crate::modules::collab::channel::Chat;\n"),
+            sf("crates/server/src/team/agent/mod.rs", "use crate::team::memory::Memory;\n"),
+            sf("crates/server/src/infra/setting.rs", "use crate::team::orchestrator::Orchestrator;\n"),
+            sf("crates/server/src/collab/voice/mod.rs", "use crate::team::orchestrator::Orchestrator;\n"),
+            sf("crates/server/src/content/artifact/mod.rs", "use crate::work::issue::Board;\n"),
+            sf("crates/server/src/work/issue/board.rs", "use crate::collab::channel::Chat;\n"),
         ];
         let violations: Vec<String> = audit_files(&files)
             .into_iter()
@@ -1321,11 +1335,11 @@ mod tests {
         assert_eq!(
             violations,
             vec![
-                "crates/server/src/modules/collab/voice/mod.rs:1",
-                "crates/server/src/modules/content/artifact/mod.rs:1",
-                "crates/server/src/modules/infra/setting.rs:1",
-                "crates/server/src/modules/team/agent/mod.rs:1",
-                "crates/server/src/modules/work/issue/board.rs:1",
+                "crates/server/src/collab/voice/mod.rs:1",
+                "crates/server/src/content/artifact/mod.rs:1",
+                "crates/server/src/infra/setting.rs:1",
+                "crates/server/src/team/agent/mod.rs:1",
+                "crates/server/src/work/issue/board.rs:1",
             ]
         );
     }
@@ -1333,11 +1347,8 @@ mod tests {
     #[test]
     fn resolves_relative_super_imports_and_grouped_use_trees() {
         let files = vec![
-            sf("crates/server/src/modules/work/session/sessions.rs", "use super::super::cron::Crons;\n"),
-            sf(
-                "crates/server/src/modules/content/attachment/mod.rs",
-                "use super::{library::Library, media::Media};\n",
-            ),
+            sf("crates/server/src/work/session/sessions.rs", "use super::super::cron::Crons;\n"),
+            sf("crates/server/src/content/attachment.rs", "use super::{library::Library, media::Media};\n"),
         ];
         let violations = audit_files(&files);
         assert_eq!(violations.len(), 3);
@@ -1347,43 +1358,34 @@ mod tests {
     #[test]
     fn passes_valid_l0_to_l3_dag_and_excluded_cfg_test_files() {
         let files = vec![
-            sf("crates/server/src/modules/infra/setting.rs", "pub struct Setting;\n"),
-            sf("crates/server/src/modules/infra/text.rs", "use super::setting::Setting;\n"),
+            sf("crates/server/src/infra/setting.rs", "pub struct Setting;\n"),
+            sf("crates/server/src/infra/text.rs", "use super::setting::Setting;\n"),
+            sf("crates/server/src/content/attachment.rs", "use crate::infra::setting::Setting;\n"),
+            sf("crates/server/src/team/agent/mod.rs", "use crate::infra::text;\n"),
+            sf("crates/server/src/work/ledger.rs", "use crate::infra::setting::Setting;\n"),
             sf(
-                "crates/server/src/modules/content/attachment/mod.rs",
-                "use crate::modules::infra::setting::Setting;\n",
-            ),
-            sf("crates/server/src/modules/team/agent/mod.rs", "use crate::modules::infra::text;\n"),
-            sf("crates/server/src/modules/work/ledger.rs", "use crate::modules::infra::setting::Setting;\n"),
-            sf(
-                "crates/server/src/modules/work/session/sessions.rs",
-                "use crate::modules::content::attachment::Attachments;\nuse crate::modules::team::agent::Agents;\nuse crate::modules::work::ledger::Ledger;\nmod inner { use super::Ledger; }",
+                "crates/server/src/work/session/sessions.rs",
+                "use crate::content::attachment::Attachments;\nuse crate::team::agent::Agents;\nuse crate::work::ledger::Ledger;\nmod inner { use super::Ledger; }",
             ),
             sf(
-                "crates/server/src/modules/work/issue/board.rs",
-                "use crate::modules::work::{ledger::Ledger, session::Sessions};\nuse super::edits::apply;",
+                "crates/server/src/work/issue/board.rs",
+                "use crate::work::{ledger::Ledger, session::Sessions};\nuse super::edits::apply;",
             ),
-            sf("crates/server/src/modules/work/pull/mod.rs", "use crate::modules::work::issue::Board;\n"),
+            sf("crates/server/src/work/pull/mod.rs", "use crate::work::issue::Board;\n"),
+            sf("crates/server/src/collab/channel/mod.rs", "use crate::content::attachment::Attachments;\n"),
             sf(
-                "crates/server/src/modules/collab/channel/mod.rs",
-                "use crate::modules::content::attachment::Attachments;\n",
+                "crates/server/src/collab/connector/store.rs",
+                "use crate::collab::channel::Chat;\n#[cfg(test)]\n#[path = \"store_test.rs\"]\nmod tests;",
             ),
+            sf("crates/server/src/collab/connector/store_test.rs", "use crate::work::issue::Board;\n"),
+            sf("crates/server/src/team/tool/mod.rs", "use crate::team::agent::Agents;\n"),
+            sf("crates/server/src/team/orchestrator/mod.rs", "use crate::team::tool::Tools;\n"),
+            sf("crates/server/src/team/mcp/mod.rs", "use crate::team::tool::Tools;\n"),
+            sf("crates/server/src/skin/game.rs", "use crate::infra::setting::Setting;\n"),
+            sf("crates/server/src/work/cron/mod.rs", "use crate::work::issue::Board;\n"),
             sf(
-                "crates/server/src/modules/collab/connector/store.rs",
-                "use crate::modules::collab::channel::Chat;\n#[cfg(test)]\n#[path = \"store_test.rs\"]\nmod tests;",
-            ),
-            sf(
-                "crates/server/src/modules/collab/connector/store_test.rs",
-                "use crate::modules::work::issue::Board;\n",
-            ),
-            sf("crates/server/src/modules/team/tool/mod.rs", "use crate::modules::team::agent::Agents;\n"),
-            sf("crates/server/src/modules/team/orchestrator/mod.rs", "use crate::modules::team::tool::Tools;\n"),
-            sf("crates/server/src/modules/team/mcp/mod.rs", "use crate::modules::team::tool::Tools;\n"),
-            sf("crates/server/src/modules/skin/game.rs", "use crate::modules::infra::setting::Setting;\n"),
-            sf("crates/server/src/modules/work/cron/mod.rs", "use crate::modules::work::issue::Board;\n"),
-            sf(
-                "crates/server/src/modules/work/chat.rs",
-                "use crate::modules::collab::channel::Chat;\nuse crate::modules::work::issue::Board;\n",
+                "crates/server/src/work/chat.rs",
+                "use crate::collab::channel::Chat;\nuse crate::work::issue::Board;\n",
             ),
         ];
         assert!(audit_files(&files).is_empty());
@@ -1392,24 +1394,21 @@ mod tests {
     #[test]
     fn detects_2_node_and_3_node_module_cycles() {
         let two_node = vec![
-            sf("crates/server/src/modules/work/issue/mod.rs", "use crate::modules::work::session::Sessions;\n"),
-            sf("crates/server/src/modules/work/session/mod.rs", "use crate::modules::work::issue::Board;\n"),
+            sf("crates/server/src/work/issue/mod.rs", "use crate::work::session::Sessions;\n"),
+            sf("crates/server/src/work/session/mod.rs", "use crate::work::issue::Board;\n"),
         ];
         let violations = audit_files(&two_node);
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].rule, BoundaryRule::ServerModulesAcyclic);
         assert!(violations[0].message.contains("work/issue -> work/session -> work/issue"));
         let formatted = format_violations(&violations);
-        assert!(formatted.contains("crates/server/src/modules/work/issue/mod.rs:1"));
-        assert!(formatted.contains("crates/server/src/modules/work/session/mod.rs:1"));
+        assert!(formatted.contains("crates/server/src/work/issue/mod.rs:1"));
+        assert!(formatted.contains("crates/server/src/work/session/mod.rs:1"));
 
         let three_node = vec![
-            sf("crates/server/src/modules/team/orchestrator/mod.rs", "use crate::modules::team::tool::Tools;\n"),
-            sf("crates/server/src/modules/team/tool/mod.rs", "use crate::modules::team::mcp::Door;\n"),
-            sf(
-                "crates/server/src/modules/team/mcp/mod.rs",
-                "use crate::modules::team::orchestrator::Orchestrator;\n",
-            ),
+            sf("crates/server/src/team/orchestrator/mod.rs", "use crate::team::tool::Tools;\n"),
+            sf("crates/server/src/team/tool/mod.rs", "use crate::team::mcp::Door;\n"),
+            sf("crates/server/src/team/mcp/mod.rs", "use crate::team::orchestrator::Orchestrator;\n"),
         ];
         let violations = audit_files(&three_node);
         assert_eq!(violations.len(), 1);
@@ -1420,30 +1419,27 @@ mod tests {
     #[test]
     fn enforces_db_entities_domain_privacy_ignoring_tests() {
         let files = vec![
-            sf("crates/server/src/modules/work/issue/db.rs", "use crate::db::entities::work_issue::issue;\n"),
+            sf("crates/server/src/work/issue/db.rs", "use crate::db::entities::work_issue::issue;\n"),
+            sf("crates/server/src/content/artifact/db.rs", "use crate::db::entities::work_issue::issue;\n"),
             sf(
-                "crates/server/src/modules/content/artifact/db.rs",
-                "use crate::db::entities::work_issue::issue;\n",
-            ),
-            sf(
-                "crates/server/src/base.rs",
+                "crates/server/src/db/mod.rs",
                 "#[cfg(test)]\nmod tests { use crate::db::entities::collab_channel::channel; }\n",
             ),
         ];
         let violations = audit_files(&files);
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].rule, BoundaryRule::DbEntitiesPrivacy);
-        assert_eq!(violations[0].file, "crates/server/src/modules/content/artifact/db.rs");
+        assert_eq!(violations[0].file, "crates/server/src/content/artifact/db.rs");
     }
 
     #[test]
     fn audits_workspace_from_disk() {
         let dir = TempDir::new("vv-boundaries");
-        dir.write("crates/server/src/lib.rs", "pub mod ports;\n");
-        dir.write("crates/server/src/ports.rs", "pub trait LiveVoicePort {}\n");
+        dir.write("crates/server/src/lib.rs", "pub mod app;\n");
+        dir.write("crates/server/src/app/hub/ports.rs", "pub trait LiveVoicePort {}\n");
         dir.write("crates/server/src/transport/api/mod.rs", "pub trait Server {}\n");
-        dir.write("crates/server/src/modules/infra/setting.rs", "pub struct Setting;\n");
-        dir.write("crates/server/src/modules/work/ledger.rs", "use crate::modules::infra::setting::Setting;\n");
+        dir.write("crates/server/src/infra/setting.rs", "pub struct Setting;\n");
+        dir.write("crates/server/src/work/ledger.rs", "use crate::infra::setting::Setting;\n");
         dir.write("apps/mac/src/live_voice.rs", "use vibevalley_server::transport::api::SharedLiveVoice;\n");
 
         let clean = audit_workspace(&dir.0).unwrap();
@@ -1452,7 +1448,7 @@ mod tests {
 
         dir.write(
             "apps/mac/src/hosted/late.rs",
-            "fn voice(&self) -> Option<vibevalley_server::modules::collab::voice::Voice> { None }\n",
+            "fn voice(&self) -> Option<vibevalley_server::collab::voice::Voice> { None }\n",
         );
         let dirty = audit_workspace(&dir.0).unwrap();
         assert_eq!(

@@ -53,7 +53,7 @@ test("every rule here is one the page uses", () => {
   }
   expect(
     unused,
-    "packages/protocol/src/rules holds only what the page and the server both run. Fix: a rule only the server runs lives in its module under crates/server/src/modules, and its conclusion goes into the frame. See docs/subsystems/foundation.md",
+    "packages/protocol/src/rules holds only what the page and the server both run. Fix: a rule only the server runs lives in its domain module under crates/server/src/, and its conclusion goes into the frame. See docs/subsystems/foundation.md",
   ).toEqual([]);
 });
 

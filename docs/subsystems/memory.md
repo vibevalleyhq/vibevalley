@@ -16,10 +16,10 @@
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/modules/team/memory/mod.rs` | `Memories`：`memory` 表（`server.db`）的读写、`memory.*` 端点、工单一轮结束时记下的经历 |
-| `crates/server/src/modules/team/memory/rules.rs` | 纯函数：切词、召回评分（`pick`）、去重、淘汰、搜索、出站前脱敏 |
-| `crates/server/src/modules/team/memory/gse.rs` | 简体中文分词（照 gse 的词典与 HMM） |
-| `crates/server/src/modules/team/tool/memory.rs` | 帮工档案的记性工具 |
+| `crates/server/src/team/memory/mod.rs` | `Memories`：`memory` 表（`server.db`）的读写、`memory.*` 端点、工单一轮结束时记下的经历 |
+| `crates/server/src/team/memory/rules.rs` | 纯函数：切词、召回评分（`pick`）、去重、淘汰、搜索、出站前脱敏 |
+| `crates/server/src/team/memory/gse.rs` | 简体中文分词（照 gse 的词典与 HMM） |
+| `crates/server/src/team/tool/memory.rs` | 帮工档案的记性工具 |
 
 接口清单见 [capabilities.md](docs/reference/capabilities.md)（`memory.*`）。
 
@@ -33,17 +33,17 @@
   - `issue`：帮工完成工单回合时由服务端自动生成的工单经历（每个 `Session` 更新同一条）。
   - 单条上限 300 字符（UTF-16），每个档案最多保留 300 条，超出时在同一事务内淘汰最久未召回的条目。
 - **高重合度自动去重**：同一仓库范围内若已存在完全相同、或分词重合度（`memoryLikeness`）≥ `0.8` 的条目，则跳过不重复记。
-- **纯函数评分召回（`pick`，`modules/team/memory/rules.rs`）**：
+- **纯函数评分召回（`pick`，`team/memory/rules.rs`）**：
   - 排除当前 `Session` 已召回过的 ID 及自己写下的条目；跨仓库条目须共享至少 3 个词才进入候选。
   - 评分公式：`种类分 + 范围分 + min(共有词数, 8)×0.5 + exp(-距上次召回天数 / 30)` 加上文本相关度。
   - 每次召回最多 8 条、总长不超过 1600 字（其中 `issue` 类最多 3 条）。
-- **出站强制脱敏**：离开本机的文本先经 `modules/team/memory/rules.rs` 的脱敏抹掉密钥。
+- **出站强制脱敏**：离开本机的文本先经 `team/memory/rules.rs` 的脱敏抹掉密钥。
 
 整理档案笔记时，服务在一笔 SeaORM 写事务中替换 agent 写下的笔记。用户写下的笔记保留。若任一条新笔记未能写入，整组笔记恢复原值。[记忆实体](crates/server/src/db/entities/team_memory.rs) · [回滚回归](crates/server/tests/memory.rs)
 
 ## 怎么走
 
-1. **新回合召回**：开会话（`crates/server/src/modules/team/agent/drive.rs`）时传入任务文本，召回的拼入 `【你记得的】`。
+1. **新回合召回**：开会话（`crates/server/src/team/agent/drive.rs`）时传入任务文本，召回的拼入 `【你记得的】`。
 2. **回合结束记下**：正常结束的回合写入 `note` 与 `issue`。
 
 ## 和谁打交道
@@ -60,5 +60,5 @@
 
 ## 怎么验证
 
-- `crates/server/src/modules/team/memory/rules_tests.rs`：切词（对 gse 的 golden）、召回、去重、淘汰与脱敏。
+- `crates/server/src/team/memory/rules_tests.rs`：切词（对 gse 的 golden）、召回、去重、淘汰与脱敏。
 - `crates/server/tests/memory.rs`：记下、搜索、召回与忘掉经端点走一遍。

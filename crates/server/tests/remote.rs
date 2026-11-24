@@ -11,7 +11,7 @@ use sqlx::Row;
 use vibevalley_core::{Clock, ManualClock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{BizCode, Caller};
-use vibevalley_server::modules::infra::remote::{self, Remote, default_remote_port, tailscale};
+use vibevalley_server::infra::remote::{self, Remote, default_remote_port, tailscale};
 use vibevalley_server::transport::http::{is_allowed_remote_ip, serve, serve_remote};
 
 use crate::support::inspect_db;
@@ -379,7 +379,7 @@ fn remote_security_wall_rejects_privileged_ops_mcp_and_invalid_or_revoked_tokens
 fn remote_manual_clock_drives_pair_expiry_rate_limit_and_last_seen_over_http() {
     vibevalley_i18n::set_locale("en");
     let dir = tempfile::tempdir().unwrap();
-    let db = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
+    let db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
     let hub = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
     let clock = Arc::new(ManualClock::new(1_700_000_000_000));
     let remote = Remote::open_with_clock(db.clone(), Arc::downgrade(&hub), "2.3.4-clock-test".into(), clock.clone()).unwrap();

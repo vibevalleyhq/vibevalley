@@ -7,7 +7,7 @@ use std::time::Duration;
 use serde_json::json;
 use vibevalley_core::{Clock, ManualClock};
 use vibevalley_protocol::{BizCode, Caller};
-use vibevalley_server::modules::work::cron::{self, Crons};
+use vibevalley_server::work::cron::{self, Crons};
 
 fn server(dir: &std::path::Path) -> vibevalley_server::Started {
     let mut registry = vibevalley_runtime::oar::Registry::new();

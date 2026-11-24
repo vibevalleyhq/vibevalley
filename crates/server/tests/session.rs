@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use serde_json::json;
 use vibevalley_core::empty_space_state;
 use vibevalley_protocol::{Caller, SessionEvent, ToolAction};
-use vibevalley_server::modules::work::session::{Journal, Trajectories};
+use vibevalley_server::work::session::{Journal, Trajectories};
 use vibevalley_server::{Hub, Server};
 
 fn line(e: &SessionEvent) -> String {
@@ -100,7 +100,7 @@ fn a_log_is_kept_read_back_and_only_grows() {
     vibevalley_i18n::set_locale("zh");
     let home = tempfile::tempdir().unwrap();
     let hub = Hub::new(empty_space_state());
-    let db = vibevalley_server::base::ServerDb::open(home.path()).unwrap();
+    let db = vibevalley_server::db::ServerDb::open(home.path()).unwrap();
     let tr = Trajectories::open(db, &hub);
     tr.with_log("w1", |j| {
         j.run_started("r7");
@@ -144,7 +144,7 @@ fn a_grown_step_is_pushed_once() {
     let home = tempfile::tempdir().unwrap();
     let hub = Hub::new(empty_space_state());
     let live = hub.live();
-    let db = vibevalley_server::base::ServerDb::open(home.path()).unwrap();
+    let db = vibevalley_server::db::ServerDb::open(home.path()).unwrap();
     let tr = Trajectories::open(db, &hub);
     tr.with_log("w9", |j| {
         j.said("好", &[]);

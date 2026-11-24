@@ -3,7 +3,7 @@ use std::{io::Cursor, path::Path, sync::Arc};
 use vibevalley_protocol::{BizCode, Caller, MediaInputPhase, MediaInputRequest};
 use vibevalley_server::{
     Hub,
-    modules::content::{
+    content::{
         attachment::Attachments,
         media::inputs::{self, Inputs},
     },
@@ -13,15 +13,9 @@ fn database(root: &Path) -> sqlx::SqliteConnection {
     vibevalley_runtime::rt::block_on(sqlx::sqlite::SqliteConnectOptions::new().filename(root.join("server.db")).connect()).unwrap()
 }
 
-fn setup() -> (
-    tempfile::TempDir,
-    Arc<vibevalley_server::base::ServerDb>,
-    Arc<Inputs>,
-    Arc<Attachments>,
-    Arc<Hub>,
-) {
+fn setup() -> (tempfile::TempDir, Arc<vibevalley_server::db::ServerDb>, Arc<Inputs>, Arc<Attachments>, Arc<Hub>) {
     let dir = tempfile::tempdir().unwrap();
-    let db = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
+    let db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
     let files = Attachments::open(dir.path(), db.clone());
     let inputs = Inputs::open(dir.path(), db.clone(), files.clone()).unwrap();
     let hub = Hub::new(vibevalley_core::empty_space_state());

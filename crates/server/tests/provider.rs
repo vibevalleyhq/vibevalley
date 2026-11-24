@@ -5,8 +5,8 @@ use std::sync::Arc;
 
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, ProviderUpdate};
-use vibevalley_server::modules::infra::provider::{Provider, connections_over};
-use vibevalley_server::modules::infra::setting::{Setting, SettingConfig};
+use vibevalley_server::infra::provider::{Provider, connections_over};
+use vibevalley_server::infra::setting::{Setting, SettingConfig};
 
 fn empty() -> Value {
     json!({ "revision": 0, "connections": [], "image": null, "understanding": null, "speech": null,
@@ -86,7 +86,7 @@ fn updates_keep_the_key_and_follow_revisions() {
         work_root: home.path().into(),
         ..Default::default()
     });
-    let p = Provider::new(setting.clone(), std::sync::Arc::new(vibevalley_server::modules::infra::http::Http));
+    let p = Provider::new(setting.clone(), std::sync::Arc::new(vibevalley_server::infra::http::Http));
     let first = p
         .update(&update(|u| u["speech"] = json!({ "connection": "moss", "model": "moss-tts-1.5-flash" })))
         .unwrap();

@@ -24,7 +24,7 @@ impl Drop for TestServer {
 fn spawn_server() -> TestServer {
     let dir = tempfile::tempdir().unwrap();
     let mut registry = vibevalley_runtime::oar::Registry::new();
-    registry.register(vibevalley_server::testing::helper());
+    registry.register(vibevalley_server::app::fakes::runtime::helper());
     let starters = [
         "fullstack",
         "architect",

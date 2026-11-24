@@ -18,9 +18,9 @@ use vibevalley_runtime::oar::{
     Capabilities, ContentBlock, Event, Installation, ModelInfo, PermissionDecision, Registry, Runtime, Session, SessionOptions, SessionStatus,
 };
 use vibevalley_server::Hub;
-use vibevalley_server::modules::collab::channel::Chat;
-use vibevalley_server::modules::work::issue::Board;
-use vibevalley_server::modules::work::ledger::{BoardConfig, BoardError};
+use vibevalley_server::collab::channel::Chat;
+use vibevalley_server::work::issue::Board;
+use vibevalley_server::work::ledger::{BoardConfig, BoardError};
 
 /// Opens a separate connection for assertions or SQLite failure injection.
 pub fn inspect_db(path: &Path) -> sqlx::SqliteConnection {

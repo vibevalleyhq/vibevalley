@@ -7,7 +7,7 @@ use vibevalley_core::empty_space_state;
 use vibevalley_core::progress::harvest_coins;
 use vibevalley_protocol::{Caller, CommitCount, Fact, FactProgressChanged, LedgerEntry, LedgerEntryHarvested};
 use vibevalley_server::Hub;
-use vibevalley_server::modules::skin::game::Game;
+use vibevalley_server::skin::game::Game;
 
 #[test]
 fn a_harvest_pays_by_its_commits_and_the_streak() {
@@ -24,7 +24,7 @@ fn the_ledger_folds_back_through_a_restart_and_skips_what_it_cannot_read() {
     let before = {
         let hub = Hub::new(empty_space_state());
         let game = Game::open(home.path(), &hub);
-        vibevalley_server::modules::skin::game::install(&hub, game.clone());
+        vibevalley_server::skin::game::install(&hub, game.clone());
         game.record(LedgerEntry::Harvested(LedgerEntryHarvested {
             at: 0,
             session: "w1".into(),
@@ -90,11 +90,11 @@ fn the_users_commits_are_counted_once_per_repository() {
     git(&["-c", "user.email=other@farm.test", "commit", "-q", "--allow-empty", "-m", "theirs"]);
     git(&["worktree", "add", "-q", "../farm.1", "-b", "issue-1"]);
     std::fs::create_dir_all(dir.path().join("a/node_modules/x/.git")).unwrap();
-    let counted = vibevalley_server::modules::work::repo::contributions_of(dir.path(), &[]);
+    let counted = vibevalley_server::work::repo::contributions_of(dir.path(), &[]);
     assert_eq!(counted.len(), 1, "{counted:?}");
     assert_eq!(counted[0].commits, 2);
     assert!(counted[0].path.ends_with("farm"), "{}", counted[0].path);
-    let with_other = vibevalley_server::modules::work::repo::contributions_of(dir.path(), &["Other@farm.test".into()]);
+    let with_other = vibevalley_server::work::repo::contributions_of(dir.path(), &["Other@farm.test".into()]);
     assert_eq!(with_other[0].commits, 3);
 
     let hub = Hub::new(empty_space_state());

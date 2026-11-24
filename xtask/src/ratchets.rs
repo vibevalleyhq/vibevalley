@@ -851,7 +851,7 @@ mod tests {
 
         let files = vec![
             sf(
-                "crates/server/src/base.rs",
+                "crates/server/src/db/mod.rs",
                 "pub fn a() { vibevalley_runtime::rt::block_on(async {}); }\npub fn b() { rt::block_on(async {}); }\n// rt::block_on(ignored_comment)\n#[cfg(test)]\nmod tests { fn c() { vibevalley_runtime::rt::block_on(async {}); } }",
             ),
             sf("crates/server/src/transport/http/mod.rs", "#[cfg(test)]\nmod tests;\n"),
@@ -874,8 +874,8 @@ mod tests {
         assert_eq!(
             violations[0].details,
             vec![
-                "crates/server/src/base.rs:1: pub fn a() { vibevalley_runtime::rt::block_on(async {}); }",
-                "crates/server/src/base.rs:2: pub fn b() { rt::block_on(async {}); }",
+                "crates/server/src/db/mod.rs:1: pub fn a() { vibevalley_runtime::rt::block_on(async {}); }",
+                "crates/server/src/db/mod.rs:2: pub fn b() { rt::block_on(async {}); }",
             ]
         );
     }

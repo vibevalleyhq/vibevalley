@@ -147,7 +147,7 @@ fn the_chat_through_its_endpoints() {
     started
         .test_internals()
         .chat
-        .post(vibevalley_server::modules::collab::channel::Posting {
+        .post(vibevalley_server::collab::channel::Posting {
             from: "orchestrator".into(),
             channel: gid.clone(),
             text: "收到 @用户".into(),
@@ -217,9 +217,9 @@ fn the_chat_through_its_endpoints() {
 
     // Everything is there when the chat opens again.
     let hub2 = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
-    let db2 = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
-    let files = vibevalley_server::modules::content::attachment::Attachments::open(dir.path(), db2.clone());
-    let chat = vibevalley_server::modules::collab::channel::Chat::open(db2, &hub2, files, None, false).unwrap();
+    let db2 = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
+    let files = vibevalley_server::content::attachment::Attachments::open(dir.path(), db2.clone());
+    let chat = vibevalley_server::collab::channel::Chat::open(db2, &hub2, files, None, false).unwrap();
     let list = chat.list().unwrap();
     assert_eq!(list[0].id, dev);
     assert_eq!(chat.history(&dev, None, None).unwrap().len(), 1);
@@ -232,7 +232,7 @@ fn the_chat_through_its_endpoints() {
 fn regression_send_key_thread_pages_and_observer_cursor_survive_sigkill() {
     use std::os::unix::process::ExitStatusExt;
     use std::process::Command;
-    use vibevalley_server::modules::collab::channel::DeliveryTargetKind;
+    use vibevalley_server::collab::channel::DeliveryTargetKind;
 
     const CHANNEL_CRASH_HOME: &str = "VV_TEST_CHANNEL_CRASH_HOME";
     let name = "channel::regression_send_key_thread_pages_and_observer_cursor_survive_sigkill";
@@ -329,7 +329,7 @@ fn regression_deleted_unread_user_mention_clears_inbox_slice() {
     let (msg, _) = started
         .test_internals()
         .chat
-        .post(vibevalley_server::modules::collab::channel::Posting {
+        .post(vibevalley_server::collab::channel::Posting {
             from: "orchestrator".into(),
             channel: gid,
             text: "请看一下 @用户".into(),

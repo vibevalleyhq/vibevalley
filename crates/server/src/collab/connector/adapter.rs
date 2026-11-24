@@ -1,0 +1,231 @@
+//! What a chat app is to the bridge: it signs an account in, hands over what
+//! the user says there, and takes the farm's words out. Each app keeps its
+//! own typed keys; the bridge holds them sealed, as one `Secret`.
+
+use std::future::Future;
+use std::pin::Pin;
+use std::time::Duration;
+
+use parking_lot::Mutex;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use tokio_util::sync::CancellationToken;
+use vibevalley_i18n::t;
+use vibevalley_protocol::{ConnectorID, ConnectorLogin, ConnectorState};
+
+use crate::infra::setting::Secret;
+
+/// One message of the outside chat.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Inbound {
+    /// Each is taken once; "" when the app names none.
+    pub id: String,
+    pub from: String,
+    pub text: String,
+    /// WeChat's context token, QQ's message id; "" for none.
+    pub reply: String,
+    /// The app's id of the message this one quotes; "" for none.
+    pub quoted: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FailedKind {
+    /// The app would not take it now (a closed reply window): tried again later.
+    Restricted,
+    /// The login is no longer good: the account rests.
+    Stale,
+    Failed,
+}
+
+/// Why an app did not do what it was asked. The message is what the user sees.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppFailed {
+    pub kind: FailedKind,
+    pub message: String,
+}
+
+impl AppFailed {
+    pub fn new(kind: FailedKind, message: impl Into<String>) -> AppFailed {
+        AppFailed { kind, message: message.into() }
+    }
+
+    pub fn failed(message: impl Into<String>) -> AppFailed {
+        AppFailed::new(FailedKind::Failed, message)
+    }
+}
+
+pub struct Linked<K> {
+    pub keys: K,
+    /// The user's id in the app; "" until the user pairs by a message.
+    pub user: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Progress {
+    pub state: ConnectorState,
+    /// The code to scan; "" while there is none.
+    pub qr: String,
+}
+
+pub struct LoginIo<'a> {
+    pub progress: &'a (dyn Fn(Progress) + Sync),
+    /// The verification code the user typed for this login; "" for none.
+    pub code: &'a (dyn Fn() -> String + Sync),
+}
+
+/// Takes what the app hands over, and how far it read (a cursor; "" for none).
+pub type Accept<'a> = dyn Fn(Vec<Inbound>, &str) -> Result<(), AppFailed> + Sync + 'a;
+
+pub struct Receiving<'a> {
+    pub cursor: String,
+    /// Kept durably before it returns: only then may the app consider them taken.
+    pub accept: &'a Accept<'a>,
+}
+
+/// Boxed `Send` future for dyn-dispatched [`App`] methods.
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+/// One chat app, with its own keys.
+pub trait Adapter: Send + Sync + 'static {
+    type Keys: Serialize + DeserializeOwned + Send + Sync;
+    const ID: ConnectorID;
+    /// In UTF-16 units; longer messages are cut.
+    const MAX_CHARS: usize;
+
+    fn login(&self, input: &ConnectorLogin, io: &LoginIo<'_>) -> impl Future<Output = Result<Linked<Self::Keys>, AppFailed>> + Send;
+    /// Until the connection ends: why it did.
+    fn receive(&self, keys: &Self::Keys, io: &Receiving<'_>) -> impl Future<Output = AppFailed> + Send;
+    /// The app's id of what was sent; "" when it names none.
+    fn send(&self, keys: &Self::Keys, to: &str, text: &str, reply: &str) -> impl Future<Output = Result<String, AppFailed>> + Send;
+}
+
+/// An adapter as the bridge holds it: async receive/send, its keys sealed.
+pub trait App: Send + Sync {
+    fn id(&self) -> ConnectorID;
+    fn max_chars(&self) -> usize;
+    fn reads(&self, keys: &Secret) -> bool;
+    /// Drives login until completion or cancellation (`None` when cancelled).
+    fn login<'a>(
+        &'a self,
+        input: &'a ConnectorLogin,
+        io: &'a LoginIo<'a>,
+        cancel: &'a CancellationToken,
+    ) -> BoxFuture<'a, Option<Result<Linked<Secret>, AppFailed>>>;
+    fn receive<'a>(&'a self, keys: &'a Secret, io: &'a Receiving<'a>) -> BoxFuture<'a, AppFailed>;
+    fn send<'a>(&'a self, keys: &'a Secret, to: &'a str, text: &'a str, reply: &'a str) -> BoxFuture<'a, Result<String, AppFailed>>;
+}
+
+fn unsealed<K: DeserializeOwned>(keys: &Secret) -> Result<K, AppFailed> {
+    serde_json::from_str(keys.expose()).map_err(|_| AppFailed::failed(t("server.connector.unreadSecrets", &[])))
+}
+
+impl<A: Adapter> App for A {
+    fn id(&self) -> ConnectorID {
+        A::ID
+    }
+
+    fn max_chars(&self) -> usize {
+        A::MAX_CHARS
+    }
+
+    fn reads(&self, keys: &Secret) -> bool {
+        unsealed::<A::Keys>(keys).is_ok()
+    }
+
+    fn login<'a>(
+        &'a self,
+        input: &'a ConnectorLogin,
+        io: &'a LoginIo<'a>,
+        cancel: &'a CancellationToken,
+    ) -> BoxFuture<'a, Option<Result<Linked<Secret>, AppFailed>>> {
+        Box::pin(async move {
+            let linked = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => return None,
+                done = Adapter::login(self, input, io) => done,
+            };
+            Some(linked.and_then(|l| {
+                let sealed = serde_json::to_string(&l.keys).map_err(|e| AppFailed::failed(e.to_string()))?;
+                Ok(Linked {
+                    keys: Secret::new(sealed),
+                    user: l.user,
+                })
+            }))
+        })
+    }
+
+    fn receive<'a>(&'a self, keys: &'a Secret, io: &'a Receiving<'a>) -> BoxFuture<'a, AppFailed> {
+        Box::pin(async move {
+            let keys = match unsealed::<A::Keys>(keys) {
+                Ok(k) => k,
+                Err(e) => return e,
+            };
+            Adapter::receive(self, &keys, io).await
+        })
+    }
+
+    fn send<'a>(&'a self, keys: &'a Secret, to: &'a str, text: &'a str, reply: &'a str) -> BoxFuture<'a, Result<String, AppFailed>> {
+        Box::pin(async move {
+            let keys = unsealed::<A::Keys>(keys)?;
+            Adapter::send(self, &keys, to, text, reply).await
+        })
+    }
+}
+
+/// Shared `reqwest::Client` reused across connector calls via `infra::http::pooled_client`.
+pub fn client() -> Result<reqwest::Client, AppFailed> {
+    crate::infra::http::pooled_client().cloned().map_err(AppFailed::failed)
+}
+
+struct CachedToken {
+    of: String,
+    token: String,
+    until: i64,
+}
+
+/// Caches one active credential-scoped token until 60 s before expiry.
+#[derive(Default)]
+pub(super) struct TokenCache(Mutex<Option<CachedToken>>);
+
+impl TokenCache {
+    pub(super) fn get(&self, of: &str, at: i64) -> Option<String> {
+        self.0.lock().as_ref().filter(|c| c.of == of && c.until > at).map(|c| c.token.clone())
+    }
+
+    pub(super) fn put(&self, of: String, token: String, at: i64, ttl_seconds: i64) {
+        *self.0.lock() = Some(CachedToken {
+            of,
+            token,
+            until: at + (ttl_seconds - 60) * 1000,
+        });
+    }
+}
+
+/// `work` with a deadline; past it, what `late` says.
+pub async fn timed<T>(within: Duration, late: impl FnOnce() -> AppFailed, work: impl Future<Output = Result<T, AppFailed>>) -> Result<T, AppFailed> {
+    match tokio::time::timeout(within, work).await {
+        Ok(done) => done,
+        Err(_) => Err(late()),
+    }
+}
+
+/// A vendor's id that may come as a 64-bit number or as text: kept as text.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct VendorId(pub String);
+
+impl<'de> serde::Deserialize<'de> for VendorId {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<VendorId, D::Error> {
+        #[derive(serde::Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Text(String),
+            Unsigned(u64),
+            Signed(i64),
+        }
+        Ok(VendorId(match Raw::deserialize(d)? {
+            Raw::Text(s) => s,
+            Raw::Unsigned(n) => n.to_string(),
+            Raw::Signed(n) => n.to_string(),
+        }))
+    }
+}

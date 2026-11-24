@@ -17,8 +17,8 @@ use serde_json::{Value, json};
 use tokio::sync::Notify;
 use tokio_tungstenite::tungstenite::{self, Message};
 use tokio_util::sync::{CancellationToken, DropGuard};
-use vibevalley_server::modules::collab::channel::{ChannelEvent, Posting};
-use vibevalley_server::modules::collab::connector::{Options, Vendors};
+use vibevalley_server::collab::channel::{ChannelEvent, Posting};
+use vibevalley_server::collab::connector::{Options, Vendors};
 use vibevalley_server::{Server, Started};
 
 const USER: &str = "o9cq80wkM5NnUserOfThisFarm@im.wechat";

@@ -9,7 +9,7 @@ use std::{
 use vibevalley_protocol::Caller;
 use vibevalley_server::{
     Server,
-    modules::infra::http::{Fetch, Request},
+    infra::http::{Fetch, Request},
 };
 
 struct Network {
@@ -21,7 +21,7 @@ struct Network {
 }
 impl Network {
     fn new() -> Network {
-        let (vendor, download) = vibevalley_server::offline::network();
+        let (vendor, download) = vibevalley_server::app::fakes::moss::network();
         let calls = Arc::new(Mutex::new(Vec::new()));
         let changed = Arc::new(Condvar::new());
         let seen = calls.clone();
@@ -109,7 +109,7 @@ fn input(s: &vibevalley_server::Started, kind: &str, mime: &str, name: &str, byt
     id
 }
 fn sample(s: &vibevalley_server::Started) -> String {
-    input(s, "audio", "audio/wav", "sample.wav", vibevalley_server::offline::wav(2880))
+    input(s, "audio", "audio/wav", "sample.wav", vibevalley_server::app::fakes::moss::wav(2880))
 }
 fn picture(s: &vibevalley_server::Started) -> String {
     let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
@@ -149,10 +149,10 @@ fn understanding(id: &str, revision: i64, input: &str, prompt: &str) -> Value {
 }
 type Tools = (
     Vec<Box<dyn vibevalley_runtime::agent::Tool>>,
-    Arc<parking_lot::Mutex<vibevalley_server::modules::team::tool::Route>>,
+    Arc<parking_lot::Mutex<vibevalley_server::team::tool::Route>>,
 );
 fn tools(s: &vibevalley_server::Started, channel: &str) -> Tools {
-    use vibevalley_server::modules::team::tool::{Route, held};
+    use vibevalley_server::team::tool::{Route, held};
     let route = Arc::new(parking_lot::Mutex::new(Route {
         agent: "orchestrator".into(),
         channel: channel.into(),

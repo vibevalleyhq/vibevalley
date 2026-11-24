@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-Loro 1.18.0 内容平面内核（[crates/core/src/collab/](crates/core/src/collab/mod.rs)）、服务端 CRDT Proxy（[collab.rs](crates/server/src/modules/content/artifact/collab.rs)）、纯内存 `PresenceHub`、`CollabDoc` 持久化 `Cursor` 建议、时间旅行、浅快照压缩与按 `origin` 选择性撤销已上线并沉淀至 [Artifact](docs/subsystems/artifact.md)。目前仍余三项进阶演进未落地：
+Loro 1.18.0 内容平面内核（[crates/core/src/collab/](crates/core/src/collab/mod.rs)）、服务端 CRDT Proxy（[collab.rs](crates/server/src/content/artifact/collab.rs)）、纯内存 `PresenceHub`、`CollabDoc` 持久化 `Cursor` 建议、时间旅行、浅快照压缩与按 `origin` 选择性撤销已上线并沉淀至 [Artifact](docs/subsystems/artifact.md)。目前仍余三项进阶演进未落地：
 
 1. **跨设备与远端 WASM/JS 同步协议未接通**：尚未暴露基于 `loro-crdt` WASM/JS 绑定的断线 Version Vector 差量同步接口。
 2. **逐 token 流式写入缺少微批合批窗口**：执行会话逐 token 流式改写 `LoroText` 时，缺少服务端 CRDT Proxy 短时间窗或语义块合批事务节流，高频写入可能放大事务与操作日志开销。
@@ -13,7 +13,7 @@ Loro 1.18.0 内容平面内核（[crates/core/src/collab/](crates/core/src/colla
 ## Proposal
 
 1. **远端差量同步与 `loro-crdt` WASM/JS 兼容**：在保留服务端 CRDT Proxy 与语义化 MCP 工具边界的前提下，为远端设备或跨端协同提供基于 Loro Version Vector 的增量更新导入/导出端点，避免整份快照往返。
-2. **CRDT Proxy 微批节流**：在 [collab.rs](crates/server/src/modules/content/artifact/collab.rs) 为高频流式文本写入引入短时间窗或语义块合并提交窗口，降低逐 token 元数据膨胀。
+2. **CRDT Proxy 微批节流**：在 [collab.rs](crates/server/src/content/artifact/collab.rs) 为高频流式文本写入引入短时间窗或语义块合并提交窗口，降低逐 token 元数据膨胀。
 3. **`VvWhiteboard` 本地副本直写**：在原生 `VvWhiteboard`（[whiteboard.rs](crates/rich/src/whiteboard.rs)）内维护进程内 Loro 副本实现拖拽零往返重绘，异步经进程内桥向服务端提交增量字节并按 Version Vector 补齐。
 
 ## Alternatives considered

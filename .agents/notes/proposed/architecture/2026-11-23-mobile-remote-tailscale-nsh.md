@@ -4,7 +4,7 @@ Status: proposed
 
 ## Problem
 
-受认证远程 HTTP/SSE 门（`crates/server/src/modules/infra/remote/`）、纯 Web Fetch 传输层（[transport.ts](packages/protocol/src/remote/transport.ts)）、Mac 设置页（[RemoteAccessPage.tsx](apps/mac/ui/features/setting/RemoteAccessPage.tsx)）、97 枚矢量图标生成（[icons.ts](scripts/gen/icons.ts)）以及支持折叠屏双栏自适应的 `apps/mobile` 4 标签原生外壳已落地并沉淀至 [核心状态与接口](docs/subsystems/core.md) 与 [客户端](docs/subsystems/app.md)。目前仍余两项移动端真机上线缺口：
+受认证远程 HTTP/SSE 门（`crates/server/src/infra/remote/`）、纯 Web Fetch 传输层（[transport.ts](packages/protocol/src/remote/transport.ts)）、Mac 设置页（[RemoteAccessPage.tsx](apps/mac/ui/features/setting/RemoteAccessPage.tsx)）、97 枚矢量图标生成（[icons.ts](scripts/gen/icons.ts)）以及支持折叠屏双栏自适应的 `apps/mobile` 4 标签原生外壳已落地并沉淀至 [核心状态与接口](docs/subsystems/core.md) 与 [客户端](docs/subsystems/app.md)。目前仍余两项移动端真机上线缺口：
 
 1. **移动端真机签名分发尚未接通**：`apps/mobile` 尚缺 iOS TestFlight / App Store 与 Android 签名发布打包流水线及真机深链配对回归。
 2. **后台唤醒与系统远程推送未接入**：应用进入后台、SSE 连接被系统挂起后，尚无面向待审批权限或 `@用户` 提及的系统推送唤醒。

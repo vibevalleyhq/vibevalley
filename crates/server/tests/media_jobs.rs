@@ -10,7 +10,7 @@ use std::{
 use tokio_util::sync::CancellationToken;
 use vibevalley_server::{
     Server,
-    modules::infra::http::{Fetch, FetchError, Request, Response},
+    infra::http::{Fetch, FetchError, Request, Response},
 };
 
 struct Backend {
@@ -319,7 +319,7 @@ fn image_request_refinements_prevent_submission() {
 #[test]
 fn orchestrator_image_tool_requires_user_intent_and_posts_once_to_its_channel() {
     use parking_lot::Mutex;
-    use vibevalley_server::modules::team::tool::{Route, held};
+    use vibevalley_server::team::tool::{Route, held};
     let dir = tempfile::tempdir().unwrap();
     let backend = Backend::new("ok");
     let s = start(dir.path(), backend);

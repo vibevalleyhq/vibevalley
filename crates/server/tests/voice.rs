@@ -8,10 +8,10 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, VoiceFix};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, Usage};
-use vibevalley_server::modules::collab::voice::moss::{Realtime, Verdict};
-use vibevalley_server::modules::collab::voice::{self, Voice};
-use vibevalley_server::modules::infra::http::{Fetch, FetchError, Request, Response};
-use vibevalley_server::modules::infra::setting::Secret;
+use vibevalley_server::collab::voice::moss::{Realtime, Verdict};
+use vibevalley_server::collab::voice::{self, Voice};
+use vibevalley_server::infra::http::{Fetch, FetchError, Request, Response};
+use vibevalley_server::infra::setting::Secret;
 
 struct Scripted {
     answers: Mutex<VecDeque<&'static str>>,

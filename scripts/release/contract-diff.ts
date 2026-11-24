@@ -7,6 +7,13 @@ export interface Changed {
   readonly removed: number;
 }
 
+const SERVER_DOMAINS = new Set(["work", "team", "collab", "content", "skin", "infra"]);
+
+function isServerDomainFile(p: string): boolean {
+  const parts = p.split("/");
+  return parts[0] === "crates" && parts[1] === "server" && parts[2] === "src" && SERVER_DOMAINS.has(parts[3] ?? "");
+}
+
 /** The contract: what other code is written against. */
 export const contractKinds: readonly { readonly kind: string; readonly is: (path: string) => boolean }[] = [
   {
@@ -15,15 +22,15 @@ export const contractKinds: readonly { readonly kind: string; readonly is: (path
   },
   {
     kind: "schema",
-    is: (p) => p === "crates/server/src/base/db.rs" || (p.startsWith("crates/server/src/modules/") && p.endsWith("store.rs")),
+    is: (p) => p === "crates/server/src/db/mod.rs" || (isServerDomainFile(p) && p.endsWith("store.rs")),
   },
 ];
 
 /** The area a path is in: a crate, an app or package's folder, a server module or a UI feature. */
 export function areaOf(path: string): string {
   const parts = path.split("/");
-  if (parts[0] === "crates" && parts[1] === "server" && parts[2] === "src" && parts[3] === "modules") {
-    const modName = parts[5] && parts[5] !== "mod.rs" ? parts[5] : parts[4];
+  if (parts[0] === "crates" && parts[1] === "server" && parts[2] === "src" && SERVER_DOMAINS.has(parts[3] ?? "")) {
+    const modName = parts[4] && parts[4] !== "mod.rs" ? parts[4] : parts[3];
     if (modName && modName !== "mod.rs") return `server/${modName.replace(/\.rs$/u, "")}`;
   }
   if (parts[0] === "apps" && parts[1] === "mac" && parts[2] === "ui" && parts[3] === "features" && parts.length > 4) return `mac/${parts[4]}`;
@@ -87,7 +94,20 @@ if (import.meta.main) {
   const base = at >= 0 ? process.argv[at + 1]! : "origin/main";
   const git = (...args: string[]) => execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   const changed = numstatOf(git("diff", "--numstat", "--no-renames", base, "HEAD"));
-  const serviceLines = git("diff", "--unified=0", base, "HEAD", "--", "crates/server/src/transport/api", "crates/server/src/modules")
+  const serviceLines = git(
+    "diff",
+    "--unified=0",
+    base,
+    "HEAD",
+    "--",
+    "crates/server/src/transport/api",
+    "crates/server/src/work",
+    "crates/server/src/team",
+    "crates/server/src/collab",
+    "crates/server/src/content",
+    "crates/server/src/skin",
+    "crates/server/src/infra",
+  )
     .split("\n")
     .filter((l) => (l.startsWith("+") || l.startsWith("-")) && !l.startsWith("+++") && !l.startsWith("---") && isServiceLine(l.slice(1))).length;
   process.stdout.write(markdownOf(summaryOf(changed, serviceLines)));

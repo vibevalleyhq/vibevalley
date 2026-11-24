@@ -48,7 +48,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 - `vp run docs:verify`：校验 Note、skill、文档链接、旧名字、用语表、词典与生成的参考表。
 - 帮工交付前，服务端运行工单 worktree 的 `.vibevalley/check`。脚本清除 `VIBEVALLEY_*` 和模型钥匙等环境变量，安装锁定版本的依赖，运行 `vp check --deny-warnings`。它按改动和新增文件选择 Rust、契约、SQL、页面和软件包的检查，最后运行 `docs:verify`。新 worktree 的 `.vibevalley/setup` 安装依赖并构建软件包声明。[仓库检查](.vibevalley/check)
 
-测试不连接真实模型：服务端的测试在 `crates/server/tests`，助手用替身模型，帮工用 oar 的 scripted 农机（`crates/server/src/testing.rs`）。页面的测试用 `nsh/test` 写在 `apps/mac/ui`，喂样例的 `Transport`；像素场景的测试在 `apps/mac/src/pixel/tests.rs`。
+测试不连接真实模型：服务端的测试在 `crates/server/tests`，助手用替身模型，帮工用 oar 的 scripted 农机（`crates/server/src/app/fakes/runtime.rs`）。页面的测试用 `nsh/test` 写在 `apps/mac/ui`，喂样例的 `Transport`；像素场景的测试在 `apps/mac/src/pixel/tests.rs`。
 
 CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`docs:verify`、脚本与软件包测试、`deadcode` 和官网构建。Rust 工作区和原生页面不在 CI 上查（macOS 机器一次要 16 到 44 分钟）：合并前在本机跑 `make verify`，它包含 `cargo xtask check`、`cargo xtask audit`、`cargo xtask protocol`、`vp run packages:check` 和 `vp run mac:build-test`。[CI 工作流](.github/workflows/ci.yml)
 

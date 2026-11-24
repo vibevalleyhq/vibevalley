@@ -17,8 +17,8 @@ use vibevalley_protocol::{
 };
 use vibevalley_runtime::oar::voyage::{Header as VoyageHeader, Kind as VoyageKind, Record as VoyageRecord, Writer as VoyageWriter};
 use vibevalley_runtime::oar::{Event as OarEvent, EventKind as OarEventKind, OarObserver, Registry, StopReason, Usage as OarUsage};
-use vibevalley_server::modules::work::ledger::Step;
 use vibevalley_server::transport::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver};
+use vibevalley_server::work::ledger::Step;
 use vibevalley_server::{ServerConfig, Started, start};
 
 static DEBUG_TEST_LOCK: Mutex<()> = Mutex::new(());

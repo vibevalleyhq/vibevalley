@@ -1,0 +1,1328 @@
+//! The orchestrator (VibeValley `modules/orchestrator/orchestrator.ts`): one
+//! assistant per orchestrator profile, each a durable conversation on
+//! `vibevalley-agent` (`Harness` / SQLite `execution.db`) holding the farm's
+//! tools. It subscribes to orchestrator-targeted dispatches from `Chat`; crons
+//! for no profile come to it too. Before each input it is shown the time and
+//! the farm (`situation`), or what changed since; its words are said in the
+//! place it answers.
+//!
+//! Inputs that come while it works wait and go in together as the next
+//! turn.
+
+mod execution;
+mod mcp;
+pub mod words;
+pub use execution::Execution;
+
+use std::collections::{HashMap, VecDeque};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Weak};
+
+use parking_lot::Mutex;
+use tokio::sync::Notify;
+use tokio::task::JoinHandle as TaskHandle;
+use tokio_util::sync::CancellationToken;
+use tracing::Instrument as _;
+use tracing::instrument::WithSubscriber as _;
+use vibevalley_i18n::t;
+use vibevalley_protocol::{
+    Actor, AgentRole, ApiError, BizCode, ChannelType, Doing, ExecutionPolicy, Fact, FactSessionChanged, FactSessionPhaseChanged, NoticeLevel,
+    ORCHESTRATOR_RUNTIME, OrchestratorEval, Outcome, Phase, PhaseResting, PhaseWorking, Session, SessionAction, SessionController, SessionEventType, ops,
+};
+use vibevalley_runtime::agent::extensions::governance::Permissions;
+use vibevalley_runtime::agent::extensions::memory::{MemoryPort, Remember, RewriteMemory};
+use vibevalley_runtime::agent::resources::skills::{LoadSkill, scan_skills, skill_index};
+use vibevalley_runtime::agent::{AgentEvent, Brain, Message, ModelClient, OpenAiClient, Tool, TurnOutcome, TypedToolAdapter};
+
+use self::words::Source;
+use crate::Hub;
+use crate::app::hub::ports::{CronOrchestratorPort, VoiceOrchestratorPort};
+use crate::app::hub::refusal::{LookIn, missing, refused};
+use crate::collab::channel::{Chat, Committed, DeliveryTargetKind, Picked, Posting, QueuedDelivery, actor_of, meta_of};
+use crate::content::artifact::Artifacts;
+use crate::now;
+use crate::team::agent::Agents;
+use crate::team::memory::Memories;
+use crate::team::tool::{Route, ToolBox, held};
+use crate::work::issue::Board;
+use crate::work::ledger::Step;
+use crate::work::repo::Repos;
+use crate::work::session::Trajectories;
+
+const DEFAULT_MODEL: &str = "deepseek-flash";
+/// `quotaLow`: a runtime with less left than this is nearly used up.
+const QUOTA_LOW: f64 = 15.0;
+const SKILLS: include_dir::Dir = include_dir::include_dir!("$CARGO_MANIFEST_DIR/assets/orchestrator/skills");
+
+/// One input to an orchestrator (`Handed`).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Input {
+    /// The orchestrator it is for; none is the place's.
+    pub agent: Option<String>,
+    /// The place it came from, where the answer goes.
+    pub channel: String,
+    pub source: Source,
+    /// The input's words, after the source's head.
+    pub line: String,
+    pub user: bool,
+    pub picked: Option<Picked>,
+    /// The messages it carries.
+    pub messages: Vec<String>,
+    /// The live answer waiting for this turn's words (`Orchestrator::answer`, `brief`).
+    pub port: Option<String>,
+}
+
+/// A live answer (VibeValley `response.ts`): the turn's words as they are
+/// said, ending with the turn. Dropped, it stops waiting.
+pub struct Reply {
+    id: String,
+    words: flume::Receiver<String>,
+    orchestrator: Weak<Orchestrator>,
+}
+
+impl Reply {
+    /// The next words, none once the turn is over or nothing came in `wait`.
+    pub fn next(&self, wait: std::time::Duration) -> Option<String> {
+        self.words.recv_timeout(wait).ok()
+    }
+
+    /// Everything said until the turn ends, or what came within `wait` of each other.
+    pub fn whole(&self, wait: std::time::Duration) -> String {
+        let mut said = vec![];
+        while let Some(words) = self.next(wait) {
+            said.push(words);
+        }
+        said.join("\n").trim().to_string()
+    }
+}
+
+impl Drop for Reply {
+    fn drop(&mut self) {
+        if let Some(o) = self.orchestrator.upgrade() {
+            o.ports.lock().remove(&self.id);
+        }
+    }
+}
+
+/// Messages heard but not woken for: shown with the next input (`digest`).
+#[derive(Default)]
+struct Waiting {
+    lines: Vec<String>,
+}
+
+struct Instance {
+    id: String,
+    queue: Mutex<VecDeque<()>>,
+    more: Arc<Notify>,
+    route: Arc<Mutex<Route>>,
+    /// The situation it was last shown whole; "" shows it whole again.
+    shown: Mutex<String>,
+    /// What it last said it cannot start for, per place.
+    cannot: Mutex<HashMap<String, String>>,
+    news: Mutex<Waiting>,
+}
+
+pub struct Orchestrator {
+    me: Weak<Orchestrator>,
+    hub: Weak<Hub>,
+    tools: Arc<ToolBox>,
+    agents: Arc<Agents>,
+    pub(super) chat: Arc<Chat>,
+    pub(super) board: Board,
+    repos: Arc<Repos>,
+    memories: Arc<Memories>,
+    pub(super) artifacts: Arc<Artifacts>,
+    home: PathBuf,
+    trajectories: Arc<Trajectories>,
+    key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
+    client: Option<Arc<dyn ModelClient>>,
+    instances: Mutex<HashMap<String, Arc<Instance>>>,
+    pub execution: Execution,
+    mcp: mcp::ProfileServers,
+    /// The live answers not yet taken by a turn.
+    ports: Mutex<HashMap<String, flume::Sender<String>>>,
+    chat_listener: Mutex<Option<(CancellationToken, TaskHandle<()>)>>,
+    closed: AtomicBool,
+}
+
+/// One turn the user marked wrong (`<home>/evals/<id>.json`).
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EvalCase {
+    id: String,
+    created_at: i64,
+    model: String,
+    want: String,
+    memory: String,
+    tools: Vec<String>,
+    before: Vec<Message>,
+    input: String,
+    did: Vec<Message>,
+    expect: Vec<String>,
+}
+
+/// What the model had in front of it before a turn: the last summary, then every message since.
+fn told_before(entries: &[execution::EvalEntry]) -> Vec<Message> {
+    let from = entries.iter().rposition(|e| matches!(e, execution::EvalEntry::Compacted { .. })).unwrap_or(0);
+    entries[from..]
+        .iter()
+        .map(|e| match e {
+            execution::EvalEntry::Compacted { summary } => Message::system(summary.clone()),
+            execution::EvalEntry::Message(message) => message.clone(),
+            execution::EvalEntry::TurnStarted { input } => Message::user(input.clone()),
+        })
+        .collect()
+}
+
+/// A turn's own messages, up to where the next turn starts.
+fn message_of_turn(entry: &execution::EvalEntry) -> Option<Option<Message>> {
+    match entry {
+        execution::EvalEntry::TurnStarted { .. } => None,
+        execution::EvalEntry::Message(message) => Some(Some(message.clone())),
+        execution::EvalEntry::Compacted { .. } => Some(None),
+    }
+}
+
+/// What the orchestrator is made with.
+pub struct Parts {
+    pub permissions: Permissions,
+    pub hub: Weak<Hub>,
+    pub tools: Arc<ToolBox>,
+    pub agents: Arc<Agents>,
+    pub chat: Arc<Chat>,
+    pub board: Board,
+    pub repos: Arc<Repos>,
+    pub memories: Arc<Memories>,
+    pub artifacts: Arc<Artifacts>,
+    pub home: PathBuf,
+    pub trajectories: Arc<Trajectories>,
+    /// The DeepSeek key, read at each turn.
+    pub key: Arc<dyn Fn() -> Option<String> + Send + Sync>,
+    /// Talks to this model instead of DeepSeek (tests).
+    pub client: Option<Arc<dyn ModelClient>>,
+    /// Whether to start listening to orchestrator-targeted dispatches from `chat` on open.
+    pub listen_chat: bool,
+}
+
+impl Orchestrator {
+    pub fn open(p: Parts) -> vibevalley_runtime::agent::durable::Result<Arc<Orchestrator>> {
+        let store = p.board.sessions().durable_store().clone();
+        let listen_chat = p.listen_chat;
+        let o = Arc::new_cyclic(|weak| Orchestrator {
+            me: weak.clone(),
+            execution: Execution::new(store, weak.clone(), p.permissions),
+            hub: p.hub,
+            tools: p.tools,
+            agents: p.agents,
+            chat: p.chat,
+            board: p.board,
+            repos: p.repos,
+            memories: p.memories,
+            artifacts: p.artifacts,
+            home: p.home,
+            trajectories: p.trajectories,
+            key: p.key,
+            client: p.client,
+            instances: Default::default(),
+            ports: Default::default(),
+            chat_listener: Default::default(),
+            mcp: Default::default(),
+            closed: AtomicBool::new(false),
+        });
+        for a in o.agents.profiles.orchestrators() {
+            o.keep_on_duty(&a);
+        }
+        let weak = Arc::downgrade(&o);
+        o.agents.profiles.when_kept(Arc::new(move |a: &vibevalley_protocol::Agent| {
+            if let Some(o) = weak.upgrade()
+                && a.role == AgentRole::Orchestrator
+            {
+                o.mcp.forget(&a.id);
+                o.keep_on_duty(a);
+            }
+            Ok(())
+        }));
+        // A turn the last process left unfinished is finished now.
+        o.execution.scheduler.recover()?;
+        for a in o.agents.profiles.orchestrators() {
+            if o.execution.has_inputs(&a.id)? {
+                o.instance(&a.id);
+            }
+        }
+        if listen_chat {
+            o.start_chat_listener();
+        }
+        Ok(o)
+    }
+
+    fn hub(&self) -> Option<Arc<Hub>> {
+        self.hub.upgrade()
+    }
+
+    pub fn ensure_open(&self) {
+        for a in self.agents.profiles.orchestrators() {
+            self.keep_on_duty(&a);
+        }
+    }
+
+    /// `keepOnDuty`: an orchestrator's standing session in the state.
+    fn keep_on_duty(&self, a: &vibevalley_protocol::Agent) {
+        let Some(hub) = self.hub() else { return };
+        let name = if a.name.trim().is_empty() {
+            t("server.channel.name.orchestrator", &[])
+        } else {
+            a.name.trim().to_string()
+        };
+        let kept = hub.read(|s| s.sessions.iter().find(|h| h.id == a.id).cloned());
+        if kept.as_ref().is_some_and(|k| k.name == name) {
+            return;
+        }
+        let at = now();
+        let session = match kept {
+            Some(k) => Session { name, ..k },
+            None => {
+                let mut s = Session::new(
+                    &a.id,
+                    SessionController::Orchestrator,
+                    name,
+                    ORCHESTRATOR_RUNTIME,
+                    ExecutionPolicy::SandboxDir,
+                    at,
+                );
+                s.profile = Some(a.id.clone());
+                s.brief = a.duty.clone();
+                s
+            }
+        };
+        hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at, session })]);
+    }
+
+    /// The orchestrator `agent` names, or the default one.
+    fn target(&self, agent: Option<&str>) -> String {
+        match agent {
+            Some(a) if self.agents.profiles.is_orchestrator(a) => a.to_string(),
+            _ => vibevalley_protocol::DEFAULT_ORCHESTRATOR.to_string(),
+        }
+    }
+
+    fn instance(self: &Arc<Self>, id: &str) -> Arc<Instance> {
+        let mut all = self.instances.lock();
+        if let Some(i) = all.get(id) {
+            return i.clone();
+        }
+        let me = Arc::new(Instance {
+            id: id.to_string(),
+            queue: Default::default(),
+            more: Arc::new(Notify::new()),
+            route: Arc::new(Mutex::new(Route {
+                channel: self.chat.default_channel(),
+                ..Route::default()
+            })),
+            shown: Default::default(),
+            cannot: Default::default(),
+            news: Default::default(),
+        });
+        all.insert(id.to_string(), me.clone());
+        let o = Arc::downgrade(self);
+        let i = me.clone();
+        let hub = self.hub();
+        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let fut = async move { Self::work_async(o, i, cancel).await };
+        if let Some(hub) = hub {
+            hub.spawn_task(fut);
+        } else {
+            vibevalley_runtime::rt::current_or_global_handle().spawn(fut.in_current_span().with_current_subscriber());
+        }
+        me
+    }
+
+    /// Hands an input to its orchestrator; false when it cannot take it.
+    pub fn hear(self: &Arc<Self>, input: Input) -> bool {
+        if self.closed.load(Ordering::Relaxed) {
+            return false;
+        }
+        let id = self.target(input.agent.as_deref());
+        let me = self.instance(&id);
+        let mut queue = me.queue.lock();
+        if let Err(error) = self.execution.enqueue(&id, &input) {
+            if let Some(hub) = self.hub() {
+                hub.notice(NoticeLevel::Error, error.to_string());
+            }
+            return false;
+        }
+        queue.push_back(());
+        drop(queue);
+        me.more.notify_one();
+        true
+    }
+
+    fn open_port(self: &Arc<Self>) -> Reply {
+        let id = uuid::Uuid::new_v4().to_string();
+        let (tx, words) = flume::unbounded();
+        self.ports.lock().insert(id.clone(), tx);
+        Reply {
+            id,
+            words,
+            orchestrator: Arc::downgrade(self),
+        }
+    }
+
+    /// `answerer("phone")`: the user's spoken words go into the chat as any
+    /// of theirs do, and the turn they wake is answered here as well.
+    pub fn answer(self: &Arc<Self>, text: &str) -> Result<Reply, vibevalley_protocol::ApiError> {
+        let reply = self.open_port();
+        self.chat.say(crate::collab::channel::Saying {
+            text: text.into(),
+            send_key: uuid::Uuid::new_v4().to_string(),
+            source: Some("voice".into()),
+            response_port: Some(reply.id.clone()),
+            voice_mode: Some("conversation".into()),
+            ..Default::default()
+        })?;
+        Ok(reply)
+    }
+
+    /// `brief`: a line from a call (what to tell the user, a question its
+    /// model passes on) put to the default orchestrator; none when it
+    /// cannot take it.
+    pub fn brief(self: &Arc<Self>, line: String) -> Option<Reply> {
+        let reply = self.open_port();
+        self.hear(Input {
+            agent: None,
+            channel: self.chat.default_channel(),
+            source: Source::Call,
+            line,
+            user: false,
+            picked: None,
+            messages: vec![],
+            port: Some(reply.id.clone()),
+        })
+        .then_some(reply)
+    }
+
+    /// Words it heard that did not wake it: shown with its next input.
+    pub fn overhear(self: &Arc<Self>, agent: Option<&str>, line: String) {
+        let id = self.target(agent);
+        self.instance(&id).news.lock().lines.push(line);
+    }
+
+    /// `stop`: ends its turn under way and drops what waits for it.
+    pub fn stop(&self, agent: Option<&str>) {
+        let id = self.target(agent);
+        let Some(me) = self.instances.lock().get(&id).cloned() else { return };
+        me.queue.lock().clear();
+        let _ = self.execution.stop(&id);
+    }
+
+    /// Subscribes to orchestrator-targeted deliveries from `self.chat` on the shared runtime
+    /// (plus replays any pending deliveries left from a prior process).
+    fn start_chat_listener(self: &Arc<Self>) {
+        let dispatches = self.chat.dispatches();
+        let o = Arc::downgrade(self);
+        let chat = self.chat.clone();
+        let hub = self.hub();
+        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let task_cancel = cancel.clone();
+        let fut = async move {
+            if let Some(o) = o.upgrade()
+                && let Ok(pending) = chat.pending_deliveries_async(DeliveryTargetKind::Orchestrator).await
+            {
+                for d in pending {
+                    if o.closed.load(Ordering::Acquire) {
+                        return;
+                    }
+                    o.handle_chat_delivery_async(&chat, &d, None).await;
+                }
+            }
+            loop {
+                let dispatched = tokio::select! {
+                    biased;
+                    _ = task_cancel.cancelled() => return,
+                    res = dispatches.recv_async() => match res {
+                        Ok(dispatched) => dispatched,
+                        Err(_) => return,
+                    },
+                };
+                let Some(o) = o.upgrade() else { return };
+                if o.closed.load(Ordering::Acquire) {
+                    return;
+                }
+                for d in &dispatched.deliveries {
+                    if d.recipient_kind == DeliveryTargetKind::Orchestrator {
+                        o.handle_chat_delivery_async(&chat, d, Some(&dispatched.committed)).await;
+                    }
+                }
+            }
+        };
+        let handle = if let Some(hub) = &hub {
+            hub.spawn_task(fut)
+        } else {
+            vibevalley_runtime::rt::current_or_global_handle().spawn(fut.in_current_span().with_current_subscriber())
+        };
+        let prev = self.chat_listener.lock().replace((cancel, handle));
+        if let Some((old_cancel, old_handle)) = prev {
+            old_cancel.cancel();
+            let reaper = async move {
+                let _ = old_handle.await;
+            };
+            if let Some(hub) = hub {
+                hub.spawn_task(reaper);
+            } else {
+                vibevalley_runtime::rt::current_or_global_handle().spawn(reaper);
+            }
+        }
+    }
+
+    async fn handle_chat_delivery_async(self: &Arc<Self>, chat: &Chat, d: &QueuedDelivery, committed: Option<&Arc<Committed>>) {
+        use crate::work::session::mailbox::{MailboxSource, MailboxStatus};
+
+        const HANDED_EMOJI: &str = "👀";
+        let sessions = self.board.sessions().clone();
+        if !chat.delivery_is_pending_async(d.id).await.unwrap_or(false) {
+            let msg_id = d.message_id.clone();
+            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+            return;
+        }
+        if !self.agents.profiles.is_orchestrator(&d.recipient_id) {
+            let _ = chat.settle_delivery_async(d.id, false).await;
+            return;
+        }
+        let owned;
+        let c = match committed {
+            Some(c) => c.as_ref(),
+            None => match chat.committed_of_async(&d.message_id).await.ok().flatten() {
+                Some(c) => {
+                    owned = c;
+                    &owned
+                }
+                None => {
+                    let msg_id = d.message_id.clone();
+                    let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+                    let _ = chat.withdraw_delivery_async(d.id).await;
+                    return;
+                }
+            },
+        };
+        if c.row.deleted_at.is_some() {
+            let msg_id = d.message_id.clone();
+            let _ = crate::spawn_blocking_traced(move || sessions.withdraw_mailbox_by_message(&msg_id)).await;
+            let _ = chat.withdraw_delivery_async(d.id).await;
+            return;
+        }
+        let m = chat.addressed_of(&c.row);
+        let line = words::orchestrator_lines(std::slice::from_ref(&m));
+        if !d.wakes {
+            self.overhear(Some(&d.recipient_id), line);
+            let _ = chat.settle_delivery_async(d.id, true).await;
+            return;
+        }
+        let mail_key = format!("orchestrator:{}:{}", d.recipient_id, d.message_id);
+        let recipient_id = d.recipient_id.clone();
+        let msg_id = d.message_id.clone();
+        let body = c.row.body.clone();
+        let sessions_for_claim = sessions.clone();
+        let key_for_claim = mail_key.clone();
+        let (mail_entry, claimed) = crate::spawn_blocking_traced(move || {
+            let mail_entry = sessions_for_claim
+                .enqueue_mailbox(&recipient_id, &key_for_claim, MailboxSource::ChannelOrchestrator, Some(&msg_id), &body)
+                .ok();
+            let claimed = sessions_for_claim.claim_mailbox_by_key(&key_for_claim).unwrap_or(false);
+            (mail_entry, claimed)
+        })
+        .await
+        .unwrap_or((None, false));
+        if !claimed
+            && mail_entry
+                .as_ref()
+                .is_some_and(|e| matches!(e.status, MailboxStatus::Withdrawn | MailboxStatus::Done | MailboxStatus::Claimed))
+        {
+            return;
+        }
+        let settle_id = mail_entry.as_ref().map(|e| e.id);
+        let actor = actor_of(&c.row.sender_kind, c.row.sender_agent.as_deref(), &c.row.sender_id, Some(&c.row.sender_name));
+        let meta = meta_of(c.row.meta.as_deref());
+        let from_user = matches!(actor, Actor::User { .. });
+        let mut picked_note = String::new();
+        if let Some(p) = &meta.picked {
+            if let Some(a) = p.agent.as_deref().and_then(|a| self.agents.profiles.agent(a)) {
+                picked_note += &words::picked_agent(&a.name);
+            }
+            if let Some(r) = &p.repo {
+                picked_note += &words::picked_repo(r);
+            }
+        }
+        let view_note = meta
+            .view_context
+            .as_ref()
+            .filter(|_| c.row.deleted_at.is_none())
+            .map(|vc| format!("{}\n", words::format_artifact_view_context(vc)))
+            .unwrap_or_default();
+        let text = c.row.body.trim();
+        let said = match meta.voice_mode.as_deref() {
+            Some("dictated") => format!("{picked_note}{view_note}{}{}", words::DICTATED, words::user_line(text)),
+            Some("conversation") => format!("{}\n{}", words::PROMPTS.voice, words::user_line(text)),
+            _ if from_user && (c.channel_type == ChannelType::Direct || c.row.channel_id == chat.default_channel()) => {
+                format!("{picked_note}{view_note}{}", words::user_line(text))
+            }
+            _ => format!("{picked_note}{}", words::chat_line(&m.target, &line)),
+        };
+        let input = Input {
+            agent: Some(d.recipient_id.clone()),
+            channel: c.row.channel_id.clone(),
+            source: if from_user { Source::User } else { Source::Chat },
+            line: said,
+            user: from_user,
+            picked: meta.picked.clone(),
+            messages: vec![c.row.id.clone()],
+            port: meta.response_port.clone(),
+        };
+        let o = self.clone();
+        let heard = crate::spawn_blocking_traced(move || o.hear(input)).await.unwrap_or(false);
+        if heard {
+            if let Some(id) = settle_id {
+                let sessions = sessions.clone();
+                let recipient = d.recipient_id.clone();
+                let _ = crate::spawn_blocking_traced(move || sessions.settle_mailbox(id, true, Some(&recipient))).await;
+            }
+            let _ = chat.settle_delivery_async(d.id, true).await;
+            if let Err(e) = chat.react_async(&c.row.id, &d.recipient_id, HANDED_EMOJI, true).await {
+                eprintln!("vibevalley-server: orchestrator: 👀: {}", e.message);
+            }
+        } else if !self.closed.load(Ordering::Acquire) {
+            if let Some(id) = settle_id {
+                let sessions = sessions.clone();
+                let _ = crate::spawn_blocking_traced(move || sessions.settle_mailbox(id, false, Some("rejected"))).await;
+            }
+            let _ = chat.settle_delivery_async(d.id, false).await;
+        }
+    }
+
+    pub async fn close_async(&self) {
+        self.closed.store(true, Ordering::Release);
+        let chat_listener = self.chat_listener.lock().take();
+        if let Some((cancel, handle)) = chat_listener {
+            cancel.cancel();
+            let _ = handle.await;
+        }
+        self.execution.close();
+        self.mcp.close();
+        self.ports.lock().clear();
+        for me in self.instances.lock().values() {
+            me.more.notify_waiters();
+        }
+    }
+
+    pub fn close(&self) {
+        vibevalley_runtime::rt::block_on(self.close_async());
+    }
+
+    fn model_of(&self, id: &str) -> Result<String, String> {
+        let configured = self.agents.profiles.agent(id).map(|a| a.model.trim().to_string()).unwrap_or_default();
+        if configured.is_empty() {
+            return Ok(DEFAULT_MODEL.into());
+        }
+        match configured.split_once('/') {
+            None => Ok(configured),
+            Some(("deepseek", m)) => Ok(m.to_string()),
+            Some(_) => Err(t("server.orchestrator.onlyDeepseek", &[("configured", configured.clone().into())])),
+        }
+    }
+
+    fn client(&self) -> Arc<dyn ModelClient> {
+        self.client.clone().unwrap_or_else(|| {
+            let key = self.key.clone();
+            Arc::new(OpenAiClient::deepseek(move || key()))
+        })
+    }
+
+    pub(crate) fn system_prompt_snapshot(&self, id: &str) -> String {
+        let home = self.home.join("agent").join(id);
+        let memory = self.memories.port(id, crate::team::memory::By::Orchestrator);
+        self.system_prompt(id, &home, memory.as_ref())
+    }
+
+    fn system_prompt(&self, id: &str, home: &std::path::Path, memory: &dyn MemoryPort) -> String {
+        let p = &*words::PROMPTS;
+        let profile = self.agents.profiles.agent(id);
+        let mut s = p.system.clone() + &p.agent;
+        if id != vibevalley_protocol::DEFAULT_ORCHESTRATOR
+            && let Some(a) = &profile
+        {
+            s += &words::identity_note(&a.name, &a.persona);
+        }
+        s = s.trim().to_string();
+        s += "\n\n";
+        s += &p.env.replace("{cwd}", &self.repos.root().display().to_string());
+        let skills = scan_skills(&[home.join("skills")]);
+        if !skills.is_empty() {
+            s += "\n\n";
+            s += &p.skills.replace("{skills}", &skill_index(&skills, 160));
+        }
+        let mem = memory.prompt();
+        if !mem.is_empty() {
+            s += "\n\n";
+            s += &p.memory.replace("{memory}", &mem);
+        }
+        s
+    }
+
+    /// Everything it can call: the farm's tools for where it is, its skills and its memory.
+    fn tools(&self, me: &Instance, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
+        self.tools_for(&me.id, &me.route, skills_dir, memory)
+    }
+
+    fn tools_for(&self, id: &str, route: &Arc<Mutex<Route>>, skills_dir: PathBuf, memory: Arc<dyn MemoryPort>) -> Vec<Box<dyn Tool>> {
+        let mut tools = held(&self.tools, route);
+        if let Some(profile) = self.agents.profiles.agent(id) {
+            tools.extend(self.mcp.tools(&profile));
+        }
+        let dirs = vec![skills_dir];
+        tools.push(Box::new(LoadSkill {
+            skills: Box::new(move || scan_skills(&dirs)),
+        }));
+        tools.push(Box::new(TypedToolAdapter(Remember(memory.clone()))));
+        tools.push(Box::new(TypedToolAdapter(RewriteMemory(memory))));
+        tools
+    }
+
+    /// Keeps the turn that answered step `on` of its log as a case to replay: what it had been told before, what it was
+    /// asked, what it did, and what the user says it should have done.
+    pub fn mark_wrong(self: &Arc<Self>, agent: Option<&str>, on: i64, want: &str) -> Result<OrchestratorEval, ApiError> {
+        let want = want.trim();
+        if want.is_empty() {
+            return Err(refused(BizCode::Refused, t("server.session.host.markNeedsWords", &[])));
+        }
+        let id = self.target(agent);
+        let label = self.agents.profiles.agent(&id).map(|a| a.name).unwrap_or_else(|| id.clone());
+        let log = self.trajectories.events(&id, None).unwrap_or_default();
+        let Some(asked) = log.iter().find(|e| e.seq == on) else {
+            return Err(missing(
+                t("server.session.host.noStep", &[("label", label.into()), ("on", on.into())]),
+                LookIn::Session,
+            ));
+        };
+        if asked.r#type != SessionEventType::UserMessage {
+            return Err(refused(
+                BizCode::Refused,
+                t("server.session.host.notAsked", &[("on", on.into()), ("label", label.into())]),
+            ));
+        }
+        // The same words asked twice are two turns: the one meant is as far along among them as its step is in the log.
+        let nth = log
+            .iter()
+            .filter(|e| e.seq < on && e.r#type == SessionEventType::UserMessage && e.text == asked.text)
+            .count();
+        let entries = self.execution.entries(&id).map_err(|e| refused(BizCode::Refused, e.to_string()))?;
+        let turns = entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| matches!(e, execution::EvalEntry::TurnStarted { input } if input.contains(&asked.text)));
+        let Some((at, execution::EvalEntry::TurnStarted { input })) = turns.clone().nth(nth).or_else(|| turns.clone().next_back()) else {
+            return Err(refused(
+                BizCode::Refused,
+                t("server.session.host.notInConversation", &[("on", on.into()), ("label", label.into())]),
+            ));
+        };
+        let model = self.model_of(&id).map_err(|e| refused(BizCode::Refused, e))?;
+        let me = self.instance(&id);
+        let memory = self.memories.port(&id, crate::team::memory::By::Orchestrator);
+        let case = EvalCase {
+            id: uuid::Uuid::now_v7().to_string(),
+            created_at: now(),
+            model,
+            want: want.into(),
+            memory: memory.prompt(),
+            tools: self
+                .tools(&me, self.home.join("agent").join(&id).join("skills"), memory)
+                .iter()
+                .map(|tool| tool.spec().name)
+                .collect(),
+            before: told_before(&entries[..at]),
+            input: input.clone(),
+            did: entries[at + 1..].iter().map_while(message_of_turn).flatten().collect(),
+            expect: vec![],
+        };
+        let dir = self.home.join("evals");
+        let file = dir.join(format!("{}.json", case.id));
+        let written = std::fs::create_dir_all(&dir).and_then(|()| {
+            use std::io::Write;
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut out = std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&file)?;
+            out.write_all(format!("{}\n", serde_json::to_string_pretty(&case).unwrap_or_default()).as_bytes())
+        });
+        written.map_err(|e| refused(BizCode::Refused, e.to_string()))?;
+        Ok(OrchestratorEval {
+            id: case.id,
+            file: file.to_string_lossy().into_owned(),
+        })
+    }
+
+    fn brain_at(&self, id: &str, route: &Arc<Mutex<Route>>, model: &str) -> Brain {
+        let home = self.home.join("agent").join(id);
+        let skills_dir = home.join("skills");
+        if !skills_dir.is_dir() {
+            let _ = std::fs::create_dir_all(&skills_dir);
+            let _ = SKILLS.extract(&skills_dir);
+        }
+        let memory = self.memories.port(id, crate::team::memory::By::Orchestrator);
+        let mut brain = Brain::new(self.client(), model, self.system_prompt(id, &home, memory.as_ref()));
+        brain.tools = self.tools_for(id, route, skills_dir, memory);
+        brain
+    }
+
+    async fn work_async(o: Weak<Orchestrator>, me: Arc<Instance>, cancel: CancellationToken) {
+        let span = tracing::debug_span!("orchestrator.work", agent_id = %me.id);
+        async move {
+            loop {
+                let ready = loop {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
+                    let Some(orch) = o.upgrade() else { return };
+                    if orch.closed.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    let notified = me.more.notified();
+                    tokio::pin!(notified);
+                    notified.as_mut().enable();
+                    {
+                        let mut q = me.queue.lock();
+                        if !q.is_empty() {
+                            q.clear();
+                            break true;
+                        }
+                    }
+                    let check_o = orch.clone();
+                    let check_id = me.id.clone();
+                    let saved = crate::spawn_blocking_traced(move || check_o.execution.has_inputs(&check_id).unwrap_or(false))
+                        .await
+                        .unwrap_or(false);
+                    drop(orch);
+                    if saved {
+                        break true;
+                    }
+                    tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => return,
+                        _ = tokio::time::timeout(std::time::Duration::from_secs(1), notified) => {}
+                    }
+                };
+                if !ready || cancel.is_cancelled() {
+                    return;
+                }
+                let Some(orch) = o.upgrade() else { return };
+                if orch.closed.load(Ordering::Relaxed) {
+                    return;
+                }
+                let inst = me.clone();
+                let orch_run = orch.clone();
+                let seen_ids = crate::spawn_blocking_traced(move || {
+                    if orch_run.closed.load(Ordering::Acquire) {
+                        return None;
+                    }
+                    let batch = match orch_run.execution.batch(&inst.id) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            if let Some(hub) = orch_run.hub() {
+                                hub.notice(NoticeLevel::Error, e.to_string());
+                            }
+                            return None;
+                        }
+                    };
+                    if !batch.is_empty() {
+                        Some(orch_run.turn(&inst, batch))
+                    } else {
+                        Some(Vec::new())
+                    }
+                })
+                .await
+                .ok()
+                .flatten();
+                let Some(seen_ids) = seen_ids else {
+                    return;
+                };
+                for id in seen_ids {
+                    let _ = orch.chat.mark_seen_async(&me.id, &id).await;
+                }
+            }
+        }
+        .instrument(span)
+        .await
+    }
+
+    /// The farm as it is shown before an input (`situation`).
+    fn situation(&self, channel: &str) -> String {
+        let mut agents = vec![];
+        for a in self.agents.profiles.agents() {
+            let assessed = self.agents.fleet.assess(&a);
+            let p = &assessed.agent;
+            let mut traits = vec![];
+            if !p.duty.is_empty() {
+                traits.push(format!("职责：{}", p.duty));
+            }
+            if !p.tags.is_empty() {
+                traits.push(format!("适合的活：{}", p.tags.join("、")));
+            }
+            let mut line = words::agent_line(&p.name, &p.id, &p.runtime, &traits.join("；"));
+            if p.enabled && assessed.blocking.is_empty() {
+                let info = assessed.info.as_ref();
+                let quota = info.and_then(|i| i.quota.as_ref());
+                let low = quota.and_then(|q| q.left.as_ref()).is_some_and(|l| l.get() < QUOTA_LOW);
+                let budget = info.and_then(|i| i.settings.daily_budget.as_ref()).map(|b| b.get()).unwrap_or(0.0);
+                let spent = info.and_then(|i| i.spent_today.as_ref()).map(|s| s.get());
+                line += &format!("；{}", words::quota_line(quota.map(|q| q.text.as_str()), low, spent, budget));
+            } else if let Some(b) = assessed.blocking.first() {
+                line += &words::blocked(&b.text);
+            } else {
+                line += words::DISABLED;
+            }
+            agents.push(line);
+        }
+        let roster = self.tools.roster();
+        let default = self.chat.default_channel();
+        let by_channel: Vec<String> = self
+            .chat
+            .channels()
+            .iter()
+            .map(|c| {
+                let theirs: Vec<String> = roster
+                    .iter()
+                    .filter(|h| h.channel_id().unwrap_or(default.as_str()) == c.id)
+                    .map(|h| self.tools.session_line(h))
+                    .collect();
+                let head = words::channel_line(&c.name, c.default, &c.description, &c.repo);
+                format!(
+                    "{head}\n{}",
+                    if theirs.is_empty() {
+                        words::NO_HELPERS.to_string()
+                    } else {
+                        theirs.join("\n")
+                    }
+                )
+            })
+            .collect();
+        let repos = self.repos.list();
+        let folders = if repos.is_empty() {
+            words::NO_REPOS.to_string()
+        } else {
+            repos.iter().map(|r| r.name.as_str()).collect::<Vec<_>>().join("、")
+        };
+        let (direct, target) = self.chat.address_of(channel);
+        words::whole(
+            &self.repos.root().display().to_string(),
+            &folders,
+            &agents.join("\n"),
+            &by_channel.join("\n"),
+            &if direct { words::direct(&target) } else { target },
+            &words::users_language(),
+        )
+    }
+
+    /// The whole input of a turn on `batch`.
+    fn input_of(&self, me: &Instance, batch: &[Input]) -> String {
+        let channel = batch.last().map(|i| i.channel.clone()).unwrap_or_default();
+        let situation = self.situation(&channel);
+        let shown = {
+            let mut was = me.shown.lock();
+            let delta = if was.is_empty() {
+                situation.clone()
+            } else {
+                words::situation_delta(&was, &situation)
+            };
+            *was = situation;
+            delta
+        };
+        let heard: Vec<String> = std::mem::take(&mut me.news.lock().lines);
+        let news = if heard.is_empty() { String::new() } else { words::news(&heard.join("\n")) };
+        let at = jiff::Timestamp::from_millisecond(now())
+            .unwrap_or_default()
+            .to_zoned_datetime(jiff::tz::TimeZone::system());
+        let time = at.strftime("%Y/%-m/%-d %H:%M").to_string();
+        let asked: Vec<String> = batch.iter().map(|i| format!("{}{}", i.source.head(), i.line)).collect();
+        [words::now_line(&time), shown, news, asked.join("\n\n")]
+            .into_iter()
+            .filter(|p| !p.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+
+    fn turn(&self, me: &Instance, pending: Vec<(String, Input)>) -> Vec<String> {
+        let (requests, batch): (Vec<_>, Vec<_>) = pending.into_iter().unzip();
+        let Some(last) = batch.last().cloned() else { return Vec::new() };
+        let route = Route {
+            agent: me.id.clone(),
+            channel: last.channel.clone(),
+            envelope: last.messages.last().cloned().unwrap_or_default(),
+            picked: batch
+                .iter()
+                .rev()
+                .find_map(|i| i.picked.as_ref().and_then(|p| p.agent.clone()))
+                .unwrap_or_default(),
+            user: batch.iter().any(|i| i.user),
+        };
+        // Taken now: a turn that cannot start ends them unanswered.
+        let ports: Vec<flume::Sender<String>> = {
+            let mut open = self.ports.lock();
+            batch.iter().filter_map(|i| i.port.as_ref().and_then(|p| open.remove(p))).collect()
+        };
+        *me.route.lock() = route.clone();
+        let cannot = |why: String| {
+            let _ = self.execution.finish_inputs(&requests, false, &serde_json::json!({"error":why}));
+            // The round is still in its log, failed: what it was told can be read and judged there.
+            let run = Run::new(self, me, &route);
+            run.asked(&self.input_of(me, &batch));
+            run.step(Step::RunEnded {
+                run: run.run.clone(),
+                outcome: Outcome::Failed,
+            });
+            run.phase(None);
+            let mut said = me.cannot.lock();
+            if said.get(&route.channel) != Some(&why) {
+                said.insert(route.channel.clone(), why.clone());
+                let _ = self.chat.post(Posting {
+                    from: me.id.clone(),
+                    channel: route.channel.clone(),
+                    text: why,
+                    run: None,
+                    send_key: String::new(),
+                    made: None,
+                    spoken: false,
+                });
+            }
+        };
+        if (self.key)().is_none_or(|k| k.trim().is_empty()) && self.client.is_none() {
+            cannot(t("server.orchestrator.noKey", &[]));
+            return Vec::new();
+        }
+        let model = match self.model_of(&me.id) {
+            Ok(m) => m,
+            Err(why) => {
+                cannot(t("server.orchestrator.cannotStart", &[("why", why.into())]));
+                return Vec::new();
+            }
+        };
+        me.cannot.lock().clear();
+        let text = self.input_of(me, &batch);
+        let mut run = Run::start(self, me, &route, format!("run-{}", requests[0]), Some(&model));
+        run.ports = ports;
+        run.asked(&text);
+        let input = execution::TurnInput {
+            requests: &requests,
+            batch: &batch,
+            text: &text,
+            model: &model,
+        };
+        let outcome = self.execution.run(&mut run, input);
+        if self.closed.load(Ordering::Acquire) {
+            return Vec::new();
+        }
+        run.finish(outcome);
+        batch.into_iter().flat_map(|i| i.messages).collect()
+    }
+}
+
+impl VoiceOrchestratorPort for Orchestrator {
+    fn brief(&self, line: String, wait: std::time::Duration) -> Option<String> {
+        let me = self.me.upgrade()?;
+        let reply = me.brief(line)?;
+        if wait.is_zero() { Some(String::new()) } else { Some(reply.whole(wait)) }
+    }
+}
+
+impl CronOrchestratorPort for Orchestrator {
+    fn hear_cron(&self, agent: &str, channel: &str, line: &str) -> bool {
+        let Some(me) = self.me.upgrade() else { return false };
+        me.hear(Input {
+            agent: Some(agent.to_string()),
+            channel: channel.to_string(),
+            source: Source::Cron,
+            line: line.to_string(),
+            user: false,
+            picked: None,
+            messages: vec![],
+            port: None,
+        })
+    }
+}
+
+/// One turn as the state, the log and the chat see it.
+struct Run<'a> {
+    o: &'a Orchestrator,
+    me: &'a Instance,
+    route: &'a Route,
+    run: String,
+    said: String,
+    calls: u64,
+    durable: bool,
+    /// The live answers this turn's words also go to, read out as they are.
+    ports: Vec<flume::Sender<String>>,
+    /// Per-turn `oar-voyage/3` JSONL recorder (`<home>/records/<id>.jsonl`).
+    recorder: Mutex<Option<vibevalley_runtime::oar::record::Recorder>>,
+    record_seq: std::sync::atomic::AtomicU64,
+}
+
+impl<'a> Run<'a> {
+    fn new(o: &'a Orchestrator, me: &'a Instance, route: &'a Route) -> Run<'a> {
+        Self::start(o, me, route, format!("run-{}", uuid::Uuid::now_v7()), None)
+    }
+
+    fn open_recorder(o: &Orchestrator, id: &str, model: Option<&str>) -> Option<vibevalley_runtime::oar::record::Recorder> {
+        let dir = o.home.join("records");
+        std::fs::create_dir_all(&dir).ok()?;
+        let path = dir.join(format!("{id}.jsonl"));
+        let file = vibevalley_runtime::oar::record::open_file(Some(&path)).ok()??;
+        vibevalley_runtime::oar::record::Recorder::start(Some(file), ORCHESTRATOR_RUNTIME, id, o.repos.root(), model)
+    }
+
+    fn start(o: &'a Orchestrator, me: &'a Instance, route: &'a Route, run: String, model: Option<&str>) -> Self {
+        let started = o
+            .trajectories
+            .events(&me.id, Some(&run))
+            .is_some_and(|steps| steps.iter().any(|step| step.r#type == SessionEventType::RunStart));
+        let recorder = Self::open_recorder(o, &me.id, model);
+        let r = Run {
+            o,
+            me,
+            route,
+            run,
+            said: String::new(),
+            calls: 0,
+            durable: false,
+            ports: vec![],
+            recorder: Mutex::new(recorder),
+            record_seq: std::sync::atomic::AtomicU64::new(0),
+        };
+        if !started {
+            r.step(Step::RunStarted { run: r.run.clone() });
+        }
+        r.phase(Some(SessionAction::Thinking));
+        r
+    }
+
+    fn step(&self, step: Step) {
+        self.o.trajectories.step(&self.me.id, "", step);
+    }
+
+    fn record_event(&self, event: &vibevalley_runtime::oar::Event) {
+        let mut slot = self.recorder.lock();
+        let Some(rec) = slot.as_mut() else { return };
+        let mut row = vibevalley_runtime::oar::voyage::Record::event(self.me.id.clone(), event);
+        row.seq = self.record_seq.fetch_add(1, Ordering::Relaxed);
+        row.span_id = self.run.clone();
+        let _ = rec.write(&row);
+    }
+
+    fn agent(&self, kind: vibevalley_runtime::oar::EventKind) {
+        let event = vibevalley_runtime::oar::Event {
+            seq: 0,
+            agent_path: vec![],
+            at_ms: now() as u64,
+            kind,
+        };
+        self.record_event(&event);
+        self.step(Step::Agent(event));
+    }
+
+    fn asked(&self, text: &str) {
+        let turn_started = vibevalley_runtime::oar::Event {
+            seq: 0,
+            agent_path: vec![],
+            at_ms: now() as u64,
+            kind: vibevalley_runtime::oar::EventKind::TurnStarted { prompt: text.into() },
+        };
+        self.record_event(&turn_started);
+        if self
+            .o
+            .trajectories
+            .events(&self.me.id, Some(&self.run))
+            .is_none_or(|events| !events.iter().any(|e| e.r#type == SessionEventType::UserMessage))
+        {
+            self.step(Step::Asked { text: text.into() });
+        }
+    }
+
+    fn phase(&self, doing: Option<SessionAction>) {
+        let Some(hub) = self.o.hub() else { return };
+        let at = now();
+        let since = hub.read(|s| {
+            s.sessions.iter().find(|h| h.id == self.me.id).and_then(|h| match &h.phase {
+                Phase::Working(w) => Some(w.since),
+                _ => None,
+            })
+        });
+        let phase = match doing {
+            Some(action) => Phase::Working(PhaseWorking {
+                since: since.unwrap_or(at),
+                quiet_since: None,
+                retry: None,
+                doing: Doing { action, label: String::new() },
+            }),
+            None => Phase::Resting(PhaseResting {}),
+        };
+        hub.apply(vec![Fact::SessionPhaseChanged(FactSessionPhaseChanged {
+            at,
+            id: self.me.id.clone(),
+            phase,
+            channel: Some(self.route.channel.clone()),
+            spent: None,
+            brief: None,
+        })]);
+    }
+
+    /// Says what it has written so far, as one message.
+    fn say(&mut self) {
+        let text = std::mem::take(&mut self.said);
+        if text.trim().is_empty() {
+            return;
+        }
+        for port in &self.ports {
+            let _ = port.send(text.clone());
+        }
+        if self.durable {
+            return;
+        }
+        if let Err(e) = self.o.chat.post(Posting {
+            from: self.me.id.clone(),
+            channel: self.route.channel.clone(),
+            text,
+            run: Some(self.run.clone()),
+            send_key: String::new(),
+            made: None,
+            spoken: !self.ports.is_empty(),
+        }) && let Some(hub) = self.o.hub()
+        {
+            hub.notice(NoticeLevel::Warn, e.message);
+        }
+    }
+
+    fn on(&mut self, e: AgentEvent) {
+        use vibevalley_runtime::oar::EventKind as K;
+        match e {
+            AgentEvent::TextDelta { delta } => {
+                if self.said.is_empty() {
+                    self.phase(Some(SessionAction::SpeakingText));
+                }
+                self.said.push_str(&delta);
+                self.agent(K::TextDelta { text: delta });
+            }
+            AgentEvent::ReasoningDelta { delta } => self.agent(K::ThinkingDelta { text: delta }),
+            AgentEvent::ToolStart { id, name, arguments } => {
+                self.say();
+                self.calls += 1;
+                self.phase(Some(SessionAction::Other));
+                let input = serde_json::from_str(&arguments).unwrap_or(serde_json::Value::String(arguments));
+                self.agent(K::ToolCallStarted { id, name, input });
+            }
+            AgentEvent::ToolEnd { id, name: _, output } => {
+                self.agent(K::ToolCallFinished {
+                    id,
+                    ok: !output.is_error,
+                    output: output.text,
+                });
+                self.phase(Some(SessionAction::Thinking));
+            }
+            AgentEvent::Error { message } => self.agent(K::Error { message }),
+            AgentEvent::AgentStart
+            | AgentEvent::TurnStart { .. }
+            | AgentEvent::ToolUpdate { .. }
+            | AgentEvent::PermissionRequested { .. }
+            | AgentEvent::SubagentSpawned { .. }
+            | AgentEvent::SubagentStatusChanged { .. }
+            | AgentEvent::Compacted { .. }
+            | AgentEvent::TurnEnd { .. }
+            | AgentEvent::AgentEnd { .. } => {}
+        }
+    }
+
+    fn finish(mut self, outcome: vibevalley_runtime::agent::Result<TurnOutcome>) {
+        self.say();
+        let outcome = match outcome {
+            Ok(TurnOutcome::Completed) => Outcome::Completed,
+            Ok(TurnOutcome::Aborted) => Outcome::Interrupted,
+            Ok(_) => Outcome::Failed,
+            Err(e) => {
+                if let Some(hub) = self.o.hub() {
+                    let label = self.o.agents.profiles.agent(&self.me.id).map(|a| a.name).unwrap_or_else(|| self.me.id.clone());
+                    hub.notice(
+                        NoticeLevel::Error,
+                        t("server.session.host.failed", &[("label", label.into()), ("why", e.to_string().into())]),
+                    );
+                }
+                Outcome::Failed
+            }
+        };
+        let stop_reason = match outcome {
+            Outcome::Completed => vibevalley_runtime::oar::StopReason::Completed,
+            Outcome::Interrupted => vibevalley_runtime::oar::StopReason::Aborted,
+            Outcome::Failed => vibevalley_runtime::oar::StopReason::Error,
+        };
+        self.record_event(&vibevalley_runtime::oar::Event {
+            seq: 0,
+            agent_path: vec![],
+            at_ms: now() as u64,
+            kind: vibevalley_runtime::oar::EventKind::TurnFinished {
+                reason: stop_reason,
+                usage: vibevalley_runtime::oar::Usage::default(),
+            },
+        });
+        self.step(Step::RunEnded {
+            run: self.run.clone(),
+            outcome,
+        });
+        self.phase(None);
+    }
+}
+
+pub fn install(hub: &Hub, o: Arc<Orchestrator>) {
+    let opened = o.clone();
+    hub.on_async::<ops::OrchestratorOpen, _, _>(move |_, ()| {
+        let opened = opened.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                opened.ensure_open();
+                Ok(())
+            })
+            .await
+            .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
+    });
+    let stopped = o.clone();
+    hub.on_async::<ops::OrchestratorStop, _, _>(move |_, input| {
+        let stopped = stopped.clone();
+        async move {
+            crate::spawn_blocking_traced(move || {
+                stopped.stop(input.agent.as_deref());
+                Ok(())
+            })
+            .await
+            .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
+    });
+    let approvals = o.clone();
+    hub.on_async::<ops::OrchestratorApprovalList, _, _>(move |_, input| {
+        let approvals = approvals.clone();
+        async move {
+            crate::spawn_blocking_traced(move || approvals.execution.approvals(input.conversation_id.as_deref()))
+                .await
+                .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
+    });
+    let decisions = o.clone();
+    hub.on_async::<ops::OrchestratorApprovalResolve, _, _>(move |_, input| {
+        let decisions = decisions.clone();
+        async move {
+            crate::spawn_blocking_traced(move || decisions.execution.resolve_approval(input))
+                .await
+                .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
+    });
+    hub.on_async::<ops::OrchestratorEvalCreate, _, _>(move |_, input| {
+        let o = o.clone();
+        async move {
+            crate::spawn_blocking_traced(move || o.mark_wrong(input.agent.as_deref(), input.on.0 as i64, &input.want))
+                .await
+                .map_err(|e| vibevalley_protocol::ApiError::new(vibevalley_protocol::BizCode::InternalError, e.to_string()))?
+        }
+    });
+}

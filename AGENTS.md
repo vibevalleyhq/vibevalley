@@ -12,13 +12,14 @@ crates/git/ · files/       仓库 Git 封装（vibevalley-git）与工作区文
 crates/runtime/            运行时与自研 agent（vibevalley-runtime）：rt（进程共享 Tokio 运行时）、oar/ 驱动（Claude Code、Codex、ACP、scripted；含基于 arc-swap 的零开销 OarObserver 与 oar-voyage/3 记录）与 agent/ 模型请求（DeepSeek，reqwest + backon）、持久执行引擎、工具、对话循环和内置 vibevalley 运行时
 crates/engines/            底层引擎：纯 Rust 正则（onig）、语法高亮（shiki）与图谱渲染（pele），供 crates/rich 使用
 crates/rich/               原生富内容组件与辅助（vibevalley-rich）：Markdown、代码块、图谱、画布、图表、GenUI 与拼音匹配（engine/ 含 canvas、chart、genui、pinyin）
-crates/server/             服务端（二进制 vibevalley-server）：src/modules 按 6 个业务域分组（work：issue、session、workplace、repo、cron、pull、ledger；
+crates/server/             服务端（二进制 vibevalley-server）：顶层分为 6 个业务域（work：issue、session、workplace、repo、cron、pull、ledger；
                            team：agent、orchestrator、memory、tool、mcp；collab：channel、connector、voice；
-                           content：attachment、library、media、artifact；skin：game；infra：setting、provider、http、column、debug、remote；
+                           content：attachment、library、media、artifact；skin：game；infra：setting、provider、http、debug、remote、machine；
                            任务板拆成 work/issue（状态与交付）、work/session（领域无关 AgentSession、session_mailbox 与游标轨迹 session_event）、work/workplace（worktree 与合并），都只经 work/ledger 写），
-                           src/db/{entities,migration}/ 集中管理双后端（SQLite + PostgreSQL）SeaORM 实体与迁移（含 shared 共享 seq_counter 与 infra_remote 远程配置/设备表），运行期经 ServerDb 的 read_conn()/write_conn() 读写；
-                           src/transport/ 收拢接口契约（api）、进程内桥（bridge）与 HTTP 门（http，含默认关闭的受认证远程监听门）；
-                           lib.rs 组装 Hub（含 EventBus、SliceFeed、CallerContext 与观察/故障/宿主调试/远程认证插槽），start.rs 起服务，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
+                           src/app/ 收拢运行时内核与装配（hub/ 含 Hub、EventBus、SliceFeed、SliceWakeGate、RuntimeInboxObserver、ports、refusal、ticker；bootstrap.rs 按 L0–L3 组装；fakes/{runtime,moss}.rs 为测试替身），
+                           src/db/ 集中管理 ServerDb、column.rs 序列化辅助与双后端（SQLite + PostgreSQL）SeaORM 实体与迁移（含 shared 共享 seq_counter 与 infra_remote 远程配置/设备表），
+                           src/transport/ 收拢接口契约（api）、进程内桥（bridge）与 HTTP 门（http，含默认关闭的受认证远程监听门），
+                           lib.rs 为薄 crate 门面，main.rs 读参数和环境；assets/ 是工具说明（tools/）、作品类型指南（artifact/types/）、主助手和执行会话的提示
 crates/cli/                命令行（二进制 vibevalley，clap）：按五大业务域（work/team/collab/content/infra）组织的纯 HTTP 客户端；评测另拆为可选二进制 vibevalley-eval（--features eval）
 apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳（src/shell/*）、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
                            crates/ 是桌面独占支撑 crate（pixel、terminal、workspace）；

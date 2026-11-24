@@ -8,7 +8,7 @@
 //! - Wrong scope (e.g. `remote:default` client token) -> HTTP 403 (`BizCode::Forbidden`);
 //!   requires `SCOPE_REMOTE_MACHINE` (`"remote:runtime"`).
 //! - Every text frame decodes into strongly typed `MachineWireFrame` at the door;
-//!   `MachineMcpRequest` tunnels through `Server::mcp()` with zero `crate::modules::*` imports.
+//!   `MachineMcpRequest` tunnels through `Server::mcp()` with zero `crate::*` imports.
 
 use std::sync::Arc;
 use std::time::Duration;

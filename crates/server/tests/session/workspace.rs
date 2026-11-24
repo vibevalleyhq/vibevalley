@@ -871,7 +871,7 @@ fn workspace_session_missing_reconnect_custom_cancel_and_board_room_isolation() 
         .test_internals()
         .board
         .sessions()
-        .dismiss(&sid, vibevalley_server::modules::work::workplace::Leave::Keep)
+        .dismiss(&sid, vibevalley_server::work::workplace::Leave::Keep)
         .unwrap();
     let miss = recv_until(&rx, "missing event after dismiss", |v| v["kind"] == "missing" && v["session"] == sid.as_str());
     assert_eq!(miss["session"], sid.as_str());

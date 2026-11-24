@@ -201,7 +201,7 @@ where
 
 async fn pump_slice_subscription(
     server: Arc<dyn Server>,
-    mut sub: crate::slice_feed::SliceSubscription,
+    mut sub: crate::app::hub::slice_feed::SliceSubscription,
     receipt: Arc<SliceReceipt>,
     revisions: Arc<AtomicU64>,
     outlet: Arc<dyn Outlet>,
@@ -483,9 +483,12 @@ impl Client {
                         rx,
                         cancel,
                         move |event| each_outlet.send(&each_name, json!({ "event": event })),
-                        move |_| {
+                        move |stopped| {
                             // Only a subscription still registered ended on the
                             // server's side; one the view stopped says nothing.
+                            if stopped {
+                                return;
+                            }
                             let Some(inner) = inner.upgrade() else { return };
                             let Some((_, mut pump)) = inner.lock().subs.remove(&key) else { return };
                             pump.server_sub = None;
@@ -523,9 +526,9 @@ impl Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        self.cancel.cancel();
         self.hub.clients.lock().remove(&self.client_key);
         let inner = std::mem::take(&mut *self.inner.lock());
+        self.cancel.cancel();
         for (_, (_, mut pump)) in inner.subs {
             if let Some(id) = pump.server_sub.take() {
                 self.hub.server.unsubscribe(id);
@@ -645,7 +648,7 @@ mod tests {
         fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
             self.inner.watch_slice(slice, after_seq, stop, receive)
         }
-        fn subscribe_slice(&self, slice: SliceKind) -> Option<crate::slice_feed::SliceSubscription> {
+        fn subscribe_slice(&self, slice: SliceKind) -> Option<crate::app::hub::slice_feed::SliceSubscription> {
             self.inner.subscribe_slice(slice)
         }
         fn live(&self) -> flume::Receiver<vibevalley_protocol::LiveEvent> {

@@ -11,8 +11,8 @@
 
 ## 2. `Hub::on_async` 与 `spawn_blocking_traced`
 
-- [ ] **I/O 型 RPC 与订阅默认走异步**：`Hub` 命令注册优先用 `Hub::on_async`（收 owned `AsyncCtx`），长订阅优先用 `Hub::on_subscription_async`（如 `crates/server/src/modules/work/session/mod.rs`、`crates/server/src/modules/collab/channel/service.rs`、`crates/server/src/modules/content/artifact/mod.rs`），避免每次 RPC 都无谓占用一个阻塞线程。
-- [ ] **阻塞工作只经 `spawn_blocking_traced`**：SQLite 同步查询、git 子进程、文件扫描或 CPU 密集计算需要离开异步 executor 时，必须通过 `crate::spawn_blocking_traced`（`crates/server/src/lib.rs`）派发，禁止裸调 `tokio::task::spawn_blocking` 或 `std::thread::spawn`，以免丢失 `tracing::Span::current()` 与 `trace_id`。
+- [ ] **I/O 型 RPC 与订阅默认走异步**：`Hub` 命令注册优先用 `Hub::on_async`（收 owned `AsyncCtx`），长订阅优先用 `Hub::on_subscription_async`（如 `crates/server/src/work/session/mod.rs`、`crates/server/src/collab/channel/service.rs`、`crates/server/src/content/artifact/mod.rs`），避免每次 RPC 都无谓占用一个阻塞线程。
+- [ ] **阻塞工作只经 `spawn_blocking_traced`**：SQLite 同步查询、git 子进程、文件扫描或 CPU 密集计算需要离开异步 executor 时，必须通过 `crate::spawn_blocking_traced`（`crates/server/src/app/hub/mod.rs`）派发，禁止裸调 `tokio::task::spawn_blocking` 或 `std::thread::spawn`，以免丢失 `tracing::Span::current()` 与 `trace_id`。
 - [ ] **不跨 `.await` 持同步锁**：检查所有 `std::sync::Mutex` / `RwLock` 守卫作用域，确保在任何 `.await` 之前已经 drop。
 
 ## 3. Axum Extractor 与统一 SSE / Range 流
@@ -24,13 +24,13 @@
 
 ## 4. 虚拟时钟与确定性生命周期（`start_paused`、`ManualClock`、`close_async`）
 
-- [ ] **异步定时测试禁睡墙钟**：涉及超时、退避、重试、心跳或节流的异步测试必须使用 `#[tokio::test(start_paused = true)]` + `tokio::time::advance(...)` + `tokio::task::yield_now().await`（参考 `crates/runtime/src/rt.rs`、`crates/server/src/lib.rs`、`crates/server/src/event_bus.rs`），不得依赖真实毫秒睡眠。
+- [ ] **异步定时测试禁睡墙钟**：涉及超时、退避、重试、心跳或节流的异步测试必须使用 `#[tokio::test(start_paused = true)]` + `tokio::time::advance(...)` + `tokio::task::yield_now().await`（参考 `crates/runtime/src/rt.rs`、`crates/server/src/app/hub/mod.rs`、`crates/server/src/app/hub/event_bus.rs`），不得依赖真实毫秒睡眠。
 - [ ] **业务时钟注入 `ManualClock`**：调度、巡查、过期窗口等逻辑必须经 `Arc<dyn Clock>` 读取时间，测试注入 `ManualClock`（`crates/core/src/clock.rs`），禁止直读 `SystemTime::now()`。
 - [ ] **生命周期关闭可瞬时排空**：启动了后台任务的 `Hub`、`EventBus`、`Remote` 等组件测试，收尾必须显式 `.await` `close_async()`，并验证在虚拟时钟下瞬时完成、无泄漏任务。
 
 ## 5. `loom` 并发状态机内核（`preemption_bound`、`--features loom`）
 
-- [ ] **无锁/原子核心隔离在 `loom_sync` 后**：原子 bitmask、水位线、状态流转内核（如 `crates/server/src/slice_wake.rs`、`crates/runtime/src/oar/acp/turn_state.rs`）通过 `loom_sync`（`crates/server/src/loom_sync.rs`）切换标准库与 `loom` 原语，确保模型直接覆盖生产状态机。
+- [ ] **无锁/原子核心隔离在 `loom_sync` 后**：原子 bitmask、水位线、状态流转内核（如 `crates/server/src/app/hub/slice_wake.rs`、`crates/runtime/src/oar/acp/turn_state.rs`）通过 `loom_sync`（`crates/server/src/app/hub/loom_sync.rs`）切换标准库与 `loom` 原语，确保模型直接覆盖生产状态机。
 - [ ] **配置 `preemption_bound` 的 `#[cfg(all(test, feature = "loom"))]` 模型**：`loom::model::Builder` 设置合理的 `preemption_bound = Some(2)`（或等价有界抢占），覆盖多生产者并发推进、唤醒合并（0 → 非 0 才 notify）、无丢失唤醒及水位不倒退等不变量。
 - [ ] **验证模型确实编过并跑通**：改了原子顺序（`Acquire`/`Release`/`AcqRel`）或状态迁移分支时，必须带 `--features loom` 执行 `loom` 检查，避免只跑常规 `cargo test` 漏掉 `loom_models`。
 

@@ -10,11 +10,11 @@ use vibevalley_core::{SliceMask, Transition, empty_space_state};
 use vibevalley_protocol::{Caller, CommitCount, Fact, FactProgressChanged, Issue, NoticeLevel, SliceKind, ops, subscriptions};
 use vibevalley_server::transport::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, FaultGate, HostDebugBridge, InvokeObserver};
 use vibevalley_server::transport::bridge::Outlet;
-use vibevalley_server::{Hub, Server, Sink, modules};
+use vibevalley_server::{Hub, Server, Sink};
 
 fn hub() -> Arc<Hub> {
     let hub = Hub::new(empty_space_state());
-    modules::install(&hub);
+    vibevalley_server::infra::install_health(&hub);
     hub
 }
 

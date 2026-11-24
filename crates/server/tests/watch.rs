@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use vibevalley_protocol::Caller;
 use vibevalley_runtime::oar::scripted::{Script, ScriptedRuntime};
 use vibevalley_runtime::oar::{Capabilities, Installation, ModelInfo, Runtime, Session, SessionOptions};
-use vibevalley_server::modules::collab::channel::DeliveryTargetKind;
+use vibevalley_server::collab::channel::DeliveryTargetKind;
 
 #[test]
 fn the_watch_routes_the_chat_to_a_session() {
@@ -359,7 +359,7 @@ fn pr2_direct_talk_reopen_passes_resume() {
 
 #[test]
 fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
-    use vibevalley_server::modules::work::session::mailbox::MailboxStatus;
+    use vibevalley_server::work::session::mailbox::MailboxStatus;
 
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();
@@ -440,7 +440,7 @@ fn pr2_deleted_channel_message_withdraws_pending_mailbox_before_claim() {
 
 #[test]
 fn regression_channel_delete_withdraws_pending_mailbox_by_source_message_across_direct_issue_and_orchestrator() {
-    use vibevalley_server::modules::work::session::mailbox::{MailboxSource, MailboxStatus};
+    use vibevalley_server::work::session::mailbox::{MailboxSource, MailboxStatus};
 
     vibevalley_i18n::set_locale("zh");
     let dir = tempfile::tempdir().unwrap();

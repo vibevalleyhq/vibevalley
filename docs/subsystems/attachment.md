@@ -1,6 +1,6 @@
 # 附件
 
-农场留下的一份文件（`Attachments`，`crates/server/src/modules/content/attachment/mod.rs`）：按内容的 SHA-256 存一次，有名字、媒体类型和大小。它不属于哪个用它的地方：消息带着附件的 id（界面叫「附件」），媒体任务的结果和输入是附件，网页 Artifact 的每一稿是一个附件，素材库的一条是一个附件加它的来路（界面叫「素材」）。农场只有这一处存文件的字节。
+农场留下的一份文件（`Attachments`，`crates/server/src/content/attachment.rs`）：按内容的 SHA-256 存一次，有名字、媒体类型和大小。它不属于哪个用它的地方：消息带着附件的 id（界面叫「附件」），媒体任务的结果和输入是附件，网页 Artifact 的每一稿是一个附件，素材库的一条是一个附件加它的来路（界面叫「素材」）。农场只有这一处存文件的字节。
 
 ## 管什么，不管什么
 
@@ -8,14 +8,14 @@
 |---|---|
 | `server.db` 的表 `attachment` 记名字、类型、大小；字节以 SHA-256 为键写在家目录的 `attachments/` 下 | 消息怎么带它、怎么画（[频道](docs/subsystems/channel.md)） |
 | 上传（`attachment.create`）：空的、超过上限的拒绝 | 生成和下载结果的任务（[媒体](docs/subsystems/media.md)） |
-| 按 id 读回字节和类型，经 `GET /api/v1/attachment/<id>` 带沙箱返回 | 素材的来路和列表（[素材库](docs/subsystems/media.md#素材库)，`crates/server/src/modules/content/library/mod.rs`） |
+| 按 id 读回字节和类型，经 `GET /api/v1/attachment/<id>` 带沙箱返回 | 素材的来路和列表（[素材库](docs/subsystems/media.md#素材库)，`crates/server/src/content/library.rs`） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
 | [附件实体](crates/server/src/db/entities/content_attachment.rs) | SeaORM 实体按哈希读取和首次写入元数据。相同哈希保留首次记录的名字和类型。 |
-| `crates/server/src/modules/content/attachment/mod.rs` | `Attachments`：`attach`（上传）、`keep`（这里做出来的字节）、`keep_staged`（媒体输入写在暂存目录、已算好哈希的大文件）、`of`（一组 id 的附件，缺一个就拒绝）、`file`、`path_of`；复用全局唯一 `ServerDb` 连接池（`crates/server/src/base.rs`）读写 `server.db` |
+| `crates/server/src/content/attachment.rs` | `Attachments`：`attach`（上传）、`keep`（这里做出来的字节）、`keep_staged`（媒体输入写在暂存目录、已算好哈希的大文件）、`of`（一组 id 的附件，缺一个就拒绝）、`file`、`path_of`；复用全局唯一 `ServerDb` 连接池（`crates/server/src/db/mod.rs`）读写 `server.db` |
 | `crates/server/src/transport/http/media.rs`、`crates/server/src/transport/http/mod.rs` | `GET /api/v1/attachment/<id>`（透传 `CallerContext` 经 `attachment.file` 鉴权并取路径，支持 `Authorization: Bearer` 与 `?token=`，以 `tokio::fs::File` 按 HTTP `Range` 分块流式返回）；`attachment.create` 走通用的命令入口 |
 | `crates/protocol/src/contract/attachment.rs`、`packages/protocol/src/attachment/` | `Attachment`、`AttachmentUpload`、`attachmentPath`、`attachmentMax`（Rust 为源，TS 形状由它生成） |
 

@@ -136,7 +136,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着像素农场的皮
 
 ### 农场的皮
 
-农场把上面的东西画成种地。这些词只在农场的画面（`apps/mac/src/pixel`）和游戏（`crates/server/src/modules/skin/game.rs`、账本、成就）里用，任务的状态、动作、拒绝、提醒、工具和主助手的话都不用；代码由 `scripts/docs/stale-names.ts` 查，词典由 `vpx scripts/gen/i18n.ts check` 查（皮的命名空间除外）。地长什么样见[农场的皮](docs/subsystems/farm.md)。
+农场把上面的东西画成种地。这些词只在农场的画面（`apps/mac/src/pixel`）和游戏（`crates/server/src/skin/game.rs`、账本、成就）里用，任务的状态、动作、拒绝、提醒、工具和主助手的话都不用；代码由 `scripts/docs/stale-names.ts` 查，词典由 `vpx scripts/gen/i18n.ts check` 查（皮的命名空间除外）。地长什么样见[农场的皮](docs/subsystems/farm.md)。
 
 | 农场里 | English | 实际是 | 代码里 |
 |---|---|---|---|

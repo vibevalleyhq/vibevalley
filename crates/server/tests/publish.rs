@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::json;
 use vibevalley_protocol::{BranchCheck, Caller, SubmitBranch};
-use vibevalley_server::modules::work::pull::{Answer, HostRun, Network, Publisher, hosted_origin};
+use vibevalley_server::work::pull::{Answer, HostRun, Network, Publisher, hosted_origin};
 
 fn git(cwd: &Path, args: &[&str]) -> String {
     let o = std::process::Command::new("git").current_dir(cwd).args(args).output().unwrap();
@@ -220,9 +220,9 @@ fn the_repos_check_runs_before_the_push() {
 fn only_the_user_publishes() {
     let dir = tempfile::tempdir().unwrap();
     let hub = vibevalley_server::Hub::new(vibevalley_core::empty_space_state());
-    let db = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
-    let pulls = vibevalley_server::modules::work::pull::Pulls::open(db, Arc::new(farm().publisher), None, None, None, None).unwrap();
-    vibevalley_server::modules::work::pull::install(&hub, pulls, None);
+    let db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
+    let pulls = vibevalley_server::work::pull::Pulls::open(db, Arc::new(farm().publisher), None, None, None, None).unwrap();
+    vibevalley_server::work::pull::install(&hub, pulls, None);
     let asked = json!({ "cwd": "/tmp", "branch": "fix", "sha": "0", "base": "main", "title": "t", "body": "" });
     let e = hub.call_as(Caller::Remote, "repo.pr.submit", asked);
     // The hub's `can` refuses it before the endpoint's own rule does.
@@ -389,7 +389,7 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
         .test_internals()
         .pulls
         .store()
-        .upsert(vibevalley_server::modules::work::pull::UpsertPullInput {
+        .upsert(vibevalley_server::work::pull::UpsertPullInput {
             platform: vibevalley_protocol::PublishPlatform::Github,
             repo: "acme/farm".into(),
             number: 8,

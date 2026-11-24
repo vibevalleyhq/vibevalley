@@ -7,7 +7,7 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, BlockCreate, BlockDelete, BlockUpdate, Caller, Envelope, SuggestionChange, SuggestionCreate, TextSpan};
 use vibevalley_server::Server;
-use vibevalley_server::modules::content::artifact::{Artifacts, Maker};
+use vibevalley_server::content::artifact::{Artifacts, Maker};
 
 fn start(dir: &std::path::Path) -> vibevalley_server::Started {
     let mut registry = vibevalley_runtime::oar::Registry::new();
@@ -578,7 +578,7 @@ fn blocks_are_written_together() {
     assert_eq!(mine.unwrap().status, vibevalley_protocol::BlockOpStatus::Applied);
 
     // What was written is there for a fresh reader of the same database.
-    let fresh_db = vibevalley_server::base::ServerDb::open(dir.path()).unwrap();
+    let fresh_db = vibevalley_server::db::ServerDb::open(dir.path()).unwrap();
     let reopened = Artifacts::open(fresh_db, started.test_internals().attachments.clone(), started.test_internals().chat.clone());
     assert_eq!(reopened.suggestions(&id).unwrap().len(), 4);
     assert_eq!(reopened.markdown(&id).unwrap(), "用户的字\n\n帮工改自己的\n");

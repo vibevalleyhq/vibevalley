@@ -196,7 +196,7 @@ pub struct MachineConnection {
 }
 
 /// Spine port connecting the `/api/v1/machine/ws` transport to the server's
-/// execution-layer machine manager without importing `crate::modules::*` into
+/// execution-layer machine manager without importing `crate::*` into
 /// `transport/`.
 pub trait MachineBus: Send + Sync + 'static {
     fn accept_connection(&self, conn: MachineConnection);
@@ -357,12 +357,12 @@ pub trait Server: Send + Sync + 'static {
         None
     }
     /// Direct `tokio::sync::watch` subscription for a domain slice when backed
-    /// by [`crate::slice_feed::SliceFeed`], avoiding blocking threads on SSE and bridge pumps.
-    fn subscribe_slice(&self, _slice: SliceKind) -> Option<crate::slice_feed::SliceSubscription> {
+    /// by [`crate::app::hub::slice_feed::SliceFeed`], avoiding blocking threads on SSE and bridge pumps.
+    fn subscribe_slice(&self, _slice: SliceKind) -> Option<crate::app::hub::slice_feed::SliceSubscription> {
         None
     }
     /// Asynchronous `tokio::sync::watch` subscription for a domain slice.
-    fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<crate::slice_feed::SliceSubscription>> {
+    fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<crate::app::hub::slice_feed::SliceSubscription>> {
         Box::pin(async move { crate::spawn_blocking_traced(move || self.subscribe_slice(slice)).await.ok().flatten() })
     }
     /// Current fault-injection gate, if attached.
