@@ -33,12 +33,12 @@
 
 ## 单数和复数
 
-名字用单数，除非值本身是一组：数组、`Map`、`Set`、一张列表、一个数，或返回好几个的接口和函数。复数说的是「好几个」，读的人会照着去遍历它；一个对象、一样东西用复数，就让读的人以为手里是一组。
+单个服务、Store、模块与结构体字段一律用单数；复数只用于集合、计数或返回列表的接口和函数（`issue.list`、`issues: Vec<Issue>`）。复数说的是「好几个」，读的人会照着去遍历它；一个服务、一个模块字段用复数，就让读的人以为手里是一组。
 
 | 复数是必要的 | 复数是多余的 |
 |---|---|
-| `issues: Issue[]`、`SpaceState.issues` | 服务 `Issue`（服务是一个，写 `Issue`） |
-| `issue.list`、`repo.list`（返回好几个） | 管一张表的存取对象 `Memory`（写 `MemoryStore`） |
+| `issues: Issue[]`、`issues: Vec<Issue>`、`SpaceState.issues` | 单个服务/Store：`IssueStore`、`AgentStore`、`RepoStore`、`CronStore`（不用 `Issues`、`Agents`、`Repos`、`Crons`） |
+| `issue.list`、`repo.list`（返回好几个） | 组合根与依赖字段：`app.issue`、`app.session`、`app.agent`（不用 `app.issues`、`app.agents`） |
 | `runsOf(session)`、`questionsOf(issue)`（返回好几个） | 只放一样东西的文件 `memories.ts`（写 `store.ts`） |
 | 一个数：`maxTasks`、`keepClosedIssues`、`autoRetries` | 返回一样东西的函数用复数名 |
 | 在内存里装着一组的：`Assignments`、`Deliveries`、`Trajectories` | |
@@ -81,11 +81,11 @@
 | 组件 | 大驼峰，一个组件一个文件 | `Board.tsx`、`IssueDetail.tsx` |
 | 其他文件 | 小驼峰 | `moves.ts`、`pageTests.test.ts` |
 | 测试 | 挨着被测的文件 | `outline.test.ts` |
-| 服务端模块对外的结构体 | 按它管的东西叫，不叫 `XService`、`XManager` | `Agents`、`Chat`、`Crons`、`Repos` |
+| 服务端模块对外的结构体 | 单数，按它管的东西或 `*Store` 叫，不用复数，不叫 `XService`、`XManager` | `IssueStore`、`AgentStore`、`RepoStore`、`CronStore`、`Chat` |
 | 带牌子的 id（页面） | `XId` | `IssueId`、`SessionId` |
 | 一组固定的取值 | 成员表 `XValues`，类型从它推；要每种都处理时用 `Record<X, …>` | `IssueStatusValues` |
 
-服务端模块和线上的形状撞名时，线上的形状用契约里的名字（`vibevalley_protocol::Issue`），模块的结构体用复数或它管的事；别的库撞名的，导入时起别名（`use … as`）。
+服务端模块和线上的形状撞名时，线上的形状用契约里的名字（`vibevalley_protocol::Issue`），模块内的服务或存取结构体用 `*Store`（如 `IssueStore`、`AgentStore`、`RepoStore`、`CronStore`）或模块路径（如 `issue::Store`）消歧，不用复数；组合根与依赖结构体字段同样用单数（`app.issue`、`app.session`、`app.agent`）；别的库撞名的，导入时起别名（`use … as`）。
 
 ## 线上和存盘的形状
 
