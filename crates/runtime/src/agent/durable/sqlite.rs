@@ -13,11 +13,3 @@ impl<'a> Sqlite<'a> {
         crate::rt::block_on(f(&mut self.0.borrow_mut()))
     }
 }
-
-pub(crate) fn optional<T>(row: sqlx::Result<T>) -> sqlx::Result<Option<T>> {
-    match row {
-        Ok(row) => Ok(Some(row)),
-        Err(sqlx::Error::RowNotFound) => Ok(None),
-        Err(err) => Err(err),
-    }
-}

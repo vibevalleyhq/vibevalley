@@ -434,7 +434,7 @@ fn approval_error(error: Error) -> ApiError {
         Error::Missing(_) => BizCode::OrchestratorNotFound,
         Error::Invalid(_) => BizCode::OrchestratorRefused,
         Error::Closed | Error::Timeout => BizCode::ServiceUnavailable,
-        Error::Commit(_) | Error::Sql(_) | Error::Json(_) => BizCode::InternalError,
+        Error::Commit(_) | Error::Db(_) | Error::Sql(_) | Error::Json(_) => BizCode::InternalError,
     };
     ApiError::new(code, error.to_string())
 }

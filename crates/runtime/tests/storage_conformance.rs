@@ -8,14 +8,15 @@ use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use sea_orm::ConnectionTrait;
 use serde_json::{Value, json};
 use tempfile::tempdir;
 use vibevalley_runtime::agent::core::engine::{BrainProvider, KIND as GENERATION_KIND, Request};
 use vibevalley_runtime::agent::core::tool::{Tool, ToolOutput};
 use vibevalley_runtime::agent::durable::conformance::{run_reopen_conformance, run_storage_conformance};
 use vibevalley_runtime::agent::durable::{
-    CommitStats, DocumentEvent, JsonlOptions, MemoryStorage, Result as DurableResult, SqliteStorage, StorageBackend, StorageRead, Store, TaskStatus,
-    WriteCallback,
+    CommitStats, DocumentEvent, JsonlOptions, MemoryStorage, Result as DurableResult, SeaOrmStorage, SqliteStorage, StorageBackend, StorageRead, Store,
+    TaskStatus, WriteCallback,
 };
 use vibevalley_runtime::agent::experiments::ExperimentFlags;
 use vibevalley_runtime::agent::extensions::OarPolicy;
@@ -35,6 +36,166 @@ fn sqlite_storage_passes_conformance() -> DurableResult<()> {
     let dir = tempdir().unwrap();
     let db = dir.path().join("server.db");
     run_reopen_conformance(|| Store::open(&db))?;
+    Ok(())
+}
+
+#[test]
+fn sea_orm_sqlite_storage_passes_conformance() -> DurableResult<()> {
+    run_storage_conformance(|| Ok(Store::from_backend(Arc::new(SeaOrmStorage::sqlite_memory()?))))?;
+    let dir = tempdir().unwrap();
+    let db = dir.path().join("seaorm.db");
+    run_reopen_conformance(|| Ok(Store::from_backend(Arc::new(SeaOrmStorage::open_sqlite(&db)?))))?;
+
+    // Verify Tx::transaction() / Tx::db_tx() runs in the same atomic transaction on SeaOrmStorage.
+    let store = Store::from_backend(Arc::new(SeaOrmStorage::open_sqlite(&db)?));
+    let res: DurableResult<()> = store.write(|tx| {
+        assert!(tx.sqlite_connection().is_none());
+        let db_tx = tx.transaction();
+        assert_eq!(db_tx.get_database_backend(), sea_orm::DbBackend::Sqlite);
+        tx.put_document("global", "seaorm-tx", "pi.aborted", &json!({"ok": false}))?;
+        Err(vibevalley_runtime::agent::durable::Error::Invalid("rollback".into()))
+    });
+    assert!(res.is_err());
+    assert!(store.read(|r| r.document("global", "seaorm-tx", "pi.aborted"))?.is_none());
+    store.close()?;
+    Ok(())
+}
+
+struct EphemeralPostgres {
+    data_dir: std::path::PathBuf,
+    pg_ctl: std::path::PathBuf,
+    port: u16,
+    _temp: tempfile::TempDir,
+}
+
+impl EphemeralPostgres {
+    fn start() -> Option<Self> {
+        let initdb = ["/opt/homebrew/bin/initdb", "/usr/local/bin/initdb"]
+            .into_iter()
+            .map(std::path::PathBuf::from)
+            .find(|p| p.is_file())?;
+        let pg_ctl = ["/opt/homebrew/bin/pg_ctl", "/usr/local/bin/pg_ctl"]
+            .into_iter()
+            .map(std::path::PathBuf::from)
+            .find(|p| p.is_file())?;
+
+        let temp = tempdir().ok()?;
+        let data_dir = temp.path().join("pgdata");
+        let sock_dir = temp.path().join("sock");
+        fs::create_dir_all(&sock_dir).ok()?;
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").ok()?;
+        let port = listener.local_addr().ok()?.port();
+        drop(listener);
+
+        let init = std::process::Command::new(&initdb)
+            .arg("-D")
+            .arg(&data_dir)
+            .args(["--username=postgres", "--auth=trust", "--encoding=UTF8", "--no-sync"])
+            .output()
+            .ok()?;
+        assert!(init.status.success(), "initdb failed: {}", String::from_utf8_lossy(&init.stderr));
+
+        let conf = format!(
+            "\nlisten_addresses = '127.0.0.1'\nport = {port}\nunix_socket_directories = '{}'\nfsync = off\nsynchronous_commit = off\nfull_page_writes = off\n",
+            sock_dir.display()
+        );
+        OpenOptions::new()
+            .append(true)
+            .open(data_dir.join("postgresql.conf"))
+            .unwrap()
+            .write_all(conf.as_bytes())
+            .unwrap();
+
+        let log = temp.path().join("postgres.log");
+        let start = std::process::Command::new(&pg_ctl)
+            .arg("-D")
+            .arg(&data_dir)
+            .arg("-l")
+            .arg(&log)
+            .args(["-w", "start"])
+            .output()
+            .ok()?;
+        assert!(
+            start.status.success(),
+            "pg_ctl start failed: {}\nlog:\n{}",
+            String::from_utf8_lossy(&start.stderr),
+            fs::read_to_string(&log).unwrap_or_default()
+        );
+
+        Some(Self {
+            data_dir,
+            pg_ctl,
+            port,
+            _temp: temp,
+        })
+    }
+
+    fn admin_url(&self) -> String {
+        format!("postgres://postgres@127.0.0.1:{}/postgres", self.port)
+    }
+
+    fn db_url(&self, db_name: &str) -> String {
+        format!("postgres://postgres@127.0.0.1:{}/{}", self.port, db_name)
+    }
+
+    fn create_database(&self, db_name: &str) {
+        let admin_url = self.admin_url();
+        let name = db_name.to_owned();
+        vibevalley_runtime::rt::block_on(async move {
+            use sea_orm::{ConnectionTrait, Database};
+            let db = Database::connect(&admin_url).await.expect("connect postgres admin db");
+            db.execute_unprepared(&format!("CREATE DATABASE \"{name}\""))
+                .await
+                .expect("create test database");
+            db.close().await.expect("close admin db");
+        });
+    }
+}
+
+impl Drop for EphemeralPostgres {
+    fn drop(&mut self) {
+        let _ = std::process::Command::new(&self.pg_ctl)
+            .arg("-D")
+            .arg(&self.data_dir)
+            .args(["-m", "immediate", "-w", "stop"])
+            .output();
+    }
+}
+
+#[test]
+fn sea_orm_postgres_storage_passes_conformance() -> DurableResult<()> {
+    let Some(pg) = EphemeralPostgres::start() else {
+        eprintln!("skipping sea_orm_postgres_storage_passes_conformance: Homebrew initdb/pg_ctl not found");
+        return Ok(());
+    };
+
+    let mut seq = 0usize;
+    run_storage_conformance(|| {
+        seq += 1;
+        let db_name = format!("durable_conf_{seq}");
+        pg.create_database(&db_name);
+        let store = Store::connect(&pg.db_url(&db_name))?;
+        assert_eq!(store.backend_kind(), "postgres");
+        Ok(store)
+    })?;
+
+    pg.create_database("durable_reopen");
+    let reopen_url = pg.db_url("durable_reopen");
+    run_reopen_conformance(|| Store::connect(&reopen_url))?;
+
+    // Verify Tx::transaction() executes inside the same PostgreSQL transaction as durable ops.
+    let store = Store::connect(&reopen_url)?;
+    let err: DurableResult<()> = store.write(|tx| {
+        assert!(tx.sqlite_connection().is_none());
+        let db_tx = tx.transaction();
+        assert_eq!(db_tx.get_database_backend(), sea_orm::DbBackend::Postgres);
+        tx.put_document("global", "pg-tx", "pi.aborted", &json!({"ok": false}))?;
+        Err(vibevalley_runtime::agent::durable::Error::Invalid("rollback".into()))
+    });
+    assert!(err.is_err());
+    assert!(store.read(|r| r.document("global", "pg-tx", "pi.aborted"))?.is_none());
+    store.close()?;
     Ok(())
 }
 
