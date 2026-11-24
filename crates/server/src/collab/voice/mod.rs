@@ -16,16 +16,18 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, ApiErrorDetail, BizCode, DEFAULT_ORCHESTRATOR, Millis, NoticeLevel, Validation, VoiceCall, VoiceFix, VoiceGrant, ops};
+use vibevalley_protocol::{ApiError, ApiErrorDetail, BizCode, DEFAULT_ORCHESTRATOR, Millis, NoticeLevel, Validation, VoiceCall, VoiceFix, VoiceGrant};
 
 use self::moss::{Realtime, Verdict};
-use crate::app::hub::ports::VoiceOrchestratorPort;
+use crate::app::live::LiveOverlay;
+use crate::app::port::VoiceOrchestratorPort;
+use crate::app::runtime::Runtime;
 use crate::collab::channel::{Chat, Picked, Posting, Saying};
 use crate::infra::http::Fetch;
 use crate::infra::provider::Use;
 use crate::infra::setting::{Secret, Setting};
+use crate::now;
 use crate::transport::api::{LiveVoiceLine, LiveVoicePort};
-use crate::{Hub, now};
 
 /// How long an unused grant stays valid before expiring.
 const GRANT_TTL_SECONDS: Millis = 3600;
@@ -52,7 +54,8 @@ fn failed(reason: impl Into<String>) -> ApiError {
 
 /// What the voice controller is built with.
 pub struct Parts {
-    pub hub: Weak<Hub>,
+    pub runtime: Arc<Runtime>,
+    pub live: Arc<LiveOverlay>,
     pub setting: Arc<Setting>,
     pub chat: Arc<Chat>,
     pub orchestrator: Arc<dyn VoiceOrchestratorPort>,
@@ -119,7 +122,8 @@ struct State {
 
 pub struct Voice {
     me: Weak<Voice>,
-    hub: Weak<Hub>,
+    runtime: Arc<Runtime>,
+    live: Arc<LiveOverlay>,
     setting: Arc<Setting>,
     chat: Arc<Chat>,
     orchestrator: Arc<dyn VoiceOrchestratorPort>,
@@ -147,7 +151,8 @@ impl Voice {
     pub fn open(p: Parts) -> Arc<Voice> {
         Arc::new_cyclic(|me| Voice {
             me: me.clone(),
-            hub: p.hub,
+            runtime: p.runtime,
+            live: p.live,
             setting: p.setting,
             chat: p.chat,
             orchestrator: p.orchestrator,
@@ -158,9 +163,7 @@ impl Voice {
     }
 
     fn warn(&self, what: &str, why: impl std::fmt::Display) {
-        if let Some(hub) = self.hub.upgrade() {
-            hub.notice(NoticeLevel::Warn, format!("{what}: {why}"));
-        }
+        self.live.publish_notice(now(), NoticeLevel::Warn, format!("{what}: {why}"));
     }
 
     fn stopped() -> ApiError {
@@ -296,22 +299,6 @@ impl Voice {
             .ok_or_else(|| failed(t("server.voice.hungUp", &[])))
     }
 
-    /// `voice.call.hear`: records what the MOSS Live session heard the user say in chat.
-    pub fn heard(&self, agent: &str, text: &str, picked: Option<&str>, send_key: Option<&str>) -> Result<(), ApiError> {
-        self.call(agent)?;
-        self.chat.say(Saying {
-            text: text.into(),
-            send_key: send_key.unwrap_or("").into(),
-            source: Some("voice".into()),
-            picked: picked.filter(|a| !a.is_empty()).map(|a| Picked {
-                agent: Some(a.into()),
-                repo: None,
-            }),
-            ..Default::default()
-        })?;
-        Ok(())
-    }
-
     pub async fn heard_async(&self, agent: &str, text: &str, picked: Option<&str>, send_key: Option<&str>) -> Result<(), ApiError> {
         self.call(agent)?;
         self.chat
@@ -340,18 +327,26 @@ impl Voice {
     }
 
     /// `voice.call.say`: records what the MOSS Live session said in chat; its greeting is skipped.
-    pub fn said(&self, agent: &str, text: &str) -> Result<(), ApiError> {
+    pub fn said(self: &Arc<Self>, agent: &str, text: &str) -> Result<(), ApiError> {
         let call = self.call(agent)?;
-        if text.trim() != call.greeting
-            && let Err(e) = self.chat.post(Posting {
-                from: DEFAULT_ORCHESTRATOR.into(),
-                channel: self.chat.default_channel(),
-                text: text.into(),
-                spoken: true,
-                ..Default::default()
-            })
-        {
-            self.warn("voice: the orchestrator's spoken words were not kept", e.message);
+        if text.trim() != call.greeting {
+            let voice = self.clone();
+            let text = text.to_string();
+            self.runtime.spawn(async move {
+                if let Err(e) = voice
+                    .chat
+                    .post_async(Posting {
+                        from: DEFAULT_ORCHESTRATOR.into(),
+                        channel: voice.chat.default_channel(),
+                        text,
+                        spoken: true,
+                        ..Default::default()
+                    })
+                    .await
+                {
+                    voice.warn("voice: the orchestrator's spoken words were not kept", e.message);
+                }
+            });
         }
         Ok(())
     }
@@ -437,18 +432,12 @@ impl Voice {
     /// Has the orchestrator answer `line` and reads its answer out on the call.
     fn tell(self: &Arc<Self>, agent: String, line: String) {
         let voice = self.clone();
-        let hub = self.hub.upgrade();
-        let task = move || {
-            let Some(said) = voice.orchestrator.brief(line, ANSWER_WAIT) else { return };
+        self.runtime.spawn(async move {
+            let Some(said) = voice.orchestrator.brief(line, ANSWER_WAIT).await else { return };
             if !said.is_empty() {
                 voice.speak_on(&agent, &said);
             }
-        };
-        if let Some(hub) = hub {
-            hub.spawn_blocking_task(task);
-        } else {
-            crate::spawn_blocking_traced(task);
-        }
+        });
     }
 
     /// `voice.moss.verify`: whether MOSS Live takes the bound account's key;
@@ -584,9 +573,8 @@ impl MossLine {
                 tools.in_flight += 1;
             }
             let (voice, shared, tools, out) = (self.voice.clone(), self.shared.clone(), self.tools.clone(), self.out.clone());
-            let hub = self.voice.hub.upgrade();
-            let task = move || {
-                let answer = voice.orchestrator.brief(call.question, ANSWER_WAIT).unwrap_or_default();
+            self.voice.runtime.spawn(async move {
+                let answer = voice.orchestrator.brief(call.question, ANSWER_WAIT).await.unwrap_or_default();
                 let answer = if answer.is_empty() { t("server.voice.moss.toolFailed", &[]) } else { answer };
                 let mut tools = tools.lock();
                 tools.in_flight -= 1;
@@ -595,12 +583,7 @@ impl MossLine {
                 }
                 tools.awaiting_ack.insert(call.call_id.clone());
                 let _ = out.send(moss::tool_output(&call.call_id, &answer));
-            };
-            if let Some(hub) = hub {
-                hub.spawn_blocking_task(task);
-            } else {
-                crate::spawn_blocking_traced(task);
-            }
+            });
         }
     }
 }
@@ -673,42 +656,15 @@ impl LiveVoicePort for Voice {
     }
 
     fn heard(&self, agent_id: &str, text: &str, turn: Option<&str>) -> Result<(), ApiError> {
-        Voice::heard(self, agent_id, text, None, turn)
+        vibevalley_runtime::rt::block_on(self.heard_async(agent_id, text, None, turn))
     }
 
     fn said(&self, agent_id: &str, text: &str) -> Result<(), ApiError> {
-        Voice::said(self, agent_id, text)
+        let me = self.me.upgrade().ok_or_else(Voice::stopped)?;
+        Voice::said(&me, agent_id, text)
     }
 
     fn stop(&self, agent_id: &str) {
         let _ = Voice::stop(self, agent_id);
     }
-}
-
-pub fn install(hub: &Hub, voice: Arc<Voice>) {
-    let v = voice.clone();
-    hub.on::<ops::VoiceGrantCreate>(move |_, ()| v.grant());
-    let v = voice.clone();
-    hub.on::<ops::VoiceCallStart>(move |_, s| v.start(&s.channel, &s.uid, s.about.as_deref()));
-    let v = voice.clone();
-    hub.on::<ops::VoiceCallStop>(move |_, c| v.stop(&c.agent_id));
-    let v = voice.clone();
-    hub.on_async::<ops::VoiceCallHear, _, _>(move |_, h| {
-        let v = v.clone();
-        async move { v.heard_async(&h.agent_id, &h.text, h.agent.as_deref(), h.send_key.as_deref()).await }
-    });
-    let v = voice.clone();
-    hub.on_async::<ops::VoiceHear, _, _>(move |_, h| {
-        let v = v.clone();
-        async move { v.heard_current_async(&h.text, h.agent.as_deref(), h.send_key.as_deref()).await }
-    });
-    let v = voice.clone();
-    hub.on_async::<ops::VoiceCallSay, _, _>(move |_, s| {
-        let v = v.clone();
-        async move { v.said_async(&s.agent_id, &s.text).await }
-    });
-    hub.on_async::<ops::VoiceMossVerify, _, _>(move |_, ()| {
-        let voice = voice.clone();
-        async move { Ok(voice.verify_moss_async().await) }
-    });
 }

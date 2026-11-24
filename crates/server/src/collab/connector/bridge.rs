@@ -17,13 +17,17 @@ use tracing::Instrument as _;
 use tracing::instrument::WithSubscriber as _;
 use vibevalley_core::channel::for_user;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus, Fact, FactConnectorChanged};
+use vibevalley_core::SliceMask;
+use vibevalley_protocol::{ApiError, ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus};
 
 use super::adapter::{App, AppFailed, FailedKind, Inbound, LoginIo, Progress, Receiving};
 use super::digest::{DIGEST_OVER, digest, is_pairing, short_id, split_text, user_line};
 use super::store::{Account, Store, StoreFailed};
+use crate::app::live::LiveOverlay;
+use crate::app::runtime::Runtime;
+use crate::app::slice::SliceProjector;
 use crate::collab::channel::{Chat, Saying};
-use crate::{Hub, now};
+use crate::now;
 
 /// WeChat's official client rests this long too.
 const STALE_PAUSE_MS: i64 = 60 * 60_000;
@@ -34,7 +38,9 @@ const IDLE: Duration = Duration::from_secs(60);
 pub struct Env {
     pub store: Store,
     pub chat: Arc<Chat>,
-    pub hub: Weak<Hub>,
+    pub runtime: Arc<Runtime>,
+    pub live: Arc<LiveOverlay>,
+    pub projector: Arc<SliceProjector>,
     /// What is held is tried again after this long, then twice as long after each try that fails, up to `retry_most`.
     pub retry_first: Duration,
     pub retry_most: Duration,
@@ -223,18 +229,22 @@ impl Bridge {
     }
 
     fn publish_status(&self, status: ConnectorStatus) {
-        let Some(hub) = self.env.hub.upgrade() else { return };
+        if self.closing() {
+            return;
+        }
         let mut told = self.told.lock();
         if told.as_ref() == Some(&status) {
             return;
         }
         *told = Some(status.clone());
         drop(told);
-        hub.apply(vec![Fact::ConnectorChanged(FactConnectorChanged { at: now(), status })]);
+        if self.env.live.upsert_connector(status) {
+            self.env.projector.mark_dirty(SliceMask::COLLAB);
+        }
     }
 
     async fn tell_async(&self) {
-        if self.env.hub.upgrade().is_none() {
+        if self.closing() {
             return;
         }
         let status = self.status_async().await;
@@ -686,15 +696,11 @@ impl Bridge {
     }
 
     fn child_cancel(&self) -> CancellationToken {
-        self.env.hub.upgrade().map(|h| h.child_token()).unwrap_or_default()
+        self.env.runtime.child_token()
     }
 
     fn spawn_task(&self, fut: impl Future<Output = ()> + Send + 'static) -> JoinHandle<()> {
-        if let Some(hub) = self.env.hub.upgrade() {
-            hub.spawn_task(fut)
-        } else {
-            vibevalley_runtime::rt::current_or_global_handle().spawn(fut.in_current_span().with_current_subscriber())
-        }
+        self.env.runtime.spawn(fut)
     }
 
     async fn stop_generation(current: &mut Option<Generation>) {

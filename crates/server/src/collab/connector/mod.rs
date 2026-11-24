@@ -26,14 +26,17 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::channel::for_user;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, BizCode, ConnectorID, ConnectorLogin, ConnectorStatus, ops};
+use vibevalley_protocol::{ApiError, BizCode, ConnectorID};
 
 use self::adapter::App;
 use self::bridge::{Bridge, Env, Handoff};
 use self::store::Store;
+use crate::app::live::LiveOverlay;
+use crate::app::runtime::Runtime;
+use crate::app::slice::SliceProjector;
 use crate::collab::channel::{ChannelEvent, Chat, to_message};
 use crate::db::ServerDb;
-use crate::{Hub, now};
+use crate::now;
 
 /// How long a message in or out is kept after it went through, for a reply to point at.
 const KEPT_MS: i64 = 30 * 24 * 60 * 60_000;
@@ -121,22 +124,22 @@ pub struct Connector {
     feed: Mutex<Option<(CancellationToken, JoinHandle<()>)>>,
 }
 
-/// Temporary compatibility alias for unowned callers until spine cutover.
-#[doc(hidden)]
-pub type Connectors = Connector;
-
 impl Connector {
-    /// Opens the accounts and goes on with those that are connected.
-    pub fn open(db: Arc<ServerDb>, hub: &Arc<Hub>, chat: Arc<Chat>, options: Options) -> Result<Arc<Connector>, ApiError> {
-        crate::collab::block_on(Self::open_async(db, hub, chat, options))
-    }
-
-    pub async fn open_async(db: Arc<ServerDb>, hub: &Arc<Hub>, chat: Arc<Chat>, options: Options) -> Result<Arc<Connector>, ApiError> {
+    pub async fn open_async(
+        db: Arc<ServerDb>,
+        runtime: &Arc<Runtime>,
+        live: Arc<LiveOverlay>,
+        projector: Arc<SliceProjector>,
+        chat: Arc<Chat>,
+        options: Options,
+    ) -> Result<Arc<Connector>, ApiError> {
         let store = Store::open(db);
         let env = Arc::new(Env {
             store,
             chat: chat.clone(),
-            hub: Arc::downgrade(hub),
+            runtime: runtime.clone(),
+            live,
+            projector,
             retry_first: options.retry_first,
             retry_most: options.retry_most,
             reconnect: options.reconnect,
@@ -159,11 +162,11 @@ impl Connector {
         for b in &bridges {
             b.load_async().await;
         }
-        let cancel = hub.child_token();
+        let cancel = runtime.child_token();
         let feed_cancel = cancel.clone();
         let events = chat.subscribe_events();
         let (feed_bridges, feed_env) = (bridges.clone(), env.clone());
-        let handle = hub.spawn_task(feed(feed_env, feed_bridges, events, feed_cancel));
+        let handle = runtime.spawn(feed(feed_env, feed_bridges, events, feed_cancel));
         for b in &bridges {
             if b.has_account() {
                 b.resume();
@@ -289,54 +292,9 @@ async fn feed(env: Arc<Env>, bridges: Vec<Arc<Bridge>>, mut events: broadcast::R
     }
 }
 
-fn app_of(id: &str) -> Result<ConnectorID, ApiError> {
+pub fn app_of(id: &str) -> Result<ConnectorID, ApiError> {
     ConnectorID::ALL
         .into_iter()
         .find(|c| c.as_str() == id)
         .ok_or_else(|| refused(t("server.connector.noConnector", &[("id", id.into())])))
-}
-
-pub fn install(hub: &Hub, connectors: Arc<Connector>) {
-    let c = connectors.clone();
-    hub.on_async::<ops::ConnectorList, _, _>(move |_, _| {
-        let c = c.clone();
-        async move { Ok(c.list_async().await) }
-    });
-    let c = connectors.clone();
-    hub.on_async::<ops::ConnectorLogin, _, _>(move |_, input| {
-        let c = c.clone();
-        async move {
-            let id = app_of(&input.id)?;
-            let login = ConnectorLogin {
-                force: input.force,
-                app_id: input.app_id,
-                secret: input.secret,
-            };
-            Ok(c.login_async(id, login).await)
-        }
-    });
-    let c = connectors.clone();
-    hub.on_async::<ops::ConnectorVerify, _, _>(move |_, input| {
-        let c = c.clone();
-        async move {
-            let id = app_of(&input.id)?;
-            Ok(c.verify_async(id, &input.code).await)
-        }
-    });
-    let c = connectors.clone();
-    hub.on_async::<ops::ConnectorLogout, _, _>(move |_, input| {
-        let c = c.clone();
-        async move {
-            let id = app_of(&input.id)?;
-            Ok(c.logout_async(id).await)
-        }
-    });
-    let c = connectors;
-    hub.on_async::<ops::ConnectorChannelSet, _, _>(move |_, input| {
-        let c = c.clone();
-        async move {
-            let id = app_of(&input.id)?;
-            c.set_channel_async(id, &input.channel).await
-        }
-    });
 }

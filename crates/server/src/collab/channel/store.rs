@@ -13,7 +13,7 @@ use super::types::{
 };
 use super::words::{self, Nameable};
 use super::{CALLERS_MAX, LAST_MAX, THREAD_TITLE_MAX, line_of};
-use crate::app::hub::refusal::{LookIn, internal, missing};
+use crate::app::refusal::{LookIn, internal, missing};
 use crate::content::attachment::AttachmentStore;
 use crate::now;
 

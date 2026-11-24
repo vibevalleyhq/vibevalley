@@ -19,7 +19,7 @@ mod types;
 pub mod words;
 
 pub use dispatch::{ChannelDispatched, DeliveryTargetKind, HeldBy, QueuedDelivery, Reason};
-pub use service::{direct_async, install, profile_id};
+pub use service::{direct_async, profile_id, seat_orchestrators_async, send_message_async};
 pub use store::Inner;
 pub use types::{
     AddressedMessage, ArtifactRef, ChannelEvent, Committed, FileAt, Info, Made, Meta, Note, Noticing, Picked, Place, Posting, ReadOptions, ReadResult, Saying,
@@ -33,8 +33,7 @@ use parking_lot::{Mutex, RwLock};
 use tokio::sync::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard, broadcast};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, BizCode, ChatMessage, DEFAULT_ORCHESTRATOR, Embed, Fact, FactChannelChanged, FactMessageChanged, FactUserMentionsChanged, QuotedBlock,
-    SubjectKind, USER_ID, UserMention,
+    ApiError, BizCode, Channel, ChatMessage, DEFAULT_ORCHESTRATOR, Embed, QuotedBlock, SliceMask, SubjectKind, USER_ID, UserMention,
 };
 
 use self::db::{EventRow, MsgRow, ParticipantRow};
@@ -43,11 +42,14 @@ use self::model::ChatModel;
 use self::store::{Q, WriteTx};
 use self::types::{Write, Written, new_id};
 use self::words::ChatTarget;
-use crate::app::hub::ports::{ChannelAnnouncePort, ChannelQuotePort};
-use crate::app::hub::refusal::{LookIn, internal, missing, refused as refuse};
+use crate::app::live::LiveOverlay;
+use crate::app::port::{ChannelAnnouncePort, ChannelMessageEvent, ChannelMessageEventsPort, ChannelQuotePort, MessageLocationsFuture};
+use crate::app::refusal::{LookIn, internal, missing, refused as refuse};
+use crate::app::runtime::Runtime;
+use crate::app::slice::SliceProjector;
 use crate::content::attachment::AttachmentStore;
 use crate::db::ServerDb;
-use crate::{Hub, now};
+use crate::now;
 
 const CHANNEL_EVENT_CAPACITY: usize = 1024;
 
@@ -81,7 +83,9 @@ type Seater = Arc<dyn Fn(&str) + Send + Sync>;
 
 /// The chat.
 pub struct Chat {
-    hub: Weak<Hub>,
+    runtime: Arc<Runtime>,
+    live: Arc<LiveOverlay>,
+    projector: Arc<SliceProjector>,
     db: Arc<ServerDb>,
     files: Arc<AttachmentStore>,
     /// Lock-free atomic snapshot of the committed in-memory [`ChatModel`],
@@ -93,7 +97,7 @@ pub struct Chat {
     me: Weak<Chat>,
     events: broadcast::Sender<ChannelEvent>,
     removals: broadcast::Sender<String>,
-    edited_messages: broadcast::Sender<ChatMessage>,
+    message_events: broadcast::Sender<ChannelMessageEvent>,
     dispatches: Mutex<Vec<flume::Sender<ChannelDispatched>>>,
     guards: RwLock<Vec<Guard>>,
     seaters: RwLock<Vec<Seater>>,
@@ -108,23 +112,13 @@ fn publish<T: Clone>(to: &Mutex<Vec<flume::Sender<T>>>, value: &T) {
 }
 
 impl Chat {
-    /// `makeChannelStore` + `makeChannelHub`: the user, the farm and the
-    /// default orchestrator seated, `#general` made on a new farm, the
-    /// places loaded, and the newest channels and the user's mentions put
-    /// in the state.
-    pub fn open(
+    /// Opens the chat store on `db`: ensures `user`, `system`, the default
+    /// orchestrator, and `#general` exist, then loads `ChatModel`.
+    pub async fn open_async(
         db: Arc<ServerDb>,
-        hub: &Arc<Hub>,
-        files: Arc<AttachmentStore>,
-        quoter: Option<Arc<dyn ChannelQuotePort>>,
-        embeds: bool,
-    ) -> Result<Arc<Chat>, ApiError> {
-        vibevalley_runtime::rt::block_on(Self::open_async(db, hub, files, quoter, embeds))
-    }
-
-    pub(in crate::collab) async fn open_async(
-        db: Arc<ServerDb>,
-        hub: &Arc<Hub>,
+        runtime: Arc<Runtime>,
+        live: Arc<LiveOverlay>,
+        projector: Arc<SliceProjector>,
         files: Arc<AttachmentStore>,
         quoter: Option<Arc<dyn ChannelQuotePort>>,
         embeds: bool,
@@ -173,9 +167,11 @@ impl Chat {
         let snapshot = Arc::new(ArcSwap::from_pointee(model.clone()));
         let (events, _events_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
         let (removals, _removals_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
-        let (edited_messages, _edited_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
-        let chat = Arc::new_cyclic(|me| Chat {
-            hub: Arc::downgrade(hub),
+        let (message_events, _message_events_rx) = broadcast::channel(CHANNEL_EVENT_CAPACITY);
+        Ok(Arc::new_cyclic(|me| Chat {
+            runtime,
+            live,
+            projector,
             db,
             files,
             snapshot: snapshot.clone(),
@@ -187,35 +183,57 @@ impl Chat {
             me: me.clone(),
             events,
             removals,
-            edited_messages,
+            message_events,
             dispatches: Mutex::default(),
             guards: RwLock::default(),
             seaters: RwLock::default(),
             embeds,
             quoter,
-        });
-        {
-            let model = chat.model();
-            let rconn = chat.db.read_conn();
-            let mut recent = db::recent_channels(rconn, KEEP_CHANNELS).await.q()?;
-            recent.reverse();
-            let mut facts = vec![];
-            for c in &recent {
-                facts.push(Fact::ChannelChanged(FactChannelChanged {
-                    at: now(),
-                    channel: model.counted_async(rconn, c).await?,
-                }));
-            }
-            hub.apply(facts);
-            chat.publish_user_mentions_async(&model).await?;
-        }
-        Ok(chat)
+        }))
     }
 
-    fn apply(&self, facts: Vec<Fact>) {
-        if let Some(hub) = self.hub.upgrade() {
-            hub.apply(facts);
+    pub fn runtime(&self) -> &Arc<Runtime> {
+        &self.runtime
+    }
+
+    pub fn subscribe_message_events(&self) -> broadcast::Receiver<ChannelMessageEvent> {
+        self.message_events.subscribe()
+    }
+
+    /// Projects the channel list + user mentions bundle for `SliceMask::COLLAB` / `state.get`.
+    pub async fn slice_chat_async(&self) -> Result<vibevalley_protocol::Chat, ApiError> {
+        let model = self.model();
+        let rconn = self.db.read_conn();
+        let mut recent = db::recent_channels(rconn, KEEP_CHANNELS).await.q()?;
+        recent.reverse();
+        let mut channels = Vec::with_capacity(recent.len());
+        for c in &recent {
+            let mut ch = model.counted_async(rconn, c).await?;
+            if let Some(published) = model.published_number(&ch.id)
+                && ch.last_number.unwrap_or(0) > published
+            {
+                ch.last_number = Some(published);
+            }
+            channels.push(ch);
         }
+        let user_mentions = self.user_mentions_snapshot_async().await?;
+        Ok(vibevalley_protocol::Chat { channels, user_mentions })
+    }
+
+    /// Projects active `@user` mentions for `SliceMask::INBOX` and `collab.chat`.
+    pub async fn user_mentions_snapshot_async(&self) -> Result<Vec<UserMention>, ApiError> {
+        let model = self.model();
+        let quiet = |id: &str| model.channel(id).is_some_and(|c| c.notify == "none");
+        let rows = db::user_mentions(self.db.read_conn()).await.q()?;
+        Ok(rows
+            .into_iter()
+            .filter(|r| !quiet(&r.row.channel_id) && !quiet(&r.top_id))
+            .map(|r| UserMention {
+                message: to_message(&r.row),
+                channel: r.top_id.clone(),
+                address: model.target_of_row(&r.channel_type, r.root_number, None, Some(&r.top_id), Some(&r.channel_name)),
+            })
+            .collect())
     }
 
     fn emit_event(&self, event: ChannelEvent) {
@@ -224,7 +242,7 @@ impl Chat {
                 let _ = self.removals.send(ev.message_id.clone());
             }
             ChannelEvent::Edited(message) => {
-                let _ = self.edited_messages.send(message.clone());
+                let _ = self.message_events.send(ChannelMessageEvent::Edited(message.clone()));
             }
             ChannelEvent::Posted(_) | ChannelEvent::Reacted(_) | ChannelEvent::Pinned(_) | ChannelEvent::UserRead { .. } => {}
         }
@@ -239,33 +257,15 @@ impl Chat {
         self.snapshot.load()
     }
 
-    /// `publishChannel`: the place as it stands into the state.
-    async fn publish_channel_async(&self, model: &ChatModel, id: &str) -> Result<(), ApiError> {
-        let Some(row) = model.channel(id) else { return Ok(()) };
-        let mut channel = model.counted_async(self.db.read_conn(), row).await?;
-        // A metadata change can read a message's number before the message's own fact is applied.
-        if let Some(published) = model.published_number(id)
-            && channel.last_number.unwrap_or(0) > published
-        {
-            channel.last_number = Some(published);
-        }
-        self.apply(vec![Fact::ChannelChanged(FactChannelChanged { at: now(), channel })]);
+    /// Marks `SliceMask::COLLAB` dirty after a channel mutation commits.
+    async fn publish_channel_async(&self, _model: &ChatModel, _id: &str) -> Result<(), ApiError> {
+        self.projector.mark_dirty(SliceMask::COLLAB);
         Ok(())
     }
 
-    async fn publish_user_mentions_async(&self, model: &ChatModel) -> Result<(), ApiError> {
-        let quiet = |id: &str| model.channel(id).is_some_and(|c| c.notify == "none");
-        let rows = db::user_mentions(self.db.read_conn()).await.q()?;
-        let mentions = rows
-            .into_iter()
-            .filter(|r| !quiet(&r.row.channel_id) && !quiet(&r.top_id))
-            .map(|r| UserMention {
-                message: to_message(&r.row),
-                channel: r.top_id.clone(),
-                address: model.target_of_row(&r.channel_type, r.root_number, None, Some(&r.top_id), Some(&r.channel_name)),
-            })
-            .collect();
-        self.apply(vec![Fact::UserMentionsChanged(FactUserMentionsChanged { at: now(), mentions })]);
+    /// Marks `SliceMask::COLLAB | SliceMask::INBOX` dirty after user mention / read-cursor changes.
+    async fn publish_user_mentions_async(&self, _model: &ChatModel) -> Result<(), ApiError> {
+        self.projector.mark_dirty(SliceMask::COLLAB | SliceMask::INBOX);
         Ok(())
     }
 
@@ -275,14 +275,20 @@ impl Chat {
             .filter(|c| c.r#type != "channel" && c.subject_kind.as_deref() == Some("issue"))
             .and_then(|c| c.subject_id.clone());
         let message = to_message(row);
-        self.apply(vec![Fact::MessageChanged(FactMessageChanged {
-            at: now(),
+        let has_user_mention = message.mentions.iter().any(|m| m == USER_ID);
+        let _ = self.message_events.send(ChannelMessageEvent::Posted {
             message,
-            thread,
+            thread_issue_id: thread,
             answers,
-        })]);
+        });
         inner.model.note_published(&row.channel_id, row.number);
         inner.publish_snapshot();
+        let mask = if has_user_mention {
+            SliceMask::COLLAB | SliceMask::INBOX
+        } else {
+            SliceMask::COLLAB
+        };
+        self.projector.mark_dirty(mask);
     }
 
     /// `readThrough`: a read that moves the cursor; the user's is told.
@@ -565,8 +571,8 @@ impl Chat {
         }
         let me = self.me.clone();
         let row = row.clone();
-        let hub = self.hub.upgrade();
-        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let runtime = self.runtime.clone();
+        let cancel = runtime.child_token();
         let fut = async move {
             let mut found: Vec<Embed> = Vec::new();
             for link in &links {
@@ -616,11 +622,7 @@ impl Chat {
                 chat.emit_event(ChannelEvent::Edited(message));
             }
         };
-        if let Some(hub) = hub {
-            hub.spawn_task(fut);
-        } else {
-            vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
-        }
+        runtime.spawn(fut);
     }
 
     /// Subscribes to removed message IDs without receiving other channel events.
@@ -739,14 +741,14 @@ impl ChannelAnnouncePort for Chat {
         Box::pin(Chat::history_async(self, channel, None, Some(limit)))
     }
 
-    fn message_locations<'a>(&'a self, ids: &'a [String]) -> crate::app::hub::ports::MessageLocationsFuture<'a> {
+    fn message_locations<'a>(&'a self, ids: &'a [String]) -> MessageLocationsFuture<'a> {
         Box::pin(async move { db::message_locations(self.db.read_conn(), ids).await.unwrap_or_default() })
     }
 }
 
-impl crate::app::hub::ports::ChannelMessageEventsPort for Chat {
-    fn subscribe_edited_messages(&self) -> broadcast::Receiver<ChatMessage> {
-        self.edited_messages.subscribe()
+impl ChannelMessageEventsPort for Chat {
+    fn subscribe_message_events(&self) -> broadcast::Receiver<ChannelMessageEvent> {
+        self.message_events.subscribe()
     }
 }
 
@@ -760,9 +762,13 @@ mod tests {
     async fn read_paths_bypass_write_mutex_and_use_wal_read_pool() {
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
-        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let runtime = Runtime::new();
+        let live = Arc::new(LiveOverlay::new());
+        let projector = Arc::new(SliceProjector::new());
         let files = AttachmentStore::open(dir.path(), db.clone());
-        let chat = Chat::open_async(db.clone(), &hub, files, None, false).await.unwrap();
+        let chat = Chat::open_async(db.clone(), runtime.clone(), live, projector, files, None, false)
+            .await
+            .unwrap();
         let gid = chat.default_channel();
 
         let (msg, _) = chat
@@ -809,40 +815,39 @@ mod tests {
 
         write_tx.rollback().await.unwrap();
         drop(_write_mutex_guard);
-        hub.close_async().await;
+        runtime.close_async().await;
         db.close_async().await;
     }
 
     #[tokio::test]
-    async fn async_channel_handlers_execute_on_hub_on_async_with_thread_idempotency() {
+    async fn async_channel_operations_and_thread_idempotency() {
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
-        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let runtime = Runtime::new();
+        let live = Arc::new(LiveOverlay::new());
+        let projector = Arc::new(SliceProjector::new());
         let files = AttachmentStore::open(dir.path(), db.clone());
-        let chat = Chat::open_async(db.clone(), &hub, files, None, false).await.unwrap();
-        let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
-        let agents = crate::team::agent::Agents::open(&hub, dir.path(), &[], registry, false).unwrap();
-        install(&hub, chat.clone(), agents, None);
-
-        use vibevalley_protocol::{Caller, ChannelMessageListInput, ChannelRequest, ChannelThreadCreateInput, SayRequest, ops};
-
-        let cid = hub
-            .invoke_as_async::<ops::ChannelCreate>(
-                Caller::User,
-                ChannelRequest {
-                    name: "async-room".into(),
-                    description: Some("native async room".into()),
-                    repo: None,
-                },
-            )
+        let chat = Chat::open_async(db.clone(), runtime.clone(), live.clone(), projector, files, None, false)
             .await
             .unwrap();
+        let registry = Arc::new(vibevalley_runtime::oar::Registry::new());
+        let agents = crate::team::agent::AgentStore::open(&runtime, live, dir.path(), &[], registry, false).unwrap();
+        service::seat_orchestrators_async(&chat, &agents).await;
 
-        hub.invoke_as_async::<ops::ChannelMessageSend>(
-            Caller::User,
+        use vibevalley_protocol::SayRequest;
+
+        let cid = chat
+            .open_channel_async("async-room", "native async room", "")
+            .await
+            .unwrap()
+            .id;
+
+        service::send_message_async(
+            &chat,
+            &agents,
             SayRequest {
                 id: cid.clone(),
-                text: "hello async hub".into(),
+                text: "hello async spine".into(),
                 send_key: Some("async-send-1".into()),
                 agent: None,
                 repo: None,
@@ -853,50 +858,24 @@ mod tests {
                 blocks: None,
                 view_context: None,
             },
+            None,
         )
         .await
         .unwrap();
 
-        let history = hub
-            .invoke_as_async::<ops::ChannelMessageList>(
-                Caller::User,
-                ChannelMessageListInput {
-                    id: cid.clone(),
-                    before: None,
-                    limit: Some(10),
-                },
-            )
-            .await
-            .unwrap();
+        let history = chat.history_async(&cid, None, Some(10)).await.unwrap();
         assert_eq!(history.len(), 1);
         let msg_id = history[0].id.clone();
 
-        let t1 = hub
-            .invoke_as_async::<ops::ChannelThreadCreate>(
-                Caller::User,
-                ChannelThreadCreateInput {
-                    id: msg_id.clone(),
-                    request_key: Some("thread-key-1".into()),
-                },
-            )
-            .await
-            .unwrap();
-        let t2 = hub
-            .invoke_as_async::<ops::ChannelThreadCreate>(
-                Caller::User,
-                ChannelThreadCreateInput {
-                    id: msg_id,
-                    request_key: Some("thread-key-1".into()),
-                },
-            )
-            .await
-            .unwrap();
+        let thread_once = Arc::new(crate::app::refusal::AsyncRequestKeys::<String>::default());
+        let t1 = thread_once.once(Some("thread-key-1"), chat.thread_under_async(&msg_id)).await.unwrap();
+        let t2 = thread_once.once(Some("thread-key-1"), chat.thread_under_async(&msg_id)).await.unwrap();
         assert_eq!(t1, t2);
 
-        let listed = hub.invoke_as_async::<ops::ChannelList>(Caller::User, ()).await.unwrap();
+        let listed = chat.list_async().await.unwrap();
         assert!(listed.iter().any(|c| c.id == cid));
 
-        hub.close_async().await;
+        runtime.close_async().await;
         db.close_async().await;
     }
 }

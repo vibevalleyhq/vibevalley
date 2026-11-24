@@ -11,10 +11,8 @@ use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, BizCode, Feature, KeySource, KeyStatus, LitFalse, LitTrue, Locale, MemorySource, MemorySourceKind, Missing, ProviderBinding, ProviderConnection,
-    ProviderConnectionAdapter, ProviderStatus, Readiness, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, SpacePaths, Validation, VoiceSettings, ops,
+    ProviderConnectionAdapter, ProviderStatus, Readiness, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, SpacePaths, Validation, VoiceSettings,
 };
-
-use crate::Hub;
 
 pub const MOSS: &str = "https://api.mosi.cn/v1";
 
@@ -648,17 +646,10 @@ fn write_private(file: &Path, text: &str) -> std::io::Result<()> {
     std::fs::rename(&tmp, file)
 }
 
-pub fn install(hub: &Hub, setting: Arc<Setting>) {
-    let s = setting.clone();
-    hub.on::<ops::SettingGet>(move |_, ()| Ok(s.status()));
-    let s = setting.clone();
-    hub.on::<ops::SettingValidate>(move |_, u| Ok(s.validate(&u)));
-    hub.on_async::<ops::SettingUpdate, _, _>(move |_, u| {
-        let setting = setting.clone();
-        async move {
-            crate::spawn_blocking_traced(move || setting.save(&u))
-                .await
-                .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
-        }
-    });
+    pub async fn save_async(self: &Arc<Self>, update: SettingsUpdate) -> Result<SettingsStatus, ApiError> {
+        let setting = self.clone();
+        crate::spawn_blocking_traced(move || setting.save(&update))
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+    }
 }

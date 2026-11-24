@@ -7,9 +7,7 @@ use std::time::Duration;
 
 use serde_json::Value;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{
-    ApiError, BizCode, ProviderModel, ProviderModelListing, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceListingVoices, ops,
-};
+use vibevalley_protocol::{ApiError, BizCode, ProviderModel, ProviderModelListing, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceListingVoices};
 
 use super::http::{Fetch, FetchError, Request, read_max};
 pub use super::setting::{
@@ -17,7 +15,6 @@ pub use super::setting::{
     VISION_MODELS, VOICE_DESIGN_MODELS,
 };
 use super::setting::{Secret, Setting};
-use crate::Hub;
 
 fn refuse(key: &str) -> ApiError {
     ApiError::new(BizCode::ProviderRefused, t(key, &[]))

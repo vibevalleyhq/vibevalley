@@ -5,8 +5,8 @@ use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    ApiError, Channel, ChannelEvent as ProtocolChannelEvent, ChannelUnread, ChannelUpdate, ChatMessage, DEFAULT_ORCHESTRATOR, Fact, FactChannelRemoved,
-    MessageKind, Notify, Preview, SubjectKind, USER_ID,
+    ApiError, Channel, ChannelEvent as ProtocolChannelEvent, ChannelUnread, ChannelUpdate, ChatMessage, DEFAULT_ORCHESTRATOR, MessageKind, Notify, Preview,
+    SliceMask, SubjectKind, USER_ID,
 };
 
 use super::db::{self, ChannelRow, DeliveryRow, EventRow, MsgRow, ParticipantRow};
@@ -18,7 +18,7 @@ use super::types::{
 };
 use super::words;
 use super::{CATCH_UP_MAX, Chat, FIRST_CHANNEL, LOG_KEEP, NO_NUMBER, READ_LIMIT, THREAD_TITLE_MAX, no_channel, refused};
-use crate::app::hub::refusal::{LookIn, missing};
+use crate::app::refusal::{LookIn, missing};
 use crate::{Sink, now};
 
 impl Chat {
@@ -255,10 +255,6 @@ impl Chat {
     }
 
     /// Seats an agent under the name it goes by now.
-    pub fn seat(&self, seat: &Seat) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.seat_async(seat))
-    }
-
     pub async fn seat_async(&self, seat: &Seat) -> Result<(), ApiError> {
         if self.model().seat_matches(seat) {
             return Ok(());
@@ -270,10 +266,6 @@ impl Chat {
     }
 
     /// A participant gone: in nothing, never back; pending session deliveries withdrawn.
-    pub fn leave(&self, participant: &str) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.leave_async(participant))
-    }
-
     pub async fn leave_async(&self, participant: &str) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         let at = now();
@@ -293,10 +285,6 @@ impl Chat {
     }
 
     /// Makes a participant a member of a place from its newest message on.
-    pub fn add_follower(&self, channel: &str, participant: &str) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.add_follower_async(channel, participant))
-    }
-
     pub async fn add_follower_async(&self, channel: &str, participant: &str) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         let Some(last) = inner.model.channel(channel).map(|r| r.last_number.unwrap_or(0)) else {
@@ -324,10 +312,6 @@ impl Chat {
         db::mark_seen(self.db.write_conn(), participant, message, now()).await.q()
     }
 
-    pub fn read_up_to(&self, participant: &str, channel: &str, number: i64) -> Result<(), ApiError> {
-        vibevalley_runtime::rt::block_on(self.read_up_to_async(participant, channel, number))
-    }
-
     pub async fn read_up_to_async(&self, participant: &str, channel: &str, number: i64) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
@@ -335,16 +319,8 @@ impl Chat {
         wtx.commit().await
     }
 
-    pub fn latest(&self, channel: &str) -> Result<i64, ApiError> {
-        vibevalley_runtime::rt::block_on(self.latest_async(channel))
-    }
-
     pub async fn latest_async(&self, channel: &str) -> Result<i64, ApiError> {
         db::latest_number(self.db.read_conn(), channel).await.q()
-    }
-
-    pub fn dispatch_count(&self, thread: &str) -> Result<i64, ApiError> {
-        vibevalley_runtime::rt::block_on(self.dispatch_count_async(thread))
     }
 
     pub async fn dispatch_count_async(&self, thread: &str) -> Result<i64, ApiError> {
@@ -378,11 +354,6 @@ impl Chat {
 
     pub fn default_channel(&self) -> String {
         self.model().default_id()
-    }
-
-    /// The state's chat now.
-    pub fn now(&self) -> Option<vibevalley_protocol::Chat> {
-        self.hub.upgrade().and_then(|h| h.read(|s| s.chat.clone()))
     }
 
     /// A refusal of removals: what still points at a channel.
@@ -620,15 +591,6 @@ impl Chat {
         for g in guards {
             why.extend(g(id.to_owned()).await);
         }
-        if self.hub.upgrade().is_some_and(|h| {
-            h.read(|s| {
-                s.sessions
-                    .iter()
-                    .any(|x| (x.is_board_worker() || x.is_direct_talker()) && x.channel_id() == Some(id))
-            })
-        }) {
-            why.push(t("server.channel.helpersThere", &[]));
-        }
         if topics != 0 {
             why.push(t("server.channel.issuesThere", &[("n", topics.into())]));
         }
@@ -666,7 +628,7 @@ impl Chat {
             wtx.model.last_read.retain(|_, target| !gone.contains(target));
             wtx.commit().await?;
         }
-        self.apply(vec![Fact::ChannelRemoved(FactChannelRemoved { at: now(), id: id.into() })]);
+        self.projector.mark_dirty(SliceMask::COLLAB);
         Ok(())
     }
 
@@ -779,8 +741,7 @@ impl Chat {
         let live = self.subscribe_events();
         let db = self.db.clone();
         let channel = channel.to_string();
-        let hub = self.hub.upgrade();
-        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let cancel = self.runtime.child_token();
         let fut = async move {
             let missed = match db::messages_changed_after(db.read_conn(), &channel, after, CATCH_UP_MAX as i64 + 1).await {
                 Ok(rows) => rows,
@@ -798,11 +759,7 @@ impl Chat {
             }
             relay(live, cancel, &sink, |m| m.channel == channel && m.revision > upto).await;
         };
-        if let Some(hub) = hub {
-            hub.spawn_task(fut);
-        } else {
-            vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
-        }
+        self.runtime.spawn(fut);
         Ok(())
     }
 
@@ -811,8 +768,7 @@ impl Chat {
     pub fn reports(&self, after: Option<String>, sink: Sink) -> Result<(), ApiError> {
         let live = self.subscribe_events();
         let db = self.db.clone();
-        let hub = self.hub.upgrade();
-        let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
+        let cancel = self.runtime.child_token();
         let fut = async move {
             let missed = {
                 let conn = db.read_conn();
@@ -840,11 +796,7 @@ impl Chat {
             }
             relay(live, cancel, &sink, |m| m.kind == MessageKind::Report && m.id > upto).await;
         };
-        if let Some(hub) = hub {
-            hub.spawn_task(fut);
-        } else {
-            vibevalley_runtime::rt::current_or_global_handle().spawn(fut);
-        }
+        self.runtime.spawn(fut);
         Ok(())
     }
 }

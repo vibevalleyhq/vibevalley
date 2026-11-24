@@ -23,45 +23,45 @@ use parking_lot::{Mutex, RwLock};
 use serde_json::{Value, json};
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
-use vibevalley_protocol::{BoardSlice, CollabSlice, FarmFrame, InboxSlice, OpsSlice, SessionsSlice, SliceBundle, SliceKind};
+use vibevalley_protocol::{SliceBundle, SliceKind};
 
-use crate::app::hub::slice_feed::{SliceFeed, SliceSubscription};
+use crate::app::slice::{SliceFeed, SliceSubscription};
 use crate::transport::api::{BizCode, CallerContext, ClientIdentity, Envelope, LiveEvent, Server, refusal};
 
 struct FakeFeeds {
-    board: SliceFeed<BoardSlice>,
-    sessions: SliceFeed<SessionsSlice>,
-    collab: SliceFeed<CollabSlice>,
-    inbox: SliceFeed<InboxSlice>,
-    ops: SliceFeed<OpsSlice>,
-    farm: SliceFeed<FarmFrame>,
+    board: SliceFeed,
+    sessions: SliceFeed,
+    collab: SliceFeed,
+    inbox: SliceFeed,
+    ops: SliceFeed,
+    farm: SliceFeed,
 }
 
 impl FakeFeeds {
     fn new(bundle: &SliceBundle) -> Self {
         Self {
-            board: SliceFeed::new("slice:board", bundle.board.clone()),
-            sessions: SliceFeed::new("slice:sessions", bundle.sessions.clone()),
-            collab: SliceFeed::new("slice:collab", bundle.collab.clone()),
-            inbox: SliceFeed::new("slice:inbox", bundle.inbox.clone()),
-            ops: SliceFeed::new("slice:ops", bundle.ops.clone()),
-            farm: SliceFeed::new("slice:farm", bundle.farm.clone()),
+            board: SliceFeed::from_value(SliceKind::Board, bundle.board.seq, &bundle.board),
+            sessions: SliceFeed::from_value(SliceKind::Sessions, bundle.sessions.seq, &bundle.sessions),
+            collab: SliceFeed::from_value(SliceKind::Collab, bundle.collab.seq, &bundle.collab),
+            inbox: SliceFeed::from_value(SliceKind::Inbox, bundle.inbox.seq, &bundle.inbox),
+            ops: SliceFeed::from_value(SliceKind::Ops, bundle.ops.seq, &bundle.ops),
+            farm: SliceFeed::from_value(SliceKind::Farm, bundle.farm.seq, &bundle.farm),
         }
     }
 
     fn replace_and_publish(&self, bundle: &SliceBundle) -> usize {
-        self.board.replace(bundle.board.clone());
-        self.sessions.replace(bundle.sessions.clone());
-        self.collab.replace(bundle.collab.clone());
-        self.inbox.replace(bundle.inbox.clone());
-        self.ops.replace(bundle.ops.clone());
-        self.farm.replace(bundle.farm.clone());
-        self.board.publish_forced()
-            + self.sessions.publish_forced()
-            + self.collab.publish_forced()
-            + self.inbox.publish_forced()
-            + self.ops.publish_forced()
-            + self.farm.publish_forced()
+        self.board.publish_value(bundle.board.seq, &bundle.board);
+        self.sessions.publish_value(bundle.sessions.seq, &bundle.sessions);
+        self.collab.publish_value(bundle.collab.seq, &bundle.collab);
+        self.inbox.publish_value(bundle.inbox.seq, &bundle.inbox);
+        self.ops.publish_value(bundle.ops.seq, &bundle.ops);
+        self.farm.publish_value(bundle.farm.seq, &bundle.farm);
+        self.board.watcher_count()
+            + self.sessions.watcher_count()
+            + self.collab.watcher_count()
+            + self.inbox.watcher_count()
+            + self.ops.watcher_count()
+            + self.farm.watcher_count()
     }
 }
 
@@ -267,42 +267,50 @@ impl Server for FakeServer {
 
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
         match slice {
-            SliceKind::Board => self.feeds.board.snapshot().wire().clone(),
-            SliceKind::Sessions => self.feeds.sessions.snapshot().wire().clone(),
-            SliceKind::Collab => self.feeds.collab.snapshot().wire().clone(),
-            SliceKind::Inbox => self.feeds.inbox.snapshot().wire().clone(),
-            SliceKind::Ops => self.feeds.ops.snapshot().wire().clone(),
-            SliceKind::Farm => self.feeds.farm.snapshot().wire().clone(),
+            SliceKind::Board => self.feeds.board.snapshot_value(),
+            SliceKind::Sessions => self.feeds.sessions.snapshot_value(),
+            SliceKind::Collab => self.feeds.collab.snapshot_value(),
+            SliceKind::Inbox => self.feeds.inbox.snapshot_value(),
+            SliceKind::Ops => self.feeds.ops.snapshot_value(),
+            SliceKind::Farm => self.feeds.farm.snapshot_value(),
+        }
+    }
+
+    fn slice_snapshot_json(&self, slice: SliceKind) -> Arc<str> {
+        match slice {
+            SliceKind::Board => self.feeds.board.snapshot_json(),
+            SliceKind::Sessions => self.feeds.sessions.snapshot_json(),
+            SliceKind::Collab => self.feeds.collab.snapshot_json(),
+            SliceKind::Inbox => self.feeds.inbox.snapshot_json(),
+            SliceKind::Ops => self.feeds.ops.snapshot_json(),
+            SliceKind::Farm => self.feeds.farm.snapshot_json(),
         }
     }
 
     fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
         match slice {
-            SliceKind::Board => self.feeds.board.watch_since(after_seq, None, stop, receive),
-            SliceKind::Sessions => self.feeds.sessions.watch_since(after_seq, None, stop, receive),
-            SliceKind::Collab => self.feeds.collab.watch_since(after_seq, None, stop, receive),
-            SliceKind::Inbox => self.feeds.inbox.watch_since(after_seq, None, stop, receive),
-            SliceKind::Ops => self.feeds.ops.watch_since(after_seq, None, stop, receive),
-            SliceKind::Farm => self.feeds.farm.watch_since(after_seq, None, stop, receive),
+            SliceKind::Board => self.feeds.board.watch_since(after_seq, stop, receive),
+            SliceKind::Sessions => self.feeds.sessions.watch_since(after_seq, stop, receive),
+            SliceKind::Collab => self.feeds.collab.watch_since(after_seq, stop, receive),
+            SliceKind::Inbox => self.feeds.inbox.watch_since(after_seq, stop, receive),
+            SliceKind::Ops => self.feeds.ops.watch_since(after_seq, stop, receive),
+            SliceKind::Farm => self.feeds.farm.watch_since(after_seq, stop, receive),
         }
     }
 
     fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
         Some(match slice {
-            SliceKind::Board => SliceSubscription::Board(self.feeds.board.subscribe()),
-            SliceKind::Sessions => SliceSubscription::Sessions(self.feeds.sessions.subscribe()),
-            SliceKind::Collab => SliceSubscription::Collab(self.feeds.collab.subscribe()),
-            SliceKind::Inbox => SliceSubscription::Inbox(self.feeds.inbox.subscribe()),
-            SliceKind::Ops => SliceSubscription::Ops(self.feeds.ops.subscribe()),
-            SliceKind::Farm => SliceSubscription::Farm {
-                rx: self.feeds.farm.subscribe(),
-                strip_initial_effects: false,
-            },
+            SliceKind::Board => self.feeds.board.subscribe(),
+            SliceKind::Sessions => self.feeds.sessions.subscribe(),
+            SliceKind::Collab => self.feeds.collab.subscribe(),
+            SliceKind::Inbox => self.feeds.inbox.subscribe(),
+            SliceKind::Ops => self.feeds.ops.subscribe(),
+            SliceKind::Farm => self.feeds.farm.subscribe(),
         })
     }
 
     fn live(&self) -> flume::Receiver<LiveEvent> {
-        crate::app::hub::bridge_live_receiver(self.live.subscribe(), CancellationToken::new())
+        crate::app::live::bridge_live_receiver(self.live.subscribe(), CancellationToken::new())
     }
 
     fn subscribe_live(&self) -> Option<broadcast::Receiver<LiveEvent>> {

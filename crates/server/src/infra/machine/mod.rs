@@ -1,30 +1,34 @@
-//! L1 Execution Machine Manager (`machine.list` + WS `MachineBus`):
+//! L1 Execution Machine Store (`machine.list` + WS `MachineBus`):
 //! owns `Arc<MachineRegistry>` (`"local"` + dynamic remote/sandbox hosts),
 //! drives authenticated `/api/v1/machine/ws` connections, serves
-//! `MachineAttachmentFetch` via `AttachmentReadPort`, emits `Fact::MachineChanged`
-//! & `Fact::MachineRemoved` into `Hub`, and triggers heartbeats on `Hub::on_system_wake()`.
+//! `MachineAttachmentFetch` via `AttachmentReadPort`, projects machine presence
+//! into [`LiveOverlay`] + [`SliceProjector`], and triggers heartbeats on
+//! [`Runtime`] system wake notifications.
 
 mod remote;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use base64::Engine as _;
 use parking_lot::RwLock;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument as _;
-use tracing::instrument::WithSubscriber as _;
+use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
-    Fact, LOCAL_MACHINE_ID, Machine, MachineAttachmentData, MachineAttachmentFetch, MachineHello, MachineHelloAck, MachineInfo, MachinePing, MachinePlatform,
-    MachineRuntimeSummary, MachineStatus, MachineWireError, MachineWireFrame, Millis, RuntimeCapability, ops,
+    LOCAL_MACHINE_ID, Machine, MachineAttachmentData, MachineAttachmentFetch, MachineHello, MachineHelloAck, MachineInfo, MachinePing, MachinePlatform,
+    MachineRuntimeSummary, MachineStatus, MachineWireError, MachineWireFrame, Millis, RuntimeCapability,
 };
 use vibevalley_runtime::machine::{LocalMachine, Machine as RuntimeMachine, MachineRegistry};
 use vibevalley_runtime::oar::Registry;
 
-use crate::app::hub::ports::AttachmentReadPort;
+use crate::app::live::LiveOverlay;
+use crate::app::port::AttachmentReadPort;
+use crate::app::runtime::Runtime;
+use crate::app::slice::SliceProjector;
+use crate::now;
 use crate::transport::api::{MachineBus, MachineConnection};
-use crate::{Hub, now};
 
 pub use remote::{RemoteDispatchMeta, RemoteMachine, RemoteRuntime, RemoteSession, attach_dispatch_meta};
 
@@ -78,7 +82,9 @@ fn valid_remote_machine_id(id: &str) -> bool {
 /// Manages local + remote/sandbox execution machines and implements the
 /// spine [`MachineBus`] trait consumed by `transport::http::machine_ws`.
 pub struct MachineStore {
-    hub: Weak<Hub>,
+    runtime: Arc<Runtime>,
+    live: Arc<LiveOverlay>,
+    projector: Arc<SliceProjector>,
     registry: Arc<MachineRegistry>,
     local_registry: Arc<Registry>,
     local_name: String,
@@ -90,19 +96,24 @@ pub struct MachineStore {
     cancel: CancellationToken,
 }
 
-/// Temporary compatibility alias for unowned callers until spine cutover.
-#[doc(hidden)]
-pub type MachineManager = MachineStore;
-
 impl MachineStore {
-    pub fn open(hub: &Arc<Hub>, local_registry: Arc<Registry>, attachments: Arc<dyn AttachmentReadPort>, server_version: String) -> Arc<Self> {
+    pub fn open(
+        runtime: &Arc<Runtime>,
+        live: Arc<LiveOverlay>,
+        projector: Arc<SliceProjector>,
+        local_registry: Arc<Registry>,
+        attachments: Arc<dyn AttachmentReadPort>,
+        server_version: String,
+    ) -> Arc<Self> {
         let local_name = "Local".to_string();
         let local_joined_at = now();
         let registry = Arc::new(MachineRegistry::new());
         registry.register(Arc::new(LocalMachine::new(local_registry.clone()).with_label(local_name.clone())));
 
         let manager = Arc::new(Self {
-            hub: Arc::downgrade(hub),
+            runtime: runtime.clone(),
+            live,
+            projector,
             registry,
             local_registry,
             local_name,
@@ -111,18 +122,19 @@ impl MachineStore {
             attachments,
             server_version,
             next_conn_id: AtomicU64::new(1),
-            cancel: hub.child_token(),
+            cancel: runtime.child_token(),
         });
 
-        // Project the co-located local execution host into `SpaceState.machines` / `SessionsSlice.machines`.
-        let local_fact = manager.local_protocol_machine();
-        hub.apply(vec![Fact::machine_changed(local_joined_at, local_fact)]);
+        let local_machine = manager.local_protocol_machine();
+        if manager.live.upsert_machine(local_machine) {
+            manager.projector.mark_dirty(SliceMask::SESSIONS);
+        }
 
         // Probe every connected remote machine immediately whenever macOS wakes from sleep.
         let weak_self = Arc::downgrade(&manager);
         let cancel = manager.cancel.clone();
-        let mut wake_rx = hub.subscribe_wake();
-        hub.spawn_task(async move {
+        let mut wake_rx = runtime.subscribe_wake();
+        runtime.spawn(async move {
             loop {
                 tokio::select! {
                     biased;
@@ -200,14 +212,14 @@ impl MachineStore {
     }
 
     fn emit_changed(&self, machine: Machine) {
-        if let Some(hub) = self.hub.upgrade() {
-            hub.apply(vec![Fact::machine_changed(now(), machine)]);
+        if self.live.upsert_machine(machine) {
+            self.projector.mark_dirty(SliceMask::SESSIONS);
         }
     }
 
     fn emit_removed(&self, machine_id: &str) {
-        if let Some(hub) = self.hub.upgrade() {
-            hub.apply(vec![Fact::machine_removed(now(), machine_id)]);
+        if self.live.remove_machine(machine_id) {
+            self.projector.mark_dirty(SliceMask::SESSIONS);
         }
     }
 
@@ -277,32 +289,29 @@ impl MachineStore {
 
     fn handle_attachment_fetch(&self, req: MachineAttachmentFetch, outgoing: flume::Sender<MachineWireFrame>) {
         let span = tracing::debug_span!("machine.conn", op = "attachment_fetch", request_id = %req.request_id);
-        let _entered = span.enter();
         let attachments = self.attachments.clone();
-        let task = move || {
-            let reply = match attachments.read_bytes(&req.attachment_id) {
-                Ok((mime, bytes)) => MachineAttachmentData {
-                    request_id: req.request_id,
-                    ok: true,
-                    mime: Some(mime),
-                    bytes_b64: Some(base64::engine::general_purpose::STANDARD.encode(bytes)),
-                    error: None,
-                },
-                Err(err) => MachineAttachmentData {
-                    request_id: req.request_id,
-                    ok: false,
-                    mime: None,
-                    bytes_b64: None,
-                    error: Some(err.message),
-                },
-            };
-            let _ = outgoing.send(MachineWireFrame::MachineAttachmentData(reply));
-        };
-        if let Some(hub) = self.hub.upgrade() {
-            hub.spawn_blocking_task(task);
-        } else {
-            crate::spawn_blocking_traced(task);
-        }
+        self.runtime.spawn(
+            async move {
+                let reply = match attachments.read_bytes(&req.attachment_id).await {
+                    Ok((mime, bytes)) => MachineAttachmentData {
+                        request_id: req.request_id,
+                        ok: true,
+                        mime: Some(mime),
+                        bytes_b64: Some(base64::engine::general_purpose::STANDARD.encode(bytes)),
+                        error: None,
+                    },
+                    Err(err) => MachineAttachmentData {
+                        request_id: req.request_id,
+                        ok: false,
+                        mime: None,
+                        bytes_b64: None,
+                        error: Some(err.message),
+                    },
+                };
+                let _ = outgoing.send_async(MachineWireFrame::MachineAttachmentData(reply)).await;
+            }
+            .instrument(span),
+        );
     }
 
     async fn drive_connection(self: Arc<Self>, conn: MachineConnection) {
@@ -435,14 +444,6 @@ pub struct MachineBusAdapter(pub Arc<MachineStore>);
 impl MachineBus for MachineBusAdapter {
     fn accept_connection(&self, conn: MachineConnection) {
         let manager = self.0.clone();
-        if let Some(hub) = manager.hub.upgrade() {
-            hub.spawn_task(manager.drive_connection(conn));
-        } else {
-            vibevalley_runtime::rt::current_or_global_handle().spawn(manager.drive_connection(conn).in_current_span().with_current_subscriber());
-        }
+        manager.runtime.spawn(manager.clone().drive_connection(conn));
     }
-}
-
-pub fn install(hub: &Hub, machines: Arc<MachineStore>) {
-    hub.on::<ops::MachineList>(move |_, ()| Ok(machines.list()));
 }

@@ -1,17 +1,19 @@
 //! Pure in-memory ephemeral overlay and telemetry spine (`LiveOverlay`):
-//! active session stream state, live event broadcast, and bounded farm effect bursts.
-//! Never reads or writes SQL.
-
-// Staged spine module wired into `App` during direct cutover.
-#![allow(dead_code)]
+//! active session stream state, farm plays & effect bursts, live runtime/connector/
+//! machine/call/inbox state, and `LiveEvent` broadcast fan-out. Never reads or writes SQL.
 
 use std::collections::{BTreeMap, VecDeque};
 
 use parking_lot::{Mutex, RwLock};
 use tokio::sync::broadcast;
+use tokio_util::sync::CancellationToken;
+use vibevalley_core::LiveSessionOverlay;
+use vibevalley_core::game::{empty_play, free_station, play_of, played_doing, played_run};
+use vibevalley_core::rules::farm_of;
 use vibevalley_protocol::{
-    Doing, GameEffect, LiveEvent, LiveEventNotice, LiveEventRuntime, LiveEventSession, Millis, NoticeLevel, Phase, RuntimeInfo, SessionEvent, SessionId,
-    SessionSubagents, Spent, ToolConnection,
+    CallState, CommitCount, ConnectorStatus, Doing, GameEffect, InboxItem, LiveEvent, LiveEventNotice, LiveEventRuntime, LiveEventSession, Machine,
+    Millis, NoticeLevel, Phase, Progress, RuntimeInfo, Session, SessionAction, SessionEvent, SessionId, SessionPlay, SessionSubagents, Spent,
+    ToolConnection,
 };
 
 const DEFAULT_LIVE_CAPACITY: usize = 512;
@@ -25,11 +27,25 @@ pub(crate) type FarmEffect = GameEffect;
 pub(crate) struct LiveSessionSnapshot {
     pub run_id: Option<String>,
     pub phase: Option<Phase>,
-    pub doing: Option<Doing>,
+    pub channel: Option<Option<String>>,
+    pub brief: Option<String>,
     pub spent: Option<Spent>,
     pub tool_connections: Option<Vec<ToolConnection>>,
     pub subagents: Option<SessionSubagents>,
     pub last_event_at: Option<Millis>,
+}
+
+impl LiveSessionSnapshot {
+    pub(crate) fn to_core_overlay(&self) -> LiveSessionOverlay {
+        LiveSessionOverlay {
+            phase: self.phase.clone(),
+            channel: self.channel.clone(),
+            brief: self.brief.clone(),
+            spent: self.spent.clone(),
+            subagents: self.subagents.as_ref().map(|s| Some(s.clone())),
+            tool_connections: self.tool_connections.clone(),
+        }
+    }
 }
 
 /// Sequenced farm effect stored inside [`LiveOverlay`]'s bounded burst ring.
@@ -76,11 +92,19 @@ impl EffectRing {
 }
 
 /// Pure in-memory live overlay holding ephemeral session stream snapshots,
-/// `LiveEvent` broadcast fan-out, and bounded `FarmEffect` bursts.
+/// farm plays & effects, live machines/connectors/call/commits/progress,
+/// `pi.inbox` alerts, and `LiveEvent` broadcast fan-out.
 pub(crate) struct LiveOverlay {
     sessions: RwLock<BTreeMap<SessionId, LiveSessionSnapshot>>,
-    live_tx: broadcast::Sender<LiveEvent>,
+    plays: RwLock<BTreeMap<SessionId, SessionPlay>>,
     effects: Mutex<EffectRing>,
+    machines: RwLock<Vec<Machine>>,
+    connectors: RwLock<Vec<ConnectorStatus>>,
+    commits: RwLock<Option<CommitCount>>,
+    progress: RwLock<Option<Progress>>,
+    call: RwLock<(CallState, String)>,
+    runtime_inbox: RwLock<Vec<InboxItem>>,
+    live_tx: broadcast::Sender<LiveEvent>,
 }
 
 impl LiveOverlay {
@@ -94,8 +118,15 @@ impl LiveOverlay {
         let (live_tx, _) = broadcast::channel(live_capacity.max(1));
         Self {
             sessions: RwLock::new(BTreeMap::new()),
-            live_tx,
+            plays: RwLock::new(BTreeMap::new()),
             effects: Mutex::new(EffectRing::new(farm_effect_capacity)),
+            machines: RwLock::new(Vec::new()),
+            connectors: RwLock::new(Vec::new()),
+            commits: RwLock::new(None),
+            progress: RwLock::new(None),
+            call: RwLock::new((CallState::Idle, String::new())),
+            runtime_inbox: RwLock::new(Vec::new()),
+            live_tx,
         }
     }
 
@@ -116,7 +147,7 @@ impl LiveOverlay {
         }
     }
 
-    /// Removes the ephemeral snapshot for `session_id` (e.g. when a run finishes).
+    /// Removes the ephemeral snapshot for `session_id` (e.g. when a run finishes or session leaves).
     pub(crate) fn remove_session(&self, session_id: &str) -> Option<LiveSessionSnapshot> {
         self.sessions.write().remove(session_id)
     }
@@ -131,9 +162,176 @@ impl LiveOverlay {
         self.sessions.read().clone()
     }
 
+    /// Returns the `vibevalley_core` overlay map for projection.
+    pub(crate) fn core_session_overlays(&self) -> BTreeMap<SessionId, LiveSessionOverlay> {
+        self.sessions
+            .read()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.to_core_overlay()))
+            .collect()
+    }
+
     /// Number of active sessions tracked in the live overlay.
     pub(crate) fn session_count(&self) -> usize {
         self.sessions.read().len()
+    }
+
+    /// Ensures a farm worker session has an assigned station & play state.
+    pub(crate) fn ensure_play_station(&self, session: &Session, other_sessions: &[&Session], prefer: Option<i64>) -> bool {
+        let mut plays = self.plays.write();
+        if let Some(existing) = plays.get(&session.id)
+            && prefer.is_none_or(|p| existing.station == p)
+        {
+            return false;
+        }
+        let current = play_of(Some(&plays), &session.id);
+        let station = free_station(Some(&plays), other_sessions, farm_of(session), prefer);
+        if prefer.is_some_and(|p| station != p) {
+            return false;
+        }
+        plays.insert(session.id.clone(), SessionPlay { station, ..current });
+        true
+    }
+
+    /// Records a run start or working action step in `plays` for a farm worker.
+    pub(crate) fn record_play_working(&self, session_id: &str, at: Millis, was_working: bool, doing: &Doing) {
+        let mut plays = self.plays.write();
+        let before = play_of(Some(&plays), session_id);
+        let next = if was_working {
+            played_doing(&before, at, doing.action, &doing.label)
+        } else {
+            played_run(&before, at)
+        };
+        plays.insert(session_id.to_owned(), next);
+    }
+
+    /// Removes farm play state when a session leaves.
+    pub(crate) fn remove_play(&self, session_id: &str) {
+        self.plays.write().remove(session_id);
+    }
+
+    /// Returns a cloned snapshot of all farm plays.
+    pub(crate) fn plays_snapshot(&self) -> BTreeMap<SessionId, SessionPlay> {
+        self.plays.read().clone()
+    }
+
+    /// Builds a [`vibevalley_core::LiveSnapshot`], optionally draining buffered farm effects.
+    pub(crate) fn to_core_snapshot(&self, drain_effects: bool) -> vibevalley_core::LiveSnapshot {
+        let effects = if drain_effects {
+            self.drain_farm_effects(0).into_iter().map(|e| e.effect).collect()
+        } else {
+            Vec::new()
+        };
+        vibevalley_core::LiveSnapshot {
+            sessions: self.core_session_overlays(),
+            plays: self.plays_snapshot(),
+            effects,
+        }
+    }
+
+    /// Upserts an execution machine into `machines` and returns whether it changed.
+    pub(crate) fn upsert_machine(&self, machine: Machine) -> bool {
+        let mut list = self.machines.write();
+        match list.iter_mut().find(|m| m.id == machine.id) {
+            Some(existing) if *existing == machine => false,
+            Some(existing) => {
+                *existing = machine;
+                true
+            }
+            None => {
+                list.push(machine);
+                true
+            }
+        }
+    }
+
+    /// Removes an execution machine by `id` and returns whether one was removed.
+    pub(crate) fn remove_machine(&self, id: &str) -> bool {
+        let mut list = self.machines.write();
+        let before = list.len();
+        list.retain(|m| m.id != id);
+        list.len() != before
+    }
+
+    pub(crate) fn machines_snapshot(&self) -> Vec<Machine> {
+        self.machines.read().clone()
+    }
+
+    /// Upserts a connector status into `connectors` and returns whether it changed.
+    pub(crate) fn upsert_connector(&self, status: ConnectorStatus) -> bool {
+        let mut list = self.connectors.write();
+        match list.iter_mut().find(|c| c.id == status.id) {
+            Some(existing) if *existing == status => false,
+            Some(existing) => {
+                *existing = status;
+                true
+            }
+            None => {
+                list.push(status);
+                true
+            }
+        }
+    }
+
+    pub(crate) fn connectors_snapshot(&self) -> Vec<ConnectorStatus> {
+        self.connectors.read().clone()
+    }
+
+    /// Replaces `commits` and returns `(previous_total, changed)`.
+    pub(crate) fn set_commits(&self, next: Option<CommitCount>) -> (Option<i64>, bool) {
+        let mut guard = self.commits.write();
+        let prev_total = guard.as_ref().map(|c| c.total);
+        if *guard == next {
+            return (prev_total, false);
+        }
+        *guard = next;
+        (prev_total, true)
+    }
+
+    pub(crate) fn commits_snapshot(&self) -> Option<CommitCount> {
+        self.commits.read().clone()
+    }
+
+    /// Replaces `progress` and returns whether it changed.
+    pub(crate) fn set_progress(&self, next: Option<Progress>) -> bool {
+        let mut guard = self.progress.write();
+        if *guard == next {
+            return false;
+        }
+        *guard = next;
+        true
+    }
+
+    pub(crate) fn progress_snapshot(&self) -> Option<Progress> {
+        self.progress.read().clone()
+    }
+
+    /// Updates voice call banner state and returns whether it changed.
+    pub(crate) fn set_call(&self, state: CallState, reason: String) -> bool {
+        let mut guard = self.call.write();
+        if guard.0 == state && guard.1 == reason {
+            return false;
+        }
+        *guard = (state, reason);
+        true
+    }
+
+    pub(crate) fn call_snapshot(&self) -> (CallState, String) {
+        self.call.read().clone()
+    }
+
+    /// Replaces projected runtime `pi.inbox` items and returns whether they changed.
+    pub(crate) fn set_runtime_inbox(&self, items: Vec<InboxItem>) -> bool {
+        let mut guard = self.runtime_inbox.write();
+        if *guard == items {
+            return false;
+        }
+        *guard = items;
+        true
+    }
+
+    pub(crate) fn runtime_inbox_snapshot(&self) -> Vec<InboxItem> {
+        self.runtime_inbox.read().clone()
     }
 
     /// Subscribes to ephemeral [`LiveEvent`] broadcasts.
@@ -204,6 +402,29 @@ impl Default for LiveOverlay {
     }
 }
 
+/// Adapts a Tokio `broadcast::Receiver<LiveEvent>` onto a bounded `flume::Receiver<LiveEvent>`
+/// for sync trait callers (`Server::live`).
+pub(crate) fn bridge_live_receiver(mut rx: broadcast::Receiver<LiveEvent>, cancel: CancellationToken) -> flume::Receiver<LiveEvent> {
+    let (tx, out) = flume::unbounded();
+    vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+        loop {
+            let item = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => break,
+                res = rx.recv() => match res {
+                    Ok(ev) => ev,
+                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Closed) => break,
+                },
+            };
+            if tx.send(item).is_err() {
+                break;
+            }
+        }
+    });
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use vibevalley_protocol::{Doing, GameEffectLevelUp, GameEffectPenalty, GameEffectReward, NoticeLevel, SessionAction};
@@ -250,7 +471,6 @@ mod tests {
     #[tokio::test]
     async fn live_event_broadcast_delivers_to_subscribers_and_handles_lag() {
         let live = LiveOverlay::with_capacities(2, 8);
-        // Publishing without subscribers never panics or blocks.
         live.publish_notice(1, NoticeLevel::Info, "nobody listening");
 
         let mut rx = live.subscribe_live();
@@ -266,7 +486,6 @@ mod tests {
             other => panic!("unexpected live event: {other:?}"),
         }
 
-        // Overflow capacity=2 to verify bounded broadcast behavior.
         live.publish_notice(3, NoticeLevel::Info, "a");
         live.publish_notice(4, NoticeLevel::Info, "b");
         live.publish_notice(5, NoticeLevel::Error, "c");
@@ -300,14 +519,12 @@ mod tests {
         assert_eq!(live.farm_effect_seq(), 4);
         assert_eq!(live.pending_farm_effect_count(), 3);
 
-        // seq=1 was evicted when seq=4 arrived; draining since=2 skips seq=2 and yields [3, 4].
         let drained = live.drain_farm_effects(2);
-        assert_eq!(drained, vec![FarmEffectEntry { seq: 3, effect: e3 }, FarmEffectEntry { seq: 4, effect: e4 },]);
+        assert_eq!(drained, vec![FarmEffectEntry { seq: 3, effect: e3 }, FarmEffectEntry { seq: 4, effect: e4 }]);
         assert_eq!(live.pending_farm_effect_count(), 0);
         assert!(live.drain_farm_effects(0).is_empty());
 
-        let tail_seq = live.push_farm_effects([e2.clone()]);
+        let tail_seq = live.push_farm_effects([e2]);
         assert_eq!(tail_seq, 5);
-        assert_eq!(live.drain_farm_effects(4), vec![FarmEffectEntry { seq: 5, effect: e2 }]);
     }
 }

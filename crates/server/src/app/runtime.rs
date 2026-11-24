@@ -1,9 +1,6 @@
 //! Single-owner async runtime spine: root cancellation token, tracked tasks,
 //! host wake watch channel, and bounded async shutdown.
 
-// Staged spine module wired into `App` during direct cutover.
-#![allow(dead_code)]
-
 use std::future::Future;
 use std::time::Duration;
 

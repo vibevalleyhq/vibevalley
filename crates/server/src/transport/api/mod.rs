@@ -321,12 +321,12 @@ pub trait Server: Send + Sync + 'static {
         None
     }
     /// Direct `tokio::sync::watch` subscription for a domain slice when backed
-    /// by [`crate::app::hub::slice_feed::SliceFeed`], avoiding blocking threads on SSE and bridge pumps.
-    fn subscribe_slice(&self, _slice: SliceKind) -> Option<crate::app::hub::slice_feed::SliceSubscription> {
+    /// by [`crate::app::slice::SliceFeed`], avoiding blocking threads on SSE and bridge pumps.
+    fn subscribe_slice(&self, _slice: SliceKind) -> Option<crate::app::slice::SliceSubscription> {
         None
     }
     /// Asynchronous `tokio::sync::watch` subscription for a domain slice.
-    fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<crate::app::hub::slice_feed::SliceSubscription>> {
+    fn subscribe_slice_async(self: Arc<Self>, slice: SliceKind) -> BoxFuture<'static, Option<crate::app::slice::SliceSubscription>> {
         Box::pin(async move { crate::spawn_blocking_traced(move || self.subscribe_slice(slice)).await.ok().flatten() })
     }
     /// Current fault-injection gate, if attached.

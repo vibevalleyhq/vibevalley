@@ -3,7 +3,7 @@
 
 use vibevalley_protocol::{Agent, Skill};
 
-use super::Agents;
+use super::AgentStore;
 
 /// `instructions`: the persona, then each of its skills.
 pub fn instructions(agent: &Agent, library: &[Skill]) -> String {
@@ -17,7 +17,7 @@ pub fn instructions(agent: &Agent, library: &[Skill]) -> String {
     parts.join("\n\n")
 }
 
-impl Agents {
+impl AgentStore {
     /// An issue's agent as the user wrote it: a profile's name becomes its
     /// id; anything else is kept as written.
     pub fn agent_key(&self, written: &str) -> String {

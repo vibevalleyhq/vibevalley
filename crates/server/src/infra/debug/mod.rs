@@ -4,16 +4,16 @@
 //!
 //! Disabled by default (`debug_enabled = false`): all 9 `debug.*` endpoints
 //! refuse with `BizCode::Refused`, and zero observer/fault-gate hooks are
-//! attached to `Hub` or `oar`.
+//! attached to [`crate::app::door::ServerDoor`] or `oar`.
 
 pub mod bundle;
 pub mod collector;
 pub mod redact;
 pub mod trajectory;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use std::time::Instant;
 
 use serde::Deserialize;
@@ -21,19 +21,20 @@ use serde_json::{Value, json};
 use vibevalley_protocol::{
     ApiError, BizCode, DebugBundleResult, DebugCacheStat, DebugGraph, DebugGraphClient, DebugGraphSession, DebugOverrideConfig, DebugOverview,
     DebugRuntimeSummary, DebugSnapshot, DebugStateCache, DebugStateCounts, DebugTimelinePage, DebugTimelineQuery, DebugTrajectoryDetail,
-    DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectorySummary, SessionEvent, SpaceState, ops,
+    DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectorySummary, Issue, Session, SessionEvent,
 };
 
 use self::bundle::BundlePayloads;
 use self::collector::DebugCollector;
 use self::redact::Redactor;
+use crate::app::slice::SliceProjector;
 use crate::infra::setting::Setting;
-use crate::{Hub, Server};
+use crate::transport::api::{BoxFuture, SharedHostDebug};
 
 const SNAPSHOT_RECENT_TIMELINE_LIMIT: usize = 16;
 
-/// Snapshot of runtime probe status and profile counts injected from `start.rs`
-/// so `modules::infra::debug` stays free of upward business-domain imports.
+/// Snapshot of runtime probe status and profile counts injected from `bootstrap.rs`
+/// so `infra::debug` stays free of upward business-domain imports.
 #[derive(Debug, Clone, Default)]
 pub struct RuntimeProbeSnapshot {
     pub runtimes: Vec<DebugRuntimeSummary>,
@@ -41,8 +42,19 @@ pub struct RuntimeProbeSnapshot {
     pub orchestrator_ids: Vec<String>,
 }
 
-/// Narrow read-only data provider implemented in `start.rs` bridging
-/// `Trajectories`, `Agents`, `Repos`, `Artifacts`, and `Orchestrator`.
+/// Live domain counts and overlaid records fetched on demand for `debug.*`.
+#[derive(Debug, Clone, Default)]
+pub struct DebugStateSnapshot {
+    pub issues: Vec<Issue>,
+    pub sessions: Vec<Session>,
+    pub channel_count: u32,
+    pub media_job_count: u32,
+    pub inbox_count: u32,
+    pub state_cache_json: Value,
+}
+
+/// Narrow read-only data provider implemented in `bootstrap.rs` bridging
+/// `TrajectoryStore`, `AgentStore`, `RepoStore`, `ArtifactStore`, and `Orchestrator`.
 pub trait DebugDataSource: Send + Sync {
     fn trajectory_events(&self, session_id: &str) -> Vec<SessionEvent>;
     fn open_trajectory_ids(&self) -> Vec<String>;
@@ -50,6 +62,7 @@ pub trait DebugDataSource: Send + Sync {
     fn runtime_probe(&self) -> RuntimeProbeSnapshot;
     fn repo_count(&self) -> u32;
     fn artifact_count(&self) -> u32;
+    fn state_snapshot_async(&self) -> BoxFuture<'_, DebugStateSnapshot>;
 }
 
 /// Empty source used in unit tests when no domain modules are attached.
@@ -80,10 +93,16 @@ impl DebugDataSource for EmptyDebugDataSource {
     fn artifact_count(&self) -> u32 {
         0
     }
+
+    fn state_snapshot_async(&self) -> BoxFuture<'_, DebugStateSnapshot> {
+        Box::pin(async { DebugStateSnapshot::default() })
+    }
 }
 
 pub struct DebugParts {
-    pub hub: Weak<Hub>,
+    pub projector: Arc<SliceProjector>,
+    pub active_subscriptions: Arc<dyn Fn() -> u32 + Send + Sync>,
+    pub host_debug: Option<SharedHostDebug>,
     pub setting: Arc<Setting>,
     pub sources: Arc<dyn DebugDataSource>,
     pub home: PathBuf,
@@ -106,7 +125,9 @@ struct HostDebugPayload {
 }
 
 pub struct DebugKit {
-    hub: Weak<Hub>,
+    projector: Arc<SliceProjector>,
+    active_subscriptions: Arc<dyn Fn() -> u32 + Send + Sync>,
+    host_debug: Option<SharedHostDebug>,
     setting: Arc<Setting>,
     sources: Arc<dyn DebugDataSource>,
     collector: Arc<DebugCollector>,
@@ -132,28 +153,29 @@ struct StateMetrics {
     sessions: u32,
     channels: u32,
     media_jobs: u32,
+    inbox: u32,
     active_sessions: u32,
 }
 
-fn extract_state_metrics(state: &SpaceState) -> StateMetrics {
+fn extract_state_metrics(snap: &DebugStateSnapshot) -> StateMetrics {
     StateMetrics {
-        issues: state.issues.len() as u32,
-        sessions: state.sessions.len() as u32,
-        channels: state.chat.as_ref().map(|c| c.channels.len() as u32).unwrap_or(0),
-        media_jobs: state.media.as_ref().map(|m| m.len() as u32).unwrap_or(0),
-        active_sessions: state.sessions.iter().filter(|s| s.phase.is_working()).count() as u32,
+        issues: snap.issues.len() as u32,
+        sessions: snap.sessions.len() as u32,
+        channels: snap.channel_count,
+        media_jobs: snap.media_job_count,
+        inbox: snap.inbox_count,
+        active_sessions: snap.sessions.iter().filter(|s| s.phase.is_working()).count() as u32,
     }
 }
 
-fn extract_graph_sessions(state: &SpaceState, orchestrator_ids: &[String]) -> Vec<RawGraphSession> {
-    if state.sessions.is_empty() {
+fn extract_graph_sessions(issues: &[Issue], sessions: &[Session], orchestrator_ids: &[String]) -> Vec<RawGraphSession> {
+    if sessions.is_empty() {
         return Vec::new();
     }
-    let issue_by_id: HashMap<&str, (i64, &str)> = state.issues.iter().map(|i| (i.id.as_str(), (i.number, i.title.as_str()))).collect();
-    let issue_exec_sessions: HashSet<&str> = state.issues.iter().flat_map(|i| i.executions().map(|e| e.session())).collect();
+    let issue_by_id: HashMap<&str, (i64, &str)> = issues.iter().map(|i| (i.id.as_str(), (i.number, i.title.as_str()))).collect();
+    let issue_exec_sessions: HashSet<&str> = issues.iter().flat_map(|i| i.executions().map(|e| e.session())).collect();
 
-    state
-        .sessions
+    sessions
         .iter()
         .map(|s| {
             let matched_issue = s.issue_id().and_then(|iid| issue_by_id.get(iid).copied());
@@ -192,7 +214,9 @@ impl DebugKit {
     pub fn new(parts: DebugParts) -> Arc<Self> {
         let collector = DebugCollector::new(parts.setting.clone());
         Arc::new(Self {
-            hub: parts.hub,
+            projector: parts.projector,
+            active_subscriptions: parts.active_subscriptions,
+            host_debug: parts.host_debug,
             setting: parts.setting,
             sources: parts.sources,
             collector,
@@ -219,12 +243,8 @@ impl DebugKit {
         Ok(())
     }
 
-    fn hub(&self) -> Result<Arc<Hub>, ApiError> {
-        self.hub.upgrade().ok_or_else(|| ApiError::new(BizCode::ServiceUnavailable, "hub is closed"))
-    }
-
-    fn read_host_payload(&self, hub: &Hub, redactor: &Redactor, redacted_count: &mut u32) -> HostDebugPayload {
-        let Some(bridge) = hub.host_debug() else {
+    fn read_host_payload(&self, redactor: &Redactor, redacted_count: &mut u32) -> HostDebugPayload {
+        let Some(bridge) = &self.host_debug else {
             return HostDebugPayload::default();
         };
         let mut raw = bridge.snapshot();
@@ -247,12 +267,20 @@ impl DebugKit {
         })
     }
 
-    fn build_state_cache(&self, hub: &Hub, metrics: &StateMetrics, mut caches: Vec<DebugCacheStat>, agent_count: u32) -> DebugStateCache {
+    fn slice_seqs_btree(&self) -> BTreeMap<String, i64> {
+        self.projector.slice_seqs()
+    }
+
+    fn slice_watchers_btree(&self) -> BTreeMap<String, u32> {
+        self.projector.watcher_counts()
+    }
+
+    fn build_state_cache(&self, metrics: &StateMetrics, mut caches: Vec<DebugCacheStat>, agent_count: u32) -> DebugStateCache {
         caches.extend(self.collector.cache_stats());
         DebugStateCache {
-            seq: hub.seq(),
-            slice_seqs: hub.slice_seqs(),
-            slice_watchers: hub.slice_watcher_counts(),
+            seq: self.projector.seq(),
+            slice_seqs: self.slice_seqs_btree(),
+            slice_watchers: self.slice_watchers_btree(),
             counts: DebugStateCounts {
                 issues: metrics.issues,
                 sessions: metrics.sessions,
@@ -260,21 +288,14 @@ impl DebugKit {
                 agents: agent_count,
                 repos: self.sources.repo_count(),
                 artifacts: self.sources.artifact_count(),
-                inbox: hub.inbox_slice().items.len() as u32,
+                inbox: metrics.inbox,
                 media_jobs: metrics.media_jobs,
             },
             caches,
         }
     }
 
-    fn build_overview(
-        &self,
-        hub: &Hub,
-        active_sessions: u32,
-        active_clients: u32,
-        host: &mut HostDebugPayload,
-        runtimes: Vec<DebugRuntimeSummary>,
-    ) -> DebugOverview {
+    fn build_overview(&self, active_sessions: u32, active_clients: u32, host: &mut HostDebugPayload, runtimes: Vec<DebugRuntimeSummary>) -> DebugOverview {
         DebugOverview {
             channel: vibevalley_protocol::home::current_channel().as_str().to_string(),
             version: self.version.clone(),
@@ -286,25 +307,26 @@ impl DebugKit {
             boot_ms: host.boot_ms.or(Some(self.boot_duration_ms)),
             active_sessions,
             active_clients,
-            active_subscriptions: hub.active_subscription_count(),
-            latest_seq: hub.seq(),
+            active_subscriptions: (self.active_subscriptions)(),
+            latest_seq: self.projector.seq(),
             last_frame_ms: host.last_frame_ms,
             runtimes,
         }
     }
 
-    pub fn snapshot(&self) -> Result<DebugSnapshot, ApiError> {
+    pub async fn snapshot_async(&self) -> Result<DebugSnapshot, ApiError> {
         self.ensure_enabled()?;
-        let hub = self.hub()?;
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
-        let mut host = self.read_host_payload(&hub, &redactor, &mut count);
+        let mut host = self.read_host_payload(&redactor, &mut count);
         let probe = self.sources.runtime_probe();
-        let (raw_sessions, metrics) = hub.read(|state| (extract_graph_sessions(state, &probe.orchestrator_ids), extract_state_metrics(state)));
+        let snap = self.sources.state_snapshot_async().await;
+        let metrics = extract_state_metrics(&snap);
+        let raw_sessions = extract_graph_sessions(&snap.issues, &snap.sessions, &probe.orchestrator_ids);
         let active_clients = host.clients.len() as u32;
         let graph = finish_graph(raw_sessions, std::mem::take(&mut host.clients), &redactor, &mut count);
-        let state_cache = self.build_state_cache(&hub, &metrics, std::mem::take(&mut host.caches), probe.agent_count);
-        let overview = self.build_overview(&hub, metrics.active_sessions, active_clients, &mut host, probe.runtimes);
+        let state_cache = self.build_state_cache(&metrics, std::mem::take(&mut host.caches), probe.agent_count);
+        let overview = self.build_overview(metrics.active_sessions, active_clients, &mut host, probe.runtimes);
         let routes = host.routes.unwrap_or_else(Self::default_routes);
         let overrides = self.collector.overrides();
         let recent_timeline = self.collector.recent(SNAPSHOT_RECENT_TIMELINE_LIMIT);
@@ -320,8 +342,7 @@ impl DebugKit {
 
     pub fn timeline_list(&self, q: &DebugTimelineQuery) -> Result<DebugTimelinePage, ApiError> {
         self.ensure_enabled()?;
-        let hub = self.hub()?;
-        if let Some(bridge) = hub.host_debug() {
+        if let Some(bridge) = &self.host_debug {
             self.collector.ingest_host_frames(&bridge.snapshot());
         }
         Ok(self.collector.query(q))
@@ -333,10 +354,10 @@ impl DebugKit {
         Ok(())
     }
 
-    pub fn trajectory_list(&self) -> Result<Vec<DebugTrajectorySummary>, ApiError> {
+    pub async fn trajectory_list_async(&self) -> Result<Vec<DebugTrajectorySummary>, ApiError> {
         self.ensure_enabled()?;
-        let hub = self.hub()?;
-        let index = hub.read(trajectory::extract_trajectory_index);
+        let snap = self.sources.state_snapshot_async().await;
+        let index = trajectory::extract_trajectory_index(&snap.issues, &snap.sessions);
         let probe = self.sources.runtime_probe();
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
@@ -350,14 +371,14 @@ impl DebugKit {
         ))
     }
 
-    pub fn trajectory_get(&self, req: &DebugTrajectoryGetRequest) -> Result<DebugTrajectoryDetail, ApiError> {
+    pub async fn trajectory_get_async(&self, req: &DebugTrajectoryGetRequest) -> Result<DebugTrajectoryDetail, ApiError> {
         self.ensure_enabled()?;
         let id = req.id.trim();
         if !trajectory::is_safe_id(id) {
             return Err(ApiError::new(BizCode::InvalidInput, "invalid trajectory id"));
         }
-        let hub = self.hub()?;
-        let meta = hub.read(|state| trajectory::extract_session_meta(state, id));
+        let snap = self.sources.state_snapshot_async().await;
+        let meta = trajectory::extract_session_meta(&snap.issues, &snap.sessions, id);
         let probe = self.sources.runtime_probe();
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
@@ -372,14 +393,14 @@ impl DebugKit {
         )
     }
 
-    pub fn graph(&self) -> Result<DebugGraph, ApiError> {
+    pub async fn graph_async(&self) -> Result<DebugGraph, ApiError> {
         self.ensure_enabled()?;
-        let hub = self.hub()?;
         let redactor = Redactor::from_setting(&self.setting);
         let mut count = 0u32;
-        let host = self.read_host_payload(&hub, &redactor, &mut count);
+        let host = self.read_host_payload(&redactor, &mut count);
         let probe = self.sources.runtime_probe();
-        let raw_sessions = hub.read(|state| extract_graph_sessions(state, &probe.orchestrator_ids));
+        let snap = self.sources.state_snapshot_async().await;
+        let raw_sessions = extract_graph_sessions(&snap.issues, &snap.sessions, &probe.orchestrator_ids);
         Ok(finish_graph(raw_sessions, host.clients, &redactor, &mut count))
     }
 
@@ -393,24 +414,20 @@ impl DebugKit {
         Ok(self.collector.set_overrides(cfg))
     }
 
-    pub fn bundle_export(&self) -> Result<DebugBundleResult, ApiError> {
+    pub async fn bundle_export_async(&self) -> Result<DebugBundleResult, ApiError> {
         self.ensure_enabled()?;
-        let hub = self.hub()?;
         let redactor = Redactor::from_setting(&self.setting);
         let mut prior_redactions = 0u32;
-        let mut host = self.read_host_payload(&hub, &redactor, &mut prior_redactions);
+        let mut host = self.read_host_payload(&redactor, &mut prior_redactions);
         let probe = self.sources.runtime_probe();
-        let (raw_sessions, metrics, index) = hub.read(|state| {
-            (
-                extract_graph_sessions(state, &probe.orchestrator_ids),
-                extract_state_metrics(state),
-                trajectory::extract_trajectory_index(state),
-            )
-        });
+        let snap = self.sources.state_snapshot_async().await;
+        let raw_sessions = extract_graph_sessions(&snap.issues, &snap.sessions, &probe.orchestrator_ids);
+        let metrics = extract_state_metrics(&snap);
+        let index = trajectory::extract_trajectory_index(&snap.issues, &snap.sessions);
         let active_clients = host.clients.len() as u32;
         let graph = finish_graph(raw_sessions, std::mem::take(&mut host.clients), &redactor, &mut prior_redactions);
-        let state_cache = self.build_state_cache(&hub, &metrics, std::mem::take(&mut host.caches), probe.agent_count);
-        let overview = self.build_overview(&hub, metrics.active_sessions, active_clients, &mut host, probe.runtimes);
+        let state_cache = self.build_state_cache(&metrics, std::mem::take(&mut host.caches), probe.agent_count);
+        let overview = self.build_overview(metrics.active_sessions, active_clients, &mut host, probe.runtimes);
         let routes = host.routes.unwrap_or_else(Self::default_routes);
         let overrides = self.collector.overrides();
         let timeline = self.collector.all_events();
@@ -434,22 +451,4 @@ impl DebugKit {
         };
         bundle::export_bundle(&self.home, &redactor, payloads, prior_redactions)
     }
-}
-
-pub fn install(hub: &Hub, debug: Arc<DebugKit>) {
-    macro_rules! on {
-        ($op:ty, |$d:ident, $input:pat_param| $body:expr) => {{
-            let $d = debug.clone();
-            hub.on::<$op>(move |_, $input| $body);
-        }};
-    }
-    on!(ops::DebugSnapshot, |d, ()| d.snapshot());
-    on!(ops::DebugTimelineList, |d, q| d.timeline_list(&q));
-    on!(ops::DebugTimelineClear, |d, ()| d.timeline_clear());
-    on!(ops::DebugTrajectoryList, |d, ()| d.trajectory_list());
-    on!(ops::DebugTrajectoryGet, |d, req| d.trajectory_get(&req));
-    on!(ops::DebugGraph, |d, ()| d.graph());
-    on!(ops::DebugOverrideGet, |d, ()| d.override_get());
-    on!(ops::DebugOverrideSet, |d, cfg| d.override_set(cfg));
-    on!(ops::DebugBundleExport, |d, ()| d.bundle_export());
 }

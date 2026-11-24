@@ -1,7 +1,5 @@
 use vibevalley_i18n::{list, t};
-use vibevalley_protocol::{
-    ApiError, Attachment, CallState, ChatMessage, Fact, FactCallChanged, MessageHit, MessageKind, NoticeLevel, Preview, SubjectKind, USER_ID,
-};
+use vibevalley_protocol::{ApiError, Attachment, CallState, ChatMessage, MessageHit, MessageKind, NoticeLevel, Preview, SliceMask, SubjectKind, USER_ID};
 
 use super::db::{self, EventRow, MsgRow};
 use super::store::{Q, WriteTx, message_of};
@@ -11,24 +9,14 @@ use super::types::{
 };
 use super::words::{self, Has};
 use super::{Chat, HELD_SHOWN, LAST_MAX, NO_NUMBER, RETRY_WINDOW_MS, SEARCH_MAX, SEND_KEY_MAX, no_channel, refused};
-use crate::app::hub::refusal::{LookIn, missing};
+use crate::app::refusal::{LookIn, missing};
 use crate::now;
 
 impl Chat {
     /// `say`: the user's words in a place; the farm goes live.
-    pub fn say(&self, s: Saying) -> Result<(ChatMessage, bool), ApiError> {
-        vibevalley_runtime::rt::block_on(self.say_async(s))
-    }
-
     pub async fn say_async(&self, s: Saying) -> Result<(ChatMessage, bool), ApiError> {
-        if let Some(hub) = self.hub.upgrade()
-            && hub.read(|st| st.call != CallState::Live)
-        {
-            hub.apply(vec![Fact::CallChanged(FactCallChanged {
-                at: now(),
-                state: CallState::Live,
-                reason: String::new(),
-            })]);
+        if self.live.set_call(CallState::Live, String::new()) {
+            self.projector.mark_dirty(SliceMask::INBOX);
         }
         let files = self.files.of_async(&s.attachments).await?;
         if s.text.trim().is_empty() && files.is_empty() {
@@ -97,12 +85,10 @@ impl Chat {
                     },
                 )
                 .await?;
-            if !written.again
-                && !written.absent.is_empty()
-                && let Some(hub) = self.hub.upgrade()
-            {
+            if !written.again && !written.absent.is_empty() {
                 let who: Vec<String> = written.absent.iter().map(|m| words::mention_of(m).unwrap_or_else(|| format!("@{m}"))).collect();
-                hub.notice(
+                self.live.publish_notice(
+                    now(),
                     NoticeLevel::Warn,
                     t("server.channel.absent", &[("who", list(&who).into()), ("n", written.absent.len().into())]),
                 );
@@ -197,10 +183,6 @@ impl Chat {
 
     /// `post`: words written as `from` into a place; the speaker has read
     /// the place up to them.
-    pub fn post(&self, p: Posting) -> Result<(ChatMessage, bool), ApiError> {
-        vibevalley_runtime::rt::block_on(self.post_async(p))
-    }
-
     pub async fn post_async(&self, p: Posting) -> Result<(ChatMessage, bool), ApiError> {
         let written = {
             let mut inner = self.locked().await;
@@ -247,10 +229,6 @@ impl Chat {
     }
 
     /// `notice`: the farm's line; best effort, never fails, wakes no one.
-    pub fn notice(&self, n: Noticing) {
-        vibevalley_runtime::rt::block_on(self.notice_async(n));
-    }
-
     pub async fn notice_async(&self, n: Noticing) {
         let mut inner = self.locked().await;
         self.notice_locked_async(&mut inner, n).await;
@@ -275,12 +253,8 @@ impl Chat {
 
     /// `note`: a dispatch or report; `topic` opens the place's thread about
     /// it under the note.
-    pub fn note(&self, n: Note) -> Result<String, ApiError> {
-        self.note_once(n, None)
-    }
-
-    pub(crate) fn note_once(&self, n: Note, key: Option<String>) -> Result<String, ApiError> {
-        vibevalley_runtime::rt::block_on(self.note_once_async(n, key))
+    pub async fn note_async(&self, n: Note) -> Result<String, ApiError> {
+        self.note_once_async(n, None).await
     }
 
     pub(crate) async fn note_once_async(&self, n: Note, key: Option<String>) -> Result<String, ApiError> {

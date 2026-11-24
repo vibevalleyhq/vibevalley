@@ -2,16 +2,15 @@
 //! `tokio::sync::watch<Arc<str>>` slice feeds (`SliceFeed`) for `board`, `session`,
 //! `collab`, `inbox`, `ops`, and `farm`.
 
-// Staged spine module wired into `App` during direct cutover.
-#![allow(dead_code)]
-
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use parking_lot::Mutex;
+use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::{Notify, watch};
 use tokio::time::Instant;
@@ -20,6 +19,7 @@ use tokio_stream::wrappers::WatchStream;
 use vibevalley_core::SliceMask;
 use vibevalley_protocol::{BoardSlice, CollabSlice, FarmFrame, FarmLevel, FarmView, InboxSlice, OpsSlice, STATE_EVERY_MS, SessionsSlice, SliceKind};
 
+use crate::app::loom_sync::{AtomicI64 as LoomAtomicI64, AtomicU8 as LoomAtomicU8, Ordering as LoomOrdering};
 use crate::app::runtime::Runtime;
 use crate::transport::api::BoxFuture;
 
@@ -48,9 +48,57 @@ const fn slice_topic(kind: SliceKind) -> &'static str {
     }
 }
 
+/// Lock-free dirty-slice sequence tracker and coalescing wakeup gate.
+pub(crate) struct SliceWakeGate {
+    seq: LoomAtomicI64,
+    dirty_seqs: [LoomAtomicI64; SLICE_COUNT],
+    pending_mask: LoomAtomicU8,
+}
+
+impl SliceWakeGate {
+    pub(crate) fn new(initial_seq: i64) -> Self {
+        Self {
+            seq: LoomAtomicI64::new(initial_seq),
+            dirty_seqs: std::array::from_fn(|_| LoomAtomicI64::new(initial_seq)),
+            pending_mask: LoomAtomicU8::new(0),
+        }
+    }
+
+    pub(crate) fn seq(&self) -> i64 {
+        self.seq.load(LoomOrdering::Acquire)
+    }
+
+    pub(crate) fn dirty_seq(&self, idx: usize) -> i64 {
+        self.dirty_seqs[idx].load(LoomOrdering::Acquire)
+    }
+
+    pub(crate) fn record_commit(&self, mask: u8) -> (i64, bool) {
+        let mask = mask & SLICE_MASK_ALL;
+        if mask == 0 {
+            return (self.seq(), false);
+        }
+        let seq = self.seq.fetch_add(1, LoomOrdering::AcqRel) + 1;
+        for (idx, slot) in self.dirty_seqs.iter().enumerate() {
+            if (mask & (1u8 << idx)) != 0 {
+                store_max(slot, seq);
+            }
+        }
+        let prev = self.pending_mask.fetch_or(mask, LoomOrdering::AcqRel);
+        (seq, prev == 0)
+    }
+
+    pub(crate) fn take_pending(&self) -> u8 {
+        self.pending_mask.swap(0, LoomOrdering::AcqRel)
+    }
+
+    pub(crate) fn pending_bits(&self) -> u8 {
+        self.pending_mask.load(LoomOrdering::Acquire)
+    }
+}
+
 /// Pre-encoded slice snapshot published through [`SliceFeed`].
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct SliceFrame {
+pub struct SliceFrame {
     pub seq: i64,
     pub generation: u64,
     pub json: Arc<str>,
@@ -61,7 +109,7 @@ struct FeedState {
 }
 
 /// Pre-encoded `tokio::sync::watch<Arc<str>>` feed for a single state slice.
-pub(crate) struct SliceFeed {
+pub struct SliceFeed {
     kind: SliceKind,
     topic: &'static str,
     json_tx: watch::Sender<Arc<str>>,
@@ -72,7 +120,7 @@ pub(crate) struct SliceFeed {
 
 impl SliceFeed {
     /// Creates a [`SliceFeed`] initialized with `initial_seq` and pre-encoded `initial_json`.
-    pub(crate) fn new(kind: SliceKind, initial_seq: i64, initial_json: impl Into<Arc<str>>) -> Self {
+    pub fn new(kind: SliceKind, initial_seq: i64, initial_json: impl Into<Arc<str>>) -> Self {
         let json: Arc<str> = initial_json.into();
         let initial = SliceFrame {
             seq: initial_seq,
@@ -91,37 +139,48 @@ impl SliceFeed {
         }
     }
 
-    pub(crate) fn kind(&self) -> SliceKind {
+    /// Creates a [`SliceFeed`] serialized from an initial typed slice value.
+    pub fn from_value<T: Serialize>(kind: SliceKind, initial_seq: i64, value: &T) -> Self {
+        let json = serde_json::to_string(value).unwrap_or_else(|_| "null".into());
+        Self::new(kind, initial_seq, json)
+    }
+
+    pub fn kind(&self) -> SliceKind {
         self.kind
     }
 
-    pub(crate) fn topic(&self) -> &'static str {
+    pub fn topic(&self) -> &'static str {
         self.topic
     }
 
-    pub(crate) fn seq(&self) -> i64 {
+    pub fn seq(&self) -> i64 {
         self.state.lock().latest.seq
     }
 
-    pub(crate) fn snapshot(&self) -> SliceFrame {
+    pub fn snapshot(&self) -> SliceFrame {
         self.state.lock().latest.clone()
     }
 
-    pub(crate) fn snapshot_json(&self) -> Arc<str> {
+    pub fn snapshot_json(&self) -> Arc<str> {
         self.state.lock().latest.json.clone()
     }
 
-    pub(crate) fn has_watchers(&self) -> bool {
+    pub fn snapshot_value(&self) -> Value {
+        let json = self.snapshot_json();
+        serde_json::from_str(&json).unwrap_or(Value::Null)
+    }
+
+    pub fn has_watchers(&self) -> bool {
         self.json_tx.receiver_count() > 0 || self.frame_tx.receiver_count() > 0
     }
 
-    pub(crate) fn watcher_count(&self) -> usize {
+    pub fn watcher_count(&self) -> usize {
         self.json_tx.receiver_count() + self.frame_tx.receiver_count()
     }
 
     /// Publishes `(seq, json)` if `seq` is strictly greater than the current feed sequence.
     /// Returns `true` when published.
-    pub(crate) fn publish_if_newer(&self, seq: i64, json: impl Into<Arc<str>>) -> bool {
+    pub fn publish_if_newer(&self, seq: i64, json: impl Into<Arc<str>>) -> bool {
         let json: Arc<str> = json.into();
         let frame = {
             let mut state = self.state.lock();
@@ -144,7 +203,7 @@ impl SliceFeed {
 
     /// Unconditionally publishes a new frame (e.g. burst `FarmEffect` or locale refresh),
     /// clamping `seq` to at least the previous sequence so `seq` never regresses.
-    pub(crate) fn publish(&self, seq: i64, json: impl Into<Arc<str>>) {
+    pub fn publish(&self, seq: i64, json: impl Into<Arc<str>>) {
         let json: Arc<str> = json.into();
         let frame = {
             let mut state = self.state.lock();
@@ -162,13 +221,20 @@ impl SliceFeed {
         self.frame_tx.send_replace(frame);
     }
 
+    /// Serializes `value` and publishes it at `seq`.
+    pub fn publish_value<T: Serialize>(&self, seq: i64, value: &T) {
+        if let Ok(json) = serde_json::to_string(value) {
+            self.publish(seq, json);
+        }
+    }
+
     /// Direct `tokio::sync::watch::Receiver<Arc<str>>` subscription carrying pre-encoded JSON.
-    pub(crate) fn subscribe_json(&self) -> watch::Receiver<Arc<str>> {
+    pub fn subscribe_json(&self) -> watch::Receiver<Arc<str>> {
         self.json_tx.subscribe()
     }
 
     /// Subscribes with `(seq, generation, json)` metadata for SSE `Last-Event-ID` streaming.
-    pub(crate) fn subscribe(&self) -> SliceSubscription {
+    pub fn subscribe(&self) -> SliceSubscription {
         SliceSubscription {
             kind: self.kind,
             topic: self.topic,
@@ -176,10 +242,43 @@ impl SliceFeed {
             strip_initial_effects: self.strip_initial_effects,
         }
     }
+
+    /// Blocking bounded-1 watch helper for synchronous [`crate::Server::watch_slice`] fallback callers.
+    pub fn watch_since(&self, after_seq: Option<i64>, stop: &flume::Receiver<()>, receive: &mut dyn FnMut(i64, &Value)) {
+        let mut sub = self.subscribe();
+        let mut is_initial = after_seq.is_none();
+        let initial = sub.borrow_and_update(is_initial);
+        is_initial = false;
+        let mut seen_gen = initial.generation;
+        if after_seq != Some(initial.seq) {
+            let value: Value = serde_json::from_str(&initial.json).unwrap_or(Value::Null);
+            receive(initial.seq, &value);
+        }
+        let handle = vibevalley_runtime::rt::current_or_global_handle();
+        let wait_changed = |sub: &mut SliceSubscription| {
+            let stop = stop.clone();
+            handle.block_on(async {
+                tokio::select! {
+                    biased;
+                    _ = stop.recv_async() => false,
+                    changed = sub.changed() => changed,
+                }
+            })
+        };
+        while !stop.is_disconnected() && wait_changed(&mut sub) {
+            let frame = sub.borrow_and_update(is_initial);
+            if frame.generation == seen_gen {
+                continue;
+            }
+            seen_gen = frame.generation;
+            let value: Value = serde_json::from_str(&frame.json).unwrap_or(Value::Null);
+            receive(frame.seq, &value);
+        }
+    }
 }
 
 /// Subscription handle for a single [`SliceFeed`] preserving `seq` and SSE `Last-Event-ID` semantics.
-pub(crate) struct SliceSubscription {
+pub struct SliceSubscription {
     kind: SliceKind,
     topic: &'static str,
     rx: watch::Receiver<SliceFrame>,
@@ -187,16 +286,16 @@ pub(crate) struct SliceSubscription {
 }
 
 impl SliceSubscription {
-    pub(crate) fn kind(&self) -> SliceKind {
+    pub fn kind(&self) -> SliceKind {
         self.kind
     }
 
-    pub(crate) fn topic(&self) -> &'static str {
+    pub fn topic(&self) -> &'static str {
         self.topic
     }
 
     /// Reads the current snapshot, marks it seen, and strips initial burst effects on `farm` when `is_initial`.
-    pub(crate) fn borrow_and_update(&mut self, is_initial: bool) -> SliceFrame {
+    pub fn borrow_and_update(&mut self, is_initial: bool) -> SliceFrame {
         let mut frame = self.rx.borrow_and_update().clone();
         if is_initial && self.strip_initial_effects {
             frame.json = strip_farm_effects(&frame.json);
@@ -205,13 +304,13 @@ impl SliceSubscription {
     }
 
     /// Awaits the next published snapshot update; returns `false` when the feed drops.
-    pub(crate) async fn changed(&mut self) -> bool {
+    pub async fn changed(&mut self) -> bool {
         self.rx.changed().await.is_ok()
     }
 
     /// Converts this subscription into a `WatchStream`-backed stream of `(seq, json)`
     /// honoring `after_seq` (`Last-Event-ID` / `?after=<seq>`) without per-client serialization.
-    pub(crate) fn into_json_watch_stream(self, after_seq: Option<i64>) -> Pin<Box<dyn Stream<Item = (i64, Arc<str>)> + Send>> {
+    pub fn into_json_watch_stream(self, after_seq: Option<i64>) -> Pin<Box<dyn Stream<Item = (i64, Arc<str>)> + Send>> {
         use futures_util::StreamExt;
 
         let (initial_seq, initial_gen) = {
@@ -339,9 +438,7 @@ where
 /// Single-flight dirty `SliceMask` coalescer and monotonic sequence projector.
 pub(crate) struct SliceProjector {
     feeds: SliceFeedSet,
-    seq: AtomicI64,
-    dirty_seqs: [AtomicI64; SLICE_COUNT],
-    pending_mask: AtomicU8,
+    gate: SliceWakeGate,
     notify: Notify,
     flush_notify: Notify,
     throttle: Duration,
@@ -362,9 +459,7 @@ impl SliceProjector {
         let (cycle_tx, _) = watch::channel(0u64);
         Self {
             feeds: SliceFeedSet::new_empty(),
-            seq: AtomicI64::new(0),
-            dirty_seqs: std::array::from_fn(|_| AtomicI64::new(0)),
-            pending_mask: AtomicU8::new(0),
+            gate: SliceWakeGate::new(0),
             notify: Notify::new(),
             flush_notify: Notify::new(),
             throttle,
@@ -376,12 +471,28 @@ impl SliceProjector {
 
     /// Latest global monotonic sequence number.
     pub(crate) fn seq(&self) -> i64 {
-        self.seq.load(Ordering::Acquire)
+        self.gate.seq()
     }
 
     /// Latest sequence number that dirtied `kind`.
     pub(crate) fn dirty_seq(&self, kind: SliceKind) -> i64 {
-        self.dirty_seqs[slice_index(kind)].load(Ordering::Acquire)
+        self.gate.dirty_seq(slice_index(kind))
+    }
+
+    /// Current per-slice published sequence numbers keyed by slice name.
+    pub(crate) fn slice_seqs(&self) -> BTreeMap<String, i64> {
+        SliceKind::ALL
+            .into_iter()
+            .map(|k| (k.as_str().to_string(), self.feeds.get(k).seq()))
+            .collect()
+    }
+
+    /// Current watcher counts per slice feed keyed by slice name.
+    pub(crate) fn watcher_counts(&self) -> BTreeMap<String, u32> {
+        SliceKind::ALL
+            .into_iter()
+            .map(|k| (k.as_str().to_string(), self.feeds.get(k).watcher_count() as u32))
+            .collect()
     }
 
     /// Returns the feed for `kind`.
@@ -397,6 +508,11 @@ impl SliceProjector {
     /// Returns the current pre-encoded JSON snapshot for `kind`.
     pub(crate) fn snapshot_json(&self, kind: SliceKind) -> Arc<str> {
         self.feeds.get(kind).snapshot_json()
+    }
+
+    /// Returns the parsed JSON value snapshot for `kind`.
+    pub(crate) fn snapshot_value(&self, kind: SliceKind) -> Value {
+        self.feeds.get(kind).snapshot_value()
     }
 
     /// Subscribes to pre-encoded JSON updates on `kind` via `tokio::sync::watch<Arc<str>>`.
@@ -420,19 +536,10 @@ impl SliceProjector {
     /// Marks the slices in `mask` dirty, advances the monotonic global `seq`,
     /// updates per-slice dirty watermarks, and wakes the single-flight projector loop.
     pub(crate) fn mark_dirty(&self, mask: SliceMask) -> i64 {
-        let bits = mask.bits() & SLICE_MASK_ALL;
-        if bits == 0 {
-            return self.seq();
+        let (seq, should_wake) = self.gate.record_commit(mask.bits());
+        if should_wake || (mask.bits() & SLICE_MASK_ALL) != 0 {
+            self.notify.notify_one();
         }
-        let seq = self.seq.fetch_add(1, Ordering::AcqRel) + 1;
-        for kind in SliceKind::ALL {
-            let bit = SliceMask::from_kind(kind).bits();
-            if (bits & bit) != 0 {
-                store_max(&self.dirty_seqs[slice_index(kind)], seq);
-            }
-        }
-        self.pending_mask.fetch_or(bits, Ordering::AcqRel);
-        self.notify.notify_one();
         seq
     }
 
@@ -452,7 +559,7 @@ impl SliceProjector {
             let _guard = RunningGuard(this.clone());
 
             loop {
-                let pending = this.pending_mask.swap(0, Ordering::AcqRel);
+                let pending = this.gate.take_pending();
                 if pending == 0 {
                     tokio::select! {
                         biased;
@@ -489,7 +596,7 @@ impl SliceProjector {
                     if cancel.is_cancelled() {
                         return;
                     }
-                    let trailing = deferred | this.pending_mask.swap(0, Ordering::AcqRel);
+                    let trailing = deferred | this.gate.take_pending();
                     for kind in SliceKind::ALL {
                         let bit = SliceMask::from_kind(kind).bits();
                         if (trailing & bit) != 0 {
@@ -518,7 +625,7 @@ impl SliceProjector {
         self.notify.notify_one();
 
         while self.running.load(Ordering::Acquire) {
-            let pending = self.pending_mask.load(Ordering::Acquire);
+            let pending = self.gate.pending_bits();
             let all_synced = SliceKind::ALL.into_iter().all(|k| self.feed(k).seq() >= self.dirty_seq(k));
             if pending == 0 && all_synced {
                 break;
@@ -568,17 +675,170 @@ impl Default for SliceProjector {
     }
 }
 
-fn store_max(slot: &AtomicI64, val: i64) {
-    let mut cur = slot.load(Ordering::Acquire);
+fn store_max(slot: &LoomAtomicI64, val: i64) {
+    let mut cur = slot.load(LoomOrdering::Acquire);
     while val > cur {
-        match slot.compare_exchange(cur, val, Ordering::AcqRel, Ordering::Acquire) {
+        match slot.compare_exchange(cur, val, LoomOrdering::AcqRel, LoomOrdering::Acquire) {
             Ok(_) => break,
             Err(actual) => cur = actual,
         }
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "loom"))]
+pub mod loom_models {
+    use loom::sync::Arc;
+    use loom::sync::Notify;
+    use loom::sync::atomic::{AtomicU64, Ordering};
+    use loom::thread;
+
+    use super::SliceWakeGate;
+
+    fn bounded_model(f: impl Fn() + Send + Sync + 'static) {
+        let mut builder = loom::model::Builder::new();
+        builder.max_branches = 100_000;
+        builder.preemption_bound = Some(2);
+        builder.check(f);
+    }
+
+    #[test]
+    fn concurrent_commits_never_miss_wakeup_or_regress_dirty_seq() {
+        bounded_model(|| {
+            let gate = Arc::new(SliceWakeGate::new(0));
+            let notify = Arc::new(Notify::new());
+
+            let p1 = {
+                let gate = gate.clone();
+                let notify = notify.clone();
+                thread::spawn(move || {
+                    let (seq, should_wake) = gate.record_commit(1 << 0);
+                    if should_wake {
+                        notify.notify();
+                    }
+                    seq
+                })
+            };
+
+            let p2 = {
+                let gate = gate.clone();
+                let notify = notify.clone();
+                thread::spawn(move || {
+                    let (seq, should_wake) = gate.record_commit(1 << 0);
+                    if should_wake {
+                        notify.notify();
+                    }
+                    seq
+                })
+            };
+
+            let consumer = {
+                let gate = gate.clone();
+                let notify = notify.clone();
+                thread::spawn(move || {
+                    let mut published = 0i64;
+                    while published < 2 {
+                        let mask = gate.take_pending();
+                        if mask == 0 {
+                            notify.wait();
+                            continue;
+                        }
+                        if (mask & (1 << 0)) != 0 {
+                            let dirty = gate.dirty_seq(0);
+                            assert!(dirty >= 1, "dirty_seq(0) must reflect at least the commit that set bit 0");
+                            assert!(dirty >= published, "dirty_seq(0) must never regress");
+                            published = dirty;
+                        }
+                    }
+                    published
+                })
+            };
+
+            let seq1 = p1.join().unwrap();
+            let seq2 = p2.join().unwrap();
+            let mut published = consumer.join().unwrap();
+
+            if (gate.take_pending() & (1 << 0)) != 0 {
+                let dirty = gate.dirty_seq(0);
+                assert!(dirty >= published, "late pending bit must never regress dirty_seq");
+                published = dirty;
+            }
+
+            assert_eq!(seq1.max(seq2), 2);
+            assert_eq!(gate.seq(), 2);
+            assert_eq!(gate.dirty_seq(0), 2);
+            assert_eq!(published, 2);
+            assert_eq!(gate.take_pending(), 0);
+        });
+    }
+
+    #[test]
+    fn acquire_release_edge_publishes_prior_writes_to_consumer() {
+        bounded_model(|| {
+            let gate = Arc::new(SliceWakeGate::new(0));
+            let notify = Arc::new(Notify::new());
+            let payload0 = Arc::new(AtomicU64::new(0));
+            let payload1 = Arc::new(AtomicU64::new(0));
+
+            let p1 = {
+                let gate = gate.clone();
+                let notify = notify.clone();
+                let payload0 = payload0.clone();
+                thread::spawn(move || {
+                    payload0.store(0xA1, Ordering::Relaxed);
+                    let (_seq, should_wake) = gate.record_commit(1 << 0);
+                    if should_wake {
+                        notify.notify();
+                    }
+                })
+            };
+
+            let p2 = {
+                let gate = gate.clone();
+                let notify = notify.clone();
+                let payload1 = payload1.clone();
+                thread::spawn(move || {
+                    payload1.store(0xB2, Ordering::Relaxed);
+                    let (_seq, should_wake) = gate.record_commit(1 << 2);
+                    if should_wake {
+                        notify.notify();
+                    }
+                })
+            };
+
+            let consumer = {
+                let gate = gate.clone();
+                let notify = notify.clone();
+                thread::spawn(move || {
+                    let mut seen = 0u8;
+                    while seen != ((1 << 0) | (1 << 2)) {
+                        let mask = gate.take_pending();
+                        if mask == 0 {
+                            notify.wait();
+                            continue;
+                        }
+                        if (mask & (1 << 0)) != 0 {
+                            assert_eq!(payload0.load(Ordering::Relaxed), 0xA1);
+                            assert!(gate.dirty_seq(0) >= 1);
+                            seen |= 1 << 0;
+                        }
+                        if (mask & (1 << 2)) != 0 {
+                            assert_eq!(payload1.load(Ordering::Relaxed), 0xB2);
+                            assert!(gate.dirty_seq(2) >= 1);
+                            seen |= 1 << 2;
+                        }
+                    }
+                })
+            };
+
+            p1.join().unwrap();
+            p2.join().unwrap();
+            consumer.join().unwrap();
+            assert_eq!(gate.take_pending(), 0);
+        });
+    }
+}
+
+#[cfg(all(test, not(feature = "loom")))]
 mod tests {
     use std::sync::atomic::AtomicUsize;
 

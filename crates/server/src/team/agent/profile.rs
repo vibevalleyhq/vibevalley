@@ -17,7 +17,11 @@ use vibevalley_protocol::{
 };
 
 use super::presets::default_settings;
-use crate::app::hub::refusal::{LookIn, missing};
+use crate::app::refusal::{LookIn, missing};
+
+fn decode_value<T: serde::de::DeserializeOwned>(value: Value) -> Result<T, ApiError> {
+    serde_json::from_value(value).map_err(|e| ApiError::new(BizCode::InvalidInput, e.to_string()))
+}
 
 static BUILT_IN: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/assets/agent");
 
@@ -89,7 +93,7 @@ fn read_stored(text: &str) -> Result<Stored, String> {
     let agents = file
         .agents
         .into_iter()
-        .map(|a| crate::app::hub::decode::<Agent>(look_filled(a)).map_err(|e| e.message))
+        .map(|a| decode_value::<Agent>(look_filled(a)).map_err(|e| e.message))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(Stored {
         agents,
@@ -156,7 +160,7 @@ fn read_json<A: serde::de::DeserializeOwned>(text_of: &dyn Fn(&str) -> Option<St
     let path = format!("{dir}/{file}");
     let Some(text) = text_of(&path) else { return Ok(None) };
     let raw: Value = serde_json::from_str(&text).map_err(|e| unreadable(&path, e))?;
-    crate::app::hub::decode::<A>(raw).map(Some).map_err(|e| unreadable(&path, e.message))
+    decode_value::<A>(raw).map(Some).map_err(|e| unreadable(&path, e.message))
 }
 
 /// `templateFrom`: a template folder read in the farm's language (English

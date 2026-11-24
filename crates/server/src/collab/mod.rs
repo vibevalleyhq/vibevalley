@@ -2,11 +2,6 @@ pub mod channel;
 pub mod connector;
 pub mod voice;
 
-/// Sync bridge for non-async callers at collab boundaries.
-pub(super) fn block_on<F: std::future::Future>(fut: F) -> F::Output {
-    vibevalley_runtime::rt::block_on(fut)
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -14,21 +9,26 @@ mod tests {
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
     use vibevalley_protocol::{ChannelUpdate, ConnectorID, MessageKind, Notify, SubjectKind, USER_ID};
 
-    use super::block_on;
-    use crate::Hub;
+    use crate::app::live::LiveOverlay;
+    use crate::app::runtime::Runtime;
+    use crate::app::slice::SliceProjector;
     use crate::collab::channel::{Chat, DeliveryTargetKind, Noticing, Posting, ReadOptions, Saying, Seat, ThreadSubject, db};
     use crate::collab::connector::adapter::Inbound;
     use crate::collab::connector::store::Store;
-    use crate::content::attachment::Attachments;
+    use crate::content::attachment::AttachmentStore;
     use crate::db::ServerDb;
     use crate::db::entities::collab_channel::channel_message;
     use crate::db::test_pg::EphemeralPostgres;
     use crate::infra::setting::Secret;
 
     async fn verify_dual_db_collab(db: &Arc<ServerDb>, home: &std::path::Path) {
-        let hub = Hub::new(vibevalley_core::empty_space_state());
-        let files = Attachments::open(home, db.clone());
-        let chat = Chat::open_async(db.clone(), &hub, files, None, false).await.unwrap();
+        let runtime = Runtime::new();
+        let live = Arc::new(LiveOverlay::new());
+        let projector = Arc::new(SliceProjector::new());
+        let files = AttachmentStore::open(home, db.clone());
+        let chat = Chat::open_async(db.clone(), runtime.clone(), live, projector, files, None, false)
+            .await
+            .unwrap();
 
         let general_id = chat.default_channel();
         assert!(!general_id.is_empty());
@@ -331,8 +331,6 @@ mod tests {
                 owner: String::new(),
             },
         );
-
-        hub.close_async().await;
     }
 
     #[test]
@@ -340,7 +338,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("collab.db");
         let db = ServerDb::open_at(&db_path).unwrap();
-        block_on(verify_dual_db_collab(&db, dir.path()));
+        vibevalley_runtime::rt::block_on(verify_dual_db_collab(&db, dir.path()));
         db.close();
     }
 
@@ -354,7 +352,7 @@ mod tests {
         let url = pg.db_url("collab_wave3_test");
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open_url(&url).unwrap();
-        block_on(verify_dual_db_collab(&db, dir.path()));
+        vibevalley_runtime::rt::block_on(verify_dual_db_collab(&db, dir.path()));
         db.close();
     }
 }

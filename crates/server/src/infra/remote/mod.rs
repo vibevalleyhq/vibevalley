@@ -14,10 +14,10 @@ use vibevalley_core::{SharedClock, system_clock};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, BizCode, Caller, Millis, RemoteDeviceRevokeRequest, RemoteDeviceSummary, RemoteEnableRequest, RemotePairCode, RemotePairExchangeRequest,
-    RemotePairExchangeResult, RemotePlatform, RemoteStatus, RemoteWhoami, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE, ops,
+    RemotePairExchangeResult, RemotePlatform, RemoteStatus, RemoteWhoami, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE,
 };
 
-use crate::Hub;
+use crate::Server;
 use crate::db::ServerDb;
 use crate::transport::api::{BoxFuture, CallerPrincipal, RemoteAuth, RemoteDeviceIdentity};
 use crate::transport::http::{Listener, is_allowed_remote_ip, is_remote_allow_all, serve_remote};
@@ -78,7 +78,7 @@ struct PairingState {
 /// Manages the optional remote HTTP listener, one-time pairing codes, and paired device tokens.
 pub struct Remote {
     db: RemoteDb,
-    hub: Weak<Hub>,
+    server: OnceLock<Weak<dyn Server>>,
     version: String,
     clock: SharedClock,
     enabled: AtomicBool,
@@ -182,22 +182,18 @@ async fn stop_listener_async(listener: Option<Listener>) {
     }
 }
 
-fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    vibevalley_runtime::rt::block_on(future)
-}
-
 impl Remote {
-    pub fn open(db: Arc<ServerDb>, hub: Weak<Hub>, version: String) -> Result<Arc<Self>, ApiError> {
-        Self::open_with_clock(db, hub, version, system_clock())
+    pub async fn open_async(db: Arc<ServerDb>, version: String) -> Result<Arc<Self>, ApiError> {
+        Self::open_with_clock_async(db, version, system_clock()).await
     }
 
-    /// Same as [`Remote::open`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
-    pub fn open_with_clock(db: Arc<ServerDb>, hub: Weak<Hub>, version: String, clock: SharedClock) -> Result<Arc<Self>, ApiError> {
+    /// Same as [`Remote::open_async`], injecting an explicit wall [`Clock`](vibevalley_core::Clock).
+    pub async fn open_with_clock_async(db: Arc<ServerDb>, version: String, clock: SharedClock) -> Result<Arc<Self>, ApiError> {
         let db = RemoteDb::new(db);
-        let persisted_enabled = block_on(db.get_config())?.is_some_and(|cfg| cfg.enabled);
+        let persisted_enabled = db.get_config().await?.is_some_and(|cfg| cfg.enabled);
         Ok(Arc::new(Self {
             db,
-            hub,
+            server: OnceLock::new(),
             version,
             clock,
             enabled: AtomicBool::new(persisted_enabled),
@@ -208,12 +204,13 @@ impl Remote {
         }))
     }
 
-    /// Starts the remote listener on boot only when persisted config has `enabled == true`.
-    /// Failures (e.g. an offline Tailscale interface) log a warning without failing server boot.
-    pub fn restore_if_enabled(&self) {
-        block_on(self.restore_if_enabled_async());
+    /// Binds the [`Server`] door once after composition root construction.
+    pub fn bind_server(&self, server: Weak<dyn Server>) {
+        let _ = self.server.set(server);
     }
 
+    /// Starts the remote listener on boot only when persisted config has `enabled == true`.
+    /// Failures (e.g. an offline Tailscale interface) log a warning without failing server boot.
     pub async fn restore_if_enabled_async(&self) {
         let _guard = self.lifecycle.lock().await;
         let cfg = match self.db.get_config().await {
@@ -252,10 +249,10 @@ impl Remote {
         };
         let port = if cfg.port == 0 { default_remote_port() } else { cfg.port };
         let addr = SocketAddr::new(ip, port);
-        let Some(hub) = self.hub.upgrade() else {
+        let Some(server) = self.server.get().and_then(Weak::upgrade) else {
             return;
         };
-        match serve_remote(hub, addr) {
+        match serve_remote(server, addr) {
             Ok(listener) => {
                 *self.listener.lock() = Some(listener);
                 self.enabled.store(true, Ordering::Release);
@@ -267,10 +264,6 @@ impl Remote {
     }
 
     /// Stops the live remote listener without mutating persisted config.
-    pub fn close(&self) {
-        block_on(self.close_async());
-    }
-
     pub async fn close_async(&self) {
         let _guard = self.lifecycle.lock().await;
         let live = self.listener.lock().take();
@@ -347,8 +340,8 @@ impl Remote {
             return self.status_with_tailscale_async(ts).await;
         }
 
-        let Some(hub) = self.hub.upgrade() else {
-            return Err(ApiError::new(BizCode::ServiceUnavailable, "server hub is shutting down"));
+        let Some(server) = self.server.get().and_then(Weak::upgrade) else {
+            return Err(ApiError::new(BizCode::ServiceUnavailable, "server is shutting down"));
         };
 
         // Release an existing listener first if it holds the same port so re-binding does not collide.
@@ -358,7 +351,7 @@ impl Remote {
             stop_listener_async(old).await;
         }
 
-        let next = match serve_remote(hub, target) {
+        let next = match serve_remote(server, target) {
             Ok(listener) => listener,
             Err(err) => {
                 if need_drop_first {
@@ -618,43 +611,6 @@ impl RemoteAuth for Remote {
     }
 }
 
-pub fn install(hub: &Hub, remote: Arc<Remote>) {
-    let r = remote.clone();
-    hub.on_async::<ops::RemoteStatus, _, _>(move |_, ()| {
-        let r = r.clone();
-        async move { r.status_async().await }
-    });
-    let r = remote.clone();
-    hub.on_async::<ops::RemoteEnable, _, _>(move |_, req| {
-        let r = r.clone();
-        async move { r.enable_async(req).await }
-    });
-    let r = remote.clone();
-    hub.on_async::<ops::RemoteDisable, _, _>(move |_, ()| {
-        let r = r.clone();
-        async move { r.disable_async().await }
-    });
-    let r = remote.clone();
-    hub.on_async::<ops::RemotePairCreate, _, _>(move |_, ()| {
-        let r = r.clone();
-        async move { r.pair_create() }
-    });
-    let r = remote.clone();
-    hub.on_async::<ops::RemotePairExchange, _, _>(move |_, req| {
-        let r = r.clone();
-        async move { r.pair_exchange_async(req).await }
-    });
-    let r = remote.clone();
-    hub.on_async::<ops::RemoteDeviceRevoke, _, _>(move |_, req| {
-        let r = r.clone();
-        async move { r.revoke_device_async(req).await }
-    });
-    hub.on_async::<ops::RemoteWhoami, _, _>(move |ctx, ()| {
-        let r = remote.clone();
-        async move { r.whoami_async(&ctx.principal, ctx.caller).await }
-    });
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -662,15 +618,17 @@ mod tests {
     use vibevalley_core::{Clock, ManualClock};
 
     use super::*;
+    use crate::transport::bridge::fake::FakeServer;
 
     #[tokio::test]
     async fn pairing_code_format_expiry_cap_and_rate_limit_work() {
         vibevalley_i18n::set_locale("en");
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
-        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
         let clock = Arc::new(ManualClock::new(1_700_000_000_000));
-        let remote = Remote::open_with_clock(db.clone(), Arc::downgrade(&hub), "0.1.0-test".into(), clock.clone()).unwrap();
+        let remote = Remote::open_with_clock_async(db.clone(), "0.1.0-test".into(), clock.clone()).await.unwrap();
+        remote.bind_server(Arc::downgrade(&fake));
 
         let status = remote
             .enable_async(RemoteEnableRequest {
@@ -807,7 +765,6 @@ mod tests {
         assert_eq!(denied.biz_code, BizCode::Forbidden);
 
         remote.close_async().await;
-        hub.close_async().await;
         db.close_async().await;
     }
 
@@ -816,33 +773,27 @@ mod tests {
         vibevalley_i18n::set_locale("en");
         let dir = tempfile::tempdir().unwrap();
         let db = ServerDb::open(dir.path()).unwrap();
-        let hub = Hub::new(vibevalley_core::empty_space_state());
-        let remote = Remote::open(db.clone(), Arc::downgrade(&hub), "0.1.0-test".into()).unwrap();
-        install(&hub, remote.clone());
+        let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
+        let remote = Remote::open_async(db.clone(), "0.1.0-test".into()).await.unwrap();
+        remote.bind_server(Arc::downgrade(&fake));
 
-        let status = hub
-            .invoke_as_async::<ops::RemoteEnable>(
-                Caller::User,
-                RemoteEnableRequest {
-                    bind_addr: Some("127.0.0.1".into()),
-                    port: Some(0),
-                },
-            )
+        let status = remote
+            .enable_async(RemoteEnableRequest {
+                bind_addr: Some("127.0.0.1".into()),
+                port: Some(0),
+            })
             .await
             .unwrap();
         assert!(status.enabled && status.listening);
 
-        let pair = hub.invoke_as_async::<ops::RemotePairCreate>(Caller::User, ()).await.unwrap();
-        let exchanged = hub
-            .invoke_as_async::<ops::RemotePairExchange>(
-                Caller::Remote,
-                RemotePairExchangeRequest {
-                    code: pair.code,
-                    device_name: "Async iPhone".into(),
-                    platform: RemotePlatform::Ios,
-                    scope: None,
-                },
-            )
+        let pair = remote.pair_create().unwrap();
+        let exchanged = remote
+            .pair_exchange_async(RemotePairExchangeRequest {
+                code: pair.code,
+                device_name: "Async iPhone".into(),
+                platform: RemotePlatform::Ios,
+                scope: None,
+            })
             .await
             .unwrap();
 
@@ -870,9 +821,8 @@ mod tests {
         assert_eq!(second.device_id, exchanged.device.id);
         txn.rollback().await.unwrap();
 
-        hub.invoke_as_async::<ops::RemoteDisable>(Caller::User, ()).await.unwrap();
-
-        hub.close_async().await;
+        remote.disable_async().await.unwrap();
+        remote.close_async().await;
         db.close_async().await;
     }
 
@@ -950,9 +900,10 @@ mod tests {
         assert_eq!(remote_db.find_by_id("dev_dual_1").await.unwrap().unwrap().revoked_at, Some(400));
 
         // Full Remote lifecycle: enable -> pair -> exchange -> verify_bearer_async -> whoami -> revoke -> disable.
-        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let fake: Arc<dyn Server> = Arc::new(FakeServer::new());
         let clock = Arc::new(ManualClock::new(1_700_000_000_000));
-        let remote = Remote::open_with_clock(db.clone(), Arc::downgrade(&hub), "0.1.0-dual".into(), clock.clone()).unwrap();
+        let remote = Remote::open_with_clock_async(db.clone(), "0.1.0-dual".into(), clock.clone()).await.unwrap();
+        remote.bind_server(Arc::downgrade(&fake));
         assert!(!remote.is_enabled());
 
         let status = remote
@@ -1005,7 +956,6 @@ mod tests {
         assert!(remote_db.get_config().await.unwrap().is_some_and(|c| !c.enabled));
 
         remote.close_async().await;
-        hub.close_async().await;
     }
 
     #[test]

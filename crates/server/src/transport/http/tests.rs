@@ -178,7 +178,7 @@ impl Server for SignaledFake {
         self.on_watch.notify_waiters();
         self.inner.watch_slice(slice, after_seq, stop, receive)
     }
-    fn subscribe_slice(&self, slice: SliceKind) -> Option<crate::app::hub::slice_feed::SliceSubscription> {
+    fn subscribe_slice(&self, slice: SliceKind) -> Option<crate::app::slice::SliceSubscription> {
         let sub = self.inner.subscribe_slice(slice);
         self.on_watch.notify_waiters();
         sub

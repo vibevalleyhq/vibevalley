@@ -28,7 +28,9 @@ use super::presets::{
     support_of,
 };
 use super::profile::Profiles;
-use crate::{Hub, now};
+use crate::app::live::LiveOverlay;
+use crate::app::runtime::Runtime as SpineRuntime;
+use crate::now;
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 const PROBE_CONCURRENCY: usize = 4;
@@ -111,17 +113,18 @@ impl DailySpend {
 }
 
 /// `RuntimeFleet`.
-pub struct Fleet {
+pub struct RuntimeFleet {
     registry: Arc<Registry>,
     machines: Arc<MachineRegistry>,
     profiles: Arc<Profiles>,
-    hub: Weak<Hub>,
+    runtime: Arc<SpineRuntime>,
+    live: Arc<LiveOverlay>,
+    background: bool,
     held: Mutex<HashMap<String, Observation>>,
     spend: Mutex<DailySpend>,
     probing: Mutex<HashSet<String>>,
     reads: AtomicU64,
     cancel: CancellationToken,
-    sub: Mutex<Option<crate::app::hub::event_bus::Subscription>>,
 }
 
 /// Runs a blocking OAR trait probe on Tokio's blocking pool with a hard `PROBE_TIMEOUT`
@@ -165,59 +168,47 @@ pub fn usage_from_oar(usage: vibevalley_runtime::oar::AccountUsage) -> vibevalle
     }
 }
 
-impl Fleet {
+impl RuntimeFleet {
     /// The fleet over `registry`. With `background`, every runtime is
     /// probed now, off the caller's thread.
-    pub fn new(registry: Arc<Registry>, profiles: Arc<Profiles>, hub: &Arc<Hub>, background: bool) -> Arc<Fleet> {
+    pub fn new(registry: Arc<Registry>, profiles: Arc<Profiles>, runtime: &Arc<SpineRuntime>, live: Arc<LiveOverlay>, background: bool) -> Arc<RuntimeFleet> {
         let machines = Arc::new(MachineRegistry::with_local(registry.clone()));
-        Self::new_with_machines(registry, machines, profiles, hub, background)
+        Self::new_with_machines(registry, machines, profiles, runtime, live, background)
     }
 
     /// The fleet backed by a shared `MachineRegistry` for local and remote dispatch.
-    pub fn new_with_machines(registry: Arc<Registry>, machines: Arc<MachineRegistry>, profiles: Arc<Profiles>, hub: &Arc<Hub>, background: bool) -> Arc<Fleet> {
-        let cancel = hub.child_token();
-        let fleet = Arc::new(Fleet {
+    pub fn new_with_machines(
+        registry: Arc<Registry>,
+        machines: Arc<MachineRegistry>,
+        profiles: Arc<Profiles>,
+        runtime: &Arc<SpineRuntime>,
+        live: Arc<LiveOverlay>,
+        background: bool,
+    ) -> Arc<RuntimeFleet> {
+        let cancel = runtime.child_token();
+        let fleet = Arc::new(RuntimeFleet {
             registry,
             machines,
             profiles,
-            hub: Arc::downgrade(hub),
+            runtime: runtime.clone(),
+            live,
+            background,
             held: Mutex::default(),
             spend: Mutex::new(DailySpend::new()),
             probing: Mutex::default(),
             reads: AtomicU64::new(0),
             cancel,
-            sub: Mutex::new(None),
         });
-        {
-            let f = Arc::downgrade(&fleet);
-            let sub = hub.subscribe_transitions("runtime-usage", move |_, tr| {
-                let vibevalley_protocol::Fact::SessionReported(r) = &tr.fact else { return };
-                let Some(fleet) = f.upgrade() else { return };
-                if let Some(s) = tr.after.sessions.iter().chain(&tr.before.sessions).find(|s| s.id == r.id) {
-                    if let Some(cny) = r.spent.as_ref().and_then(|sp| sp.cny).map(JsNumber::get)
-                        && cny.is_finite()
-                        && cny > 0.0
-                    {
-                        fleet.record_spend(&s.runtime, cny);
-                    }
-                    if background {
-                        fleet.usage_soon(&s.runtime);
-                    }
-                }
-            });
-            let prev = fleet.sub.lock().replace(sub);
-            drop(prev);
-        }
         if background {
             let ids = fleet.ids();
             let startup_fleet = Arc::downgrade(&fleet);
-            hub.spawn_task(async move {
+            runtime.spawn(async move {
                 let Some(fleet) = startup_fleet.upgrade() else { return };
                 fleet.probe_all_async(ids).await;
             });
             let f = Arc::downgrade(&fleet);
             let cancel = fleet.cancel.clone();
-            hub.spawn_task(async move {
+            runtime.spawn(async move {
                 let mut tick = tokio::time::interval(USAGE_EVERY);
                 tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
                 tick.tick().await;
@@ -233,6 +224,19 @@ impl Fleet {
             });
         }
         fleet
+    }
+
+    /// Records CNY spend reported by a finished session and schedules usage refresh when `background`.
+    pub(crate) fn on_session_reported(self: &Arc<Self>, runtime_id: &str, cny: Option<f64>) {
+        if let Some(cny) = cny
+            && cny.is_finite()
+            && cny > 0.0
+        {
+            self.record_spend(runtime_id, cny);
+        }
+        if self.background {
+            self.usage_soon(runtime_id);
+        }
     }
 
     async fn probe_all_async(self: &Arc<Self>, ids: Vec<String>) {
@@ -268,8 +272,8 @@ impl Fleet {
             let settings = self.profiles.settings(key);
             self.shown(RuntimeInfo { settings, ..hit.info })
         });
-        if let (Some(info), Some(hub)) = (updated, self.hub.upgrade()) {
-            hub.runtime(info);
+        if let Some(info) = updated {
+            self.live.publish_runtime(now(), info);
         }
     }
 
@@ -280,14 +284,10 @@ impl Fleet {
         if self.cancel.is_cancelled() || !self.probing.lock().insert(key.clone()) {
             return;
         }
-        let Some(hub) = self.hub.upgrade() else {
-            self.probing.lock().remove(&key);
-            return;
-        };
         let fleet = Arc::downgrade(self);
         let cancel = self.cancel.clone();
         let id = id.to_string();
-        hub.spawn_task(async move {
+        self.runtime.spawn(async move {
             let stopped = tokio::select! {
                 biased;
                 _ = cancel.cancelled() => true,
@@ -323,9 +323,7 @@ impl Fleet {
         now_held.info.checked_at = now();
         let info = self.shown(now_held.info.clone());
         drop(held);
-        if let Some(hub) = self.hub.upgrade() {
-            hub.runtime(info);
-        }
+        self.live.publish_runtime(now(), info);
     }
 
     /// Refreshes usage across all available runtimes in parallel with bounded concurrency.
@@ -508,9 +506,7 @@ impl Fleet {
             );
         }
         drop(held);
-        if let Some(hub) = self.hub.upgrade() {
-            hub.runtime(info.clone());
-        }
+        self.live.publish_runtime(now(), info.clone());
         info
     }
 
@@ -518,13 +514,9 @@ impl Fleet {
         if self.cancel.is_cancelled() || !self.probing.lock().insert(id.to_string()) {
             return;
         }
-        let Some(hub) = self.hub.upgrade() else {
-            self.probing.lock().remove(id);
-            return;
-        };
         let fleet = self.clone();
         let id = id.to_string();
-        hub.spawn_task(async move {
+        self.runtime.spawn(async move {
             fleet.lookup_async(&id).await;
             fleet.probing.lock().remove(&id);
         });
@@ -607,6 +599,19 @@ impl Fleet {
             Some(hit) if hit.locale == vibevalley_i18n::locale() => Some(self.shown(hit.info)),
             _ => self.refresh(id),
         }
+    }
+
+    pub async fn update_async(&self, id: &str, settings: RuntimeSettings) -> Result<Option<RuntimeInfo>, ApiError> {
+        if !self.known(id) {
+            return Ok(None);
+        }
+        let profiles = self.profiles.clone();
+        let id_owned = id.to_string();
+        crate::spawn_blocking_traced(move || profiles.save_settings(&id_owned, settings))
+            .await
+            .map_err(|e| ApiError::new(BizCode::InternalError, e.to_string()))?
+            .map_err(|e| refused(t("server.runtime.notSaved", &[("id", id.into()), ("why", e.message.into())])))?;
+        Ok(self.refresh_async(id).await)
     }
 
     pub fn update(&self, id: &str, settings: RuntimeSettings) -> Result<Option<RuntimeInfo>, ApiError> {
@@ -751,10 +756,9 @@ impl Fleet {
                 &[("name", agent.name.clone().into()), ("why", problem.text.clone().into())],
             )));
         }
-        if !options.missing_model.is_empty()
-            && let Some(hub) = self.hub.upgrade()
-        {
-            hub.notice(
+        if !options.missing_model.is_empty() {
+            self.live.publish_notice(
+                now(),
                 NoticeLevel::Warn,
                 t(
                     "server.runtime.defaultModel",
@@ -909,93 +913,35 @@ mod usage_tests {
         assert_eq!(serde_json::to_value(&none).unwrap()["reason"], "capability_unavailable");
     }
 
-    #[test]
-    fn spent_today_accumulates_reported_cny_and_enforces_daily_budget() {
-        use tokio::sync::Notify;
-        use vibevalley_protocol::{ExecutionPolicy, Fact, FactSessionChanged, FactSessionReported, Outcome, Session, SessionController, Spent};
-
+    #[tokio::test]
+    async fn spent_today_accumulates_reported_cny_and_enforces_daily_budget() {
         let home = tempfile::tempdir().unwrap();
-        let hub = Hub::new(vibevalley_core::empty_space_state());
+        let runtime = Arc::new(SpineRuntime::new());
+        let live = Arc::new(LiveOverlay::new());
         let mut registry = Registry::new();
         registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
         let profiles = Profiles::open(home.path(), &[]).unwrap();
-        let fleet = Fleet::new(Arc::new(registry), profiles, &hub, false);
+        let fleet = RuntimeFleet::new(Arc::new(registry), profiles, &runtime, live, false);
         fleet
-            .update(
+            .update_async(
                 "scripted",
                 RuntimeSettings {
                     daily_budget: Some(5.0.into()),
                     ..super::super::presets::default_settings()
                 },
             )
+            .await
             .unwrap();
-        let before = fleet.info("scripted").unwrap();
+        let before = fleet.refresh_async("scripted").await.unwrap();
         assert_eq!(before.spent_today, None);
         assert!(before.stop.is_empty());
 
-        let notify = Arc::new(Notify::new());
-        let wake = notify.clone();
-        let sub = hub.subscribe_transitions("test-runtime-spend", move |_, _| {
-            wake.notify_one();
-        });
+        fleet.on_session_reported("scripted", Some(3.5));
+        fleet.on_session_reported("scripted", Some(2.0));
 
-        let session = Session::new(
-            "s1",
-            SessionController::IssueBoard,
-            "Worker",
-            "scripted",
-            ExecutionPolicy::ManagedWorktree {
-                repo: "demo".into(),
-                branch: None,
-            },
-            1,
-        );
-        hub.apply(vec![Fact::SessionChanged(FactSessionChanged { at: 1, session })]);
-        for (at, cny) in [(2, 3.5), (3, 2.0)] {
-            hub.apply(vec![Fact::SessionReported(FactSessionReported {
-                at,
-                id: "s1".into(),
-                run: None,
-                outcome: Outcome::Completed,
-                phase: None,
-                summary: "done".into(),
-                runs: 1,
-                spent: Some(Spent {
-                    tokens: 100,
-                    cny: Some(cny.into()),
-                }),
-                questions: vec![],
-                checks: vec![],
-                answer: None,
-            })]);
-        }
-
-        // With `background = false`, `record_spend` updates in-memory spend without publishing a
-        // cached `RuntimeInfo` fact; select on transition notifications plus a short async tick.
-        let after = vibevalley_runtime::rt::block_on(async {
-            let mut tick = tokio::time::interval(Duration::from_millis(2));
-            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-            let res = tokio::time::timeout(Duration::from_secs(3), async {
-                loop {
-                    let notified = notify.notified();
-                    tokio::pin!(notified);
-                    notified.as_mut().enable();
-                    let info = fleet.info("scripted").unwrap();
-                    if info.spent_today.map(JsNumber::get).unwrap_or(0.0) >= 5.5 {
-                        return info;
-                    }
-                    tokio::select! {
-                        _ = notified => {}
-                        _ = tick.tick() => {}
-                    }
-                }
-            })
-            .await;
-            sub.close_async().await;
-            res.unwrap_or_else(|_| panic!("spent_today did not accumulate: {:?}", fleet.info("scripted").unwrap().spent_today))
-        });
+        let after = fleet.refresh_async("scripted").await.unwrap();
+        assert!((after.spent_today.map(JsNumber::get).unwrap_or(0.0) - 5.5).abs() < 1e-6);
         assert!(!after.stop.is_empty(), "daily budget stop should trigger at 5.5 >= 5.0");
         fleet.close();
-        hub.close_bus();
     }
 }

@@ -1,9 +1,6 @@
 //! Transactional outbox spine: atomic enqueue inside `ServerDb` write transactions,
 //! topic handler registry, exponential-backoff retries, and `Runtime`-bound dispatch.
 
-// Staged spine module wired into `App` during direct cutover.
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::future::Future;

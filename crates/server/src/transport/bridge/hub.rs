@@ -201,7 +201,7 @@ where
 
 async fn pump_slice_subscription(
     server: Arc<dyn Server>,
-    mut sub: crate::app::hub::slice_feed::SliceSubscription,
+    mut sub: crate::app::slice::SliceSubscription,
     receipt: Arc<SliceReceipt>,
     revisions: Arc<AtomicU64>,
     outlet: Arc<dyn Outlet>,
@@ -212,7 +212,8 @@ async fn pump_slice_subscription(
     let mut is_initial = true;
     let mut seen_gen = None;
     loop {
-        let (_seq, generation, frame) = sub.borrow_and_update(is_initial);
+        let frame = sub.borrow_and_update(is_initial);
+        let generation = frame.generation;
         if !is_initial && seen_gen == Some(generation) {
             let changed = tokio::select! {
                 biased;
@@ -242,12 +243,13 @@ async fn pump_slice_subscription(
         }
         seen_gen = Some(generation);
         is_initial = false;
+        let data: Value = serde_json::from_str(&frame.json).unwrap_or(Value::Null);
         let notified = receipt.ack.notified();
         tokio::pin!(notified);
         notified.as_mut().enable();
         let rev = revisions.fetch_add(1, Ordering::Relaxed) + 1;
         receipt.pending.store(rev, Ordering::Release);
-        outlet.send(&event_name, json!({ "rev": rev, "data": frame }));
+        outlet.send(&event_name, json!({ "rev": rev, "data": data }));
         tokio::select! {
             biased;
             _ = task_cancel.cancelled() => break,

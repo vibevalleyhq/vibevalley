@@ -15,7 +15,7 @@ use crate::game::{AchievementDef, achievements, level_for_commits};
 use crate::status::{is_hired, session_of, session_on_issue};
 
 const CHEAP_CNY: f64 = 0.05;
-const FULL_HOUSE: usize = 6;
+pub const FULL_HOUSE: usize = 6;
 
 fn tier_of(p: &Progress, id: &str) -> i64 {
     p.unlocked.iter().filter(|u| u.id == id).map(|u| u.tier).max().unwrap_or(0)
@@ -267,7 +267,7 @@ fn working(state: &SpaceState) -> usize {
     state.sessions.iter().filter(|h| is_hired(h) && h.phase.is_working()).count()
 }
 
-fn family_entry(id: &str, children: &[&Issue]) -> LedgerEntry {
+pub fn family_entry(id: &str, children: &[&Issue]) -> LedgerEntry {
     let merged: Vec<&str> = children
         .iter()
         .filter(|i| i.delivered == Some(Landing::MergedIntoParent))

@@ -1,6 +1,6 @@
 //! Read-only trajectory inspector across IssueSession, WorkspaceChat, and
 //! Orchestrator trajectories, joining SQLite `session_event` rows, live
-//! `SpaceState`, and on-disk `oar-voyage/3` JSONL records.
+//! DB/`LiveOverlay` state, and on-disk `oar-voyage/3` JSONL records.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs::File;
@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value, json};
 use vibevalley_protocol::{
     ApiError, BizCode, DebugTrajectoryDetail, DebugTrajectoryGetRequest, DebugTrajectoryKind, DebugTrajectoryRawEntry, DebugTrajectorySummary,
-    DebugTrajectoryTurn, EventTokens, ORCHESTRATOR_RUNTIME, Phase, Session, SessionController, SessionEvent, SessionEventType, SpaceState,
+    DebugTrajectoryTurn, EventTokens, Issue, ORCHESTRATOR_RUNTIME, Phase, Session, SessionController, SessionEvent, SessionEventType,
 };
 use vibevalley_runtime::oar::voyage::{Header as VoyageHeader, Kind as VoyageKind, Reader as VoyageReader, Record as VoyageRecord};
 use vibevalley_runtime::oar::{EventKind as OarEventKind, StopReason, Usage as OarUsage};
@@ -83,15 +83,15 @@ fn classify_meta(id: &str, meta: Option<&SessionStateMeta>, orchestrator_ids: &[
     DebugTrajectoryKind::WorkspaceChat
 }
 
-pub(crate) fn extract_session_meta(state: &SpaceState, id: &str) -> Option<SessionStateMeta> {
-    let session = state.sessions.iter().find(|s| s.id == id);
-    let exec_issue = state.issues.iter().find(|i| i.executions().any(|e| e.session() == id));
+pub(crate) fn extract_session_meta(issues: &[Issue], sessions: &[Session], id: &str) -> Option<SessionStateMeta> {
+    let session = sessions.iter().find(|s| s.id == id);
+    let exec_issue = issues.iter().find(|i| i.executions().any(|e| e.session() == id));
     if session.is_none() && exec_issue.is_none() {
         return None;
     }
     let title = if let Some(s) = session {
         if let Some(issue_id) = s.issue_id()
-            && let Some(issue) = state.issues.iter().find(|i| i.id == issue_id)
+            && let Some(issue) = issues.iter().find(|i| i.id == issue_id)
         {
             Some(format!("#{} {}", issue.number, issue.title))
         } else if !s.name.trim().is_empty() {
@@ -114,11 +114,11 @@ pub(crate) fn extract_session_meta(state: &SpaceState, id: &str) -> Option<Sessi
     })
 }
 
-pub(crate) fn extract_trajectory_index(state: &SpaceState) -> StateTrajectoryIndex {
+pub(crate) fn extract_trajectory_index(issues: &[Issue], sessions: &[Session]) -> StateTrajectoryIndex {
     let mut index = StateTrajectoryIndex::default();
-    let issue_by_id: HashMap<&str, (i64, &str)> = state.issues.iter().map(|i| (i.id.as_str(), (i.number, i.title.as_str()))).collect();
+    let issue_by_id: HashMap<&str, (i64, &str)> = issues.iter().map(|i| (i.id.as_str(), (i.number, i.title.as_str()))).collect();
     let mut exec_issue: HashMap<&str, (i64, &str)> = HashMap::new();
-    for issue in &state.issues {
+    for issue in issues {
         for exec in issue.executions() {
             let sid = exec.session();
             exec_issue.entry(sid).or_insert((issue.number, issue.title.as_str()));
@@ -126,7 +126,7 @@ pub(crate) fn extract_trajectory_index(state: &SpaceState) -> StateTrajectoryInd
         }
     }
 
-    for s in &state.sessions {
+    for s in sessions {
         index.known_ids.insert(s.id.clone());
         let linked_exec = exec_issue.get(s.id.as_str()).copied();
         let title = if let Some(issue_id) = s.issue_id()

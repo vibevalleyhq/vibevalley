@@ -11,12 +11,12 @@ use base64::Engine;
 use sea_orm::{ActiveValue::Set, EntityTrait};
 use sha2::{Digest, Sha256};
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentImportPathInput, AttachmentUpload, BizCode, native_ops, ops};
+use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentImportPathInput, AttachmentUpload, BizCode};
 
-use crate::app::hub::refusal::internal;
+use crate::app::refusal::internal;
 use crate::db::ServerDb;
 use crate::db::entities::content_attachment::attachment;
-use crate::{Hub, now};
+use crate::now;
 
 /// `attachmentMax`: 25 MB.
 pub const ATTACHMENT_MAX: usize = 25 * 1024 * 1024;
@@ -25,10 +25,6 @@ pub struct AttachmentStore {
     root: PathBuf,
     db: Arc<ServerDb>,
 }
-
-/// Temporary compatibility alias for unowned callers until spine cutover.
-#[doc(hidden)]
-pub type Attachments = AttachmentStore;
 
 fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::AttachmentRefused, text)
@@ -179,12 +175,6 @@ impl AttachmentStore {
             name: a.name,
         })
     }
-
-    /// Temporary compatibility wrapper for unowned sync callers until `spine-cutover-all`.
-    #[doc(hidden)]
-    pub fn file(&self, id: &str) -> Result<AttachmentFile, ApiError> {
-        vibevalley_runtime::rt::block_on(self.file_async(id))
-    }
 }
 
 /// `writeOnce`: a file already there with these bytes is left; a new
@@ -292,11 +282,13 @@ fn stream_import_to_cas(root: &Path, input: &AttachmentImportPathInput) -> Resul
     Ok((id, name, mime, size))
 }
 
-impl crate::app::hub::ports::AttachmentReadPort for AttachmentStore {
-    fn read_bytes(&self, id: &str) -> Result<(String, Vec<u8>), ApiError> {
-        let file = vibevalley_runtime::rt::block_on(self.file_async(id))?;
-        let bytes = std::fs::read(&file.path).map_err(|_| no_attachment(id))?;
-        Ok((file.r#type, bytes))
+impl crate::app::port::AttachmentReadPort for AttachmentStore {
+    fn read_bytes<'a>(&'a self, id: &'a str) -> crate::transport::api::BoxFuture<'a, Result<(String, Vec<u8>), ApiError>> {
+        Box::pin(async move {
+            let file = self.file_async(id).await?;
+            let bytes = tokio::fs::read(&file.path).await.map_err(|_| no_attachment(id))?;
+            Ok((file.r#type, bytes))
+        })
     }
 }
 
@@ -336,94 +328,83 @@ fn guess_mime_from_path(path: &Path) -> &'static str {
     }
 }
 
-pub fn install(hub: &Hub, files: Arc<AttachmentStore>) {
-    hub.on_async::<ops::AttachmentCreate, _, _>({
-        let files = files.clone();
-        move |_, upload| {
-            let files = files.clone();
-            async move { files.attach_async(upload).await }
-        }
-    });
-    hub.on_async::<ops::AttachmentImportPath, _, _>({
-        let files = files.clone();
-        move |_, input| {
-            let files = files.clone();
-            async move { files.import_path_async(input).await }
-        }
-    });
-    hub.on_async::<native_ops::AttachmentFile, _, _>(move |_, i| {
-        let files = files.clone();
-        async move { files.file_async(&i.id).await }
-    });
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
-    use vibevalley_protocol::Caller;
 
-    fn test_hub() -> (tempfile::TempDir, Arc<Hub>, Arc<AttachmentStore>) {
+    fn test_store() -> (tempfile::TempDir, Arc<AttachmentStore>) {
         let dir = tempfile::tempdir().expect("tempdir");
         let db = ServerDb::open(dir.path()).expect("open db");
         let files = AttachmentStore::open(dir.path(), db);
-        let hub = Hub::new(vibevalley_core::empty_space_state());
-        install(&hub, files.clone());
-        (dir, hub, files)
+        (dir, files)
     }
 
-    #[test]
-    fn import_path_succeeds_for_local_user_and_rejects_remote_caller_with_forbidden() {
-        let (dir, hub, files) = test_hub();
+    #[tokio::test]
+    async fn import_path_and_create_deduplicate_by_content_hash() {
+        let (dir, files) = test_store();
         let sample = dir.path().join("diagram.png");
         let payload = b"\x89PNG\r\n\x1a\nlocal-import-bytes";
         std::fs::write(&sample, payload).expect("write sample");
 
-        let user_env = hub.call_as(Caller::User, "attachment.importPath", json!({ "path": sample.to_string_lossy() }));
-        assert_eq!(user_env.biz_code, 0, "local user must succeed: {}", user_env.message);
-        let att: Attachment = serde_json::from_value(user_env.data.expect("data")).expect("attachment");
+        let att = files
+            .import_path_async(AttachmentImportPathInput {
+                path: sample.to_string_lossy().into_owned(),
+                name: None,
+                mime: None,
+            })
+            .await
+            .expect("import path");
         assert_eq!(att.name, "diagram.png");
         assert_eq!(att.r#type, "image/png");
         assert_eq!(att.size, payload.len() as i64);
         assert_eq!(std::fs::read(files.path_of(&att.id)).expect("cas bytes"), payload);
 
-        // Deduplicates with identical content via base64 attachment.create.
         let b64 = base64::engine::general_purpose::STANDARD.encode(payload);
-        let created = hub.call_as(
-            Caller::User,
-            "attachment.create",
-            json!({ "name": "copy.png", "type": "image/png", "data": b64 }),
-        );
-        assert_eq!(created.biz_code, 0);
-        let att2: Attachment = serde_json::from_value(created.data.expect("data")).expect("attachment");
+        let att2 = files
+            .attach_async(AttachmentUpload {
+                name: "copy.png".into(),
+                r#type: "image/png".into(),
+                data: b64,
+            })
+            .await
+            .expect("attach");
         assert_eq!(att.id, att2.id);
-
-        // Remote caller MUST be rejected with Forbidden.
-        let remote_env = hub.call_as(Caller::Remote, "attachment.importPath", json!({ "path": sample.to_string_lossy() }));
-        assert_eq!(
-            remote_env.biz_code,
-            BizCode::Forbidden.code(),
-            "remote caller must receive Forbidden, got: {:?}",
-            remote_env
-        );
     }
 
-    #[test]
-    fn import_path_enforces_absolute_regular_non_symlink_and_size_checks() {
-        let (dir, hub, _) = test_hub();
+    #[tokio::test]
+    async fn import_path_enforces_absolute_regular_non_symlink_and_size_checks() {
+        let (dir, files) = test_store();
 
-        let rel = hub.call_as(Caller::User, "attachment.importPath", json!({ "path": "relative/file.txt" }));
-        assert_eq!(rel.biz_code, BizCode::InvalidInput.code());
+        let rel = files
+            .import_path_async(AttachmentImportPathInput {
+                path: "relative/file.txt".into(),
+                name: None,
+                mime: None,
+            })
+            .await;
+        assert_eq!(rel.unwrap_err().biz_code, BizCode::InvalidInput.code());
 
         let subdir = dir.path().join("folder");
         std::fs::create_dir_all(&subdir).expect("mkdir");
-        let dir_res = hub.call_as(Caller::User, "attachment.importPath", json!({ "path": subdir.to_string_lossy() }));
-        assert_eq!(dir_res.biz_code, BizCode::AttachmentRefused.code());
+        let dir_res = files
+            .import_path_async(AttachmentImportPathInput {
+                path: subdir.to_string_lossy().into_owned(),
+                name: None,
+                mime: None,
+            })
+            .await;
+        assert_eq!(dir_res.unwrap_err().biz_code, BizCode::AttachmentRefused.code());
 
         let empty = dir.path().join("empty.txt");
         std::fs::write(&empty, b"").expect("write empty");
-        let empty_res = hub.call_as(Caller::User, "attachment.importPath", json!({ "path": empty.to_string_lossy() }));
-        assert_eq!(empty_res.biz_code, BizCode::AttachmentRefused.code());
+        let empty_res = files
+            .import_path_async(AttachmentImportPathInput {
+                path: empty.to_string_lossy().into_owned(),
+                name: None,
+                mime: None,
+            })
+            .await;
+        assert_eq!(empty_res.unwrap_err().biz_code, BizCode::AttachmentRefused.code());
 
         #[cfg(unix)]
         {
@@ -431,20 +412,27 @@ mod tests {
             let link = dir.path().join("link.txt");
             std::fs::write(&target, b"secret").expect("write target");
             std::os::unix::fs::symlink(&target, &link).expect("symlink");
-            let link_res = hub.call_as(Caller::User, "attachment.importPath", json!({ "path": link.to_string_lossy() }));
-            assert_eq!(link_res.biz_code, BizCode::AttachmentRefused.code());
+            let link_res = files
+                .import_path_async(AttachmentImportPathInput {
+                    path: link.to_string_lossy().into_owned(),
+                    name: None,
+                    mime: None,
+                })
+                .await;
+            assert_eq!(link_res.unwrap_err().biz_code, BizCode::AttachmentRefused.code());
         }
 
         // Explicit name and mime override extension defaults.
         let custom = dir.path().join("blob");
         std::fs::write(&custom, b"hello world").expect("write custom");
-        let custom_res = hub.call_as(
-            Caller::User,
-            "attachment.importPath",
-            json!({ "path": custom.to_string_lossy(), "name": "notes.md", "mime": "text/markdown" }),
-        );
-        assert_eq!(custom_res.biz_code, 0);
-        let att: Attachment = serde_json::from_value(custom_res.data.expect("data")).expect("attachment");
+        let att = files
+            .import_path_async(AttachmentImportPathInput {
+                path: custom.to_string_lossy().into_owned(),
+                name: Some("notes.md".into()),
+                mime: Some("text/markdown".into()),
+            })
+            .await
+            .expect("custom import");
         assert_eq!(att.name, "notes.md");
         assert_eq!(att.r#type, "text/markdown");
         assert_eq!(att.size, 11);
