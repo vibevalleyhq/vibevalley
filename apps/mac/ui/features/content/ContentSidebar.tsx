@@ -14,7 +14,7 @@ import { ready, useQuery, useQueryClient } from "../../infra/query";
 import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { defineStored } from "../../infra/state/stored";
-import { artifactTypeIcon, openOutlineImport, useArtifacts } from "../artifact";
+import { artifactTypeIcon, artifactTypeLabel, useArtifacts } from "../artifact";
 import { libraryQuery } from "../media/listing";
 import {
   type ArtifactFacet,
@@ -32,15 +32,18 @@ const artifactsSectionOpen = defineStored("content.sidebar.artifacts", z.boolean
 const mediaSectionOpen = defineStored("content.sidebar.media", z.boolean(), true);
 
 const artifactFacets: readonly { readonly type: ArtifactFacet; readonly icon: IconName; readonly label: () => string }[] = [
-  { type: "outline", icon: artifactTypeIcon.outline, label: () => t("web.library.content.artifactType.outline") },
-  { type: "whiteboard", icon: artifactTypeIcon.whiteboard, label: () => t("web.library.content.artifactType.whiteboard") },
-  { type: "docs", icon: artifactTypeIcon.docs, label: () => t("web.library.content.artifactType.docs") },
-  { type: "slides", icon: artifactTypeIcon.slides, label: () => t("web.library.content.artifactType.slides") },
-  { type: "dashboard", icon: artifactTypeIcon.dashboard, label: () => t("web.library.content.artifactType.dashboard") },
-  { type: "design", icon: artifactTypeIcon.design, label: () => t("web.library.content.artifactType.design") },
-  { type: "design-system", icon: artifactTypeIcon["design-system"], label: () => t("web.library.content.artifactType.designSystem") },
-  { type: "motion", icon: artifactTypeIcon.motion, label: () => t("web.library.content.artifactType.motion") },
-  { type: "html", icon: "web", label: () => t("web.library.content.artifactType.html") },
+  { type: "docs", icon: artifactTypeIcon.docs, label: () => artifactTypeLabel("docs") },
+  { type: "outline", icon: artifactTypeIcon.outline, label: () => artifactTypeLabel("outline") },
+  { type: "slides", icon: artifactTypeIcon.slides, label: () => artifactTypeLabel("slides") },
+  { type: "dashboard", icon: artifactTypeIcon.dashboard, label: () => artifactTypeLabel("dashboard") },
+  { type: "motion", icon: artifactTypeIcon.motion, label: () => artifactTypeLabel("motion") },
+  { type: "whiteboard", icon: artifactTypeIcon.whiteboard, label: () => artifactTypeLabel("whiteboard") },
+  { type: "design", icon: artifactTypeIcon.design, label: () => artifactTypeLabel("design") },
+  { type: "design-system", icon: artifactTypeIcon["design-system"], label: () => artifactTypeLabel("design-system") },
+  { type: "sheet", icon: artifactTypeIcon.sheet, label: () => artifactTypeLabel("sheet") },
+  { type: "prototype", icon: artifactTypeIcon.prototype, label: () => artifactTypeLabel("prototype") },
+  { type: "diagram", icon: artifactTypeIcon.diagram, label: () => artifactTypeLabel("diagram") },
+  { type: "storyboard", icon: artifactTypeIcon.storyboard, label: () => artifactTypeLabel("storyboard") },
 ];
 
 const mediaKinds: readonly LibraryFileKind[] = ["image", "audio", "video", "other"];
@@ -149,24 +152,14 @@ export function ContentSidebar() {
           open={artifactsSectionOpen.get()}
           onToggle={() => artifactsSectionOpen.update((on) => !on)}
           action={
-            <View class="flex-row items-center gap-0.5">
-              <IconButton
-                icon="upload"
-                size={12}
-                label={t("web.artifact.outline.importAction")}
-                testid="content-import-outline-btn"
-                disabled={act.busy()}
-                onClick={() => openOutlineImport()}
-              />
-              <IconButton
-                icon="add"
-                size={12}
-                label={t("web.library.content.newNote")}
-                testid="content-new-note-btn"
-                disabled={act.busy()}
-                onClick={newBlankNote}
-              />
-            </View>
+            <IconButton
+              icon="add"
+              size={12}
+              label={t("web.library.content.newNote")}
+              testid="content-new-note-btn"
+              disabled={act.busy()}
+              onClick={newBlankNote}
+            />
           }
           listClass="gap-0.5"
         >

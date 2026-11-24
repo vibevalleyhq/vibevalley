@@ -1,7 +1,7 @@
 import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import { type Artifact, type LibraryItem, userId } from "@vibevalley/protocol";
+import { type Artifact, ArtifactTypeValues, type LibraryItem, userId } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 
 import type { ContentBucket } from "../content";
@@ -31,11 +31,11 @@ import {
 } from "./libraryView";
 
 const makeArtifact = (over: Omit<Partial<Artifact>, "id"> & { readonly id: string; readonly title: string }): Artifact => ({
-  body: "html",
+  artifactType: "docs",
   isDefault: false,
   by: userId,
   byName: "Me",
-  version: 1,
+  version: 0,
   seq: 0,
   versions: [],
   at: 100,
@@ -88,45 +88,22 @@ test("bucket helpers report visible content categories and clear incompatible me
   expect(selectBucketSelection(openLightbox(withAsking, 0, 2), whiteboard)).toEqual({ kind: "none" });
 });
 
-test("artifactMatchesType matches all 9 exact artifact types and legacy body/display fallbacks", () => {
-  const outline = makeArtifact({ id: "a-out", title: "Outline", body: "blocks", artifactType: "outline" });
-  const wb = makeArtifact({ id: "a-wb", title: "Board", body: "store", artifactType: "whiteboard" });
-  const docs = makeArtifact({ id: "a-docs", title: "Doc", body: "blocks", artifactType: "docs" });
-  const legacyBlocks = makeArtifact({ id: "a-blocks", title: "Legacy Doc", body: "blocks" });
-  const slides = makeArtifact({ id: "a-slides", title: "Deck", body: "html", artifactType: "slides" });
-  const legacySlides = makeArtifact({ id: "a-lslides", title: "Legacy Deck", body: "html", display: "slides" });
-  const dash = makeArtifact({ id: "a-dash", title: "KPI", body: "html", artifactType: "dashboard" });
-  const design = makeArtifact({ id: "a-des", title: "Mock", body: "store", artifactType: "design" });
-  const ds = makeArtifact({ id: "a-ds", title: "Tokens", body: "store", artifactType: "design-system" });
-  const motion = makeArtifact({ id: "a-mot", title: "Anim", body: "html", artifactType: "motion" });
-  const legacyMotion = makeArtifact({ id: "a-lmot", title: "Legacy Anim", body: "html", display: "motion" });
-  const html = makeArtifact({ id: "a-html", title: "Page", body: "html", display: "page" });
-
-  expect(artifactMatchesType(outline, "outline")).toBe(true);
-  expect(artifactMatchesType(outline, "docs")).toBe(false);
-  expect(artifactMatchesType(wb, "whiteboard")).toBe(true);
-  expect(artifactMatchesType(wb, "design")).toBe(false);
-  expect(artifactMatchesType(docs, "docs")).toBe(true);
-  expect(artifactMatchesType(legacyBlocks, "docs")).toBe(true);
-  expect(artifactMatchesType(slides, "slides")).toBe(true);
-  expect(artifactMatchesType(legacySlides, "slides")).toBe(true);
-  expect(artifactMatchesType(dash, "dashboard")).toBe(true);
-  expect(artifactMatchesType(design, "design")).toBe(true);
-  expect(artifactMatchesType(design, "design-system")).toBe(false);
-  expect(artifactMatchesType(ds, "design-system")).toBe(true);
-  expect(artifactMatchesType(motion, "motion")).toBe(true);
-  expect(artifactMatchesType(legacyMotion, "motion")).toBe(true);
-  expect(artifactMatchesType(html, "html")).toBe(true);
-  expect(artifactMatchesType(slides, "html")).toBe(false);
-  expect(artifactMatchesType(legacySlides, "html")).toBe(false);
-  expect(artifactMatchesType(wb, undefined)).toBe(true);
-  expect(artifactMatchesType(html, undefined)).toBe(true);
+test("artifactMatchesType matches all 12 exact artifact types", () => {
+  const byType = new Map(ArtifactTypeValues.map((t) => [t, makeArtifact({ id: `a-${t}`, title: t, artifactType: t })]));
+  for (const type of ArtifactTypeValues) {
+    const target = byType.get(type)!;
+    expect(artifactMatchesType(target, type)).toBe(true);
+    expect(artifactMatchesType(target, undefined)).toBe(true);
+    for (const other of ArtifactTypeValues) {
+      if (other !== type) expect(artifactMatchesType(target, other)).toBe(false);
+    }
+  }
 });
 
 test("orthogonal SourceFilter and pinned filtering work across artifacts and media", () => {
   const artifacts = [
-    makeArtifact({ id: "art-user", title: "My Board", body: "store", artifactType: "whiteboard", by: userId, updated: 150 }),
-    makeArtifact({ id: "art-agent", title: "Agent Deck", body: "html", artifactType: "slides", by: "a1", byName: "Agent", updated: 250 }),
+    makeArtifact({ id: "art-user", title: "My Board", artifactType: "whiteboard", by: userId, updated: 150 }),
+    makeArtifact({ id: "art-agent", title: "Agent Deck", artifactType: "slides", by: "a1", byName: "Agent", updated: 250 }),
   ];
   const media = [
     makeMedia({ id: "m-up", name: "photo.png", type: "image/png", origin: { kind: "uploaded" } }),
@@ -253,11 +230,14 @@ test("reconcileSelection prunes vanished files, anchors, and out-of-range lightb
 
 test("regression: countContentHub sidebar badges match LibraryPage visible counts across every bucket", () => {
   const artifacts = [
-    makeArtifact({ id: "a-out", title: "Outline", body: "blocks", artifactType: "outline" }),
-    makeArtifact({ id: "a-wb", title: "Board", body: "store", artifactType: "whiteboard" }),
-    makeArtifact({ id: "a-doc", title: "Legacy Doc", body: "blocks" }),
-    makeArtifact({ id: "a-slides", title: "Legacy Slides", body: "html", display: "slides" }),
-    makeArtifact({ id: "a-html", title: "Raw Html", body: "html", display: "page" }),
+    makeArtifact({ id: "a-out", title: "Outline", artifactType: "outline" }),
+    makeArtifact({ id: "a-wb", title: "Board", artifactType: "whiteboard" }),
+    makeArtifact({ id: "a-doc", title: "Doc", artifactType: "docs" }),
+    makeArtifact({ id: "a-slides", title: "Slides", artifactType: "slides" }),
+    makeArtifact({ id: "a-proto", title: "Prototype", artifactType: "prototype" }),
+    makeArtifact({ id: "a-sheet", title: "Sheet", artifactType: "sheet" }),
+    makeArtifact({ id: "a-diag", title: "Diagram", artifactType: "diagram" }),
+    makeArtifact({ id: "a-sb", title: "Storyboard", artifactType: "storyboard" }),
   ];
   const media = [
     makeMedia({ id: "m-img", name: "photo.png", type: "image/png", origin: { kind: "uploaded" } }),
@@ -272,15 +252,7 @@ test("regression: countContentHub sidebar badges match LibraryPage visible count
     { kind: "recent" },
     { kind: "pinned" },
     { kind: "artifacts" },
-    { kind: "artifacts", artifactType: "outline" },
-    { kind: "artifacts", artifactType: "whiteboard" },
-    { kind: "artifacts", artifactType: "docs" },
-    { kind: "artifacts", artifactType: "slides" },
-    { kind: "artifacts", artifactType: "dashboard" },
-    { kind: "artifacts", artifactType: "design" },
-    { kind: "artifacts", artifactType: "design-system" },
-    { kind: "artifacts", artifactType: "motion" },
-    { kind: "artifacts", artifactType: "html" },
+    ...ArtifactTypeValues.map((artifactType): ContentBucket => ({ kind: "artifacts", artifactType })),
     { kind: "media" },
     { kind: "media", fileKind: "image" },
     { kind: "media", fileKind: "audio" },

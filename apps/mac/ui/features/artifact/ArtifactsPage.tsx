@@ -21,18 +21,14 @@ import { useCollabSlice, useIssue } from "../../infra/frame";
 import { ready, useQueryClient } from "../../infra/query";
 import { richNative } from "../../infra/rich";
 import { Link as A, useRouter, useSearch } from "../../infra/router";
-import { createMemo, createSignal } from "../../infra/solid";
+import { createMemo } from "../../infra/solid";
 import { contentPresenting, contentSidebarOpen, isPinned, openTemplatePicker, togglePinned } from "../content/navigation";
-import { artifactHref, artifactSuffix, kindLabel, useArtifact, useArtifacts } from "./ArtifactCard";
-import { plainOf } from "./blocks";
-import { BlocksView } from "./BlocksView";
-import { type Frame, withShellQuery } from "./frame";
-import { HtmlFrame } from "./HtmlFrame";
-import { openOutlineImport } from "./OutlineImportModal";
-import { PageWords } from "./PageWords";
-import { exportMarkdownFile, requestArtifactChatFocus, saveTextFile } from "./store";
-import { StoreArtifactView } from "./StoreArtifactView";
+import { artifactHref, kindLabel, useArtifact, useArtifacts } from "./ArtifactCard";
+import { ArtifactDirectoryView } from "./ArtifactDirectoryView";
+import { buildPrototypeDocument } from "./frame";
+import { exportArtifactDirectory, requestArtifactChatFocus } from "./store";
 import { TimelineBar } from "./TimelineBar";
+import { BOARD_FILE_PATH, boardToNativeEntries, parseBoardDocument } from "./WhiteboardView";
 
 /** Provided by app/: channel shows artifacts, so artifact does not import channel back. */
 export type ArtifactChat = (props: {
@@ -40,20 +36,6 @@ export type ArtifactChat = (props: {
   readonly issue?: string | undefined;
   readonly point?: number | undefined;
 }) => JSX.Element;
-
-async function exportArtifactFile(artifact: Artifact, activeVersion?: number): Promise<boolean> {
-  const safeName = (artifact.title.trim() || "deliverable").replace(/[\\/:*?"<>|]/gu, "-");
-  if (artifact.body === "blocks") {
-    return exportMarkdownFile(artifact.id, artifact.title);
-  }
-  if (artifact.body === "html") {
-    const content = await api.artifact.content.get({ id: artifact.id, version: activeVersion ?? artifact.version });
-    const suffix = artifactSuffix(artifact);
-    return saveTextFile(`${safeName}${suffix}`, "text/html;charset=utf-8", content.content);
-  }
-  const snap = await api.artifact.entry.list({ id: artifact.id, includeValues: true });
-  return saveTextFile(`${safeName}.json`, "application/json;charset=utf-8", JSON.stringify(snap.entries, null, 2));
-}
 
 function ArtifactSkeleton() {
   return (
@@ -105,14 +87,9 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
                 <Empty
                   icon="artifacts"
                   action={
-                    <View class="flex-row items-center gap-2">
-                      <Button icon="add" onPress={() => openTemplatePicker("deliverable")}>
-                        {t("web.artifact.page.new")}
-                      </Button>
-                      <Button icon="upload" testID="artifact-import-outline" onPress={() => openOutlineImport()}>
-                        {t("web.artifact.outline.importAction")}
-                      </Button>
-                    </View>
+                    <Button icon="add" onPress={() => openTemplatePicker("deliverable")}>
+                      {t("web.artifact.page.new")}
+                    </Button>
                   }
                 >
                   {t("web.artifact.page.none")}
@@ -224,19 +201,24 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   const timelineOpen = signal(false);
   const historyPreview = signal<ArtifactHistoryPreviewResult | undefined>(undefined);
   const revisionKey = signal(0);
-  const html = () => props.artifact.body === "html";
-  const store = () => props.artifact.body === "store";
-  const isOutline = () => props.artifact.artifactType === "outline";
-  const wide = () => html() || store();
-  // Wide artifacts start with the rail closed so the canvas gets the full width.
-  const railOpen = signal(!untracked(wide));
-  const asked = () => Number(search().get("v"));
-  const version = createMemo((): ArtifactVersion | undefined => props.artifact.versions.find((v) => v.version === asked()) ?? props.artifact.versions.at(-1));
+
+  const isWideCanvas = () => props.artifact.artifactType !== "docs" && props.artifact.artifactType !== "outline";
+  // Wide visual canvases start with the chat rail collapsed so the canvas gets the full width.
+  const railOpen = signal(!untracked(isWideCanvas));
+  const askedVersion = () => {
+    const raw = search().get("v");
+    const parsed = raw ? Number(raw) : Number.NaN;
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+  };
+  const selectedVersion = createMemo((): ArtifactVersion | undefined => {
+    const v = askedVersion();
+    return v !== undefined ? props.artifact.versions.find((item) => item.version === v) : undefined;
+  });
   const issue = useIssue(() => props.artifact.issue);
   const channels = createMemo(() => (collab()?.chat?.channels ?? []).filter((c) => c.type === "channel" && c.archived === undefined));
   /** Where its comments are: the version shown, else where it was first said. */
-  const said = createMemo(() => version() ?? props.artifact.said);
-  const pick = (n: number) => router.navigate(artifactHref(props.artifact.id, n === props.artifact.version ? undefined : n), { replace: true });
+  const said = createMemo(() => selectedVersion() ?? props.artifact.said);
+  const pickVersion = (n: number | undefined) => router.navigate(artifactHref(props.artifact.id, n), { replace: true });
   const removing = createAct();
   const exporting = createAct();
   const sending = createAct();
@@ -283,17 +265,9 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
 
   const more = (): MoreItem[] => [
     { key: "issue", label: t("web.library.content.turnIntoIssue"), icon: "issues", onSelect: () => void turnIntoIssue() },
-    { key: "import-outline", label: t("web.artifact.outline.importAction"), icon: "upload", onSelect: () => openOutlineImport() },
     { key: "delete", label: t("web.artifact.page.delete"), icon: "delete", danger: true, onSelect: () => asking.set(true) },
   ];
 
-  const [frame, setFrame] = createSignal<Frame>();
-  const framed = createMemo(() => {
-    const v = version();
-    const f = frame();
-    return html() && v && f ? { version: v.version, frame: f } : undefined;
-  });
-  const [suggestions, setSuggestions] = createSignal<{ readonly draw: () => JSX.Element }>();
   const Chat = untracked(() => props.chat);
   const presenting = () => contentPresenting();
   const isCovered = createMemo(() => menu() || sendMenu());
@@ -311,7 +285,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
     <View
       testID="artifact"
       accessibilityLabel={props.artifact.title}
-      accessibilityValue={{ text: `${props.artifact.id} ${props.artifact.body} ${version()?.version ?? ""}` }}
+      accessibilityValue={{ text: `${props.artifact.id} ${props.artifact.artifactType} ${selectedVersion()?.version ?? props.artifact.version}` }}
       class="min-h-0 flex-1 xl:flex-row"
     >
       <View class="min-h-0 min-w-0 flex-1">
@@ -347,20 +321,31 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
                   <Text class="text-2xs font-semibold text-page">{t("web.artifact.types.defaultBadge")}</Text>
                 </View>
               </If>
-              <If when={html() && props.artifact.versions.length > 1}>
+              <If when={props.artifact.versions.length > 0}>
                 <View testID="artifact-versions" class="shrink-0 flex-row items-center gap-1">
+                  <View
+                    role="button"
+                    testID="artifact-version-live"
+                    accessibilityState={{ selected: selectedVersion() === undefined }}
+                    onPress={() => pickVersion(undefined)}
+                    class={`h-5 items-center justify-center rounded-sm border px-1.5 ${
+                      selectedVersion() === undefined ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
+                    }`}
+                  >
+                    <Text class={`font-mono text-2xs font-medium ${selectedVersion() === undefined ? "text-ink" : "text-muted"}`}>live</Text>
+                  </View>
                   <Each of={props.artifact.versions.toReversed()} key={(v) => v.version}>
                     {(v) => (
                       <View
                         role="button"
                         testID={`artifact-version-${v().version}`}
-                        accessibilityState={{ selected: v().version === version()?.version }}
-                        onPress={() => pick(v().version)}
+                        accessibilityState={{ selected: v().version === selectedVersion()?.version }}
+                        onPress={() => pickVersion(v().version)}
                         class={`h-5 items-center justify-center rounded-sm border px-1.5 ${
-                          v().version === version()?.version ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
+                          v().version === selectedVersion()?.version ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
                         }`}
                       >
-                        <Text class={`font-mono text-2xs font-medium tabular-nums ${v().version === version()?.version ? "text-ink" : "text-muted"}`}>
+                        <Text class={`font-mono text-2xs font-medium tabular-nums ${v().version === selectedVersion()?.version ? "text-ink" : "text-muted"}`}>
                           {`v${v().version}`}
                         </Text>
                       </View>
@@ -413,7 +398,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
                 label={t("web.library.content.exportArtifact")}
                 testid="artifact-export"
                 disabled={exporting.busy()}
-                onClick={() => void exporting.run(() => exportArtifactFile(props.artifact, version()?.version))}
+                onClick={() => void exporting.run(() => exportArtifactDirectory(props.artifact, selectedVersion()?.version))}
               />
               <IconButton
                 icon="clock"
@@ -470,57 +455,18 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
         <If
           when={historyPreview()}
           else={
-            <Keyed key={`${props.artifact.id}:${revisionKey()}`}>
+            <Keyed key={`${props.artifact.id}:${selectedVersion()?.version ?? "live"}:${revisionKey()}`}>
               {() => (
-                <>
-                  <If when={props.artifact.body === "blocks"}>
-                    <View class="min-h-0 w-full flex-1">
-                      <View class={`mx-auto min-h-0 w-full flex-1 gap-2 px-5 py-4 ${isOutline() ? "max-w-2xl" : "max-w-3xl"}`}>
-                        <If when={!railOpen() ? suggestions() : undefined}>{(s) => s().draw()}</If>
-                        <BlocksView id={props.artifact.id} artifactType={props.artifact.artifactType} onRail={(draw) => setSuggestions({ draw })} />
-                      </View>
-                    </View>
-                  </If>
-
-                  <If when={store()}>
-                    <StoreArtifactView
-                      artifact={props.artifact}
-                      covered={isCovered()}
-                      onPresent={(on) => contentPresenting.set(on)}
-                      onOpenChat={() => {
-                        railOpen.set(true);
-                        requestArtifactChatFocus();
-                      }}
-                      frameClass="min-h-0 w-full flex-1 bg-page"
-                    />
-                  </If>
-
-                  <If when={html() ? version() : undefined}>
-                    {(v) => (
-                      <Keyed key={v().version}>
-                        {() => (
-                          <View class="min-h-0 w-full flex-1">
-                            <HtmlFrame
-                              artifact={props.artifact}
-                              version={untracked(v).version}
-                              title={t("web.artifact.page.frame", { title: props.artifact.title, version: untracked(v).version })}
-                              testId="artifact-frame"
-                              frameClass="min-h-0 w-full flex-1 bg-page"
-                              covered={isCovered()}
-                              onPresent={(on) => contentPresenting.set(on)}
-                              onFrame={setFrame}
-                            />
-                            <If when={!presenting() && railOpen() && untracked(v).version === props.artifact.version}>
-                              <View class="shrink-0 border-t border-line bg-side px-3 py-1">
-                                <Text class="text-xs text-faint">{t("web.artifact.edit.hint")}</Text>
-                              </View>
-                            </If>
-                          </View>
-                        )}
-                      </Keyed>
-                    )}
-                  </If>
-                </>
+                <ArtifactDirectoryView
+                  artifact={props.artifact}
+                  version={selectedVersion()?.version}
+                  covered={isCovered()}
+                  onPresent={(on) => contentPresenting.set(on)}
+                  onOpenChat={() => {
+                    railOpen.set(true);
+                    requestArtifactChatFocus();
+                  }}
+                />
               )}
             </Keyed>
           }
@@ -535,20 +481,6 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
           testID="artifact-rail"
           class="h-96 min-h-0 shrink-0 border-t border-line bg-side xl:h-full xl:w-88 xl:border-t-0 xl:border-l"
         >
-          <If when={!wide() ? suggestions() : undefined}>
-            {(s) => (
-              <Scroll class="max-h-56 shrink-0 border-b border-line" contentClass="px-3 py-3">
-                {s().draw()}
-              </Scroll>
-            )}
-          </If>
-          <If when={framed()}>
-            {(p) => (
-              <View class="shrink-0 border-b border-line px-3 py-3">
-                <Keyed key={p().version}>{() => <PageWords artifact={props.artifact} version={untracked(p).version} frame={untracked(p).frame} />}</Keyed>
-              </View>
-            )}
-          </If>
           <View class="min-h-0 min-w-0 flex-1">
             <Chat channel={said()?.channel ?? props.artifact.channel} issue={props.artifact.issue} point={said()?.number} />
           </View>
@@ -560,7 +492,13 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
 
 function HistoryPreviewBody(props: { artifact: Artifact; preview: ArtifactHistoryPreviewResult; onBackToLive: () => void }) {
   const native = richNative();
-  const isWhiteboard = () => (props.preview.artifactType ?? props.artifact.artifactType) === "whiteboard";
+  const isWhiteboard = () => props.preview.artifactType === "whiteboard";
+  const isPrototype = () => props.preview.artifactType === "prototype";
+  const boardEntry = () => props.preview.files.find((f) => f.path === BOARD_FILE_PATH);
+  const prototypeHtml = () => {
+    const map = new Map(props.preview.files.map((f) => [f.path, f.content]));
+    return buildPrototypeDocument(map);
+  };
   return (
     <View testID="artifact-history-preview" class="min-h-0 w-full flex-1 bg-page">
       <Banner tone="info" edge icon="clock">
@@ -576,91 +514,50 @@ function HistoryPreviewBody(props: { artifact: Artifact; preview: ArtifactHistor
         </View>
       </Banner>
 
-      <If when={props.preview.blocks !== undefined}>
-        <Scroll testID="artifact-history-preview-blocks" class="min-h-0 flex-1" contentClass="mx-auto w-full max-w-3xl gap-1.5 px-6 py-4">
-          <Each of={props.preview.blocks ?? []} key={(b) => b.id}>
-            {(block) => (
-              <View class="flex-row items-start gap-2">
-                <If when={block().type === "bulleted"}>
-                  <View class="mt-2 size-1.5 shrink-0 rounded-full bg-faint" />
-                </If>
-                <If when={block().type === "todo"}>
-                  <View
-                    class={`mt-0.5 size-4 shrink-0 items-center justify-center rounded-xs border ${
-                      block().attrs.checked === true ? "border-accent bg-accent" : "border-idle bg-page"
-                    }`}
-                  >
-                    <If when={block().attrs.checked === true}>
-                      <Icon name="ticked" size={12} tone="page" />
-                    </If>
-                  </View>
-                </If>
-                <Text
-                  class={
-                    block().type === "heading"
-                      ? "text-lg font-semibold text-ink"
-                      : block().type === "code"
-                        ? "rounded-sm bg-code-bg px-2 py-1 font-mono text-xs text-code-ink"
-                        : "text-sm text-ink"
-                  }
-                >
-                  {plainOf(block().text)}
-                </Text>
-              </View>
-            )}
-          </Each>
-        </Scroll>
-      </If>
-
-      <If when={props.preview.blocks === undefined && props.preview.html !== undefined}>
-        <WebView
-          testID="artifact-history-preview-html"
-          accessibilityLabel={props.artifact.title}
-          html={withShellQuery(props.preview.html ?? "")}
-          incognito
-          class="min-h-0 w-full flex-1 bg-page"
-        />
-      </If>
-
-      <If when={props.preview.blocks === undefined && props.preview.html === undefined && props.preview.entries !== undefined}>
-        <If
-          when={isWhiteboard() ? native : undefined}
-          else={
-            <Scroll testID="artifact-history-preview-entries" class="min-h-0 flex-1" contentClass="gap-2 p-4">
-              <Each of={props.preview.entries ?? []} key={(e) => e.path}>
-                {(entry) => (
-                  <View class="gap-1 rounded-md border border-line bg-side px-3 py-2">
-                    <Text class="font-mono text-xs font-medium text-ink">{entry().path}</Text>
-                    <If when={entry().value}>{(val) => <Text class="truncate font-mono text-2xs text-muted">{val()}</Text>}</If>
-                  </View>
-                )}
-              </Each>
-            </Scroll>
-          }
-        >
-          {(rich) => {
-            const VvWhiteboard = rich().VvWhiteboard;
-            return (
-              <VvWhiteboard
-                entriesJson={JSON.stringify(props.preview.entries ?? [])}
-                readOnly
-                title={props.artifact.title}
-                locale={currentLocale()}
-                class="min-h-0 min-w-0 flex-1"
-              />
-            );
-          }}
-        </If>
-      </If>
-
       <If
-        when={
-          props.preview.blocks === undefined && props.preview.html === undefined && props.preview.entries === undefined && props.preview.markdown !== undefined
+        when={isWhiteboard() && boardEntry() && native ? native : undefined}
+        else={
+          <If
+            when={isPrototype() && props.preview.files.some((f) => f.path === "structure/index.html")}
+            else={
+              <Scroll testID="artifact-history-preview-files" class="min-h-0 flex-1" contentClass="mx-auto w-full max-w-3xl gap-2.5 p-5">
+                <Each of={props.preview.files} key={(f) => f.path}>
+                  {(file) => (
+                    <View class="gap-1.5 rounded-lg border border-line bg-side px-3.5 py-2.5">
+                      <View class="flex-row items-center justify-between gap-2">
+                        <Text class="font-mono text-xs font-semibold text-ink">{file().path}</Text>
+                        <Text class="font-mono text-2xs text-faint">{`${file().mime} · ${file().size} B`}</Text>
+                      </View>
+                      <Text class="font-mono text-xs leading-relaxed text-ink select-text">{file().content}</Text>
+                    </View>
+                  )}
+                </Each>
+              </Scroll>
+            }
+          >
+            <WebView
+              testID="artifact-history-preview-html"
+              accessibilityLabel={props.artifact.title}
+              html={prototypeHtml()}
+              incognito
+              class="min-h-0 w-full flex-1 bg-page"
+            />
+          </If>
         }
       >
-        <Scroll testID="artifact-history-preview-markdown" class="min-h-0 flex-1" contentClass="mx-auto w-full max-w-3xl px-6 py-4">
-          <Text class="font-mono text-xs text-ink">{props.preview.markdown ?? ""}</Text>
-        </Scroll>
+        {(rich) => {
+          const VvWhiteboard = rich().VvWhiteboard;
+          const doc = parseBoardDocument(boardEntry()?.content);
+          return (
+            <VvWhiteboard
+              entriesJson={JSON.stringify(boardToNativeEntries(props.artifact.id, props.artifact.title, doc, 0))}
+              readOnly
+              title={props.artifact.title}
+              locale={currentLocale()}
+              class="min-h-0 min-w-0 flex-1"
+            />
+          );
+        }}
       </If>
     </View>
   );

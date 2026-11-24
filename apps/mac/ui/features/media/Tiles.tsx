@@ -273,7 +273,7 @@ export function ArtifactTiles(props: {
               <Text class="truncate text-sm font-semibold text-ink">{a().title}</Text>
               <View class="flex-row items-center justify-between gap-2">
                 <Text class="min-w-0 flex-1 truncate text-xs text-muted">
-                  {[...(a().body === "html" ? [t("web.library.inspector.versionBadge", { version: a().version })] : []), ago(a().updated, now())].join(" · ")}
+                  {[...(a().version > 0 ? [t("web.library.inspector.versionBadge", { version: a().version })] : []), ago(a().updated, now())].join(" · ")}
                 </Text>
                 <Icon name="open" size={12} tone="faint" />
               </View>

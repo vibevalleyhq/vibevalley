@@ -1,25 +1,9 @@
-import { type ArtifactPresence, type HtmlAnchor, type HtmlShellMessage, userId } from "@vibevalley/protocol";
-import * as S from "@vibevalley/protocol/schema";
+import { type ArtifactPresence, userId } from "@vibevalley/protocol";
 
 /** The workbench theme the page is shown in: the frame cannot read the workbench's own setting. */
 export type ShellTheme = "light" | "dark";
 
-export const shellMessageOf = (data: unknown): HtmlShellMessage | undefined => {
-  const got = S.HtmlShellMessage.safeParse(data);
-  return got.success ? got.data : undefined;
-};
-
-const wordsMax = 10_000;
-const contextMax = 64;
-
-export function selectionOf(data: unknown): HtmlAnchor | undefined {
-  const message = shellMessageOf(data);
-  if (message?.vibevalley !== "selection") return undefined;
-  const { anchor } = message;
-  return anchor.exact.length > wordsMax || anchor.prefix.length > contextMax || anchor.suffix.length > contextMax ? undefined : anchor;
-}
-
-/** One live collaborator highlight rendered inside a sandboxed HTML/slides/design WebView without relaxing CSP. */
+/** One live collaborator highlight rendered inside a sandboxed prototype WebView without relaxing CSP. */
 export interface PresenceHighlightItem {
   readonly id: string;
   readonly name: string;
@@ -32,7 +16,6 @@ export interface PresenceHighlightItem {
   readonly h?: number;
 }
 
-/** Matches `crates/core/src/artifact/shell.rs::PresenceHighlightCommand`. */
 export interface PresenceHighlightCommand {
   readonly vibevalley: "presence-highlight";
   readonly items: readonly PresenceHighlightItem[];

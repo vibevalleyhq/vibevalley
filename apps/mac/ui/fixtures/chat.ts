@@ -41,7 +41,7 @@ const messages: ChatMessage[] = [
   orchestrator("派给老周了，在工单 #18 里。"),
   orchestrator("他说半小时左右。"),
   helper("收到，先看 session.ts。", {
-    artifact: { id: "art-login", title: "登录流程", body: "html", version: 2, note: "多一条测试", display: "page" } as ChatMessage["artifact"],
+    artifact: { id: "art-login", title: "登录流程", artifactType: "prototype", version: 2, note: "多一条测试" } as ChatMessage["artifact"],
   }),
   helper("改好了：过期回到登录页，加了两条测试。", { kind: "report", run: "run-1", outcome: "completed", spent: { tokens: 32_800, cny: 0.42 } }),
   helper("测试起不来：缺一个环境变量。", { kind: "report", outcome: "failed", spent: { tokens: 9_100, cny: 0.11 } }),

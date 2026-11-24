@@ -1,12 +1,12 @@
 import { signal } from "nsh";
 import { z } from "zod";
 
-import type { Artifact, ArtifactBody, ArtifactDisplay, ArtifactType, LibraryFileKind, LibraryItem } from "@vibevalley/protocol";
+import type { Artifact, ArtifactType, LibraryFileKind, LibraryItem } from "@vibevalley/protocol";
 
 import { defineAtom } from "../../infra/state/atom";
 import { defineStored } from "../../infra/state/stored";
 
-export type ArtifactFacet = ArtifactType | "html";
+export type ArtifactFacet = ArtifactType;
 
 export type ContentBucket =
   | { readonly kind: "recent" }
@@ -93,21 +93,8 @@ export function safeLastContentPath(): string {
   return normalizeContentPath(pathname, query ? `?${query}` : "") ?? "/library";
 }
 
-export function artifactFacetOf(a: {
-  readonly body: ArtifactBody;
-  readonly display?: ArtifactDisplay | undefined;
-  readonly artifactType?: ArtifactType | undefined;
-}): ArtifactFacet {
-  if (a.artifactType !== undefined) return a.artifactType;
-  switch (a.body) {
-    case "blocks":
-    case "store":
-      return "docs";
-    case "html":
-      if (a.display === "slides") return "slides";
-      if (a.display === "motion") return "motion";
-      return "html";
-  }
+export function artifactFacetOf(a: { readonly artifactType: ArtifactType }): ArtifactFacet {
+  return a.artifactType;
 }
 
 export function mediaKindOf(mime: string): LibraryFileKind {
@@ -128,7 +115,7 @@ export interface ContentHubCounts {
 
 /** Single count formula shared by `ContentSidebar` badges and `LibraryPage` bucket views. */
 export function countContentHub(input: {
-  readonly artifacts: readonly Pick<Artifact, "id" | "body" | "display" | "artifactType">[];
+  readonly artifacts: readonly Pick<Artifact, "id" | "artifactType">[];
   readonly media: readonly { readonly attachment: Pick<LibraryItem["attachment"], "id" | "type"> }[];
   readonly pinned: ReadonlySet<string>;
 }): ContentHubCounts {

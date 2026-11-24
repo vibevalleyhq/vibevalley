@@ -2,7 +2,7 @@ import { computed, effect, Scroll, signal, Text, untracked, View, type Accessor 
 import { z } from "zod";
 
 import { currentLocale, t } from "@vibevalley/i18n";
-import { type ArtifactEntry, type ArtifactEntryWriteInput, type ArtifactPresenceKind, userId, type ViewportRect } from "@vibevalley/protocol";
+import { type Artifact, type ArtifactPresenceKind, userId, type ViewportRect } from "@vibevalley/protocol";
 import { isFreeUserSession, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
@@ -19,8 +19,16 @@ import {
   type VvWhiteboardSelectionEvent,
   type VvWhiteboardViewportEvent,
 } from "../../infra/rich";
-import { saveBase64File, saveTextFile, type StoreEntryClient, useArtifactPresence, useReportViewContext, useStoreEntries } from "./store";
-import type { StoreViewerProps } from "./StoreArtifactView";
+import { type DirectoryArtifactClient, saveBase64File, saveTextFile, useArtifactDirectory, useArtifactPresence, useReportViewContext } from "./store";
+
+export const BOARD_FILE_PATH = "structure/board.json";
+
+export interface WhiteboardViewerProps {
+  readonly artifact: Artifact;
+  readonly version?: number | undefined;
+  readonly onOpenChat?: (() => void) | undefined;
+  readonly frameClass?: string | undefined;
+}
 
 const WhiteboardWriteSchema = z.object({
   op: z.enum(["set", "patch", "delete", "copy"]),
@@ -32,7 +40,7 @@ const WhiteboardWriteSchema = z.object({
   ifRev: z.exactOptional(z.number().int().min(0)),
 });
 
-const FallbackElementSchema = z
+const BoardElementSchema = z
   .object({
     id: z.string().min(1),
     type: z.string().min(1),
@@ -40,6 +48,7 @@ const FallbackElementSchema = z
     title: z.optional(z.string()),
     label: z.optional(z.string()),
     text: z.optional(z.string()),
+    body: z.optional(z.string()),
     x: z.optional(z.number()),
     y: z.optional(z.number()),
     w: z.optional(z.number()),
@@ -47,7 +56,14 @@ const FallbackElementSchema = z
   })
   .loose();
 
-type FallbackElement = z.output<typeof FallbackElementSchema> & { readonly rev: number };
+type BoardElement = z.output<typeof BoardElementSchema>;
+
+export interface BoardDocument {
+  readonly version: number;
+  readonly grid: string | boolean;
+  readonly viewport: { readonly x: number; readonly y: number; readonly zoom: number };
+  readonly elements: Record<string, Record<string, unknown>>;
+}
 
 interface PresenceWire {
   readonly id: string;
@@ -73,7 +89,66 @@ function parseJsonSafe(raw: string): unknown {
   }
 }
 
-function labelOfFallback(el: { readonly title?: string | undefined; readonly label?: string | undefined; readonly text?: string | undefined }): string {
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+export function parseBoardDocument(raw: string | undefined): BoardDocument {
+  const empty: BoardDocument = { version: 1, grid: "architectural", viewport: { x: 0, y: 0, zoom: 1 }, elements: {} };
+  if (!raw) return empty;
+  const parsed = parseJsonSafe(raw);
+  if (!isRecord(parsed)) return empty;
+  const rawElements = isRecord(parsed.elements) ? parsed.elements : {};
+  const elements: Record<string, Record<string, unknown>> = {};
+  for (const [k, v] of Object.entries(rawElements)) {
+    if (isRecord(v)) elements[k] = v;
+  }
+  const rawVp = isRecord(parsed.viewport) ? parsed.viewport : {};
+  return {
+    version: typeof parsed.version === "number" ? parsed.version : 1,
+    grid: typeof parsed.grid === "string" || typeof parsed.grid === "boolean" ? parsed.grid : "architectural",
+    viewport: {
+      x: typeof rawVp.x === "number" ? rawVp.x : 0,
+      y: typeof rawVp.y === "number" ? rawVp.y : 0,
+      zoom: typeof rawVp.zoom === "number" ? rawVp.zoom : 1,
+    },
+    elements,
+  };
+}
+
+/** Projects `structure/board.json` into the legacy entry list shape expected by native `VvWhiteboard`. */
+export function boardToNativeEntries(artifactId: string, title: string, doc: BoardDocument, seq: number): unknown[] {
+  const entries: unknown[] = [
+    {
+      artifactId,
+      path: "board/meta",
+      kind: "json",
+      mime: "application/json",
+      size: 0,
+      rev: seq,
+      updatedBy: "user",
+      updated: 0,
+      value: JSON.stringify({ title, grid: doc.grid, viewport: doc.viewport }),
+    },
+  ];
+  for (const [elId, el] of Object.entries(doc.elements)) {
+    const value = JSON.stringify(el);
+    entries.push({
+      artifactId,
+      path: `elements/${elId}`,
+      kind: "json",
+      mime: "application/json",
+      size: value.length,
+      rev: seq,
+      updatedBy: "user",
+      updated: 0,
+      value,
+    });
+  }
+  return entries;
+}
+
+function labelOfElement(el: { readonly title?: string | undefined; readonly label?: string | undefined; readonly text?: string | undefined }): string {
   return el.title ?? el.label ?? el.text ?? "";
 }
 
@@ -81,10 +156,10 @@ function escapeXml(value: string): string {
   return value.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/"/gu, "&quot;");
 }
 
-function buildHeadlessSvg(title: string, items: readonly FallbackElement[]): string {
+function buildHeadlessSvg(title: string, items: readonly BoardElement[]): string {
   const texts = items
     .map((el, i) => {
-      const label = labelOfFallback(el) || el.id;
+      const label = labelOfElement(el) || el.id;
       const y = 64 + i * 28;
       return `<text x="32" y="${y}" font-size="14" fill="#1c1917">${escapeXml(label)}</text>`;
     })
@@ -93,21 +168,26 @@ function buildHeadlessSvg(title: string, items: readonly FallbackElement[]): str
   return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="${height}" viewBox="0 0 800 ${height}"><title>${escapeXml(title)}</title><rect width="100%" height="100%" fill="#fcfcfb"/>${texts}</svg>`;
 }
 
-export function WhiteboardView(props: StoreViewerProps) {
-  const { client, snapshot } = useStoreEntries(() => props.artifact.id);
-  const presence = useArtifactPresence(() => props.artifact.id);
+export function WhiteboardView(props: WhiteboardViewerProps) {
+  const { client, snapshot } = useArtifactDirectory(
+    () => props.artifact.id,
+    () => props.version,
+  );
+  const presence = useArtifactPresence(() => props.artifact.id, {
+    enabled: () => props.version === undefined,
+  });
   const sessionsSlice = useSessionsSlice();
   const act = createAct();
   const selectedIds = signal<readonly string[]>([]);
 
   const seq = () => (snapshot().seq > 0 ? snapshot().seq : props.artifact.seq);
-
-  const entriesList = computed((): readonly ArtifactEntry[] => [...snapshot().entries.values()].filter((entry) => !entry.path.startsWith("presence/")));
+  const boardRaw = () => snapshot().contents.get(BOARD_FILE_PATH)?.content;
+  const boardDoc = computed(() => parseBoardDocument(boardRaw()));
 
   const presences = computed((): PresenceWire[] => {
     const out: PresenceWire[] = [];
     const seen = new Set<string>();
-    const claims: FallbackElement[] = [];
+    const claims: BoardElement[] = [];
 
     for (const peer of presence.peers()) {
       if (peer.id === userId) continue;
@@ -121,18 +201,17 @@ export function WhiteboardView(props: StoreViewerProps) {
         w: peer.w,
         h: peer.h,
         status: peer.status,
-        selector: peer.selector,
+        selector: peer.selector ?? peer.nodeId,
         viewport: peer.viewport,
         updatedAt: peer.updatedAt,
       });
       seen.add(peer.id);
     }
 
-    for (const [path, entry] of snapshot().entries) {
-      if (!entry.value || !path.startsWith("elements/")) continue;
-      const parsed = FallbackElementSchema.safeParse(parseJsonSafe(entry.value));
+    for (const rawEl of Object.values(boardDoc().elements)) {
+      const parsed = BoardElementSchema.safeParse(rawEl);
       if (parsed.success && parsed.data.type === "claim") {
-        claims.push({ ...parsed.data, rev: entry.rev });
+        claims.push(parsed.data);
       }
     }
 
@@ -141,7 +220,7 @@ export function WhiteboardView(props: StoreViewerProps) {
       if (isFreeUserSession(sess) || sess.phase._tag !== "working") continue;
       const id = sessionProfile(sess) ?? sess.id;
       if (seen.has(id)) continue;
-      const ownClaim = claims.find((c) => c.id.includes(id) || labelOfFallback(c).includes(sess.name));
+      const ownClaim = claims.find((c) => c.id.includes(id) || labelOfElement(c).includes(sess.name));
       out.push({
         id,
         name: sess.name,
@@ -161,14 +240,16 @@ export function WhiteboardView(props: StoreViewerProps) {
       presence.clear(userId);
       return;
     }
-    const raw = snapshot().entries.get(`elements/${firstId}`)?.value;
-    const parsed = raw ? FallbackElementSchema.safeParse(parseJsonSafe(raw)) : undefined;
+    const raw: unknown = boardDoc().elements[firstId];
+    const parsed = raw !== undefined ? BoardElementSchema.safeParse(raw) : undefined;
     const el = parsed?.success === true ? parsed.data : undefined;
     presence.publish({
       id: userId,
       name: t("web.artifact.blocks.user"),
       color: "blue",
       kind: "selection",
+      path: BOARD_FILE_PATH,
+      nodeId: firstId,
       selector: firstId,
       ...(el?.x !== undefined ? { x: el.x } : {}),
       ...(el?.y !== undefined ? { y: el.y } : {}),
@@ -182,26 +263,74 @@ export function WhiteboardView(props: StoreViewerProps) {
     () => ({
       artifactType: "whiteboard",
       title: props.artifact.title,
+      activePath: BOARD_FILE_PATH,
       seq: seq(),
       ...(selectedIds().length > 0 ? { selectedIds: [...selectedIds()] } : {}),
     }),
   );
 
+  const saveBoard = async (nextDoc: BoardDocument, summary?: string) => {
+    await client().writeFiles(
+      [{ path: BOARD_FILE_PATH, content: `${JSON.stringify(nextDoc, null, 2)}\n`, mime: "application/json" }],
+      ...(summary ? [{ summary }] : []),
+    );
+  };
+
   const native = richNative();
   if (native) {
     const VvWhiteboard = native.VvWhiteboard;
-    const entriesJson = computed(() => JSON.stringify(entriesList()));
+    const entriesJson = computed(() => JSON.stringify(boardToNativeEntries(props.artifact.id, props.artifact.title, boardDoc(), seq())));
     const presencesJson = computed(() => JSON.stringify(presences()));
 
-    // Presence is strictly ephemeral via `artifact.presence.update`; never persist `presence/*` entries.
+    // Presence is strictly ephemeral via `artifact.presence.update`; never persist `presence/*`.
     const handleNativeBatch = (ev: VvWhiteboardBatchEvent) => {
+      if (props.version !== undefined) return;
       const parsed = z.array(WhiteboardWriteSchema).safeParse(parseJsonSafe(ev.writesJson));
       if (!parsed.success) return;
-      const writes: ArtifactEntryWriteInput[] = parsed.data.filter((w) => !w.path.startsWith("presence/"));
+      const writes = parsed.data.filter((w) => !w.path.startsWith("presence/"));
       if (writes.length === 0) return;
-      void act.run(async () => {
-        await client.batch(writes);
-      });
+
+      const cur = untracked(boardDoc);
+      const nextElements: Record<string, Record<string, unknown>> = { ...cur.elements };
+      let nextGrid = cur.grid;
+      let nextViewport = cur.viewport;
+
+      for (const w of writes) {
+        if (w.path === "board/meta" && w.value) {
+          const meta = parseJsonSafe(w.value);
+          if (isRecord(meta)) {
+            if (typeof meta.grid === "string" || typeof meta.grid === "boolean") nextGrid = meta.grid;
+            if (isRecord(meta.viewport)) {
+              nextViewport = {
+                x: typeof meta.viewport.x === "number" ? meta.viewport.x : nextViewport.x,
+                y: typeof meta.viewport.y === "number" ? meta.viewport.y : nextViewport.y,
+                zoom: typeof meta.viewport.zoom === "number" ? meta.viewport.zoom : nextViewport.zoom,
+              };
+            }
+          }
+          continue;
+        }
+        if (!w.path.startsWith("elements/")) continue;
+        const elId = w.path.slice("elements/".length);
+        if (w.op === "delete") {
+          delete nextElements[elId];
+        } else if (w.op === "set" && w.value) {
+          const val = parseJsonSafe(w.value);
+          if (isRecord(val)) nextElements[elId] = val;
+        } else if (w.op === "patch" && w.value) {
+          const patch = parseJsonSafe(w.value);
+          if (isRecord(patch)) {
+            const prev = { ...(nextElements[elId] ?? { id: elId }) };
+            for (const [k, v] of Object.entries(patch)) {
+              if (v === null) delete prev[k];
+              else prev[k] = v;
+            }
+            nextElements[elId] = prev;
+          }
+        }
+      }
+
+      void act.run(() => saveBoard({ ...cur, grid: nextGrid, viewport: nextViewport, elements: nextElements }));
     };
 
     const handleNativeSelection = (ev: VvWhiteboardSelectionEvent) => {
@@ -218,6 +347,7 @@ export function WhiteboardView(props: StoreViewerProps) {
         name: t("web.artifact.blocks.user"),
         color: "blue",
         kind: "cursor",
+        path: BOARD_FILE_PATH,
         x: ev.x,
         y: ev.y,
         viewport: { x: ev.viewportX, y: ev.viewportY, w: ev.viewportW, h: ev.viewportH, zoom: ev.zoom },
@@ -230,6 +360,7 @@ export function WhiteboardView(props: StoreViewerProps) {
         name: t("web.artifact.blocks.user"),
         color: "blue",
         kind: "viewport",
+        path: BOARD_FILE_PATH,
         viewport: { x: ev.x, y: ev.y, w: ev.w, h: ev.h, zoom: ev.zoom },
       });
     };
@@ -259,6 +390,7 @@ export function WhiteboardView(props: StoreViewerProps) {
           entriesJson={entriesJson()}
           presencesJson={presencesJson()}
           seq={seq()}
+          readOnly={props.version !== undefined}
           title={props.artifact.title}
           locale={currentLocale()}
           onBatch={handleNativeBatch}
@@ -276,7 +408,8 @@ export function WhiteboardView(props: StoreViewerProps) {
   return (
     <WhiteboardHeadlessFallback
       title={props.artifact.title}
-      entries={entriesList}
+      boardDoc={boardDoc}
+      seq={seq}
       presences={presences}
       client={client}
       selectedIds={selectedIds}
@@ -291,9 +424,10 @@ export function WhiteboardView(props: StoreViewerProps) {
 
 interface HeadlessProps {
   readonly title: string;
-  readonly entries: Accessor<readonly ArtifactEntry[]>;
+  readonly boardDoc: Accessor<BoardDocument>;
+  readonly seq: Accessor<number>;
   readonly presences: Accessor<readonly PresenceWire[]>;
-  readonly client: StoreEntryClient;
+  readonly client: Accessor<DirectoryArtifactClient>;
   readonly selectedIds: {
     (): readonly string[];
     set: (next: readonly string[]) => void;
@@ -307,14 +441,13 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
   const inspectorOpen = signal(false);
   const labelDraft = signal("");
   const lastKey = signal<string | undefined>(undefined);
-  const undoStack = signal<readonly (readonly ArtifactEntryWriteInput[])[]>([]);
+  const undoStack = signal<readonly BoardDocument[]>([]);
 
-  const elements = computed((): FallbackElement[] => {
-    const out: FallbackElement[] = [];
-    for (const entry of props.entries()) {
-      if (!entry.path.startsWith("elements/") || !entry.value) continue;
-      const parsed = FallbackElementSchema.safeParse(parseJsonSafe(entry.value));
-      if (parsed.success) out.push({ ...parsed.data, rev: entry.rev });
+  const elements = computed((): BoardElement[] => {
+    const out: BoardElement[] = [];
+    for (const rawEl of Object.values(props.boardDoc().elements)) {
+      const parsed = BoardElementSchema.safeParse(rawEl);
+      if (parsed.success) out.push(parsed.data);
     }
     return out;
   });
@@ -326,14 +459,20 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
 
   effect(() => {
     const el = selectedElement();
-    const key = el ? `${el.id}:${el.rev}` : undefined;
+    const key = el ? `${el.id}:${props.seq()}` : undefined;
     if (key !== untracked(() => lastKey())) {
       lastKey.set(key);
-      labelDraft.set(el ? labelOfFallback(el) : "");
+      labelDraft.set(el ? labelOfElement(el) : "");
     }
   });
 
+  const writeDoc = (nextDoc: BoardDocument, summary: string) =>
+    act.run(() =>
+      props.client().writeFiles([{ path: BOARD_FILE_PATH, content: `${JSON.stringify(nextDoc, null, 2)}\n`, mime: "application/json" }], { summary }),
+    );
+
   const addNode = () => {
+    const cur = untracked(props.boardDoc);
     const id = `n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const payload = {
       id,
@@ -346,31 +485,33 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
       title: t("web.artifact.whiteboard.card"),
       fill: "sun",
     };
-    const path = `elements/${id}`;
-    undoStack.set([...untracked(undoStack), [{ op: "delete", path }]]);
+    const nextDoc: BoardDocument = { ...cur, elements: { ...cur.elements, [id]: payload } };
+    undoStack.set([...untracked(undoStack), cur]);
     props.selectedIds.set([id]);
-    void act.run(() => props.client.batch([{ op: "set", path, kind: "json", value: JSON.stringify(payload) }]));
+    void writeDoc(nextDoc, `Add node ${id}`);
   };
 
   const runUndo = () => {
     const stack = untracked(undoStack);
-    const step = stack[stack.length - 1];
-    if (step === undefined) return;
+    const prevDoc = stack[stack.length - 1];
+    if (prevDoc === undefined) return;
     undoStack.set(stack.slice(0, -1));
-    void act.run(() => props.client.batch([...step]));
+    void writeDoc(prevDoc, "Undo whiteboard edit");
   };
 
   const saveLabel = () => {
     const el = selectedElement();
     if (!el) return;
+    const cur = untracked(props.boardDoc);
     const textVal = labelDraft().trim();
-    const patch = el.type === "container" || (el.type === "shape" && (el.title !== undefined || el.shape === "card")) ? { title: textVal } : { label: textVal };
-    const path = `elements/${el.id}`;
-    const prevRaw = props.entries().find((e) => e.path === path)?.value;
-    if (prevRaw !== undefined) {
-      undoStack.set([...untracked(undoStack), [{ op: "set", path, kind: "json", value: prevRaw }]]);
-    }
-    void act.run(() => props.client.batch([{ op: "patch", path, value: JSON.stringify(patch) }]));
+    const existing = cur.elements[el.id] ?? { id: el.id };
+    const updatedEl =
+      el.type === "container" || (el.type === "shape" && (el.title !== undefined || el.shape === "card"))
+        ? { ...existing, title: textVal }
+        : { ...existing, label: textVal };
+    const nextDoc: BoardDocument = { ...cur, elements: { ...cur.elements, [el.id]: updatedEl } };
+    undoStack.set([...untracked(undoStack), cur]);
+    void writeDoc(nextDoc, `Update ${el.id}`);
   };
 
   const exportSvg = () => {
@@ -445,7 +586,7 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
                           onPress={() => props.onSelectIds([el().id])}
                           class="h-8 flex-row items-center justify-between gap-2 rounded-md border border-line bg-side px-2.5"
                         >
-                          <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{labelOfFallback(el()) || el().id}</Text>
+                          <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{labelOfElement(el()) || el().id}</Text>
                         </View>
                       )}
                     </Each>
