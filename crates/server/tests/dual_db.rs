@@ -385,29 +385,29 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
     let media_got = ok(&started, "media.input.get", json!({ "id": media_id }));
     assert_eq!(media_got["phase"], "ready");
 
-    // 10. content/artifact (markdown + store entry batch)
+    // 10. content/artifact (docs + slides directory files)
     let md_art = ok(
         &started,
         "artifact.create",
-        json!({ "title": "Dual Markdown", "kind": "markdown", "content": "# Dual DB", "channel": eng_id }),
+        json!({ "title": "Dual Markdown", "artifactType": "docs", "content": "# Dual DB", "channel": eng_id }),
     );
     let md_art_id = md_art["id"].as_str().unwrap().to_string();
 
     let store_art = ok(
         &started,
         "artifact.create",
-        json!({ "title": "Dual Store", "kind": "store", "artifactType": "slides", "channel": eng_id }),
+        json!({ "title": "Dual Store", "artifactType": "slides", "channel": eng_id }),
     );
     let store_art_id = store_art["id"].as_str().unwrap().to_string();
-    let batch = ok(
+    let written = ok(
         &started,
-        "artifact.entry.batch",
+        "artifact.file.write",
         json!({
             "id": store_art_id,
-            "writes": [{ "op": "set", "path": "project/notes.txt", "kind": "text", "value": "persisted" }]
+            "files": [{ "path": "structure/notes.txt", "content": "persisted" }]
         }),
     );
-    assert_eq!(batch["applied"], true);
+    assert_eq!(written["seq"], 2);
 
     // 11. team/memory
     let mem = ok(
@@ -511,14 +511,10 @@ fn run_full_stack_e2e(home: &Path, database_url: Option<String>) {
 
     let md_got = ok(&reopened, "artifact.get", json!({ "id": md_art_id }));
     assert_eq!(md_got["title"], "Dual Markdown");
-    let entries = ok(&reopened, "artifact.entry.list", json!({ "id": store_art_id, "includeValues": true }));
-    assert!(
-        entries["entries"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|e| e["path"] == "project/notes.txt" && e["value"] == "persisted")
-    );
+    let files = ok(&reopened, "artifact.file.list", json!({ "id": store_art_id, "prefix": "structure/" }));
+    assert!(files["files"].as_array().unwrap().iter().any(|f| f["path"] == "structure/notes.txt"));
+    let file_got = ok(&reopened, "artifact.file.get", json!({ "id": store_art_id, "path": "structure/notes.txt" }));
+    assert_eq!(file_got["content"], "persisted");
 
     let mems = ok(&reopened, "memory.list", json!({ "agent": reviewer.id }));
     assert!(mems["memories"].as_array().unwrap().iter().any(|m| m["id"] == mem_id));

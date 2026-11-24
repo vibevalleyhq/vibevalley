@@ -227,10 +227,11 @@ mod tests {
     fn sample_view_context(title: &str) -> ArtifactViewContext {
         ArtifactViewContext {
             artifact_id: "art-1".into(),
-            artifact_type: Some(ArtifactType::Slides),
+            artifact_type: ArtifactType::Slides,
             title: title.into(),
             seq: Some(3),
             version: None,
+            active_path: None,
             slide_id: Some("02".into()),
             slide_index: Some(1),
             time: None,
@@ -238,7 +239,6 @@ mod tests {
             active_dataset: None,
             active_tab: None,
             selected_ids: None,
-            selected_block_ids: None,
             summary: Some("Slide 2".into()),
         }
     }
@@ -275,7 +275,6 @@ mod tests {
             deleted: None,
             attachments: None,
             artifact: None,
-            blocks: None,
             view_context: Some(sample_view_context("Q3 Pitch")),
             picked: None,
             response_port: None,

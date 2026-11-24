@@ -61,8 +61,8 @@ for (const file of files) {
       // macOS and Windows find a file whatever the case; Linux and git do not. agents.md is not AGENTS.md.
       else if (realpathSync.native(full) !== realpathSync(full)) broken.push(`${file}:${i + 1}: ${target} (the file is ${realpathSync.native(full)})`);
     }
-    // Notes are history: they name files as they were then.
-    if (file.startsWith(".agents/notes/")) continue;
+    // Notes name historical files; artifact type guides describe virtual per-artifact directory paths (`structure/*.json`).
+    if (file.startsWith(".agents/notes/") || file.startsWith("crates/server/assets/artifact/types/")) continue;
     for (const match of line.matchAll(CODE_PATH)) {
       const path = match[1] ?? "";
       if (!inRepo(path.replace(/^(\.\.?\/)+/u, "")) && !existsSync(resolve(dirname(resolve(root, file)), path)))

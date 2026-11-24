@@ -1,11 +1,8 @@
 //! Dual-backend (SQLite + PostgreSQL) SeaORM entity models (one table per file).
 
 pub mod artifact;
-pub mod artifact_block;
-pub mod artifact_block_revision;
 pub mod artifact_change;
 pub mod artifact_collab;
-pub mod artifact_entry;
 pub mod artifact_suggestion;
 pub mod artifact_version;
 pub mod attachment;

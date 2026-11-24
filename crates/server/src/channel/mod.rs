@@ -31,7 +31,7 @@ use parking_lot::{Mutex, RwLock};
 use tokio::sync::{Mutex as AsyncMutex, MutexGuard as AsyncMutexGuard, broadcast};
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, BizCode, BlockRef, ChatMessage, DEFAULT_ORCHESTRATOR, Embed, QuotedBlock, SubjectKind, USER_ID, UserMention};
+use vibevalley_protocol::{ApiError, BizCode, ChatMessage, DEFAULT_ORCHESTRATOR, Embed, SubjectKind, USER_ID, UserMention};
 
 use self::dispatch::Reach;
 use self::model::{ChatModel, Q, WriteTx};
@@ -168,42 +168,6 @@ impl Chat {
 
     pub fn subscribe_message_events(&self) -> broadcast::Receiver<ChannelMessageEvent> {
         self.message_events.subscribe()
-    }
-
-    /// Quotes artifact blocks directly via `ctx.service.artifact`, avoiding any
-    /// `channel <-> artifact` cycle or blocking bridge.
-    pub async fn quote_blocks_async(&self, refs: &[BlockRef]) -> Vec<QuotedBlock> {
-        let mut out = Vec::new();
-        let artifacts = &self.ctx.service.artifact;
-        for r in refs {
-            let row = match artifacts.get(&r.artifact_id).await {
-                Ok(Some(row)) => row,
-                Ok(None) => continue,
-                Err(e) => {
-                    eprintln!("vibevalley-server: quoting a block failed: {e}");
-                    continue;
-                }
-            };
-            let blocks = match artifacts.blocks(&r.artifact_id).await {
-                Ok(b) => b,
-                Err(e) => {
-                    eprintln!("vibevalley-server: quoting a block failed: {e}");
-                    continue;
-                }
-            };
-            let b = blocks.iter().find(|b| b.id == r.block_id && b.deleted.is_none());
-            out.push(QuotedBlock {
-                artifact_id: r.artifact_id.clone(),
-                block_id: r.block_id.clone(),
-                rev: r.rev,
-                title: row.title,
-                r#type: b.and_then(|b| serde_json::to_value(b.r#type).ok()?.as_str().map(str::to_string)),
-                text: b.map(|b| vibevalley_core::artifact::plain(&b.text)),
-                now_rev: b.map(|b| b.rev),
-                deleted: b.is_none().then_some(true),
-            });
-        }
-        out
     }
 
     /// Projects committed channels snapshot for `SliceMask::BOARD` and diagnostics.
@@ -754,7 +718,6 @@ mod tests {
                 reply_to: None,
                 attachments: None,
                 to: None,
-                blocks: None,
                 view_context: None,
             },
             None,

@@ -62,10 +62,6 @@ impl Chat {
             on_station(station);
         }
         let was_idle = self.ctx.live.call_snapshot().0 != CallState::Live;
-        let blocks = match body.blocks {
-            Some(refs) if !refs.is_empty() => self.quote_blocks_async(&refs).await,
-            _ => Vec::new(),
-        };
         self.say_async(Saying {
             text: body.text,
             channel: Some(body.id),
@@ -77,7 +73,6 @@ impl Chat {
             reply_to: body.reply_to,
             attachments: body.attachments.unwrap_or_default(),
             to: body.to,
-            blocks,
             view_context: body.view_context,
             ..Saying::default()
         })

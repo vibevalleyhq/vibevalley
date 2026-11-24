@@ -2,7 +2,6 @@
   "split": {
     "created": "Created {count} child issues under #{n}."
   },
-  "issueNumbered": "ticket #{n}",
   "issueRef": "ticket {ref}",
   "repoRef": "repo {name}",
   "helper": "the helper",

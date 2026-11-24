@@ -98,8 +98,8 @@ fn interpolates_strings_numbers_booleans_plurals_and_handles_fallbacks() {
     assert_eq!(translate_json("en", "web.issue.detail.runCount", Some(r#"{"n":1}"#)), "1 round");
     assert_eq!(translate_json("en", "web.issue.detail.runCount", Some(r#"{"n":4}"#)), "4 rounds");
     assert_eq!(translate_json("zh", "web.issue.detail.runCount", Some(r#"{"n":4}"#)), "4 次");
-    assert_eq!(translate_json("en", "web.artifact.blocks.blocks", Some(r#"{"n":1}"#)), "1 block");
-    assert_eq!(translate_json("en", "web.artifact.blocks.blocks", Some(r#"{"n":5}"#)), "5 blocks");
+    assert_eq!(translate_json("en", "web.channel.replies", Some(r#"{"n":1}"#)), "1 reply");
+    assert_eq!(translate_json("en", "web.channel.replies", Some(r#"{"n":5}"#)), "5 replies");
 
     // ICU boolean `select` branches.
     assert_eq!(
@@ -152,8 +152,8 @@ fn quickjs_native_module_calls_translate_synchronously() {
             [rich.translate("en", "web.shell.sidebar.terminalCount", JSON.stringify({ n: 2 })), "2 terminals"],
             [rich.translate("en", "web.issue.detail.runCount", JSON.stringify({ n: 1 })), "1 round"],
             [rich.translate("en", "web.issue.detail.runCount", JSON.stringify({ n: 3 })), "3 rounds"],
-            [rich.translate("en", "web.artifact.blocks.blocks", JSON.stringify({ n: 1 })), "1 block"],
-            [rich.translate("en", "web.artifact.blocks.blocks", JSON.stringify({ n: 7 })), "7 blocks"],
+            [rich.translate("en", "web.channel.replies", JSON.stringify({ n: 1 })), "1 reply"],
+            [rich.translate("en", "web.channel.replies", JSON.stringify({ n: 7 })), "7 replies"],
             [rich.translate("zh", "web.farm.panel.sow", JSON.stringify({ plot: 4 })), "播种 · 第 4 块地"],
             [rich.translate("en", "web.issue.detail.noCriteria", JSON.stringify({ answer: true })), "This ticket has no criteria for done: judge by its answer when it comes back."],
             [rich.translate("en", "web.issue.detail.noCriteria", JSON.stringify({ answer: false })), "This ticket has no criteria for done: judge by its changes when it comes back."],

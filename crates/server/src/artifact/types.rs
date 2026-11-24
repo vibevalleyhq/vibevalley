@@ -2,6 +2,7 @@
 //! `assets/artifact/types/`.
 
 use include_dir::{Dir, include_dir};
+use vibevalley_core::artifact::type_spec;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{ApiError, ArtifactType, ArtifactTypeGuide, ArtifactTypeInfo, ArtifactTypeReadRequest};
 
@@ -22,25 +23,11 @@ fn strip_frontmatter(raw: &str) -> String {
 }
 
 fn type_words(ty: ArtifactType) -> (String, String) {
-    match ty {
-        ArtifactType::Docs => (t("server.artifact.types.docs.title", &[]), t("server.artifact.types.docs.summary", &[])),
-        ArtifactType::Outline => (t("server.artifact.types.outline.title", &[]), t("server.artifact.types.outline.summary", &[])),
-        ArtifactType::Slides => (t("server.artifact.types.slides.title", &[]), t("server.artifact.types.slides.summary", &[])),
-        ArtifactType::Dashboard => (
-            t("server.artifact.types.dashboard.title", &[]),
-            t("server.artifact.types.dashboard.summary", &[]),
-        ),
-        ArtifactType::Motion => (t("server.artifact.types.motion.title", &[]), t("server.artifact.types.motion.summary", &[])),
-        ArtifactType::Whiteboard => (
-            t("server.artifact.types.whiteboard.title", &[]),
-            t("server.artifact.types.whiteboard.summary", &[]),
-        ),
-        ArtifactType::Design => (t("server.artifact.types.design.title", &[]), t("server.artifact.types.design.summary", &[])),
-        ArtifactType::DesignSystem => (
-            t("server.artifact.types.design-system.title", &[]),
-            t("server.artifact.types.design-system.summary", &[]),
-        ),
-    }
+    let slug = ty.as_str();
+    (
+        t(&format!("server.artifact.types.{slug}.title"), &[]),
+        t(&format!("server.artifact.types.{slug}.summary"), &[]),
+    )
 }
 
 fn list_references(ty: ArtifactType) -> Vec<String> {
@@ -72,9 +59,9 @@ impl Manager {
             let (title, summary) = type_words(ty);
             out.push(ArtifactTypeInfo {
                 r#type: ty,
-                body: ty.body(),
                 title,
                 summary,
+                entry: type_spec(ty).entry_path.to_owned(),
                 references: list_references(ty),
                 default_artifact_id: if ty == ArtifactType::DesignSystem {
                     def.as_ref().map(|d| d.id.clone())
@@ -99,20 +86,26 @@ impl Manager {
         };
         let (reference, content) = if !wanted.is_empty() {
             if !references.iter().any(|r| r == wanted) {
-                let available = if references.is_empty() { "-".to_string() } else { list(&references) };
                 return Err(refused(t(
                     "server.artifact.noReference",
                     &[
                         ("type", ty.as_str().into()),
-                        ("reference", req.reference.as_deref().unwrap_or(wanted).into()),
-                        ("available", available.into()),
+                        ("reference", wanted.into()),
+                        ("available", list(&references).into()),
                     ],
                 )));
             }
-            (Some(wanted.to_string()), read_asset(&format!("{}/references/{wanted}.md", ty.as_str()))?)
+            let path = format!("{}/references/{wanted}.md", ty.as_str());
+            (Some(wanted.to_string()), read_asset(&path)?)
         } else {
-            let skill_file = if vibevalley_i18n::locale() == "en" { "SKILL.en.md" } else { "SKILL.md" };
-            (None, read_asset(&format!("{}/{skill_file}", ty.as_str()))?)
+            let preferred = if vibevalley_i18n::locale() == "en" {
+                format!("{}/SKILL.en.md", ty.as_str())
+            } else {
+                format!("{}/SKILL.md", ty.as_str())
+            };
+            let fallback = format!("{}/SKILL.md", ty.as_str());
+            let body = read_asset(&preferred).or_else(|_| read_asset(&fallback))?;
+            (None, body)
         };
         Ok(ArtifactTypeGuide {
             r#type: ty,
@@ -121,7 +114,7 @@ impl Manager {
             content,
             references,
             default_artifact_id: def.as_ref().map(|d| d.id.clone()),
-            default_artifact_title: def.as_ref().map(|d| d.title.clone()),
+            default_artifact_title: def.map(|d| d.title),
         })
     }
 }

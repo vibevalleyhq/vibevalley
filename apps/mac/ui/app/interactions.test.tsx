@@ -212,7 +212,9 @@ test("orchestrator trajectory: polled approval can be granted", async () => {
 });
 
 test("directory artifact files: lists, edits, and saves via artifact.file.{list,get,write}", async () => {
-  const { app, fake } = await mountApp("/artifacts/art-plan", (f) => {
+  const docsArtifact = (scenarios.typical.responses["artifact.list"] as Artifact[] | undefined)?.find((a) => a.artifactType === "docs");
+  if (!docsArtifact) throw new Error("typical scenario must provide a docs artifact");
+  const { app, fake } = await mountApp(`/artifacts/${docsArtifact.id}`, (f) => {
     for (const [op, handler] of Object.entries(artifactResponses)) {
       f.respond(op, handler);
     }
@@ -230,7 +232,7 @@ test("directory artifact files: lists, edits, and saves via artifact.file.{list,
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.file.write"));
   const writeCall = fake.calls.find((c) => c.op === "artifact.file.write");
   expect(writeCall?.payload).toMatchObject({
-    id: "art-plan",
+    id: docsArtifact.id,
     files: [{ path: "structure/index.md", content: "# Updated Spec\n" }],
   });
 });

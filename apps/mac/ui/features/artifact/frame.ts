@@ -1,5 +1,5 @@
 // Sandboxed HTML/CSS/JS assembly for `prototype` artifacts.
-// Never grants `allow-same-origin`; injects strict CSP meta with `connect-src 'none'`.
+// Strict incognito WebView isolation (never shares host origin); injects strict CSP meta with `connect-src 'none'`.
 
 const limits = [
   "default-src 'none'",

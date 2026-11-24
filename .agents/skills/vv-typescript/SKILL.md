@@ -35,7 +35,7 @@ description: 在 VibeValley 里写、改、评审原生应用的页面、官网�
 |---|---|
 | 一个一个来 | `for (const x of xs) await f(x)` |
 | 一起来，等全部 | `await Promise.all(xs.map(f))` |
-| 跨异步的状态 | 普通的变量或字段；有 `await` 夹在读和写之间时，把读改写排成一条队（`apps/mac/ui/features/artifact/editor.ts` 的 `BlockEditor`） |
+| 跨异步的状态 | 普通的变量或字段；有 `await` 夹在读和写之间时，把读改写排成一条队 |
 | 一串值 | `AsyncIterable`，写成 `async function*` |
 | 等一个将来的值 | `Promise.withResolvers()` |
 

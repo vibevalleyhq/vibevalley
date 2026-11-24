@@ -122,14 +122,28 @@ const COMMANDS: &[&str] = &[
     "agent update",
     "artifact create",
     "artifact delete",
-    "artifact entry batch",
-    "artifact entry get",
-    "artifact entry list",
-    "artifact entry set",
+    "artifact file batch",
+    "artifact file delete",
+    "artifact file get",
+    "artifact file list",
+    "artifact file write",
+    "artifact history compact",
+    "artifact history fork",
+    "artifact history list",
+    "artifact history preview",
+    "artifact history restore",
+    "artifact history undo-origin",
     "artifact list",
     "artifact read",
     "artifact show",
+    "artifact suggestion accept",
+    "artifact suggestion create",
+    "artifact suggestion list",
+    "artifact suggestion reject",
+    "artifact type list",
+    "artifact type read",
     "artifact update",
+    "artifact version",
     "attachment get",
     "attachment upload",
     "auth login",
@@ -380,7 +394,7 @@ fn state_snapshot_and_doctor_verify_sse_and_channel() {
 fn content_domain_artifacts_entries_attachments_library_media_and_channel_flags() {
     let srv = spawn_server();
 
-    // 1. Artifact create, update, entry set/get/list/batch, and dry-run delete
+    // 1. Artifact create, update, file write/batch/list/get/delete, and dry-run delete
     let created = srv.run(&["artifact", "create", "System Map", "--type", "whiteboard", "--json"]).json();
     let art_id = created["id"].as_str().unwrap().to_string();
     assert_eq!(created["artifactType"], "whiteboard");
@@ -388,30 +402,28 @@ fn content_domain_artifacts_entries_attachments_library_media_and_channel_flags(
     let renamed = srv.run(&["artifact", "update", &art_id, "--title", "System Map v2", "--json"]).json();
     assert_eq!(renamed["title"], "System Map v2");
 
-    let set_meta = srv
+    let wrote_meta = srv
         .run(&[
             "artifact",
-            "entry",
-            "set",
+            "file",
+            "write",
             &art_id,
-            "board/meta",
-            r#"{"title":"System Map v2","viewport":{"x":0,"y":0,"zoom":1}}"#,
-            "--kind",
-            "json",
+            "structure/notes.md",
+            "Architecture overview",
+            "--summary",
+            "seed notes",
             "--json",
         ])
         .json();
-    assert_eq!(set_meta["applied"], true, "{set_meta}");
+    assert!(wrote_meta["seq"].as_i64().unwrap() >= 2, "{wrote_meta}");
 
     let batch_file = srv.dir.path().join("writes.json");
     std::fs::write(
         &batch_file,
         serde_json::to_string(&json!([
             {
-                "op": "set",
-                "path": "elements/n1",
-                "kind": "json",
-                "value": r#"{"id":"n1","type":"shape","shape":"card","x":40,"y":60,"w":220,"h":100,"text":"API"}"#
+                "path": "structure/n1.json",
+                "content": r#"{"id":"n1","type":"shape","shape":"card","x":40,"y":60,"w":220,"h":100,"text":"API"}"#
             }
         ]))
         .unwrap(),
@@ -419,19 +431,17 @@ fn content_domain_artifacts_entries_attachments_library_media_and_channel_flags(
     .unwrap();
     let batch_arg = format!("@{}", batch_file.display());
     let batched = srv
-        .run(&["artifact", "entry", "batch", &art_id, &batch_arg, "--note", "seed node", "--json"])
+        .run(&["artifact", "file", "batch", &art_id, &batch_arg, "--summary", "seed node", "--json"])
         .json();
-    assert_eq!(batched["applied"], true, "{batched}");
+    assert!(batched["seq"].as_i64().unwrap() >= 3, "{batched}");
 
-    let entry_list = srv
-        .run(&["artifact", "entry", "list", &art_id, "--prefix", "elements/", "--values", "--json"])
-        .json();
-    let entries = entry_list["entries"].as_array().unwrap();
-    assert!(!entries.is_empty() && entries.iter().all(|e| e["path"].as_str().unwrap().starts_with("elements/")));
-    assert!(entries.iter().any(|e| e["path"] == "elements/n1"));
-    let entry_get = srv.run(&["artifact", "entry", "get", &art_id, "elements/n1", "--json"]).json();
-    assert_eq!(entry_get["path"], "elements/n1");
-    assert!(entry_get["value"].as_str().unwrap().contains("API"));
+    let file_list = srv.run(&["artifact", "file", "list", &art_id, "--prefix", "structure/", "--json"]).json();
+    let files = file_list["files"].as_array().unwrap();
+    assert!(!files.is_empty() && files.iter().all(|f| f["path"].as_str().unwrap().starts_with("structure/")));
+    assert!(files.iter().any(|f| f["path"] == "structure/n1.json"));
+    let file_get = srv.run(&["artifact", "file", "get", &art_id, "structure/n1.json", "--json"]).json();
+    assert_eq!(file_get["path"], "structure/n1.json");
+    assert!(file_get["content"].as_str().unwrap().contains("API"));
 
     let listed_wb = srv.run(&["artifact", "list", "--type", "whiteboard", "--json"]).json();
     assert_eq!(listed_wb.as_array().unwrap().len(), 1);

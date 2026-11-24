@@ -90,16 +90,7 @@
       "user": "Created by me"
     },
     "artifactType": {
-      "all": "All artifacts",
-      "outline": "Outline notes",
-      "whiteboard": "Whiteboard",
-      "docs": "Docs",
-      "slides": "Slides",
-      "dashboard": "Dashboard",
-      "design": "Design",
-      "designSystem": "Design system",
-      "motion": "Motion",
-      "html": "Web page"
+      "all": "All artifacts"
     },
     "inspector": {
       "openExternal": "Open externally",

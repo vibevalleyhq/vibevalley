@@ -317,37 +317,11 @@ fn attachments_are_served_from_the_path_the_server_gives() {
 }
 
 #[test]
-fn artifact_pages_carry_the_servers_headers_and_bad_ids_are_404() {
-    let (fake, l) = start();
-    let id = "0b1c2d3e-4f50-4617-8899-aabbccddeeff";
-    fake.respond(
-        "artifact.page",
-        json!({ "content": "<h1>hi</h1>", "headers": { "content-type": "text/html; charset=utf-8", "content-security-policy": "sandbox allow-scripts" } }),
-    );
-    let res = agent().get(format!("{}/api/v1/artifact/{id}/2?shell=1&theme=dark", l.url())).send().unwrap();
-    assert_eq!(res.status().as_u16(), 200);
-    assert_eq!(res.headers().get("content-type").unwrap(), "text/html; charset=utf-8");
-    assert_eq!(res.headers().get("content-security-policy").unwrap(), "sandbox allow-scripts");
-    assert_eq!(res.text().unwrap(), "<h1>hi</h1>");
-    assert_eq!(
-        fake.calls().last().unwrap(),
-        &("artifact.page".to_string(), json!({ "id": id, "version": 2, "shell": true, "theme": "dark" }))
-    );
-
-    let calls = fake.calls().len();
-    for bad in ["not-an-id/1", &format!("{id}/0"), &format!("{id}/01"), &format!("{id}/x")] {
-        let res = agent().get(format!("{}/api/v1/artifact/{bad}", l.url())).send().unwrap();
-        assert_eq!(res.status().as_u16(), 404, "{bad}");
-    }
-    assert_eq!(fake.calls().len(), calls, "a bad id never reaches the server");
-}
-
-#[test]
 fn ops_shaped_like_get_routes_still_reach_the_server() {
     let (fake, l) = start();
     for (path, op) in [
         ("attachment/create", "attachment.create"),
-        ("artifact/block/list", "artifact.block.list"),
+        ("artifact/file/list", "artifact.file.list"),
         ("artifact/suggestion/accept", "artifact.suggestion.accept"),
         ("issue/watch/x", "issue.watch.x"),
         ("subscribe/thing", "subscribe.thing"),
@@ -427,13 +401,6 @@ fn loopback_and_artifact_route_validators_match_exact_ascii_rules() {
     assert!(!is_artifact_id("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3"));
     assert!(!is_artifact_id("0196F8E2-7c0a-7f10-8b2d-9e5a4c1d2e3f"));
     assert!(!is_artifact_id("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3g"));
-
-    for good in ["1", "2", "10", "987654321"] {
-        assert!(is_artifact_version(good), "{good}");
-    }
-    for bad in ["", "0", "01", "-1", "1a", "+1"] {
-        assert!(!is_artifact_version(bad), "{bad}");
-    }
 }
 
 struct StaticRemoteAuth {

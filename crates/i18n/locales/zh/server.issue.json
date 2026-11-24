@@ -2,7 +2,6 @@
   "split": {
     "created": "已在 #{n} 下创建 {count} 个子任务。"
   },
-  "issueNumbered": "任务 #{n}",
   "issueRef": "任务 {ref}",
   "repoRef": "仓库 {name}",
   "helper": "执行会话",

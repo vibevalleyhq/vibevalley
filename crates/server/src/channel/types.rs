@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vibevalley_protocol::{
-    Actor, AgentRole, ArtifactCard, ArtifactViewContext, Attachment, ChannelType, ChatMessage, Embed, MessageKind, Notify, Outcome, QuotedBlock, Reaction,
-    Spent, SubjectKind, USER_ID,
+    Actor, AgentRole, ArtifactCard, ArtifactViewContext, Attachment, ChannelType, ChatMessage, Embed, MessageKind, Notify, Outcome, Reaction, Spent,
+    SubjectKind, USER_ID,
 };
 
 use super::dispatch::QueuedDelivery;
@@ -62,7 +62,6 @@ pub struct Meta {
     pub attachments: Option<Vec<Attachment>>,
     pub embeds: Option<Vec<Embed>>,
     pub artifact: Option<ArtifactCard>,
-    pub blocks: Option<Vec<QuotedBlock>>,
     pub view_context: Option<ArtifactViewContext>,
     pub picked: Option<Picked>,
     pub ingress_source: Option<String>,
@@ -197,7 +196,6 @@ pub fn to_message(row: &MsgRow) -> ChatMessage {
         attachments: meta.attachments.unwrap_or_default(),
         embeds: meta.embeds.unwrap_or_default(),
         artifact: meta.artifact.filter(|_| !gone),
-        blocks: meta.blocks.filter(|b| !b.is_empty() && !gone),
         view_context: meta.view_context.filter(|_| !gone),
     }
 }
@@ -238,8 +236,6 @@ pub struct AddressedMessage {
     pub attachments: Option<Vec<FileAt>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub artifact: Option<ArtifactRef>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub blocks: Option<Vec<QuotedBlock>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub view_context: Option<ArtifactViewContext>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -339,7 +335,6 @@ pub struct Saying {
     pub reply_to: Option<i64>,
     pub attachments: Vec<String>,
     pub picked: Option<Picked>,
-    pub blocks: Vec<QuotedBlock>,
     pub view_context: Option<ArtifactViewContext>,
     /// Delivers only to this orchestrator.
     pub to: Option<String>,

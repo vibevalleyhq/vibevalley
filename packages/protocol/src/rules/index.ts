@@ -3,7 +3,6 @@ export * from "./inbox";
 export * from "./issues";
 export * from "./phase";
 export * from "./stage";
-export * from "./order";
 export * from "./same";
 export * from "./plain";
 export * from "./omit";

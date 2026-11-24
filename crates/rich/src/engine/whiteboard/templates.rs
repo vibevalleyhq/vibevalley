@@ -1,6 +1,4 @@
-use vibevalley_protocol::ArtifactEntryWriteInput;
-
-use crate::engine::whiteboard::codec::{encode_element_write, encode_meta_write, encode_presence_write};
+use crate::engine::whiteboard::codec::{WhiteboardWriteInput, encode_element_write, encode_meta_write, encode_presence_write};
 use crate::engine::whiteboard::model::{
     AnchorSide, ArrowCurve, ArrowEndpoint, ArrowHead, BoardDoc, BoardMeta, ElementId, ElementKind, ElementRecord, GridStyle, MilestoneKind, Point2, Presence,
     PresenceColor, Rect2, ShapeKind, StrokeStyle, TextAlign, TextVariant, TimelineMilestone, WbFill,
@@ -140,7 +138,7 @@ pub fn build_template_doc(kind: TemplateKind, copy: &TemplateCopy) -> BoardDoc {
     doc
 }
 
-pub fn build_template_writes(kind: TemplateKind, copy: &TemplateCopy) -> Vec<ArtifactEntryWriteInput> {
+pub fn build_template_writes(kind: TemplateKind, copy: &TemplateCopy) -> Vec<WhiteboardWriteInput> {
     let doc = build_template_doc(kind, copy);
     let mut writes = Vec::with_capacity(doc.elements.len() + doc.presences.len() + 1);
     writes.push(encode_meta_write(&doc.meta));

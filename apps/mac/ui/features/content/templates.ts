@@ -496,7 +496,7 @@ export async function createFromTemplate(
       await api.artifact.file.write({
         id: made.id,
         files: [{ path: BOARD_FILE_PATH, content: `${JSON.stringify(boardDoc, null, 2)}\n`, mime: "application/json" }],
-        summary: `Seed ${tpl.variant} template`,
+        summary: `Apply ${tpl.variant} template`,
       });
       await deps.queries.invalidate({ prefix: ["artifacts"] });
       deps.router.navigate(artifactHref(made.id));

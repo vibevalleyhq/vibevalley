@@ -85,7 +85,6 @@ impl Chat {
                 ingress_recipient: s.to.clone(),
                 attachments: (!files.is_empty()).then_some(files),
                 picked: (picked.agent.is_some() || picked.repo.is_some()).then_some(picked),
-                blocks: (!s.blocks.is_empty()).then(|| s.blocks.clone()),
                 view_context: s.view_context.clone(),
                 ingress_source: s.source.clone(),
                 spoken: voice.then_some(true),

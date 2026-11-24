@@ -1,6 +1,6 @@
-//! Dual-backend persistence for artifacts (`artifact`, `artifact_version`, `artifact_block`,
-//! `artifact_block_revision`, `artifact_change`, `artifact_suggestion`, `artifact_entry`,
-//! `artifact_collab`), media library items (`media_library_item`), and media jobs (`media_job`).
+//! Dual-backend persistence for artifacts (`artifact`, `artifact_version`,
+//! `artifact_change`, `artifact_suggestion`, `artifact_collab`), media library
+//! items (`media_library_item`), and media jobs (`media_job`).
 
 use std::sync::Arc;
 
@@ -9,25 +9,18 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, FromQueryResult, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Update,
 };
-use vibevalley_protocol::{
-    Attachment, Block, BlockOpResult, LibraryFileKind, LibraryItem, LibraryListRequest, LibraryOrigin, LibrarySort, Suggestion, TextSpan,
-};
+use vibevalley_protocol::{Attachment, LibraryFileKind, LibraryItem, LibraryListRequest, LibraryOrigin, LibrarySort, Suggestion};
 
-use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
-use crate::db::entity::{
-    artifact, artifact_block, artifact_block_revision, artifact_change, artifact_collab, artifact_entry, artifact_suggestion, artifact_version, attachment,
-    media_job, media_library_item,
-};
+use crate::db::column::{db_json, read_db_json, read_db_word};
+use crate::db::entity::{artifact, artifact_change, artifact_collab, artifact_suggestion, artifact_version, attachment, media_job, media_library_item};
 use crate::db::{Database, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ArtifactRow {
     pub id: String,
     pub title: String,
-    pub body: String,
-    pub artifact_type: Option<String>,
+    pub artifact_type: String,
     pub is_default: bool,
-    pub display: Option<String>,
     pub channel_id: Option<String>,
     pub message_id: Option<String>,
     pub issue: Option<String>,
@@ -44,10 +37,8 @@ impl From<artifact::Model> for ArtifactRow {
         Self {
             id: r.id,
             title: r.title,
-            body: r.body,
             artifact_type: r.artifact_type,
             is_default: r.is_default,
-            display: r.display,
             channel_id: r.channel_id,
             message_id: r.message_id,
             issue: r.issue,
@@ -65,10 +56,8 @@ impl From<artifact::Model> for ArtifactRow {
 pub struct NewArtifact {
     pub id: String,
     pub title: String,
-    pub body: String,
-    pub artifact_type: Option<String>,
+    pub artifact_type: String,
     pub is_default: bool,
-    pub display: Option<String>,
     pub channel_id: Option<String>,
     pub issue: Option<String>,
     pub by_id: String,
@@ -81,7 +70,7 @@ pub struct NewArtifact {
 pub struct NewVersion {
     pub artifact_id: String,
     pub version: i64,
-    pub attachment_id: String,
+    pub storage_id: String,
     pub size: i64,
     pub note: Option<String>,
     pub by_id: String,
@@ -92,7 +81,7 @@ pub struct NewVersion {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VersionRow {
     pub version: i64,
-    pub attachment_id: String,
+    pub storage_id: String,
     pub size: i64,
     pub note: Option<String>,
     pub by_id: String,
@@ -105,7 +94,7 @@ impl From<artifact_version::Model> for VersionRow {
     fn from(r: artifact_version::Model) -> Self {
         Self {
             version: r.version,
-            attachment_id: r.attachment_id,
+            storage_id: r.storage_id,
             size: r.size,
             note: r.note,
             by_id: r.by_id,
@@ -116,73 +105,11 @@ impl From<artifact_version::Model> for VersionRow {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EntryRow {
-    pub artifact_id: String,
-    pub path: String,
-    pub kind: String,
-    pub mime: String,
-    pub value: Option<String>,
-    pub attachment_id: Option<String>,
-    pub size: i64,
-    pub rev: i64,
-    pub updated_by: String,
-    pub updated_at: i64,
-}
-
-impl From<artifact_entry::Model> for EntryRow {
-    fn from(r: artifact_entry::Model) -> Self {
-        Self {
-            artifact_id: r.artifact_id,
-            path: r.path,
-            kind: r.kind,
-            mime: r.mime,
-            value: r.value,
-            attachment_id: r.attachment_id,
-            size: r.size,
-            rev: r.rev,
-            updated_by: r.updated_by,
-            updated_at: r.updated_at,
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
-pub struct UpsertEntry {
-    pub artifact_id: String,
-    pub path: String,
-    pub kind: String,
-    pub mime: String,
-    pub value: Option<String>,
-    pub attachment_id: Option<String>,
-    pub size: i64,
-    pub rev: i64,
-    pub updated_by: String,
-    pub updated_at: i64,
-}
-
-#[derive(Clone, Debug)]
-pub struct ChangeRow {
-    pub artifact_id: String,
+pub struct FileChangeRow {
     pub seq: i64,
-    pub batch_id: String,
-    pub block_ids: Vec<String>,
-    pub results: Vec<BlockOpResult>,
-}
-
-pub struct NewChange<'a> {
-    pub artifact_id: &'a str,
-    pub seq: i64,
-    pub batch_id: &'a str,
-    pub actor: &'a str,
-    pub block_ids: &'a [String],
-    pub results: &'a [BlockOpResult],
-    pub created_at: i64,
-}
-
-#[derive(Clone, Debug)]
-pub struct EntryChangeRow {
-    pub seq: i64,
+    pub frontiers: Option<String>,
+    pub actor: String,
     pub paths: Vec<String>,
     pub deleted: Vec<String>,
 }
@@ -191,8 +118,6 @@ pub struct EntryChangeRow {
 pub struct StoredSuggestion {
     pub wire: Suggestion,
     pub origin: Option<String>,
-    pub anchor_text: Option<String>,
-    pub replacement_text: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -291,24 +216,15 @@ fn escape_like(raw: &str) -> String {
     out
 }
 
-fn decode_change(row: artifact_change::Model) -> DbResult<ChangeRow> {
-    Ok(ChangeRow {
-        artifact_id: row.artifact_id,
-        seq: row.seq,
-        batch_id: row.batch_id.unwrap_or_default(),
-        block_ids: read_db_json(row.targets)?,
-        results: read_db_json(row.payload)?,
-    })
-}
-
 fn decode_stored_suggestion(row: artifact_suggestion::Model) -> DbResult<StoredSuggestion> {
     Ok(StoredSuggestion {
         wire: Suggestion {
             id: row.id,
             artifact_id: row.artifact_id,
-            block_id: row.block_id,
+            path: row.path,
             author: row.author,
             base_rev: row.at_rev,
+            base_hash: row.base_hash,
             change: read_db_json(row.change)?,
             status: read_db_word(row.status)?,
             created_at: row.created_at,
@@ -320,8 +236,6 @@ fn decode_stored_suggestion(row: artifact_suggestion::Model) -> DbResult<StoredS
             end_offset: row.end_offset.and_then(|n| u32::try_from(n).ok()),
         },
         origin: row.origin,
-        anchor_text: row.anchor_text,
-        replacement_text: row.replacement_text,
     })
 }
 
@@ -363,10 +277,8 @@ async fn add_impl<C: ConnectionTrait>(db: &C, params: NewArtifact) -> DbResult<(
     artifact::ActiveModel {
         id: Set(params.id),
         title: Set(params.title),
-        body: Set(params.body),
         artifact_type: Set(params.artifact_type),
         is_default: Set(params.is_default),
-        display: Set(params.display),
         channel_id: Set(params.channel_id),
         message_id: Set(None),
         issue: Set(params.issue),
@@ -386,7 +298,7 @@ async fn add_version_impl<C: ConnectionTrait>(db: &C, params: NewVersion) -> DbR
     artifact_version::ActiveModel {
         artifact_id: Set(params.artifact_id),
         version: Set(params.version),
-        attachment_id: Set(params.attachment_id),
+        storage_id: Set(params.storage_id),
         size: Set(params.size),
         note: Set(params.note),
         by_id: Set(params.by_id),
@@ -438,17 +350,6 @@ async fn rename_impl<C: ConnectionTrait>(db: &C, id: &str, title: &str, at: i64)
     Ok(())
 }
 
-async fn set_display_impl<C: ConnectionTrait>(db: &C, id: &str, display: &str, at: i64) -> DbResult<()> {
-    Update::many(artifact::Entity)
-        .col_expr(artifact::Column::Display, Expr::value(Some(display.to_owned())))
-        .col_expr(artifact::Column::UpdatedAt, Expr::value(at))
-        .filter(artifact::Column::Id.eq(id))
-        .filter(artifact::Column::Body.eq("html"))
-        .exec(db)
-        .await?;
-    Ok(())
-}
-
 async fn delete_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<()> {
     artifact::Entity::delete_by_id(id.to_owned()).exec(db).await?;
     Ok(())
@@ -480,162 +381,20 @@ async fn version_impl<C: ConnectionTrait>(db: &C, artifact_id: &str, version: i6
         .map(VersionRow::from))
 }
 
-async fn blocks_impl<C: ConnectionTrait>(db: &C, artifact_id: &str) -> DbResult<Vec<Block>> {
-    let rows = artifact_block::Entity::find()
-        .filter(artifact_block::Column::ArtifactId.eq(artifact_id))
-        .order_by_asc(artifact_block::Column::OrderKey)
-        .order_by_asc(artifact_block::Column::Id)
-        .all(db)
-        .await?;
-    rows.into_iter()
-        .map(|r| {
-            Ok(vibevalley_core::artifact::ops::wire(Block {
-                id: r.id,
-                artifact_id: r.artifact_id,
-                parent_id: r.parent_id,
-                order_key: r.order_key,
-                r#type: read_db_word(r.block_type)?,
-                attrs: read_db_json(r.attrs)?,
-                text: read_db_json::<Option<Vec<TextSpan>>>(r.spans)?.unwrap_or_default(),
-                rev: r.rev,
-                deleted: Some(r.deleted),
-                updated_by: r.updated_by,
-                updated: r.updated_at,
-            }))
-        })
-        .collect()
-}
-
-async fn block_owner_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<Option<String>> {
-    Ok(artifact_block::Entity::find_by_id(id.to_owned())
-        .select_only()
-        .column(artifact_block::Column::ArtifactId)
-        .into_tuple()
-        .one(db)
-        .await?)
-}
-
-async fn put_block_impl<C: ConnectionTrait>(db: &C, artifact_id: &str, b: &Block) -> DbResult<()> {
-    let model = artifact_block::ActiveModel {
-        id: Set(b.id.clone()),
-        artifact_id: Set(artifact_id.into()),
-        parent_id: Set(b.parent_id.clone()),
-        order_key: Set(b.order_key.clone()),
-        block_type: Set(db_word(&b.r#type)?),
-        attrs: Set(db_json(&b.attrs)?),
-        spans: Set(db_json(&b.text)?),
-        rev: Set(b.rev),
-        deleted: Set(b.deleted == Some(true)),
-        updated_by: Set(b.updated_by.clone()),
-        updated_at: Set(b.updated),
-    };
-    artifact_block::Entity::insert(model)
-        .on_conflict(
-            OnConflict::column(artifact_block::Column::Id)
-                .update_columns([
-                    artifact_block::Column::ParentId,
-                    artifact_block::Column::OrderKey,
-                    artifact_block::Column::BlockType,
-                    artifact_block::Column::Attrs,
-                    artifact_block::Column::Spans,
-                    artifact_block::Column::Rev,
-                    artifact_block::Column::Deleted,
-                    artifact_block::Column::UpdatedBy,
-                    artifact_block::Column::UpdatedAt,
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await?;
-    Ok(())
-}
-
-async fn add_revision_impl<C: ConnectionTrait>(db: &C, block: &str, rev: i64, spans: &[TextSpan], actor: &str, kind: &str, at: i64) -> DbResult<()> {
-    artifact_block_revision::ActiveModel {
-        id: Set(uuid::Uuid::now_v7().to_string()),
-        block_id: Set(block.into()),
-        rev: Set(rev),
-        spans: Set(db_json(&spans)?),
-        actor: Set(actor.into()),
-        kind: Set(kind.into()),
-        created_at: Set(at),
-    }
-    .insert(db)
-    .await?;
-    Ok(())
-}
-
-async fn revision_impl<C: ConnectionTrait>(db: &C, block: &str, rev: i64) -> DbResult<Option<Vec<TextSpan>>> {
-    let spans: Option<String> = artifact_block_revision::Entity::find()
-        .select_only()
-        .column(artifact_block_revision::Column::Spans)
-        .filter(artifact_block_revision::Column::BlockId.eq(block))
-        .filter(artifact_block_revision::Column::Rev.eq(rev))
-        .filter(artifact_block_revision::Column::Kind.eq("normal"))
-        .order_by_desc(artifact_block_revision::Column::CreatedAt)
-        .into_tuple()
-        .one(db)
-        .await?;
-    spans
-        .map(|raw| read_db_json::<Option<Vec<TextSpan>>>(raw).map(Option::unwrap_or_default))
-        .transpose()
-}
-
-async fn change_by_batch_impl<C: ConnectionTrait>(db: &C, batch: &str) -> DbResult<Option<ChangeRow>> {
-    artifact_change::Entity::find()
-        .filter(artifact_change::Column::BatchId.eq(batch))
-        .filter(artifact_change::Column::Kind.eq("blocks"))
-        .one(db)
-        .await?
-        .map(decode_change)
-        .transpose()
-}
-
-async fn add_change_impl<C: ConnectionTrait>(db: &C, c: &NewChange<'_>) -> DbResult<()> {
-    artifact_change::ActiveModel {
-        artifact_id: Set(c.artifact_id.into()),
-        seq: Set(c.seq),
-        kind: Set("blocks".into()),
-        batch_id: Set(Some(c.batch_id.into())),
-        actor: Set(c.actor.into()),
-        targets: Set(db_json(&c.block_ids)?),
-        payload: Set(db_json(&c.results)?),
-        created_at: Set(c.created_at),
-    }
-    .insert(db)
-    .await?;
-    Ok(())
-}
-
-async fn changes_after_impl<C: ConnectionTrait>(db: &C, artifact_id: &str, seq: i64, limit: i64) -> DbResult<Vec<ChangeRow>> {
-    artifact_change::Entity::find()
-        .filter(artifact_change::Column::ArtifactId.eq(artifact_id))
-        .filter(artifact_change::Column::Kind.eq("blocks"))
-        .filter(artifact_change::Column::Seq.gt(seq))
-        .order_by_asc(artifact_change::Column::Seq)
-        .limit(u64::try_from(limit).unwrap_or(0))
-        .all(db)
-        .await?
-        .into_iter()
-        .map(decode_change)
-        .collect()
-}
-
 async fn add_suggestion_impl<C: ConnectionTrait>(db: &C, s: &StoredSuggestion) -> DbResult<()> {
     artifact_suggestion::ActiveModel {
         id: Set(s.wire.id.clone()),
         artifact_id: Set(s.wire.artifact_id.clone()),
-        block_id: Set(s.wire.block_id.clone()),
+        path: Set(s.wire.path.clone()),
         author: Set(s.wire.author.clone()),
         origin: Set(s.origin.clone()),
         at_rev: Set(s.wire.base_rev),
+        base_hash: Set(s.wire.base_hash.clone()),
         change: Set(db_json(&s.wire.change)?),
         cursor_start: Set(s.wire.cursor_start.clone()),
         cursor_end: Set(s.wire.cursor_end.clone()),
         start_offset: Set(s.wire.start_offset.map(i64::from)),
         end_offset: Set(s.wire.end_offset.map(i64::from)),
-        anchor_text: Set(s.anchor_text.clone()),
-        replacement_text: Set(s.replacement_text.clone()),
         status: Set("open".into()),
         created_at: Set(s.wire.created_at),
         resolved_at: Set(None),
@@ -649,13 +408,12 @@ async fn add_suggestion_impl<C: ConnectionTrait>(db: &C, s: &StoredSuggestion) -
 async fn update_suggestion_impl<C: ConnectionTrait>(db: &C, s: &StoredSuggestion) -> DbResult<()> {
     Update::many(artifact_suggestion::Entity)
         .col_expr(artifact_suggestion::Column::AtRev, Expr::value(s.wire.base_rev))
+        .col_expr(artifact_suggestion::Column::BaseHash, Expr::value(s.wire.base_hash.clone()))
         .col_expr(artifact_suggestion::Column::Change, Expr::value(db_json(&s.wire.change)?))
         .col_expr(artifact_suggestion::Column::CursorStart, Expr::value(s.wire.cursor_start.clone()))
         .col_expr(artifact_suggestion::Column::CursorEnd, Expr::value(s.wire.cursor_end.clone()))
         .col_expr(artifact_suggestion::Column::StartOffset, Expr::value(s.wire.start_offset.map(i64::from)))
         .col_expr(artifact_suggestion::Column::EndOffset, Expr::value(s.wire.end_offset.map(i64::from)))
-        .col_expr(artifact_suggestion::Column::AnchorText, Expr::value(s.anchor_text.clone()))
-        .col_expr(artifact_suggestion::Column::ReplacementText, Expr::value(s.replacement_text.clone()))
         .filter(artifact_suggestion::Column::Id.eq(&s.wire.id))
         .filter(artifact_suggestion::Column::Status.eq("open"))
         .exec(db)
@@ -717,83 +475,16 @@ async fn upsert_collab_snapshot_impl<C: ConnectionTrait>(db: &C, artifact_id: &s
     Ok(())
 }
 
-async fn entries_impl<C: ConnectionTrait>(db: &C, artifact_id: &str) -> DbResult<Vec<EntryRow>> {
-    let rows = artifact_entry::Entity::find()
-        .filter(artifact_entry::Column::ArtifactId.eq(artifact_id))
-        .order_by_asc(artifact_entry::Column::Path)
-        .all(db)
-        .await?;
-    Ok(rows.into_iter().map(EntryRow::from).collect())
-}
-
-async fn entries_by_prefix_impl<C: ConnectionTrait>(db: &C, artifact_id: &str, prefix: &str) -> DbResult<Vec<EntryRow>> {
-    let rows = artifact_entry::Entity::find()
-        .filter(artifact_entry::Column::ArtifactId.eq(artifact_id))
-        .filter(artifact_entry::Column::Path.starts_with(prefix))
-        .order_by_asc(artifact_entry::Column::Path)
-        .all(db)
-        .await?;
-    Ok(rows.into_iter().filter(|r| r.path.starts_with(prefix)).map(EntryRow::from).collect())
-}
-
-async fn entry_impl<C: ConnectionTrait>(db: &C, artifact_id: &str, path: &str) -> DbResult<Option<EntryRow>> {
-    Ok(artifact_entry::Entity::find_by_id((artifact_id.to_owned(), path.to_owned()))
-        .one(db)
-        .await?
-        .map(EntryRow::from))
-}
-
-async fn entry_count_impl<C: ConnectionTrait>(db: &C, artifact_id: &str) -> DbResult<i64> {
-    let count = artifact_entry::Entity::find()
-        .filter(artifact_entry::Column::ArtifactId.eq(artifact_id))
-        .count(db)
-        .await?;
-    Ok(count as i64)
-}
-
-async fn upsert_entry_impl<C: ConnectionTrait>(db: &C, params: UpsertEntry) -> DbResult<()> {
-    let model = artifact_entry::ActiveModel {
-        artifact_id: Set(params.artifact_id),
-        path: Set(params.path),
-        kind: Set(params.kind),
-        mime: Set(params.mime),
-        value: Set(params.value),
-        attachment_id: Set(params.attachment_id),
-        size: Set(params.size),
-        rev: Set(params.rev),
-        updated_by: Set(params.updated_by),
-        updated_at: Set(params.updated_at),
-    };
-    artifact_entry::Entity::insert(model)
-        .on_conflict(
-            OnConflict::columns([artifact_entry::Column::ArtifactId, artifact_entry::Column::Path])
-                .update_columns([
-                    artifact_entry::Column::Kind,
-                    artifact_entry::Column::Mime,
-                    artifact_entry::Column::Value,
-                    artifact_entry::Column::AttachmentId,
-                    artifact_entry::Column::Size,
-                    artifact_entry::Column::Rev,
-                    artifact_entry::Column::UpdatedBy,
-                    artifact_entry::Column::UpdatedAt,
-                ])
-                .to_owned(),
-        )
-        .exec(db)
-        .await?;
-    Ok(())
-}
-
-async fn delete_entry_impl<C: ConnectionTrait>(db: &C, artifact_id: &str, path: &str) -> DbResult<()> {
-    artifact_entry::Entity::delete_by_id((artifact_id.to_owned(), path.to_owned())).exec(db).await?;
-    Ok(())
-}
-
-async fn add_entry_change_impl<C: ConnectionTrait>(
+#[allow(
+    clippy::too_many_arguments,
+    reason = "records an atomic artifact_change row with optional frontiers and path lists"
+)]
+async fn add_file_change_impl<C: ConnectionTrait>(
     db: &C,
     artifact_id: &str,
     seq: i64,
     actor: &str,
+    frontiers: Option<&str>,
     paths: &[String],
     deleted: &[String],
     created_at: i64,
@@ -801,8 +492,8 @@ async fn add_entry_change_impl<C: ConnectionTrait>(
     artifact_change::ActiveModel {
         artifact_id: Set(artifact_id.into()),
         seq: Set(seq),
-        kind: Set("entries".into()),
-        batch_id: Set(None),
+        kind: Set("files".into()),
+        batch_id: Set(frontiers.map(str::to_owned)),
         actor: Set(actor.into()),
         targets: Set(db_json(&paths)?),
         payload: Set(db_json(&deleted)?),
@@ -813,10 +504,10 @@ async fn add_entry_change_impl<C: ConnectionTrait>(
     Ok(())
 }
 
-async fn entry_changes_after_impl<C: ConnectionTrait>(db: &C, artifact_id: &str, seq: i64, limit: i64) -> DbResult<Vec<EntryChangeRow>> {
+async fn file_changes_after_impl<C: ConnectionTrait>(db: &C, artifact_id: &str, seq: i64, limit: i64) -> DbResult<Vec<FileChangeRow>> {
     artifact_change::Entity::find()
         .filter(artifact_change::Column::ArtifactId.eq(artifact_id))
-        .filter(artifact_change::Column::Kind.eq("entries"))
+        .filter(artifact_change::Column::Kind.eq("files"))
         .filter(artifact_change::Column::Seq.gt(seq))
         .order_by_asc(artifact_change::Column::Seq)
         .limit(u64::try_from(limit).unwrap_or(0))
@@ -824,8 +515,10 @@ async fn entry_changes_after_impl<C: ConnectionTrait>(db: &C, artifact_id: &str,
         .await?
         .into_iter()
         .map(|r| {
-            Ok(EntryChangeRow {
+            Ok(FileChangeRow {
                 seq: r.seq,
+                frontiers: r.batch_id,
+                actor: r.actor,
                 paths: read_db_json(r.targets)?,
                 deleted: read_db_json(r.payload)?,
             })
@@ -987,14 +680,6 @@ impl ArtifactService {
         rename_impl(tx, id, title, at).await
     }
 
-    pub async fn set_display(&self, id: &str, display: &str, at: i64) -> DbResult<()> {
-        set_display_impl(self.db.write_conn(), id, display, at).await
-    }
-
-    pub async fn set_display_in_tx(&self, tx: &Tx, id: &str, display: &str, at: i64) -> DbResult<()> {
-        set_display_impl(tx, id, display, at).await
-    }
-
     pub async fn delete(&self, id: &str) -> DbResult<()> {
         delete_impl(self.db.write_conn(), id).await
     }
@@ -1027,57 +712,11 @@ impl ArtifactService {
         version_impl(tx, artifact_id, version).await
     }
 
-    pub async fn blocks(&self, artifact_id: &str) -> DbResult<Vec<Block>> {
-        blocks_impl(self.db.read_conn(), artifact_id).await
-    }
-
-    pub async fn blocks_in_tx(&self, tx: &Tx, artifact_id: &str) -> DbResult<Vec<Block>> {
-        blocks_impl(tx, artifact_id).await
-    }
-
-    pub async fn block_owner(&self, id: &str) -> DbResult<Option<String>> {
-        block_owner_impl(self.db.read_conn(), id).await
-    }
-
-    pub async fn block_owner_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<String>> {
-        block_owner_impl(tx, id).await
-    }
-
-    pub async fn put_block(&self, artifact_id: &str, block: &Block) -> DbResult<()> {
-        put_block_impl(self.db.write_conn(), artifact_id, block).await
-    }
-
-    pub async fn put_block_in_tx(&self, tx: &Tx, artifact_id: &str, block: &Block) -> DbResult<()> {
-        put_block_impl(tx, artifact_id, block).await
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub async fn add_revision(&self, block_id: &str, rev: i64, spans: &[TextSpan], actor: &str, kind: &str, at: i64) -> DbResult<()> {
-        add_revision_impl(self.db.write_conn(), block_id, rev, spans, actor, kind, at).await
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub async fn add_revision_in_tx(&self, tx: &Tx, block_id: &str, rev: i64, spans: &[TextSpan], actor: &str, kind: &str, at: i64) -> DbResult<()> {
-        add_revision_impl(tx, block_id, rev, spans, actor, kind, at).await
-    }
-
-    pub async fn revision(&self, block_id: &str, rev: i64) -> DbResult<Option<Vec<TextSpan>>> {
-        revision_impl(self.db.read_conn(), block_id, rev).await
-    }
-
-    pub async fn revision_in_tx(&self, tx: &Tx, block_id: &str, rev: i64) -> DbResult<Option<Vec<TextSpan>>> {
-        revision_impl(tx, block_id, rev).await
-    }
-
     pub async fn prune_history(&self, before: i64) -> DbResult<()> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
         let outcome: DbResult<()> = async {
             artifact_change::Entity::delete_many()
                 .filter(artifact_change::Column::CreatedAt.lt(before))
-                .exec(&tx)
-                .await?;
-            artifact_block_revision::Entity::delete_many()
-                .filter(artifact_block_revision::Column::CreatedAt.lt(before))
                 .exec(&tx)
                 .await?;
             Ok(())
@@ -1090,30 +729,6 @@ impl ArtifactService {
                 Err(err)
             }
         }
-    }
-
-    pub async fn change_by_batch(&self, batch_id: &str) -> DbResult<Option<ChangeRow>> {
-        change_by_batch_impl(self.db.read_conn(), batch_id).await
-    }
-
-    pub async fn change_by_batch_in_tx(&self, tx: &Tx, batch_id: &str) -> DbResult<Option<ChangeRow>> {
-        change_by_batch_impl(tx, batch_id).await
-    }
-
-    pub async fn add_change(&self, change: &NewChange<'_>) -> DbResult<()> {
-        add_change_impl(self.db.write_conn(), change).await
-    }
-
-    pub async fn add_change_in_tx(&self, tx: &Tx, change: &NewChange<'_>) -> DbResult<()> {
-        add_change_impl(tx, change).await
-    }
-
-    pub async fn changes_after(&self, artifact_id: &str, seq: i64, limit: i64) -> DbResult<Vec<ChangeRow>> {
-        changes_after_impl(self.db.read_conn(), artifact_id, seq, limit).await
-    }
-
-    pub async fn changes_after_in_tx(&self, tx: &Tx, artifact_id: &str, seq: i64, limit: i64) -> DbResult<Vec<ChangeRow>> {
-        changes_after_impl(tx, artifact_id, seq, limit).await
     }
 
     pub async fn add_suggestion(&self, suggestion: &StoredSuggestion) -> DbResult<()> {
@@ -1180,79 +795,41 @@ impl ArtifactService {
         upsert_collab_snapshot_impl(tx, artifact_id, snapshot, updated_at).await
     }
 
-    pub async fn entries(&self, artifact_id: &str) -> DbResult<Vec<EntryRow>> {
-        entries_impl(self.db.read_conn(), artifact_id).await
-    }
-
-    pub async fn entries_in_tx(&self, tx: &Tx, artifact_id: &str) -> DbResult<Vec<EntryRow>> {
-        entries_impl(tx, artifact_id).await
-    }
-
-    pub async fn entries_by_prefix(&self, artifact_id: &str, prefix: &str) -> DbResult<Vec<EntryRow>> {
-        entries_by_prefix_impl(self.db.read_conn(), artifact_id, prefix).await
-    }
-
-    pub async fn entries_by_prefix_in_tx(&self, tx: &Tx, artifact_id: &str, prefix: &str) -> DbResult<Vec<EntryRow>> {
-        entries_by_prefix_impl(tx, artifact_id, prefix).await
-    }
-
-    pub async fn entry(&self, artifact_id: &str, path: &str) -> DbResult<Option<EntryRow>> {
-        entry_impl(self.db.read_conn(), artifact_id, path).await
-    }
-
-    pub async fn entry_in_tx(&self, tx: &Tx, artifact_id: &str, path: &str) -> DbResult<Option<EntryRow>> {
-        entry_impl(tx, artifact_id, path).await
-    }
-
-    pub async fn entry_count(&self, artifact_id: &str) -> DbResult<i64> {
-        entry_count_impl(self.db.read_conn(), artifact_id).await
-    }
-
-    pub async fn entry_count_in_tx(&self, tx: &Tx, artifact_id: &str) -> DbResult<i64> {
-        entry_count_impl(tx, artifact_id).await
-    }
-
-    pub async fn upsert_entry(&self, params: UpsertEntry) -> DbResult<()> {
-        upsert_entry_impl(self.db.write_conn(), params).await
-    }
-
-    pub async fn upsert_entry_in_tx(&self, tx: &Tx, params: UpsertEntry) -> DbResult<()> {
-        upsert_entry_impl(tx, params).await
-    }
-
-    pub async fn delete_entry(&self, artifact_id: &str, path: &str) -> DbResult<()> {
-        delete_entry_impl(self.db.write_conn(), artifact_id, path).await
-    }
-
-    pub async fn delete_entry_in_tx(&self, tx: &Tx, artifact_id: &str, path: &str) -> DbResult<()> {
-        delete_entry_impl(tx, artifact_id, path).await
+    #[allow(clippy::too_many_arguments)]
+    pub async fn add_file_change(
+        &self,
+        artifact_id: &str,
+        seq: i64,
+        actor: &str,
+        frontiers: Option<&str>,
+        paths: &[String],
+        deleted: &[String],
+        created_at: i64,
+    ) -> DbResult<()> {
+        add_file_change_impl(self.db.write_conn(), artifact_id, seq, actor, frontiers, paths, deleted, created_at).await
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub async fn add_entry_change(&self, artifact_id: &str, seq: i64, actor: &str, paths: &[String], deleted: &[String], created_at: i64) -> DbResult<()> {
-        add_entry_change_impl(self.db.write_conn(), artifact_id, seq, actor, paths, deleted, created_at).await
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub async fn add_entry_change_in_tx(
+    pub async fn add_file_change_in_tx(
         &self,
         tx: &Tx,
         artifact_id: &str,
         seq: i64,
         actor: &str,
+        frontiers: Option<&str>,
         paths: &[String],
         deleted: &[String],
         created_at: i64,
     ) -> DbResult<()> {
-        add_entry_change_impl(tx, artifact_id, seq, actor, paths, deleted, created_at).await
+        add_file_change_impl(tx, artifact_id, seq, actor, frontiers, paths, deleted, created_at).await
     }
 
-    pub async fn entry_changes_after(&self, artifact_id: &str, seq: i64, limit: i64) -> DbResult<Vec<EntryChangeRow>> {
-        entry_changes_after_impl(self.db.read_conn(), artifact_id, seq, limit).await
+    pub async fn file_changes_after(&self, artifact_id: &str, seq: i64, limit: i64) -> DbResult<Vec<FileChangeRow>> {
+        file_changes_after_impl(self.db.read_conn(), artifact_id, seq, limit).await
     }
 
-    pub async fn entry_changes_after_in_tx(&self, tx: &Tx, artifact_id: &str, seq: i64, limit: i64) -> DbResult<Vec<EntryChangeRow>> {
-        entry_changes_after_impl(tx, artifact_id, seq, limit).await
+    pub async fn file_changes_after_in_tx(&self, tx: &Tx, artifact_id: &str, seq: i64, limit: i64) -> DbResult<Vec<FileChangeRow>> {
+        file_changes_after_impl(tx, artifact_id, seq, limit).await
     }
 
     // --- Media library ---

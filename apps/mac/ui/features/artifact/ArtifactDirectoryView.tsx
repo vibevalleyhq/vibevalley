@@ -935,7 +935,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
           </If>
 
           <If when={props.artifact.artifactType === "prototype"}>
-            {/* Strictly sandboxed WebView: incognito + strict CSP via buildPrototypeDocument (no allow-same-origin). */}
+            {/* Strictly sandboxed WebView: incognito + strict CSP via buildPrototypeDocument (never shares host origin). */}
             <WebView
               testID="artifact-prototype-webview"
               accessibilityLabel={props.artifact.title}

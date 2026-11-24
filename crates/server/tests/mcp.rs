@@ -118,11 +118,11 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
         .iter()
         .map(|t| t["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names.len(), 28, "{names:?}");
+    assert_eq!(names.len(), 25, "{names:?}");
     assert!(names.contains(&"issue_report"));
-    assert!(names.contains(&"artifact_block_list"));
-    assert!(names.contains(&"artifact_block_batch"));
-    assert!(names.contains(&"artifact_outline_import"));
+    assert!(names.contains(&"artifact_file_list"));
+    assert!(names.contains(&"artifact_file_write"));
+    assert!(names.contains(&"artifact_suggestion_create"));
     assert!(!names.contains(&"pkm_search"));
 
     let stranger = rpc(&door, "not-a-token", 3, "tools/call", json!({ "name": "session_list", "arguments": {} }));
@@ -184,94 +184,92 @@ fn a_helper_calls_its_tools_through_the_door_it_was_given() {
     assert_eq!(none["result"]["isError"], true);
     assert!(text_of(&none).contains("没有 no_such_tool 这个工具"));
 
-    // Artifact S2 + S6 MCP tools: outline import, block snapshot, and block batch (including tempId nesting, move, and suggestion diversion).
-    let imported_res = rpc(
+    // Artifact MCP tools: directory create, file list/get/write, and human-owned suggestion diversion.
+    let created_res = rpc(
         &door,
         &token,
         10,
         "tools/call",
         json!({
-            "name": "artifact_outline_import",
+            "name": "artifact_create",
             "arguments": {
-                "markdown": "---\ntitle: Sprint Outline\n---\n- TODO Ship collab tools\n  id:: block-prop-1\n  - DONE Wire block batch",
+                "title": "Sprint Outline",
+                "artifactType": "outline",
+                "files": [{ "path": "structure/notes.md", "content": "Initial agent notes" }],
                 "announce": false
             }
         }),
     );
-    assert_eq!(imported_res["result"]["isError"], false, "{imported_res}");
-    let imported_art: Value = serde_json::from_str(&text_of(&imported_res)).unwrap();
-    let outline_id = imported_art["id"].as_str().unwrap().to_string();
-    assert_eq!(imported_art["title"], "Sprint Outline");
-    assert_eq!(imported_art["artifactType"], "outline");
-    assert_eq!(imported_art["body"], "blocks");
+    assert_eq!(created_res["result"]["isError"], false, "{created_res}");
+    let created_art: Value = serde_json::from_str(&text_of(&created_res)).unwrap();
+    let outline_id = created_art["id"].as_str().unwrap().to_string();
+    assert_eq!(created_art["title"], "Sprint Outline");
+    assert_eq!(created_art["artifactType"], "outline");
 
-    let snap_res = rpc(
+    let list_res = rpc(
         &door,
         &token,
         11,
         "tools/call",
-        json!({ "name": "artifact_block_list", "arguments": { "id": outline_id } }),
+        json!({ "name": "artifact_file_list", "arguments": { "id": outline_id, "prefix": "structure/" } }),
     );
-    assert_eq!(snap_res["result"]["isError"], false, "{snap_res}");
-    let snap: Value = serde_json::from_str(&text_of(&snap_res)).unwrap();
-    let blocks = snap["blocks"].as_array().unwrap();
-    assert_eq!(blocks.len(), 2, "{snap}");
-    let first_block_id = blocks[0]["id"].as_str().unwrap().to_string();
-    let first_block_rev = blocks[0]["rev"].as_i64().unwrap();
+    assert_eq!(list_res["result"]["isError"], false, "{list_res}");
+    let listed: Value = serde_json::from_str(&text_of(&list_res)).unwrap();
+    let files = listed["files"].as_array().unwrap();
+    assert!(files.iter().any(|f| f["path"] == "structure/notes.md"), "{listed}");
 
-    // User adds a block directly; helper batch editing that user block must divert to a suggestion.
-    let user_block = call(
-        "artifact.block.create",
-        json!({ "id": outline_id, "type": "paragraph", "text": "User authored note" }),
-    )
-    .data
-    .unwrap();
-    let user_block_id = user_block["blockId"].as_str().unwrap().to_string();
-    let user_block_rev = user_block["rev"].as_i64().unwrap();
+    // Human edits `structure/notes.md` directly; subsequent helper write diverts to a review suggestion.
+    let human_write = call(
+        "artifact.file.write",
+        json!({
+            "id": outline_id,
+            "files": [{ "path": "structure/notes.md", "content": "Human edited note" }],
+            "summary": "user tweak"
+        }),
+    );
+    assert_eq!(human_write.biz_code, 0, "{}", human_write.message);
 
-    let batch_res = rpc(
+    let agent_write_res = rpc(
         &door,
         &token,
         12,
         "tools/call",
         json!({
-            "name": "artifact_block_batch",
+            "name": "artifact_file_write",
             "arguments": {
                 "id": outline_id,
-                "note": "expand outline",
-                "ops": [
-                    { "op": "create", "tempId": "sec", "type": "heading", "level": 2, "text": "Follow-ups" },
-                    { "op": "create", "tempId": "child", "type": "bulleted", "parentId": "sec", "text": "Verify MCP tools" },
-                    { "op": "update", "block": first_block_id, "baseRev": first_block_rev, "checked": true, "text": "Shipped collab tools" },
-                    { "op": "move", "block": "child", "parentId": "", "afterBlock": "" },
-                    { "op": "update", "block": user_block_id, "baseRev": user_block_rev, "text": "Suggested rewrite" }
+                "summary": "suggest improvement",
+                "files": [
+                    { "path": "structure/notes.md", "content": "Agent proposed rewrite" },
+                    { "path": "structure/appendix.md", "content": "Brand new section" }
                 ]
             }
         }),
     );
-    assert_eq!(batch_res["result"]["isError"], false, "{batch_res}");
-    let batch: Value = serde_json::from_str(&text_of(&batch_res)).unwrap();
-    let results = batch["results"].as_array().unwrap();
-    assert_eq!(results.len(), 5, "{batch}");
-    assert_eq!(results[0]["status"], "applied");
-    assert_eq!(results[1]["status"], "applied");
-    assert_eq!(results[2]["status"], "applied");
-    assert_eq!(results[3]["status"], "applied");
-    assert_eq!(results[4]["status"], "rejected");
-    assert!(results[4]["suggestion"].as_str().is_some(), "{batch}");
-    let moved_child_id = batch["createdIds"]["child"].as_str().unwrap().to_string();
+    assert_eq!(agent_write_res["result"]["isError"], false, "{agent_write_res}");
+    let written: Value = serde_json::from_str(&text_of(&agent_write_res)).unwrap();
+    assert_eq!(written["suggestions"].as_array().unwrap().len(), 1, "{written}");
+    assert_eq!(written["suggestions"][0]["path"], "structure/notes.md");
 
-    let after_snap_res = rpc(
+    let notes_res = rpc(
         &door,
         &token,
         13,
         "tools/call",
-        json!({ "name": "artifact_block_list", "arguments": { "id": outline_id } }),
+        json!({ "name": "artifact_file_get", "arguments": { "id": outline_id, "path": "structure/notes.md" } }),
     );
-    let after_snap: Value = serde_json::from_str(&text_of(&after_snap_res)).unwrap();
-    let after_blocks = after_snap["blocks"].as_array().unwrap();
-    assert_eq!(after_blocks[0]["id"], moved_child_id, "child moved to top-level first");
-    assert!(after_blocks[0].get("parentId").is_none());
+    let notes_file: Value = serde_json::from_str(&text_of(&notes_res)).unwrap();
+    assert_eq!(notes_file["content"], "Human edited note");
+
+    let appendix_res = rpc(
+        &door,
+        &token,
+        14,
+        "tools/call",
+        json!({ "name": "artifact_file_get", "arguments": { "id": outline_id, "path": "structure/appendix.md" } }),
+    );
+    let appendix_file: Value = serde_json::from_str(&text_of(&appendix_res)).unwrap();
+    assert_eq!(appendix_file["content"], "Brand new section");
 
     app.close_blocking();
 }

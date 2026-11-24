@@ -2,16 +2,14 @@
 //! services and [`crate::agent::mcp::Resource`] (`vv://`), keeping actor-scoped
 //! artifact/media/library writes strongly typed with zero `block_on`.
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use vibevalley_core::collab::CommitMeta;
 use vibevalley_protocol::{
-    ArtifactBody, ArtifactEntryBatchRequest, ArtifactEntryGetRequest, ArtifactEntryListRequest, ArtifactKind, ArtifactListRequest,
-    ArtifactOutlineImportRequest, ArtifactRequest, ArtifactType, ArtifactTypeReadRequest, ArtifactVersionRequest, BlockCreate, BlockDelete, BlockOpResult,
-    BlockOpStatus, BlockUpdate, LibraryAddRequest, LibraryListRequest, MediaImageRequest, MediaSource, MediaSpeakersRequest, MediaSpeechRequest,
-    MediaVoiceDesignRequest, Session,
+    ArtifactFileDeleteRequest, ArtifactFileGetRequest, ArtifactFileListRequest, ArtifactFileWriteRequest, ArtifactListRequest, ArtifactRequest,
+    ArtifactSuggestionCreateInput, ArtifactType, ArtifactTypeReadRequest, ArtifactVersionRequest, LibraryAddRequest, LibraryListRequest, MediaImageRequest,
+    MediaSource, MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, Session,
 };
 
 use super::{ToolRegistry, Who, given};
@@ -185,7 +183,7 @@ pub struct ArtifactContentArgs {
 }
 
 pub async fn artifact_content(f: &ToolRegistry, _who: &Who, a: ArtifactContentArgs) -> Result<String, String> {
-    let (content, _) = f.artifact.content_async(&a.id, a.version).await.map_err(|e| e.message)?;
+    let content = f.artifact.content_async(&a.id, a.version).await.map_err(|e| e.message)?;
     text(&content)
 }
 
@@ -218,25 +216,6 @@ pub struct ArtifactCreateArgs {
     file: Option<String>,
 }
 
-fn is_store_create(req: &ArtifactRequest, file: Option<&str>) -> bool {
-    req.artifact_type.is_some_and(|t| t.body() == ArtifactBody::Store)
-        || req.kind == Some(ArtifactKind::Store)
-        || (req.entries.is_some() && req.content.is_none() && file.is_none())
-}
-
-fn prepare_artifact_create(req: &mut ArtifactRequest, file: Option<&str>) {
-    if is_store_create(req, file) || (req.artifact_type.is_some_and(|t| t.body() == ArtifactBody::Blocks) && req.content.is_none() && file.is_none()) {
-        return;
-    }
-    if req.kind.is_none() && req.content.is_some() {
-        req.kind = Some(ArtifactKind::Markdown);
-    }
-    if req.kind == Some(ArtifactKind::Html) && req.display.is_none() {
-        let name = file.unwrap_or(req.title.as_str());
-        req.display = vibevalley_core::artifact::infer_artifact_from_name(name, req.content.as_deref()).display;
-    }
-}
-
 pub async fn artifact_create(f: &ToolRegistry, who: &Who, mut a: ArtifactCreateArgs) -> Result<String, String> {
     let file = given(&a.file).map(str::to_string);
     if a.req.content.is_some() && file.is_some() {
@@ -244,6 +223,9 @@ pub async fn artifact_create(f: &ToolRegistry, who: &Who, mut a: ArtifactCreateA
     }
     match who {
         Who::Orchestrator(here) => {
+            if file.is_some() {
+                return Err("主助手不能用 file，请直接传 content 或 files".into());
+            }
             if given(&a.req.channel).is_none() && !here.channel.is_empty() {
                 a.req.channel = Some(here.channel.clone());
             }
@@ -261,64 +243,7 @@ pub async fn artifact_create(f: &ToolRegistry, who: &Who, mut a: ArtifactCreateA
             }
         }
     }
-    prepare_artifact_create(&mut a.req, file.as_deref());
     text(&f.artifact.create_async(&maker_of(who), &a.req).await.map_err(|e| e.message)?)
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ArtifactOutlineImportArgs {
-    markdown: Option<String>,
-    file: Option<String>,
-    title: Option<String>,
-    filename: Option<String>,
-    channel: Option<String>,
-    issue: Option<String>,
-    announce: Option<bool>,
-    note: Option<String>,
-}
-
-pub async fn artifact_outline_import(f: &ToolRegistry, who: &Who, mut a: ArtifactOutlineImportArgs) -> Result<String, String> {
-    let file = given(&a.file).map(str::to_string);
-    if a.markdown.is_some() && file.is_some() {
-        return Err("markdown 和 file 只能填一个".into());
-    }
-    match who {
-        Who::Orchestrator(here) => {
-            if file.is_some() {
-                return Err("主助手不能用 file，请直接传 markdown".into());
-            }
-            if given(&a.channel).is_none() && !here.channel.is_empty() {
-                a.channel = Some(here.channel.clone());
-            }
-            a.issue = match given(&a.issue) {
-                Some(r) => Some(f.issue_async(r).await?.id),
-                None => None,
-            };
-        }
-        Who::Helper(me) => {
-            if let Some(content) = read_helper_file(f, me, &a.file).await? {
-                a.markdown = Some(content);
-                if given(&a.filename).is_none() {
-                    a.filename = file;
-                }
-            }
-            if given(&a.issue).is_none() {
-                a.issue = me.issue_id().map(String::from);
-            }
-        }
-    }
-    let markdown = a.markdown.ok_or_else(|| "需要提供 markdown（或工作区里的 file）".to_string())?;
-    let req = ArtifactOutlineImportRequest {
-        markdown,
-        title: a.title,
-        filename: a.filename,
-        channel: a.channel,
-        issue: a.issue,
-        announce: a.announce,
-        note: a.note,
-    };
-    text(&f.artifact.import_outline_async(&maker_of(who), &req).await.map_err(|e| e.message)?)
 }
 
 #[derive(Deserialize)]
@@ -348,233 +273,10 @@ pub async fn artifact_version(f: &ToolRegistry, who: &Who, mut a: ArtifactVersio
     if let Who::Helper(me) = who
         && let Some(content) = read_helper_file(f, me, &a.file).await?
     {
-        a.req.content = content;
+        a.req.content = Some(content);
     }
     let meta = commit_meta_for_who(f, who, a.req.note.clone());
     text(&f.artifact.version_with_meta_async(&maker_of(who), &a.req, &meta).await.map_err(|e| e.message)?)
-}
-
-pub async fn block_list(f: &ToolRegistry, _: &Who, a: IdArgs) -> Result<String, String> {
-    text(&f.artifact.snapshot_async(a.id.trim()).await.map_err(|e| e.message)?)
-}
-
-#[derive(Deserialize)]
-pub struct BlockCreateArgs {
-    #[serde(default)]
-    id: String,
-    #[serde(flatten)]
-    body: BlockCreate,
-}
-
-pub async fn block_create(f: &ToolRegistry, who: &Who, a: BlockCreateArgs) -> Result<String, String> {
-    let meta = commit_meta_for_who(f, who, None);
-    text(
-        &f.artifact
-            .insert_block_with_meta_async(a.id.trim(), actor_of(who), &a.body, &meta)
-            .await
-            .map_err(|e| e.message)?,
-    )
-}
-
-#[derive(Deserialize)]
-pub struct BlockUpdateArgs {
-    #[serde(default)]
-    id: String,
-    #[serde(flatten)]
-    body: BlockUpdate,
-}
-
-pub async fn block_update(f: &ToolRegistry, who: &Who, a: BlockUpdateArgs) -> Result<String, String> {
-    let meta = commit_meta_for_who(f, who, None);
-    text(
-        &f.artifact
-            .update_block_with_meta_async(a.id.trim(), actor_of(who), &a.body, &meta)
-            .await
-            .map_err(|e| e.message)?,
-    )
-}
-
-#[derive(Deserialize)]
-pub struct BlockDeleteArgs {
-    #[serde(default)]
-    id: String,
-    #[serde(flatten)]
-    body: BlockDelete,
-}
-
-pub async fn block_delete(f: &ToolRegistry, who: &Who, a: BlockDeleteArgs) -> Result<String, String> {
-    let meta = commit_meta_for_who(f, who, None);
-    text(
-        &f.artifact
-            .delete_block_with_meta_async(a.id.trim(), actor_of(who), &a.body, &meta)
-            .await
-            .map_err(|e| e.message)?,
-    )
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "op", rename_all = "lowercase")]
-pub enum BlockBatchOp {
-    #[serde(rename_all = "camelCase")]
-    Create {
-        temp_id: Option<String>,
-        r#type: Option<String>,
-        level: Option<i64>,
-        checked: Option<bool>,
-        language: Option<String>,
-        text: String,
-        after_block: Option<String>,
-        parent_id: Option<String>,
-    },
-    #[serde(rename_all = "camelCase")]
-    Update {
-        block: String,
-        base_rev: i64,
-        text: Option<String>,
-        r#type: Option<String>,
-        level: Option<i64>,
-        checked: Option<bool>,
-        language: Option<String>,
-    },
-    #[serde(rename_all = "camelCase")]
-    Move {
-        block: String,
-        parent_id: Option<String>,
-        after_block: Option<String>,
-    },
-    #[serde(rename_all = "camelCase")]
-    Delete { block: String },
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BlockBatchArgs {
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    ops: Vec<BlockBatchOp>,
-    note: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct BlockBatchResponse {
-    artifact_id: String,
-    seq: i64,
-    results: Vec<BlockOpResult>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-    created_ids: BTreeMap<String, String>,
-}
-
-pub async fn block_batch(f: &ToolRegistry, who: &Who, a: BlockBatchArgs) -> Result<String, String> {
-    let artifact_id = a.id.trim().to_string();
-    if a.ops.is_empty() {
-        return Err("ops 不能为空".into());
-    }
-    let actor = actor_of(who);
-    let meta = commit_meta_for_who(f, who, given(&a.note).map(str::to_string));
-    let mut created_ids: BTreeMap<String, String> = BTreeMap::new();
-    let mut results = Vec::with_capacity(a.ops.len());
-
-    for op in a.ops {
-        let resolve = |raw: &str, ids: &BTreeMap<String, String>| ids.get(raw).cloned().unwrap_or_else(|| raw.to_string());
-        let resolve_opt = |raw: Option<String>, ids: &BTreeMap<String, String>| {
-            raw.map(|s| {
-                let trimmed = s.trim();
-                if trimmed.is_empty() { String::new() } else { resolve(trimmed, ids) }
-            })
-        };
-        let res = match op {
-            BlockBatchOp::Create {
-                temp_id,
-                r#type,
-                level,
-                checked,
-                language,
-                text,
-                after_block,
-                parent_id,
-            } => {
-                let body = BlockCreate {
-                    r#type,
-                    level,
-                    checked,
-                    language,
-                    text,
-                    after_block: resolve_opt(after_block, &created_ids),
-                    parent_id: resolve_opt(parent_id, &created_ids).filter(|p| !p.is_empty()),
-                };
-                let r = f
-                    .artifact
-                    .insert_block_with_meta_async(&artifact_id, actor, &body, &meta)
-                    .await
-                    .map_err(|e| e.message)?;
-                if r.status == BlockOpStatus::Applied
-                    && let Some(tid) = given(&temp_id)
-                {
-                    created_ids.insert(tid.to_string(), r.block_id.clone());
-                }
-                r
-            }
-            BlockBatchOp::Update {
-                block,
-                base_rev,
-                text,
-                r#type,
-                level,
-                checked,
-                language,
-            } => {
-                let body = BlockUpdate {
-                    block: resolve(block.trim(), &created_ids),
-                    base_rev,
-                    text,
-                    r#type,
-                    level,
-                    checked,
-                    language,
-                };
-                f.artifact
-                    .update_block_with_meta_async(&artifact_id, actor, &body, &meta)
-                    .await
-                    .map_err(|e| e.message)?
-            }
-            BlockBatchOp::Move { block, parent_id, after_block } => {
-                let resolved_block = resolve(block.trim(), &created_ids);
-                let resolved_parent = resolve_opt(parent_id, &created_ids).filter(|p| !p.is_empty());
-                let resolved_after = resolve_opt(after_block, &created_ids);
-                f.artifact
-                    .move_block_with_meta_async(
-                        &artifact_id,
-                        actor,
-                        &resolved_block,
-                        resolved_parent.as_deref(),
-                        resolved_after.as_deref(),
-                        &meta,
-                    )
-                    .await
-                    .map_err(|e| e.message)?
-            }
-            BlockBatchOp::Delete { block } => {
-                let body = BlockDelete {
-                    block: resolve(block.trim(), &created_ids),
-                };
-                f.artifact
-                    .delete_block_with_meta_async(&artifact_id, actor, &body, &meta)
-                    .await
-                    .map_err(|e| e.message)?
-            }
-        };
-        results.push(res);
-    }
-
-    let artifact = f.artifact.get_async(&artifact_id).await.map_err(|e| e.message)?;
-    text(&BlockBatchResponse {
-        artifact_id,
-        seq: artifact.seq,
-        results,
-        created_ids,
-    })
 }
 
 pub async fn artifact_type_list(f: &ToolRegistry, _who: &Who, _: EmptyArgs) -> Result<String, String> {
@@ -585,25 +287,45 @@ pub async fn artifact_type_read(f: &ToolRegistry, _who: &Who, req: ArtifactTypeR
     text(&f.artifact.read_type_async(&req).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_entry_list(f: &ToolRegistry, _who: &Who, mut req: ArtifactEntryListRequest) -> Result<String, String> {
+pub async fn artifact_file_list(f: &ToolRegistry, _who: &Who, mut req: ArtifactFileListRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
-    text(&f.artifact.list_entries_async(&req).await.map_err(|e| e.message)?)
+    text(&f.artifact.list_files_async(&req).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_entry_get(f: &ToolRegistry, _who: &Who, mut req: ArtifactEntryGetRequest) -> Result<String, String> {
+pub async fn artifact_file_get(f: &ToolRegistry, _who: &Who, mut req: ArtifactFileGetRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
-    text(&f.artifact.get_entry_async(&req).await.map_err(|e| e.message)?)
+    text(&f.artifact.get_file_async(&req).await.map_err(|e| e.message)?)
 }
 
-pub async fn artifact_entry_batch(f: &ToolRegistry, who: &Who, mut req: ArtifactEntryBatchRequest) -> Result<String, String> {
+pub async fn artifact_file_write(f: &ToolRegistry, who: &Who, mut req: ArtifactFileWriteRequest) -> Result<String, String> {
     req.id = req.id.trim().to_string();
-    let meta = commit_meta_for_who(f, who, req.note.clone());
+    let meta = commit_meta_for_who(f, who, req.summary.clone());
     text(
         &f.artifact
-            .batch_entries_with_meta_async(&maker_of(who), &req, &meta)
+            .write_files_with_meta_async(&maker_of(who), &req, &meta)
             .await
             .map_err(|e| e.message)?,
     )
+}
+
+pub async fn artifact_file_delete(f: &ToolRegistry, who: &Who, mut req: ArtifactFileDeleteRequest) -> Result<String, String> {
+    req.id = req.id.trim().to_string();
+    let meta = commit_meta_for_who(f, who, req.summary.clone());
+    text(
+        &f.artifact
+            .delete_file_with_meta_async(&maker_of(who), &req, &meta)
+            .await
+            .map_err(|e| e.message)?,
+    )
+}
+
+pub async fn artifact_suggestion_list(f: &ToolRegistry, _who: &Who, a: IdArgs) -> Result<String, String> {
+    text(&f.artifact.suggestions_async(a.id.trim()).await.map_err(|e| e.message)?)
+}
+
+pub async fn artifact_suggestion_create(f: &ToolRegistry, who: &Who, mut req: ArtifactSuggestionCreateInput) -> Result<String, String> {
+    req.id = req.id.trim().to_string();
+    text(&f.artifact.create_suggestion_async(actor_of(who), &req).await.map_err(|e| e.message)?)
 }
 
 /// `file`: a file in the helper's own folder becomes the content.
@@ -638,23 +360,7 @@ fn inside(dir: &Path, name: &str) -> Result<PathBuf, String> {
 
 #[cfg(test)]
 mod tests {
-    use vibevalley_protocol::{ArtifactDisplay, ArtifactEntryOp, ArtifactEntryWriteInput, ArtifactKind, ArtifactRequest, ArtifactType};
-
-    fn empty_req(title: &str) -> ArtifactRequest {
-        ArtifactRequest {
-            title: title.into(),
-            kind: None,
-            artifact_type: None,
-            display: None,
-            content: None,
-            entries: None,
-            is_default: None,
-            announce: None,
-            note: None,
-            channel: None,
-            issue: None,
-        }
-    }
+    use vibevalley_protocol::{ArtifactRequest, ArtifactType};
 
     #[test]
     fn a_file_outside_the_folder_is_refused() {
@@ -665,31 +371,20 @@ mod tests {
     }
 
     #[test]
-    fn prepare_artifact_create_preserves_store_and_infers_html_display() {
-        let mut store = empty_req("Q3 Deck");
-        store.artifact_type = Some(ArtifactType::Slides);
-        store.entries = Some(vec![ArtifactEntryWriteInput {
-            op: ArtifactEntryOp::Set,
-            path: "project/deck.json".into(),
-            kind: None,
-            value: Some("{}".into()),
-            from: None,
-            mime: None,
-            if_rev: None,
-        }]);
-        super::prepare_artifact_create(&mut store, None);
-        assert_eq!(store.kind, None);
-        assert_eq!(store.display, None);
-
-        let mut md = empty_req("Notes");
-        md.content = Some("# Hello".into());
-        super::prepare_artifact_create(&mut md, None);
-        assert_eq!(md.kind, Some(ArtifactKind::Markdown));
-
-        let mut slides_html = empty_req("Deck");
-        slides_html.kind = Some(ArtifactKind::Html);
-        slides_html.content = Some("<html><body></body></html>".into());
-        super::prepare_artifact_create(&mut slides_html, Some("pitch.slide.html"));
-        assert_eq!(slides_html.display, Some(ArtifactDisplay::Slides));
+    fn artifact_request_accepts_all_12_types() {
+        for ty in ArtifactType::ALL {
+            let req = ArtifactRequest {
+                title: "Spec".into(),
+                artifact_type: ty,
+                content: Some("body".into()),
+                files: None,
+                is_default: None,
+                announce: None,
+                note: None,
+                channel: None,
+                issue: None,
+            };
+            assert_eq!(req.artifact_type, ty);
+        }
     }
 }

@@ -710,7 +710,6 @@ impl ChatModel {
                 title: a.title,
                 version: a.version,
             }),
-            blocks: meta.blocks.filter(|b| !b.is_empty() && !gone),
             view_context: meta.view_context.filter(|_| !gone),
             picked: meta.picked,
             response_port: meta.response_port.filter(|s| !s.is_empty()),

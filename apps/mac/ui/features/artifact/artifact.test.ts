@@ -37,14 +37,14 @@ test("infers all 12 artifact types from filenames and content", () => {
 });
 
 test("buildOutlineFromMarkdown creates valid structure/outline.json tree", () => {
-  const doc = buildOutlineFromMarkdown("Launch", "## Plan\n- Ship UI\n- [x] Run checks\n");
+  const doc = buildOutlineFromMarkdown("Launch", "## Roadmap\n- Ship UI\n- [x] Run checks\n");
   expect(doc.version).toBe(1);
   expect(doc.rootIds).toHaveLength(1);
   const rootId = doc.rootIds[0];
   expect(rootId).toBeDefined();
   const root = rootId !== undefined ? doc.nodes[rootId] : undefined;
   expect(root?.kind).toBe("heading");
-  expect(root?.text).toBe("Plan");
+  expect(root?.text).toBe("Roadmap");
   expect(root?.children).toHaveLength(2);
   const secondId = root?.children[1];
   expect(secondId !== undefined ? doc.nodes[secondId]?.checked : undefined).toBe(true);

@@ -117,7 +117,7 @@ fn single_server_db_shares_pool_wal_fk_and_reopens_cleanly() {
     let artifact = started.router().call_as(
         Caller::User,
         "artifact.create",
-        json!({ "title": "Spec", "kind": "markdown", "content": "# Hello" }),
+        json!({ "title": "Spec", "artifactType": "docs", "content": "# Hello" }),
     );
     assert_eq!(artifact.biz_code, 0, "{}", artifact.message);
 

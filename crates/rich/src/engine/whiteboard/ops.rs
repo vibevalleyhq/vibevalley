@@ -1,9 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use vibevalley_protocol::{ArtifactEntry, ArtifactEntryWriteInput};
-
 use crate::engine::whiteboard::codec::{
-    decode_element, decode_meta, decode_presence, encode_element_delete, encode_element_patch, encode_element_write, encode_meta_write,
+    WhiteboardEntry, WhiteboardWriteInput, decode_element, decode_meta, decode_presence, encode_element_delete, encode_element_patch, encode_element_write,
+    encode_meta_write,
 };
 use crate::engine::whiteboard::hit::{container_at_point, expand_with_children};
 use crate::engine::whiteboard::model::{
@@ -143,7 +142,7 @@ fn same_ids(a: &[ElementDelta], b: &[ElementDelta]) -> bool {
 
 #[derive(Debug, Clone, Default)]
 pub struct ApplyResult {
-    pub writes: Vec<ArtifactEntryWriteInput>,
+    pub writes: Vec<WhiteboardWriteInput>,
     pub selected_ids: Option<Vec<ElementId>>,
 }
 
@@ -155,7 +154,7 @@ pub fn apply_command(
     include_if_rev: bool,
 ) -> ApplyResult {
     let mut deltas: Vec<ElementDelta> = Vec::new();
-    let mut writes: Vec<ArtifactEntryWriteInput> = Vec::new();
+    let mut writes: Vec<WhiteboardWriteInput> = Vec::new();
     let mut meta_change: Option<(BoardMeta, BoardMeta)> = None;
     let mut selected_ids: Option<Vec<ElementId>> = None;
     let label: String;
@@ -535,7 +534,7 @@ pub fn apply_command(
     ApplyResult { writes, selected_ids }
 }
 
-pub fn apply_history_step(doc: &mut BoardDoc, entry: &HistoryEntry, is_undo: bool, include_if_rev: bool) -> Vec<ArtifactEntryWriteInput> {
+pub fn apply_history_step(doc: &mut BoardDoc, entry: &HistoryEntry, is_undo: bool, include_if_rev: bool) -> Vec<WhiteboardWriteInput> {
     let mut writes = Vec::new();
     for d in &entry.element_deltas {
         let target = if is_undo { &d.before } else { &d.after };
@@ -563,7 +562,7 @@ pub fn apply_history_step(doc: &mut BoardDoc, entry: &HistoryEntry, is_undo: boo
     writes
 }
 
-pub fn apply_remote_entries(doc: &mut BoardDoc, updated: &[ArtifactEntry], deleted_paths: &[String], next_seq: i64) -> Vec<ElementId> {
+pub fn apply_remote_entries(doc: &mut BoardDoc, updated: &[WhiteboardEntry], deleted_paths: &[String], next_seq: i64) -> Vec<ElementId> {
     if next_seq > doc.seq {
         doc.seq = next_seq;
     }

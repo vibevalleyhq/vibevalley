@@ -7,7 +7,7 @@ pub struct Model {
     pub artifact_id: String,
     #[sea_orm(primary_key, auto_increment = false)]
     pub version: i64,
-    pub attachment_id: String,
+    pub storage_id: String,
     pub size: i64,
     #[sea_orm(column_type = "Text", nullable)]
     pub note: Option<String>,

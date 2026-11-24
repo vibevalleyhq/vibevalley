@@ -6,14 +6,9 @@
 use std::time::Duration;
 
 use serde_json::Value;
-use vibevalley_protocol::{BlockRef, QuotedBlock, Session};
+use vibevalley_protocol::Session;
 
 use crate::BoxFuture;
-
-/// Breaks the `channel <-> artifact` cycle so `channel` quotes artifact blocks without importing `artifact`.
-pub trait ChannelQuotePort: Send + Sync {
-    fn quote(&self, refs: &[BlockRef]) -> Vec<QuotedBlock>;
-}
 
 /// Breaks the `cron <-> orchestrator` cycle so `cron` triggers the orchestrator while `orchestrator`/`tool` manages crons.
 pub trait CronOrchestratorPort: Send + Sync {

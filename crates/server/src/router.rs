@@ -202,10 +202,6 @@ impl Router {
             NativeEndpointId::MediaInputFile | NativeEndpointId::MediaInputUploadFile | NativeEndpointId::AttachmentFile => {
                 self.core.storage.dispatch_native_async(id, payload).await
             }
-            NativeEndpointId::ArtifactPage
-            | NativeEndpointId::ArtifactView
-            | NativeEndpointId::ArtifactEntryWriteProps
-            | NativeEndpointId::ArtifactTokensInspect => self.core.artifact.dispatch_native_async(id, payload).await,
         }
     }
 
@@ -370,27 +366,19 @@ impl Router {
             | EndpointId::ArtifactContentGet
             | EndpointId::ArtifactCreate
             | EndpointId::ArtifactVersionCreate
-            | EndpointId::ArtifactHtmlEdit
             | EndpointId::ArtifactUpdate
             | EndpointId::ArtifactDelete
             | EndpointId::ArtifactPreviewDelete
-            | EndpointId::ArtifactBlockList
-            | EndpointId::ArtifactSubmit
-            | EndpointId::ArtifactBlockCreate
-            | EndpointId::ArtifactBlockUpdate
-            | EndpointId::ArtifactBlockDelete
-            | EndpointId::ArtifactBlockPreviewDelete
+            | EndpointId::ArtifactFileList
+            | EndpointId::ArtifactFileGet
+            | EndpointId::ArtifactFileWrite
+            | EndpointId::ArtifactFileDelete
             | EndpointId::ArtifactSuggestionList
             | EndpointId::ArtifactSuggestionCreate
             | EndpointId::ArtifactSuggestionAccept
             | EndpointId::ArtifactSuggestionReject
-            | EndpointId::ArtifactMarkdownGet
             | EndpointId::ArtifactTypeList
             | EndpointId::ArtifactTypeRead
-            | EndpointId::ArtifactEntryList
-            | EndpointId::ArtifactEntryGet
-            | EndpointId::ArtifactEntryBatch
-            | EndpointId::ArtifactOutlineImport
             | EndpointId::ArtifactPresenceUpdate
             | EndpointId::ArtifactHistoryList
             | EndpointId::ArtifactHistoryPreview
@@ -824,7 +812,7 @@ impl Router {
                 let p: <subscriptions::ChannelReports as Subscription>::Payload = decode(payload)?;
                 self.core.channel.reports(p.after, Sink { events, stop })
             }
-            "artifact.follow" | "artifact.entry.follow" | "artifact.suggestion.follow" | "artifact.presence.follow" => {
+            "artifact.follow" | "artifact.suggestion.follow" | "artifact.presence.follow" => {
                 self.core.artifact.dispatch_subscription_async(spec.name, payload, Sink { events, stop }).await
             }
             "session.watch" => {

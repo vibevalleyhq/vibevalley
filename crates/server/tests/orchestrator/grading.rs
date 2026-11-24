@@ -42,7 +42,7 @@ fn graded_issue(
     server.set_mcp_url(format!("{}/mcp", listener.url()));
     let user = |op: &str, req| via_http(&listener, op, req);
     user("repo.create", json!({"name":"r"}));
-    user("artifact.create", json!({"title":"unrelated artifact private marker","kind":"markdown"}));
+    user("artifact.create", json!({"title":"unrelated artifact private marker","artifactType":"docs"}));
     let mut helper = server.test_internals().agent.profile.store.install_template("reviewer").unwrap();
     helper.name = "Checked".into();
     helper.runtime = "vibevalley".into();

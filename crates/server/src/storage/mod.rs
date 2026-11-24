@@ -1,6 +1,7 @@
 //! Core file and staged media input storage (`Storage`), combining content-addressed
 //! attachments ([`AttachmentStorage`]) and temporary staged uploads ([`MediaInputStorage`]).
 
+pub mod artifact;
 pub mod attachment;
 pub mod media_input;
 pub mod validate;
@@ -17,6 +18,7 @@ use vibevalley_protocol::{
 };
 use vibevalley_protocol::{NativeEndpointId, native_ops};
 
+pub use artifact::ArtifactStorage;
 pub use attachment::{ATTACHMENT_MAX, AttachmentStorage};
 pub use media_input::MediaInputStorage;
 pub use validate::{AudioFacts, audio_facts};
@@ -24,27 +26,38 @@ pub use validate::{AudioFacts, audio_facts};
 use crate::context::Context;
 use crate::db::Tx;
 
-/// Unified server file storage: content-addressed attachments and staged media inputs.
+/// Unified server file storage: content-addressed attachments, staged media inputs, and artifact directories.
 pub struct Storage {
     pub attachment: Arc<AttachmentStorage>,
     pub media_input: Arc<MediaInputStorage>,
+    pub artifact: Arc<ArtifactStorage>,
 }
 
 impl Storage {
-    /// Opens attachment CAS and staged media input storage synchronously under `home`,
+    /// Opens attachment CAS, staged media input storage, and artifact directory storage synchronously under `home`,
     /// scheduling the initial staged-input recovery and periodic sweeper on `ctx.task`.
     pub fn open(home: &Path, ctx: Arc<Context>) -> Arc<Self> {
         let attachment = AttachmentStorage::open(home, ctx.clone());
-        let media_input = MediaInputStorage::open(home, ctx, attachment.clone());
-        Arc::new(Self { attachment, media_input })
+        let media_input = MediaInputStorage::open(home, ctx.clone(), attachment.clone());
+        let artifact = ArtifactStorage::open(home, ctx);
+        Arc::new(Self {
+            attachment,
+            media_input,
+            artifact,
+        })
     }
 
-    /// Opens attachment CAS and staged media input storage under `home`, awaiting the
+    /// Opens attachment CAS, staged media input storage, and artifact directory storage under `home`, awaiting the
     /// initial staged-input recovery sweep and starting the periodic sweeper on `ctx.task`.
     pub async fn open_async(home: &Path, ctx: Arc<Context>) -> Result<Arc<Self>, ApiError> {
         let attachment = AttachmentStorage::open(home, ctx.clone());
-        let media_input = MediaInputStorage::open_async(home, ctx, attachment.clone()).await?;
-        Ok(Arc::new(Self { attachment, media_input }))
+        let media_input = MediaInputStorage::open_async(home, ctx.clone(), attachment.clone()).await?;
+        let artifact = ArtifactStorage::open(home, ctx);
+        Ok(Arc::new(Self {
+            attachment,
+            media_input,
+            artifact,
+        }))
     }
 
     /// Stops the staged media input sweeper cleanly.
@@ -195,10 +208,6 @@ impl Storage {
                 let req: <native_ops::MediaInputUploadFile as Op>::Input = decode(payload)?;
                 ok_json(self.media_input.upload_file_async(&req.id, PathBuf::from(req.path)).await?)
             }
-            other => Err(ApiError::new(
-                BizCode::RouteNotFound,
-                format!("storage does not handle native endpoint {}", other.op()),
-            )),
         }
     }
 }

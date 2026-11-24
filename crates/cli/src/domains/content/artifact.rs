@@ -180,8 +180,10 @@ pub struct ArtifactTypeCmd {
 #[derive(Debug, Subcommand)]
 pub enum ArtifactTypeAction {
     /// List all 12 artifact types
+    #[command(after_help = "Examples:\n  vibevalley artifact type list --json")]
     List,
     /// Read a type's SKILL guide or a named reference chapter
+    #[command(after_help = "Examples:\n  vibevalley artifact type read docs")]
     Read {
         /// Artifact type
         #[arg(value_enum)]
@@ -292,11 +294,13 @@ pub struct ArtifactSuggestionCmd {
 #[derive(Debug, Subcommand)]
 pub enum ArtifactSuggestionAction {
     /// List suggestions on an artifact
+    #[command(after_help = "Examples:\n  vibevalley artifact suggestion list a1")]
     List {
         /// Artifact id
         artifact: String,
     },
     /// Create a review suggestion on a file in an artifact
+    #[command(after_help = "Examples:\n  vibevalley artifact suggestion create a1 structure/index.md --content 'Updated'")]
     Create {
         /// Artifact id
         artifact: String,
@@ -325,6 +329,7 @@ pub enum ArtifactSuggestionAction {
         summary: Option<String>,
     },
     /// Accept a pending suggestion
+    #[command(after_help = "Examples:\n  vibevalley artifact suggestion accept a1 s1")]
     Accept {
         /// Artifact id
         artifact: String,
@@ -332,6 +337,7 @@ pub enum ArtifactSuggestionAction {
         suggestion: String,
     },
     /// Reject a pending suggestion
+    #[command(after_help = "Examples:\n  vibevalley artifact suggestion reject a1 s1")]
     Reject {
         /// Artifact id
         artifact: String,
@@ -350,6 +356,7 @@ pub struct ArtifactHistoryCmd {
 #[derive(Debug, Subcommand)]
 pub enum ArtifactHistoryAction {
     /// List collaborative commits, newest first
+    #[command(after_help = "Examples:\n  vibevalley artifact history list a1 --limit 20")]
     List {
         /// Artifact id
         artifact: String,
@@ -358,6 +365,7 @@ pub enum ArtifactHistoryAction {
         limit: Option<i64>,
     },
     /// Preview files at a historical frontiers checkpoint
+    #[command(after_help = "Examples:\n  vibevalley artifact history preview a1 <frontiers>")]
     Preview {
         /// Artifact id
         artifact: String,
@@ -365,6 +373,7 @@ pub enum ArtifactHistoryAction {
         frontiers: String,
     },
     /// Restore an artifact to a historical frontiers checkpoint
+    #[command(after_help = "Examples:\n  vibevalley artifact history restore a1 <frontiers> --note 'Revert layout'")]
     Restore {
         /// Artifact id
         artifact: String,
@@ -375,6 +384,7 @@ pub enum ArtifactHistoryAction {
         note: Option<String>,
     },
     /// Fork a new artifact from a historical frontiers checkpoint
+    #[command(after_help = "Examples:\n  vibevalley artifact history fork a1 <frontiers> --title 'Branch A'")]
     Fork {
         /// Artifact id
         artifact: String,
@@ -388,6 +398,7 @@ pub enum ArtifactHistoryAction {
         channel: Option<String>,
     },
     /// Selectively undo commits from one origin while keeping other concurrent edits
+    #[command(after_help = "Examples:\n  vibevalley artifact history undo-origin a1 session:w1:turn:1")]
     UndoOrigin {
         /// Artifact id
         artifact: String,
@@ -395,6 +406,7 @@ pub enum ArtifactHistoryAction {
         origin: String,
     },
     /// Compact old operation history into a shallow snapshot
+    #[command(after_help = "Examples:\n  vibevalley artifact history compact a1")]
     Compact {
         /// Artifact id
         artifact: String,

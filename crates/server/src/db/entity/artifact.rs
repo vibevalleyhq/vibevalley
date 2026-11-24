@@ -7,10 +7,8 @@ pub struct Model {
     pub id: String,
     #[sea_orm(column_type = "Text")]
     pub title: String,
-    pub body: String,
-    pub artifact_type: Option<String>,
+    pub artifact_type: String,
     pub is_default: bool,
-    pub display: Option<String>,
     pub channel_id: Option<String>,
     pub message_id: Option<String>,
     pub issue: Option<String>,
