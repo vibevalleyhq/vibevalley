@@ -1,1045 +1,386 @@
 {
+ "ArtifactType": [
+  "docs",
+  "outline",
+  "slides",
+  "dashboard",
+  "motion",
+  "whiteboard",
+  "design",
+  "design-system",
+  "sheet",
+  "prototype",
+  "diagram",
+  "storyboard"
+ ],
+ "ArtifactFileEncoding": [
+  "utf8",
+  "base64"
+ ],
  "ArtifactCard": [
   {
-   "id": "s1666",
-   "title": "s1667",
-   "body": "blocks",
-   "version": 1668,
-   "note": "s1669",
-   "display": "page"
+   "id": "a1",
+   "title": "Design Spec",
+   "artifactType": "docs",
+   "version": 1,
+   "note": "initial"
   },
   {
-   "id": "s1670",
-   "title": "s1671",
-   "body": "blocks",
-   "version": 1672,
-   "note": "s1673"
+   "id": "a2",
+   "title": "Launch Deck",
+   "artifactType": "slides",
+   "version": 2,
+   "note": "updated"
   }
- ],
- "ArtifactBody": [
-  "blocks",
-  "html"
- ],
- "ArtifactDisplay": [
-  "page",
-  "slides",
-  "motion"
- ],
- "QuotedBlock": [
-  {
-   "artifactId": "s1674",
-   "blockId": "s1675",
-   "rev": 1676,
-   "title": "s1677",
-   "type": "s1678",
-   "text": "s1679",
-   "nowRev": 1680,
-   "deleted": false
-  },
-  {
-   "artifactId": "s1682",
-   "blockId": "s1683",
-   "rev": 1684,
-   "title": "s1685"
-  }
- ],
- "BlockRef": [
-  {
-   "artifactId": "s1973",
-   "blockId": "s1974",
-   "rev": 1975
-  },
-  {
-   "artifactId": "s1976",
-   "blockId": "s1977",
-   "rev": 1978
-  }
- ],
- "ArtifactKind": [
-  "html",
-  "markdown"
  ],
  "ArtifactVersion": [
   {
-   "version": 3484,
-   "size": 3485,
-   "note": "s3486",
-   "by": "s3487",
-   "byName": "s3488",
-   "at": 3489,
-   "channel": "s3490",
-   "number": 3491
+   "version": 1,
+   "size": 1024,
+   "note": "v1",
+   "by": "user",
+   "byName": "User",
+   "at": 1000,
+   "channel": "general",
+   "number": 5
   },
   {
-   "version": 3492,
-   "size": 3493,
-   "note": "s3494",
-   "by": "s3495",
-   "byName": "s3496",
-   "at": 3497,
-   "channel": "s3498"
-  }
- ],
- "Artifact": [
-  {
-   "id": "s3499",
-   "title": "s3500",
-   "body": "blocks",
-   "isDefault": false,
-   "display": "page",
-   "channel": "s3501",
-   "said": {
-    "channel": "s3502",
-    "number": 3503
-   },
-   "issue": "s3504",
-   "by": "s3505",
-   "byName": "s3506",
-   "version": 3507,
-   "seq": 3508,
-   "versions": [
-    {
-     "version": 3509,
-     "size": 3510,
-     "note": "s3511",
-     "by": "s3512",
-     "byName": "s3513",
-     "at": 3514,
-     "channel": "s3515",
-     "number": 3516
-    }
-   ],
-   "at": 3517,
-   "updated": 3518
-  },
-  {
-   "id": "s3519",
-   "title": "s3520",
-   "body": "blocks",
-   "isDefault": false,
-   "by": "s3521",
-   "byName": "s3522",
-   "version": 3523,
-   "seq": 3524,
-   "versions": [
-    {
-     "version": 3525,
-     "size": 3526,
-     "note": "s3527",
-     "by": "s3528",
-     "byName": "s3529",
-     "at": 3530,
-     "channel": "s3531"
-    }
-   ],
-   "at": 3532,
-   "updated": 3533
+   "version": 2,
+   "size": 2048,
+   "note": "v2",
+   "by": "w1",
+   "byName": "Worker",
+   "at": 2000,
+   "channel": "general"
   }
  ],
  "ArtifactSaid": [
   {
-   "channel": "s3534",
-   "number": 3535
+   "channel": "general",
+   "number": 12
+  }
+ ],
+ "Artifact": [
+  {
+   "id": "a1",
+   "title": "System Architecture",
+   "artifactType": "diagram",
+   "isDefault": false,
+   "channel": "general",
+   "said": {
+    "channel": "general",
+    "number": 12
+   },
+   "issue": "i1",
+   "by": "user",
+   "byName": "User",
+   "version": 1,
+   "seq": 3,
+   "versions": [
+    {
+     "version": 1,
+     "size": 512,
+     "note": "v1",
+     "by": "user",
+     "byName": "User",
+     "at": 1000,
+     "channel": "general",
+     "number": 12
+    }
+   ],
+   "at": 1000,
+   "updated": 2000
   },
   {
-   "channel": "s3536",
-   "number": 3537
+   "id": "a2",
+   "title": "Fieldcraft Tokens",
+   "artifactType": "design-system",
+   "isDefault": true,
+   "by": "user",
+   "byName": "User",
+   "version": 0,
+   "seq": 1,
+   "versions": [],
+   "at": 1000,
+   "updated": 1000
+  }
+ ],
+ "ArtifactFileMeta": [
+  {
+   "path": "structure/index.md",
+   "mime": "text/markdown",
+   "size": 42,
+   "hash": "abc123",
+   "updatedAt": 1000
+  }
+ ],
+ "ArtifactFileListRequest": [
+  {
+   "id": "a1",
+   "prefix": "structure/"
+  },
+  {
+   "id": "a1"
+  }
+ ],
+ "ArtifactFileListResult": [
+  {
+   "artifactId": "a1",
+   "seq": 2,
+   "files": [
+    {
+     "path": "manifest.json",
+     "mime": "application/json",
+     "size": 120,
+     "hash": "h0",
+     "updatedAt": 1000
+    }
+   ]
+  }
+ ],
+ "ArtifactFileGetRequest": [
+  {
+   "id": "a1",
+   "path": "structure/index.md",
+   "version": 1
+  },
+  {
+   "id": "a1",
+   "path": "structure/index.md"
+  }
+ ],
+ "ArtifactFileContent": [
+  {
+   "artifactId": "a1",
+   "path": "structure/index.md",
+   "mime": "text/markdown",
+   "encoding": "utf8",
+   "content": "# Hello\n",
+   "size": 8,
+   "hash": "h1",
+   "updatedAt": 1000
+  }
+ ],
+ "ArtifactFileWriteItem": [
+  {
+   "path": "structure/index.md",
+   "content": "# Updated\n",
+   "encoding": "utf8",
+   "mime": "text/markdown",
+   "expectedHash": "h1"
+  },
+  {
+   "path": "asset/logo.png",
+   "content": "iVBORw0KGgo=",
+   "encoding": "base64"
+  }
+ ],
+ "ArtifactFileWriteRequest": [
+  {
+   "id": "a1",
+   "files": [
+    {
+     "path": "structure/index.md",
+     "content": "# Updated\n"
+    }
+   ],
+   "origin": "session:w1:turn:1",
+   "summary": "update intro",
+   "announce": false
+  }
+ ],
+ "ArtifactFileWriteResult": [
+  {
+   "artifactId": "a1",
+   "seq": 4,
+   "files": [
+    {
+     "path": "structure/index.md",
+     "mime": "text/markdown",
+     "size": 10,
+     "hash": "h2",
+     "updatedAt": 2000
+    }
+   ],
+   "frontiers": "f1"
+  }
+ ],
+ "ArtifactFileDeleteRequest": [
+  {
+   "id": "a1",
+   "path": "asset/old.png",
+   "origin": "user",
+   "summary": "remove unused image"
+  }
+ ],
+ "ArtifactFileDeleteResult": [
+  {
+   "artifactId": "a1",
+   "seq": 5,
+   "path": "asset/old.png",
+   "frontiers": "f2"
+  }
+ ],
+ "ArtifactTypeInfo": [
+  {
+   "type": "design-system",
+   "title": "Design System",
+   "summary": "Tokens and components",
+   "entry": "structure/tokens.json",
+   "references": [
+    "format",
+    "tokens-craft"
+   ],
+   "defaultArtifactId": "a2"
+  },
+  {
+   "type": "sheet",
+   "title": "Spreadsheet",
+   "summary": "Multi-sheet workbook",
+   "entry": "structure/workbook.json",
+   "references": [
+    "format",
+    "craft"
+   ],
+   "defaultArtifactId": null
+  }
+ ],
+ "ArtifactTypeReadRequest": [
+  {
+   "type": "prototype",
+   "reference": "format"
+  },
+  {
+   "type": "storyboard"
+  }
+ ],
+ "ArtifactTypeGuide": [
+  {
+   "type": "docs",
+   "title": "Docs",
+   "reference": null,
+   "content": "# Docs",
+   "references": [
+    "structure",
+    "craft"
+   ],
+   "defaultArtifactId": null,
+   "defaultArtifactTitle": null
+  }
+ ],
+ "ArtifactViewContext": [
+  {
+   "artifactId": "a1",
+   "artifactType": "slides",
+   "title": "Launch Deck",
+   "seq": 4,
+   "version": 1,
+   "activePath": "structure/slides/s01-cover.json",
+   "slideId": "s01-cover",
+   "slideIndex": 0,
+   "time": 1.5,
+   "activeArtboard": "desktop",
+   "activeDataset": "revenue",
+   "activeTab": "preview",
+   "selectedIds": [
+    "n1"
+   ],
+   "summary": "Editing cover"
   }
  ],
  "ArtifactRequest": [
   {
-   "title": "s3538",
-   "kind": "html",
-   "display": "page",
-   "content": "s3539",
-   "note": "s3540",
-   "channel": "s3541",
-   "issue": "s3542"
+   "title": "Q3 Budget",
+   "artifactType": "sheet",
+   "content": "{\"title\":\"Q3 Budget\"}",
+   "files": [
+    {
+     "path": "asset/raw.csv",
+     "content": "a,b\n1,2\n"
+    }
+   ],
+   "isDefault": false,
+   "announce": true,
+   "note": "seed",
+   "channel": "general",
+   "issue": "i1"
   },
   {
-   "title": "s3543",
-   "kind": "html"
+   "title": "Quick Note",
+   "artifactType": "docs"
   }
  ],
  "ArtifactVersionRequest": [
   {
-   "id": "s3544",
-   "content": "s3545",
-   "note": "s3546"
+   "id": "a1",
+   "content": "# v2",
+   "note": "checkpoint"
   },
   {
-   "id": "s3547",
-   "content": "s3548"
-  }
- ],
- "HtmlAnchor": [
-  {
-   "kind": "text",
-   "exact": "s3549",
-   "prefix": "s3550",
-   "suffix": "s3551"
-  },
-  {
-   "kind": "text",
-   "exact": "s3552",
-   "prefix": "s3553",
-   "suffix": "s3554"
-  }
- ],
- "HtmlAnchorKind": [
-  "text"
- ],
- "ArtifactHtmlEdit": [
-  {
-   "id": "s3555",
-   "version": 3556,
-   "anchor": {
-    "kind": "text",
-    "exact": "s3557",
-    "prefix": "s3558",
-    "suffix": "s3559"
-   },
-   "text": "s3560"
-  },
-  {
-   "id": "s3561",
-   "version": 3562,
-   "anchor": {
-    "kind": "text",
-    "exact": "s3563",
-    "prefix": "s3564",
-    "suffix": "s3565"
-   },
-   "text": "s3566"
+   "id": "a1"
   }
  ],
  "ArtifactUpdateRequest": [
   {
-   "id": "s3567",
-   "title": "s3568",
-   "display": "page"
+   "id": "a1",
+   "title": "Renamed",
+   "isDefault": true
   },
   {
-   "id": "s3569"
-  }
- ],
- "ShellCount": [
-  3570,
-  3571
- ],
- "ShellTime": [
-  3572,
-  3573
- ],
- "ShellWords": [
-  [
-   "s3574"
-  ],
-  [
-   "s3575"
-  ]
- ],
- "HtmlShellMessage": [
-  {
-   "vibevalley": "selection",
-   "anchor": {
-    "kind": "text",
-    "exact": "s3576",
-    "prefix": "s3577",
-    "suffix": "s3578"
-   }
-  },
-  {
-   "vibevalley": "selection",
-   "anchor": {
-    "kind": "text",
-    "exact": "s3579",
-    "prefix": "s3580",
-    "suffix": "s3581"
-   }
-  },
-  {
-   "vibevalley": "ready",
-   "display": "slides",
-   "pages": 3582,
-   "titles": [
-    "s3583"
-   ],
-   "notes": [
-    "s3584"
-   ],
-   "duration": 3585
-  },
-  {
-   "vibevalley": "ready",
-   "display": "slides"
-  },
-  {
-   "vibevalley": "at",
-   "page": 3586,
-   "time": 3587
-  },
-  {
-   "vibevalley": "at"
+   "id": "a1"
   }
  ],
  "ArtifactListRequest": [
   {
-   "channel": "s3588",
-   "issue": "s3589"
+   "channel": "general",
+   "issue": "i1",
+   "artifactType": "storyboard"
   },
   {}
  ],
  "ArtifactReadRequest": [
   {
-   "id": "s3590",
-   "version": 3591
+   "id": "a1",
+   "version": 1
   },
   {
-   "id": "s3592"
+   "id": "a1"
   }
  ],
  "ArtifactContent": [
   {
-   "version": 3593,
-   "content": "s3594"
-  },
-  {
-   "version": 3595,
-   "content": "s3596"
+   "version": 1,
+   "content": "# Hello"
   }
  ],
- "SpanMarks": [
+ "ArtifactGetInput": [
   {
-   "bold": false,
-   "italic": true,
-   "code": false,
-   "strike": true,
-   "link": "s3601"
-  },
-  {}
- ],
- "TextSpan": [
-  {
-   "t": "s3602",
-   "marks": {
-    "bold": false,
-    "italic": true,
-    "code": false,
-    "strike": true,
-    "link": "s3607"
-   }
-  },
-  {
-   "t": "s3608",
-   "marks": {}
+   "id": "a1"
   }
  ],
- "BlockAttrs": [
+ "ArtifactDeleteInput": [
   {
-   "level": 3609,
-   "checked": true,
-   "language": "s3611",
-   "src": "s3612",
-   "width": 3613,
-   "height": 3614,
-   "alt": "s3615",
-   "issueId": "s3616",
-   "memoryId": "s3617"
-  },
-  {}
- ],
- "BlockType": [
-  "paragraph",
-  "heading",
-  "bulleted",
-  "numbered",
-  "todo",
-  "quote",
-  "code",
-  "divider",
-  "image",
-  "issue_ref",
-  "memory_item"
- ],
- "BlockInput": [
-  {
-   "id": "s3618",
-   "parentId": "s3619",
-   "orderKey": "s3620",
-   "type": "paragraph",
-   "attrs": {
-    "level": 3621,
-    "checked": true,
-    "language": "s3623",
-    "src": "s3624",
-    "width": 3625,
-    "height": 3626,
-    "alt": "s3627",
-    "issueId": "s3628",
-    "memoryId": "s3629"
-   },
-   "text": [
-    {
-     "t": "s3630",
-     "marks": {
-      "bold": false,
-      "italic": true,
-      "code": false,
-      "strike": true,
-      "link": "s3635"
-     }
-    }
-   ]
-  },
-  {
-   "id": "s3636",
-   "orderKey": "s3637",
-   "type": "paragraph",
-   "attrs": {},
-   "text": [
-    {
-     "t": "s3638",
-     "marks": {}
-    }
-   ]
-  }
- ],
- "Block": [
-  {
-   "id": "s3639",
-   "parentId": "s3640",
-   "orderKey": "s3641",
-   "type": "paragraph",
-   "attrs": {
-    "level": 3642,
-    "checked": false,
-    "language": "s3644",
-    "src": "s3645",
-    "width": 3646,
-    "height": 3647,
-    "alt": "s3648",
-    "issueId": "s3649",
-    "memoryId": "s3650"
-   },
-   "text": [
-    {
-     "t": "s3651",
-     "marks": {
-      "bold": true,
-      "italic": false,
-      "code": true,
-      "strike": false,
-      "link": "s3656"
-     }
-    }
-   ],
-   "artifactId": "s3657",
-   "rev": 3658,
-   "deleted": false,
-   "updatedBy": "s3660",
-   "updated": 3661
-  },
-  {
-   "id": "s3662",
-   "orderKey": "s3663",
-   "type": "paragraph",
-   "attrs": {},
-   "text": [
-    {
-     "t": "s3664",
-     "marks": {}
-    }
-   ],
-   "artifactId": "s3665",
-   "rev": 3666,
-   "updatedBy": "s3667",
-   "updated": 3668
-  }
- ],
- "BlockSnapshot": [
-  {
-   "artifact": {
-    "id": "s3669",
-    "title": "s3670",
-    "body": "blocks",
-    "isDefault": false,
-    "display": "page",
-    "channel": "s3671",
-    "said": {
-     "channel": "s3672",
-     "number": 3673
-    },
-    "issue": "s3674",
-    "by": "s3675",
-    "byName": "s3676",
-    "version": 3677,
-    "seq": 3678,
-    "versions": [
-     {
-      "version": 3679,
-      "size": 3680,
-      "note": "s3681",
-      "by": "s3682",
-      "byName": "s3683",
-      "at": 3684,
-      "channel": "s3685",
-      "number": 3686
-     }
-    ],
-    "at": 3687,
-    "updated": 3688
-   },
-   "blocks": [
-    {
-     "id": "s3689",
-     "parentId": "s3690",
-     "orderKey": "s3691",
-     "type": "paragraph",
-     "attrs": {
-      "level": 3692,
-      "checked": false,
-      "language": "s3694",
-      "src": "s3695",
-      "width": 3696,
-      "height": 3697,
-      "alt": "s3698",
-      "issueId": "s3699",
-      "memoryId": "s3700"
-     },
-     "text": [
-      {
-       "t": "s3701",
-       "marks": {}
-      }
-     ],
-     "artifactId": "s3702",
-     "rev": 3703,
-     "deleted": true,
-     "updatedBy": "s3705",
-     "updated": 3706
-    }
-   ]
-  },
-  {
-   "artifact": {
-    "id": "s3707",
-    "title": "s3708",
-    "body": "blocks",
-    "isDefault": false,
-    "by": "s3709",
-    "byName": "s3710",
-    "version": 3711,
-    "seq": 3712,
-    "versions": [
-     {
-      "version": 3713,
-      "size": 3714,
-      "note": "s3715",
-      "by": "s3716",
-      "byName": "s3717",
-      "at": 3718,
-      "channel": "s3719"
-     }
-    ],
-    "at": 3720,
-    "updated": 3721
-   },
-   "blocks": [
-    {
-     "id": "s3722",
-     "orderKey": "s3723",
-     "type": "paragraph",
-     "attrs": {},
-     "text": [
-      {
-       "t": "s3724",
-       "marks": {}
-      }
-     ],
-     "artifactId": "s3725",
-     "rev": 3726,
-     "updatedBy": "s3727",
-     "updated": 3728
-    }
-   ]
-  }
- ],
- "ArtifactMarkdown": [
-  {
-   "markdown": "s3729"
-  },
-  {
-   "markdown": "s3730"
-  }
- ],
- "BlockOp": [
-  {
-   "op": "insert_block",
-   "block": {
-    "id": "s3731",
-    "parentId": "s3732",
-    "orderKey": "s3733",
-    "type": "paragraph",
-    "attrs": {
-     "level": 3734,
-     "checked": false,
-     "language": "s3736",
-     "src": "s3737",
-     "width": 3738,
-     "height": 3739,
-     "alt": "s3740",
-     "issueId": "s3741",
-     "memoryId": "s3742"
-    },
-    "text": [
-     {
-      "t": "s3743",
-      "marks": {}
-     }
-    ]
-   }
-  },
-  {
-   "op": "insert_block",
-   "block": {
-    "id": "s3744",
-    "orderKey": "s3745",
-    "type": "paragraph",
-    "attrs": {},
-    "text": [
-     {
-      "t": "s3746",
-      "marks": {}
-     }
-    ]
-   }
-  },
-  {
-   "op": "update_text",
-   "blockId": "s3747",
-   "baseRev": 3748,
-   "text": [
-    {
-     "t": "s3749",
-     "marks": {
-      "bold": true,
-      "italic": false,
-      "code": true,
-      "strike": false,
-      "link": "s3754"
-     }
-    }
-   ]
-  },
-  {
-   "op": "update_text",
-   "blockId": "s3755",
-   "baseRev": 3756,
-   "text": [
-    {
-     "t": "s3757",
-     "marks": {}
-    }
-   ]
-  },
-  {
-   "op": "set_attrs",
-   "blockId": "s3758",
-   "attrs": {
-    "level": 3759,
-    "checked": true,
-    "language": "s3761",
-    "src": "s3762",
-    "width": 3763,
-    "height": 3764,
-    "alt": "s3765",
-    "issueId": "s3766",
-    "memoryId": "s3767"
-   },
-   "unset": [
-    "s3768"
-   ]
-  },
-  {
-   "op": "set_attrs",
-   "blockId": "s3769",
-   "attrs": {}
-  },
-  {
-   "op": "set_type",
-   "blockId": "s3770",
-   "type": "numbered",
-   "attrs": {
-    "level": 3771,
-    "checked": true,
-    "language": "s3773",
-    "src": "s3774",
-    "width": 3775,
-    "height": 3776,
-    "alt": "s3777",
-    "issueId": "s3778",
-    "memoryId": "s3779"
-   }
-  },
-  {
-   "op": "set_type",
-   "blockId": "s3780",
-   "type": "numbered",
-   "attrs": {}
-  },
-  {
-   "op": "move_block",
-   "blockId": "s3781",
-   "parentId": "s3782",
-   "orderKey": "s3783"
-  },
-  {
-   "op": "move_block",
-   "blockId": "s3784",
-   "orderKey": "s3785"
-  },
-  {
-   "op": "delete_block",
-   "blockId": "s3786"
-  },
-  {
-   "op": "delete_block",
-   "blockId": "s3787"
-  },
-  {
-   "op": "restore_block",
-   "blockId": "s3788"
-  },
-  {
-   "op": "restore_block",
-   "blockId": "s3789"
-  },
-  {
-   "op": "split_block",
-   "blockId": "s3790",
-   "baseRev": 3791,
-   "offset": 3792,
-   "newBlock": {
-    "id": "s3793",
-    "parentId": "s3794",
-    "orderKey": "s3795",
-    "type": "divider",
-    "attrs": {
-     "level": 3796,
-     "checked": false,
-     "language": "s3798",
-     "src": "s3799",
-     "width": 3800,
-     "height": 3801,
-     "alt": "s3802",
-     "issueId": "s3803",
-     "memoryId": "s3804"
-    },
-    "text": [
-     {
-      "t": "s3805",
-      "marks": {}
-     }
-    ]
-   }
-  },
-  {
-   "op": "split_block",
-   "blockId": "s3806",
-   "baseRev": 3807,
-   "offset": 3808,
-   "newBlock": {
-    "id": "s3809",
-    "orderKey": "s3810",
-    "type": "divider",
-    "attrs": {},
-    "text": [
-     {
-      "t": "s3811",
-      "marks": {}
-     }
-    ]
-   }
-  },
-  {
-   "op": "merge_blocks",
-   "targetId": "s3812",
-   "sourceId": "s3813"
-  },
-  {
-   "op": "merge_blocks",
-   "targetId": "s3814",
-   "sourceId": "s3815"
-  }
- ],
- "BlockSubmit": [
-  {
-   "batchId": "s3816",
-   "lastSeq": 3817,
-   "ops": [
-    {
-     "op": "insert_block",
-     "block": {
-      "id": "s3818",
-      "parentId": "s3819",
-      "orderKey": "s3820",
-      "type": "paragraph",
-      "attrs": {},
-      "text": [
-       {
-        "t": "s3821",
-        "marks": {}
-       }
-      ]
-     }
-    }
-   ]
-  },
-  {
-   "batchId": "s3822",
-   "lastSeq": 3823,
-   "ops": [
-    {
-     "op": "insert_block",
-     "block": {
-      "id": "s3824",
-      "orderKey": "s3825",
-      "type": "paragraph",
-      "attrs": {},
-      "text": [
-       {
-        "t": "s3826",
-        "marks": {}
-       }
-      ]
-     }
-    }
-   ]
-  }
- ],
- "BlockOpStatus": [
-  "applied",
-  "merged",
-  "conflict",
-  "noop",
-  "rejected"
- ],
- "BlockCreate": [
-  {
-   "type": "s3827",
-   "level": 3828,
-   "checked": false,
-   "language": "s3830",
-   "text": "s3831",
-   "afterBlock": "s3832",
-   "parentId": "s3833"
-  },
-  {
-   "text": "s3834"
-  }
- ],
- "BlockUpdate": [
-  {
-   "block": "s3835",
-   "baseRev": 3836,
-   "text": "s3837",
-   "type": "s3838",
-   "level": 3839,
-   "checked": true,
-   "language": "s3841"
-  },
-  {
-   "block": "s3842",
-   "baseRev": 3843
-  }
- ],
- "BlockDelete": [
-  {
-   "block": "s3844"
-  },
-  {
-   "block": "s3845"
-  }
- ],
- "BlockOpResult": [
-  {
-   "status": "applied",
-   "blockId": "s3846",
-   "rev": 3847,
-   "text": [
-    {
-     "t": "s3848",
-     "marks": {
-      "bold": false,
-      "italic": true,
-      "code": false,
-      "strike": true,
-      "link": "s3853"
-     }
-    }
-   ],
-   "yours": [
-    {
-     "t": "s3854",
-     "marks": {
-      "bold": false,
-      "italic": true,
-      "code": false,
-      "strike": true,
-      "link": "s3859"
-     }
-    }
-   ],
-   "reason": "s3860",
-   "suggestion": "s3861"
-  },
-  {
-   "status": "applied",
-   "blockId": "s3862"
-  }
- ],
- "BlockAck": [
-  {
-   "batchId": "s3863",
-   "seq": 3864,
-   "results": [
-    {
-     "status": "applied",
-     "blockId": "s3865",
-     "rev": 3866,
-     "text": [
-      {
-       "t": "s3867",
-       "marks": {}
-      }
-     ],
-     "yours": [
-      {
-       "t": "s3868",
-       "marks": {}
-      }
-     ],
-     "reason": "s3869",
-     "suggestion": "s3870"
-    }
-   ],
-   "blocks": [
-    {
-     "id": "s3871",
-     "parentId": "s3872",
-     "orderKey": "s3873",
-     "type": "paragraph",
-     "attrs": {
-      "level": 3874,
-      "checked": false,
-      "language": "s3876",
-      "src": "s3877",
-      "width": 3878,
-      "height": 3879,
-      "alt": "s3880",
-      "issueId": "s3881",
-      "memoryId": "s3882"
-     },
-     "text": [
-      {
-       "t": "s3883",
-       "marks": {}
-      }
-     ],
-     "artifactId": "s3884",
-     "rev": 3885,
-     "deleted": true,
-     "updatedBy": "s3887",
-     "updated": 3888
-    }
-   ]
-  },
-  {
-   "batchId": "s3889",
-   "seq": 3890,
-   "results": [
-    {
-     "status": "applied",
-     "blockId": "s3891"
-    }
-   ],
-   "blocks": [
-    {
-     "id": "s3892",
-     "orderKey": "s3893",
-     "type": "paragraph",
-     "attrs": {},
-     "text": [
-      {
-       "t": "s3894",
-       "marks": {}
-      }
-     ],
-     "artifactId": "s3895",
-     "rev": 3896,
-     "updatedBy": "s3897",
-     "updated": 3898
-    }
-   ]
+   "id": "a1"
   }
  ],
  "ArtifactEvent": [
   {
-   "_tag": "Blocks",
-   "seq": 3899,
-   "blocks": [
+   "_tag": "Files",
+   "seq": 3,
+   "files": [
     {
-     "id": "s3900",
-     "parentId": "s3901",
-     "orderKey": "s3902",
-     "type": "paragraph",
-     "attrs": {
-      "level": 3903,
-      "checked": true,
-      "language": "s3905",
-      "src": "s3906",
-      "width": 3907,
-      "height": 3908,
-      "alt": "s3909",
-      "issueId": "s3910",
-      "memoryId": "s3911"
-     },
-     "text": [
-      {
-       "t": "s3912",
-       "marks": {}
-      }
-     ],
-     "artifactId": "s3913",
-     "rev": 3914,
-     "deleted": false,
-     "updatedBy": "s3916",
-     "updated": 3917
+     "path": "structure/index.md",
+     "mime": "text/markdown",
+     "size": 12,
+     "hash": "h3",
+     "updatedAt": 3000
     }
-   ]
-  },
-  {
-   "_tag": "Blocks",
-   "seq": 3918,
-   "blocks": [
-    {
-     "id": "s3919",
-     "orderKey": "s3920",
-     "type": "paragraph",
-     "attrs": {},
-     "text": [
-      {
-       "t": "s3921",
-       "marks": {}
-      }
-     ],
-     "artifactId": "s3922",
-     "rev": 3923,
-     "updatedBy": "s3924",
-     "updated": 3925
-    }
-   ]
+   ],
+   "deleted": [
+    "asset/old.png"
+   ],
+   "origin": "user",
+   "frontiers": "f3"
   },
   {
    "_tag": "Reset"
@@ -1052,358 +393,220 @@
  ],
  "SuggestionChange": [
   {
-   "text": [
-    {
-     "t": "s3926",
-     "marks": {
-      "bold": false,
-      "italic": true,
-      "code": false,
-      "strike": true,
-      "link": "s3931"
-     }
-    }
-   ],
-   "type": "paragraph",
-   "attrs": {
-    "level": 3932,
-    "checked": false,
-    "language": "s3934",
-    "src": "s3935",
-    "width": 3936,
-    "height": 3937,
-    "alt": "s3938",
-    "issueId": "s3939",
-    "memoryId": "s3940"
-   },
-   "unset": [
-    "s3941"
-   ],
-   "delete": true
+   "content": "# Proposed Title",
+   "patch": "{\"title\":\"New\"}",
+   "target": "n1",
+   "delete": false,
+   "summary": "tighten heading"
   },
-  {}
+  {
+   "delete": true
+  }
  ],
  "Suggestion": [
   {
-   "id": "s3943",
-   "artifactId": "s3944",
-   "blockId": "s3945",
-   "author": "s3946",
-   "baseRev": 3947,
+   "id": "sug1",
+   "artifactId": "a1",
+   "path": "structure/index.md",
+   "author": "session:w1",
+   "baseRev": 3,
+   "baseHash": "h3",
    "change": {
-    "text": [
-     {
-      "t": "s3948",
-      "marks": {}
-     }
-    ],
-    "type": "paragraph",
-    "attrs": {
-     "level": 3949,
-     "checked": true,
-     "language": "s3951",
-     "src": "s3952",
-     "width": 3953,
-     "height": 3954,
-     "alt": "s3955",
-     "issueId": "s3956",
-     "memoryId": "s3957"
-    },
-    "unset": [
-     "s3958"
-    ],
-    "delete": false
+    "content": "# Better\n"
    },
    "status": "open",
-   "createdAt": 3960,
-   "resolvedAt": 3961,
-   "resolvedBy": "s3962"
-  },
-  {
-   "id": "s3963",
-   "artifactId": "s3964",
-   "blockId": "s3965",
-   "author": "s3966",
-   "baseRev": 3967,
-   "change": {},
-   "status": "open",
-   "createdAt": 3968
+   "createdAt": 1000,
+   "resolvedAt": 2000,
+   "resolvedBy": "user",
+   "cursorStart": "c0",
+   "cursorEnd": "c8",
+   "startOffset": 0,
+   "endOffset": 8
   }
  ],
  "SuggestionCreate": [
   {
-   "block": "s3969",
-   "baseRev": 3970,
+   "path": "structure/index.md",
+   "baseRev": 3,
+   "baseHash": "h3",
    "change": {
-    "text": [
-     {
-      "t": "s3971",
-      "marks": {}
-     }
-    ],
-    "type": "paragraph",
-    "attrs": {
-     "level": 3972,
-     "checked": false,
-     "language": "s3974",
-     "src": "s3975",
-     "width": 3976,
-     "height": 3977,
-     "alt": "s3978",
-     "issueId": "s3979",
-     "memoryId": "s3980"
-    },
-    "unset": [
-     "s3981"
-    ],
-    "delete": true
+    "content": "# Better\n"
    }
-  },
-  {
-   "block": "s3983",
-   "baseRev": 3984,
-   "change": {}
   }
+ ],
+ "SuggestionEventKind": [
+  "Suggestions"
  ],
  "SuggestionEvent": [
   {
    "_tag": "Suggestions",
    "suggestions": [
     {
-     "id": "s3985",
-     "artifactId": "s3986",
-     "blockId": "s3987",
-     "author": "s3988",
-     "baseRev": 3989,
+     "id": "sug1",
+     "artifactId": "a1",
+     "path": "structure/index.md",
+     "author": "session:w1",
+     "baseRev": 3,
      "change": {
-      "text": [
-       {
-        "t": "s3990",
-        "marks": {}
-       }
-      ],
-      "type": "paragraph",
-      "attrs": {},
-      "unset": [
-       "s3991"
-      ],
-      "delete": true
+      "content": "# Better\n"
      },
      "status": "open",
-     "createdAt": 3993,
-     "resolvedAt": 3994,
-     "resolvedBy": "s3995"
+     "createdAt": 1000
     }
    ]
-  },
-  {
-   "_tag": "Suggestions",
-   "suggestions": [
-    {
-     "id": "s3996",
-     "artifactId": "s3997",
-     "blockId": "s3998",
-     "author": "s3999",
-     "baseRev": 4000,
-     "change": {},
-     "status": "open",
-     "createdAt": 4001
-    }
-   ]
-  }
- ],
- "SuggestionEventKind": [
-  "Suggestions"
- ],
- "ArtifactGetInput": [
-  {
-   "id": "s7108"
-  },
-  {
-   "id": "s7109"
-  }
- ],
- "ArtifactDeleteInput": [
-  {
-   "id": "s7110"
-  },
-  {
-   "id": "s7111"
-  }
- ],
- "ArtifactBlockListInput": [
-  {
-   "id": "s7112"
-  },
-  {
-   "id": "s7113"
-  }
- ],
- "ArtifactSubmitInput": [
-  {
-   "id": "s7114",
-   "batchId": "s7115",
-   "lastSeq": 7116,
-   "ops": [
-    {
-     "op": "insert_block",
-     "block": {
-      "id": "s7117",
-      "parentId": "s7118",
-      "orderKey": "s7119",
-      "type": "paragraph",
-      "attrs": {},
-      "text": [
-       {
-        "t": "s7120",
-        "marks": {}
-       }
-      ]
-     }
-    }
-   ]
-  },
-  {
-   "id": "s7121",
-   "batchId": "s7122",
-   "lastSeq": 7123,
-   "ops": [
-    {
-     "op": "insert_block",
-     "block": {
-      "id": "s7124",
-      "orderKey": "s7125",
-      "type": "paragraph",
-      "attrs": {},
-      "text": [
-       {
-        "t": "s7126",
-        "marks": {}
-       }
-      ]
-     }
-    }
-   ]
-  }
- ],
- "ArtifactBlockCreateInput": [
-  {
-   "id": "s7127",
-   "type": "s7128",
-   "level": 7129,
-   "checked": true,
-   "language": "s7131",
-   "text": "s7132",
-   "afterBlock": "s7133",
-   "parentId": "s7134"
-  },
-  {
-   "id": "s7135",
-   "text": "s7136"
-  }
- ],
- "ArtifactBlockUpdateInput": [
-  {
-   "id": "s7137",
-   "block": "s7138",
-   "baseRev": 7139,
-   "text": "s7140",
-   "type": "s7141",
-   "level": 7142,
-   "checked": false,
-   "language": "s7144"
-  },
-  {
-   "id": "s7145",
-   "block": "s7146",
-   "baseRev": 7147
-  }
- ],
- "ArtifactBlockDeleteInput": [
-  {
-   "id": "s7148",
-   "block": "s7149"
-  },
-  {
-   "id": "s7150",
-   "block": "s7151"
   }
  ],
  "ArtifactSuggestionListInput": [
   {
-   "id": "s7152"
-  },
-  {
-   "id": "s7153"
+   "id": "a1"
   }
  ],
  "ArtifactSuggestionCreateInput": [
   {
-   "id": "s7154",
-   "block": "s7155",
-   "baseRev": 7156,
+   "id": "a1",
+   "path": "structure/index.md",
+   "baseRev": 3,
    "change": {
-    "text": [
-     {
-      "t": "s7157",
-      "marks": {}
-     }
-    ],
-    "type": "paragraph",
-    "attrs": {
-     "level": 7158,
-     "checked": false,
-     "language": "s7160",
-     "src": "s7161",
-     "width": 7162,
-     "height": 7163,
-     "alt": "s7164",
-     "issueId": "s7165",
-     "memoryId": "s7166"
-    },
-    "unset": [
-     "s7167"
-    ],
-    "delete": true
+    "content": "# Better\n"
    }
-  },
-  {
-   "id": "s7169",
-   "block": "s7170",
-   "baseRev": 7171,
-   "change": {}
   }
  ],
  "ArtifactSuggestionAcceptInput": [
   {
-   "id": "s7172",
-   "suggestion": "s7173"
-  },
-  {
-   "id": "s7174",
-   "suggestion": "s7175"
+   "id": "a1",
+   "suggestion": "sug1"
   }
  ],
- "ArtifactMarkdownGetInput": [
+ "ArtifactPresenceKind": [
+  "cursor",
+  "selection",
+  "highlight",
+  "viewport"
+ ],
+ "ViewportRect": [
   {
-   "id": "s7176"
-  },
-  {
-   "id": "s7177"
+   "x": 0,
+   "y": 0,
+   "w": 1280,
+   "h": 800,
+   "zoom": 1
   }
  ],
- "ArtifactOutlineImportRequest": [
+ "ArtifactPresence": [
   {
-   "markdown": "# Roadmap\n- First item",
-   "title": "Roadmap",
-   "filename": "roadmap.md",
-   "channel": "general",
-   "issue": "i1",
-   "announce": false,
-   "note": "imported"
+   "id": "session:w1",
+   "name": "Worker",
+   "color": "#22c55e",
+   "kind": "highlight",
+   "x": 10,
+   "y": 20,
+   "w": 100,
+   "h": 40,
+   "status": "editing",
+   "nodeId": "n1",
+   "offset": 0,
+   "endOffset": 10,
+   "selector": "#hero",
+   "path": "structure/index.md",
+   "viewport": {
+    "x": 0,
+    "y": 0,
+    "w": 1280,
+    "h": 800,
+    "zoom": 1
+   },
+   "sessionId": "w1",
+   "updatedAt": 1000
+  }
+ ],
+ "ArtifactPresenceUpdateRequest": [
+  {
+   "id": "a1",
+   "peerId": "user"
+  }
+ ],
+ "ArtifactPresenceFollowRequest": [
+  {
+   "id": "a1"
+  }
+ ],
+ "ArtifactPresenceEvent": [
+  {
+   "_tag": "Snapshot",
+   "peers": []
   },
   {
-   "markdown": "- Minimal"
+   "_tag": "Remove",
+   "peerId": "user"
+  }
+ ],
+ "ArtifactHistoryEntry": [
+  {
+   "frontiers": "f1",
+   "author": "user",
+   "agent": "claude",
+   "sessionId": "w1",
+   "turn": 1,
+   "origin": "session:w1:turn:1",
+   "summary": "seed",
+   "at": 1000
+  }
+ ],
+ "ArtifactHistoryListRequest": [
+  {
+   "id": "a1",
+   "limit": 20
+  }
+ ],
+ "ArtifactHistoryPreviewRequest": [
+  {
+   "id": "a1",
+   "frontiers": "f1"
+  }
+ ],
+ "ArtifactHistoryPreviewResult": [
+  {
+   "artifactId": "a1",
+   "artifactType": "docs",
+   "frontiers": "f1",
+   "files": [
+    {
+     "artifactId": "a1",
+     "path": "structure/index.md",
+     "mime": "text/markdown",
+     "encoding": "utf8",
+     "content": "# v1\n",
+     "size": 5,
+     "hash": "h1",
+     "updatedAt": 1000
+    }
+   ]
+  }
+ ],
+ "ArtifactHistoryRestoreRequest": [
+  {
+   "id": "a1",
+   "frontiers": "f1",
+   "note": "rollback"
+  }
+ ],
+ "ArtifactHistoryForkRequest": [
+  {
+   "id": "a1",
+   "frontiers": "f1",
+   "title": "Forked",
+   "channel": "general"
+  }
+ ],
+ "ArtifactHistoryUndoOriginRequest": [
+  {
+   "id": "a1",
+   "origin": "session:w1:turn:1"
+  }
+ ],
+ "ArtifactHistoryCompactRequest": [
+  {
+   "id": "a1"
   }
  ]
 }

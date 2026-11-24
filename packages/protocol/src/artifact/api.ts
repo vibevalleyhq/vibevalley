@@ -5,58 +5,41 @@ import * as S from "../schema";
 import type * as T from "../shapes";
 
 const artifactDeleteInput = input({ id: S.ArtifactId });
-const artifactBlockDeleteInput = input({ id: S.ArtifactId }, S.BlockDelete);
 const artifactSuggestionInput = input({ id: S.ArtifactId, suggestion: S.SuggestionId });
 
 export interface ArtifactHandlers {
-  /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
+  /** The artifacts announced in a channel or made for an issue, newest change first; every one the workspace has when neither is given. */
   readonly "artifact.list": (a: T.ArtifactListRequest) => Promise<T.Artifact[]>;
   readonly "artifact.get": (a: { readonly id: T.ArtifactId }) => Promise<T.Artifact>;
-  /** Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
-   * to make the next one. */
+  /** Reads the artifact's primary entry file content (optionally at a historical immutable snapshot version). */
   readonly "artifact.content.get": (a: T.ArtifactReadRequest) => Promise<T.ArtifactContent>;
-  /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
+  /** Creates a new directory-backed artifact seeded with starter files for its `artifactType`. */
   readonly "artifact.create": (a: T.ArtifactRequest) => Promise<T.Artifact>;
-  /** An html one's new version over the latest. the old ones stay. */
+  /** Cuts a new immutable directory snapshot version over the latest state. */
   readonly "artifact.version.create": (a: T.ArtifactVersionRequest) => Promise<T.Artifact>;
-  /** The user's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
-  readonly "artifact.html.edit": (a: T.ArtifactHtmlEdit) => Promise<T.Artifact>;
-  /** Its title, as the user renames it. */
+  /** Updates an artifact's title or default design-system flag. */
   readonly "artifact.update": (a: T.ArtifactUpdateRequest) => Promise<T.Artifact>;
   readonly "artifact.delete": (a: { readonly id: T.ArtifactId }) => Promise<void>;
   readonly "artifact.previewDelete": (a: { readonly id: T.ArtifactId }) => Promise<T.Preview>;
-  /** A blocks artifact and every live block (no tombstones), in order. */
-  readonly "artifact.block.list": (a: { readonly id: T.ArtifactId }) => Promise<T.BlockSnapshot>;
-  /** A batch of ops, as the user: taken in order, in one transaction, one batch at a time. */
-  readonly "artifact.submit": (a: { readonly id: T.ArtifactId } & T.BlockSubmit) => Promise<T.BlockAck>;
-  /** One block inserted, as one batch of one op. */
-  readonly "artifact.block.create": (a: { readonly id: T.ArtifactId } & T.BlockCreate) => Promise<T.BlockOpResult>;
-  /** One block's words, type or attrs changed, as one batch. */
-  readonly "artifact.block.update": (a: { readonly id: T.ArtifactId } & T.BlockUpdate) => Promise<T.BlockOpResult>;
-  /** One block and its children put in their tombstones. */
-  readonly "artifact.block.delete": (a: { readonly id: T.ArtifactId } & T.BlockDelete) => Promise<T.BlockOpResult>;
-  readonly "artifact.block.previewDelete": (a: { readonly id: T.ArtifactId } & T.BlockDelete) => Promise<T.Preview>;
+  /** All 12 artifact types and the workspace's standing default design-system if any. */
+  readonly "artifact.type.list": () => Promise<T.ArtifactTypeInfo[]>;
+  /** An artifact type's SKILL.md guide or one of its named reference chapters. */
+  readonly "artifact.type.read": (a: T.ArtifactTypeReadRequest) => Promise<T.ArtifactTypeGuide>;
+  /** Lists files (`manifest.json`, `structure/*`, `asset/*`) inside an artifact directory. */
+  readonly "artifact.file.list": (a: T.ArtifactFileListRequest) => Promise<T.ArtifactFileListResult>;
+  /** Reads one file by relative path inside an artifact directory (or historical version snapshot). */
+  readonly "artifact.file.get": (a: T.ArtifactFileGetRequest) => Promise<T.ArtifactFileContent>;
+  /** Atomically writes one or more files into `structure/` or `asset/` with origin attribution and collab sync. */
+  readonly "artifact.file.write": (a: T.ArtifactFileWriteRequest) => Promise<T.ArtifactFileWriteResult>;
+  /** Deletes a relative path under `structure/` or `asset/` with origin attribution and collab sync. */
+  readonly "artifact.file.delete": (a: T.ArtifactFileDeleteRequest) => Promise<T.ArtifactFileDeleteResult>;
   /** The open and resolved suggestions on an artifact, oldest first. */
   readonly "artifact.suggestion.list": (a: { readonly id: T.ArtifactId }) => Promise<T.Suggestion[]>;
-  /** A change an agent proposes to a block the user wrote. */
+  /** A proposed edit to a file or structured target inside an artifact directory. */
   readonly "artifact.suggestion.create": (a: { readonly id: T.ArtifactId } & T.SuggestionCreate) => Promise<T.Suggestion>;
-  /** The user takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
+  /** Accepts a pending suggestion and applies it to the artifact directory and collab state. */
   readonly "artifact.suggestion.accept": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Promise<T.Suggestion>;
   readonly "artifact.suggestion.reject": (a: { readonly id: T.ArtifactId; readonly suggestion: T.SuggestionId }) => Promise<T.Suggestion>;
-  /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
-  readonly "artifact.markdown.get": (a: { readonly id: T.ArtifactId }) => Promise<T.ArtifactMarkdown>;
-  /** All structured artifact types and the farm's standing default design-system if any. */
-  readonly "artifact.type.list": () => Promise<T.ArtifactTypeInfo[]>;
-  /** A structured artifact type's SKILL.md guide or one of its named reference chapters. */
-  readonly "artifact.type.read": (a: T.ArtifactTypeReadRequest) => Promise<T.ArtifactTypeGuide>;
-  /** A store artifact's entries (filtered by path prefix when given), with values when requested. */
-  readonly "artifact.entry.list": (a: T.ArtifactEntryListRequest) => Promise<T.ArtifactEntrySnapshot>;
-  /** One store entry with its value and revision. */
-  readonly "artifact.entry.get": (a: T.ArtifactEntryGetRequest) => Promise<T.ArtifactEntry>;
-  /** An atomic batch of set, patch, delete or copy writes on a store artifact with per-entry optimistic concurrency. */
-  readonly "artifact.entry.batch": (a: T.ArtifactEntryBatchRequest) => Promise<T.ArtifactEntryBatchResult>;
-  /** Imports a `.md` document into a new `ArtifactType::Outline` blocks artifact. */
-  readonly "artifact.outline.import": (a: T.ArtifactOutlineImportRequest) => Promise<T.Artifact>;
   /** Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite. */
   readonly "artifact.presence.update": (a: T.ArtifactPresenceUpdateRequest) => Promise<void>;
   /** Newest first. */
@@ -110,13 +93,6 @@ export const artifactEndpoints: readonly Endpoint[] = [
     can: ["user", "remote", "orchestrator", "session"],
   },
   {
-    op: "artifact.html.edit",
-    about: ["id"],
-    input: S.ArtifactHtmlEdit,
-    result: S.Artifact,
-    can: ["user", "remote"],
-  },
-  {
     op: "artifact.update",
     about: ["id"],
     input: S.ArtifactUpdateRequest,
@@ -139,84 +115,6 @@ export const artifactEndpoints: readonly Endpoint[] = [
     can: ["user", "remote"],
   },
   {
-    op: "artifact.block.list",
-    about: ["id"],
-    input: input({ id: S.ArtifactId }),
-    result: S.BlockSnapshot,
-    can: ["user", "remote"],
-  },
-  {
-    op: "artifact.submit",
-    about: ["id"],
-    input: input({ id: S.ArtifactId }, S.BlockSubmit),
-    result: S.BlockAck,
-    can: ["user", "remote"],
-  },
-  {
-    op: "artifact.block.create",
-    about: ["id"],
-    input: input({ id: S.ArtifactId }, S.BlockCreate),
-    result: S.BlockOpResult,
-    can: ["user", "remote", "session", "orchestrator"],
-  },
-  {
-    op: "artifact.block.update",
-    about: ["id"],
-    input: input({ id: S.ArtifactId }, S.BlockUpdate),
-    result: S.BlockOpResult,
-    can: ["user", "remote", "session", "orchestrator"],
-  },
-  {
-    op: "artifact.block.delete",
-    about: ["id"],
-    input: artifactBlockDeleteInput,
-    result: S.BlockOpResult,
-    can: ["user", "remote", "session", "orchestrator"],
-    dryRun: "artifact.block.previewDelete",
-  },
-  {
-    op: "artifact.block.previewDelete",
-    about: ["id"],
-    input: artifactBlockDeleteInput,
-    result: S.Preview,
-    can: ["user", "remote", "session", "orchestrator"],
-  },
-  {
-    op: "artifact.suggestion.list",
-    about: ["id"],
-    input: input({ id: S.ArtifactId }),
-    result: z.array(S.Suggestion),
-    can: ["user", "remote"],
-  },
-  {
-    op: "artifact.suggestion.create",
-    about: ["id"],
-    input: input({ id: S.ArtifactId }, S.SuggestionCreate),
-    result: S.Suggestion,
-    can: ["user", "remote"],
-  },
-  {
-    op: "artifact.suggestion.accept",
-    about: ["id"],
-    input: artifactSuggestionInput,
-    result: S.Suggestion,
-    can: ["user", "remote"],
-  },
-  {
-    op: "artifact.suggestion.reject",
-    about: ["id"],
-    input: artifactSuggestionInput,
-    result: S.Suggestion,
-    can: ["user", "remote"],
-  },
-  {
-    op: "artifact.markdown.get",
-    about: ["id"],
-    input: input({ id: S.ArtifactId }),
-    result: S.ArtifactMarkdown,
-    can: ["user", "remote"],
-  },
-  {
     op: "artifact.type.list",
     about: [],
     input: undefined,
@@ -231,32 +129,60 @@ export const artifactEndpoints: readonly Endpoint[] = [
     can: ["user", "remote", "orchestrator", "session"],
   },
   {
-    op: "artifact.entry.list",
+    op: "artifact.file.list",
     about: ["id"],
-    input: S.ArtifactEntryListRequest,
-    result: S.ArtifactEntrySnapshot,
+    input: S.ArtifactFileListRequest,
+    result: S.ArtifactFileListResult,
     can: ["user", "remote", "orchestrator", "session"],
   },
   {
-    op: "artifact.entry.get",
+    op: "artifact.file.get",
     about: ["id"],
-    input: S.ArtifactEntryGetRequest,
-    result: S.ArtifactEntry,
+    input: S.ArtifactFileGetRequest,
+    result: S.ArtifactFileContent,
     can: ["user", "remote", "orchestrator", "session"],
   },
   {
-    op: "artifact.entry.batch",
+    op: "artifact.file.write",
     about: ["id"],
-    input: S.ArtifactEntryBatchRequest,
-    result: S.ArtifactEntryBatchResult,
+    input: S.ArtifactFileWriteRequest,
+    result: S.ArtifactFileWriteResult,
     can: ["user", "remote", "orchestrator", "session"],
   },
   {
-    op: "artifact.outline.import",
-    about: [],
-    input: S.ArtifactOutlineImportRequest,
-    result: S.Artifact,
+    op: "artifact.file.delete",
+    about: ["id"],
+    input: S.ArtifactFileDeleteRequest,
+    result: S.ArtifactFileDeleteResult,
     can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.suggestion.list",
+    about: ["id"],
+    input: input({ id: S.ArtifactId }),
+    result: z.array(S.Suggestion),
+    can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.suggestion.create",
+    about: ["id"],
+    input: input({ id: S.ArtifactId }, S.SuggestionCreate),
+    result: S.Suggestion,
+    can: ["user", "remote", "orchestrator", "session"],
+  },
+  {
+    op: "artifact.suggestion.accept",
+    about: ["id"],
+    input: artifactSuggestionInput,
+    result: S.Suggestion,
+    can: ["user", "remote"],
+  },
+  {
+    op: "artifact.suggestion.reject",
+    about: ["id"],
+    input: artifactSuggestionInput,
+    result: S.Suggestion,
+    can: ["user", "remote"],
   },
   {
     op: "artifact.presence.update",

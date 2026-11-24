@@ -488,97 +488,65 @@ export class VibeValleyApi {
   };
 
   readonly artifact = {
-    /** The artifacts announced in a channel or made for an issue, newest change first; every one the farm has when neither is given. */
+    /** The artifacts announced in a channel or made for an issue, newest change first; every one the workspace has when neither is given. */
     list: (a: T.ArtifactListRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact[]> =>
       this.call<T.Artifact[]>("artifact.list", "/api/v1/artifact/list", a, options),
     get: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
       this.call<T.Artifact>("artifact.get", "/api/v1/artifact/get", a, options),
-    /** Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card. */
+    /** Creates a new directory-backed artifact seeded with starter files for its `artifactType`. */
     create: (a: T.ArtifactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
       this.call<T.Artifact>("artifact.create", "/api/v1/artifact/create", a, options),
-    /** Its title, as the user renames it. */
+    /** Updates an artifact's title or default design-system flag. */
     update: (a: T.ArtifactUpdateRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
       this.call<T.Artifact>("artifact.update", "/api/v1/artifact/update", a, options),
     delete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<void> =>
       this.call<void>("artifact.delete", "/api/v1/artifact/delete", a, options),
     previewDelete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
       this.call<T.Preview>("artifact.previewDelete", "/api/v1/artifact/previewDelete", a, options),
-    /** A batch of ops, as the user: taken in order, in one transaction, one batch at a time. */
-    submit: (a: { id: T.ArtifactId } & T.BlockSubmit, options?: { signal?: AbortSignal }): Promise<T.BlockAck> =>
-      this.call<T.BlockAck>("artifact.submit", "/api/v1/artifact/submit", a, options),
     content: {
-      /** Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
-       * to make the next one. */
+      /** Reads the artifact's primary entry file content (optionally at a historical immutable snapshot version). */
       get: (a: T.ArtifactReadRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactContent> =>
         this.call<T.ArtifactContent>("artifact.content.get", "/api/v1/artifact/content/get", a, options),
     },
     version: {
-      /** An html one's new version over the latest. the old ones stay. */
+      /** Cuts a new immutable directory snapshot version over the latest state. */
       create: (a: T.ArtifactVersionRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
         this.call<T.Artifact>("artifact.version.create", "/api/v1/artifact/version/create", a, options),
     },
-    html: {
-      /** The user's words in place of some in an html one's page: the next version, the rest of its bytes as they were. */
-      edit: (a: T.ArtifactHtmlEdit, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
-        this.call<T.Artifact>("artifact.html.edit", "/api/v1/artifact/html/edit", a, options),
+    type: {
+      /** All 12 artifact types and the workspace's standing default design-system if any. */
+      list: (options?: { signal?: AbortSignal }): Promise<T.ArtifactTypeInfo[]> =>
+        this.call<T.ArtifactTypeInfo[]>("artifact.type.list", "/api/v1/artifact/type/list", undefined, options),
+      /** An artifact type's SKILL.md guide or one of its named reference chapters. */
+      read: (a: T.ArtifactTypeReadRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactTypeGuide> =>
+        this.call<T.ArtifactTypeGuide>("artifact.type.read", "/api/v1/artifact/type/read", a, options),
     },
-    block: {
-      /** A blocks artifact and every live block (no tombstones), in order. */
-      list: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.BlockSnapshot> =>
-        this.call<T.BlockSnapshot>("artifact.block.list", "/api/v1/artifact/block/list", a, options),
-      /** One block inserted, as one batch of one op. */
-      create: (a: { id: T.ArtifactId } & T.BlockCreate, options?: { signal?: AbortSignal }): Promise<T.BlockOpResult> =>
-        this.call<T.BlockOpResult>("artifact.block.create", "/api/v1/artifact/block/create", a, options),
-      /** One block's words, type or attrs changed, as one batch. */
-      update: (a: { id: T.ArtifactId } & T.BlockUpdate, options?: { signal?: AbortSignal }): Promise<T.BlockOpResult> =>
-        this.call<T.BlockOpResult>("artifact.block.update", "/api/v1/artifact/block/update", a, options),
-      /** One block and its children put in their tombstones. */
-      delete: (a: { id: T.ArtifactId } & T.BlockDelete, options?: { signal?: AbortSignal }): Promise<T.BlockOpResult> =>
-        this.call<T.BlockOpResult>("artifact.block.delete", "/api/v1/artifact/block/delete", a, options),
-      previewDelete: (a: { id: T.ArtifactId } & T.BlockDelete, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
-        this.call<T.Preview>("artifact.block.previewDelete", "/api/v1/artifact/block/previewDelete", a, options),
+    file: {
+      /** Lists files (`manifest.json`, `structure/*`, `asset/*`) inside an artifact directory. */
+      list: (a: T.ArtifactFileListRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactFileListResult> =>
+        this.call<T.ArtifactFileListResult>("artifact.file.list", "/api/v1/artifact/file/list", a, options),
+      /** Reads one file by relative path inside an artifact directory (or historical version snapshot). */
+      get: (a: T.ArtifactFileGetRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactFileContent> =>
+        this.call<T.ArtifactFileContent>("artifact.file.get", "/api/v1/artifact/file/get", a, options),
+      /** Atomically writes one or more files into `structure/` or `asset/` with origin attribution and collab sync. */
+      write: (a: T.ArtifactFileWriteRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactFileWriteResult> =>
+        this.call<T.ArtifactFileWriteResult>("artifact.file.write", "/api/v1/artifact/file/write", a, options),
+      /** Deletes a relative path under `structure/` or `asset/` with origin attribution and collab sync. */
+      delete: (a: T.ArtifactFileDeleteRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactFileDeleteResult> =>
+        this.call<T.ArtifactFileDeleteResult>("artifact.file.delete", "/api/v1/artifact/file/delete", a, options),
     },
     suggestion: {
       /** The open and resolved suggestions on an artifact, oldest first. */
       list: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion[]> =>
         this.call<T.Suggestion[]>("artifact.suggestion.list", "/api/v1/artifact/suggestion/list", a, options),
-      /** A change an agent proposes to a block the user wrote. */
+      /** A proposed edit to a file or structured target inside an artifact directory. */
       create: (a: { id: T.ArtifactId } & T.SuggestionCreate, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
         this.call<T.Suggestion>("artifact.suggestion.create", "/api/v1/artifact/suggestion/create", a, options),
-      /** The user takes a suggestion; a block that moved on since it was read comes back stale, and is not changed. */
+      /** Accepts a pending suggestion and applies it to the artifact directory and collab state. */
       accept: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
         this.call<T.Suggestion>("artifact.suggestion.accept", "/api/v1/artifact/suggestion/accept", a, options),
       reject: (a: { id: T.ArtifactId; suggestion: T.SuggestionId }, options?: { signal?: AbortSignal }): Promise<T.Suggestion> =>
         this.call<T.Suggestion>("artifact.suggestion.reject", "/api/v1/artifact/suggestion/reject", a, options),
-    },
-    markdown: {
-      /** A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored. */
-      get: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<T.ArtifactMarkdown> =>
-        this.call<T.ArtifactMarkdown>("artifact.markdown.get", "/api/v1/artifact/markdown/get", a, options),
-    },
-    type: {
-      /** All structured artifact types and the farm's standing default design-system if any. */
-      list: (options?: { signal?: AbortSignal }): Promise<T.ArtifactTypeInfo[]> =>
-        this.call<T.ArtifactTypeInfo[]>("artifact.type.list", "/api/v1/artifact/type/list", undefined, options),
-      /** A structured artifact type's SKILL.md guide or one of its named reference chapters. */
-      read: (a: T.ArtifactTypeReadRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactTypeGuide> =>
-        this.call<T.ArtifactTypeGuide>("artifact.type.read", "/api/v1/artifact/type/read", a, options),
-    },
-    entry: {
-      /** A store artifact's entries (filtered by path prefix when given), with values when requested. */
-      list: (a: T.ArtifactEntryListRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactEntrySnapshot> =>
-        this.call<T.ArtifactEntrySnapshot>("artifact.entry.list", "/api/v1/artifact/entry/list", a, options),
-      /** One store entry with its value and revision. */
-      get: (a: T.ArtifactEntryGetRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactEntry> =>
-        this.call<T.ArtifactEntry>("artifact.entry.get", "/api/v1/artifact/entry/get", a, options),
-      /** An atomic batch of set, patch, delete or copy writes on a store artifact with per-entry optimistic concurrency. */
-      batch: (a: T.ArtifactEntryBatchRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactEntryBatchResult> =>
-        this.call<T.ArtifactEntryBatchResult>("artifact.entry.batch", "/api/v1/artifact/entry/batch", a, options),
-    },
-    outline: {
-      /** Imports a `.md` document into a new `ArtifactType::Outline` blocks artifact. */
-      import: (a: T.ArtifactOutlineImportRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
-        this.call<T.Artifact>("artifact.outline.import", "/api/v1/artifact/outline/import", a, options),
     },
     presence: {
       /** Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite. */

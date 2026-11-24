@@ -1285,15 +1285,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Artifact"),
     },
     Endpoint {
-        op: "artifact.html.edit",
-        module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("ArtifactHtmlEdit"),
-        result: Some("Artifact"),
-    },
-    Endpoint {
         op: "artifact.update",
         module: "artifact",
         about: &["id"],
@@ -1321,64 +1312,64 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Preview"),
     },
     Endpoint {
-        op: "artifact.block.list",
+        op: "artifact.type.list",
         module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactBlockListInput"),
-        result: Some("BlockSnapshot"),
+        input: None,
+        result: Some("Vec<ArtifactTypeInfo>"),
     },
     Endpoint {
-        op: "artifact.submit",
+        op: "artifact.type.read",
         module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactSubmitInput"),
-        result: Some("BlockAck"),
+        input: Some("ArtifactTypeReadRequest"),
+        result: Some("ArtifactTypeGuide"),
     },
     Endpoint {
-        op: "artifact.block.create",
+        op: "artifact.file.list",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Session, Caller::Orchestrator],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactBlockCreateInput"),
-        result: Some("BlockOpResult"),
+        input: Some("ArtifactFileListRequest"),
+        result: Some("ArtifactFileListResult"),
     },
     Endpoint {
-        op: "artifact.block.update",
+        op: "artifact.file.get",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Session, Caller::Orchestrator],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactBlockUpdateInput"),
-        result: Some("BlockOpResult"),
+        input: Some("ArtifactFileGetRequest"),
+        result: Some("ArtifactFileContent"),
     },
     Endpoint {
-        op: "artifact.block.delete",
+        op: "artifact.file.write",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Session, Caller::Orchestrator],
-        dry_run: Some("artifact.block.previewDelete"),
-        input: Some("ArtifactBlockDeleteInput"),
-        result: Some("BlockOpResult"),
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
+        dry_run: None,
+        input: Some("ArtifactFileWriteRequest"),
+        result: Some("ArtifactFileWriteResult"),
     },
     Endpoint {
-        op: "artifact.block.previewDelete",
+        op: "artifact.file.delete",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Session, Caller::Orchestrator],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
-        input: Some("ArtifactBlockDeleteInput"),
-        result: Some("Preview"),
+        input: Some("ArtifactFileDeleteRequest"),
+        result: Some("ArtifactFileDeleteResult"),
     },
     Endpoint {
         op: "artifact.suggestion.list",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
         input: Some("ArtifactSuggestionListInput"),
         result: Some("Vec<Suggestion>"),
@@ -1387,7 +1378,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
         op: "artifact.suggestion.create",
         module: "artifact",
         about: &["id"],
-        can: &[Caller::User, Caller::Remote],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
         dry_run: None,
         input: Some("ArtifactSuggestionCreateInput"),
         result: Some("Suggestion"),
@@ -1409,69 +1400,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: Some("ArtifactSuggestionAcceptInput"),
         result: Some("Suggestion"),
-    },
-    Endpoint {
-        op: "artifact.markdown.get",
-        module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("ArtifactMarkdownGetInput"),
-        result: Some("ArtifactMarkdown"),
-    },
-    Endpoint {
-        op: "artifact.type.list",
-        module: "artifact",
-        about: &[],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: None,
-        result: Some("Vec<ArtifactTypeInfo>"),
-    },
-    Endpoint {
-        op: "artifact.type.read",
-        module: "artifact",
-        about: &[],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("ArtifactTypeReadRequest"),
-        result: Some("ArtifactTypeGuide"),
-    },
-    Endpoint {
-        op: "artifact.entry.list",
-        module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("ArtifactEntryListRequest"),
-        result: Some("ArtifactEntrySnapshot"),
-    },
-    Endpoint {
-        op: "artifact.entry.get",
-        module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("ArtifactEntryGetRequest"),
-        result: Some("ArtifactEntry"),
-    },
-    Endpoint {
-        op: "artifact.entry.batch",
-        module: "artifact",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("ArtifactEntryBatchRequest"),
-        result: Some("ArtifactEntryBatchResult"),
-    },
-    Endpoint {
-        op: "artifact.outline.import",
-        module: "artifact",
-        about: &[],
-        can: &[Caller::User, Caller::Remote, Caller::Orchestrator, Caller::Session],
-        dry_run: None,
-        input: Some("ArtifactOutlineImportRequest"),
-        result: Some("Artifact"),
     },
     Endpoint {
         op: "artifact.presence.update",
@@ -2727,36 +2655,28 @@ pub mod ops {
         type Input = t::ArtifactGetInput;
         type Result = t::Artifact;
     }
-    /// Its words: an html one's version as made, a blocks one's Markdown now (its version is its seq). What an agent reads
-    /// to make the next one.
+    /// Reads the artifact's primary entry file content (optionally at a historical version snapshot).
     pub struct ArtifactContentGet;
     impl Op for ArtifactContentGet {
         const NAME: &'static str = "artifact.content.get";
         type Input = t::ArtifactReadRequest;
         type Result = t::ArtifactContent;
     }
-    /// Without content, an empty blocks one to write in; with content, a hand-in its maker announces with its card.
+    /// Creates a new directory-backed artifact seeded with starter files for its `artifact_type`.
     pub struct ArtifactCreate;
     impl Op for ArtifactCreate {
         const NAME: &'static str = "artifact.create";
         type Input = t::ArtifactRequest;
         type Result = t::Artifact;
     }
-    /// An html one's new version over the latest. the old ones stay.
+    /// Cuts a new immutable directory snapshot version over the latest state.
     pub struct ArtifactVersionCreate;
     impl Op for ArtifactVersionCreate {
         const NAME: &'static str = "artifact.version.create";
         type Input = t::ArtifactVersionRequest;
         type Result = t::Artifact;
     }
-    /// The user's words in place of some in an html one's page: the next version, the rest of its bytes as they were.
-    pub struct ArtifactHtmlEdit;
-    impl Op for ArtifactHtmlEdit {
-        const NAME: &'static str = "artifact.html.edit";
-        type Input = t::ArtifactHtmlEdit;
-        type Result = t::Artifact;
-    }
-    /// Its title, as the user renames it.
+    /// Updates an artifact's title or default design-system flag.
     pub struct ArtifactUpdate;
     impl Op for ArtifactUpdate {
         const NAME: &'static str = "artifact.update";
@@ -2775,46 +2695,47 @@ pub mod ops {
         type Input = t::ArtifactDeleteInput;
         type Result = t::Preview;
     }
-    /// A blocks artifact and every live block (no tombstones), in order.
-    pub struct ArtifactBlockList;
-    impl Op for ArtifactBlockList {
-        const NAME: &'static str = "artifact.block.list";
-        type Input = t::ArtifactBlockListInput;
-        type Result = t::BlockSnapshot;
+    /// All 12 artifact types and the workspace's standing default design-system if any.
+    pub struct ArtifactTypeList;
+    impl Op for ArtifactTypeList {
+        const NAME: &'static str = "artifact.type.list";
+        type Input = ();
+        type Result = Vec<t::ArtifactTypeInfo>;
     }
-    /// A batch of ops, as the user: taken in order, in one transaction, one batch at a time.
-    pub struct ArtifactSubmit;
-    impl Op for ArtifactSubmit {
-        const NAME: &'static str = "artifact.submit";
-        type Input = t::ArtifactSubmitInput;
-        type Result = t::BlockAck;
+    /// An artifact type's SKILL.md guide or one of its named reference chapters.
+    pub struct ArtifactTypeRead;
+    impl Op for ArtifactTypeRead {
+        const NAME: &'static str = "artifact.type.read";
+        type Input = t::ArtifactTypeReadRequest;
+        type Result = t::ArtifactTypeGuide;
     }
-    /// One block inserted, as one batch of one op.
-    pub struct ArtifactBlockCreate;
-    impl Op for ArtifactBlockCreate {
-        const NAME: &'static str = "artifact.block.create";
-        type Input = t::ArtifactBlockCreateInput;
-        type Result = t::BlockOpResult;
+    /// Lists files (`manifest.json`, `structure/*`, `asset/*`) inside an artifact directory.
+    pub struct ArtifactFileList;
+    impl Op for ArtifactFileList {
+        const NAME: &'static str = "artifact.file.list";
+        type Input = t::ArtifactFileListRequest;
+        type Result = t::ArtifactFileListResult;
     }
-    /// One block's words, type or attrs changed, as one batch.
-    pub struct ArtifactBlockUpdate;
-    impl Op for ArtifactBlockUpdate {
-        const NAME: &'static str = "artifact.block.update";
-        type Input = t::ArtifactBlockUpdateInput;
-        type Result = t::BlockOpResult;
+    /// Reads one file by relative path inside an artifact directory (or historical version snapshot).
+    pub struct ArtifactFileGet;
+    impl Op for ArtifactFileGet {
+        const NAME: &'static str = "artifact.file.get";
+        type Input = t::ArtifactFileGetRequest;
+        type Result = t::ArtifactFileContent;
     }
-    /// One block and its children put in their tombstones.
-    pub struct ArtifactBlockDelete;
-    impl Op for ArtifactBlockDelete {
-        const NAME: &'static str = "artifact.block.delete";
-        type Input = t::ArtifactBlockDeleteInput;
-        type Result = t::BlockOpResult;
+    /// Atomically writes one or more files into `structure/` or `asset/` with origin attribution and collab sync.
+    pub struct ArtifactFileWrite;
+    impl Op for ArtifactFileWrite {
+        const NAME: &'static str = "artifact.file.write";
+        type Input = t::ArtifactFileWriteRequest;
+        type Result = t::ArtifactFileWriteResult;
     }
-    pub struct ArtifactBlockPreviewDelete;
-    impl Op for ArtifactBlockPreviewDelete {
-        const NAME: &'static str = "artifact.block.previewDelete";
-        type Input = t::ArtifactBlockDeleteInput;
-        type Result = t::Preview;
+    /// Deletes a relative path under `structure/` or `asset/` with origin attribution and collab sync.
+    pub struct ArtifactFileDelete;
+    impl Op for ArtifactFileDelete {
+        const NAME: &'static str = "artifact.file.delete";
+        type Input = t::ArtifactFileDeleteRequest;
+        type Result = t::ArtifactFileDeleteResult;
     }
     /// The open and resolved suggestions on an artifact, oldest first.
     pub struct ArtifactSuggestionList;
@@ -2823,14 +2744,14 @@ pub mod ops {
         type Input = t::ArtifactSuggestionListInput;
         type Result = Vec<t::Suggestion>;
     }
-    /// A change an agent proposes to a block the user wrote.
+    /// A proposed edit to a file or structured target inside an artifact directory.
     pub struct ArtifactSuggestionCreate;
     impl Op for ArtifactSuggestionCreate {
         const NAME: &'static str = "artifact.suggestion.create";
         type Input = t::ArtifactSuggestionCreateInput;
         type Result = t::Suggestion;
     }
-    /// The user takes a suggestion; a block that moved on since it was read comes back stale, and is not changed.
+    /// Accepts a pending suggestion and applies it to the artifact directory and collab state.
     pub struct ArtifactSuggestionAccept;
     impl Op for ArtifactSuggestionAccept {
         const NAME: &'static str = "artifact.suggestion.accept";
@@ -2842,55 +2763,6 @@ pub mod ops {
         const NAME: &'static str = "artifact.suggestion.reject";
         type Input = t::ArtifactSuggestionAcceptInput;
         type Result = t::Suggestion;
-    }
-    /// A blocks artifact as Markdown: the format artifacts trade with agents and MEMORY.md in, not how they are stored.
-    pub struct ArtifactMarkdownGet;
-    impl Op for ArtifactMarkdownGet {
-        const NAME: &'static str = "artifact.markdown.get";
-        type Input = t::ArtifactMarkdownGetInput;
-        type Result = t::ArtifactMarkdown;
-    }
-    /// All structured artifact types and the farm's standing default design-system if any.
-    pub struct ArtifactTypeList;
-    impl Op for ArtifactTypeList {
-        const NAME: &'static str = "artifact.type.list";
-        type Input = ();
-        type Result = Vec<t::ArtifactTypeInfo>;
-    }
-    /// A structured artifact type's SKILL.md guide or one of its named reference chapters.
-    pub struct ArtifactTypeRead;
-    impl Op for ArtifactTypeRead {
-        const NAME: &'static str = "artifact.type.read";
-        type Input = t::ArtifactTypeReadRequest;
-        type Result = t::ArtifactTypeGuide;
-    }
-    /// A store artifact's entries (filtered by path prefix when given), with values when requested.
-    pub struct ArtifactEntryList;
-    impl Op for ArtifactEntryList {
-        const NAME: &'static str = "artifact.entry.list";
-        type Input = t::ArtifactEntryListRequest;
-        type Result = t::ArtifactEntrySnapshot;
-    }
-    /// One store entry with its value and revision.
-    pub struct ArtifactEntryGet;
-    impl Op for ArtifactEntryGet {
-        const NAME: &'static str = "artifact.entry.get";
-        type Input = t::ArtifactEntryGetRequest;
-        type Result = t::ArtifactEntry;
-    }
-    /// An atomic batch of set, patch, delete or copy writes on a store artifact with per-entry optimistic concurrency.
-    pub struct ArtifactEntryBatch;
-    impl Op for ArtifactEntryBatch {
-        const NAME: &'static str = "artifact.entry.batch";
-        type Input = t::ArtifactEntryBatchRequest;
-        type Result = t::ArtifactEntryBatchResult;
-    }
-    /// Imports a `.md` document into a new `ArtifactType::Outline` blocks artifact.
-    pub struct ArtifactOutlineImport;
-    impl Op for ArtifactOutlineImport {
-        const NAME: &'static str = "artifact.outline.import";
-        type Input = t::ArtifactOutlineImportRequest;
-        type Result = t::Artifact;
     }
     /// Ephemeral live presence update (cursor, selection, highlight, viewport); never persisted to SQLite.
     pub struct ArtifactPresenceUpdate;
@@ -3170,13 +3042,6 @@ pub const SUBSCRIPTIONS: &[SubscriptionSpec] = &[
         event: "ArtifactEvent",
     },
     SubscriptionSpec {
-        name: "artifact.entry.follow",
-        module: "artifact",
-        can: &[Caller::User, Caller::Remote],
-        payload: "ArtifactFollowPayload",
-        event: "ArtifactEntryEvent",
-    },
-    SubscriptionSpec {
         name: "artifact.suggestion.follow",
         module: "artifact",
         can: &[Caller::User, Caller::Remote],
@@ -3231,13 +3096,6 @@ pub mod subscriptions {
         const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
         type Payload = t::ArtifactFollowPayload;
         type Event = t::ArtifactEvent;
-    }
-    pub struct ArtifactEntryFollow;
-    impl Subscription for ArtifactEntryFollow {
-        const NAME: &'static str = "artifact.entry.follow";
-        const CAN: &'static [Caller] = &[Caller::User, Caller::Remote];
-        type Payload = t::ArtifactFollowPayload;
-        type Event = t::ArtifactEntryEvent;
     }
     pub struct ArtifactSuggestionFollow;
     impl Subscription for ArtifactSuggestionFollow {
@@ -3460,27 +3318,19 @@ endpoint_ids! {
     ArtifactContentGet => "artifact.content.get",
     ArtifactCreate => "artifact.create",
     ArtifactVersionCreate => "artifact.version.create",
-    ArtifactHtmlEdit => "artifact.html.edit",
     ArtifactUpdate => "artifact.update",
     ArtifactDelete => "artifact.delete",
     ArtifactPreviewDelete => "artifact.previewDelete",
-    ArtifactBlockList => "artifact.block.list",
-    ArtifactSubmit => "artifact.submit",
-    ArtifactBlockCreate => "artifact.block.create",
-    ArtifactBlockUpdate => "artifact.block.update",
-    ArtifactBlockDelete => "artifact.block.delete",
-    ArtifactBlockPreviewDelete => "artifact.block.previewDelete",
+    ArtifactTypeList => "artifact.type.list",
+    ArtifactTypeRead => "artifact.type.read",
+    ArtifactFileList => "artifact.file.list",
+    ArtifactFileGet => "artifact.file.get",
+    ArtifactFileWrite => "artifact.file.write",
+    ArtifactFileDelete => "artifact.file.delete",
     ArtifactSuggestionList => "artifact.suggestion.list",
     ArtifactSuggestionCreate => "artifact.suggestion.create",
     ArtifactSuggestionAccept => "artifact.suggestion.accept",
     ArtifactSuggestionReject => "artifact.suggestion.reject",
-    ArtifactMarkdownGet => "artifact.markdown.get",
-    ArtifactTypeList => "artifact.type.list",
-    ArtifactTypeRead => "artifact.type.read",
-    ArtifactEntryList => "artifact.entry.list",
-    ArtifactEntryGet => "artifact.entry.get",
-    ArtifactEntryBatch => "artifact.entry.batch",
-    ArtifactOutlineImport => "artifact.outline.import",
     ArtifactPresenceUpdate => "artifact.presence.update",
     ArtifactHistoryList => "artifact.history.list",
     ArtifactHistoryPreview => "artifact.history.preview",

@@ -1,259 +1,140 @@
-//! vibevalley_core::artifact golden regression checks against committed fixtures in `tests/golden`.
+//! `vibevalley_core::artifact` golden & unit checks for the unified
+//! directory-backed 12-type artifact layout, path validation, manifest codec,
+//! and starter directory builder.
 
-use std::collections::BTreeMap;
-
-use serde_json::{Value, json};
+use serde_json::Value;
 use vibevalley_core::artifact::{
-    ArtifactEntry, ArtifactEntryKind, ArtifactType, Page, RenderStoreOptions, StoreViewQuery, apply_json_merge_patch, artifact_problem, artifact_suffix_of,
-    blocks_of_markdown, contrast_ratio, entry_path_problem, format_store_summary, html_check, html_edit, html_problem, infer_artifact_from_name,
-    infer_entry_kind, infer_entry_mime, markdown_of, motion_recorder_helper, ordered, parse_tokens_spec, render_store_artifact_html, sanitize_whiteboard_svg,
-    starter_entries_for_type, store_html_problem, store_view_headers, store_view_url, write_props_into_dc_html,
+    ArtifactPathZone, MANIFEST_FILE, all_type_specs, apply_json_merge_patch, canonical_json, default_manifest, format_directory_summary, infer_encoding,
+    infer_mime, parse_manifest, serialize_manifest, starter_directory, title_problem, type_spec, validate_artifact_path, validate_deletable_path,
+    validate_prefix,
 };
-use vibevalley_protocol::{ArtifactDisplay, Block, BlockOp, HtmlAnchor, TextSpan};
+use vibevalley_protocol::{ArtifactFileMeta, ArtifactType};
 
 fn golden_val(name: &str) -> Value {
     let path = format!("{}/tests/golden/artifact/{name}.json", env!("CARGO_MANIFEST_DIR"));
     serde_json::from_str(&std::fs::read_to_string(path).expect("golden")).expect("golden json")
 }
 
-fn golden(name: &str) -> Vec<Value> {
-    golden_val(name).as_array().expect("golden array").clone()
-}
-
-fn of<T: serde::de::DeserializeOwned>(v: &Value) -> T {
-    serde_json::from_value(v.clone()).expect("a wire value")
-}
-
-fn to(v: impl serde::Serialize) -> Value {
-    serde_json::to_value(v).expect("serializable")
-}
-
 #[test]
-fn markdown_reads_and_writes_as_vibevalley() {
-    for case in golden("markdown") {
-        let md = case["md"].as_str().unwrap();
-        assert_eq!(to(blocks_of_markdown(md)), case["parsed"], "parsed: {md:?}");
-        let blocks: Vec<Block> = of(&case["blocks"]);
-        assert_eq!(markdown_of(&blocks), case["out"].as_str().unwrap(), "out: {md:?}");
-    }
-    for case in golden("spans") {
-        let blocks: Vec<Block> = of(&case["blocks"]);
-        assert_eq!(markdown_of(&blocks), case["out"].as_str().unwrap(), "spans: {:?}", case["blocks"][0]["text"]);
-    }
-}
+fn valid_and_invalid_artifact_paths_and_mimes_match_golden() {
+    let data = golden_val("directory");
 
-#[test]
-fn ops_apply_as_vibevalley() {
-    for case in golden("ops") {
-        let name = case["name"].as_str().unwrap();
-        let blocks: Vec<Block> = of(&case["blocks"]);
-        let mut p = Page::new("d", "helper", 5000, &blocks);
-        let history = case["history"].clone();
-        p.base = Box::new(move |block, rev| {
-            history[block][rev.to_string()].as_str().map(|t| {
-                vec![TextSpan {
-                    t: t.into(),
-                    marks: Default::default(),
-                }]
-            })
-        });
-        let taken: Vec<String> = case.get("taken").map(of).unwrap_or_default();
-        p.taken = Box::new(move |id| taken.iter().any(|t| t == id));
-        let ops: Vec<BlockOp> = of(&case["ops"]);
-        let results: Vec<_> = ops.iter().map(|op| p.apply(op)).collect();
-        assert_eq!(to(&results), case["results"], "{name}: results");
-        let after: Vec<Block> = p.all().cloned().collect();
-        assert_eq!(to(&after), case["after"], "{name}: blocks");
-        assert_eq!(to(&p.changed), case["changed"], "{name}: changed");
-        let revisions: Vec<Value> = p
-            .revisions
-            .iter()
-            .map(|r| json!({ "block": r.block, "rev": r.rev, "spans": r.spans, "kind": r.kind.as_str() }))
-            .collect();
-        assert_eq!(Value::Array(revisions), case["revisions"], "{name}: revisions");
-        assert_eq!(to(ordered(&after)), case["ordered"], "{name}: ordered");
-    }
-}
-
-#[test]
-fn html_check_as_vibevalley() {
-    for case in golden("check") {
-        let page = case["page"].as_str().unwrap();
-        let check = html_check(page);
-        assert_eq!(to(&check), case["check"], "check: {page}");
-        assert_eq!(html_problem(&check), case["problem"].as_str().unwrap(), "problem: {page}");
-    }
-}
-
-#[test]
-fn html_edit_as_vibevalley() {
-    for case in golden("edit") {
-        let source = case["source"].as_str().unwrap();
-        let anchor: HtmlAnchor = of(&case["anchor"]);
-        let got = match html_edit(source, &anchor, case["text"].as_str().unwrap()) {
-            Ok(source) => json!({ "ok": true, "source": source }),
-            Err(why) => json!({ "ok": false, "why": why }),
-        };
-        assert_eq!(got, case["result"], "edit {:?} in {source}", anchor.exact);
-    }
-}
-
-#[test]
-fn problems_as_vibevalley() {
-    for case in golden("problem") {
-        let got = artifact_problem(case["title"].as_str(), case["kind"].as_str(), case["size"].as_u64().map(|n| n as usize));
-        assert_eq!(got, case["problem"].as_str().unwrap(), "{case}");
-    }
-}
-
-#[test]
-fn shell_comes_after_the_page() {
-    let shown = vibevalley_core::artifact::with_shell("<p>hi</p>", ArtifactDisplay::Page, "dark");
-    assert!(shown.starts_with("<p>hi</p>\n<style>:root{"));
-    assert!(shown.contains("--vv-page:#151413"));
-    assert!(shown.contains("({ display: \"page\" })"));
-
-    let motion = vibevalley_core::artifact::with_shell("<!doctype html><html><head></head><body></body></html>", ArtifactDisplay::Motion, "dark");
-    assert!(motion.contains("<head><script>window.__vvEarly = null;"));
-    assert!(motion.contains("({ display: \"motion\" })"));
-    assert!(motion_recorder_helper().contains("\"video/webm;codecs=vp9\", \"video/webm;codecs=vp8\", \"video/webm\", \"video/mp4\""));
-}
-
-#[test]
-fn suffixes_match_vibevalley() {
-    let data = golden_val("suffix");
-    for case in data["suffixes"].as_array().unwrap() {
-        let body = case["body"].as_str().unwrap();
-        let artifact_type: Option<ArtifactType> = case.get("artifactType").and_then(|v| serde_json::from_value(v.clone()).ok());
-        let display: Option<ArtifactDisplay> = case.get("display").and_then(|v| serde_json::from_value(v.clone()).ok());
-        assert_eq!(artifact_suffix_of(body, artifact_type, display), case["suffix"].as_str().unwrap(), "{case}");
-    }
-    for case in data["names"].as_array().unwrap() {
-        let name = case["name"].as_str().unwrap();
-        let content = case.get("content").and_then(Value::as_str);
-        assert_eq!(to(infer_artifact_from_name(name, content)), case["inferred"], "{case}");
-    }
-}
-
-#[test]
-fn store_matches_vibevalley() {
-    let data = golden_val("store");
-    for case in data["paths"].as_array().unwrap() {
+    for case in data["validPaths"].as_array().unwrap() {
         let path = case["path"].as_str().unwrap();
-        assert_eq!(entry_path_problem(path).as_deref(), case["problem"].as_str(), "path: {path:?}");
+        let zone = validate_artifact_path(path).unwrap_or_else(|e| panic!("expected valid path {path:?}: {e}"));
+        assert_eq!(zone.as_str(), case["zone"].as_str().unwrap(), "zone for {path}");
+        assert_eq!(infer_mime(path), case["mime"].as_str().unwrap(), "mime for {path}");
+        assert_eq!(infer_encoding(path).as_str(), case["encoding"].as_str().unwrap(), "encoding for {path}");
+
+        if zone == ArtifactPathZone::Manifest {
+            assert!(validate_deletable_path(path).is_err(), "manifest.json must not be deletable");
+        } else {
+            assert_eq!(validate_deletable_path(path), Ok(zone));
+        }
     }
-    for case in data["kinds"].as_array().unwrap() {
-        let path = case["path"].as_str().unwrap();
-        let kind = infer_entry_kind(path);
-        assert_eq!(kind.as_str(), case["kind"].as_str().unwrap(), "kind: {path}");
-        assert_eq!(infer_entry_mime(path, kind), case["mime"].as_str().unwrap(), "mime: {path}");
+
+    for case in data["invalidPaths"].as_array().unwrap() {
+        let path = case.as_str().unwrap();
+        assert!(validate_artifact_path(path).is_err(), "expected invalid path to be rejected: {path:?}");
     }
-    for case in data["patches"].as_array().unwrap() {
-        let current = case.get("current").and_then(Value::as_str);
-        let patch = case["patch"].as_str().unwrap();
-        let res = apply_json_merge_patch(current, patch).expect("merge patch");
-        let expected_raw = case["result"]["value"].as_str().unwrap();
-        assert_eq!(
-            serde_json::from_str::<Value>(&res).unwrap(),
-            serde_json::from_str::<Value>(expected_raw).unwrap()
+
+    assert!(validate_prefix("").is_ok());
+    assert!(validate_prefix("structure/").is_ok());
+    assert!(validate_prefix("asset/frames/").is_ok());
+    assert!(validate_prefix("../structure/").is_err());
+    assert!(validate_prefix("/structure/").is_err());
+    assert!(validate_prefix("other/").is_err());
+}
+
+#[test]
+fn all_twelve_artifact_types_have_canonical_specs_manifests_and_starters() {
+    let data = golden_val("directory");
+    let expected = data["typeEntries"].as_array().unwrap();
+    assert_eq!(ArtifactType::ALL.len(), 12);
+    assert_eq!(all_type_specs().len(), 12);
+    assert_eq!(expected.len(), 12);
+
+    for (artifact_type, case) in ArtifactType::ALL.into_iter().zip(expected.iter()) {
+        let slug = case["type"].as_str().unwrap();
+        assert_eq!(artifact_type.as_str(), slug);
+        assert_eq!(ArtifactType::parse(slug), Some(artifact_type));
+
+        let spec = type_spec(artifact_type);
+        assert_eq!(spec.slug, slug);
+        assert_eq!(spec.entry_path, case["entry"].as_str().unwrap());
+        assert_eq!(spec.supports_design_system, case["supportsDesignSystem"].as_bool().unwrap());
+        assert_eq!(validate_artifact_path(spec.entry_path), Ok(ArtifactPathZone::Structure));
+
+        let dir = starter_directory("art_01", artifact_type, "Demo Title");
+        assert_eq!(dir.manifest.id, "art_01");
+        assert_eq!(dir.manifest.artifact_type, artifact_type);
+        assert_eq!(dir.manifest.entry, spec.entry_path);
+        assert!(dir.dirs.iter().any(|d| d == "structure"));
+        assert!(dir.dirs.iter().any(|d| d == "asset"));
+        assert_eq!(dir.files[0].path, MANIFEST_FILE);
+        assert!(
+            dir.files.iter().any(|f| f.path == spec.entry_path),
+            "starter for {slug} must include entry {}",
+            spec.entry_path
         );
-    }
-    let summary = &data["summary"];
-    let entries: Vec<ArtifactEntry> = of(&summary["entries"]);
-    let artifact_type: Option<ArtifactType> = summary.get("artifactType").and_then(|v| serde_json::from_value(v.clone()).ok());
-    assert_eq!(
-        format_store_summary(summary["title"].as_str().unwrap(), artifact_type, summary["seq"].as_i64().unwrap(), &entries),
-        summary["out"].as_str().unwrap()
-    );
-}
 
-#[test]
-fn tokens_match_vibevalley() {
-    let data = golden_val("tokens");
-    for case in data["specs"].as_array().unwrap() {
-        let raw = case["raw"].as_str().unwrap();
-        assert_eq!(to(parse_tokens_spec(raw)), case["parsed"], "tokens spec");
-    }
-    for case in data["contrasts"].as_array().unwrap() {
-        let fg = case["fg"].as_str().unwrap();
-        let bg = case["bg"].as_str().unwrap();
-        assert_eq!(contrast_ratio(fg, bg), case["ratio"].as_f64(), "contrast: {fg} vs {bg}");
-    }
-}
+        let parsed = parse_manifest(&dir.files[0].content).unwrap_or_else(|e| panic!("manifest for {slug}: {e}"));
+        assert_eq!(parsed, dir.manifest);
 
-#[test]
-fn starters_match_vibevalley() {
-    for case in golden("starters") {
-        let artifact_type: ArtifactType = of(&case["type"]);
-        let title = case["title"].as_str().unwrap();
-        let got = starter_entries_for_type(artifact_type, title);
-        let expected = case["entries"].as_array().unwrap();
-        assert_eq!(got.len(), expected.len(), "starter count for {artifact_type:?}");
-        for (g, e) in got.iter().zip(expected.iter()) {
-            assert_eq!(g.path, e["path"].as_str().unwrap());
-            assert_eq!(g.kind.map(ArtifactEntryKind::as_str), e["kind"].as_str());
-            if g.kind == Some(ArtifactEntryKind::Json) {
-                let gv: Value = serde_json::from_str(g.value.as_deref().unwrap()).unwrap();
-                let ev: Value = serde_json::from_str(e["value"].as_str().unwrap()).unwrap();
-                assert_eq!(gv, ev, "json starter {}", g.path);
-            } else {
-                assert_eq!(g.value.as_deref(), e["value"].as_str(), "text starter {}", g.path);
+        for file in &dir.files {
+            assert!(validate_artifact_path(&file.path).is_ok(), "invalid starter path {} for {slug}", file.path);
+            if file.mime == "application/json" {
+                let _: Value = serde_json::from_str(&file.content).unwrap_or_else(|e| panic!("invalid JSON starter {} for {slug}: {e}", file.path));
             }
         }
     }
 }
 
 #[test]
-fn viewers_match_vibevalley() {
-    let data = golden_val("viewers");
-    for case in data["headers"].as_array().unwrap() {
-        let origin = case.get("origin").and_then(Value::as_str);
-        let print = case["print"].as_bool().unwrap();
-        assert_eq!(to(store_view_headers(origin, print)), case["out"]);
-    }
-    for case in data["htmlProblems"].as_array().unwrap() {
-        let source = case["source"].as_str().unwrap();
-        assert_eq!(store_html_problem(source), case["problem"].as_str().unwrap());
-    }
-    for case in data["urls"].as_array().unwrap() {
-        let id = case["id"].as_str().unwrap();
-        let q = &case["query"];
-        let query = StoreViewQuery {
-            theme: q.get("theme").and_then(Value::as_str).map(str::to_string),
-            seq: q.get("seq").and_then(Value::as_i64),
-            path: q.get("path").and_then(Value::as_str).map(str::to_string),
-            at: q.get("at").and_then(Value::as_i64),
-            still: q.get("still").and_then(Value::as_bool).unwrap_or(false),
-            print: q.get("print").and_then(Value::as_bool).unwrap_or(false),
-            element_id: q.get("elementId").and_then(Value::as_str).map(str::to_string),
-        };
-        assert_eq!(store_view_url(id, &query), case["out"].as_str().unwrap());
-    }
-    let dc = &data["dcProps"];
-    let values: BTreeMap<String, Value> = of(&dc["values"]);
-    assert_eq!(write_props_into_dc_html(dc["source"].as_str().unwrap(), &values), dc["out"].as_str().unwrap());
+fn manifest_validation_rejects_escape_paths_and_blank_titles() {
+    assert!(title_problem("").is_some());
+    assert!(title_problem("   ").is_some());
+    assert!(title_problem("Valid Title").is_none());
 
-    let dirty_svg = r#"<svg viewBox="0 0 100 100" onload="alert(1)"><script>evil()</script><rect width="50" height="50" onclick="bad()" /><a href="https://evil.example"><text>Hi</text></a></svg>"#;
-    let clean_svg = sanitize_whiteboard_svg(dirty_svg);
-    assert!(!clean_svg.contains("<script"));
-    assert!(!clean_svg.contains("onload"));
-    assert!(!clean_svg.contains("onclick"));
-    assert!(!clean_svg.contains("evil.example"));
-    assert!(clean_svg.contains("<rect"));
+    let mut bad = default_manifest("a1", ArtifactType::Docs, "Spec");
+    bad.entry = "../escape.md".to_owned();
+    assert!(serialize_manifest(&bad).is_err());
 
-    for case in data["renders"].as_array().unwrap() {
-        let artifact_type: ArtifactType = of(&case["type"]);
-        let entries: Vec<ArtifactEntry> = of(&case["entries"]);
-        let theme = case["theme"].as_str().unwrap();
-        let got = render_store_artifact_html(Some(artifact_type), &entries, &RenderStoreOptions::new(theme));
-        let expected = case["html"].as_str().unwrap();
-        // Compare byte-for-byte on non-JSON-key-order-sensitive renderers, and verify structure on all.
-        if matches!(artifact_type, ArtifactType::Slides | ArtifactType::Design | ArtifactType::DesignSystem) {
-            assert_eq!(got, expected, "render {artifact_type:?}");
-        } else {
-            assert!(got.starts_with("<!doctype html>\n"));
-            assert!(got.contains("data-theme=\"light\""));
-            assert_eq!(got.len(), expected.len(), "render length {artifact_type:?}");
-        }
+    let mut bad_asset_entry = default_manifest("a1", ArtifactType::Docs, "Spec");
+    bad_asset_entry.entry = "asset/pic.png".to_owned();
+    assert!(serialize_manifest(&bad_asset_entry).is_err());
+
+    let mut bad_file = default_manifest("a1", ArtifactType::Docs, "Spec");
+    bad_file.files.push("manifest.json".to_owned());
+    assert!(serialize_manifest(&bad_file).is_err());
+}
+
+#[test]
+fn merge_patch_canonical_json_and_directory_summary_work() {
+    let data = golden_val("directory");
+    for case in data["mergePatches"].as_array().unwrap() {
+        let current = case["current"].as_str();
+        let patch = case["patch"].as_str().unwrap();
+        let merged = apply_json_merge_patch(current, patch).expect("merge patch");
+        let parsed: Value = serde_json::from_str(&merged).unwrap();
+        assert_eq!(parsed, case["expected"]);
     }
+
+    assert_eq!(canonical_json("{ \"a\": 1, \"b\": [2, 3] }").unwrap(), "{\"a\":1,\"b\":[2,3]}");
+
+    let summary = format_directory_summary(
+        "Launch Plan",
+        ArtifactType::Docs,
+        4,
+        &[ArtifactFileMeta {
+            path: "structure/index.md".to_owned(),
+            mime: "text/markdown".to_owned(),
+            size: 128,
+            hash: "abc".to_owned(),
+            updated_at: 1000,
+        }],
+    );
+    assert!(summary.contains("# Launch Plan"));
+    assert!(summary.contains("type: docs · seq: 4 · files: 1"));
+    assert!(summary.contains("`structure/index.md`"));
 }
