@@ -7,7 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use sqlx::{Connection, SqliteConnection};
+use sea_orm::ConnectionTrait;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::artifact::{MdBlock, Page, blocks_of_markdown, inline_spans, markdown_of, ordered, plain, unmarked};
@@ -23,6 +23,7 @@ use vibevalley_protocol::{
 use super::collab::commit_meta_for_actor;
 use super::db::{self, ArtifactRow, ChangeRow, StoredSuggestion};
 use super::{Artifacts, Change, new_id, q, refused};
+use crate::db::begin_write_tx;
 use crate::{Hub, Sink, now};
 
 /// How long a batch is kept to answer it again, and a block's text to
@@ -168,7 +169,7 @@ fn base_of(op: &BlockOp) -> Option<(&str, i64)> {
 
 impl Artifacts {
     /// `foundBlocks`: the artifact, refused when it is not written in blocks.
-    pub(super) async fn found_blocks_async(&self, db: &mut SqliteConnection, id: &str) -> Result<ArtifactRow, ApiError> {
+    pub(super) async fn found_blocks_async<C: ConnectionTrait>(&self, db: &C, id: &str) -> Result<ArtifactRow, ApiError> {
         let row = self.found(db, id).await?;
         if row.body != "blocks" {
             return Err(refused(t("server.artifact.notBlocks", &[("title", row.title.as_str().into())])));
@@ -177,15 +178,14 @@ impl Artifacts {
     }
 
     async fn blocks_of_async(&self, id: &str) -> Result<Vec<Block>, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        db::blocks(&mut db, id).await.map_err(q)
+        db::blocks(self.db.read_conn(), id).await.map_err(q)
     }
 
     /// The live blocks in order.
     pub async fn live_blocks_async(&self, id: &str) -> Result<Vec<Block>, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        self.found_blocks_async(&mut db, id).await?;
-        Ok(ordered(&db::blocks(&mut db, id).await.map_err(q)?))
+        let conn = self.db.read_conn();
+        self.found_blocks_async(conn, id).await?;
+        Ok(ordered(&db::blocks(conn, id).await.map_err(q)?))
     }
 
     pub fn live_blocks(&self, id: &str) -> Result<Vec<Block>, ApiError> {
@@ -233,12 +233,16 @@ impl Artifacts {
         if batch_id.trim().is_empty() {
             return Err(refused(t("server.artifact.noBatch", &[])));
         }
-        let (ack, fresh) = {
-            let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
-            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-            let result = self.apply_batch_async(&mut tx, id, actor, batch_id, &ops, meta).await?;
-            tx.commit().await.map_err(q)?;
-            result
+        let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+        let (ack, fresh) = match self.apply_batch_async(&tx, id, actor, batch_id, &ops, meta).await {
+            Ok(result) => {
+                tx.commit().await.map_err(q)?;
+                result
+            }
+            Err(err) => {
+                let _ = tx.rollback().await;
+                return Err(err);
+            }
         };
         if fresh {
             self.publish_change(id, &ack);
@@ -246,9 +250,9 @@ impl Artifacts {
         Ok(ack)
     }
 
-    async fn apply_batch_async(
+    async fn apply_batch_async<C: ConnectionTrait>(
         &self,
-        db: &mut SqliteConnection,
+        db: &C,
         id: &str,
         actor: &str,
         batch_id: &str,
@@ -345,7 +349,7 @@ impl Artifacts {
     }
 
     pub fn insert_block(&self, artifact: &str, actor: &str, req: &BlockCreate) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.insert_block_async(artifact, actor, req))
+        self.insert_block_inner(artifact, actor, req, None)
     }
 
     pub async fn insert_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
@@ -353,14 +357,15 @@ impl Artifacts {
     }
 
     pub fn insert_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.insert_block_with_meta_async(artifact, actor, req, meta))
+        self.insert_block_inner(artifact, actor, req, Some(meta))
+    }
+
+    fn insert_block_inner(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
+        vibevalley_runtime::rt::block_on(self.insert_block_inner_async(artifact, actor, req, meta))
     }
 
     async fn insert_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockCreate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
-        {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found_blocks_async(&mut db, artifact).await?;
-        }
+        self.found_blocks_async(self.db.read_conn(), artifact).await?;
         let name = req.r#type.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or("paragraph");
         let kind = append_type(name).ok_or_else(bad_block_type)?;
         if let Some(problem) = attr_problem(kind, &req.into()) {
@@ -413,7 +418,7 @@ impl Artifacts {
     }
 
     pub fn update_block(&self, artifact: &str, actor: &str, req: &BlockUpdate) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.update_block_async(artifact, actor, req))
+        self.update_block_inner(artifact, actor, req, None)
     }
 
     pub async fn update_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
@@ -421,7 +426,11 @@ impl Artifacts {
     }
 
     pub fn update_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.update_block_with_meta_async(artifact, actor, req, meta))
+        self.update_block_inner(artifact, actor, req, Some(meta))
+    }
+
+    fn update_block_inner(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
+        vibevalley_runtime::rt::block_on(self.update_block_inner_async(artifact, actor, req, meta))
     }
 
     async fn update_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockUpdate, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
@@ -514,10 +523,7 @@ impl Artifacts {
         after_block: Option<&str>,
         meta: &CommitMeta,
     ) -> Result<BlockOpResult, ApiError> {
-        {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found_blocks_async(&mut db, artifact).await?;
-        }
+        self.found_blocks_async(self.db.read_conn(), artifact).await?;
         let block_id = block.trim().to_string();
         let _batches = self.batches.lock().await;
         let existing_blocks = self.blocks_of_async(artifact).await?;
@@ -579,7 +585,7 @@ impl Artifacts {
     }
 
     pub fn delete_block(&self, artifact: &str, actor: &str, req: &BlockDelete) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.delete_block_async(artifact, actor, req))
+        self.delete_block_inner(artifact, actor, req, None)
     }
 
     pub async fn delete_block_with_meta_async(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
@@ -587,7 +593,11 @@ impl Artifacts {
     }
 
     pub fn delete_block_with_meta(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: &CommitMeta) -> Result<BlockOpResult, ApiError> {
-        vibevalley_runtime::rt::block_on(self.delete_block_with_meta_async(artifact, actor, req, meta))
+        self.delete_block_inner(artifact, actor, req, Some(meta))
+    }
+
+    fn delete_block_inner(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
+        vibevalley_runtime::rt::block_on(self.delete_block_inner_async(artifact, actor, req, meta))
     }
 
     async fn delete_block_inner_async(&self, artifact: &str, actor: &str, req: &BlockDelete, meta: Option<&CommitMeta>) -> Result<BlockOpResult, ApiError> {
@@ -641,12 +651,12 @@ impl Artifacts {
     /// when too far behind.
     pub async fn follow_async(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
         let (rx, missed, current) = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found_blocks_async(&mut db, id).await?;
+            let conn = self.db.read_conn();
+            self.found_blocks_async(conn, id).await?;
             // Subscribed before the catch-up is read; live ones are told by seq.
             let rx = self.changes.subscribe();
-            let missed = db::changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).await.map_err(q)?;
-            let current = db::blocks(&mut db, id).await.map_err(q)?;
+            let missed = db::changes_after(conn, id, after, CATCH_UP_MAX as i64 + 1).await.map_err(q)?;
+            let current = db::blocks(conn, id).await.map_err(q)?;
             (rx, missed, current)
         };
         let id = id.to_string();
@@ -676,10 +686,10 @@ impl Artifacts {
     }
 
     pub async fn suggestions_async(&self, id: &str) -> Result<Vec<Suggestion>, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        self.found_blocks_async(&mut db, id).await?;
-        let mut list = db::suggestions(&mut db, id, SUGGESTIONS_LISTED).await.map_err(q)?;
-        self.hydrate_suggestion_offsets_async(&mut db, id, &mut list).await;
+        let conn = self.db.read_conn();
+        self.found_blocks_async(conn, id).await?;
+        let mut list = db::suggestions(conn, id, SUGGESTIONS_LISTED).await.map_err(q)?;
+        self.hydrate_suggestion_offsets_async(conn, id, &mut list).await;
         Ok(list)
     }
 
@@ -703,9 +713,9 @@ impl Artifacts {
 
     pub async fn suggest_with_origin_async(&self, artifact: &str, actor: &str, origin: Option<&str>, req: &SuggestionCreate) -> Result<Suggestion, ApiError> {
         let made = {
-            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-            let row = self.found_blocks_async(&mut db, artifact).await?;
-            let all_blocks = db::blocks(&mut db, artifact).await.map_err(q)?;
+            let db = self.db.write_conn();
+            let row = self.found_blocks_async(db, artifact).await?;
+            let all_blocks = db::blocks(db, artifact).await.map_err(q)?;
             let block = all_blocks.iter().find(|b| b.id == req.block);
             let Some(block) = block.filter(|b| b.deleted != Some(true)) else {
                 return Err(refused(t("server.artifact.suggestion.noBlock", &[("id", req.block.as_str().into())])));
@@ -729,7 +739,7 @@ impl Artifacts {
 
             let (cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text) = if let Some(spans) = &req.change.text {
                 let new_text = plain(spans);
-                let (cs, ce, so, eo, orig, repl) = self.anchor_suggestion_range_async(&mut db, &row, &all_blocks, block, &new_text).await?;
+                let (cs, ce, so, eo, orig, repl) = self.anchor_suggestion_range_async(db, &row, &all_blocks, block, &new_text).await?;
                 (Some(cs), Some(ce), Some(so), Some(eo), Some(orig), Some(repl))
             } else {
                 (None, None, None, None, None, None)
@@ -737,7 +747,7 @@ impl Artifacts {
 
             // Coalesce overlapping/adjacent text-only suggestions from the same origin on the same block.
             if is_text_only && let (Some(so), Some(eo)) = (start_offset, end_offset) {
-                let open_same: Vec<StoredSuggestion> = db::stored_suggestions(&mut db, artifact, SUGGESTIONS_LISTED)
+                let open_same: Vec<StoredSuggestion> = db::stored_suggestions(db, artifact, SUGGESTIONS_LISTED)
                     .await
                     .map_err(q)?
                     .into_iter()
@@ -800,14 +810,10 @@ impl Artifacts {
                             anchor_text: anchor_text.clone(),
                             replacement_text: replacement_text.clone(),
                         };
-                        db::update_suggestion(&mut db, &updated).await.map_err(q)?;
-                        let mut wire = db::suggestion(&mut db, &updated.wire.id)
-                            .await
-                            .map_err(q)?
-                            .unwrap_or_else(|| updated.wire.clone());
-                        self.hydrate_suggestion_offsets_async(&mut db, artifact, std::slice::from_mut(&mut wire)).await;
+                        db::update_suggestion(db, &updated).await.map_err(q)?;
+                        let mut wire = db::suggestion(db, &updated.wire.id).await.map_err(q)?.unwrap_or_else(|| updated.wire.clone());
+                        self.hydrate_suggestion_offsets_async(db, artifact, std::slice::from_mut(&mut wire)).await;
                         updated.wire = wire;
-                        drop(db);
                         self.publish_suggestions_async(artifact).await?;
                         return Ok(updated.wire);
                     }
@@ -836,12 +842,12 @@ impl Artifacts {
                 anchor_text,
                 replacement_text,
             };
-            db::add_suggestion(&mut db, &open).await.map_err(q)?;
-            let mut made = db::suggestion(&mut db, &id)
+            db::add_suggestion(db, &open).await.map_err(q)?;
+            let mut made = db::suggestion(db, &id)
                 .await
                 .map_err(q)?
                 .ok_or_else(|| refused(t("server.artifact.suggestion.missing", &[("id", id.as_str().into())])))?;
-            self.hydrate_suggestion_offsets_async(&mut db, artifact, std::slice::from_mut(&mut made)).await;
+            self.hydrate_suggestion_offsets_async(db, artifact, std::slice::from_mut(&mut made)).await;
             made
         };
         self.publish_suggestions_async(artifact).await?;
@@ -849,8 +855,7 @@ impl Artifacts {
     }
 
     async fn open_stored_suggestion_async(&self, artifact: &str, suggestion: &str) -> Result<StoredSuggestion, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        db::stored_suggestion(&mut db, suggestion)
+        db::stored_suggestion(self.db.read_conn(), suggestion)
             .await
             .map_err(q)?
             .filter(|s| s.wire.artifact_id == artifact)
@@ -858,11 +863,9 @@ impl Artifacts {
     }
 
     async fn resolve_async(&self, artifact: &str, row: &Suggestion, status: SuggestionStatus, actor: &str) -> Result<Suggestion, ApiError> {
-        let updated = {
-            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-            db::resolve_suggestion(&mut db, &row.id, status.as_str(), now(), actor).await.map_err(q)?;
-            db::suggestion(&mut db, &row.id).await.map_err(q)?
-        };
+        let db = self.db.write_conn();
+        db::resolve_suggestion(db, &row.id, status.as_str(), now(), actor).await.map_err(q)?;
+        let updated = db::suggestion(db, &row.id).await.map_err(q)?;
         self.publish_suggestions_async(artifact).await?;
         Ok(updated.unwrap_or_else(|| row.clone()))
     }
@@ -997,9 +1000,9 @@ impl Artifacts {
     }
 
     /// `fill`: Markdown read into blocks, as one batch.
-    pub(super) async fn fill_with_meta_async(
+    pub(super) async fn fill_with_meta_async<C: ConnectionTrait>(
         &self,
-        db: &mut SqliteConnection,
+        db: &C,
         id: &str,
         markdown: &str,
         actor: &str,
@@ -1009,9 +1012,9 @@ impl Artifacts {
     }
 
     /// Inserts pre-parsed Markdown blocks as one atomic batch.
-    pub(super) async fn fill_md_blocks_with_meta_async(
+    pub(super) async fn fill_md_blocks_with_meta_async<C: ConnectionTrait>(
         &self,
-        db: &mut SqliteConnection,
+        db: &C,
         id: &str,
         blocks: Vec<MdBlock>,
         actor: &str,

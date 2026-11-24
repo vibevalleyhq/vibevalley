@@ -1,4 +1,8 @@
 //! SQLite `StorageBackend` with WAL mode, read-only reader pool, and group-commit savepoints.
+//!
+//! Retained as the Wave 1–3 transition bridge for callers requiring synchronous `&Sqlite<'_>`
+//! (`Tx::connection()`); durable queries themselves execute through the shared SeaORM/SeaQuery
+//! layer (`storage::ops`) and `durable::migration::Migrator`.
 
 use std::path::Path;
 use std::sync::{
@@ -7,15 +11,19 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use serde_json::{Value, json};
+use sea_orm::sea_query::{OptionEnum, Value as SeaValue, Values as SeaValues};
+use sea_orm::{ConnectionTrait, DbBackend, DbErr, ExecResult, QueryResult, RuntimeErr, SqlxSqliteConnector, Statement};
+use sea_orm_migration::MigratorTrait;
+use serde_json::Value;
 use sqlx::pool::PoolConnection;
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
-use sqlx::{Connection, Sqlite as SqlxSqlite, SqliteConnection, SqlitePool};
+use sqlx::sqlite::{SqliteArguments, SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
+use sqlx::{Arguments, Connection, Executor, Sqlite as SqlxSqlite, SqliteConnection, SqlitePool};
 
+use super::ops;
 use super::{StorageBackend, StorageRead, StorageWrite, WriteCallback};
+use crate::agent::durable::migration::Migrator;
 use crate::agent::durable::{
-    CommitStats, Conversation, Document, DocumentEvent, Entry, Error, Result, Signal, Sqlite, Submission, SubmissionStatus, Task, TaskStatus, WaitMode, now_ms,
-    queries as q, sqlite::optional,
+    CommitStats, Conversation, Document, DocumentEvent, Entry, Error, Result, Signal, Sqlite, Submission, SubmissionStatus, Task, TaskStatus, now_ms,
 };
 use crate::rt::block_on;
 
@@ -156,12 +164,8 @@ impl SqliteStorage {
     /// Wraps externally managed `SqlitePool`s (such as `ServerDb`'s shared write/read pools)
     /// and initializes durable's schema once on `write_pool`.
     pub fn from_pools(write_pool: SqlitePool, read_pool: Option<SqlitePool>, clock: impl Fn() -> i64 + Send + Sync + 'static) -> Result<Self> {
-        let (write_pool, read_pool) = block_on(async move {
-            let mut conn = write_pool.acquire().await?;
-            sqlx::raw_sql(include_str!("../schema.sql")).execute(&mut *conn).await?;
-            drop(conn);
-            Ok::<_, sqlx::Error>((write_pool, read_pool))
-        })?;
+        let sea_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool.clone());
+        block_on(Migrator::up(&sea_conn, None))?;
         Ok(Self(Arc::new(SqliteInner {
             db: Mutex::new(Database::new()),
             write_pool: Some(write_pool),
@@ -213,9 +217,8 @@ impl SqliteStorage {
                         .journal_mode(SqliteJournalMode::Wal)
                         .synchronous(SqliteSynchronous::Normal);
                     let write_pool = SqlitePoolOptions::new().max_connections(1).min_connections(1).connect_with(write_opts).await?;
-                    let mut conn = write_pool.acquire().await?;
-                    sqlx::raw_sql(include_str!("../schema.sql")).execute(&mut *conn).await?;
-                    drop(conn);
+                    let sea_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool.clone());
+                    Migrator::up(&sea_conn, None).await?;
                     let read_opts = base.filename(&file).read_only(true);
                     let read_pool = SqlitePoolOptions::new().max_connections(4).min_connections(1).connect_with(read_opts).await?;
                     (write_pool, Some(read_pool))
@@ -230,13 +233,12 @@ impl SqliteStorage {
                         .max_lifetime(None)
                         .connect_with(write_opts)
                         .await?;
-                    let mut conn = write_pool.acquire().await?;
-                    sqlx::raw_sql(include_str!("../schema.sql")).execute(&mut *conn).await?;
-                    drop(conn);
+                    let sea_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool.clone());
+                    Migrator::up(&sea_conn, None).await?;
                     (write_pool, None)
                 }
             };
-            Ok::<_, sqlx::Error>((write_pool, read_pool))
+            Ok::<_, Error>((write_pool, read_pool))
         })?;
         Ok(Self(Arc::new(SqliteInner {
             db: Mutex::new(Database::new()),
@@ -336,7 +338,7 @@ impl StorageBackend for SqliteStorage {
                 let conn = db.active_tx.as_mut().expect("active_tx present during write operation");
                 let conn_wrap = Sqlite::new(conn);
                 let tx = SqliteTx(&conn_wrap);
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&tx, &tx, Some(&conn_wrap), now)))
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&tx, &tx, Some(&conn_wrap), None, now)))
             };
             match outcome {
                 Ok(Ok(write_outcome)) => {
@@ -441,608 +443,270 @@ impl StorageBackend for SqliteStorage {
     }
 }
 
+struct SqliteConnExec<'c>(tokio::sync::Mutex<&'c mut SqliteConnection>);
+
+fn bind_sqlite_values(values: Option<SeaValues>) -> std::result::Result<SqliteArguments, DbErr> {
+    let mut args = SqliteArguments::default();
+    let Some(values) = values else {
+        return Ok(args);
+    };
+    for arg in values.into_iter() {
+        match arg {
+            SeaValue::Bool(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::TinyInt(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::SmallInt(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::Int(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::BigInt(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::TinyUnsigned(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::SmallUnsigned(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::Unsigned(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::BigUnsigned(v) => {
+                let v = v.map(i64::try_from).transpose().map_err(|_| DbErr::ConvertFromU64("BigUnsigned"))?;
+                let _ = args.add(v);
+            }
+            SeaValue::Float(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::Double(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::String(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::Enum(e) => {
+                let v = match e {
+                    OptionEnum::Some(v) => Some(v.value.into_owned()),
+                    OptionEnum::None(_) => None,
+                };
+                let _ = args.add(v);
+            }
+            SeaValue::Char(v) => {
+                let _ = args.add(v.map(|c| c.to_string()));
+            }
+            SeaValue::Bytes(v) => {
+                let _ = args.add(v);
+            }
+            SeaValue::Json(v) => {
+                let _ = args.add(v.map(|j| *j));
+            }
+            SeaValue::Uuid(v) => {
+                let _ = args.add(v);
+            }
+            other => {
+                return Err(DbErr::Type(format!("unsupported sqlite SeaQuery value: {other:?}")));
+            }
+        }
+    }
+    Ok(args)
+}
+
+#[sea_orm_migration::prelude::async_trait::async_trait]
+impl ConnectionTrait for SqliteConnExec<'_> {
+    fn get_database_backend(&self) -> DbBackend {
+        DbBackend::Sqlite
+    }
+
+    async fn execute_raw(&self, stmt: Statement) -> std::result::Result<ExecResult, DbErr> {
+        let args = bind_sqlite_values(stmt.values)?;
+        let mut conn = self.0.lock().await;
+        sqlx::query_with(sqlx::AssertSqlSafe(stmt.sql.as_str()), args)
+            .execute(&mut **conn)
+            .await
+            .map(ExecResult::from)
+            .map_err(|e| DbErr::Exec(RuntimeErr::SqlxError(Arc::new(e))))
+    }
+
+    async fn execute_unprepared(&self, sql: &str) -> std::result::Result<ExecResult, DbErr> {
+        let mut conn = self.0.lock().await;
+        Executor::execute(&mut **conn, sqlx::AssertSqlSafe(sql))
+            .await
+            .map(ExecResult::from)
+            .map_err(|e| DbErr::Exec(RuntimeErr::SqlxError(Arc::new(e))))
+    }
+
+    async fn query_one_raw(&self, stmt: Statement) -> std::result::Result<Option<QueryResult>, DbErr> {
+        let args = bind_sqlite_values(stmt.values)?;
+        let mut conn = self.0.lock().await;
+        sqlx::query_with(sqlx::AssertSqlSafe(stmt.sql.as_str()), args)
+            .fetch_optional(&mut **conn)
+            .await
+            .map(|row| row.map(QueryResult::from))
+            .map_err(|e| DbErr::Query(RuntimeErr::SqlxError(Arc::new(e))))
+    }
+
+    async fn query_all_raw(&self, stmt: Statement) -> std::result::Result<Vec<QueryResult>, DbErr> {
+        let args = bind_sqlite_values(stmt.values)?;
+        let mut conn = self.0.lock().await;
+        sqlx::query_with(sqlx::AssertSqlSafe(stmt.sql.as_str()), args)
+            .fetch_all(&mut **conn)
+            .await
+            .map(|rows| rows.into_iter().map(QueryResult::from).collect())
+            .map_err(|e| DbErr::Query(RuntimeErr::SqlxError(Arc::new(e))))
+    }
+}
+
 struct SqliteTx<'b, 'a>(&'b Sqlite<'a>);
+
+impl SqliteTx<'_, '_> {
+    fn run<T>(&self, f: impl for<'c> AsyncFnOnce(&'c SqliteConnExec<'c>) -> Result<T>) -> Result<T> {
+        let mut out: Option<Result<T>> = None;
+        self.0.query(async |db| {
+            let exec = SqliteConnExec(tokio::sync::Mutex::new(db));
+            out = Some(f(&exec).await);
+            Ok(())
+        })?;
+        out.expect("sqlite query closure executes once")
+    }
+}
 
 impl StorageRead for SqliteTx<'_, '_> {
     fn document(&self, scope: &str, id: &str, kind: &str) -> Result<Option<Document>> {
-        optional(self.0.query(async |db| {
-            q::get_document(
-                db,
-                q::GetDocumentParams {
-                    scope_kind: scope.into(),
-                    scope_id: id.into(),
-                    doc_kind: kind.into(),
-                },
-            )
-            .await
-        }))?
-        .map(TryInto::try_into)
-        .transpose()
+        self.run(async |db| ops::document(db, scope, id, kind).await)
     }
 
     fn documents_by_kind(&self, scope: &str, kind: &str) -> Result<Vec<Document>> {
-        self.0
-            .query(async |db| {
-                q::documents_by_kind(
-                    db,
-                    q::DocumentsByKindParams {
-                        scope_kind: scope.into(),
-                        doc_kind: kind.into(),
-                    },
-                )
-                .await
-            })?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::documents_by_kind(db, scope, kind).await)
     }
 
     fn documents_by_scope(&self, scope: &str, id: &str) -> Result<Vec<Document>> {
-        self.0
-            .query(async |db| {
-                q::documents_by_scope(
-                    db,
-                    q::DocumentsByScopeParams {
-                        scope_kind: scope.into(),
-                        scope_id: id.into(),
-                    },
-                )
-                .await
-            })?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::documents_by_scope(db, scope, id).await)
     }
 
     fn conversation(&self, id: &str) -> Result<Option<Conversation>> {
-        optional(
-            self.0
-                .query(async |db| q::get_conversation(db, q::GetConversationParams { id: id.into() }).await),
-        )?
-        .map(TryInto::try_into)
-        .transpose()
+        self.run(async |db| ops::conversation(db, id).await)
     }
 
     fn conversations(&self) -> Result<Vec<Conversation>> {
-        self.0
-            .query(async |db| q::list_conversations(db).await)?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::conversations(db).await)
     }
 
     fn conversations_by_owner_task(&self, owner_task_id: &str) -> Result<Vec<Conversation>> {
-        self.0
-            .query(async |db| {
-                q::conversations_by_owner(
-                    db,
-                    q::ConversationsByOwnerParams {
-                        owner_task_id: owner_task_id.into(),
-                    },
-                )
-                .await
-            })?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::conversations_by_owner_task(db, owner_task_id).await)
     }
 
     fn entries_from(&self, conv: &str, from_seq: i64) -> Result<Vec<Entry>> {
-        self.0
-            .query(async |db| {
-                q::entries_from(
-                    db,
-                    q::EntriesFromParams {
-                        conversation_id: conv.into(),
-                        seq: from_seq,
-                    },
-                )
-                .await
-            })?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::entries_from(db, conv, from_seq).await)
     }
 
     fn entries_within(&self, conv: &str, first_seq: i64, last_seq: i64) -> Result<Vec<Entry>> {
-        self.0
-            .query(async |db| {
-                q::entries_within(
-                    db,
-                    q::EntriesWithinParams {
-                        conversation_id: conv.into(),
-                        first_seq,
-                        last_seq,
-                    },
-                )
-                .await
-            })?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::entries_within(db, conv, first_seq, last_seq).await)
     }
 
     fn submission(&self, id: &str) -> Result<Option<Submission>> {
-        optional(self.0.query(async |db| q::get_submission(db, q::GetSubmissionParams { id: id.into() }).await))?
-            .map(TryInto::try_into)
-            .transpose()
+        self.run(async |db| ops::submission(db, id).await)
     }
 
     fn submission_by_request(&self, conv: &str, request_id: &str) -> Result<Option<Submission>> {
-        optional(self.0.query(async |db| {
-            q::submission_by_request(
-                db,
-                q::SubmissionByRequestParams {
-                    conversation_id: conv.into(),
-                    request_id: request_id.into(),
-                },
-            )
-            .await
-        }))?
-        .map(TryInto::try_into)
-        .transpose()
+        self.run(async |db| ops::submission_by_request(db, conv, request_id).await)
     }
 
     fn submissions(&self, conv: &str) -> Result<Vec<Submission>> {
-        self.0
-            .query(async |db| q::submissions(db, q::SubmissionsParams { conversation_id: conv.into() }).await)?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::submissions(db, conv).await)
     }
 
     fn task(&self, id: &str) -> Result<Option<Task>> {
-        optional(self.0.query(async |db| q::get_task(db, q::GetTaskParams { id: id.into() }).await))?
-            .map(TryInto::try_into)
-            .transpose()
+        self.run(async |db| ops::task(db, id).await)
     }
 
     fn task_by_dedup(&self, owner: &str, key: &str) -> Result<Option<Task>> {
-        optional(self.0.query(async |db| {
-            q::task_by_dedup(
-                db,
-                q::TaskByDedupParams {
-                    owner_task_id: owner.into(),
-                    dedup_key: key.into(),
-                },
-            )
-            .await
-        }))?
-        .map(TryInto::try_into)
-        .transpose()
+        self.run(async |db| ops::task_by_dedup(db, owner, key).await)
     }
 
     fn tasks_by_conversation(&self, conv: &str) -> Result<Vec<Task>> {
-        self.0
-            .query(async |db| q::conversation_tasks(db, q::ConversationTasksParams { conversation_id: conv.into() }).await)?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::tasks_by_conversation(db, conv).await)
     }
 
     fn children(&self, owner: &str) -> Result<Vec<Task>> {
-        self.0
-            .query(async |db| q::child_tasks(db, q::ChildTasksParams { owner_task_id: owner.into() }).await)?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::children(db, owner).await)
     }
 
     fn tasks_by_status(&self, status: TaskStatus) -> Result<Vec<Task>> {
-        self.0
-            .query(async |db| {
-                q::tasks_by_status(
-                    db,
-                    q::TasksByStatusParams {
-                        status: status.as_str().into(),
-                    },
-                )
-                .await
-            })?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::tasks_by_status(db, status).await)
     }
 
     fn active_tasks(&self) -> Result<Vec<Task>> {
-        self.0.query(async |db| q::active_tasks(db).await)?.into_iter().map(TryInto::try_into).collect()
+        self.run(async |db| ops::active_tasks(db).await)
     }
 
     fn signals(&self, task_id: &str, include_consumed: bool) -> Result<Vec<Signal>> {
-        self.0
-            .query(async |db| {
-                q::task_signals(
-                    db,
-                    q::TaskSignalsParams {
-                        task_id: task_id.into(),
-                        include_consumed: i64::from(include_consumed),
-                    },
-                )
-                .await
-            })?
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect()
+        self.run(async |db| ops::signals(db, task_id, include_consumed).await)
     }
 
     fn signal_by_key(&self, task_id: &str, name: &str, key: &str) -> Result<Option<Signal>> {
-        optional(self.0.query(async |db| {
-            q::signal_by_key(
-                db,
-                q::SignalByKeyParams {
-                    task_id: task_id.into(),
-                    signal_name: name.into(),
-                    signal_key: key.into(),
-                },
-            )
-            .await
-        }))?
-        .map(TryInto::try_into)
-        .transpose()
+        self.run(async |db| ops::signal_by_key(db, task_id, name, key).await)
     }
 }
 
 impl StorageWrite for SqliteTx<'_, '_> {
     fn put_document(&self, scope: &str, id: &str, kind: &str, state: &Value, now_ms: i64) -> Result<i64> {
-        Ok(self
-            .0
-            .query(async |db| {
-                q::put_document(
-                    db,
-                    q::PutDocumentParams {
-                        scope_kind: scope.into(),
-                        scope_id: id.into(),
-                        doc_kind: kind.into(),
-                        state_json: state.to_string(),
-                        updated_at_ms: now_ms,
-                    },
-                )
-                .await
-            })?
-            .rev)
+        self.run(async |db| ops::put_document(db, scope, id, kind, state, now_ms).await)
     }
 
     fn delete_document(&self, scope: &str, id: &str, kind: &str) -> Result<()> {
-        self.0.query(async |db| {
-            q::delete_document(
-                db,
-                q::DeleteDocumentParams {
-                    scope_kind: scope.into(),
-                    scope_id: id.into(),
-                    doc_kind: kind.into(),
-                },
-            )
-            .await
-        })?;
-        Ok(())
+        self.run(async |db| ops::delete_document(db, scope, id, kind).await)
     }
 
     fn insert_conversation(&self, conv: &Conversation) -> Result<()> {
-        if conv.parent_id.is_empty() && conv.head_seq == 1 && conv.next_seq == 1 && conv.fork_entry_seq == 0 {
-            self.0.query(async |db| {
-                q::insert_conversation(
-                    db,
-                    q::InsertConversationParams {
-                        id: conv.id.clone(),
-                        provider_affinity: conv.provider_affinity.clone(),
-                        owner_task_id: conv.owner_task_id.clone(),
-                        created_at_ms: conv.created_at_ms,
-                    },
-                )
-                .await
-            })?;
-        } else {
-            self.0.query(async |db| {
-                q::fork_conversation(
-                    db,
-                    q::ForkConversationParams {
-                        id: conv.id.clone(),
-                        owner_task_id: conv.owner_task_id.clone(),
-                        parent_id: conv.parent_id.clone(),
-                        fork_entry_seq: conv.fork_entry_seq,
-                        head_seq: conv.head_seq,
-                        next_seq: conv.next_seq,
-                        provider_affinity: conv.provider_affinity.clone(),
-                        created_at_ms: conv.created_at_ms,
-                    },
-                )
-                .await
-            })?;
-        }
-        Ok(())
+        self.run(async |db| ops::insert_conversation(db, conv).await)
     }
 
     fn advance_sequence(&self, conv: &str, now_ms: i64) -> Result<Option<i64>> {
-        Ok(optional(self.0.query(async |db| {
-            q::advance_sequence(
-                db,
-                q::AdvanceSequenceParams {
-                    updated_at_ms: now_ms,
-                    id: conv.into(),
-                },
-            )
-            .await
-        }))?
-        .map(|row| row.next_seq))
+        self.run(async |db| ops::advance_sequence(db, conv, now_ms).await)
     }
 
     fn insert_entry(&self, entry: &Entry) -> Result<()> {
-        self.0.query(async |db| {
-            q::insert_entry(
-                db,
-                q::InsertEntryParams {
-                    conversation_id: entry.conversation_id.clone(),
-                    seq: entry.seq,
-                    kind: entry.kind.clone(),
-                    payload_json: entry.payload.to_string(),
-                    created_at_ms: entry.created_at_ms,
-                },
-            )
-            .await
-        })?;
-        Ok(())
+        self.run(async |db| ops::insert_entry(db, entry).await)
     }
 
     fn set_head(&self, conv: &str, head_seq: i64) -> Result<()> {
-        self.0.query(async |db| q::set_head(db, q::SetHeadParams { head_seq, id: conv.into() }).await)?;
-        Ok(())
+        self.run(async |db| ops::set_head(db, conv, head_seq).await)
     }
 
     fn reset_head(&self, conv: &str) -> Result<()> {
-        self.0.query(async |db| q::reset_head(db, q::ResetHeadParams { id: conv.into() }).await)?;
-        Ok(())
+        self.run(async |db| ops::reset_head(db, conv).await)
     }
 
     fn insert_submission(&self, sub: &Submission) -> Result<()> {
-        self.0.query(async |db| {
-            q::insert_submission(
-                db,
-                q::InsertSubmissionParams {
-                    id: sub.id.clone(),
-                    conversation_id: sub.conversation_id.clone(),
-                    request_id: sub.request_id.clone(),
-                    kind: sub.kind.clone(),
-                    payload_json: sub.payload.to_string(),
-                    notify_task_id: sub.notify_task_id.clone(),
-                    created_at_ms: sub.created_at_ms,
-                },
-            )
-            .await
-        })?;
-        Ok(())
+        self.run(async |db| ops::insert_submission(db, sub).await)
     }
 
     fn set_submission_status(&self, id: &str, status: SubmissionStatus, now_ms: i64) -> Result<()> {
-        self.0.query(async |db| {
-            q::set_submission_status(
-                db,
-                q::SetSubmissionStatusParams {
-                    status: status.as_str().into(),
-                    updated_at_ms: now_ms,
-                    id: id.into(),
-                },
-            )
-            .await
-        })?;
-        Ok(())
+        self.run(async |db| ops::set_submission_status(db, id, status, now_ms).await)
     }
 
     fn settle_submission(&self, id: &str, status: SubmissionStatus, result: &Value, now_ms: i64) -> Result<()> {
-        self.0.query(async |db| {
-            q::settle_submission(
-                db,
-                q::SettleSubmissionParams {
-                    status: status.as_str().into(),
-                    result_json: result.to_string(),
-                    updated_at_ms: now_ms,
-                    id: id.into(),
-                },
-            )
-            .await
-        })?;
-        Ok(())
+        self.run(async |db| ops::settle_submission(db, id, status, result, now_ms).await)
     }
 
     fn insert_task(&self, t: &Task) -> Result<()> {
-        self.0.query(async |db| {
-            q::insert_task(
-                db,
-                q::InsertTaskParams {
-                    id: t.id.clone(),
-                    conversation_id: t.conversation_id.clone(),
-                    owner_task_id: t.owner_task_id.clone(),
-                    dedup_key: t.dedup_key.clone(),
-                    kind: t.kind.clone(),
-                    is_model_task: i64::from(t.is_model_task),
-                    status: t.status.as_str().into(),
-                    terminal_reason: t.terminal_reason.clone(),
-                    restart_count: i64::from(t.restart_count),
-                    restart_limit: i64::from(t.restart_limit),
-                    phase_name: t.phase_name.clone(),
-                    checkpoint_json: t.checkpoint.to_string(),
-                    wake_until_ms: t.wake_until_ms,
-                    wait_mode: t.wait_mode.map_or("", WaitMode::as_str).into(),
-                    wait_task_ids_json: json!(t.wait_task_ids).to_string(),
-                    wait_signal_name: t.wait_signal_name.clone(),
-                    memo_json: t.memo.to_string(),
-                    result_json: t.result.to_string(),
-                    error_text: t.error_text.clone(),
-                    created_at_ms: t.created_at_ms,
-                    updated_at_ms: t.updated_at_ms,
-                },
-            )
-            .await
-        })?;
-        Ok(())
+        self.run(async |db| ops::insert_task(db, t).await)
     }
 
     fn update_task(&self, t: &Task, now_ms: i64) -> Result<bool> {
-        let rows = self.0.query(async |db| {
-            q::update_task(
-                db,
-                q::UpdateTaskParams {
-                    status: t.status.as_str().into(),
-                    terminal_reason: t.terminal_reason.clone(),
-                    restart_count: i64::from(t.restart_count),
-                    restart_limit: i64::from(t.restart_limit),
-                    phase_name: t.phase_name.clone(),
-                    checkpoint_json: t.checkpoint.to_string(),
-                    wake_until_ms: t.wake_until_ms,
-                    wait_mode: t.wait_mode.map_or("", WaitMode::as_str).into(),
-                    wait_task_ids_json: json!(t.wait_task_ids).to_string(),
-                    wait_signal_name: t.wait_signal_name.clone(),
-                    memo_json: t.memo.to_string(),
-                    result_json: t.result.to_string(),
-                    error_text: t.error_text.clone(),
-                    updated_at_ms: now_ms,
-                    id: t.id.clone(),
-                },
-            )
-            .await
-        })?;
-        Ok(rows > 0)
+        self.run(async |db| ops::update_task(db, t, now_ms).await)
     }
 
     fn insert_signal(&self, signal: &Signal) -> Result<Signal> {
-        self.0
-            .query(async |db| {
-                q::insert_signal(
-                    db,
-                    q::InsertSignalParams {
-                        id: signal.id.clone(),
-                        task_id: signal.task_id.clone(),
-                        signal_name: signal.signal_name.clone(),
-                        signal_key: signal.signal_key.clone(),
-                        payload_json: signal.payload.to_string(),
-                        created_at_ms: signal.created_at_ms,
-                    },
-                )
-                .await
-            })?
-            .try_into()
+        self.run(async |db| ops::insert_signal(db, signal).await)
     }
 
     fn consume_first_signal(&self, task_id: &str, name: &str, now_ms: i64) -> Result<Option<Signal>> {
-        optional(self.0.query(async |db| {
-            q::consume_signal(
-                db,
-                q::ConsumeSignalParams {
-                    consumed_at_ms: now_ms,
-                    task_id: task_id.into(),
-                    signal_name: name.into(),
-                },
-            )
-            .await
-        }))?
-        .map(TryInto::try_into)
-        .transpose()
-    }
-}
-
-impl TryFrom<q::GetDocumentRow> for Document {
-    type Error = Error;
-    fn try_from(row: q::GetDocumentRow) -> Result<Self> {
-        Ok(Self {
-            scope_kind: row.scope_kind,
-            scope_id: row.scope_id,
-            doc_kind: row.doc_kind,
-            rev: row.rev,
-            state: serde_json::from_str(&row.state_json)?,
-            updated_at_ms: row.updated_at_ms,
-        })
-    }
-}
-
-impl TryFrom<q::GetConversationRow> for Conversation {
-    type Error = Error;
-    fn try_from(r: q::GetConversationRow) -> Result<Self> {
-        Ok(Self {
-            id: r.id,
-            owner_task_id: r.owner_task_id,
-            parent_id: r.parent_id,
-            fork_entry_seq: r.fork_entry_seq,
-            head_seq: r.head_seq,
-            next_seq: r.next_seq,
-            provider_affinity: r.provider_affinity,
-            metadata: serde_json::from_str(&r.metadata_json)?,
-            created_at_ms: r.created_at_ms,
-            updated_at_ms: r.updated_at_ms,
-        })
-    }
-}
-
-impl TryFrom<q::EntriesFromRow> for Entry {
-    type Error = Error;
-    fn try_from(r: q::EntriesFromRow) -> Result<Self> {
-        Ok(Self {
-            conversation_id: r.conversation_id,
-            seq: r.seq,
-            kind: r.kind,
-            payload: serde_json::from_str(&r.payload_json)?,
-            created_at_ms: r.created_at_ms,
-        })
-    }
-}
-
-impl TryFrom<q::GetSubmissionRow> for Submission {
-    type Error = Error;
-    fn try_from(r: q::GetSubmissionRow) -> Result<Self> {
-        Ok(Self {
-            id: r.id,
-            conversation_id: r.conversation_id,
-            request_id: r.request_id,
-            kind: r.kind,
-            status: r.status.parse()?,
-            payload: serde_json::from_str(&r.payload_json)?,
-            notify_task_id: r.notify_task_id,
-            result: serde_json::from_str(&r.result_json)?,
-            created_at_ms: r.created_at_ms,
-            updated_at_ms: r.updated_at_ms,
-        })
-    }
-}
-
-impl TryFrom<q::GetTaskRow> for Task {
-    type Error = Error;
-    fn try_from(r: q::GetTaskRow) -> Result<Self> {
-        Ok(Self {
-            id: r.id,
-            conversation_id: r.conversation_id,
-            owner_task_id: r.owner_task_id,
-            dedup_key: r.dedup_key,
-            kind: r.kind,
-            is_model_task: r.is_model_task != 0,
-            status: r.status.parse()?,
-            terminal_reason: r.terminal_reason,
-            restart_count: r.restart_count.try_into().map_err(|_| Error::Invalid("invalid restart count".into()))?,
-            restart_limit: r.restart_limit.try_into().map_err(|_| Error::Invalid("invalid restart limit".into()))?,
-            phase_name: r.phase_name,
-            checkpoint: serde_json::from_str(&r.checkpoint_json)?,
-            wake_until_ms: r.wake_until_ms,
-            wait_mode: if r.wait_mode.is_empty() { None } else { Some(r.wait_mode.parse()?) },
-            wait_task_ids: serde_json::from_str(&r.wait_task_ids_json)?,
-            wait_signal_name: r.wait_signal_name,
-            memo: serde_json::from_str(&r.memo_json)?,
-            result: serde_json::from_str(&r.result_json)?,
-            error_text: r.error_text,
-            created_at_ms: r.created_at_ms,
-            updated_at_ms: r.updated_at_ms,
-        })
-    }
-}
-
-impl TryFrom<q::TaskSignalsRow> for Signal {
-    type Error = Error;
-    fn try_from(r: q::TaskSignalsRow) -> Result<Self> {
-        Ok(Self {
-            id: r.id,
-            task_id: r.task_id,
-            signal_name: r.signal_name,
-            signal_key: r.signal_key,
-            payload: serde_json::from_str(&r.payload_json)?,
-            consumed: r.consumed != 0,
-            consumed_at_ms: r.consumed_at_ms,
-            created_at_ms: r.created_at_ms,
-        })
+        self.run(async |db| ops::consume_first_signal(db, task_id, name, now_ms).await)
     }
 }

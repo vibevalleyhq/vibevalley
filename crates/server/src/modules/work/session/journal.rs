@@ -615,20 +615,23 @@ impl Trajectories {
     }
 
     fn load_tail(&self, id: &str) -> Vec<SessionEvent> {
-        self.db
-            .run(async |c| super::db::list_events_tail(c, id, "", KEEP_EVENTS as i64).await)
-            .unwrap_or_default()
+        crate::modules::work::block_on(super::db::list_events_tail(self.db.read_conn(), id, "", KEEP_EVENTS as i64)).unwrap_or_default()
     }
 
     fn persist_dirty(&self, writes: Vec<(String, Vec<SessionEvent>)>) {
         if writes.is_empty() {
             return;
         }
-        if let Err(e) = self.db.run(async |c| {
-            use sqlx::Connection as _;
-            let mut tx = c.begin_with("BEGIN IMMEDIATE").await?;
+        if let Err(e) = crate::modules::work::block_on(async {
+            use sea_orm::{DatabaseBackend, SqliteTransactionMode, TransactionOptions, TransactionTrait as _};
+            let w = self.db.write_conn();
+            let opts = TransactionOptions {
+                sqlite_transaction_mode: (w.get_database_backend() == DatabaseBackend::Sqlite).then_some(SqliteTransactionMode::Immediate),
+                ..Default::default()
+            };
+            let tx = w.begin_with_options(opts).await?;
             for (id, events) in writes {
-                super::db::upsert_events(&mut tx, &id, &events).await?;
+                super::db::upsert_events(&tx, &id, &events).await?;
             }
             tx.commit().await
         }) {
@@ -695,17 +698,16 @@ impl Trajectories {
         self.flush_session(id);
         let is_open = self.open.lock().contains_key(id);
         let run_id = run.filter(|r| !r.is_empty()).unwrap_or("");
-        let (has_any, events) = self
-            .db
-            .run(async |c| {
-                let max_seq = super::db::max_event_seq(c, id).await?;
-                if max_seq < 0 && !is_open {
-                    return Ok((false, vec![]));
-                }
-                let rows = super::db::list_events_tail(c, id, run_id, 1_000_000).await?;
-                Ok((true, rows))
-            })
-            .ok()?;
+        let (has_any, events) = crate::modules::work::block_on(async {
+            let r = self.db.read_conn();
+            let max_seq = super::db::max_event_seq(r, id).await?;
+            if max_seq < 0 && !is_open {
+                return Ok::<_, sea_orm::DbErr>((false, vec![]));
+            }
+            let rows = super::db::list_events_tail(r, id, run_id, 1_000_000).await?;
+            Ok((true, rows))
+        })
+        .ok()?;
         has_any.then_some(events)
     }
 
@@ -718,18 +720,17 @@ impl Trajectories {
         let limit = input.limit.unwrap_or(200).clamp(1, 1000);
         let run_id = input.run.as_deref().unwrap_or("");
         let fetch = limit + 1;
-        let mut events = self
-            .db
-            .run(async |c| {
-                if let Some(after) = input.after_seq {
-                    super::db::list_events_after(c, &input.id, run_id, after, fetch).await
-                } else if let Some(before) = input.before_seq {
-                    super::db::list_events_before(c, &input.id, run_id, before, fetch).await
-                } else {
-                    super::db::list_events_tail(c, &input.id, run_id, fetch).await
-                }
-            })
-            .unwrap_or_default();
+        let mut events = crate::modules::work::block_on(async {
+            let r = self.db.read_conn();
+            if let Some(after) = input.after_seq {
+                super::db::list_events_after(r, &input.id, run_id, after, fetch).await
+            } else if let Some(before) = input.before_seq {
+                super::db::list_events_before(r, &input.id, run_id, before, fetch).await
+            } else {
+                super::db::list_events_tail(r, &input.id, run_id, fetch).await
+            }
+        })
+        .unwrap_or_default();
         let has_more = events.len() > limit as usize;
         if has_more {
             if input.after_seq.is_some() {
@@ -787,7 +788,7 @@ impl Trajectories {
     pub fn close(&self) {
         if let Some((cancel, handle)) = self.worker.lock().take() {
             cancel.cancel();
-            let _ = vibevalley_runtime::rt::block_on(handle);
+            let _ = crate::modules::work::block_on(handle);
         }
         self.finish_all();
     }
@@ -808,7 +809,7 @@ impl Trajectories {
             return;
         }
         self.open.lock().remove(id);
-        let _ = self.db.run(async |c| super::db::delete_events(c, id).await);
+        let _ = crate::modules::work::block_on(super::db::delete_events(self.db.write_conn(), id));
     }
 
     /// Takes one of the board's steps for session `id` working in `cwd`.
@@ -1081,7 +1082,7 @@ mod tests {
 
         tr.close_async().await;
         hub.close_async().await;
-        db.close();
+        db.close_async().await;
         assert!(
             wall_start.elapsed() < Duration::from_secs(1),
             "virtual-clock journal push & close_async must finish instantaneously, took {:?}",

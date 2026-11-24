@@ -71,11 +71,22 @@ fn single_server_db_shares_pool_wal_fk_and_reopens_cleanly() {
     let db = started.test_internals().db.clone();
     assert_eq!(db.path(), dir.path().join("server.db"));
 
-    // Verify WAL mode and foreign keys on the single shared SqlitePool.
+    // Verify WAL mode and foreign keys on the SQLite write connection.
     let (journal, fk): (String, i64) = vibevalley_runtime::rt::block_on(async {
-        let mut conn = db.pool().acquire().await.unwrap();
-        let journal: String = sqlx::query_scalar("PRAGMA journal_mode").fetch_one(&mut *conn).await.unwrap();
-        let fk: i64 = sqlx::query_scalar("PRAGMA foreign_keys").fetch_one(&mut *conn).await.unwrap();
+        use sea_orm::{ConnectionTrait, DbBackend, Statement};
+        let conn = db.write_conn();
+        let journal_row = conn
+            .query_one_raw(Statement::from_string(DbBackend::Sqlite, "PRAGMA journal_mode"))
+            .await
+            .unwrap()
+            .unwrap();
+        let journal: String = journal_row.try_get_by_index(0).unwrap();
+        let fk_row = conn
+            .query_one_raw(Statement::from_string(DbBackend::Sqlite, "PRAGMA foreign_keys"))
+            .await
+            .unwrap()
+            .unwrap();
+        let fk: i64 = fk_row.try_get_by_index(0).unwrap();
         (journal, fk)
     });
     assert_eq!(journal.to_lowercase(), "wal");

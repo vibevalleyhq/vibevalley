@@ -4,20 +4,23 @@
 
 use std::sync::Arc;
 
-use sqlx::Connection;
+use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, DbErr, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Update};
 use vibevalley_protocol::ConnectorID;
 
 use super::adapter::Inbound;
 use crate::base::ServerDb;
-use crate::db::generated::collab_connector as q;
+use crate::db::begin_write_tx;
+use crate::db::entities::collab_connector::{connector_account, connector_inbound, connector_outbox};
+use crate::modules::collab::block_on;
 use crate::modules::infra::setting::Secret;
 
 /// The database did not take a step: said as the status's error.
 #[derive(Debug, Clone)]
 pub struct StoreFailed(pub String);
 
-impl From<sqlx::Error> for StoreFailed {
-    fn from(e: sqlx::Error) -> StoreFailed {
+impl From<DbErr> for StoreFailed {
+    fn from(e: DbErr) -> StoreFailed {
         StoreFailed(e.to_string())
     }
 }
@@ -53,176 +56,194 @@ impl Store {
         Store { db }
     }
 
+    pub async fn account_async(&self, id: ConnectorID) -> Kept<Option<Account>> {
+        let row = connector_account::Entity::find_by_id(id.as_str().to_owned()).one(self.db.read_conn()).await?;
+        Ok(row.map(|a| Account {
+            keys: Secret::new(a.secrets),
+            user: a.user_id.unwrap_or_default(),
+            pair_code: a.pair_code.unwrap_or_default(),
+            cursor: a.cursor,
+            reply_context: a.reply_context.unwrap_or_default(),
+            last_inbound: a.last_inbound.unwrap_or(0),
+            paused_until: a.paused_until.unwrap_or(0),
+            connected_at: a.connected_at,
+            channel: a.channel_id.filter(|c| !c.is_empty()),
+        }))
+    }
+
     pub fn account(&self, id: ConnectorID) -> Kept<Option<Account>> {
-        match self
-            .db
-            .run(async |db| q::get_account(db, q::GetAccountParams { connector: id.as_str().into() }).await)
-        {
-            Ok(a) => Ok(Some(Account {
-                keys: Secret::new(a.secrets),
-                user: a.user_id.unwrap_or_default(),
-                pair_code: a.pair_code.unwrap_or_default(),
-                cursor: a.cursor,
-                reply_context: a.reply_context.unwrap_or_default(),
-                last_inbound: a.last_inbound.unwrap_or(0),
-                paused_until: a.paused_until.unwrap_or(0),
-                connected_at: a.connected_at,
-                channel: a.channel_id.filter(|c| !c.is_empty()),
-            })),
-            Err(sqlx::Error::RowNotFound) => Ok(None),
-            Err(error) => Err(error.into()),
-        }
+        block_on(self.account_async(id))
     }
 
     /// Replacing an account retires its queued work before reopening the bridge.
+    pub async fn connect_async(&self, id: ConnectorID, keys: &Secret, user: &str, pair_code: Option<&str>, at: i64, retired: &str) -> Kept<()> {
+        let tx = begin_write_tx(self.db.write_conn()).await?;
+        let model = connector_account::ActiveModel {
+            connector: Set(id.as_str().to_owned()),
+            secrets: Set(keys.expose().to_owned()),
+            user_id: Set(nonempty(user)),
+            pair_code: Set(pair_code.map(str::to_owned)),
+            cursor: Set(String::new()),
+            reply_context: Set(None),
+            last_inbound: Set(None),
+            paused_until: Set(None),
+            connected_at: Set(at),
+            channel_id: Set(None),
+        };
+        let on_conflict = OnConflict::column(connector_account::Column::Connector)
+            .update_columns([
+                connector_account::Column::Secrets,
+                connector_account::Column::UserId,
+                connector_account::Column::PairCode,
+            ])
+            .value(connector_account::Column::Cursor, Expr::val(""))
+            .value(connector_account::Column::ReplyContext, Expr::val(Option::<String>::None))
+            .value(connector_account::Column::LastInbound, Expr::val(Option::<i64>::None))
+            .value(connector_account::Column::PausedUntil, Expr::val(Option::<i64>::None))
+            .update_column(connector_account::Column::ConnectedAt)
+            .to_owned();
+        connector_account::Entity::insert(model)
+            .on_conflict(on_conflict)
+            .exec_without_returning(&tx)
+            .await?;
+        forget(&tx, id, retired).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    #[cfg(test)]
     pub fn connect(&self, id: ConnectorID, keys: &Secret, user: &str, pair_code: Option<&str>, at: i64, retired: &str) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
-            q::connect_account(
-                &mut *tx,
-                q::ConnectAccountParams {
-                    connector: id.as_str().into(),
-                    secrets: keys.expose().into(),
-                    user_id: nonempty(user),
-                    pair_code: pair_code.map(str::to_owned),
-                    connected_at: at,
-                },
-            )
+        block_on(self.connect_async(id, keys, user, pair_code, at, retired))
+    }
+
+    pub async fn disconnect_async(&self, id: ConnectorID, retired: &str) -> Kept<()> {
+        let tx = begin_write_tx(self.db.write_conn()).await?;
+        connector_account::Entity::delete_by_id(id.as_str().to_owned()).exec(&tx).await?;
+        forget(&tx, id, retired).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    pub async fn pause_async(&self, id: ConnectorID, until: Option<i64>) -> Kept<()> {
+        Update::many(connector_account::Entity)
+            .col_expr(connector_account::Column::PausedUntil, Expr::value(until))
+            .filter(connector_account::Column::Connector.eq(id.as_str()))
+            .exec(self.db.write_conn())
             .await?;
-            forget(&mut tx, id, retired).await?;
-            tx.commit().await
-        })?)
+        Ok(())
     }
 
-    pub fn disconnect(&self, id: ConnectorID, retired: &str) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
-            q::delete_account(&mut *tx, q::DeleteAccountParams { connector: id.as_str().into() }).await?;
-            forget(&mut tx, id, retired).await?;
-            tx.commit().await
-        })?)
-    }
-
-    pub fn pause(&self, id: ConnectorID, until: Option<i64>) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            q::pause_account(
-                db,
-                q::PauseAccountParams {
-                    connector: id.as_str().into(),
-                    paused_until: until,
-                },
-            )
-            .await
-        })?)
-    }
-
-    pub fn paired(&self, id: ConnectorID, m: &Inbound, at: i64) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
-            q::pair_account(
-                &mut *tx,
-                q::PairAccountParams {
-                    connector: id.as_str().into(),
-                    user_id: Some(m.from.clone()),
-                    reply_context: nonempty(&m.reply),
-                    last_inbound: Some(at),
-                },
-            )
+    pub async fn paired_async(&self, id: ConnectorID, m: &Inbound, at: i64) -> Kept<()> {
+        let tx = begin_write_tx(self.db.write_conn()).await?;
+        Update::many(connector_account::Entity)
+            .col_expr(connector_account::Column::UserId, Expr::value(Some(m.from.clone())))
+            .col_expr(connector_account::Column::PairCode, Expr::value(Option::<String>::None))
+            .col_expr(connector_account::Column::ReplyContext, Expr::value(nonempty(&m.reply)))
+            .col_expr(connector_account::Column::LastInbound, Expr::value(Some(at)))
+            .filter(connector_account::Column::Connector.eq(id.as_str()))
+            .exec(&tx)
             .await?;
-            q::finish_pairing(
-                &mut *tx,
-                q::FinishPairingParams {
-                    connector: id.as_str().into(),
-                    ext_id: m.id.clone(),
-                },
-            )
+        Update::many(connector_inbound::Entity)
+            .col_expr(connector_inbound::Column::Delivered, Expr::value(true))
+            .col_expr(connector_inbound::Column::Body, Expr::value(String::new()))
+            .filter(connector_inbound::Column::Connector.eq(id.as_str()))
+            .filter(connector_inbound::Column::ExtId.eq(&m.id))
+            .exec(&tx)
             .await?;
-            tx.commit().await
-        })?)
-    }
-    pub fn replied(&self, id: ConnectorID, reply: &str, at: i64) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            q::update_reply(
-                db,
-                q::UpdateReplyParams {
-                    connector: id.as_str().into(),
-                    reply_context: nonempty(reply),
-                    last_inbound: Some(at),
-                },
-            )
-            .await
-        })?)
+        tx.commit().await?;
+        Ok(())
     }
 
+    pub async fn replied_async(&self, id: ConnectorID, reply: &str, at: i64) -> Kept<()> {
+        Update::many(connector_account::Entity)
+            .col_expr(connector_account::Column::ReplyContext, Expr::value(nonempty(reply)))
+            .col_expr(connector_account::Column::LastInbound, Expr::value(Some(at)))
+            .filter(connector_account::Column::Connector.eq(id.as_str()))
+            .exec(self.db.write_conn())
+            .await?;
+        Ok(())
+    }
+
+    pub async fn set_channel_async(&self, id: ConnectorID, channel: Option<&str>) -> Kept<()> {
+        Update::many(connector_account::Entity)
+            .col_expr(connector_account::Column::ChannelId, Expr::value(channel.map(str::to_owned)))
+            .filter(connector_account::Column::Connector.eq(id.as_str()))
+            .exec(self.db.write_conn())
+            .await?;
+        Ok(())
+    }
+
+    #[cfg(test)]
     pub fn set_channel(&self, id: ConnectorID, channel: Option<&str>) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            q::set_channel(
-                db,
-                q::SetChannelParams {
-                    connector: id.as_str().into(),
-                    channel_id: channel.map(str::to_owned),
-                },
-            )
-            .await
-        })?)
+        block_on(self.set_channel_async(id, channel))
+    }
+
+    pub async fn accounts_in_async(&self, channel: &str) -> Kept<i64> {
+        let count = connector_account::Entity::find()
+            .filter(connector_account::Column::ChannelId.eq(channel))
+            .count(self.db.read_conn())
+            .await?;
+        Ok(count as i64)
     }
 
     pub fn accounts_in(&self, channel: &str) -> Kept<i64> {
-        Ok(self
-            .db
-            .run(async |db| {
-                q::accounts_in_channel(
-                    db,
-                    q::AccountsInChannelParams {
-                        channel_id: Some(channel.into()),
-                    },
-                )
-                .await
-            })?
-            .count)
+        block_on(self.accounts_in_async(channel))
     }
 
     /// Only advance the cursor after the whole batch of inbound messages is durable.
-    pub fn accept(&self, id: ConnectorID, messages: &[Inbound], cursor: &str, at: i64) -> Kept<bool> {
-        Ok(self.db.run(async |db| {
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
-            if q::account_count(&mut *tx, q::AccountCountParams { connector: id.as_str().into() }).await?.count == 0 {
-                return Ok(false);
-            }
-            for m in messages {
-                q::accept_inbound(
-                    &mut *tx,
-                    q::AcceptInboundParams {
-                        connector: id.as_str().into(),
-                        ext_id: m.id.clone(),
-                        from_id: m.from.clone(),
-                        body: m.text.clone(),
-                        reply: m.reply.clone(),
-                        quoted: m.quoted.clone(),
-                        created_at: at,
-                    },
+    pub async fn accept_async(&self, id: ConnectorID, messages: &[Inbound], cursor: &str, at: i64) -> Kept<bool> {
+        let tx = begin_write_tx(self.db.write_conn()).await?;
+        let count = connector_account::Entity::find()
+            .filter(connector_account::Column::Connector.eq(id.as_str()))
+            .count(&tx)
+            .await?;
+        if count == 0 {
+            return Ok(false);
+        }
+        for m in messages {
+            let model = connector_inbound::ActiveModel {
+                connector: Set(id.as_str().to_owned()),
+                ext_id: Set(m.id.clone()),
+                from_id: Set(m.from.clone()),
+                body: Set(m.text.clone()),
+                reply: Set(m.reply.clone()),
+                quoted: Set(m.quoted.clone()),
+                message_id: Set(None),
+                created_at: Set(at),
+                delivered: Set(false),
+                ..Default::default()
+            };
+            connector_inbound::Entity::insert(model)
+                .on_conflict(
+                    OnConflict::columns([connector_inbound::Column::Connector, connector_inbound::Column::ExtId])
+                        .do_nothing()
+                        .to_owned(),
                 )
+                .exec_without_returning(&tx)
                 .await?;
-            }
-            if !cursor.is_empty() {
-                q::update_cursor(
-                    &mut *tx,
-                    q::UpdateCursorParams {
-                        connector: id.as_str().into(),
-                        cursor: cursor.into(),
-                    },
-                )
+        }
+        if !cursor.is_empty() {
+            Update::many(connector_account::Entity)
+                .col_expr(connector_account::Column::Cursor, Expr::value(cursor.to_owned()))
+                .filter(connector_account::Column::Connector.eq(id.as_str()))
+                .exec(&tx)
                 .await?;
-            }
-            tx.commit().await?;
-            Ok(true)
-        })?)
+        }
+        tx.commit().await?;
+        Ok(true)
     }
 
-    pub fn pending_inbound(&self, id: ConnectorID) -> Kept<Vec<Inbound>> {
-        let rows = self
-            .db
-            .run(async |db| q::pending_inbound(db, q::PendingInboundParams { connector: id.as_str().into() }).await)?;
+    pub fn accept(&self, id: ConnectorID, messages: &[Inbound], cursor: &str, at: i64) -> Kept<bool> {
+        block_on(self.accept_async(id, messages, cursor, at))
+    }
+
+    pub async fn pending_inbound_async(&self, id: ConnectorID) -> Kept<Vec<Inbound>> {
+        let rows = connector_inbound::Entity::find()
+            .filter(connector_inbound::Column::Connector.eq(id.as_str()))
+            .filter(connector_inbound::Column::Delivered.eq(false))
+            .order_by_asc(connector_inbound::Column::Seq)
+            .all(self.db.read_conn())
+            .await?;
         Ok(rows
             .into_iter()
             .map(|r| Inbound {
@@ -235,43 +256,61 @@ impl Store {
             .collect())
     }
 
+    #[cfg(test)]
+    pub fn pending_inbound(&self, id: ConnectorID) -> Kept<Vec<Inbound>> {
+        block_on(self.pending_inbound_async(id))
+    }
+
+    pub async fn delivered_async(&self, id: ConnectorID, ext: &str, message: Option<&str>) -> Kept<()> {
+        Update::many(connector_inbound::Entity)
+            .col_expr(connector_inbound::Column::Delivered, Expr::value(true))
+            .col_expr(connector_inbound::Column::Body, Expr::value(String::new()))
+            .col_expr(connector_inbound::Column::MessageId, Expr::value(message.map(str::to_owned)))
+            .filter(connector_inbound::Column::Connector.eq(id.as_str()))
+            .filter(connector_inbound::Column::ExtId.eq(ext))
+            .exec(self.db.write_conn())
+            .await?;
+        Ok(())
+    }
+
+    #[cfg(test)]
     pub fn delivered(&self, id: ConnectorID, ext: &str, message: Option<&str>) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            q::mark_delivered(
-                db,
-                q::MarkDeliveredParams {
-                    connector: id.as_str().into(),
-                    ext_id: ext.into(),
-                    message_id: message.map(str::to_owned),
-                },
-            )
-            .await
-        })?)
+        block_on(self.delivered_async(id, ext, message))
     }
 
-    pub fn add_outgoing(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
-            for piece in pieces {
-                q::add_outgoing(
-                    &mut *tx,
-                    q::AddOutgoingParams {
-                        connector: id.as_str().into(),
-                        message_id: message.into(),
-                        body: piece.clone(),
-                        created_at: at,
-                    },
-                )
-                .await?;
+    pub async fn add_outgoing_async(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> Kept<()> {
+        let tx = begin_write_tx(self.db.write_conn()).await?;
+        for piece in pieces {
+            connector_outbox::ActiveModel {
+                connector: Set(id.as_str().to_owned()),
+                message_id: Set(message.to_owned()),
+                body: Set(piece.clone()),
+                state: Set("pending".to_owned()),
+                ext_id: Set(None),
+                error: Set(None),
+                created_at: Set(at),
+                sent_at: Set(None),
+                ..Default::default()
             }
-            tx.commit().await
-        })?)
+            .insert(&tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
     }
 
-    pub fn pending_outgoing(&self, id: ConnectorID) -> Kept<Vec<Outgoing>> {
-        let rows = self
-            .db
-            .run(async |db| q::pending_outgoing(db, q::PendingOutgoingParams { connector: id.as_str().into() }).await)?;
+    #[cfg(test)]
+    pub fn add_outgoing(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> Kept<()> {
+        block_on(self.add_outgoing_async(id, message, pieces, at))
+    }
+
+    pub async fn pending_outgoing_async(&self, id: ConnectorID) -> Kept<Vec<Outgoing>> {
+        let rows = connector_outbox::Entity::find()
+            .filter(connector_outbox::Column::Connector.eq(id.as_str()))
+            .filter(connector_outbox::Column::State.eq("pending"))
+            .order_by_asc(connector_outbox::Column::Seq)
+            .all(self.db.read_conn())
+            .await?;
         Ok(rows
             .into_iter()
             .map(|r| Outgoing {
@@ -282,75 +321,104 @@ impl Store {
             .collect())
     }
 
+    #[cfg(test)]
+    pub fn pending_outgoing(&self, id: ConnectorID) -> Kept<Vec<Outgoing>> {
+        block_on(self.pending_outgoing_async(id))
+    }
+
+    pub async fn count_pending_async(&self, id: ConnectorID) -> Kept<i64> {
+        let count = connector_outbox::Entity::find()
+            .filter(connector_outbox::Column::Connector.eq(id.as_str()))
+            .filter(connector_outbox::Column::State.eq("pending"))
+            .count(self.db.read_conn())
+            .await?;
+        Ok(count as i64)
+    }
+
     pub fn count_pending(&self, id: ConnectorID) -> Kept<i64> {
-        Ok(self
-            .db
-            .run(async |db| q::pending_count(db, q::PendingCountParams { connector: id.as_str().into() }).await)?
-            .count)
+        block_on(self.count_pending_async(id))
     }
 
-    pub fn withdraw(&self, message: &str) -> Kept<()> {
-        Ok(self
-            .db
-            .run(async |db| q::withdraw_outgoing(db, q::WithdrawOutgoingParams { message_id: message.into() }).await)?)
+    pub async fn withdraw_async(&self, message: &str) -> Kept<()> {
+        Update::many(connector_outbox::Entity)
+            .col_expr(connector_outbox::Column::State, Expr::value("dropped"))
+            .col_expr(connector_outbox::Column::Error, Expr::value("withdrawn"))
+            .filter(connector_outbox::Column::MessageId.eq(message))
+            .filter(connector_outbox::Column::State.eq("pending"))
+            .exec(self.db.write_conn())
+            .await?;
+        Ok(())
     }
 
-    pub fn sent(&self, rows: &[i64], at: i64, ext: &str) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
-            for seq in rows {
-                q::mark_sent(
-                    &mut *tx,
-                    q::MarkSentParams {
-                        seq: *seq,
-                        sent_at: Some(at),
-                        ext_id: nonempty(ext),
-                    },
-                )
-                .await?;
-            }
-            tx.commit().await
-        })?)
-    }
-
-    pub fn not_sent(&self, rows: &[i64], error: &str) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            for seq in rows {
-                q::mark_send_error(
-                    &mut *db,
-                    q::MarkSendErrorParams {
-                        seq: *seq,
-                        error: nonempty(error),
-                    },
-                )
-                .await?;
-            }
-            Ok(())
-        })?)
-    }
-
-    pub fn message_of_ext(&self, id: ConnectorID, ext: &str) -> Kept<Option<String>> {
-        match self.db.run(async |db| {
-            q::message_of_external(
-                db,
-                q::MessageOfExternalParams {
-                    connector: id.as_str().into(),
-                    ext_id: Some(ext.into()),
-                },
-            )
-            .await
-        }) {
-            Ok(row) => Ok(Some(row.message_id)),
-            Err(sqlx::Error::RowNotFound) => Ok(None),
-            Err(error) => Err(error.into()),
+    pub async fn sent_async(&self, rows: &[i64], at: i64, ext: &str) -> Kept<()> {
+        if rows.is_empty() {
+            return Ok(());
         }
+        let tx = begin_write_tx(self.db.write_conn()).await?;
+        Update::many(connector_outbox::Entity)
+            .col_expr(connector_outbox::Column::State, Expr::value("sent"))
+            .col_expr(connector_outbox::Column::SentAt, Expr::value(Some(at)))
+            .col_expr(connector_outbox::Column::ExtId, Expr::value(nonempty(ext)))
+            .col_expr(connector_outbox::Column::Error, Expr::value(Option::<String>::None))
+            .filter(connector_outbox::Column::Seq.is_in(rows.iter().copied()))
+            .exec(&tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
     }
 
-    pub fn prune(&self, before: i64) -> Kept<()> {
-        Ok(self.db.run(async |db| {
-            q::prune_inbound(&mut *db, q::PruneInboundParams { created_at: before }).await?;
-            q::prune_outgoing(db, q::PruneOutgoingParams { created_at: before }).await
-        })?)
+    #[cfg(test)]
+    pub fn sent(&self, rows: &[i64], at: i64, ext: &str) -> Kept<()> {
+        block_on(self.sent_async(rows, at, ext))
+    }
+
+    pub async fn not_sent_async(&self, rows: &[i64], error: &str) -> Kept<()> {
+        if rows.is_empty() {
+            return Ok(());
+        }
+        Update::many(connector_outbox::Entity)
+            .col_expr(connector_outbox::Column::Error, Expr::value(nonempty(error)))
+            .filter(connector_outbox::Column::Seq.is_in(rows.iter().copied()))
+            .exec(self.db.write_conn())
+            .await?;
+        Ok(())
+    }
+
+    pub async fn message_of_ext_async(&self, id: ConnectorID, ext: &str) -> Kept<Option<String>> {
+        if let Some(row) = connector_outbox::Entity::find()
+            .filter(connector_outbox::Column::Connector.eq(id.as_str()))
+            .filter(connector_outbox::Column::ExtId.eq(ext))
+            .one(self.db.read_conn())
+            .await?
+        {
+            return Ok(Some(row.message_id));
+        }
+        let row = connector_inbound::Entity::find()
+            .filter(connector_inbound::Column::Connector.eq(id.as_str()))
+            .filter(connector_inbound::Column::ExtId.eq(ext))
+            .filter(connector_inbound::Column::MessageId.is_not_null())
+            .one(self.db.read_conn())
+            .await?;
+        Ok(row.and_then(|r| r.message_id))
+    }
+
+    #[cfg(test)]
+    pub fn message_of_ext(&self, id: ConnectorID, ext: &str) -> Kept<Option<String>> {
+        block_on(self.message_of_ext_async(id, ext))
+    }
+
+    pub async fn prune_async(&self, before: i64) -> Kept<()> {
+        connector_inbound::Entity::delete_many()
+            .filter(connector_inbound::Column::Delivered.eq(true))
+            .filter(connector_inbound::Column::CreatedAt.lt(before))
+            .exec(self.db.write_conn())
+            .await?;
+        connector_outbox::Entity::delete_many()
+            .filter(connector_outbox::Column::State.ne("pending"))
+            .filter(connector_outbox::Column::CreatedAt.lt(before))
+            .exec(self.db.write_conn())
+            .await?;
+        Ok(())
     }
 }
 
@@ -358,16 +426,19 @@ fn nonempty(value: &str) -> Option<String> {
     (!value.is_empty()).then(|| value.to_owned())
 }
 
-async fn forget(db: &mut sqlx::SqliteConnection, id: ConnectorID, retired: &str) -> sqlx::Result<()> {
-    q::forget_inbound(&mut *db, q::ForgetInboundParams { connector: id.as_str().into() }).await?;
-    q::retire_pending(
-        db,
-        q::RetirePendingParams {
-            connector: id.as_str().into(),
-            error: Some(retired.into()),
-        },
-    )
-    .await
+async fn forget<C: ConnectionTrait>(db: &C, id: ConnectorID, retired: &str) -> Result<(), DbErr> {
+    connector_inbound::Entity::delete_many()
+        .filter(connector_inbound::Column::Connector.eq(id.as_str()))
+        .exec(db)
+        .await?;
+    Update::many(connector_outbox::Entity)
+        .col_expr(connector_outbox::Column::State, Expr::value("dropped"))
+        .col_expr(connector_outbox::Column::Error, Expr::value(Some(retired.to_owned())))
+        .filter(connector_outbox::Column::Connector.eq(id.as_str()))
+        .filter(connector_outbox::Column::State.eq("pending"))
+        .exec(db)
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]

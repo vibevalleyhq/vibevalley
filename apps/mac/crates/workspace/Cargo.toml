@@ -10,7 +10,7 @@ vibevalley-runtime = { version = "0.1.0", path = "../../../../crates/runtime" }
 vibevalley-terminal = { version = "0.1.0", path = "../terminal" }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sqlx = { workspace = true }
+sea-orm = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

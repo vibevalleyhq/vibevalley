@@ -86,7 +86,7 @@ async fn seat_orchestrator_async(chat: &Chat, agents: &Agents, agent: &vibevalle
 }
 
 fn seat_orchestrator(chat: &Chat, agents: &Agents, agent: &vibevalley_protocol::Agent) -> Result<(), ApiError> {
-    vibevalley_runtime::rt::block_on(seat_orchestrator_async(chat, agents, agent))
+    crate::modules::collab::block_on(seat_orchestrator_async(chat, agents, agent))
 }
 
 /// Async direct channel lookup/creation with a profile (by name or id).

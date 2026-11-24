@@ -25,7 +25,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 
 ## 准备
 
-1. 先跑和改动有关的最窄的检查：服务端、命令行和 `apps/mac/src` 跑 `vp run rust:check`，`apps/mac/ui` 跑 `vp run mac:check`。
+1. 先跑和改动有关的最窄的检查：服务端、命令行和 `apps/mac/src` 跑 `cargo xtask check`，`apps/mac/ui` 跑 `vp run mac:check`。
 2. `cargo build -p vibevalley-server -p vibevalley-cli`：沙箱用构建好的二进制，不替你构建。
 3. 照分册的「准备」做它要的事（构建、钥匙）。
 
@@ -56,7 +56,7 @@ description: 改完 VibeValley 的代码之后，在真的程序上验收、拿�
 - **服务端起不来或健康检查超时**：看 `server.stdout.log`、`server.stderr.log`（二进制不在、表结构对不上、端口）。脚本已经停掉它起的进程。
 - **子命令失败**：看 `command.stderr.log` 和 `command.stdout.log`；脚本不会把非零退出码改成成功。
 - **清理失败**：看 `result.json` 的 `cleanupErrors`；`stopped` 为 false 时临时目录会留着，不要当成已收拾。
-- **接口或形状对不上**：跑 `vp run protocol:check`、`vp run rust:check` 和 `vp run mac:check`；确认二进制是改完以后构建的。
+- **接口或形状对不上**：跑 `cargo xtask protocol`、`cargo xtask check` 和 `vp run mac:check`；确认二进制是改完以后构建的。
 - 各块自己的失败在分册的「出错时」。
 
 ## 收拾

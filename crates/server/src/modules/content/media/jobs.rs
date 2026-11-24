@@ -17,9 +17,10 @@ use std::sync::{Arc, OnceLock, Weak};
 use std::time::Duration;
 
 use parking_lot::{Mutex, MutexGuard};
+use sea_orm::sea_query::OnConflict;
+use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sqlx::{Connection, SqliteConnection};
 use tokio::sync::{Mutex as AsyncMutex, OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::{SharedClock, system_clock};
@@ -31,12 +32,14 @@ use vibevalley_protocol::{
     MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Millis, Preview, ops,
 };
 
+use super::Stop;
 use super::remote::{RemoteFile, RemoteState};
 use super::understanding::Authorization;
 use super::vendor::{self, Account, Moss, Outcome, Task, TaskKind};
-use super::{Stop, q};
 use crate::Hub;
 use crate::base::ServerDb;
+use crate::db::begin_write_tx;
+use crate::db::entities::content_media::media_job;
 use crate::modules::content::attachment::{ATTACHMENT_MAX, Attachments};
 use crate::modules::content::media::inputs::Inputs;
 use crate::modules::infra::http::{Fetch, Request, public_https};
@@ -622,67 +625,94 @@ impl Jobs {
         self.runs.lock()
     }
 
-    async fn read_db(db: &mut SqliteConnection, id: &str) -> Result<Option<Record>, ApiError> {
-        match q::get_job(db, q::GetJobParams { id: id.into() }).await {
-            Ok(row) => serde_json::from_str(&row.data).map(Some).map_err(storage),
-            Err(sqlx::Error::RowNotFound) => Ok(None),
-            Err(error) => Err(storage(error)),
+    async fn read_db<C: ConnectionTrait>(db: &C, id: &str) -> Result<Option<Record>, ApiError> {
+        match media_job::Entity::find_by_id(id.to_owned()).one(db).await.map_err(storage)? {
+            Some(row) => serde_json::from_str(&row.data).map(Some).map_err(storage),
+            None => Ok(None),
         }
     }
 
     pub(super) async fn found_async(&self, id: &str) -> Result<Record, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
-        Self::read_db(&mut db, id).await?.ok_or_else(|| refused("missing"))
+        Self::read_db(self.db.read_conn(), id).await?.ok_or_else(|| refused("missing"))
     }
 
-    fn decode_rows(rows: Vec<q::GetJobRow>) -> Result<Vec<Record>, ApiError> {
+    fn decode_rows(rows: Vec<media_job::Model>) -> Result<Vec<Record>, ApiError> {
         rows.into_iter().map(|row| serde_json::from_str(&row.data).map_err(storage)).collect()
     }
 
     async fn recent_async(&self) -> Result<Vec<Record>, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
-        Self::decode_rows(q::recent_jobs(&mut *db).await.map_err(storage)?)
+        let rows = media_job::Entity::find()
+            .order_by_desc(media_job::Column::CreatedAt)
+            .order_by_asc(media_job::Column::Id)
+            .limit(100)
+            .all(self.db.read_conn())
+            .await
+            .map_err(storage)?;
+        Self::decode_rows(rows)
     }
 
     async fn waiting_jobs_async(&self) -> Result<Vec<Record>, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
-        Self::decode_rows(q::waiting_jobs(&mut *db).await.map_err(storage)?)
+        let rows = media_job::Entity::find()
+            .filter(media_job::Column::Phase.is_in(["queued", "generating", "downloading"]))
+            .order_by_asc(media_job::Column::CreatedAt)
+            .order_by_asc(media_job::Column::Id)
+            .all(self.db.read_conn())
+            .await
+            .map_err(storage)?;
+        Self::decode_rows(rows)
     }
 
     async fn active_jobs_async(&self) -> Result<Vec<Record>, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
-        Self::decode_rows(q::active_jobs(&mut *db).await.map_err(storage)?)
+        let rows = media_job::Entity::find()
+            .filter(media_job::Column::Phase.is_in(["queued", "generating", "downloading", "authorized", "uploading"]))
+            .all(self.db.read_conn())
+            .await
+            .map_err(storage)?;
+        Self::decode_rows(rows)
     }
 
     pub(super) async fn authorized_jobs_async(&self) -> Result<Vec<Record>, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
-        Self::decode_rows(q::authorized_jobs(&mut *db).await.map_err(storage)?)
+        let rows = media_job::Entity::find()
+            .filter(media_job::Column::Phase.eq("authorized"))
+            .all(self.db.read_conn())
+            .await
+            .map_err(storage)?;
+        Self::decode_rows(rows)
     }
 
     pub(super) fn now_ms(&self) -> Millis {
         self.clock.now_ms()
     }
 
-    async fn save_db(db: &mut SqliteConnection, r: &mut Record, at: Millis) -> Result<(), ApiError> {
+    async fn save_db<C: ConnectionTrait>(db: &C, r: &mut Record, at: Millis) -> Result<(), ApiError> {
         r.updated_at = at;
-        q::save_job(
-            db,
-            q::SaveJobParams {
-                id: r.id().into(),
-                kind: r.ask.kind().into(),
-                phase: r.phase.as_str().into(),
-                data: serde_json::to_string(r).map_err(storage)?,
-                created_at: r.created_at,
-                updated_at: r.updated_at,
-            },
-        )
-        .await
-        .map_err(storage)
+        let model = media_job::ActiveModel {
+            id: Set(r.id().into()),
+            kind: Set(r.ask.kind().into()),
+            phase: Set(r.phase.as_str().into()),
+            data: Set(serde_json::to_string(r).map_err(storage)?),
+            created_at: Set(r.created_at),
+            updated_at: Set(r.updated_at),
+        };
+        media_job::Entity::insert(model)
+            .on_conflict(
+                OnConflict::column(media_job::Column::Id)
+                    .update_columns([media_job::Column::Phase, media_job::Column::Data, media_job::Column::UpdatedAt])
+                    .to_owned(),
+            )
+            .exec(db)
+            .await
+            .map_err(storage)?;
+        Ok(())
     }
 
-    async fn require_capacity_db(db: &mut SqliteConnection) -> Result<(), ApiError> {
-        let count = q::active_count(db).await.map_err(storage)?.total;
-        if count >= ADMITTED {
+    async fn require_capacity_db<C: ConnectionTrait>(db: &C) -> Result<(), ApiError> {
+        let count = media_job::Entity::find()
+            .filter(media_job::Column::Phase.is_in(["queued", "generating", "downloading", "authorized", "uploading"]))
+            .count(db)
+            .await
+            .map_err(storage)?;
+        if count as i64 >= ADMITTED {
             return Err(refused("busy"));
         }
         Ok(())
@@ -706,23 +736,35 @@ impl Jobs {
         if self.closed.load(Ordering::SeqCst) {
             return Ok(false);
         }
-        {
-            let mut db = self.db.write_pool().acquire().await.map_err(storage)?;
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(storage)?;
-            let Some(mut r) = Self::read_db(&mut tx, id).await? else { return Ok(false) };
+        let tx = begin_write_tx(self.db.write_conn()).await.map_err(storage)?;
+        let outcome: Result<bool, ApiError> = async {
+            let Some(mut r) = Self::read_db(&tx, id).await? else { return Ok(false) };
             if !before.contains(&r.phase) {
                 return Ok(false);
             }
             let was_active = active(r.phase);
             patch(&mut r);
             if !was_active && active(r.phase) {
-                Self::require_capacity_db(&mut tx).await?;
+                Self::require_capacity_db(&tx).await?;
             }
-            Self::save_db(&mut tx, &mut r, self.now_ms()).await?;
-            tx.commit().await.map_err(storage)?;
+            Self::save_db(&tx, &mut r, self.now_ms()).await?;
+            Ok(true)
         }
-        self.publish_async().await;
-        Ok(true)
+        .await;
+        let changed = match outcome {
+            Ok(changed) => {
+                tx.commit().await.map_err(storage)?;
+                changed
+            }
+            Err(err) => {
+                let _ = tx.rollback().await;
+                return Err(err);
+            }
+        };
+        if changed {
+            self.publish_async().await;
+        }
+        Ok(changed)
     }
 
     /// Something about the job written down, wherever it is.
@@ -739,8 +781,7 @@ impl Jobs {
 
     /// The job already under this ask's id, refused when it was asked otherwise.
     pub(super) async fn known_async(&self, ask: &Ask, alike: impl FnOnce(&Record) -> bool) -> Result<Option<Record>, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(storage)?;
-        match Self::read_db(&mut db, ask.id()).await? {
+        match Self::read_db(self.db.read_conn(), ask.id()).await? {
             Some(old) if old.ask != *ask || !alike(&old) => Err(refused("reusedId")),
             old => Ok(old),
         }
@@ -749,32 +790,50 @@ impl Jobs {
     /// A new job admitted under its id once: the same ask again is the job it made.
     pub(super) async fn admit_async(&self, mut r: Record, held: Option<Held>) -> Result<Record, ApiError> {
         self.open_for_work()?;
-        {
+        let (record, admitted) = {
             // Another worker may scan queued jobs as soon as the transaction commits.
             let _schedule = self.scheduling.lock().await;
-            let mut db = self.db.write_pool().acquire().await.map_err(storage)?;
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(storage)?;
-            if let Some(old) = Self::read_db(&mut tx, r.id()).await? {
-                if old.ask != r.ask || old.source != r.source || old.authorization.as_ref().map(|a| &a.channel) != r.authorization.as_ref().map(|a| &a.channel)
-                {
-                    return Err(refused("reusedId"));
+            let tx = begin_write_tx(self.db.write_conn()).await.map_err(storage)?;
+            let outcome: Result<(Record, bool), ApiError> = async {
+                if let Some(old) = Self::read_db(&tx, r.id()).await? {
+                    if old.ask != r.ask
+                        || old.source != r.source
+                        || old.authorization.as_ref().map(|a| &a.channel) != r.authorization.as_ref().map(|a| &a.channel)
+                    {
+                        return Err(refused("reusedId"));
+                    }
+                    return Ok((old, false));
                 }
-                return Ok(old);
+                Self::require_capacity_db(&tx).await?;
+                let ids: Vec<_> = r.input.iter().chain(&r.inputs).map(|input| input.id.clone()).collect();
+                if !ids.is_empty() {
+                    self.inputs.pin_in_async(&tx, &ids, r.id()).await?;
+                }
+                Self::save_db(&tx, &mut r, self.now_ms()).await?;
+                Ok((r, true))
             }
-            Self::require_capacity_db(&mut tx).await?;
-            let ids: Vec<_> = r.input.iter().chain(&r.inputs).map(|input| input.id.clone()).collect();
-            if !ids.is_empty() {
-                self.inputs.pin_in_async(&mut tx, &ids, r.id()).await?;
+            .await;
+            let (record, admitted) = match outcome {
+                Ok(res) => {
+                    tx.commit().await.map_err(storage)?;
+                    res
+                }
+                Err(err) => {
+                    let _ = tx.rollback().await;
+                    return Err(err);
+                }
+            };
+            if admitted && let Some(held) = held {
+                self.hold(record.id(), held);
             }
-            Self::save_db(&mut tx, &mut r, self.now_ms()).await?;
-            tx.commit().await.map_err(storage)?;
-            if let Some(held) = held {
-                self.hold(r.id(), held);
-            }
+            (record, admitted)
+        };
+        if !admitted {
+            return Ok(record);
         }
         self.publish_async().await;
         self.schedule_async().await;
-        Ok(r)
+        Ok(record)
     }
 
     pub(super) fn hold(&self, id: &str, held: Held) {
@@ -2016,22 +2075,22 @@ mod tests {
         );
         rec.phase = Phase::Generating;
         vibevalley_runtime::rt::block_on(async {
-            let mut conn = db.write_pool().acquire().await.unwrap();
-            Jobs::save_db(&mut conn, &mut rec, 1_700_000_000_000).await.unwrap();
+            Jobs::save_db(db.write_conn(), &mut rec, 1_700_000_000_000).await.unwrap();
         });
         let (tx, rx) = flume::bounded(16);
         jobs.streams.lock().insert(job_id.into(), Stream { tx, rx, claimed: false });
 
         let claim = jobs.claim(job_id).unwrap();
 
-        // Hold the sole write_pool connection on the Tokio worker while invoking `gone`:
+        // Hold the sole write connection on the Tokio worker while invoking `gone`:
         // if `gone` still called `rt::block_on(change_async)`, this would deadlock before returning.
         let jobs_async = jobs.clone();
         let db_async = db.clone();
         let hub_async = hub.clone();
         vibevalley_runtime::rt::block_on(async move {
             vibevalley_runtime::rt::spawn(async move {
-                let held_write = db_async.write_pool().acquire().await.unwrap();
+                use sea_orm::TransactionTrait;
+                let held_write = db_async.write_conn().begin().await.unwrap();
                 (claim.gone)();
                 assert!(!jobs_async.streams.lock().contains_key(job_id));
                 drop(held_write);

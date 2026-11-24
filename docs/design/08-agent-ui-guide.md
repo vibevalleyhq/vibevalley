@@ -41,7 +41,7 @@
 
 ## 8.3 状态、并发与键盘可达性
 
-1. **核心状态只读不折**：禁止在 TS 组件内部自行推算工单阶段文案、农田作物状态或帮工排队位置；缺字段时到 `crates/protocol/src/contract/` 补契约与 Rust `reduce` 后执行 `vp run protocol:ts` 重生成协议。
+1. **核心状态只读不折**：禁止在 TS 组件内部自行推算工单阶段文案、农田作物状态或帮工排队位置；缺字段时到 `crates/protocol/src/contract/` 补契约与 Rust `reduce` 后执行 `cargo xtask protocol --write` 重生成协议。
 2. **显式状态机与幂等保护**：多步弹窗、提交锁与复杂视图选择必须抽离至独立纯函数模型文件（如 `closeFlow.ts`、`draftSubmit.ts`、`libraryView.ts`），销毁动作使用 `ConfirmButton`，发消息与建单使用 `createAct` / `newSendKey` 防重放，绝不引入硬编码睡眠等待。
 3. **键盘一等可达与无障碍完备**：可点击 `<View>` 须附带 `role="button"`（或对应语义角色）、`accessibilityLabel` 与明确焦点环样式（`focus-visible:outline-2 focus-visible:outline-focus`）；新快捷键登记入 `apps/mac/ui/infra/base/shortcuts.ts` 以便 `ShortcutSheet` 自动收录，不与全局或 `Workspace` 热键冲突。
 4. **多语言不漏键**：面向用户的全部文案必须录入 `crates/i18n/locales/{zh,en}/` 词典并以 `t("key")` 调用，同时在页面中核验中英文双语长度不会挤乱排版。
@@ -51,7 +51,7 @@
 改完代码准备交付前依次确认并运行对应校验命令：
 
 - [ ] **令牌与静态护栏检查**：运行 `vpx scripts/gen/tokens.ts --check` 与 `vpx scripts/audit/ui-tokens.ts` 确认零漂移与零违规（改动 `design/tokens.json` 后先跑 `vpx scripts/gen/tokens.ts`）。
-- [ ] **页面级静态检查**：工作台修改执行 `vp run mac:check`；官网修改执行 `vp run site:check`；协议修改先跑 `vp run protocol:ts` 再验证。
+- [ ] **页面级静态检查**：工作台修改执行 `vp run mac:check`；官网修改执行 `vp run site:check`；协议修改先跑 `cargo xtask protocol --write` 再验证。
 - [ ] **词典漏翻与多余检查**：运行 `vpx scripts/gen/i18n.ts check` 确认无缺失或未用键（若改动词典则先运行 `vp run i18n:gen`）。
 - [ ] **生成产物一致性检查**：运行 `vpx scripts/gen/primitives.ts --check`（若有导出原语增删先运行 `vpx scripts/gen/primitives.ts` 刷新）。
 - [ ] **文档与术语核对**：涉及文档或规范更新时运行 `vpx scripts/docs/doc-links.ts`、`vpx scripts/docs/glossary.ts` 与 `vpx scripts/docs/stale-names.ts`。

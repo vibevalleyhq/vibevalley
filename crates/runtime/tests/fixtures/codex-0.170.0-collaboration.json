@@ -8,7 +8,7 @@
     "origin": "Isolated macOS app-server with scripted Responses on loopback, with credentials omitted and external connections denied.",
     "reread": "Fresh app-server process with networking denied; thread/resume excluded turns before thread/read of known child ids.",
     "redaction": "Preserves notification order and selected fields, substitutes thread/turn ids, omits disk paths, timestamps and token counts.",
-    "reproducer": "capture_codex_collaboration.py"
+    "reproducer": "vv_test_fixture capture_codex"
   },
   "notifications": [
     {"method":"turn/started","params":{"threadId":"root-thread","turn":{"id":"root-turn","status":"inProgress","error":null}}},

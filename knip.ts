@@ -15,8 +15,7 @@ const config: KnipConfig = {
   ignoreExportsUsedInFile: { interface: true, type: true },
   workspaces: {
     ".": {
-      // sqlc launches its plugin from YAML.
-      entry: ["scripts/*/*.ts", "scripts/gen/sqlc-rust/generate.ts"],
+      entry: ["scripts/*/*.ts"],
       project: ["scripts/**/*.ts"],
     },
     "apps/site": {

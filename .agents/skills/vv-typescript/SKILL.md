@@ -43,7 +43,7 @@ description: 在 VibeValley 里写、改、评审原生应用的页面、官网�
 
 页面收到的东西（接口的结果、帧、订阅的事件、存在本机的 JSON）都用 Zod 4 解，进门一次，门内是类型。
 
-- **类型由 Rust 的契约生成**：`shapes.gen.ts` 是生成的类型（`vp run protocol:ts`），手写的 `schema.ts` 里每个 Schema 写成 `export const Issue = z.object({ … }) satisfies Codec<T.Issue>`（`Codec<A>` 是 `z.ZodType<A, Wire<A>>`，在 `packages/protocol/src/codec.ts`），两边对不上就编不过。用 `satisfies` 而不是 `: Codec<…>`：Schema 保住自己的类型（对象的 `.shape`、`.extend`，接口的入参要拼它）。
+- **类型由 Rust 的契约生成**：`shapes.gen.ts` 是生成的类型（`cargo xtask protocol --write`），手写的 `schema.ts` 里每个 Schema 写成 `export const Issue = z.object({ … }) satisfies Codec<T.Issue>`（`Codec<A>` 是 `z.ZodType<A, Wire<A>>`，在 `packages/protocol/src/codec.ts`），两边对不上就编不过。用 `satisfies` 而不是 `: Codec<…>`：Schema 保住自己的类型（对象的 `.shape`、`.extend`，接口的入参要拼它）。
 - **可选字段用 `z.exactOptional(x)`**（仓库开着 `exactOptionalPropertyTypes`，`.optional()` 会多出 `| undefined`）。
 - **品牌主键**：门内造一个用 `packages/protocol/src/common/schema.ts` 的铸造函数（`issueId(s)`），不写 `as`。
 - **解的时候**：门口用 `X.parse(v)`（错了抛 `ZodError`，网关答 `InvalidInput`）；要自己处理错的用 `X.safeParse(v)`。不要 `as` 一个没解过的值。

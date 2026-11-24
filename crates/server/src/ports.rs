@@ -1,6 +1,9 @@
 //! Narrow spine port traits decoupling L1/L2/L3 domains without importing any
 //! concrete server domain modules.
 
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::time::Duration;
 
 use serde_json::Value;
@@ -41,6 +44,9 @@ pub trait ChannelMessageEventsPort: Send + Sync {
     fn subscribe_edited_messages(&self) -> broadcast::Receiver<ChatMessage>;
 }
 
+/// Future returning `(channel_id, message_number)` locations keyed by `message_id`.
+pub type MessageLocationsFuture<'a> = Pin<Box<dyn Future<Output = HashMap<String, (String, i64)>> + Send + 'a>>;
+
 /// Narrow channel announcement port for L2 peer domains (`content/artifact`,
 /// `content/media`, `work/issue`) so they never import `collab/channel`.
 pub trait ChannelAnnouncePort: Send + Sync {
@@ -54,6 +60,7 @@ pub trait ChannelAnnouncePort: Send + Sync {
     fn issue_thread_id(&self, issue_id: &str) -> Option<String>;
     fn say_in(&self, channel: &str, text: &str, send_key: String) -> Result<ChatMessage, ApiError>;
     fn history(&self, channel: &str, limit: i64) -> Result<Vec<ChatMessage>, ApiError>;
+    fn message_locations<'a>(&'a self, ids: &'a [String]) -> MessageLocationsFuture<'a>;
 }
 
 /// Read-only `vv://` resource reader port decoupling `team/tool` from `team/mcp`.

@@ -10,16 +10,12 @@ rust=false
 packages=false
 mac=false
 protocol=false
-sql=false
 while IFS= read -r path; do
-    case "$path" in crates/*|apps/mac/*|Cargo.*) rust=true ;; esac
+    case "$path" in crates/*|apps/mac/*|xtask/*|Cargo.*) rust=true ;; esac
     case "$path" in packages/*) packages=true ;; esac
     case "$path" in apps/mac/ui/*|packages/*) mac=true ;; esac
     case "$path" in
-        crates/vibevalley-protocol/*|crates/vibevalley-artifact/*|crates/vibevalley-pkm/*|packages/protocol/*|packages/artifact/*|packages/pkm/*|scripts/gen/goldens.sh) protocol=true ;;
-    esac
-    case "$path" in
-        sqlc.yaml|crates/*.sql|crates/*/generated/queries.rs|scripts/gen/sqlc-rust/*|scripts/release/verify-native-schema.py) sql=true ;;
+        crates/protocol/*|crates/core/src/artifact/*|crates/core/tests/artifact_golden.rs|packages/protocol/*) protocol=true ;;
     esac
 done <<PATHS
 $changed
@@ -36,13 +32,11 @@ done
 vp install --frozen-lockfile
 vp check --deny-warnings
 if "$protocol"; then
-    vp run protocol:check
-fi
-if "$sql"; then
-    vp run sql:check
+    cargo xtask protocol
 fi
 if "$rust"; then
-    vp run rust:check
+    cargo xtask check
+    cargo xtask audit
 fi
 if "$packages"; then
     vp run packages:check

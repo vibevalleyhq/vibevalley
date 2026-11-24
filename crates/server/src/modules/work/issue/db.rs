@@ -1,132 +1,192 @@
 //! Derived status and stage are rebuilt from issues and sessions, never persisted.
-use crate::modules::infra::column::{json, optional, read_json, read_word, word};
-use crate::modules::work::ledger::IssueStore;
+use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::{
+    ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, DatabaseTransaction, DbErr, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, SqliteTransactionMode, TransactionOptions, TransactionTrait, Update,
+};
 use vibevalley_protocol::Issue;
-use vibevalley_runtime::agent::durable::Sqlite;
 
-use crate::db::generated::work_issue as queries;
+use crate::db::entities::work_issue::issue;
+use crate::modules::infra::column::{db_json as json, db_word as word, read_db_json as read_json, read_db_word as read_word};
+use crate::modules::work::block_on;
+use crate::modules::work::ledger::IssueStore;
 
 pub struct SqliteIssueStore;
 
 impl IssueStore for SqliteIssueStore {
-    fn all(&self, db: &Sqlite<'_>) -> sqlx::Result<Vec<Issue>> {
-        all(db)
+    fn all(&self, db: &DatabaseConnection) -> Result<Vec<Issue>, DbErr> {
+        block_on(all(db))
     }
 
-    fn put(&self, db: &Sqlite<'_>, issue: &Issue) -> sqlx::Result<()> {
-        put(db, issue)
+    fn put(&self, tx: &DatabaseTransaction, issue: &Issue) -> Result<(), DbErr> {
+        block_on(put(tx, issue))
     }
 
-    fn remove(&self, db: &Sqlite<'_>, id: &str) -> sqlx::Result<()> {
-        remove(db, id)
+    fn remove(&self, tx: &DatabaseTransaction, id: &str) -> Result<(), DbErr> {
+        block_on(remove(tx, id))
     }
 }
 
-fn read(r: queries::ListIssuesRow) -> sqlx::Result<Issue> {
-    let mut issue = Issue::new(r.id, r.number, r.title, r.created_at);
-    issue.description = r.description;
-    issue.repo = r.repo;
-    issue.machine_id = r.machine_id;
-    issue.parent = r.parent;
-    issue.rank = r.rank;
-    issue.queued_at = r.queued_at;
-    issue.closed_at = r.closed_at;
-    issue.reviewed_at = r.reviewed_at;
-    issue.priority = read_word(r.priority)?;
-    issue.deliver = read_word(r.deliver)?;
-    issue.canceled = r.canceled.map(read_word).transpose()?;
-    issue.delivered = r.delivered.map(read_word).transpose()?;
-    issue.mandate = read_json(r.mandate)?;
-    issue.blocked_by = read_json(r.blocked_by)?;
-    issue.criteria = read_json(r.criteria)?;
-    issue.checks = read_json(r.checks)?;
-    issue.findings = read_json(r.findings)?;
-    issue.questions = read_json(r.questions)?;
-    issue.assignments = read_json(r.assignments)?;
-    issue.constraints = r.constraints.map(read_json).transpose()?;
-    issue.conflict = r.conflict.map(read_json).transpose()?;
-    issue.last_run = r.last_run.map(read_json).transpose()?;
-    issue.answer = r.answer.map(read_json).transpose()?;
-    issue.delivery_evidence = r.delivery_evidence.map(read_json).transpose()?;
-    Ok(issue)
+fn read(r: issue::Model) -> Result<Issue, DbErr> {
+    let mut item = Issue::new(r.id, r.number, r.title, r.created_at);
+    item.description = r.description;
+    item.repo = r.repo;
+    item.machine_id = r.machine_id;
+    item.parent = r.parent;
+    item.rank = r.rank;
+    item.queued_at = r.queued_at;
+    item.closed_at = r.closed_at;
+    item.reviewed_at = r.reviewed_at;
+    item.priority = read_word(r.priority)?;
+    item.deliver = read_word(r.deliver)?;
+    item.canceled = r.canceled.map(read_word).transpose()?;
+    item.delivered = r.delivered.map(read_word).transpose()?;
+    item.mandate = read_json(r.mandate)?;
+    item.blocked_by = read_json(r.blocked_by)?;
+    item.criteria = read_json(r.criteria)?;
+    item.checks = read_json(r.checks)?;
+    item.findings = read_json(r.findings)?;
+    item.questions = read_json(r.questions)?;
+    item.assignments = read_json(r.assignments)?;
+    item.constraints = r.constraints.map(read_json).transpose()?;
+    item.conflict = r.conflict.map(read_json).transpose()?;
+    item.last_run = r.last_run.map(read_json).transpose()?;
+    item.answer = r.answer.map(read_json).transpose()?;
+    item.delivery_evidence = r.delivery_evidence.map(read_json).transpose()?;
+    Ok(item)
 }
 
-pub fn all(db: &Sqlite<'_>) -> sqlx::Result<Vec<Issue>> {
-    db.query(async |c| queries::list_issues(c).await)?.into_iter().map(read).collect()
+pub async fn all<C: ConnectionTrait>(db: &C) -> Result<Vec<Issue>, DbErr> {
+    issue::Entity::find()
+        .order_by_asc(issue::Column::Number)
+        .all(db)
+        .await?
+        .into_iter()
+        .map(read)
+        .collect()
 }
 
-pub fn put(db: &Sqlite<'_>, t: &Issue) -> sqlx::Result<()> {
-    let params = queries::PutIssueParams {
-        id: t.id.clone(),
-        title: t.title.clone(),
-        description: t.description.clone(),
-        repo: t.repo.clone(),
-        machine_id: t.machine_id.clone(),
-        parent: t.parent.clone(),
-        number: t.number,
-        rank: t.rank,
-        created_at: t.created_at,
-        queued_at: t.queued_at,
-        closed_at: t.closed_at,
-        reviewed_at: t.reviewed_at,
-        priority: word(&t.priority)?,
-        deliver: word(&t.deliver)?,
-        canceled: t.canceled.as_ref().map(word).transpose()?,
-        delivered: t.delivered.as_ref().map(word).transpose()?,
-        mandate: json(&t.mandate)?,
-        blocked_by: json(&t.blocked_by)?,
-        criteria: json(&t.criteria)?,
-        checks: json(&t.checks)?,
-        findings: json(&t.findings)?,
-        questions: json(&t.questions)?,
-        assignments: json(&t.assignments)?,
-        constraints: t.constraints.as_ref().map(json).transpose()?,
-        conflict: t.conflict.as_ref().map(json).transpose()?,
-        last_run: t.last_run.as_ref().map(json).transpose()?,
-        answer: t.answer.as_ref().map(json).transpose()?,
-        delivery_evidence: t.delivery_evidence.as_ref().map(json).transpose()?,
+pub async fn put<C: ConnectionTrait>(db: &C, t: &Issue) -> Result<(), DbErr> {
+    let model = issue::ActiveModel {
+        id: Set(t.id.clone()),
+        number: Set(t.number),
+        title: Set(t.title.clone()),
+        description: Set(t.description.clone()),
+        repo: Set(t.repo.clone()),
+        machine_id: Set(t.machine_id.clone()),
+        priority: Set(word(&t.priority)?),
+        rank: Set(t.rank),
+        deliver: Set(word(&t.deliver)?),
+        parent: Set(t.parent.clone()),
+        created_at: Set(t.created_at),
+        queued_at: Set(t.queued_at),
+        closed_at: Set(t.closed_at),
+        reviewed_at: Set(t.reviewed_at),
+        canceled: Set(t.canceled.as_ref().map(word).transpose()?),
+        delivered: Set(t.delivered.as_ref().map(word).transpose()?),
+        mandate: Set(json(&t.mandate)?),
+        constraints: Set(t.constraints.as_ref().map(json).transpose()?),
+        conflict: Set(t.conflict.as_ref().map(json).transpose()?),
+        last_run: Set(t.last_run.as_ref().map(json).transpose()?),
+        answer: Set(t.answer.as_ref().map(json).transpose()?),
+        delivery_evidence: Set(t.delivery_evidence.as_ref().map(json).transpose()?),
+        queued_words: Set("[]".into()),
+        blocked_by: Set(json(&t.blocked_by)?),
+        criteria: Set(json(&t.criteria)?),
+        checks: Set(json(&t.checks)?),
+        findings: Set(json(&t.findings)?),
+        questions: Set(json(&t.questions)?),
+        assignments: Set(json(&t.assignments)?),
     };
-    db.query(async |c| queries::put_issue(c, params).await)
+    let on_conflict = OnConflict::column(issue::Column::Id)
+        .update_columns([
+            issue::Column::Number,
+            issue::Column::Title,
+            issue::Column::Description,
+            issue::Column::Repo,
+            issue::Column::MachineId,
+            issue::Column::Priority,
+            issue::Column::Rank,
+            issue::Column::Deliver,
+            issue::Column::Parent,
+            issue::Column::CreatedAt,
+            issue::Column::QueuedAt,
+            issue::Column::ClosedAt,
+            issue::Column::ReviewedAt,
+            issue::Column::Canceled,
+            issue::Column::Delivered,
+            issue::Column::Mandate,
+            issue::Column::Constraints,
+            issue::Column::Conflict,
+            issue::Column::LastRun,
+            issue::Column::Answer,
+            issue::Column::DeliveryEvidence,
+            issue::Column::BlockedBy,
+            issue::Column::Criteria,
+            issue::Column::Checks,
+            issue::Column::Findings,
+            issue::Column::Questions,
+            issue::Column::Assignments,
+        ])
+        .to_owned();
+    issue::Entity::insert(model).on_conflict(on_conflict).exec(db).await?;
+    Ok(())
 }
 
-pub fn remove(db: &Sqlite<'_>, id: &str) -> sqlx::Result<()> {
-    db.query(async |c| queries::delete_issue(c, queries::DeleteIssueParams { id: id.into() }).await)
+pub async fn remove<C: ConnectionTrait>(db: &C, id: &str) -> Result<(), DbErr> {
+    issue::Entity::delete_by_id(id.to_owned()).exec(db).await?;
+    Ok(())
 }
 
-pub fn keep_words(db: &Sqlite<'_>, issue: &str, words: &str) -> sqlx::Result<()> {
-    db.query(async |c| {
-        let Some(row) = optional(queries::get_issue_queued_words(&mut *c, queries::GetIssueQueuedWordsParams { id: issue.into() }).await)? else {
-            return Ok(());
-        };
-        let mut kept: Vec<String> = read_json(row.queued_words)?;
-        kept.push(words.to_string());
-        queries::set_issue_queued_words(
-            c,
-            queries::SetIssueQueuedWordsParams {
-                id: issue.into(),
-                queued_words: json(&kept)?,
-            },
-        )
-        .await
-    })
+fn immediate_opts(db: &DatabaseConnection) -> TransactionOptions {
+    TransactionOptions {
+        sqlite_transaction_mode: (db.get_database_backend() == DatabaseBackend::Sqlite).then_some(SqliteTransactionMode::Immediate),
+        ..Default::default()
+    }
 }
 
-pub fn take_words(db: &Sqlite<'_>, issue: &str) -> sqlx::Result<Vec<String>> {
-    db.query(async |c| {
-        let Some(row) = optional(queries::get_issue_queued_words(&mut *c, queries::GetIssueQueuedWordsParams { id: issue.into() }).await)? else {
-            return Ok(Vec::new());
-        };
-        let kept: Vec<String> = read_json(row.queued_words)?;
-        if !kept.is_empty() {
-            queries::set_issue_queued_words(
-                c,
-                queries::SetIssueQueuedWordsParams {
-                    id: issue.into(),
-                    queued_words: "[]".into(),
-                },
-            )
+pub async fn keep_words(db: &DatabaseConnection, issue_id: &str, words: &str) -> Result<(), DbErr> {
+    let txn = db.begin_with_options(immediate_opts(db)).await?;
+    let Some(raw) = issue::Entity::find_by_id(issue_id.to_owned())
+        .select_only()
+        .column(issue::Column::QueuedWords)
+        .into_tuple::<String>()
+        .one(&txn)
+        .await?
+    else {
+        txn.commit().await?;
+        return Ok(());
+    };
+    let mut kept: Vec<String> = read_json(raw)?;
+    kept.push(words.to_string());
+    Update::many(issue::Entity)
+        .col_expr(issue::Column::QueuedWords, Expr::value(json(&kept)?))
+        .filter(issue::Column::Id.eq(issue_id))
+        .exec(&txn)
+        .await?;
+    txn.commit().await
+}
+
+pub async fn take_words(db: &DatabaseConnection, issue_id: &str) -> Result<Vec<String>, DbErr> {
+    let txn = db.begin_with_options(immediate_opts(db)).await?;
+    let Some(raw) = issue::Entity::find_by_id(issue_id.to_owned())
+        .select_only()
+        .column(issue::Column::QueuedWords)
+        .into_tuple::<String>()
+        .one(&txn)
+        .await?
+    else {
+        txn.commit().await?;
+        return Ok(Vec::new());
+    };
+    let kept: Vec<String> = read_json(raw)?;
+    if !kept.is_empty() {
+        Update::many(issue::Entity)
+            .col_expr(issue::Column::QueuedWords, Expr::value("[]"))
+            .filter(issue::Column::Id.eq(issue_id))
+            .exec(&txn)
             .await?;
-        }
-        Ok(kept)
-    })
+    }
+    txn.commit().await?;
+    Ok(kept)
 }

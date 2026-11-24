@@ -208,7 +208,7 @@ impl Pulls {
 
     /// Sync shim for synchronous callers (e.g. `team/tool/issue`).
     pub fn publish(&self, req: &SubmitBranch, issue_id: Option<&str>) -> Result<BranchPublication, ApiError> {
-        vibevalley_runtime::rt::block_on(self.publish_async(req, issue_id))
+        crate::modules::work::block_on(self.publish_async(req, issue_id))
     }
 
     /// Fetches a GitHub pull request snapshot (`checks`, `reviews`, `comments`).
@@ -219,7 +219,7 @@ impl Pulls {
 
     /// Sync shim for synchronous callers (e.g. `team/mcp/resource`).
     pub fn snapshot(&self, repo: &str, number: i64) -> Result<GitHubPullSnapshot, ApiError> {
-        vibevalley_runtime::rt::block_on(self.snapshot_async(repo, number))
+        crate::modules::work::block_on(self.snapshot_async(repo, number))
     }
 
     pub async fn refresh_async(&self) {

@@ -52,8 +52,10 @@ impl Sessions {
                         super::delivery::bind(tx, &mut run, &sub)?;
                     }
                 }
-                super::db::put_run(tx.connection(), &run)?;
-                super::db::put_extra(tx.connection(), session, &extra)?;
+                crate::modules::work::block_on(async {
+                    super::db::put_run(tx.transaction(), &run).await?;
+                    super::db::put_extra(tx.transaction(), session, &extra).await
+                })?;
                 Ok(())
             })?;
             extras.insert(session.into(), extra);
@@ -68,15 +70,15 @@ impl Sessions {
         let mut extra = extras.get(session).cloned().unwrap_or_default();
         let Some(id) = extra.run.take() else { return Ok(()) };
         self.0.durable.write(|tx| {
-            if let Some(mut run) = super::db::run(tx.connection(), &id)? {
+            if let Some(mut run) = crate::modules::work::block_on(super::db::run(tx.transaction(), &id))? {
                 run.ended_at = Some(now());
                 run.outcome = Some(outcome);
                 run.summary = summary.into();
                 run.spent = spent;
-                super::db::put_run(tx.connection(), &run)?;
+                crate::modules::work::block_on(super::db::put_run(tx.transaction(), &run))?;
                 super::delivery::settle_run(tx, &run)?;
             }
-            super::db::put_extra(tx.connection(), session, &extra)?;
+            crate::modules::work::block_on(super::db::put_extra(tx.transaction(), session, &extra))?;
             Ok(())
         })?;
         extras.insert(session.into(), extra);
@@ -87,6 +89,6 @@ impl Sessions {
 
     /// The issue's runs, oldest first.
     pub fn runs(&self, issue: &str) -> Result<Vec<Run>> {
-        self.0.ledger.database(|db| super::db::runs(db, issue))
+        self.0.ledger.read_db(async |db| super::db::runs(db, issue).await)
     }
 }

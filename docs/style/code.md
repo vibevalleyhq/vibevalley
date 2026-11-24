@@ -1,6 +1,6 @@
 # 代码风格
 
-TypeScript 的页面（`apps/mac/ui`）、官网、共用包和它们的测试照这一篇写；Rust（`crates/`、`apps/mac`）的格式与 lint 交给 `cargo fmt` 和 clippy（`vp run rust:check`），叫法、注释与「没有值」的道理一样（Rust 里没有就是 `Option`）。格式交给工具，本篇管工具管不到的：用什么叫法、注释写什么；名字怎么起见 [naming.md](docs/style/naming.md)。
+TypeScript 的页面（`apps/mac/ui`）、官网、共用包和它们的测试照这一篇写；Rust（`crates/`、`apps/mac`、`xtask`）的格式与 lint 交给 `cargo fmt` 和 clippy（`cargo xtask check`），叫法、注释与「没有值」的道理一样（Rust 里没有就是 `Option`）。格式交给工具，本篇管工具管不到的：用什么叫法、注释写什么；名字怎么起见 [naming.md](docs/style/naming.md)。
 
 ## 格式
 

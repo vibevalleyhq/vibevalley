@@ -1,0 +1,2052 @@
+use sea_orm_migration::{prelude::*, schema::*};
+
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[derive(DeriveIden)]
+enum SeqCounter {
+    Table,
+    Name,
+    LastNumber,
+}
+
+#[derive(DeriveIden)]
+enum Issue {
+    Table,
+    Id,
+    Number,
+    Title,
+    Description,
+    Repo,
+    MachineId,
+    Priority,
+    Rank,
+    Deliver,
+    Parent,
+    CreatedAt,
+    QueuedAt,
+    ClosedAt,
+    ReviewedAt,
+    Canceled,
+    Delivered,
+    Mandate,
+    Constraints,
+    Conflict,
+    LastRun,
+    Answer,
+    DeliveryEvidence,
+    QueuedWords,
+    BlockedBy,
+    Criteria,
+    Checks,
+    Findings,
+    Questions,
+    Assignments,
+}
+
+#[derive(DeriveIden)]
+#[allow(clippy::enum_variant_names)]
+enum Session {
+    Table,
+    Id,
+    Controller,
+    Role,
+    Name,
+    Profile,
+    Runtime,
+    Brief,
+    Cwd,
+    Policy,
+    Bindings,
+    HiredAt,
+    Runs,
+    LastRun,
+    Spent,
+    ToolConnections,
+    Machine,
+    Phase,
+    Departed,
+    Title,
+    Model,
+    Effort,
+    PermissionMode,
+    AgentSession,
+    Base,
+    Run,
+}
+
+#[derive(DeriveIden)]
+enum SessionRun {
+    Table,
+    Id,
+    Session,
+    Issue,
+    TriggeredBy,
+    Heard,
+    StartedAt,
+    EndedAt,
+    Outcome,
+    Summary,
+    Spent,
+    SubagentSummary,
+}
+
+#[derive(DeriveIden)]
+enum SessionMailbox {
+    Table,
+    Id,
+    SessionId,
+    IdempotencyKey,
+    Source,
+    SourceMessageId,
+    Payload,
+    Status,
+    CreatedAt,
+    UpdatedAt,
+    Result,
+}
+
+#[derive(DeriveIden)]
+enum SessionEvent {
+    Table,
+    SessionId,
+    Seq,
+    RunId,
+    Payload,
+}
+
+#[derive(DeriveIden)]
+enum Cron {
+    Table,
+    Id,
+    Name,
+    Body,
+    ChannelId,
+    Agent,
+    Repo,
+    IssueId,
+    Spec,
+    Tz,
+    Enabled,
+    CreatedAt,
+    LastRun,
+    SetBy,
+    Pending,
+}
+
+#[derive(DeriveIden)]
+enum Pull {
+    Table,
+    Id,
+    Platform,
+    Repo,
+    Number,
+    Url,
+    Branch,
+    Base,
+    State,
+    IssueId,
+    CheckFingerprint,
+    CheckRevision,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum PullEvent {
+    Table,
+    PullId,
+    Key,
+    BotRoundKey,
+    BotRound,
+}
+
+#[derive(DeriveIden)]
+enum ChannelParticipant {
+    Table,
+    Id,
+    Kind,
+    Name,
+    AgentId,
+    HomeId,
+    JoinedAt,
+    LeftAt,
+}
+
+#[derive(DeriveIden)]
+enum Channel {
+    Table,
+    Id,
+    Type,
+    IsDefault,
+    RootId,
+    RootNumber,
+    SubjectKind,
+    SubjectId,
+    LastNumber,
+    ReplyCount,
+    CreatedAt,
+    Name,
+    Description,
+    Repo,
+    ParentId,
+    PeerId,
+    Revision,
+    Category,
+    Position,
+    ArchivedAt,
+    Notify,
+}
+
+#[derive(DeriveIden)]
+enum ChannelMessage {
+    Table,
+    Id,
+    ChannelId,
+    Number,
+    SenderId,
+    Kind,
+    Body,
+    Meta,
+    SystemCode,
+    SendKey,
+    CreatedAt,
+    Revision,
+    ReplyNumber,
+    EditedAt,
+    DeletedAt,
+    PinnedAt,
+    Reactions,
+}
+
+#[derive(DeriveIden)]
+enum ChannelMention {
+    Table,
+    MessageId,
+    TargetId,
+    Resolved,
+}
+
+#[derive(DeriveIden)]
+enum ChannelMember {
+    Table,
+    ChannelId,
+    ParticipantId,
+    Reason,
+    FromNumber,
+    LeftAt,
+}
+
+#[derive(DeriveIden)]
+enum ChannelReadCursor {
+    Table,
+    ParticipantId,
+    ChannelId,
+    ReadNumber,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum ChannelSeen {
+    Table,
+    ParticipantId,
+    MessageId,
+    SeenAt,
+}
+
+#[derive(DeriveIden)]
+enum ChannelEvent {
+    Table,
+    Seq,
+    Kind,
+    ChannelId,
+    MessageId,
+    At,
+}
+
+#[derive(DeriveIden)]
+enum ChannelDelivery {
+    Table,
+    Id,
+    MessageId,
+    ChannelId,
+    RecipientKind,
+    RecipientId,
+    Reason,
+    Wakes,
+    HeldBy,
+    Status,
+    CreatedAt,
+    SettledAt,
+}
+
+#[derive(DeriveIden)]
+enum ConnectorAccount {
+    Table,
+    Connector,
+    Secrets,
+    UserId,
+    PairCode,
+    Cursor,
+    ReplyContext,
+    LastInbound,
+    PausedUntil,
+    ConnectedAt,
+    ChannelId,
+}
+
+#[derive(DeriveIden)]
+enum ConnectorInbound {
+    Table,
+    Seq,
+    Connector,
+    ExtId,
+    FromId,
+    Body,
+    Reply,
+    Quoted,
+    MessageId,
+    CreatedAt,
+    Delivered,
+}
+
+#[derive(DeriveIden)]
+enum ConnectorOutbox {
+    Table,
+    Seq,
+    Connector,
+    MessageId,
+    Body,
+    State,
+    ExtId,
+    Error,
+    CreatedAt,
+    SentAt,
+}
+
+#[derive(DeriveIden)]
+enum Attachment {
+    Table,
+    Id,
+    Name,
+    Type,
+    Size,
+    CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum MediaLibraryItem {
+    Table,
+    AttachmentId,
+    Kind,
+    Origin,
+    AddedAt,
+    LastAt,
+    SourceJobId,
+    RemovedAt,
+}
+
+#[derive(DeriveIden)]
+enum MediaInput {
+    Table,
+    Id,
+    Metadata,
+    Size,
+    Phase,
+    Hash,
+    CreatedAt,
+    ExpiresAt,
+}
+
+#[derive(DeriveIden)]
+enum MediaInputPin {
+    Table,
+    InputId,
+    Holder,
+}
+
+#[derive(DeriveIden)]
+enum MediaJob {
+    Table,
+    Id,
+    Kind,
+    Phase,
+    Data,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+#[allow(clippy::enum_variant_names)]
+enum Artifact {
+    Table,
+    Id,
+    Title,
+    Body,
+    ArtifactType,
+    IsDefault,
+    Display,
+    ChannelId,
+    MessageId,
+    Issue,
+    ById,
+    ByName,
+    Version,
+    Seq,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum ArtifactVersion {
+    Table,
+    ArtifactId,
+    Version,
+    AttachmentId,
+    Size,
+    Note,
+    ById,
+    ByName,
+    MessageId,
+    CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum ArtifactBlock {
+    Table,
+    Id,
+    ArtifactId,
+    ParentId,
+    OrderKey,
+    Type,
+    Attrs,
+    Spans,
+    Rev,
+    Deleted,
+    UpdatedBy,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum ArtifactBlockRevision {
+    Table,
+    Id,
+    BlockId,
+    Rev,
+    Spans,
+    Actor,
+    Kind,
+    CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum ArtifactChange {
+    Table,
+    ArtifactId,
+    Seq,
+    Kind,
+    BatchId,
+    Actor,
+    Targets,
+    Payload,
+    CreatedAt,
+}
+
+#[derive(DeriveIden)]
+enum ArtifactSuggestion {
+    Table,
+    Id,
+    ArtifactId,
+    BlockId,
+    Author,
+    Origin,
+    AtRev,
+    Change,
+    CursorStart,
+    CursorEnd,
+    StartOffset,
+    EndOffset,
+    AnchorText,
+    ReplacementText,
+    Status,
+    CreatedAt,
+    ResolvedAt,
+    ResolvedBy,
+}
+
+#[derive(DeriveIden)]
+enum ArtifactEntry {
+    Table,
+    ArtifactId,
+    Path,
+    Kind,
+    Mime,
+    Value,
+    AttachmentId,
+    Size,
+    Rev,
+    UpdatedBy,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum ArtifactCollab {
+    Table,
+    ArtifactId,
+    Snapshot,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum Memory {
+    Table,
+    Id,
+    Agent,
+    Kind,
+    Body,
+    Repo,
+    Session,
+    Author,
+    CreatedAt,
+    UpdatedAt,
+    Recalled,
+    RecalledAt,
+}
+
+#[derive(DeriveIden)]
+enum RemoteConfig {
+    Table,
+    Id,
+    Enabled,
+    BindAddr,
+    Port,
+    UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum RemoteDevice {
+    Table,
+    Id,
+    Name,
+    Platform,
+    TokenHash,
+    Scope,
+    CreatedAt,
+    LastSeenAt,
+    RevokedAt,
+}
+
+async fn create_shared(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .create_table(
+            Table::create()
+                .table(SeqCounter::Table)
+                .if_not_exists()
+                .col(text(SeqCounter::Name).primary_key())
+                .col(big_integer(SeqCounter::LastNumber))
+                .to_owned(),
+        )
+        .await
+}
+
+async fn create_work_issue(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .create_table(
+            Table::create()
+                .table(Issue::Table)
+                .if_not_exists()
+                .col(text(Issue::Id).primary_key())
+                .col(big_integer_uniq(Issue::Number))
+                .col(text(Issue::Title))
+                .col(text(Issue::Description))
+                .col(text_null(Issue::Repo))
+                .col(text_null(Issue::MachineId))
+                .col(text(Issue::Priority))
+                .col(big_integer_null(Issue::Rank))
+                .col(text(Issue::Deliver))
+                .col(text_null(Issue::Parent))
+                .col(big_integer(Issue::CreatedAt))
+                .col(big_integer_null(Issue::QueuedAt))
+                .col(big_integer_null(Issue::ClosedAt))
+                .col(big_integer_null(Issue::ReviewedAt))
+                .col(text_null(Issue::Canceled))
+                .col(text_null(Issue::Delivered))
+                .col(text(Issue::Mandate))
+                .col(text_null(Issue::Constraints))
+                .col(text_null(Issue::Conflict))
+                .col(text_null(Issue::LastRun))
+                .col(text_null(Issue::Answer))
+                .col(text_null(Issue::DeliveryEvidence))
+                .col(text(Issue::QueuedWords).default("[]"))
+                .col(text(Issue::BlockedBy))
+                .col(text(Issue::Criteria))
+                .col(text(Issue::Checks))
+                .col(text(Issue::Findings))
+                .col(text(Issue::Questions))
+                .col(text(Issue::Assignments))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("issue_parent")
+                .table(Issue::Table)
+                .col(Issue::Parent)
+                .to_owned(),
+        )
+        .await
+}
+
+async fn create_work_session(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .create_table(
+            Table::create()
+                .table(Session::Table)
+                .if_not_exists()
+                .col(text(Session::Id).primary_key())
+                .col(text(Session::Controller))
+                .col(text_null(Session::Role))
+                .col(text(Session::Name))
+                .col(text_null(Session::Profile))
+                .col(text(Session::Runtime))
+                .col(text(Session::Brief))
+                .col(text_null(Session::Cwd))
+                .col(text(Session::Policy))
+                .col(text(Session::Bindings))
+                .col(big_integer(Session::HiredAt))
+                .col(big_integer(Session::Runs))
+                .col(text_null(Session::LastRun))
+                .col(text_null(Session::Spent))
+                .col(text_null(Session::ToolConnections))
+                .col(text_null(Session::Machine))
+                .col(text(Session::Phase))
+                .col(boolean(Session::Departed).default(false))
+                .col(text_null(Session::Title))
+                .col(text_null(Session::Model))
+                .col(text_null(Session::Effort))
+                .col(text_null(Session::PermissionMode))
+                .col(text_null(Session::AgentSession))
+                .col(text_null(Session::Base))
+                .col(text_null(Session::Run))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("session_departed")
+                .table(Session::Table)
+                .col(Session::Departed)
+                .col(Session::HiredAt)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(SessionRun::Table)
+                .if_not_exists()
+                .col(text(SessionRun::Id).primary_key())
+                .col(text(SessionRun::Session))
+                .col(text_null(SessionRun::Issue))
+                .col(text(SessionRun::TriggeredBy))
+                .col(text(SessionRun::Heard))
+                .col(big_integer(SessionRun::StartedAt))
+                .col(big_integer_null(SessionRun::EndedAt))
+                .col(text_null(SessionRun::Outcome))
+                .col(text(SessionRun::Summary))
+                .col(text_null(SessionRun::Spent))
+                .col(text_null(SessionRun::SubagentSummary))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("session_run_issue")
+                .table(SessionRun::Table)
+                .col(SessionRun::Issue)
+                .col(SessionRun::StartedAt)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("session_run_session")
+                .table(SessionRun::Table)
+                .col(SessionRun::Session)
+                .col((SessionRun::StartedAt, IndexOrder::Desc))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(SessionMailbox::Table)
+                .if_not_exists()
+                .col(big_pk_auto(SessionMailbox::Id))
+                .col(text(SessionMailbox::SessionId))
+                .col(text_uniq(SessionMailbox::IdempotencyKey))
+                .col(text(SessionMailbox::Source))
+                .col(text_null(SessionMailbox::SourceMessageId))
+                .col(text(SessionMailbox::Payload))
+                .col(text(SessionMailbox::Status))
+                .col(big_integer(SessionMailbox::CreatedAt))
+                .col(big_integer(SessionMailbox::UpdatedAt))
+                .col(text_null(SessionMailbox::Result))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("session_mailbox_pending")
+                .table(SessionMailbox::Table)
+                .col(SessionMailbox::SessionId)
+                .col(SessionMailbox::Status)
+                .col(SessionMailbox::Id)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("session_mailbox_source_message")
+                .table(SessionMailbox::Table)
+                .col(SessionMailbox::SourceMessageId)
+                .col(SessionMailbox::Status)
+                .and_where(Expr::col(SessionMailbox::SourceMessageId).is_not_null())
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(SessionEvent::Table)
+                .if_not_exists()
+                .col(text(SessionEvent::SessionId))
+                .col(big_integer(SessionEvent::Seq))
+                .col(text_null(SessionEvent::RunId))
+                .col(text(SessionEvent::Payload))
+                .primary_key(Index::create().col(SessionEvent::SessionId).col(SessionEvent::Seq))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("session_event_run")
+                .table(SessionEvent::Table)
+                .col(SessionEvent::SessionId)
+                .col(SessionEvent::RunId)
+                .col(SessionEvent::Seq)
+                .to_owned(),
+        )
+        .await
+}
+
+async fn create_work_cron_and_pull(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .create_table(
+            Table::create()
+                .table(Cron::Table)
+                .if_not_exists()
+                .col(text(Cron::Id).primary_key())
+                .col(text(Cron::Name))
+                .col(text(Cron::Body))
+                .col(text(Cron::ChannelId))
+                .col(text_null(Cron::Agent))
+                .col(text_null(Cron::Repo))
+                .col(text_null(Cron::IssueId))
+                .col(text(Cron::Spec))
+                .col(text(Cron::Tz))
+                .col(boolean(Cron::Enabled).default(true))
+                .col(big_integer(Cron::CreatedAt))
+                .col(big_integer_null(Cron::LastRun))
+                .col(
+                    text(Cron::SetBy)
+                        .default("user")
+                        .check(Expr::col(Cron::SetBy).is_in(["user", "agent", "system"])),
+                )
+                .col(boolean(Cron::Pending).default(false))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(Cron::Table, Cron::IssueId)
+                        .to(Issue::Table, Issue::Id)
+                        .on_delete(ForeignKeyAction::SetNull),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("cron_by_channel")
+                .table(Cron::Table)
+                .col(Cron::ChannelId)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("cron_by_issue")
+                .table(Cron::Table)
+                .col(Cron::IssueId)
+                .and_where(Expr::col(Cron::IssueId).is_not_null())
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(Pull::Table)
+                .if_not_exists()
+                .col(text(Pull::Id).primary_key())
+                .col(text(Pull::Platform).check(Expr::col(Pull::Platform).is_in(["github", "gitlab"])))
+                .col(text(Pull::Repo))
+                .col(big_integer(Pull::Number))
+                .col(text(Pull::Url))
+                .col(text(Pull::Branch).default(""))
+                .col(text(Pull::Base).default(""))
+                .col(text(Pull::State).check(Expr::col(Pull::State).is_in(["open", "merged", "closed"])))
+                .col(text_null(Pull::IssueId))
+                .col(text(Pull::CheckFingerprint).default(""))
+                .col(big_integer(Pull::CheckRevision).default(0))
+                .col(big_integer(Pull::CreatedAt))
+                .col(big_integer(Pull::UpdatedAt))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(Pull::Table, Pull::IssueId)
+                        .to(Issue::Table, Issue::Id)
+                        .on_delete(ForeignKeyAction::SetNull),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("pull_repo_number_uidx")
+                .table(Pull::Table)
+                .col(Pull::Repo)
+                .col(Pull::Number)
+                .unique()
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("pull_by_issue")
+                .table(Pull::Table)
+                .col(Pull::IssueId)
+                .and_where(Expr::col(Pull::IssueId).is_not_null())
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("pull_by_state")
+                .table(Pull::Table)
+                .col(Pull::State)
+                .and_where(Expr::col(Pull::State).eq("open"))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(PullEvent::Table)
+                .if_not_exists()
+                .col(text(PullEvent::PullId))
+                .col(text(PullEvent::Key))
+                .col(text_null(PullEvent::BotRoundKey))
+                .col(big_integer_null(PullEvent::BotRound))
+                .primary_key(Index::create().col(PullEvent::PullId).col(PullEvent::Key))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(PullEvent::Table, PullEvent::PullId)
+                        .to(Pull::Table, Pull::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await
+}
+
+async fn create_collab_channel(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .create_table(
+            Table::create()
+                .table(ChannelParticipant::Table)
+                .if_not_exists()
+                .col(text(ChannelParticipant::Id).primary_key())
+                .col(text(ChannelParticipant::Kind).check(Expr::col(ChannelParticipant::Kind).is_in(["user", "agent", "system"])))
+                .col(text(ChannelParticipant::Name))
+                .col(text_null(ChannelParticipant::AgentId))
+                .col(text_null(ChannelParticipant::HomeId))
+                .col(big_integer(ChannelParticipant::JoinedAt))
+                .col(big_integer_null(ChannelParticipant::LeftAt))
+                .check(
+                    Expr::col(ChannelParticipant::Kind)
+                        .eq("agent")
+                        .or(Expr::col(ChannelParticipant::AgentId).is_null()),
+                )
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(Channel::Table)
+                .if_not_exists()
+                .col(text(Channel::Id).primary_key())
+                .col(text(Channel::Type).check(Expr::col(Channel::Type).is_in(["channel", "direct", "thread"])))
+                .col(boolean(Channel::IsDefault).default(false))
+                .col(text_null(Channel::RootId).unique_key())
+                .col(big_integer_null(Channel::RootNumber))
+                .col(text_null(Channel::SubjectKind).check(Expr::col(Channel::SubjectKind).is_in(["issue", "talk"])))
+                .col(text_null(Channel::SubjectId))
+                .col(big_integer_null(Channel::LastNumber))
+                .col(big_integer(Channel::ReplyCount).default(0))
+                .col(big_integer(Channel::CreatedAt))
+                .col(text_null(Channel::Name))
+                .col(text_null(Channel::Description))
+                .col(text_null(Channel::Repo))
+                .col(text_null(Channel::ParentId))
+                .col(text_null(Channel::PeerId).unique_key())
+                .col(big_integer(Channel::Revision).default(0))
+                .col(text_null(Channel::Category))
+                .col(big_integer_null(Channel::Position))
+                .col(big_integer_null(Channel::ArchivedAt))
+                .col(
+                    text(Channel::Notify)
+                        .default("all")
+                        .check(Expr::col(Channel::Notify).is_in(["all", "mentions", "none"])),
+                )
+                .foreign_key(ForeignKey::create().from(Channel::Table, Channel::ParentId).to(Channel::Table, Channel::Id))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(Channel::Table, Channel::PeerId)
+                        .to(ChannelParticipant::Table, ChannelParticipant::Id),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_by_name")
+                .table(Channel::Table)
+                .col(Channel::Name)
+                .unique()
+                .and_where(Expr::col(Channel::Name).is_not_null())
+                .and_where(Expr::col(Channel::Type).ne("thread"))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_by_subject")
+                .table(Channel::Table)
+                .col(Channel::SubjectKind)
+                .col(Channel::SubjectId)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_one_default")
+                .table(Channel::Table)
+                .col(Channel::IsDefault)
+                .unique()
+                .and_where(Expr::col(Channel::IsDefault).eq(true))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_by_parent")
+                .table(Channel::Table)
+                .col(Channel::ParentId)
+                .and_where(Expr::col(Channel::ParentId).is_not_null())
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ChannelMessage::Table)
+                .if_not_exists()
+                .col(text(ChannelMessage::Id).primary_key())
+                .col(text(ChannelMessage::ChannelId))
+                .col(big_integer(ChannelMessage::Number))
+                .col(text(ChannelMessage::SenderId))
+                .col(text(ChannelMessage::Kind).check(Expr::col(ChannelMessage::Kind).is_in(["chat", "dispatch", "report", "notice"])))
+                .col(text(ChannelMessage::Body))
+                .col(text_null(ChannelMessage::Meta))
+                .col(text_null(ChannelMessage::SystemCode))
+                .col(text_null(ChannelMessage::SendKey))
+                .col(big_integer(ChannelMessage::CreatedAt))
+                .col(big_integer(ChannelMessage::Revision))
+                .col(big_integer_null(ChannelMessage::ReplyNumber))
+                .col(big_integer_null(ChannelMessage::EditedAt))
+                .col(big_integer_null(ChannelMessage::DeletedAt))
+                .col(big_integer_null(ChannelMessage::PinnedAt))
+                .col(text_null(ChannelMessage::Reactions))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelMessage::Table, ChannelMessage::ChannelId)
+                        .to(Channel::Table, Channel::Id),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelMessage::Table, ChannelMessage::SenderId)
+                        .to(ChannelParticipant::Table, ChannelParticipant::Id),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_message_channel_number_uidx")
+                .table(ChannelMessage::Table)
+                .col(ChannelMessage::ChannelId)
+                .col(ChannelMessage::Number)
+                .unique()
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_message_channel_revision_uidx")
+                .table(ChannelMessage::Table)
+                .col(ChannelMessage::ChannelId)
+                .col(ChannelMessage::Revision)
+                .unique()
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_message_by_channel")
+                .table(ChannelMessage::Table)
+                .col(ChannelMessage::ChannelId)
+                .col(ChannelMessage::Number)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_message_by_sender")
+                .table(ChannelMessage::Table)
+                .col(ChannelMessage::SenderId)
+                .col(ChannelMessage::Id)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_message_send_key")
+                .table(ChannelMessage::Table)
+                .col(ChannelMessage::SenderId)
+                .col(ChannelMessage::SendKey)
+                .unique()
+                .and_where(Expr::col(ChannelMessage::SendKey).is_not_null())
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_message_system_code")
+                .table(ChannelMessage::Table)
+                .col(ChannelMessage::ChannelId)
+                .col(ChannelMessage::SystemCode)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ChannelMention::Table)
+                .if_not_exists()
+                .col(text(ChannelMention::MessageId))
+                .col(text(ChannelMention::TargetId))
+                .col(text(ChannelMention::Resolved).check(Expr::col(ChannelMention::Resolved).is_in(["delivered", "absent", "unknown"])))
+                .primary_key(Index::create().col(ChannelMention::MessageId).col(ChannelMention::TargetId))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelMention::Table, ChannelMention::MessageId)
+                        .to(ChannelMessage::Table, ChannelMessage::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_mention_by_target")
+                .table(ChannelMention::Table)
+                .col(ChannelMention::TargetId)
+                .col(ChannelMention::MessageId)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ChannelMember::Table)
+                .if_not_exists()
+                .col(text(ChannelMember::ChannelId))
+                .col(text(ChannelMember::ParticipantId))
+                .col(text(ChannelMember::Reason).check(Expr::col(ChannelMember::Reason).is_in(["user", "replied", "mentioned", "manual"])))
+                .col(big_integer(ChannelMember::FromNumber))
+                .col(big_integer_null(ChannelMember::LeftAt))
+                .primary_key(Index::create().col(ChannelMember::ChannelId).col(ChannelMember::ParticipantId))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelMember::Table, ChannelMember::ChannelId)
+                        .to(Channel::Table, Channel::Id),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelMember::Table, ChannelMember::ParticipantId)
+                        .to(ChannelParticipant::Table, ChannelParticipant::Id),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_member_by_participant")
+                .table(ChannelMember::Table)
+                .col(ChannelMember::ParticipantId)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ChannelReadCursor::Table)
+                .if_not_exists()
+                .col(text(ChannelReadCursor::ParticipantId))
+                .col(text(ChannelReadCursor::ChannelId))
+                .col(big_integer(ChannelReadCursor::ReadNumber))
+                .col(big_integer(ChannelReadCursor::UpdatedAt))
+                .primary_key(Index::create().col(ChannelReadCursor::ParticipantId).col(ChannelReadCursor::ChannelId))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelReadCursor::Table, ChannelReadCursor::ParticipantId)
+                        .to(ChannelParticipant::Table, ChannelParticipant::Id),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelReadCursor::Table, ChannelReadCursor::ChannelId)
+                        .to(Channel::Table, Channel::Id),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_read_cursor_by_channel")
+                .table(ChannelReadCursor::Table)
+                .col(ChannelReadCursor::ChannelId)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ChannelSeen::Table)
+                .if_not_exists()
+                .col(text(ChannelSeen::ParticipantId))
+                .col(text(ChannelSeen::MessageId))
+                .col(big_integer(ChannelSeen::SeenAt))
+                .primary_key(Index::create().col(ChannelSeen::ParticipantId).col(ChannelSeen::MessageId))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelSeen::Table, ChannelSeen::ParticipantId)
+                        .to(ChannelParticipant::Table, ChannelParticipant::Id),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelSeen::Table, ChannelSeen::MessageId)
+                        .to(ChannelMessage::Table, ChannelMessage::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_seen_by_message")
+                .table(ChannelSeen::Table)
+                .col(ChannelSeen::MessageId)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ChannelEvent::Table)
+                .if_not_exists()
+                .col(big_pk_auto(ChannelEvent::Seq))
+                .col(text(ChannelEvent::Kind).check(Expr::col(ChannelEvent::Kind).is_in(["posted", "removed"])))
+                .col(text(ChannelEvent::ChannelId))
+                .col(text(ChannelEvent::MessageId))
+                .col(big_integer(ChannelEvent::At))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_event_by_message")
+                .table(ChannelEvent::Table)
+                .col(ChannelEvent::MessageId)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ChannelDelivery::Table)
+                .if_not_exists()
+                .col(big_pk_auto(ChannelDelivery::Id))
+                .col(text(ChannelDelivery::MessageId))
+                .col(text(ChannelDelivery::ChannelId))
+                .col(text(ChannelDelivery::RecipientKind).check(Expr::col(ChannelDelivery::RecipientKind).is_in([
+                    "session",
+                    "issue",
+                    "orchestrator",
+                    "direct",
+                ])))
+                .col(text(ChannelDelivery::RecipientId))
+                .col(text(ChannelDelivery::Reason).check(Expr::col(ChannelDelivery::Reason).is_in([
+                    "mention",
+                    "everyone",
+                    "own_thread",
+                    "member",
+                    "channel",
+                    "direct",
+                    "addressed",
+                ])))
+                .col(boolean(ChannelDelivery::Wakes).default(false))
+                .col(text_null(ChannelDelivery::HeldBy).check(Expr::col(ChannelDelivery::HeldBy).is_in(["hop_limit", "cooldown"])))
+                .col(
+                    text(ChannelDelivery::Status)
+                        .default("pending")
+                        .check(Expr::col(ChannelDelivery::Status).is_in(["pending", "delivered", "withdrawn", "failed"])),
+                )
+                .col(big_integer(ChannelDelivery::CreatedAt))
+                .col(big_integer_null(ChannelDelivery::SettledAt))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelDelivery::Table, ChannelDelivery::MessageId)
+                        .to(ChannelMessage::Table, ChannelMessage::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ChannelDelivery::Table, ChannelDelivery::ChannelId)
+                        .to(Channel::Table, Channel::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_delivery_msg_recipient_uidx")
+                .table(ChannelDelivery::Table)
+                .col(ChannelDelivery::MessageId)
+                .col(ChannelDelivery::RecipientKind)
+                .col(ChannelDelivery::RecipientId)
+                .unique()
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_delivery_by_recipient")
+                .table(ChannelDelivery::Table)
+                .col(ChannelDelivery::RecipientKind)
+                .col(ChannelDelivery::RecipientId)
+                .col(ChannelDelivery::Status)
+                .col(ChannelDelivery::Id)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("channel_delivery_by_message")
+                .table(ChannelDelivery::Table)
+                .col(ChannelDelivery::MessageId)
+                .col(ChannelDelivery::Status)
+                .to_owned(),
+        )
+        .await
+}
+
+async fn create_collab_connector(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .create_table(
+            Table::create()
+                .table(ConnectorAccount::Table)
+                .if_not_exists()
+                .col(text(ConnectorAccount::Connector).primary_key())
+                .col(text(ConnectorAccount::Secrets))
+                .col(text_null(ConnectorAccount::UserId))
+                .col(text_null(ConnectorAccount::PairCode))
+                .col(text(ConnectorAccount::Cursor).default(""))
+                .col(text_null(ConnectorAccount::ReplyContext))
+                .col(big_integer_null(ConnectorAccount::LastInbound))
+                .col(big_integer_null(ConnectorAccount::PausedUntil))
+                .col(big_integer(ConnectorAccount::ConnectedAt))
+                .col(text_null(ConnectorAccount::ChannelId))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ConnectorInbound::Table)
+                .if_not_exists()
+                .col(big_pk_auto(ConnectorInbound::Seq))
+                .col(text(ConnectorInbound::Connector))
+                .col(text(ConnectorInbound::ExtId))
+                .col(text(ConnectorInbound::FromId))
+                .col(text(ConnectorInbound::Body))
+                .col(text(ConnectorInbound::Reply))
+                .col(text(ConnectorInbound::Quoted))
+                .col(text_null(ConnectorInbound::MessageId))
+                .col(big_integer(ConnectorInbound::CreatedAt))
+                .col(boolean(ConnectorInbound::Delivered).default(false))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("connector_inbound_ext_uidx")
+                .table(ConnectorInbound::Table)
+                .col(ConnectorInbound::Connector)
+                .col(ConnectorInbound::ExtId)
+                .unique()
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ConnectorOutbox::Table)
+                .if_not_exists()
+                .col(big_pk_auto(ConnectorOutbox::Seq))
+                .col(text(ConnectorOutbox::Connector))
+                .col(text(ConnectorOutbox::MessageId))
+                .col(text(ConnectorOutbox::Body))
+                .col(
+                    text(ConnectorOutbox::State)
+                        .default("pending")
+                        .check(Expr::col(ConnectorOutbox::State).is_in(["pending", "sent", "dropped"])),
+                )
+                .col(text_null(ConnectorOutbox::ExtId))
+                .col(text_null(ConnectorOutbox::Error))
+                .col(big_integer(ConnectorOutbox::CreatedAt))
+                .col(big_integer_null(ConnectorOutbox::SentAt))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("connector_outbox_waiting")
+                .table(ConnectorOutbox::Table)
+                .col(ConnectorOutbox::Connector)
+                .col(ConnectorOutbox::State)
+                .col(ConnectorOutbox::Seq)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("connector_outbox_ext")
+                .table(ConnectorOutbox::Table)
+                .col(ConnectorOutbox::Connector)
+                .col(ConnectorOutbox::ExtId)
+                .to_owned(),
+        )
+        .await
+}
+
+async fn create_content_media_and_library(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .create_table(
+            Table::create()
+                .table(Attachment::Table)
+                .if_not_exists()
+                .col(text(Attachment::Id).primary_key())
+                .col(text(Attachment::Name))
+                .col(text(Attachment::Type))
+                .col(big_integer(Attachment::Size))
+                .col(big_integer(Attachment::CreatedAt))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(MediaLibraryItem::Table)
+                .if_not_exists()
+                .col(text(MediaLibraryItem::AttachmentId).primary_key())
+                .col(text(MediaLibraryItem::Kind).check(Expr::col(MediaLibraryItem::Kind).is_in(["generated", "uploaded", "fetched"])))
+                .col(text(MediaLibraryItem::Origin))
+                .col(big_integer(MediaLibraryItem::AddedAt))
+                .col(big_integer(MediaLibraryItem::LastAt))
+                .col(text_null(MediaLibraryItem::SourceJobId))
+                .col(big_integer_null(MediaLibraryItem::RemovedAt))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("media_library_item_recent")
+                .table(MediaLibraryItem::Table)
+                .col((MediaLibraryItem::LastAt, IndexOrder::Desc))
+                .col(MediaLibraryItem::AttachmentId)
+                .and_where(Expr::col(MediaLibraryItem::RemovedAt).is_null())
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("media_library_item_by_job")
+                .table(MediaLibraryItem::Table)
+                .col(MediaLibraryItem::SourceJobId)
+                .unique()
+                .and_where(Expr::col(MediaLibraryItem::SourceJobId).is_not_null())
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(MediaInput::Table)
+                .if_not_exists()
+                .col(text(MediaInput::Id).primary_key())
+                .col(text(MediaInput::Metadata))
+                .col(big_integer(MediaInput::Size))
+                .col(text(MediaInput::Phase))
+                .col(text_null(MediaInput::Hash))
+                .col(big_integer(MediaInput::CreatedAt))
+                .col(big_integer(MediaInput::ExpiresAt))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(MediaInputPin::Table)
+                .if_not_exists()
+                .col(text(MediaInputPin::InputId))
+                .col(text(MediaInputPin::Holder))
+                .primary_key(Index::create().col(MediaInputPin::InputId).col(MediaInputPin::Holder))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(MediaInputPin::Table, MediaInputPin::InputId)
+                        .to(MediaInput::Table, MediaInput::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(MediaJob::Table)
+                .if_not_exists()
+                .col(text(MediaJob::Id).primary_key())
+                .col(text(MediaJob::Kind))
+                .col(text(MediaJob::Phase))
+                .col(text(MediaJob::Data))
+                .col(big_integer(MediaJob::CreatedAt))
+                .col(big_integer(MediaJob::UpdatedAt))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("media_job_recent")
+                .table(MediaJob::Table)
+                .col((MediaJob::CreatedAt, IndexOrder::Desc))
+                .col(MediaJob::Id)
+                .to_owned(),
+        )
+        .await
+}
+
+async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .create_table(
+            Table::create()
+                .table(Artifact::Table)
+                .if_not_exists()
+                .col(text(Artifact::Id).primary_key())
+                .col(text(Artifact::Title))
+                .col(text(Artifact::Body).check(Expr::col(Artifact::Body).is_in(["blocks", "html", "store"])))
+                .col(text_null(Artifact::ArtifactType).check(Expr::col(Artifact::ArtifactType).is_in([
+                    "docs",
+                    "outline",
+                    "slides",
+                    "dashboard",
+                    "motion",
+                    "whiteboard",
+                    "design",
+                    "design-system",
+                ])))
+                .col(boolean(Artifact::IsDefault).default(false))
+                .col(text_null(Artifact::Display).check(Expr::col(Artifact::Display).is_in(["page", "slides", "motion"])))
+                .col(text_null(Artifact::ChannelId))
+                .col(text_null(Artifact::MessageId))
+                .col(text_null(Artifact::Issue))
+                .col(text(Artifact::ById))
+                .col(text(Artifact::ByName))
+                .col(big_integer(Artifact::Version))
+                .col(big_integer(Artifact::Seq).default(0))
+                .col(big_integer(Artifact::CreatedAt))
+                .col(big_integer(Artifact::UpdatedAt))
+                .check(
+                    Expr::col(Artifact::IsDefault)
+                        .eq(false)
+                        .or(Expr::col(Artifact::ArtifactType).eq("design-system")),
+                )
+                .check(
+                    Expr::col(Artifact::Body)
+                        .eq("html")
+                        .and(Expr::col(Artifact::Display).is_not_null())
+                        .or(Expr::col(Artifact::Body).ne("html").and(Expr::col(Artifact::Display).is_null())),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(Artifact::Table, Artifact::Issue)
+                        .to(Issue::Table, Issue::Id)
+                        .on_delete(ForeignKeyAction::SetNull),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("artifact_by_channel")
+                .table(Artifact::Table)
+                .col(Artifact::ChannelId)
+                .col(Artifact::UpdatedAt)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("artifact_by_issue")
+                .table(Artifact::Table)
+                .col(Artifact::Issue)
+                .col(Artifact::UpdatedAt)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("artifact_by_type")
+                .table(Artifact::Table)
+                .col(Artifact::ArtifactType)
+                .col(Artifact::UpdatedAt)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("artifact_default_design_system")
+                .table(Artifact::Table)
+                .col(Artifact::ArtifactType)
+                .unique()
+                .and_where(Expr::col(Artifact::IsDefault).eq(true))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ArtifactVersion::Table)
+                .if_not_exists()
+                .col(text(ArtifactVersion::ArtifactId))
+                .col(big_integer(ArtifactVersion::Version))
+                .col(text(ArtifactVersion::AttachmentId))
+                .col(big_integer(ArtifactVersion::Size))
+                .col(text_null(ArtifactVersion::Note))
+                .col(text(ArtifactVersion::ById))
+                .col(text(ArtifactVersion::ByName))
+                .col(text_null(ArtifactVersion::MessageId))
+                .col(big_integer(ArtifactVersion::CreatedAt))
+                .primary_key(Index::create().col(ArtifactVersion::ArtifactId).col(ArtifactVersion::Version))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ArtifactVersion::Table, ArtifactVersion::ArtifactId)
+                        .to(Artifact::Table, Artifact::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ArtifactBlock::Table)
+                .if_not_exists()
+                .col(text(ArtifactBlock::Id).primary_key())
+                .col(text(ArtifactBlock::ArtifactId))
+                .col(text_null(ArtifactBlock::ParentId))
+                .col(text(ArtifactBlock::OrderKey))
+                .col(text(ArtifactBlock::Type).check(Expr::col(ArtifactBlock::Type).is_in([
+                    "paragraph",
+                    "heading",
+                    "bulleted",
+                    "numbered",
+                    "todo",
+                    "quote",
+                    "code",
+                    "divider",
+                    "image",
+                    "issue_ref",
+                    "memory_item",
+                ])))
+                .col(text(ArtifactBlock::Attrs).default("{}"))
+                .col(text(ArtifactBlock::Spans).default("[]"))
+                .col(big_integer(ArtifactBlock::Rev))
+                .col(boolean(ArtifactBlock::Deleted).default(false))
+                .col(text(ArtifactBlock::UpdatedBy))
+                .col(big_integer(ArtifactBlock::UpdatedAt))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ArtifactBlock::Table, ArtifactBlock::ArtifactId)
+                        .to(Artifact::Table, Artifact::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("artifact_block_by_artifact")
+                .table(ArtifactBlock::Table)
+                .col(ArtifactBlock::ArtifactId)
+                .col(ArtifactBlock::OrderKey)
+                .col(ArtifactBlock::Id)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ArtifactBlockRevision::Table)
+                .if_not_exists()
+                .col(text(ArtifactBlockRevision::Id).primary_key())
+                .col(text(ArtifactBlockRevision::BlockId))
+                .col(big_integer(ArtifactBlockRevision::Rev))
+                .col(text(ArtifactBlockRevision::Spans))
+                .col(text(ArtifactBlockRevision::Actor))
+                .col(text(ArtifactBlockRevision::Kind).check(Expr::col(ArtifactBlockRevision::Kind).is_in(["normal", "conflict"])))
+                .col(big_integer(ArtifactBlockRevision::CreatedAt))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ArtifactBlockRevision::Table, ArtifactBlockRevision::BlockId)
+                        .to(ArtifactBlock::Table, ArtifactBlock::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("artifact_block_revision_by_block")
+                .table(ArtifactBlockRevision::Table)
+                .col(ArtifactBlockRevision::BlockId)
+                .col(ArtifactBlockRevision::Rev)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ArtifactChange::Table)
+                .if_not_exists()
+                .col(text(ArtifactChange::ArtifactId))
+                .col(big_integer(ArtifactChange::Seq))
+                .col(text(ArtifactChange::Kind).check(Expr::col(ArtifactChange::Kind).is_in(["blocks", "entries"])))
+                .col(text_null(ArtifactChange::BatchId).unique_key())
+                .col(text(ArtifactChange::Actor))
+                .col(text(ArtifactChange::Targets))
+                .col(text(ArtifactChange::Payload))
+                .col(big_integer(ArtifactChange::CreatedAt))
+                .primary_key(Index::create().col(ArtifactChange::ArtifactId).col(ArtifactChange::Seq))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ArtifactChange::Table, ArtifactChange::ArtifactId)
+                        .to(Artifact::Table, Artifact::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("artifact_change_by_created")
+                .table(ArtifactChange::Table)
+                .col(ArtifactChange::CreatedAt)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ArtifactSuggestion::Table)
+                .if_not_exists()
+                .col(text(ArtifactSuggestion::Id).primary_key())
+                .col(text(ArtifactSuggestion::ArtifactId))
+                .col(text(ArtifactSuggestion::BlockId))
+                .col(text(ArtifactSuggestion::Author))
+                .col(text_null(ArtifactSuggestion::Origin))
+                .col(big_integer(ArtifactSuggestion::AtRev))
+                .col(text(ArtifactSuggestion::Change))
+                .col(text_null(ArtifactSuggestion::CursorStart))
+                .col(text_null(ArtifactSuggestion::CursorEnd))
+                .col(big_integer_null(ArtifactSuggestion::StartOffset))
+                .col(big_integer_null(ArtifactSuggestion::EndOffset))
+                .col(text_null(ArtifactSuggestion::AnchorText))
+                .col(text_null(ArtifactSuggestion::ReplacementText))
+                .col(
+                    text(ArtifactSuggestion::Status)
+                        .default("open")
+                        .check(Expr::col(ArtifactSuggestion::Status).is_in(["open", "accepted", "rejected"])),
+                )
+                .col(big_integer(ArtifactSuggestion::CreatedAt))
+                .col(big_integer_null(ArtifactSuggestion::ResolvedAt))
+                .col(text_null(ArtifactSuggestion::ResolvedBy))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ArtifactSuggestion::Table, ArtifactSuggestion::ArtifactId)
+                        .to(Artifact::Table, Artifact::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ArtifactSuggestion::Table, ArtifactSuggestion::BlockId)
+                        .to(ArtifactBlock::Table, ArtifactBlock::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("artifact_suggestion_by_artifact")
+                .table(ArtifactSuggestion::Table)
+                .col(ArtifactSuggestion::ArtifactId)
+                .col(ArtifactSuggestion::CreatedAt)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ArtifactEntry::Table)
+                .if_not_exists()
+                .col(text(ArtifactEntry::ArtifactId))
+                .col(text(ArtifactEntry::Path))
+                .col(text(ArtifactEntry::Kind).check(Expr::col(ArtifactEntry::Kind).is_in(["text", "json", "asset"])))
+                .col(text(ArtifactEntry::Mime))
+                .col(text_null(ArtifactEntry::Value))
+                .col(text_null(ArtifactEntry::AttachmentId))
+                .col(big_integer(ArtifactEntry::Size))
+                .col(big_integer(ArtifactEntry::Rev))
+                .col(text(ArtifactEntry::UpdatedBy))
+                .col(big_integer(ArtifactEntry::UpdatedAt))
+                .primary_key(Index::create().col(ArtifactEntry::ArtifactId).col(ArtifactEntry::Path))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ArtifactEntry::Table, ArtifactEntry::ArtifactId)
+                        .to(Artifact::Table, Artifact::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("artifact_entry_by_artifact")
+                .table(ArtifactEntry::Table)
+                .col(ArtifactEntry::ArtifactId)
+                .col(ArtifactEntry::Path)
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ArtifactCollab::Table)
+                .if_not_exists()
+                .col(text(ArtifactCollab::ArtifactId).primary_key())
+                .col(blob(ArtifactCollab::Snapshot))
+                .col(big_integer(ArtifactCollab::UpdatedAt))
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(ArtifactCollab::Table, ArtifactCollab::ArtifactId)
+                        .to(Artifact::Table, Artifact::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await
+}
+
+async fn create_team_memory_and_infra_remote(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    manager
+        .create_table(
+            Table::create()
+                .table(Memory::Table)
+                .if_not_exists()
+                .col(text(Memory::Id).primary_key())
+                .col(text(Memory::Agent))
+                .col(text(Memory::Kind))
+                .col(text(Memory::Body))
+                .col(text_null(Memory::Repo))
+                .col(text_null(Memory::Session))
+                .col(text(Memory::Author))
+                .col(big_integer(Memory::CreatedAt))
+                .col(big_integer(Memory::UpdatedAt))
+                .col(big_integer(Memory::Recalled).default(0))
+                .col(big_integer_null(Memory::RecalledAt))
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("memory_agent")
+                .table(Memory::Table)
+                .col(Memory::Agent)
+                .col(Memory::CreatedAt)
+                .to_owned(),
+        )
+        .await?;
+    manager
+        .create_index(
+            Index::create()
+                .if_not_exists()
+                .name("memory_issue_session")
+                .table(Memory::Table)
+                .col(Memory::Agent)
+                .col(Memory::Session)
+                .unique()
+                .and_where(Expr::col(Memory::Kind).eq("issue"))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(RemoteConfig::Table)
+                .if_not_exists()
+                .col(big_integer(RemoteConfig::Id).primary_key().check(Expr::col(RemoteConfig::Id).eq(1)))
+                .col(boolean(RemoteConfig::Enabled).default(false))
+                .col(text_null(RemoteConfig::BindAddr))
+                .col(big_integer(RemoteConfig::Port))
+                .col(big_integer(RemoteConfig::UpdatedAt))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(RemoteDevice::Table)
+                .if_not_exists()
+                .col(text(RemoteDevice::Id).primary_key())
+                .col(text(RemoteDevice::Name))
+                .col(text(RemoteDevice::Platform))
+                .col(text_uniq(RemoteDevice::TokenHash))
+                .col(text(RemoteDevice::Scope))
+                .col(big_integer(RemoteDevice::CreatedAt))
+                .col(big_integer_null(RemoteDevice::LastSeenAt))
+                .col(big_integer_null(RemoteDevice::RevokedAt))
+                .to_owned(),
+        )
+        .await
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        create_shared(manager).await?;
+        create_work_issue(manager).await?;
+        create_work_session(manager).await?;
+        create_work_cron_and_pull(manager).await?;
+        create_collab_channel(manager).await?;
+        create_collab_connector(manager).await?;
+        create_content_media_and_library(manager).await?;
+        create_content_artifact(manager).await?;
+        create_team_memory_and_infra_remote(manager).await?;
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for table in [
+            RemoteDevice::Table.into_iden(),
+            RemoteConfig::Table.into_iden(),
+            Memory::Table.into_iden(),
+            ArtifactCollab::Table.into_iden(),
+            ArtifactEntry::Table.into_iden(),
+            ArtifactSuggestion::Table.into_iden(),
+            ArtifactChange::Table.into_iden(),
+            ArtifactBlockRevision::Table.into_iden(),
+            ArtifactBlock::Table.into_iden(),
+            ArtifactVersion::Table.into_iden(),
+            Artifact::Table.into_iden(),
+            MediaJob::Table.into_iden(),
+            MediaInputPin::Table.into_iden(),
+            MediaInput::Table.into_iden(),
+            MediaLibraryItem::Table.into_iden(),
+            Attachment::Table.into_iden(),
+            ConnectorOutbox::Table.into_iden(),
+            ConnectorInbound::Table.into_iden(),
+            ConnectorAccount::Table.into_iden(),
+            ChannelDelivery::Table.into_iden(),
+            ChannelEvent::Table.into_iden(),
+            ChannelSeen::Table.into_iden(),
+            ChannelReadCursor::Table.into_iden(),
+            ChannelMember::Table.into_iden(),
+            ChannelMention::Table.into_iden(),
+            ChannelMessage::Table.into_iden(),
+            Channel::Table.into_iden(),
+            ChannelParticipant::Table.into_iden(),
+            PullEvent::Table.into_iden(),
+            Pull::Table.into_iden(),
+            Cron::Table.into_iden(),
+            SessionEvent::Table.into_iden(),
+            SessionMailbox::Table.into_iden(),
+            SessionRun::Table.into_iden(),
+            Session::Table.into_iden(),
+            Issue::Table.into_iden(),
+            SeqCounter::Table.into_iden(),
+        ] {
+            manager.drop_table(Table::drop().if_exists().table(table).to_owned()).await?;
+        }
+        Ok(())
+    }
+}

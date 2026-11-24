@@ -6,8 +6,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
+use sea_orm::ConnectionTrait;
 use serde_json::Value;
-use sqlx::{Connection, SqliteConnection};
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::artifact::{
     ENTRY_MAX_BYTES, ENTRY_MAX_COUNT, INLINE_EVENT_MAX_BYTES, RenderStoreOptions, apply_json_merge_patch, canonical_json, contrast_ratio, entry_path_problem,
@@ -27,6 +27,7 @@ use super::blocks::relay_with_reset;
 use super::collab::commit_meta_for_maker;
 use super::{Artifacts, Maker, artifact_type_of, db, q, refused};
 use crate::base::{LookIn, missing};
+use crate::db::begin_write_tx;
 use crate::{Hub, Sink, now};
 
 const CATCH_UP_MAX: usize = 200;
@@ -111,7 +112,7 @@ impl Artifacts {
         map.entry(id.to_string()).or_insert_with(|| Arc::new(AsyncMutex::new(()))).clone()
     }
 
-    async fn found_store_async(&self, db: &mut SqliteConnection, id: &str) -> Result<db::ArtifactRow, ApiError> {
+    async fn found_store_async<C: ConnectionTrait>(&self, db: &C, id: &str) -> Result<db::ArtifactRow, ApiError> {
         let row = self.found(db, id).await?;
         if row.body != "store" {
             return Err(refused(t("server.artifact.notStore", &[("title", row.title.as_str().into())])));
@@ -120,39 +121,37 @@ impl Artifacts {
     }
 
     pub(super) async fn entry_count_async(&self, id: &str) -> Result<i64, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        db::entry_count(&mut db, id).await.map_err(q)
+        db::entry_count(self.db.read_conn(), id).await.map_err(q)
     }
 
     pub(super) async fn store_summary_async(&self, row: &db::ArtifactRow) -> Result<String, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        let rows = db::entries(&mut db, &row.id).await.map_err(q)?;
+        let rows = db::entries(self.db.read_conn(), &row.id).await.map_err(q)?;
         let entries: Vec<ArtifactEntry> = rows.iter().map(|r| entry_of(r, true)).collect();
         let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
         Ok(format_store_summary(&row.title, artifact_type, row.seq, &entries))
     }
 
     pub async fn list_entries_async(&self, req: &ArtifactEntryListRequest) -> Result<ArtifactEntrySnapshot, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        let row = self.found_store_async(&mut db, &req.id).await?;
+        let conn = self.db.read_conn();
+        let row = self.found_store_async(conn, &req.id).await?;
         let prefix = req.prefix.as_deref().map(str::trim).unwrap_or("");
         let include_values = req.include_values == Some(true);
         let rows = if prefix.is_empty() {
-            db::entries(&mut db, &req.id).await.map_err(q)?
+            db::entries(conn, &req.id).await.map_err(q)?
         } else {
-            db::entries_by_prefix(&mut db, &req.id, prefix).await.map_err(q)?
+            db::entries_by_prefix(conn, &req.id, prefix).await.map_err(q)?
         };
         let seq = row.seq;
-        let artifact = self.assemble(&mut db, row).await?;
+        let artifact = self.assemble(conn, row).await?;
         let entries = rows.iter().map(|r| entry_of(r, include_values)).collect();
         Ok(ArtifactEntrySnapshot { artifact, seq, entries })
     }
 
     pub async fn get_entry_async(&self, req: &ArtifactEntryGetRequest) -> Result<ArtifactEntry, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        let row = self.found_store_async(&mut db, &req.id).await?;
+        let conn = self.db.read_conn();
+        let row = self.found_store_async(conn, &req.id).await?;
         check_path(&req.path)?;
-        let entry = db::entry(&mut db, &req.id, &req.path).await.map_err(q)?.ok_or_else(|| {
+        let entry = db::entry(conn, &req.id, &req.path).await.map_err(q)?.ok_or_else(|| {
             missing(
                 t(
                     "server.artifact.entry.missing",
@@ -191,8 +190,8 @@ impl Artifacts {
         let _guard = write_lock.lock().await;
 
         let (row, current_rows) = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            let row = self.found_store_async(&mut db, &req.id).await?;
+            let conn = self.db.read_conn();
+            let row = self.found_store_async(conn, &req.id).await?;
             for w in &req.writes {
                 check_path(&w.path)?;
                 if w.op == ArtifactEntryOp::Copy {
@@ -211,7 +210,7 @@ impl Artifacts {
                     conflicts: vec![],
                 });
             }
-            let rows = db::entries(&mut db, &req.id).await.map_err(q)?;
+            let rows = db::entries(conn, &req.id).await.map_err(q)?;
             (row, rows)
         };
 
@@ -250,336 +249,356 @@ impl Artifacts {
         let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
 
         let (result, change) = {
-            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-            let mut tx = db.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
+            let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+            let outcome: Result<Option<(ArtifactEntryBatchResult, Option<EntryChange>)>, ApiError> = async {
+                let collab_doc = self.load_or_bootstrap_store_doc_async(&tx, &row, &current_rows).await?;
+                let mut working: BTreeMap<String, db::EntryRow> = current_rows.into_iter().map(|r| (r.path.clone(), r)).collect();
 
-            let collab_doc = self.load_or_bootstrap_store_doc_async(&mut tx, &row, &current_rows).await?;
-            let mut working: BTreeMap<String, db::EntryRow> = current_rows.into_iter().map(|r| (r.path.clone(), r)).collect();
-
-            // Check optimistic concurrency preconditions before mutating any entry.
-            let mut seen_paths: BTreeSet<String> = BTreeSet::new();
-            let mut conflicts: Vec<ArtifactEntryConflict> = vec![];
-            for w in &req.writes {
-                let Some(expected_rev) = w.if_rev else { continue };
-                if !seen_paths.insert(w.path.clone()) {
-                    continue;
-                }
-                let existing = working.get(&w.path);
-                let actual_rev = existing.map_or(0, |r| r.rev);
-                if expected_rev != actual_rev {
-                    conflicts.push(ArtifactEntryConflict {
-                        path: w.path.clone(),
-                        expected_rev,
-                        actual_rev,
-                        current: existing.map(|r| entry_of(r, true)),
-                    });
-                }
-            }
-            if !conflicts.is_empty() {
-                tx.rollback().await.map_err(q)?;
-                return Ok(ArtifactEntryBatchResult {
-                    applied: false,
-                    seq: row.seq,
-                    entries: vec![],
-                    conflicts,
-                });
-            }
-
-            let at = now();
-            let mut upserted_paths: BTreeSet<String> = BTreeSet::new();
-            let mut deleted_paths: BTreeSet<String> = BTreeSet::new();
-            let max_kb = (ENTRY_MAX_BYTES / 1024) as i64;
-
-            for w in &req.writes {
-                match w.op {
-                    ArtifactEntryOp::Delete => {
-                        if working.remove(&w.path).is_some() {
-                            upserted_paths.remove(&w.path);
-                            deleted_paths.insert(w.path.clone());
-                        }
+                // Check optimistic concurrency preconditions before mutating any entry.
+                let mut seen_paths: BTreeSet<String> = BTreeSet::new();
+                let mut conflicts: Vec<ArtifactEntryConflict> = vec![];
+                for w in &req.writes {
+                    let Some(expected_rev) = w.if_rev else { continue };
+                    if !seen_paths.insert(w.path.clone()) {
+                        continue;
                     }
-                    ArtifactEntryOp::Copy => {
-                        let from_path = w.from.as_deref().unwrap_or("");
-                        let (src_kind, src_mime, src_value, src_attachment_id, src_size) = working
-                            .get(from_path)
-                            .map(|s| (s.kind.clone(), s.mime.clone(), s.value.clone(), s.attachment_id.clone(), s.size))
-                            .ok_or_else(|| {
-                                missing(
-                                    t(
-                                        "server.artifact.entry.missing",
-                                        &[("title", row.title.as_str().into()), ("path", from_path.into())],
-                                    ),
-                                    LookIn::Artifact,
-                                )
-                            })?;
-                        let prev_rev = working.get(&w.path).map_or(0, |r| r.rev);
-                        let next_kind = w.kind.unwrap_or_else(|| entry_kind_of(&src_kind));
-                        let next_mime = w
-                            .mime
-                            .as_deref()
-                            .map(str::trim)
-                            .filter(|m| !m.is_empty())
-                            .map(str::to_string)
-                            .or_else(|| (!src_mime.is_empty()).then_some(src_mime))
-                            .unwrap_or_else(|| infer_entry_mime(&w.path, next_kind).to_string());
-                        working.insert(
-                            w.path.clone(),
-                            db::EntryRow {
-                                artifact_id: req.id.clone(),
-                                path: w.path.clone(),
-                                kind: next_kind.as_str().to_string(),
-                                mime: next_mime,
-                                value: src_value,
-                                attachment_id: src_attachment_id,
-                                size: src_size,
-                                rev: prev_rev + 1,
-                                updated_by: maker.by.clone(),
-                                updated_at: at,
-                            },
-                        );
-                        deleted_paths.remove(&w.path);
-                        upserted_paths.insert(w.path.clone());
-                    }
-                    ArtifactEntryOp::Set => {
-                        let value = w
-                            .value
-                            .as_deref()
-                            .ok_or_else(|| refused(t("server.artifact.entry.noValue", &[("path", w.path.as_str().into())])))?;
-                        let prev = working.get(&w.path);
-                        let prev_rev = prev.map_or(0, |r| r.rev);
-                        let kind = w
-                            .kind
-                            .or_else(|| prev.map(|r| entry_kind_of(&r.kind)))
-                            .unwrap_or_else(|| infer_entry_kind(&w.path));
-                        let mime = w
-                            .mime
-                            .as_deref()
-                            .map(str::trim)
-                            .filter(|m| !m.is_empty())
-                            .map(str::to_string)
-                            .unwrap_or_else(|| infer_entry_mime(&w.path, kind).to_string());
-                        match kind {
-                            ArtifactEntryKind::Asset => {
-                                let att_id = value.trim();
-                                let att = resolved_assets.get(att_id).ok_or_else(|| {
-                                    refused(t(
-                                        "server.artifact.entry.noAttachment",
-                                        &[("id", att_id.into()), ("path", w.path.as_str().into())],
-                                    ))
-                                })?;
-                                let asset_mime = w
-                                    .mime
-                                    .as_deref()
-                                    .map(str::trim)
-                                    .filter(|m| !m.is_empty())
-                                    .map(str::to_string)
-                                    .or_else(|| (!att.r#type.is_empty()).then(|| att.r#type.clone()))
-                                    .unwrap_or(mime);
-                                working.insert(
-                                    w.path.clone(),
-                                    db::EntryRow {
-                                        artifact_id: req.id.clone(),
-                                        path: w.path.clone(),
-                                        kind: "asset".into(),
-                                        mime: asset_mime,
-                                        value: None,
-                                        attachment_id: Some(att.id.clone()),
-                                        size: att.size,
-                                        rev: prev_rev + 1,
-                                        updated_by: maker.by.clone(),
-                                        updated_at: at,
-                                    },
-                                );
-                            }
-                            ArtifactEntryKind::Json => {
-                                let canon = canonical_json(value)
-                                    .map_err(|why| refused(t("server.artifact.entry.badJson", &[("path", w.path.as_str().into()), ("why", why.into())])))?;
-                                let checked_json = sanitize_whiteboard_element_json(artifact_type, &w.path, &canon)?;
-                                let size = checked_json.len();
-                                if size > ENTRY_MAX_BYTES {
-                                    return Err(refused(t(
-                                        "server.artifact.entry.tooBig",
-                                        &[("path", w.path.as_str().into()), ("kb", max_kb.into())],
-                                    )));
-                                }
-                                working.insert(
-                                    w.path.clone(),
-                                    db::EntryRow {
-                                        artifact_id: req.id.clone(),
-                                        path: w.path.clone(),
-                                        kind: "json".into(),
-                                        mime,
-                                        value: Some(checked_json),
-                                        attachment_id: None,
-                                        size: size as i64,
-                                        rev: prev_rev + 1,
-                                        updated_by: maker.by.clone(),
-                                        updated_at: at,
-                                    },
-                                );
-                            }
-                            ArtifactEntryKind::Text => {
-                                let text_val = if mime == "image/svg+xml" || w.path.ends_with(".svg") {
-                                    sanitize_whiteboard_svg(value)
-                                } else {
-                                    value.to_string()
-                                };
-                                let size = text_val.len();
-                                if size > ENTRY_MAX_BYTES {
-                                    return Err(refused(t(
-                                        "server.artifact.entry.tooBig",
-                                        &[("path", w.path.as_str().into()), ("kb", max_kb.into())],
-                                    )));
-                                }
-                                if mime == "text/html" || w.path.ends_with(".html") {
-                                    let hp = store_html_problem(&text_val);
-                                    if !hp.is_empty() {
-                                        return Err(refused(hp));
-                                    }
-                                }
-                                working.insert(
-                                    w.path.clone(),
-                                    db::EntryRow {
-                                        artifact_id: req.id.clone(),
-                                        path: w.path.clone(),
-                                        kind: "text".into(),
-                                        mime,
-                                        value: Some(text_val),
-                                        attachment_id: None,
-                                        size: size as i64,
-                                        rev: prev_rev + 1,
-                                        updated_by: maker.by.clone(),
-                                        updated_at: at,
-                                    },
-                                );
-                            }
-                        }
-                        deleted_paths.remove(&w.path);
-                        upserted_paths.insert(w.path.clone());
-                    }
-                    ArtifactEntryOp::Patch => {
-                        let value = w
-                            .value
-                            .as_deref()
-                            .ok_or_else(|| refused(t("server.artifact.entry.noValue", &[("path", w.path.as_str().into())])))?;
-                        let prev = working.get(&w.path);
-                        let prev_rev = prev.map_or(0, |r| r.rev);
-                        let kind = prev.map(|r| entry_kind_of(&r.kind)).or(w.kind).unwrap_or_else(|| infer_entry_kind(&w.path));
-                        if kind != ArtifactEntryKind::Json {
-                            return Err(refused(t(
-                                "server.artifact.entry.notJson",
-                                &[("path", w.path.as_str().into()), ("kind", kind.as_str().into())],
-                            )));
-                        }
-                        let merged = apply_json_merge_patch(prev.and_then(|r| r.value.as_deref()), value)
-                            .map_err(|why| refused(t("server.artifact.entry.badJson", &[("path", w.path.as_str().into()), ("why", why.into())])))?;
-                        let checked_json = sanitize_whiteboard_element_json(artifact_type, &w.path, &merged)?;
-                        let size = checked_json.len();
-                        if size > ENTRY_MAX_BYTES {
-                            return Err(refused(t(
-                                "server.artifact.entry.tooBig",
-                                &[("path", w.path.as_str().into()), ("kb", max_kb.into())],
-                            )));
-                        }
-                        let mime = w
-                            .mime
-                            .as_deref()
-                            .map(str::trim)
-                            .filter(|m| !m.is_empty())
-                            .map(str::to_string)
-                            .or_else(|| prev.map(|r| r.mime.clone()))
-                            .unwrap_or_else(|| "application/json".into());
-                        working.insert(
-                            w.path.clone(),
-                            db::EntryRow {
-                                artifact_id: req.id.clone(),
-                                path: w.path.clone(),
-                                kind: "json".into(),
-                                mime,
-                                value: Some(checked_json),
-                                attachment_id: None,
-                                size: size as i64,
-                                rev: prev_rev + 1,
-                                updated_by: maker.by.clone(),
-                                updated_at: at,
-                            },
-                        );
-                        deleted_paths.remove(&w.path);
-                        upserted_paths.insert(w.path.clone());
+                    let existing = working.get(&w.path);
+                    let actual_rev = existing.map_or(0, |r| r.rev);
+                    if expected_rev != actual_rev {
+                        conflicts.push(ArtifactEntryConflict {
+                            path: w.path.clone(),
+                            expected_rev,
+                            actual_rev,
+                            current: existing.map(|r| entry_of(r, true)),
+                        });
                     }
                 }
-            }
-
-            if working.len() > ENTRY_MAX_COUNT {
-                return Err(refused(t("server.artifact.entry.tooMany", &[("max", (ENTRY_MAX_COUNT as i64).into())])));
-            }
-            if upserted_paths.is_empty() && deleted_paths.is_empty() {
-                tx.rollback().await.map_err(q)?;
-                return Ok(ArtifactEntryBatchResult {
-                    applied: true,
-                    seq: row.seq,
-                    entries: vec![],
-                    conflicts: vec![],
-                });
-            }
-
-            let removed_paths: Vec<String> = deleted_paths.into_iter().collect();
-            let changed_paths: Vec<String> = upserted_paths.into_iter().collect();
-
-            for p in &removed_paths {
-                db::delete_entry(&mut tx, &req.id, p).await.map_err(q)?;
-            }
-            for p in &changed_paths {
-                if let Some(next) = working.get(p) {
-                    db::upsert_entry(
-                        &mut tx,
-                        db::UpsertEntry {
-                            artifact_id: next.artifact_id.clone(),
-                            path: next.path.clone(),
-                            kind: next.kind.clone(),
-                            mime: next.mime.clone(),
-                            value: next.value.clone(),
-                            attachment_id: next.attachment_id.clone(),
-                            size: next.size,
-                            rev: next.rev,
-                            updated_by: next.updated_by.clone(),
-                            updated_at: next.updated_at,
+                if !conflicts.is_empty() {
+                    return Ok(Some((
+                        ArtifactEntryBatchResult {
+                            applied: false,
+                            seq: row.seq,
+                            entries: vec![],
+                            conflicts,
                         },
-                    )
+                        None,
+                    )));
+                }
+
+                let at = now();
+                let mut upserted_paths: BTreeSet<String> = BTreeSet::new();
+                let mut deleted_paths: BTreeSet<String> = BTreeSet::new();
+                let max_kb = (ENTRY_MAX_BYTES / 1024) as i64;
+
+                for w in &req.writes {
+                    match w.op {
+                        ArtifactEntryOp::Delete => {
+                            if working.remove(&w.path).is_some() {
+                                upserted_paths.remove(&w.path);
+                                deleted_paths.insert(w.path.clone());
+                            }
+                        }
+                        ArtifactEntryOp::Copy => {
+                            let from_path = w.from.as_deref().unwrap_or("");
+                            let (src_kind, src_mime, src_value, src_attachment_id, src_size) = working
+                                .get(from_path)
+                                .map(|s| (s.kind.clone(), s.mime.clone(), s.value.clone(), s.attachment_id.clone(), s.size))
+                                .ok_or_else(|| {
+                                    missing(
+                                        t(
+                                            "server.artifact.entry.missing",
+                                            &[("title", row.title.as_str().into()), ("path", from_path.into())],
+                                        ),
+                                        LookIn::Artifact,
+                                    )
+                                })?;
+                            let prev_rev = working.get(&w.path).map_or(0, |r| r.rev);
+                            let next_kind = w.kind.unwrap_or_else(|| entry_kind_of(&src_kind));
+                            let next_mime = w
+                                .mime
+                                .as_deref()
+                                .map(str::trim)
+                                .filter(|m| !m.is_empty())
+                                .map(str::to_string)
+                                .or_else(|| (!src_mime.is_empty()).then_some(src_mime))
+                                .unwrap_or_else(|| infer_entry_mime(&w.path, next_kind).to_string());
+                            working.insert(
+                                w.path.clone(),
+                                db::EntryRow {
+                                    artifact_id: req.id.clone(),
+                                    path: w.path.clone(),
+                                    kind: next_kind.as_str().to_string(),
+                                    mime: next_mime,
+                                    value: src_value,
+                                    attachment_id: src_attachment_id,
+                                    size: src_size,
+                                    rev: prev_rev + 1,
+                                    updated_by: maker.by.clone(),
+                                    updated_at: at,
+                                },
+                            );
+                            deleted_paths.remove(&w.path);
+                            upserted_paths.insert(w.path.clone());
+                        }
+                        ArtifactEntryOp::Set => {
+                            let value = w
+                                .value
+                                .as_deref()
+                                .ok_or_else(|| refused(t("server.artifact.entry.noValue", &[("path", w.path.as_str().into())])))?;
+                            let prev = working.get(&w.path);
+                            let prev_rev = prev.map_or(0, |r| r.rev);
+                            let kind = w
+                                .kind
+                                .or_else(|| prev.map(|r| entry_kind_of(&r.kind)))
+                                .unwrap_or_else(|| infer_entry_kind(&w.path));
+                            let mime = w
+                                .mime
+                                .as_deref()
+                                .map(str::trim)
+                                .filter(|m| !m.is_empty())
+                                .map(str::to_string)
+                                .unwrap_or_else(|| infer_entry_mime(&w.path, kind).to_string());
+                            match kind {
+                                ArtifactEntryKind::Asset => {
+                                    let att_id = value.trim();
+                                    let att = resolved_assets.get(att_id).ok_or_else(|| {
+                                        refused(t(
+                                            "server.artifact.entry.noAttachment",
+                                            &[("id", att_id.into()), ("path", w.path.as_str().into())],
+                                        ))
+                                    })?;
+                                    let asset_mime = w
+                                        .mime
+                                        .as_deref()
+                                        .map(str::trim)
+                                        .filter(|m| !m.is_empty())
+                                        .map(str::to_string)
+                                        .or_else(|| (!att.r#type.is_empty()).then(|| att.r#type.clone()))
+                                        .unwrap_or(mime);
+                                    working.insert(
+                                        w.path.clone(),
+                                        db::EntryRow {
+                                            artifact_id: req.id.clone(),
+                                            path: w.path.clone(),
+                                            kind: "asset".into(),
+                                            mime: asset_mime,
+                                            value: None,
+                                            attachment_id: Some(att.id.clone()),
+                                            size: att.size,
+                                            rev: prev_rev + 1,
+                                            updated_by: maker.by.clone(),
+                                            updated_at: at,
+                                        },
+                                    );
+                                }
+                                ArtifactEntryKind::Json => {
+                                    let canon = canonical_json(value)
+                                        .map_err(|why| refused(t("server.artifact.entry.badJson", &[("path", w.path.as_str().into()), ("why", why.into())])))?;
+                                    let checked_json = sanitize_whiteboard_element_json(artifact_type, &w.path, &canon)?;
+                                    let size = checked_json.len();
+                                    if size > ENTRY_MAX_BYTES {
+                                        return Err(refused(t(
+                                            "server.artifact.entry.tooBig",
+                                            &[("path", w.path.as_str().into()), ("kb", max_kb.into())],
+                                        )));
+                                    }
+                                    working.insert(
+                                        w.path.clone(),
+                                        db::EntryRow {
+                                            artifact_id: req.id.clone(),
+                                            path: w.path.clone(),
+                                            kind: "json".into(),
+                                            mime,
+                                            value: Some(checked_json),
+                                            attachment_id: None,
+                                            size: size as i64,
+                                            rev: prev_rev + 1,
+                                            updated_by: maker.by.clone(),
+                                            updated_at: at,
+                                        },
+                                    );
+                                }
+                                ArtifactEntryKind::Text => {
+                                    let text_val = if mime == "image/svg+xml" || w.path.ends_with(".svg") {
+                                        sanitize_whiteboard_svg(value)
+                                    } else {
+                                        value.to_string()
+                                    };
+                                    let size = text_val.len();
+                                    if size > ENTRY_MAX_BYTES {
+                                        return Err(refused(t(
+                                            "server.artifact.entry.tooBig",
+                                            &[("path", w.path.as_str().into()), ("kb", max_kb.into())],
+                                        )));
+                                    }
+                                    if mime == "text/html" || w.path.ends_with(".html") {
+                                        let hp = store_html_problem(&text_val);
+                                        if !hp.is_empty() {
+                                            return Err(refused(hp));
+                                        }
+                                    }
+                                    working.insert(
+                                        w.path.clone(),
+                                        db::EntryRow {
+                                            artifact_id: req.id.clone(),
+                                            path: w.path.clone(),
+                                            kind: "text".into(),
+                                            mime,
+                                            value: Some(text_val),
+                                            attachment_id: None,
+                                            size: size as i64,
+                                            rev: prev_rev + 1,
+                                            updated_by: maker.by.clone(),
+                                            updated_at: at,
+                                        },
+                                    );
+                                }
+                            }
+                            deleted_paths.remove(&w.path);
+                            upserted_paths.insert(w.path.clone());
+                        }
+                        ArtifactEntryOp::Patch => {
+                            let value = w
+                                .value
+                                .as_deref()
+                                .ok_or_else(|| refused(t("server.artifact.entry.noValue", &[("path", w.path.as_str().into())])))?;
+                            let prev = working.get(&w.path);
+                            let prev_rev = prev.map_or(0, |r| r.rev);
+                            let kind = prev.map(|r| entry_kind_of(&r.kind)).or(w.kind).unwrap_or_else(|| infer_entry_kind(&w.path));
+                            if kind != ArtifactEntryKind::Json {
+                                return Err(refused(t(
+                                    "server.artifact.entry.notJson",
+                                    &[("path", w.path.as_str().into()), ("kind", kind.as_str().into())],
+                                )));
+                            }
+                            let merged = apply_json_merge_patch(prev.and_then(|r| r.value.as_deref()), value)
+                                .map_err(|why| refused(t("server.artifact.entry.badJson", &[("path", w.path.as_str().into()), ("why", why.into())])))?;
+                            let checked_json = sanitize_whiteboard_element_json(artifact_type, &w.path, &merged)?;
+                            let size = checked_json.len();
+                            if size > ENTRY_MAX_BYTES {
+                                return Err(refused(t(
+                                    "server.artifact.entry.tooBig",
+                                    &[("path", w.path.as_str().into()), ("kb", max_kb.into())],
+                                )));
+                            }
+                            let mime = w
+                                .mime
+                                .as_deref()
+                                .map(str::trim)
+                                .filter(|m| !m.is_empty())
+                                .map(str::to_string)
+                                .or_else(|| prev.map(|r| r.mime.clone()))
+                                .unwrap_or_else(|| "application/json".into());
+                            working.insert(
+                                w.path.clone(),
+                                db::EntryRow {
+                                    artifact_id: req.id.clone(),
+                                    path: w.path.clone(),
+                                    kind: "json".into(),
+                                    mime,
+                                    value: Some(checked_json),
+                                    attachment_id: None,
+                                    size: size as i64,
+                                    rev: prev_rev + 1,
+                                    updated_by: maker.by.clone(),
+                                    updated_at: at,
+                                },
+                            );
+                            deleted_paths.remove(&w.path);
+                            upserted_paths.insert(w.path.clone());
+                        }
+                    }
+                }
+
+                if working.len() > ENTRY_MAX_COUNT {
+                    return Err(refused(t("server.artifact.entry.tooMany", &[("max", (ENTRY_MAX_COUNT as i64).into())])));
+                }
+                if upserted_paths.is_empty() && deleted_paths.is_empty() {
+                    return Ok(Some((
+                        ArtifactEntryBatchResult {
+                            applied: true,
+                            seq: row.seq,
+                            entries: vec![],
+                            conflicts: vec![],
+                        },
+                        None,
+                    )));
+                }
+
+                let removed_paths: Vec<String> = deleted_paths.into_iter().collect();
+                let changed_paths: Vec<String> = upserted_paths.into_iter().collect();
+
+                for p in &removed_paths {
+                    db::delete_entry(&tx, &req.id, p).await.map_err(q)?;
+                }
+                for p in &changed_paths {
+                    if let Some(next) = working.get(p) {
+                        db::upsert_entry(
+                            &tx,
+                            db::UpsertEntry {
+                                artifact_id: next.artifact_id.clone(),
+                                path: next.path.clone(),
+                                kind: next.kind.clone(),
+                                mime: next.mime.clone(),
+                                value: next.value.clone(),
+                                attachment_id: next.attachment_id.clone(),
+                                size: next.size,
+                                rev: next.rev,
+                                updated_by: next.updated_by.clone(),
+                                updated_at: next.updated_at,
+                            },
+                        )
+                        .await
+                        .map_err(q)?;
+                    }
+                }
+
+                let seq = row.seq + 1;
+                db::add_entry_change(&tx, &req.id, seq, &maker.by, &changed_paths, &removed_paths, at)
                     .await
                     .map_err(q)?;
+                db::artifact_accepted(&tx, &req.id, seq, at).await.map_err(q)?;
+                let meta = explicit_meta.cloned().unwrap_or_else(|| commit_meta_for_maker(maker, req.note.clone(), at));
+                Self::sync_store_to_collab_async(&tx, &row.id, &collab_doc, &working, &changed_paths, &removed_paths, &meta).await?;
+
+                let full_entries: Vec<ArtifactEntry> = changed_paths.iter().filter_map(|p| working.get(p).map(|r| entry_of(r, true))).collect();
+                let event_entries: Vec<ArtifactEntry> = changed_paths
+                    .iter()
+                    .filter_map(|p| working.get(p).map(|r| entry_of(r, r.size <= INLINE_EVENT_MAX_BYTES as i64)))
+                    .collect();
+                let change = EntryChange {
+                    artifact: req.id.clone(),
+                    seq,
+                    entries: event_entries,
+                    deleted: removed_paths,
+                };
+                Ok(Some((
+                    ArtifactEntryBatchResult {
+                        applied: true,
+                        seq,
+                        entries: full_entries,
+                        conflicts: vec![],
+                    },
+                    Some(change),
+                )))
+            }
+            .await;
+
+            match outcome {
+                Ok(Some((res, Some(change)))) => {
+                    tx.commit().await.map_err(q)?;
+                    (res, change)
+                }
+                Ok(Some((early, None))) => {
+                    let _ = tx.rollback().await;
+                    return Ok(early);
+                }
+                Ok(None) => unreachable!(),
+                Err(err) => {
+                    let _ = tx.rollback().await;
+                    return Err(err);
                 }
             }
-
-            let seq = row.seq + 1;
-            db::add_entry_change(&mut tx, &req.id, seq, &maker.by, &changed_paths, &removed_paths, at)
-                .await
-                .map_err(q)?;
-            db::artifact_accepted(&mut tx, &req.id, seq, at).await.map_err(q)?;
-            let meta = explicit_meta.cloned().unwrap_or_else(|| commit_meta_for_maker(maker, req.note.clone(), at));
-            Self::sync_store_to_collab_async(&mut tx, &row.id, &collab_doc, &working, &changed_paths, &removed_paths, &meta).await?;
-            tx.commit().await.map_err(q)?;
-
-            let full_entries: Vec<ArtifactEntry> = changed_paths.iter().filter_map(|p| working.get(p).map(|r| entry_of(r, true))).collect();
-            let event_entries: Vec<ArtifactEntry> = changed_paths
-                .iter()
-                .filter_map(|p| working.get(p).map(|r| entry_of(r, r.size <= INLINE_EVENT_MAX_BYTES as i64)))
-                .collect();
-            let change = EntryChange {
-                artifact: req.id.clone(),
-                seq,
-                entries: event_entries,
-                deleted: removed_paths,
-            };
-            (
-                ArtifactEntryBatchResult {
-                    applied: true,
-                    seq,
-                    entries: full_entries,
-                    conflicts: vec![],
-                },
-                change,
-            )
         };
 
         let seq = change.seq;
@@ -602,8 +621,7 @@ impl Artifacts {
             );
             let said = self.channel.post_card(&maker.from, &channel, &text, card, maker.run.clone(), String::new())?;
             if row.message_id.is_none() {
-                let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-                db::artifact_said(&mut db, &row.id, &said.id).await.map_err(q)?;
+                db::artifact_said(self.db.write_conn(), &row.id, &said.id).await.map_err(q)?;
             }
         }
 
@@ -612,12 +630,12 @@ impl Artifacts {
 
     pub async fn follow_entries_async(&self, hub: &Hub, id: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
         let (rx, missed, current) = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found_store_async(&mut db, id).await?;
+            let conn = self.db.read_conn();
+            self.found_store_async(conn, id).await?;
             // Subscribe before reading catch-up; live events are deduplicated by seq.
             let rx = self.entry_changes.subscribe();
-            let missed = db::entry_changes_after(&mut db, id, after, CATCH_UP_MAX as i64 + 1).await.map_err(q)?;
-            let current: HashMap<String, db::EntryRow> = db::entries(&mut db, id).await.map_err(q)?.into_iter().map(|r| (r.path.clone(), r)).collect();
+            let missed = db::entry_changes_after(conn, id, after, CATCH_UP_MAX as i64 + 1).await.map_err(q)?;
+            let current: HashMap<String, db::EntryRow> = db::entries(conn, id).await.map_err(q)?.into_iter().map(|r| (r.path.clone(), r)).collect();
             (rx, missed, current)
         };
         let id = id.to_string();
@@ -659,11 +677,11 @@ impl Artifacts {
     /// (`artifact.view` native op & `GET /api/v1/artifact/:id/view`).
     pub async fn view_async(&self, req: &ArtifactViewInput) -> Result<ArtifactPage, ApiError> {
         let (row, rows, default_tokens_json) = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            let row = self.found_store_async(&mut db, &req.id).await?;
-            let rows = db::entries(&mut db, &req.id).await.map_err(q)?;
-            let default_tokens_json = match db::default_design_system_artifact(&mut db).await.map_err(q)? {
-                Some(ds) if ds.id != req.id => db::entry(&mut db, &ds.id, "project/tokens.json").await.map_err(q)?.and_then(|e| e.value),
+            let conn = self.db.read_conn();
+            let row = self.found_store_async(conn, &req.id).await?;
+            let rows = db::entries(conn, &req.id).await.map_err(q)?;
+            let default_tokens_json = match db::default_design_system_artifact(conn).await.map_err(q)? {
+                Some(ds) if ds.id != req.id => db::entry(conn, &ds.id, "project/tokens.json").await.map_err(q)?.and_then(|e| e.value),
                 _ => None,
             };
             (row, rows, default_tokens_json)

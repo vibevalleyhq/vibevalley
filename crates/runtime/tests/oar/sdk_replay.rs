@@ -1,13 +1,15 @@
 use serde_json::Value;
-use std::{fs, os::unix::fs::PermissionsExt, path::Path, time::Duration};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use vibevalley_runtime::oar::{ContentBlock, EventKind, McpServer, SessionOptions, StopReason};
 
 #[test]
 fn sdk_streams_keep_secrets_private_and_resume_with_the_vendors_id() {
     let root = tempfile::tempdir().unwrap();
-    let binary = root.path().join("sdk-replay");
-    fs::write(&binary, include_bytes!("../fixtures/sdk_replay.py")).unwrap();
-    fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+    let binary = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     let registry = vibevalley_runtime::oar::default_runtimes();
     for id in ["qwen", "qoder"] {
         let runtime = registry.require(id).unwrap();
@@ -18,6 +20,7 @@ fn sdk_streams_keep_secrets_private_and_resume_with_the_vendors_id() {
             system_prompt: Some("system\nexample".into()),
             append_system_prompt: Some("append\nexample".into()),
             env: vec![
+                ("VV_FIXTURE".into(), "sdk_replay".into()),
                 ("REPLAY_LOG".into(), log.display().to_string()),
                 ("QODER_EXPOSE_TOKEN_USAGE".into(), "0".into()),
             ],

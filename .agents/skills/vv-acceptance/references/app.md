@@ -16,7 +16,7 @@
 2. `cargo build -p vibevalley-mac --features shot`：不带 `shot` 时 `shot:` 一步只报「build with --features shot」。
 3. 改了 TSX 只用重跑第 1 步；改了 Rust 重跑第 2 步。
 
-改宿主项目加载或终端恢复时，运行 `python3 scripts/release/verify-workspace-store.py target/debug/vibevalley-mac`。脚本从窗口动作打开新目录，并保持另一个 SQLite 写事务到下一次绘制。两个入口都应成功保存新项目。脚本只使用临时目录。
+改宿主项目加载或终端恢复时，运行 `vpx scripts/release/verify-workspace-store.ts target/debug/vibevalley-mac`。脚本从窗口动作打开新目录，并保持另一个 SQLite 写事务到下一次绘制。两个入口都应成功保存新项目。脚本只使用临时目录。
 
 ## 一键验收画廊（推荐先跑）
 
@@ -107,7 +107,7 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 
 ## 验收三张并行工单
 
-对本地安装包运行 `python3 scripts/release/verify-native-work.py <VibeValley.app>`。脚本创建隔离的家目录、宿主库和工作目录。帮工使用脚本农机。脚本在第三单写入 Git 后强制退出本次启动的应用，再重开同一目录。终端打印证据目录，`result.json` 记录问答、已审版本合并及中断轮次。使用开发构建时传入原生二进制和匹配的 `--cli`。[验收脚本](scripts/release/verify-native-work.py)
+对本地安装包运行 `vpx scripts/release/verify-native-work.ts <VibeValley.app>`。脚本创建隔离的家目录、宿主库和工作目录。帮工使用脚本农机。脚本在第三单写入 Git 后强制退出本次启动的应用，再重开同一目录。终端打印证据目录，`result.json` 记录问答、已审版本合并及中断轮次。使用开发构建时传入原生二进制和匹配的 `--cli`。[验收脚本](scripts/release/verify-native-work.ts)
 
 自愿试用时，加 `--prepare-trial`。脚本备好三单，关闭应用，并打印两个本地文件的路径。
 
@@ -134,7 +134,7 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 3. 核对打印的证据目录：`result.json` 的 `ok`、`restarted`、`serverHealthy`、`signatureVerified` 均为 true，`before`、`after` 是两个版本；`app.log` 含 ready 状态，`health.json` 是新进程的健康响应，`dump.json` 的 `loaded` 是 true、`load_error` 为空，`workbench` 已应用 `state` 帧且没有错误。
 4. 检查新旧输出目录都含 `.app`、`.dmg`、`.zip`、`release.json`。用 `codesign --verify --deep --strict <app>` 验签；ad-hoc 验签不代表 Developer ID 或公证通过。
 
-在候选包上运行 `python3 scripts/release/verify-farm-dispatch.py /绝对路径/VibeValley.app`。脚本在原生农场手机上输入一条派工请求。回环模型返回建单工具调用。脚本还验包内 CLI 的 doctor 与频道读写，并等真实时钟触发一次定时任务。测试环境使用临时家目录和假凭据，沙箱只允许回环出站。凭 `result.json`、`local-model.json`、`field.json` 和 `cron.json` 对账。Debug 构建使用 `--features shot` 时另有渲染截图。该用例使用 1280 × 820 点窗口的农场布局。
+在候选包上运行 `vpx scripts/release/verify-farm-dispatch.ts /绝对路径/VibeValley.app`。脚本在原生农场手机上输入一条派工请求。回环模型返回建单工具调用。脚本还验包内 CLI 的 doctor 与频道读写，并等真实时钟触发一次定时任务。测试环境使用临时家目录和假凭据，沙箱只允许回环出站。凭 `result.json`、`local-model.json`、`field.json` 和 `cron.json` 对账。Debug 构建使用 `--features shot` 时另有渲染截图。该用例使用 1280 × 820 点窗口的农场布局。
 
 更新检查先在旧包创建宿主项目和工单，再让脚本帮工按回复提交两次。升级后对照 `before-data.json` 与 `after-data.json`，确认项目、工单、会话、消息和 Git 提交保留。
 
@@ -143,8 +143,6 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 
 ### 数据库升级和回退
 
-用旧包和候选包分别传给 `python3 scripts/release/verify-native-data.py <旧.app> <新.app>`。脚本限制外部网络，在临时目录运行真实应用及包内 CLI。终端输出证据目录。旧包写入工单、工单目录、消息、记性、Artifact、媒体和宿主布局。连接器加载[旧版离线存储样本](scripts/release/fixtures/connector-275732ef1.json)。脚本平移样本时间以保留其有效期，并将待发分片关联到本次旧包生成的汇报。
+用旧包和候选包分别传给 `vpx scripts/release/verify-native-data.ts <旧.app> <新.app>`。脚本限制外部网络，在临时目录运行真实应用及包内 CLI。终端输出证据目录。旧包写入工单、工单目录、消息、记性、Artifact、媒体和宿主布局。连接器加载[旧版离线存储样本](scripts/release/fixtures/connector-275732ef1.json)。脚本平移样本时间以保留其有效期，并将待发分片关联到本次旧包生成的汇报。
 
 新包应能审查旧工单、合并原改动并结算一次新回复。回退前先归档升级后的完整数据，再将旧包的备份恢复到原绝对路径。查看 `result.json` 的新旧提交、实际 SQLite 版本、宿主与服务库版本和启动耗时。`backup-files.json` 记录冷备份清单。
-
-在有冻结源码和工具链的开发机上，运行 `python3 scripts/release/verify-native-schema.py <证据目录>/upgraded-cohort --source <候选包检出>`。需要已安装 JS 依赖、sqlc 和 Cargo 缓存。若当前仓库缺少 Go 对照提交，可用 `--go-repo <Go 仓库>` 指向含 `a2c1851ab` 的检出。输出给出宿主库与服务库的表归属、DDL、索引、外键、生产与测试依赖。脚本还在临时目录修改一份生成物，验证 CI 使用的 `sqlc diff` 能发现变化。

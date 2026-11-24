@@ -85,7 +85,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | `subscribe(name, payload, on, ended)` | `subscribe`、`unsubscribe` | `sub:<id>`，每个事件一次，结束一次 |
 | `hostApi.<名字>` | `call`，`op` 是 `host.<名字>` | 外壳的 `Shell::host_call` 答 |
 
-- **`call` 不抛**：失败是 `bizCode` 非 0 的信封；没有宿主或超时回 `ServiceUnavailable`。关闭工作区对话标签页直接经 `Server::call("session.closeWorkspace", ...)` 停机回收，不经进程全局静态锁；音频与语音句柄经 `Server::speech_streams()` / `Server::voice() -> Option<SharedLiveVoice>`（`LiveVoicePort`）获取，桌面宿主 `apps/mac/src/` 不导入 `vibevalley_server::modules::*`（由 `vp run audit:boundaries` 守住），`LateServer` 同步转发 `subscribe_with`、`voice` 与 `remote_auth`，启动期经 `Started::set_mcp_url` 注入 `/mcp` 地址。
+- **`call` 不抛**：失败是 `bizCode` 非 0 的信封；没有宿主或超时回 `ServiceUnavailable`。关闭工作区对话标签页直接经 `Server::call("session.closeWorkspace", ...)` 停机回收，不经进程全局静态锁；音频与语音句柄经 `Server::speech_streams()` / `Server::voice() -> Option<SharedLiveVoice>`（`LiveVoicePort`）获取，桌面宿主 `apps/mac/src/` 不导入 `vibevalley_server::modules::*`（由 `cargo xtask audit` 守住），`LateServer` 同步转发 `subscribe_with`、`voice` 与 `remote_auth`，启动期经 `Started::set_mcp_url` 注入 `/mcp` 地址。
 - **工作台按 6 个一级入口与 5 栏设置组织**：左侧导航主栏（`places.ts`）固定收敛为对话（`/chat`）、工单（`/issues`）、代码仓库与工作区（`/repos`）、内容（`/library`）、团队（`/agents`）与设置（`/settings`）6 项一级位置；运行中心（`/runs`）作为次级入口随工单/团队下钻可达；设置页收拢为「通用 / 模型 / 语音 / 连接 / 关于」5 栏，所有面向用户的菜单与设置沿用日常中文词汇（如模型、成员、设置），避免内部工程缩写或农场隐喻外溢。
 - **统一二元内容中心与上下文记忆**：`/library` 与 `/artifacts/*` 共用嵌套布局 `ContentShell`（`apps/mac/ui/features/content/`），提供可折叠统一侧栏 `ContentSidebar`（收敛为「作品（含一等 `outline` 大纲笔记与 `.md` 导入）+ 素材」二元模型，`⌘\` 切换，全屏演示 `contentPresenting` 时自动收起）、统一搜索 `ContentSearchModal`、`.md` 大纲导入弹窗 `OutlineImportModal`（经 `hostApi.pickFile()` 选文件、拖放或粘贴调用 `artifact.outline.import`）与 19 套双语模板库 `TemplateModal`（`⌘N` 打开，笔记模板直接创建 `outline` 作品）。36px 顶栏 `<Desk>` 使用工作区同款 `sidebar` 面板图标切换侧栏（[icons.ts](apps/mac/ui/design/icons.ts)），`desk-content-search`、`desk-content-new` 与作品页 `artifact-back-library` 仅在侧栏收起（`!contentSidebarOpen`）时按需补位，避免与常驻侧栏同屏重复；作品详情页内置 `TimelineBar` 时间旅行抽屉。`ContentShell` 持续记录当前内容路径（剥离 `?make=`/`?nav`/`?understand` 瞬态参数），离开再点左栏「内容」或访问 `/content` 时经 `safeLastContentPath()` 恢复上次视图。
 - **工作台的请求只经 `Transport`**（`apps/mac/ui/infra/transport.ts`）：`VibeValleyApi.over` 直接在契约信封上收发，不绕合成的 HTTP `Request`/`Response`；应用里是桥（`bridged.ts` 的 `useBridge()`），测试和故事换成基于 `SliceBundle` 的替身（`infra/fixtures.ts`）；页面的代码不直接碰 `host`。
@@ -168,7 +168,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 
 ## 怎么验证
 
-- `vp run rust:check`：`apps/mac` 和它用的 crate 的格式、clippy 与测试（`apps/mac/src/pixel/tests.rs` 用真的素材和替身服务端的样例画每个场景）。
+- `cargo xtask check`：`apps/mac` 和它用的 crate 的格式、clippy 与测试（`apps/mac/src/pixel/tests.rs` 用真的素材和替身服务端的样例画每个场景）。
 - `vp run mac:check`：`apps/mac/ui` 的 nsh 类型检查、打包、`vp lint --deny-warnings` 与全量 `nsh/test` 单元测试及集成测试（含 `interactions.test.tsx`、`scenarios.test.tsx`）。
 - `vp run mobile:check` 与 `vpx scripts/gen/icons.ts --check`：`apps/mobile` 的 nsh 类型检查、打包、无头组件测试、`vp lint --deny-warnings` 与 97 枚 reicons 矢量路径同步检查。
 - `apps/mac/ui/{app,workspace}/*.test.{ts,tsx}`、`apps/mac/ui/features/**`: `nsh/test` 写的页面、工作区外壳、主题令牌与领域逻辑测试，用样例的 `Transport`。

@@ -2,22 +2,23 @@
 //! terminal restore data, and settings. Source files never go in here.
 //! `Store` is `Send + Sync`; calls block briefly.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use std::sync::Mutex;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
+use sea_orm::sea_query::{Expr, OnConflict};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::NotSet, ActiveValue::Set, ColumnTrait, ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DatabaseTransaction,
+    DbErr, EntityTrait, ExprTrait, QueryFilter, QueryOrder, QuerySelect, SqliteTransactionMode, TransactionOptions, TransactionTrait,
+};
 use serde::{Deserialize, Serialize};
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
-use sqlx::{ConnectOptions, Connection, SqliteConnection};
 
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
-use queries as q;
+mod entities;
 mod schema;
 #[cfg(test)]
 mod tests;
+
+use entities::{layouts, projects, settings, terminals};
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -55,13 +56,13 @@ pub struct SavedTerminal {
 }
 
 pub struct Store {
-    conn: Mutex<SqliteConnection>,
+    conn: DatabaseConnection,
 }
 
-impl From<sqlx::Error> for StoreError {
-    fn from(e: sqlx::Error) -> Self {
+impl From<DbErr> for StoreError {
+    fn from(e: DbErr) -> Self {
         match e {
-            sqlx::Error::RowNotFound => StoreError::NotFound,
+            DbErr::RecordNotFound(_) => StoreError::NotFound,
             other => StoreError::Db(other.to_string()),
         }
     }
@@ -81,6 +82,27 @@ fn path_text(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
+fn sqlite_file_url(path: &Path) -> String {
+    let raw = path_text(path);
+    let mut encoded = String::with_capacity(raw.len());
+    for byte in raw.bytes() {
+        match byte {
+            b'%' => encoded.push_str("%25"),
+            b' ' => encoded.push_str("%20"),
+            b'"' => encoded.push_str("%22"),
+            b'#' => encoded.push_str("%23"),
+            b'<' => encoded.push_str("%3C"),
+            b'>' => encoded.push_str("%3E"),
+            b'?' => encoded.push_str("%3F"),
+            b'`' => encoded.push_str("%60"),
+            b'{' => encoded.push_str("%7B"),
+            b'}' => encoded.push_str("%7D"),
+            _ => encoded.push(byte as char),
+        }
+    }
+    format!("sqlite://{encoded}?mode=rwc")
+}
+
 /// Drops trailing separators and `.` components so the same folder always
 /// maps to the same row. Does not touch the filesystem: a project whose
 /// folder is gone must still be addressable.
@@ -93,23 +115,37 @@ fn display_name(path: &Path) -> String {
     path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| path_text(path))
 }
 
-async fn project_by_id(conn: &mut SqliteConnection, id: ProjectId) -> Result<Project> {
-    let row = q::get_project(conn, q::GetProjectParams { id }).await?;
-    Ok(Project {
+fn project_from_model(row: projects::Model) -> Project {
+    Project {
         id: row.id,
         path: row.path.into(),
         name: row.name,
         position: row.position,
         last_opened_ms: row.last_opened_ms,
-    })
+    }
 }
 
-fn optional<T>(result: std::result::Result<T, sqlx::Error>) -> Result<Option<T>> {
-    match result {
-        Ok(row) => Ok(Some(row)),
-        Err(sqlx::Error::RowNotFound) => Ok(None),
-        Err(err) => Err(err.into()),
-    }
+pub(crate) async fn begin_write_tx(conn: &DatabaseConnection) -> Result<DatabaseTransaction> {
+    let opts = TransactionOptions {
+        sqlite_transaction_mode: Some(SqliteTransactionMode::Immediate),
+        ..Default::default()
+    };
+    Ok(conn.begin_with_options(opts).await?)
+}
+
+async fn project_by_id(conn: &impl ConnectionTrait, id: ProjectId) -> Result<Project> {
+    let row = projects::Entity::find_by_id(id).one(conn).await?.ok_or(StoreError::NotFound)?;
+    Ok(project_from_model(row))
+}
+
+async fn require_project(conn: &impl ConnectionTrait, id: ProjectId) -> Result<()> {
+    let found: Option<i64> = projects::Entity::find_by_id(id)
+        .select_only()
+        .column(projects::Column::Id)
+        .into_tuple()
+        .one(conn)
+        .await?;
+    found.map(|_| ()).ok_or(StoreError::NotFound)
 }
 
 fn changed(rows: u64) -> Result<()> {
@@ -124,23 +160,30 @@ impl Store {
         {
             std::fs::create_dir_all(parent).map_err(|e| StoreError::Io(e.to_string()))?;
         }
-        Self::connect(SqliteConnectOptions::new().filename(path).create_if_missing(true))
+        Self::connect(sqlite_file_url(path))
     }
 
     pub fn open_in_memory() -> Result<Store> {
-        Self::connect(SqliteConnectOptions::new().in_memory(true))
+        Self::connect("sqlite::memory:".into())
     }
 
-    fn connect(options: SqliteConnectOptions) -> Result<Store> {
-        let options = options
-            .busy_timeout(Duration::from_secs(5))
-            .journal_mode(SqliteJournalMode::Wal)
-            .synchronous(SqliteSynchronous::Normal)
-            .foreign_keys(true);
+    fn connect(url: String) -> Result<Store> {
+        let mut opts = ConnectOptions::new(url);
+        opts.max_connections(1)
+            .min_connections(1)
+            .idle_timeout(None)
+            .max_lifetime(None)
+            .after_connect(|conn| {
+                Box::pin(async move {
+                    conn.execute_unprepared("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;")
+                        .await?;
+                    Ok(())
+                })
+            });
         vibevalley_runtime::rt::block_on(async {
-            let mut conn = options.connect().await?;
-            schema::migrate(&mut conn).await?;
-            Ok(Self { conn: Mutex::new(conn) })
+            let conn = Database::connect(opts).await?;
+            schema::migrate(&conn).await?;
+            Ok(Self { conn })
         })
     }
 
@@ -157,57 +200,58 @@ impl Store {
 
     /// The schema version this build migrates databases to.
     pub fn schema_version() -> i64 {
-        schema::MIGRATIONS.len() as i64
+        schema::SCHEMA_VERSION
     }
 
-    fn run<T>(&self, f: impl AsyncFnOnce(&mut SqliteConnection) -> Result<T>) -> Result<T> {
-        let mut conn = self.conn.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        vibevalley_runtime::rt::block_on(f(&mut conn))
+    #[cfg(test)]
+    fn run<T>(&self, f: impl AsyncFnOnce(&DatabaseConnection) -> Result<T>) -> Result<T> {
+        vibevalley_runtime::rt::block_on(f(&self.conn))
     }
 
     pub fn projects(&self) -> Result<Vec<Project>> {
-        self.run(async |conn| {
-            Ok(q::list_projects(conn)
-                .await?
-                .into_iter()
-                .map(|r| Project {
-                    id: r.id,
-                    path: r.path.into(),
-                    name: r.name,
-                    position: r.position,
-                    last_opened_ms: r.last_opened_ms,
-                })
-                .collect())
+        vibevalley_runtime::rt::block_on(async {
+            let rows = projects::Entity::find()
+                .order_by_asc(projects::Column::Position)
+                .order_by_asc(projects::Column::Id)
+                .all(&self.conn)
+                .await?;
+            Ok(rows.into_iter().map(project_from_model).collect())
         })
     }
 
     pub fn project(&self, id: ProjectId) -> Result<Project> {
-        self.run(async |conn| project_by_id(conn, id).await)
+        vibevalley_runtime::rt::block_on(project_by_id(&self.conn, id))
     }
 
     /// Adds the folder as a project, or returns the existing one.
     pub fn add_project(&self, path: &Path) -> Result<Project> {
         let path = normalize(path);
-        self.run(async |conn| {
-            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await?;
+        vibevalley_runtime::rt::block_on(async {
+            let tx = begin_write_tx(&self.conn).await?;
             let text = path_text(&path);
-            let existing = optional(q::find_project_id(&mut *tx, q::FindProjectIdParams { path: text.clone() }).await)?;
-            let id = match existing {
-                Some(row) => row.id,
+            let existing = projects::Entity::find().filter(projects::Column::Path.eq(text.clone())).one(&tx).await?;
+            let project = match existing {
+                Some(row) => project_from_model(row),
                 None => {
-                    q::insert_project(
-                        &mut *tx,
-                        q::InsertProjectParams {
-                            path: text,
-                            name: display_name(&path),
-                            last_opened_ms: now_ms(),
-                        },
-                    )
-                    .await?
-                    .id
+                    let max_position: Option<i64> = projects::Entity::find()
+                        .select_only()
+                        .expr(Expr::col(projects::Column::Position).max())
+                        .into_tuple()
+                        .one(&tx)
+                        .await?
+                        .flatten();
+                    let inserted = projects::ActiveModel {
+                        id: NotSet,
+                        path: Set(text),
+                        name: Set(display_name(&path)),
+                        position: Set(max_position.map_or(0, |m| m + 1)),
+                        last_opened_ms: Set(now_ms()),
+                    }
+                    .insert(&tx)
+                    .await?;
+                    project_from_model(inserted)
                 }
             };
-            let project = project_by_id(&mut tx, id).await?;
             tx.commit().await?;
             Ok(project)
         })
@@ -215,51 +259,61 @@ impl Store {
 
     /// Removes saved layout and terminals even for a database without cascading keys.
     pub fn remove_project(&self, id: ProjectId) -> Result<()> {
-        self.run(async |conn| {
-            let mut tx = conn.begin().await?;
-            q::delete_layout(&mut *tx, q::DeleteLayoutParams { project_id: id }).await?;
-            q::delete_terminals(&mut *tx, q::DeleteTerminalsParams { project_id: id }).await?;
-            changed(q::remove_project(&mut *tx, q::RemoveProjectParams { id }).await?)?;
+        vibevalley_runtime::rt::block_on(async {
+            let tx = begin_write_tx(&self.conn).await?;
+            layouts::Entity::delete_by_id(id).exec(&tx).await?;
+            terminals::Entity::delete_many().filter(terminals::Column::ProjectId.eq(id)).exec(&tx).await?;
+            let res = projects::Entity::delete_by_id(id).exec(&tx).await?;
+            changed(res.rows_affected)?;
             tx.commit().await?;
             Ok(())
         })
     }
 
     pub fn rename_project(&self, id: ProjectId, name: &str) -> Result<()> {
-        self.run(async |conn| changed(q::rename_project(conn, q::RenameProjectParams { id, name: name.into() }).await?))
+        let name = name.to_owned();
+        vibevalley_runtime::rt::block_on(async {
+            let res = projects::Entity::update_many()
+                .col_expr(projects::Column::Name, Expr::value(name))
+                .filter(projects::Column::Id.eq(id))
+                .exec(&self.conn)
+                .await?;
+            changed(res.rows_affected)
+        })
     }
 
     /// Fails with `Db` when another project already lives at `path`.
     pub fn relocate_project(&self, id: ProjectId, path: &Path) -> Result<()> {
-        self.run(async |conn| {
-            changed(
-                q::relocate_project(
-                    conn,
-                    q::RelocateProjectParams {
-                        id,
-                        path: path_text(&normalize(path)),
-                    },
-                )
-                .await?,
-            )
+        let path = path_text(&normalize(path));
+        vibevalley_runtime::rt::block_on(async {
+            let res = projects::Entity::update_many()
+                .col_expr(projects::Column::Path, Expr::value(path))
+                .filter(projects::Column::Id.eq(id))
+                .exec(&self.conn)
+                .await?;
+            changed(res.rows_affected)
         })
     }
 
     /// Listed projects take positions in the given order; all others keep their relative order.
     pub fn reorder_projects(&self, ids_in_order: &[ProjectId]) -> Result<()> {
-        self.run(async |conn| {
-            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await?;
-            let current: Vec<_> = q::list_project_ids(&mut *tx).await?.into_iter().map(|r| r.id).collect();
-            let mut remaining: std::collections::HashSet<_> = current.iter().copied().collect();
-            for (position, id) in ids_in_order.iter().chain(&current).filter(|id| remaining.remove(*id)).enumerate() {
-                q::set_position(
-                    &mut *tx,
-                    q::SetPositionParams {
-                        id: *id,
-                        position: position as i64,
-                    },
-                )
+        vibevalley_runtime::rt::block_on(async {
+            let tx = begin_write_tx(&self.conn).await?;
+            let current: Vec<i64> = projects::Entity::find()
+                .select_only()
+                .column(projects::Column::Id)
+                .order_by_asc(projects::Column::Position)
+                .order_by_asc(projects::Column::Id)
+                .into_tuple()
+                .all(&tx)
                 .await?;
+            let mut remaining: HashSet<_> = current.iter().copied().collect();
+            for (position, id) in ids_in_order.iter().chain(&current).filter(|id| remaining.remove(*id)).enumerate() {
+                projects::Entity::update_many()
+                    .col_expr(projects::Column::Position, Expr::value(position as i64))
+                    .filter(projects::Column::Id.eq(*id))
+                    .exec(&tx)
+                    .await?;
             }
             tx.commit().await?;
             Ok(())
@@ -267,28 +321,34 @@ impl Store {
     }
 
     pub fn touch_project(&self, id: ProjectId) -> Result<()> {
-        self.run(async |conn| changed(q::touch_project(conn, q::TouchProjectParams { id, last_opened_ms: now_ms() }).await?))
+        vibevalley_runtime::rt::block_on(async {
+            let res = projects::Entity::update_many()
+                .col_expr(projects::Column::LastOpenedMs, Expr::value(now_ms()))
+                .filter(projects::Column::Id.eq(id))
+                .exec(&self.conn)
+                .await?;
+            changed(res.rows_affected)
+        })
     }
 
     pub fn layout(&self, id: ProjectId) -> Result<Option<serde_json::Value>> {
-        self.run(async |conn| {
-            let row = optional(q::read_layout(conn, q::ReadLayoutParams { project_id: id }).await)?;
+        vibevalley_runtime::rt::block_on(async {
+            let row = layouts::Entity::find_by_id(id).one(&self.conn).await?;
             Ok(row.map(|r| serde_json::from_str(&r.json)).transpose()?)
         })
     }
 
     pub fn set_layout(&self, id: ProjectId, layout: &serde_json::Value) -> Result<()> {
-        self.run(async |conn| {
-            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await?;
-            let project_id = q::require_project(&mut *tx, q::RequireProjectParams { id }).await?.id;
-            q::write_layout(
-                &mut *tx,
-                q::WriteLayoutParams {
-                    project_id,
-                    json: serde_json::to_string(layout)?,
-                },
-            )
-            .await?;
+        let json = serde_json::to_string(layout)?;
+        vibevalley_runtime::rt::block_on(async {
+            let tx = begin_write_tx(&self.conn).await?;
+            require_project(&tx, id).await?;
+            let model = layouts::ActiveModel {
+                project_id: Set(id),
+                json: Set(json),
+            };
+            let on_conflict = OnConflict::column(layouts::Column::ProjectId).update_column(layouts::Column::Json).to_owned();
+            layouts::Entity::insert(model).on_conflict(on_conflict).exec(&tx).await?;
             tx.commit().await?;
             Ok(())
         })
@@ -296,9 +356,13 @@ impl Store {
 
     /// In the order they were saved.
     pub fn terminals(&self, project_id: ProjectId) -> Result<Vec<SavedTerminal>> {
-        self.run(async |conn| {
-            Ok(q::list_terminals(conn, q::ListTerminalsParams { project_id })
-                .await?
+        vibevalley_runtime::rt::block_on(async {
+            let rows = terminals::Entity::find()
+                .filter(terminals::Column::ProjectId.eq(project_id))
+                .order_by_asc(terminals::Column::Ord)
+                .all(&self.conn)
+                .await?;
+            Ok(rows
                 .into_iter()
                 .map(|r| SavedTerminal {
                     id: r.id,
@@ -313,23 +377,20 @@ impl Store {
 
     /// Replaces the set atomically. A restored row belongs to the requested project.
     pub fn set_terminals(&self, id: ProjectId, terminals: &[SavedTerminal]) -> Result<()> {
-        self.run(async |conn| {
-            let mut tx = conn.begin_with("BEGIN IMMEDIATE").await?;
-            let project_id = q::require_project(&mut *tx, q::RequireProjectParams { id }).await?.id;
-            q::delete_terminals(&mut *tx, q::DeleteTerminalsParams { project_id }).await?;
-            for (ord, term) in terminals.iter().enumerate() {
-                q::insert_terminal(
-                    &mut *tx,
-                    q::InsertTerminalParams {
-                        project_id,
-                        id: term.id.clone(),
-                        ord: ord as i64,
-                        cwd: path_text(&term.cwd),
-                        title: term.title.clone(),
-                        scrollback: term.scrollback.clone(),
-                    },
-                )
-                .await?;
+        vibevalley_runtime::rt::block_on(async {
+            let tx = begin_write_tx(&self.conn).await?;
+            require_project(&tx, id).await?;
+            terminals::Entity::delete_many().filter(terminals::Column::ProjectId.eq(id)).exec(&tx).await?;
+            if !terminals.is_empty() {
+                let models = terminals.iter().enumerate().map(|(ord, term)| terminals::ActiveModel {
+                    project_id: Set(id),
+                    id: Set(term.id.clone()),
+                    ord: Set(ord as i64),
+                    cwd: Set(path_text(&term.cwd)),
+                    title: Set(term.title.clone()),
+                    scrollback: Set(term.scrollback.clone()),
+                });
+                terminals::Entity::insert_many(models).exec(&tx).await?;
             }
             tx.commit().await?;
             Ok(())
@@ -337,26 +398,26 @@ impl Store {
     }
 
     pub fn setting(&self, key: &str) -> Result<Option<serde_json::Value>> {
-        self.run(async |conn| {
-            let row = optional(q::read_setting(conn, q::ReadSettingParams { key: key.into() }).await)?;
+        let key = key.to_owned();
+        vibevalley_runtime::rt::block_on(async {
+            let row = settings::Entity::find_by_id(key).one(&self.conn).await?;
             Ok(row.map(|r| serde_json::from_str(&r.value)).transpose()?)
         })
     }
 
     /// Setting a key to JSON `null` removes it.
     pub fn set_setting(&self, key: &str, value: &serde_json::Value) -> Result<()> {
-        self.run(async |conn| {
+        let key = key.to_owned();
+        vibevalley_runtime::rt::block_on(async {
             if value.is_null() {
-                q::delete_setting(conn, q::DeleteSettingParams { key: key.into() }).await?;
+                settings::Entity::delete_by_id(key).exec(&self.conn).await?;
             } else {
-                q::write_setting(
-                    conn,
-                    q::WriteSettingParams {
-                        key: key.into(),
-                        value: serde_json::to_string(value)?,
-                    },
-                )
-                .await?;
+                let model = settings::ActiveModel {
+                    key: Set(key),
+                    value: Set(serde_json::to_string(value)?),
+                };
+                let on_conflict = OnConflict::column(settings::Column::Key).update_column(settings::Column::Value).to_owned();
+                settings::Entity::insert(model).on_conflict(on_conflict).exec(&self.conn).await?;
             }
             Ok(())
         })

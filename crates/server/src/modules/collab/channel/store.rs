@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
-use sqlx::{Connection, Sqlite, SqliteConnection, Transaction};
+use sea_orm::{ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbErr};
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{ApiError, Channel, ChannelLast, ChannelUnread, DEFAULT_ORCHESTRATOR, EVERYONE, USER_ID};
 
@@ -21,7 +21,7 @@ pub(super) trait Q<T> {
     fn q(self) -> Result<T, ApiError>;
 }
 
-impl<T> Q<T> for sqlx::Result<T> {
+impl<T> Q<T> for Result<T, DbErr> {
     fn q(self) -> Result<T, ApiError> {
         self.map_err(internal)
     }
@@ -30,7 +30,7 @@ impl<T> Q<T> for sqlx::Result<T> {
 /// Write-side state under `Chat::inner`: the committed `ChatModel` staged
 /// inside transactions, delivery loop-guard state, and the atomic snapshot
 /// handle published on commit. Read-only queries bypass this lock and read
-/// `Chat::snapshot` + the WAL `read_pool` directly.
+/// `Chat::snapshot` + `ServerDb::read_conn()` directly.
 pub struct Inner {
     pub(super) model: ChatModel,
     pub(super) reach: Reach,
@@ -44,19 +44,19 @@ impl Inner {
 }
 
 /// Stages in-memory `ChatModel` and `Reach` mutations alongside an open
-/// `BEGIN IMMEDIATE` SQLite transaction. Dropping without [`WriteTx::commit`]
-/// rolls back SQLite automatically and leaves [`Inner`] untouched; on commit,
+/// write transaction. Dropping without [`WriteTx::commit`]
+/// rolls back automatically and leaves [`Inner`] untouched; on commit,
 /// the new `ChatModel` is published atomically to lock-free readers via `snapshot`.
 pub(super) struct WriteTx<'a> {
     inner: &'a mut Inner,
     pub(super) model: ChatModel,
     pub(super) reach: Reach,
-    pub(super) tx: Transaction<'a, Sqlite>,
+    pub(super) tx: DatabaseTransaction,
 }
 
 impl<'a> WriteTx<'a> {
-    pub(super) async fn begin(inner: &'a mut Inner, conn: &'a mut SqliteConnection) -> Result<Self, ApiError> {
-        let tx = conn.begin_with("BEGIN IMMEDIATE").await.q()?;
+    pub(super) async fn begin(inner: &'a mut Inner, conn: &DatabaseConnection) -> Result<Self, ApiError> {
+        let tx = crate::db::begin_write_tx(conn).await.q()?;
         Ok(Self {
             model: inner.model.clone(),
             reach: inner.reach.clone(),
@@ -74,13 +74,13 @@ impl<'a> WriteTx<'a> {
     }
 
     pub(super) async fn add_member(&mut self, channel: &str, participant: &str, reason: &str, from: i64) -> Result<(), ApiError> {
-        db::add_member(&mut self.tx, channel, participant, reason, from).await.q()?;
+        db::add_member(&self.tx, channel, participant, reason, from).await.q()?;
         self.model.member_added(channel, participant);
         Ok(())
     }
 
     async fn upsert_participant(&mut self, p: ParticipantRow) -> Result<(), ApiError> {
-        db::upsert_participant(&mut self.tx, &p).await.q()?;
+        db::upsert_participant(&self.tx, &p).await.q()?;
         self.model.joined(p);
         Ok(())
     }
@@ -103,7 +103,7 @@ impl<'a> WriteTx<'a> {
     }
 
     pub(super) async fn set_read(&mut self, who: &str, channel: &str, upto: i64, at: i64) -> Result<(), ApiError> {
-        db::set_read_cursor(&mut self.tx, who, channel, upto, at).await.q()?;
+        db::set_read_cursor(&self.tx, who, channel, upto, at).await.q()?;
         if who == USER_ID {
             self.model.user_read_to(channel, upto);
         }
@@ -111,7 +111,7 @@ impl<'a> WriteTx<'a> {
     }
 
     pub(super) async fn touch_channel(&mut self, id: &str, number: i64) -> Result<(), ApiError> {
-        db::touch_channel(&mut self.tx, id, number).await.q()?;
+        db::touch_channel(&self.tx, id, number).await.q()?;
         self.model.touched(id, number);
         Ok(())
     }
@@ -124,7 +124,7 @@ impl<'a> WriteTx<'a> {
         let id = new_id();
         let at = now();
         let subject_id = (!subject.id.is_empty()).then_some(subject.id.as_str());
-        db::create_thread(&mut self.tx, &id, root_id, root_number, subject.kind.as_str(), subject_id, channel, at)
+        db::create_thread(&self.tx, &id, root_id, root_number, subject.kind.as_str(), subject_id, channel, at)
             .await
             .q()?;
         self.model.created(ChannelRow {
@@ -174,13 +174,13 @@ impl<'a> WriteTx<'a> {
             } else {
                 "unknown"
             };
-            db::insert_mention(&mut self.tx, &row.id, m, how).await.q()?;
+            db::insert_mention(&self.tx, &row.id, m, how).await.q()?;
             named.push((m.clone(), how));
         }
         if !mentions.is_empty() {
             meta.mentions = Some(mentions);
             row.meta = meta_text(Some(&meta));
-            db::update_message_meta(&mut self.tx, &row.id, row.meta.as_deref()).await.q()?;
+            db::update_message_meta(&self.tx, &row.id, row.meta.as_deref()).await.q()?;
         }
         if ch.r#type == "thread" {
             // A dispatch handing the issue on makes no one a member: the orchestrator would be woken by every word in it.
@@ -202,7 +202,7 @@ impl<'a> WriteTx<'a> {
     }
 }
 
-pub(super) async fn message_of(conn: &mut SqliteConnection, id: &str) -> Result<MsgRow, ApiError> {
+pub(super) async fn message_of<C: ConnectionTrait>(conn: &C, id: &str) -> Result<MsgRow, ApiError> {
     db::message_by_id(conn, id)
         .await
         .q()?
@@ -356,7 +356,7 @@ impl ChatModel {
 
     /// `counted`: a channel as a page lists it, with the user's unread and
     /// a title.
-    pub(super) async fn counted_async(&self, conn: &mut SqliteConnection, row: &ChannelRow) -> Result<Channel, ApiError> {
+    pub(super) async fn counted_async<C: ConnectionTrait>(&self, conn: &C, row: &ChannelRow) -> Result<Channel, ApiError> {
         let n = match row.notify.as_str() {
             "none" => 0,
             "mentions" => db::user_mentions(conn).await.q()?.iter().filter(|m| m.row.channel_id == row.id).count() as i64,
@@ -448,7 +448,7 @@ impl ChatModel {
 
     /// A participant's unread: the channel given, or the one its home is
     /// in (else the default), and the threads it follows.
-    pub(super) async fn unread_of_async(&self, conn: &mut SqliteConnection, who: &str, in_channel: Option<&str>) -> Result<Vec<ChannelUnread>, ApiError> {
+    pub(super) async fn unread_of_async<C: ConnectionTrait>(&self, conn: &C, who: &str, in_channel: Option<&str>) -> Result<Vec<ChannelUnread>, ApiError> {
         let channel = in_channel
             .map(str::to_string)
             .or_else(|| self.home_of(who).and_then(|h| self.top_of_row(self.channel(&h)).map(|t| t.id.clone())))
@@ -496,7 +496,7 @@ impl ChatModel {
 
     /// `answersOf`: a helper's words answer the session that last named it
     /// there since it last spoke.
-    pub(super) async fn answers_of_async(&self, conn: &mut SqliteConnection, row: &MsgRow) -> Result<Option<String>, ApiError> {
+    pub(super) async fn answers_of_async<C: ConnectionTrait>(&self, conn: &C, row: &MsgRow) -> Result<Option<String>, ApiError> {
         if row.kind != "chat" || row.sender_kind != "agent" || self.is_orchestrator_seat(&row.sender_id) {
             return Ok(None);
         }

@@ -63,12 +63,14 @@ impl Sessions {
             return Ok(false);
         };
         Ok(self.0.durable.write(|tx| {
-            let Some(mut run) = db::run(tx.connection(), id)? else { return Ok(false) };
+            let Some(mut run) = crate::modules::work::block_on(db::run(tx.transaction(), id))? else {
+                return Ok(false);
+            };
             if run.outcome.is_some() {
                 return Ok(false);
             }
             bind(tx, &mut run, submission)?;
-            db::put_run(tx.connection(), &run)?;
+            crate::modules::work::block_on(db::put_run(tx.transaction(), &run))?;
             Ok(true)
         })?)
     }
@@ -118,7 +120,7 @@ pub(crate) fn interrupt_on_reopen(
     let Some(mut extra) = extra.cloned() else { return Ok(None) };
     let Some(id) = extra.run.take() else { return Ok(None) };
     let mut needs_reconciliation = false;
-    if let Some(mut run) = db::run(tx.connection(), &id)? {
+    if let Some(mut run) = crate::modules::work::block_on(db::run(tx.transaction(), &id))? {
         if run.outcome.is_none() {
             run.ended_at = Some(at);
             run.outcome = Some(Outcome::Interrupted);
@@ -132,11 +134,11 @@ pub(crate) fn interrupt_on_reopen(
                 )?;
                 run.needs_reconciliation = true;
             }
-            db::put_run(tx.connection(), &run)?;
+            crate::modules::work::block_on(db::put_run(tx.transaction(), &run))?;
             settle_run(tx, &run)?;
         }
         needs_reconciliation = run.needs_reconciliation;
     }
-    db::put_extra(tx.connection(), &session.id, &extra)?;
+    crate::modules::work::block_on(db::put_extra(tx.transaction(), &session.id, &extra))?;
     Ok(Some((id, needs_reconciliation)))
 }

@@ -17,6 +17,7 @@ members = [
   "apps/mac/crates/pixel",
   "apps/mac/crates/terminal",
   "apps/mac/crates/workspace",
+  "xtask",
 ]
 exclude = ["apps/mac/ui"]
 
@@ -39,10 +40,26 @@ parking_lot = "0.12"
 regex = "1.13.1"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider", "json", "stream"] }
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std"] }
+sea-orm = { version = "2.0.4", default-features = false, features = [
+  "macros",
+  "with-json",
+  "with-uuid",
+  "runtime-tokio-rustls",
+  "sqlx-sqlite",
+  "sqlx-postgres",
+  "sqlite-use-returning-for-3_35",
+] }
+sea-orm-migration = { version = "2.0.4", default-features = false, features = [
+  "runtime-tokio-rustls",
+  "sqlx-sqlite",
+  "sqlx-postgres",
+  "sqlite-use-returning-for-3_35",
+] }
+sea-query = { version = "1.0.2", default-features = false, features = ["backend-sqlite", "backend-postgres", "with-json", "with-uuid", "thread-safe"] }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
-sqlx = { version = "0.9.1", default-features = false, features = ["sqlite", "derive"] }
+sqlx = { version = "0.9.1", default-features = false, features = ["sqlite", "postgres", "derive"] }
 tempfile = "3.27.0"
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["fs", "macros", "net", "process", "rt", "rt-multi-thread", "signal", "sync", "time"] }

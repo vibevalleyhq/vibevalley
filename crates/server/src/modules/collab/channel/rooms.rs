@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use sqlx::SqliteConnection;
+use sea_orm::ConnectionTrait;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::{list, t};
@@ -67,12 +67,12 @@ impl Chat {
         };
         let before = opt.before.filter(|b| *b != 0);
         let rows = {
-            let mut rconn = self.db.read_pool().acquire().await.q()?;
-            let cursor = db::read_cursor(&mut rconn, who, &channel).await.q()?.unwrap_or(0);
+            let rconn = self.db.read_conn();
+            let cursor = db::read_cursor(rconn, who, &channel).await.q()?.unwrap_or(0);
             if opt.unread {
-                db::messages_after(&mut rconn, &channel, cursor, limit).await.q()?
+                db::messages_after(rconn, &channel, cursor, limit).await.q()?
             } else {
-                let mut rows = db::messages_before(&mut rconn, &channel, before.unwrap_or(NO_NUMBER), limit).await.q()?;
+                let mut rows = db::messages_before(rconn, &channel, before.unwrap_or(NO_NUMBER), limit).await.q()?;
                 rows.reverse();
                 rows
             }
@@ -90,10 +90,7 @@ impl Chat {
         }
         inner.model.last_read.insert(who.into(), target.clone());
         let older = match rows.first() {
-            Some(oldest) => {
-                let mut rconn = self.db.read_pool().acquire().await.q()?;
-                !db::messages_before(&mut rconn, &channel, oldest.number, 1).await.q()?.is_empty()
-            }
+            Some(oldest) => !db::messages_before(self.db.read_conn(), &channel, oldest.number, 1).await.q()?.is_empty(),
             None => false,
         };
         let messages = rows.iter().map(|r| inner.model.addressed_of(r, &self.files)).collect();
@@ -108,12 +105,7 @@ impl Chat {
     pub async fn unread_async(&self, who: &str, channel: Option<&str>) -> Vec<ChannelUnread> {
         self.prepare_seat(who);
         let model = self.snapshot.load_full();
-        let res = async {
-            let mut conn = self.db.read_pool().acquire().await.q()?;
-            model.unread_of_async(&mut conn, who, channel).await
-        }
-        .await;
-        res.unwrap_or_else(|e| {
+        model.unread_of_async(self.db.read_conn(), who, channel).await.unwrap_or_else(|e| {
             eprintln!("vibevalley-server: chat: unread of {who}: {}", e.message);
             vec![]
         })
@@ -126,10 +118,10 @@ impl Chat {
 
     pub async fn list_async(&self) -> Result<Vec<Channel>, ApiError> {
         let model = self.snapshot.load_full();
-        let mut conn = self.db.read_pool().acquire().await.q()?;
+        let conn = self.db.read_conn();
         let mut out = vec![];
         for row in model.channels("channel").iter().chain(model.channels("direct").iter()) {
-            out.push(model.counted_async(&mut conn, row).await?);
+            out.push(model.counted_async(conn, row).await?);
         }
         Ok(out)
     }
@@ -154,8 +146,7 @@ impl Chat {
                 place
             }
         };
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        let mut rows = db::messages_before(&mut conn, &at, before.unwrap_or(NO_NUMBER), limit.unwrap_or(50).clamp(1, 200))
+        let mut rows = db::messages_before(self.db.read_conn(), &at, before.unwrap_or(NO_NUMBER), limit.unwrap_or(50).clamp(1, 200))
             .await
             .q()?;
         rows.reverse();
@@ -178,12 +169,8 @@ impl Chat {
 
     /// `messageLocation`: a message's place and the channel it is in.
     pub async fn message_location_async(&self, id: &str) -> Result<Option<(Channel, String)>, ApiError> {
-        let m = {
-            let mut conn = self.db.read_pool().acquire().await.q()?;
-            let Some(m) = db::message_by_id(&mut conn, id).await.q()? else {
-                return Ok(None);
-            };
-            m
+        let Some(m) = db::message_by_id(self.db.read_conn(), id).await.q()? else {
+            return Ok(None);
         };
         let model = self.model();
         let Some(row) = model.channel(&m.channel_id) else { return Ok(None) };
@@ -198,11 +185,11 @@ impl Chat {
     /// `userReceipt`: when the user read a message, and whether a later one
     /// took its place; none once it is deleted.
     pub async fn user_receipt_async(&self, id: &str) -> Result<Option<(ChatMessage, Option<i64>, bool)>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        let Some(row) = db::message_by_id(&mut conn, id).await.q()?.filter(|r| r.deleted_at.is_none()) else {
+        let conn = self.db.read_conn();
+        let Some(row) = db::message_by_id(conn, id).await.q()?.filter(|r| r.deleted_at.is_none()) else {
             return Ok(None);
         };
-        let Some((read_at, superseded)) = db::notification_receipt(&mut conn, id).await.q()? else {
+        let Some((read_at, superseded)) = db::notification_receipt(conn, id).await.q()? else {
             return Ok(None);
         };
         Ok(Some((to_message(&row), read_at, superseded)))
@@ -210,8 +197,7 @@ impl Chat {
 
     /// Each speaker's newest report the user has read: (from, at, readAt).
     pub async fn user_read_reports_async(&self) -> Result<Vec<(String, i64, i64)>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        db::user_read_reports(&mut conn).await.q()
+        db::user_read_reports(self.db.read_conn()).await.q()
     }
 
     pub fn home_of(&self, participant: &str) -> Option<String> {
@@ -224,18 +210,14 @@ impl Chat {
     }
 
     pub async fn events_async(&self, after: i64, n: i64) -> Result<Vec<EventRow>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        db::events_after(&mut conn, after, n).await.q()
+        db::events_after(self.db.read_conn(), after, n).await.q()
     }
 
     /// A posted message as it is now, told as when it was committed.
     pub async fn committed_of_async(&self, message: &str) -> Result<Option<Committed>, ApiError> {
-        let (row, event) = {
-            let mut conn = self.db.read_pool().acquire().await.q()?;
-            let row = db::message_by_id(&mut conn, message).await.q()?;
-            let event = db::event_of(&mut conn, message).await.q()?;
-            (row, event)
-        };
+        let conn = self.db.read_conn();
+        let row = db::message_by_id(conn, message).await.q()?;
+        let event = db::event_of(conn, message).await.q()?;
         let model = self.model();
         Ok(match (row, event) {
             (Some(row), Some(e)) if row.deleted_at.is_none() => model.committed_from(&row, &e),
@@ -255,8 +237,7 @@ impl Chat {
     }
 
     pub async fn pending_deliveries_async(&self, kind: DeliveryTargetKind) -> Result<Vec<QueuedDelivery>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        Ok(db::pending_deliveries_by_kind(&mut conn, kind.as_str())
+        Ok(db::pending_deliveries_by_kind(self.db.read_conn(), kind.as_str())
             .await
             .q()?
             .into_iter()
@@ -265,8 +246,7 @@ impl Chat {
     }
 
     pub async fn pending_deliveries_for_async(&self, kind: DeliveryTargetKind, recipient: &str, max_id: i64) -> Result<Vec<QueuedDelivery>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        Ok(db::pending_deliveries_for_recipient(&mut conn, kind.as_str(), recipient, max_id)
+        Ok(db::pending_deliveries_for_recipient(self.db.read_conn(), kind.as_str(), recipient, max_id)
             .await
             .q()?
             .into_iter()
@@ -275,8 +255,7 @@ impl Chat {
     }
 
     pub async fn delivery_is_pending_async(&self, id: i64) -> Result<bool, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        db::delivery_is_pending(&mut conn, id).await.q()
+        db::delivery_is_pending(self.db.read_conn(), id).await.q()
     }
 
     pub fn settle_delivery(&self, id: i64, delivered: bool) -> Result<(), ApiError> {
@@ -285,13 +264,11 @@ impl Chat {
 
     pub async fn settle_delivery_async(&self, id: i64, delivered: bool) -> Result<(), ApiError> {
         let status = if delivered { "delivered" } else { "failed" };
-        let mut conn = self.db.write_pool().acquire().await.q()?;
-        db::settle_delivery(&mut conn, id, status, now()).await.q()
+        db::settle_delivery(self.db.write_conn(), id, status, now()).await.q()
     }
 
     pub async fn withdraw_delivery_async(&self, id: i64) -> Result<(), ApiError> {
-        let mut conn = self.db.write_pool().acquire().await.q()?;
-        db::settle_delivery(&mut conn, id, "withdrawn", now()).await.q()
+        db::settle_delivery(self.db.write_conn(), id, "withdrawn", now()).await.q()
     }
 
     /// Ensures a session's thread is opened and seated before it speaks or reads.
@@ -319,8 +296,7 @@ impl Chat {
             return Ok(());
         }
         let mut inner = self.locked().await;
-        let mut conn = self.db.write_pool().acquire().await.q()?;
-        let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+        let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
         wtx.seat(seat).await?;
         wtx.commit().await
     }
@@ -333,11 +309,10 @@ impl Chat {
     pub async fn leave_async(&self, participant: &str) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
         let at = now();
-        let mut conn = self.db.write_pool().acquire().await.q()?;
-        let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
-        db::participant_left(&mut wtx.tx, participant, at).await.q()?;
-        db::remove_from_all(&mut wtx.tx, participant, at).await.q()?;
-        db::withdraw_deliveries_for_recipient(&mut wtx.tx, DeliveryTargetKind::Session.as_str(), participant, at)
+        let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
+        db::participant_left(&wtx.tx, participant, at).await.q()?;
+        db::remove_from_all(&wtx.tx, participant, at).await.q()?;
+        db::withdraw_deliveries_for_recipient(&wtx.tx, DeliveryTargetKind::Session.as_str(), participant, at)
             .await
             .q()?;
         wtx.model.left(participant, at);
@@ -359,8 +334,7 @@ impl Chat {
         let Some(last) = inner.model.channel(channel).map(|r| r.last_number.unwrap_or(0)) else {
             return Ok(());
         };
-        let mut conn = self.db.write_pool().acquire().await.q()?;
-        let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+        let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
         wtx.add_member(channel, participant, "user", last).await?;
         wtx.commit().await
     }
@@ -379,8 +353,7 @@ impl Chat {
     }
 
     pub async fn mark_seen_async(&self, participant: &str, message: &str) -> Result<(), ApiError> {
-        let mut conn = self.db.write_pool().acquire().await.q()?;
-        db::mark_seen(&mut conn, participant, message, now()).await.q()
+        db::mark_seen(self.db.write_conn(), participant, message, now()).await.q()
     }
 
     pub fn read_up_to(&self, participant: &str, channel: &str, number: i64) -> Result<(), ApiError> {
@@ -389,8 +362,7 @@ impl Chat {
 
     pub async fn read_up_to_async(&self, participant: &str, channel: &str, number: i64) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
-        let mut conn = self.db.write_pool().acquire().await.q()?;
-        let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+        let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
         wtx.set_read(participant, channel, number, now()).await?;
         wtx.commit().await
     }
@@ -400,8 +372,7 @@ impl Chat {
     }
 
     pub async fn latest_async(&self, channel: &str) -> Result<i64, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        db::latest_number(&mut conn, channel).await.q()
+        db::latest_number(self.db.read_conn(), channel).await.q()
     }
 
     pub fn dispatch_count(&self, thread: &str) -> Result<i64, ApiError> {
@@ -409,21 +380,18 @@ impl Chat {
     }
 
     pub async fn dispatch_count_async(&self, thread: &str) -> Result<i64, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        db::dispatches_in(&mut conn, thread).await.q()
+        db::dispatches_in(self.db.read_conn(), thread).await.q()
     }
 
     /// The newest n messages of a place, oldest first.
     pub async fn recent_rows_async(&self, channel: &str, n: i64) -> Result<Vec<MsgRow>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        let mut rows = db::messages_before(&mut conn, channel, NO_NUMBER, n).await.q()?;
+        let mut rows = db::messages_before(self.db.read_conn(), channel, NO_NUMBER, n).await.q()?;
         rows.reverse();
         Ok(rows)
     }
 
     pub async fn rows_after_async(&self, channel: &str, after: i64) -> Result<Vec<MsgRow>, ApiError> {
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        db::messages_after(&mut conn, channel, after, 1000).await.q()
+        db::messages_after(self.db.read_conn(), channel, after, 1000).await.q()
     }
 
     pub fn addressed_of(&self, row: &MsgRow) -> AddressedMessage {
@@ -503,9 +471,8 @@ impl Chat {
         let id = new_id();
         let at = now();
         {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
-            db::create_channel(&mut wtx.tx, &id, false, &clean, desc.as_deref(), proj.as_deref(), at)
+            let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
+            db::create_channel(&wtx.tx, &id, false, &clean, desc.as_deref(), proj.as_deref(), at)
                 .await
                 .q()?;
             wtx.model.created(ChannelRow {
@@ -602,27 +569,26 @@ impl Chat {
             rest
         });
         {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
+            let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
             if row.r#type == "channel" {
-                db::update_channel(&mut wtx.tx, id, desc.as_deref(), proj.as_deref()).await.q()?;
+                db::update_channel(&wtx.tx, id, desc.as_deref(), proj.as_deref()).await.q()?;
             }
             if name != row.name {
-                db::rename_channel(&mut wtx.tx, id, name.as_deref()).await.q()?;
+                db::rename_channel(&wtx.tx, id, name.as_deref()).await.q()?;
             }
             if category != row.category {
-                db::set_category(&mut wtx.tx, id, category.as_deref()).await.q()?;
+                db::set_category(&wtx.tx, id, category.as_deref()).await.q()?;
             }
             for m in &joining {
                 wtx.add_member(id, m, "manual", 0).await?;
             }
             let at = now();
             for m in &leaving {
-                db::remove_member(&mut wtx.tx, id, m, at).await.q()?;
+                db::remove_member(&wtx.tx, id, m, at).await.q()?;
                 wtx.model.member_removed(id, m);
             }
             for (position, each) in order.iter().flatten().enumerate() {
-                db::place_channel(&mut wtx.tx, each, position as i64).await.q()?;
+                db::place_channel(&wtx.tx, each, position as i64).await.q()?;
             }
             let row_type = row.r#type.clone();
             wtx.model.patch(id, |c| {
@@ -666,9 +632,8 @@ impl Chat {
         }
         let at = on.then(now);
         {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
-            db::set_archived(&mut wtx.tx, id, at).await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
+            db::set_archived(&wtx.tx, id, at).await.q()?;
             wtx.model.patch(id, |c| c.archived_at = at);
             wtx.commit().await?;
         }
@@ -676,7 +641,7 @@ impl Chat {
     }
 
     /// `removable`: a channel nothing points at; (target, threads, said).
-    async fn removable_with_async(&self, model: &ChatModel, conn: &mut SqliteConnection, id: &str) -> Result<(String, usize, i64), ApiError> {
+    async fn removable_with_async<C: ConnectionTrait>(&self, model: &ChatModel, conn: &C, id: &str) -> Result<(String, usize, i64), ApiError> {
         let row = model.channel(id).filter(|r| r.r#type == "channel").ok_or_else(|| no_channel(id))?;
         if row.is_default {
             return Err(refused(t("server.channel.defaultStays", &[])));
@@ -706,8 +671,7 @@ impl Chat {
 
     pub async fn preview_remove_channel_async(&self, id: &str) -> Result<Preview, ApiError> {
         let model = self.snapshot.load_full();
-        let mut conn = self.db.read_pool().acquire().await.q()?;
-        let (target, threads, said) = self.removable_with_async(&model, &mut conn, id).await?;
+        let (target, threads, said) = self.removable_with_async(&model, self.db.read_conn(), id).await?;
         Ok(Preview {
             does: vec![t(
                 "server.channel.deletesChannel",
@@ -718,18 +682,14 @@ impl Chat {
 
     pub async fn remove_channel_async(&self, id: &str) -> Result<(), ApiError> {
         let mut inner = self.locked().await;
-        {
-            let mut rconn = self.db.read_pool().acquire().await.q()?;
-            self.removable_with_async(&inner.model, &mut rconn, id).await?;
-        }
+        self.removable_with_async(&inner.model, self.db.read_conn(), id).await?;
         let mut gone: Vec<String> = vec![];
         for c in inner.model.channel(id).into_iter().cloned().chain(inner.model.threads_of(id)) {
             gone.push(inner.model.target_of_channel(&c));
         }
         {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
-            db::delete_channel(&mut wtx.tx, id).await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
+            db::delete_channel(&wtx.tx, id).await.q()?;
             wtx.model.removed(id);
             wtx.reach.channel_removed(id);
             wtx.model.last_read.retain(|_, target| !gone.contains(target));
@@ -745,9 +705,8 @@ impl Chat {
             return Err(no_channel(id));
         }
         {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
-            db::set_notify(&mut wtx.tx, id, notify.as_str()).await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
+            db::set_notify(&wtx.tx, id, notify.as_str()).await.q()?;
             wtx.model.patch(id, |c| c.notify = notify.as_str().into());
             wtx.commit().await?;
         }
@@ -790,9 +749,8 @@ impl Chat {
         let id = new_id();
         let at = now();
         {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
-            db::create_direct(&mut wtx.tx, &id, peer, at).await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
+            db::create_direct(&wtx.tx, &id, peer, at).await.q()?;
             wtx.model.created(ChannelRow {
                 peer_id: Some(peer.into()),
                 ..ChannelRow::empty(&id, "direct", at)
@@ -810,9 +768,8 @@ impl Chat {
         }
         let upto = (number - 1).max(0);
         {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
-            db::mark_unread(&mut wtx.tx, channel, upto, now()).await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
+            db::mark_unread(&wtx.tx, channel, upto, now()).await.q()?;
             wtx.model.user_read_back(channel, upto);
             wtx.commit().await?;
         }
@@ -831,10 +788,9 @@ impl Chat {
             return Ok(());
         }
         {
-            let mut conn = self.db.write_pool().acquire().await.q()?;
-            let mut wtx = WriteTx::begin(&mut inner, &mut conn).await?;
-            db::clear_default(&mut wtx.tx).await.q()?;
-            db::make_default(&mut wtx.tx, id).await.q()?;
+            let mut wtx = WriteTx::begin(&mut inner, self.db.write_conn()).await?;
+            db::clear_default(&wtx.tx).await.q()?;
+            db::make_default(&wtx.tx, id).await.q()?;
             wtx.model.default_moved(&was, id);
             wtx.commit().await?;
         }
@@ -855,12 +811,9 @@ impl Chat {
         let hub = self.hub.upgrade();
         let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
         let fut = async move {
-            let missed = {
-                let Ok(mut conn) = db.read_pool().acquire().await else { return };
-                match db::messages_changed_after(&mut conn, &channel, after, CATCH_UP_MAX as i64 + 1).await {
-                    Ok(rows) => rows,
-                    Err(_) => return,
-                }
+            let missed = match db::messages_changed_after(db.read_conn(), &channel, after, CATCH_UP_MAX as i64 + 1).await {
+                Ok(rows) => rows,
+                Err(_) => return,
             };
             if missed.len() > CATCH_UP_MAX {
                 sink.send(&ProtocolChannelEvent::Reset {});
@@ -891,13 +844,13 @@ impl Chat {
         let cancel = hub.as_ref().map(|h| h.child_token()).unwrap_or_default();
         let fut = async move {
             let missed = {
-                let Ok(mut conn) = db.read_pool().acquire().await else { return };
+                let conn = db.read_conn();
                 let res = match &after {
-                    None => db::recent_reports(&mut conn, LOG_KEEP).await.map(|mut rows| {
+                    None => db::recent_reports(conn, LOG_KEEP).await.map(|mut rows| {
                         rows.reverse();
                         rows
                     }),
-                    Some(a) => db::reports_after(&mut conn, a, CATCH_UP_MAX as i64 + 1).await,
+                    Some(a) => db::reports_after(conn, a, CATCH_UP_MAX as i64 + 1).await,
                 };
                 match res {
                     Ok(rows) => rows,

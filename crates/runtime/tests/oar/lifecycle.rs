@@ -1,5 +1,11 @@
 use serde_json::{Value, json};
-use std::{fs, io::Cursor, os::unix::fs::PermissionsExt, path::Path, sync::Arc, time::Duration};
+use std::{
+    fs,
+    io::Cursor,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 use vibevalley_runtime::oar::{
     ControlAction as A, ControlStatus as S, EventKind, SessionOptions,
     subagent::{Pool, parse_depth},
@@ -68,9 +74,7 @@ fn child_slots_are_released_after_failure_dispose_and_close() {
 fn queue_withdraw_raw_frames_cursors_and_reopen() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("session.jsonl");
-    let binary = dir.path().join("replay");
-    fs::write(&binary, include_bytes!("../fixtures/cli_replay.py")).unwrap();
-    fs::set_permissions(&binary, fs::Permissions::from_mode(0o700)).unwrap();
+    let binary = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/go-claude.json");
     let mut sequence: Value = serde_json::from_slice(&fs::read(fixture).unwrap()).unwrap();
     sequence["hold"] = json!([]);
@@ -81,7 +85,10 @@ fn queue_withdraw_raw_frames_cursors_and_reopen() {
         bin_path: Some(binary),
         cwd: dir.path().into(),
         record_to: Some(file.clone()),
-        env: vec![("OAR_REPLAY_FILE".into(), script.display().to_string())],
+        env: vec![
+            ("VV_FIXTURE".into(), "cli_replay".into()),
+            ("OAR_REPLAY_FILE".into(), script.display().to_string()),
+        ],
         ..Default::default()
     };
     let runtime = vibevalley_runtime::oar::default_runtimes().require("claude").unwrap();
@@ -127,9 +134,7 @@ fn codex_compaction_blocks_queue_until_the_native_end_marker() {
     use std::io::{Read, Write};
     use std::os::unix::net::UnixListener;
     let dir = tempfile::tempdir().unwrap();
-    let bin = dir.path().join("driver");
-    fs::write(&bin, include_bytes!("../fixtures/cli_replay.py")).unwrap();
-    fs::set_permissions(&bin, fs::Permissions::from_mode(0o700)).unwrap();
+    let bin = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     let socket = dir.path().join("gate");
     let listener = UnixListener::bind(&socket).unwrap();
     let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/go-codex.json");
@@ -139,6 +144,7 @@ fn codex_compaction_blocks_queue_until_the_native_end_marker() {
             cwd: dir.path().into(),
             bin_path: Some(bin),
             env: vec![
+                ("VV_FIXTURE".into(), "cli_replay".into()),
                 ("OAR_REPLAY_FILE".into(), file.display().to_string()),
                 ("OAR_REPLAY_GATE".into(), socket.display().to_string()),
             ],
@@ -167,9 +173,7 @@ fn codex_compaction_blocks_queue_until_the_native_end_marker() {
 #[test]
 fn resumed_sessions_with_no_token_baseline_leave_usage_unknown() {
     let dir = tempfile::tempdir().unwrap();
-    let bin = dir.path().join("driver");
-    fs::write(&bin, include_bytes!("../fixtures/cli_replay.py")).unwrap();
-    fs::set_permissions(&bin, fs::Permissions::from_mode(0o700)).unwrap();
+    let bin = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     for (id, family, reason) in [
         ("codex", "codex", "missing_codex_resume_baseline"),
         ("claude", "claude", "missing_resume_usage_fields"),
@@ -200,7 +204,10 @@ fn resumed_sessions_with_no_token_baseline_leave_usage_unknown() {
                     }
                     .to_owned(),
                 ),
-                env: vec![("OAR_REPLAY_FILE".into(), file.display().to_string())],
+                env: vec![
+                    ("VV_FIXTURE".into(), "cli_replay".into()),
+                    ("OAR_REPLAY_FILE".into(), file.display().to_string()),
+                ],
                 ..Default::default()
             })
             .unwrap();
@@ -227,9 +234,7 @@ fn resumed_sessions_with_no_token_baseline_leave_usage_unknown() {
 #[test]
 fn nonzero_process_exit_fails_the_active_turn_and_waiter() {
     let dir = tempfile::tempdir().unwrap();
-    let bin = dir.path().join("replay");
-    fs::write(&bin, include_bytes!("../fixtures/cli_replay.py")).unwrap();
-    fs::set_permissions(&bin, fs::Permissions::from_mode(0o700)).unwrap();
+    let bin = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/go-claude.json");
     let session = vibevalley_runtime::oar::default_runtimes()
         .require("claude")
@@ -238,6 +243,7 @@ fn nonzero_process_exit_fails_the_active_turn_and_waiter() {
             cwd: dir.path().into(),
             bin_path: Some(bin),
             env: vec![
+                ("VV_FIXTURE".into(), "cli_replay".into()),
                 ("OAR_REPLAY_EXIT".into(), "23".into()),
                 ("OAR_REPLAY_FILE".into(), script.display().to_string()),
             ],
@@ -255,9 +261,7 @@ fn nonzero_process_exit_fails_the_active_turn_and_waiter() {
 fn dispose_removes_the_worker_process_group() {
     use nix::{errno::Errno, sys::signal::kill, unistd::Pid};
     let dir = tempfile::tempdir().unwrap();
-    let bin = dir.path().join("replay");
-    fs::write(&bin, include_bytes!("../fixtures/cli_replay.py")).unwrap();
-    fs::set_permissions(&bin, fs::Permissions::from_mode(0o700)).unwrap();
+    let bin = PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"));
     let file = dir.path().join("pids.json");
     let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/go-claude.json");
     let session = vibevalley_runtime::oar::default_runtimes()
@@ -267,6 +271,7 @@ fn dispose_removes_the_worker_process_group() {
             cwd: dir.path().into(),
             bin_path: Some(bin),
             env: vec![
+                ("VV_FIXTURE".into(), "cli_replay".into()),
                 ("OAR_REPLAY_CHILD".into(), file.display().to_string()),
                 ("OAR_REPLAY_FILE".into(), script.display().to_string()),
             ],

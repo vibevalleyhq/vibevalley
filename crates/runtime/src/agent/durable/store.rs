@@ -6,7 +6,7 @@ use std::sync::{Arc, RwLock};
 
 use serde_json::{Value, json};
 
-use super::storage::{JsonlOptions, JsonlStorage, MemoryStorage, SqliteStorage, StorageBackend, StorageRead, StorageWrite, WriteOutcome};
+use super::storage::{DbTx, JsonlOptions, JsonlStorage, MemoryStorage, SeaOrmStorage, SqliteStorage, StorageBackend, StorageRead, StorageWrite, WriteOutcome};
 use super::telemetry::{NoopTelemetrySink, TelemetryEvent, TelemetrySink};
 use super::{CommitStats, Document, DocumentEvent, Error, Result, Sqlite};
 
@@ -18,6 +18,7 @@ pub struct Tx<'a> {
     pub(crate) read: Read<'a>,
     pub(crate) write: &'a dyn StorageWrite,
     pub(crate) sqlite: Option<&'a Sqlite<'a>>,
+    pub(crate) db_tx: Option<&'a DbTx<'a>>,
     pub now_ms: i64,
     pub(crate) events: Vec<DocumentEvent>,
     pub(crate) tasks_changed: bool,
@@ -47,6 +48,22 @@ impl Store {
 
     pub fn from_sqlite_pools(write_pool: sqlx::SqlitePool, read_pool: Option<sqlx::SqlitePool>) -> Result<Self> {
         Ok(Self::from_backend(Arc::new(SqliteStorage::from_pools(write_pool, read_pool, super::now_ms)?)))
+    }
+
+    pub fn connect(url: &str) -> Result<Self> {
+        Ok(Self::from_backend(Arc::new(SeaOrmStorage::connect(url)?)))
+    }
+
+    pub fn connect_with_clock(url: &str, clock: impl Fn() -> i64 + Send + Sync + 'static) -> Result<Self> {
+        Ok(Self::from_backend(Arc::new(SeaOrmStorage::connect_with_clock(url, clock)?)))
+    }
+
+    pub fn from_sea_orm_conns(
+        write: sea_orm::DatabaseConnection,
+        read: Option<sea_orm::DatabaseConnection>,
+        clock: impl Fn() -> i64 + Send + Sync + 'static,
+    ) -> Result<Self> {
+        Ok(Self::from_backend(Arc::new(SeaOrmStorage::from_sea_orm_conns(write, read, clock)?)))
     }
 
     pub fn open(path: &Path) -> Result<Self> {
@@ -134,13 +151,14 @@ impl Store {
         let mut f = Some(f);
         let mut out = None;
         let mut staged_telemetry = Vec::new();
-        self.backend.write_dyn(&mut |ops, write, sqlite, now_ms| {
+        self.backend.write_dyn(&mut |ops, write, sqlite, db_tx, now_ms| {
             let fun = f.take().expect("write_dyn calls closure once");
             staged_telemetry.clear();
             let mut tx = Tx {
                 read: Read { ops },
                 write,
                 sqlite,
+                db_tx,
                 now_ms,
                 events: Vec::new(),
                 tasks_changed: false,
@@ -200,6 +218,17 @@ impl<'a> Tx<'a> {
     /// Returns the underlying SQLite connection when running on `SqliteStorage`.
     pub fn sqlite_connection(&self) -> Option<&Sqlite<'a>> {
         self.sqlite
+    }
+
+    /// Returns the active SeaORM transaction when running on `SeaOrmStorage`.
+    pub fn db_tx(&self) -> Option<&DbTx<'a>> {
+        self.db_tx
+    }
+
+    /// Domain writes through this view join the current SeaORM operation transaction.
+    /// Panics if the `Store` is not backed by `SeaOrmStorage`.
+    pub fn transaction(&self) -> &sea_orm::DatabaseTransaction {
+        self.db_tx().expect("Tx::transaction() requires a SeaOrmStorage-backed Store").inner()
     }
 
     /// Domain writes through this view join the current operation's savepoint.

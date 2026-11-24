@@ -10,8 +10,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
+use sea_orm::ConnectionTrait;
 use serde_json::{Map, Value};
-use sqlx::{Connection, SqliteConnection};
 use tokio::sync::broadcast;
 use vibevalley_core::artifact::shell::{presence_highlight_from_payloads, presence_highlight_script};
 use vibevalley_core::artifact::{INLINE_EVENT_MAX_BYTES, markdown_of, ordered, plain};
@@ -32,6 +32,7 @@ use super::blocks::spans_of;
 use super::db::{self, ArtifactRow, StoredSuggestion};
 use super::entries::EntryChange;
 use super::{Artifacts, Maker, artifact_type_of, new_id, q, refused};
+use crate::db::begin_write_tx;
 use crate::{Hub, Sink, now};
 
 const DEFAULT_PRESENCE_COLORS: [&str; 6] = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
@@ -448,10 +449,7 @@ impl Artifacts {
     /// to SQLite and never increments `artifact.seq`.
     pub async fn update_presence_async(&self, actor: &str, req: &ArtifactPresenceUpdateRequest) -> Result<(), ApiError> {
         // Read-only existence check.
-        {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found(&mut db, &req.id).await?;
-        }
+        self.found(self.db.read_conn(), &req.id).await?;
         self.evict_expired_presence(&req.id);
         match &req.presence {
             Some(p) => {
@@ -472,10 +470,7 @@ impl Artifacts {
     /// Streams initial `Snapshot` of live peers followed by incremental `Upsert`
     /// and `Remove` events (including TTL evictions).
     pub async fn follow_presence_async(self: &Arc<Self>, hub: &Hub, id: &str, sink: Sink) -> Result<(), ApiError> {
-        {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found(&mut db, id).await?;
-        }
+        self.found(self.db.read_conn(), id).await?;
         let mut rx = self.presence_changes.subscribe();
         let initial = self.presence_snapshot(id);
         let weak = Arc::downgrade(self);
@@ -552,9 +547,9 @@ impl Artifacts {
 
     // ---- Phase B: CollabDoc bootstrap, sync & durable Cursor helpers --------
 
-    pub(super) async fn load_or_bootstrap_blocks_doc_async(
+    pub(super) async fn load_or_bootstrap_blocks_doc_async<C: ConnectionTrait>(
         &self,
-        db: &mut SqliteConnection,
+        db: &C,
         row: &ArtifactRow,
         existing: &[Block],
     ) -> Result<CollabDoc, ApiError> {
@@ -579,9 +574,9 @@ impl Artifacts {
         Ok(doc)
     }
 
-    pub(super) async fn sync_blocks_to_collab_async(
+    pub(super) async fn sync_blocks_to_collab_async<C: ConnectionTrait>(
         &self,
-        db: &mut SqliteConnection,
+        db: &C,
         row: &ArtifactRow,
         pre_blocks: &[Block],
         post_all: &[Block],
@@ -627,9 +622,9 @@ impl Artifacts {
         Ok(())
     }
 
-    pub(super) async fn load_or_bootstrap_store_doc_async(
+    pub(super) async fn load_or_bootstrap_store_doc_async<C: ConnectionTrait>(
         &self,
-        db: &mut SqliteConnection,
+        db: &C,
         row: &ArtifactRow,
         existing: &[db::EntryRow],
     ) -> Result<CollabDoc, ApiError> {
@@ -647,8 +642,8 @@ impl Artifacts {
         Ok(doc)
     }
 
-    pub(super) async fn sync_store_to_collab_async(
-        db: &mut SqliteConnection,
+    pub(super) async fn sync_store_to_collab_async<C: ConnectionTrait>(
+        db: &C,
         artifact_id: &str,
         doc: &CollabDoc,
         working: &BTreeMap<String, db::EntryRow>,
@@ -673,9 +668,9 @@ impl Artifacts {
         Ok(())
     }
 
-    pub(super) async fn sync_html_to_collab_async(
+    pub(super) async fn sync_html_to_collab_async<C: ConnectionTrait>(
         &self,
-        db: &mut SqliteConnection,
+        db: &C,
         artifact_id: &str,
         prior_html: Option<&str>,
         new_html: &str,
@@ -699,7 +694,7 @@ impl Artifacts {
         Ok(())
     }
 
-    async fn load_collab_for_row_async(&self, db: &mut SqliteConnection, row: &ArtifactRow) -> Result<CollabDoc, ApiError> {
+    async fn load_collab_for_row_async<C: ConnectionTrait>(&self, db: &C, row: &ArtifactRow) -> Result<CollabDoc, ApiError> {
         if let Some(bytes) = db::artifact_collab(db, &row.id).await.map_err(q)? {
             return CollabDoc::from_snapshot(&bytes).map_err(collab_err);
         }
@@ -730,9 +725,9 @@ impl Artifacts {
 
     /// Anchors a text suggestion range on `block` using persistent Loro `Cursor`s,
     /// returning `(cursor_start, cursor_end, start_offset, end_offset, anchor_text, replacement_text)`.
-    pub(super) async fn anchor_suggestion_range_async(
+    pub(super) async fn anchor_suggestion_range_async<C: ConnectionTrait>(
         &self,
-        db: &mut SqliteConnection,
+        db: &C,
         row: &ArtifactRow,
         all_blocks: &[Block],
         block: &Block,
@@ -762,7 +757,7 @@ impl Artifacts {
     }
 
     /// Resolves live drifted offsets for any suggestion carrying persistent cursors.
-    pub(super) async fn hydrate_suggestion_offsets_async(&self, db: &mut SqliteConnection, artifact_id: &str, items: &mut [Suggestion]) {
+    pub(super) async fn hydrate_suggestion_offsets_async<C: ConnectionTrait>(&self, db: &C, artifact_id: &str, items: &mut [Suggestion]) {
         if !items.iter().any(|s| s.cursor_start.is_some() && s.cursor_end.is_some()) {
             return;
         }
@@ -803,11 +798,9 @@ impl Artifacts {
         let Some(replacement) = &stored.replacement_text else {
             return Ok(None);
         };
-        let doc = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            let row = self.found_blocks_async(&mut db, artifact_id).await?;
-            self.load_collab_for_row_async(&mut db, &row).await?
-        };
+        let conn = self.db.read_conn();
+        let row = self.found_blocks_async(conn, artifact_id).await?;
+        let doc = self.load_collab_for_row_async(conn, &row).await?;
         let anchor = TextRangeAnchor {
             text_key: block.id.clone(),
             start_cursor: cs.clone(),
@@ -843,10 +836,9 @@ impl Artifacts {
     // ---- Phase C: Time Travel, Compaction & Selective Per-Origin Undo -------
 
     pub async fn history_list_async(&self, req: &ArtifactHistoryListRequest) -> Result<Vec<ArtifactHistoryEntry>, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        let row = self.found(&mut db, &req.id).await?;
-        let doc = self.load_collab_for_row_async(&mut db, &row).await?;
-        drop(db);
+        let conn = self.db.read_conn();
+        let row = self.found(conn, &req.id).await?;
+        let doc = self.load_collab_for_row_async(conn, &row).await?;
         let mut list: Vec<ArtifactHistoryEntry> = doc.history().map_err(collab_err)?.iter().map(history_entry_wire).collect();
         list.reverse();
         if let Some(limit) = req.limit {
@@ -856,9 +848,9 @@ impl Artifacts {
     }
 
     pub async fn history_preview_async(&self, req: &ArtifactHistoryPreviewRequest) -> Result<ArtifactHistoryPreviewResult, ApiError> {
-        let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-        let row = self.found(&mut db, &req.id).await?;
-        let doc = self.load_collab_for_row_async(&mut db, &row).await?;
+        let conn = self.db.read_conn();
+        let row = self.found(conn, &req.id).await?;
+        let doc = self.load_collab_for_row_async(conn, &row).await?;
         let frontiers = decode_frontiers(&req.frontiers).map_err(collab_err)?;
         let snap = doc.checkout_snapshot(&frontiers).map_err(collab_err)?;
         let entry = doc
@@ -871,7 +863,7 @@ impl Artifacts {
         let artifact_type = row.artifact_type.as_deref().and_then(artifact_type_of);
         match row.body.as_str() {
             "blocks" => {
-                let existing = db::blocks(&mut db, &row.id).await.map_err(q)?;
+                let existing = db::blocks(conn, &row.id).await.map_err(q)?;
                 let blocks = snapshot_blocks_to_wire(&row.id, &snap.blocks, &existing, at);
                 let md = markdown_of(&blocks);
                 Ok(ArtifactHistoryPreviewResult {
@@ -887,7 +879,7 @@ impl Artifacts {
                 })
             }
             "store" => {
-                let existing = db::entries(&mut db, &row.id).await.map_err(q)?;
+                let existing = db::entries(conn, &row.id).await.map_err(q)?;
                 let entries = snapshot_store_entries_to_wire(&row.id, &snap.store_entries, &existing, at);
                 Ok(ArtifactHistoryPreviewResult {
                     artifact_id: row.id,
@@ -916,69 +908,80 @@ impl Artifacts {
     }
 
     /// Projects a mutated `CollabDoc` (after `restore_to` or `selective_undo_origin`)
-    /// back into SQLite projection tables + `artifact_collab` and broadcasts live updates.
+    /// back into SQLite/PostgreSQL projection tables + `artifact_collab` and broadcasts live updates.
     async fn apply_collab_projection_async(&self, row: &ArtifactRow, doc: &CollabDoc, actor: &str, note: Option<String>, at: i64) -> Result<Wire, ApiError> {
         let snap = doc.project_snapshot();
         let bytes = doc.export_snapshot().map_err(collab_err)?;
         match row.body.as_str() {
             "blocks" => {
                 let ack = {
-                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
-                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-                    let current_row = self.found_blocks_async(&mut tx, &row.id).await?;
-                    let existing = db::blocks(&mut tx, &row.id).await.map_err(q)?;
-                    let existing_by_id: HashMap<String, Block> = existing.iter().cloned().map(|b| (b.id.clone(), b)).collect();
-                    let projected = snapshot_blocks_to_wire(&row.id, &snap.blocks, &existing, at);
-                    let projected_ids: HashSet<String> = projected.iter().map(|b| b.id.clone()).collect();
-                    let mut changed = Vec::new();
-                    for mut b in projected {
-                        let prev = existing_by_id.get(&b.id);
-                        let rev = prev.map_or(1, |p| p.rev + 1);
-                        b.rev = rev;
-                        b.deleted = Some(false);
-                        b.updated_by = prev.map_or_else(|| actor.to_string(), |p| p.updated_by.clone());
-                        b.updated = at;
-                        db::put_block(&mut tx, &row.id, &b).await.map_err(q)?;
-                        db::add_revision(&mut tx, &b.id, b.rev, &b.text, actor, "normal", at).await.map_err(q)?;
-                        changed.push(b);
-                    }
-                    // Tombstone blocks absent from the restored snapshot instead of hard-deleting
-                    // so foreign keys from `artifact_suggestion` stay intact and followers see removals.
-                    for old in &existing {
-                        if old.deleted != Some(true) && !projected_ids.contains(&old.id) {
-                            let mut tomb = old.clone();
-                            tomb.rev += 1;
-                            tomb.deleted = Some(true);
-                            tomb.updated = at;
-                            db::put_block(&mut tx, &row.id, &tomb).await.map_err(q)?;
-                            changed.push(tomb);
+                    let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+                    let outcome: Result<BlockAck, ApiError> = async {
+                        let current_row = self.found_blocks_async(&tx, &row.id).await?;
+                        let existing = db::blocks(&tx, &row.id).await.map_err(q)?;
+                        let existing_by_id: HashMap<String, Block> = existing.iter().cloned().map(|b| (b.id.clone(), b)).collect();
+                        let projected = snapshot_blocks_to_wire(&row.id, &snap.blocks, &existing, at);
+                        let projected_ids: HashSet<String> = projected.iter().map(|b| b.id.clone()).collect();
+                        let mut changed = Vec::new();
+                        for mut b in projected {
+                            let prev = existing_by_id.get(&b.id);
+                            let rev = prev.map_or(1, |p| p.rev + 1);
+                            b.rev = rev;
+                            b.deleted = Some(false);
+                            b.updated_by = prev.map_or_else(|| actor.to_string(), |p| p.updated_by.clone());
+                            b.updated = at;
+                            db::put_block(&tx, &row.id, &b).await.map_err(q)?;
+                            db::add_revision(&tx, &b.id, b.rev, &b.text, actor, "normal", at).await.map_err(q)?;
+                            changed.push(b);
                         }
-                    }
-                    let seq = current_row.seq + 1;
-                    let batch_id = new_id();
-                    let block_ids: Vec<String> = changed.iter().map(|b| b.id.clone()).collect();
-                    db::add_change(
-                        &mut tx,
-                        &db::NewChange {
-                            artifact_id: &row.id,
+                        // Tombstone blocks absent from the restored snapshot instead of hard-deleting
+                        // so foreign keys from `artifact_suggestion` stay intact and followers see removals.
+                        for old in &existing {
+                            if old.deleted != Some(true) && !projected_ids.contains(&old.id) {
+                                let mut tomb = old.clone();
+                                tomb.rev += 1;
+                                tomb.deleted = Some(true);
+                                tomb.updated = at;
+                                db::put_block(&tx, &row.id, &tomb).await.map_err(q)?;
+                                changed.push(tomb);
+                            }
+                        }
+                        let seq = current_row.seq + 1;
+                        let batch_id = new_id();
+                        let block_ids: Vec<String> = changed.iter().map(|b| b.id.clone()).collect();
+                        db::add_change(
+                            &tx,
+                            &db::NewChange {
+                                artifact_id: &row.id,
+                                seq,
+                                batch_id: &batch_id,
+                                actor,
+                                block_ids: &block_ids,
+                                results: &[],
+                                created_at: at,
+                            },
+                        )
+                        .await
+                        .map_err(q)?;
+                        db::artifact_accepted(&tx, &row.id, seq, at).await.map_err(q)?;
+                        db::upsert_artifact_collab(&tx, &row.id, &bytes, at).await.map_err(q)?;
+                        Ok(BlockAck {
+                            batch_id,
                             seq,
-                            batch_id: &batch_id,
-                            actor,
-                            block_ids: &block_ids,
-                            results: &[],
-                            created_at: at,
-                        },
-                    )
-                    .await
-                    .map_err(q)?;
-                    db::artifact_accepted(&mut tx, &row.id, seq, at).await.map_err(q)?;
-                    db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).await.map_err(q)?;
-                    tx.commit().await.map_err(q)?;
-                    BlockAck {
-                        batch_id,
-                        seq,
-                        results: vec![],
-                        blocks: changed,
+                            results: vec![],
+                            blocks: changed,
+                        })
+                    }
+                    .await;
+                    match outcome {
+                        Ok(ack) => {
+                            tx.commit().await.map_err(q)?;
+                            ack
+                        }
+                        Err(err) => {
+                            let _ = tx.rollback().await;
+                            return Err(err);
+                        }
                     }
                 };
                 self.publish_change(&row.id, &ack);
@@ -986,61 +989,72 @@ impl Artifacts {
             }
             "store" => {
                 let change = {
-                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
-                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-                    let current_row = self.found(&mut tx, &row.id).await?;
-                    let existing = db::entries(&mut tx, &row.id).await.map_err(q)?;
-                    let prev_rev_by_path: HashMap<String, i64> = existing.iter().map(|r| (r.path.clone(), r.rev)).collect();
-                    let projected = snapshot_store_entries_to_wire(&row.id, &snap.store_entries, &existing, at);
-                    let projected_paths: HashSet<String> = projected.iter().map(|e| e.path.clone()).collect();
-                    let mut deleted_paths = Vec::new();
-                    for old in &existing {
-                        if !projected_paths.contains(&old.path) {
-                            db::delete_entry(&mut tx, &row.id, &old.path).await.map_err(q)?;
-                            deleted_paths.push(old.path.clone());
+                    let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+                    let outcome: Result<EntryChange, ApiError> = async {
+                        let current_row = self.found(&tx, &row.id).await?;
+                        let existing = db::entries(&tx, &row.id).await.map_err(q)?;
+                        let prev_rev_by_path: HashMap<String, i64> = existing.iter().map(|r| (r.path.clone(), r.rev)).collect();
+                        let projected = snapshot_store_entries_to_wire(&row.id, &snap.store_entries, &existing, at);
+                        let projected_paths: HashSet<String> = projected.iter().map(|e| e.path.clone()).collect();
+                        let mut deleted_paths = Vec::new();
+                        for old in &existing {
+                            if !projected_paths.contains(&old.path) {
+                                db::delete_entry(&tx, &row.id, &old.path).await.map_err(q)?;
+                                deleted_paths.push(old.path.clone());
+                            }
                         }
-                    }
-                    let mut changed_paths = Vec::new();
-                    let mut event_entries = Vec::new();
-                    for mut e in projected {
-                        let prev_rev = prev_rev_by_path.get(&e.path).copied().unwrap_or(0);
-                        e.rev = prev_rev + 1;
-                        e.updated = at;
-                        db::upsert_entry(
-                            &mut tx,
-                            db::UpsertEntry {
-                                artifact_id: row.id.clone(),
-                                path: e.path.clone(),
-                                kind: e.kind.as_str().to_string(),
-                                mime: e.mime.clone(),
-                                value: e.value.clone(),
-                                attachment_id: e.attachment_id.clone(),
-                                size: e.size,
-                                rev: e.rev,
-                                updated_by: e.updated_by.clone(),
-                                updated_at: at,
-                            },
-                        )
-                        .await
-                        .map_err(q)?;
-                        changed_paths.push(e.path.clone());
-                        if e.size > INLINE_EVENT_MAX_BYTES as i64 {
-                            e.value = None;
+                        let mut changed_paths = Vec::new();
+                        let mut event_entries = Vec::new();
+                        for mut e in projected {
+                            let prev_rev = prev_rev_by_path.get(&e.path).copied().unwrap_or(0);
+                            e.rev = prev_rev + 1;
+                            e.updated = at;
+                            db::upsert_entry(
+                                &tx,
+                                db::UpsertEntry {
+                                    artifact_id: row.id.clone(),
+                                    path: e.path.clone(),
+                                    kind: e.kind.as_str().to_string(),
+                                    mime: e.mime.clone(),
+                                    value: e.value.clone(),
+                                    attachment_id: e.attachment_id.clone(),
+                                    size: e.size,
+                                    rev: e.rev,
+                                    updated_by: e.updated_by.clone(),
+                                    updated_at: at,
+                                },
+                            )
+                            .await
+                            .map_err(q)?;
+                            changed_paths.push(e.path.clone());
+                            if e.size > INLINE_EVENT_MAX_BYTES as i64 {
+                                e.value = None;
+                            }
+                            event_entries.push(e);
                         }
-                        event_entries.push(e);
+                        let seq = current_row.seq + 1;
+                        db::add_entry_change(&tx, &row.id, seq, actor, &changed_paths, &deleted_paths, at)
+                            .await
+                            .map_err(q)?;
+                        db::artifact_accepted(&tx, &row.id, seq, at).await.map_err(q)?;
+                        db::upsert_artifact_collab(&tx, &row.id, &bytes, at).await.map_err(q)?;
+                        Ok(EntryChange {
+                            artifact: row.id.clone(),
+                            seq,
+                            entries: event_entries,
+                            deleted: deleted_paths,
+                        })
                     }
-                    let seq = current_row.seq + 1;
-                    db::add_entry_change(&mut tx, &row.id, seq, actor, &changed_paths, &deleted_paths, at)
-                        .await
-                        .map_err(q)?;
-                    db::artifact_accepted(&mut tx, &row.id, seq, at).await.map_err(q)?;
-                    db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).await.map_err(q)?;
-                    tx.commit().await.map_err(q)?;
-                    EntryChange {
-                        artifact: row.id.clone(),
-                        seq,
-                        entries: event_entries,
-                        deleted: deleted_paths,
+                    .await;
+                    match outcome {
+                        Ok(change) => {
+                            tx.commit().await.map_err(q)?;
+                            change
+                        }
+                        Err(err) => {
+                            let _ = tx.rollback().await;
+                            return Err(err);
+                        }
                     }
                 };
                 let _ = self.entry_changes.send(change);
@@ -1050,32 +1064,41 @@ impl Artifacts {
                 let html = snap.html.unwrap_or_default();
                 let file = self.keep_async(html.as_bytes().to_vec(), &row.title).await?;
                 {
-                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
-                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-                    let current_row = self.found(&mut tx, &row.id).await?;
-                    let next = current_row.version + 1;
-                    db::add_version(
-                        &mut tx,
-                        db::NewVersion {
-                            artifact_id: row.id.clone(),
-                            version: next,
-                            attachment_id: file,
-                            size: html.len() as i64,
-                            note,
-                            by_id: actor.to_string(),
-                            by_name: if actor == USER_ID {
-                                t("server.channel.name.user", &[])
-                            } else {
-                                actor.to_string()
+                    let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+                    let outcome: Result<(), ApiError> = async {
+                        let current_row = self.found(&tx, &row.id).await?;
+                        let next = current_row.version + 1;
+                        db::add_version(
+                            &tx,
+                            db::NewVersion {
+                                artifact_id: row.id.clone(),
+                                version: next,
+                                attachment_id: file,
+                                size: html.len() as i64,
+                                note,
+                                by_id: actor.to_string(),
+                                by_name: if actor == USER_ID {
+                                    t("server.channel.name.user", &[])
+                                } else {
+                                    actor.to_string()
+                                },
+                                created_at: at,
                             },
-                            created_at: at,
-                        },
-                    )
-                    .await
-                    .map_err(q)?;
-                    db::artifact_versioned(&mut tx, &row.id, next, at).await.map_err(q)?;
-                    db::upsert_artifact_collab(&mut tx, &row.id, &bytes, at).await.map_err(q)?;
-                    tx.commit().await.map_err(q)?;
+                        )
+                        .await
+                        .map_err(q)?;
+                        db::artifact_versioned(&tx, &row.id, next, at).await.map_err(q)?;
+                        db::upsert_artifact_collab(&tx, &row.id, &bytes, at).await.map_err(q)?;
+                        Ok(())
+                    }
+                    .await;
+                    match outcome {
+                        Ok(()) => tx.commit().await.map_err(q)?,
+                        Err(err) => {
+                            let _ = tx.rollback().await;
+                            return Err(err);
+                        }
+                    }
                 }
                 self.get_now_async(&row.id).await
             }
@@ -1097,19 +1120,13 @@ impl Artifacts {
     }
 
     pub async fn history_restore_async(&self, req: &ArtifactHistoryRestoreRequest) -> Result<Wire, ApiError> {
-        let row = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found(&mut db, &req.id).await?
-        };
+        let row = self.found(self.db.read_conn(), &req.id).await?;
         let target = decode_frontiers(&req.frontiers).map_err(collab_err)?;
         let at = now();
         let note = req.note.clone().or_else(|| Some("restore".to_string()));
         let meta = CommitMeta::user(USER_ID, note.clone(), at);
         let _body_lock = self.lock_body(&row).await;
-        let doc = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.load_collab_for_row_async(&mut db, &row).await?
-        };
+        let doc = self.load_collab_for_row_async(self.db.read_conn(), &row).await?;
         if doc.restore_to(&target, &meta).is_err() {
             // Fallback when Loro's `revert_to` cannot emit an inverse diff across
             // a child container deleted in an earlier commit: materialize the target
@@ -1171,18 +1188,12 @@ impl Artifacts {
         if origin.is_empty() {
             return Err(refused(t("server.artifact.nothingToChange", &[])));
         }
-        let row = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found(&mut db, &req.id).await?
-        };
+        let row = self.found(self.db.read_conn(), &req.id).await?;
         let at = now();
         let note = Some(format!("undo {origin}"));
         let meta = CommitMeta::undo(USER_ID, origin, note.clone(), at);
         let _body_lock = self.lock_body(&row).await;
-        let doc = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.load_collab_for_row_async(&mut db, &row).await?
-        };
+        let doc = self.load_collab_for_row_async(self.db.read_conn(), &row).await?;
         let reverted = doc.selective_undo_origin(origin, &meta).map_err(collab_err)?;
         if reverted == 0 {
             return self.get_now_async(&row.id).await;
@@ -1191,25 +1202,20 @@ impl Artifacts {
     }
 
     pub async fn history_compact_async(&self, req: &ArtifactHistoryCompactRequest) -> Result<Wire, ApiError> {
-        let row = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            self.found(&mut db, &req.id).await?
-        };
+        let row = self.found(self.db.read_conn(), &req.id).await?;
         let _body_lock = self.lock_body(&row).await;
-        {
-            let mut db = self.db.write_pool().acquire().await.map_err(q)?;
-            let doc = self.load_collab_for_row_async(&mut db, &row).await?;
-            let shallow = doc.compact_shallow_snapshot().map_err(collab_err)?;
-            db::upsert_artifact_collab(&mut db, &row.id, &shallow, now()).await.map_err(q)?;
-        }
+        let conn = self.db.write_conn();
+        let doc = self.load_collab_for_row_async(conn, &row).await?;
+        let shallow = doc.compact_shallow_snapshot().map_err(collab_err)?;
+        db::upsert_artifact_collab(conn, &row.id, &shallow, now()).await.map_err(q)?;
         self.get_now_async(&row.id).await
     }
 
     pub async fn history_fork_async(&self, req: &ArtifactHistoryForkRequest) -> Result<Wire, ApiError> {
         let (row, forked_doc, snap) = {
-            let mut db = self.db.read_pool().acquire().await.map_err(q)?;
-            let row = self.found(&mut db, &req.id).await?;
-            let doc = self.load_collab_for_row_async(&mut db, &row).await?;
+            let conn = self.db.read_conn();
+            let row = self.found(conn, &req.id).await?;
+            let doc = self.load_collab_for_row_async(conn, &row).await?;
             let target = decode_frontiers(&req.frontiers).map_err(collab_err)?;
             let forked = doc.fork_at(&target).map_err(collab_err)?;
             let snap = forked.project_snapshot();
@@ -1280,36 +1286,45 @@ impl Artifacts {
                 let collab_bytes = remapped_doc.export_snapshot().map_err(collab_err)?;
                 let seq = i64::from(!new_blocks.is_empty());
                 {
-                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
-                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-                    db::add_artifact(
-                        &mut tx,
-                        db::NewArtifact {
-                            id: new_art_id.clone(),
-                            title,
-                            body: "blocks".into(),
-                            artifact_type: artifact_type.map(|ty| ty.as_str().into()),
-                            is_default: 0,
-                            display: None,
-                            channel_id: channel,
-                            issue: None,
-                            by_id: maker.by,
-                            by_name: user_name,
-                            version: 0,
-                            created_at: at,
-                        },
-                    )
-                    .await
-                    .map_err(q)?;
-                    for b in &new_blocks {
-                        db::put_block(&mut tx, &new_art_id, b).await.map_err(q)?;
-                        db::add_revision(&mut tx, &b.id, 1, &b.text, USER_ID, "normal", at).await.map_err(q)?;
+                    let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+                    let outcome: Result<(), ApiError> = async {
+                        db::add_artifact(
+                            &tx,
+                            db::NewArtifact {
+                                id: new_art_id.clone(),
+                                title,
+                                body: "blocks".into(),
+                                artifact_type: artifact_type.map(|ty| ty.as_str().into()),
+                                is_default: false,
+                                display: None,
+                                channel_id: channel,
+                                issue: None,
+                                by_id: maker.by,
+                                by_name: user_name,
+                                version: 0,
+                                created_at: at,
+                            },
+                        )
+                        .await
+                        .map_err(q)?;
+                        for b in &new_blocks {
+                            db::put_block(&tx, &new_art_id, b).await.map_err(q)?;
+                            db::add_revision(&tx, &b.id, 1, &b.text, USER_ID, "normal", at).await.map_err(q)?;
+                        }
+                        if seq > 0 {
+                            db::artifact_accepted(&tx, &new_art_id, seq, at).await.map_err(q)?;
+                        }
+                        db::upsert_artifact_collab(&tx, &new_art_id, &collab_bytes, at).await.map_err(q)?;
+                        Ok(())
                     }
-                    if seq > 0 {
-                        db::artifact_accepted(&mut tx, &new_art_id, seq, at).await.map_err(q)?;
+                    .await;
+                    match outcome {
+                        Ok(()) => tx.commit().await.map_err(q)?,
+                        Err(err) => {
+                            let _ = tx.rollback().await;
+                            return Err(err);
+                        }
                     }
-                    db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).await.map_err(q)?;
-                    tx.commit().await.map_err(q)?;
                 }
                 self.get_now_async(&new_art_id).await
             }
@@ -1318,54 +1333,63 @@ impl Artifacts {
                 let collab_bytes = forked_doc.export_snapshot().map_err(collab_err)?;
                 let seq = i64::from(!entries.is_empty());
                 {
-                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
-                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-                    db::add_artifact(
-                        &mut tx,
-                        db::NewArtifact {
-                            id: new_art_id.clone(),
-                            title,
-                            body: "store".into(),
-                            artifact_type: artifact_type.map(|ty| ty.as_str().into()),
-                            is_default: 0,
-                            display: None,
-                            channel_id: channel,
-                            issue: None,
-                            by_id: maker.by,
-                            by_name: user_name,
-                            version: 0,
-                            created_at: at,
-                        },
-                    )
-                    .await
-                    .map_err(q)?;
-                    let mut paths = Vec::with_capacity(entries.len());
-                    for e in &entries {
-                        db::upsert_entry(
-                            &mut tx,
-                            db::UpsertEntry {
-                                artifact_id: new_art_id.clone(),
-                                path: e.path.clone(),
-                                kind: e.kind.as_str().to_string(),
-                                mime: e.mime.clone(),
-                                value: e.value.clone(),
-                                attachment_id: e.attachment_id.clone(),
-                                size: e.size,
-                                rev: 1,
-                                updated_by: USER_ID.to_string(),
-                                updated_at: at,
+                    let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+                    let outcome: Result<(), ApiError> = async {
+                        db::add_artifact(
+                            &tx,
+                            db::NewArtifact {
+                                id: new_art_id.clone(),
+                                title,
+                                body: "store".into(),
+                                artifact_type: artifact_type.map(|ty| ty.as_str().into()),
+                                is_default: false,
+                                display: None,
+                                channel_id: channel,
+                                issue: None,
+                                by_id: maker.by,
+                                by_name: user_name,
+                                version: 0,
+                                created_at: at,
                             },
                         )
                         .await
                         .map_err(q)?;
-                        paths.push(e.path.clone());
+                        let mut paths = Vec::with_capacity(entries.len());
+                        for e in &entries {
+                            db::upsert_entry(
+                                &tx,
+                                db::UpsertEntry {
+                                    artifact_id: new_art_id.clone(),
+                                    path: e.path.clone(),
+                                    kind: e.kind.as_str().to_string(),
+                                    mime: e.mime.clone(),
+                                    value: e.value.clone(),
+                                    attachment_id: e.attachment_id.clone(),
+                                    size: e.size,
+                                    rev: 1,
+                                    updated_by: USER_ID.to_string(),
+                                    updated_at: at,
+                                },
+                            )
+                            .await
+                            .map_err(q)?;
+                            paths.push(e.path.clone());
+                        }
+                        if seq > 0 {
+                            db::add_entry_change(&tx, &new_art_id, seq, USER_ID, &paths, &[], at).await.map_err(q)?;
+                            db::artifact_accepted(&tx, &new_art_id, seq, at).await.map_err(q)?;
+                        }
+                        db::upsert_artifact_collab(&tx, &new_art_id, &collab_bytes, at).await.map_err(q)?;
+                        Ok(())
                     }
-                    if seq > 0 {
-                        db::add_entry_change(&mut tx, &new_art_id, seq, USER_ID, &paths, &[], at).await.map_err(q)?;
-                        db::artifact_accepted(&mut tx, &new_art_id, seq, at).await.map_err(q)?;
+                    .await;
+                    match outcome {
+                        Ok(()) => tx.commit().await.map_err(q)?,
+                        Err(err) => {
+                            let _ = tx.rollback().await;
+                            return Err(err);
+                        }
                     }
-                    db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).await.map_err(q)?;
-                    tx.commit().await.map_err(q)?;
                 }
                 self.get_now_async(&new_art_id).await
             }
@@ -1374,44 +1398,53 @@ impl Artifacts {
                 let file = self.keep_async(html.as_bytes().to_vec(), &title).await?;
                 let collab_bytes = forked_doc.export_snapshot().map_err(collab_err)?;
                 {
-                    let mut conn = self.db.write_pool().acquire().await.map_err(q)?;
-                    let mut tx = conn.begin_with("BEGIN IMMEDIATE").await.map_err(q)?;
-                    db::add_artifact(
-                        &mut tx,
-                        db::NewArtifact {
-                            id: new_art_id.clone(),
-                            title,
-                            body: "html".into(),
-                            artifact_type: None,
-                            is_default: 0,
-                            display: row.display.clone().or_else(|| Some(ArtifactDisplay::Page.as_str().into())),
-                            channel_id: channel,
-                            issue: None,
-                            by_id: maker.by.clone(),
-                            by_name: user_name.clone(),
-                            version: 1,
-                            created_at: at,
-                        },
-                    )
-                    .await
-                    .map_err(q)?;
-                    db::add_version(
-                        &mut tx,
-                        db::NewVersion {
-                            artifact_id: new_art_id.clone(),
-                            version: 1,
-                            attachment_id: file,
-                            size: html.len() as i64,
-                            note: Some("fork".into()),
-                            by_id: maker.by,
-                            by_name: user_name,
-                            created_at: at,
-                        },
-                    )
-                    .await
-                    .map_err(q)?;
-                    db::upsert_artifact_collab(&mut tx, &new_art_id, &collab_bytes, at).await.map_err(q)?;
-                    tx.commit().await.map_err(q)?;
+                    let tx = begin_write_tx(self.db.write_conn()).await.map_err(q)?;
+                    let outcome: Result<(), ApiError> = async {
+                        db::add_artifact(
+                            &tx,
+                            db::NewArtifact {
+                                id: new_art_id.clone(),
+                                title,
+                                body: "html".into(),
+                                artifact_type: None,
+                                is_default: false,
+                                display: row.display.clone().or_else(|| Some(ArtifactDisplay::Page.as_str().into())),
+                                channel_id: channel,
+                                issue: None,
+                                by_id: maker.by.clone(),
+                                by_name: user_name.clone(),
+                                version: 1,
+                                created_at: at,
+                            },
+                        )
+                        .await
+                        .map_err(q)?;
+                        db::add_version(
+                            &tx,
+                            db::NewVersion {
+                                artifact_id: new_art_id.clone(),
+                                version: 1,
+                                attachment_id: file,
+                                size: html.len() as i64,
+                                note: Some("fork".into()),
+                                by_id: maker.by,
+                                by_name: user_name,
+                                created_at: at,
+                            },
+                        )
+                        .await
+                        .map_err(q)?;
+                        db::upsert_artifact_collab(&tx, &new_art_id, &collab_bytes, at).await.map_err(q)?;
+                        Ok(())
+                    }
+                    .await;
+                    match outcome {
+                        Ok(()) => tx.commit().await.map_err(q)?,
+                        Err(err) => {
+                            let _ = tx.rollback().await;
+                            return Err(err);
+                        }
+                    }
                 }
                 self.get_now_async(&new_art_id).await
             }

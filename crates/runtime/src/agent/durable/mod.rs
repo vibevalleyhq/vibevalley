@@ -1,11 +1,10 @@
 //! Persistent conversations, submissions, wakeups, pluggable storage backends, and phase execution.
 pub mod conformance;
 mod conversation;
+pub mod entities;
 pub mod export;
-#[rustfmt::skip]
-#[path = "generated/queries.rs"]
-mod queries;
 pub mod graph;
+pub mod migration;
 mod rows;
 mod scheduler;
 mod sqlite;
@@ -19,7 +18,9 @@ pub use graph::{TaskGraph, TaskGraphNode};
 pub use rows::*;
 pub use scheduler::*;
 pub use sqlite::Sqlite;
-pub use storage::{JsonlOptions, JsonlStorage, MemoryStorage, SqliteStorage, StorageBackend, StorageRead, StorageWrite, WriteCallback, WriteOutcome};
+pub use storage::{
+    DbTx, JsonlOptions, JsonlStorage, MemoryStorage, SeaOrmStorage, SqliteStorage, StorageBackend, StorageRead, StorageWrite, WriteCallback, WriteOutcome,
+};
 pub use store::{Read, Store, Tx};
 pub use telemetry::{JsonlTelemetrySink, MemoryTelemetrySink, NoopTelemetrySink, TelemetryEvent, TelemetrySink, read_telemetry_jsonl};
 
@@ -29,6 +30,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
+    Db(#[from] sea_orm::DbErr),
     #[error(transparent)]
     Sql(#[from] sqlx::Error),
     #[error(transparent)]

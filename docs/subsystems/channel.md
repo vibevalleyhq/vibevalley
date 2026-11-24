@@ -2,7 +2,7 @@
 
 频道（`Channel`）是用户、助手和帮工说话的地方，含公共频道 `channel`（默认 `general` 叫「田头」）、私聊 `direct` 和工单串 `thread` 三类通道。外部聊天软件（微信、飞书、QQ）经连接器（`modules/collab/connector`）各接到一个频道上：用户在那边对机器人说的话记成他在这个频道里说的，农场里该用户听的话（助手的话、汇报、派活、`@` 他的）在他还没在农场里读到时发到那边。
 
-连接器按平台和外部消息标识登记入站消息。一批消息与读取游标在同一个 SQLite 事务中保存。换绑账号时，连接器同时清除旧入站记录并退役旧待发消息。重启后只读取 `pending` 状态的出站分片，按序号投递。平台已接收但本地尚未记录回执的分片仍可能重发。[连接器查询](crates/server/src/db/queries/collab_connector.sql)
+连接器按平台和外部消息标识登记入站消息。一批消息与读取游标在同一个数据库事务中保存。换绑账号时，连接器同时清除旧入站记录并退役旧待发消息。重启后只读取 `pending` 状态的出站分片，按序号投递。平台已接收但本地尚未记录回执的分片仍可能重发。[连接器存储](crates/server/src/modules/collab/connector/store.rs)
 
 ## 读取频道消息
 
@@ -26,7 +26,7 @@
 |---|---|
 | `crates/server/src/modules/collab/channel/` | `Chat` 核心、事务保存点（`store.rs`）、原生异步消息写入/编辑/搜索（`messages.rs`）、异步房间/投递/订阅流（`rooms.rs`）、DTO 与 `ChannelEvent` 定义（`types.rs`）及通过 `Hub::on_async` 安装全部 `channel.*` 端点的服务层（`service.rs`）；每条消息连同 `channel_event` 与 `channel_delivery` 待发记录在同一个事务里落库，提交后非阻塞广播 `ChannelEvent`（`Chat::subscribe_events()`）并推送 `Chat::dispatches()` |
 | `crates/server/src/modules/collab/channel/dispatch.rs` | 纯受众规则（`who_hears`）、两道环路刹车（`brakes`：`hopLimit = 4`、`cooldown = 60s`）与 `plan_deliveries`，仅读频道模型与参与者表，零依赖 `issue`、`session` 或 `orchestrator` |
-| [频道表结构](crates/server/src/db/schema/collab_channel.sql)、[命名查询](crates/server/src/db/queries/collab_channel.sql)、`db.rs` | sqlc 生成 SQLx 查询。频道连接在 `server.db` 上读写消息、串与 `channel_delivery` |
+| [频道实体](crates/server/src/db/entities/collab_channel.rs)、[频道存储](crates/server/src/modules/collab/channel/db.rs) | SeaORM + SeaQuery 双后端查询。频道连接在共享数据库上读写消息、串与 `channel_delivery` |
 | `crates/server/src/modules/collab/channel/model.rs` | 写事务在频道锁内更新镜像。回滚恢复原镜像与环路记账，提交后才向订阅者发布 |
 | `crates/server/src/modules/collab/channel/words.rs` | `@` 识别、地址解析、搜索过滤与公网链接预览 |
 | `crates/server/src/transport/http/mod.rs` | 订阅流（SSE，`/api/v1/subscribe/<名字>`，[SSE 流](docs/subsystems/core.md#sse-流和其余路由)） |

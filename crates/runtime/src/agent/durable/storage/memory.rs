@@ -975,7 +975,7 @@ impl StorageBackend for MemoryStorage {
         self.0.hub.record_request();
         let now = self.0.hub.now_ms();
         let staging = MemoryTx::new(&mut state, false);
-        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&staging, &staging, None, now)));
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&staging, &staging, None, None, now)));
         match outcome {
             Ok(Ok(write_outcome)) => {
                 self.0.hub.record_commit_and_publish(write_outcome.events, write_outcome.tasks_changed);

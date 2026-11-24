@@ -1,4 +1,8 @@
-use std::{fs, os::unix::fs::PermissionsExt, path::Path, time::Duration};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 use vibevalley_runtime::oar::{ContentBlock, EventKind, SessionOptions, StopReason, SubagentStatus, ToolAction, tool_action};
 
 #[test]
@@ -95,16 +99,16 @@ fn regression_codex_collaboration_survives_process_and_record_replay() {
 }
 
 fn open_replay(dir: &Path, spec: &Path) -> std::sync::Arc<dyn vibevalley_runtime::oar::Session> {
-    let executable = dir.join("replay");
-    fs::write(&executable, include_bytes!("../fixtures/cli_replay.py")).unwrap();
-    fs::set_permissions(&executable, fs::Permissions::from_mode(0o700)).unwrap();
     vibevalley_runtime::oar::default_runtimes()
         .require("codex")
         .unwrap()
         .open(SessionOptions {
             cwd: dir.into(),
-            bin_path: Some(executable),
-            env: vec![("OAR_REPLAY_FILE".into(), spec.display().to_string())],
+            bin_path: Some(PathBuf::from(env!("CARGO_BIN_EXE_vv_test_fixture"))),
+            env: vec![
+                ("VV_FIXTURE".into(), "cli_replay".into()),
+                ("OAR_REPLAY_FILE".into(), spec.display().to_string()),
+            ],
             record_to: Some(dir.join("session.jsonl")),
             ..Default::default()
         })
