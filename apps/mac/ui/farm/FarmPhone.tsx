@@ -1,5 +1,6 @@
 import "../infra/polyfill";
 import { cleanup, computed, effect, host, keymap, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
+import { z } from "zod";
 
 import { t, setLocale } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
@@ -8,16 +9,22 @@ import { TextArea } from "../design/Field";
 import { SpriteIcon } from "../design/pixel/icons";
 import { useFollowed } from "../features/channel/model/follow";
 import { api, newSendKey, reasonOf } from "../infra/api";
-import { frame, call } from "../infra/bridge";
+import { callDecoded, frame } from "../infra/bridge";
 import { useBridge } from "../infra/bridged";
 import { useCollabSlice } from "../infra/frame";
-import { readFarmPhoneParams, readHostLocale, type FarmCalls } from "../infra/hostParams";
+import { farmCallsSchema, readFarmPhoneParams, readHostLocale, type FarmCalls } from "../infra/hostParams";
 import { Root } from "../infra/Root";
 import { GameIcon, GamePad, PhoneGame, type GameId } from "./PhoneGames";
 
 type Screen = "home" | "missed" | "log" | "orchestrator" | "games" | GameId;
 type Calls = FarmCalls;
-type Voice = { phase: "idle" | "connecting" | "live" | "stopping"; problem: string | null; heard: string; said: string };
+const voiceSchema = z.object({
+  phase: z.enum(["idle", "connecting", "live", "stopping"]),
+  problem: z.string().nullable(),
+  heard: z.string(),
+  said: z.string(),
+});
+type Voice = z.infer<typeof voiceSchema>;
 const games = ["blocks", "sokoban", "dino", "bugs", "merge"] as const;
 const isGame = (screen: Screen): screen is GameId => games.some((g) => g === screen);
 const close = () => host.post("action", { type: "dismiss_farm_form" });
@@ -163,7 +170,7 @@ function Handset(props: { calls: () => Calls }) {
   const active = () => activeCall().phase !== "idle";
   const voice = async (op: "host.voiceState" | "host.voiceStart" | "host.voiceStop") => {
     try {
-      const result = await call<Voice>(op, { id: voiceId });
+      const result = await callDecoded(op, { id: voiceId }, voiceSchema);
       if (result.bizCode !== 0) {
         error.set(result.message);
         return;
@@ -394,7 +401,7 @@ export function FarmPhone() {
   setLocale(readHostLocale());
   useBridge();
   const initial = readFarmPhoneParams().calls;
-  const updates = frame<Calls>("calls");
+  const updates = frame("calls", farmCallsSchema);
   const calls = () => updates() ?? initial;
   return (
     <Root>

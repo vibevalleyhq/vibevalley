@@ -201,6 +201,11 @@ pub fn run_cli<C: Parser>(args: impl IntoIterator<Item = OsString>, execute: imp
     }
 }
 
+/// Parses `args` into `C`, prints help/version cleanly, drives `execute` on the shared Tokio runtime, and returns the process exit code.
+pub fn run_cli_async<C: Parser, Fut: std::future::Future<Output = Done>>(args: impl IntoIterator<Item = OsString>, execute: impl FnOnce(C) -> Fut) -> i32 {
+    run_cli(args, |cli| vibevalley_runtime::rt::block_on(execute(cli)))
+}
+
 #[cfg(test)]
 mod tests {
     use clap::Subcommand;

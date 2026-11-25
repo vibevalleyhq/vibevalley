@@ -148,38 +148,44 @@ fn message_line(message: &ChatMessage) -> String {
     format!("#{}  {}: {}", message.number, message.name, one_line(&message.text))
 }
 
-pub fn run(client: &Client, cmd: ChannelCmd) -> Done {
+pub async fn run(client: &Client, cmd: ChannelCmd) -> Done {
     match cmd.action {
         ChannelAction::List => {
-            let channels = client.ask::<ops::ChannelList>(&())?;
+            let channels = client.ask::<ops::ChannelList>(&()).await?;
             client.output.show(&channels, |cs| cs.iter().map(channel_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
         ChannelAction::Create { name, description, repo } => {
             let request = ChannelRequest { name, description, repo };
-            client.mutate::<ops::ChannelCreate>("channel create", &request, |id| format!("#{id}"))
+            client.mutate::<ops::ChannelCreate>("channel create", &request, |id| format!("#{id}")).await
         }
         ChannelAction::Delete { channel } => {
             let id = channel.clone();
-            client.mutate::<ops::ChannelDelete>("channel delete", &ChannelPinListInput { id: channel }, |_| format!("deleted #{id}"))
+            client
+                .mutate::<ops::ChannelDelete>("channel delete", &ChannelPinListInput { id: channel }, |_| format!("deleted #{id}"))
+                .await
         }
         ChannelAction::Pin(pin) => match pin.action {
             ChannelPinAction::List { channel } => {
-                let messages = client.ask::<ops::ChannelPinList>(&ChannelPinListInput { id: channel })?;
+                let messages = client.ask::<ops::ChannelPinList>(&ChannelPinListInput { id: channel }).await?;
                 client.output.show(&messages, |ms| ms.iter().map(message_line).collect::<Vec<_>>().join("\n"));
                 Ok(())
             }
             ChannelPinAction::Set { message, off } => {
-                client.mutate::<ops::ChannelPinSet>("channel pin set", &ChannelPinSetInput { id: message, on: !off }, message_line)
+                client
+                    .mutate::<ops::ChannelPinSet>("channel pin set", &ChannelPinSetInput { id: message, on: !off }, message_line)
+                    .await
             }
         },
         ChannelAction::Message(msg) => match msg.action {
             ChannelMessageAction::List { channel, limit, before } => {
-                let messages = client.ask::<ops::ChannelMessageList>(&ChannelMessageListInput {
-                    id: channel,
-                    limit: Some(limit),
-                    before,
-                })?;
+                let messages = client
+                    .ask::<ops::ChannelMessageList>(&ChannelMessageListInput {
+                        id: channel,
+                        limit: Some(limit),
+                        before,
+                    })
+                    .await?;
                 client.output.show(&messages, |ms| {
                     let mut lines: Vec<String> = ms.iter().map(message_line).collect();
                     if let Some(first) = ms.first().filter(|f| f.number > 1) {
@@ -207,13 +213,17 @@ pub fn run(client: &Client, cmd: ChannelCmd) -> Done {
                     view_context: parsed_ctx,
                     ..Default::default()
                 };
-                client.mutate::<ops::ChannelMessageSend>("channel message send", &request, |_| format!("sent to #{channel}"))
+                client
+                    .mutate::<ops::ChannelMessageSend>("channel message send", &request, |_| format!("sent to #{channel}"))
+                    .await
             }
             ChannelMessageAction::Search { words, channel } => {
-                let hits = client.ask::<ops::ChannelMessageSearch>(&MessageSearch {
-                    text: words.join(" "),
-                    channel,
-                })?;
+                let hits = client
+                    .ask::<ops::ChannelMessageSearch>(&MessageSearch {
+                        text: words.join(" "),
+                        channel,
+                    })
+                    .await?;
                 client.output.show(&hits, |hs| {
                     hs.iter()
                         .map(|h| format!("{}  {}", h.channel, message_line(&h.message)))
@@ -224,9 +234,11 @@ pub fn run(client: &Client, cmd: ChannelCmd) -> Done {
             }
             ChannelMessageAction::Delete { message } => {
                 let id = message.clone();
-                client.mutate::<ops::ChannelMessageDelete>("channel message delete", &ChannelMessageDeleteInput { id: message }, |_| {
-                    format!("deleted {id}")
-                })
+                client
+                    .mutate::<ops::ChannelMessageDelete>("channel message delete", &ChannelMessageDeleteInput { id: message }, |_| {
+                        format!("deleted {id}")
+                    })
+                    .await
             }
         },
     }

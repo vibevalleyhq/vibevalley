@@ -24,7 +24,7 @@ use crate::channel::{
 use crate::context::error::{LookIn, missing, refused};
 use crate::context::text::{format_artifact_view_context, head};
 use crate::context::{Context, now};
-use crate::runtime::{MailboxSource, MailboxStatus, OUTBOX_SESSION_REPORTED, OutboxSessionReported, SessionLifecycleEvent};
+use crate::runtime::{IssueReportDoc, MailboxSource, MailboxStatus, OUTBOX_SESSION_REPORTED, OutboxSessionReported, SessionLifecycleEvent};
 
 const HANDED_EMOJI: &str = "👀";
 const REPORT_MAX: usize = 1500;
@@ -506,21 +506,21 @@ impl IssueChat {
             }
         };
         for d in docs {
-            let p = &d.state;
-            let Some(issue) = p["issueId"].as_str() else { continue };
-            let Some(session) = p["sessionId"].as_str() else { continue };
-            let Some(thread) = self.channel.issue_thread_id(issue) else { continue };
-            let Ok(outcome) = serde_json::from_value::<Outcome>(p["outcome"].clone()) else {
+            let Ok(report) = serde_json::from_value::<IssueReportDoc>(d.state) else {
+                continue;
+            };
+            let Some(outcome) = report.outcome else { continue };
+            let Some(thread) = self.channel.issue_thread_id(&report.issue_id) else {
                 continue;
             };
             let note = Note {
                 channel: thread,
-                from: session.into(),
+                from: report.session_id,
                 kind: MessageKind::Report,
-                text: head(p["summary"].as_str().unwrap_or(""), REPORT_MAX),
+                text: head(&report.summary, REPORT_MAX),
                 meta: Meta {
                     outcome: Some(outcome),
-                    spent: serde_json::from_value(p["spent"].clone()).ok().flatten(),
+                    spent: report.spent,
                     run: Some(d.scope_id.clone()),
                     ..Meta::default()
                 },
@@ -1433,5 +1433,38 @@ mod tests {
         ic.close_async().await;
         board.close_async().await;
         let _ = ctx.shutdown(Duration::from_secs(1)).await;
+    }
+
+    #[test]
+    fn issue_report_doc_decodes_typed_and_omitted_fields() {
+        let minimal: IssueReportDoc = serde_json::from_value(serde_json::json!({
+            "issueId": "i-1",
+            "sessionId": "s-1",
+            "outcome": "completed"
+        }))
+        .unwrap();
+        assert_eq!(minimal.issue_id, "i-1");
+        assert_eq!(minimal.session_id, "s-1");
+        assert_eq!(minimal.run_id, "");
+        assert_eq!(minimal.outcome, Some(Outcome::Completed));
+        assert_eq!(minimal.summary, "");
+        assert_eq!(minimal.spent, None);
+
+        let full = IssueReportDoc {
+            issue_id: "i-2".into(),
+            session_id: "s-2".into(),
+            run_id: "r-2".into(),
+            outcome: Some(Outcome::Failed),
+            summary: "did not compile".into(),
+            spent: Some(vibevalley_protocol::Spent {
+                tokens: 42,
+                cny: Some(vibevalley_protocol::JsNumber(0.1)),
+            }),
+        };
+        let decoded: IssueReportDoc = serde_json::from_value(serde_json::to_value(&full).unwrap()).unwrap();
+        assert_eq!(decoded.run_id, "r-2");
+        assert_eq!(decoded.outcome, Some(Outcome::Failed));
+        assert_eq!(decoded.summary, "did not compile");
+        assert_eq!(decoded.spent.map(|s| s.tokens), Some(42));
     }
 }

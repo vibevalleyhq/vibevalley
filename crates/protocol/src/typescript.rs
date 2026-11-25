@@ -115,6 +115,39 @@ pub fn alias<T: TS + ?Sized>(name: &str, cfg: &Config) -> Decl {
     }
 }
 
+fn artifact_types_decl() -> Decl {
+    let names = crate::contract::all_type_specs()
+        .iter()
+        .map(|spec| serde_json::to_string(spec.artifact_type.as_str()).expect("serialize artifact type"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    Decl {
+        name: "ARTIFACT_TYPES".to_owned(),
+        text: format!("export const ARTIFACT_TYPES = [{names}] as const;"),
+    }
+}
+
+fn artifact_type_specs_decl() -> Decl {
+    let mut text = String::from("export const ARTIFACT_TYPE_SPECS: Readonly<Record<ArtifactType, ArtifactTypeSpec>> = {\n");
+    for spec in crate::contract::all_type_specs() {
+        let key = serde_json::to_string(spec.artifact_type.as_str()).expect("serialize artifact type");
+        let slug = serde_json::to_string(spec.slug).expect("serialize slug");
+        let entry_path = serde_json::to_string(spec.entry_path).expect("serialize entryPath");
+        let entry_mime = serde_json::to_string(spec.entry_mime).expect("serialize entryMime");
+        let default_dirs = serde_json::to_string(spec.default_dirs).expect("serialize defaultDirs");
+        let export_suffix = serde_json::to_string(spec.export_suffix).expect("serialize exportSuffix");
+        let supports_design_system = spec.supports_design_system;
+        text.push_str(&format!(
+            "  {key}: {{ artifactType: {key}, slug: {slug}, entryPath: {entry_path}, entryMime: {entry_mime}, defaultDirs: {default_dirs}, exportSuffix: {export_suffix}, supportsDesignSystem: {supports_design_system} }},\n"
+        ));
+    }
+    text.push_str("};");
+    Decl {
+        name: "ARTIFACT_TYPE_SPECS".to_owned(),
+        text,
+    }
+}
+
 /// The strings of `type X = "a" | "b";`, when that is all it is.
 fn string_union(decl: &str) -> Option<Vec<&str>> {
     let body = decl.split_once(" = ")?.1.strip_suffix(';')?;
@@ -125,7 +158,7 @@ fn string_union(decl: &str) -> Option<Vec<&str>> {
         .then_some(values)
 }
 
-const BUILTIN: &[&str] = &["Array", "Record", "Partial", "Branded"];
+const BUILTIN: &[&str] = &["Array", "Record", "Partial", "Branded", "Readonly"];
 
 /// Every `shapes.gen.ts` and `endpoints.gen.ts`, as (path from the repository root, contents).
 pub fn files() -> Vec<(String, String)> {
@@ -166,6 +199,11 @@ fn shape_files() -> Vec<(String, String)> {
             let mut decls = brand_decls(&cfg);
             decls.append(&mut m.decls);
             m.decls = decls;
+        }
+        if m.name == "artifact" {
+            let specs_pos = m.decls.iter().position(|d| d.name == "ArtifactTypeSpec").map_or(m.decls.len(), |i| i + 1);
+            m.decls.insert(specs_pos, artifact_types_decl());
+            m.decls.insert(specs_pos + 1, artifact_type_specs_decl());
         }
     }
     fold_tags(&mut modules);

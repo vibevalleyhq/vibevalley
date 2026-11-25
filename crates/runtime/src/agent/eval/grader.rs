@@ -364,16 +364,13 @@ async fn run_rubric_grader(ctx: &GradeContext<'_>, markdown: &str, model_overrid
 async fn collect_workspace_deliverables(workspace: &Path) -> (String, bool) {
     let mut parts = Vec::new();
     if workspace.join(".git").exists()
-        && let Ok(out) = Command::new("git")
-            .arg("status")
-            .arg("--short")
-            .current_dir(workspace)
-            .kill_on_drop(true)
-            .output()
-            .await
+        && let Ok(Some(repo)) = vibevalley_git::Repo::discover_async(workspace).await
+        && let Ok(out) = repo.run_async(&["status", "--short"]).await
+        && out.ok()
     {
         parts.push(format!("git status:\n{}", String::from_utf8_lossy(&out.stdout)));
-        if let Ok(diff) = Command::new("git").arg("diff").current_dir(workspace).kill_on_drop(true).output().await
+        if let Ok(diff) = repo.run_async(&["diff"]).await
+            && diff.ok()
             && !diff.stdout.is_empty()
         {
             parts.push(format!("git diff:\n{}", String::from_utf8_lossy(&diff.stdout)));

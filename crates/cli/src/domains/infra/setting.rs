@@ -90,10 +90,10 @@ fn status_text(status: &SettingsStatus) -> String {
     lines.join("\n")
 }
 
-pub fn run(client: &Client, cmd: SettingCmd) -> Done {
+pub async fn run(client: &Client, cmd: SettingCmd) -> Done {
     match cmd.action {
         SettingAction::Get => {
-            let status = client.ask::<ops::SettingGet>(&())?;
+            let status = client.ask::<ops::SettingGet>(&()).await?;
             client.output.show(&status, status_text);
             Ok(())
         }
@@ -105,11 +105,11 @@ pub fn run(client: &Client, cmd: SettingCmd) -> Done {
             if !any {
                 return Err(Failure::usage("MissingArgument", "provide at least one setting flag to update"));
             }
-            client.mutate::<ops::SettingUpdate>("setting update", &update, status_text)
+            client.mutate::<ops::SettingUpdate>("setting update", &update, status_text).await
         }
         SettingAction::Validate(fields) => {
             let (update, _) = fields.into_update();
-            let checked = client.ask::<ops::SettingValidate>(&update)?;
+            let checked = client.ask::<ops::SettingValidate>(&update).await?;
             if !checked.problem.is_empty() {
                 return Err(Failure::new(exit::REFUSED, "Refused", checked.problem));
             }

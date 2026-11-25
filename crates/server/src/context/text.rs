@@ -6,7 +6,9 @@ use std::sync::{LazyLock, OnceLock};
 use serde::Deserialize;
 use vibevalley_core::rules::{closed_text, phase_text, short_title, slice};
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ArtifactViewContext, Changes, Cron, Issue, IssueStageKind, IssueStatus, IssueTimeline, Priority, Session, Spent};
+use vibevalley_protocol::{
+    ActorKind, ArtifactViewContext, Changes, Cron, CronWhen, Issue, IssueStageKind, IssueStatus, IssueTimeline, Priority, Session, Spent,
+};
 
 /// Prompt clause prepended to read-only answer issues.
 pub const ANSWER_ONLY: &str = "This issue asks for an answer, not a change: investigate read-only (read code, run read-only \
@@ -372,11 +374,42 @@ pub fn changes_text(c: &Changes) -> String {
     lines.join("\n")
 }
 
+fn core_cron_of(s: &Cron) -> vibevalley_core::cron::Cron {
+    let when = match &s.when {
+        CronWhen::Once(w) => vibevalley_core::cron::CronWhen::Once { at: w.at },
+        CronWhen::Every(w) => vibevalley_core::cron::CronWhen::Every { minutes: w.minutes as f64 },
+        CronWhen::Daily(w) => vibevalley_core::cron::CronWhen::Daily { time: w.time.clone() },
+        CronWhen::Weekly(w) => vibevalley_core::cron::CronWhen::Weekly {
+            days: w.days.clone(),
+            time: w.time.clone(),
+        },
+        CronWhen::Cron(w) => vibevalley_core::cron::CronWhen::Cron { expr: w.expr.clone() },
+    };
+    let by = match s.by {
+        ActorKind::User => vibevalley_core::cron::ActorKind::User,
+        ActorKind::Agent => vibevalley_core::cron::ActorKind::Agent,
+        ActorKind::System => vibevalley_core::cron::ActorKind::System,
+    };
+    vibevalley_core::cron::Cron {
+        id: s.id.clone(),
+        name: s.name.clone(),
+        text: s.text.clone(),
+        channel: s.channel.clone(),
+        agent: s.agent.clone(),
+        repo: s.repo.clone(),
+        when,
+        tz: s.tz.clone(),
+        enabled: s.enabled,
+        created: s.created,
+        last_run: s.last_run,
+        by,
+        pending: s.pending,
+    }
+}
+
 /// `cronLine`.
 pub fn cron_line(s: &Cron, channel: &str) -> String {
-    let Ok(rules) = serde_json::from_value::<vibevalley_core::cron::Cron>(serde_json::to_value(s).unwrap_or_default()) else {
-        return format!("- {} 号「{}」#{channel}\n  {}", s.id, s.name, s.text);
-    };
+    let rules = core_cron_of(s);
     let direct = match &s.agent {
         Some(a) => format!("，直接派给 {a}{}", s.repo.as_deref().map(|r| format!(" 去 {r}")).unwrap_or_default()),
         None => String::new(),

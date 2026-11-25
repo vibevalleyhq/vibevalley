@@ -12428,6 +12428,7 @@ dependencies = [
  "url",
  "uuid",
  "vibevalley-core",
+ "vibevalley-git",
  "vibevalley-protocol",
  "vibevalley-runtime",
  "vibevalley-server",
@@ -12472,6 +12473,7 @@ dependencies = [
  "similar",
  "tempfile",
  "thiserror 2.0.21",
+ "tokio",
 ]
 
 [[package]]
@@ -12635,6 +12637,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "uuid",
+ "vibevalley-git",
  "vibevalley-protocol",
 ]
 

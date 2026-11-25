@@ -1,9 +1,9 @@
-use std::io::{BufWriter, Read as _, Write as _};
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Duration;
 
 use sha2::Digest as _;
+use tokio::io::AsyncWriteExt as _;
 
 use super::releases::{self, Build};
 
@@ -31,6 +31,7 @@ fn validate_url(url: &str) -> Result<bool, String> {
 }
 
 fn build_client(local_http: bool, total_timeout: Duration) -> Result<reqwest::Client, String> {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let redirect_policy = reqwest::redirect::Policy::custom(move |attempt| {
         if local_http {
             return attempt.error("redirects are disabled for local loopback feeds");
@@ -79,7 +80,7 @@ async fn text_once_async(client: &reqwest::Client, url: &str) -> Result<(u16, St
     Ok((status, String::from_utf8_lossy(&body).into_owned()))
 }
 
-pub fn text(url: &str) -> Result<(u16, String), String> {
+pub async fn text(url: &str) -> Result<(u16, String), String> {
     use backon::BackoffBuilder as _;
     text_with_backoff(
         url,
@@ -89,62 +90,57 @@ pub fn text(url: &str) -> Result<(u16, String), String> {
             .with_max_times(2)
             .build(),
     )
+    .await
 }
 
-fn text_with_backoff(url: &str, mut backoff: impl Iterator<Item = Duration>) -> Result<(u16, String), String> {
+async fn text_with_backoff(url: &str, mut backoff: impl Iterator<Item = Duration>) -> Result<(u16, String), String> {
     let local = validate_url(url)?;
-    vibevalley_runtime::rt::block_on(async {
-        let client = build_client(local, TEXT_TIMEOUT)?;
-        loop {
-            let (status, body) = text_once_async(&client, url).await?;
-            if is_retryable_status(status)
-                && let Some(delay) = backoff.next()
-            {
-                tokio::time::sleep(delay).await;
-                continue;
-            }
-            return Ok((status, body));
-        }
-    })
-}
-
-fn download(url: &str, to: &Path, size: u64, mut percent: impl FnMut(u8)) -> Result<(), String> {
-    let local = validate_url(url)?;
-    let url = url.to_string();
-    let to = to.to_path_buf();
-    vibevalley_runtime::rt::block_on(async move {
-        let client = build_client(local, DOWNLOAD_TIMEOUT)?;
-        let mut resp = client.get(&url).send().await.map_err(|e| format!("http: {e}"))?;
-        if !resp.status().is_success() {
-            return Err(format!("http status {}", resp.status().as_u16()));
-        }
-        if let Some(len) = resp.content_length()
-            && len > size
+    let client = build_client(local, TEXT_TIMEOUT)?;
+    loop {
+        let (status, body) = text_once_async(&client, url).await?;
+        if is_retryable_status(status)
+            && let Some(delay) = backoff.next()
         {
-            return Err(format!("download exceeds expected {size} bytes"));
+            tokio::time::sleep(delay).await;
+            continue;
         }
-        let file = std::fs::File::create(&to).map_err(|e| format!("{}: {e}", to.display()))?;
-        let mut writer = BufWriter::new(file);
-        let mut got = 0u64;
-        let mut last_pct = None;
-        percent(0);
-        while let Some(chunk) = resp.chunk().await.map_err(|e| format!("http: {e}"))? {
-            got = got.saturating_add(chunk.len() as u64);
-            if got > size {
-                drop(writer);
-                let _ = std::fs::remove_file(&to);
-                return Err(format!("download exceeded expected {size} bytes"));
-            }
-            writer.write_all(&chunk).map_err(|e| format!("{}: {e}", to.display()))?;
-            let pct = (got.saturating_mul(100) / size.max(1)).min(100) as u8;
-            if last_pct != Some(pct) {
-                last_pct = Some(pct);
-                percent(pct);
-            }
+        return Ok((status, body));
+    }
+}
+
+async fn download(url: &str, to: &Path, size: u64, mut percent: impl FnMut(u8)) -> Result<(), String> {
+    let local = validate_url(url)?;
+    let client = build_client(local, DOWNLOAD_TIMEOUT)?;
+    let mut resp = client.get(url).send().await.map_err(|e| format!("http: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("http status {}", resp.status().as_u16()));
+    }
+    if let Some(len) = resp.content_length()
+        && len > size
+    {
+        return Err(format!("download exceeds expected {size} bytes"));
+    }
+    let file = tokio::fs::File::create(to).await.map_err(|e| format!("{}: {e}", to.display()))?;
+    let mut writer = tokio::io::BufWriter::new(file);
+    let mut got = 0u64;
+    let mut last_pct = None;
+    percent(0);
+    while let Some(chunk) = resp.chunk().await.map_err(|e| format!("http: {e}"))? {
+        got = got.saturating_add(chunk.len() as u64);
+        if got > size {
+            drop(writer);
+            let _ = tokio::fs::remove_file(to).await;
+            return Err(format!("download exceeded expected {size} bytes"));
         }
-        writer.flush().map_err(|e| format!("{}: {e}", to.display()))?;
-        Ok(())
-    })
+        writer.write_all(&chunk).await.map_err(|e| format!("{}: {e}", to.display()))?;
+        let pct = (got.saturating_mul(100) / size.max(1)).min(100) as u8;
+        if last_pct != Some(pct) {
+            last_pct = Some(pct);
+            percent(pct);
+        }
+    }
+    writer.flush().await.map_err(|e| format!("{}: {e}", to.display()))?;
+    Ok(())
 }
 
 pub fn measure(path: &Path) -> std::io::Result<(u64, String)> {
@@ -185,19 +181,23 @@ fn inspect_archive(zip_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn signature(app: &Path) -> Result<String, String> {
-    let verified = Command::new("/usr/bin/codesign")
+async fn signature(app: &Path) -> Result<String, String> {
+    let verified = tokio::process::Command::new("/usr/bin/codesign")
         .args(["--verify", "--deep", "--strict"])
         .arg(app)
+        .kill_on_drop(true)
         .output()
+        .await
         .map_err(|e| format!("codesign: {e}"))?;
     if !verified.status.success() {
         return Err(String::from_utf8_lossy(&verified.stderr).trim().to_string());
     }
-    let said = Command::new("/usr/bin/codesign")
+    let said = tokio::process::Command::new("/usr/bin/codesign")
         .args(["-dv", "--verbose=2"])
         .arg(app)
+        .kill_on_drop(true)
         .output()
+        .await
         .map_err(|e| format!("codesign: {e}"))?;
     Ok(String::from_utf8_lossy(&said.stderr).into_owned())
 }
@@ -227,37 +227,49 @@ fn validate_bundle_id(running_bundle_id: Option<&str>, next_plist: &str, file: &
     Ok(())
 }
 
-pub fn staged_app(url: &str, build: &Build, version: &str, bundle: &Path, folder: &Path, percent: impl FnMut(u8)) -> Result<PathBuf, String> {
-    let running = signature(bundle).map_err(|why| format!("running app signature: {why}"))?;
-    let running_plist = std::fs::read_to_string(bundle.join("Contents/Info.plist")).unwrap_or_default();
+pub async fn staged_app(url: &str, build: &Build, version: &str, bundle: &Path, folder: &Path, percent: impl FnMut(u8)) -> Result<PathBuf, String> {
+    let running = signature(bundle).await.map_err(|why| format!("running app signature: {why}"))?;
+    let running_plist = tokio::fs::read_to_string(bundle.join("Contents/Info.plist")).await.unwrap_or_default();
     let running_bundle_id = releases::plist_bundle_id(&running_plist);
-    let _ = std::fs::remove_dir_all(folder);
-    std::fs::create_dir_all(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
+    let _ = tokio::fs::remove_dir_all(folder).await;
+    tokio::fs::create_dir_all(folder).await.map_err(|e| format!("{}: {e}", folder.display()))?;
     let zip = folder.join("update.zip");
-    download(url, &zip, build.size, percent)?;
-    let (size, sha512) = measure(&zip).map_err(|e| e.to_string())?;
-    if size != build.size || !sha512.eq_ignore_ascii_case(&build.sha512) {
-        return Err(format!("{}: not the file the release lists", build.file));
-    }
-    inspect_archive(&zip)?;
+    download(url, &zip, build.size, percent).await?;
+    let zip_for_verify = zip.clone();
+    let expected_size = build.size;
+    let expected_sha512 = build.sha512.clone();
+    let file_name = build.file.clone();
+    tokio::task::spawn_blocking(move || {
+        let (size, sha512) = measure(&zip_for_verify).map_err(|e| e.to_string())?;
+        if size != expected_size || !sha512.eq_ignore_ascii_case(&expected_sha512) {
+            return Err(format!("{file_name}: not the file the release lists"));
+        }
+        inspect_archive(&zip_for_verify)
+    })
+    .await
+    .map_err(|e| format!("verify archive task failed: {e}"))??;
     // ditto keeps what a .app holds that unzip would lose (symlinks, extended attributes).
-    let unpacked = Command::new("/usr/bin/ditto")
+    let unpacked = tokio::process::Command::new("/usr/bin/ditto")
         .args(["-x", "-k"])
         .arg(&zip)
         .arg(folder)
+        .kill_on_drop(true)
         .output()
+        .await
         .map_err(|e| format!("ditto: {e}"))?;
     if !unpacked.status.success() {
         return Err(format!("{}: {}", build.file, String::from_utf8_lossy(&unpacked.stderr).trim()));
     }
-    let _ = std::fs::remove_file(&zip);
+    let _ = tokio::fs::remove_file(&zip).await;
     let app = unpacked_app(folder, bundle)?;
-    let plist = std::fs::read_to_string(app.join("Contents/Info.plist")).unwrap_or_default();
+    let plist = tokio::fs::read_to_string(app.join("Contents/Info.plist")).await.unwrap_or_default();
     if releases::plist_version(&plist) != Some(version) {
         return Err(format!("{}: no VibeValley {version} in it", build.file));
     }
     validate_bundle_id(running_bundle_id, &plist, &build.file)?;
-    let said = signature(&app).map_err(|why| format!("{}: its signature does not hold: {why}", build.file))?;
+    let said = signature(&app)
+        .await
+        .map_err(|why| format!("{}: its signature does not hold: {why}", build.file))?;
     if !releases::same_signer(releases::team_of(&running), releases::team_of(&said)) {
         return Err(format!("{}: not signed by the team that signed this app", build.file));
     }
@@ -266,6 +278,7 @@ pub fn staged_app(url: &str, build: &Build, version: &str, bundle: &Path, folder
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write as _;
     use std::net::SocketAddr;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -278,21 +291,19 @@ mod tests {
 
     use super::*;
 
-    fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
-        vibevalley_runtime::rt::block_on(async move {
-            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            let cancel = CancellationToken::new();
-            let guard = cancel.clone().drop_guard();
-            tokio::spawn(async move {
-                let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
-            });
-            (addr, guard)
-        })
+    async fn spawn_mock(router: Router) -> (SocketAddr, DropGuard) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cancel = CancellationToken::new();
+        let guard = cancel.clone().drop_guard();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+        });
+        (addr, guard)
     }
 
-    #[test]
-    fn regression_plain_http_is_only_allowed_for_a_loopback_feed_without_redirects() {
+    #[tokio::test]
+    async fn regression_plain_http_is_only_allowed_for_a_loopback_feed_without_redirects() {
         let hits = Arc::new(AtomicUsize::new(0));
         let server_hits = hits.clone();
         let app = Router::new().route(
@@ -302,10 +313,10 @@ mod tests {
                 async { (StatusCode::FOUND, [(header::LOCATION, "http://example.invalid/release.json")]) }
             }),
         );
-        let (address, _guard) = spawn_mock(app);
-        assert!(text(&format!("http://{address}/release.json")).is_err());
+        let (address, _guard) = spawn_mock(app).await;
+        assert!(text(&format!("http://{address}/release.json")).await.is_err());
         assert_eq!(hits.load(Ordering::SeqCst), 1);
-        assert!(text("http://example.invalid/release.json").is_err());
+        assert!(text("http://example.invalid/release.json").await.is_err());
     }
 
     #[test]
@@ -321,8 +332,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn text_retries_transient_server_errors_with_backon() {
+    #[tokio::test]
+    async fn text_retries_transient_server_errors_with_backon() {
         use backon::BackoffBuilder as _;
         let hits = Arc::new(AtomicUsize::new(0));
         let server_hits = hits.clone();
@@ -339,19 +350,19 @@ mod tests {
                 }
             }),
         );
-        let (address, _guard) = spawn_mock(app);
+        let (address, _guard) = spawn_mock(app).await;
         let backoff = backon::ExponentialBuilder::new()
             .with_min_delay(Duration::from_millis(1))
             .with_max_delay(Duration::from_millis(5))
             .with_max_times(2)
             .build();
-        let (status, body) = text_with_backoff(&format!("http://{address}/release.json"), backoff).unwrap();
+        let (status, body) = text_with_backoff(&format!("http://{address}/release.json"), backoff).await.unwrap();
         assert_eq!((status, body.as_str()), (200, "{}"));
         assert_eq!(hits.load(Ordering::SeqCst), 2);
     }
 
-    #[test]
-    fn download_streams_with_progress_and_enforces_max_size() {
+    #[tokio::test]
+    async fn download_streams_with_progress_and_enforces_max_size() {
         let dir = tempfile::tempdir().unwrap();
         let target = dir.path().join("payload.bin");
         let payload: &'static [u8] = b"vibevalley-update-bytes";
@@ -365,16 +376,18 @@ mod tests {
                 async move { (StatusCode::OK, payload) }
             }),
         );
-        let (address, _guard) = spawn_mock(app);
+        let (address, _guard) = spawn_mock(app).await;
 
         let mut progress = Vec::new();
-        download(&format!("http://{address}/app.zip"), &target, payload.len() as u64, |p| progress.push(p)).unwrap();
-        assert_eq!(std::fs::read(&target).unwrap(), payload);
+        download(&format!("http://{address}/app.zip"), &target, payload.len() as u64, |p| progress.push(p))
+            .await
+            .unwrap();
+        assert_eq!(tokio::fs::read(&target).await.unwrap(), payload);
         assert_eq!(progress.last().copied(), Some(100));
 
         // Exceeding declared max size is rejected.
         let oversized = dir.path().join("oversized.bin");
-        assert!(download(&format!("http://{address}/app.zip"), &oversized, 4, |_| {}).is_err());
+        assert!(download(&format!("http://{address}/app.zip"), &oversized, 4, |_| {}).await.is_err());
         assert_eq!(hits.load(Ordering::SeqCst), 2);
     }
 

@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, OnceLock, Weak, atomic::Ordering};
 
 use parking_lot::Mutex;
-use serde_json::{Value, json};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{ApiError, BizCode, OrchestratorApproval, OrchestratorApprovalResolveInput};
@@ -60,6 +61,50 @@ impl BrainProvider for Bound {
     }
 }
 
+#[derive(Serialize)]
+struct ReviewChanges {
+    files: Vec<vibevalley_protocol::ChangedFile>,
+    uncommitted: Vec<vibevalley_protocol::UncommittedItem>,
+    revision: Option<vibevalley_protocol::ReviewRevision>,
+}
+
+#[derive(Serialize)]
+struct ReviewDeliverables {
+    report: crate::runtime::Report,
+    changes: Option<ReviewChanges>,
+    artifacts: Vec<vibevalley_protocol::Artifact>,
+}
+
+#[derive(Serialize)]
+struct StoppedPayload {
+    error: &'static str,
+}
+
+#[derive(Serialize)]
+struct TurnErrorPayload<'a> {
+    error: &'a str,
+    reason: &'a str,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct AssistantEntryPayload {
+    generation_task: String,
+    text: String,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct UserEntryPayload {
+    text: String,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct CompactionEntryPayload {
+    summary: String,
+}
+
 impl ReviewProvider for Bound {
     fn review<'a>(&'a self, request: ReviewRequest<'a>) -> BoxFuture<'a, Result<Option<OutcomeReview>>> {
         Box::pin(async move {
@@ -77,7 +122,11 @@ impl ReviewProvider for Bound {
             };
             let changes = if issue.repo.is_some() {
                 let diff = o.issue.diff_async(&issue.id, None).await.map_err(|e| Error::Invalid(e.message))?;
-                Some(json!({"files": diff.files, "uncommitted": diff.uncommitted, "revision": diff.revision}))
+                Some(ReviewChanges {
+                    files: diff.files,
+                    uncommitted: diff.uncommitted,
+                    revision: diff.revision,
+                })
             } else {
                 None
             };
@@ -90,7 +139,7 @@ impl ReviewProvider for Bound {
                 })
                 .await
                 .map_err(|e| Error::Invalid(e.message))?;
-            let deliverables = json!({"report": report, "changes": changes, "artifacts": artifacts}).to_string();
+            let deliverables = serde_json::to_string(&ReviewDeliverables { report, changes, artifacts })?;
             const EVIDENCE_CHARS: usize = 16_000;
             Ok(Some(OutcomeReview {
                 task_prompt: format!("{}\n{}", issue.title, issue.description),
@@ -341,7 +390,8 @@ impl Execution {
                 })
             })
             .await?;
-        self.finish_inputs_async(&ids, false, &json!({"error":"stopped"})).await
+        let stopped = serde_json::to_value(StoppedPayload { error: "stopped" })?;
+        self.finish_inputs_async(&ids, false, &stopped).await
     }
 
     pub(super) async fn finish_inputs_async(&self, ids: &[String], ok: bool, result: &Value) -> Result<()> {
@@ -436,7 +486,10 @@ impl Execution {
         let payload = if ok {
             task.result.clone()
         } else {
-            json!({"error":task.error_text,"reason":task.terminal_reason})
+            serde_json::to_value(TurnErrorPayload {
+                error: &task.error_text,
+                reason: &task.terminal_reason,
+            })?
         };
         if !ok {
             let sub_id = sub.id.clone();
@@ -465,27 +518,31 @@ impl Execution {
             .store()
             .read_with_async((conv, task_id), |tx, (conv, task_id)| {
                 Box::pin(async move {
-                    Ok(tx
-                        .entries_async(conv, 1)
-                        .await?
-                        .into_iter()
-                        .filter(|e| e.kind == "pi.assistant" && e.payload["generationTask"] == *task_id)
-                        .collect::<Vec<_>>())
+                    let mut matched = Vec::new();
+                    for e in tx.entries_async(conv, 1).await? {
+                        if e.kind != "pi.assistant" {
+                            continue;
+                        }
+                        let Ok(payload) = serde_json::from_value::<AssistantEntryPayload>(e.payload) else {
+                            continue;
+                        };
+                        if payload.generation_task == *task_id && !payload.text.trim().is_empty() {
+                            matched.push((e.seq, payload.text));
+                        }
+                    }
+                    Ok(matched)
                 })
             })
             .await?;
-        for e in replies {
-            let Some(text) = e.payload["text"].as_str().filter(|s| !s.trim().is_empty()) else {
-                continue;
-            };
+        for (seq, text) in replies {
             run.o
                 .chat
                 .post_async(Posting {
                     from: run.me.id.clone(),
                     channel: run.route.channel.clone(),
-                    text: text.into(),
+                    text,
                     run: Some(run.run.clone()),
-                    send_key: format!("{}:{}", task.id, e.seq),
+                    send_key: format!("{}:{seq}", task.id),
                     made: None,
                     spoken: !run.ports.is_empty(),
                 })
@@ -503,9 +560,10 @@ impl Execution {
                     let mut out = vec![];
                     for e in tx.entries_async(conv, 1).await? {
                         match e.kind.as_str() {
-                            "pi.user" => out.push(EvalEntry::TurnStarted {
-                                input: e.payload["text"].as_str().unwrap_or_default().into(),
-                            }),
+                            "pi.user" => {
+                                let payload = serde_json::from_value::<UserEntryPayload>(e.payload).unwrap_or_default();
+                                out.push(EvalEntry::TurnStarted { input: payload.text });
+                            }
                             "pi.assistant" | "pi.tool_result" => {
                                 let tr = Transcript {
                                     conversation_id: conv.into(),
@@ -515,9 +573,10 @@ impl Execution {
                                 };
                                 out.extend(tr.messages().into_iter().map(EvalEntry::Message));
                             }
-                            "pi.compaction" => out.push(EvalEntry::Compacted {
-                                summary: e.payload["summary"].as_str().unwrap_or_default().into(),
-                            }),
+                            "pi.compaction" => {
+                                let payload = serde_json::from_value::<CompactionEntryPayload>(e.payload).unwrap_or_default();
+                                out.push(EvalEntry::Compacted { summary: payload.summary });
+                            }
                             _ => (),
                         }
                     }
@@ -536,4 +595,27 @@ fn approval_error(error: Error) -> ApiError {
         Error::Commit(_) | Error::Db(_) | Error::Sql(_) | Error::Json(_) => BizCode::InternalError,
     };
     ApiError::new(code, error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn route_and_entry_payloads_default_missing_fields() {
+        let route: Route = serde_json::from_value(serde_json::json!({ "agent": "orch" })).unwrap();
+        assert_eq!(route.agent, "orch");
+        assert_eq!(route.channel, "");
+        assert!(!route.user);
+
+        let assistant: AssistantEntryPayload = serde_json::from_value(serde_json::json!({ "generationTask": "t1" })).unwrap();
+        assert_eq!(assistant.generation_task, "t1");
+        assert_eq!(assistant.text, "");
+
+        let user: UserEntryPayload = serde_json::from_value(serde_json::json!({})).unwrap();
+        assert_eq!(user.text, "");
+
+        let compaction: CompactionEntryPayload = serde_json::from_value(serde_json::json!({ "summary": "done" })).unwrap();
+        assert_eq!(compaction.summary, "done");
+    }
 }

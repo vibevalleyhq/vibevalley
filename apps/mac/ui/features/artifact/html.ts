@@ -1,33 +1,11 @@
-import type { ArtifactType } from "@vibevalley/protocol";
-
-export interface ArtifactTypeMeta {
-  readonly entry: string;
-  readonly suffix: string;
-  readonly mime: string;
-}
-
-/** Mirrors `crates/core/src/artifact/manifest.rs::ALL_SPECS`. */
-const ARTIFACT_TYPE_META: Record<ArtifactType, ArtifactTypeMeta> = {
-  docs: { entry: "structure/index.md", suffix: ".md", mime: "text/markdown" },
-  outline: { entry: "structure/outline.json", suffix: ".outline.json", mime: "application/json" },
-  slides: { entry: "structure/deck.json", suffix: ".slides.json", mime: "application/json" },
-  dashboard: { entry: "structure/dashboard.json", suffix: ".dashboard.json", mime: "application/json" },
-  motion: { entry: "structure/timeline.json", suffix: ".motion.json", mime: "application/json" },
-  whiteboard: { entry: "structure/board.json", suffix: ".whiteboard.json", mime: "application/json" },
-  design: { entry: "structure/frames/main.json", suffix: ".design.json", mime: "application/json" },
-  "design-system": { entry: "structure/tokens.json", suffix: ".design-system.json", mime: "application/json" },
-  sheet: { entry: "structure/workbook.json", suffix: ".sheet.json", mime: "application/json" },
-  prototype: { entry: "structure/index.html", suffix: ".html", mime: "text/html" },
-  diagram: { entry: "structure/diagram.json", suffix: ".diagram.json", mime: "application/json" },
-  storyboard: { entry: "structure/shots.json", suffix: ".storyboard.json", mime: "application/json" },
-};
+import { ARTIFACT_TYPE_SPECS, ARTIFACT_TYPES, type ArtifactType } from "@vibevalley/protocol";
 
 export function entryPathOf(artifactType: ArtifactType): string {
-  return ARTIFACT_TYPE_META[artifactType].entry;
+  return ARTIFACT_TYPE_SPECS[artifactType].entryPath;
 }
 
 export function artifactSuffixOf(a: { readonly artifactType: ArtifactType }): string {
-  return ARTIFACT_TYPE_META[a.artifactType].suffix;
+  return ARTIFACT_TYPE_SPECS[a.artifactType].exportSuffix;
 }
 
 export interface InferredArtifactName {
@@ -35,23 +13,34 @@ export interface InferredArtifactName {
   readonly artifactType: ArtifactType;
 }
 
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
+const EXTRA_NAME_PATTERNS: Record<ArtifactType, readonly RegExp[]> = {
+  slides: [/^(.+?)\.(?:slide|slides)\.(?:json|html)$/iu],
+  design: [/^(.+?)\.(?:visual|canvas|design)\.(?:json|html)$/iu],
+  dashboard: [/^(.+?)\.dashboard\.(?:json|html)$/iu],
+  motion: [/^(.+?)\.motion\.(?:json|html)$/iu],
+  whiteboard: [/^(.+?)\.whiteboard(?:\.json|\.html)?$/iu],
+  "design-system": [/^(.+?)\.(?:design-system|tokens)\.json$/iu],
+  sheet: [],
+  diagram: [],
+  storyboard: [],
+  outline: [/^(.+?)\.outline\.(?:json|md)$/iu],
+  prototype: [/^(.+?)\.(?:prototype\.html|page\.html|html|htm)$/iu],
+  docs: [/^(.+?)\.(?:doc\.md|md|markdown)$/iu],
+};
+
+// Longer compound suffixes (e.g. `.outline.json`, `.design-system.json`) must run before generic `.html` / `.md`.
+const INFER_RULES: readonly { readonly re: RegExp; readonly artifactType: ArtifactType }[] = [...ARTIFACT_TYPES]
+  .toSorted((a, b) => ARTIFACT_TYPE_SPECS[b].exportSuffix.length - ARTIFACT_TYPE_SPECS[a].exportSuffix.length)
+  .flatMap((artifactType) => {
+    const canonical = new RegExp(`^(.+?)${escapeRegExp(ARTIFACT_TYPE_SPECS[artifactType].exportSuffix)}$`, "iu");
+    return [...EXTRA_NAME_PATTERNS[artifactType], canonical].map((re) => ({ re, artifactType }));
+  });
+
 export function inferArtifactFromName(name: string, content?: string): InferredArtifactName {
   const trimmed = name.trim();
-  const rules: readonly { readonly re: RegExp; readonly artifactType: ArtifactType }[] = [
-    { re: /^(.+?)\.(?:slide|slides)\.(?:json|html)$/iu, artifactType: "slides" },
-    { re: /^(.+?)\.(?:visual|canvas|design)\.(?:json|html)$/iu, artifactType: "design" },
-    { re: /^(.+?)\.dashboard\.(?:json|html)$/iu, artifactType: "dashboard" },
-    { re: /^(.+?)\.motion\.(?:json|html)$/iu, artifactType: "motion" },
-    { re: /^(.+?)\.whiteboard(?:\.json|\.html)?$/iu, artifactType: "whiteboard" },
-    { re: /^(.+?)\.(?:design-system|tokens)\.json$/iu, artifactType: "design-system" },
-    { re: /^(.+?)\.sheet\.json$/iu, artifactType: "sheet" },
-    { re: /^(.+?)\.diagram\.json$/iu, artifactType: "diagram" },
-    { re: /^(.+?)\.storyboard\.json$/iu, artifactType: "storyboard" },
-    { re: /^(.+?)\.outline\.(?:json|md)$/iu, artifactType: "outline" },
-    { re: /^(.+?)\.(?:prototype\.html|page\.html|html|htm)$/iu, artifactType: "prototype" },
-    { re: /^(.+?)\.(?:doc\.md|md|markdown)$/iu, artifactType: "docs" },
-  ];
-  for (const r of rules) {
+  for (const r of INFER_RULES) {
     const m = r.re.exec(trimmed);
     if (!m) continue;
     return { title: m[1]?.trim() || trimmed, artifactType: r.artifactType };

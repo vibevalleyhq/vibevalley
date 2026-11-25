@@ -1,6 +1,6 @@
 //! Local binary inputs: bounded streaming upload and ranged playback.
 use super::auth::{LocalOnly, LocalOnlyStatus};
-use super::{HttpState, file_range_stream, refuse, reply};
+use super::{FileRangeSpec, HttpState, refuse, reply, serve_file_range};
 use axum::{
     body::{Body, Bytes},
     extract::{Path, State},
@@ -9,7 +9,6 @@ use axum::{
 };
 use futures_util::{Stream, StreamExt};
 use std::{io, time::Duration};
-use tokio::io::AsyncSeekExt;
 use tokio_util::io::{StreamReader, SyncIoBridge};
 use vibevalley_protocol::{BizCode, Envelope};
 
@@ -56,7 +55,7 @@ pub(super) async fn upload(State(state): State<HttpState>, _local: LocalOnly, Pa
     {
         return refuse(BizCode::PayloadTooLarge, "the body exceeds 512000000 bytes");
     }
-    if !super::is_artifact_id(&id) {
+    if !super::is_media_input_uuid(&id) {
         return refuse(BizCode::MediaNotFound, "media input not found");
     }
     let Some(inputs) = state.ports().media_input else {
@@ -71,7 +70,7 @@ pub(super) async fn upload(State(state): State<HttpState>, _local: LocalOnly, Pa
 }
 
 pub(super) async fn content(State(state): State<HttpState>, _local: LocalOnlyStatus, Path(id): Path<String>, headers: HeaderMap) -> Response {
-    if !super::is_artifact_id(&id) {
+    if !super::is_media_input_uuid(&id) {
         return StatusCode::NOT_FOUND.into_response();
     }
     let Some(inputs) = state.ports().media_input else {
@@ -80,41 +79,14 @@ pub(super) async fn content(State(state): State<HttpState>, _local: LocalOnlySta
     let Ok(found) = inputs.content_async(id).await else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    let Ok(mut file) = tokio::fs::File::open(&found.path).await else {
-        return StatusCode::NOT_FOUND.into_response();
+    let spec = FileRangeSpec {
+        path: std::path::Path::new(&found.path),
+        content_type: &found.r#type,
+        filename: &found.name,
+        cache_control: "private, no-store",
+        truncated_msg: "media input truncated",
     };
-    let Ok(size) = file.metadata().await.map(|m| m.len()) else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-    let text = headers.get("range");
-    let bounds = match text {
-        Some(v) => v.to_str().ok().and_then(|v| super::parse_byte_range(v, size)),
-        None => (size > 0).then_some((0, size - 1)),
-    };
-    let Some((start, end)) = bounds else {
-        return (StatusCode::RANGE_NOT_SATISFIABLE, [("content-range", format!("bytes */{size}"))]).into_response();
-    };
-    if start > 0 && file.seek(io::SeekFrom::Start(start)).await.is_err() {
-        return StatusCode::NOT_FOUND.into_response();
-    }
-    let length = end - start + 1;
-    let stream = file_range_stream(file, length, "media input truncated");
-    let filename = found.name.as_bytes().iter().map(|b| format!("%{b:02X}")).collect::<String>();
-    let mut response = Response::builder()
-        .status(if text.is_some() { 206 } else { 200 })
-        .header("content-type", found.r#type)
-        .header("content-length", length)
-        .header("accept-ranges", "bytes")
-        .header("cache-control", "private, no-store")
-        .header("x-content-type-options", "nosniff")
-        .header("content-security-policy", "sandbox")
-        .header("content-disposition", format!("inline; filename*=UTF-8''{filename}"));
-    if text.is_some() {
-        response = response.header("content-range", format!("bytes {start}-{end}/{size}"));
-    }
-    response
-        .body(Body::from_stream(stream))
-        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+    serve_file_range(&headers, spec).await.unwrap_or_else(|_| StatusCode::NOT_FOUND.into_response())
 }
 
 /// Calls `gone` when the response body is dropped: the page went away.

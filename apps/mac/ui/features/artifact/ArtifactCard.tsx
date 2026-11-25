@@ -48,13 +48,13 @@ export function artifactTypeLabel(type: ArtifactType): string {
     case "design-system":
       return t("web.artifact.types.designSystem");
     case "sheet":
-      return "Sheet";
+      return t("web.artifact.types.sheet");
     case "prototype":
-      return "Prototype";
+      return t("web.artifact.types.prototype");
     case "diagram":
-      return "Diagram";
+      return t("web.artifact.types.diagram");
     case "storyboard":
-      return "Storyboard";
+      return t("web.artifact.types.storyboard");
   }
 }
 

@@ -57,6 +57,34 @@ export type HostMotionChoice = (typeof HostMotionChoiceValues)[number];
 export const HostOpeningPhaseValues = ["connecting", "reading", "loading", "ready", "waiting", "failed"] as const;
 export type HostOpeningPhase = (typeof HostOpeningPhaseValues)[number];
 
+/**
+ * Active or configured Control Plane connection mode for the macOS desktop app.
+ */
+export const DesktopConnectionModeValues = ["embedded", "remote"] as const;
+/**
+ * Active or configured Control Plane connection mode for the macOS desktop app.
+ */
+export type DesktopConnectionMode = (typeof DesktopConnectionModeValues)[number];
+
+/**
+ * Where the desktop app's configured Control Plane connection came from.
+ */
+export const DesktopConnectionSourceValues = ["env", "file", "default"] as const;
+/**
+ * Where the desktop app's configured Control Plane connection came from.
+ */
+export type DesktopConnectionSource = (typeof DesktopConnectionSourceValues)[number];
+
+/**
+ * Safe UI-facing snapshot of active vs configured desktop Control Plane connection mode.
+ */
+export type DesktopConnectionSnapshot = { activeMode: DesktopConnectionMode, activeUrl?: string, activeLabel?: string, configuredMode: DesktopConnectionMode, configuredUrl?: string, configuredLabel?: string, tokenHint?: string, source: DesktopConnectionSource, restartRequired: boolean, };
+
+/**
+ * Request payload for `host.connectionSave`.
+ */
+export type ConnectionSaveRequest = { url: string, token?: string, pairCode?: string, deviceName?: string, label?: string, };
+
 export const HostSoundNameValues = ["tap", "nope", "pick", "open", "close", "water", "spray", "weed", "harvest", "shovel", "plant", "ripe", "bug", "coin", "levelUp", "achievement", "arrive", "rustle", "splash", "thud", "woof", "yip", "pant", "meow", "mew", "purr", "voiceOn", "ring", "voiceOff"] as const;
 export type HostSoundName = (typeof HostSoundNameValues)[number];
 

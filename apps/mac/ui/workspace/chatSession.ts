@@ -99,12 +99,6 @@ export function asThoughtLevel(value: string | undefined): ThoughtLevel | undefi
   }
 }
 
-export const FALLBACK_RUNTIMES: readonly WorkspaceRuntimeOption[] = [
-  { id: "antigravity", name: "Antigravity", available: true, models: [], supportsSteer: true, supportsConfig: true },
-  { id: "claude", name: "Claude Code", available: true, models: [], supportsSteer: true, supportsConfig: true },
-  { id: "codex", name: "Codex", available: true, models: [], supportsSteer: true, supportsConfig: true },
-];
-
 const runtimeListSchema = z.array(RuntimeInfoSchema);
 
 export function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOption {
@@ -133,7 +127,7 @@ export function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOpt
         : undefined;
   return {
     id: rt.id,
-    name: rt.preset.label || runtimeDisplayName(rt.id),
+    name: rt.preset.label || rt.id,
     available: rt.installation.status === "available",
     models,
     defaultModel: rt.settings.defaultModel.trim() || undefined,
@@ -163,23 +157,9 @@ export function clampThoughtLevel(model: RuntimeModelOption | undefined, current
 
 export async function fetchWorkspaceRuntimes(): Promise<readonly WorkspaceRuntimeOption[]> {
   const env = await transport().call("runtime.list", {});
-  if (env.bizCode !== 0) return FALLBACK_RUNTIMES;
+  if (env.bizCode !== 0) return [];
   const parsed = runtimeListSchema.safeParse(env.data);
-  if (!parsed.success || parsed.data.length === 0) return FALLBACK_RUNTIMES;
-  return parsed.data.map(toWorkspaceRuntime);
-}
-
-export function runtimeDisplayName(runtime: string): string {
-  switch (runtime) {
-    case "antigravity":
-      return "Antigravity";
-    case "claude":
-      return "Claude Code";
-    case "codex":
-      return "Codex";
-    default:
-      return runtime || "Chat";
-  }
+  return parsed.success ? parsed.data.map(toWorkspaceRuntime) : [];
 }
 
 const chatHiddenStepTypes: ReadonlySet<SessionEvent["type"]> = new Set([

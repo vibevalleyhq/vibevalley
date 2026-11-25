@@ -176,6 +176,18 @@
           "name": "Web page",
           "desc": "Standalone interactive HTML page with version history"
         },
+        "artSheet": {
+          "name": "Workbook sheet",
+          "desc": "Multi-sheet structured tables and CSV export"
+        },
+        "artDiagram": {
+          "name": "Architecture diagram",
+          "desc": "Nodes, edges, and architecture flows"
+        },
+        "artStoryboard": {
+          "name": "Storyboard shots",
+          "desc": "Shot list, framing, palette, and dialogue"
+        },
         "aiImage": {
           "name": "AI image",
           "desc": "Generate concept art, icons, or illustrations from text"

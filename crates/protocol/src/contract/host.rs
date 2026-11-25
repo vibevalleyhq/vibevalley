@@ -559,6 +559,86 @@ impl HostOpeningPhase {
     }
 }
 
+/// Active or configured Control Plane connection mode for the macOS desktop app.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum DesktopConnectionMode {
+    Embedded,
+    Remote,
+}
+
+impl DesktopConnectionMode {
+    pub const ALL: [DesktopConnectionMode; 2] = [DesktopConnectionMode::Embedded, DesktopConnectionMode::Remote];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DesktopConnectionMode::Embedded => "embedded",
+            DesktopConnectionMode::Remote => "remote",
+        }
+    }
+}
+
+/// Where the desktop app's configured Control Plane connection came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum DesktopConnectionSource {
+    Env,
+    File,
+    Default,
+}
+
+impl DesktopConnectionSource {
+    pub const ALL: [DesktopConnectionSource; 3] = [DesktopConnectionSource::Env, DesktopConnectionSource::File, DesktopConnectionSource::Default];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DesktopConnectionSource::Env => "env",
+            DesktopConnectionSource::File => "file",
+            DesktopConnectionSource::Default => "default",
+        }
+    }
+}
+
+/// Safe UI-facing snapshot of active vs configured desktop Control Plane connection mode.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopConnectionSnapshot {
+    pub active_mode: DesktopConnectionMode,
+    pub active_url: Option<String>,
+    pub active_label: Option<String>,
+    pub configured_mode: DesktopConnectionMode,
+    pub configured_url: Option<String>,
+    pub configured_label: Option<String>,
+    pub token_hint: Option<String>,
+    pub source: DesktopConnectionSource,
+    pub restart_required: bool,
+}
+
+/// Request payload for `host.connectionSave`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionSaveRequest {
+    pub url: String,
+    #[serde(default)]
+    pub token: Option<String>,
+    #[serde(default)]
+    pub pair_code: Option<String>,
+    #[serde(default)]
+    pub device_name: Option<String>,
+    #[serde(default)]
+    pub label: Option<String>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[serde(rename_all = "camelCase")]
@@ -1142,6 +1222,10 @@ crate::typescript::module! {
     HostThemeChoice,
     HostMotionChoice,
     HostOpeningPhase,
+    DesktopConnectionMode,
+    DesktopConnectionSource,
+    DesktopConnectionSnapshot,
+    ConnectionSaveRequest,
     HostSoundName,
     HostFontPayload,
     HostNotifyPayload,
@@ -1379,5 +1463,51 @@ mod tests {
         assert!(HostOp::from_wire("host.sha256", json!({ "text": "a", "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.randomBytes", json!({ "length": -1 })).is_err());
         assert!(HostOp::from_wire("host.qr", json!({ "text": "hi", "extra": 1 })).is_err());
+    }
+
+    #[test]
+    fn desktop_connection_snapshot_and_save_request_round_trip_wire_json() {
+        let snapshot = DesktopConnectionSnapshot {
+            active_mode: DesktopConnectionMode::Embedded,
+            active_url: None,
+            active_label: None,
+            configured_mode: DesktopConnectionMode::Remote,
+            configured_url: Some("https://hub.ts.net:8791".into()),
+            configured_label: Some("Studio".into()),
+            token_hint: Some("…abcd".into()),
+            source: DesktopConnectionSource::File,
+            restart_required: true,
+        };
+        let encoded = serde_json::to_value(&snapshot).unwrap();
+        assert_eq!(
+            encoded,
+            json!({
+                "activeMode": "embedded",
+                "configuredMode": "remote",
+                "configuredUrl": "https://hub.ts.net:8791",
+                "configuredLabel": "Studio",
+                "tokenHint": "…abcd",
+                "source": "file",
+                "restartRequired": true,
+            })
+        );
+        assert_eq!(serde_json::from_value::<DesktopConnectionSnapshot>(encoded).unwrap(), snapshot);
+
+        let save: ConnectionSaveRequest = serde_json::from_value(json!({
+            "url": "https://hub.ts.net:8791",
+            "pairCode": "AB34CD",
+            "label": "Studio",
+        }))
+        .unwrap();
+        assert_eq!(
+            save,
+            ConnectionSaveRequest {
+                url: "https://hub.ts.net:8791".into(),
+                token: None,
+                pair_code: Some("AB34CD".into()),
+                device_name: None,
+                label: Some("Studio".into()),
+            }
+        );
     }
 }

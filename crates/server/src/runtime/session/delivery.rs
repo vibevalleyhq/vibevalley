@@ -77,7 +77,36 @@ impl SessionEngine {
             })
             .await?)
     }
+}
 
+/// Persisted payload for `"issue.report"` durable documents and delivery settlements.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct IssueReportDoc {
+    pub issue_id: String,
+    pub session_id: String,
+    #[serde(default)]
+    pub run_id: String,
+    #[serde(default)]
+    pub outcome: Option<Outcome>,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub spent: Option<vibevalley_protocol::Spent>,
+}
+
+#[derive(serde::Serialize)]
+struct SettleErrorPayload<'a> {
+    error: &'a str,
+}
+
+#[derive(serde::Serialize)]
+struct ReconciliationDocPayload<'a> {
+    worktree: Option<&'a str>,
+    branch: Option<&'a str>,
+}
+
+impl SessionEngine {
     /// Reserve input against a running external process before writing to its protocol stream.
     /// An unknown outcome is reconciled from this run on recovery.
     pub(crate) async fn bind_to_active_run_async(&self, session: &str, submission: &Submission) -> Result<bool> {
@@ -108,7 +137,11 @@ impl SessionEngine {
     }
 
     pub(crate) async fn settle_words_async(&self, id: &str, ok: bool, error: Option<&str>) -> Result<()> {
-        let payload = error.map(|e| json!({ "error": e })).unwrap_or(Value::Null);
+        let payload = error
+            .map(|e| serde_json::to_value(SettleErrorPayload { error: e }))
+            .transpose()
+            .map_err(Error::from)?
+            .unwrap_or(Value::Null);
         self.0
             .durable
             .write_with_async((id, ok, &payload), |tx, &(id, ok, payload)| {
@@ -137,7 +170,15 @@ pub(super) async fn settle_run(tx: &mut Tx<'_>, run: &Run) -> DurableResult<()> 
     } else {
         SubmissionStatus::Unanswered
     };
-    let payload = json!({"issueId":issue,"sessionId":run.session,"runId":run.id,"outcome":run.outcome,"summary":run.summary,"spent":run.spent});
+    let doc = IssueReportDoc {
+        issue_id: issue.clone(),
+        session_id: run.session.clone(),
+        run_id: run.id.clone(),
+        outcome: run.outcome,
+        summary: run.summary.clone(),
+        spent: run.spent.clone(),
+    };
+    let payload = serde_json::to_value(&doc)?;
     let conv = delivery_conversation(issue);
     for key in &run.heard {
         if let Some(sub) = tx.submission_by_request_async(&conv, key).await? {
@@ -167,13 +208,11 @@ pub(crate) async fn interrupt_on_reopen(
             run.outcome = Some(Outcome::Interrupted);
             run.summary = summary.into();
             if !session.is_refining() && session.runtime != vibevalley_runtime::agent::runtime::ID && run.issue.is_some() {
-                tx.put_document_async(
-                    "run",
-                    &id,
-                    "workspace.reconciliation",
-                    &json!({"worktree":session.cwd,"branch":session.worktree_branch()}),
-                )
-                .await?;
+                let payload = serde_json::to_value(ReconciliationDocPayload {
+                    worktree: session.cwd.as_deref(),
+                    branch: session.worktree_branch(),
+                })?;
+                tx.put_document_async("run", &id, "workspace.reconciliation", &payload).await?;
                 run.needs_reconciliation = true;
             }
             session_svc.put_run_in_tx(tx.transaction(), &run).await.map_err(DbError::into_durable_error)?;

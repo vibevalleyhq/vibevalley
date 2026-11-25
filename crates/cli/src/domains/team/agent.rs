@@ -111,10 +111,10 @@ fn default_look(role: AgentRole) -> Look {
     }
 }
 
-pub fn run(client: &Client, cmd: AgentCmd) -> Done {
+pub async fn run(client: &Client, cmd: AgentCmd) -> Done {
     match cmd.action {
         AgentAction::List => {
-            let agents = client.ask::<ops::AgentList>(&())?;
+            let agents = client.ask::<ops::AgentList>(&()).await?;
             client.output.show(&agents, |a| a.iter().map(agent_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
@@ -149,7 +149,7 @@ pub fn run(client: &Client, cmd: AgentCmd) -> Done {
                 look: default_look(role),
                 from: None,
             };
-            client.mutate::<ops::AgentCreate>("agent create", &profile, agent_line)
+            client.mutate::<ops::AgentCreate>("agent create", &profile, agent_line).await
         }
         AgentAction::Update {
             agent,
@@ -163,7 +163,7 @@ pub fn run(client: &Client, cmd: AgentCmd) -> Done {
             if name.is_none() && runtime.is_none() && duty.is_none() && model.is_none() && effort.is_none() && enabled.is_none() {
                 return Err(Failure::usage("MissingArgument", "provide at least one field to update"));
             }
-            let agents = client.ask::<ops::AgentList>(&())?;
+            let agents = client.ask::<ops::AgentList>(&()).await?;
             let Some(mut profile) = agents.into_iter().find(|a| a.id == agent) else {
                 return Err(Failure::new(exit::MISSING, "Missing", format!("agent {agent:?} not found")));
             };
@@ -185,11 +185,13 @@ pub fn run(client: &Client, cmd: AgentCmd) -> Done {
             if let Some(v) = enabled {
                 profile.enabled = v;
             }
-            client.mutate::<ops::AgentUpdate>("agent update", &profile, agent_line)
+            client.mutate::<ops::AgentUpdate>("agent update", &profile, agent_line).await
         }
         AgentAction::Delete { agent } => {
             let id = agent.clone();
-            client.mutate::<ops::AgentDelete>("agent delete", &AgentDeleteInput { id: agent }, |_| format!("deleted {id}"))
+            client
+                .mutate::<ops::AgentDelete>("agent delete", &AgentDeleteInput { id: agent }, |_| format!("deleted {id}"))
+                .await
         }
     }
 }

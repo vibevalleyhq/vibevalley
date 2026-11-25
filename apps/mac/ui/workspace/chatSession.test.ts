@@ -3,12 +3,14 @@ import { expect, test } from "nsh/test";
 
 import type { RuntimeInfo, SessionEvent } from "@vibevalley/protocol";
 
+import { setTransport, transport } from "../infra/transport";
 import {
   asThoughtLevel,
   clampThoughtLevel,
   computeTelemetry,
   defaultThoughtLevelFor,
   extractToolTarget,
+  fetchWorkspaceRuntimes,
   formatTokens,
   mergeChatSteps,
   parseBoardTokens,
@@ -256,4 +258,44 @@ test("preferredModelFor, defaultThoughtLevelFor, and clampThoughtLevel select an
   expect(clampThoughtLevel(neon, "xhigh")).toBe("xhigh");
   expect(clampThoughtLevel(neon, "max")).toBe("high");
   expect(clampThoughtLevel(neon, undefined)).toBe("high");
+});
+
+test("fetchWorkspaceRuntimes returns server preset labels without hardcoded fallback runtimes", async () => {
+  const prev = transport();
+  try {
+    setTransport({
+      ...prev,
+      call: async () => ({ bizCode: 100009, message: "unavailable" }),
+    });
+    expect(await fetchWorkspaceRuntimes()).toEqual([]);
+
+    setTransport({
+      ...prev,
+      call: async () => ({ bizCode: 0, message: "ok", data: [] }),
+    });
+    expect(await fetchWorkspaceRuntimes()).toEqual([]);
+
+    setTransport({
+      ...prev,
+      call: async () => ({
+        bizCode: 0,
+        message: "ok",
+        data: [
+          makeRuntimeInfo({
+            id: "custom-engine",
+            preset: {
+              ...makeRuntimeInfo().preset,
+              id: "custom-engine",
+              label: "Custom Engine",
+            },
+          }),
+        ],
+      }),
+    });
+    const list = await fetchWorkspaceRuntimes();
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id: "custom-engine", name: "Custom Engine", available: true });
+  } finally {
+    setTransport(prev);
+  }
 });
