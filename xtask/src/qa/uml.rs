@@ -1,5 +1,7 @@
 //! Clean Architecture topology IR, dependency rule checker, and UML viewer (`cargo xtask uml`).
 
+#[path = "arch.rs"]
+pub mod arch;
 #[path = "viewer.rs"]
 mod viewer;
 
@@ -399,6 +401,17 @@ pub fn split_ns_segments(ns: &str) -> Vec<&str> {
     ns.split('.').flat_map(|part| part.split("::")).filter(|s| !s.is_empty()).collect()
 }
 
+fn strip_stray_crates_prefix<'a>(rest: &'a str, pref: &str) -> &'a str {
+    if let Some(after_crates) = rest.strip_prefix("crates.") {
+        let crate_seg = after_crates.split('.').next().unwrap_or("");
+        let pref_last = pref.rsplit('.').next().unwrap_or(pref);
+        if !crate_seg.is_empty() && crate_seg.replace('-', "_") == pref_last.replace('-', "_") {
+            return after_crates.strip_prefix(crate_seg).and_then(|s| s.strip_prefix('.').or(Some(s))).unwrap_or("");
+        }
+    }
+    rest
+}
+
 pub fn qualify_namespace(raw_ns: &str, source_prefix: Option<&str>, lang: Lang) -> String {
     let clean_raw = raw_ns.replace("::", ".");
     let Some(pref) = source_prefix.map(str::trim).filter(|s| !s.is_empty()) else {
@@ -409,7 +422,8 @@ pub fn qualify_namespace(raw_ns: &str, source_prefix: Option<&str>, lang: Lang) 
             if clean_raw == "crate" {
                 pref.to_owned()
             } else if let Some(rest) = clean_raw.strip_prefix("crate.") {
-                format!("{pref}.{rest}")
+                let rest = strip_stray_crates_prefix(rest, pref);
+                if rest.is_empty() { pref.to_owned() } else { format!("{pref}.{rest}") }
             } else {
                 format!("{pref}.{clean_raw}")
             }
@@ -788,6 +802,15 @@ fn round2(v: f64) -> f64 {
     (v * 100.0).round() / 100.0
 }
 
+fn is_rust_module_root_file(lang: Lang, rel_file: &str) -> bool {
+    if lang != Lang::Rust {
+        return false;
+    }
+    let norm = crate::qa::normalize_posix_path(rel_file);
+    let file_name = norm.rsplit('/').next().unwrap_or(norm.as_str());
+    matches!(file_name, "mod.rs" | "lib.rs" | "main.rs")
+}
+
 struct PendingLeaf {
     id: String,
     name: String,
@@ -1104,6 +1127,28 @@ fn compute_tree_metadata(
         }
     }
 
+    let own_leaf = leaf_map.get(&node.id);
+    let mut own_ops = Vec::new();
+    if let Some(leaf) = own_leaf {
+        agg.form_count += leaf.ops.len();
+        for op in &leaf.ops {
+            if let Some(c) = op.crap {
+                agg.crap_vals.push(c);
+            }
+            if op.has_mutation {
+                agg.has_mutation = true;
+                agg.killed += op.killed;
+                agg.survived += op.survived;
+                agg.uncovered += op.uncovered;
+                agg.sites += op.sites;
+                if let Some(s) = op.mutation_score {
+                    agg.fallback_scores.push(s);
+                }
+            }
+        }
+        own_ops = leaf.ops.clone();
+    }
+
     let metrics = build_node_metrics(
         agg.form_count,
         &agg.crap_vals,
@@ -1123,13 +1168,13 @@ fn compute_tree_metadata(
             node_kind: kind,
             parent: parent.map(str::to_owned),
             children: child_ids,
-            file: None,
-            lang: None,
-            line: None,
+            file: own_leaf.map(|l| l.file.clone()),
+            lang: own_leaf.map(|l| l.lang),
+            line: own_leaf.map(|l| l.line),
             type_kind: Some("component".to_owned()),
-            raw_namespace: None,
+            raw_namespace: own_leaf.map(|l| l.raw_namespace.clone()),
             fields: Vec::new(),
-            ops: Vec::new(),
+            ops: own_ops,
             bases: Vec::new(),
             metrics,
         },
@@ -1426,31 +1471,40 @@ pub fn build_topology(root: &Path, policy: &Policy, path_filters: &[String]) -> 
         }
 
         if !has_types || !free_forms.is_empty() {
-            let leaf_id = if has_types {
+            let fold_into_parent = is_rust_module_root_file(af.analysis.lang, &af.analysis.file);
+            let leaf_id = if has_types && !fold_into_parent {
                 format!("{}._module", af.qualified_mod_ns)
             } else {
                 af.qualified_mod_ns.clone()
             };
             let short_name = af.qualified_mod_ns.rsplit('.').next().unwrap_or(&af.qualified_mod_ns).to_owned();
-            let display_name = if has_types { format!("{short_name} (module)") } else { short_name };
+            let display_name = if has_types && !fold_into_parent {
+                format!("{short_name} (module)")
+            } else {
+                short_name
+            };
             let ops: Vec<MemberOp> = free_forms.iter().map(|f| build_member_op(f, &overlay, &af.qualified_mod_ns)).collect();
             let line = free_forms.first().map_or(1, |f| f.start_line);
 
-            leaf_map.insert(
-                leaf_id.clone(),
-                PendingLeaf {
-                    id: leaf_id,
-                    name: display_name,
-                    file: af.analysis.file.clone(),
-                    lang: af.analysis.lang,
-                    line,
-                    type_kind: "module".to_owned(),
-                    raw_namespace: af.analysis.module_namespace.clone(),
-                    fields: Vec::new(),
-                    ops,
-                    bases: Vec::new(),
-                },
-            );
+            if let Some(existing) = leaf_map.get_mut(&leaf_id) {
+                existing.ops.extend(ops);
+            } else {
+                leaf_map.insert(
+                    leaf_id.clone(),
+                    PendingLeaf {
+                        id: leaf_id,
+                        name: display_name,
+                        file: af.analysis.file.clone(),
+                        lang: af.analysis.lang,
+                        line,
+                        type_kind: "module".to_owned(),
+                        raw_namespace: af.analysis.module_namespace.clone(),
+                        fields: Vec::new(),
+                        ops,
+                        bases: Vec::new(),
+                    },
+                );
+            }
         }
     }
 
@@ -2068,6 +2122,8 @@ Subcommands:
   check [<path>...] [--json]                Check Clean Architecture dependency rule violations
   export [--mermaid <path>] [--svg <path>] [<path>...]
                                             Export layered Mermaid or pure-Rust SVG diagram
+  arch [--json] [--scope <crate>] [--min-delta 0.15] [--git-commits 200] [--no-git]
+                                            Run 5 quantitative macro-architecture lenses
   viewer [--port <N>] [--open]              Start standalone local HTTP UML workbench"
     );
 }
@@ -2252,6 +2308,7 @@ pub fn run(root: &Path, args: &[String]) -> Result<i32, String> {
         "ir" => cmd_ir(root, rest),
         "check" => cmd_check(root, rest),
         "export" => cmd_export(root, rest),
+        "arch" => arch::run(root, rest),
         "viewer" => viewer::run(root, rest),
         "--svg" | "--mermaid" => cmd_export(root, args),
         other if other.starts_with('-') => {
@@ -2744,6 +2801,36 @@ mod tests {
             ),
             None
         );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn folds_rust_mod_rs_into_parent_and_strips_stray_crates_prefix() {
+        let dir = temp_dir("fold-mod-crates");
+        write_file(&dir, "crates/core/src/cron/mod.rs", "pub struct Cron {}\npub fn parse_cron() {}\n");
+        write_file(&dir, "crates/core/src/cron/schedule.rs", "pub struct Schedule {}\n");
+        write_file(&dir, "crates/core/examples/export_scenarios.rs", "pub fn main() {}\n");
+
+        let policy = default_policy(&dir);
+        let ir = build_topology(&dir, &policy, &[]).unwrap();
+
+        assert!(
+            !ir.nodes.contains_key("vibevalley.core.cron._module"),
+            "mod.rs free functions must fold into parent namespace without emitting ._module"
+        );
+        let cron_node = ir.nodes.get("vibevalley.core.cron").expect("parent cron component must exist");
+        assert_eq!(cron_node.node_kind, NodeKind::Component);
+        assert_eq!(cron_node.ops.len(), 1);
+        assert_eq!(cron_node.ops[0].name, "parse_cron");
+        assert_eq!(cron_node.metrics.form_count, 1);
+
+        assert!(
+            !ir.nodes.keys().any(|k| k.contains(".crates")),
+            "stray .crates prefix must be stripped, got keys: {:?}",
+            ir.nodes.keys().filter(|k| k.contains("crates")).collect::<Vec<_>>()
+        );
+        assert!(ir.nodes.contains_key("vibevalley.core.examples.export_scenarios"));
 
         let _ = fs::remove_dir_all(&dir);
     }

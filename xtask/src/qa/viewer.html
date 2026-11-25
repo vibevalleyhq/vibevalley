@@ -37,6 +37,9 @@
         grid-template-columns: 1fr 340px;
         height: 100vh;
       }
+      #layout.arch-wide {
+        grid-template-columns: 1fr 460px;
+      }
       header#topbar {
         grid-column: 1 / -1;
         display: flex;
@@ -585,6 +588,105 @@
         flex-wrap: wrap;
         margin-top: 6px;
       }
+      .sidebar-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        padding: 4px;
+        background: #f1f5f9;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .sidebar-tab {
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .sidebar-tab.active {
+        background: #fff;
+        color: var(--text);
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+      }
+      .arch-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+      .arch-controls select {
+        flex: 1;
+        font-size: 12px;
+        padding: 4px 6px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: #fff;
+      }
+      .arch-row {
+        font-size: 11.5px;
+        padding: 6px 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        margin-bottom: 5px;
+        background: #f8fafc;
+      }
+      .arch-row.sev-high {
+        border-left: 3px solid var(--danger);
+      }
+      .arch-row.sev-medium {
+        border-left: 3px solid var(--warn);
+      }
+      .arch-row.sev-low {
+        border-left: 3px solid var(--accent);
+      }
+      .mod-link {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+        color: #1d4ed8;
+        cursor: pointer;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 4px;
+        padding: 1px 5px;
+        display: inline-block;
+        margin: 1px 2px 1px 0;
+      }
+      .mod-link:hover {
+        background: #dbeafe;
+        text-decoration: underline;
+      }
+      .arch-meta {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--muted);
+        margin-top: 3px;
+      }
+      .arch-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11px;
+      }
+      .arch-table th,
+      .arch-table td {
+        border-bottom: 1px solid #e2e8f0;
+        padding: 4px 5px;
+        text-align: left;
+      }
+      .arch-table th {
+        color: var(--muted);
+        font-weight: 700;
+        background: #f8fafc;
+      }
+      .arch-table td.num,
+      .arch-table th.num {
+        text-align: right;
+        font-family: var(--mono);
+      }
     </style>
   </head>
   <body>
@@ -602,6 +704,7 @@
           <button id="btn-back" class="btn" title="Go up (Esc)">← Up</button>
           <button id="btn-foreign" class="btn" title="Toggle external/foreign ovals (F)">Show Foreign</button>
           <button id="btn-declutter" class="btn primary" title="Cycle 5 declutter modes (D)">Declutter: arrows</button>
+          <button id="btn-arch-lens" class="btn" title="Toggle Architecture Lens (L)">Arch Lens</button>
           <button id="btn-zoom-out" class="btn" title="Zoom out (Ctrl+-)">−</button>
           <button id="btn-zoom-reset" class="btn" title="Reset zoom (Ctrl+0)">100%</button>
           <button id="btn-zoom-in" class="btn" title="Zoom in (Ctrl++)">+</button>
@@ -617,41 +720,98 @@
       </main>
 
       <aside id="sidebar">
-        <div class="card">
-          <h3>
-            <span>Overview</span>
-            <label style="font-weight: 500; text-transform: none; font-size: 11px; cursor: pointer">
-              <input id="chk-watch" type="checkbox" checked /> Auto-watch
-            </label>
-          </h3>
-          <div id="stats-grid" class="stat-grid"></div>
+        <div class="sidebar-tabs">
+          <button id="tab-topology" class="sidebar-tab active" type="button">Overview</button>
+          <button id="tab-arch" class="sidebar-tab" type="button">Architecture Lens</button>
         </div>
 
-        <div class="card">
-          <h3>
-            <span>Views &amp; Proposals</span>
-            <button id="btn-new-proposal" class="btn light" style="padding: 2px 7px; font-size: 11px">+ New Proposal</button>
-          </h3>
-          <div id="proposals-list"></div>
-          <div id="proposal-editor" style="display: none; margin-top: 8px">
-            <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px">Proposal layers (rank 0 first, comma-separated per line):</div>
-            <textarea id="proposal-layers-input" class="layer-editor"></textarea>
-            <div class="row-actions">
-              <button id="btn-save-proposal" class="btn primary" style="font-size: 11px; padding: 4px 8px">Apply Layers</button>
-              <button id="btn-rename-proposal" class="btn light" style="font-size: 11px; padding: 4px 8px">Rename</button>
-              <button id="btn-delete-proposal" class="btn danger" style="font-size: 11px; padding: 4px 8px">Delete</button>
+        <div id="topology-panel" style="display: flex; flex-direction: column; gap: 12px">
+          <div class="card">
+            <h3>
+              <span>Overview</span>
+              <label style="font-weight: 500; text-transform: none; font-size: 11px; cursor: pointer">
+                <input id="chk-watch" type="checkbox" checked /> Auto-watch
+              </label>
+            </h3>
+            <div id="stats-grid" class="stat-grid"></div>
+          </div>
+
+          <div class="card">
+            <h3>
+              <span>Views &amp; Proposals</span>
+              <button id="btn-new-proposal" class="btn light" style="padding: 2px 7px; font-size: 11px">+ New Proposal</button>
+            </h3>
+            <div id="proposals-list"></div>
+            <div id="proposal-editor" style="display: none; margin-top: 8px">
+              <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px">Proposal layers (rank 0 first, comma-separated per line):</div>
+              <textarea id="proposal-layers-input" class="layer-editor"></textarea>
+              <div class="row-actions">
+                <button id="btn-save-proposal" class="btn primary" style="font-size: 11px; padding: 4px 8px">Apply Layers</button>
+                <button id="btn-rename-proposal" class="btn light" style="font-size: 11px; padding: 4px 8px">Rename</button>
+                <button id="btn-delete-proposal" class="btn danger" style="font-size: 11px; padding: 4px 8px">Delete</button>
+              </div>
             </div>
+          </div>
+
+          <div class="card">
+            <h3><span>Dependency Rule Violations</span><span id="viol-badge" class="badge green">0</span></h3>
+            <div id="violations-list" style="max-height: 220px; overflow-y: auto"></div>
+          </div>
+
+          <div class="card">
+            <h3><span>Omitted Namespaces</span></h3>
+            <div id="omit-list"></div>
           </div>
         </div>
 
-        <div class="card">
-          <h3><span>Dependency Rule Violations</span><span id="viol-badge" class="badge green">0</span></h3>
-          <div id="violations-list" style="max-height: 220px; overflow-y: auto"></div>
-        </div>
+        <div id="arch-lens-panel" style="display: none; flex-direction: column; gap: 10px">
+          <div class="card">
+            <h3>
+              <span>Architecture Lens</span>
+              <button id="btn-refresh-arch" class="btn light" style="padding: 2px 7px; font-size: 11px">Refresh</button>
+            </h3>
+            <div class="arch-controls">
+              <select id="arch-scope-select" title="Filter by crate">
+                <option value="">All Crates (Repo-wide)</option>
+              </select>
+            </div>
+            <div id="arch-summary-grid" class="stat-grid"></div>
+          </div>
 
-        <div class="card">
-          <h3><span>Omitted Namespaces</span></h3>
-          <div id="omit-list"></div>
+          <div class="card">
+            <h3><span>Ranked Findings</span><span id="arch-findings-badge" class="badge amber">0</span></h3>
+            <div id="arch-findings-list" style="max-height: 220px; overflow-y: auto"></div>
+          </div>
+
+          <div class="card">
+            <h3><span>SDP Inversions (I_from &lt; I_to)</span><span id="arch-sdp-badge" class="badge amber">0</span></h3>
+            <div id="arch-sdp-list" style="max-height: 220px; overflow-y: auto"></div>
+          </div>
+
+          <div class="card">
+            <h3><span>Zone of Pain / Uselessness</span><span id="arch-pain-badge" class="badge red">0</span></h3>
+            <div id="arch-pain-list" style="max-height: 220px; overflow-y: auto"></div>
+          </div>
+
+          <div class="card">
+            <h3><span>SCC Cycles &amp; DSM Feedback Arcs</span><span id="arch-scc-badge" class="badge red">0</span></h3>
+            <div id="arch-scc-list" style="max-height: 220px; overflow-y: auto"></div>
+          </div>
+
+          <div class="card">
+            <h3><span>Misplaced Modules (Gravity)</span><span id="arch-misplaced-badge" class="badge amber">0</span></h3>
+            <div id="arch-misplaced-list" style="max-height: 200px; overflow-y: auto"></div>
+          </div>
+
+          <div class="card">
+            <h3><span>Blast Radius (Top 10)</span></h3>
+            <div id="arch-blast-list" style="max-height: 220px; overflow-y: auto"></div>
+          </div>
+
+          <div class="card">
+            <h3><span>Temporal Co-Change Pairs</span><span id="arch-cochange-badge" class="badge green">0</span></h3>
+            <div id="arch-cochange-list" style="max-height: 220px; overflow-y: auto"></div>
+          </div>
         </div>
       </aside>
     </div>
@@ -725,6 +885,10 @@
           searchMatches: [],
           searchActiveIdx: 0,
           lastMtime: null,
+          sidebarTab: "topology",
+          archData: null,
+          archScope: "",
+          archLoading: false,
         };
 
         const svgEl = document.getElementById("diagram");
@@ -1751,6 +1915,272 @@
           });
         }
 
+        function focusModuleInDiagram(modId) {
+          if (!state.data || !modId) return;
+          const ir = state.data.ir;
+          let targetId = modId;
+          while (targetId && !ir.nodes[targetId]) {
+            const dot = targetId.lastIndexOf(".");
+            if (dot <= 0) break;
+            targetId = targetId.slice(0, dot);
+          }
+          const meta = ir.nodes[targetId];
+          if (!meta) {
+            setStatus(`Module not in current IR: ${modId}`);
+            return;
+          }
+          if (meta.node_kind === "foreign") {
+            state.showForeign = true;
+          }
+          state.highlightNodeId = targetId;
+          const parentId = meta.parent || "root";
+          state.scopeStack = buildScopeChain(parentId);
+          state.needsFit = true;
+          renderAll();
+          setStatus(`Focused ${targetId}`);
+        }
+
+        function modChipHtml(modId) {
+          return `<span class="mod-link" data-focus-mod="${escHtml(modId)}">${escHtml(modId)}</span>`;
+        }
+
+        function bindArchModuleClicks(rootEl) {
+          rootEl.querySelectorAll("[data-focus-mod]").forEach((el) => {
+            el.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              focusModuleInDiagram(el.dataset.focusMod);
+            });
+          });
+        }
+
+        function setSidebarTab(tab) {
+          state.sidebarTab = tab;
+          const isArch = tab === "arch";
+          document.getElementById("layout").classList.toggle("arch-wide", isArch);
+          document.getElementById("tab-topology").classList.toggle("active", !isArch);
+          document.getElementById("tab-arch").classList.toggle("active", isArch);
+          document.getElementById("topology-panel").style.display = isArch ? "none" : "flex";
+          document.getElementById("arch-lens-panel").style.display = isArch ? "flex" : "none";
+          const btnArch = document.getElementById("btn-arch-lens");
+          btnArch.classList.toggle("primary", isArch);
+          btnArch.textContent = isArch ? "Arch Lens: On" : "Arch Lens";
+          state.needsFit = true;
+          renderGraph();
+          if (isArch && !state.archData && !state.archLoading) {
+            loadArchLens();
+          } else if (isArch && state.archData) {
+            renderArchLens();
+          }
+        }
+
+        async function loadArchLens(force = false) {
+          if (state.archLoading && !force) return;
+          state.archLoading = true;
+          setStatus("Computing Architecture Lens…");
+          try {
+            const qs = new URLSearchParams();
+            if (state.archScope) qs.set("scope", state.archScope);
+            const url = qs.toString() ? `/api/arch?${qs.toString()}` : "/api/arch";
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!res.ok) {
+              setStatus(data.error || "Failed to load Architecture Lens");
+              return;
+            }
+            state.archData = data;
+            populateArchScopeOptions(data);
+            renderArchLens();
+            setStatus(`Arch Lens: ${data.summary.total_modules} modules, ${data.summary.finding_count} findings`);
+          } catch (err) {
+            setStatus(`Arch Lens error: ${err?.message || err}`);
+          } finally {
+            state.archLoading = false;
+          }
+        }
+
+        function populateArchScopeOptions(arch) {
+          const sel = document.getElementById("arch-scope-select");
+          const current = state.archScope || "";
+          const crates = Array.from(
+            new Set((state.data?.policy?.order || []).length > 0 ? state.data.policy.order : (arch.modules || []).map((m) => m.crate_name).filter(Boolean)),
+          ).sort();
+          sel.innerHTML =
+            `<option value="">All Crates (Repo-wide)</option>` + crates.map((c) => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join("");
+          sel.value = current;
+        }
+
+        function renderArchLens() {
+          const arch = state.archData;
+          if (!arch) return;
+          const s = arch.summary || {};
+
+          document.getElementById("arch-summary-grid").innerHTML = `
+            <div class="stat-item"><span>Mod2 / Edges</span><strong>${s.total_modules || 0} / ${s.total_edges || 0}</strong></div>
+            <div class="stat-item"><span>SDP Inv (R/I)</span><strong>${s.sdp_repo_inversions || 0} / ${s.sdp_intra_inversions || 0}</strong></div>
+            <div class="stat-item"><span>Pain / Useless</span><strong>${s.zone_of_pain_count || 0} / ${s.zone_of_uselessness_count || 0}</strong></div>
+            <div class="stat-item"><span>SCC (C/2/3)</span><strong>${s.crate_cycles || 0} / ${s.mod2_cycles || 0} / ${s.mod3_cycles || 0}</strong></div>
+          `;
+
+          const findings = arch.findings || [];
+          const fBadge = document.getElementById("arch-findings-badge");
+          fBadge.textContent = findings.length;
+          fBadge.className = `badge ${findings.some((f) => f.severity === "high") ? "red" : findings.length > 0 ? "amber" : "green"}`;
+          const fEl = document.getElementById("arch-findings-list");
+          fEl.innerHTML =
+            findings.length === 0
+              ? `<div style="font-size:12px;color:#16a34a;">No architectural findings</div>`
+              : findings
+                  .slice(0, 25)
+                  .map(
+                    (f) => `<div class="arch-row sev-${escHtml(f.severity)}">
+                      <div style="display:flex;justify-content:space-between;gap:6px;align-items:center;">
+                        <strong>${escHtml(f.title)}</strong>
+                        <span class="badge ${f.severity === "high" ? "red" : f.severity === "medium" ? "amber" : "green"}">${escHtml(f.severity)}</span>
+                      </div>
+                      <div class="arch-meta">${escHtml(f.detail)}</div>
+                      <div style="margin-top:4px;">${(f.modules || []).map(modChipHtml).join("")}</div>
+                    </div>`,
+                  )
+                  .join("");
+          bindArchModuleClicks(fEl);
+
+          const sdps = [...(arch.sdp_inversions_repo || []), ...(arch.sdp_inversions_intra || [])];
+          const sdpBadge = document.getElementById("arch-sdp-badge");
+          sdpBadge.textContent = sdps.length;
+          sdpBadge.className = `badge ${sdps.length > 0 ? "amber" : "green"}`;
+          const sdpEl = document.getElementById("arch-sdp-list");
+          sdpEl.innerHTML =
+            sdps.length === 0
+              ? `<div style="font-size:12px;color:#16a34a;">No SDP inversions above threshold</div>`
+              : sdps
+                  .slice(0, 30)
+                  .map(
+                    (inv) => `<div class="arch-row sev-${inv.delta >= 0.5 ? "high" : "medium"}">
+                      <div>${modChipHtml(inv.from)} → ${modChipHtml(inv.to)}</div>
+                      <div class="arch-meta">[${escHtml(inv.scope)}] I: ${inv.from_instability.toFixed(2)} → ${inv.to_instability.toFixed(2)} (Δ+${inv.delta.toFixed(
+                        2,
+                      )}, ${inv.edge_count}e)</div>
+                    </div>`,
+                  )
+                  .join("");
+          bindArchModuleClicks(sdpEl);
+
+          const offenders = (arch.modules || []).filter((m) => m.zone !== "balanced");
+          const painBadge = document.getElementById("arch-pain-badge");
+          painBadge.textContent = offenders.length;
+          painBadge.className = `badge ${offenders.some((m) => m.zone === "pain") ? "red" : offenders.length > 0 ? "amber" : "green"}`;
+          const painEl = document.getElementById("arch-pain-list");
+          painEl.innerHTML =
+            offenders.length === 0
+              ? `<div style="font-size:12px;color:#16a34a;">All modules balanced near Main Sequence</div>`
+              : `<table class="arch-table">
+                  <thead><tr><th>Module</th><th>Zone</th><th class="num">I</th><th class="num">A</th><th class="num">D</th></tr></thead>
+                  <tbody>${offenders
+                    .slice(0, 30)
+                    .map(
+                      (m) => `<tr>
+                        <td>${modChipHtml(m.module)}</td>
+                        <td><span class="badge ${m.zone === "pain" ? "red" : "amber"}">${escHtml(m.zone)}</span></td>
+                        <td class="num">${m.instability.toFixed(2)}</td>
+                        <td class="num">${m.abstractness.toFixed(2)}</td>
+                        <td class="num">${m.distance.toFixed(2)}</td>
+                      </tr>`,
+                    )
+                    .join("")}</tbody>
+                </table>`;
+          bindArchModuleClicks(painEl);
+
+          const scopes = [arch.cycles?.crate_scope, arch.cycles?.mod2_scope, arch.cycles?.mod3_scope].filter(Boolean);
+          const totalSccs = scopes.reduce((acc, sc) => acc + (sc.sccs?.length || 0), 0);
+          const sccBadge = document.getElementById("arch-scc-badge");
+          sccBadge.textContent = totalSccs;
+          sccBadge.className = `badge ${totalSccs > 0 ? "red" : "green"}`;
+          const sccEl = document.getElementById("arch-scc-list");
+          sccEl.innerHTML = scopes
+            .map((sc) => {
+              const sccsHtml = (sc.sccs || [])
+                .slice(0, 8)
+                .map(
+                  (comp) => `<div class="arch-row sev-high">
+                    <div><strong>SCC (${comp.length})</strong></div>
+                    <div style="margin-top:3px;">${comp.map(modChipHtml).join(" ↔ ")}</div>
+                  </div>`,
+                )
+                .join("");
+              return `<div style="margin-bottom:8px;">
+                <div class="arch-meta" style="font-weight:700;color:#0f172a;margin-bottom:4px;">${escHtml(sc.scope)}: ${sc.sccs.length} SCCs, ${
+                  sc.mutual_cycles.length
+                } 2-cycles, ${sc.feedback_arcs.length} DSM feedback arcs</div>
+                ${sccsHtml || `<div style="font-size:11px;color:#16a34a;">Acyclic</div>`}
+              </div>`;
+            })
+            .join("");
+          bindArchModuleClicks(sccEl);
+
+          const misplaced = arch.misplaced || [];
+          const misBadge = document.getElementById("arch-misplaced-badge");
+          misBadge.textContent = misplaced.length;
+          misBadge.className = `badge ${misplaced.length > 0 ? "amber" : "green"}`;
+          const misEl = document.getElementById("arch-misplaced-list");
+          misEl.innerHTML =
+            misplaced.length === 0
+              ? `<div style="font-size:12px;color:#16a34a;">No modules with cross-crate gravity &gt; intra-crate</div>`
+              : misplaced
+                  .map(
+                    (m) => `<div class="arch-row sev-medium">
+                      <div>${modChipHtml(m.module)}</div>
+                      <div class="arch-meta">intra=${m.intra_coupling} vs cross=${m.cross_coupling} (ratio ${(m.gravity_ratio * 100).toFixed(0)}%, top=${escHtml(
+                        m.top_external_crate,
+                      )}:${m.top_external_coupling})</div>
+                    </div>`,
+                  )
+                  .join("");
+          bindArchModuleClicks(misEl);
+
+          const blast = (arch.blast_radius || []).slice(0, 10);
+          const blastEl = document.getElementById("arch-blast-list");
+          blastEl.innerHTML =
+            blast.length === 0
+              ? `<div style="font-size:12px;color:#64748b;">No modules</div>`
+              : `<table class="arch-table">
+                  <thead><tr><th>Module</th><th class="num">Impact</th><th class="num">%</th><th class="num">Ca</th></tr></thead>
+                  <tbody>${blast
+                    .map(
+                      (b) => `<tr>
+                        <td>${modChipHtml(b.module)}</td>
+                        <td class="num">${b.impacted_count}/${b.total_modules}</td>
+                        <td class="num">${b.impacted_pct.toFixed(1)}%</td>
+                        <td class="num">${b.direct_dependents}</td>
+                      </tr>`,
+                    )
+                    .join("")}</tbody>
+                </table>`;
+          bindArchModuleClicks(blastEl);
+
+          const cc = arch.co_change || { enabled: false, pairs: [] };
+          const ccPairs = cc.pairs || [];
+          const ccBadge = document.getElementById("arch-cochange-badge");
+          ccBadge.textContent = ccPairs.length;
+          ccBadge.className = `badge ${ccPairs.some((p) => !p.has_static_edge) ? "amber" : "green"}`;
+          const ccEl = document.getElementById("arch-cochange-list");
+          ccEl.innerHTML = !cc.enabled
+            ? `<div style="font-size:12px;color:#64748b;">Disabled (--no-git)</div>`
+            : ccPairs.length === 0
+              ? `<div style="font-size:12px;color:#64748b;">No co-change pairs across ${cc.commits_mapped || 0} commits</div>`
+              : ccPairs
+                  .slice(0, 20)
+                  .map(
+                    (p) => `<div class="arch-row ${p.has_static_edge ? "sev-low" : "sev-medium"}">
+                    <div>${modChipHtml(p.module_a)} ↔ ${modChipHtml(p.module_b)}</div>
+                    <div class="arch-meta">${p.co_changes}x co-change · J=${p.jaccard.toFixed(2)} · ${
+                      p.has_static_edge ? "static edge" : "hidden coupling"
+                    }</div>
+                  </div>`,
+                  )
+                  .join("");
+          bindArchModuleClicks(ccEl);
+        }
+
         function renderAll() {
           const btnForeign = document.getElementById("btn-foreign");
           btnForeign.textContent = state.showForeign ? "Show Foreign: On" : "Show Foreign";
@@ -1941,8 +2371,26 @@
           state.panY = 24;
           renderAll();
         });
-        document.getElementById("btn-regen").addEventListener("click", () => runAction("regen"));
-        document.getElementById("btn-reload").addEventListener("click", () => loadState());
+        document.getElementById("btn-regen").addEventListener("click", () => {
+          runAction("regen").then(() => {
+            if (state.sidebarTab === "arch") loadArchLens(true);
+          });
+        });
+        document.getElementById("btn-reload").addEventListener("click", () => {
+          loadState().then(() => {
+            if (state.sidebarTab === "arch") loadArchLens(true);
+          });
+        });
+        document.getElementById("btn-arch-lens").addEventListener("click", () => {
+          setSidebarTab(state.sidebarTab === "arch" ? "topology" : "arch");
+        });
+        document.getElementById("tab-topology").addEventListener("click", () => setSidebarTab("topology"));
+        document.getElementById("tab-arch").addEventListener("click", () => setSidebarTab("arch"));
+        document.getElementById("btn-refresh-arch").addEventListener("click", () => loadArchLens(true));
+        document.getElementById("arch-scope-select").addEventListener("change", (ev) => {
+          state.archScope = ev.target.value || "";
+          loadArchLens(true);
+        });
         document.getElementById("btn-close-modal").addEventListener("click", () => {
           modalBackdrop.style.display = "none";
           state.modalNodeId = null;
@@ -2042,6 +2490,10 @@
               state.declutterIdx = (state.declutterIdx + 1) % DECLUTTER_MODES.length;
               state.needsFit = true;
               renderAll();
+            }
+          } else if (ev.key === "l" || ev.key === "L") {
+            if (!ev.ctrlKey && !ev.metaKey) {
+              setSidebarTab(state.sidebarTab === "arch" ? "topology" : "arch");
             }
           } else if ((ev.ctrlKey || ev.metaKey) && (ev.key === "=" || ev.key === "+")) {
             ev.preventDefault();
