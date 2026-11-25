@@ -101,8 +101,10 @@
 | `useTimeout` | `base/timer.ts` | A timeout to set from a handler: setting it again replaces the one waiting, and the reactive owner's end clears it. |
 | `typedMarks` | `base/typedMarks.ts` | The text with the marks just typed before the caret as the syntax they stand for. undefined when there are none. |
 | `call` | `bridge.ts` | One endpoint by name. Never rejects: failures are envelopes with a non-zero bizCode. |
+| `callDecoded` | `bridge.ts` | One endpoint by name whose `data` payload is decoded at the bridge boundary with `decoder`. |
 | `watchSlice` | `bridge.ts` | A listener joining an active topic gets the newest cached frame at once. |
-| `frame` | `bridge.ts` |  |
+| `frame` | `bridge.ts` | `null` until the first frame arrives and decodes against `decoder`. |
+| `sliceFrame` | `bridge.ts` | Reactive decoded slice reader backed by `@vibevalley/protocol`'s `sliceDecoders`. |
 | `frameRev` | `bridge.ts` | The frame's revision (reactive): goes up by one per frame this view received. |
 | `onLive` | `bridge.ts` | Every LiveEvent from now on. Returns how to stop listening. |
 | `subscribe` | `bridge.ts` | One of api.ts's subscriptions (`channel.follow`, ...). `ended` gets `null` when the server ended it, |
@@ -140,6 +142,7 @@
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `followArtifactPresence` | `gateway.ts` | An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. |
 | `currentHost` | `host.ts` |  |
+| `farmCallsSchema` | `hostParams.ts` |  |
 | `readHostParams` | `hostParams.ts` |  |
 | `readHostLocale` | `hostParams.ts` |  |
 | `readHostMotion` | `hostParams.ts` |  |

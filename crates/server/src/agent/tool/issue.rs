@@ -558,29 +558,13 @@ async fn submit(f: &ToolRegistry, who: &Who, summary: Option<&str>) -> Result<St
     let (Deliverable::PullRequest, Some(cwd), Some(branch)) = (issue.deliver, me.cwd.clone(), me.worktree_branch().map(String::from)) else {
         return Err(t("server.issue.prSubmitUnavailable", &[]));
     };
-    let git = |args: &[&str]| {
-        let cwd = cwd.clone();
-        let args: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
-        async move {
-            let out = tokio::process::Command::new("git")
-                .arg("-C")
-                .arg(&cwd)
-                .args(&args)
-                .output()
-                .await
-                .map_err(|e| e.to_string())?;
-            if !out.status.success() {
-                return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
-            }
-            Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
-        }
-    };
-    let sha = git(&["rev-parse", "HEAD"]).await?;
-    let written = match git(&["rev-parse", "--git-path", "vibevalley-pr.md"]).await {
-        Ok(p) => tokio::fs::read_to_string(std::path::Path::new(&cwd).join(p))
-            .await
-            .ok()
-            .and_then(|text| pull_request_text(&text)),
+    let repo = vibevalley_git::Repo::discover_async(std::path::Path::new(&cwd))
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "not a git repository".to_string())?;
+    let sha = repo.commit_id_async("HEAD").await.map_err(|e| e.to_string())?;
+    let written = match vibevalley_git::read::git_path(repo.root(), std::path::Path::new("vibevalley-pr.md")) {
+        Ok(p) => tokio::fs::read_to_string(&p).await.ok().and_then(|text| pull_request_text(&text)),
         Err(_) => None,
     };
     let (title, body) = written.unwrap_or_else(|| (issue.title.clone(), summary.unwrap_or("").to_string()));

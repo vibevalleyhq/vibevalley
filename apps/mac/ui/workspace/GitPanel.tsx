@@ -4,9 +4,9 @@
 //   - "commits": commit history log (click to open commit diff)
 import { Clipboard, computed, effect, Scroll, signal, Text, untracked, View, type TextStyle } from "nsh";
 import { Button, ContextMenu, Input, MenuItem, MenuSeparator } from "nsh/base";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { BoardSlice, SessionsSlice } from "@vibevalley/protocol";
 import { sessionIssueId, sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { Button as DesignButton } from "../design/Button";
@@ -16,7 +16,7 @@ import { motionClass } from "../design/motion";
 import { SkeletonBar, SkeletonLines, useDelayedBusy } from "../design/Skeleton";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
-import { act, frame, hostApi } from "../infra/bridge";
+import { act, hostApi, sliceFrame } from "../infra/bridge";
 import {
   gitToneTextClass,
   menuDangerItemClass,
@@ -60,6 +60,37 @@ export type GitFrame = {
   worktrees?: GitWorktree[];
   log?: { id: string; short: string; summary: string; author: string; time: number }[];
 };
+
+const gitRowSchema = z.object({ path: z.string(), code: z.string(), tone: z.string() });
+const gitWorktreeSchema = z.object({
+  path: z.string(),
+  branch: z.string().nullable(),
+  main: z.boolean(),
+  locked: z.boolean(),
+  current: z.exactOptional(z.boolean()),
+  changed: z.exactOptional(z.number()),
+  conflicts: z.exactOptional(z.number()),
+  ahead: z.exactOptional(z.number()),
+  behind: z.exactOptional(z.number()),
+  summary: z.exactOptional(z.string().nullable()),
+});
+
+export const gitFrameSchema: z.ZodType<GitFrame> = z.object({
+  repo: z.boolean(),
+  error: z.exactOptional(z.string().nullable()),
+  busy: z.exactOptional(z.boolean()),
+  branch: z.exactOptional(z.string().nullable()),
+  head: z.exactOptional(z.string().nullable()),
+  upstream: z.exactOptional(z.string().nullable()),
+  ahead: z.exactOptional(z.number()),
+  behind: z.exactOptional(z.number()),
+  staged: z.exactOptional(z.array(gitRowSchema)),
+  changes: z.exactOptional(z.array(gitRowSchema)),
+  conflicts: z.exactOptional(z.array(gitRowSchema)),
+  branches: z.exactOptional(z.array(z.object({ name: z.string(), head: z.boolean(), upstream: z.string().nullable() }))),
+  worktrees: z.exactOptional(z.array(gitWorktreeSchema)),
+  log: z.exactOptional(z.array(z.object({ id: z.string(), short: z.string(), summary: z.string(), author: z.string(), time: z.number() }))),
+});
 
 export type GitTab = "changes" | "branches" | "commits";
 
@@ -332,8 +363,8 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
   const addingWt = signal(false);
   const newBranch = signal("");
   const creatingWt = signal(false);
-  const board = frame<BoardSlice>("slice:board");
-  const sessionsSlice = frame<SessionsSlice>("slice:sessions");
+  const board = sliceFrame("board");
+  const sessionsSlice = sliceFrame("sessions");
   const activeTab = () => props.tab ?? localTab();
   const f = () => props.frame;
   const isOpen = (key: string) => !folded()[key];

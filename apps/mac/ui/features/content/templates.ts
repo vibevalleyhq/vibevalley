@@ -1,5 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import type { ArtifactType } from "@vibevalley/protocol";
+import { ARTIFACT_TYPES, type ArtifactType } from "@vibevalley/protocol";
 
 import type { IconName } from "../../design/icons";
 import { api } from "../../infra/api";
@@ -14,6 +14,19 @@ import type { TemplateCategory } from "./navigation";
 type NoteTemplateVariant = "blank" | "tech" | "meeting" | "daily";
 type WhiteboardTemplateVariant = "blank" | "arch" | "timeline" | "journey" | "workshop";
 type AiMediaMakeTab = "image" | "speech" | "audio";
+type DeliverableArtifactType = Exclude<ArtifactType, "outline" | "whiteboard">;
+
+type DeliverableTemplateKey =
+  | "artDocs"
+  | "artSlides"
+  | "artDashboard"
+  | "artDesign"
+  | "artDesignSystem"
+  | "artMotion"
+  | "artHtml"
+  | "artSheet"
+  | "artDiagram"
+  | "artStoryboard";
 
 type TemplateItemKey =
   | "noteBlank"
@@ -25,16 +38,7 @@ type TemplateItemKey =
   | "wbTimeline"
   | "wbJourney"
   | "wbWorkshop"
-  | "artDocs"
-  | "artSlides"
-  | "artDashboard"
-  | "artDesign"
-  | "artDesignSystem"
-  | "artMotion"
-  | "artHtml"
-  | "artSheet"
-  | "artDiagram"
-  | "artStoryboard"
+  | DeliverableTemplateKey
   | "aiImage"
   | "aiSpeech"
   | "aiAudio";
@@ -50,10 +54,36 @@ interface TemplateBase {
 export type ContentTemplate =
   | (TemplateBase & { readonly kind: "note"; readonly variant: NoteTemplateVariant })
   | (TemplateBase & { readonly kind: "whiteboard"; readonly variant: WhiteboardTemplateVariant })
-  | (TemplateBase & { readonly kind: "deliverable"; readonly artifactType: Exclude<ArtifactType, "whiteboard"> })
+  | (TemplateBase & { readonly kind: "deliverable"; readonly artifactType: DeliverableArtifactType })
   | (TemplateBase & { readonly kind: "ai"; readonly makeTab: AiMediaMakeTab });
 
 export const TEMPLATE_CATEGORIES: readonly TemplateCategory[] = ["recommended", "note", "whiteboard", "deliverable", "ai"];
+
+const DELIVERABLE_TEMPLATE_META: Record<DeliverableArtifactType, { readonly id: string; readonly key: DeliverableTemplateKey; readonly recommended: boolean }> =
+  {
+    docs: { id: "tpl-art-docs", key: "artDocs", recommended: true },
+    slides: { id: "tpl-art-slides", key: "artSlides", recommended: true },
+    dashboard: { id: "tpl-art-dashboard", key: "artDashboard", recommended: false },
+    design: { id: "tpl-art-design", key: "artDesign", recommended: false },
+    "design-system": { id: "tpl-art-design-system", key: "artDesignSystem", recommended: false },
+    motion: { id: "tpl-art-motion", key: "artMotion", recommended: false },
+    prototype: { id: "tpl-art-prototype", key: "artHtml", recommended: false },
+    sheet: { id: "tpl-art-sheet", key: "artSheet", recommended: false },
+    diagram: { id: "tpl-art-diagram", key: "artDiagram", recommended: false },
+    storyboard: { id: "tpl-art-storyboard", key: "artStoryboard", recommended: false },
+  };
+
+const isDeliverableArtifactType = (type: ArtifactType): type is DeliverableArtifactType => type !== "outline" && type !== "whiteboard";
+
+const DELIVERABLE_TEMPLATES: readonly ContentTemplate[] = ARTIFACT_TYPES.filter(isDeliverableArtifactType).map((artifactType) => ({
+  id: DELIVERABLE_TEMPLATE_META[artifactType].id,
+  key: DELIVERABLE_TEMPLATE_META[artifactType].key,
+  category: "deliverable",
+  recommended: DELIVERABLE_TEMPLATE_META[artifactType].recommended,
+  icon: artifactTypeIcon[artifactType],
+  kind: "deliverable",
+  artifactType,
+}));
 
 export const CONTENT_TEMPLATES: readonly ContentTemplate[] = [
   { id: "tpl-note-blank", key: "noteBlank", category: "note", recommended: true, icon: "notes", kind: "note", variant: "blank" },
@@ -89,118 +119,15 @@ export const CONTENT_TEMPLATES: readonly ContentTemplate[] = [
     kind: "whiteboard",
     variant: "workshop",
   },
-  { id: "tpl-art-docs", key: "artDocs", category: "deliverable", recommended: true, icon: artifactTypeIcon.docs, kind: "deliverable", artifactType: "docs" },
-  {
-    id: "tpl-art-slides",
-    key: "artSlides",
-    category: "deliverable",
-    recommended: true,
-    icon: artifactTypeIcon.slides,
-    kind: "deliverable",
-    artifactType: "slides",
-  },
-  {
-    id: "tpl-art-dashboard",
-    key: "artDashboard",
-    category: "deliverable",
-    recommended: false,
-    icon: artifactTypeIcon.dashboard,
-    kind: "deliverable",
-    artifactType: "dashboard",
-  },
-  {
-    id: "tpl-art-design",
-    key: "artDesign",
-    category: "deliverable",
-    recommended: false,
-    icon: artifactTypeIcon.design,
-    kind: "deliverable",
-    artifactType: "design",
-  },
-  {
-    id: "tpl-art-design-system",
-    key: "artDesignSystem",
-    category: "deliverable",
-    recommended: false,
-    icon: artifactTypeIcon["design-system"],
-    kind: "deliverable",
-    artifactType: "design-system",
-  },
-  {
-    id: "tpl-art-motion",
-    key: "artMotion",
-    category: "deliverable",
-    recommended: false,
-    icon: artifactTypeIcon.motion,
-    kind: "deliverable",
-    artifactType: "motion",
-  },
-  {
-    id: "tpl-art-prototype",
-    key: "artHtml",
-    category: "deliverable",
-    recommended: false,
-    icon: artifactTypeIcon.prototype,
-    kind: "deliverable",
-    artifactType: "prototype",
-  },
-  {
-    id: "tpl-art-sheet",
-    key: "artSheet",
-    category: "deliverable",
-    recommended: false,
-    icon: artifactTypeIcon.sheet,
-    kind: "deliverable",
-    artifactType: "sheet",
-  },
-  {
-    id: "tpl-art-diagram",
-    key: "artDiagram",
-    category: "deliverable",
-    recommended: false,
-    icon: artifactTypeIcon.diagram,
-    kind: "deliverable",
-    artifactType: "diagram",
-  },
-  {
-    id: "tpl-art-storyboard",
-    key: "artStoryboard",
-    category: "deliverable",
-    recommended: false,
-    icon: artifactTypeIcon.storyboard,
-    kind: "deliverable",
-    artifactType: "storyboard",
-  },
+  ...DELIVERABLE_TEMPLATES,
   { id: "tpl-ai-image", key: "aiImage", category: "ai", recommended: true, icon: "image", kind: "ai", makeTab: "image" },
   { id: "tpl-ai-speech", key: "aiSpeech", category: "ai", recommended: false, icon: "record", kind: "ai", makeTab: "speech" },
   { id: "tpl-ai-audio", key: "aiAudio", category: "ai", recommended: false, icon: "audio", kind: "ai", makeTab: "audio" },
 ];
 
-export const templateName = (tpl: ContentTemplate): string => {
-  switch (tpl.key) {
-    case "artSheet":
-      return "Workbook Sheet";
-    case "artDiagram":
-      return "Architecture Diagram";
-    case "artStoryboard":
-      return "Storyboard Shots";
-    default:
-      return t(`web.library.content.templates.items.${tpl.key}.name`);
-  }
-};
+export const templateName = (tpl: ContentTemplate): string => t(`web.library.content.templates.items.${tpl.key}.name`);
 
-export const templateDesc = (tpl: ContentTemplate): string => {
-  switch (tpl.key) {
-    case "artSheet":
-      return "Multi-sheet structured tables and CSV export";
-    case "artDiagram":
-      return "Nodes, edges, and architecture flows";
-    case "artStoryboard":
-      return "Shot list, framing, palette, and dialogue";
-    default:
-      return t(`web.library.content.templates.items.${tpl.key}.desc`);
-  }
-};
+export const templateDesc = (tpl: ContentTemplate): string => t(`web.library.content.templates.items.${tpl.key}.desc`);
 
 function uniqueNoteTitle(base: string, existingTitles: readonly string[]): string {
   const taken = new Set(existingTitles.map((s) => s.trim().toLowerCase()));

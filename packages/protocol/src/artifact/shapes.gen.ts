@@ -5,6 +5,52 @@ import type { ArtifactId, IssueId, SessionId, SuggestionId } from "../common/sha
 export const ArtifactTypeValues = ["docs", "outline", "slides", "dashboard", "motion", "whiteboard", "design", "design-system", "sheet", "prototype", "diagram", "storyboard"] as const;
 export type ArtifactType = (typeof ArtifactTypeValues)[number];
 
+/**
+ * Static directory layout specification for one of the 12 `ArtifactType`s.
+ */
+export type ArtifactTypeSpec = { artifactType: ArtifactType,
+/**
+ * Kebab-case slug matching `crates/server/assets/artifact/types/<slug>/`.
+ */
+slug: string,
+/**
+ * Primary entry file path inside `<storage>/artifact/<id>/`.
+ */
+entryPath: string,
+/**
+ * MIME type of the primary entry file.
+ */
+entryMime: string,
+/**
+ * Relative directories created inside `<storage>/artifact/<id>/`.
+ */
+defaultDirs: Array<string>,
+/**
+ * Default suffix when exporting a single file for the user.
+ */
+exportSuffix: string,
+/**
+ * True when this type can link to a workspace default `design-system`.
+ */
+supportsDesignSystem: boolean, };
+
+export const ARTIFACT_TYPES = ["docs", "outline", "slides", "dashboard", "motion", "whiteboard", "design", "design-system", "sheet", "prototype", "diagram", "storyboard"] as const;
+
+export const ARTIFACT_TYPE_SPECS: Readonly<Record<ArtifactType, ArtifactTypeSpec>> = {
+  "docs": { artifactType: "docs", slug: "docs", entryPath: "structure/index.md", entryMime: "text/markdown", defaultDirs: ["structure","asset"], exportSuffix: ".md", supportsDesignSystem: false },
+  "outline": { artifactType: "outline", slug: "outline", entryPath: "structure/outline.json", entryMime: "application/json", defaultDirs: ["structure","asset"], exportSuffix: ".outline.json", supportsDesignSystem: false },
+  "slides": { artifactType: "slides", slug: "slides", entryPath: "structure/deck.json", entryMime: "application/json", defaultDirs: ["structure","structure/slides","asset"], exportSuffix: ".slides.json", supportsDesignSystem: true },
+  "dashboard": { artifactType: "dashboard", slug: "dashboard", entryPath: "structure/dashboard.json", entryMime: "application/json", defaultDirs: ["structure","structure/data","asset"], exportSuffix: ".dashboard.json", supportsDesignSystem: true },
+  "motion": { artifactType: "motion", slug: "motion", entryPath: "structure/timeline.json", entryMime: "application/json", defaultDirs: ["structure","structure/scenes","asset","asset/audio","asset/video","asset/image"], exportSuffix: ".motion.json", supportsDesignSystem: true },
+  "whiteboard": { artifactType: "whiteboard", slug: "whiteboard", entryPath: "structure/board.json", entryMime: "application/json", defaultDirs: ["structure","asset"], exportSuffix: ".whiteboard.json", supportsDesignSystem: false },
+  "design": { artifactType: "design", slug: "design", entryPath: "structure/frames/main.json", entryMime: "application/json", defaultDirs: ["structure","structure/frames","asset"], exportSuffix: ".design.json", supportsDesignSystem: true },
+  "design-system": { artifactType: "design-system", slug: "design-system", entryPath: "structure/tokens.json", entryMime: "application/json", defaultDirs: ["structure","structure/components","asset"], exportSuffix: ".design-system.json", supportsDesignSystem: false },
+  "sheet": { artifactType: "sheet", slug: "sheet", entryPath: "structure/workbook.json", entryMime: "application/json", defaultDirs: ["structure","structure/sheets","asset"], exportSuffix: ".sheet.json", supportsDesignSystem: false },
+  "prototype": { artifactType: "prototype", slug: "prototype", entryPath: "structure/index.html", entryMime: "text/html", defaultDirs: ["structure","asset"], exportSuffix: ".html", supportsDesignSystem: true },
+  "diagram": { artifactType: "diagram", slug: "diagram", entryPath: "structure/diagram.json", entryMime: "application/json", defaultDirs: ["structure","asset"], exportSuffix: ".diagram.json", supportsDesignSystem: false },
+  "storyboard": { artifactType: "storyboard", slug: "storyboard", entryPath: "structure/shots.json", entryMime: "application/json", defaultDirs: ["structure","asset","asset/frames","asset/refs","asset/audio"], exportSuffix: ".storyboard.json", supportsDesignSystem: false },
+};
+
 export const ArtifactFileEncodingValues = ["utf8", "base64"] as const;
 export type ArtifactFileEncoding = (typeof ArtifactFileEncodingValues)[number];
 

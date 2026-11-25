@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
 use serde_json::json;
-use vibevalley_cli::{Done, Failure, Output, exit, no_dry_run, run_cli};
+use vibevalley_cli::{Done, Failure, Output, exit, no_dry_run, run_cli_async};
 use vibevalley_runtime::agent::OpenAiClient;
 use vibevalley_runtime::agent::ai::types::ModelClient;
 use vibevalley_runtime::agent::durable::{ExportOptions, Store, read_telemetry_jsonl};
@@ -115,10 +115,6 @@ fn resolve_deepseek_client() -> Result<Arc<dyn ModelClient>, Failure> {
         ));
     };
     Ok(Arc::new(OpenAiClient::deepseek(move || Some(key.clone()))))
-}
-
-fn run(cli: EvalCli) -> Done {
-    vibevalley_runtime::rt::block_on(run_async(cli))
 }
 
 async fn run_async(cli: EvalCli) -> Done {
@@ -273,5 +269,5 @@ async fn run_async(cli: EvalCli) -> Done {
 }
 
 fn main() {
-    std::process::exit(run_cli(std::env::args_os(), run));
+    std::process::exit(run_cli_async(std::env::args_os(), run_async));
 }

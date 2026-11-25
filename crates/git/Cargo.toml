@@ -8,3 +8,4 @@ license.workspace = true
 similar = "3.2.1"
 thiserror = { workspace = true }
 tempfile = { workspace = true }
+tokio = { workspace = true, features = ["process", "io-util", "rt", "rt-multi-thread", "macros"] }

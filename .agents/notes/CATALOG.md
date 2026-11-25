@@ -16,6 +16,7 @@
 
 ### architecture
 
+- 2026-11-25 [跨端 SSOT、纯 Rust git 与全仓 Tokio 收敛](.agents/notes/proposed/architecture/2026-11-25-ssot-git-tokio-convergence.md)
 - 2026-11-24 [服务端扁平化与单数架构重构](.agents/notes/proposed/architecture/2026-11-24-first-principles-server-spine.md)
 - 2026-11-24 [作品目录化存储、统一实时协同引擎与 12 类产品技能体系](.agents/notes/proposed/architecture/2026-11-24-artifact-unified-collab.md)
 - 2026-11-23 [Tailscale 与 nsh 原生移动远程控制：真机分发与远程推送](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)

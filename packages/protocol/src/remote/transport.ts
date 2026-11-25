@@ -1,19 +1,9 @@
 import { z } from "zod";
 
 import { VibeValleyApiError } from "../client";
-import { BoardSlice, CollabSlice, InboxSlice, LiveEvent, OpsSlice, SessionsSlice } from "../core/schema";
-import type {
-  BoardSlice as BoardSliceShape,
-  CollabSlice as CollabSliceShape,
-  InboxSlice as InboxSliceShape,
-  LiveEvent as LiveEventShape,
-  OpsSlice as OpsSliceShape,
-  SessionsSlice as SessionsSliceShape,
-  SliceKind,
-} from "../core/shapes";
-import { ApiErrorEnvelope, apiSuccessEnvelope, BizCode, bizCodeMeta, pathOf } from "../endpoint";
-import { FarmFrame } from "../game/schema";
-import type { FarmFrame as FarmFrameShape } from "../game/shapes.gen";
+import { LiveEvent, sliceDecoders } from "../core/schema";
+import type { LiveEvent as LiveEventShape, SliceKind, SliceMap } from "../core/shapes";
+import { ApiErrorEnvelope, apiSuccessEnvelope, BizCode, bizCodeMeta, type Envelope, EnvelopeSchema, pathOf } from "../endpoint";
 import { RemotePairExchangeResult } from "./schema";
 import type { RemotePairExchangeRequest, RemotePairExchangeResult as RemotePairExchangeResultShape } from "./shapes.gen";
 
@@ -24,21 +14,9 @@ export interface ParsedPairUrl {
   readonly code: string;
 }
 
-export interface RemoteEnvelope {
-  readonly bizCode: number;
-  readonly message: string;
-  readonly data?: unknown;
-  readonly error?: unknown;
-}
+export type RemoteEnvelope = Envelope;
 
-export interface RemoteSliceMap {
-  readonly board: BoardSliceShape;
-  readonly sessions: SessionsSliceShape;
-  readonly collab: CollabSliceShape;
-  readonly inbox: InboxSliceShape;
-  readonly ops: OpsSliceShape;
-  readonly farm: FarmFrameShape;
-}
+export type RemoteSliceMap = SliceMap;
 
 export interface HttpRemoteTransportOptions {
   readonly baseUrl: string;
@@ -61,33 +39,6 @@ const BACKOFF_MS = [1000, 2000, 4000, 8000] as const;
 const REMOTE_CLIENT_HEADER = "remote";
 const pairResultEnvelope = apiSuccessEnvelope(RemotePairExchangeResult);
 
-type SliceDecoder<K extends SliceKind> = (raw: unknown) => RemoteSliceMap[K] | undefined;
-
-function decodeWith<T>(schema: {
-  readonly safeParse: (input: unknown) => { readonly success: true; readonly data: T } | { readonly success: false };
-}): (raw: unknown) => T | undefined {
-  return (raw) => {
-    const parsed = schema.safeParse(raw);
-    return parsed.success ? parsed.data : undefined;
-  };
-}
-
-const sliceDecoders: { readonly [K in SliceKind]: SliceDecoder<K> } = {
-  board: decodeWith(BoardSlice),
-  sessions: decodeWith(SessionsSlice),
-  collab: decodeWith(CollabSlice),
-  inbox: decodeWith(InboxSlice),
-  ops: decodeWith(OpsSlice),
-  farm: decodeWith(FarmFrame),
-};
-
-const RemoteEnvelopeSchema = z.object({
-  bizCode: z.number(),
-  message: z.string(),
-  data: z.exactOptional(z.unknown()),
-  error: z.exactOptional(z.unknown()),
-});
-
 const MessageEnvelopeSchema = z.object({
   message: z.string().min(1),
 });
@@ -102,14 +53,8 @@ const parseJsonSafe = (text: string): unknown => {
 };
 
 function toEnvelope(raw: unknown): RemoteEnvelope | undefined {
-  const parsed = RemoteEnvelopeSchema.safeParse(raw);
-  if (!parsed.success) return undefined;
-  return {
-    bizCode: parsed.data.bizCode,
-    message: parsed.data.message,
-    ...(parsed.data.data !== undefined ? { data: parsed.data.data } : {}),
-    ...(parsed.data.error !== undefined ? { error: parsed.data.error } : {}),
-  };
+  const parsed = EnvelopeSchema.safeParse(raw);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function fallbackBizCode(status: number): number {
@@ -613,7 +558,7 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
   };
 
   const slice: HttpRemoteTransport["slice"] = (kind, listener) => {
-    const decode = sliceDecoders[kind];
+    const decoder = sliceDecoders[kind];
     let lastEventId: string | undefined;
     return trackStream(async (signal) => {
       await runReconnectableSse(
@@ -623,10 +568,10 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
         (msg) => {
           if (msg.id) lastEventId = msg.id;
           const parsed = parseJsonSafe(msg.data);
-          const decoded = decode(parsed);
-          if (decoded === undefined) return;
-          if (!msg.id) lastEventId = String(decoded.seq);
-          listener(decoded);
+          const decoded = decoder.safeParse(parsed);
+          if (!decoded.success) return;
+          if (!msg.id) lastEventId = String(decoded.data.seq);
+          listener(decoded.data);
         },
       );
     });

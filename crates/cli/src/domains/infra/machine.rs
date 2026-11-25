@@ -85,7 +85,7 @@ fn machine_line(machine: &MachineInfo) -> String {
     line(&[&machine.id, &machine.name, machine.platform.as_str(), machine.status.as_str(), kind, &runtimes])
 }
 
-fn resolve_machine_up(client: &Client, args: &MachineUpArgs) -> Result<MachineAgentConfig, Failure> {
+async fn resolve_machine_up(client: &Client, args: &MachineUpArgs) -> Result<MachineAgentConfig, Failure> {
     if client.dry_run {
         return Err(no_dry_run("machine up"));
     }
@@ -114,12 +114,14 @@ fn resolve_machine_up(client: &Client, args: &MachineUpArgs) -> Result<MachineAg
         let device_name = requested_name.unwrap_or_else(default_device_name);
         let platform = if args.ephemeral { RemotePlatform::Sandbox } else { RemotePlatform::Machine };
         let target = client.for_target(server_url.clone(), None);
-        let exchanged = target.ask::<ops::RemotePairExchange>(&RemotePairExchangeRequest {
-            code: code.to_string(),
-            device_name: device_name.clone(),
-            platform,
-            scope: Some(SCOPE_REMOTE_MACHINE.to_string()),
-        })?;
+        let exchanged = target
+            .ask::<ops::RemotePairExchange>(&RemotePairExchangeRequest {
+                code: code.to_string(),
+                device_name: device_name.clone(),
+                platform,
+                scope: Some(SCOPE_REMOTE_MACHINE.to_string()),
+            })
+            .await?;
 
         let token = MachineSecret::new(exchanged.token);
         let machine_id = requested_machine_id.unwrap_or_else(|| {
@@ -213,32 +215,30 @@ async fn wait_for_shutdown_signal() {
     }
 }
 
-fn run_up(client: &Client, args: MachineUpArgs) -> Done {
-    let config = resolve_machine_up(client, &args)?;
+async fn run_up(client: &Client, args: MachineUpArgs) -> Done {
+    let config = resolve_machine_up(client, &args).await?;
     let registry = build_runtime_registry(&args.runtime, args.scripted);
     let cancel = CancellationToken::new();
 
-    vibevalley_runtime::rt::block_on(async move {
-        let agent = MachineAgent::new_async(config, registry, cancel.clone()).await;
-        let sig_cancel = cancel.clone();
-        let sig_task = tokio::spawn(async move {
-            wait_for_shutdown_signal().await;
-            sig_cancel.cancel();
-        });
-        let result = agent.run().await;
-        sig_task.abort();
-        let _ = sig_task.await;
-        result
-    })
+    let agent = MachineAgent::new_async(config, registry, cancel.clone()).await;
+    let sig_cancel = cancel.clone();
+    let sig_task = tokio::spawn(async move {
+        wait_for_shutdown_signal().await;
+        sig_cancel.cancel();
+    });
+    let result = agent.run().await;
+    sig_task.abort();
+    let _ = sig_task.await;
+    result
 }
 
-pub fn run(client: &Client, cmd: MachineCmd) -> Done {
+pub async fn run(client: &Client, cmd: MachineCmd) -> Done {
     match cmd.action {
         MachineAction::List => {
-            let machines = client.ask::<ops::MachineList>(&())?;
+            let machines = client.ask::<ops::MachineList>(&()).await?;
             client.output.show(&machines, |ms| ms.iter().map(machine_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
-        MachineAction::Up(args) => run_up(client, args),
+        MachineAction::Up(args) => run_up(client, args).await,
     }
 }

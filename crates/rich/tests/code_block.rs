@@ -152,6 +152,23 @@ fn regression_all_rich_ui_i18n_keys_resolve_in_zh_and_en() {
 }
 
 #[test]
+fn rich_preview_modal_i18n_keys_resolve_in_zh_and_en() {
+    for lang in ["zh", "en"] {
+        for key in [
+            "web.base.rich.expand",
+            "web.base.rich.viewDiagram",
+            "web.base.rich.viewSource",
+            "web.base.rich.zoomIn",
+            "web.base.rich.zoomOut",
+            "web.base.rich.zoomReset",
+        ] {
+            let value = vibevalley_i18n::t_in(lang, key, &[]);
+            assert!(!value.starts_with("web."), "{lang} key {key} resolved to raw key {value:?}");
+        }
+    }
+}
+
+#[test]
 fn vv_code_block_folds_long_blocks_and_handles_large_async_offload_without_panicking() {
     let _guard = CACHE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     // 24 lines (> 16 fold threshold), no language -> header shows localized line count.

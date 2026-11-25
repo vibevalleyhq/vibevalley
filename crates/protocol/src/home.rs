@@ -225,6 +225,42 @@ pub fn saved_deepseek_key(home: &Path) -> Option<String> {
     said.deepseek_api_key.as_deref().map(str::trim).filter(|k| !k.is_empty()).map(String::from)
 }
 
+/// Resolves this machine's display name (`VIBEVALLEY_SERVER_NAME`, macOS `scutil --get ComputerName`,
+/// `hostname -s`, `hostname`, `HOSTNAME`, `COMPUTERNAME`, else `"VibeValley"`), cached per process.
+pub fn computer_name() -> String {
+    static NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    NAME.get_or_init(|| {
+        let non_empty_env = |key: &str| std::env::var(key).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+        if let Some(name) = non_empty_env("VIBEVALLEY_SERVER_NAME") {
+            return name;
+        }
+        let read_cmd = |bin: &str, args: &[&str]| -> Option<String> {
+            let out = std::process::Command::new(bin)
+                .args(args)
+                .stdin(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .output()
+                .ok()?;
+            if !out.status.success() {
+                return None;
+            }
+            let text = String::from_utf8(out.stdout).ok()?;
+            let trimmed = text.trim();
+            (!trimmed.is_empty()).then(|| trimmed.to_string())
+        };
+        #[cfg(target_os = "macos")]
+        if let Some(name) = read_cmd("scutil", &["--get", "ComputerName"]) {
+            return name;
+        }
+        read_cmd("hostname", &["-s"])
+            .or_else(|| read_cmd("hostname", &[]))
+            .or_else(|| non_empty_env("HOSTNAME"))
+            .or_else(|| non_empty_env("COMPUTERNAME"))
+            .unwrap_or_else(|| "VibeValley".into())
+    })
+    .clone()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

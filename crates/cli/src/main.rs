@@ -11,8 +11,8 @@ mod output;
 use crate::client::Client;
 
 fn main() {
-    std::process::exit(vibevalley_cli::run_cli(std::env::args_os(), |cli: domains::Cli| {
+    std::process::exit(vibevalley_cli::run_cli_async(std::env::args_os(), |cli: domains::Cli| async move {
         let client = Client::new(cli.server, cli.token, cli.dry_run, cli.json);
-        domains::run(&client, cli.command)
+        domains::run(&client, cli.command).await
     }));
 }

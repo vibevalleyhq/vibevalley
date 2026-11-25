@@ -237,7 +237,13 @@
     "diagram": "图",
     "diagramFailed": "这张图画不出来：{why}",
     "longMore": "展开全文",
-    "longLess": "收起"
+    "longLess": "收起",
+    "expand": "放大查看",
+    "viewDiagram": "图表",
+    "viewSource": "源码",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "zoomReset": "重置缩放"
   },
   "updateReady": "{next} 已下好，去「关于」重启",
   "intent": {

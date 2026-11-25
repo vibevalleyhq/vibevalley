@@ -5,23 +5,25 @@ import { t } from "@vibevalley/i18n";
 import type { PhaseView } from "@vibevalley/protocol";
 
 import { Button } from "../design/Button";
+import { CodeBlock } from "../design/code/CodeBlock";
+import { Diagram } from "../design/code/Diagram";
 import { TextInput } from "../design/Field";
 import { Icon } from "../design/Icon";
 import { actionIcon, type IconName } from "../design/icons";
 import { motionClass, popupTransition } from "../design/motion";
+import { RichPreviewModal, type RichPreviewPayload } from "../design/RichPreviewModal";
 import { Dot } from "../design/Tag";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { act, hostApi } from "../infra/bridge";
 import { readChatPaneParams } from "../infra/hostParams";
-import { formatGenUiAction, richNative, type VvGenUiActionEvent } from "../infra/rich";
+import { formatGenUiAction, richNative, type VvDiagramPressEvent, type VvGenUiActionEvent } from "../infra/rich";
 import {
   asThoughtLevel,
   clampThoughtLevel,
   computeTelemetry,
   defaultThoughtLevelFor,
   extractToolTarget,
-  FALLBACK_RUNTIMES,
   fetchWorkspaceRuntimes,
   formatTokens,
   mergeChatSteps,
@@ -30,7 +32,6 @@ import {
   preferredModelFor,
   respondWorkspaceInteraction,
   respondWorkspacePermission,
-  runtimeDisplayName,
   sendWorkspaceMessage,
   setWorkspaceConfig,
   stopWorkspaceSession,
@@ -120,7 +121,12 @@ function basenameOf(path: string): string {
   return trimmed.split("/").pop() || trimmed || "/";
 }
 
-function ChatMarkdown(props: { text: string; streaming?: boolean; onGenUiAction?: (event: VvGenUiActionEvent) => void }) {
+function ChatMarkdown(props: {
+  text: string;
+  streaming?: boolean;
+  onGenUiAction?: (event: VvGenUiActionEvent) => void;
+  onDiagramPress?: (event: VvDiagramPressEvent) => void;
+}) {
   const native = richNative();
   const openLink = (url: string) => {
     if (url.startsWith("/")) {
@@ -150,10 +156,25 @@ function ChatMarkdown(props: { text: string; streaming?: boolean; onGenUiAction?
         selectable
         onLinkPress={(e) => openLink(e.url)}
         onGenUiAction={handleGenUiAction}
+        onDiagramPress={props.onDiagramPress}
       />
     );
   }
-  return <TextView markdown={props.text} selectable onLinkPress={(e) => openLink(e.url)} />;
+  return (
+    <TextView
+      markdown={props.text}
+      selectable
+      onLinkPress={(e) => openLink(e.url)}
+      renderCodeBlock={(block) => {
+        switch (block.language) {
+          case "mermaid":
+            return <Diagram source={block.code} interactive onPress={props.onDiagramPress} />;
+          default:
+            return <CodeBlock code={block.code} language={block.language} />;
+        }
+      }}
+    />
+  );
 }
 
 function ThinkingBlock(props: { step: SessionEvent }) {
@@ -461,15 +482,17 @@ export function WorkspaceChatPane() {
   const responding = signal(false);
   const errorText = signal<string | undefined>(undefined);
   const telemetryOpen = signal(false);
+  const richPreview = signal<RichPreviewPayload | undefined>(undefined);
   let localSeq = 0;
   const inFlightOptimistic = new Map<number, string>();
 
   const hasDraft = computed(() => draft().trim().length > 0);
   const canSend = computed(() => !sending() && (hasDraft() || attachedFiles().length > 0));
   const currentRuntime = computed(() => runtimes().find((r) => r.id === runtime()));
+  const currentRuntimeLabel = computed(() => currentRuntime()?.name || runtime());
   const currentModels = computed(() => currentRuntime()?.models ?? []);
   const currentModelInfo = computed(() => currentModels().find((m) => m.id === model()));
-  const modelTriggerLabel = computed(() => currentModelInfo()?.label ?? runtimeDisplayName(runtime()));
+  const modelTriggerLabel = computed(() => currentModelInfo()?.label ?? currentRuntimeLabel());
   const effortOptions = computed((): readonly ThoughtLevel[] => currentModelInfo()?.effortLevels ?? []);
   const effectiveThoughtLevel = computed((): ThoughtLevel | undefined => clampThoughtLevel(currentModelInfo(), thoughtLevel()));
   const hasAttention = computed(() => pendingInteractions().length > 0 || pendingPermissions().length > 0);
@@ -765,10 +788,9 @@ export function WorkspaceChatPane() {
     }
   };
 
-  const runtimeOptions = computed((): readonly { value: string; label: string; disabled?: boolean }[] => {
-    const list = runtimes().length === 0 ? FALLBACK_RUNTIMES : runtimes();
-    return list.map((r) => ({ value: r.id, label: r.name, disabled: !r.available }));
-  });
+  const runtimeOptions = computed((): readonly { value: string; label: string; disabled?: boolean }[] =>
+    runtimes().map((r) => ({ value: r.id, label: r.name, disabled: !r.available })),
+  );
 
   const modelOptions = computed(() => currentModels().map((m) => ({ value: m.id, label: m.label })));
 
@@ -945,6 +967,7 @@ export function WorkspaceChatPane() {
                   <ChatMarkdown
                     text={step().text}
                     streaming={effectivePhase() === "working"}
+                    onDiagramPress={(ev) => richPreview.set({ kind: "mermaid", source: ev.source })}
                     onGenUiAction={(ev) => {
                       const action = ev.action.trim();
                       const payload = ev.payload.trim();
@@ -1115,7 +1138,7 @@ export function WorkspaceChatPane() {
             placeholder={
               effectivePhase() === "working"
                 ? t("web.shell.chat.steerPlaceholder")
-                : t("web.shell.chat.composerPlaceholder", { runtime: runtimeDisplayName(runtime()) })
+                : t("web.shell.chat.composerPlaceholder", { runtime: currentRuntimeLabel() })
             }
             value={draft()}
             onChange={(e) => draft.set(e.value)}
@@ -1314,6 +1337,7 @@ export function WorkspaceChatPane() {
           </View>
         </View>
       </View>
+      <RichPreviewModal payload={richPreview()} onClose={() => richPreview.set(undefined)} />
     </View>
   );
 }

@@ -1,4 +1,5 @@
 import { computed, effect, signal, Text, untracked, View } from "nsh";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { DebugOverrideConfig, DebugSnapshot } from "@vibevalley/protocol";
@@ -40,6 +41,8 @@ function tabMeta(tab: DevToolsTab): { icon: IconName; label: string } {
   }
 }
 
+const devtoolsVisibleSchema = z.object({ visible: z.exactOptional(z.boolean()) });
+
 export function DevToolsApp() {
   const { detached } = readDevToolsParams();
   const activeTab = signal<DevToolsTab>("overview");
@@ -49,7 +52,7 @@ export function DevToolsApp() {
   const error = signal<string | undefined>(undefined);
   const autoRefresh = signal(true);
   const refreshTick = signal(0);
-  const visibleFrame = frame<{ visible?: boolean }>("devtools_visible");
+  const visibleFrame = frame("devtools_visible", devtoolsVisibleSchema);
   const visible = computed(() => visibleFrame()?.visible !== false);
 
   let inFlight = false;

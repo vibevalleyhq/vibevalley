@@ -11,6 +11,10 @@ export interface VvCodeCopyEvent {
   language?: string | null;
 }
 
+export interface VvDiagramPressEvent {
+  source: string;
+}
+
 export interface VvGenUiActionEvent {
   action: string;
   payload: string;
@@ -68,6 +72,8 @@ export interface VvCodeBlockProps extends ComponentHostProps {
 export interface VvDiagramProps extends ComponentHostProps {
   source: string;
   maxWidth?: number | null;
+  interactive?: boolean;
+  onPress?: (event: VvDiagramPressEvent) => void;
 }
 
 export interface VvGenUiProps extends ComponentHostProps {
@@ -99,6 +105,7 @@ export interface VvMarkdownProps extends ComponentHostProps {
   onTaskPress?: (event: VvTaskPressEvent) => void;
   onCodeCopy?: (event: VvCodeCopyEvent) => void;
   onGenUiAction?: (event: VvGenUiActionEvent) => void;
+  onDiagramPress?: (event: VvDiagramPressEvent) => void;
 }
 
 export interface VvWhiteboardBatchEvent {

@@ -233,11 +233,11 @@ impl Pull {
 
     async fn infer_farm_repo_async(&self, cwd: &str) -> Option<String> {
         let repos = self.repos.clone()?;
-        let cwd = cwd.to_string();
-        let discovered_root = spawn_blocking_traced(move || vibevalley_git::Repo::discover(Path::new(&cwd)).ok().flatten().map(|r| r.root().to_path_buf()))
+        let discovered_root = vibevalley_git::Repo::discover_async(Path::new(cwd))
             .await
             .ok()
-            .flatten()?;
+            .flatten()
+            .map(|r| r.root().to_path_buf())?;
         let root_real = tokio::fs::canonicalize(&discovered_root).await.ok()?;
         let listed = repos.list_async().await;
         for p in listed {
@@ -268,16 +268,7 @@ impl Pull {
                 .into_iter()
                 .find(|p| p.name == name)
                 .ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
-            let output = std::process::Command::new("git")
-                .arg("-C")
-                .arg(&found.path)
-                .args(["remote", "get-url", "origin"])
-                .output()
-                .ok();
-            let origin = output
-                .filter(|o| o.status.success())
-                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-                .unwrap_or_default();
+            let origin = vibevalley_git::read::remote_url(&found.path, "origin").ok().flatten().unwrap_or_default();
             let hosted = hosted_origin(&origin).ok_or_else(|| refuse(BizCode::RepoRefused, t("server.repo.github.notGithub", &[])))?;
             if let Some(want) = platform
                 && hosted.platform != want

@@ -1097,3 +1097,61 @@ test("regression: ChatPane sends optimistically before session.openWorkspace set
   expect(failApp.value("id:chat-composer-input")).toBe("Should restore");
   expect(failApp.count("id:chat-error")).toBe(1);
 });
+
+test("workspace ChatPane opens RichPreviewModal when clicking inline mermaid preview", async () => {
+  const baseSession = {
+    id: "sess-mermaid-1",
+    controller: "user" as const,
+    name: "Antigravity",
+    runtime: "antigravity",
+    brief: "Diagram chat",
+    cwd: "/work/vibevalley",
+    policy: { kind: "directCwd" as const, repo: "vibevalley", permissionMode: "acceptEdits" as const },
+    bindings: [],
+    hiredAt: 1_700_000_000_000,
+    runs: 1,
+    phase: { _tag: "resting" as const },
+  };
+  const host = workspaceHost(
+    { view: "workspace-chat", tabId: 70, sessionId: "sess-mermaid-1", runtime: "antigravity", cwd: "/work/vibevalley" },
+    { "runtime.list": [] },
+  );
+  const app = await open("../ShellApp.story.tsx", { width: 820, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  await host.pump(app);
+
+  await host.emitSub(app, "session.watch", {
+    kind: "state",
+    session: baseSession,
+    permissionMode: "acceptEdits",
+    pendingPermissions: [],
+    pendingInteractions: [],
+  });
+  await host.emitSub(app, "session.watch", {
+    kind: "history",
+    session: "sess-mermaid-1",
+    events: [
+      {
+        seq: 1,
+        revision: 1,
+        time: 1_700_000_001_000,
+        type: "assistant/message",
+        text: "Architecture:\n\n```mermaid\nflowchart TD\n  UI --> Modal\n```\n",
+      },
+    ],
+  });
+  await host.pump(app);
+
+  expect(app.count("id:chat-step-1 >> id:diagram-expand")).toBe(1);
+  expect(app.count("id:rich-preview-modal")).toBe(0);
+
+  await app.press("id:chat-step-1 >> id:diagram-expand");
+  expect(app.count("id:rich-preview-modal")).toBe(1);
+  expect(app.texts()).toContain("100%");
+
+  await app.press("id:rich-preview-tab-source");
+  expect(app.count("id:rich-preview-source-pane")).toBe(1);
+  expect(app.count("id:rich-preview-modal >> id:code-block")).toBe(1);
+
+  await app.press("id:rich-preview-close");
+  expect(app.count("id:rich-preview-modal")).toBe(0);
+});

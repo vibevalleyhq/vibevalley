@@ -48,7 +48,11 @@
     "motion": "Motion Film",
     "whiteboard": "Whiteboard",
     "design": "Design Canvas",
-    "designSystem": "Design System"
+    "designSystem": "Design System",
+    "sheet": "Sheet",
+    "prototype": "Prototype",
+    "diagram": "Diagram",
+    "storyboard": "Storyboard"
   },
   "timeline": {
     "toggle": "History timeline",

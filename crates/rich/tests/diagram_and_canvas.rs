@@ -5,8 +5,8 @@ use nsh_core::ViewKind;
 use nsh_core::element::Root;
 use nsh_core::prelude::*;
 use vibevalley_rich::{
-    ASYNC_CANVAS_BYTE_THRESHOLD, cached_render_diagram_with_max_width, canvas_cache_stats, clear_canvas_cache, clear_diagram_cache, diagram_cache_stats,
-    render_canvas, render_diagram, render_diagram_with_max_width, vv_canvas, vv_diagram,
+    ASYNC_CANVAS_BYTE_THRESHOLD, VvDiagramPressEvent, cached_render_diagram_with_max_width, canvas_cache_stats, clear_canvas_cache, clear_diagram_cache,
+    diagram_cache_stats, render_canvas, render_diagram, render_diagram_with_max_width, vv_canvas, vv_diagram,
 };
 
 use crate::support::{TestHarness, assert_inline_svg_image};
@@ -173,6 +173,70 @@ fn vv_diagram_mounts_as_image_svg_markup_never_element_svg_and_falls_back_on_err
     assert!(bad.find_test_id("diagram-image").is_none());
     assert!(bad.find_test_id("code-block").is_some());
     assert!(bad.find_test_id("diagram-error").is_some());
+}
+
+#[derive(Clone, PartialEq, Props)]
+struct InteractiveDiagramHarnessProps {
+    source: String,
+    interactive: bool,
+}
+
+thread_local! {
+    static RECORDED_DIAGRAM_PRESSES: std::cell::RefCell<Vec<VvDiagramPressEvent>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+#[component]
+fn InteractiveDiagramHarness(props: InteractiveDiagramHarnessProps) -> impl IntoElement {
+    vv_diagram()
+        .source(props.source.clone())
+        .interactive(props.interactive)
+        .on_press(|ev: &VvDiagramPressEvent| {
+            RECORDED_DIAGRAM_PRESSES.with(|list| list.borrow_mut().push(ev.clone()));
+        })
+}
+
+#[test]
+fn vv_diagram_interactive_emits_press_events_and_skips_fallback_errors() {
+    let _guard = DIAGRAM_CACHE_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    clear_diagram_cache();
+    RECORDED_DIAGRAM_PRESSES.with(|list| list.borrow_mut().clear());
+
+    let mut interactive = TestHarness::mount(Root::new::<InteractiveDiagramHarness>(|| InteractiveDiagramHarnessProps {
+        source: SAMPLE_FLOWCHART.to_owned(),
+        interactive: true,
+    }));
+    assert!(interactive.wait_until(Duration::from_secs(5), |h| h.find_test_id("diagram-image").is_some()));
+
+    let expand_id = interactive.find_test_id("diagram-expand").expect("expand trigger mounted");
+    let preview_id = interactive.find_test_id("diagram-preview").expect("preview trigger mounted");
+    assert!(interactive.contains_text("mermaid"));
+    assert!(interactive.press(expand_id));
+    assert!(interactive.press(preview_id));
+    RECORDED_DIAGRAM_PRESSES.with(|list| {
+        let recorded = list.borrow();
+        assert_eq!(recorded.len(), 2);
+        assert_eq!(recorded[0].source.as_str(), SAMPLE_FLOWCHART);
+        assert_eq!(recorded[1].source.as_str(), SAMPLE_FLOWCHART);
+    });
+
+    // Non-interactive diagram (used inside modal) renders full-height without preview/expand wrapper.
+    let mut plain = TestHarness::mount(Root::new::<InteractiveDiagramHarness>(|| InteractiveDiagramHarnessProps {
+        source: SAMPLE_FLOWCHART.to_owned(),
+        interactive: false,
+    }));
+    assert!(plain.wait_until(Duration::from_secs(5), |h| h.find_test_id("diagram-image").is_some()));
+    assert!(plain.find_test_id("diagram-expand").is_none());
+    assert!(plain.find_test_id("diagram-preview").is_none());
+
+    // Fallback code/error block must never intercept clicks with interactive preview triggers.
+    let mut invalid = TestHarness::mount(Root::new::<InteractiveDiagramHarness>(|| InteractiveDiagramHarnessProps {
+        source: "invalid-diagram-kind ???".to_owned(),
+        interactive: true,
+    }));
+    assert!(invalid.wait_until(Duration::from_secs(5), |h| h.find_test_id("diagram-error").is_some()));
+    assert!(invalid.find_test_id("diagram-expand").is_none());
+    assert!(invalid.find_test_id("diagram-preview").is_none());
+    assert!(invalid.find_test_id("code-block").is_some());
 }
 
 #[test]

@@ -17,8 +17,8 @@
 | 位置 | 职责 |
 |---|---|
 | `crates/server/src/repo.rs` | `repo.*`、`github.*`：`<工作目录>/repos` 下按名字新建或克隆、活跃度与语言（`tokei`）、`gh` 能不能开 PR |
-| `crates/git/src/repo.rs` | git 封装：状态、diff、分支、worktree、冲突预检（`merge_check`）、无检出合入（`merge_into`：`merge-tree` + `commit-tree` + `update-ref`） |
-| `crates/server/src/runtime/worktree/mod.rs`、`crates/server/src/runtime/worktree/git.rs`、`crates/server/src/runtime/worktree/check.rs` | `Workplace`：确保仓库在（`ensure_repo`）、工单的 worktree 与分支（`worktree`、`base`）、改动（`changes`）、交付（`land`）、子工单合进父分支（`join`）、帮工走时收拾 worktree 和分支（`release`）、跑 `.vibevalley/check`；不读工单板的状态 |
+| `crates/git/src/read.rs`、`crates/git/src/repo.rs` | git 封装：纯 Rust 只读（根发现、引用、配置、worktree）与 Tokio 异步子进程（状态、diff、分支、worktree、冲突预检 `merge_check`、无检出合入 `merge_into`） |
+| `crates/server/src/runtime/worktree/mod.rs`、`crates/server/src/runtime/worktree/check.rs` | `Workplace`：确保仓库在（`ensure_repo`）、工单的 worktree 与分支（`worktree`、`base`）、改动（`changes`）、交付（`land`）、子工单合进父分支（`join`）、帮工走时收拾 worktree 和分支（`release`）、异步 `.vibevalley/check`；不读工单板的状态 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`repo.*`、`github.*`、`issue.diff.get`）。
 

@@ -6,7 +6,6 @@ use std::fmt;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -233,22 +232,9 @@ pub fn remove(home: &Path) -> Result<bool, Failure> {
     }
 }
 
-/// Resolves a default device display name from the system hostname, falling back to `"vibevalley-cli"`.
+/// Resolves a default device display name from the system hostname.
 pub fn default_device_name() -> String {
-    let read_cmd = |bin: &str, args: &[&str]| -> Option<String> {
-        let out = Command::new(bin).args(args).stdin(Stdio::null()).stderr(Stdio::null()).output().ok()?;
-        if !out.status.success() {
-            return None;
-        }
-        let text = String::from_utf8(out.stdout).ok()?;
-        let trimmed = text.trim();
-        (!trimmed.is_empty()).then(|| trimmed.to_string())
-    };
-    read_cmd("hostname", &["-s"])
-        .or_else(|| read_cmd("hostname", &[]))
-        .or_else(|| std::env::var("HOSTNAME").ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()))
-        .or_else(|| std::env::var("COMPUTERNAME").ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()))
-        .unwrap_or_else(|| "vibevalley-cli".into())
+    vibevalley_protocol::home::computer_name()
 }
 
 #[cfg(test)]

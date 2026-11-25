@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from
 import { join, relative } from "node:path";
 
 import { placeholderKinds, placeholders } from "@vibevalley/i18n";
+import { ARTIFACT_TYPES, type ArtifactType } from "@vibevalley/protocol";
 
 import { readGlossary, wordProblems } from "../docs/glossary.ts";
 import { messageUses } from "./i18n-uses.ts";
@@ -36,6 +37,96 @@ export function glyphLabelProblems(locale: string, entries: ReadonlyMap<string, 
   }
   return problems;
 }
+/** Explicit whitelist for zh entries that intentionally contain only unit templates, proper nouns, or identifiers without Han characters. */
+export const ZH_ASCII_ALLOWLIST: ReadonlySet<string> = new Set([
+  // Unit templates
+  "web.audio.metadataRate",
+  "web.devtools.timeline.durationUs",
+  // Proper nouns, OS/platform labels, model IDs, and technical placeholders
+  "server.cron.when.cron",
+  "server.memory.source.nowledge",
+  "server.memory.source.everos",
+  "server.provider.use.live",
+  "web.agent.orchestrator.modelHint",
+  "web.devtools.lanes.coreApply",
+  "web.farm.hud.toLevel",
+  "web.provider.use.live",
+  "web.remote.tailscale.ip",
+  "web.remote.devices.platform.ios",
+  "web.remote.devices.platform.android",
+  "web.remote.controlPlane.urlPlaceholder",
+  "web.remote.controlPlane.tokenPlaceholder",
+  "web.runtime.machines.platform.macos",
+  "web.runtime.machines.platform.linux",
+  "web.setting.language.en",
+  "web.setting.feature.live",
+  "web.shell.swarm.pill",
+]);
+
+/** Flags non-whitelisted identical ASCII/untranslated English strings in `zh` locales. */
+export function zhUntranslatedProblems(
+  zh: ReadonlyMap<string, string>,
+  en: ReadonlyMap<string, string>,
+  allowlist: ReadonlySet<string> = ZH_ASCII_ALLOWLIST,
+): string[] {
+  const problems: string[] = [];
+  for (const [key, value] of zh) {
+    if (same.has(key) || allowlist.has(key)) continue;
+    if (han.test(value)) continue;
+    const stripped = value.replace(/\{[^{}]*\}/gu, "").trim();
+    if (!/[A-Za-z]/u.test(stripped)) continue;
+    const enValue = en.get(key);
+    if (enValue !== undefined && value === enValue) {
+      problems.push(`zh: ${key} is untranslated identical ASCII/English (${JSON.stringify(value)})`);
+    } else {
+      problems.push(`zh: ${key} has non-whitelisted ASCII/English without Chinese (${JSON.stringify(value)})`);
+    }
+  }
+  return problems;
+}
+
+function artifactTypeDictKey(type: ArtifactType): string {
+  switch (type) {
+    case "docs":
+      return "docs";
+    case "outline":
+      return "outline";
+    case "slides":
+      return "slides";
+    case "dashboard":
+      return "dashboard";
+    case "motion":
+      return "motion";
+    case "whiteboard":
+      return "whiteboard";
+    case "design":
+      return "design";
+    case "design-system":
+      return "designSystem";
+    case "sheet":
+      return "sheet";
+    case "prototype":
+      return "prototype";
+    case "diagram":
+      return "diagram";
+    case "storyboard":
+      return "storyboard";
+  }
+}
+
+/** Asserts every canonical `ArtifactType` in `ARTIFACT_TYPES` has a non-empty `web.artifact.types.*` entry. */
+export function artifactTypeParityProblems(locale: string, entries: ReadonlyMap<string, string>): string[] {
+  const problems: string[] = [];
+  for (const type of ARTIFACT_TYPES) {
+    const key = `web.artifact.types.${artifactTypeDictKey(type)}`;
+    const value = entries.get(key);
+    if (value === undefined || value.trim() === "") {
+      problems.push(`${locale}: missing ${key} for ArtifactType "${type}"`);
+    }
+  }
+  return problems;
+}
+
 /** Messages every language says the same way (a language's own name): Han in English is meant there. */
 // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the locales' own files, checked by this script
 const same = new Set((JSON.parse(readFileSync(join(dictionaries, "same.json"), "utf8")) as { keys: string[] }).keys);
@@ -150,10 +241,13 @@ function check(): string[] {
   for (const u of uses) if (!u.prefix && !zh.has(u.key)) problems.push(`${u.file}:${u.line}: ${u.key} is not in the catalogs`);
   for (const k of zh.keys()) if (!used.has(k) && !prefixes.some((p) => k.startsWith(p))) problems.push(`unused: ${k}`);
   const glossary = readGlossary(readFileSync(join(root, "docs/README.md"), "utf8"));
+  const en = messages("en");
+  problems.push(...zhUntranslatedProblems(zh, en));
   for (const locale of locales) {
     const localeMessages = messages(locale);
     problems.push(...wordProblems(glossary, locale, localeMessages));
     problems.push(...glyphLabelProblems(locale, localeMessages));
+    problems.push(...artifactTypeParityProblems(locale, localeMessages));
   }
   if (!existsSync(catalogsFile) || readFileSync(catalogsFile, "utf8") !== formatted(generated()))
     problems.push("packages/i18n/src/catalogs.ts is stale: run vpx scripts/gen/i18n.ts gen");

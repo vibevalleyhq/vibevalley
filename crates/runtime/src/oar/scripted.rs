@@ -394,7 +394,7 @@ impl Driver for ScriptedDriver {
                 let steps = match computed {
                     None => steps,
                     Some(turn) => {
-                        // Computed test callbacks may perform blocking git/HTTP work (e.g. `reqwest::blocking`).
+                        // Computed test callbacks may perform synchronous work on a blocking thread.
                         let ask = TurnAsk {
                             prompt: prompt.clone(),
                             turn: index,
