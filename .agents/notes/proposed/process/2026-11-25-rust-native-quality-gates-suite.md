@@ -39,6 +39,14 @@ Status: proposed
    - **拓扑与依赖校验**：严格遵循真实命名空间树（禁止虚构包分层），按 Policy `:levels` 判定 `:dependency` 边 `from_rank < to_rank` 为违例红箭头（`:implements` 与 `:association` 不报违例），缺失 CRAP 或变异数据时按最差 `grade 1` 着色并在右上角展示 `C` / `M` 双色点。
    - **独立本地 Web 查看器（`cargo xtask uml viewer [--port N] [--open]`）**：由 `std::net::TcpListener` 托管内嵌单页 `viewer.html`，提供命名空间下钻/`Esc` 返回、5 档 Declutter（含去连线入/出三角与悬停违例清单）、Class Card（CRAP `μ/max/σ` + Mutation 明细 + `locate_member` 源码高亮跳转）、What-If `:proposals` 沙盘与局部刷新端点；**不改动 `apps/mac`**，GPUI 桌面集成留待后续评估。
 
+### 2. 集成验收与实测基线（Stage 3）
+
+- `cargo xtask crap --no-coverage crates/core --json`：共提取 427 个函数（最高 CC 为 `crate::core::fold` CC=88、`crate::progress::entries_for` CC=41、`crate::moves::status_move` CC=36）。
+- `cargo xtask dry crates/server/src/gateway/http --json`：扫描 67 个函数，检出 1 对同构克隆（`Authenticated::from_request_parts` vs `AuthenticatedQuery::from_request_parts`，相似度 `1.0`，`54/54` 指纹）。
+- `cargo xtask mutate --scan crates/core/src/artifact --json`：扫描 4 个文件、32 个函数，发现 37 个可变异位点（37 个已覆盖、0 个未覆盖）。
+- `cargo xtask uml ir && cargo xtask uml check --json`：全仓解析 589 个组件、3606 个类/模块、8976 个函数与 5482 条边，Dependency Rule 违例 `0`；`export --mermaid` / `--svg` 均生成合法文件，`viewer` 本地 HTTP 接口经单测端到端验证。
+- `cargo xtask audit`：确认 `module boundaries: 280 files ok`、`rust ratchets: 1004 files ok`、`arch-audit: 368 files ok`（11 条规则全过），`xtask/Cargo.toml` 保持零新依赖且 `apps/mac/**` 无任何改动。
+
 ## Alternatives considered
 
 ### 1. 纯 Rust 零依赖词法/结构扫描器 vs 引入 `syn` + `oxc_parser`
