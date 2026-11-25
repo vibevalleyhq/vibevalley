@@ -30,8 +30,7 @@ import { sortRuntimes } from "../../infra/agents";
 import { ready, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { MemoryPanel } from "../memory";
-import { type DisplayMachine, useMergedMachines } from "../runtime/machines";
-import { useSkills } from "../runtime/SkillsPage";
+import { type DisplayMachine, useMergedMachines, useSkills } from "../runtime";
 import { Labeled } from "./AgentLook";
 
 const noSupport: RuntimeSupport = { steer: false, refused: {}, capabilities: [], inProcess: false };

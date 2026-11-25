@@ -21,7 +21,7 @@ import { typedMarks } from "../../../infra/base/typedMarks";
 import { useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { useRouter } from "../../../infra/router";
 import { useIntents } from "../../../infra/state/intent";
-import { activeArtifactViewContext, artifactChatFocus, clearActiveArtifactViewContext } from "../../artifact/store";
+import { activeArtifactViewContext, artifactChatFocus, clearActiveArtifactViewContext } from "../../artifact";
 import { attachFiles, chatMarks, chatSay, createComposer, draftOf, drafts, setEditingId, uploadsIn, useReplying, type ComposerKey } from "../model/composing";
 import { followed } from "../model/follow";
 import { EmojiPopover } from "./EmojiPicker";

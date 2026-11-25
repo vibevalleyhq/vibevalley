@@ -15,7 +15,7 @@ import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle,
 
 import { ago, tookText } from "../../../infra/base/format";
 import { matches } from "../../../infra/base/search";
-import { describeSubagents } from "../../session/subagents";
+import { describeSubagents } from "../../session";
 import { endedAt, assignedOnDuty, issueSession, issueTag, needsWorktreeCheck, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";

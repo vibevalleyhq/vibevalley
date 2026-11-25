@@ -507,12 +507,13 @@ test("timeline: scrubs history preview and executes restore, fork, and selective
 
   await fake.pumpUntil(app, () => app.count("id:timeline-node-1") === 1);
   await app.press("id:timeline-node-1");
-  await fake.pump(app);
+  await fake.pumpUntil(app, () => app.enabled("id:timeline-undo-origin"));
   fake.clearCalls();
   await app.press("id:timeline-undo-origin");
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.undoOrigin"));
   expect(fake.calls.find((c) => c.op === "artifact.history.undoOrigin")?.payload).toEqual({ id: aid, origin: "session:w1:turn:2" });
 
+  await fake.pumpUntil(app, () => app.enabled("id:timeline-fork"));
   fake.clearCalls();
   await app.press("id:timeline-fork");
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.fork"));

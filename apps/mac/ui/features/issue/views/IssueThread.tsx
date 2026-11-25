@@ -14,8 +14,7 @@ import { useNow } from "../../../infra/base/dom";
 import { momentText, shortMomentText } from "../../../infra/base/format";
 import { useCollabSlice } from "../../../infra/frame";
 import { defineQuery, ready, retryRead, useQuery } from "../../../infra/query";
-import { followed, useFollowed } from "../../channel/model/follow";
-import { issueThreadOf } from "../../channel/model/places";
+import { followed, issueThreadOf, useFollowed } from "../../channel";
 import { SheetLabel } from "./Sheet";
 
 const conversationQuery = defineQuery({

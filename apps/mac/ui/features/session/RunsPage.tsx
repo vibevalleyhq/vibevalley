@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, untracked, View } from "nsh";
+import { computed, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Look, OrchestratorEval } from "@vibevalley/protocol";
@@ -20,7 +20,6 @@ import { useBoardSlice, useSessionsSlice } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useAgents, useQuery } from "../../infra/query";
 import { useRouter, useSearch } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
-import { PendingApprovals } from "../orchestrator/PendingApprovals";
 import {
   buildRunEntries,
   filterRunEntries,
@@ -158,7 +157,10 @@ function entryTiming(entry: RunEntry, now: number): string {
   }
 }
 
-export function RunsPage() {
+/** Provided by app/: orchestrator links to runs, so session does not import orchestrator back. */
+export type RunApprovals = (props: { readonly conversationId: string }) => JSX.Element;
+
+export function RunsPage(props: { approvals?: RunApprovals }) {
   const board = useBoardSlice();
   const sessionsSlice = useSessionsSlice();
   const router = useRouter();
@@ -347,7 +349,16 @@ export function RunsPage() {
       >
         {(entry) => (
           <Keyed key={`${entry().kind}:${entry().id}`}>
-            {() => <RunDetail entry={entry()} look={lookOf(entry())} now={now()} showBack={!wide()} onBack={() => narrowPane.set("list")} />}
+            {() => (
+              <RunDetail
+                entry={entry()}
+                look={lookOf(entry())}
+                now={now()}
+                showBack={!wide()}
+                onBack={() => narrowPane.set("list")}
+                approvals={props.approvals}
+              />
+            )}
           </Keyed>
         )}
       </If>
@@ -443,7 +454,7 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
   );
 }
 
-function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: number; showBack: boolean; onBack: () => void }) {
+function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: number; showBack: boolean; onBack: () => void; approvals?: RunApprovals }) {
   const status = computed(() => statusMeta(runStatusOf(props.entry)));
   const pillStyle = () => {
     const bg = status().pillBg;
@@ -533,8 +544,11 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
       </View>
       <View class="min-h-0 flex-1 px-5 pt-3 pb-4">
         <View class="min-h-0 w-full max-w-5xl flex-1 gap-3">
-          <If when={props.entry.kind === "orchestrator"}>
-            <PendingApprovals conversationId={props.entry.id} />
+          <If when={props.entry.kind === "orchestrator" ? props.approvals : undefined}>
+            {(Approvals) => {
+              const ViewApprovals = Approvals();
+              return <ViewApprovals conversationId={props.entry.id} />;
+            }}
           </If>
           <View class="min-h-0 flex-1">
             <If

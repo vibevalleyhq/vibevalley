@@ -1,10 +1,15 @@
-export { ContentShell } from "./ContentShell";
 export {
+  type ArtifactFacet,
+  artifactFacetOf,
   type ContentBucket,
   contentBrowseBucket,
   contentFocusMediaId,
+  contentPresenting,
   contentSidebarOpen,
+  countContentHub,
+  countForBucket,
   isPinned,
+  mediaKindOf,
   openContentSearch,
   openTemplatePicker,
   pinnedKeys,
