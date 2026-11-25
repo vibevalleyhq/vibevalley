@@ -26,7 +26,7 @@ const appletsQuery = defineQuery({
   },
 });
 
-export function useInstalledApplet(artifactId: () => string) {
+function useInstalledApplet(artifactId: () => string) {
   const list = useQuery(() => appletsQuery(), { enabled: () => currentHost().applet !== undefined });
   return computed((): ArtifactAppletInfo | undefined => {
     const items = ready(list, []);
@@ -34,14 +34,14 @@ export function useInstalledApplet(artifactId: () => string) {
   });
 }
 
-export interface InstallAppletModalProps {
+interface InstallAppletModalProps {
   readonly open: boolean;
   readonly artifact: Artifact;
   readonly onClose: () => void;
 }
 
 /** Modal to install, update, launch, or uninstall a local macOS artifact applet. */
-export function InstallAppletModal(props: InstallAppletModalProps) {
+function InstallAppletModal(props: InstallAppletModalProps) {
   return (
     <Dialog open={props.open} onClose={props.onClose} title={t("web.artifact.applet.modalTitle")} testid="install-applet-modal">
       <If when={props.open}>

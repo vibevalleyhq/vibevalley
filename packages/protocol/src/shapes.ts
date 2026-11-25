@@ -299,7 +299,7 @@ export {
   type RemoteStatus,
   type RemoteWhoami,
 } from "./remote/shapes.gen";
-export type { ArtifactAppletInfo, ConnectionSaveRequest, DesktopConnectionSnapshot, HostAppletIdPayload, HostAppletInstallPayload } from "./host/shapes.gen";
+export type { ConnectionSaveRequest, DesktopConnectionSnapshot } from "./host/shapes.gen";
 export type { MachineInfo, MachinePlatform, MachineStatus } from "./machine/shapes.gen";
 export {
   type LibraryAddRequest,
