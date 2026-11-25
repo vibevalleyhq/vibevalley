@@ -4,7 +4,15 @@ import { z } from "zod";
 
 import type { ConnectionSaveRequest, Envelope, SliceKind, SliceMap } from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
-import { CommandLineState, MotionChoice, ThemeChoice } from "@vibevalley/protocol/host";
+import {
+  type AppletInstallInput,
+  AppletOpenResult,
+  AppletRemoveResult,
+  ArtifactAppletInfo,
+  CommandLineState,
+  MotionChoice,
+  ThemeChoice,
+} from "@vibevalley/protocol/host";
 import { DesktopConnectionSnapshot as DesktopConnectionSnapshotSchema, EnvelopeSchema, sliceDecoders } from "@vibevalley/protocol/schema";
 
 import { readHostViewName } from "./hostParams";
@@ -294,6 +302,7 @@ const OpenTerminalSchema = z.object({ terminalId: z.string() });
 const PixelDirSchema = z.object({ path: z.string() });
 const PickFileSchema = z.object({ path: z.string(), name: z.string(), type: z.string() }).nullable();
 const ReadFileSchema = z.object({ data: z.string(), type: z.string(), name: z.string() });
+const AppletListSchema = z.array(ArtifactAppletInfo);
 
 /** The host's capabilities (packages/protocol's Host, desktop flavour) and the terminal. */
 export const hostApi = {
@@ -329,6 +338,10 @@ export const hostApi = {
   cliState: () => callDecoded("host.cliState", null, CommandLineState),
   cliInstall: () => callDecoded("host.cliInstall", null, CommandLineState),
   cliRemove: () => callDecoded("host.cliRemove", null, CommandLineState),
+  appletList: () => callDecoded("host.appletList", null, AppletListSchema),
+  appletInstall: (input: AppletInstallInput) => callDecoded("host.appletInstall", input, ArtifactAppletInfo),
+  appletUninstall: (artifactId: string) => callDecoded("host.appletUninstall", { artifactId }, AppletRemoveResult),
+  appletOpen: (artifactId: string) => callDecoded("host.appletOpen", { artifactId }, AppletOpenResult),
   stopAudio: () => call("host.stopAudio", {}),
 };
 

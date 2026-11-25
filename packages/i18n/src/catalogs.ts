@@ -369,6 +369,32 @@ export const catalogs = {
         empty: "没有可演示的页",
         loadFailure: "演示页未能载入：{reason}",
       },
+      standalone: { missing: "这份作品已经删掉了，或者没有这份作品。", version: "第 {version} 稿", live: "最新" },
+      applet: {
+        button: "安装为桌面应用",
+        buttonInstalled: "桌面应用已安装",
+        badgeInstalled: "已安装",
+        modalTitle: "本地桌面应用",
+        subtitle: "将这份作品安装为独立 Mac 应用，可从聚焦搜索或程序坞直接打开。",
+        appNameLabel: "应用名称",
+        appNamePlaceholder: "输入应用显示名称",
+        alwaysOnTopLabel: "窗口置顶",
+        alwaysOnTopHint: "独立应用窗口保持在其它窗口之上。",
+        statusInstalled: "已安装",
+        statusNotInstalled: "尚未安装",
+        bundlePathLabel: "应用位置",
+        bundleIdLabel: "应用标识",
+        install: "安装应用",
+        reinstall: "更新并重装",
+        installing: "正在安装…",
+        open: "打开应用",
+        uninstall: "卸载",
+        installedToast: "已安装「{name}.app」",
+        uninstalledToast: "已卸载「{name}.app」",
+        openedToast: "正在打开「{name}.app」",
+        nameRequired: "请先输入应用名称",
+        unavailable: "当前宿主不支持安装本地桌面应用",
+      },
     },
     "web.audio": {
       title: "音频工作台",
@@ -3260,6 +3286,32 @@ export const catalogs = {
         waiting: "Waiting for the slide deck",
         empty: "This deck has no slides",
         loadFailure: "Could not load the slide deck: {reason}",
+      },
+      standalone: { missing: "This artifact was deleted, or there is no such artifact.", version: "v{version}", live: "Live" },
+      applet: {
+        button: "Install as App",
+        buttonInstalled: "App Installed",
+        badgeInstalled: "Installed",
+        modalTitle: "Local Desktop App",
+        subtitle: "Install this artifact as a standalone Mac app you can launch from Spotlight or the Dock.",
+        appNameLabel: "App Name",
+        appNamePlaceholder: "Enter app display name",
+        alwaysOnTopLabel: "Always on Top",
+        alwaysOnTopHint: "Keep the standalone applet window floating above other windows.",
+        statusInstalled: "Installed",
+        statusNotInstalled: "Not installed",
+        bundlePathLabel: "Bundle Path",
+        bundleIdLabel: "Bundle ID",
+        install: "Install App",
+        reinstall: "Update & Reinstall",
+        installing: "Installing…",
+        open: "Open App",
+        uninstall: "Uninstall",
+        installedToast: "Installed “{name}.app”",
+        uninstalledToast: "Uninstalled “{name}.app”",
+        openedToast: "Opening “{name}.app”",
+        nameRequired: "Enter an app name first",
+        unavailable: "Local desktop app installation is unavailable in this host",
       },
     },
     "web.audio": {
@@ -6158,6 +6210,29 @@ export interface Messages {
   "web.agent.workdirTip": undefined;
   "web.agent.worktree": undefined;
   "web.agent.worktreeHint": undefined;
+  "web.artifact.applet.alwaysOnTopHint": undefined;
+  "web.artifact.applet.alwaysOnTopLabel": undefined;
+  "web.artifact.applet.appNameLabel": undefined;
+  "web.artifact.applet.appNamePlaceholder": undefined;
+  "web.artifact.applet.badgeInstalled": undefined;
+  "web.artifact.applet.bundleIdLabel": undefined;
+  "web.artifact.applet.bundlePathLabel": undefined;
+  "web.artifact.applet.button": undefined;
+  "web.artifact.applet.buttonInstalled": undefined;
+  "web.artifact.applet.install": undefined;
+  "web.artifact.applet.installedToast": { readonly name: string | number };
+  "web.artifact.applet.installing": undefined;
+  "web.artifact.applet.modalTitle": undefined;
+  "web.artifact.applet.nameRequired": undefined;
+  "web.artifact.applet.open": undefined;
+  "web.artifact.applet.openedToast": { readonly name: string | number };
+  "web.artifact.applet.reinstall": undefined;
+  "web.artifact.applet.statusInstalled": undefined;
+  "web.artifact.applet.statusNotInstalled": undefined;
+  "web.artifact.applet.subtitle": undefined;
+  "web.artifact.applet.unavailable": undefined;
+  "web.artifact.applet.uninstall": undefined;
+  "web.artifact.applet.uninstalledToast": { readonly name: string | number };
   "web.artifact.blocks.saved": undefined;
   "web.artifact.blocks.start": undefined;
   "web.artifact.blocks.user": undefined;
@@ -6201,6 +6276,9 @@ export interface Messages {
   "web.artifact.slides.presenter": undefined;
   "web.artifact.slides.previous": undefined;
   "web.artifact.slidesStore.addSlide": undefined;
+  "web.artifact.standalone.live": undefined;
+  "web.artifact.standalone.missing": undefined;
+  "web.artifact.standalone.version": { readonly version: string | number };
   "web.artifact.suggestions.accept": undefined;
   "web.artifact.suggestions.by": { readonly name: string | number };
   "web.artifact.suggestions.delete": undefined;

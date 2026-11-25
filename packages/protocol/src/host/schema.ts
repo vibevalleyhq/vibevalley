@@ -325,6 +325,27 @@ export const HostQrPayload = z.object({
   border: z.exactOptional(z.number()),
 }) satisfies Codec<T.HostQrPayload>;
 
+export const ArtifactAppletInfo = z.object({
+  artifactId: z.string(),
+  artifactType: z.string(),
+  appName: z.string(),
+  bundleId: z.string(),
+  bundlePath: z.string(),
+  alwaysOnTop: z.boolean(),
+  installed: z.boolean(),
+}) satisfies Codec<T.ArtifactAppletInfo>;
+
+export const HostAppletInstallPayload = z.object({
+  artifactId: z.string(),
+  artifactType: z.string(),
+  appName: z.string(),
+  alwaysOnTop: z.boolean(),
+}) satisfies Codec<T.HostAppletInstallPayload>;
+
+export const HostAppletIdPayload = z.object({
+  artifactId: z.string(),
+}) satisfies Codec<T.HostAppletIdPayload>;
+
 export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.info") }),
   z.object({ op: z.literal("host.updateState") }),
@@ -366,4 +387,8 @@ export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.sha256"), payload: HostSha256Payload }),
   z.object({ op: z.literal("host.randomBytes"), payload: HostRandomBytesPayload }),
   z.object({ op: z.literal("host.qr"), payload: HostQrPayload }),
+  z.object({ op: z.literal("host.appletList") }),
+  z.object({ op: z.literal("host.appletInstall"), payload: HostAppletInstallPayload }),
+  z.object({ op: z.literal("host.appletUninstall"), payload: HostAppletIdPayload }),
+  z.object({ op: z.literal("host.appletOpen"), payload: HostAppletIdPayload }),
 ]) satisfies Codec<T.HostOp>;

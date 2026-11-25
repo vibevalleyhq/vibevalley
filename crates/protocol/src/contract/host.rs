@@ -929,6 +929,45 @@ pub struct HostQrPayload {
     pub border: Option<u32>,
 }
 
+/// Installed or queried metadata for a local macOS artifact applet `.app` bundle.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactAppletInfo {
+    pub artifact_id: String,
+    pub artifact_type: String,
+    pub app_name: String,
+    pub bundle_id: String,
+    pub bundle_path: String,
+    pub always_on_top: bool,
+    pub installed: bool,
+}
+
+/// Request payload for `host.appletInstall`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostAppletInstallPayload {
+    pub artifact_id: String,
+    pub artifact_type: String,
+    pub app_name: String,
+    pub always_on_top: bool,
+}
+
+/// Request payload for `host.appletUninstall` and `host.appletOpen`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostAppletIdPayload {
+    pub artifact_id: String,
+}
+
 /// Every `host.*` bridge call answered by the native shell, decoded once at the boundary.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -1014,6 +1053,14 @@ pub enum HostOp {
     RandomBytes(HostRandomBytesPayload),
     #[serde(rename = "host.qr")]
     Qr(HostQrPayload),
+    #[serde(rename = "host.appletList")]
+    AppletList,
+    #[serde(rename = "host.appletInstall")]
+    AppletInstall(HostAppletInstallPayload),
+    #[serde(rename = "host.appletUninstall")]
+    AppletUninstall(HostAppletIdPayload),
+    #[serde(rename = "host.appletOpen")]
+    AppletOpen(HostAppletIdPayload),
 }
 
 impl HostOp {
@@ -1058,6 +1105,10 @@ impl HostOp {
         "host.sha256",
         "host.randomBytes",
         "host.qr",
+        "host.appletList",
+        "host.appletInstall",
+        "host.appletUninstall",
+        "host.appletOpen",
     ];
 
     pub fn is_known_op(op: &str) -> bool {
@@ -1106,6 +1157,10 @@ impl HostOp {
             HostOp::Sha256(_) => "host.sha256",
             HostOp::RandomBytes(_) => "host.randomBytes",
             HostOp::Qr(_) => "host.qr",
+            HostOp::AppletList => "host.appletList",
+            HostOp::AppletInstall(_) => "host.appletInstall",
+            HostOp::AppletUninstall(_) => "host.appletUninstall",
+            HostOp::AppletOpen(_) => "host.appletOpen",
         }
     }
 
@@ -1191,6 +1246,14 @@ impl HostOp {
                 .map(HostOp::RandomBytes)
                 .map_err(|e| format!("randomBytes: {e}")),
             "host.qr" => serde_json::from_value(payload).map(HostOp::Qr).map_err(|e| format!("qr: {e}")),
+            "host.appletList" => expect_empty(&payload).map(|()| HostOp::AppletList),
+            "host.appletInstall" => serde_json::from_value(payload)
+                .map(HostOp::AppletInstall)
+                .map_err(|e| format!("appletInstall: {e}")),
+            "host.appletUninstall" => serde_json::from_value(payload)
+                .map(HostOp::AppletUninstall)
+                .map_err(|e| format!("appletUninstall: {e}")),
+            "host.appletOpen" => serde_json::from_value(payload).map(HostOp::AppletOpen).map_err(|e| format!("appletOpen: {e}")),
             other => Err(format!("the host has no op {other}")),
         }
     }
@@ -1246,6 +1309,9 @@ crate::typescript::module! {
     HostSha256Payload,
     HostRandomBytesPayload,
     HostQrPayload,
+    ArtifactAppletInfo,
+    HostAppletInstallPayload,
+    HostAppletIdPayload,
     HostOp];
     aliases: [];
 }
@@ -1435,6 +1501,32 @@ mod tests {
                     border: Some(2),
                 }),
             ),
+            ("host.appletList", json!(null), HostOp::AppletList),
+            (
+                "host.appletInstall",
+                json!({
+                    "artifactId": "art-1",
+                    "artifactType": "dashboard",
+                    "appName": "Metrics",
+                    "alwaysOnTop": true
+                }),
+                HostOp::AppletInstall(HostAppletInstallPayload {
+                    artifact_id: "art-1".into(),
+                    artifact_type: "dashboard".into(),
+                    app_name: "Metrics".into(),
+                    always_on_top: true,
+                }),
+            ),
+            (
+                "host.appletUninstall",
+                json!({ "artifactId": "art-1" }),
+                HostOp::AppletUninstall(HostAppletIdPayload { artifact_id: "art-1".into() }),
+            ),
+            (
+                "host.appletOpen",
+                json!({ "artifactId": "art-1" }),
+                HostOp::AppletOpen(HostAppletIdPayload { artifact_id: "art-1".into() }),
+            ),
         ];
 
         let mut seen = std::collections::BTreeSet::new();
@@ -1463,6 +1555,44 @@ mod tests {
         assert!(HostOp::from_wire("host.sha256", json!({ "text": "a", "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.randomBytes", json!({ "length": -1 })).is_err());
         assert!(HostOp::from_wire("host.qr", json!({ "text": "hi", "extra": 1 })).is_err());
+        assert!(HostOp::from_wire("host.appletList", json!({ "extra": 1 })).is_err());
+        assert!(HostOp::from_wire("host.appletInstall", json!({ "artifactId": "art-1" })).is_err());
+        assert!(
+            HostOp::from_wire(
+                "host.appletInstall",
+                json!({ "artifactId": "art-1", "artifactType": "docs", "appName": "Docs", "alwaysOnTop": false, "extra": 1 })
+            )
+            .is_err()
+        );
+        assert!(HostOp::from_wire("host.appletUninstall", json!({})).is_err());
+        assert!(HostOp::from_wire("host.appletOpen", json!({ "artifactId": "art-1", "extra": 1 })).is_err());
+    }
+
+    #[test]
+    fn artifact_applet_info_round_trips_wire_json() {
+        let info = ArtifactAppletInfo {
+            artifact_id: "art-1".into(),
+            artifact_type: "dashboard".into(),
+            app_name: "Metrics".into(),
+            bundle_id: "dev.vibevalley.applet.art-1".into(),
+            bundle_path: "/Users/demo/Applications/VibeValley Apps/Metrics.app".into(),
+            always_on_top: true,
+            installed: true,
+        };
+        let encoded = serde_json::to_value(&info).unwrap();
+        assert_eq!(
+            encoded,
+            json!({
+                "artifactId": "art-1",
+                "artifactType": "dashboard",
+                "appName": "Metrics",
+                "bundleId": "dev.vibevalley.applet.art-1",
+                "bundlePath": "/Users/demo/Applications/VibeValley Apps/Metrics.app",
+                "alwaysOnTop": true,
+                "installed": true,
+            })
+        );
+        assert_eq!(serde_json::from_value::<ArtifactAppletInfo>(encoded).unwrap(), info);
     }
 
     #[test]

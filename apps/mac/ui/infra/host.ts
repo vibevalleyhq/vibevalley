@@ -18,12 +18,24 @@ const commandLineState = async (pending: Promise<Envelope>) => {
   return CommandLineState.parse(e.data);
 };
 
+const unwrap = async <T>(pending: Promise<Envelope<T>>): Promise<T> => {
+  const e = await pending;
+  if (e.bizCode !== 0 || e.data === undefined) throw new Error(e.message);
+  return e.data;
+};
+
 const desktop: Host = {
   name: "desktop",
   commandLine: {
     state: () => commandLineState(hostApi.cliState()),
     install: () => commandLineState(hostApi.cliInstall()),
     remove: () => commandLineState(hostApi.cliRemove()),
+  },
+  applet: {
+    list: () => unwrap(hostApi.appletList()),
+    install: (input) => unwrap(hostApi.appletInstall(input)),
+    uninstall: (artifactId) => unwrap(hostApi.appletUninstall(artifactId)),
+    open: (artifactId) => unwrap(hostApi.appletOpen(artifactId)),
   },
   notify: (notice) => done(hostApi.notify(notice)),
   tray: (summary) => done(hostApi.tray(summary)),
