@@ -796,6 +796,10 @@ mod tests {
             self.inner.watch_slice(slice, after_seq, stop, receive);
         }
 
+        fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
+            self.inner.subscribe_slice(slice)
+        }
+
         fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
             let rx = self.inner.live();
             self.on_live.notify_waiters();

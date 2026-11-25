@@ -112,22 +112,18 @@ impl WorktreeManager {
         let repo = Repo::discover(&repo_dir)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("{} is not a git repository", repo_dir.display()))?;
-        let branch_exists = repo
-            .branches()
-            .map_err(|e| e.to_string())?
-            .iter()
-            .any(|b| !b.is_remote && b.name == branch_name);
-        let target_str = target.to_string_lossy().to_string();
+        let branch_exists = vibevalley_git::read::branch_exists(&repo_dir, &branch_name).map_err(|e| e.to_string())?;
         if branch_exists {
-            let out = repo.run(&["worktree", "add", &target_str, &branch_name]).map_err(|e| e.to_string())?;
-            if !out.ok() {
-                return Err(format!("git worktree add failed: {}", out.stderr));
-            }
+            repo.worktree_add_on(&target, &branch_name).map_err(|e| e.to_string())?;
         } else {
             let start_point = base_ref
                 .map(str::trim)
                 .filter(|r| !r.is_empty())
-                .filter(|r| repo.run(&["rev-parse", "--verify", "--quiet", r]).is_ok_and(|out| out.ok()));
+                .filter(|r| match vibevalley_git::read::commit_id_fast(&repo_dir, r) {
+                    Ok(Some(_)) => true,
+                    Ok(None) => repo.run(&["rev-parse", "--verify", "--quiet", r]).is_ok_and(|out| out.ok()),
+                    Err(_) => false,
+                });
             repo.worktree_add(&target, &branch_name, start_point).map_err(|e| e.to_string())?;
         }
 
@@ -164,7 +160,7 @@ impl WorktreeManager {
             && let Ok(Some(repo)) = Repo::discover(&repo_dir)
         {
             let _ = repo.worktree_remove(&canonical, true);
-            let _ = repo.run(&["worktree", "prune"]);
+            let _ = repo.worktree_prune();
         }
 
         if canonical.exists() {
@@ -306,19 +302,8 @@ fn is_git_repo(path: &Path) -> bool {
 }
 
 fn discover_common_git_repo(worktree: &Path) -> Option<PathBuf> {
-    let repo = Repo::discover(worktree).ok()??;
-    let out = repo.run(&["rev-parse", "--git-common-dir"]).ok()?;
-    if !out.ok() {
-        return None;
-    }
-    let raw = out.text();
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let git_dir = PathBuf::from(trimmed);
-    let abs = if git_dir.is_absolute() { git_dir } else { worktree.join(git_dir) };
-    let canon = fs::canonicalize(&abs).unwrap_or(abs);
+    let common = vibevalley_git::read::git_common_dir(worktree).ok()?;
+    let canon = fs::canonicalize(&common).unwrap_or(common);
     if canon.file_name().and_then(|n| n.to_str()) == Some(".git") {
         canon.parent().map(Path::to_path_buf)
     } else {

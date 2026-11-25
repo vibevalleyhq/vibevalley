@@ -19,7 +19,7 @@ Status: proposed
 ### 2. 基础设施绕行与重复面（S8）
 
 1. **9 处生产路径绕开 `crates/git` 直接调用 `Command::new("git")`**（另 `crates/server/src/fake/runtime.rs` 含 2 处测试替身用法）：
-   - `crates/server`（6 处）：[worktree/git.rs](crates/server/src/runtime/worktree/git.rs#L12)、[worktree/mod.rs](crates/server/src/runtime/worktree/mod.rs#L167)、[issue/pull/mod.rs](crates/server/src/issue/pull/mod.rs#L271)、[issue/pull/publish.rs](crates/server/src/issue/pull/publish.rs#L122)、[repo.rs](crates/server/src/repo.rs#L932)、[agent/tool/issue.rs](crates/server/src/agent/tool/issue.rs#L565)。
+   - `crates/server`（6 处）：`crates/server/src/runtime/worktree/git.rs`（第 12 行，已删）、[worktree/mod.rs](crates/server/src/runtime/worktree/mod.rs#L167)、[issue/pull/mod.rs](crates/server/src/issue/pull/mod.rs#L271)、[issue/pull/publish.rs](crates/server/src/issue/pull/publish.rs#L122)、[repo.rs](crates/server/src/repo.rs#L932)、[agent/tool/issue.rs](crates/server/src/agent/tool/issue.rs#L565)。
    - `crates/cli`（1 处 4 调用点）：[machine_agent/worktree.rs](crates/cli/src/machine_agent/worktree.rs#L38)（及同文件第 `288`、`314`、`326` 行）。
    - `crates/runtime`（2 个子系统 6 调用点）：[engine.rs](crates/runtime/src/agent/core/engine.rs#L1539)、[grader.rs](crates/runtime/src/agent/eval/grader.rs#L367)（及同文件第 `376` 行）、[suite.rs](crates/runtime/src/agent/eval/suite.rs#L325)（及同文件第 `340`、`384` 行）。
 
@@ -146,6 +146,20 @@ Stage 2 按严格互斥文件集合拆分为 5 个并行波次，所有波次基
 | `w3-cli-mac-tokio` | `crates/cli` 异步 `reqwest::Client` + `crates/git` 替换 + `auth.rs` 设备名收敛；`crates/runtime` 6 处 raw git 清理与 `scripted.rs` 阻塞 HTTP 清理；`apps/mac/src/{update,hosted}` 异步化与压低 `MAC_*` 天花板；`crates/protocol/src/home.rs` 本机设备名收口 | `crates/protocol/src/home.rs`、`crates/cli/**`、`crates/runtime/**`、`apps/mac/src/**` |
 | `w4-ssot-proto-ui` | `crates/protocol` 导出 `ARTIFACT_TYPE_SPECS` 与 `DesktopConnectionSnapshot` / `ConnectionSaveRequest`；`crates/i18n/locales/{zh,en}/web.artifact.json` 补齐 4 键与 `scripts/gen/i18n.ts` 守卫；`packages/protocol/**`、`apps/mac/ui/**`、`apps/mobile/**` 收口 | `crates/protocol/src/{artifact,host,connection}*.rs`、`crates/core/src/artifact/manifest.rs`、`crates/i18n/**`、`packages/protocol/**`、`packages/i18n/**`、`apps/mac/ui/**`、`apps/mobile/**`、`scripts/gen/i18n.ts` |
 | `w5-http-value-clean` | `crates/server` 内部 HTTP Range 安全头与 0 字节统一、`is_media_input_uuid` 更名、`http::slice` 异步收口、9 处服务端 raw git / 同步进程与 `.vibevalley/check` 异步合并、`channel/types.rs` 等 `Value` 强类型收敛 | `crates/server/**` |
+
+### 6. Red-First → Green-After 实测收敛结果
+
+Stage 3 整合后实测指标（基于 `cargo xtask arch-audit` 843 文件、`cargo xtask audit` 1004 文件与隔离 `vv-acceptance`）：
+
+| 检查项 | Red-First 基线 | Green-After 结果 |
+|---|---|---|
+| `no-raw-git-command` | `16`（`cli` 4、`runtime` 6、`server` 6） | `0/0` |
+| `no-sync-process-in-server` | `7`（`crates/server/src/`） | `0/0` |
+| `no-blocking-reqwest` | `4`（`crates/cli/src/client.rs`） | `0/0` |
+| `apps/mac/src` `block_on` / `os-thread` | `7` / `4` | `5/5` / `3/3`（`MAC_BLOCK_ON_CEILING=5`、`MAC_OS_THREAD_CEILING=3`） |
+| 既有 `arch-audit` 11 项规则 & `ratchets` | `0`（`server block_on=5/5`） | `14` 条规则全 `0` 违规（279 边界文件、1004 棘轮文件全绿） |
+| `i18n` 词典与 12 类 `ArtifactType` | 缺 4 键 + `zh` 无纯英文残值守卫 | `3564` 条目全通过、`web.artifact.types.*` 与 `ARTIFACT_TYPES` 一一对应 |
+| `vv-acceptance` 隔离端到端 | — | `verify-server.ts --scripted-helper`（`code: 0, stopped: true`）通过工单合并与 `/api/v1/attachment`、`/api/v1/media/input/.../content` 的 `nosniff`/`sandbox`/RFC 5987/Byte-Range `206`；隔离 `vibevalley-mac --features shot` `/library` 浅深色双帧 12 类中文标签零英文退化 |
 
 ## Alternatives considered
 
