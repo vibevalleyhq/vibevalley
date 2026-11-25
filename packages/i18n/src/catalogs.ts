@@ -603,6 +603,12 @@ export const catalogs = {
         diagramFailed: "这张图画不出来：{why}",
         longMore: "展开全文",
         longLess: "收起",
+        expand: "放大查看",
+        viewDiagram: "图表",
+        viewSource: "源码",
+        zoomIn: "放大",
+        zoomOut: "缩小",
+        zoomReset: "重置缩放",
       },
       updateReady: "{next} 已下好，去「关于」重启",
       intent: { timedOut: "等了太久没回音，可以重试", offline: "没连上 VibeValley，这一下没发出去" },
@@ -3505,6 +3511,12 @@ export const catalogs = {
         diagramFailed: "This diagram cannot be drawn: {why}",
         longMore: "Show all",
         longLess: "Show less",
+        expand: "Expand",
+        viewDiagram: "Diagram",
+        viewSource: "Source",
+        zoomIn: "Zoom in",
+        zoomOut: "Zoom out",
+        zoomReset: "Reset zoom",
       },
       updateReady: "{next} is ready: restart from About",
       intent: { timedOut: "No answer in time; try again", offline: "Not connected to the farm, so this was not sent" },
@@ -6452,11 +6464,17 @@ export interface Messages {
   "web.base.rich.copy": undefined;
   "web.base.rich.diagram": undefined;
   "web.base.rich.diagramFailed": { readonly why: string | number };
+  "web.base.rich.expand": undefined;
   "web.base.rich.less": undefined;
   "web.base.rich.lines": { readonly n: string | number };
   "web.base.rich.longLess": undefined;
   "web.base.rich.longMore": undefined;
   "web.base.rich.more": undefined;
+  "web.base.rich.viewDiagram": undefined;
+  "web.base.rich.viewSource": undefined;
+  "web.base.rich.zoomIn": undefined;
+  "web.base.rich.zoomOut": undefined;
+  "web.base.rich.zoomReset": undefined;
   "web.base.route.home": undefined;
   "web.base.route.invalid": undefined;
   "web.base.route.missing": undefined;

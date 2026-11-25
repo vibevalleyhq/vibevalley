@@ -237,7 +237,13 @@
     "diagram": "Diagram",
     "diagramFailed": "This diagram cannot be drawn: {why}",
     "longMore": "Show all",
-    "longLess": "Show less"
+    "longLess": "Show less",
+    "expand": "Expand",
+    "viewDiagram": "Diagram",
+    "viewSource": "Source",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomReset": "Reset zoom"
   },
   "updateReady": "{next} is ready: restart from About",
   "intent": {

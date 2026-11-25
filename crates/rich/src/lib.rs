@@ -47,8 +47,8 @@ pub use code_block::{
     VvCodeBlockProps, VvCodeCopyEvent, count_code_lines, should_offload_highlight, vv_code_block,
 };
 pub use diagram::{
-    DiagramError, RenderedDiagram, VvDiagram, VvDiagramElement, VvDiagramProps, cached_render_diagram_with_max_width, clear_diagram_cache, diagram_cache_stats,
-    render_diagram, render_diagram_with_max_width, vv_diagram,
+    DiagramError, RenderedDiagram, VvDiagram, VvDiagramElement, VvDiagramEvent, VvDiagramPressEvent, VvDiagramProps, cached_render_diagram_with_max_width,
+    clear_diagram_cache, diagram_cache_stats, render_diagram, render_diagram_with_max_width, vv_diagram,
 };
 pub use genui::{VvGenUi, VvGenUiActionEvent, VvGenUiElement, VvGenUiEvent, VvGenUiProps, vv_gen_ui};
 pub use grammars::{BUNDLED_GRAMMARS, BundledGrammar, MERMAID_LANGUAGE};

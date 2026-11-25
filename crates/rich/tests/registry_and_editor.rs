@@ -48,6 +48,9 @@ fn registry_exports_all_components_and_documents_every_export() {
         "export declare const VvWhiteboard:",
         "onIssuePress?: (event: VvIssuePressEvent) => void;",
         "onGenUiAction?: (event: VvGenUiActionEvent) => void;",
+        "onDiagramPress?: (event: VvDiagramPressEvent) => void;",
+        "onPress?: (event: VvDiagramPressEvent) => void;",
+        "interactive?: boolean;",
         "onCursorMove?: (event: VvWhiteboardCursorEvent) => void;",
         "onViewportChange?: (event: VvWhiteboardViewportEvent) => void;",
     ] {

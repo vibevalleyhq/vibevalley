@@ -16,6 +16,7 @@ use vibevalley_pele::{DiagramType, RenderOptions, ThemeMode};
 use crate::cache::{CacheStats, LruCache, hash_str};
 use crate::code_block::{CODE_LINE_HEIGHT, vv_code_block};
 use crate::highlight::run_offloaded;
+use crate::icon::vv_icon;
 use crate::theme::{AdaptiveUi, CODE_FONT_MONO, DIAGRAM_FONT_SANS, vv_pele_palette};
 
 /// Maximum number of rendered Mermaid SVGs retained in the LRU cache.
@@ -149,6 +150,24 @@ pub fn clear_diagram_cache() {
     diagram_cache().lock().unwrap_or_else(|p| p.into_inner()).clear();
 }
 
+/// Maximum height in points for an interactive inline diagram preview card.
+const INTERACTIVE_PREVIEW_MAX_HEIGHT: f32 = 320.0;
+
+/// Payload emitted when an interactive Mermaid diagram preview is pressed.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, JsObject)]
+pub struct VvDiagramPressEvent {
+    /// Raw Mermaid source text of the pressed diagram.
+    pub source: SharedString,
+}
+
+/// Events emitted by [`VvDiagram`].
+#[derive(Debug, Clone, PartialEq, Event)]
+pub enum VvDiagramEvent {
+    /// Fired when an interactive diagram preview or its expand trigger is pressed.
+    #[args(event)]
+    Press(VvDiagramPressEvent),
+}
+
 /// Props of [`VvDiagram`].
 #[derive(Debug, Clone, Copy, PartialEq, Props)]
 pub struct VvDiagramProps {
@@ -156,6 +175,9 @@ pub struct VvDiagramProps {
     pub source: Prop<SharedString>,
     /// Optional maximum width hint in points for responsive layout.
     pub max_width: Prop<Option<f32>>,
+    /// When true, renders a compact height-capped preview card that emits `onPress` on click.
+    #[prop(default)]
+    pub interactive: Prop<bool>,
 }
 
 /// Native Mermaid diagram view rendered via `vibevalley-pele` and `ImageSrc::svg_markup`.
@@ -164,7 +186,7 @@ pub struct VvDiagramProps {
 /// off the UI thread, and falls back to [`crate::VvCodeBlock`] plus a localized error message
 /// when the Mermaid source cannot be rendered.
 #[component]
-pub fn VvDiagram(props: VvDiagramProps) -> impl IntoElement {
+pub fn VvDiagram(props: VvDiagramProps, cx: Scope<VvDiagramEvent>) -> impl IntoElement {
     let label = SharedString::from(t("web.base.rich.diagram", &[]));
     let image_label = label.clone();
     let placeholder_label = label.clone();
@@ -212,6 +234,7 @@ pub fn VvDiagram(props: VvDiagramProps) -> impl IntoElement {
         .child(dynamic(move || {
             let source = props.source.get();
             let max_width = props.max_width.get();
+            let interactive = props.interactive.get();
             let is_dark = dark();
             let current_gen = generation.get_untracked();
 
@@ -225,14 +248,77 @@ pub fn VvDiagram(props: VvDiagramProps) -> impl IntoElement {
             match result {
                 Some(Ok(rendered)) => {
                     let src = ImageSrc::svg_markup(&rendered.svg).size(Size::new(px(rendered.width), px(rendered.height)));
-                    image(src)
+                    let img_el = image(src)
                         .test_id("diagram-image")
                         .role(AccessibilityRole::Image)
                         .accessible(true)
                         .label(image_label.clone())
                         .w(px(rendered.width))
                         .max_w(relative(1.0))
-                        .aspect_ratio(rendered.width / rendered.height)
+                        .aspect_ratio(rendered.width / rendered.height);
+
+                    if !interactive {
+                        return img_el.into_element();
+                    }
+
+                    let expand_label = SharedString::from(t("web.base.rich.expand", &[]));
+                    let preview_label = expand_label.clone();
+                    let header_source = source.clone();
+                    let body_source = source;
+
+                    let header = view()
+                        .flex_row()
+                        .items_center()
+                        .justify_between()
+                        .gap(px(8.0))
+                        .px(px(10.0))
+                        .py(px(6.0))
+                        .border_b_1()
+                        .border_color(AdaptiveUi::LINE)
+                        .child(text("mermaid").font_family(CODE_FONT_MONO).text_size(px(11.0)).text_color(AdaptiveUi::MUTED))
+                        .child(
+                            view()
+                                .test_id("diagram-expand")
+                                .role(AccessibilityRole::Button)
+                                .label(expand_label.clone())
+                                .flex_row()
+                                .items_center()
+                                .gap(px(4.0))
+                                .rounded_sm()
+                                .px(px(6.0))
+                                .py(px(2.0))
+                                .cursor_pointer()
+                                .hover(|s| s.bg(AdaptiveUi::HOVER))
+                                .on_press(move |_: &PressEvent| {
+                                    cx.emit(VvDiagramEvent::Press(VvDiagramPressEvent { source: header_source.clone() }));
+                                })
+                                .child(vv_icon().name("enlarge").size(11.0))
+                                .child(text(expand_label).text_size(px(11.0)).text_color(AdaptiveUi::MUTED)),
+                        );
+
+                    let preview_body = view()
+                        .test_id("diagram-preview")
+                        .role(AccessibilityRole::Button)
+                        .label(preview_label)
+                        .p(px(10.0))
+                        .overflow_hidden()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(AdaptiveUi::HOVER))
+                        .on_press(move |_: &PressEvent| {
+                            cx.emit(VvDiagramEvent::Press(VvDiagramPressEvent { source: body_source.clone() }));
+                        })
+                        .child(img_el);
+
+                    view()
+                        .flex_col()
+                        .max_h(px(INTERACTIVE_PREVIEW_MAX_HEIGHT))
+                        .overflow_hidden()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(AdaptiveUi::LINE)
+                        .bg(AdaptiveUi::SIDE)
+                        .child(header)
+                        .child(preview_body)
                         .into_element()
                 }
                 Some(Err(err)) => {

@@ -23,7 +23,7 @@ use crate::cache::{LruCache, hash_str};
 use crate::canvas::vv_canvas;
 use crate::chart::vv_chart;
 use crate::code_block::{VvCodeCopyEvent, vv_code_block};
-use crate::diagram::vv_diagram;
+use crate::diagram::{VvDiagramPressEvent, vv_diagram};
 use crate::genui::{VvGenUiActionEvent, vv_gen_ui};
 use crate::math::render_math_element;
 use crate::theme::{AdaptiveUi, CODE_FONT_MONO, UiPalette};
@@ -418,6 +418,9 @@ pub enum VvMarkdownEvent {
     /// Fired when an embedded ` ```genui ` block emits an action.
     #[args(event)]
     GenUiAction(VvGenUiActionEvent),
+    /// Fired when an embedded ` ```mermaid ` diagram preview is pressed.
+    #[args(event)]
+    DiagramPress(VvDiagramPressEvent),
 }
 
 /// Constructs [`MarkdownOptions`] for [`VvMarkdown`] with math, GitHub alerts, and HTML enabled,
@@ -859,7 +862,13 @@ fn render_custom_node(node: &CustomNode, streaming: bool, cx: Scope<VvMarkdownEv
                 });
             with_optional_prefix(prefix, span)
         }
-        CustomNodeKind::Mermaid => vv_diagram().source(node.text.clone()).into_element(),
+        CustomNodeKind::Mermaid => vv_diagram()
+            .source(node.text.clone())
+            .interactive(true)
+            .on_press(move |ev: &VvDiagramPressEvent| {
+                cx.emit(VvMarkdownEvent::DiagramPress(ev.clone()));
+            })
+            .into_element(),
         CustomNodeKind::Canvas => vv_canvas().data(node.text.clone()).streaming(streaming).into_element(),
         CustomNodeKind::Chart => vv_chart().spec(node.text.clone()).streaming(streaming).into_element(),
         CustomNodeKind::GenUi => vv_gen_ui()
