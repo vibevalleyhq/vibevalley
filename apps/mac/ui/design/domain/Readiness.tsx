@@ -3,10 +3,10 @@ import { Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { Feature } from "@vibevalley/protocol";
 
-import { Icon } from "../../design/Icon";
-import { TextLink } from "../../design/TextLink";
 import { ready, settingsQuery, useQuery } from "../../infra/query";
 import { fixOf } from "../../infra/readiness";
+import { Icon } from "../Icon";
+import { TextLink } from "../TextLink";
 
 /** Whether the features a page sets up can be used now, as the server says (SettingsStatus.readiness), and where to
  * fix the ones that cannot. Says nothing while the settings are on their way. */

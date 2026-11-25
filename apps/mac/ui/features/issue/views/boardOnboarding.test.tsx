@@ -5,7 +5,7 @@ import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 import type { Issue, IssueId, RepoSummary, RuntimeInfo, SliceBundle } from "@vibevalley/protocol";
 
-import { fakeHost, type FakeHost } from "../../../app/fakeHost";
+import { fakeHost, type FakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, type ScenarioDensity, scenarios } from "../../../fixtures/scenarios";
 
 const sampleRepo: RepoSummary = {

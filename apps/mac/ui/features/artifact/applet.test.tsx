@@ -5,8 +5,8 @@ import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 import { BizCode } from "@vibevalley/protocol/api";
 
-import { fakeHost, type FakeHost } from "../../app/fakeHost";
 import { responses as artifactResponses } from "../../fixtures/artifacts";
+import { fakeHost, type FakeHost } from "../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../fixtures/scenarios";
 
 async function mountRoute(route: string, configure?: (fake: FakeHost) => void, params?: Record<string, unknown>) {

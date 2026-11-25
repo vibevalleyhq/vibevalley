@@ -5,7 +5,7 @@ import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 import type { MachineInfo, SessionsSlice, SliceBundle } from "@vibevalley/protocol";
 
-import { fakeHost, type FakeHost } from "../../app/fakeHost";
+import { fakeHost, type FakeHost } from "../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../fixtures/scenarios";
 
 type SliceMachine = SessionsSlice["machines"][number];

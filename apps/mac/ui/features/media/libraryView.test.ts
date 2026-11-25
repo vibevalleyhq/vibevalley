@@ -4,7 +4,7 @@ import { expect, test } from "nsh/test";
 import { type Artifact, ArtifactTypeValues, type LibraryItem, userId } from "@vibevalley/protocol";
 import { artifactId } from "@vibevalley/protocol/schema";
 
-import { type ContentBucket, countContentHub, countForBucket } from "../content";
+import { type ContentBucket, countContentHub, countForBucket } from "../../infra/state/contentNav";
 import { artifactMatchesType, shownArtifacts, shownMedia } from "./items";
 import {
   activeFileId,

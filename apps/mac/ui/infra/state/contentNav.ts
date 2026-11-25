@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import type { Artifact, ArtifactType, LibraryFileKind, LibraryItem } from "@vibevalley/protocol";
 
-import { defineAtom } from "../../infra/state/atom";
-import { defineStored } from "../../infra/state/stored";
+import { defineAtom } from "./atom";
+import { defineStored } from "./stored";
 
 export type ArtifactFacet = ArtifactType;
 

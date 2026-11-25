@@ -77,6 +77,8 @@ export interface Finding {
 }
 
 const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
+  // Farm machine sprite fallback palette (moved from `design/pixel/RuntimeIcon.tsx`).
+  "apps/mac/ui/design/domain/RuntimeIcon.tsx": ["hardcoded-color"],
   // Third-party WeChat/Feishu/QQ brand stand-ins and QR quiet frame.
   "apps/mac/ui/features/connector/ConnectorsPage.tsx": ["hardcoded-color"],
   // Sandboxed WebView HTML CSS custom properties (--vv-*).

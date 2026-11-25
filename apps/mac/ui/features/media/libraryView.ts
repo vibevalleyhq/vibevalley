@@ -1,6 +1,6 @@
 import type { LibraryFileKind } from "@vibevalley/protocol";
 
-import type { ContentBucket } from "../content";
+import type { ContentBucket } from "../../infra/state/contentNav";
 import { type ArtifactTypeFilter, between } from "./items";
 
 export interface PriorFileSelection {

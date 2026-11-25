@@ -14,8 +14,8 @@ import type {
 
 import { sampleChanges } from "../features/issue/model/issue.samples";
 import { responses as artifactResponses } from "../fixtures/artifacts";
+import { fakeHost, type FakeHost } from "../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../fixtures/scenarios";
-import { fakeHost, type FakeHost } from "./fakeHost";
 
 async function mountApp(
   route: string,
