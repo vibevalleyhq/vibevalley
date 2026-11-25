@@ -139,6 +139,7 @@ pub struct HostChrome {
     pub inspector_open: bool,
     pub inspector_width: f32,
     pub last_route: Option<String>,
+    pub(super) explicit_route: bool,
     pub sidebar_width: f32,
     pub sidebar_visible: bool,
     pub(super) resizing_sidebar: bool,
@@ -304,6 +305,7 @@ impl Shell {
                 inspector_open: ui_settings.inspector_open,
                 inspector_width: ui_settings.inspector_width,
                 last_route: None,
+                explicit_route: false,
                 sidebar_width: ui_settings.sidebar_width,
                 sidebar_visible: ui_settings.sidebar_visible,
                 resizing_sidebar: false,
@@ -594,7 +596,8 @@ impl Shell {
                     if effective_motion == MotionChoice::Off {
                         this.overlays.launch = None;
                     }
-                    if let Some(route) = saved_route
+                    if !this.chrome.explicit_route
+                        && let Some(route) = saved_route
                         && !route.is_empty()
                         && route != "/issues"
                     {

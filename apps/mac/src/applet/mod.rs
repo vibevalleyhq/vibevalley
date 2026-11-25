@@ -265,6 +265,31 @@ pub struct AppletOpenResult {
     pub bundle_path: String,
 }
 
+impl From<AppletInfo> for vibevalley_protocol::ArtifactAppletInfo {
+    fn from(info: AppletInfo) -> Self {
+        Self {
+            artifact_id: info.artifact_id,
+            artifact_type: info.artifact_type,
+            app_name: info.app_name,
+            bundle_id: info.bundle_id,
+            bundle_path: info.bundle_path,
+            always_on_top: info.always_on_top,
+            installed: info.installed,
+        }
+    }
+}
+
+impl From<vibevalley_protocol::HostAppletInstallPayload> for AppletInstallRequest {
+    fn from(payload: vibevalley_protocol::HostAppletInstallPayload) -> Self {
+        Self {
+            artifact_id: payload.artifact_id,
+            artifact_type: payload.artifact_type,
+            app_name: payload.app_name,
+            always_on_top: payload.always_on_top,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

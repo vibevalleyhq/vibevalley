@@ -171,23 +171,19 @@ impl AppletHost {
         let _ = std::fs::remove_file(&host.inner.sock_path);
     }
 
-    #[allow(dead_code, reason = "called by shell/host_bridge.rs in Phase 2 integration")]
-    pub(crate) fn list(&self) -> Result<Vec<AppletInfo>, String> {
+    pub(crate) fn list() -> Result<Vec<AppletInfo>, String> {
         installer::list_installed()
     }
 
-    #[allow(dead_code, reason = "called by shell/host_bridge.rs in Phase 2 integration")]
-    pub(crate) fn install_applet(&self, req: AppletInstallRequest) -> Result<AppletInfo, String> {
+    pub(crate) fn install_applet(req: AppletInstallRequest) -> Result<AppletInfo, String> {
         installer::install(&req)
     }
 
-    #[allow(dead_code, reason = "called by shell/host_bridge.rs in Phase 2 integration")]
-    pub(crate) fn uninstall_applet(&self, artifact_id: &str) -> Result<AppletRemoveResult, String> {
+    pub(crate) fn uninstall_applet(artifact_id: &str) -> Result<AppletRemoveResult, String> {
         installer::uninstall(artifact_id)
     }
 
-    #[allow(dead_code, reason = "called by shell/host_bridge.rs in Phase 2 integration")]
-    pub(crate) fn open_applet(&self, artifact_id: &str) -> Result<AppletOpenResult, String> {
+    pub(crate) fn open_applet(artifact_id: &str) -> Result<AppletOpenResult, String> {
         installer::open_installed(artifact_id)
     }
 }
@@ -368,20 +364,36 @@ fn handle_shim_message(inner: &Rc<HostInner>, conn_id: u64, msg: ShimToHost, cx:
                 });
                 return;
             };
+            let rt = vibevalley_runtime::rt::current_or_global_handle();
+            let (tx, rx) = flume::bounded(1);
+            let server_bg = server.clone();
+            let artifact_id_bg = artifact_id.clone();
+            let cancel_bg = attach_cancel.clone();
+            rt.spawn(async move {
+                let res = prepare_attach(&server_bg, &artifact_id_bg, &cancel_bg).await;
+                let _ = tx.send(res);
+            });
             let inner = inner.clone();
             cx.spawn(async move |cx| {
-                let artifact = fetch_artifact(&server, &artifact_id).await;
+                let Ok(prepared) = rx.recv_async().await else {
+                    return;
+                };
                 if attach_cancel.is_cancelled() {
+                    if let Ok(PreparedAttach::Prototype { sub_id: Some(id), .. }) = prepared {
+                        server.unsubscribe(id);
+                    }
                     return;
                 }
-                match artifact {
+                match prepared {
                     Err(message) => {
                         let _ = out_tx.send(HostToShim::Error { message });
                     }
-                    Ok(art) if art.artifact_type == ArtifactType::Prototype => {
-                        attach_prototype(&inner, conn_id, &server, &artifact_id, out_tx, attach_cancel, cx).await;
+                    Ok(PreparedAttach::Prototype { bundle, sub_id, rx: event_rx }) => {
+                        cx.update(|_| {
+                            finish_attach_prototype(&inner, conn_id, &server, &artifact_id, bundle, sub_id, event_rx, out_tx, attach_cancel);
+                        });
                     }
-                    Ok(art) => {
+                    Ok(PreparedAttach::Native(art)) => {
                         cx.update(|cx| {
                             attach_native(&inner, conn_id, &art, width, height, scale, display_id, out_tx.clone(), cx);
                         });
@@ -621,35 +633,39 @@ async fn fetch_artifact(server: &Arc<dyn Server>, artifact_id: &str) -> Result<A
     serde_json::from_value(data).map_err(|e| format!("decode artifact.get: {e}"))
 }
 
-async fn attach_prototype(
-    inner: &Rc<HostInner>,
-    conn_id: u64,
-    server: &Arc<dyn Server>,
-    artifact_id: &str,
-    out_tx: mpsc::UnboundedSender<HostToShim>,
-    attach_cancel: CancellationToken,
-    cx: &mut gpui::AsyncApp,
-) {
-    let initial = match prototype::load_prototype_bundle(server, artifact_id).await {
-        Ok(bundle) => bundle,
-        Err(message) => {
-            let _ = out_tx.send(HostToShim::Error { message });
-            return;
-        }
-    };
-    if attach_cancel.is_cancelled() {
-        return;
-    }
+enum PreparedAttach {
+    Native(Artifact),
+    Prototype {
+        bundle: prototype::PrototypeBundle,
+        sub_id: Option<u64>,
+        rx: Option<mpsc::UnboundedReceiver<Value>>,
+    },
+}
 
-    let sub = Arc::clone(server)
-        .subscribe_with_async(
+/// Runs all server RPCs and SQLite-backed loads inside the Tokio runtime context.
+async fn prepare_attach(server: &Arc<dyn Server>, artifact_id: &str, cancel: &CancellationToken) -> Result<PreparedAttach, String> {
+    let artifact = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return Err("attach cancelled".to_string()),
+        res = fetch_artifact(server, artifact_id) => res?,
+    };
+    if artifact.artifact_type != ArtifactType::Prototype {
+        return Ok(PreparedAttach::Native(artifact));
+    }
+    let bundle = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return Err("attach cancelled".to_string()),
+        res = prototype::load_prototype_bundle(server, artifact_id) => res?,
+    };
+    let sub = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return Err("attach cancelled".to_string()),
+        res = Arc::clone(server).subscribe_with_async(
             CallerContext::local(),
             "artifact.follow".into(),
-            json!({ "id": artifact_id, "after": initial.seq }),
-        )
-        .await;
-
-    let watch_cancel = CancellationToken::new();
+            json!({ "id": artifact_id, "after": bundle.seq }),
+        ) => res,
+    };
     let (sub_id, rx) = match sub {
         Ok((sub_id, rx)) => (Some(sub_id), Some(rx)),
         Err(err) => {
@@ -657,7 +673,22 @@ async fn attach_prototype(
             (None, None)
         }
     };
+    Ok(PreparedAttach::Prototype { bundle, sub_id, rx })
+}
 
+#[allow(clippy::too_many_arguments)]
+fn finish_attach_prototype(
+    inner: &Rc<HostInner>,
+    conn_id: u64,
+    server: &Arc<dyn Server>,
+    artifact_id: &str,
+    initial: prototype::PrototypeBundle,
+    sub_id: Option<u64>,
+    rx: Option<mpsc::UnboundedReceiver<Value>>,
+    out_tx: mpsc::UnboundedSender<HostToShim>,
+    attach_cancel: CancellationToken,
+) {
+    let watch_cancel = CancellationToken::new();
     let installed = {
         let mut guard = inner.sessions.borrow_mut();
         if let Some(conn) = guard.conns.get_mut(&conn_id)
@@ -690,7 +721,7 @@ async fn attach_prototype(
         let server = server.clone();
         let artifact_id = artifact_id.to_string();
         let out_tx = out_tx.clone();
-        cx.background_spawn(async move {
+        vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
             loop {
                 let event = tokio::select! {
                     biased;
@@ -718,8 +749,7 @@ async fn attach_prototype(
                     }
                 }
             }
-        })
-        .detach();
+        });
     }
 }
 
@@ -981,6 +1011,8 @@ fn open_artifact_in_host(artifact_id: &str, cx: &mut App) {
                 let done = handle
                     .update(cx, |shell, window, cx| {
                         if shell.chrome.workbench.read(cx).is_ready() {
+                            cx.activate(true);
+                            window.activate_window();
                             shell.on_action(Action::OpenRoute { path: route.clone() }, window, cx);
                             true
                         } else {

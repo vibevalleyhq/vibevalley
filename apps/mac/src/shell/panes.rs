@@ -21,6 +21,7 @@ impl Shell {
     pub(super) fn navigate_workbench(&mut self, route: &str, cx: &mut Context<Self>) {
         self.chrome.native_workspace = false;
         self.chrome.native_pixel = None;
+        self.chrome.explicit_route = true;
         self.chrome.last_route = Some(route.to_string());
         self.sync_devtools_route(route);
         self.chrome.workbench.update(cx, |v, cx| v.navigate(route, cx));

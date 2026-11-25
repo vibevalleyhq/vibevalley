@@ -288,7 +288,11 @@ pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalle
         | HostOp::PcmAppend(_)
         | HostOp::StopAudio
         | HostOp::ReadFile(_)
-        | HostOp::PixelDir => None,
+        | HostOp::PixelDir
+        | HostOp::AppletList
+        | HostOp::AppletInstall(_)
+        | HostOp::AppletUninstall(_)
+        | HostOp::AppletOpen(_) => None,
     }
 }
 
