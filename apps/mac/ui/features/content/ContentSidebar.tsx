@@ -2,7 +2,7 @@ import { Scroll, Text, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { LibraryFileKind } from "@vibevalley/protocol";
+import { ARTIFACT_TYPES, type LibraryFileKind } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -16,35 +16,17 @@ import { createMemo } from "../../infra/solid";
 import { defineStored } from "../../infra/state/stored";
 import { artifactTypeIcon, artifactTypeLabel, useArtifacts } from "../artifact";
 import { libraryQuery } from "../media/listing";
-import {
-  type ArtifactFacet,
-  type ContentBucket,
-  contentBrowseBucket,
-  countContentHub,
-  countForBucket,
-  openContentSearch,
-  openTemplatePicker,
-  pinnedKeys,
-} from "./navigation";
+import { type ContentBucket, contentBrowseBucket, countContentHub, countForBucket, openContentSearch, openTemplatePicker, pinnedKeys } from "./navigation";
 import { createQuickBlankNote } from "./templates";
 
 const artifactsSectionOpen = defineStored("content.sidebar.artifacts", z.boolean(), true);
 const mediaSectionOpen = defineStored("content.sidebar.media", z.boolean(), true);
 
-const artifactFacets: readonly { readonly type: ArtifactFacet; readonly icon: IconName; readonly label: () => string }[] = [
-  { type: "docs", icon: artifactTypeIcon.docs, label: () => artifactTypeLabel("docs") },
-  { type: "outline", icon: artifactTypeIcon.outline, label: () => artifactTypeLabel("outline") },
-  { type: "slides", icon: artifactTypeIcon.slides, label: () => artifactTypeLabel("slides") },
-  { type: "dashboard", icon: artifactTypeIcon.dashboard, label: () => artifactTypeLabel("dashboard") },
-  { type: "motion", icon: artifactTypeIcon.motion, label: () => artifactTypeLabel("motion") },
-  { type: "whiteboard", icon: artifactTypeIcon.whiteboard, label: () => artifactTypeLabel("whiteboard") },
-  { type: "design", icon: artifactTypeIcon.design, label: () => artifactTypeLabel("design") },
-  { type: "design-system", icon: artifactTypeIcon["design-system"], label: () => artifactTypeLabel("design-system") },
-  { type: "sheet", icon: artifactTypeIcon.sheet, label: () => artifactTypeLabel("sheet") },
-  { type: "prototype", icon: artifactTypeIcon.prototype, label: () => artifactTypeLabel("prototype") },
-  { type: "diagram", icon: artifactTypeIcon.diagram, label: () => artifactTypeLabel("diagram") },
-  { type: "storyboard", icon: artifactTypeIcon.storyboard, label: () => artifactTypeLabel("storyboard") },
-];
+const artifactFacets = ARTIFACT_TYPES.map((type) => ({
+  type,
+  icon: artifactTypeIcon[type],
+  label: () => artifactTypeLabel(type),
+}));
 
 const mediaKinds: readonly LibraryFileKind[] = ["image", "audio", "video", "other"];
 

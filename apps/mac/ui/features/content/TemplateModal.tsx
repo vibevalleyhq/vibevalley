@@ -1,6 +1,7 @@
 import { computed, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
+import type { ArtifactType } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Dialog } from "../../design/Dialog";
@@ -166,11 +167,32 @@ function TemplatePreview(props: { tpl: ContentTemplate }) {
   );
 }
 
+type DeliverablePreviewKind = "design-system" | "dashboard" | "slides" | "design" | "motion" | "prototype" | "document";
+
+function deliverablePreviewKind(type: ArtifactType): DeliverablePreviewKind {
+  switch (type) {
+    case "design-system":
+    case "dashboard":
+    case "slides":
+    case "design":
+    case "motion":
+    case "prototype":
+      return type;
+    case "docs":
+    case "outline":
+    case "whiteboard":
+    case "sheet":
+    case "diagram":
+    case "storyboard":
+      return "document";
+  }
+}
+
 function DeliverablePreview(props: { tpl: ContentTemplate }) {
-  const artType = () => (props.tpl.kind === "deliverable" ? props.tpl.artifactType : "docs");
+  const previewKind = () => deliverablePreviewKind(props.tpl.kind === "deliverable" ? props.tpl.artifactType : "docs");
   return (
     <View class="h-full w-full items-center justify-center">
-      <If when={artType() === "design-system"}>
+      <If when={previewKind() === "design-system"}>
         <View class="flex-row items-center gap-2">
           <View class="size-8 rounded-md bg-accent" />
           <View class="size-8 rounded-md bg-wheat" />
@@ -178,7 +200,7 @@ function DeliverablePreview(props: { tpl: ContentTemplate }) {
           <View class="size-8 rounded-md bg-berry" />
         </View>
       </If>
-      <If when={artType() === "dashboard"}>
+      <If when={previewKind() === "dashboard"}>
         <View class="h-full w-full gap-1.5">
           <View class="flex-row gap-1.5">
             <View class="h-5 flex-1 justify-center rounded-sm border border-line bg-page px-1.5">
@@ -199,14 +221,14 @@ function DeliverablePreview(props: { tpl: ContentTemplate }) {
           </View>
         </View>
       </If>
-      <If when={artType() === "slides"}>
+      <If when={previewKind() === "slides"}>
         <View class="h-full w-40 justify-center gap-1.5 rounded-sm border border-line bg-page px-3 py-2">
           <View class="h-1.5 w-10 rounded-xs bg-accent" />
           <View class="h-2 w-24 rounded-xs bg-ink opacity-75" />
           <View class="h-1.5 w-20 rounded-xs bg-faint opacity-50" />
         </View>
       </If>
-      <If when={artType() === "design"}>
+      <If when={previewKind() === "design"}>
         <View class="h-full w-full flex-row items-center justify-center gap-2">
           <View class="h-full w-18 gap-1 rounded-sm border border-line bg-page p-1.5">
             <View class="h-3 rounded-xs bg-selected" />
@@ -218,7 +240,7 @@ function DeliverablePreview(props: { tpl: ContentTemplate }) {
           </View>
         </View>
       </If>
-      <If when={artType() === "motion"}>
+      <If when={previewKind() === "motion"}>
         <View class="h-full w-40 items-center justify-center gap-1.5 rounded-sm border border-line bg-page px-2.5 py-1.5">
           <View class="size-6 items-center justify-center rounded-full bg-accent">
             <Icon name="play" size={12} tone="page" />
@@ -228,7 +250,7 @@ function DeliverablePreview(props: { tpl: ContentTemplate }) {
           </View>
         </View>
       </If>
-      <If when={artType() === "prototype"}>
+      <If when={previewKind() === "prototype"}>
         <View class="h-full w-40 overflow-hidden rounded-sm border border-line bg-page">
           <View class="h-3.5 flex-row items-center gap-1 bg-selected px-2">
             <View class="size-1.5 rounded-full bg-berry opacity-75" />
@@ -241,7 +263,7 @@ function DeliverablePreview(props: { tpl: ContentTemplate }) {
           </View>
         </View>
       </If>
-      <If when={artType() === "docs" || artType() === "sheet" || artType() === "diagram" || artType() === "storyboard"}>
+      <If when={previewKind() === "document"}>
         <View class="h-full w-40 justify-center gap-1.5 rounded-sm border border-line bg-page px-3 py-2">
           <View class="h-2 w-18 rounded-xs bg-ink opacity-75" />
           <View class="h-1.5 w-28 rounded-xs bg-faint opacity-50" />

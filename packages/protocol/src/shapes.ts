@@ -33,7 +33,9 @@ export {
   type SliceBundle,
   type SliceKind,
   SliceKindValues,
+  type SliceMap,
 } from "./core/shapes";
+export type { Envelope } from "./endpoint";
 export {
   type Agent,
   type AgentProblem,
@@ -145,6 +147,8 @@ export {
   type SayRequest,
 } from "./channel/shapes.gen";
 export {
+  ARTIFACT_TYPE_SPECS,
+  ARTIFACT_TYPES,
   type Artifact,
   type ArtifactCard,
   type ArtifactContent,
@@ -175,10 +179,10 @@ export {
   type ArtifactReadRequest,
   type ArtifactRequest,
   type ArtifactType,
-  ArtifactTypeValues,
   type ArtifactTypeGuide,
   type ArtifactTypeInfo,
   type ArtifactTypeReadRequest,
+  ArtifactTypeValues,
   type ArtifactUpdateRequest,
   type ArtifactVersion,
   type ArtifactVersionRequest,
@@ -295,6 +299,7 @@ export {
   type RemoteStatus,
   type RemoteWhoami,
 } from "./remote/shapes.gen";
+export type { ConnectionSaveRequest, DesktopConnectionSnapshot } from "./host/shapes.gen";
 export type { MachineInfo, MachinePlatform, MachineStatus } from "./machine/shapes.gen";
 export {
   type LibraryAddRequest,

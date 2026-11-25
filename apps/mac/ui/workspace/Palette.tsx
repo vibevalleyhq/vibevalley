@@ -1,5 +1,6 @@
 import { computed, Text, View } from "nsh";
 import { Command, type CommandItem } from "nsh/base";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
@@ -11,7 +12,25 @@ import { startEllipsis } from "./chrome";
 
 type PaletteMode = "commands" | "files" | "search";
 type Item = CommandItem & { detail?: string };
-type PaletteFrame = { mode: PaletteMode; query: string; items: Item[]; loading: boolean; note: string | null };
+
+const paletteItemSchema: z.ZodType<Item> = z.object({
+  id: z.string(),
+  label: z.string(),
+  keywords: z.exactOptional(z.array(z.string())),
+  group: z.exactOptional(z.string()),
+  shortcut: z.exactOptional(z.string()),
+  shortcutLabel: z.exactOptional(z.string()),
+  disabled: z.exactOptional(z.boolean()),
+  detail: z.exactOptional(z.string()),
+});
+
+const paletteFrameSchema = z.object({
+  mode: z.enum(["commands", "files", "search"]),
+  query: z.string(),
+  items: z.array(paletteItemSchema),
+  loading: z.boolean(),
+  note: z.string().nullable(),
+});
 
 const modeIcons: Record<PaletteMode, IconName> = {
   commands: "command",
@@ -38,7 +57,7 @@ function KeyCap(props: { label: string; surface?: "tile" | "surface"; active?: b
 }
 
 export function Palette() {
-  const f = frame<PaletteFrame>("palette");
+  const f = frame("palette", paletteFrameSchema);
   const mode = (): PaletteMode => f()?.mode ?? "commands";
   const showEmptySkeleton = useDelayedBusy(() => f()?.loading === true && (f()?.items.length ?? 0) === 0);
 

@@ -17,7 +17,8 @@ export {
   SuggestionId,
   Validation,
 } from "./common/schema";
-export { BoardSlice, CollabSlice, Health, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceBundle, SliceKind } from "./core/schema";
+export { BoardSlice, CollabSlice, Health, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceBundle, sliceDecoders, SliceKind } from "./core/schema";
+export { EnvelopeSchema } from "./endpoint";
 export { Agent, AgentTemplate, AgentValidateRequest, AgentValidation, Build, Outfit, PersonaMode, Skill, Species } from "./agent/schema";
 export { ModelEntry, RuntimeInfo, RuntimePreset, RuntimeSettings, RuntimeSupport } from "./runtime/schema";
 export { Memory, MemoryList, MemoryRequest, MemorySearch, RecallPreview } from "./memory/schema";
@@ -179,6 +180,10 @@ export {
 export { InboxItem } from "./inbox/schema";
 export { Achievement, AchievementList, AchievementStanding, ChooseTitleRequest, FarmFrame, FarmView } from "./game/schema";
 export {
+  ConnectionSaveRequest,
+  DesktopConnectionMode,
+  DesktopConnectionSnapshot,
+  DesktopConnectionSource,
   HostAction,
   HostFileTreeFrame,
   HostFontPayload,

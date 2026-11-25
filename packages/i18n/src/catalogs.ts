@@ -274,6 +274,10 @@ export const catalogs = {
         whiteboard: "无限白板",
         design: "界面画板",
         designSystem: "设计体系",
+        sheet: "电子表格",
+        prototype: "交互原型",
+        diagram: "结构图表",
+        storyboard: "分镜脚本",
       },
       timeline: {
         toggle: "时间轴历史",
@@ -1758,6 +1762,9 @@ export const catalogs = {
             artDesignSystem: { name: "设计体系", desc: "色彩令牌、字阶规范与对比度核验" },
             artMotion: { name: "动态短片", desc: "可交互动效预览与视频导出" },
             artHtml: { name: "单页网页", desc: "独立可交互网页与版本迭代" },
+            artSheet: { name: "电子表格", desc: "多工作表结构化表格与 CSV 导出" },
+            artDiagram: { name: "结构图表", desc: "节点、连线与架构流程表达" },
+            artStoryboard: { name: "分镜脚本", desc: "镜头清单、景别、色调与对白脚本" },
             aiImage: { name: "AI 生成图片", desc: "根据描述生成概念插画、图标或配图" },
             aiSpeech: { name: "AI 单人语音", desc: "将文案合成为自然人声音频文件" },
             aiAudio: { name: "音频工作台", desc: "多人对白、音色设计、克隆与转写" },
@@ -3153,6 +3160,10 @@ export const catalogs = {
         whiteboard: "Whiteboard",
         design: "Design Canvas",
         designSystem: "Design System",
+        sheet: "Sheet",
+        prototype: "Prototype",
+        diagram: "Diagram",
+        storyboard: "Storyboard",
       },
       timeline: {
         toggle: "History timeline",
@@ -4713,6 +4724,9 @@ export const catalogs = {
             artDesignSystem: { name: "Design system", desc: "Color tokens, typography scale, and contrast checks" },
             artMotion: { name: "Motion clip", desc: "Interactive animated canvas with video export" },
             artHtml: { name: "Web page", desc: "Standalone interactive HTML page with version history" },
+            artSheet: { name: "Workbook sheet", desc: "Multi-sheet structured tables and CSV export" },
+            artDiagram: { name: "Architecture diagram", desc: "Nodes, edges, and architecture flows" },
+            artStoryboard: { name: "Storyboard shots", desc: "Shot list, framing, palette, and dialogue" },
             aiImage: { name: "AI image", desc: "Generate concept art, icons, or illustrations from text" },
             aiSpeech: { name: "AI speech", desc: "Synthesize natural voiceover audio from text" },
             aiAudio: { name: "Audio studio", desc: "Multi-speaker dialogue, voice design, cloning, and transcription" },
@@ -6202,11 +6216,15 @@ export interface Messages {
   "web.artifact.types.defaultBadge": undefined;
   "web.artifact.types.design": undefined;
   "web.artifact.types.designSystem": undefined;
+  "web.artifact.types.diagram": undefined;
   "web.artifact.types.docs": undefined;
   "web.artifact.types.motion": undefined;
   "web.artifact.types.outline": undefined;
+  "web.artifact.types.prototype": undefined;
   "web.artifact.types.setDefault": undefined;
+  "web.artifact.types.sheet": undefined;
   "web.artifact.types.slides": undefined;
+  "web.artifact.types.storyboard": undefined;
   "web.artifact.types.unsetDefault": undefined;
   "web.artifact.types.whiteboard": undefined;
   "web.artifact.whiteboard.arrow": undefined;
@@ -7645,14 +7663,20 @@ export interface Messages {
   "web.library.content.templates.items.artDesign.name": undefined;
   "web.library.content.templates.items.artDesignSystem.desc": undefined;
   "web.library.content.templates.items.artDesignSystem.name": undefined;
+  "web.library.content.templates.items.artDiagram.desc": undefined;
+  "web.library.content.templates.items.artDiagram.name": undefined;
   "web.library.content.templates.items.artDocs.desc": undefined;
   "web.library.content.templates.items.artDocs.name": undefined;
   "web.library.content.templates.items.artHtml.desc": undefined;
   "web.library.content.templates.items.artHtml.name": undefined;
   "web.library.content.templates.items.artMotion.desc": undefined;
   "web.library.content.templates.items.artMotion.name": undefined;
+  "web.library.content.templates.items.artSheet.desc": undefined;
+  "web.library.content.templates.items.artSheet.name": undefined;
   "web.library.content.templates.items.artSlides.desc": undefined;
   "web.library.content.templates.items.artSlides.name": undefined;
+  "web.library.content.templates.items.artStoryboard.desc": undefined;
+  "web.library.content.templates.items.artStoryboard.name": undefined;
   "web.library.content.templates.items.noteBlank.desc": undefined;
   "web.library.content.templates.items.noteBlank.name": undefined;
   "web.library.content.templates.items.noteDaily.desc": undefined;

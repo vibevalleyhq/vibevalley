@@ -1,8 +1,8 @@
 import { Clipboard, computed, effect, host, Image, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 import { Button, ContextMenu, Menu, MenuItem, MenuSeparator } from "nsh/base";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { BoardSlice, SessionsSlice } from "@vibevalley/protocol";
 import { isFreeUserSession, isOrchestratorSession, sessionBranch, sessionIssueId, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { Icon } from "../design/Icon";
@@ -12,11 +12,11 @@ import { motionClass, motionOff, popupTransition } from "../design/motion";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { useInterval } from "../infra/base/timer";
-import { act, call, frame, hostApi } from "../infra/bridge";
+import { act, callDecoded, frame, hostApi, sliceFrame } from "../infra/bridge";
 import { readHostParams } from "../infra/hostParams";
 import { menuDangerItemClass, menuItemClass, menuPopupClass, menuSeparatorClass, ShellIconButton } from "./chrome";
-import { FileTree, type FilesFrame } from "./FileTree";
-import { GitPanel, type GitFrame, type GitTab } from "./GitPanel";
+import { FileTree, filesFrameSchema } from "./FileTree";
+import { GitPanel, gitFrameSchema, type GitTab } from "./GitPanel";
 
 type RailRunningState = "working" | "ready" | "idle";
 
@@ -46,7 +46,7 @@ type RailProject = {
   active: boolean;
   attention: boolean;
   terminals: number;
-  shortcut: string | null;
+  shortcut?: string | null;
   branch?: string | null;
   mainRoot?: string | null;
   worktrees?: RailWorktree[];
@@ -56,6 +56,52 @@ type RailProject = {
 type RailFrame = { projects: RailProject[]; panel: string; inspectorOpen?: boolean };
 
 type VvRepo = { name: string; path: string; git?: boolean; last?: number };
+
+const railTabSchema: z.ZodType<RailTab> = z.object({
+  id: z.number(),
+  title: z.string(),
+  active: z.boolean(),
+  kind: z.string(),
+  running: z.exactOptional(z.boolean()),
+  runningState: z.exactOptional(z.enum(["working", "ready", "idle"])),
+  runningAgent: z.exactOptional(z.string().nullable()),
+  runningLabel: z.exactOptional(z.string().nullable()),
+  attention: z.exactOptional(z.boolean()),
+});
+
+const railWorktreeSchema: z.ZodType<RailWorktree> = z.object({
+  path: z.string(),
+  branch: z.string().nullable(),
+  main: z.boolean(),
+});
+
+const railProjectSchema: z.ZodType<RailProject> = z.object({
+  id: z.number(),
+  name: z.string(),
+  path: z.string(),
+  initials: z.string(),
+  active: z.boolean(),
+  attention: z.boolean(),
+  terminals: z.number(),
+  shortcut: z.exactOptional(z.string().nullable()),
+  branch: z.exactOptional(z.string().nullable()),
+  mainRoot: z.exactOptional(z.string().nullable()),
+  worktrees: z.exactOptional(z.array(railWorktreeSchema)),
+  tabs: z.exactOptional(z.array(railTabSchema)),
+});
+
+const railFrameSchema: z.ZodType<RailFrame> = z.object({
+  projects: z.array(railProjectSchema),
+  panel: z.string(),
+  inspectorOpen: z.exactOptional(z.boolean()),
+});
+
+const vvRepoSchema: z.ZodType<VvRepo> = z.object({
+  name: z.string(),
+  path: z.string(),
+  git: z.exactOptional(z.boolean()),
+  last: z.exactOptional(z.number()),
+});
 
 type WorktreeGroup = {
   id: string;
@@ -758,14 +804,14 @@ function formatSummaryTooltip(base: string, summary: ActivitySummary, collapsed:
 }
 
 export function Sidebar() {
-  const rail = frame<RailFrame>("rail");
-  const files = frame<FilesFrame>("files");
-  const git = frame<GitFrame>("git");
+  const rail = frame("rail", railFrameSchema);
+  const files = frame("files", filesFrameSchema);
+  const git = frame("git", gitFrameSchema);
   const vvRepos = signal<VvRepo[]>([]);
   const hostParams = readHostParams();
   const isInspector = hostParams.role === "inspector";
-  const board = isInspector ? () => null : frame<BoardSlice>("slice:board");
-  const sessionsSlice = isInspector ? () => null : frame<SessionsSlice>("slice:sessions");
+  const board = isInspector ? () => null : sliceFrame("board");
+  const sessionsSlice = isInspector ? () => null : sliceFrame("sessions");
   const pixelDir = signal<string | undefined>(hostParams.pixelDir);
   const foldOverrides = signal<Record<string, boolean>>({});
   const hoveredKey = signal<string | null>(null);
@@ -810,8 +856,8 @@ export function Sidebar() {
     if (hostParams.role !== "inspector") {
       effect(() => {
         void repoNamesKey();
-        void call<VvRepo[]>("repo.list", {}).then((env) => {
-          if (env.bizCode === 0 && Array.isArray(env.data)) {
+        void callDecoded("repo.list", {}, z.array(vvRepoSchema)).then((env) => {
+          if (env.bizCode === 0 && env.data) {
             vvRepos.set(env.data);
           }
         });

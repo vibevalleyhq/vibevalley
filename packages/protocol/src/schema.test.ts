@@ -203,3 +203,31 @@ test("Machine codecs parse every Rust golden sample", () => {
   }
   expect(checked).toBeGreaterThan(30);
 });
+
+test("DesktopConnectionSnapshot, ConnectionSaveRequest, EnvelopeSchema, and sliceDecoders validate wire payloads", () => {
+  const snap = S.DesktopConnectionSnapshot.parse({
+    activeMode: "embedded",
+    configuredMode: "remote",
+    configuredUrl: "https://hub.ts.net:8791",
+    configuredLabel: "Studio",
+    tokenHint: "…abcd",
+    source: "file",
+    restartRequired: true,
+  });
+  expect(snap.configuredMode).toBe("remote");
+
+  const save = S.ConnectionSaveRequest.parse({
+    url: "https://hub.ts.net:8791",
+    pairCode: "AB34CD",
+    label: "Studio",
+  });
+  expect(save.pairCode).toBe("AB34CD");
+
+  expect(S.EnvelopeSchema.parse({ bizCode: 0, message: "ok", data: { ok: true } })).toEqual({
+    bizCode: 0,
+    message: "ok",
+    data: { ok: true },
+  });
+  expect(S.EnvelopeSchema.safeParse({ message: "missing bizCode" }).success).toBe(false);
+  expect(Object.keys(S.sliceDecoders).toSorted()).toEqual([...S.SliceKind.options].toSorted());
+});

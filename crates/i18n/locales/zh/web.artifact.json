@@ -48,7 +48,11 @@
     "motion": "动态短片",
     "whiteboard": "无限白板",
     "design": "界面画板",
-    "designSystem": "设计体系"
+    "designSystem": "设计体系",
+    "sheet": "电子表格",
+    "prototype": "交互原型",
+    "diagram": "结构图表",
+    "storyboard": "分镜脚本"
   },
   "timeline": {
     "toggle": "时间轴历史",
