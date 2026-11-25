@@ -66,6 +66,7 @@ if (!values["skip-build"]) {
     profile === "release" ? { LIBGHOSTTY_VT_SYS_OPTIMIZE: "ReleaseFast" } : undefined,
   );
   run("swift", ["build", "-c", "release", "--package-path", "apps/island"]);
+  run("swift", ["build", "-c", "release", "--package-path", "apps/shim"]);
 }
 const arch = packageArchitecture(process.arch);
 const icon = join(root, channelIconFile(version));
@@ -75,13 +76,19 @@ for (const file of [
   join(target, "vibevalley-mac"),
   join(target, "vibevalley"),
   join(root, "apps/island/.build/release/VibeValleyIsland"),
+  join(root, "apps/shim/.build/release/VibeValleyShim"),
   icon,
   fullIcon,
   dmgBackground,
 ]) {
   if (!existsSync(file)) throw new Error(`Missing package input: ${file}. Build it before --skip-build`);
 }
-for (const binary of [join(target, "vibevalley-mac"), join(target, "vibevalley"), join(root, "apps/island/.build/release/VibeValleyIsland")]) {
+for (const binary of [
+  join(target, "vibevalley-mac"),
+  join(target, "vibevalley"),
+  join(root, "apps/island/.build/release/VibeValleyIsland"),
+  join(root, "apps/shim/.build/release/VibeValleyShim"),
+]) {
   verifyMacExecutable(binary, arch);
 }
 mkdirSync(out, { recursive: true });
@@ -91,6 +98,7 @@ mkdirSync(resources, { recursive: true });
 cpSync(join(target, "vibevalley-mac"), join(macos, "vibevalley-mac"));
 cpSync(join(target, "vibevalley"), join(macos, "vibevalley"));
 cpSync(join(root, "apps/island/.build/release/VibeValleyIsland"), join(macos, "VibeValleyIsland"));
+cpSync(join(root, "apps/shim/.build/release/VibeValleyShim"), join(macos, "VibeValleyShim"));
 const assetsRoot = join(root, "assets");
 cpSync(assetsRoot, join(resources, "assets"), {
   recursive: true,
@@ -107,7 +115,7 @@ const sign = (path: string, microphone = false) =>
     ...(identity === "-" ? [] : ["--options", "runtime", "--timestamp", ...(microphone ? ["--entitlements", join(root, "apps/mac/entitlements.plist")] : [])]),
     path,
   ]);
-for (const bin of ["vibevalley", "VibeValleyIsland", "vibevalley-mac"]) sign(join(macos, bin), bin === "vibevalley-mac");
+for (const bin of ["vibevalley", "VibeValleyIsland", "VibeValleyShim", "vibevalley-mac"]) sign(join(macos, bin), bin === "vibevalley-mac");
 writeFileSync(
   join(app, "Contents/Info.plist"),
   `<?xml version="1.0" encoding="UTF-8"?>
