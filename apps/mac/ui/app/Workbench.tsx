@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 
 import { ToastHost } from "../design/ToastHost";
 import { AgentsRoute } from "../features/agent";
-import { ArtifactsPage, PresenterPage } from "../features/artifact";
+import { ArtifactsPage, PresenterPage, StandaloneArtifactPage } from "../features/artifact";
 import { CatalogPage } from "../features/catalog";
 import { ChannelSidePane, ChatPage } from "../features/channel";
 import { safeLastContentPath } from "../features/content";
@@ -34,6 +34,12 @@ import { places } from "./places";
 import { Shell } from "./Shell";
 
 const farmRoute = route("/farm/:repo", { params: z.object({ repo: z.string().min(1) }) });
+const standaloneArtifactRoute = route("/standalone/artifact/:id", { params: z.object({ id: z.string().min(1) }) });
+
+function StandaloneArtifactRoute() {
+  const params = useParams(standaloneArtifactRoute);
+  return <Keyed key={params().id}>{() => <StandaloneArtifactPage id={untracked(() => params().id)} />}</Keyed>;
+}
 
 function page(path: string, place: string, render: (rest: () => string) => JSX.Element, search?: SearchCheck): RouteDefinition {
   const pattern = route(`${path}/*`, search ? { search } : undefined);
@@ -135,6 +141,7 @@ const routes: readonly RouteDefinition[] = [
   },
 
   { path: "/present", component: PresenterPage },
+  { path: standaloneArtifactRoute, component: StandaloneArtifactRoute },
   {
     layout: () => (
       <Shell>

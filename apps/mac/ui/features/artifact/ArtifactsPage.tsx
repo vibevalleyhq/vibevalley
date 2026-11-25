@@ -26,6 +26,7 @@ import { contentPresenting, contentSidebarOpen, isPinned, openTemplatePicker, to
 import { artifactHref, kindLabel, useArtifact, useArtifacts } from "./ArtifactCard";
 import { ArtifactDirectoryView } from "./ArtifactDirectoryView";
 import { buildPrototypeDocument } from "./frame";
+import { InstallAppletButton } from "./InstallAppletModal";
 import { exportArtifactDirectory, requestArtifactChatFocus } from "./store";
 import { TimelineBar } from "./TimelineBar";
 import { BOARD_FILE_PATH, boardToNativeEntries, parseBoardDocument } from "./WhiteboardView";
@@ -198,6 +199,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   const asking = signal(false);
   const menu = signal(false);
   const sendMenu = signal(false);
+  const appletModalOpen = signal(false);
   const timelineOpen = signal(false);
   const historyPreview = signal<ArtifactHistoryPreviewResult | undefined>(undefined);
   const revisionKey = signal(0);
@@ -270,7 +272,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
 
   const Chat = untracked(() => props.chat);
   const presenting = () => contentPresenting();
-  const isCovered = createMemo(() => menu() || sendMenu());
+  const isCovered = createMemo(() => menu() || sendMenu() || appletModalOpen());
 
   effect(() => {
     if (!presenting()) return;
@@ -400,6 +402,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
                 disabled={exporting.busy()}
                 onClick={() => void exporting.run(() => exportArtifactDirectory(props.artifact, selectedVersion()?.version))}
               />
+              <InstallAppletButton artifact={props.artifact} testID="artifact-install-applet" onOpenChange={(open) => appletModalOpen.set(open)} />
               <IconButton
                 icon="clock"
                 label={t("web.artifact.timeline.toggle")}

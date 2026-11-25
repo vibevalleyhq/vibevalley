@@ -180,11 +180,14 @@ export {
 export { InboxItem } from "./inbox/schema";
 export { Achievement, AchievementList, AchievementStanding, ChooseTitleRequest, FarmFrame, FarmView } from "./game/schema";
 export {
+  ArtifactAppletInfo,
   ConnectionSaveRequest,
   DesktopConnectionMode,
   DesktopConnectionSnapshot,
   DesktopConnectionSource,
   HostAction,
+  HostAppletIdPayload,
+  HostAppletInstallPayload,
   HostFileTreeFrame,
   HostFontPayload,
   HostGitBranch,

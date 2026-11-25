@@ -596,6 +596,58 @@ impl Shell {
                 );
                 return;
             }
+            HostOp::AppletList => {
+                Self::bg(cx, crate::applet::AppletHost::list, move |_, result, _| {
+                    reply.send(match result {
+                        Ok(list) => {
+                            let mapped: Vec<vibevalley_protocol::ArtifactAppletInfo> = list.into_iter().map(Into::into).collect();
+                            Envelope::ok(json!(mapped))
+                        }
+                        Err(error) => refusal(BizCode::Refused, error),
+                    });
+                });
+                return;
+            }
+            HostOp::AppletInstall(req) => {
+                let request: crate::applet::AppletInstallRequest = req.into();
+                Self::bg(
+                    cx,
+                    move || crate::applet::AppletHost::install_applet(request),
+                    move |_, result, _| {
+                        reply.send(match result {
+                            Ok(info) => Envelope::ok(json!(vibevalley_protocol::ArtifactAppletInfo::from(info))),
+                            Err(error) => refusal(BizCode::Refused, error),
+                        });
+                    },
+                );
+                return;
+            }
+            HostOp::AppletUninstall(req) => {
+                Self::bg(
+                    cx,
+                    move || crate::applet::AppletHost::uninstall_applet(&req.artifact_id),
+                    move |_, result, _| {
+                        reply.send(match result {
+                            Ok(res) => Envelope::ok(json!(res)),
+                            Err(error) => refusal(BizCode::Refused, error),
+                        });
+                    },
+                );
+                return;
+            }
+            HostOp::AppletOpen(req) => {
+                Self::bg(
+                    cx,
+                    move || crate::applet::AppletHost::open_applet(&req.artifact_id),
+                    move |_, result, _| {
+                        reply.send(match result {
+                            Ok(res) => Envelope::ok(json!(res)),
+                            Err(error) => refusal(BizCode::Refused, error),
+                        });
+                    },
+                );
+                return;
+            }
             stateless @ (HostOp::PixelManifest | HostOp::Sha256(_) | HostOp::RandomBytes(_) | HostOp::Qr(_)) => {
                 crate::host::handle_stateless_op(&stateless).expect("stateless HostOp handled")
             }
@@ -646,7 +698,7 @@ fn host_info_payload(settings: &crate::theme::Settings, fonts: &[String]) -> Val
         "uiFontSize": settings.ui_font_size,
         "theme": settings.theme.as_str(),
         "motion": settings.effective_motion().as_str(),
-        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice"],
+        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet"],
     })
 }
 
@@ -676,6 +728,7 @@ mod tests {
             assert_eq!(info["theme"], expected);
             let caps = info["capabilities"].as_array().expect("capabilities array");
             assert!(caps.iter().any(|c| c == "theme"));
+            assert!(caps.iter().any(|c| c == "applet"));
             assert!(!caps.iter().any(|c| c == "seekAudio" || c == "pcm"));
         }
     }
