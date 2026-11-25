@@ -10,9 +10,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
-use vibevalley_cli::{load_secret_json, save_secret_json};
-
-use crate::client::{Failure, exit};
+use vibevalley_cli::{Failure, exit, load_secret_json, save_secret_json};
 
 pub const AUTH_FILE: &str = "auth.json";
 

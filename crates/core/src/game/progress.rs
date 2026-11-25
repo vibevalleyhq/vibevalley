@@ -10,8 +10,8 @@ use vibevalley_protocol::{
     LedgerEntryLevel, LedgerEntryMoment, LedgerEntryTold, Outcome, Progress, ProgressNews, ProgressTitle, SessionClose, SpaceState, USER_ID, Unlock,
 };
 
+use super::{AchievementDef, achievements, level_for_commits};
 use crate::deps::{DagNode, dag_layers};
-use crate::game::{AchievementDef, achievements, level_for_commits};
 use crate::status::{is_hired, session_of, session_on_issue};
 
 const CHEAP_CNY: f64 = 0.05;

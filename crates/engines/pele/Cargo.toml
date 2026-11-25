@@ -13,9 +13,9 @@ path = "tests/suite.rs"
 [dependencies]
 indexmap = "2.14.2"
 serde = { workspace = true }
-serde_json = "1.0.154"
+serde_json = { workspace = true }
 
 [dev-dependencies]
-regex = "1.13.1"
+regex = { workspace = true }
 roxmltree = "0.21.2"
 usvg = { version = "0.46.0", default-features = false }

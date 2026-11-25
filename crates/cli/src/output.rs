@@ -4,7 +4,7 @@ use std::path::Path;
 
 use serde::de::DeserializeOwned;
 
-use crate::client::{Failure, exit};
+use vibevalley_cli::{Failure, exit};
 pub use vibevalley_cli::{Output, out};
 
 /// Collapses all whitespace runs into single spaces.

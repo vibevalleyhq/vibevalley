@@ -1,6 +1,8 @@
 //! The farm as the state shows it: plays, stations, plots, level and the
 //! effects facts set off; achievements come from `data/seeds{,.en}.json`.
 
+pub mod progress;
+
 use std::collections::{BTreeMap, HashMap};
 use std::sync::OnceLock;
 
@@ -411,9 +413,9 @@ pub fn achievements() -> &'static [AchievementDef] {
     static EN: OnceLock<Vec<AchievementDef>> = OnceLock::new();
     let parse = |text: &str| serde_json::from_str::<Seeds>(text).expect("bundled seeds").achievements;
     if vibevalley_i18n::locale() == "en" {
-        EN.get_or_init(|| parse(include_str!("../data/seeds.en.json")))
+        EN.get_or_init(|| parse(include_str!("../../data/seeds.en.json")))
     } else {
-        ZH.get_or_init(|| parse(include_str!("../data/seeds.json")))
+        ZH.get_or_init(|| parse(include_str!("../../data/seeds.json")))
     }
 }
 

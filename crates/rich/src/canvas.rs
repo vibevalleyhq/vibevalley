@@ -7,14 +7,129 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use crate::engine::canvas::{Canvas, SvgRenderOptions, SvgTheme, render_svg};
+use crate::engine::canvas::{
+    Canvas, PresetSwatch as CanvasPresetSwatch, Rgba8 as CanvasRgba8, SvgRenderOptions, SvgTheme, ThemePalette as CanvasThemePalette, render_svg,
+};
 use nsh_core::element::ImageSrc;
 use nsh_core::prelude::*;
 
 use crate::cache::{CacheStats, LruCache, hash_str};
 use crate::code_block::vv_code_block;
 use crate::highlight::run_offloaded;
-use crate::theme::{AdaptiveUi, DIAGRAM_FONT_SANS, vv_canvas_palette};
+use crate::theme::{AdaptiveUi, DIAGRAM_FONT_SANS};
+
+/// Builds a warm VibeValley `crate::engine::canvas::ThemePalette` for JSON Canvas SVG rendering.
+pub fn vv_canvas_palette(dark: bool) -> CanvasThemePalette {
+    if dark {
+        CanvasThemePalette {
+            background: CanvasRgba8::from_hex_u32(0x151413),
+            dot_color: CanvasRgba8::from_hex_u32(0x2b2926),
+            card_fill: CanvasRgba8::from_hex_u32(0x1b1a18),
+            card_border: CanvasRgba8::from_hex_u32(0x3a3632),
+            group_fill: CanvasRgba8::from_hex_u32(0x201e1c),
+            group_fill_opacity: 0.72,
+            group_border: CanvasRgba8::from_hex_u32(0x46413b),
+            group_label_bg: CanvasRgba8::from_hex_u32(0x282522),
+            text: CanvasRgba8::from_hex_u32(0xecebe8),
+            muted: CanvasRgba8::from_hex_u32(0xa9a49e),
+            link: CanvasRgba8::from_hex_u32(0x6aa6dc),
+            edge: CanvasRgba8::from_hex_u32(0x8b867f),
+            edge_label_bg: CanvasRgba8::from_hex_u32(0x1b1a18),
+            presets: [
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0xe47d6d),
+                    fill: CanvasRgba8::from_hex_u32(0xe47d6d),
+                    fill_opacity: 0.14,
+                    label: CanvasRgba8::from_hex_u32(0xf2a99c),
+                },
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0xe0a062),
+                    fill: CanvasRgba8::from_hex_u32(0xe0a062),
+                    fill_opacity: 0.14,
+                    label: CanvasRgba8::from_hex_u32(0xf3be8b),
+                },
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0xe5a93c),
+                    fill: CanvasRgba8::from_hex_u32(0xe5a93c),
+                    fill_opacity: 0.14,
+                    label: CanvasRgba8::from_hex_u32(0xf0ca78),
+                },
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0x8dbb5c),
+                    fill: CanvasRgba8::from_hex_u32(0x8dbb5c),
+                    fill_opacity: 0.14,
+                    label: CanvasRgba8::from_hex_u32(0xb0d488),
+                },
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0x6aa6dc),
+                    fill: CanvasRgba8::from_hex_u32(0x6aa6dc),
+                    fill_opacity: 0.14,
+                    label: CanvasRgba8::from_hex_u32(0x9bc4ea),
+                },
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0xb48ef5),
+                    fill: CanvasRgba8::from_hex_u32(0xb48ef5),
+                    fill_opacity: 0.15,
+                    label: CanvasRgba8::from_hex_u32(0xd5bcf9),
+                },
+            ],
+        }
+    } else {
+        CanvasThemePalette {
+            background: CanvasRgba8::from_hex_u32(0xfcfcfb),
+            dot_color: CanvasRgba8::from_hex_u32(0xdfdcd5),
+            card_fill: CanvasRgba8::from_hex_u32(0xfffaf0),
+            card_border: CanvasRgba8::from_hex_u32(0xd8d2c7),
+            group_fill: CanvasRgba8::from_hex_u32(0xf6f5f3),
+            group_fill_opacity: 0.7,
+            group_border: CanvasRgba8::from_hex_u32(0xc8c0b4),
+            group_label_bg: CanvasRgba8::from_hex_u32(0xefeeeb),
+            text: CanvasRgba8::from_hex_u32(0x1c1917),
+            muted: CanvasRgba8::from_hex_u32(0x5e5852),
+            link: CanvasRgba8::from_hex_u32(0x2c6aa3),
+            edge: CanvasRgba8::from_hex_u32(0x716a64),
+            edge_label_bg: CanvasRgba8::from_hex_u32(0xfcfcfb),
+            presets: [
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0xa83a2c),
+                    fill: CanvasRgba8::from_hex_u32(0xa83a2c),
+                    fill_opacity: 0.09,
+                    label: CanvasRgba8::from_hex_u32(0x882c21),
+                },
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0xb8682a),
+                    fill: CanvasRgba8::from_hex_u32(0xb8682a),
+                    fill_opacity: 0.10,
+                    label: CanvasRgba8::from_hex_u32(0x94531f),
+                },
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0xc48b20),
+                    fill: CanvasRgba8::from_hex_u32(0xe5a93c),
+                    fill_opacity: 0.14,
+                    label: CanvasRgba8::from_hex_u32(0x8a5e0d),
+                },
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0x4d7a2a),
+                    fill: CanvasRgba8::from_hex_u32(0x74a046),
+                    fill_opacity: 0.11,
+                    label: CanvasRgba8::from_hex_u32(0x3b6125),
+                },
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0x2c6aa3),
+                    fill: CanvasRgba8::from_hex_u32(0x4f8fbd),
+                    fill_opacity: 0.11,
+                    label: CanvasRgba8::from_hex_u32(0x21527f),
+                },
+                CanvasPresetSwatch {
+                    border: CanvasRgba8::from_hex_u32(0x7c52a8),
+                    fill: CanvasRgba8::from_hex_u32(0x7c52a8),
+                    fill_opacity: 0.09,
+                    label: CanvasRgba8::from_hex_u32(0x5d3b82),
+                },
+            ],
+        }
+    }
+}
 
 /// Maximum number of rendered JSON Canvas SVGs retained in the LRU cache.
 const CANVAS_CACHE_CAPACITY: usize = 32;

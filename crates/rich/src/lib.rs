@@ -26,6 +26,7 @@ pub mod highlight;
 pub mod i18n;
 pub mod icon;
 pub mod markdown;
+mod markdown_base;
 mod math;
 pub mod pinyin;
 pub mod theme;
@@ -36,11 +37,11 @@ use nsh_core::element::Registry;
 pub use cache::CacheStats;
 pub use canvas::{
     ASYNC_CANVAS_BYTE_THRESHOLD, CanvasRenderError, RenderedCanvas, VvCanvas, VvCanvasElement, VvCanvasProps, canvas_cache_stats, clear_canvas_cache,
-    render_canvas, should_offload_canvas, vv_canvas,
+    render_canvas, should_offload_canvas, vv_canvas, vv_canvas_palette,
 };
 pub use chart::{
     ASYNC_CHART_BYTE_THRESHOLD, RenderedSvg, VvChart, VvChartElement, VvChartProps, cached_render_chart, chart_cache_stats, clear_chart_cache, render_chart,
-    should_offload_chart, vv_chart,
+    should_offload_chart, vv_chart, vv_chart_palette,
 };
 pub use code_block::{
     ASYNC_HIGHLIGHT_BYTE_THRESHOLD, ASYNC_HIGHLIGHT_LINE_THRESHOLD, CODE_LINE_HEIGHT, DEFAULT_FOLD_LINES, VvCodeBlock, VvCodeBlockElement, VvCodeBlockEvent,
@@ -66,8 +67,7 @@ pub use markdown::{
 };
 pub use pinyin::VvPinyin;
 pub use theme::{
-    AdaptiveUi, CODE_FONT_MONO, DIAGRAM_FONT_SANS, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, UiPalette, vv_canvas_palette, vv_chart_palette, vv_pele_palette,
-    vv_shiki_dark_theme, vv_shiki_light_theme,
+    AdaptiveUi, CODE_FONT_MONO, DIAGRAM_FONT_SANS, SHIKI_DARK_THEME, SHIKI_LIGHT_THEME, UiPalette, vv_pele_palette, vv_shiki_dark_theme, vv_shiki_light_theme,
 };
 pub use whiteboard::{
     VvWhiteboard, VvWhiteboardBatchEvent, VvWhiteboardChatEvent, VvWhiteboardCursorEvent, VvWhiteboardElement, VvWhiteboardEvent, VvWhiteboardExportEvent,

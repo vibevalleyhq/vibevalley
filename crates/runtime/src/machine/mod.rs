@@ -1,5 +1,7 @@
 //! Execution-layer `Machine` abstraction and lock-free `MachineRegistry`.
 
+pub mod remote;
+
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
@@ -12,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
 use crate::oar::{Registry, Runtime, find_runtime};
+
+pub use remote::{RemoteDispatchMeta, RemoteMachine, RemoteRuntime, RemoteSession, attach_dispatch_meta};
 
 pub const LOCAL_MACHINE_ID: &str = "local";
 

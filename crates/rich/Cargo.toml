@@ -22,7 +22,6 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 ttf-parser = "0.25"
-vibevalley-protocol = { path = "../protocol" }
 vibevalley-i18n = { path = "../i18n", features = ["web"] }
 vibevalley-pele = { path = "../engines/pele" }
 vibevalley-shiki = { path = "../engines/shiki" }

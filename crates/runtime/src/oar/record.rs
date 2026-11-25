@@ -3,8 +3,7 @@ use std::io::{BufReader, Seek, SeekFrom};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 
-use crate::oar::core::now_ms;
-use crate::oar::voyage::{Header, Reader, Record, Writer};
+use crate::oar::voyage::{Header, Reader, Record, Writer, now_ms};
 use crate::oar::{AgentError, Event, Result};
 use serde::{Deserialize, Serialize};
 

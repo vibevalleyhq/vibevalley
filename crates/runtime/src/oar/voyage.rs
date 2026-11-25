@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::io::{BufRead, Write};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -9,6 +10,10 @@ use crate::oar::{AgentError, Event, EventKind, Result, StopReason, Usage};
 
 pub const FORMAT: &str = "oar-voyage/3";
 const VERSION: u8 = 3;
+
+pub(crate) fn now_ms() -> u64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
