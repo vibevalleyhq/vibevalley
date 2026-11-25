@@ -18,8 +18,11 @@
         --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       }
-      * { box-sizing: border-box; }
-      html, body {
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
         margin: 0;
         padding: 0;
         height: 100%;
@@ -69,8 +72,14 @@
         cursor: pointer;
         font-size: 12px;
       }
-      .crumb:hover { background: #334155; }
-      .crumb.active { background: #2563eb; border-color: #3b82f6; color: #fff; }
+      .crumb:hover {
+        background: #334155;
+      }
+      .crumb.active {
+        background: #2563eb;
+        border-color: #3b82f6;
+        color: #fff;
+      }
       .toolbar {
         display: flex;
         align-items: center;
@@ -88,16 +97,28 @@
         cursor: pointer;
         white-space: nowrap;
       }
-      button.btn:hover { background: #334155; }
-      button.btn.primary { background: #2563eb; border-color: #3b82f6; }
-      button.btn.primary:hover { background: #1d4ed8; }
-      button.btn.danger { background: #991b1b; border-color: #dc2626; }
+      button.btn:hover {
+        background: #334155;
+      }
+      button.btn.primary {
+        background: #2563eb;
+        border-color: #3b82f6;
+      }
+      button.btn.primary:hover {
+        background: #1d4ed8;
+      }
+      button.btn.danger {
+        background: #991b1b;
+        border-color: #dc2626;
+      }
       button.btn.light {
         background: #fff;
         color: var(--text);
         border: 1px solid var(--border);
       }
-      button.btn.light:hover { background: #f1f5f9; }
+      button.btn.light:hover {
+        background: #f1f5f9;
+      }
       #canvas-wrap {
         position: relative;
         overflow: hidden;
@@ -107,7 +128,9 @@
         cursor: grab;
         user-select: none;
       }
-      #canvas-wrap.panning { cursor: grabbing; }
+      #canvas-wrap.panning {
+        cursor: grabbing;
+      }
       #proposal-banner {
         position: absolute;
         top: 10px;
@@ -179,8 +202,13 @@
         border-radius: 6px;
         padding: 6px 8px;
       }
-      .stat-item strong { display: block; font-size: 15px; }
-      .violation-item, .omit-item, .proposal-item {
+      .stat-item strong {
+        display: block;
+        font-size: 15px;
+      }
+      .violation-item,
+      .omit-item,
+      .proposal-item {
         font-size: 12px;
         padding: 6px 8px;
         border: 1px solid #e2e8f0;
@@ -192,7 +220,9 @@
         border-left: 3px solid var(--danger);
         cursor: pointer;
       }
-      .violation-item:hover { background: #fef2f2; }
+      .violation-item:hover {
+        background: #fef2f2;
+      }
       .proposal-item {
         cursor: pointer;
         display: flex;
@@ -211,9 +241,18 @@
         font-size: 11px;
         font-weight: 700;
       }
-      .badge.red { background: #fee2e2; color: #b91c1c; }
-      .badge.green { background: #dcfce7; color: #15803d; }
-      .badge.amber { background: #fef3c7; color: #b45309; }
+      .badge.red {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .badge.green {
+        background: #dcfce7;
+        color: #15803d;
+      }
+      .badge.amber {
+        background: #fef3c7;
+        color: #b45309;
+      }
       .tooltip {
         position: fixed;
         z-index: 60;
@@ -236,8 +275,13 @@
         padding: 2px 0;
         border-bottom: 1px solid #1e293b;
       }
-      .tooltip .pair-row:last-child { border-bottom: none; }
-      .tooltip .pair-row.viol { color: #fca5a5; font-weight: 700; }
+      .tooltip .pair-row:last-child {
+        border-bottom: none;
+      }
+      .tooltip .pair-row.viol {
+        color: #fca5a5;
+        font-weight: 700;
+      }
       #context-menu {
         position: fixed;
         z-index: 70;
@@ -260,8 +304,15 @@
         cursor: pointer;
         color: var(--text);
       }
-      #context-menu button:hover { background: #eff6ff; color: var(--accent); }
-      #context-menu hr { border: none; border-top: 1px solid #e2e8f0; margin: 4px 0; }
+      #context-menu button:hover {
+        background: #eff6ff;
+        color: var(--accent);
+      }
+      #context-menu hr {
+        border: none;
+        border-top: 1px solid #e2e8f0;
+        margin: 4px 0;
+      }
       #modal-backdrop {
         position: fixed;
         inset: 0;
@@ -298,7 +349,9 @@
         gap: 10px;
         cursor: pointer;
       }
-      .modal-title:hover .link-name { text-decoration: underline; }
+      .modal-title:hover .link-name {
+        text-decoration: underline;
+      }
       .dot {
         display: inline-flex;
         align-items: center;
@@ -342,7 +395,9 @@
         color: #e2e8f0;
         overflow: hidden;
       }
-      .modal-body.with-source .source-pane { display: flex; }
+      .modal-body.with-source .source-pane {
+        display: flex;
+      }
       .source-head {
         display: flex;
         justify-content: space-between;
@@ -380,7 +435,8 @@
         border-collapse: collapse;
         font-size: 12px;
       }
-      table.card-table th, table.card-table td {
+      table.card-table th,
+      table.card-table td {
         border: 1px solid #e2e8f0;
         padding: 5px 8px;
         text-align: left;
@@ -406,11 +462,28 @@
         color: #1d4ed8;
         cursor: pointer;
       }
-      .member-link:hover { text-decoration: underline; }
-      .cell-white { background: #ffffff; color: #475569; }
-      .cell-green { background: #dcfce7; color: #166534; font-weight: 600; }
-      .cell-amber { background: #fef3c7; color: #92400e; font-weight: 600; }
-      .cell-red { background: #fee2e2; color: #991b1b; font-weight: 700; }
+      .member-link:hover {
+        text-decoration: underline;
+      }
+      .cell-white {
+        background: #ffffff;
+        color: #475569;
+      }
+      .cell-green {
+        background: #dcfce7;
+        color: #166534;
+        font-weight: 600;
+      }
+      .cell-amber {
+        background: #fef3c7;
+        color: #92400e;
+        font-weight: 600;
+      }
+      .cell-red {
+        background: #fee2e2;
+        color: #991b1b;
+        font-weight: 700;
+      }
       .no-sites {
         text-align: center !important;
         font-family: var(--mono);
@@ -462,7 +535,7 @@
         <div class="card">
           <h3>
             <span>Overview</span>
-            <label style="font-weight:500;text-transform:none;font-size:11px;cursor:pointer;">
+            <label style="font-weight: 500; text-transform: none; font-size: 11px; cursor: pointer">
               <input id="chk-watch" type="checkbox" checked /> Auto-watch
             </label>
           </h3>
@@ -472,23 +545,23 @@
         <div class="card">
           <h3>
             <span>Views &amp; Proposals</span>
-            <button id="btn-new-proposal" class="btn light" style="padding:2px 7px;font-size:11px;">+ New Proposal</button>
+            <button id="btn-new-proposal" class="btn light" style="padding: 2px 7px; font-size: 11px">+ New Proposal</button>
           </h3>
           <div id="proposals-list"></div>
-          <div id="proposal-editor" style="display:none;margin-top:8px;">
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Proposal layers (rank 0 first, comma-separated per line):</div>
+          <div id="proposal-editor" style="display: none; margin-top: 8px">
+            <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px">Proposal layers (rank 0 first, comma-separated per line):</div>
             <textarea id="proposal-layers-input" class="layer-editor"></textarea>
             <div class="row-actions">
-              <button id="btn-save-proposal" class="btn primary" style="font-size:11px;padding:4px 8px;">Apply Layers</button>
-              <button id="btn-rename-proposal" class="btn light" style="font-size:11px;padding:4px 8px;">Rename</button>
-              <button id="btn-delete-proposal" class="btn danger" style="font-size:11px;padding:4px 8px;">Delete</button>
+              <button id="btn-save-proposal" class="btn primary" style="font-size: 11px; padding: 4px 8px">Apply Layers</button>
+              <button id="btn-rename-proposal" class="btn light" style="font-size: 11px; padding: 4px 8px">Rename</button>
+              <button id="btn-delete-proposal" class="btn danger" style="font-size: 11px; padding: 4px 8px">Delete</button>
             </div>
           </div>
         </div>
 
         <div class="card">
           <h3><span>Dependency Rule Violations</span><span id="viol-badge" class="badge green">0</span></h3>
-          <div id="violations-list" style="max-height:220px;overflow-y:auto;"></div>
+          <div id="violations-list" style="max-height: 220px; overflow-y: auto"></div>
         </div>
 
         <div class="card">
@@ -507,7 +580,7 @@
       <button data-act="refresh_mutation">Refresh Mutation</button>
       <button data-act="refresh_all_mutation">Refresh All Mutation</button>
       <hr />
-      <button data-act="omit" style="color:#dc2626;">Omit from Diagram</button>
+      <button data-act="omit" style="color: #dc2626">Omit from Diagram</button>
     </div>
 
     <div id="modal-backdrop">
@@ -516,9 +589,9 @@
           <div id="modal-title-btn" class="modal-title" title="Click to view module source">
             <span id="modal-kind-badge" class="badge amber">class</span>
             <strong id="modal-name" class="link-name">ClassName</strong>
-            <span id="modal-ns" style="font-family:var(--mono);font-size:12px;color:#94a3b8;"></span>
+            <span id="modal-ns" style="font-family: var(--mono); font-size: 12px; color: #94a3b8"></span>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;">
+          <div style="display: flex; align-items: center; gap: 8px">
             <span id="modal-c-dot" class="dot">C</span>
             <span id="modal-m-dot" class="dot">M</span>
             <button id="btn-close-modal" class="btn">Close (Esc)</button>
@@ -530,7 +603,7 @@
           <div id="source-pane" class="source-pane">
             <div class="source-head">
               <span id="source-title">source</span>
-              <button id="btn-close-source" class="btn" style="padding:2px 7px;font-size:11px;">Hide Source</button>
+              <button id="btn-close-source" class="btn" style="padding: 2px 7px; font-size: 11px">Hide Source</button>
             </div>
             <div id="source-lines" class="source-lines"></div>
           </div>
@@ -576,11 +649,7 @@
         }
 
         function escHtml(s) {
-          return String(s)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;");
+          return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
         }
 
         function svgNode(tag, attrs = {}, text = null) {
@@ -750,7 +819,7 @@
               (p) =>
                 `<div class="pair-row ${p.violating ? "viol" : ""}">${escHtml(p.from)} → ${escHtml(p.to)} [${escHtml(p.kind)}]${
                   p.violating ? " VIOLATION" : ""
-                }</div>`
+                }</div>`,
             )
             .join("");
           const extra = pairs.length > 40 ? `<div style="color:#94a3b8;font-size:11px;">… +${pairs.length - 40} more</div>` : "";
@@ -759,8 +828,7 @@
 
         function renderNodeTooltipHtml(meta) {
           const m = meta.metrics;
-          const crapLine =
-            m.crap_count > 0 ? `CRAP μ=${m.crap_mu} max=${m.crap_max} σ=${m.crap_sigma} (grade ${m.crap_grade})` : "CRAP: missing (grade 1)";
+          const crapLine = m.crap_count > 0 ? `CRAP μ=${m.crap_mu} max=${m.crap_max} σ=${m.crap_sigma} (grade ${m.crap_grade})` : "CRAP: missing (grade 1)";
           const mutLine = m.has_mutation
             ? `Mutation: ${m.killed} killed, ${m.survived} survived, ${m.uncovered} uncovered (${m.mutation_score ?? 100}%, grade ${m.mutation_grade})`
             : "Mutation: missing (grade 1)";
@@ -861,9 +929,25 @@
           svgEl.innerHTML = "";
 
           const defs = svgNode("defs");
-          const mkNormal = svgNode("marker", { id: "m-normal", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" });
+          const mkNormal = svgNode("marker", {
+            id: "m-normal",
+            viewBox: "0 0 10 10",
+            refX: 9,
+            refY: 5,
+            markerWidth: 7,
+            markerHeight: 7,
+            orient: "auto-start-reverse",
+          });
           mkNormal.appendChild(svgNode("path", { d: "M 0 1 L 10 5 L 0 9 z", fill: "#64748b" }));
-          const mkViol = svgNode("marker", { id: "m-viol", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 8, markerHeight: 8, orient: "auto-start-reverse" });
+          const mkViol = svgNode("marker", {
+            id: "m-viol",
+            viewBox: "0 0 10 10",
+            refX: 9,
+            refY: 5,
+            markerWidth: 8,
+            markerHeight: 8,
+            orient: "auto-start-reverse",
+          });
           mkViol.appendChild(svgNode("path", { d: "M 0 1 L 10 5 L 0 9 z", fill: "#dc2626" }));
           defs.appendChild(mkNormal);
           defs.appendChild(mkViol);
@@ -896,7 +980,7 @@
                   stroke: "#64748b",
                   "stroke-width": 1.6,
                   "stroke-dasharray": "5 3",
-                })
+                }),
               );
             } else {
               gBox.appendChild(
@@ -909,14 +993,18 @@
                   fill,
                   stroke: "#334155",
                   "stroke-width": 1.6,
-                })
+                }),
               );
               const cColor = meta?.metrics?.crap_color || "#dc2626";
               const mColor = meta?.metrics?.mutation_color || "#dc2626";
               gBox.appendChild(svgNode("circle", { cx: pos.x + pos.w - 28, cy: pos.y + 13, r: 6, fill: cColor, stroke: "#0f172a", "stroke-width": 0.9 }));
-              gBox.appendChild(svgNode("text", { x: pos.x + pos.w - 28, y: pos.y + 16, "text-anchor": "middle", "font-size": 8, "font-weight": 800, fill: "#fff" }, "C"));
+              gBox.appendChild(
+                svgNode("text", { x: pos.x + pos.w - 28, y: pos.y + 16, "text-anchor": "middle", "font-size": 8, "font-weight": 800, fill: "#fff" }, "C"),
+              );
               gBox.appendChild(svgNode("circle", { cx: pos.x + pos.w - 13, cy: pos.y + 13, r: 6, fill: mColor, stroke: "#0f172a", "stroke-width": 0.9 }));
-              gBox.appendChild(svgNode("text", { x: pos.x + pos.w - 13, y: pos.y + 16, "text-anchor": "middle", "font-size": 8, "font-weight": 800, fill: "#fff" }, "M"));
+              gBox.appendChild(
+                svgNode("text", { x: pos.x + pos.w - 13, y: pos.y + 16, "text-anchor": "middle", "font-size": 8, "font-weight": 800, fill: "#fff" }, "M"),
+              );
             }
 
             // Nested child boxes inside component
@@ -935,7 +1023,7 @@
                   fill: subFill,
                   stroke: "#475569",
                   "stroke-width": 1.1,
-                })
+                }),
               );
               const sc = subMeta?.metrics?.crap_color || "#dc2626";
               const sm = subMeta?.metrics?.mutation_color || "#dc2626";
@@ -969,8 +1057,8 @@
                     fill: "#0f172a",
                     "pointer-events": "none",
                   },
-                  label
-                )
+                  label,
+                ),
               );
             }
 
@@ -986,8 +1074,8 @@
                     fill: "#334155",
                     "pointer-events": "none",
                   },
-                  `+${pos.node.children.length - 8} more`
-                )
+                  `+${pos.node.children.length - 8} more`,
+                ),
               );
             }
 
@@ -1028,7 +1116,7 @@
                 fill: "#0f172a",
                 "pointer-events": "none",
               },
-              titleText
+              titleText,
             );
             layerTitles.appendChild(titleBg);
             layerTitles.appendChild(titleEl);
@@ -1151,8 +1239,7 @@
           mDot.style.background = m.mutation_color;
           mDot.title = `Mutation grade ${m.mutation_grade}/10`;
 
-          const crapText =
-            m.crap_count > 0 ? `Crap μ ${m.crap_mu}  max ${m.crap_max}  σ ${m.crap_sigma}` : "Crap μ —  max —  σ — (missing)";
+          const crapText = m.crap_count > 0 ? `Crap μ ${m.crap_mu}  max ${m.crap_max}  σ ${m.crap_sigma}` : "Crap μ —  max —  σ — (missing)";
           const mutText = m.has_mutation
             ? `Mutation: ${m.killed} killed, ${m.survived} survived, ${m.uncovered} uncovered (${m.sites} sites, ${m.mutation_score ?? 100}%)`
             : "Mutation: missing (grade 1)";
@@ -1244,8 +1331,8 @@
             .map(
               (l) =>
                 `<div class="src-line ${l.highlight ? "hl" : ""}" data-line="${l.line}"><span class="src-num">${l.line}</span><span>${escHtml(
-                  l.text
-                )}</span></div>`
+                  l.text,
+                )}</span></div>`,
             )
             .join("");
           const targetEl = linesEl.querySelector(`.src-line[data-line="${data.target_line}"]`);
@@ -1286,7 +1373,7 @@
                 (v) => `<div class="violation-item" data-from="${escHtml(v.from)}">
                   <div><strong>${escHtml(v.from)}</strong> (r${v.from_rank}) → <strong>${escHtml(v.to)}</strong> (r${v.to_rank})</div>
                   <div style="font-family:var(--mono);font-size:11px;color:#475569;">${escHtml(v.file)}:${v.line}</div>
-                </div>`
+                </div>`,
               )
               .join("");
             vList.querySelectorAll(".violation-item").forEach((el) => {
@@ -1339,7 +1426,7 @@
                 (o) => `<div class="omit-item" style="display:flex;justify-content:space-between;align-items:center;">
                   <code>${escHtml(o)}</code>
                   <button class="btn light" data-unomit="${escHtml(o)}" style="padding:2px 6px;font-size:11px;">Restore</button>
-                </div>`
+                </div>`,
               )
               .join("");
             omitEl.querySelectorAll("[data-unomit]").forEach((btn) => {
@@ -1489,7 +1576,7 @@
             ev.preventDefault();
             zoomAt(ev.deltaY < 0 ? 1.12 : 0.89, ev.clientX, ev.clientY);
           },
-          { passive: false }
+          { passive: false },
         );
 
         document.addEventListener("click", (ev) => {
@@ -1552,7 +1639,12 @@
           const raw = document.getElementById("proposal-layers-input").value;
           const layers = raw
             .split("\n")
-            .map((line) => line.split(",").map((s) => s.trim()).filter(Boolean))
+            .map((line) =>
+              line
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            )
             .filter((grp) => grp.length > 0);
           const proposals = (state.data.policy.proposals || []).map((p) => (p.id === state.activeProposalId ? { ...p, layers } : p));
           savePolicyPatch({ proposals });
@@ -1563,9 +1655,7 @@
           const cur = (state.data.policy.proposals || []).find((p) => p.id === state.activeProposalId);
           const name = window.prompt("Rename proposal:", cur ? cur.name : "");
           if (!name) return;
-          const proposals = (state.data.policy.proposals || []).map((p) =>
-            p.id === state.activeProposalId ? { ...p, name: name.trim() } : p
-          );
+          const proposals = (state.data.policy.proposals || []).map((p) => (p.id === state.activeProposalId ? { ...p, name: name.trim() } : p));
           savePolicyPatch({ proposals });
         });
 
