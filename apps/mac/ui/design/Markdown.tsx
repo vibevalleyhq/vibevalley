@@ -2,7 +2,7 @@
 // with a stock `nsh/base` `TextView` fallback when running headless under `nsh test`.
 // Issue numbers (#12), @mentions, Shiki code blocks, Mermaid diagrams,
 // JSON Canvas, SVG Charts, reactive GenUI, and LaTeX math are all handled natively in Rust.
-import { Clipboard } from "nsh";
+import { Clipboard, signal } from "nsh";
 import { TextView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -11,6 +11,7 @@ import {
   formatGenUiAction,
   richNative,
   type VvCodeCopyEvent,
+  type VvDiagramPressEvent,
   type VvGenUiActionEvent,
   type VvIssuePressEvent,
   type VvMentionPressEvent,
@@ -22,6 +23,7 @@ import { CodeBlock } from "./code/CodeBlock";
 import { Diagram } from "./code/Diagram";
 import { GenUi } from "./code/GenUi";
 import { followDesignHref, useDesignHost } from "./host";
+import { RichPreviewModal, type RichPreviewPayload } from "./RichPreviewModal";
 
 const fallbackClasses = {
   link: "text-water underline",
@@ -70,13 +72,22 @@ export interface MarkdownProps {
   onTaskPress?: (event: VvTaskPressEvent) => void;
   onCodeCopy?: (event: VvCodeCopyEvent) => void;
   onGenUiAction?: (event: VvGenUiActionEvent) => void;
+  onDiagramPress?: (event: VvDiagramPressEvent) => void;
 }
 
 /** Chat text, descriptions, notes, and reports. */
 export function Markdown(props: MarkdownProps) {
   const designHost = useDesignHost();
+  const preview = signal<RichPreviewPayload | undefined>(undefined);
   const size = () => props.size ?? "base";
   const openLink = (url: string) => followDesignHref(designHost, url);
+  const handleDiagramPress = (event: VvDiagramPressEvent) => {
+    if (props.onDiagramPress) {
+      props.onDiagramPress(event);
+      return;
+    }
+    preview.set({ kind: "mermaid", source: event.source });
+  };
   const handleGenUiAction = (event: VvGenUiActionEvent) => {
     if (props.onGenUiAction) {
       props.onGenUiAction(event);
@@ -102,51 +113,58 @@ export function Markdown(props: MarkdownProps) {
   if (native) {
     const VvMarkdown = native.VvMarkdown;
     return (
-      <VvMarkdown
-        text={props.text}
-        size={size()}
-        baseDir={props.baseDir ?? null}
-        mentions={props.mentions === true}
-        streaming={props.streaming === true}
-        selectable={props.selectable ?? true}
-        class={props.class}
-        onLinkPress={(e) => openLink(e.url)}
-        onIssuePress={(e) => {
-          if (props.onIssuePress) props.onIssuePress(e);
-          else designHost.navigate(`/issues/${e.number}`);
-        }}
-        onMentionPress={props.onMentionPress}
-        onTaskPress={props.onTaskPress}
-        onCodeCopy={props.onCodeCopy}
-        onGenUiAction={handleGenUiAction}
-      />
+      <>
+        <VvMarkdown
+          text={props.text}
+          size={size()}
+          baseDir={props.baseDir ?? null}
+          mentions={props.mentions === true}
+          streaming={props.streaming === true}
+          selectable={props.selectable ?? true}
+          class={props.class}
+          onLinkPress={(e) => openLink(e.url)}
+          onIssuePress={(e) => {
+            if (props.onIssuePress) props.onIssuePress(e);
+            else designHost.navigate(`/issues/${e.number}`);
+          }}
+          onMentionPress={props.onMentionPress}
+          onTaskPress={props.onTaskPress}
+          onCodeCopy={props.onCodeCopy}
+          onGenUiAction={handleGenUiAction}
+          onDiagramPress={handleDiagramPress}
+        />
+        <RichPreviewModal payload={preview()} onClose={() => preview.set(undefined)} />
+      </>
     );
   }
   return (
-    <TextView
-      markdown={props.text}
-      selectable={props.selectable ?? true}
-      classes={{
-        ...fallbackClasses,
-        ...fallbackHeadings(size()),
-        root: `min-w-0 gap-0 text-ink ${size() === "sm" ? "text-sm" : "text-base"} ${props.class ?? ""}`,
-      }}
-      renderCodeBlock={(block) => {
-        switch (block.language) {
-          case "mermaid":
-            return <Diagram source={block.code} />;
-          case "chart":
-            return <Chart spec={block.code} />;
-          case "canvas":
-            return <Canvas data={block.code} />;
-          case "genui":
-            return <GenUi spec={block.code} streaming={props.streaming} onAction={handleGenUiAction} />;
-          default:
-            return <CodeBlock code={block.code} language={block.language} onCopy={props.onCodeCopy} />;
-        }
-      }}
-      onLinkPress={(e) => openLink(e.url)}
-      onTaskPress={props.onTaskPress}
-    />
+    <>
+      <TextView
+        markdown={props.text}
+        selectable={props.selectable ?? true}
+        classes={{
+          ...fallbackClasses,
+          ...fallbackHeadings(size()),
+          root: `min-w-0 gap-0 text-ink ${size() === "sm" ? "text-sm" : "text-base"} ${props.class ?? ""}`,
+        }}
+        renderCodeBlock={(block) => {
+          switch (block.language) {
+            case "mermaid":
+              return <Diagram source={block.code} interactive onPress={handleDiagramPress} />;
+            case "chart":
+              return <Chart spec={block.code} />;
+            case "canvas":
+              return <Canvas data={block.code} />;
+            case "genui":
+              return <GenUi spec={block.code} streaming={props.streaming} onAction={handleGenUiAction} />;
+            default:
+              return <CodeBlock code={block.code} language={block.language} onCopy={props.onCodeCopy} />;
+          }
+        }}
+        onLinkPress={(e) => openLink(e.url)}
+        onTaskPress={props.onTaskPress}
+      />
+      <RichPreviewModal payload={preview()} onClose={() => preview.set(undefined)} />
+    </>
   );
 }

@@ -5,16 +5,19 @@ import { t } from "@vibevalley/i18n";
 import type { PhaseView } from "@vibevalley/protocol";
 
 import { Button } from "../design/Button";
+import { CodeBlock } from "../design/code/CodeBlock";
+import { Diagram } from "../design/code/Diagram";
 import { TextInput } from "../design/Field";
 import { Icon } from "../design/Icon";
 import { actionIcon, type IconName } from "../design/icons";
 import { motionClass, popupTransition } from "../design/motion";
+import { RichPreviewModal, type RichPreviewPayload } from "../design/RichPreviewModal";
 import { Dot } from "../design/Tag";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { act, hostApi } from "../infra/bridge";
 import { readChatPaneParams } from "../infra/hostParams";
-import { formatGenUiAction, richNative, type VvGenUiActionEvent } from "../infra/rich";
+import { formatGenUiAction, richNative, type VvDiagramPressEvent, type VvGenUiActionEvent } from "../infra/rich";
 import {
   asThoughtLevel,
   clampThoughtLevel,
@@ -120,7 +123,12 @@ function basenameOf(path: string): string {
   return trimmed.split("/").pop() || trimmed || "/";
 }
 
-function ChatMarkdown(props: { text: string; streaming?: boolean; onGenUiAction?: (event: VvGenUiActionEvent) => void }) {
+function ChatMarkdown(props: {
+  text: string;
+  streaming?: boolean;
+  onGenUiAction?: (event: VvGenUiActionEvent) => void;
+  onDiagramPress?: (event: VvDiagramPressEvent) => void;
+}) {
   const native = richNative();
   const openLink = (url: string) => {
     if (url.startsWith("/")) {
@@ -150,10 +158,25 @@ function ChatMarkdown(props: { text: string; streaming?: boolean; onGenUiAction?
         selectable
         onLinkPress={(e) => openLink(e.url)}
         onGenUiAction={handleGenUiAction}
+        onDiagramPress={props.onDiagramPress}
       />
     );
   }
-  return <TextView markdown={props.text} selectable onLinkPress={(e) => openLink(e.url)} />;
+  return (
+    <TextView
+      markdown={props.text}
+      selectable
+      onLinkPress={(e) => openLink(e.url)}
+      renderCodeBlock={(block) => {
+        switch (block.language) {
+          case "mermaid":
+            return <Diagram source={block.code} interactive onPress={props.onDiagramPress} />;
+          default:
+            return <CodeBlock code={block.code} language={block.language} />;
+        }
+      }}
+    />
+  );
 }
 
 function ThinkingBlock(props: { step: SessionEvent }) {
@@ -461,6 +484,7 @@ export function WorkspaceChatPane() {
   const responding = signal(false);
   const errorText = signal<string | undefined>(undefined);
   const telemetryOpen = signal(false);
+  const richPreview = signal<RichPreviewPayload | undefined>(undefined);
   let localSeq = 0;
   const inFlightOptimistic = new Map<number, string>();
 
@@ -945,6 +969,7 @@ export function WorkspaceChatPane() {
                   <ChatMarkdown
                     text={step().text}
                     streaming={effectivePhase() === "working"}
+                    onDiagramPress={(ev) => richPreview.set({ kind: "mermaid", source: ev.source })}
                     onGenUiAction={(ev) => {
                       const action = ev.action.trim();
                       const payload = ev.payload.trim();
@@ -1314,6 +1339,7 @@ export function WorkspaceChatPane() {
           </View>
         </View>
       </View>
+      <RichPreviewModal payload={richPreview()} onClose={() => richPreview.set(undefined)} />
     </View>
   );
 }

@@ -8,8 +8,9 @@ use nsh_core::element::Root;
 use nsh_core::prelude::*;
 use vibevalley_rich::markdown::{ResolvedMarkdownImage, read_local_image_dimensions, resolve_markdown_image_src};
 use vibevalley_rich::{
-    CustomNodeKind, NativeMarkdownDoc, VvCodeCopyEvent, VvGenUiActionEvent, VvIssuePressEvent, VvLinkPressEvent, VvMarkdownSize, VvMentionPressEvent,
-    VvTaskPressEvent, is_incremental_streaming_safe, native_markdown_root, parse_vv_markdown, vv_markdown, vv_markdown_extensions, vv_markdown_options,
+    CustomNodeKind, NativeMarkdownDoc, VvCodeCopyEvent, VvDiagramPressEvent, VvGenUiActionEvent, VvIssuePressEvent, VvLinkPressEvent, VvMarkdownSize,
+    VvMentionPressEvent, VvTaskPressEvent, is_incremental_streaming_safe, native_markdown_root, parse_vv_markdown, vv_markdown, vv_markdown_extensions,
+    vv_markdown_options,
 };
 
 use crate::support::TestHarness;
@@ -22,6 +23,7 @@ struct RecordedMarkdownEvents {
     tasks: Vec<(u32, bool)>,
     copies: Vec<String>,
     genui_actions: Vec<(String, String)>,
+    diagrams: Vec<String>,
 }
 
 thread_local! {
@@ -191,6 +193,9 @@ fn MarkdownTestRoot() -> impl IntoElement {
                 e.borrow_mut().genui_actions.push((ev.action.to_string(), ev.payload.to_string()));
             });
         })
+        .on_diagram_press(|ev: &VvDiagramPressEvent| {
+            RECORDED_EVENTS.with(|e| e.borrow_mut().diagrams.push(ev.source.to_string()));
+        })
 }
 
 #[test]
@@ -223,6 +228,9 @@ fn vv_markdown_mounts_in_core_and_emits_typed_events_without_canvas_svg_view_kin
     let copy_id = harness.find_test_id("code-copy").expect("code-copy button mounted");
     assert!(harness.press(copy_id));
 
+    let diagram_expand_id = harness.find_test_id("diagram-expand").expect("interactive diagram expand mounted");
+    assert!(harness.press(diagram_expand_id));
+
     RECORDED_EVENTS.with(|e| {
         let recorded = e.borrow();
         assert_eq!(recorded.links, vec!["https://vibevalley.dev"]);
@@ -231,6 +239,7 @@ fn vv_markdown_mounts_in_core_and_emits_typed_events_without_canvas_svg_view_kin
         assert_eq!(recorded.mentions, vec!["helper"]);
         assert_eq!(recorded.genui_actions, vec![("state_change".to_owned(), "enabled=true".to_owned())]);
         assert_eq!(recorded.copies, vec!["let v = 7;"]);
+        assert_eq!(recorded.diagrams, vec!["flowchart LR\n  A[Start] --> B[Done]"]);
     });
     assert_eq!(harness.clipboard_writes, vec!["let v = 7;"]);
 }
