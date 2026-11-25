@@ -90,31 +90,31 @@ pub enum Command {
     Doctor(infra::doctor::DoctorCmd),
 }
 
-pub fn run(client: &Client, command: Command) -> Done {
+pub async fn run(client: &Client, command: Command) -> Done {
     match command {
-        Command::Issue(cmd) => work::issue::run(client, cmd),
-        Command::Session(cmd) => work::session::run(client, cmd),
-        Command::Repo(cmd) => work::repo::run(client, cmd),
-        Command::Cron(cmd) => work::cron::run(client, cmd),
+        Command::Issue(cmd) => work::issue::run(client, cmd).await,
+        Command::Session(cmd) => work::session::run(client, cmd).await,
+        Command::Repo(cmd) => work::repo::run(client, cmd).await,
+        Command::Cron(cmd) => work::cron::run(client, cmd).await,
 
-        Command::Agent(cmd) => team::agent::run(client, cmd),
-        Command::Orchestrator(cmd) => team::orchestrator::run(client, cmd),
-        Command::Runtime(cmd) => team::runtime::run(client, cmd),
-        Command::Memory(cmd) => team::memory::run(client, cmd),
+        Command::Agent(cmd) => team::agent::run(client, cmd).await,
+        Command::Orchestrator(cmd) => team::orchestrator::run(client, cmd).await,
+        Command::Runtime(cmd) => team::runtime::run(client, cmd).await,
+        Command::Memory(cmd) => team::memory::run(client, cmd).await,
 
-        Command::Channel(cmd) => collab::channel::run(client, cmd),
-        Command::Chat(cmd) => collab::chat::run(client, cmd),
+        Command::Channel(cmd) => collab::channel::run(client, cmd).await,
+        Command::Chat(cmd) => collab::chat::run(client, cmd).await,
 
-        Command::Artifact(cmd) => content::artifact::run(client, cmd),
-        Command::Library(cmd) => content::library::run(client, cmd),
-        Command::Media(cmd) => content::media::run(client, cmd),
-        Command::Attachment(cmd) => content::attachment::run(client, cmd),
+        Command::Artifact(cmd) => content::artifact::run(client, cmd).await,
+        Command::Library(cmd) => content::library::run(client, cmd).await,
+        Command::Media(cmd) => content::media::run(client, cmd).await,
+        Command::Attachment(cmd) => content::attachment::run(client, cmd).await,
 
-        Command::State(cmd) => infra::state::run(client, cmd),
-        Command::Setting(cmd) => infra::setting::run(client, cmd),
-        Command::Auth(cmd) => infra::auth::run(client, cmd),
-        Command::Remote(cmd) => infra::remote::run(client, cmd),
-        Command::Machine(cmd) => infra::machine::run(client, cmd),
-        Command::Doctor(cmd) => infra::doctor::run(client, cmd),
+        Command::State(cmd) => infra::state::run(client, cmd).await,
+        Command::Setting(cmd) => infra::setting::run(client, cmd).await,
+        Command::Auth(cmd) => infra::auth::run(client, cmd).await,
+        Command::Remote(cmd) => infra::remote::run(client, cmd).await,
+        Command::Machine(cmd) => infra::machine::run(client, cmd).await,
+        Command::Doctor(cmd) => infra::doctor::run(client, cmd).await,
     }
 }

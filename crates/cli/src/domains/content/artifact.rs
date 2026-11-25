@@ -439,26 +439,28 @@ fn suggestion_line(s: &Suggestion) -> String {
     line(&[&s.id, s.status.as_str(), &s.path, &s.author, summary])
 }
 
-pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
+pub async fn run(client: &Client, cmd: ArtifactCmd) -> Done {
     match cmd.action {
         ArtifactAction::List { issue, channel, artifact_type } => {
-            let artifacts = client.ask::<ops::ArtifactList>(&ArtifactListRequest {
-                issue: issue.map(|i| issue_ref(&i)),
-                channel,
-                artifact_type: artifact_type.map(Into::into),
-            })?;
+            let artifacts = client
+                .ask::<ops::ArtifactList>(&ArtifactListRequest {
+                    issue: issue.map(|i| issue_ref(&i)),
+                    channel,
+                    artifact_type: artifact_type.map(Into::into),
+                })
+                .await?;
             client
                 .output
                 .show(&artifacts, |list| list.iter().map(artifact_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
         ArtifactAction::Show { artifact } => {
-            let found = client.ask::<ops::ArtifactGet>(&ArtifactGetInput { id: artifact })?;
+            let found = client.ask::<ops::ArtifactGet>(&ArtifactGetInput { id: artifact }).await?;
             client.output.show(&found, artifact_line);
             Ok(())
         }
         ArtifactAction::Read { artifact, version } => {
-            let content = client.ask::<ops::ArtifactContentGet>(&ArtifactReadRequest { id: artifact, version })?;
+            let content = client.ask::<ops::ArtifactContentGet>(&ArtifactReadRequest { id: artifact, version }).await?;
             client.output.show(&content, |c| c.content.clone());
             Ok(())
         }
@@ -484,12 +486,12 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
                 channel,
                 issue: issue.map(|i| issue_ref(&i)),
             };
-            client.mutate::<ops::ArtifactCreate>("artifact create", &request, artifact_line)
+            client.mutate::<ops::ArtifactCreate>("artifact create", &request, artifact_line).await
         }
         ArtifactAction::Version { artifact, content, note } => {
             let content = content.as_deref().map(read_text_input).transpose()?;
             let request = ArtifactVersionRequest { id: artifact, content, note };
-            client.mutate::<ops::ArtifactVersionCreate>("artifact version", &request, artifact_line)
+            client.mutate::<ops::ArtifactVersionCreate>("artifact version", &request, artifact_line).await
         }
         ArtifactAction::Update { artifact, title, default } => {
             if title.is_none() && default.is_none() {
@@ -500,15 +502,17 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
                 title,
                 is_default: default,
             };
-            client.mutate::<ops::ArtifactUpdate>("artifact update", &request, artifact_line)
+            client.mutate::<ops::ArtifactUpdate>("artifact update", &request, artifact_line).await
         }
         ArtifactAction::Delete { artifact } => {
             let id = artifact.clone();
-            client.mutate::<ops::ArtifactDelete>("artifact delete", &ArtifactDeleteInput { id: artifact }, |_| format!("deleted {id}"))
+            client
+                .mutate::<ops::ArtifactDelete>("artifact delete", &ArtifactDeleteInput { id: artifact }, |_| format!("deleted {id}"))
+                .await
         }
         ArtifactAction::Type(cmd) => match cmd.action {
             ArtifactTypeAction::List => {
-                let types = client.ask::<ops::ArtifactTypeList>(&())?;
+                let types = client.ask::<ops::ArtifactTypeList>(&()).await?;
                 client.output.show(&types, |list| {
                     list.iter()
                         .map(|t| line(&[t.r#type.as_str(), &t.entry, &t.title]))
@@ -518,17 +522,19 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
                 Ok(())
             }
             ArtifactTypeAction::Read { artifact_type, reference } => {
-                let guide = client.ask::<ops::ArtifactTypeRead>(&ArtifactTypeReadRequest {
-                    r#type: artifact_type.into(),
-                    reference,
-                })?;
+                let guide = client
+                    .ask::<ops::ArtifactTypeRead>(&ArtifactTypeReadRequest {
+                        r#type: artifact_type.into(),
+                        reference,
+                    })
+                    .await?;
                 client.output.show(&guide, |g| g.content.clone());
                 Ok(())
             }
         },
         ArtifactAction::File(cmd) => match cmd.action {
             ArtifactFileAction::List { artifact, prefix } => {
-                let listing = client.ask::<ops::ArtifactFileList>(&ArtifactFileListRequest { id: artifact, prefix })?;
+                let listing = client.ask::<ops::ArtifactFileList>(&ArtifactFileListRequest { id: artifact, prefix }).await?;
                 client.output.show(&listing, |res| {
                     res.files
                         .iter()
@@ -539,7 +545,9 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
                 Ok(())
             }
             ArtifactFileAction::Get { artifact, path, version } => {
-                let file = client.ask::<ops::ArtifactFileGet>(&ArtifactFileGetRequest { id: artifact, path, version })?;
+                let file = client
+                    .ask::<ops::ArtifactFileGet>(&ArtifactFileGetRequest { id: artifact, path, version })
+                    .await?;
                 client.output.show(&file, |f| f.content.clone());
                 Ok(())
             }
@@ -568,7 +576,7 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
                     summary,
                     announce: announce.then_some(true),
                 };
-                client.mutate::<ops::ArtifactFileWrite>("artifact file write", &request, write_text)
+                client.mutate::<ops::ArtifactFileWrite>("artifact file write", &request, write_text).await
             }
             ArtifactFileAction::Batch {
                 artifact,
@@ -585,7 +593,7 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
                     summary,
                     announce: announce.then_some(true),
                 };
-                client.mutate::<ops::ArtifactFileWrite>("artifact file batch", &request, write_text)
+                client.mutate::<ops::ArtifactFileWrite>("artifact file batch", &request, write_text).await
             }
             ArtifactFileAction::Delete {
                 artifact,
@@ -599,12 +607,12 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
                     origin,
                     summary,
                 };
-                client.mutate::<ops::ArtifactFileDelete>("artifact file delete", &request, delete_text)
+                client.mutate::<ops::ArtifactFileDelete>("artifact file delete", &request, delete_text).await
             }
         },
         ArtifactAction::Suggestion(cmd) => match cmd.action {
             ArtifactSuggestionAction::List { artifact } => {
-                let list = client.ask::<ops::ArtifactSuggestionList>(&ArtifactSuggestionListInput { id: artifact })?;
+                let list = client.ask::<ops::ArtifactSuggestionList>(&ArtifactSuggestionListInput { id: artifact }).await?;
                 client
                     .output
                     .show(&list, |items| items.iter().map(suggestion_line).collect::<Vec<_>>().join("\n"));
@@ -643,22 +651,34 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
                     start_offset: None,
                     end_offset: None,
                 };
-                client.mutate::<ops::ArtifactSuggestionCreate>("artifact suggestion create", &request, suggestion_line)
+                client
+                    .mutate::<ops::ArtifactSuggestionCreate>("artifact suggestion create", &request, suggestion_line)
+                    .await
             }
-            ArtifactSuggestionAction::Accept { artifact, suggestion } => client.mutate::<ops::ArtifactSuggestionAccept>(
-                "artifact suggestion accept",
-                &ArtifactSuggestionAcceptInput { id: artifact, suggestion },
-                suggestion_line,
-            ),
-            ArtifactSuggestionAction::Reject { artifact, suggestion } => client.mutate::<ops::ArtifactSuggestionReject>(
-                "artifact suggestion reject",
-                &ArtifactSuggestionAcceptInput { id: artifact, suggestion },
-                suggestion_line,
-            ),
+            ArtifactSuggestionAction::Accept { artifact, suggestion } => {
+                client
+                    .mutate::<ops::ArtifactSuggestionAccept>(
+                        "artifact suggestion accept",
+                        &ArtifactSuggestionAcceptInput { id: artifact, suggestion },
+                        suggestion_line,
+                    )
+                    .await
+            }
+            ArtifactSuggestionAction::Reject { artifact, suggestion } => {
+                client
+                    .mutate::<ops::ArtifactSuggestionReject>(
+                        "artifact suggestion reject",
+                        &ArtifactSuggestionAcceptInput { id: artifact, suggestion },
+                        suggestion_line,
+                    )
+                    .await
+            }
         },
         ArtifactAction::History(cmd) => match cmd.action {
             ArtifactHistoryAction::List { artifact, limit } => {
-                let entries = client.ask::<ops::ArtifactHistoryList>(&ArtifactHistoryListRequest { id: artifact, limit })?;
+                let entries = client
+                    .ask::<ops::ArtifactHistoryList>(&ArtifactHistoryListRequest { id: artifact, limit })
+                    .await?;
                 client.output.show(&entries, |list| {
                     list.iter()
                         .map(|e| line(&[&e.frontiers, &e.origin, &e.author, e.summary.as_deref().unwrap_or("")]))
@@ -668,7 +688,9 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
                 Ok(())
             }
             ArtifactHistoryAction::Preview { artifact, frontiers } => {
-                let preview = client.ask::<ops::ArtifactHistoryPreview>(&ArtifactHistoryPreviewRequest { id: artifact, frontiers })?;
+                let preview = client
+                    .ask::<ops::ArtifactHistoryPreview>(&ArtifactHistoryPreviewRequest { id: artifact, frontiers })
+                    .await?;
                 client.output.show(&preview, |p| {
                     p.files
                         .iter()
@@ -678,33 +700,47 @@ pub fn run(client: &Client, cmd: ArtifactCmd) -> Done {
                 });
                 Ok(())
             }
-            ArtifactHistoryAction::Restore { artifact, frontiers, note } => client.mutate::<ops::ArtifactHistoryRestore>(
-                "artifact history restore",
-                &ArtifactHistoryRestoreRequest { id: artifact, frontiers, note },
-                artifact_line,
-            ),
+            ArtifactHistoryAction::Restore { artifact, frontiers, note } => {
+                client
+                    .mutate::<ops::ArtifactHistoryRestore>(
+                        "artifact history restore",
+                        &ArtifactHistoryRestoreRequest { id: artifact, frontiers, note },
+                        artifact_line,
+                    )
+                    .await
+            }
             ArtifactHistoryAction::Fork {
                 artifact,
                 frontiers,
                 title,
                 channel,
-            } => client.mutate::<ops::ArtifactHistoryFork>(
-                "artifact history fork",
-                &ArtifactHistoryForkRequest {
-                    id: artifact,
-                    frontiers,
-                    title,
-                    channel,
-                },
-                artifact_line,
-            ),
-            ArtifactHistoryAction::UndoOrigin { artifact, origin } => client.mutate::<ops::ArtifactHistoryUndoOrigin>(
-                "artifact history undo-origin",
-                &ArtifactHistoryUndoOriginRequest { id: artifact, origin },
-                artifact_line,
-            ),
+            } => {
+                client
+                    .mutate::<ops::ArtifactHistoryFork>(
+                        "artifact history fork",
+                        &ArtifactHistoryForkRequest {
+                            id: artifact,
+                            frontiers,
+                            title,
+                            channel,
+                        },
+                        artifact_line,
+                    )
+                    .await
+            }
+            ArtifactHistoryAction::UndoOrigin { artifact, origin } => {
+                client
+                    .mutate::<ops::ArtifactHistoryUndoOrigin>(
+                        "artifact history undo-origin",
+                        &ArtifactHistoryUndoOriginRequest { id: artifact, origin },
+                        artifact_line,
+                    )
+                    .await
+            }
             ArtifactHistoryAction::Compact { artifact } => {
-                client.mutate::<ops::ArtifactHistoryCompact>("artifact history compact", &ArtifactHistoryCompactRequest { id: artifact }, artifact_line)
+                client
+                    .mutate::<ops::ArtifactHistoryCompact>("artifact history compact", &ArtifactHistoryCompactRequest { id: artifact }, artifact_line)
+                    .await
             }
         },
     }

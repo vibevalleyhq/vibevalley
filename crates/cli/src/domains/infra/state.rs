@@ -133,7 +133,7 @@ fn show_slice_json(client: &Client, kind: SliceKind, data: &str) -> Done {
     Ok(())
 }
 
-pub fn run(client: &Client, cmd: StateCmd) -> Done {
+pub async fn run(client: &Client, cmd: StateCmd) -> Done {
     if cmd.watch {
         let Some(slice_arg) = cmd.slice else {
             return Err(Failure::usage(
@@ -144,24 +144,28 @@ pub fn run(client: &Client, cmd: StateCmd) -> Done {
         let kind: SliceKind = slice_arg.into();
         let timeout = cmd.timeout.map(|s| Duration::from_secs(s.max(1) as u64));
         let path = format!("/api/v1/slice/{}", kind.as_str());
-        return client.sse(&path, timeout, |data| {
-            show_slice_json(client, kind, data)?;
-            Ok(true)
-        });
+        return client
+            .sse(&path, timeout, async |data| {
+                show_slice_json(client, kind, data)?;
+                Ok(true)
+            })
+            .await;
     }
 
     if let Some(slice_arg) = cmd.slice {
         let kind: SliceKind = slice_arg.into();
-        let data = client.get_text(&format!("/api/v1/slice/{}?once=1", kind.as_str()))?;
+        let data = client.get_text(&format!("/api/v1/slice/{}?once=1", kind.as_str())).await?;
         return show_slice_json(client, kind, &data);
     }
 
-    let board: BoardSlice = client.slice(SliceKind::Board)?;
-    let sessions: SessionsSlice = client.slice(SliceKind::Sessions)?;
-    let collab: CollabSlice = client.slice(SliceKind::Collab)?;
-    let inbox: InboxSlice = client.slice(SliceKind::Inbox)?;
-    let ops: OpsSlice = client.slice(SliceKind::Ops)?;
-    let farm: FarmFrame = client.slice(SliceKind::Farm)?;
+    let (board, sessions, collab, inbox, ops, farm) = tokio::try_join!(
+        client.slice::<BoardSlice>(SliceKind::Board),
+        client.slice::<SessionsSlice>(SliceKind::Sessions),
+        client.slice::<CollabSlice>(SliceKind::Collab),
+        client.slice::<InboxSlice>(SliceKind::Inbox),
+        client.slice::<OpsSlice>(SliceKind::Ops),
+        client.slice::<FarmFrame>(SliceKind::Farm),
+    )?;
     let seq = [board.seq, sessions.seq, collab.seq, inbox.seq, ops.seq, farm.seq]
         .into_iter()
         .max()

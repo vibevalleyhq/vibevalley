@@ -139,24 +139,28 @@ fn infer_kind(mime: &str) -> Option<MediaInputKind> {
     }
 }
 
-pub fn run(client: &Client, cmd: MediaCmd) -> Done {
+pub async fn run(client: &Client, cmd: MediaCmd) -> Done {
     match cmd.action {
         MediaAction::Job(job) => match job.action {
             MediaJobAction::List => {
-                let jobs = client.ask::<ops::MediaJobList>(&())?;
+                let jobs = client.ask::<ops::MediaJobList>(&()).await?;
                 client.output.show(&jobs, |list| list.iter().map(job_line).collect::<Vec<_>>().join("\n"));
                 Ok(())
             }
             MediaJobAction::Show { id } => {
-                let found = client.ask::<ops::MediaJobGet>(&MediaJobRequest { id })?;
+                let found = client.ask::<ops::MediaJobGet>(&MediaJobRequest { id }).await?;
                 client.output.show(&found, job_line);
                 Ok(())
             }
-            MediaJobAction::Cancel { id } => client.mutate::<ops::MediaJobCancel>("media job cancel", &MediaJobRequest { id }, job_line),
+            MediaJobAction::Cancel { id } => {
+                client
+                    .mutate::<ops::MediaJobCancel>("media job cancel", &MediaJobRequest { id }, job_line)
+                    .await
+            }
         },
         MediaAction::Input(input) => match input.action {
             MediaInputAction::List => {
-                let inputs = client.ask::<ops::MediaInputList>(&())?;
+                let inputs = client.ask::<ops::MediaInputList>(&()).await?;
                 client.output.show(&inputs, |list| list.iter().map(input_line).collect::<Vec<_>>().join("\n"));
                 Ok(())
             }
@@ -178,23 +182,29 @@ pub fn run(client: &Client, cmd: MediaCmd) -> Done {
                 let name = name
                     .or_else(|| file.file_name().and_then(|n| n.to_str()).map(ToString::to_string))
                     .unwrap_or_else(|| "input".into());
-                let reserved = client.ask::<ops::MediaInputCreate>(&MediaInputRequest {
-                    kind,
-                    name,
-                    mime,
-                    size: bytes.len() as i64,
-                })?;
-                let uploaded: MediaInput = client.put_bytes(
-                    &format!("/api/v1/media/input/{}/content", url_segment(&reserved.id)),
-                    "application/octet-stream",
-                    &bytes,
-                )?;
+                let reserved = client
+                    .ask::<ops::MediaInputCreate>(&MediaInputRequest {
+                        kind,
+                        name,
+                        mime,
+                        size: bytes.len() as i64,
+                    })
+                    .await?;
+                let uploaded: MediaInput = client
+                    .put_bytes(
+                        &format!("/api/v1/media/input/{}/content", url_segment(&reserved.id)),
+                        "application/octet-stream",
+                        &bytes,
+                    )
+                    .await?;
                 client.output.show(&uploaded, input_line);
                 Ok(())
             }
             MediaInputAction::Delete { id } => {
                 let key = id.clone();
-                client.mutate::<ops::MediaInputDelete>("media input delete", &MediaJobRequest { id }, |_| format!("deleted {key}"))
+                client
+                    .mutate::<ops::MediaInputDelete>("media input delete", &MediaJobRequest { id }, |_| format!("deleted {key}"))
+                    .await
             }
         },
     }

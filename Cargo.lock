@@ -12428,6 +12428,7 @@ dependencies = [
  "url",
  "uuid",
  "vibevalley-core",
+ "vibevalley-git",
  "vibevalley-protocol",
  "vibevalley-runtime",
  "vibevalley-server",

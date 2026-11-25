@@ -91,7 +91,7 @@ fn failed(check: &'static str, why: String, next: Vec<Next>) -> DoctorCheck {
     DoctorCheck::Failed { check, ok: false, why, next }
 }
 
-pub fn run(client: &Client, cmd: DoctorCmd) -> Done {
+pub async fn run(client: &Client, cmd: DoctorCmd) -> Done {
     let channel = vibevalley_protocol::home::current_channel().as_str();
     let home = client.home.clone();
     let from = match client.server_source {
@@ -109,7 +109,7 @@ pub fn run(client: &Client, cmd: DoctorCmd) -> Done {
         from,
     }];
 
-    match client.ask::<ops::ServerHealthGet>(&()) {
+    match client.ask::<ops::ServerHealthGet>(&()).await {
         Ok(health) => checks.push(DoctorCheck::Server {
             check: "server",
             ok: health.ok,
@@ -131,11 +131,14 @@ pub fn run(client: &Client, cmd: DoctorCmd) -> Done {
 
     let mut state_seq: Option<i64> = None;
     let state_timeout = Duration::from_secs(cmd.timeout.max(1) as u64);
-    match client.sse("/api/v1/slice/board", Some(state_timeout), |data| {
-        let slice: BoardSlice = serde_json::from_str(data).map_err(decode_failure)?;
-        state_seq = Some(slice.seq);
-        Ok(false)
-    }) {
+    match client
+        .sse("/api/v1/slice/board", Some(state_timeout), async |data| {
+            let slice: BoardSlice = serde_json::from_str(data).map_err(decode_failure)?;
+            state_seq = Some(slice.seq);
+            Ok(false)
+        })
+        .await
+    {
         Ok(()) => checks.push(DoctorCheck::State {
             check: "state",
             ok: true,
@@ -151,7 +154,7 @@ pub fn run(client: &Client, cmd: DoctorCmd) -> Done {
         )),
     }
 
-    let runtimes = client.ask::<ops::RuntimeList>(&())?;
+    let runtimes = client.ask::<ops::RuntimeList>(&()).await?;
     let installed: Vec<String> = runtimes
         .iter()
         .filter(|r| matches!(r.installation, Installation::Available(_)))
@@ -174,7 +177,7 @@ pub fn run(client: &Client, cmd: DoctorCmd) -> Done {
         }
     });
 
-    let settings = client.ask::<ops::SettingGet>(&())?;
+    let settings = client.ask::<ops::SettingGet>(&()).await?;
     checks.push(match settings.deepseek_api_key.source {
         Some(source) => DoctorCheck::Model {
             check: "model",
