@@ -131,6 +131,9 @@ pub enum IssueActionCmd {
         /// Acceptance criterion (repeatable)
         #[arg(long)]
         criterion: Vec<String>,
+        /// Uploaded attachment id (repeatable)
+        #[arg(long)]
+        attach: Vec<String>,
         /// Idempotency key
         #[arg(long)]
         key: Option<String>,
@@ -158,6 +161,9 @@ pub enum IssueActionCmd {
         /// Replace acceptance criteria (repeatable)
         #[arg(long)]
         criterion: Vec<String>,
+        /// Replace attachments with uploaded attachment ids (repeatable)
+        #[arg(long)]
+        attach: Vec<String>,
     },
     /// Transition an issue to a new status
     #[command(after_help = "Examples:\n  vibevalley issue status 12 todo\n  vibevalley issue status 12 done --dry-run")]
@@ -285,6 +291,10 @@ fn issue_text(issue: &Issue) -> String {
         lines.extend([String::new(), "criteria:".into()]);
         lines.extend(issue.criteria.iter().enumerate().map(|(idx, c)| format!("  {}. {c}", idx + 1)));
     }
+    if !issue.attachments.is_empty() {
+        lines.extend([String::new(), "attachments:".into()]);
+        lines.extend(issue.attachments.iter().map(|a| format!("  {}  {} ({}, {}B)", a.id, a.name, a.r#type, a.size)));
+    }
     if !issue.questions.is_empty() {
         lines.extend([String::new(), "questions:".into()]);
         lines.extend(issue.questions.iter().map(|q| {
@@ -381,6 +391,7 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
             agent,
             priority,
             criterion,
+            attach,
             key,
         } => {
             let request = IssueRequest {
@@ -390,6 +401,7 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
                 agent,
                 priority: priority.map(Into::into),
                 criteria: (!criterion.is_empty()).then_some(criterion),
+                attachments: (!attach.is_empty()).then_some(attach),
                 request_key: key,
                 ..Default::default()
             };
@@ -403,6 +415,7 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
             agent,
             priority,
             criterion,
+            attach,
         } => {
             let request = IssueUpdateInput {
                 id: issue_ref(&issue),
@@ -412,6 +425,7 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
                 agent,
                 priority: priority.map(Into::into),
                 criteria: (!criterion.is_empty()).then_some(criterion),
+                attachments: (!attach.is_empty()).then_some(attach),
                 ..Default::default()
             };
             client.mutate::<ops::IssueUpdate>("issue edit", &request, applied_line).await

@@ -242,6 +242,9 @@ pub async fn dispatch_mcp_tunnel_async(mcp: Option<SharedMcp>, req: vibevalley_p
         content_type: "application/json".to_string(),
         body,
     };
+    if req.session_token.trim().is_empty() {
+        return reply(401, r#"{"error":"unauthorized"}"#.to_string());
+    }
     if req.session_token.starts_with("vv_dev_") {
         return reply(403, r#"{"error":"forbidden"}"#.to_string());
     }

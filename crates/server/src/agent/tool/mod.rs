@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 use vibevalley_protocol::{Issue, Session};
 
 use crate::BoxFuture;
-use crate::agent::mcp::{Resource, ToolDispatchPort, ToolSpecWire};
+use crate::agent::mcp::{McpResourceContentWire, McpResourceTemplateWire, McpResourceWire, Resource, ResourceReader, ToolDispatchPort, ToolSpecWire};
 use crate::agent::memory::Memory;
 use crate::agent::profile::{Profile, text};
 use crate::artifact::Manager as ArtifactManager;
@@ -30,6 +30,7 @@ use crate::cron::Scheduler as CronScheduler;
 use crate::issue::{Board, Pull};
 use crate::repo::Repo;
 use crate::runtime::Runtime;
+use crate::storage::Storage;
 
 /// A tool as the model sees it.
 #[derive(Deserialize, Clone)]
@@ -84,6 +85,7 @@ pub struct ToolRegistry {
     pub chat: Arc<Chat>,
     pub pull: Arc<Pull>,
     pub artifact: Arc<ArtifactManager>,
+    pub storage: Arc<Storage>,
     pub repos_root: PathBuf,
 }
 
@@ -166,6 +168,17 @@ impl ToolRegistry {
             None => Err(format!("没成：没有 {name} 这个工具")),
         }
     }
+
+    pub async fn call_readonly_issue_tool_async(&self, name: &str, args_json: &str) -> Result<String, String> {
+        if !matches!(name, "issue_list" | "issue_get") {
+            return Err("没认出你是谁：这些工具只给执行会话用".into());
+        }
+        let tools = helper();
+        match tools.into_iter().find(|t| t.words.name == name) {
+            Some(t) => t.run_async(self, &Who::Orchestrator(Route::default()), args_json).await,
+            None => Err(format!("没成：没有 {name} 这个工具")),
+        }
+    }
 }
 
 impl ToolDispatchPort for ToolRegistry {
@@ -179,6 +192,29 @@ impl ToolDispatchPort for ToolRegistry {
 
     fn call_helper_async<'a>(&'a self, session: Session, name: &'a str, args_json: &'a str) -> BoxFuture<'a, Result<String, String>> {
         Box::pin(ToolRegistry::call_helper_async(self, session, name, args_json))
+    }
+
+    fn call_readonly_issue_tool_async<'a>(&'a self, name: &'a str, args_json: &'a str) -> BoxFuture<'a, Result<String, String>> {
+        Box::pin(ToolRegistry::call_readonly_issue_tool_async(self, name, args_json))
+    }
+
+    fn list_resources_async<'a>(&'a self) -> BoxFuture<'a, Vec<McpResourceWire>> {
+        Box::pin(self.resource.list_mcp_resources_async())
+    }
+
+    fn list_resource_templates(&self) -> Vec<McpResourceTemplateWire> {
+        self.resource.list_mcp_resource_templates()
+    }
+
+    fn read_resource_async<'a>(&'a self, session: Option<Session>, uri: &'a str) -> BoxFuture<'a, Result<McpResourceContentWire, String>> {
+        Box::pin(async move {
+            let reader = match session.as_ref() {
+                Some(s) if s.is_orchestrator() => ResourceReader::Orchestrator,
+                Some(s) => ResourceReader::Helper(s),
+                None => ResourceReader::LocalReadOnly,
+            };
+            self.resource.read_mcp_async(reader, uri, Some(&self.storage)).await
+        })
     }
 }
 
@@ -420,6 +456,8 @@ mod tests {
     fn artifact_directory_tools_are_listed_with_expected_replay_safety() {
         for tools in [orchestrator(), helper()] {
             for (op, expected_safe) in [
+                ("issue.list", true),
+                ("issue.get", true),
                 ("artifact.type.list", true),
                 ("artifact.type.read", true),
                 ("artifact.file.list", true),

@@ -8,6 +8,7 @@ import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { SearchField, Select } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
+import { IconButton } from "../../../design/IconButton";
 import { motionClass } from "../../../design/motion";
 import { Segmented } from "../../../design/Segmented";
 import { Bubble } from "../../../design/Tip";
@@ -147,7 +148,7 @@ export function IssuesPage(props: { rest: string }) {
     { when: "notEditing" },
   );
   const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
-    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? ""));
+    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? "", where.attachments));
     if (!made) return false;
     rememberPick(where.agent ?? "", where.repo ?? "");
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
@@ -366,20 +367,14 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
             <Text class="text-sm font-medium text-muted">{props.backLabel}</Text>
           </View>
           <If when={chrome.hasSheet()}>
-            <View
-              role="button"
-              testID="issue-inspector-toggle"
-              accessibilityLabel={t("web.issue.detail.properties")}
-              accessibilityState={{ selected: chrome.inspectorVisible() }}
-              tooltip={<Bubble text={t("web.issue.detail.properties")} placement="bottom" />}
-              onPress={() => chrome.toggleInspector()}
-              class={`h-7 flex-row items-center gap-1.5 rounded-md border px-2 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${
-                chrome.inspectorVisible() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
-              }`}
-            >
-              <Icon name="info" size={14} tone={chrome.inspectorVisible() ? "ink" : "muted"} />
-              <Text class={`text-xs font-medium ${chrome.inspectorVisible() ? "text-ink" : "text-muted"}`}>{t("web.issue.detail.properties")}</Text>
-            </View>
+            <IconButton
+              testid="issue-inspector-toggle"
+              icon="sidebarRight"
+              size={14}
+              pressed={chrome.inspectorVisible()}
+              label={t("web.issue.detail.properties")}
+              onClick={() => chrome.toggleInspector()}
+            />
           </If>
         </View>
         <View class="min-h-0 flex-1">{props.children}</View>

@@ -20,9 +20,9 @@ fn refused(key: &str, params: vibevalley_i18n::Params) -> BoardError {
 }
 
 impl Board {
-    /// The title, the priority and `deliver` may change while the issue is
-    /// open; the rest is what the helper was asked, so only before it is
-    /// sent. An empty `agent` leaves it unassigned; `before` places it on
+    /// The title, the priority, `deliver`, and `attachments` may change while
+    /// the issue is open; the rest is what the helper was asked, so only before
+    /// it is sent. An empty `agent` leaves it unassigned; `before` places it on
     /// the board before that issue ("" last).
     pub fn edit_async<'a>(
         &'a self,
@@ -44,6 +44,8 @@ impl Board {
                 }
             } else if was.executions().next().is_some() {
                 return Err(refused("server.issue.started", &[]));
+            } else if upd.attachments.is_some() && was.status.is_closed() {
+                return Err(refused("server.issue.closed", &[]));
             }
             let (title, description) = issue_words(
                 upd.title.as_deref().unwrap_or(&was.title),
@@ -81,6 +83,9 @@ impl Board {
             }
             if let Some(machine) = upd.machine_id.as_deref().map(str::trim) {
                 issue.machine_id = (!machine.is_empty()).then(|| machine.to_string());
+            }
+            if let Some(ids) = &upd.attachments {
+                issue.attachments = self.resolve_attachments_async(ids).await?;
             }
             let mut edited = vec![issue];
             if let Some(before) = &upd.before {

@@ -143,6 +143,59 @@
   }
  },
  {
+  "op": "issue.list",
+  "name": "issue_list",
+  "description": "查看工单列表：可按仓库（repo）、状态（status）、关键词（text）、是否只看等用户的（wantsUser）或是否包含已关闭工单（closed）筛选；每行显示编号、短标题、状态、仓库、执行者与附件数量。查看单张工单全文与附件本地路径用 issue_get。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "closed": {
+     "description": "也列关上的（已完成、已取消）；不填只列开着的",
+     "type": "boolean"
+    },
+    "limit": {
+     "description": "最多列几张，默认 20",
+     "type": "number"
+    },
+    "repo": {
+     "description": "只看这个仓库的",
+     "type": "string"
+    },
+    "status": {
+     "description": "只看这个状态的：备选、待办、处理中、等你看、已完成、已取消",
+     "type": "string"
+    },
+    "text": {
+     "description": "标题或说明里有这些字的",
+     "type": "string"
+    },
+    "wantsUser": {
+     "description": "只看在等用户的：等回答、等验收、卡住了；按等了多久排，久的在前",
+     "type": "boolean"
+    }
+   },
+   "type": "object"
+  }
+ },
+ {
+  "op": "issue.get",
+  "name": "issue_get",
+  "description": "查看一张工单的完整信息：标题与说明、验收标准、待回答问题、待修项、附件列表及其本地文件路径（可直接读取）、动态里程碑以及关联执行会话的上一轮汇报。",
+  "parameters": {
+   "additionalProperties": true,
+   "properties": {
+    "id": {
+     "description": "任务编号（#41 或 41）、工单 id，或正在做它的执行会话的名字",
+     "type": "string"
+    }
+   },
+   "required": [
+    "id"
+   ],
+   "type": "object"
+  }
+ },
+ {
   "op": "issue.split",
   "name": "issue_split",
   "description": "把你手上这个任务拆成几个子任务，挂在它下面，马上派给几个执行会话分头做（有先后的按 needs 等）。读完代码觉得这件活一个人做太大、能分成几件各自提交和验证的事时用；一般三到六张，最多 12 张。拆之前把已经做的提交：计划的分支从你的分支顶上开，没提交的带不过去。拆完你就别再改代码，汇报拆成了哪几步，这一轮结束。",

@@ -17,10 +17,24 @@ export function createWriteKey() {
 }
 
 /** The plus: an issue made at once in the backlog. With words, they are its title and its draft starts from them. */
-export async function writeIssue(text: string, agent: string, repo: string, requestKey: string, machineId = ""): Promise<{ issue: Issue; refused: string }> {
+export async function writeIssue(
+  text: string,
+  agent: string,
+  repo: string,
+  requestKey: string,
+  machineId = "",
+  attachments?: readonly string[],
+): Promise<{ issue: Issue; refused: string }> {
   const words = text.trim();
   const made = await api.issue.create(
-    omitUndefined({ title: words || newIssueTitle, repo: repo || undefined, agent: agent || undefined, machineId: machineId || undefined, requestKey }),
+    omitUndefined({
+      title: words || newIssueTitle,
+      repo: repo || undefined,
+      agent: agent || undefined,
+      machineId: machineId || undefined,
+      attachments: attachments && attachments.length > 0 ? [...attachments] : undefined,
+      requestKey,
+    }),
   );
   if (!words) return { issue: made, refused: "" };
   try {
@@ -29,6 +43,11 @@ export async function writeIssue(text: string, agent: string, repo: string, requ
     if (e instanceof VibeValleyApiError) return { issue: made, refused: e.reason };
     throw e;
   }
+}
+
+/** Replaces the attachment list on an open issue. */
+export function updateIssueAttachments(id: string, attachments: readonly string[]): Promise<AppliedIssue> {
+  return api.issue.update({ id, attachments: [...attachments] });
 }
 
 // An issue's labels set by the user on its page (title, priority, what it delivers): an intent (state/intent.ts) on issue.update,

@@ -768,6 +768,9 @@ pub struct Issue {
     pub last_run: Option<IssueLastRun>,
     pub answer: Option<IssueAnswer>,
     pub stage: IssueStage,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<Attachment>>", optional))]
+    pub attachments: Vec<Attachment>,
 }
 
 /// Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
@@ -816,6 +819,9 @@ pub struct AppliedIssue {
     pub last_run: Option<IssueLastRun>,
     pub answer: Option<IssueAnswer>,
     pub stage: IssueStage,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<Attachment>>", optional))]
+    pub attachments: Vec<Attachment>,
     pub seq: i64,
 }
 
@@ -856,6 +862,7 @@ impl AppliedIssue {
             last_run: issue.last_run,
             answer: issue.answer,
             stage: issue.stage,
+            attachments: issue.attachments,
             seq,
         }
     }
@@ -878,6 +885,8 @@ pub struct IssueUpdate {
     pub deliver: Option<Deliverable>,
     /// Board placement before this issue id; "" places it last. Valid only before dispatch.
     pub before: Option<String>,
+    #[serde(default)]
+    pub attachments: Option<Vec<String>>,
 }
 
 #[skip_serializing_none]
@@ -924,6 +933,8 @@ pub struct IssueRequest {
     pub deliver: Option<Deliverable>,
     pub auto_submit_pr: Option<bool>,
     pub criteria: Option<Vec<String>>,
+    #[serde(default)]
+    pub attachments: Option<Vec<String>>,
     /// Idempotency key deduplicating retries after a lost response.
     pub request_key: Option<String>,
 }
@@ -1190,6 +1201,8 @@ pub struct IssueUpdateInput {
     pub criteria: Option<Vec<String>>,
     pub deliver: Option<Deliverable>,
     pub before: Option<String>,
+    #[serde(default)]
+    pub attachments: Option<Vec<String>>,
 }
 
 #[skip_serializing_none]

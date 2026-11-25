@@ -181,7 +181,8 @@ function Row(props: {
   const look = computed(() => cardLook(props.card, props.nameOf, issues(), now()));
   const repo = computed(() => cardRepo(props.card));
   const shownFlags = computed(() => (props.wide ? look().flags : look().flags.slice(0, 1)));
-  const hasTrailingMarks = computed(() => Boolean(look().progress) || shownFlags().length > 0);
+  const attachmentCount = computed(() => props.card.issue.attachments?.length ?? 0);
+  const hasTrailingMarks = computed(() => Boolean(look().progress) || shownFlags().length > 0 || attachmentCount() > 0);
   return (
     <View
       role="button"
@@ -224,6 +225,17 @@ function Row(props: {
       <If when={hasTrailingMarks()}>
         <View class="shrink-0 flex-row items-center gap-1.5">
           <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
+          <If when={attachmentCount() > 0}>
+            <View
+              testID="row-attachments"
+              accessibilityLabel={t("web.issue.attachments.count", { n: attachmentCount() })}
+              tooltip={<Bubble text={t("web.issue.attachments.count", { n: attachmentCount() })} />}
+              class="flex-row items-center gap-0.5"
+            >
+              <Icon name="attach" size={12} tone="muted" />
+              <Text class="text-2xs text-muted tabular-nums">{String(attachmentCount())}</Text>
+            </View>
+          </If>
           <Each of={shownFlags()} key={(f) => `${f.tone}:${f.text}`}>
             {(f) => <FlagChip text={f().text} tone={f().tone} />}
           </Each>

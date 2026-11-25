@@ -510,6 +510,8 @@ impl SessionEngine {
             effort: effective_effort.clone(),
             permission_mode,
         };
+        let mut mcp_servers: Vec<_> = self.door_for(&id).into_iter().collect();
+        mcp_servers.extend(drive.mcp_servers.iter().cloned());
         let env = self.build_workspace_env(&id, &drive, repo_name.as_deref());
         let opts = SessionOptions {
             cwd: PathBuf::from(&cwd),
@@ -519,6 +521,7 @@ impl SessionEngine {
             env,
             record_to: Some(self.record_path(&id)),
             effort: effective_effort,
+            mcp_servers,
             ..Default::default()
         };
         let agent = drive.runtime.open(opts).await?;
@@ -576,6 +579,8 @@ impl SessionEngine {
         } else {
             None
         };
+        let mut mcp_servers: Vec<_> = self.door_for(&session.id).into_iter().collect();
+        mcp_servers.extend(drive.mcp_servers.iter().cloned());
         let mut env = drive.env.clone();
         if !drive.is_local {
             let repo_ref = session.repo_name().map(|r| self.0.worktree.repo_remote_url(r).unwrap_or_else(|| r.to_string()));
@@ -596,6 +601,7 @@ impl SessionEngine {
             env,
             record_to: Some(self.record_path(&session.id)),
             effort: meta.effort.clone(),
+            mcp_servers,
             ..Default::default()
         };
         let agent = drive.runtime.open(opts).await?;

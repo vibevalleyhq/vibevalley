@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { Attachment } from "../attachment/schema";
 import type { Codec } from "../codec";
 import { IssueId, Outcome, SessionId, Spent } from "../common/schema";
 import { Conflict, ReviewRevision } from "../repo/schema";
@@ -199,6 +200,7 @@ const issueFields = {
   ),
   answer: z.exactOptional(IssueAnswer),
   stage: IssueStage,
+  attachments: z.exactOptional(z.array(Attachment)),
 };
 
 export const Issue = z.object(issueFields) satisfies Codec<T.Issue>;
@@ -215,6 +217,7 @@ export const IssueUpdate = z.object({
   criteria: z.exactOptional(z.array(z.string())),
   deliver: z.exactOptional(Deliverable),
   before: z.exactOptional(z.string()),
+  attachments: z.exactOptional(z.array(z.string())),
 }) satisfies Codec<T.IssueUpdate>;
 
 export const IssueHistory = z.object({
@@ -241,6 +244,7 @@ export const IssueRequest = z.object({
   deliver: z.exactOptional(Deliverable),
   autoSubmitPr: z.exactOptional(z.boolean()),
   criteria: z.exactOptional(z.array(z.string())),
+  attachments: z.exactOptional(z.array(z.string())),
   requestKey: z.exactOptional(z.string()),
 }) satisfies Codec<T.IssueRequest>;
 

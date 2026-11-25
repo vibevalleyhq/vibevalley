@@ -1,7 +1,7 @@
 import { computed, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Issue, IssueAction, IssueAnswer, Milestone, Question as QuestionItem, SessionEvent } from "@vibevalley/protocol";
+import type { Attachment, Issue, IssueAction, IssueAnswer, Milestone, Question as QuestionItem, SessionEvent } from "@vibevalley/protocol";
 import { plainText } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
@@ -22,7 +22,9 @@ import { useIssueRuns } from "../model/history";
 import { issueTag, runText, tagOpen, tagText } from "../model/issue";
 import { issueMove, issueMoveOf, sendMove } from "../model/moves";
 import { type CriterionRow, stageTone } from "../model/overview";
+import { updateIssueAttachments } from "../model/write";
 import { ActLines } from "./ActLines";
+import { IssueAttachments } from "./IssueAttachments";
 import { IssueSheet, Note, Property, SheetLabel } from "./Sheet";
 
 /** A question of the helper's: its options are replies as they are, one click each. */
@@ -222,6 +224,18 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
   const move = computed(() => issueMoveOf(props.issue.id, moves.list()));
   const busy = computed(() => act.busy() || move()?.state === "moving");
   const tone = computed(() => stageTone[props.issue.stage.state]);
+  const open = computed(() => props.issue.status !== "done" && props.issue.status !== "canceled");
+  const attachAct = createAct();
+  const hasAttachmentsSection = computed(() => open() || (props.issue.attachments?.length ?? 0) > 0);
+  const addAttachment = (file: Attachment) => {
+    const current = (props.issue.attachments ?? []).map((a) => a.id);
+    if (current.includes(file.id)) return;
+    return attachAct.run(() => updateIssueAttachments(props.issue.id, [...current, file.id]));
+  };
+  const removeAttachment = (id: string) => {
+    const next = (props.issue.attachments ?? []).filter((a) => a.id !== id).map((a) => a.id);
+    return attachAct.run(() => updateIssueAttachments(props.issue.id, next));
+  };
   // The orchestrator's answer is the user's to take as done or put away; one that did not end well can only be put away.
   const go = (a: IssueAction) => {
     const issue = props.issue;
@@ -260,8 +274,18 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
           <Markdown size="sm" text={props.issue.description} />
         </View>
       </If>
+      <IssueAttachments
+        files={props.issue.attachments ?? []}
+        editable={open()}
+        busy={attachAct.busy()}
+        first={!props.issue.description && props.issue.stage.state !== "stuck"}
+        onAdd={addAttachment}
+        onRemove={removeAttachment}
+      />
       <View>
-        <SheetLabel first={!props.issue.description && props.issue.stage.state !== "stuck"}>{t("web.issue.detail.runs")}</SheetLabel>
+        <SheetLabel first={!props.issue.description && props.issue.stage.state !== "stuck" && !hasAttachmentsSection()}>
+          {t("web.issue.detail.runs")}
+        </SheetLabel>
         <Runs issue={props.issue.id} version={`${props.issue.status}:${props.issue.closedAt}:${tagOpen(tag())}`} />
       </View>
     </>

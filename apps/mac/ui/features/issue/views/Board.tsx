@@ -376,6 +376,7 @@ function CardView(props: {
   });
   const showsStatus = computed(() => ownStatus(props.card.lane, look().status));
   const unassignedTodo = computed(() => props.card.kind === "todo" && props.card.lane === "todo" && !cardAgent(props.card));
+  const attachmentCount = computed(() => props.card.issue.attachments?.length ?? 0);
   const marks = computed(
     () =>
       showsStatus() ||
@@ -384,6 +385,7 @@ function CardView(props: {
       unassignedTodo() ||
       props.card.kind === "orchestrator" ||
       !!look().progress ||
+      attachmentCount() > 0 ||
       look().flags.length > 0,
   );
   const draggable = computed(() => props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving");
@@ -464,6 +466,17 @@ function CardView(props: {
               </View>
             </If>
             <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
+            <If when={attachmentCount() > 0}>
+              <View
+                testID="card-attachments"
+                accessibilityLabel={t("web.issue.attachments.count", { n: attachmentCount() })}
+                tooltip={<Bubble text={t("web.issue.attachments.count", { n: attachmentCount() })} />}
+                class="flex-row items-center gap-0.5"
+              >
+                <Icon name="attach" size={12} tone="muted" />
+                <Text class="text-2xs text-muted tabular-nums">{String(attachmentCount())}</Text>
+              </View>
+            </If>
             <Each of={look().flags} key={(f) => `${f.tone}:${f.text}`}>
               {(f) => <FlagChip text={f().text} tone={f().tone} />}
             </Each>

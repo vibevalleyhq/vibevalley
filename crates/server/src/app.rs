@@ -148,17 +148,13 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
         None if config.offline_media => crate::fake::moss::network(),
         None => (Arc::new(Http), Arc::new(PublicDownload)),
     };
-    let outbox = Arc::new(Outbox::new(service.clone()));
-    let ctx = Arc::new(Context::new(
-        service,
-        TaskGroup::new(),
+    let (live, outbox, feed, clock) = (
         Arc::new(LiveState::new()),
-        outbox,
+        Arc::new(Outbox::new(service.clone())),
         Arc::new(StateFeed::new()),
         config.clock.clone(),
-        http,
-        download,
-    ));
+    );
+    let ctx = Arc::new(Context::new(service, TaskGroup::new(), live, outbox, feed, clock, http, download));
     let active_subscriptions = Arc::new(AtomicUsize::new(0));
 
     let setting = Setting::open_async(SettingConfig {
@@ -231,12 +227,13 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
     let (runtime, opened) = Box::pin(Runtime::open_async(ctx.clone(), drivers, board_config))
         .await
         .map_err(|e| failed("the runtime")(&e))?;
-    let board = Box::pin(Board::open_async(
+    let board = Box::pin(Board::with_storage(
         ctx.clone(),
         runtime.clone(),
         opened,
         Some(repo.clone()),
         Some(channel.clone()),
+        Some(storage.clone()),
     ))
     .await
     .map_err(|e| failed("the board")(&e))?;
@@ -270,6 +267,7 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
         chat: channel.clone(),
         pull: pull.clone(),
         artifact: artifact.clone(),
+        storage: storage.clone(),
         repos_root: repo.root().to_path_buf(),
     });
     let mcp = Mcp::new(tool.clone(), config.version.clone());

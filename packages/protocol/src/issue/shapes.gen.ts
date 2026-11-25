@@ -1,5 +1,6 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
+import type { Attachment } from "../attachment/shapes.gen";
 import type { IssueId, Outcome, SessionId, Spent } from "../common/shapes.gen";
 import type { Conflict, ReviewRevision } from "../repo/shapes.gen";
 import type { IssueAnswer, PhaseRestingOnly, Session, SessionEvent } from "../session/shapes.gen";
@@ -128,7 +129,7 @@ machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: n
 /**
  * Tracks runs executed without a worker session (e.g. in-process orchestrator); active while `endedAt` is absent.
  */
-lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, };
+lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, };
 
 /**
  * Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
@@ -137,13 +138,13 @@ export type AppliedIssue = { constraints?: IssueConstraints, id: IssueId, number
 /**
  * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
  */
-machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, seq: number, };
+machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, seq: number, };
 
 export type IssueUpdate = { title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable,
 /**
  * Board placement before this issue id; "" places it last. Valid only before dispatch.
  */
-before?: string, };
+before?: string, attachments?: Array<string>, };
 
 export type IssueHistory = { issue: Issue, sessions: Array<Session>, missingSessions: Array<SessionId>, };
 
@@ -153,7 +154,7 @@ export type IssueRefineRequest = { text?: string,
  */
 edit?: IssueUpdate, };
 
-export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>,
+export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>, attachments?: Array<string>,
 /**
  * Idempotency key deduplicating retries after a lost response.
  */
@@ -223,7 +224,7 @@ export type IssueRunListInput = { id: string, };
 
 export type IssueTimelineGetInput = { id: string, };
 
-export type IssueUpdateInput = { id: string, title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable, before?: string, };
+export type IssueUpdateInput = { id: string, title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable, before?: string, attachments?: Array<string>, };
 
 export type IssueDeleteInput = { id: string, };
 

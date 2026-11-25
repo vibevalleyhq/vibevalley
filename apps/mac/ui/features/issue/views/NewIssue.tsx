@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
 import { Select, TextArea } from "../../../design/Field";
+import { IconButton } from "../../../design/IconButton";
 import { Banner } from "../../../design/layout";
 import { toast } from "../../../design/toasts";
 import { useWorkAgents } from "../../../infra/agents";
@@ -15,13 +16,15 @@ import { useRouter } from "../../../infra/router";
 import { prefsNow } from "../../../infra/state/prefs";
 import { canSubmitDraft, type DraftSubmitEvent, type DraftSubmitState, draftSubmitTransition, initialDraftSubmit } from "../model/draftSubmit";
 import { isRuntimeReady } from "../model/onboarding";
+import { createAttachmentUploader, IssueAttachmentStrip } from "./IssueAttachments";
 
-/** The repo, helper, optional execution machine, or starter template text the dialog is opened with. */
+/** The repo, helper, optional execution machine, starter template text, or attachment ids for a new issue. */
 export interface NewIssueAt {
   readonly repo?: string;
   readonly agent?: string;
   readonly machineId?: string;
   readonly text?: string;
+  readonly attachments?: readonly string[];
 }
 
 export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where: NewIssueAt, requestKey: string) => Promise<boolean>; onClose: () => void }) {
@@ -32,6 +35,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
       text: props.at.text ?? "",
       repo: props.at.repo ?? last.repo,
       agent: props.at.agent ?? (last.pick === "auto" ? "" : last.pick),
+      attachments: [],
     }),
   );
   const machineId = signal(props.at.machineId ?? "");
@@ -40,6 +44,9 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     flow.set(next);
     return next;
   };
+  const uploader = createAttachmentUploader((file) => {
+    dispatch({ kind: "addAttachment", file });
+  });
   const draft = () => flow().draft;
   const agents = useWorkAgents(true);
   const repoList = useRepos();
@@ -77,6 +84,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           ...(submitted.repo ? { repo: submitted.repo } : {}),
           ...(submitted.agent ? { agent: submitted.agent } : {}),
           ...(pickedMachine ? { machineId: pickedMachine } : {}),
+          ...(submitted.attachments.length > 0 ? { attachments: submitted.attachments.map((file) => file.id) } : {}),
         },
         requestKey,
       );
@@ -116,6 +124,12 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           onInput={(text) => dispatch({ kind: "setText", text })}
           onFocus={() => textFocused.set(true)}
           onBlur={() => textFocused.set(false)}
+        />
+        <IssueAttachmentStrip
+          files={draft().attachments}
+          uploading={uploader.uploading()}
+          onRemove={(id) => dispatch({ kind: "removeAttachment", id })}
+          testid="issue-new-attachments"
         />
         <If when={!noRepos() || !noReadyRuntimes() || hasMultipleMachines()}>
           <View class="flex-row flex-wrap items-center gap-2">
@@ -182,6 +196,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           </View>
         </If>
         <View class="flex-row items-center justify-end gap-2 border-t border-line pt-3">
+          <IconButton icon="attach" size={14} label={t("web.issue.attachments.attachFile")} onClick={() => void uploader.pick()} testid="issue-new-attach" />
           <Text class="mr-auto text-xs text-faint">{t("web.issue.new.keys")}</Text>
           <Button tone="quiet" testID="issue-new-dialog-never" onPress={() => props.onClose()}>
             {t("web.base.form.never")}
