@@ -306,12 +306,21 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
   });
 
   expect(app.count("id:library-page")).toBe(1);
+  expect(app.count("id:desk")).toBe(0);
   expect(app.count("id:content-sidebar")).toBe(1);
   expect(app.count("id:content-nav-artifact-outline")).toBe(1);
   expect(app.count("id:content-nav-artifact-sheet")).toBe(1);
   expect(app.count("id:content-nav-artifact-prototype")).toBe(1);
   expect(app.count("id:content-nav-artifact-diagram")).toBe(1);
   expect(app.count("id:content-nav-artifact-storyboard")).toBe(1);
+
+  await app.press("id:content-sidebar-toggle");
+  await fake.pump(app);
+  expect(app.count("id:content-sidebar")).toBe(0);
+  expect(app.count("id:content-sidebar-toggle")).toBe(1);
+  await app.press("id:content-sidebar-toggle");
+  await fake.pump(app);
+  expect(app.count("id:content-sidebar")).toBe(1);
 
   fake.clearCalls();
   await app.press("id:content-new-btn");
@@ -335,7 +344,26 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
   await fake.pump(app);
   await fake.pump(app);
   expect(app.count("id:artifacts")).toBe(1);
+  expect(app.count("id:desk")).toBe(0);
   expect(app.count("id:artifact-header")).toBe(1);
+  expect(app.count("id:artifact-collab-bar")).toBe(0);
+  expect(app.count("id:artifact-view-mode")).toBe(1);
+
+  await app.press("id:content-sidebar-toggle");
+  await fake.pump(app);
+  expect(app.count("id:content-sidebar")).toBe(0);
+  expect(app.count("id:content-sidebar-toggle")).toBe(1);
+  await app.press("id:content-sidebar-toggle");
+  await fake.pump(app);
+  expect(app.count("id:content-sidebar")).toBe(1);
+
+  await app.press("id:artifact-rail-toggle");
+  await fake.pump(app);
+  expect(app.count("id:artifact-rail")).toBe(1);
+  expect(app.count("id:splitter-artifact-rail")).toBe(1);
+  await app.press("id:artifact-rail-close");
+  await fake.pump(app);
+  expect(app.count("id:artifact-rail")).toBe(0);
 
   await app.press("id:place-issues");
   await fake.pump(app);

@@ -71,6 +71,7 @@ fn read_issue(r: issue::Model) -> DbResult<Issue> {
     item.findings = read_db_json(r.findings)?;
     item.questions = read_db_json(r.questions)?;
     item.assignments = read_db_json(r.assignments)?;
+    item.attachments = read_db_json(r.attachments)?;
     item.constraints = r.constraints.map(read_db_json).transpose()?;
     item.conflict = r.conflict.map(read_db_json).transpose()?;
     item.last_run = r.last_run.map(read_db_json).transpose()?;
@@ -142,6 +143,7 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
         findings: Set(db_json(&t.findings)?),
         questions: Set(db_json(&t.questions)?),
         assignments: Set(db_json(&t.assignments)?),
+        attachments: Set(db_json(&t.attachments)?),
     };
     let on_conflict = OnConflict::column(issue::Column::Id)
         .update_columns([
@@ -172,6 +174,7 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
             issue::Column::Findings,
             issue::Column::Questions,
             issue::Column::Assignments,
+            issue::Column::Attachments,
         ])
         .to_owned();
     issue::Entity::insert(model).on_conflict(on_conflict).exec(db).await?;

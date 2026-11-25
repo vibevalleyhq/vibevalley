@@ -399,6 +399,14 @@
     "older": "Load earlier messages",
     "empty": "Requirements, execution feedback and deliveries stay here"
   },
+  "attachments": {
+    "title": "Attachments",
+    "attachFile": "Attach file",
+    "count": "{n, plural, one {# attachment} other {# attachments}}",
+    "uploadFailed": "Upload failed: {why}",
+    "uploading": "Uploading {name}…",
+    "remove": "Remove attachment {name}"
+  },
   "guide": {
     "title": "How issues flow",
     "summary": "Assign a helper to launch a worktree session, then inspect changes in Review to complete.",

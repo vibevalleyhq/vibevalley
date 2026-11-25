@@ -46,6 +46,7 @@
     "general": "General & Appearance",
     "appearance": "Appearance",
     "models": "Models & Keys",
+    "skills": "Skills",
     "voice": "Voice",
     "connections": "Connections",
     "remote": "Remote Access",
@@ -57,6 +58,8 @@
   "words": {
     "general": "language start workbench farm theme dark light size zoom scale font animation motion reduce",
     "models": "keys accounts DeepSeek MOSS API key models binding",
+    "skills": "skills skill built-in installed library prompt",
+    "memory": "memory source sources Nowledge EverOS external read write",
     "voice": "call phone recognition speech MOSS live realtime vision transcription",
     "connections": "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
     "remote": "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",

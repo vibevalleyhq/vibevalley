@@ -1,4 +1,4 @@
-import { cleanup, effect, keymap, Scroll, signal, Text, untracked, View, WebView, type InputRef, type JSX } from "nsh";
+import { cleanup, effect, keymap, Scroll, signal, Text, untracked, View, WebView, windowSize, type InputRef, type JSX } from "nsh";
 import { Input } from "nsh/base";
 
 import { currentLocale, t } from "@vibevalley/i18n";
@@ -11,12 +11,13 @@ import { IconButton } from "../../design/IconButton";
 import { Banner, Empty } from "../../design/layout";
 import { type MoreItem, MoreMenu } from "../../design/MoreMenu";
 import { motionClass } from "../../design/motion";
+import { Segmented } from "../../design/Segmented";
 import { SkeletonBar, SkeletonLines, useDelayedBusy } from "../../design/Skeleton";
+import { Splitter, usePaneWidth } from "../../design/Splitter";
 import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { api, newSendKey, reasonOf } from "../../infra/api";
-import { Keyed, useNow } from "../../infra/base/dom";
-import { ago } from "../../infra/base/format";
+import { Keyed } from "../../infra/base/dom";
 import { useCollabSlice, useIssue } from "../../infra/frame";
 import { ready, useQueryClient } from "../../infra/query";
 import { richNative } from "../../infra/rich";
@@ -24,25 +25,38 @@ import { Link as A, useRouter, useSearch } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { contentPresenting, contentSidebarOpen, isPinned, openTemplatePicker, togglePinned } from "../../infra/state/contentNav";
 import { artifactHref, kindLabel, useArtifact, useArtifacts } from "./ArtifactCard";
-import { ArtifactDirectoryView } from "./ArtifactDirectoryView";
+import { type ArtifactDirectoryMeta, ArtifactDirectoryView, type ArtifactViewTab } from "./ArtifactDirectoryView";
 import { buildPrototypeDocument } from "./frame";
 import { InstallAppletButton } from "./InstallAppletModal";
 import { exportArtifactDirectory, requestArtifactChatFocus } from "./store";
 import { TimelineBar } from "./TimelineBar";
 import { BOARD_FILE_PATH, boardToNativeEntries, parseBoardDocument } from "./WhiteboardView";
 
+/** Tailwind's lg (64rem): side-by-side 3rd column on desktop, full overlay below. */
+const lg = () => windowSize().width >= 1024;
+
 /** Provided by app/: channel shows artifacts, so artifact does not import channel back. */
 export type ArtifactChat = (props: {
   readonly channel?: string | undefined;
   readonly issue?: string | undefined;
   readonly point?: number | undefined;
+  readonly onClose?: (() => void) | undefined;
 }) => JSX.Element;
 
 function ArtifactSkeleton() {
   return (
     <View testID="artifact-skeleton" accessibilityState={{ busy: true }} class="min-h-0 flex-1 bg-page">
-      <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
-        <SkeletonBar class="h-6 w-16 rounded-md" />
+      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+        <If when={!contentSidebarOpen.get()}>
+          <IconButton
+            icon="sidebar"
+            size={16}
+            label={t("web.library.content.sidebarToggle")}
+            testid="content-sidebar-toggle"
+            pressed={false}
+            onClick={() => contentSidebarOpen.set(true)}
+          />
+        </If>
         <SkeletonBar class="h-5 w-44 rounded-sm" />
         <SkeletonBar class="h-5 w-14 rounded-sm" />
         <View class="flex-1" />
@@ -54,6 +68,26 @@ function ArtifactSkeleton() {
         <SkeletonLines rows={["92%", "78%", "85%", "60%", "88%", "45%"]} gap="md" />
       </View>
     </View>
+  );
+}
+
+function CollapsedContentHeader() {
+  return (
+    <If when={!contentSidebarOpen.get()}>
+      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+        <IconButton
+          icon="sidebar"
+          size={16}
+          label={t("web.library.content.sidebarToggle")}
+          testid="content-sidebar-toggle"
+          pressed={false}
+          onClick={() => contentSidebarOpen.set(true)}
+        />
+        <Text role="header" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+          {t("web.library.content.title")}
+        </Text>
+      </View>
+    </If>
   );
 }
 
@@ -85,20 +119,26 @@ export function ArtifactsPage(props: { rest: string; chat: ArtifactChat }) {
                   </If>
                 }
               >
-                <Empty
-                  icon="artifacts"
-                  action={
-                    <Button icon="add" onPress={() => openTemplatePicker("deliverable")}>
-                      {t("web.artifact.page.new")}
-                    </Button>
-                  }
-                >
-                  {t("web.artifact.page.none")}
-                </Empty>
+                <View class="min-h-0 flex-1">
+                  <CollapsedContentHeader />
+                  <Empty
+                    icon="artifacts"
+                    action={
+                      <Button icon="add" onPress={() => openTemplatePicker("deliverable")}>
+                        {t("web.artifact.page.new")}
+                      </Button>
+                    }
+                  >
+                    {t("web.artifact.page.none")}
+                  </Empty>
+                </View>
               </If>
             }
           >
-            <Empty icon="artifacts">{reasonOf(all.error())}</Empty>
+            <View class="min-h-0 flex-1">
+              <CollapsedContentHeader />
+              <Empty icon="artifacts">{reasonOf(all.error())}</Empty>
+            </View>
           </If>
         }
       >
@@ -123,7 +163,10 @@ function Opened(props: { id: string; chat: ArtifactChat }) {
             </If>
           }
         >
-          <Empty icon="artifacts">{t("web.artifact.page.gone")}</Empty>
+          <View class="min-h-0 flex-1">
+            <CollapsedContentHeader />
+            <Empty icon="artifacts">{t("web.artifact.page.gone")}</Empty>
+          </View>
         </If>
       }
     >
@@ -185,7 +228,7 @@ function Title(props: { artifact: Artifact }) {
         focused.set(false);
         void save();
       }}
-      class="h-7 min-w-24 max-w-72 flex-1 rounded-md bg-transparent px-1.5 text-base font-semibold text-ink hover:bg-hover focus:bg-hover"
+      class="h-7 min-w-20 max-w-64 shrink rounded-md bg-transparent px-1.5 text-sm font-semibold text-ink hover:bg-hover focus:bg-hover"
     />
   );
 }
@@ -195,7 +238,6 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   const search = useSearch();
   const router = useRouter();
   const collab = useCollabSlice();
-  const now = useNow();
   const asking = signal(false);
   const menu = signal(false);
   const sendMenu = signal(false);
@@ -203,6 +245,9 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   const timelineOpen = signal(false);
   const historyPreview = signal<ArtifactHistoryPreviewResult | undefined>(undefined);
   const revisionKey = signal(0);
+  const viewTab = signal<ArtifactViewTab>("preview");
+  const dirMeta = signal<ArtifactDirectoryMeta>({ fileCount: 0, seq: untracked(() => props.artifact.seq), peers: [] });
+  const railWidth = usePaneWidth("artifact-rail", 352, 280, 560);
 
   const isWideCanvas = () => props.artifact.artifactType !== "docs" && props.artifact.artifactType !== "outline";
   // Wide visual canvases start with the chat rail collapsed so the canvas gets the full width.
@@ -225,6 +270,22 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   const exporting = createAct();
   const sending = createAct();
   const creatingIssue = createAct();
+  const snapshotting = createAct();
+
+  const handleDirMeta = (next: ArtifactDirectoryMeta) => {
+    const prev = untracked(dirMeta);
+    if (
+      prev.fileCount === next.fileCount &&
+      prev.seq === next.seq &&
+      prev.peers.length === next.peers.length &&
+      prev.peers.every((p, i) => p === next.peers[i])
+    ) {
+      return;
+    }
+    dirMeta.set(next);
+  };
+
+  const currentSeq = () => (dirMeta().seq > 0 ? dirMeta().seq : props.artifact.seq);
 
   const pinKey = () => `artifact:${props.artifact.id}`;
   const pinned = () => isPinned(pinKey());
@@ -255,6 +316,22 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
     });
   };
 
+  const createSnapshotVersion = () =>
+    snapshotting.run(async () => {
+      const updated = await api.artifact.version.create({
+        id: props.artifact.id,
+        note: "Snapshot",
+      });
+      await queries.invalidate({ prefix: ["artifacts"] });
+      toast(t("web.artifact.edit.saved", { version: updated.version }));
+    });
+
+  const toggleDefaultDesignSystem = () =>
+    snapshotting.run(async () => {
+      await api.artifact.update({ id: props.artifact.id, isDefault: !props.artifact.isDefault });
+      await queries.invalidate({ prefix: ["artifacts"] });
+    });
+
   const remove = () => {
     const { id, title } = props.artifact;
     return removing.run(async () => {
@@ -266,6 +343,32 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   };
 
   const more = (): MoreItem[] => [
+    ...(selectedVersion() === undefined
+      ? [
+          {
+            key: "snapshot",
+            label: `${t("web.artifact.edit.save")} · seq ${currentSeq()}`,
+            icon: "add" as const,
+            onSelect: () => void createSnapshotVersion(),
+          },
+        ]
+      : []),
+    ...(props.artifact.artifactType === "design-system" && selectedVersion() === undefined
+      ? [
+          {
+            key: "default",
+            label: props.artifact.isDefault ? t("web.artifact.types.unsetDefault") : t("web.artifact.types.setDefault"),
+            icon: "check" as const,
+            onSelect: () => void toggleDefaultDesignSystem(),
+          },
+        ]
+      : []),
+    {
+      key: "export",
+      label: t("web.library.content.exportArtifact"),
+      icon: "download",
+      onSelect: () => void exporting.run(() => exportArtifactDirectory(props.artifact, selectedVersion()?.version)),
+    },
     { key: "issue", label: t("web.library.content.turnIntoIssue"), icon: "issues", onSelect: () => void turnIntoIssue() },
     { key: "delete", label: t("web.artifact.page.delete"), icon: "delete", danger: true, onSelect: () => asking.set(true) },
   ];
@@ -288,32 +391,31 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
       testID="artifact"
       accessibilityLabel={props.artifact.title}
       accessibilityValue={{ text: `${props.artifact.id} ${props.artifact.artifactType} ${selectedVersion()?.version ?? props.artifact.version}` }}
-      class="min-h-0 flex-1 xl:flex-row"
+      class="relative h-full min-h-0 min-w-0 flex-1 flex-row overflow-hidden"
     >
       <View class="min-h-0 min-w-0 flex-1">
         <If when={presenting()}>
-          <View testID="artifact-presenting" class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-side px-3">
+          <View testID="artifact-presenting" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-side px-3">
             <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{props.artifact.title}</Text>
-            <Button icon="close" testID="artifact-present-end" onPress={() => contentPresenting.set(false)}>
+            <Button size="compact" icon="close" testID="artifact-present-end" onPress={() => contentPresenting.set(false)}>
               {t("web.artifact.canvas.close")}
             </Button>
           </View>
         </If>
 
         <If when={!presenting()}>
-          <View testID="artifact-header" class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+          <View testID="artifact-header" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
             <If when={!contentSidebarOpen.get()}>
-              <A
-                href="/library"
-                testID="artifact-back-library"
-                tooltip={<Bubble text={t("web.library.content.back")} />}
-                class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
-              >
-                <Icon name="back" size={14} tone="muted" />
-                <Text class="text-xs font-medium text-muted">{t("web.library.content.back")}</Text>
-              </A>
+              <IconButton
+                icon="sidebar"
+                size={16}
+                label={t("web.library.content.sidebarToggle")}
+                testid="content-sidebar-toggle"
+                pressed={false}
+                onClick={() => contentSidebarOpen.set(true)}
+              />
             </If>
-            <View class="min-w-0 flex-1 flex-row items-center gap-2 overflow-hidden">
+            <View class="min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden">
               <Title artifact={props.artifact} />
               <View class="h-5 shrink-0 items-center justify-center rounded-sm bg-selected px-1.5">
                 <Text class="text-2xs font-medium text-ink">{kindLabel(props.artifact)}</Text>
@@ -355,7 +457,6 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
                   </Each>
                 </View>
               </If>
-              <Text class="hidden shrink-0 text-xs text-muted md:flex">{`${props.artifact.byName} · ${ago(props.artifact.updated, now())}`}</Text>
               <If when={issue()}>
                 {(i) => (
                   <A
@@ -367,8 +468,33 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
                   </A>
                 )}
               </If>
+              <If when={dirMeta().peers.length > 0}>
+                <View testID="artifact-presence-bar" class="shrink-0 flex-row items-center gap-1">
+                  <Each of={dirMeta().peers} key={(p) => p.id}>
+                    {(peer) => (
+                      <View testID="artifact-presence-pill" class="h-5 flex-row items-center gap-1 rounded-full border border-line bg-side px-2">
+                        <View class="size-1.5 shrink-0 rounded-full bg-accent" />
+                        <Text class="max-w-28 truncate text-2xs font-medium text-ink">{peer().status ? `${peer().name} · ${peer().status}` : peer().name}</Text>
+                      </View>
+                    )}
+                  </Each>
+                </View>
+              </If>
             </View>
             <View class="shrink-0 flex-row items-center gap-1">
+              <If when={!historyPreview()}>
+                <Segmented
+                  testid="artifact-view-mode"
+                  label="View mode"
+                  value={viewTab()}
+                  onChange={(v) => viewTab.set(v)}
+                  options={[
+                    { value: "preview" as const, label: "Preview" },
+                    { value: "files" as const, label: dirMeta().fileCount > 0 ? `Files (${dirMeta().fileCount})` : "Files" },
+                  ]}
+                />
+                <View class="mx-0.5 h-4 w-px shrink-0 bg-line" />
+              </If>
               <View
                 role="button"
                 testID="artifact-pin"
@@ -395,17 +521,10 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
                   onOpenChange={(o) => sendMenu.set(o)}
                 />
               </If>
-              <IconButton
-                icon="download"
-                label={t("web.library.content.exportArtifact")}
-                testid="artifact-export"
-                disabled={exporting.busy()}
-                onClick={() => void exporting.run(() => exportArtifactDirectory(props.artifact, selectedVersion()?.version))}
-              />
               <InstallAppletButton artifact={props.artifact} testID="artifact-install-applet" onOpenChange={(open) => appletModalOpen.set(open)} />
               <IconButton
                 icon="clock"
-                label={t("web.artifact.timeline.toggle")}
+                label={`${t("web.artifact.timeline.toggle")} · seq ${currentSeq()}`}
                 testid="artifact-timeline-toggle"
                 pressed={timelineOpen()}
                 onClick={() => {
@@ -415,7 +534,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
                 }}
               />
               <IconButton
-                icon="thread"
+                icon="sidebarRight"
                 label={railOpen() ? t("web.artifact.page.railHide") : t("web.artifact.page.railShow")}
                 testid="artifact-rail-toggle"
                 pressed={railOpen()}
@@ -464,6 +583,10 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
                   artifact={props.artifact}
                   version={selectedVersion()?.version}
                   covered={isCovered()}
+                  tab={viewTab()}
+                  onTabChange={(v) => viewTab.set(v)}
+                  hideToolbar
+                  onMeta={handleDirMeta}
                   onPresent={(on) => contentPresenting.set(on)}
                   onOpenChat={() => {
                     railOpen.set(true);
@@ -482,10 +605,14 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
         <View
           accessibilityLabel={t("web.artifact.page.rail")}
           testID="artifact-rail"
-          class="h-96 min-h-0 shrink-0 border-t border-line bg-side xl:h-full xl:w-88 xl:border-t-0 xl:border-l"
+          class={`h-full min-h-0 border-l border-line bg-side ${lg() ? "relative shrink-0" : "absolute inset-0 z-20"}`}
+          style={lg() ? { width: railWidth() } : undefined}
         >
+          <If when={lg()}>
+            <Splitter pane="artifact-rail" side="left" width={railWidth()} min={280} max={560} label={t("web.artifact.page.rail")} />
+          </If>
           <View class="min-h-0 min-w-0 flex-1">
-            <Chat channel={said()?.channel ?? props.artifact.channel} issue={props.artifact.issue} point={said()?.number} />
+            <Chat channel={said()?.channel ?? props.artifact.channel} issue={props.artifact.issue} point={said()?.number} onClose={() => railOpen.set(false)} />
           </View>
         </View>
       </If>

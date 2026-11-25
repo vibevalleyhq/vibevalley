@@ -399,6 +399,14 @@
     "older": "加载更早的消息",
     "empty": "需求讨论、执行反馈与交付会保留在这里"
   },
+  "attachments": {
+    "title": "附件",
+    "attachFile": "添加附件",
+    "count": "{n} 个附件",
+    "uploadFailed": "附件上传失败：{why}",
+    "uploading": "正在上传 {name}…",
+    "remove": "移除附件 {name}"
+  },
   "guide": {
     "title": "任务流转指南",
     "summary": "写下需求并指派角色，执行会话在独立 worktree 改代码，完成后经验收合入主分支。",

@@ -14,13 +14,11 @@
   "notFound": "not found",
   "checking": "checking…",
   "noRuntimes": "The machines could not be read: ",
-  "list": "Machines",
   "usedBy": " · {n} agents",
   "reading": "Reading…",
   "bundled": "installed with oar",
   "commandLine": "command line",
   "unsupportedWhy": "Unsupported: {why}",
-  "notHere": "Not found on this computer",
   "checkedAt": "checked at {clock}",
   "recheck": "Check again",
   "account": "Account",
@@ -117,8 +115,6 @@
   },
   "spentToday": "Helpers spent about {spent} today, with no daily budget.",
   "spentTodayBudget": "Helpers spent about {spent} today, against a daily budget of {budget}.",
-  "missingCommand": "Install {runtime} on this computer, then check again. If it is installed, enter the full path to its executable.",
-  "enterPath": "Enter command path",
   "signInTerminal": "Open a terminal to sign in",
   "machines": {
     "title": "Execution machines",
@@ -138,6 +134,22 @@
       "offline": "Offline",
       "draining": "Draining"
     },
-    "noRuntimes": "No engines reported"
-  }
+    "machineId": "Machine ID",
+    "worktree": "Worktree",
+    "worktreeYes": "Supported",
+    "worktreeNo": "Unavailable",
+    "installedCount": "Installed",
+    "lastSeen": "Last seen"
+  },
+  "sidebarToggle": "Toggle engines sidebar",
+  "refreshAll": "Refresh machines and engines",
+  "inspectorTitle": "Machine & Inspector",
+  "inspectorShow": "Show inspector",
+  "inspectorHide": "Hide inspector",
+  "noneInstalled": "No installed coding engines found",
+  "noneInstalledHint": "Install a coding engine on this machine or a connected host, then refresh.",
+  "remoteSummary": "Hosted on {machine} and dispatched remotely.",
+  "sessions": "Related sessions",
+  "noSessions": "No active or recent sessions.",
+  "quickActions": "Quick actions"
 }

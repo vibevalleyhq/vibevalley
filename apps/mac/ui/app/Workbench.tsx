@@ -16,9 +16,9 @@ import { LibraryPage } from "../features/media";
 import { OrchestratorPage, PendingApprovals } from "../features/orchestrator";
 import { ReposPage } from "../features/repo";
 import { sortRepos } from "../features/repo/repos";
-import { RuntimesPage, SkillsPage } from "../features/runtime";
+import { RuntimesPage } from "../features/runtime";
 import { RunsPage } from "../features/session";
-import { SettingsPage, TeamMemoryPage } from "../features/setting";
+import { SettingsPage } from "../features/setting";
 import { Keyed } from "../infra/base/dom";
 import { act } from "../infra/bridge";
 import { ready, useRepos } from "../infra/query";
@@ -49,6 +49,21 @@ function page(path: string, place: string, render: (rest: () => string) => JSX.E
     component: () => {
       const params = useParams(pattern);
       return render(() => params().rest);
+    },
+  };
+}
+
+function redirectRoute(from: string, to: string, keepRest = false): RouteDefinition {
+  const pattern = route(`${from}/*`);
+  return {
+    path: pattern,
+    component: () => {
+      const params = useParams(pattern);
+      const target = () => {
+        const rest = params().rest;
+        return keepRest && rest ? `${to}/${rest}` : to;
+      };
+      return <Navigate href={target()} />;
     },
   };
 }
@@ -160,11 +175,13 @@ const routes: readonly RouteDefinition[] = [
       page("/chat", "chat", () => <ChatPage />),
       page("/settings", "settings", (rest) => <SettingsPage rest={rest()} />),
       { path: "/team", component: () => <Navigate href="/agents" /> },
-      page("/team/skills", "team", (rest) => <SkillsPage id={rest() ? decodeURIComponent(rest()) : undefined} />),
-      page("/team/memory", "team", () => <TeamMemoryPage />),
+      redirectRoute("/team/skills", "/settings/skills", true),
+      redirectRoute("/skills", "/settings/skills", true),
+      redirectRoute("/team/memory", "/settings/memory"),
+      redirectRoute("/memory", "/settings/memory"),
       page("/orchestrator", "team", (rest) => <OrchestratorPage rest={rest()} />),
       page("/agents", "team", (rest) => <AgentsRoute rest={rest()} />),
-      page("/runtimes", "team", (rest) => <RuntimesPage rest={rest()} />),
+      page("/runtimes", "runtimes", (rest) => <RuntimesPage rest={rest()} />),
       page("/repos", "workspace", (rest) => <ReposPage rest={rest()} />),
       page("/catalog", "catalog", (rest) => <CatalogPage rest={rest()} />),
       {

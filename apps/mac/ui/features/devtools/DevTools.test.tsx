@@ -499,7 +499,7 @@ test("DevTools auto-refresh polls on interval and pauses cleanly", async () => {
   expect(host.calls.filter((c) => c.op === "debug.snapshot").length).toBe(2);
 
   await app.press("id:devtools-auto-refresh");
-  expect(app.texts()).toContain(t("web.devtools.actions.resume"));
+  expect(app.count(`label:${t("web.devtools.actions.autoRefresh")}: ${t("web.devtools.actions.resume")}`)).toBe(1);
   await clock.fastForward(4_500);
   await host.pump(app);
   expect(host.calls.filter((c) => c.op === "debug.snapshot").length).toBe(2);

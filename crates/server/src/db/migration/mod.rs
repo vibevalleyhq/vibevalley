@@ -2,6 +2,7 @@
 
 pub mod m20261124_100001_create_server_tables;
 pub mod m20261124_100002_create_outbox_item;
+pub mod m20261125_100002_add_issue_attachments;
 
 use sea_orm_migration::prelude::*;
 
@@ -17,6 +18,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20261124_100001_create_server_tables::Migration),
             Box::new(m20261124_100002_create_outbox_item::Migration),
+            Box::new(m20261125_100002_add_issue_attachments::Migration),
         ]
     }
 }

@@ -1,16 +1,17 @@
-import { computed, Scroll, signal, Text, View } from "nsh";
+import { computed, effect, keymap, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, defaultOrchestrator, orchestratorRuntime, type OrchestratorLook } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
-import { Button, ButtonLink } from "../../design/Button";
-import { ConfirmButton } from "../../design/ConfirmButton";
+import { Button } from "../../design/Button";
 import { orchestratorLooks } from "../../design/domain/cast";
 import { OrchestratorFace } from "../../design/domain/Face";
 import { Field, TextArea, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
+import { IconButton } from "../../design/IconButton";
+import { MoreMenu } from "../../design/MoreMenu";
 import { Bubble } from "../../design/Tip";
 import { api } from "../../infra/api";
 import { useQueryClient } from "../../infra/query";
@@ -49,6 +50,7 @@ export function newOrchestrator(): Agent {
 export function OrchestratorProfile(props: { saved?: Agent | undefined; start: Agent; all: readonly Agent[] }) {
   const isNew = untrack(() => !props.saved);
   const draft = signal(untrack(() => props.start));
+  const asking = signal(false);
   const saving = createAct();
   const act = createAct();
   const router = useRouter();
@@ -57,6 +59,11 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
   const nameTaken = computed(() => props.all.some((a) => a.id !== draft().id && a.name === draft().name.trim()));
   const patch = (p: Partial<Agent>) => draft.set({ ...draft(), ...p });
   const setLook = (orchestrator: OrchestratorLook) => patch({ look: { ...draft().look, orchestrator, avatar: undefined } });
+
+  effect(() => {
+    if (!asking()) return;
+    return keymap.bind("escape", () => asking.set(false), { when: "always" });
+  });
 
   const save = () => {
     const d = draft();
@@ -108,24 +115,24 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
               </Text>
             </View>
           </View>
-          <View class="flex-row flex-wrap items-center gap-2">
+          <View class="flex-row flex-wrap items-center gap-1.5">
             <If when={props.saved}>
               {(saved) => (
                 <>
+                  <IconButton
+                    icon="log"
+                    label={t("web.agent.runsLink")}
+                    testid="agent-runs-link"
+                    onClick={() => router.navigate(runsHref({ session: saved().id }))}
+                  />
+                  <IconButton icon="thread" label={t("web.agent.talk")} testid="talk" disabled={act.busy()} onClick={talk} />
                   <If when={saved().id !== defaultOrchestrator}>
-                    <ConfirmButton
-                      label={t("web.agent.remove")}
-                      question={t("web.agent.removeWhich", { name: saved().name })}
-                      testid="delete"
-                      onConfirm={remove}
+                    <MoreMenu
+                      label={t("web.artifact.page.more")}
+                      testid="agent-more"
+                      items={[{ key: "delete", label: t("web.agent.remove"), icon: "delete", danger: true, onSelect: () => asking.set(true) }]}
                     />
                   </If>
-                  <ButtonLink href={runsHref({ session: saved().id })} icon="log" testID="agent-runs-link">
-                    {t("web.agent.runsLink")}
-                  </ButtonLink>
-                  <Button icon="thread" testID="talk" disabled={act.busy()} onPress={talk}>
-                    {t("web.agent.talk")}
-                  </Button>
                   <If when={dirty()}>
                     <Button tone="quiet" testID="discard" onPress={() => draft.set(saved())}>
                       {t("web.agent.discard")}
@@ -139,6 +146,17 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
             </Button>
           </View>
         </View>
+        <If when={asking() && props.saved && props.saved.id !== defaultOrchestrator ? props.saved : undefined}>
+          {(saved) => (
+            <View testID="agent-delete" class="shrink-0 flex-row flex-wrap items-center gap-2 rounded-md border border-line bg-bad-soft px-3 py-2">
+              <Text class="min-w-0 flex-1 text-sm text-berry">{t("web.agent.removeWhich", { name: saved().name })}</Text>
+              <Button tone="danger" icon="delete" testID="delete-sure" disabled={act.busy()} onPress={() => void remove()}>
+                {t("web.agent.remove")}
+              </Button>
+              <Button onPress={() => asking.set(false)}>{t("web.base.form.never")}</Button>
+            </View>
+          )}
+        </If>
         <If when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={(a) => draft.set(a)} />}</If>
         <View class="gap-1">
           <Text class="text-sm text-muted">{t("web.agent.orchestrator.intro")}</Text>

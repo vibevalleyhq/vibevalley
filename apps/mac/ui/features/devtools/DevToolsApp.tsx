@@ -4,7 +4,6 @@ import { z } from "zod";
 import { t } from "@vibevalley/i18n";
 import type { DebugOverrideConfig, DebugSnapshot } from "@vibevalley/protocol";
 
-import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import type { IconName } from "../../design/icons";
@@ -124,21 +123,16 @@ export function DevToolsApp() {
           </If>
         </View>
 
-        <View class="shrink-0 flex-row items-center gap-1.5">
-          <Button size="compact" tone="plain" icon="refresh" testID="devtools-refresh" onPress={() => void refresh()}>
-            {t("web.devtools.actions.refresh")}
-          </Button>
-          <Button
-            size="compact"
-            tone={autoRefresh() ? "plain" : "quiet"}
+        <View class="shrink-0 flex-row items-center gap-1">
+          <IconButton icon="refresh" size={14} label={t("web.devtools.actions.refresh")} testid="devtools-refresh" onClick={() => void refresh()} />
+          <IconButton
             icon={autoRefresh() ? "stop" : "play"}
-            testID="devtools-auto-refresh"
-            accessibilityLabel={`${t("web.devtools.actions.autoRefresh")}: ${autoRefresh() ? t("web.devtools.actions.pause") : t("web.devtools.actions.resume")}`}
-            tooltip={<Bubble text={t("web.devtools.actions.autoRefresh")} />}
-            onPress={() => autoRefresh.set(!autoRefresh())}
-          >
-            {autoRefresh() ? t("web.devtools.actions.pause") : t("web.devtools.actions.resume")}
-          </Button>
+            size={14}
+            pressed={autoRefresh()}
+            label={`${t("web.devtools.actions.autoRefresh")}: ${autoRefresh() ? t("web.devtools.actions.pause") : t("web.devtools.actions.resume")}`}
+            testid="devtools-auto-refresh"
+            onClick={() => autoRefresh.set(!autoRefresh())}
+          />
           <If when={!detached}>
             <IconButton
               icon="open"

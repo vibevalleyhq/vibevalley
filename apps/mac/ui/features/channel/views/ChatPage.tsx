@@ -243,25 +243,19 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
           </HeadPopover>
           {/* The members panel is beside the list, which a phone has no room for. */}
           <If when={md()}>
-            <View
-              role="button"
-              testID="members-toggle"
-              accessibilityLabel={t("web.channel.members.open")}
-              accessibilityState={{ selected: membersOpen() }}
-              tooltip={<Bubble text={t("web.channel.members.open")} />}
+            <BarButton
+              icon="agents"
+              size={16}
+              testid="members-toggle"
+              label={t("web.channel.members.open")}
+              pressed={membersOpen()}
               disabled={!props.channel}
               onPress={() => {
                 const next = !membersOpen();
                 membersOpen.set(next);
                 if (next) tab.set("chat");
               }}
-              class={`h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border px-2 ${
-                membersOpen() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
-              } ${!props.channel ? "opacity-50" : "active:translate-y-px"}`}
-            >
-              <Icon name="agents" size={14} tone={membersOpen() ? "ink" : "muted"} />
-              <Text class={`text-xs font-medium ${membersOpen() ? "text-ink" : "text-muted"}`}>{t("web.channel.members.open")}</Text>
-            </View>
+            />
           </If>
           <BarButton
             icon="settings"

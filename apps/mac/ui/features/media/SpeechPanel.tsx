@@ -7,9 +7,9 @@ import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
 import { Field, Select, TextArea } from "../../design/Field";
+import { IconButton } from "../../design/IconButton";
 import { Card, Quiet } from "../../design/layout";
 import { Dot } from "../../design/Tag";
-import { Bubble } from "../../design/Tip";
 import { api, reasonOf } from "../../infra/api";
 import { useCollabSlice, useOpsSlice } from "../../infra/frame";
 import { providerQuery, providerVoicesQuery, ready, useQuery } from "../../infra/query";
@@ -111,17 +111,13 @@ export function SpeechPanel() {
       <Card
         title={t("web.media.speech.title")}
         action={
-          <View tooltip={<Bubble text={t("web.media.speech.refresh")} />}>
-            <Button
-              testID="speech-refresh"
-              tone="quiet"
-              icon="refresh"
-              disabled={act.busy() || query.fetching()}
-              onPress={() => void act.run(() => query.refetch())}
-            >
-              {t("web.media.speech.refresh")}
-            </Button>
-          </View>
+          <IconButton
+            icon="refresh"
+            label={t("web.media.speech.refresh")}
+            testid="speech-refresh"
+            disabled={act.busy() || query.fetching()}
+            onClick={() => void act.run(() => query.refetch())}
+          />
         }
       >
         <NoticeBanner tone="info">{t("web.media.speech.notice")}</NoticeBanner>

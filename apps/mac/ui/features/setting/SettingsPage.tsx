@@ -14,6 +14,7 @@ import { matches } from "../../infra/base/search";
 import { Link as A, Navigate, useRouter } from "../../infra/router";
 import { ConnectorsPage } from "../connector";
 import { ProviderModels } from "../provider";
+import { SkillsPage } from "../runtime";
 import { VoiceForm } from "../voice";
 import { AboutPage } from "./AboutPage";
 import { AppearanceGroups } from "./AppearancePage";
@@ -32,9 +33,11 @@ interface Section {
   readonly words: string;
 }
 
-const sections: readonly Section[] = [
+const allSections = (): readonly Section[] => [
   { id: "general", group: "main", icon: "settings", label: t("web.setting.nav.general"), words: t("web.setting.words.general") },
   { id: "models", group: "main", icon: "plug", label: t("web.setting.nav.models"), words: t("web.setting.words.models") },
+  { id: "skills", group: "main", icon: "skill", label: t("web.setting.nav.skills"), words: t("web.setting.words.skills") },
+  { id: "memory", group: "main", icon: "memory", label: t("web.setting.nav.memory"), words: t("web.setting.words.memory") },
   { id: "voice", group: "main", icon: "call", label: t("web.setting.nav.voice"), words: t("web.setting.words.voice") },
   {
     id: "connections",
@@ -66,10 +69,6 @@ function legacyRedirect(rest: string): string | undefined {
       return "/settings/connections/github";
     case "remote":
       return "/settings/connections/remote";
-    case "skills":
-      return tail ? `/team/skills/${tail}` : "/team/skills";
-    case "memory":
-      return "/team/memory";
     default:
       return undefined;
   }
@@ -131,6 +130,11 @@ function SectionBody(props: { id: string; sub: string | undefined; connectorId: 
           <ProviderModels />
         </Page>
       </If>
+      <If when={props.id === "memory"}>
+        <Page title={t("web.setting.nav.memory")} hint={t("web.setting.memory.intro")} action={<SettingsFile />}>
+          <SettingsForm part="memory" />
+        </Page>
+      </If>
       <If when={props.id === "voice"}>
         <VoiceSettings />
       </If>
@@ -144,17 +148,6 @@ function SectionBody(props: { id: string; sub: string | undefined; connectorId: 
   );
 }
 
-/** At /team/memory, under the Team place. */
-export function TeamMemoryPage() {
-  return (
-    <Scroll testID="team-memory-page" class="min-h-0 min-w-0 flex-1 bg-page" contentClass="px-6 py-5">
-      <Page title={t("web.setting.nav.memory")} hint={t("web.setting.memory.intro")} action={<SettingsFile />}>
-        <SettingsForm part="memory" />
-      </Page>
-    </Scroll>
-  );
-}
-
 /** `rest` is the path after /settings/. */
 export function SettingsPage(props: { rest: string }) {
   /** Tailwind's md (48rem): narrower, the list sits over the section. */
@@ -163,7 +156,9 @@ export function SettingsPage(props: { rest: string }) {
   const q = computed(() => query().trim().toLowerCase());
   const parts = computed(() => props.rest.split("/"));
   const redirect = computed(() => legacyRedirect(props.rest));
+  const sections = allSections();
   const section = computed(() => sections.find((s) => s.id === parts()[0]));
+  const skillId = computed(() => (parts().length > 1 ? decodeURIComponent(parts().slice(1).join("/")) : undefined));
   const connectorId = computed(() => (parts().length > 2 ? decodeURIComponent(parts().slice(2).join("/")) : undefined));
   const mainShown = computed(() => sections.filter((s) => s.group === "main" && matches(q(), [s.label, s.words])));
   const aboutShown = computed(() => sections.filter((s) => s.group === "about" && matches(q(), [s.label, s.words])));
@@ -210,11 +205,20 @@ export function SettingsPage(props: { rest: string }) {
                     </Each>
                   </Scroll>
                 </View>
-                <Scroll testID={`settings-${current().id}`} class="min-h-0 min-w-0 flex-1 bg-page" contentClass="px-6 py-5">
-                  <Each of={[current()]} key={(s) => s.id}>
-                    {(s) => <SectionBody id={s().id} sub={parts()[1]} connectorId={connectorId()} />}
-                  </Each>
-                </Scroll>
+                <If
+                  when={current().id === "skills"}
+                  else={
+                    <Scroll testID={`settings-${current().id}`} class="min-h-0 min-w-0 flex-1 bg-page" contentClass="px-6 py-5">
+                      <Each of={[current()]} key={(s) => s.id}>
+                        {(s) => <SectionBody id={s().id} sub={parts()[1]} connectorId={connectorId()} />}
+                      </Each>
+                    </Scroll>
+                  }
+                >
+                  <View testID="settings-skills" class="min-h-0 min-w-0 flex-1 bg-page px-6 py-5">
+                    <SkillsPage id={skillId()} />
+                  </View>
+                </If>
               </View>
             </SettingsSearch.Provider>
           )}

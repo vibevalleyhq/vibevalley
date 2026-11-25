@@ -1,13 +1,13 @@
-import { computed, signal, Text, View } from "nsh";
+import { computed, effect, keymap, signal, Text, View } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
 import type { AgentTemplate, RuntimeInfo, TemplateCategory } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
-import { ConfirmButton } from "../../design/ConfirmButton";
 import { AgentFace, OrchestratorFace } from "../../design/domain/Face";
 import { runtimeName } from "../../design/domain/RuntimeBadge";
+import { IconButton } from "../../design/IconButton";
 import { CountPill, Dot } from "../../design/Tag";
 import { toast } from "../../design/toasts";
 import { sortRuntimes } from "../../infra/agents";
@@ -71,7 +71,13 @@ function resolveTargetRuntime(template: AgentTemplate, runtimes: readonly Runtim
 
 export function TemplateCard(props: { template: AgentTemplate; runtimes: readonly RuntimeInfo[]; navigateOnAdopt?: boolean | undefined }) {
   const open = signal(false);
+  const confirmingDelete = signal(false);
   const act = createAct();
+
+  effect(() => {
+    if (!confirmingDelete()) return;
+    return keymap.bind("escape", () => confirmingDelete.set(false), { when: "always" });
+  });
   const router = useRouter();
   const client = useQueryClient();
   const library = useSkills();
@@ -183,11 +189,47 @@ export function TemplateCard(props: { template: AgentTemplate; runtimes: readonl
           </Text>
         </View>
         <View class="shrink-0 flex-row items-center gap-1.5">
-          <Button tone="quiet" size="compact" testID="template-look" onPress={() => open.set(!open())}>
-            {open() ? t("web.agent.templates.fold") : t("web.agent.templates.preview")}
-          </Button>
+          <IconButton
+            icon="show"
+            size={14}
+            label={open() ? t("web.agent.templates.fold") : t("web.agent.templates.preview")}
+            testid="template-look"
+            pressed={open()}
+            onClick={() => open.set(!open())}
+          />
           <If when={template().source === "added"}>
-            <ConfirmButton label={t("web.agent.remove")} confirm={t("web.agent.templates.removeSure")} onConfirm={remove} />
+            <If
+              when={confirmingDelete()}
+              else={
+                <IconButton
+                  icon="delete"
+                  size={14}
+                  tone="danger"
+                  label={t("web.agent.remove")}
+                  testid="template-delete"
+                  disabled={act.busy()}
+                  onClick={() => confirmingDelete.set(true)}
+                />
+              }
+            >
+              <View role="group" class="flex-row items-center gap-1">
+                <Button
+                  tone="danger"
+                  size="compact"
+                  testID="template-delete-sure"
+                  disabled={act.busy()}
+                  onPress={() => {
+                    confirmingDelete.set(false);
+                    void remove();
+                  }}
+                >
+                  {t("web.agent.templates.removeSure")}
+                </Button>
+                <Button tone="quiet" size="compact" onPress={() => confirmingDelete.set(false)}>
+                  {t("web.base.form.never")}
+                </Button>
+              </View>
+            </If>
           </If>
           <Button tone="plain" size="compact" testID="template-install" disabled={act.busy()} onPress={() => void install()}>
             {t("web.agent.templates.adopt")}

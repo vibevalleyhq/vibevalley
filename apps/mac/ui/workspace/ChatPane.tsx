@@ -241,11 +241,11 @@ function ToolCallCard(props: { step: SessionEvent }) {
         </View>
         <If when={target()}>
           {(hit) => (
-            <View class="shrink-0 flex-row items-center gap-1">
-              <Button
-                size="compact"
+            <View class="shrink-0 flex-row items-center gap-0.5">
+              <ShellIconButton
+                compact
                 icon="file"
-                testID={`chat-tool-open-file-${props.step.seq}`}
+                label={t("web.shell.chat.toolOpenFile")}
                 onPress={() =>
                   act({
                     type: "open_file_adjacent",
@@ -253,18 +253,14 @@ function ToolCallCard(props: { step: SessionEvent }) {
                     ...(hit().line !== undefined ? { line: hit().line } : {}),
                   })
                 }
-              >
-                {t("web.shell.chat.toolOpenFile")}
-              </Button>
+              />
               <If when={hit().canDiff}>
-                <Button
-                  size="compact"
+                <ShellIconButton
+                  compact
                   icon="diff"
-                  testID={`chat-tool-open-diff-${props.step.seq}`}
+                  label={t("web.shell.chat.toolOpenDiff")}
                   onPress={() => act({ type: "open_diff_adjacent", path: hit().path, staged: false })}
-                >
-                  {t("web.shell.chat.toolOpenDiff")}
-                </Button>
+                />
               </If>
             </View>
           )}

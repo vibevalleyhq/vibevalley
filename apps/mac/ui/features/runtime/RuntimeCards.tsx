@@ -41,7 +41,7 @@ const toneChoices1 = {
   unknown: "bg-bark",
 };
 
-const capabilityLabel: Record<RuntimeCapability, string> = {
+export const capabilityLabel: Record<RuntimeCapability, string> = {
   listModels: t("web.runtime.capability.listModels"),
   accountUsage: t("web.runtime.capability.accountUsage"),
   checkUpdate: t("web.runtime.capability.checkUpdate"),

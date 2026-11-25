@@ -3,15 +3,12 @@ import { colorScheme, effect, host, keymap, Scroll, Text, View, windowSize, type
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession } from "@vibevalley/protocol/rules";
 
-import { Button } from "../design/Button";
 import { OrchestratorFace } from "../design/domain/Face";
 import { Icon } from "../design/Icon";
-import { IconButton } from "../design/IconButton";
 import type { IconName } from "../design/icons";
 import { motionClass } from "../design/motion";
 import { usePixelDir } from "../design/pixel/atlas";
 import { ShortcutSheet } from "../design/ShortcutSheet";
-import { Tabs } from "../design/Tabs";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { QuickSwitcher, switcher } from "../features/channel";
@@ -21,7 +18,7 @@ import { useInboxSlice, useLink, useSessionsSlice } from "../infra/frame";
 import { readHostParams } from "../infra/hostParams";
 import { NavLink, useLocation, useMatches } from "../infra/router";
 import { useUpdates } from "../infra/settings";
-import { contentSidebarOpen, openContentSearch, openTemplatePicker, safeLastContentPath } from "../infra/state/contentNav";
+import { safeLastContentPath } from "../infra/state/contentNav";
 import { catalogPlace, type Place, places, runsPlace, settingsPlace } from "./places";
 
 const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;
@@ -232,31 +229,12 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
 }
 
 function Desk(props: { place?: Place | undefined }) {
-  const location = useLocation();
-  const teamTab = () => {
-    const p = location().pathname;
-    if (p.startsWith("/runtimes")) return "team-runtimes";
-    if (p.startsWith("/team/skills")) return "team-skills";
-    if (p.startsWith("/team/memory")) return "team-memory";
-    return "team-roles";
-  };
-  const showContentActions = () => props.place?.id === "content" && !contentSidebarOpen.get();
   return (
     <View testID="desk" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center justify-between gap-3 border-b border-line px-3.5">
       <If when={props.place} else={<View class="flex-1" />}>
         {(place) => (
           <View class="min-w-0 flex-1 flex-row items-center gap-2.5 overflow-hidden">
             <View class="min-w-0 shrink flex-row items-center gap-2">
-              <If when={place().id === "content"}>
-                <IconButton
-                  icon="sidebar"
-                  size={16}
-                  label={t("web.library.content.sidebarToggle")}
-                  testid="content-sidebar-toggle"
-                  pressed={contentSidebarOpen.get()}
-                  onClick={() => contentSidebarOpen.update((open) => !open)}
-                />
-              </If>
               <View class="shrink-0">
                 <Keyed key={place().icon}>{() => <Icon name={place().icon} size={16} />}</Keyed>
               </View>
@@ -264,30 +242,8 @@ function Desk(props: { place?: Place | undefined }) {
                 {place().label}
               </Text>
             </View>
-            <If when={place().id === "team"}>
-              <View class="h-4 w-px shrink-0 bg-line" />
-              <Tabs
-                look="pills"
-                label={place().label}
-                value={teamTab()}
-                items={[
-                  { value: "team-roles", label: t("web.base.tab.roles"), icon: "agents", href: "/agents" },
-                  { value: "team-runtimes", label: t("web.base.tab.runtimes"), icon: "runtimes", href: "/runtimes" },
-                  { value: "team-skills", label: t("web.base.tab.skills"), icon: "skill", href: "/team/skills" },
-                  { value: "team-memory", label: t("web.base.tab.memory"), icon: "memory", href: "/team/memory" },
-                ]}
-              />
-            </If>
           </View>
         )}
-      </If>
-      <If when={showContentActions()}>
-        <View class="shrink-0 flex-row items-center gap-1.5">
-          <IconButton icon="search" size={14} label={t("web.library.content.searchAll")} testid="desk-content-search" onClick={() => openContentSearch()} />
-          <Button tone="primary" size="compact" icon="add" testID="desk-content-new" onPress={() => openTemplatePicker()}>
-            {t("web.library.content.new")}
-          </Button>
-        </View>
       </If>
     </View>
   );
@@ -312,8 +268,8 @@ export function Shell(props: { children: JSX.Element }) {
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <View class="min-w-0 flex-1">
-        {/* Chat draws its own top bar; native workspace fills its own pane. */}
-        <If when={!inFarm() && here()?.id !== "chat" && location().pathname !== "/workspace"}>
+        {/* Chat, Content, and Runtimes draw their own 3-column top bars; native workspace fills its own pane. */}
+        <If when={!inFarm() && here()?.id !== "chat" && here()?.id !== "content" && here()?.id !== "runtimes" && location().pathname !== "/workspace"}>
           <Desk place={here()} />
         </If>
         <View class="min-h-0 flex-1">{props.children}</View>

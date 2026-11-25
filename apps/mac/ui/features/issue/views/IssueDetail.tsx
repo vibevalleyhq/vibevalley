@@ -1,7 +1,7 @@
 import { Clipboard, computed, keymap, signal, Text, View, type ViewRef } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
-import { DeliverableValues, type Issue, type IssueAct, PriorityValues, type Session, type SessionView } from "@vibevalley/protocol";
+import { type Attachment, DeliverableValues, type Issue, type IssueAct, PriorityValues, type Session, type SessionView } from "@vibevalley/protocol";
 import { closedText, plainText, sessionBranch, sessionProfile, sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
@@ -31,9 +31,10 @@ import { changesLine } from "../model/changes";
 import { useIssueChanges, useIssues, useIssueTimeline } from "../model/history";
 import { issueMove, movedIssue } from "../model/moves";
 import { issueState, noStepsText, stageTone } from "../model/overview";
-import { issueSet, labeledIssue, sendLabel } from "../model/write";
+import { issueSet, labeledIssue, sendLabel, updateIssueAttachments } from "../model/write";
 import { ActLines } from "./ActLines";
 import { ChangesBody, ChangesHead, ConflictFiles } from "./CloseDialog";
+import { IssueAttachments } from "./IssueAttachments";
 import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
 import { IssueThread } from "./IssueThread";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
@@ -169,6 +170,17 @@ export function IssueDetail(props: {
     const check = live().deliveryEvidence?.check;
     return check?.status === "failed" ? check : undefined;
   });
+  const attachAct = createAct();
+  const hasAttachmentsSection = computed(() => s().open || (live().attachments?.length ?? 0) > 0);
+  const addAttachment = (file: Attachment) => {
+    const current = (live().attachments ?? []).map((a) => a.id);
+    if (current.includes(file.id)) return;
+    return attachAct.run(() => updateIssueAttachments(props.issue.id, [...current, file.id]));
+  };
+  const removeAttachment = (id: string) => {
+    const next = (live().attachments ?? []).filter((a) => a.id !== id).map((a) => a.id);
+    return attachAct.run(() => updateIssueAttachments(props.issue.id, next));
+  };
   const otherActs = createMemo(() => s().others.filter((a) => a !== "close" && a !== "stop"));
   const main = (
     <>
@@ -199,6 +211,14 @@ export function IssueDetail(props: {
           <Markdown size="sm" text={s().description} />
         </View>
       </If>
+      <IssueAttachments
+        files={live().attachments ?? []}
+        editable={s().open}
+        busy={attachAct.busy()}
+        first={!failedCheck() && !s().description}
+        onAdd={addAttachment}
+        onRemove={removeAttachment}
+      />
       <If when={s().needsWorktreeCheck}>
         <ReconcileWorktree onChanges={changesAction()} />
       </If>
@@ -207,7 +227,7 @@ export function IssueDetail(props: {
       <If when={s().ask}>
         {(ask) => (
           <View accessibilityLabel={t("web.issue.detail.yours")} testID="issue-ask" class="mb-5">
-            <SheetLabel first={!failedCheck() && !s().description}>{t("web.issue.detail.yours")}</SheetLabel>
+            <SheetLabel first={!failedCheck() && !s().description && !hasAttachmentsSection()}>{t("web.issue.detail.yours")}</SheetLabel>
             <Note tone={ask().tone}>
               <Text class="text-sm font-semibold text-ink">{ask().head}</Text>
               <If
@@ -273,7 +293,7 @@ export function IssueDetail(props: {
       </If>
 
       <View accessibilityLabel={t("web.issue.detail.progress")} testID="issue-progress">
-        <View class={`${!failedCheck() && !s().description && !s().ask ? "mt-0" : "mt-6"} mb-2 flex-row items-baseline gap-2`}>
+        <View class={`${!failedCheck() && !s().description && !hasAttachmentsSection() && !s().ask ? "mt-0" : "mt-6"} mb-2 flex-row items-baseline gap-2`}>
           <Text class="text-xs font-semibold text-muted">{t("web.issue.detail.progress")}</Text>
           <If when={s().criteria.length > 0}>
             <Text class="text-xs text-muted tabular-nums">{t("web.issue.detail.met", { met: s().met, of: s().criteria.length })}</Text>

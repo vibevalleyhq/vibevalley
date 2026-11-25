@@ -51,6 +51,8 @@ pub struct Model {
     pub questions: String,
     #[sea_orm(column_type = "Text")]
     pub assignments: String,
+    #[sea_orm(column_type = "Text")]
+    pub attachments: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

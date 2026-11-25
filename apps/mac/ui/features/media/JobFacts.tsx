@@ -11,6 +11,7 @@ import { createAct, type Act } from "../../design/act";
 import { Button } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
 import { Icon } from "../../design/Icon";
+import { IconButton } from "../../design/IconButton";
 import type { IconName } from "../../design/icons";
 import { Banner, type BannerTone as LayoutBannerTone } from "../../design/layout";
 import { motionClass } from "../../design/motion";
@@ -268,16 +269,13 @@ export function ResultAudio(props: {
               </View>
             </View>
           </If>
-          <View tooltip={<Bubble text={props.save} />}>
-            <Button
-              testID={`${props.prefix}-save`}
-              icon="download"
-              disabled={act.busy()}
-              onPress={() => void act.run(() => saveFile(file().path, file().name))}
-            >
-              {props.save}
-            </Button>
-          </View>
+          <IconButton
+            icon="download"
+            label={props.save}
+            testid={`${props.prefix}-save`}
+            disabled={act.busy()}
+            onClick={() => void act.run(() => saveFile(file().path, file().name))}
+          />
         </View>
       )}
     </If>

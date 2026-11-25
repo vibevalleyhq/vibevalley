@@ -1,4 +1,4 @@
-import { Scroll, Text, View } from "nsh";
+import { Scroll, Text, View, type JSX } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
@@ -9,13 +9,15 @@ import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import type { IconName } from "../../design/icons";
-import { ActiveBar, SidebarSection } from "../../design/layout";
+import { ActiveBar } from "../../design/layout";
+import { motionClass } from "../../design/motion";
 import { ready, useQuery, useQueryClient } from "../../infra/query";
 import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import {
   type ContentBucket,
   contentBrowseBucket,
+  contentSidebarOpen,
   countContentHub,
   countForBucket,
   openContentSearch,
@@ -97,11 +99,25 @@ export function ContentSidebar() {
   };
 
   return (
-    <View testID="content-sidebar" accessibilityLabel={t("web.library.content.title")} class="w-58 shrink-0 border-r border-line bg-side">
-      <View class="shrink-0 gap-1.5 border-b border-line p-2.5">
-        <Button tone="primary" icon="add" testID="content-new-btn" class="h-8 w-full" onPress={() => openTemplatePicker()}>
+    <View testID="content-sidebar" accessibilityLabel={t("web.library.content.title")} class="h-full w-58 shrink-0 border-r border-line bg-side">
+      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-1.5 border-b border-line px-2.5">
+        <IconButton
+          icon="sidebar"
+          size={16}
+          label={t("web.library.content.sidebarToggle")}
+          testid="content-sidebar-toggle"
+          pressed={contentSidebarOpen.get()}
+          onClick={() => contentSidebarOpen.update((open) => !open)}
+        />
+        <Text role="header" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+          {t("web.library.content.title")}
+        </Text>
+        <Button tone="primary" size="compact" icon="add" testID="content-new-btn" onPress={() => openTemplatePicker()}>
           {t("web.library.content.new")}
         </Button>
+      </View>
+
+      <Scroll class="min-h-0 flex-1" contentClass="gap-2.5 p-2 pb-4">
         <View
           role="button"
           testID="content-search-btn"
@@ -112,9 +128,6 @@ export function ContentSidebar() {
           <Icon name="search" size={14} tone="faint" />
           <Text class="min-w-0 flex-1 truncate text-xs text-faint group-hover:text-muted">{t("web.library.content.searchAll")}</Text>
         </View>
-      </View>
-
-      <Scroll class="min-h-0 flex-1" contentClass="gap-3 p-2 pb-4">
         <View class="gap-0.5">
           <NavRow
             testID="content-nav-recent"
@@ -135,11 +148,15 @@ export function ContentSidebar() {
           />
         </View>
 
-        <SidebarSection
+        <NavSection
           testID="content-nav-artifacts-section"
+          navTestID="content-nav-artifacts-all"
+          toggleTestID="content-nav-artifacts-toggle"
           title={t("web.library.content.artifacts")}
           count={counts().artifacts}
+          active={allArtifactsActive()}
           open={artifactsSectionOpen.get()}
+          onSelect={() => selectBucket({ kind: "artifacts" })}
           onToggle={() => artifactsSectionOpen.update((on) => !on)}
           action={
             <IconButton
@@ -151,17 +168,8 @@ export function ContentSidebar() {
               onClick={newBlankNote}
             />
           }
-          listClass="gap-0.5"
         >
-          <NavRow
-            testID="content-nav-artifacts-all"
-            icon="artifacts"
-            label={t("web.library.content.artifactType.all")}
-            count={countForBucket(counts(), { kind: "artifacts" })}
-            active={allArtifactsActive()}
-            onPress={() => selectBucket({ kind: "artifacts" })}
-          />
-          <Each of={artifactFacets}>
+          <Each of={artifactFacets} key={(facet) => facet.type}>
             {(facet) => {
               const active = () => {
                 const b = bucket();
@@ -180,25 +188,20 @@ export function ContentSidebar() {
               );
             }}
           </Each>
-        </SidebarSection>
+        </NavSection>
 
-        <SidebarSection
+        <NavSection
           testID="content-nav-media-section"
+          navTestID="content-nav-media-all"
+          toggleTestID="content-nav-media-toggle"
           title={t("web.library.content.media")}
           count={counts().media}
+          active={allMediaActive()}
           open={mediaSectionOpen.get()}
+          onSelect={() => selectBucket({ kind: "media" })}
           onToggle={() => mediaSectionOpen.update((on) => !on)}
-          listClass="gap-0.5"
         >
-          <NavRow
-            testID="content-nav-media-all"
-            icon="media"
-            label={t("web.library.kind.all")}
-            count={countForBucket(counts(), { kind: "media" })}
-            active={allMediaActive()}
-            onPress={() => selectBucket({ kind: "media" })}
-          />
-          <Each of={mediaKinds}>
+          <Each of={mediaKinds} key={(kind) => kind}>
             {(kind) => {
               const active = () => {
                 const b = bucket();
@@ -217,8 +220,66 @@ export function ContentSidebar() {
               );
             }}
           </Each>
-        </SidebarSection>
+        </NavSection>
       </Scroll>
+    </View>
+  );
+}
+
+function NavSection(props: {
+  testID: string;
+  navTestID: string;
+  toggleTestID: string;
+  title: string;
+  count: number;
+  active: boolean;
+  open: boolean;
+  onSelect: () => void;
+  onToggle: () => void;
+  action?: JSX.Element | undefined;
+  children: JSX.Element;
+}) {
+  return (
+    <View testID={props.testID} accessibilityLabel={props.title} class="gap-0.5">
+      <View class="h-7 flex-row items-center gap-1">
+        <View class={`relative h-7 min-w-0 flex-1 flex-row items-center gap-2 rounded-md px-2 ${props.active ? "bg-selected" : "hover:bg-hover"}`}>
+          <If when={props.active}>
+            <ActiveBar />
+          </If>
+          <View
+            role="button"
+            testID={props.toggleTestID}
+            accessibilityLabel={
+              props.open ? t("web.shell.sidebar.collapseItem", { name: props.title }) : t("web.shell.sidebar.expandItem", { name: props.title })
+            }
+            accessibilityState={{ expanded: props.open }}
+            onPress={() => props.onToggle()}
+            class="h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
+          >
+            <View
+              class={`size-2.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
+              style={{ transform: [{ rotate: props.open ? "90deg" : "0deg" }] }}
+            >
+              <Icon name="expand" size={10} tone={props.active ? "muted" : "faint"} />
+            </View>
+          </View>
+          <View
+            role="button"
+            testID={props.navTestID}
+            accessibilityLabel={props.title}
+            accessibilityState={{ selected: props.active }}
+            onPress={() => props.onSelect()}
+            class="h-7 min-w-0 flex-1 flex-row items-center gap-2 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
+          >
+            <Text class={`min-w-0 flex-1 truncate text-sm font-medium ${props.active ? "text-ink" : "text-muted"}`}>{props.title}</Text>
+            <Text class={`shrink-0 font-mono text-2xs tabular-nums ${props.active ? "text-muted" : "text-faint"}`}>{String(props.count)}</Text>
+          </View>
+        </View>
+        {props.action}
+      </View>
+      <If when={props.open}>
+        <View class="gap-0.5">{props.children}</View>
+      </If>
     </View>
   );
 }

@@ -1,13 +1,17 @@
+import type { Attachment } from "@vibevalley/protocol";
+
 export interface NewIssueDraft {
   readonly text: string;
   readonly repo: string;
   readonly agent: string;
+  readonly attachments: readonly Attachment[];
 }
 
 export interface SubmittedDraft {
   readonly words: string;
   readonly repo: string;
   readonly agent: string;
+  readonly attachments: readonly Attachment[];
 }
 
 export type DraftSubmitState =
@@ -21,23 +25,36 @@ export type DraftSubmitEvent =
   | { readonly kind: "setText"; readonly text: string }
   | { readonly kind: "setRepo"; readonly repo: string }
   | { readonly kind: "setAgent"; readonly agent: string }
+  | { readonly kind: "addAttachment"; readonly file: Attachment }
+  | { readonly kind: "removeAttachment"; readonly id: string }
   | { readonly kind: "submit" }
   | { readonly kind: "accepted" }
   | { readonly kind: "rejected" };
+
+type DraftEditEvent = Extract<DraftSubmitEvent, { readonly kind: "setText" | "setRepo" | "setAgent" | "addAttachment" | "removeAttachment" }>;
 
 export function initialDraftSubmit(draft: NewIssueDraft): DraftSubmitState {
   return { kind: "editing", draft };
 }
 
+function sameAttachments(a: readonly Attachment[], b: readonly Attachment[]): boolean {
+  return a.length === b.length && a.every((file, index) => file.id === b[index]?.id);
+}
+
 function toSubmittedDraft(draft: NewIssueDraft): SubmittedDraft {
-  return { words: draft.text.trim(), repo: draft.repo, agent: draft.agent };
+  return { words: draft.text.trim(), repo: draft.repo, agent: draft.agent, attachments: draft.attachments };
 }
 
 function sameDraftPayload(draft: NewIssueDraft, submitted: SubmittedDraft): boolean {
-  return draft.text.trim() === submitted.words && draft.repo === submitted.repo && draft.agent === submitted.agent;
+  return (
+    draft.text.trim() === submitted.words &&
+    draft.repo === submitted.repo &&
+    draft.agent === submitted.agent &&
+    sameAttachments(draft.attachments, submitted.attachments)
+  );
 }
 
-function applyDraftEdit(draft: NewIssueDraft, event: Extract<DraftSubmitEvent, { readonly kind: "setText" | "setRepo" | "setAgent" }>): NewIssueDraft {
+function applyDraftEdit(draft: NewIssueDraft, event: DraftEditEvent): NewIssueDraft {
   switch (event.kind) {
     case "setText":
       return event.text === draft.text ? draft : { ...draft, text: event.text };
@@ -45,6 +62,12 @@ function applyDraftEdit(draft: NewIssueDraft, event: Extract<DraftSubmitEvent, {
       return event.repo === draft.repo ? draft : { ...draft, repo: event.repo };
     case "setAgent":
       return event.agent === draft.agent ? draft : { ...draft, agent: event.agent };
+    case "addAttachment":
+      return draft.attachments.some((file) => file.id === event.file.id) ? draft : { ...draft, attachments: [...draft.attachments, event.file] };
+    case "removeAttachment":
+      return draft.attachments.some((file) => file.id === event.id)
+        ? { ...draft, attachments: draft.attachments.filter((file) => file.id !== event.id) }
+        : draft;
   }
 }
 
@@ -54,7 +77,9 @@ export function draftSubmitTransition(state: DraftSubmitState, event: DraftSubmi
       switch (event.kind) {
         case "setText":
         case "setRepo":
-        case "setAgent": {
+        case "setAgent":
+        case "addAttachment":
+        case "removeAttachment": {
           const draft = applyDraftEdit(state.draft, event);
           return draft === state.draft ? state : { kind: "editing", draft };
         }
@@ -73,7 +98,9 @@ export function draftSubmitTransition(state: DraftSubmitState, event: DraftSubmi
       switch (event.kind) {
         case "setText":
         case "setRepo":
-        case "setAgent": {
+        case "setAgent":
+        case "addAttachment":
+        case "removeAttachment": {
           const draft = applyDraftEdit(state.draft, event);
           return draft === state.draft ? state : { ...state, draft };
         }
@@ -93,7 +120,9 @@ export function draftSubmitTransition(state: DraftSubmitState, event: DraftSubmi
       switch (event.kind) {
         case "setText":
         case "setRepo":
-        case "setAgent": {
+        case "setAgent":
+        case "addAttachment":
+        case "removeAttachment": {
           const draft = applyDraftEdit(state.draft, event);
           if (draft === state.draft) return state;
           return sameDraftPayload(draft, toSubmittedDraft(state.draft))
@@ -115,7 +144,9 @@ export function draftSubmitTransition(state: DraftSubmitState, event: DraftSubmi
       switch (event.kind) {
         case "setText":
         case "setRepo":
-        case "setAgent": {
+        case "setAgent":
+        case "addAttachment":
+        case "removeAttachment": {
           const draft = applyDraftEdit(state.draft, event);
           return draft === state.draft ? state : { kind: "editing", draft };
         }
@@ -135,6 +166,8 @@ export function draftSubmitTransition(state: DraftSubmitState, event: DraftSubmi
         case "setText":
         case "setRepo":
         case "setAgent":
+        case "addAttachment":
+        case "removeAttachment":
         case "submit":
         case "accepted":
         case "rejected":

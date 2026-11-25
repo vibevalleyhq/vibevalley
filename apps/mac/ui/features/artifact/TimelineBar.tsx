@@ -305,25 +305,33 @@ export function TimelineBar(props: TimelineBarProps) {
                   {t("web.artifact.timeline.restore")}
                 </Button>
               </If>
-              <Button size="compact" tone="plain" icon="branch" testID="timeline-fork" disabled={mutateAct.busy() || previewAct.busy()} onPress={forkSelected}>
-                {t("web.artifact.timeline.fork")}
-              </Button>
+              <IconButton
+                icon="branch"
+                size={14}
+                label={t("web.artifact.timeline.fork")}
+                testid="timeline-fork"
+                disabled={mutateAct.busy() || previewAct.busy()}
+                onClick={forkSelected}
+              />
               <If when={entry().origin.length > 0}>
-                <Button
-                  size="compact"
-                  tone="plain"
+                <IconButton
                   icon="undo"
-                  testID="timeline-undo-origin"
+                  size={14}
+                  label={t("web.artifact.timeline.undoTurn")}
+                  testid="timeline-undo-origin"
                   disabled={mutateAct.busy() || previewAct.busy()}
-                  onPress={undoSelectedOrigin}
-                >
-                  {t("web.artifact.timeline.undoTurn")}
-                </Button>
+                  onClick={undoSelectedOrigin}
+                />
               </If>
               <If when={chronological().length > 1}>
-                <Button size="compact" tone="quiet" testID="timeline-compact" disabled={mutateAct.busy() || previewAct.busy()} onPress={compactHistory}>
-                  {t("web.artifact.timeline.compact")}
-                </Button>
+                <IconButton
+                  icon="collapse"
+                  size={14}
+                  label={t("web.artifact.timeline.compact")}
+                  testid="timeline-compact"
+                  disabled={mutateAct.busy() || previewAct.busy()}
+                  onClick={compactHistory}
+                />
               </If>
             </View>
           </View>

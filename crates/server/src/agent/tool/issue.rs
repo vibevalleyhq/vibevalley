@@ -83,6 +83,18 @@ pub async fn get(f: &ToolRegistry, _: &Who, a: IdArgs) -> Result<String, String>
         .map(|runs| vibevalley_core::brief::milestones_of(&item, &runs, |s| session_names.get(s).map(|n| (*n).to_string())));
     let at = f.ctx.now();
     let mut lines = vec![text::issue_detail(&item, &f.who_of_async(&item).await, timeline.as_ref(), at)];
+    if !item.attachments.is_empty() {
+        lines.push("附件本地路径：".into());
+        for att in &item.attachments {
+            lines.push(format!(
+                "  - {}（{}，{} bytes）：{}",
+                att.name,
+                att.r#type,
+                att.size,
+                f.storage.path_of(&att.id).display()
+            ));
+        }
+    }
     if let Some(w) = f.worker_of_async(&item).await {
         lines.push(text::session_line(&w, at, Some(item.number)));
         lines.push(format!("目录：{}", w.cwd.clone().unwrap_or_default()));
@@ -229,6 +241,7 @@ pub struct UpdateArgs {
     deliver: Option<Deliverable>,
     priority: Option<String>,
     agent: Option<String>,
+    attachments: Option<Vec<String>>,
 }
 
 pub async fn update(f: &ToolRegistry, _who: &Who, a: UpdateArgs) -> Result<String, String> {
@@ -243,6 +256,7 @@ pub async fn update(f: &ToolRegistry, _who: &Who, a: UpdateArgs) -> Result<Strin
         repo: a.repo,
         criteria: a.criteria,
         deliver: a.deliver,
+        attachments: a.attachments,
         ..Default::default()
     };
     if let Some(pr) = given(&a.priority) {
@@ -329,6 +343,7 @@ pub struct CreateArgs {
     draft: bool,
     #[serde(rename = "autoSubmitPr")]
     auto_submit_pr: Option<bool>,
+    attachments: Option<Vec<String>>,
 }
 
 /// `issue_create`: written down, and sent when asked (`start`).
@@ -354,6 +369,7 @@ pub async fn create(f: &ToolRegistry, who: &Who, a: CreateArgs) -> Result<String
         parent: a.parent,
         blocked_by: a.blocked_by,
         auto_submit_pr: a.auto_submit_pr,
+        attachments: a.attachments,
         ..Default::default()
     };
     match given(&a.repo) {

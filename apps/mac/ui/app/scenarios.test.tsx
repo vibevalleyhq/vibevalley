@@ -310,6 +310,8 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   });
   await visit(app, fake, "/runtimes", row, () => {
     expect(app.count("id:runtimes-page")).toBe(1);
+    expect(app.count("id:desk")).toBe(0);
+    expect(app.count("id:place-runtimes")).toBe(1);
   });
 
   await app.setColorScheme("dark");
@@ -564,7 +566,7 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.count("id:skills-book")).toBe(1);
   });
   await visit(app, fake, "/settings/memory", row, () => {
-    expect(app.count("id:team-memory-page")).toBe(1);
+    expect(app.count("id:settings-memory")).toBe(1);
   });
   await visit(app, fake, "/settings/chat/weixin", row, () => {
     expect(app.count("id:connector-weixin")).toBe(1);

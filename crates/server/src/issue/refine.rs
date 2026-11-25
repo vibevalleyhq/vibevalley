@@ -53,7 +53,7 @@ impl Board {
             }
         };
         let word = words.trim();
-        let prompt = vibevalley_core::refine::refinement_brief(
+        let mut prompt = vibevalley_core::refine::refinement_brief(
             &issue.title,
             &issue.description,
             &issue.criteria,
@@ -62,6 +62,11 @@ impl Board {
             issue.repo.as_deref(),
             discussion,
         );
+        let attachments = super::board::attachments_brief(&issue, self.storage().map(std::sync::Arc::as_ref));
+        if !attachments.is_empty() {
+            prompt.push_str("\n\n");
+            prompt.push_str(&attachments);
+        }
         let issue = if issue.assigned_agent().is_none() && !drive.agent.is_empty() {
             self.change_async(&issue.id, IssueChange::Assigned(drive.agent.clone())).await?
         } else {

@@ -2,7 +2,7 @@ import { computed, signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
+import { type Attachment, type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
@@ -23,6 +23,7 @@ import { IssueArtifacts } from "../../artifact";
 import { isRefined, newIssueTitle } from "../model/issue";
 import { issueMove, issueMoveOf, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
+import { IssueAttachments } from "./IssueAttachments";
 import { IssueThread } from "./IssueThread";
 import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 
@@ -34,6 +35,7 @@ interface Draft {
   agent: string;
   priority: Priority;
   deliver: Deliverable;
+  attachments: readonly Attachment[];
 }
 
 const draftOf = (i: Issue): Draft => ({
@@ -44,6 +46,7 @@ const draftOf = (i: Issue): Draft => ({
   agent: assignedAgentOf(i) ?? "",
   priority: i.priority,
   deliver: i.deliver,
+  attachments: i.attachments ?? [],
 });
 
 const criteriaList = (text: string) =>
@@ -93,6 +96,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const edit = (change: Partial<Draft>) => {
     setForm((cur) => ({ draft: { ...cur.draft, ...change }, edited: true }));
   };
+  const addAttachment = (file: Attachment) => {
+    setForm((cur) => ({
+      draft: { ...cur.draft, attachments: [...cur.draft.attachments.filter((a) => a.id !== file.id), file] },
+      edited: true,
+    }));
+  };
+  const removeAttachment = (id: string) => {
+    setForm((cur) => ({
+      draft: { ...cur.draft, attachments: cur.draft.attachments.filter((a) => a.id !== id) },
+      edited: true,
+    }));
+  };
 
   const update = (x: Draft): IssueUpdate => ({
     title: x.title,
@@ -102,6 +117,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     priority: x.priority,
     deliver: x.deliver,
     criteria: criteriaList(x.criteria),
+    attachments: x.attachments.map((a) => a.id),
   });
 
   // Saving goes with the act (edit): the server saves the fields before it acts on them. Taken when asked, so a call
@@ -302,6 +318,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         </View>
         {talk()}
       </If>
+      <IssueAttachments files={d().attachments} editable busy={busy()} onAdd={addAttachment} onRemove={removeAttachment} />
       <IssueThread issue={props.item.id} />
       <IssueArtifacts issue={props.item.id} heading={<SheetLabel>{t("web.artifact.issue.title")}</SheetLabel>} />
     </>

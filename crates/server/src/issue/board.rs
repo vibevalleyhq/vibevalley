@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::{Move, Refusal, status_move};
 use vibevalley_protocol::{
-    AppliedIssue, Assignment, Deliverable, Issue, IssueCanceled, IssueConstraints, IssueStageKind as StageKind, IssueStatus, Priority, Run, RunTriggerKind,
-    Session, SliceBundle, StuckReason,
+    ApiError, AppliedIssue, Assignment, Attachment, BizCode, Deliverable, Issue, IssueCanceled, IssueConstraints, IssueStageKind as StageKind, IssueStatus,
+    Priority, Run, RunTriggerKind, Session, SliceBundle, StuckReason,
 };
 use vibevalley_runtime::oar::Registry;
 
@@ -28,6 +28,7 @@ use crate::runtime::{
     Changes, Delivery, DraftEnd, Hire, Landed, Leave, MailboxSource, MailboxStatus, OnDisk, Rounds, Runtime, SessionEngine, Worktree, find_issue, io,
     issue_branch, trigger_of,
 };
+use crate::storage::Storage;
 
 /// What the user writes down.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -60,6 +61,9 @@ pub struct NewIssue {
     /// Explicit user mandate allowing the helper to open a PR itself.
     #[serde(default)]
     pub auto_submit_pr: bool,
+    /// Uploaded attachment ids bound to this issue.
+    #[serde(default)]
+    pub attachments: Vec<String>,
 }
 
 /// What became of a request to send an issue.
@@ -79,6 +83,7 @@ pub struct Board {
     pub(super) runtime: Arc<Runtime>,
     repos: Option<Arc<Repo>>,
     channel: Option<Arc<Chat>>,
+    storage: Option<Arc<Storage>>,
     pub(super) create_keys: AsyncRequestKeys<AppliedIssue>,
     pub(super) status_keys: AsyncRequestKeys<AppliedIssue>,
     /// Held by every change to the workflow (not by event pumps), so rooms
@@ -139,6 +144,19 @@ impl Board {
         repos: Option<Arc<Repo>>,
         channel: Option<Arc<Chat>>,
     ) -> Result<Arc<Board>> {
+        Self::with_storage(ctx, runtime, opened, repos, channel, None).await
+    }
+
+    /// Takes the board lock with optional content-addressed [`Storage`] for resolving
+    /// issue attachments and formatting their local CAS paths in agent prompts.
+    pub async fn with_storage(
+        ctx: Arc<Context>,
+        runtime: Arc<Runtime>,
+        opened: Opened,
+        repos: Option<Arc<Repo>>,
+        channel: Option<Arc<Chat>>,
+        storage: Option<Arc<Storage>>,
+    ) -> Result<Arc<Board>> {
         let config = runtime.config();
         tokio::fs::create_dir_all(config.data_dir.join("reports")).await.map_err(io)?;
         tokio::fs::create_dir_all(config.data_dir.join("records")).await.map_err(io)?;
@@ -160,6 +178,7 @@ impl Board {
             runtime,
             repos,
             channel,
+            storage,
             create_keys: AsyncRequestKeys::default(),
             status_keys: AsyncRequestKeys::default(),
             work: AsyncMutex::new(()),
@@ -228,6 +247,34 @@ impl Board {
 
     pub fn channel(&self) -> Option<&Arc<Chat>> {
         self.channel.as_ref()
+    }
+
+    pub fn storage(&self) -> Option<&Arc<Storage>> {
+        self.storage.as_ref()
+    }
+
+    pub(super) async fn resolve_attachments_async(&self, ids: &[String]) -> Result<Vec<Attachment>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        if let Some(storage) = &self.storage {
+            return storage.of_async(ids).await.map_err(BoardError::Api);
+        }
+        let map = self.ctx.service.storage.find_attachments_map(ids).await?;
+        let mut out = Vec::with_capacity(ids.len());
+        for id in ids {
+            if out.iter().any(|a: &Attachment| &a.id == id) {
+                continue;
+            }
+            let att = map.get(id).cloned().ok_or_else(|| {
+                BoardError::Api(ApiError::new(
+                    BizCode::NotFound,
+                    vibevalley_i18n::t("server.attachment.noAttachment", &[("id", id.clone().into())]),
+                ))
+            })?;
+            out.push(att);
+        }
+        Ok(out)
     }
 
     pub fn seq(&self) -> i64 {
@@ -337,6 +384,7 @@ impl Board {
         {
             return Err(BoardError::Other("an acceptance issue needs a check command".into()));
         }
+        let attachments = self.resolve_attachments_async(&new.attachments).await?;
         let at = now();
         let mut issue = Issue::new(&id, number, title, at);
         issue.description = description;
@@ -350,6 +398,7 @@ impl Board {
         issue.blocked_by = blocked_by;
         issue.constraints = new.constraints;
         issue.cron = new.cron;
+        issue.attachments = attachments;
         if new.auto_submit_pr {
             issue.mandate = vibevalley_protocol::IssueMandate::explicit("", true);
         }
@@ -702,11 +751,12 @@ impl Board {
                 Some(s) => {
                     let words = words.clone().unwrap_or_else(|| default_words(&issue));
                     let trigger = trigger_of(kind, Some(words.clone()));
+                    let storage = self.storage.as_deref();
                     let again = |words: &str| {
                         format!(
                             "{}\n\nYou are taking this issue up again in its worktree; earlier work is on its branch: \
                              check `git status` and `git log` first.",
-                            brief(&issue, &all_issues, Some(words))
+                            brief(&issue, &all_issues, Some(words), storage)
                         )
                     };
                     self.session_engine().next_round_async(&issue, &s, words, again, trigger).await
@@ -764,7 +814,7 @@ impl Board {
         self.session_engine()
             .hire_async(Hire {
                 issue,
-                prompt: brief(issue, all, words.as_deref()),
+                prompt: brief(issue, all, words.as_deref(), self.storage.as_deref()),
                 trigger: trigger_of(kind, words),
                 drive,
                 cwd,
@@ -1118,15 +1168,32 @@ pub(super) fn default_words(issue: &Issue) -> String {
     }
 }
 
+pub(super) fn attachments_brief(issue: &Issue, storage: Option<&Storage>) -> String {
+    if issue.attachments.is_empty() {
+        return String::new();
+    }
+    let mut lines = vec!["Attachments:".to_string()];
+    for a in &issue.attachments {
+        let path = storage.map(|s| format!(" — {}", s.path_of(&a.id).display())).unwrap_or_default();
+        lines.push(format!("- {} ({}, {} bytes){path}", a.name, a.r#type, a.size));
+    }
+    lines.join("\n")
+}
+
 /// What the agent is told to do.
-fn brief(issue: &Issue, all: &[Issue], words: Option<&str>) -> String {
+pub(super) fn brief(issue: &Issue, all: &[Issue], words: Option<&str>, storage: Option<&Storage>) -> String {
     let frozen: Vec<String> = vibevalley_core::acceptance_ancestors(issue, all)
         .iter()
         .flat_map(|t| t.constraints.as_ref().map(|c| c.frozen.clone()).unwrap_or_default())
         .collect();
     let brief = vibevalley_core::prompts::issue_brief(&issue.title, &issue.description, &issue.criteria, issue.deliver);
+    let attachments = attachments_brief(issue, storage);
     let constraints = vibevalley_core::work_constraints(issue.constraints.as_ref(), &frozen);
-    let brief = [brief, constraints].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("\n\n");
+    let brief = [brief, attachments, constraints]
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n");
     match words.map(str::trim).filter(|w| !w.is_empty()) {
         Some(words) => format!("{words}{}", vibevalley_i18n::t("server.issue.brief.original", &[("brief", brief.into())])),
         None => brief,

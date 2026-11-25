@@ -581,7 +581,7 @@ impl Shell {
         Ok(id)
     }
 
-    /// `$EDITOR file` in a new terminal tab (the viewer's "Open in editor").
+    /// `$EDITOR file` in a new terminal tab (the viewer's "Terminal ($EDITOR)").
     pub fn open_in_editor(&mut self, path: &Path, window: &mut Window, cx: &mut Context<Self>) {
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
         let quoted = format!("'{}'", path.to_string_lossy().replace('\'', "'\\''"));
@@ -596,6 +596,37 @@ impl Shell {
             title: None,
         };
         self.new_terminal(Some(spec), window, cx);
+    }
+
+    /// Opens `path` in the selected editor target (GUI app, terminal `$EDITOR`, or macOS Default App).
+    pub fn open_in_editor_target(&mut self, path: &Path, target: crate::host::EditorTarget, window: &mut Window, cx: &mut Context<Self>) {
+        match target {
+            crate::host::EditorTarget::TerminalEditor => self.open_in_editor(path, window, cx),
+            crate::host::EditorTarget::DefaultApp => {
+                let path = path.to_path_buf();
+                Self::bg(
+                    cx,
+                    move || crate::host::open(&path),
+                    |_, result, _| {
+                        if let Err(err) = result {
+                            tracing::warn!(error = %err, "failed to open file in default app");
+                        }
+                    },
+                );
+            }
+            crate::host::EditorTarget::Cursor { app_path } | crate::host::EditorTarget::VsCode { app_path } | crate::host::EditorTarget::Zed { app_path } => {
+                let path = path.to_path_buf();
+                Self::bg(
+                    cx,
+                    move || crate::host::open_with_app(&app_path, &path),
+                    |_, result, _| {
+                        if let Err(err) = result {
+                            tracing::warn!(error = %err, "failed to open file in external editor");
+                        }
+                    },
+                );
+            }
+        }
     }
 
     pub(super) fn split(&mut self, axis: Axis, window: &mut Window, cx: &mut Context<Self>) {
@@ -884,9 +915,9 @@ impl Shell {
             PaneKind::File { path } => {
                 let view = cx.new(|cx| FileViewer::new(path, cx));
                 let sub = cx.subscribe_in(&view, window, |this, view, event: &crate::viewer::ViewerEvent, window, cx| match event {
-                    crate::viewer::ViewerEvent::OpenInEditor => {
+                    crate::viewer::ViewerEvent::OpenInEditor(target) => {
                         let path = view.read(cx).path().to_path_buf();
-                        this.open_in_editor(&path, window, cx);
+                        this.open_in_editor_target(&path, target.clone(), window, cx);
                     }
                     crate::viewer::ViewerEvent::Preview => {
                         let path = view.read(cx).path().to_path_buf();
@@ -939,9 +970,9 @@ impl Shell {
                     MarkdownPaneEvent::OpenRoute(route) => {
                         this.navigate_workbench(route, cx);
                     }
-                    MarkdownPaneEvent::OpenInEditor => {
+                    MarkdownPaneEvent::OpenInEditor(target) => {
                         let path = view.read(cx).path().to_path_buf();
-                        this.open_in_editor(&path, window, cx);
+                        this.open_in_editor_target(&path, target.clone(), window, cx);
                     }
                     MarkdownPaneEvent::Reveal => {
                         let path = view.read(cx).path().to_path_buf();

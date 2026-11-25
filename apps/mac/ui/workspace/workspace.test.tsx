@@ -195,6 +195,130 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   expect(app.texts()).toContain("README.md");
 });
 
+test("workspace sidebar right-click opens standalone RepoDetailPanel for managed repos and local folders", async () => {
+  const host = workspaceHost(
+    { view: "sidebar" },
+    {
+      "repo.list": [
+        {
+          name: "vibevalley",
+          path: "/work/vibevalley",
+          git: true,
+          maxSessions: 4,
+          pullRequest: { available: true, reason: "gh authenticated" },
+        },
+      ],
+      "repo.activity.get": {
+        repo: "vibevalley",
+        at: 1_700_000_000_000,
+        days: [{ day: "2026-11-25", commits: 5 }],
+        authors: [{ name: "Lucas", commits: 5 }],
+        total: 128,
+      },
+      "repo.language.list": {
+        repo: "vibevalley",
+        at: 1_700_000_000_000,
+        languages: [
+          { name: "Rust", files: 120, code: 40_000, comments: 2_000, blanks: 4_000 },
+          { name: "TypeScript", files: 80, code: 18_000, comments: 1_000, blanks: 2_000 },
+        ],
+      },
+    },
+  );
+  const app = await open("../ShellApp.story.tsx", { width: 280, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  await host.pump(app);
+
+  await host.pushFrame(app, "slice:board", { seq: 1, issues: [] });
+  await host.pushFrame(app, "slice:sessions", { seq: 1, sessions: [], machines: [] });
+  await host.pushFrame(app, "rail", {
+    panel: "files",
+    projects: [
+      {
+        id: 1,
+        name: "vibevalley",
+        path: "/work/vibevalley",
+        initials: "VV",
+        active: true,
+        attention: false,
+        terminals: 1,
+        branch: "main",
+        worktrees: [
+          { path: "/work/vibevalley", branch: "main", main: true },
+          { path: "/work/vibevalley-wt", branch: "feat/repo-detail", main: false },
+        ],
+        tabs: [{ id: 101, title: "zsh", active: true, kind: "terminal" }],
+      },
+      {
+        id: 2,
+        name: "notes",
+        path: "/tmp/notes",
+        initials: "NO",
+        active: false,
+        attention: false,
+        terminals: 0,
+        tabs: [],
+      },
+    ],
+  });
+
+  expect(app.count("id:workspace-repo-detail")).toBe(0);
+
+  await app.rightClick("text:vibevalley");
+  expect(app.shows(`text:${t("web.shell.sidebar.repoDetails")}`)).toBe(true);
+  await app.press("id:sidebar-repo-menu-details-vibevalley");
+  await host.pump(app);
+
+  expect(app.count("id:workspace-repo-detail")).toBe(1);
+  expect(app.texts()).toContain("vibevalley");
+  expect(app.texts()).toContain("/work/vibevalley");
+  expect(app.texts()).toContain("main");
+  expect(app.texts()).toContain("128");
+  expect(app.texts()).toContain("Rust");
+  expect(app.texts()).toContain("TypeScript");
+  expect(app.texts()).toContain("feat/repo-detail");
+  expect(app.count("id:repo-detail-languages")).toBe(1);
+  expect(app.count("id:repo-detail-open-full")).toBe(1);
+  expect(app.count("id:repo-detail-close-folder")).toBe(0);
+
+  host.clearActs();
+  host.clearCalls();
+  await app.press("id:repo-detail-copy-path");
+  expect(app.clipboard()).toBe("/work/vibevalley");
+
+  await app.press("id:repo-detail-reveal");
+  expect(host.calls).toContainEqual({ op: "host.reveal", payload: "/work/vibevalley" });
+
+  await app.press("id:repo-detail-new-chat");
+  expect(host.acts).toContainEqual({ type: "new_chat_at", path: "/work/vibevalley" });
+
+  await app.press("id:repo-detail-new-terminal");
+  expect(host.acts).toContainEqual({ type: "new_terminal_at", path: "/work/vibevalley" });
+
+  await app.press("id:repo-detail-worktree-feat/repo-detail");
+  expect(host.acts).toContainEqual({ type: "activate_path", path: "/work/vibevalley-wt" });
+
+  await app.press("id:repo-detail-open-full");
+  expect(host.acts).toContainEqual({ type: "open_route", path: "/repos/vibevalley" });
+
+  await app.keyboard.press("escape");
+  expect(app.count("id:workspace-repo-detail")).toBe(0);
+  expect(app.texts()).toContain("notes");
+
+  // Local non-VibeValley folder opens detail view without full-page link and allows closing the folder.
+  await app.rightClick("text:notes");
+  await app.press("id:sidebar-repo-menu-details-notes");
+  await host.pump(app);
+  expect(app.count("id:workspace-repo-detail")).toBe(1);
+  expect(app.texts()).toContain("/tmp/notes");
+  expect(app.count("id:repo-detail-open-full")).toBe(0);
+  expect(app.count("id:repo-detail-close-folder")).toBe(1);
+
+  host.clearActs();
+  await app.press("id:repo-detail-close-folder");
+  expect(app.count("id:workspace-repo-detail")).toBe(0);
+  expect(host.acts).toContainEqual({ type: "close_project", id: 2 });
+});
+
 test("workspace inspector FileTree expands, collapses, opens files, and handles context menus", async () => {
   const host = workspaceHost({ view: "sidebar", role: "inspector" });
   const app = await open("../ShellApp.story.tsx", { width: 320, height: 760, colorScheme: "light", platform: "macos", host: host.options });
@@ -482,8 +606,8 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   expect(app.count("id:chat-permission-mode")).toBe(1);
 
   host.clearActs();
-  await app.press("id:chat-tool-open-file-3");
-  await app.press("id:chat-tool-open-diff-3");
+  await app.press(`label:${t("web.shell.chat.toolOpenFile")}`);
+  await app.press(`label:${t("web.shell.chat.toolOpenDiff")}`);
   expect(host.acts).toContainEqual({ type: "open_file_adjacent", path: "crates/runtime/src/oar/acp/mod.rs", line: 136 });
   expect(host.acts).toContainEqual({ type: "open_diff_adjacent", path: "crates/runtime/src/oar/acp/mod.rs", staged: false });
 

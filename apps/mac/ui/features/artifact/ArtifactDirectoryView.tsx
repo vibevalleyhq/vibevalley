@@ -29,16 +29,26 @@ import { presenterHref } from "./slides";
 import { exportCsvFile, formatCellValue, useArtifactDirectory, useArtifactPresence, useArtifactSuggestions, useReportViewContext } from "./store";
 import { WhiteboardView } from "./WhiteboardView";
 
+export type ArtifactViewTab = "preview" | "files";
+
+export interface ArtifactDirectoryMeta {
+  readonly fileCount: number;
+  readonly seq: number;
+  readonly peers: readonly ArtifactPresence[];
+}
+
 export interface ArtifactDirectoryViewProps {
   readonly artifact: Artifact;
   readonly version?: number | undefined;
   readonly compact?: boolean | undefined;
   readonly covered?: boolean | undefined;
+  readonly tab?: ArtifactViewTab | undefined;
+  readonly onTabChange?: ((tab: ArtifactViewTab) => void) | undefined;
+  readonly hideToolbar?: boolean | undefined;
+  readonly onMeta?: ((meta: ArtifactDirectoryMeta) => void) | undefined;
   readonly onPresent?: ((on: boolean) => void) | undefined;
   readonly onOpenChat?: (() => void) | undefined;
 }
-
-type ViewTab = "preview" | "files";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -117,7 +127,12 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   const suggestions = useArtifactSuggestions(() => props.artifact.id);
   const act = createAct();
 
-  const tab = signal<ViewTab>("preview");
+  const internalTab = signal<ArtifactViewTab>("preview");
+  const tab = () => props.tab ?? internalTab();
+  const setTab = (next: ArtifactViewTab) => {
+    if (props.onTabChange) props.onTabChange(next);
+    else internalTab.set(next);
+  };
   const selectedPath = signal<string>(untracked(() => entryPathOf(props.artifact.artifactType)));
   const draftContent = signal("");
   const lastLoadedHash = signal<string | undefined>(undefined);
@@ -184,6 +199,15 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   );
 
   const remotePeers = computed((): readonly ArtifactPresence[] => presence.peers().filter((p) => p.id !== userId));
+  effect(() => {
+    const notify = props.onMeta;
+    if (!notify) return;
+    notify({
+      fileCount: sortedFiles().length,
+      seq: seq(),
+      peers: remotePeers(),
+    });
+  });
   const openSuggestions = computed(() => suggestions.open());
   const topSuggestion = computed((): Suggestion | undefined => {
     const list = openSuggestions();
@@ -545,47 +569,60 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
 
   return (
     <View testID="artifact-directory-view" class="min-h-0 min-w-0 flex-1 bg-page">
-      <View testID="artifact-collab-bar" class="min-h-9 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-side px-3 py-1">
-        <Segmented
-          testid="artifact-view-mode"
-          label="View mode"
-          value={tab()}
-          onChange={(v) => tab.set(v)}
-          options={[
-            { value: "preview" as const, label: "Preview" },
-            { value: "files" as const, label: `Files (${sortedFiles().length})` },
-          ]}
-        />
+      <If when={props.hideToolbar !== true}>
+        <View testID="artifact-collab-bar" class="min-h-9 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-side px-3 py-1">
+          <Segmented
+            testid="artifact-view-mode"
+            label="View mode"
+            value={tab()}
+            onChange={(v) => setTab(v)}
+            options={[
+              { value: "preview" as const, label: "Preview" },
+              { value: "files" as const, label: `Files (${sortedFiles().length})` },
+            ]}
+          />
 
-        <If when={remotePeers().length > 0}>
-          <View testID="artifact-presence-bar" class="flex-row flex-wrap items-center gap-1">
-            <Each of={remotePeers()} key={(p) => p.id}>
-              {(peer) => (
-                <View testID="artifact-presence-pill" class="h-5 flex-row items-center gap-1 rounded-full border border-line bg-page px-2">
-                  <View class="size-1.5 shrink-0 rounded-full bg-accent" />
-                  <Text class="max-w-32 truncate text-2xs font-medium text-ink">{peer().status ? `${peer().name} · ${peer().status}` : peer().name}</Text>
-                </View>
-              )}
-            </Each>
+          <If when={remotePeers().length > 0}>
+            <View testID="artifact-presence-bar" class="flex-row flex-wrap items-center gap-1">
+              <Each of={remotePeers()} key={(p) => p.id}>
+                {(peer) => (
+                  <View testID="artifact-presence-pill" class="h-5 flex-row items-center gap-1 rounded-full border border-line bg-page px-2">
+                    <View class="size-1.5 shrink-0 rounded-full bg-accent" />
+                    <Text class="max-w-32 truncate text-2xs font-medium text-ink">{peer().status ? `${peer().name} · ${peer().status}` : peer().name}</Text>
+                  </View>
+                )}
+              </Each>
+            </View>
+          </If>
+
+          <View class="ml-auto flex-row items-center gap-1.5">
+            <If when={props.artifact.artifactType === "design-system" && props.version === undefined}>
+              <IconButton
+                icon="check"
+                size={14}
+                pressed={props.artifact.isDefault}
+                label={props.artifact.isDefault ? t("web.artifact.types.unsetDefault") : t("web.artifact.types.setDefault")}
+                testid="artifact-toggle-default"
+                disabled={act.busy()}
+                onClick={toggleDefaultDesignSystem}
+              />
+            </If>
+            <If when={props.version === undefined && props.compact !== true}>
+              <IconButton
+                icon="add"
+                size={14}
+                label={t("web.artifact.edit.save")}
+                testid="artifact-snapshot-version"
+                disabled={act.busy()}
+                onClick={createSnapshotVersion}
+              />
+            </If>
+            <Text testID="artifact-seq" class="font-mono text-2xs text-faint tabular-nums">
+              {`seq ${seq()}`}
+            </Text>
           </View>
-        </If>
-
-        <View class="ml-auto flex-row items-center gap-1.5">
-          <If when={props.artifact.artifactType === "design-system" && props.version === undefined}>
-            <Button size="compact" tone="plain" testID="artifact-toggle-default" disabled={act.busy()} onPress={toggleDefaultDesignSystem}>
-              {props.artifact.isDefault ? t("web.artifact.types.unsetDefault") : t("web.artifact.types.setDefault")}
-            </Button>
-          </If>
-          <If when={props.version === undefined && props.compact !== true}>
-            <Button size="compact" tone="plain" icon="add" testID="artifact-snapshot-version" disabled={act.busy()} onPress={createSnapshotVersion}>
-              {t("web.artifact.edit.save")}
-            </Button>
-          </If>
-          <Text testID="artifact-seq" class="font-mono text-2xs text-faint tabular-nums">
-            {`seq ${seq()}`}
-          </Text>
         </View>
-      </View>
+      </If>
 
       <If when={snapshot().error}>{(err) => <Banner edge>{err()}</Banner>}</If>
 
@@ -787,9 +824,13 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
                   <View class="gap-2 rounded-lg border border-line bg-page p-3">
                     <View class="flex-row items-center justify-between gap-2">
                       <Text class="font-mono text-xs font-semibold text-ink">{ds().path}</Text>
-                      <Button size="compact" icon="download" onPress={() => void act.run(() => exportCsvFile(ds().name, ds().rows))}>
-                        {t("web.artifact.dashboard.exportCsv")}
-                      </Button>
+                      <IconButton
+                        icon="download"
+                        size={14}
+                        label={t("web.artifact.dashboard.exportCsv")}
+                        disabled={act.busy()}
+                        onClick={() => void act.run(() => exportCsvFile(ds().name, ds().rows))}
+                      />
                     </View>
                     <Each of={ds().rows.slice(0, 20)} key={(_, idx) => String(idx)}>
                       {(row) => (
@@ -908,9 +949,13 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
                 </View>
                 <If when={currentSheet()}>
                   {(sh) => (
-                    <Button size="compact" icon="download" onPress={() => void act.run(() => exportCsvFile(sh().title, sh().rows))}>
-                      {t("web.artifact.dashboard.exportCsv")}
-                    </Button>
+                    <IconButton
+                      icon="download"
+                      size={14}
+                      label={t("web.artifact.dashboard.exportCsv")}
+                      disabled={act.busy()}
+                      onClick={() => void act.run(() => exportCsvFile(sh().title, sh().rows))}
+                    />
                   )}
                 </If>
               </View>

@@ -551,9 +551,13 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
           <Text testID="wb-count" class="pr-1 font-mono text-xs text-muted tabular-nums">
             {t("web.artifact.whiteboard.elements", { n: elements().length })}
           </Text>
-          <Button icon="download" testID="wb-export-svg" disabled={act.busy()} onPress={exportSvg}>
-            SVG
-          </Button>
+          <IconButton
+            icon="download"
+            label={`${t("web.library.content.exportArtifact")} SVG`}
+            testid="wb-export-svg"
+            disabled={act.busy()}
+            onClick={exportSvg}
+          />
           <IconButton
             icon="edit"
             label={t("web.artifact.whiteboard.inspector")}

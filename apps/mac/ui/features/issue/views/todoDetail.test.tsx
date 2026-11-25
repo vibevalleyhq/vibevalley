@@ -1,15 +1,22 @@
 import "../../../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
+import type { Attachment } from "@vibevalley/protocol";
+
 import { fakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../../fixtures/scenarios";
 
-async function mountTodoIssue() {
+async function mountTodoIssue(attachments?: Attachment[]) {
   const baseTodo =
     scenarios.typical.state.board.issues.find((i) => i.status === "backlog") ?? scenarios.typical.state.board.issues.find((i) => i.status === "todo");
   if (!baseTodo) throw new Error("typical scenario must include a backlog or todo issue");
   const { refining: _refining, queuedAt: _queuedAt, ...rest } = baseTodo;
-  const draftTodo = { ...rest, status: "backlog" as const, stage: { state: "draft" as const, acts: [] } };
+  const draftTodo = {
+    ...rest,
+    ...(attachments ? { attachments } : {}),
+    status: "backlog" as const,
+    stage: { state: "draft" as const, acts: [] },
+  };
   const state = {
     ...scenarios.typical.state,
     board: {
@@ -20,6 +27,12 @@ async function mountTodoIssue() {
   let allowRefine = false;
   const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${draftTodo.id}` });
   fake.respond("issue.refine", () => (allowRefine ? { ...draftTodo, seq: state.seq + 1 } : { bizCode: 300001, message: "Refine failed" }));
+  fake.respond("issue.update", (payload: unknown) => {
+    const p = payload as { attachments?: string[] };
+    const ids = p.attachments;
+    const nextAttachments = ids ? (draftTodo.attachments ?? []).filter((a) => ids.includes(a.id)) : draftTodo.attachments;
+    return { ...draftTodo, ...(nextAttachments ? { attachments: nextAttachments } : {}), seq: state.seq + 1 };
+  });
   const app = await open("../../../app/main.tsx", {
     width: 1200,
     height: 800,
@@ -32,6 +45,7 @@ async function mountTodoIssue() {
   return {
     app,
     fake,
+    draftTodo,
     setAllowRefine: (next: boolean) => {
       allowRefine = next;
     },
@@ -66,4 +80,26 @@ test("TodoDetail clears draft word optimistically on submit and restores on erro
   expect(app.value("id:issue-talk")).toBe("");
   await fake.pump(app);
   expect(app.value("id:issue-talk")).toBe("");
+});
+
+test("TodoDetail renders issue attachments and persists removed attachments on Save", async () => {
+  const files: Attachment[] = [
+    { id: "att-spec", name: "spec.pdf", type: "application/pdf", size: 2048 },
+    { id: "att-log", name: "trace.txt", type: "text/plain", size: 512 },
+  ];
+  const { app, fake } = await mountTodoIssue(files);
+
+  expect(app.count("id:issue-attachments")).toBe(1);
+  expect(app.count("id:issue-attachment-item")).toBe(2);
+  expect(app.count("id:issue-save")).toBe(0);
+
+  await app.press("id:issue-attachment-remove-att-spec");
+  await fake.pumpUntil(app, () => app.count("id:issue-attachment-item") === 1);
+  expect(app.count("id:issue-save")).toBe(1);
+
+  await app.press("id:issue-save");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.update"));
+
+  const updateCall = fake.calls.find((c) => c.op === "issue.update");
+  expect((updateCall?.payload as { attachments?: string[] } | undefined)?.attachments).toEqual(["att-log"]);
 });

@@ -1,6 +1,7 @@
 //! The read-only file viewer: highlighted text painted by GPUI, images,
 //! and placeholders for binary or oversized files. Markdown files offer a
-//! rendered preview (a hosted view) and every file can open in `$EDITOR`.
+//! rendered preview and every file can open in Cursor, VS Code, Zed, `$EDITOR`,
+//! or macOS Default App.
 
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -9,17 +10,19 @@ use std::time::Duration;
 
 use gpui::{
     AnyElement, AppContext as _, ClipboardItem, Context, EventEmitter, FocusHandle, Focusable, FontWeight, HighlightStyle, Hsla, InteractiveElement as _,
-    IntoElement, ObjectFit, ParentElement as _, Render, ScrollStrategy, StatefulInteractiveElement as _, Styled as _, StyledImage as _, StyledText,
-    UniformListScrollHandle, Window, div, hsla, img, px, uniform_list,
+    IntoElement, KeyDownEvent, MouseButton, ObjectFit, ParentElement as _, Render, ScrollStrategy, StatefulInteractiveElement as _, Styled as _,
+    StyledImage as _, StyledText, UniformListScrollHandle, Window, div, img, px, uniform_list,
 };
 use vibevalley_files::{FileContent, HighlightKind, HighlightSpan, Language};
 
+use crate::host::{EditorOption, EditorTarget};
+use crate::icon::{editor_popover, gpui_icon, icon_button, icon_caret_button};
 use crate::theme::{Palette, Ui};
 
 const MAX_BYTES: u64 = 8 * 1024 * 1024;
 
 pub enum ViewerEvent {
-    OpenInEditor,
+    OpenInEditor(EditorTarget),
     Preview,
     Reveal,
 }
@@ -47,6 +50,10 @@ pub struct FileViewer {
     reloads: u64,
     load_gen: u64,
     show_skeleton: bool,
+    copied: bool,
+    copy_gen: u64,
+    editor_menu_open: bool,
+    editor_options: Vec<EditorOption>,
 }
 
 fn matches_scope(scope: &str, prefix: &str) -> bool {
@@ -179,9 +186,57 @@ impl FileViewer {
             reloads: 0,
             load_gen: 0,
             show_skeleton: false,
+            copied: false,
+            copy_gen: 0,
+            editor_menu_open: false,
+            editor_options: crate::host::cached_editor_options(),
         };
+        viewer.refresh_editors(cx);
         viewer.reload(cx);
         viewer
+    }
+
+    fn refresh_editors(&mut self, cx: &mut Context<Self>) {
+        let task = cx.background_spawn(async { crate::host::detect_editors_blocking() });
+        cx.spawn(async move |this, cx| {
+            let options = task.await;
+            let _ = this.update(cx, |v, cx| {
+                if v.editor_options != options {
+                    v.editor_options = options;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    fn copy_path(&mut self, cx: &mut Context<Self>) {
+        cx.write_to_clipboard(ClipboardItem::new_string(self.path.to_string_lossy().into_owned()));
+        self.copied = true;
+        self.copy_gen = self.copy_gen.wrapping_add(1);
+        let generation = self.copy_gen;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(Duration::from_millis(1500)).await;
+            let _ = this.update(cx, |v, cx| {
+                if v.copy_gen == generation && v.copied {
+                    v.copied = false;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    fn toggle_editor_menu(&mut self, was_open: bool, window: &mut Window, cx: &mut Context<Self>) {
+        // Use render-time `was_open`: `on_mouse_down_out` already cleared
+        // `editor_menu_open` during capture when clicking the trigger to close.
+        self.editor_menu_open = !was_open;
+        if self.editor_menu_open {
+            window.focus(&self.focus, cx);
+            self.refresh_editors(cx);
+        }
+        cx.notify();
     }
 
     pub fn path(&self) -> &Path {
@@ -277,10 +332,6 @@ impl Focusable for FileViewer {
     }
 }
 
-fn transparent() -> Hsla {
-    hsla(0.0, 0.0, 0.0, 0.0)
-}
-
 fn format_bytes(bytes: u64) -> String {
     const KB: f64 = 1024.0;
     const MB: f64 = KB * 1024.0;
@@ -312,49 +363,6 @@ pub(crate) fn split_display_path(path: &Path) -> (String, Option<String>) {
         None => p.to_string_lossy().into_owned(),
     });
     (name, parent)
-}
-
-#[derive(Clone, Copy)]
-enum ButtonTone {
-    Quiet,
-    Plain,
-    Accent,
-}
-
-fn action_button(id: &'static str, label: &'static str, tone: ButtonTone, colors: &Palette) -> gpui::Stateful<gpui::Div> {
-    let hover = colors.hover;
-    let text = colors.text;
-    let base = div()
-        .id(id)
-        .h(px(24.0))
-        .px(px(8.0))
-        .flex_none()
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(px(5.0))
-        .border_1()
-        .cursor_pointer()
-        .text_size(px(11.5))
-        .font_weight(FontWeight::MEDIUM)
-        .child(label);
-    match tone {
-        ButtonTone::Quiet => base
-            .bg(transparent())
-            .border_color(transparent())
-            .text_color(colors.muted)
-            .hover(move |s| s.bg(hover).text_color(text)),
-        ButtonTone::Plain => base
-            .bg(colors.elevated)
-            .border_color(colors.border)
-            .text_color(colors.text)
-            .hover(move |s| s.bg(hover)),
-        ButtonTone::Accent => base
-            .bg(colors.selected)
-            .border_color(Hsla { a: 0.35, ..colors.accent })
-            .text_color(colors.accent)
-            .hover(move |s| s.bg(hover)),
-    }
 }
 
 fn file_skeleton(line_height: f32, colors: &Palette) -> AnyElement {
@@ -469,6 +477,7 @@ impl Render for FileViewer {
             State::Binary(size) | State::TooLarge(size) => (None, Some(format_bytes(*size))),
             State::Loading | State::Error(_) => (None, None),
         };
+        let menu_open = self.editor_menu_open;
         let toolbar = div()
             .h(px(34.0))
             .flex_none()
@@ -488,6 +497,7 @@ impl Render for FileViewer {
                     .flex_row()
                     .items_center()
                     .gap(px(6.0))
+                    .child(gpui_icon("file", 13.0, colors.muted))
                     .child(
                         div()
                             .flex_none()
@@ -535,22 +545,56 @@ impl Render for FileViewer {
                     .flex()
                     .flex_row()
                     .items_center()
-                    .gap(px(4.0))
+                    .gap(px(3.0))
                     .children(self.is_markdown().then(|| {
-                        action_button("preview", "Preview", ButtonTone::Accent, &colors).on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::Preview)))
+                        icon_button("preview", "show", "Preview Markdown", false, &colors).on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::Preview)))
                     }))
                     .child(
-                        action_button("copy-path", "Copy path", ButtonTone::Quiet, &colors).on_click(cx.listener(|v, _, _, cx| {
-                            cx.write_to_clipboard(ClipboardItem::new_string(v.path.to_string_lossy().into_owned()));
-                        })),
+                        icon_button(
+                            "copy-path",
+                            if self.copied { "check" } else { "copy" },
+                            if self.copied { "Copied" } else { "Copy path" },
+                            false,
+                            &colors,
+                        )
+                        .on_click(cx.listener(|v, _, _, cx| v.copy_path(cx))),
                     )
-                    .child(action_button("reload", "Reload", ButtonTone::Quiet, &colors).on_click(cx.listener(|v, _, _, cx| v.reload(cx))))
-                    .child(action_button("reveal", "Reveal", ButtonTone::Quiet, &colors).on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::Reveal))))
+                    .child(icon_button("reload", "refresh", "Reload", false, &colors).on_click(cx.listener(|v, _, _, cx| v.reload(cx))))
                     .child(
-                        action_button("editor", "Open in $EDITOR", ButtonTone::Plain, &colors)
-                            .on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::OpenInEditor))),
-                    ),
+                        icon_button("reveal", "folder", "Reveal in Finder", false, &colors).on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::Reveal))),
+                    )
+                    .child(icon_caret_button("editor", "open", "Open in editor…", menu_open, &colors).on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |v, _, window, cx| {
+                            cx.stop_propagation();
+                            v.toggle_editor_menu(menu_open, window, cx);
+                        }),
+                    )),
             );
+        let editor_menu = menu_open.then(|| {
+            let select_entity = cx.entity();
+            let dismiss_entity = cx.entity();
+            editor_popover(
+                "viewer-editor-menu",
+                &self.editor_options,
+                &colors,
+                move |target, _, cx| {
+                    select_entity.update(cx, |v, cx| {
+                        v.editor_menu_open = false;
+                        cx.emit(ViewerEvent::OpenInEditor(target));
+                        cx.notify();
+                    });
+                },
+                move |_, cx| {
+                    dismiss_entity.update(cx, |v, cx| {
+                        if v.editor_menu_open {
+                            v.editor_menu_open = false;
+                            cx.notify();
+                        }
+                    });
+                },
+            )
+        });
         let body = match &self.state {
             State::Loading if self.show_skeleton => file_skeleton(line_height, &colors),
             State::Loading => div().size_full().into_any_element(),
@@ -558,14 +602,14 @@ impl Render for FileViewer {
             State::Binary(size) => state_card(
                 "Binary file",
                 format!("{} ({size} bytes) — preview is not available.", format_bytes(*size)),
-                Some("Use Open in $EDITOR or Reveal to inspect it externally."),
+                Some("Use Open in editor or Reveal to inspect it externally."),
                 false,
                 &colors,
             ),
             State::TooLarge(size) => state_card(
                 "File too large to preview",
                 format!("{} exceeds the {} viewer limit.", format_bytes(*size), format_bytes(MAX_BYTES)),
-                Some("Open it in $EDITOR to view the full file."),
+                Some("Use Open in editor to view the full file."),
                 false,
                 &colors,
             ),
@@ -659,14 +703,23 @@ impl Render for FileViewer {
         };
         div()
             .id("viewer")
+            .relative()
             .track_focus(&self.focus)
             .key_context("FileViewer")
+            .on_key_down(cx.listener(|v, event: &KeyDownEvent, _, cx| {
+                if v.editor_menu_open && event.keystroke.key == "escape" {
+                    v.editor_menu_open = false;
+                    cx.stop_propagation();
+                    cx.notify();
+                }
+            }))
             .size_full()
             .flex()
             .flex_col()
             .bg(colors.bg)
             .child(toolbar)
             .child(div().flex_1().min_h_0().child(body))
+            .children(editor_menu)
     }
 }
 

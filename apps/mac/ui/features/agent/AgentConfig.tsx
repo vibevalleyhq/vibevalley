@@ -385,7 +385,7 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
         label={t("web.agent.library")}
         tip={t("web.agent.libraryTip")}
         aside={
-          <A href="/team/skills" class="group flex-row items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-hover">
+          <A href="/settings/skills" class="group flex-row items-center gap-1 rounded-sm px-1 py-0.5 hover:bg-hover">
             <Text class="text-xs text-muted underline group-hover:text-ink">{t("web.agent.manageLibrary")}</Text>
             <Icon name="next" size={12} tone="muted" />
           </A>

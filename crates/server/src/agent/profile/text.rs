@@ -272,6 +272,9 @@ pub fn issue_line(issue: &Issue, who: &str, now: i64) -> String {
     {
         parts.push(format!("等了 {}", span_words(now - since)));
     }
+    if !issue.attachments.is_empty() {
+        parts.push(format!("{} 个附件", issue.attachments.len()));
+    }
     format!("- {}", parts.join(" · "))
 }
 
@@ -304,6 +307,12 @@ pub fn issue_detail(issue: &Issue, who: &str, timeline: Option<&IssueTimeline>, 
     let open: Vec<&str> = issue.findings.iter().filter(|f| !f.resolved).map(|f| f.text.as_str()).collect();
     if !open.is_empty() {
         lines.push(format!("验收没过要修的：{}", open.join("；")));
+    }
+    if !issue.attachments.is_empty() {
+        lines.push("附件：".into());
+        for a in &issue.attachments {
+            lines.push(format!("  - {}（{}，{} bytes，id={}）", a.name, a.r#type, a.size, a.id));
+        }
     }
     if let Some(o) = issue.last_run.as_ref().and_then(|r| r.outcome.as_ref()) {
         lines.push(format!("最后一轮{}，在等用户点头", t(&format!("shared.outcome.{}", wire(o)), &[])));

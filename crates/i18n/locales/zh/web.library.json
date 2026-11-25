@@ -83,7 +83,6 @@
     "exportArtifact": "导出",
     "turnIntoIssue": "转为任务",
     "issueCreated": "已创建任务",
-    "back": "返回",
     "source": {
       "all": "全部来源",
       "agent": "执行会话交付",

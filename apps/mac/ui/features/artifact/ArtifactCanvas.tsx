@@ -5,15 +5,15 @@ import { t } from "@vibevalley/i18n";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { Banner, Empty } from "../../design/layout";
-import { Bubble } from "../../design/Tip";
 import { reasonOf } from "../../infra/api";
 import { ready } from "../../infra/query";
-import { Link as A } from "../../infra/router";
+import { useRouter } from "../../infra/router";
 import { artifactIcon, kindLabel, useArtifact } from "./ArtifactCard";
 import { ArtifactDirectoryView } from "./ArtifactDirectoryView";
 import { InstallAppletButton } from "./InstallAppletModal";
 
 export function ArtifactCanvas(props: { id: string; version?: number | undefined; onClose?: () => void }) {
+  const router = useRouter();
   const artifact = useArtifact(() => props.id);
   const shown = () => ready(artifact, undefined);
   const pageVersion = () => {
@@ -46,15 +46,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
         </If>
         <View class="shrink-0 flex-row items-center gap-1">
           <If when={shown()}>{(a) => <InstallAppletButton artifact={a()} testID="artifact-canvas-install-applet" />}</If>
-          <A
-            href={pageHref()}
-            testID="artifact-canvas-page"
-            tooltip={<Bubble text={t("web.artifact.canvas.openPage")} />}
-            class="group h-6 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-          >
-            <Icon name="open" size={12} tone="muted" />
-            <Text class="text-xs font-medium text-muted group-hover:text-ink">{t("web.artifact.canvas.openPage")}</Text>
-          </A>
+          <IconButton icon="open" label={t("web.artifact.canvas.openPage")} testid="artifact-canvas-page" onClick={() => router.navigate(pageHref())} />
           <If when={props.onClose}>
             <IconButton icon="close" label={t("web.artifact.canvas.close")} testid="artifact-canvas-close" onClick={() => props.onClose?.()} />
           </If>

@@ -14,7 +14,7 @@ use gpui::{
 use vibevalley_git::{Change, FileDiff, LineKind, Repo};
 use vibevalley_workspace::DiffSpec;
 
-use crate::icon::gpui_icon;
+use crate::icon::{CompactIconTone, compact_icon_button, gpui_icon, icon_button};
 use crate::theme::{Palette, Ui};
 
 /// Emitted after a hunk was staged, unstaged or discarded.
@@ -626,32 +626,13 @@ impl Render for DiffView {
                 .rounded(px(4.0))
                 .cursor_pointer()
                 .text_size(px(11.5))
-                .font_weight(if active { FontWeight::MEDIUM } else { FontWeight::NORMAL })
+                .font_weight(FontWeight::MEDIUM)
                 .child(label);
             if active {
                 btn.bg(colors.elevated).text_color(colors.text)
             } else {
                 btn.bg(transparent()).text_color(colors.muted).hover(move |s| s.text_color(text_color))
             }
-        };
-        let quiet_btn = |id: &'static str, label: &'static str| {
-            let hover = colors.hover;
-            let text = colors.text;
-            div()
-                .id(id)
-                .h(px(24.0))
-                .px(px(8.0))
-                .flex_none()
-                .flex()
-                .items_center()
-                .justify_center()
-                .rounded(px(5.0))
-                .cursor_pointer()
-                .text_size(px(11.5))
-                .font_weight(FontWeight::MEDIUM)
-                .text_color(colors.muted)
-                .hover(move |s| s.bg(hover).text_color(text))
-                .child(label)
         };
         let toolbar = div()
             .h(px(34.0))
@@ -780,10 +761,16 @@ impl Render for DiffView {
                             .child(segment("split", "Split", mode == Mode::Split).on_click(cx.listener(|v, _, _, cx| v.set_mode(Mode::Split, cx)))),
                     )
                     .children(multi_expandable.then(|| {
-                        quiet_btn("fold-all", if all_collapsed { "Expand all" } else { "Collapse all" })
-                            .on_click(cx.listener(|v, _, _, cx| v.toggle_all_files(cx)))
+                        icon_button(
+                            "fold-all",
+                            if all_collapsed { "expandAll" } else { "collapseAll" },
+                            if all_collapsed { "Expand all" } else { "Collapse all" },
+                            false,
+                            &colors,
+                        )
+                        .on_click(cx.listener(|v, _, _, cx| v.toggle_all_files(cx)))
                     }))
-                    .child(quiet_btn("refresh", "Refresh").on_click(cx.listener(|v, _, _, cx| v.reload(cx)))),
+                    .child(icon_button("refresh", "refresh", "Refresh", false, &colors).on_click(cx.listener(|v, _, _, cx| v.reload(cx)))),
             );
         let body: AnyElement = match &self.files {
             None if self.show_skeleton => diff_skeleton(line_height, &colors),
@@ -928,37 +915,24 @@ impl Render for DiffView {
                                     let (file, hunk) = (*file, *hunk);
                                     let (range_part, context_part) = split_hunk_header(header);
                                     let hunk_bg = if c.dark { c.elevated } else { c.hover };
-                                    let action = |id: &'static str, label: &'static str, op: HunkOp| {
+                                    let action = |id: &'static str, icon_name: &'static str, tooltip: &'static str, op: HunkOp| {
                                         let entity = entity.clone();
-                                        let (fg, hover_bg) = match op {
-                                            HunkOp::Stage => (c.accent, c.added_bg),
-                                            HunkOp::Unstage => (c.muted, c.hover),
-                                            HunkOp::Discard => (c.danger, c.removed_bg),
+                                        let tone = if busy {
+                                            CompactIconTone::Disabled
+                                        } else {
+                                            match op {
+                                                HunkOp::Stage => CompactIconTone::Accent,
+                                                HunkOp::Unstage => CompactIconTone::Default,
+                                                HunkOp::Discard => CompactIconTone::Danger,
+                                            }
                                         };
-                                        div()
-                                            .id((id, i))
-                                            .h(px(18.0))
-                                            .px(px(7.0))
-                                            .flex_none()
-                                            .flex()
-                                            .items_center()
-                                            .rounded(px(4.0))
-                                            .border_1()
-                                            .border_color(c.border)
-                                            .bg(c.bg)
-                                            .cursor_pointer()
-                                            .text_size(px(11.0))
-                                            .font_weight(FontWeight::MEDIUM)
-                                            .text_color(if busy { c.faint } else { fg })
-                                            .hover(move |s| s.bg(hover_bg))
-                                            .child(label)
-                                            .on_click(move |_, _, cx| {
-                                                if !busy {
-                                                    entity.update(cx, |v, cx| v.hunk_op(file, hunk, op, cx));
-                                                }
-                                            })
+                                        compact_icon_button((id, i), icon_name, tooltip, tone, &c).on_click(move |_, _, cx| {
+                                            if !busy {
+                                                entity.update(cx, |v, cx| v.hunk_op(file, hunk, op, cx));
+                                            }
+                                        })
                                     };
-                                    let mut row = base.px(px(10.0)).gap(px(6.0)).bg(hunk_bg).border_b_1().border_color(c.border);
+                                    let mut row = base.px(px(10.0)).gap(px(4.0)).bg(hunk_bg).border_b_1().border_color(c.border);
                                     if hunk > 0 {
                                         row = row.border_t_1();
                                     }
@@ -992,9 +966,9 @@ impl Render for DiffView {
                                                     .child(context_part.to_string())
                                             })),
                                     )
-                                    .children(can_stage.then(|| action("stage", "Stage hunk", HunkOp::Stage)))
-                                    .children(can_unstage.then(|| action("unstage", "Unstage hunk", HunkOp::Unstage)))
-                                    .children(can_discard.then(|| action("discard", "Discard hunk", HunkOp::Discard)))
+                                    .children(can_stage.then(|| action("stage", "add", "Stage hunk", HunkOp::Stage)))
+                                    .children(can_unstage.then(|| action("unstage", "minus", "Unstage hunk", HunkOp::Unstage)))
+                                    .children(can_discard.then(|| action("discard", "undo", "Discard hunk", HunkOp::Discard)))
                                     .into_any_element()
                                 }
                                 Row::Line { old_no, new_no, side } => {

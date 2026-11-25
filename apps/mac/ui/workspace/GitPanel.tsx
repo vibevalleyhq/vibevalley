@@ -514,18 +514,16 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
         borderTop={borderTop}
         borderBottom={isOpen(sectionKey) && worktreesCount() > 0 && !addingWt()}
         right={
-          <Button
+          <ShellIconButton
+            icon="add"
+            label={creatingWt() ? t("web.shell.git.creatingWorktree") : t("web.shell.git.newWorktree")}
+            disabled={creatingWt()}
             onPress={() => {
               const next = !addingWt();
               addingWt.set(next);
               if (next) ensureOpen(sectionKey);
             }}
-            accessibilityLabel={t("web.shell.git.newWorktree")}
-            class={`h-5 flex-row items-center gap-1 rounded-md bg-hover px-1.5 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
-          >
-            <Icon name="add" size={10} tone="ink" />
-            <Text class="text-2xs font-medium text-ink">{creatingWt() ? t("web.shell.git.creatingWorktree") : t("web.shell.git.createWorktreeBtn")}</Text>
-          </Button>
+          />
         }
       />
       <If when={isOpen(sectionKey)}>
