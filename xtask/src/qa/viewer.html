@@ -4,11 +4,1631 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>VibeValley UML Viewer</title>
+    <style>
+      :root {
+        --bg: #f8fafc;
+        --panel: #ffffff;
+        --border: #cbd5e1;
+        --text: #0f172a;
+        --muted: #475569;
+        --accent: #2563eb;
+        --danger: #dc2626;
+        --warn: #d97706;
+        --ok: #16a34a;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: var(--sans);
+        background: var(--bg);
+        color: var(--text);
+        overflow: hidden;
+      }
+      #layout {
+        display: grid;
+        grid-template-rows: 48px 1fr;
+        grid-template-columns: 1fr 340px;
+        height: 100vh;
+      }
+      header#topbar {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 0 14px;
+        background: #0f172a;
+        color: #f8fafc;
+        border-bottom: 1px solid #1e293b;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+      .breadcrumbs {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
+        overflow-x: auto;
+      }
+      .crumb {
+        background: #1e293b;
+        color: #e2e8f0;
+        border: 1px solid #334155;
+        border-radius: 5px;
+        padding: 3px 8px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .crumb:hover { background: #334155; }
+      .crumb.active { background: #2563eb; border-color: #3b82f6; color: #fff; }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+      }
+      button.btn {
+        background: #1e293b;
+        color: #f8fafc;
+        border: 1px solid #475569;
+        border-radius: 6px;
+        padding: 5px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      button.btn:hover { background: #334155; }
+      button.btn.primary { background: #2563eb; border-color: #3b82f6; }
+      button.btn.primary:hover { background: #1d4ed8; }
+      button.btn.danger { background: #991b1b; border-color: #dc2626; }
+      button.btn.light {
+        background: #fff;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      button.btn.light:hover { background: #f1f5f9; }
+      #canvas-wrap {
+        position: relative;
+        overflow: hidden;
+        background:
+          radial-gradient(#cbd5e1 1px, transparent 1px) 0 0 / 22px 22px,
+          #f8fafc;
+        cursor: grab;
+        user-select: none;
+      }
+      #canvas-wrap.panning { cursor: grabbing; }
+      #proposal-banner {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+        background: #fef3c7;
+        color: #92400e;
+        border: 2px solid #f59e0b;
+        border-radius: 8px;
+        padding: 5px 14px;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        display: none;
+      }
+      #status-pill {
+        position: absolute;
+        bottom: 12px;
+        left: 12px;
+        z-index: 15;
+        background: rgba(15, 23, 42, 0.88);
+        color: #f8fafc;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        pointer-events: none;
+      }
+      svg#diagram {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      aside#sidebar {
+        background: var(--panel);
+        border-left: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 12px;
+        gap: 12px;
+      }
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px;
+        background: #fff;
+      }
+      .card h3 {
+        margin: 0 0 8px 0;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .stat-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        font-size: 12px;
+      }
+      .stat-item {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 6px 8px;
+      }
+      .stat-item strong { display: block; font-size: 15px; }
+      .violation-item, .omit-item, .proposal-item {
+        font-size: 12px;
+        padding: 6px 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        margin-bottom: 6px;
+        background: #f8fafc;
+      }
+      .violation-item {
+        border-left: 3px solid var(--danger);
+        cursor: pointer;
+      }
+      .violation-item:hover { background: #fef2f2; }
+      .proposal-item {
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 6px;
+      }
+      .proposal-item.active {
+        border-color: #f59e0b;
+        background: #fffbeb;
+      }
+      .badge {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .badge.red { background: #fee2e2; color: #b91c1c; }
+      .badge.green { background: #dcfce7; color: #15803d; }
+      .badge.amber { background: #fef3c7; color: #b45309; }
+      .tooltip {
+        position: fixed;
+        z-index: 60;
+        background: #0f172a;
+        color: #f8fafc;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+        max-width: 440px;
+        max-height: 280px;
+        overflow-y: auto;
+        pointer-events: none;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+        display: none;
+      }
+      .tooltip .pair-row {
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 2px 0;
+        border-bottom: 1px solid #1e293b;
+      }
+      .tooltip .pair-row:last-child { border-bottom: none; }
+      .tooltip .pair-row.viol { color: #fca5a5; font-weight: 700; }
+      #context-menu {
+        position: fixed;
+        z-index: 70;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+        padding: 4px;
+        min-width: 190px;
+        display: none;
+      }
+      #context-menu button {
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        border: none;
+        padding: 7px 10px;
+        font-size: 12px;
+        border-radius: 5px;
+        cursor: pointer;
+        color: var(--text);
+      }
+      #context-menu button:hover { background: #eff6ff; color: var(--accent); }
+      #context-menu hr { border: none; border-top: 1px solid #e2e8f0; margin: 4px 0; }
+      #modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        z-index: 50;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      #class-modal {
+        background: #fff;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        width: min(1080px, 95vw);
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.3);
+      }
+      .modal-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: #0f172a;
+        color: #f8fafc;
+        gap: 12px;
+      }
+      .modal-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+      }
+      .modal-title:hover .link-name { text-decoration: underline; }
+      .dot {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        font-size: 11px;
+        font-weight: 800;
+        color: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.25);
+      }
+      .modal-summary {
+        padding: 8px 16px;
+        background: #f1f5f9;
+        border-bottom: 1px solid var(--border);
+        font-family: var(--mono);
+        font-size: 12px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .modal-body {
+        display: grid;
+        grid-template-columns: 1fr;
+        overflow: hidden;
+        flex: 1;
+      }
+      .modal-body.with-source {
+        grid-template-columns: 1.15fr 1fr;
+      }
+      .members-pane {
+        overflow: auto;
+        padding: 12px 16px;
+      }
+      .source-pane {
+        display: none;
+        flex-direction: column;
+        border-left: 1px solid var(--border);
+        background: #0f172a;
+        color: #e2e8f0;
+        overflow: hidden;
+      }
+      .modal-body.with-source .source-pane { display: flex; }
+      .source-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        background: #1e293b;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .source-lines {
+        overflow: auto;
+        flex: 1;
+        padding: 8px 0;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .src-line {
+        display: flex;
+        padding: 0 12px;
+        white-space: pre;
+      }
+      .src-line.hl {
+        background: rgba(234, 179, 8, 0.25);
+        border-left: 3px solid #eab308;
+      }
+      .src-num {
+        width: 48px;
+        flex-shrink: 0;
+        color: #64748b;
+        user-select: none;
+      }
+      table.card-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      table.card-table th, table.card-table td {
+        border: 1px solid #e2e8f0;
+        padding: 5px 8px;
+        text-align: left;
+      }
+      table.card-table thead tr.group-head th {
+        background: #e2e8f0;
+        text-align: center;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: #334155;
+      }
+      table.card-table thead tr.col-head th {
+        background: #f8fafc;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      table.card-table tbody tr:hover {
+        background: #eff6ff;
+      }
+      .member-link {
+        font-family: var(--mono);
+        font-weight: 600;
+        color: #1d4ed8;
+        cursor: pointer;
+      }
+      .member-link:hover { text-decoration: underline; }
+      .cell-white { background: #ffffff; color: #475569; }
+      .cell-green { background: #dcfce7; color: #166534; font-weight: 600; }
+      .cell-amber { background: #fef3c7; color: #92400e; font-weight: 600; }
+      .cell-red { background: #fee2e2; color: #991b1b; font-weight: 700; }
+      .no-sites {
+        text-align: center !important;
+        font-family: var(--mono);
+        color: #64748b;
+        background: #ffffff;
+      }
+      textarea.layer-editor {
+        width: 100%;
+        min-height: 84px;
+        font-family: var(--mono);
+        font-size: 11px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px;
+      }
+      .row-actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+      }
+    </style>
   </head>
   <body>
-    <main id="app">
-      <h1>VibeValley UML Viewer</h1>
-      <p>Interactive workbench placeholder — pending Stage 2 implementation.</p>
-    </main>
+    <div id="layout">
+      <header id="topbar">
+        <div class="brand">
+          <span>VibeValley UML</span>
+          <div id="breadcrumbs" class="breadcrumbs"></div>
+        </div>
+        <div class="toolbar">
+          <button id="btn-back" class="btn" title="Go up (Esc)">← Up</button>
+          <button id="btn-declutter" class="btn primary" title="Cycle 5 declutter modes (D)">Declutter: arrows</button>
+          <button id="btn-zoom-out" class="btn" title="Zoom out (Ctrl+-)">−</button>
+          <button id="btn-zoom-reset" class="btn" title="Reset zoom (Ctrl+0)">100%</button>
+          <button id="btn-zoom-in" class="btn" title="Zoom in (Ctrl++)">+</button>
+          <button id="btn-regen" class="btn" title="Regenerate Topology IR">Regen</button>
+          <button id="btn-reload" class="btn" title="Reload from disk (R)">Reload (R)</button>
+        </div>
+      </header>
+
+      <main id="canvas-wrap">
+        <div id="proposal-banner">PROPOSAL — not instantiated in code</div>
+        <svg id="diagram"></svg>
+        <div id="status-pill">Ready</div>
+      </main>
+
+      <aside id="sidebar">
+        <div class="card">
+          <h3>
+            <span>Overview</span>
+            <label style="font-weight:500;text-transform:none;font-size:11px;cursor:pointer;">
+              <input id="chk-watch" type="checkbox" checked /> Auto-watch
+            </label>
+          </h3>
+          <div id="stats-grid" class="stat-grid"></div>
+        </div>
+
+        <div class="card">
+          <h3>
+            <span>Views &amp; Proposals</span>
+            <button id="btn-new-proposal" class="btn light" style="padding:2px 7px;font-size:11px;">+ New Proposal</button>
+          </h3>
+          <div id="proposals-list"></div>
+          <div id="proposal-editor" style="display:none;margin-top:8px;">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Proposal layers (rank 0 first, comma-separated per line):</div>
+            <textarea id="proposal-layers-input" class="layer-editor"></textarea>
+            <div class="row-actions">
+              <button id="btn-save-proposal" class="btn primary" style="font-size:11px;padding:4px 8px;">Apply Layers</button>
+              <button id="btn-rename-proposal" class="btn light" style="font-size:11px;padding:4px 8px;">Rename</button>
+              <button id="btn-delete-proposal" class="btn danger" style="font-size:11px;padding:4px 8px;">Delete</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3><span>Dependency Rule Violations</span><span id="viol-badge" class="badge green">0</span></h3>
+          <div id="violations-list" style="max-height:220px;overflow-y:auto;"></div>
+        </div>
+
+        <div class="card">
+          <h3><span>Omitted Namespaces</span></h3>
+          <div id="omit-list"></div>
+        </div>
+      </aside>
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <div id="context-menu">
+      <button data-act="open">Open / Drill Down</button>
+      <hr />
+      <button data-act="refresh_crap">Refresh CRAP</button>
+      <button data-act="refresh_mutation">Refresh Mutation</button>
+      <button data-act="refresh_all_mutation">Refresh All Mutation</button>
+      <hr />
+      <button data-act="omit" style="color:#dc2626;">Omit from Diagram</button>
+    </div>
+
+    <div id="modal-backdrop">
+      <div id="class-modal">
+        <div class="modal-head">
+          <div id="modal-title-btn" class="modal-title" title="Click to view module source">
+            <span id="modal-kind-badge" class="badge amber">class</span>
+            <strong id="modal-name" class="link-name">ClassName</strong>
+            <span id="modal-ns" style="font-family:var(--mono);font-size:12px;color:#94a3b8;"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span id="modal-c-dot" class="dot">C</span>
+            <span id="modal-m-dot" class="dot">M</span>
+            <button id="btn-close-modal" class="btn">Close (Esc)</button>
+          </div>
+        </div>
+        <div id="modal-summary" class="modal-summary"></div>
+        <div id="modal-body" class="modal-body">
+          <div id="members-pane" class="members-pane"></div>
+          <div id="source-pane" class="source-pane">
+            <div class="source-head">
+              <span id="source-title">source</span>
+              <button id="btn-close-source" class="btn" style="padding:2px 7px;font-size:11px;">Hide Source</button>
+            </div>
+            <div id="source-lines" class="source-lines"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const DECLUTTER_MODES = [
+          { id: "arrows", label: "Declutter arrows" },
+          { id: "remove", label: "Remove arrows" },
+          { id: "elements", label: "Declutter elements" },
+          { id: "classes", label: "Declutter classes" },
+          { id: "none", label: "Declutter none" },
+        ];
+
+        const state = {
+          data: null,
+          scopeStack: ["root"],
+          declutterIdx: 0,
+          activeProposalId: null,
+          zoom: 1,
+          panX: 24,
+          panY: 24,
+          panning: false,
+          panStartX: 0,
+          panStartY: 0,
+          ctxTargetId: null,
+          modalNodeId: null,
+          lastMtime: null,
+        };
+
+        const svgEl = document.getElementById("diagram");
+        const wrapEl = document.getElementById("canvas-wrap");
+        const tooltipEl = document.getElementById("tooltip");
+        const ctxMenuEl = document.getElementById("context-menu");
+        const modalBackdrop = document.getElementById("modal-backdrop");
+        const statusPill = document.getElementById("status-pill");
+
+        function setStatus(msg) {
+          statusPill.textContent = msg;
+        }
+
+        function escHtml(s) {
+          return String(s)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+        }
+
+        function svgNode(tag, attrs = {}, text = null) {
+          const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+          for (const [k, v] of Object.entries(attrs)) {
+            el.setAttribute(k, String(v));
+          }
+          if (text !== null) el.textContent = text;
+          return el;
+        }
+
+        function splitSegs(ns) {
+          return String(ns || "")
+            .split(/\.|::/)
+            .filter(Boolean);
+        }
+
+        function getActiveLayers() {
+          if (!state.data) return [];
+          if (!state.activeProposalId) return state.data.policy.levels || [];
+          const p = (state.data.policy.proposals || []).find((x) => x.id === state.activeProposalId);
+          return p ? p.layers || [] : state.data.policy.levels || [];
+        }
+
+        function getActiveOmit() {
+          if (!state.data) return [];
+          const base = state.data.policy.omit || [];
+          if (!state.activeProposalId) return base;
+          const p = (state.data.policy.proposals || []).find((x) => x.id === state.activeProposalId);
+          return p ? [...base, ...(p.omit || [])] : base;
+        }
+
+        function isOmitted(ns, omitList) {
+          const nsSegs = splitSegs(ns);
+          return omitList.some((pat) => {
+            const pSegs = splitSegs(pat);
+            return pSegs.length > 0 && nsSegs.length >= pSegs.length && pSegs.every((s, idx) => nsSegs[idx] === s);
+          });
+        }
+
+        function rankForNs(ns, prefix, levels) {
+          const nsSegs = splitSegs(ns);
+          const prefSegs = splitSegs(prefix);
+          let seg = null;
+          if (prefSegs.length === 0) {
+            seg = nsSegs[0] || null;
+          } else if (nsSegs.length > prefSegs.length && prefSegs.every((s, idx) => nsSegs[idx] === s)) {
+            seg = nsSegs[prefSegs.length];
+          }
+          if (!seg) return null;
+          const idx = levels.findIndex((grp) => grp.includes(seg));
+          return idx >= 0 ? idx : null;
+        }
+
+        function findTreeNode(node, id) {
+          if (!node) return null;
+          if (node.id === id) return node;
+          for (const ch of node.children || []) {
+            const found = findTreeNode(ch, id);
+            if (found) return found;
+          }
+          return null;
+        }
+
+        function isDescendantOrSelf(candidate, ancestor) {
+          if (candidate === ancestor) return true;
+          const nodes = state.data.ir.nodes;
+          let cur = nodes[candidate] ? nodes[candidate].parent : null;
+          while (cur) {
+            if (cur === ancestor) return true;
+            cur = nodes[cur] ? nodes[cur].parent : null;
+          }
+          return false;
+        }
+
+        function computeScopeEdges(scopeNode) {
+          const ir = state.data.ir;
+          const omit = getActiveOmit();
+          const levels = getActiveLayers();
+          const children = (scopeNode.children || []).filter((c) => !isOmitted(c.id, omit));
+
+          const mapChild = (endpoint) => {
+            for (const ch of children) {
+              if (isDescendantOrSelf(endpoint, ch.id)) return ch.id;
+            }
+            return null;
+          };
+
+          const bundled = new Map();
+          const incomingByTarget = new Map();
+          const outgoingBySource = new Map();
+
+          for (const e of ir.edges || []) {
+            if (isOmitted(e.from, omit) || isOmitted(e.to, omit)) continue;
+            const fc = mapChild(e.from);
+            const tcDirect = mapChild(e.to);
+            const tc = tcDirect || (ir.nodes[e.to]?.node_kind === "foreign" ? e.to : null);
+
+            const fr = rankForNs(e.from, ir.prefix, levels);
+            const tr = rankForNs(e.to, ir.prefix, levels);
+            const violating = e.kind === "dependency" && fr !== null && tr !== null && fr < tr;
+
+            const pair = { from: e.from, to: e.to, kind: e.kind, violating, file: e.file, line: e.line };
+
+            if (fc) {
+              if (!outgoingBySource.has(fc)) outgoingBySource.set(fc, []);
+              outgoingBySource.get(fc).push(pair);
+            }
+            if (tc) {
+              if (!incomingByTarget.has(tc)) incomingByTarget.set(tc, []);
+              incomingByTarget.get(tc).push(pair);
+            }
+
+            if (fc && tc && fc !== tc) {
+              const key = `${fc}|||${tc}|||${e.kind}`;
+              if (!bundled.has(key)) {
+                bundled.set(key, { from: fc, to: tc, kind: e.kind, violating: false, pairs: [] });
+              }
+              const entry = bundled.get(key);
+              entry.pairs.push(pair);
+              if (violating) entry.violating = true;
+            }
+
+            // Also track nested class triangles when visible
+            for (const ch of children) {
+              for (const sub of ch.children || []) {
+                if (isDescendantOrSelf(e.from, sub.id)) {
+                  if (!outgoingBySource.has(sub.id)) outgoingBySource.set(sub.id, []);
+                  outgoingBySource.get(sub.id).push(pair);
+                }
+                if (isDescendantOrSelf(e.to, sub.id)) {
+                  if (!incomingByTarget.has(sub.id)) incomingByTarget.set(sub.id, []);
+                  incomingByTarget.get(sub.id).push(pair);
+                }
+              }
+            }
+          }
+
+          return {
+            children,
+            edges: Array.from(bundled.values()),
+            incomingByTarget,
+            outgoingBySource,
+          };
+        }
+
+        function showTooltip(x, y, html) {
+          tooltipEl.innerHTML = html;
+          tooltipEl.style.display = "block";
+          const pad = 12;
+          const rect = tooltipEl.getBoundingClientRect();
+          const left = Math.min(window.innerWidth - rect.width - pad, x + 14);
+          const top = Math.min(window.innerHeight - rect.height - pad, y + 14);
+          tooltipEl.style.left = `${Math.max(pad, left)}px`;
+          tooltipEl.style.top = `${Math.max(pad, top)}px`;
+        }
+
+        function hideTooltip() {
+          tooltipEl.style.display = "none";
+        }
+
+        function renderPairListHtml(title, pairs) {
+          const header = `<div style="font-weight:700;margin-bottom:4px;">${escHtml(title)} (${pairs.length})</div>`;
+          const rows = pairs
+            .slice(0, 40)
+            .map(
+              (p) =>
+                `<div class="pair-row ${p.violating ? "viol" : ""}">${escHtml(p.from)} → ${escHtml(p.to)} [${escHtml(p.kind)}]${
+                  p.violating ? " VIOLATION" : ""
+                }</div>`
+            )
+            .join("");
+          const extra = pairs.length > 40 ? `<div style="color:#94a3b8;font-size:11px;">… +${pairs.length - 40} more</div>` : "";
+          return header + rows + extra;
+        }
+
+        function renderNodeTooltipHtml(meta) {
+          const m = meta.metrics;
+          const crapLine =
+            m.crap_count > 0 ? `CRAP μ=${m.crap_mu} max=${m.crap_max} σ=${m.crap_sigma} (grade ${m.crap_grade})` : "CRAP: missing (grade 1)";
+          const mutLine = m.has_mutation
+            ? `Mutation: ${m.killed} killed, ${m.survived} survived, ${m.uncovered} uncovered (${m.mutation_score ?? 100}%, grade ${m.mutation_grade})`
+            : "Mutation: missing (grade 1)";
+          return `
+            <div style="font-weight:700;">${escHtml(meta.name)}</div>
+            <div style="font-family:var(--mono);font-size:11px;color:#94a3b8;margin-bottom:4px;">${escHtml(meta.id)}</div>
+            <div>${escHtml(crapLine)}</div>
+            <div>${escHtml(mutLine)}</div>
+            <div>Combined: <strong>${m.combined_grade}</strong> / 10</div>
+          `;
+        }
+
+        function renderGraph() {
+          if (!state.data) return;
+          const ir = state.data.ir;
+          const levels = getActiveLayers();
+          const mode = DECLUTTER_MODES[state.declutterIdx].id;
+          const scopeId = state.scopeStack[state.scopeStack.length - 1] || "root";
+          const scopeNode = findTreeNode(ir.root, scopeId) || ir.root;
+
+          const { children, edges, incomingByTarget, outgoingBySource } = computeScopeEdges(scopeNode);
+
+          const visibleIds = new Set(children.map((c) => c.id));
+          const extraForeign = [];
+          for (const e of edges) {
+            if (!visibleIds.has(e.to) && ir.nodes[e.to]?.node_kind === "foreign") {
+              visibleIds.add(e.to);
+              extraForeign.push({ id: e.to, name: ir.nodes[e.to].name, node_kind: "foreign", children: [] });
+            }
+          }
+          const displayNodes = [...children, ...extraForeign];
+
+          // Group into layered rows by Clean Architecture rank (outer on top, inner rank 0 at bottom)
+          const layers = new Map();
+          const maxRank = levels.length;
+          for (const node of displayNodes) {
+            const meta = ir.nodes[node.id];
+            const isForeign = (meta?.node_kind || node.node_kind) === "foreign";
+            let row = maxRank;
+            if (isForeign) {
+              row = maxRank + 1;
+            } else {
+              const r = rankForNs(node.id, ir.prefix, levels);
+              if (r !== null) row = maxRank - r;
+            }
+            if (!layers.has(row)) layers.set(row, []);
+            layers.get(row).push(node);
+          }
+
+          const showNested = mode !== "elements";
+          const showClassesOnlyMode = mode === "classes";
+          const sortedRows = Array.from(layers.keys()).sort((a, b) => a - b);
+
+          const boxW = 220;
+          const gapX = 34;
+          const gapY = 68;
+          const positions = new Map();
+          const subPositions = new Map();
+
+          let curY = 20;
+          for (const rKey of sortedRows) {
+            const rowNodes = layers.get(rKey);
+            let rowMaxH = 74;
+            const computedRow = rowNodes.map((n) => {
+              const subAll = (n.children || []).filter((c) => !isOmitted(c.id, getActiveOmit()));
+              const subs = showNested ? (showClassesOnlyMode ? subAll.filter((s) => ir.nodes[s.id]?.node_kind !== "component") : subAll) : [];
+              let h = 72;
+              if (subs.length > 0) {
+                const subCols = 2;
+                const subRows = Math.ceil(Math.min(subs.length, 8) / subCols);
+                h = 44 + subRows * 34 + 12;
+              }
+              rowMaxH = Math.max(rowMaxH, h);
+              return { node: n, subs, h };
+            });
+
+            let curX = 20;
+            for (const item of computedRow) {
+              positions.set(item.node.id, { x: curX, y: curY, w: boxW, h: item.h, node: item.node, subs: item.subs });
+              const subW = 94;
+              const subH = 26;
+              item.subs.slice(0, 8).forEach((sub, idx) => {
+                const col = idx % 2;
+                const row = Math.floor(idx / 2);
+                subPositions.set(sub.id, {
+                  x: curX + 12 + col * (subW + 8),
+                  y: curY + 38 + row * (subH + 8),
+                  w: subW,
+                  h: subH,
+                  node: sub,
+                });
+              });
+              curX += boxW + gapX;
+            }
+            curY += rowMaxH + gapY;
+          }
+
+          svgEl.innerHTML = "";
+
+          const defs = svgNode("defs");
+          const mkNormal = svgNode("marker", { id: "m-normal", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" });
+          mkNormal.appendChild(svgNode("path", { d: "M 0 1 L 10 5 L 0 9 z", fill: "#64748b" }));
+          const mkViol = svgNode("marker", { id: "m-viol", viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 8, markerHeight: 8, orient: "auto-start-reverse" });
+          mkViol.appendChild(svgNode("path", { d: "M 0 1 L 10 5 L 0 9 z", fill: "#dc2626" }));
+          defs.appendChild(mkNormal);
+          defs.appendChild(mkViol);
+          svgEl.appendChild(defs);
+
+          const viewport = svgNode("g", { id: "viewport", transform: `translate(${state.panX}, ${state.panY}) scale(${state.zoom})` });
+          const layerBoxes = svgNode("g", { id: "layer-boxes" });
+          const layerEdges = svgNode("g", { id: "layer-edges" });
+          const layerTitles = svgNode("g", { id: "layer-titles" });
+          viewport.appendChild(layerBoxes);
+          viewport.appendChild(layerEdges);
+          viewport.appendChild(layerTitles);
+          svgEl.appendChild(viewport);
+
+          // Draw boxes & nested elements
+          for (const pos of positions.values()) {
+            const meta = ir.nodes[pos.node.id];
+            const isForeign = (meta?.node_kind || pos.node.node_kind) === "foreign";
+            const fill = meta?.metrics?.fill_color || "#e2e8f0";
+            const gBox = svgNode("g", { "data-id": pos.node.id, style: "cursor:pointer;" });
+
+            if (isForeign) {
+              gBox.appendChild(
+                svgNode("ellipse", {
+                  cx: pos.x + pos.w / 2,
+                  cy: pos.y + pos.h / 2,
+                  rx: pos.w / 2,
+                  ry: pos.h / 2,
+                  fill,
+                  stroke: "#64748b",
+                  "stroke-width": 1.6,
+                  "stroke-dasharray": "5 3",
+                })
+              );
+            } else {
+              gBox.appendChild(
+                svgNode("rect", {
+                  x: pos.x,
+                  y: pos.y,
+                  width: pos.w,
+                  height: pos.h,
+                  rx: 8,
+                  fill,
+                  stroke: "#334155",
+                  "stroke-width": 1.6,
+                })
+              );
+              const cColor = meta?.metrics?.crap_color || "#dc2626";
+              const mColor = meta?.metrics?.mutation_color || "#dc2626";
+              gBox.appendChild(svgNode("circle", { cx: pos.x + pos.w - 28, cy: pos.y + 13, r: 6, fill: cColor, stroke: "#0f172a", "stroke-width": 0.9 }));
+              gBox.appendChild(svgNode("text", { x: pos.x + pos.w - 28, y: pos.y + 16, "text-anchor": "middle", "font-size": 8, "font-weight": 800, fill: "#fff" }, "C"));
+              gBox.appendChild(svgNode("circle", { cx: pos.x + pos.w - 13, cy: pos.y + 13, r: 6, fill: mColor, stroke: "#0f172a", "stroke-width": 0.9 }));
+              gBox.appendChild(svgNode("text", { x: pos.x + pos.w - 13, y: pos.y + 16, "text-anchor": "middle", "font-size": 8, "font-weight": 800, fill: "#fff" }, "M"));
+            }
+
+            // Nested child boxes inside component
+            for (const sub of pos.subs) {
+              const sp = subPositions.get(sub.id);
+              const subMeta = ir.nodes[sub.id];
+              const subFill = subMeta?.metrics?.fill_color || "#f1f5f9";
+              const subG = svgNode("g", { "data-id": sub.id, style: "cursor:pointer;" });
+              subG.appendChild(
+                svgNode("rect", {
+                  x: sp.x,
+                  y: sp.y,
+                  width: sp.w,
+                  height: sp.h,
+                  rx: 5,
+                  fill: subFill,
+                  stroke: "#475569",
+                  "stroke-width": 1.1,
+                })
+              );
+              const sc = subMeta?.metrics?.crap_color || "#dc2626";
+              const sm = subMeta?.metrics?.mutation_color || "#dc2626";
+              subG.appendChild(svgNode("circle", { cx: sp.x + sp.w - 16, cy: sp.y + 7, r: 3.5, fill: sc }));
+              subG.appendChild(svgNode("circle", { cx: sp.x + sp.w - 7, cy: sp.y + 7, r: 3.5, fill: sm }));
+              subG.addEventListener("dblclick", (ev) => {
+                ev.stopPropagation();
+                openNode(sub.id);
+              });
+              subG.addEventListener("contextmenu", (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                openContextMenu(ev.clientX, ev.clientY, sub.id);
+              });
+              subG.addEventListener("mousemove", (ev) => {
+                if (subMeta) showTooltip(ev.clientX, ev.clientY, renderNodeTooltipHtml(subMeta));
+              });
+              subG.addEventListener("mouseleave", hideTooltip);
+              gBox.appendChild(subG);
+
+              // Sub-title on title layer (above arrows)
+              const label = sub.name.length > 13 ? `${sub.name.slice(0, 12)}…` : sub.name;
+              layerTitles.appendChild(
+                svgNode(
+                  "text",
+                  {
+                    x: sp.x + 6,
+                    y: sp.y + 17,
+                    "font-size": 10.5,
+                    "font-weight": 600,
+                    fill: "#0f172a",
+                    "pointer-events": "none",
+                  },
+                  label
+                )
+              );
+            }
+
+            if ((pos.node.children || []).length > 8 && showNested) {
+              layerTitles.appendChild(
+                svgNode(
+                  "text",
+                  {
+                    x: pos.x + pos.w - 10,
+                    y: pos.y + pos.h - 6,
+                    "text-anchor": "end",
+                    "font-size": 10,
+                    fill: "#334155",
+                    "pointer-events": "none",
+                  },
+                  `+${pos.node.children.length - 8} more`
+                )
+              );
+            }
+
+            gBox.addEventListener("dblclick", (ev) => {
+              ev.stopPropagation();
+              openNode(pos.node.id);
+            });
+            gBox.addEventListener("contextmenu", (ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              openContextMenu(ev.clientX, ev.clientY, pos.node.id);
+            });
+            gBox.addEventListener("mousemove", (ev) => {
+              if (meta) showTooltip(ev.clientX, ev.clientY, renderNodeTooltipHtml(meta));
+            });
+            gBox.addEventListener("mouseleave", hideTooltip);
+
+            layerBoxes.appendChild(gBox);
+
+            // Component title painted ABOVE arrows (on layerTitles)
+            const titleText = pos.node.name.length > 22 ? `${pos.node.name.slice(0, 21)}…` : pos.node.name;
+            const titleBg = svgNode("rect", {
+              x: pos.x + 8,
+              y: pos.y + 7,
+              width: Math.min(pos.w - 48, titleText.length * 7.6 + 12),
+              height: 20,
+              rx: 4,
+              fill: "rgba(255,255,255,0.72)",
+              "pointer-events": "none",
+            });
+            const titleEl = svgNode(
+              "text",
+              {
+                x: pos.x + 14,
+                y: pos.y + 21,
+                "font-size": 12.5,
+                "font-weight": 700,
+                fill: "#0f172a",
+                "pointer-events": "none",
+              },
+              titleText
+            );
+            layerTitles.appendChild(titleBg);
+            layerTitles.appendChild(titleEl);
+          }
+
+          // Draw edges OR Remove-arrows top/bottom triangles
+          if (mode === "remove") {
+            const drawTriangles = (boxMap) => {
+              for (const [id, p] of boxMap.entries()) {
+                const inc = incomingByTarget.get(id) || [];
+                const out = outgoingBySource.get(id) || [];
+                if (inc.length > 0) {
+                  const hasViol = inc.some((x) => x.violating);
+                  const cx = p.x + p.w / 2;
+                  const ty = p.y;
+                  const tri = svgNode("polygon", {
+                    points: `${cx - 7},${ty - 9} ${cx + 7},${ty - 9} ${cx},${ty}`,
+                    fill: hasViol ? "#dc2626" : "#64748b",
+                    stroke: "#0f172a",
+                    "stroke-width": 0.7,
+                    style: "cursor:pointer;",
+                  });
+                  tri.addEventListener("mousemove", (ev) => {
+                    showTooltip(ev.clientX, ev.clientY, renderPairListHtml(`Incoming to ${p.node.name}`, inc));
+                  });
+                  tri.addEventListener("mouseleave", hideTooltip);
+                  layerTitles.appendChild(tri);
+                }
+                if (out.length > 0) {
+                  const hasViol = out.some((x) => x.violating);
+                  const cx = p.x + p.w / 2;
+                  const by = p.y + p.h;
+                  const tri = svgNode("polygon", {
+                    points: `${cx - 7},${by} ${cx + 7},${by} ${cx},${by + 9}`,
+                    fill: hasViol ? "#dc2626" : "#64748b",
+                    stroke: "#0f172a",
+                    "stroke-width": 0.7,
+                    style: "cursor:pointer;",
+                  });
+                  tri.addEventListener("mousemove", (ev) => {
+                    showTooltip(ev.clientX, ev.clientY, renderPairListHtml(`Outgoing from ${p.node.name}`, out));
+                  });
+                  tri.addEventListener("mouseleave", hideTooltip);
+                  layerTitles.appendChild(tri);
+                }
+              }
+            };
+            drawTriangles(positions);
+            drawTriangles(subPositions);
+          } else {
+            for (const edge of edges) {
+              if (mode === "arrows" && !edge.violating && edge.pairs.length < 1) continue;
+              const fp = positions.get(edge.from);
+              const tp = positions.get(edge.to);
+              if (!fp || !tp) continue;
+              const x1 = fp.x + fp.w / 2;
+              const y1 = fp.y <= tp.y ? fp.y + fp.h : fp.y;
+              const x2 = tp.x + tp.w / 2;
+              const y2 = fp.y <= tp.y ? tp.y : tp.y + tp.h;
+              const midY = (y1 + y2) / 2;
+              const pathD = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+
+              const stroke = edge.violating ? "#dc2626" : mode === "arrows" ? "#94a3b8" : "#475569";
+              const width = edge.violating ? 3.2 : mode === "arrows" ? 1.3 : 1.9;
+              const attrs = {
+                d: pathD,
+                fill: "none",
+                stroke,
+                "stroke-width": width,
+                "marker-end": edge.violating ? "url(#m-viol)" : "url(#m-normal)",
+                style: "cursor:pointer;",
+              };
+              if (edge.kind === "implements" || edge.kind === "inheritance") {
+                attrs["stroke-dasharray"] = "6 4";
+              }
+              const pathEl = svgNode("path", attrs);
+              const hitEl = svgNode("path", { d: pathD, fill: "none", stroke: "transparent", "stroke-width": 12, style: "cursor:pointer;" });
+
+              const onMove = (ev) => {
+                showTooltip(ev.clientX, ev.clientY, renderPairListHtml(`${edge.from} → ${edge.to} (${edge.kind})`, edge.pairs));
+              };
+              pathEl.addEventListener("mousemove", onMove);
+              pathEl.addEventListener("mouseleave", hideTooltip);
+              hitEl.addEventListener("mousemove", onMove);
+              hitEl.addEventListener("mouseleave", hideTooltip);
+
+              layerEdges.appendChild(pathEl);
+              layerEdges.appendChild(hitEl);
+            }
+          }
+        }
+
+        function openNode(nodeId) {
+          const ir = state.data.ir;
+          const node = findTreeNode(ir.root, nodeId);
+          const meta = ir.nodes[nodeId];
+          if (node && node.children && node.children.length > 0) {
+            state.scopeStack.push(nodeId);
+            renderAll();
+          } else if (meta) {
+            openClassModal(nodeId);
+          }
+        }
+
+        function openClassModal(nodeId) {
+          const meta = state.data.ir.nodes[nodeId];
+          if (!meta) return;
+          state.modalNodeId = nodeId;
+          modalBackdrop.style.display = "flex";
+          document.getElementById("modal-body").classList.remove("with-source");
+          document.getElementById("modal-kind-badge").textContent = meta.type_kind || meta.node_kind;
+          document.getElementById("modal-name").textContent = meta.name;
+          document.getElementById("modal-ns").textContent = `${meta.id}${meta.file ? ` (${meta.file})` : ""}`;
+
+          const m = meta.metrics;
+          const cDot = document.getElementById("modal-c-dot");
+          cDot.style.background = m.crap_color;
+          cDot.title = `CRAP grade ${m.crap_grade}/10`;
+          const mDot = document.getElementById("modal-m-dot");
+          mDot.style.background = m.mutation_color;
+          mDot.title = `Mutation grade ${m.mutation_grade}/10`;
+
+          const crapText =
+            m.crap_count > 0 ? `Crap μ ${m.crap_mu}  max ${m.crap_max}  σ ${m.crap_sigma}` : "Crap μ —  max —  σ — (missing)";
+          const mutText = m.has_mutation
+            ? `Mutation: ${m.killed} killed, ${m.survived} survived, ${m.uncovered} uncovered (${m.sites} sites, ${m.mutation_score ?? 100}%)`
+            : "Mutation: missing (grade 1)";
+          document.getElementById("modal-summary").innerHTML = `<span>${escHtml(crapText)}</span><span>${escHtml(mutText)}</span>`;
+
+          let html = "";
+          if (meta.fields && meta.fields.length > 0) {
+            html += `<div style="margin-bottom:10px;font-size:12px;"><strong>Fields:</strong> ${meta.fields
+              .map((f) => `<code>${f.visibility === "private" ? "-" : "+"}${escHtml(f.name)}</code>`)
+              .join(", ")}</div>`;
+          }
+
+          html += `<table class="card-table">
+            <thead>
+              <tr class="group-head">
+                <th rowspan="2" style="width:30px;">Vis</th>
+                <th rowspan="2">Member</th>
+                <th colspan="3">--crap--</th>
+                <th colspan="3">--mutation--</th>
+              </tr>
+              <tr class="col-head">
+                <th>Crap</th>
+                <th>CC</th>
+                <th>Cov</th>
+                <th>killed</th>
+                <th>survived</th>
+                <th>uncovered</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+          for (const op of meta.ops || []) {
+            const vis = op.visibility === "private" ? "-" : "+";
+            const crapClass = op.crap === null ? "cell-red" : op.crap <= 5 ? "cell-green" : op.crap < 30 ? "cell-amber" : "cell-red";
+            const crapVal = op.crap === null ? "—" : op.crap.toFixed(1);
+            const ccVal = op.cc === null ? "—" : op.cc;
+            const covVal = op.coverage === null ? "—" : `${op.coverage.toFixed(0)}%`;
+
+            let mutCells = "";
+            if (!op.has_mutation) {
+              mutCells = `<td class="cell-red">—</td><td class="cell-red">—</td><td class="cell-red">—</td>`;
+            } else if (op.sites === 0) {
+              mutCells = `<td colspan="3" class="no-sites">---no mutation sites---</td>`;
+            } else {
+              const kClass = op.killed > 0 ? "cell-green" : "cell-white";
+              const sClass = op.survived > 0 ? "cell-red" : "cell-green";
+              const uClass = op.uncovered > 0 ? "cell-amber" : "cell-white";
+              mutCells = `<td class="${kClass}">${op.killed}</td><td class="${sClass}">${op.survived}</td><td class="${uClass}">${op.uncovered}</td>`;
+            }
+
+            html += `<tr>
+              <td style="font-family:var(--mono);text-align:center;font-weight:700;">${vis}</td>
+              <td><span class="member-link" data-file="${escHtml(op.file)}" data-lang="${escHtml(meta.lang || "rust")}" data-name="${escHtml(op.name)}" data-line="${op.line}">${escHtml(op.name)}</span></td>
+              <td class="${crapClass}">${crapVal}</td>
+              <td>${ccVal}</td>
+              <td>${covVal}</td>
+              ${mutCells}
+            </tr>`;
+          }
+
+          if (!meta.ops || meta.ops.length === 0) {
+            html += `<tr><td colspan="8" style="text-align:center;color:#64748b;">No functions or methods in this unit</td></tr>`;
+          }
+          html += `</tbody></table>`;
+          const pane = document.getElementById("members-pane");
+          pane.innerHTML = html;
+
+          pane.querySelectorAll(".member-link").forEach((el) => {
+            el.addEventListener("click", () => {
+              loadSourceViewer(el.dataset.lang, el.dataset.file, el.dataset.name, el.dataset.line);
+            });
+          });
+        }
+
+        async function loadSourceViewer(lang, file, name, line) {
+          if (!file) return;
+          setStatus(`Loading source ${file}:${line || 1}…`);
+          const qs = new URLSearchParams({ lang: lang || "rust", file, name: name || "", line: String(line || 1) });
+          const res = await fetch(`/api/source?${qs.toString()}`);
+          const data = await res.json();
+          if (!res.ok) {
+            setStatus(data.error || "Failed to load source");
+            return;
+          }
+          document.getElementById("modal-body").classList.add("with-source");
+          document.getElementById("source-title").textContent = `${data.file}:${data.target_line}`;
+          const linesEl = document.getElementById("source-lines");
+          linesEl.innerHTML = (data.snippet || [])
+            .map(
+              (l) =>
+                `<div class="src-line ${l.highlight ? "hl" : ""}" data-line="${l.line}"><span class="src-num">${l.line}</span><span>${escHtml(
+                  l.text
+                )}</span></div>`
+            )
+            .join("");
+          const targetEl = linesEl.querySelector(`.src-line[data-line="${data.target_line}"]`);
+          if (targetEl) targetEl.scrollIntoView({ block: "center" });
+          setStatus(`Showing ${data.file}:${data.target_line}`);
+        }
+
+        function renderSidebar() {
+          if (!state.data) return;
+          const ir = state.data.ir;
+          const policy = state.data.policy;
+          const activeProp = state.activeProposalId ? (policy.proposals || []).find((p) => p.id === state.activeProposalId) : null;
+          const activeEval = activeProp ? (state.data.proposals_eval || []).find((e) => e.id === activeProp.id) : null;
+
+          document.getElementById("proposal-banner").style.display = activeProp ? "block" : "none";
+
+          const violCount = activeEval ? activeEval.violating_count : ir.stats.violating_edges;
+          const violations = activeEval ? activeEval.violations : ir.violations;
+
+          document.getElementById("stats-grid").innerHTML = `
+            <div class="stat-item"><span>Components</span><strong>${ir.stats.total_components}</strong></div>
+            <div class="stat-item"><span>Classes / Mods</span><strong>${ir.stats.total_classes}</strong></div>
+            <div class="stat-item"><span>Edges</span><strong>${ir.stats.total_edges}</strong></div>
+            <div class="stat-item"><span>Violations</span><strong style="color:${violCount > 0 ? "#dc2626" : "#16a34a"}">${violCount}</strong></div>
+          `;
+
+          const violBadge = document.getElementById("viol-badge");
+          violBadge.textContent = violCount;
+          violBadge.className = `badge ${violCount > 0 ? "red" : "green"}`;
+
+          const vList = document.getElementById("violations-list");
+          if (violations.length === 0) {
+            vList.innerHTML = `<div style="font-size:12px;color:#16a34a;">No Dependency Rule violations</div>`;
+          } else {
+            vList.innerHTML = violations
+              .slice(0, 50)
+              .map(
+                (v) => `<div class="violation-item" data-from="${escHtml(v.from)}">
+                  <div><strong>${escHtml(v.from)}</strong> (r${v.from_rank}) → <strong>${escHtml(v.to)}</strong> (r${v.to_rank})</div>
+                  <div style="font-family:var(--mono);font-size:11px;color:#475569;">${escHtml(v.file)}:${v.line}</div>
+                </div>`
+              )
+              .join("");
+            vList.querySelectorAll(".violation-item").forEach((el) => {
+              el.addEventListener("click", () => {
+                const parentId = state.data.ir.nodes[el.dataset.from]?.parent || "root";
+                state.scopeStack = ["root"];
+                if (parentId !== "root") state.scopeStack.push(parentId);
+                renderAll();
+              });
+            });
+          }
+
+          const propList = document.getElementById("proposals-list");
+          const proposals = policy.proposals || [];
+          let propHtml = `<div class="proposal-item ${!state.activeProposalId ? "active" : ""}" data-prop="">
+            <span><strong>Real diagram</strong></span>
+            <span class="badge ${ir.stats.violating_edges > 0 ? "red" : "green"}">${ir.stats.violating_edges}</span>
+          </div>`;
+          for (const p of proposals) {
+            const ev = (state.data.proposals_eval || []).find((x) => x.id === p.id);
+            const vc = ev ? ev.violating_count : 0;
+            propHtml += `<div class="proposal-item ${state.activeProposalId === p.id ? "active" : ""}" data-prop="${escHtml(p.id)}">
+              <span>${escHtml(p.name)}</span>
+              <span class="badge ${vc > 0 ? "red" : "green"}">${vc}</span>
+            </div>`;
+          }
+          propList.innerHTML = propHtml;
+          propList.querySelectorAll(".proposal-item").forEach((el) => {
+            el.addEventListener("click", () => {
+              state.activeProposalId = el.dataset.prop || null;
+              renderAll();
+            });
+          });
+
+          const ed = document.getElementById("proposal-editor");
+          if (activeProp) {
+            ed.style.display = "block";
+            document.getElementById("proposal-layers-input").value = (activeProp.layers || []).map((grp) => grp.join(", ")).join("\n");
+          } else {
+            ed.style.display = "none";
+          }
+
+          const omitEl = document.getElementById("omit-list");
+          const omits = policy.omit || [];
+          if (omits.length === 0) {
+            omitEl.innerHTML = `<div style="font-size:12px;color:#64748b;">None</div>`;
+          } else {
+            omitEl.innerHTML = omits
+              .map(
+                (o) => `<div class="omit-item" style="display:flex;justify-content:space-between;align-items:center;">
+                  <code>${escHtml(o)}</code>
+                  <button class="btn light" data-unomit="${escHtml(o)}" style="padding:2px 6px;font-size:11px;">Restore</button>
+                </div>`
+              )
+              .join("");
+            omitEl.querySelectorAll("[data-unomit]").forEach((btn) => {
+              btn.addEventListener("click", () => runAction("unomit", { target: btn.dataset.unomit }));
+            });
+          }
+        }
+
+        function renderBreadcrumbs() {
+          const bc = document.getElementById("breadcrumbs");
+          if (!state.data) return;
+          bc.innerHTML = state.scopeStack
+            .map((id, idx) => {
+              const name = state.data.ir.nodes[id]?.name || id;
+              const active = idx === state.scopeStack.length - 1 ? "active" : "";
+              return `<button class="crumb ${active}" data-idx="${idx}">${escHtml(name)}</button>`;
+            })
+            .join(`<span style="color:#64748b;">/</span>`);
+          bc.querySelectorAll(".crumb").forEach((el) => {
+            el.addEventListener("click", () => {
+              const idx = Number(el.dataset.idx);
+              state.scopeStack = state.scopeStack.slice(0, idx + 1);
+              renderAll();
+            });
+          });
+        }
+
+        function renderAll() {
+          document.getElementById("btn-declutter").textContent = DECLUTTER_MODES[state.declutterIdx].label;
+          document.getElementById("btn-zoom-reset").textContent = `${Math.round(state.zoom * 100)}%`;
+          renderBreadcrumbs();
+          renderSidebar();
+          renderGraph();
+        }
+
+        async function loadState(quiet = false) {
+          if (!quiet) setStatus("Loading state…");
+          const res = await fetch("/api/state");
+          const data = await res.json();
+          state.data = data;
+          state.lastMtime = data.metrics_mtime;
+          renderAll();
+          if (!quiet) setStatus(`Loaded ${data.ir.stats.total_classes} classes, ${data.ir.stats.total_edges} edges`);
+        }
+
+        async function savePolicyPatch(patch) {
+          setStatus("Saving policy…");
+          const res = await fetch("/api/policy", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            state.data = data;
+            state.lastMtime = data.metrics_mtime;
+            renderAll();
+            setStatus("Policy saved");
+          } else {
+            setStatus(data.error || "Policy save failed");
+          }
+        }
+
+        async function runAction(action, extra = {}) {
+          setStatus(`Running ${action}…`);
+          const res = await fetch("/api/action", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action, ...extra }),
+          });
+          const data = await res.json();
+          if (res.ok && data.state) {
+            state.data = data.state;
+            state.lastMtime = data.state.metrics_mtime;
+            renderAll();
+            setStatus(data.message || `${action} complete`);
+          } else {
+            setStatus(data.error || `${action} failed`);
+          }
+        }
+
+        function openContextMenu(x, y, targetId) {
+          state.ctxTargetId = targetId;
+          ctxMenuEl.style.display = "block";
+          ctxMenuEl.style.left = `${Math.min(window.innerWidth - 200, x)}px`;
+          ctxMenuEl.style.top = `${Math.min(window.innerHeight - 190, y)}px`;
+        }
+
+        function hideContextMenu() {
+          ctxMenuEl.style.display = "none";
+        }
+
+        ctxMenuEl.querySelectorAll("button").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const act = btn.dataset.act;
+            const id = state.ctxTargetId;
+            hideContextMenu();
+            if (!id || !state.data) return;
+            const meta = state.data.ir.nodes[id];
+            if (act === "open") {
+              openNode(id);
+            } else {
+              runAction(act, {
+                target: id,
+                file: meta?.file || null,
+                lang: meta?.lang || null,
+                namespace: meta?.raw_namespace || id,
+              });
+            }
+          });
+        });
+
+        function zoomAt(factor, clientX, clientY) {
+          const rect = wrapEl.getBoundingClientRect();
+          const cx = clientX !== undefined ? clientX - rect.left : rect.width / 2;
+          const cy = clientY !== undefined ? clientY - rect.top : rect.height / 2;
+          const prev = state.zoom;
+          const next = Math.min(3.5, Math.max(0.2, prev * factor));
+          state.panX = cx - ((cx - state.panX) * next) / prev;
+          state.panY = cy - ((cy - state.panY) * next) / prev;
+          state.zoom = next;
+          renderAll();
+        }
+
+        wrapEl.addEventListener("mousedown", (ev) => {
+          if (ev.button !== 0) return;
+          hideContextMenu();
+          state.panning = true;
+          state.panStartX = ev.clientX - state.panX;
+          state.panStartY = ev.clientY - state.panY;
+          wrapEl.classList.add("panning");
+        });
+        window.addEventListener("mousemove", (ev) => {
+          if (!state.panning) return;
+          state.panX = ev.clientX - state.panStartX;
+          state.panY = ev.clientY - state.panStartY;
+          const vp = svgEl.querySelector("#viewport");
+          if (vp) vp.setAttribute("transform", `translate(${state.panX}, ${state.panY}) scale(${state.zoom})`);
+        });
+        window.addEventListener("mouseup", () => {
+          state.panning = false;
+          wrapEl.classList.remove("panning");
+        });
+        wrapEl.addEventListener(
+          "wheel",
+          (ev) => {
+            ev.preventDefault();
+            zoomAt(ev.deltaY < 0 ? 1.12 : 0.89, ev.clientX, ev.clientY);
+          },
+          { passive: false }
+        );
+
+        document.addEventListener("click", (ev) => {
+          if (!ctxMenuEl.contains(ev.target)) hideContextMenu();
+        });
+
+        document.getElementById("btn-back").addEventListener("click", () => {
+          if (state.scopeStack.length > 1) {
+            state.scopeStack.pop();
+            renderAll();
+          }
+        });
+        document.getElementById("btn-declutter").addEventListener("click", () => {
+          state.declutterIdx = (state.declutterIdx + 1) % DECLUTTER_MODES.length;
+          renderAll();
+        });
+        document.getElementById("btn-zoom-in").addEventListener("click", () => zoomAt(1.18));
+        document.getElementById("btn-zoom-out").addEventListener("click", () => zoomAt(0.85));
+        document.getElementById("btn-zoom-reset").addEventListener("click", () => {
+          state.zoom = 1;
+          state.panX = 24;
+          state.panY = 24;
+          renderAll();
+        });
+        document.getElementById("btn-regen").addEventListener("click", () => runAction("regen"));
+        document.getElementById("btn-reload").addEventListener("click", () => loadState());
+        document.getElementById("btn-close-modal").addEventListener("click", () => {
+          modalBackdrop.style.display = "none";
+          state.modalNodeId = null;
+        });
+        document.getElementById("btn-close-source").addEventListener("click", () => {
+          document.getElementById("modal-body").classList.remove("with-source");
+        });
+        document.getElementById("modal-title-btn").addEventListener("click", () => {
+          if (!state.modalNodeId) return;
+          const meta = state.data.ir.nodes[state.modalNodeId];
+          if (meta && meta.file) {
+            loadSourceViewer(meta.lang, meta.file, meta.name, meta.line || 1);
+          }
+        });
+
+        document.getElementById("btn-new-proposal").addEventListener("click", () => {
+          if (!state.data) return;
+          const proposals = [...(state.data.policy.proposals || [])];
+          const id = `prop-${Date.now()}`;
+          const name = window.prompt("Proposal name:", `Proposal ${proposals.length + 1}`);
+          if (!name) return;
+          proposals.push({
+            id,
+            name: name.trim(),
+            layers: (state.data.policy.levels || []).map((g) => [...g]),
+            omit: [],
+          });
+          state.activeProposalId = id;
+          savePolicyPatch({ proposals });
+        });
+
+        document.getElementById("btn-save-proposal").addEventListener("click", () => {
+          if (!state.activeProposalId || !state.data) return;
+          const raw = document.getElementById("proposal-layers-input").value;
+          const layers = raw
+            .split("\n")
+            .map((line) => line.split(",").map((s) => s.trim()).filter(Boolean))
+            .filter((grp) => grp.length > 0);
+          const proposals = (state.data.policy.proposals || []).map((p) => (p.id === state.activeProposalId ? { ...p, layers } : p));
+          savePolicyPatch({ proposals });
+        });
+
+        document.getElementById("btn-rename-proposal").addEventListener("click", () => {
+          if (!state.activeProposalId || !state.data) return;
+          const cur = (state.data.policy.proposals || []).find((p) => p.id === state.activeProposalId);
+          const name = window.prompt("Rename proposal:", cur ? cur.name : "");
+          if (!name) return;
+          const proposals = (state.data.policy.proposals || []).map((p) =>
+            p.id === state.activeProposalId ? { ...p, name: name.trim() } : p
+          );
+          savePolicyPatch({ proposals });
+        });
+
+        document.getElementById("btn-delete-proposal").addEventListener("click", () => {
+          if (!state.activeProposalId || !state.data) return;
+          const proposals = (state.data.policy.proposals || []).filter((p) => p.id !== state.activeProposalId);
+          state.activeProposalId = null;
+          savePolicyPatch({ proposals });
+        });
+
+        window.addEventListener("keydown", (ev) => {
+          if (ev.target && ["INPUT", "TEXTAREA"].includes(ev.target.tagName)) return;
+          if (ev.key === "Escape") {
+            if (ctxMenuEl.style.display === "block") {
+              hideContextMenu();
+            } else if (modalBackdrop.style.display === "flex") {
+              modalBackdrop.style.display = "none";
+              state.modalNodeId = null;
+            } else if (state.scopeStack.length > 1) {
+              state.scopeStack.pop();
+              renderAll();
+            }
+          } else if (ev.key === "r" || ev.key === "R") {
+            if (!ev.ctrlKey && !ev.metaKey) loadState();
+          } else if (ev.key === "d" || ev.key === "D") {
+            if (!ev.ctrlKey && !ev.metaKey) {
+              state.declutterIdx = (state.declutterIdx + 1) % DECLUTTER_MODES.length;
+              renderAll();
+            }
+          } else if ((ev.ctrlKey || ev.metaKey) && (ev.key === "=" || ev.key === "+")) {
+            ev.preventDefault();
+            zoomAt(1.18);
+          } else if ((ev.ctrlKey || ev.metaKey) && ev.key === "-") {
+            ev.preventDefault();
+            zoomAt(0.85);
+          } else if ((ev.ctrlKey || ev.metaKey) && ev.key === "0") {
+            ev.preventDefault();
+            state.zoom = 1;
+            state.panX = 24;
+            state.panY = 24;
+            renderAll();
+          }
+        });
+
+        setInterval(async () => {
+          if (!document.getElementById("chk-watch").checked) return;
+          try {
+            const res = await fetch("/api/state");
+            if (!res.ok) return;
+            const next = await res.json();
+            if (next.metrics_mtime !== state.lastMtime) {
+              state.data = next;
+              state.lastMtime = next.metrics_mtime;
+              renderAll();
+              setStatus("Auto-reloaded from disk change");
+            }
+          } catch {
+            // ignore transient network failure during poll
+          }
+        }, 2000);
+
+        loadState();
+      })();
+    </script>
   </body>
 </html>
