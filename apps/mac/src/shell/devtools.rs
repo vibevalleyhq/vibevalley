@@ -2,12 +2,13 @@ use std::time::Duration;
 
 use gpui::{
     App, AppContext as _, Bounds, Context, Entity, FocusHandle, Focusable, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render,
-    Styled as _, Subscription, TitlebarOptions, WeakEntity, Window, WindowBounds, WindowHandle, WindowOptions, div, px, size,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TitlebarOptions, WeakEntity, Window, WindowBounds, WindowHandle, WindowOptions, div, px, size,
 };
 use serde_json::json;
 use vibevalley_protocol::{SessionsSlice, SliceKind};
 
 use crate::hosted::{BridgeHub, HostedEvent, HostedView, ShellDebugHandle};
+use crate::icon::{TOOLTIP_SHOW_DELAY, gpui_tooltip};
 use crate::theme::Ui;
 
 use super::Shell;
@@ -488,6 +489,8 @@ impl Shell {
                     .text_xs()
                     .text_color(colors.text)
                     .hover(move |style| style.bg(colors.surface))
+                    .tooltip(gpui_tooltip("Toggle DevTools", &colors))
+                    .tooltip_show_delay(TOOLTIP_SHOW_DELAY)
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|s, _, window, cx| {

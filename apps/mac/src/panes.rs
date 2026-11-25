@@ -13,7 +13,7 @@ use vibevalley_workspace::{Axis, Group, Layout, Node, PaneKind, Tab, TabId};
 
 use crate::diff::DiffView;
 use crate::hosted::HostedView;
-use crate::icon::gpui_icon;
+use crate::icon::{TOOLTIP_SHOW_DELAY, gpui_icon, gpui_tooltip};
 use crate::markdown_pane::MarkdownView;
 use crate::pixel::view::PixelView;
 use crate::shell::Shell;
@@ -493,6 +493,8 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 .border_color(transparent())
                 .cursor_pointer()
                 .hover(move |s| s.bg(hover_bg))
+                .tooltip(gpui_tooltip("Show sidebar ⌘B", &colors))
+                .tooltip_show_delay(TOOLTIP_SHOW_DELAY)
                 .child(gpui_icon("sidebar", 14.0, colors.muted))
                 .on_mouse_down(
                     MouseButton::Left,
@@ -595,6 +597,8 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                         .rounded(px(4.0))
                         .cursor_pointer()
                         .hover(move |s| s.bg(hover_bg))
+                        .tooltip(gpui_tooltip("Close tab ⌘W", &colors))
+                        .tooltip_show_delay(TOOLTIP_SHOW_DELAY)
                         .child(gpui_icon("close", 11.0, if active { colors.muted } else { colors.faint }))
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .on_click(cx.listener(move |shell, _, window, cx| {
@@ -617,6 +621,8 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         .rounded(px(6.0))
         .border_1()
         .cursor_pointer()
+        .tooltip(gpui_tooltip("New terminal / chat", &colors))
+        .tooltip_show_delay(TOOLTIP_SHOW_DELAY)
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |shell, _, _, cx| {
@@ -665,6 +671,8 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
             .rounded(px(6.0))
             .border_1()
             .cursor_pointer()
+            .tooltip(gpui_tooltip("Toggle inspector", &colors))
+            .tooltip_show_delay(TOOLTIP_SHOW_DELAY)
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|s, _, _, cx| {

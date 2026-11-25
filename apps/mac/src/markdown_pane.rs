@@ -1,24 +1,25 @@
 //! Native GPUI Markdown preview pane backed directly by `vibevalley_rich`'s
 //! pure-Rust `VvMarkdown` root (`nsh_platform_gpui::App::Rust`, zero QuickJS VM).
 //!
-//! Renders a unified 36px native GPUI header bar (file icon, filename, truncated
-//! parent path, source/copy/reload/reveal/$EDITOR actions), a 150ms anti-flicker
-//! skeleton, error states, file-watch reload, and synchronized light/dark theme
-//! and UI font scale.
+//! Renders a unified 34px native GPUI header bar (file icon, filename, truncated
+//! parent path, source/copy/reload/reveal/open-in-editor icon actions), a 150ms
+//! anti-flicker skeleton, error states, file-watch reload, and synchronized
+//! light/dark theme and UI font scale.
 
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
 use gpui::{
     AnyElement, AppContext as _, ClipboardItem, Context, Entity, EventEmitter, FocusHandle, Focusable, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _, Window, div, hsla, px,
+    KeyDownEvent, MouseButton, ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _, Window, div, px,
 };
 use nsh_platform_gpui::{App as NshApp, AppOptions, AppView, Appearance};
 use serde_json::json;
 use tokio::sync::mpsc::UnboundedSender;
 use vibevalley_rich::{NativeMarkdownDoc, NativeMarkdownEvent, native_markdown_root};
 
-use crate::icon::gpui_icon;
+use crate::host::{EditorOption, EditorTarget};
+use crate::icon::{editor_popover, gpui_icon, icon_button, icon_caret_button};
 use crate::theme::{Palette, Ui};
 
 const MAX_BYTES: u64 = 8 * 1024 * 1024;
@@ -28,7 +29,7 @@ pub enum MarkdownPaneEvent {
     OpenFile(PathBuf),
     OpenUrl(String),
     OpenRoute(String),
-    OpenInEditor,
+    OpenInEditor(EditorTarget),
     Reveal,
 }
 
@@ -47,6 +48,10 @@ pub struct MarkdownView {
     reloads: u64,
     load_gen: u64,
     show_skeleton: bool,
+    copied: bool,
+    copy_gen: u64,
+    editor_menu_open: bool,
+    editor_options: Vec<EditorOption>,
 }
 
 impl MarkdownView {
@@ -96,9 +101,57 @@ impl MarkdownView {
             reloads: 0,
             load_gen: 0,
             show_skeleton: false,
+            copied: false,
+            copy_gen: 0,
+            editor_menu_open: false,
+            editor_options: crate::host::cached_editor_options(),
         };
+        view.refresh_editors(cx);
         view.reload(cx);
         view
+    }
+
+    fn refresh_editors(&mut self, cx: &mut Context<Self>) {
+        let task = cx.background_spawn(async { crate::host::detect_editors_blocking() });
+        cx.spawn(async move |this, cx| {
+            let options = task.await;
+            let _ = this.update(cx, |v, cx| {
+                if v.editor_options != options {
+                    v.editor_options = options;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    fn copy_path(&mut self, cx: &mut Context<Self>) {
+        cx.write_to_clipboard(ClipboardItem::new_string(self.path.to_string_lossy().into_owned()));
+        self.copied = true;
+        self.copy_gen = self.copy_gen.wrapping_add(1);
+        let generation = self.copy_gen;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(Duration::from_millis(1500)).await;
+            let _ = this.update(cx, |v, cx| {
+                if v.copy_gen == generation && v.copied {
+                    v.copied = false;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    fn toggle_editor_menu(&mut self, was_open: bool, window: &mut Window, cx: &mut Context<Self>) {
+        // Use render-time `was_open`: `on_mouse_down_out` already cleared
+        // `editor_menu_open` during capture when clicking the trigger to close.
+        self.editor_menu_open = !was_open;
+        if self.editor_menu_open {
+            window.focus(&self.focus, cx);
+            self.refresh_editors(cx);
+        }
+        cx.notify();
     }
 
     pub fn path(&self) -> &Path {
@@ -340,47 +393,6 @@ pub(crate) fn resolve_local_link(raw_url: &str, base_dir: Option<&Path>) -> Opti
     }
 }
 
-fn transparent() -> Hsla {
-    hsla(0.0, 0.0, 0.0, 0.0)
-}
-
-#[derive(Clone, Copy)]
-enum ButtonTone {
-    Quiet,
-    Plain,
-}
-
-fn toolbar_button(id: &'static str, label: String, tone: ButtonTone, colors: &Palette) -> gpui::Stateful<gpui::Div> {
-    let hover = colors.hover;
-    let text = colors.text;
-    let base = div()
-        .id(id)
-        .h(px(24.0))
-        .px(px(8.0))
-        .flex_none()
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(px(5.0))
-        .border_1()
-        .cursor_pointer()
-        .text_size(px(11.5))
-        .font_weight(FontWeight::MEDIUM)
-        .child(label);
-    match tone {
-        ButtonTone::Quiet => base
-            .bg(transparent())
-            .border_color(transparent())
-            .text_color(colors.muted)
-            .hover(move |s| s.bg(hover).text_color(text)),
-        ButtonTone::Plain => base
-            .bg(colors.elevated)
-            .border_color(colors.border)
-            .text_color(colors.text)
-            .hover(move |s| s.bg(hover)),
-    }
-}
-
 fn doc_skeleton(colors: &Palette) -> AnyElement {
     div()
         .size_full()
@@ -463,9 +475,9 @@ impl Render for MarkdownView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = Ui::get(cx).colors.clone();
         let (file_name, parent_dir) = crate::viewer::split_display_path(&self.path);
-        let source_label = "Source".to_string();
+        let menu_open = self.editor_menu_open;
         let toolbar = div()
-            .h(px(36.0))
+            .h(px(34.0))
             .flex_none()
             .flex()
             .flex_row()
@@ -510,26 +522,59 @@ impl Render for MarkdownView {
                     .flex()
                     .flex_row()
                     .items_center()
-                    .gap(px(4.0))
+                    .gap(px(3.0))
                     .child(
-                        toolbar_button("md-source", source_label, ButtonTone::Plain, &colors)
+                        icon_button("md-source", "show", "View source", true, &colors)
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(MarkdownPaneEvent::OpenSource))),
                     )
                     .child(
-                        toolbar_button("md-copy-path", "Copy path".into(), ButtonTone::Quiet, &colors).on_click(cx.listener(|v, _, _, cx| {
-                            cx.write_to_clipboard(ClipboardItem::new_string(v.path.to_string_lossy().into_owned()));
-                        })),
+                        icon_button(
+                            "md-copy-path",
+                            if self.copied { "check" } else { "copy" },
+                            if self.copied { "Copied" } else { "Copy path" },
+                            false,
+                            &colors,
+                        )
+                        .on_click(cx.listener(|v, _, _, cx| v.copy_path(cx))),
                     )
-                    .child(toolbar_button("md-reload", "Reload".into(), ButtonTone::Quiet, &colors).on_click(cx.listener(|v, _, _, cx| v.reload(cx))))
+                    .child(icon_button("md-reload", "refresh", "Reload", false, &colors).on_click(cx.listener(|v, _, _, cx| v.reload(cx))))
                     .child(
-                        toolbar_button("md-reveal", "Reveal".into(), ButtonTone::Quiet, &colors)
+                        icon_button("md-reveal", "folder", "Reveal in Finder", false, &colors)
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(MarkdownPaneEvent::Reveal))),
                     )
-                    .child(
-                        toolbar_button("md-editor", "Open in $EDITOR".into(), ButtonTone::Plain, &colors)
-                            .on_click(cx.listener(|_, _, _, cx| cx.emit(MarkdownPaneEvent::OpenInEditor))),
-                    ),
+                    .child(icon_caret_button("md-editor", "open", "Open in editor…", menu_open, &colors).on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |v, _, window, cx| {
+                            cx.stop_propagation();
+                            v.toggle_editor_menu(menu_open, window, cx);
+                        }),
+                    )),
             );
+
+        let editor_menu = menu_open.then(|| {
+            let select_entity = cx.entity();
+            let dismiss_entity = cx.entity();
+            editor_popover(
+                "md-editor-menu",
+                &self.editor_options,
+                &colors,
+                move |target, _, cx| {
+                    select_entity.update(cx, |v, cx| {
+                        v.editor_menu_open = false;
+                        cx.emit(MarkdownPaneEvent::OpenInEditor(target));
+                        cx.notify();
+                    });
+                },
+                move |_, cx| {
+                    dismiss_entity.update(cx, |v, cx| {
+                        if v.editor_menu_open {
+                            v.editor_menu_open = false;
+                            cx.notify();
+                        }
+                    });
+                },
+            )
+        });
 
         let body: AnyElement = match &self.state {
             LoadState::Loading if self.show_skeleton => doc_skeleton(&colors),
@@ -540,14 +585,23 @@ impl Render for MarkdownView {
 
         div()
             .id("markdown-pane")
+            .relative()
             .track_focus(&self.focus)
             .key_context("MarkdownView")
+            .on_key_down(cx.listener(|v, event: &KeyDownEvent, _, cx| {
+                if v.editor_menu_open && event.keystroke.key == "escape" {
+                    v.editor_menu_open = false;
+                    cx.stop_propagation();
+                    cx.notify();
+                }
+            }))
             .size_full()
             .flex()
             .flex_col()
             .bg(colors.bg)
             .child(toolbar)
             .child(div().flex_1().min_h_0().child(body))
+            .children(editor_menu)
     }
 }
 

@@ -405,6 +405,173 @@ pub fn reveal(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Destination for opening a workspace file from the native viewer / Markdown toolbar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EditorTarget {
+    Cursor { app_path: PathBuf },
+    VsCode { app_path: PathBuf },
+    Zed { app_path: PathBuf },
+    TerminalEditor,
+    DefaultApp,
+}
+
+impl EditorTarget {
+    pub fn is_gui(&self) -> bool {
+        matches!(self, EditorTarget::Cursor { .. } | EditorTarget::VsCode { .. } | EditorTarget::Zed { .. })
+    }
+}
+
+/// Menu row shown inside the native "Open in editor" popover.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EditorOption {
+    pub target: EditorTarget,
+    pub label: String,
+    pub subtitle: Option<String>,
+}
+
+static DETECTED_GUI_EDITORS: parking_lot::RwLock<Option<Vec<EditorOption>>> = parking_lot::RwLock::new(None);
+static EDITOR_WARM_STARTED: AtomicBool = AtomicBool::new(false);
+
+fn resolve_editor_basename(editor_env: Option<&str>) -> String {
+    let raw = editor_env.unwrap_or_default().trim();
+    let token = raw.split_whitespace().next().unwrap_or_default().trim_matches(['"', '\'']);
+    let base = Path::new(token).file_name().and_then(|n| n.to_str()).unwrap_or_default().trim();
+    if base.is_empty() { "vi".to_string() } else { base.to_string() }
+}
+
+fn build_editor_options(mut gui_editors: Vec<EditorOption>, editor_env: Option<&str>) -> Vec<EditorOption> {
+    gui_editors.push(EditorOption {
+        target: EditorTarget::TerminalEditor,
+        label: "Terminal ($EDITOR)".to_string(),
+        subtitle: Some(resolve_editor_basename(editor_env)),
+    });
+    gui_editors.push(EditorOption {
+        target: EditorTarget::DefaultApp,
+        label: "Default App".to_string(),
+        subtitle: Some("macOS".to_string()),
+    });
+    gui_editors
+}
+
+fn find_app_by_bundle_id(bundle_id: &str) -> Option<PathBuf> {
+    use objc2_app_kit::NSWorkspace;
+    use objc2_foundation::NSString;
+
+    let ns_id = NSString::from_str(bundle_id);
+    let url = NSWorkspace::sharedWorkspace().URLForApplicationWithBundleIdentifier(&ns_id)?;
+    let path = PathBuf::from(url.path()?.to_string());
+    path.exists().then_some(path)
+}
+
+fn probe_gui_editors_with(bundle_lookup: impl Fn(&str) -> Option<PathBuf>, path_exists: impl Fn(&Path) -> bool, home: Option<&Path>) -> Vec<EditorOption> {
+    let fallback_dirs = |app_name: &str| -> Vec<PathBuf> {
+        let mut paths = vec![PathBuf::from("/Applications").join(app_name)];
+        if let Some(h) = home {
+            paths.push(h.join("Applications").join(app_name));
+        }
+        paths
+    };
+
+    let resolve = |bundles: &[(&str, Option<&str>)], app_names: &[(&str, Option<&str>)]| -> Option<(PathBuf, Option<String>)> {
+        for &(bundle_id, tag) in bundles {
+            if let Some(path) = bundle_lookup(bundle_id) {
+                return Some((path, tag.map(str::to_string)));
+            }
+        }
+        for &(app_name, tag) in app_names {
+            for candidate in fallback_dirs(app_name) {
+                if path_exists(&candidate) {
+                    return Some((candidate, tag.map(str::to_string)));
+                }
+            }
+        }
+        None
+    };
+
+    let mut found = Vec::new();
+    if let Some((app_path, subtitle)) = resolve(&[("com.todesktop.230313mzl4w4u92", None)], &[("Cursor.app", None)]) {
+        found.push(EditorOption {
+            target: EditorTarget::Cursor { app_path },
+            label: "Cursor".to_string(),
+            subtitle,
+        });
+    }
+    if let Some((app_path, subtitle)) = resolve(
+        &[("com.microsoft.VSCode", None), ("com.microsoft.VSCodeInsiders", Some("Insiders"))],
+        &[("Visual Studio Code.app", None), ("Visual Studio Code - Insiders.app", Some("Insiders"))],
+    ) {
+        found.push(EditorOption {
+            target: EditorTarget::VsCode { app_path },
+            label: "VS Code".to_string(),
+            subtitle,
+        });
+    }
+    if let Some((app_path, subtitle)) = resolve(
+        &[("dev.zed.Zed", None), ("dev.zed.Zed-Preview", Some("Preview"))],
+        &[("Zed.app", None), ("Zed Preview.app", Some("Preview"))],
+    ) {
+        found.push(EditorOption {
+            target: EditorTarget::Zed { app_path },
+            label: "Zed".to_string(),
+            subtitle,
+        });
+    }
+    found
+}
+
+/// Returns the currently cached editor list immediately without touching LaunchServices or the filesystem.
+/// Triggers a one-time background probe when the cache has not been populated yet.
+/// Safe to call on the GPUI UI thread.
+pub fn cached_editor_options() -> Vec<EditorOption> {
+    let cached = DETECTED_GUI_EDITORS.read().clone();
+    if cached.is_none() {
+        warm_editor_cache();
+    }
+    build_editor_options(cached.unwrap_or_default(), std::env::var("EDITOR").ok().as_deref())
+}
+
+/// Probes installed macOS GUI editors (Cursor, VS Code, Zed) via LaunchServices + standard
+/// `/Applications` fallbacks, updates the process cache, and returns the full ordered option list.
+/// Blocking: must be called off the GPUI UI thread.
+pub fn detect_editors_blocking() -> Vec<EditorOption> {
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let gui = probe_gui_editors_with(find_app_by_bundle_id, Path::exists, home.as_deref());
+    *DETECTED_GUI_EDITORS.write() = Some(gui.clone());
+    build_editor_options(gui, std::env::var("EDITOR").ok().as_deref())
+}
+
+/// Kicks off a one-time background probe on the shared Tokio blocking pool so the editor cache is warm.
+pub fn warm_editor_cache() {
+    if DETECTED_GUI_EDITORS.read().is_some() || EDITOR_WARM_STARTED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    vibevalley_runtime::rt::current_or_global_handle().spawn_blocking(|| {
+        let _ = detect_editors_blocking();
+    });
+}
+
+/// Launches `path` inside a specific macOS `.app` bundle via `/usr/bin/open -a <app_path> <path>`.
+/// Blocking: must be called off the GPUI UI thread.
+pub fn open_with_app(app_path: &Path, path: &Path) -> Result<(), String> {
+    if !app_path.exists() {
+        return Err(format!("editor application does not exist: {}", app_path.display()));
+    }
+    if !path.exists() {
+        return Err(format!("path does not exist: {}", path.display()));
+    }
+    let status = std::process::Command::new("/usr/bin/open")
+        .arg("-a")
+        .arg(app_path)
+        .arg(path)
+        .status()
+        .map_err(|e| format!("failed to launch {}: {e}", app_path.display()))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("/usr/bin/open exited with {status} for {}", app_path.display()))
+    }
+}
+
 /// System lifecycle events observed natively via `NSWorkspace` and `Network.framework`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SystemEvent {
@@ -1135,5 +1302,88 @@ mod tests {
             CfPrefValue::Unset => assert_eq!(cf_app_pref(APPLE_FONT_SMOOTHING_KEY), CfPrefValue::Int(0)),
             explicit => assert_eq!(cf_app_pref(APPLE_FONT_SMOOTHING_KEY), explicit),
         }
+    }
+
+    #[test]
+    fn editor_detection_orders_gui_apps_before_terminal_and_default_app() {
+        let home = Path::new("/Users/tester");
+        let gui = probe_gui_editors_with(
+            |bundle_id| match bundle_id {
+                "com.todesktop.230313mzl4w4u92" => Some(PathBuf::from("/Applications/Cursor.app")),
+                "com.microsoft.VSCodeInsiders" => Some(PathBuf::from("/Applications/Visual Studio Code - Insiders.app")),
+                _ => None,
+            },
+            |path| path == Path::new("/Users/tester/Applications/Zed.app"),
+            Some(home),
+        );
+        let options = build_editor_options(gui, Some("/opt/homebrew/bin/nvim --clean"));
+
+        assert_eq!(options.len(), 5);
+        assert_eq!(options[0].label, "Cursor");
+        assert_eq!(options[0].subtitle, None);
+        assert_eq!(
+            options[0].target,
+            EditorTarget::Cursor {
+                app_path: PathBuf::from("/Applications/Cursor.app")
+            }
+        );
+        assert!(options[0].target.is_gui());
+
+        assert_eq!(options[1].label, "VS Code");
+        assert_eq!(options[1].subtitle.as_deref(), Some("Insiders"));
+        assert_eq!(
+            options[1].target,
+            EditorTarget::VsCode {
+                app_path: PathBuf::from("/Applications/Visual Studio Code - Insiders.app")
+            }
+        );
+        assert!(options[1].target.is_gui());
+
+        assert_eq!(options[2].label, "Zed");
+        assert_eq!(options[2].subtitle, None);
+        assert_eq!(
+            options[2].target,
+            EditorTarget::Zed {
+                app_path: PathBuf::from("/Users/tester/Applications/Zed.app")
+            }
+        );
+        assert!(options[2].target.is_gui());
+
+        assert_eq!(options[3].label, "Terminal ($EDITOR)");
+        assert_eq!(options[3].subtitle.as_deref(), Some("nvim"));
+        assert_eq!(options[3].target, EditorTarget::TerminalEditor);
+        assert!(!options[3].target.is_gui());
+
+        assert_eq!(options[4].label, "Default App");
+        assert_eq!(options[4].subtitle.as_deref(), Some("macOS"));
+        assert_eq!(options[4].target, EditorTarget::DefaultApp);
+        assert!(!options[4].target.is_gui());
+    }
+
+    #[test]
+    fn editor_detection_falls_back_cleanly_when_no_gui_editors_installed() {
+        let gui = probe_gui_editors_with(|_| None, |_| false, None);
+        assert!(gui.is_empty());
+
+        let options = build_editor_options(gui, None);
+        assert_eq!(options.len(), 2);
+        assert_eq!(options[0].target, EditorTarget::TerminalEditor);
+        assert_eq!(options[0].subtitle.as_deref(), Some("vi"));
+        assert_eq!(options[1].target, EditorTarget::DefaultApp);
+
+        assert_eq!(resolve_editor_basename(Some("")), "vi");
+        assert_eq!(resolve_editor_basename(Some("   ")), "vi");
+        assert_eq!(resolve_editor_basename(Some("\"/usr/local/bin/hx\" -c foo")), "hx");
+        assert_eq!(resolve_editor_basename(Some("code --wait")), "code");
+    }
+
+    #[test]
+    fn open_with_app_rejects_missing_app_or_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("README.md");
+        std::fs::write(&file, "# hi").unwrap();
+
+        assert!(open_with_app(Path::new("/nonexistent/NoEditor.app"), &file).is_err());
+        assert!(open_with_app(dir.path(), &dir.path().join("missing.md")).is_err());
     }
 }
