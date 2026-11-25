@@ -25,9 +25,13 @@
       "label": "Content",
       "hint": "Library, artifacts, and notes"
     },
+    "runtimes": {
+      "label": "Engines",
+      "hint": "Installed coding engines across machines"
+    },
     "team": {
       "label": "Team",
-      "hint": "Roles, engines, skills, and memory"
+      "hint": "Roles and team templates"
     },
     "catalog": {
       "label": "Catalog",
@@ -37,12 +41,6 @@
       "label": "Settings",
       "hint": "General & appearance, models & keys, voice, connections, about"
     }
-  },
-  "tab": {
-    "roles": "Roles",
-    "runtimes": "Engines",
-    "skills": "Skills",
-    "memory": "Memory"
   },
   "link": {
     "connecting": "Connecting",

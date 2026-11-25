@@ -3,7 +3,6 @@ import { cleanup, computed, keymap, Scroll, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import { artifactId } from "@vibevalley/protocol/schema";
 
-import { Button } from "../../design/Button";
 import { IconButton } from "../../design/IconButton";
 import { Empty, Kbd } from "../../design/layout";
 import { useNow } from "../../infra/base/dom";
@@ -122,9 +121,7 @@ function Presenter(props: { id: string; version: number }) {
           <Text testID="presenter-clock" accessibilityLabel={t("web.artifact.presenter.clock")} class="font-mono text-sm font-semibold text-ink tabular-nums">
             {elapsedText(now() - started())}
           </Text>
-          <Button tone="quiet" size="compact" icon="refresh" onPress={() => started.set(now())}>
-            {t("web.artifact.presenter.restart")}
-          </Button>
+          <IconButton icon="refresh" label={t("web.artifact.presenter.restart")} testid="presenter-restart" onClick={() => started.set(now())} />
         </View>
       </View>
 

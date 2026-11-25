@@ -83,7 +83,6 @@
     "exportArtifact": "Export",
     "turnIntoIssue": "Turn into ticket",
     "issueCreated": "Ticket created",
-    "back": "Back",
     "source": {
       "all": "All sources",
       "agent": "From helpers",

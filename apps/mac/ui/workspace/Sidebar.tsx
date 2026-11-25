@@ -17,6 +17,7 @@ import { readHostParams } from "../infra/hostParams";
 import { menuDangerItemClass, menuItemClass, menuPopupClass, menuSeparatorClass, ShellIconButton } from "./chrome";
 import { FileTree, filesFrameSchema } from "./FileTree";
 import { GitPanel, gitFrameSchema, type GitTab } from "./GitPanel";
+import { RepoDetailPanel, type RepoDetailTarget } from "./RepoDetailPanel";
 
 type RailRunningState = "working" | "ready" | "idle";
 
@@ -55,7 +56,14 @@ type RailProject = {
 
 type RailFrame = { projects: RailProject[]; panel: string; inspectorOpen?: boolean };
 
-type VvRepo = { name: string; path: string; git?: boolean; last?: number };
+type VvRepo = {
+  name: string;
+  path: string;
+  git?: boolean;
+  last?: number;
+  maxSessions?: number;
+  pullRequest?: { available: boolean; reason: string };
+};
 
 const railTabSchema: z.ZodType<RailTab> = z.object({
   id: z.number(),
@@ -101,6 +109,8 @@ const vvRepoSchema: z.ZodType<VvRepo> = z.object({
   path: z.string(),
   git: z.exactOptional(z.boolean()),
   last: z.exactOptional(z.number()),
+  maxSessions: z.exactOptional(z.number()),
+  pullRequest: z.exactOptional(z.object({ available: z.boolean(), reason: z.string() })),
 });
 
 type WorktreeGroup = {
@@ -134,11 +144,11 @@ type ActivitySummary = {
 };
 
 // Pixel-strict tree grid constants:
-// Depth 0 (Repo):     chevron @ 6,  icon @ 26, label @ 48
-// Depth 1 (WT / Tab): chevron @ 20, icon @ 40, label @ 62
-// Depth 2 (Tab):      chevron @ 34, icon @ 54, label @ 76
-const ROW_BASE_PAD = 6;
-const INDENT_STEP = 14;
+// Depth 0 (Repo):     icon @ 10, label @ 32
+// Depth 1 (WT / Tab): icon @ 22, label @ 44
+// Depth 2 (Tab):      icon @ 34, label @ 56
+const ROW_BASE_PAD = 10;
+const INDENT_STEP = 12;
 
 const KNOWN_RUNTIME_LOGOS = new Set(["claude", "codex", "opencode", "cursor", "kimi", "pi", "grok", "antigravity"]);
 
@@ -313,22 +323,20 @@ function CollapsedSummary(props: { summary: ActivitySummary }) {
   );
 }
 
-function ChevronSlot(props: { expandable: boolean; expanded: boolean; label: string; onToggle: () => void }) {
+function ChevronButton(props: { expanded: boolean; label: string; onToggle: () => void }) {
   return (
-    <If when={props.expandable} else={<View class="h-3.5 w-3.5 shrink-0" />}>
-      <Button
-        onPress={props.onToggle}
-        accessibilityLabel={props.label}
-        class={`h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
+    <Button
+      onPress={props.onToggle}
+      accessibilityLabel={props.label}
+      class={`h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
+    >
+      <View
+        class={`size-2.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
+        style={{ transform: [{ rotate: props.expanded ? "90deg" : "0deg" }] }}
       >
-        <View
-          class={`size-2.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
-          style={{ transform: [{ rotate: props.expanded ? "90deg" : "0deg" }] }}
-        >
-          <Icon name="expand" size={10} tone="muted" />
-        </View>
-      </Button>
-    </If>
+        <Icon name="expand" size={10} tone="muted" />
+      </View>
+    </Button>
   );
 }
 
@@ -354,6 +362,54 @@ interface SidebarTreeCtx {
   readonly isGroupExpanded: (group: WorktreeGroup) => boolean;
   readonly setFold: (key: string, expanded: boolean) => void;
   readonly toggleFold: (key: string, current: boolean) => void;
+  readonly openRepoDetail: (path: string) => void;
+}
+
+function RepoContextMenu(props: { repo: RepoNode; ctx: SidebarTreeCtx; trigger: JSX.Element }) {
+  return (
+    <ContextMenu trigger={props.trigger} popupClass={menuPopupClass}>
+      <MenuItem
+        onSelect={() => {
+          props.ctx.setFold(repoFoldKey(props.repo), true);
+          act({ type: "new_chat_at", path: props.repo.path });
+        }}
+        class={menuItemClass}
+      >
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.newChatHere")}</Text>
+      </MenuItem>
+      <MenuItem
+        onSelect={() => {
+          props.ctx.setFold(repoFoldKey(props.repo), true);
+          act({ type: "new_terminal_at", path: props.repo.path });
+        }}
+        class={menuItemClass}
+      >
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.newTerminalHere")}</Text>
+      </MenuItem>
+      <MenuSeparator class={menuSeparatorClass} />
+      <MenuItem testID={`sidebar-repo-menu-details-${props.repo.name}`} onSelect={() => props.ctx.openRepoDetail(props.repo.path)} class={menuItemClass}>
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.repoDetails")}</Text>
+      </MenuItem>
+      <MenuItem onSelect={() => void hostApi.reveal(props.repo.path)} class={menuItemClass}>
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.revealInFinder")}</Text>
+      </MenuItem>
+      <MenuItem onSelect={() => void Clipboard.writeText(props.repo.path)} class={menuItemClass}>
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.copyPath")}</Text>
+      </MenuItem>
+      <If when={props.repo.projectId !== undefined && !props.repo.vibevalley}>
+        <MenuSeparator class={menuSeparatorClass} />
+        <MenuItem
+          onSelect={() => {
+            if (props.ctx.hoveredKey() === repoFoldKey(props.repo)) props.ctx.setHoveredKey(null);
+            act({ type: "close_project", id: props.repo.projectId! });
+          }}
+          class={menuDangerItemClass}
+        >
+          <Text class="text-sm text-berry">{t("web.shell.sidebar.closeFolderMenu")}</Text>
+        </MenuItem>
+      </If>
+    </ContextMenu>
+  );
 }
 
 function WorktreeContextMenu(props: { group: WorktreeGroup; setFold: (key: string, expanded: boolean) => void; trigger: JSX.Element }) {
@@ -423,8 +479,6 @@ function TabRow(props: { group: WorktreeGroup; tab: RailTab; depth: number; ctx:
       <If when={isSelected()}>
         <ActiveBar />
       </If>
-      {/* Leaf rows keep the exact 14px chevron slot so sibling icons & labels align vertically. */}
-      <View class="h-3.5 w-3.5 shrink-0" />
       <Button
         onPress={() => act({ type: "activate_tab", path: props.group.path, tab_id: props.tab.id })}
         class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
@@ -544,19 +598,12 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
               if (props.ctx.hoveredKey() === rowKey()) props.ctx.setHoveredKey(null);
             }}
             tooltip={<Bubble text={tipText()} />}
-            class={`${rowClass(isSelected())} pl-5`}
+            class={rowClass(isSelected())}
+            style={{ paddingLeft: ROW_BASE_PAD + INDENT_STEP }}
           >
             <If when={isSelected()}>
               <ActiveBar />
             </If>
-            <ChevronSlot
-              expandable={expandable()}
-              expanded={expanded()}
-              label={
-                expanded() ? t("web.shell.sidebar.collapseItem", { name: props.group.label }) : t("web.shell.sidebar.expandItem", { name: props.group.label })
-              }
-              onToggle={() => props.ctx.toggleFold(groupFoldKey(props.group), expanded())}
-            />
             <Button
               onPress={() => act({ type: "activate_path", path: props.group.path })}
               class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
@@ -621,6 +668,17 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
                   }}
                 />
               </If>
+              <If when={expandable()}>
+                <ChevronButton
+                  expanded={expanded()}
+                  label={
+                    expanded()
+                      ? t("web.shell.sidebar.collapseItem", { name: props.group.label })
+                      : t("web.shell.sidebar.expandItem", { name: props.group.label })
+                  }
+                  onToggle={() => props.ctx.toggleFold(groupFoldKey(props.group), expanded())}
+                />
+              </If>
             </View>
           </View>
         }
@@ -653,9 +711,9 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
 
   return (
     <View class={`gap-px rounded-lg border py-0.5 ${showActiveCard() ? "border-line bg-elevated" : "border-transparent"}`}>
-      <WorktreeContextMenu
-        group={mainGroup()}
-        setFold={props.ctx.setFold}
+      <RepoContextMenu
+        repo={props.repo}
+        ctx={props.ctx}
         trigger={
           <View
             onMouseEnter={() => props.ctx.setHoveredKey(rowKey())}
@@ -663,17 +721,11 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
               if (props.ctx.hoveredKey() === rowKey()) props.ctx.setHoveredKey(null);
             }}
             tooltip={<Bubble text={repoTip()} />}
-            class={`${rowClass(isRepoSelected())} pl-1.5`}
+            class={`${rowClass(isRepoSelected())} pl-2.5`}
           >
             <If when={isRepoSelected()}>
               <ActiveBar />
             </If>
-            <ChevronSlot
-              expandable={expandable()}
-              expanded={expanded()}
-              label={expanded() ? t("web.shell.sidebar.collapseItem", { name: props.repo.name }) : t("web.shell.sidebar.expandItem", { name: props.repo.name })}
-              onToggle={() => props.ctx.toggleFold(repoFoldKey(props.repo), expanded())}
-            />
             <Button
               onPress={() => act({ type: "activate_path", path: props.repo.path })}
               class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
@@ -751,6 +803,15 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
                   />
                 </If>
               </If>
+              <If when={expandable()}>
+                <ChevronButton
+                  expanded={expanded()}
+                  label={
+                    expanded() ? t("web.shell.sidebar.collapseItem", { name: props.repo.name }) : t("web.shell.sidebar.expandItem", { name: props.repo.name })
+                  }
+                  onToggle={() => props.ctx.toggleFold(repoFoldKey(props.repo), expanded())}
+                />
+              </If>
             </View>
           </View>
         }
@@ -816,6 +877,7 @@ export function Sidebar() {
   const foldOverrides = signal<Record<string, boolean>>({});
   const hoveredKey = signal<string | null>(null);
   const openMenuKey = signal<string | null>(null);
+  const detailRepoPath = signal<string | null>(null);
   const sweepPhase = signal(false);
 
   const sessions = () => sessionsSlice()?.sessions ?? [];
@@ -1160,6 +1222,49 @@ export function Sidebar() {
 
   const disambiguators = computed(() => disambiguatorMap(orderedRepos()));
 
+  const vvRepoByPath = computed(() => {
+    const map = new Map<string, VvRepo>();
+    for (const r of vvRepos()) map.set(normPath(r.path), r);
+    return map;
+  });
+
+  const detailRepo = computed((): RepoDetailTarget | null => {
+    const path = detailRepoPath();
+    if (!path) return null;
+    const repo = orderedRepos().find((r) => r.path === path);
+    if (!repo) return null;
+    const vv = vvRepoByPath().get(repo.path);
+    const openIssues = issues().filter((i) => i.repo === repo.name && i.status !== "done" && i.status !== "canceled").length;
+    const activeSessions = sessions().filter(
+      (s) => !isFreeUserSession(s) && !isOrchestratorSession(s) && s.phase._tag === "working" && sessionRepo(s) === repo.name,
+    ).length;
+    const totalTabs = repo.groups.reduce((sum, g) => sum + g.tabs.length, 0);
+    return {
+      projectId: repo.projectId,
+      name: repo.name,
+      path: repo.path,
+      branch: repo.branch,
+      active: repo.active,
+      vibevalley: repo.vibevalley,
+      git: vv?.git,
+      maxSessions: vv?.maxSessions,
+      pullRequest: vv?.pullRequest,
+      openIssues,
+      activeSessions,
+      totalTabs,
+      worktrees: repo.groups.map((g) => ({
+        id: g.id,
+        label: g.label,
+        branch: g.branch,
+        path: g.path,
+        isMain: g.isMain,
+        active: g.active,
+        sessionRunning: g.sessionRunning,
+        tabsCount: g.tabs.length,
+      })),
+    };
+  });
+
   const treeCtx: SidebarTreeCtx = {
     hoveredKey: () => hoveredKey(),
     setHoveredKey: (key) => hoveredKey.set(key),
@@ -1171,6 +1276,7 @@ export function Sidebar() {
     isGroupExpanded,
     setFold,
     toggleFold,
+    openRepoDetail: (path) => detailRepoPath.set(path),
   };
 
   return (
@@ -1178,41 +1284,55 @@ export function Sidebar() {
       <If when={sweepActive()}>
         <SweepTicker onTick={() => sweepPhase.set(!untracked(sweepPhase))} />
       </If>
-      <View desktop={{ windowDrag: true }} class="h-9 flex-row items-center justify-between border-b border-line pr-2 pl-3">
-        <Text class="text-xs font-semibold text-ink">{t("web.shell.sidebar.title")}</Text>
-        <View class="flex-row items-center gap-1">
-          <ShellIconButton icon="catalog" size={13} label={t("web.shell.sidebar.manageRepos")} onPress={() => act({ type: "open_route", path: "/repos" })} />
-          <If when={hasFoldableItems()}>
-            <ShellIconButton
-              icon={anyExpanded() ? "collapseAll" : "expandAll"}
-              size={13}
-              label={anyExpanded() ? t("web.shell.sidebar.collapseAll") : t("web.shell.sidebar.expandCurrent")}
-              onPress={toggleCollapseAll}
-            />
-          </If>
-          <Button
-            onPress={() => act({ type: "add_project" })}
-            accessibilityLabel={t("web.shell.sidebar.addRepo")}
-            tooltip={<Bubble text={t("web.shell.sidebar.addRepoTooltip")} />}
-            class={`h-5.5 flex-row items-center gap-1 rounded-md border border-line bg-hover px-2 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
-          >
-            <Icon name="add" size={11} tone="ink" />
-            <Text class="text-2xs font-medium text-ink">{t("web.shell.sidebar.addRepoButton")}</Text>
-          </Button>
-        </View>
-      </View>
+      <If
+        when={detailRepo()}
+        else={
+          <>
+            <View desktop={{ windowDrag: true }} class="h-9 flex-row items-center justify-between border-b border-line pr-2 pl-3">
+              <Text class="text-xs font-semibold text-ink">{t("web.shell.sidebar.title")}</Text>
+              <View class="flex-row items-center gap-1">
+                <ShellIconButton
+                  icon="catalog"
+                  size={13}
+                  label={t("web.shell.sidebar.manageRepos")}
+                  onPress={() => act({ type: "open_route", path: "/repos" })}
+                />
+                <If when={hasFoldableItems()}>
+                  <ShellIconButton
+                    icon={anyExpanded() ? "collapseAll" : "expandAll"}
+                    size={13}
+                    label={anyExpanded() ? t("web.shell.sidebar.collapseAll") : t("web.shell.sidebar.expandCurrent")}
+                    onPress={toggleCollapseAll}
+                  />
+                </If>
+                <Button
+                  onPress={() => act({ type: "add_project" })}
+                  accessibilityLabel={t("web.shell.sidebar.addRepo")}
+                  tooltip={<Bubble text={t("web.shell.sidebar.addRepoTooltip")} />}
+                  class={`h-5.5 flex-row items-center gap-1 rounded-md border border-line bg-hover px-2 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
+                >
+                  <Icon name="add" size={11} tone="ink" />
+                  <Text class="text-2xs font-medium text-ink">{t("web.shell.sidebar.addRepoButton")}</Text>
+                </Button>
+              </View>
+            </View>
 
-      <Scroll
-        class="flex-1"
-        contentClass="gap-0.5 px-2 py-1.5"
-        onMouseLeave={() => {
-          if (hoveredKey() !== null) hoveredKey.set(null);
-        }}
+            <Scroll
+              class="flex-1"
+              contentClass="gap-0.5 px-2 py-1.5"
+              onMouseLeave={() => {
+                if (hoveredKey() !== null) hoveredKey.set(null);
+              }}
+            >
+              <Each of={orderedRepos()} key={(repo) => repo.path}>
+                {(repo) => <RepoNodeRow repo={repo()} parentHint={disambiguators().get(repo().path)} ctx={treeCtx} />}
+              </Each>
+            </Scroll>
+          </>
+        }
       >
-        <Each of={orderedRepos()} key={(repo) => repo.path}>
-          {(repo) => <RepoNodeRow repo={repo()} parentHint={disambiguators().get(repo().path)} ctx={treeCtx} />}
-        </Each>
-      </Scroll>
+        {(repo) => <RepoDetailPanel repo={repo()} spriteSrc={spriteSrc} onClose={() => detailRepoPath.set(null)} />}
+      </If>
     </View>
   );
 }

@@ -22,6 +22,7 @@ import { ConfirmButton } from "../../design/ConfirmButton";
 import { sizeText } from "../../design/domain/AttachmentTile";
 import { Field, Select, TextArea, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
+import { IconButton } from "../../design/IconButton";
 import { Card, Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { CountPill, Dot } from "../../design/Tag";
@@ -74,17 +75,13 @@ export function AudioPanel() {
       <NoticeBanner tone="info">{t("web.audio.notice")}</NoticeBanner>
       <View class="flex-row flex-wrap items-center justify-between gap-2">
         <Segmented testid="audio-mode" label={t("web.audio.title")} value={mode()} onChange={(kind) => mode.set(kind)} options={modeOptions()} />
-        <View tooltip={<Bubble text={t("web.audio.refresh")} />}>
-          <Button
-            testID="audio-refresh"
-            tone="quiet"
-            icon="refresh"
-            disabled={act.busy() || query.fetching()}
-            onPress={() => void act.run(() => query.refetch())}
-          >
-            {t("web.audio.refresh")}
-          </Button>
-        </View>
+        <IconButton
+          icon="refresh"
+          label={t("web.audio.refresh")}
+          testid="audio-refresh"
+          disabled={act.busy() || query.fetching()}
+          onClick={() => void act.run(() => query.refetch())}
+        />
       </View>
       <Refusal error={error() ?? (query.error() ? reasonOf(query.error()) : undefined)} testid="audio-error" />
       <If when={mode() === "speakers"}>
@@ -303,18 +300,17 @@ function SpeakersForm(props: { status: ProviderStatus | undefined }) {
             <View testID="audio-speaker" class="min-w-0 gap-2.5 rounded-md bg-side p-3">
               <View class="flex-row items-center justify-between gap-2">
                 <Text class="font-mono text-2xs font-semibold text-muted tabular-nums">{`${t("web.audio.speaker")} #${idx() + 1}`}</Text>
-                <Button
-                  testID="audio-remove-speaker"
-                  tone="quiet"
+                <IconButton
                   icon="delete"
+                  tone="danger"
+                  label={t("web.audio.remove")}
+                  testid="audio-remove-speaker"
                   disabled={disabled() || speakers().length <= 1}
-                  onPress={() => {
+                  onClick={() => {
                     const key = speaker().key;
                     speakers.set(speakers().filter((item) => item.key !== key));
                   }}
-                >
-                  {t("web.audio.remove")}
-                </Button>
+                />
               </View>
               <Field label={t("web.audio.speaker")}>
                 <TextInput
@@ -377,18 +373,17 @@ function SpeakersForm(props: { status: ProviderStatus | undefined }) {
                     }}
                   />
                 </View>
-                <Button
-                  testID="audio-remove-turn"
-                  tone="quiet"
+                <IconButton
                   icon="delete"
+                  tone="danger"
+                  label={t("web.audio.remove")}
+                  testid="audio-remove-turn"
                   disabled={disabled() || segments().length <= 1}
-                  onPress={() => {
+                  onClick={() => {
                     const key = segment().key;
                     segments.set(segments().filter((item) => item.key !== key));
                   }}
-                >
-                  {t("web.audio.remove")}
-                </Button>
+                />
               </View>
               <Field label={t("web.audio.text")}>
                 <TextArea
@@ -844,21 +839,18 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
                 <View class="flex-row flex-wrap items-center justify-between gap-2">
                   <Text class="text-xs font-semibold text-ink">{t("web.audio.transcript")}</Text>
                   <View class="flex-row flex-wrap items-center gap-1.5">
-                    <View tooltip={<Bubble text={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}>
-                      <Button
-                        testID="audio-copy-transcript"
-                        icon={copied() ? "check" : "copy"}
-                        disabled={!content()}
-                        onPress={() =>
-                          void Clipboard.writeText(content()).then(() => {
-                            copied.set(true);
-                            later(() => copied.set(false), 1500);
-                          })
-                        }
-                      >
-                        {copied() ? t("web.base.rich.copied") : partial() ? t("web.audio.copyPartialTranscript") : t("web.audio.copyTranscript")}
-                      </Button>
-                    </View>
+                    <IconButton
+                      icon={copied() ? "check" : "copy"}
+                      label={copied() ? t("web.base.rich.copied") : partial() ? t("web.audio.copyPartialTranscript") : t("web.audio.copyTranscript")}
+                      testid="audio-copy-transcript"
+                      disabled={!content()}
+                      onClick={() =>
+                        void Clipboard.writeText(content()).then(() => {
+                          copied.set(true);
+                          later(() => copied.set(false), 1500);
+                        })
+                      }
+                    />
                     <Button
                       testID="audio-save-transcript"
                       icon="artifacts"

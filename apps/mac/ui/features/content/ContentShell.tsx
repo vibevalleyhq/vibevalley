@@ -18,7 +18,7 @@ export function ContentShell(props: { children: JSX.Element }) {
   keymap.bind("mod+n", () => openTemplatePicker(), { when: "notEditing" });
 
   return (
-    <View testID="content-shell" class="min-h-0 min-w-0 flex-1 flex-row">
+    <View testID="content-shell" class="h-full min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
       <If when={contentSidebarOpen.get() && !contentPresenting()}>
         <ContentSidebar />
       </If>

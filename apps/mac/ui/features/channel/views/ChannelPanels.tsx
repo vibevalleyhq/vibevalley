@@ -231,7 +231,12 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
 }
 
 /** Embedded live channel pane used beside an artifact canvas so the user can discuss it in place. */
-export function ChannelSidePane(props: { channel?: string | undefined; issue?: string | undefined; point?: number | undefined }) {
+export function ChannelSidePane(props: {
+  channel?: string | undefined;
+  issue?: string | undefined;
+  point?: number | undefined;
+  onClose?: (() => void) | undefined;
+}) {
   const chat = useMarkedChat();
   const shown = computed(() => {
     const c = chat();
@@ -257,12 +262,15 @@ export function ChannelSidePane(props: { channel?: string | undefined; issue?: s
         <Keyed key={c().id}>
           {() => (
             <View testID="artifact-chat-pane" class="min-h-0 min-w-0 flex-1">
-              <View class="shrink-0 flex-row items-center justify-between gap-2 border-b border-line px-2 py-1.5">
+              <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center justify-between gap-1.5 border-b border-line px-2.5">
                 <A href={href()} testID="artifact-message" class="min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-hover">
                   <Icon name="chat" size={14} tone="muted" />
-                  <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{channelLabel(c())}</Text>
+                  <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{channelLabel(c())}</Text>
                   <Icon name="open" size={12} tone="muted" />
                 </A>
+                <If when={props.onClose}>
+                  <BarButton icon="close" size={14} testid="artifact-rail-close" label={t("web.artifact.page.railHide")} onPress={() => props.onClose?.()} />
+                </If>
               </View>
               <FileDrop channel={c()}>
                 <MessageList channel={c()} point={props.point} emptyText={t("web.channel.empty", { label: channelLabel(c()) })} />

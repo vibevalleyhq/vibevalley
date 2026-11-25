@@ -3,8 +3,8 @@ import { effect, Scroll, signal, Text, untracked, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { DebugTrajectoryDetail, DebugTrajectorySummary, DebugTrajectoryTurn } from "@vibevalley/protocol";
 
-import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
+import { IconButton } from "../../design/IconButton";
 import { Banner, Empty } from "../../design/layout";
 import { CountPill, Tag } from "../../design/Tag";
 import { api, reasonOf } from "../../infra/api";
@@ -340,14 +340,7 @@ function TurnCard(props: { turn: () => DebugTrajectoryTurn }) {
                       <View testID={`trajectory-raw-payload-${turn().index}-${entry().seq}`} class="gap-1.5 border-t border-line bg-page p-2">
                         <View class="flex-row items-center justify-between gap-2">
                           <Text class="text-2xs font-medium text-muted">{t("web.devtools.trajectory.rawPayload")}</Text>
-                          <Button
-                            size="compact"
-                            tone="quiet"
-                            onPress={() => expandedRawSeq.set(undefined)}
-                            accessibilityLabel={t("web.devtools.actions.close")}
-                          >
-                            {t("web.devtools.actions.close")}
-                          </Button>
+                          <IconButton icon="close" size={14} label={t("web.devtools.actions.close")} onClick={() => expandedRawSeq.set(undefined)} />
                         </View>
                         <If when={Boolean(entry().payload)} else={<Text class="text-xs text-muted">{t("web.devtools.status.empty")}</Text>}>
                           <JsonPreview content={entry().payload ?? ""} copyTestID={`trajectory-raw-copy-${turn().index}-${entry().seq}`} />

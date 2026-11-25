@@ -3,8 +3,8 @@ import { computed, effect, Scroll, signal, Text, untracked, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { DebugTimelineEvent, DebugTimelinePage } from "@vibevalley/protocol";
 
-import { Button } from "../../design/Button";
 import { SearchField } from "../../design/Field";
+import { IconButton } from "../../design/IconButton";
 import { Banner, Empty, Toggle } from "../../design/layout";
 import { Tag } from "../../design/Tag";
 import { api, reasonOf } from "../../infra/api";
@@ -142,9 +142,14 @@ export function TimelineTab(props: { fallbackEvents: () => readonly DebugTimelin
           <If when={dropped() > 0}>
             <Tag tone="wait" label={t("web.devtools.timeline.dropped", { count: dropped() })} />
           </If>
-          <Button size="compact" tone="plain" icon="delete" testID="timeline-clear" disabled={clearing()} onPress={() => void clearTimeline()}>
-            {t("web.devtools.actions.clear")}
-          </Button>
+          <IconButton
+            icon="delete"
+            size={14}
+            label={t("web.devtools.actions.clear")}
+            testid="timeline-clear"
+            disabled={clearing()}
+            onClick={() => void clearTimeline()}
+          />
         </View>
       </View>
 

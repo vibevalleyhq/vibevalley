@@ -497,11 +497,11 @@ export const catalogs = {
         runs: { label: "运行与轨迹", hint: "执行会话、主助手审批与历史轨迹" },
         workspace: { hint: "管理仓库与工作区", name: "工作区" },
         content: { label: "内容", hint: "媒体库、作品与笔记" },
-        team: { label: "团队", hint: "角色、引擎、技能与记忆" },
+        runtimes: { label: "引擎", hint: "本机与远端已安装的编码引擎" },
+        team: { label: "团队", hint: "角色与团队模板" },
         catalog: { label: "素材图鉴", hint: "像素与界面素材：每张图、指针、声音和工作台零件" },
         settings: { label: "设置", hint: "通用与外观、模型与密钥、语音与通话、外部连接、关于与数据" },
       },
-      tab: { roles: "角色", runtimes: "引擎", skills: "技能", memory: "记忆" },
       link: { connecting: "连接中", open: "已连上", lost: "断了，重连中" },
       rail: "工作台",
       farm: "回农场",
@@ -1639,6 +1639,14 @@ export const catalogs = {
         goRuntimes: "去配置引擎",
       },
       conversation: { title: "讨论与交付记录", older: "加载更早的消息", empty: "需求讨论、执行反馈与交付会保留在这里" },
+      attachments: {
+        title: "附件",
+        attachFile: "添加附件",
+        count: "{n} 个附件",
+        uploadFailed: "附件上传失败：{why}",
+        uploading: "正在上传 {name}…",
+        remove: "移除附件 {name}",
+      },
       guide: {
         title: "任务流转指南",
         summary: "写下需求并指派角色，执行会话在独立 worktree 改代码，完成后经验收合入主分支。",
@@ -1761,7 +1769,6 @@ export const catalogs = {
         exportArtifact: "导出",
         turnIntoIssue: "转为任务",
         issueCreated: "已创建任务",
-        back: "返回",
         source: { all: "全部来源", agent: "执行会话交付", user: "我创建的" },
         artifactType: { all: "全部作品" },
         inspector: {
@@ -2237,13 +2244,11 @@ export const catalogs = {
       notFound: "没找到",
       checking: "检测中…",
       noRuntimes: "读不到引擎：",
-      list: "引擎列表",
       usedBy: " · {n} 个 agent",
       reading: "读取中…",
       bundled: "随 oar 一起装",
       commandLine: "命令行",
       unsupportedWhy: "不支持：{why}",
-      notHere: "这台机器上没找到",
       checkedAt: "检测于 {clock}",
       recheck: "重新检测",
       account: "账户",
@@ -2335,16 +2340,30 @@ export const catalogs = {
       quota: { session: "当前会话", weekly: "本周额度", week: "本周（{models}）", oneWeek: "· 一周", unreported: "不报额度", signedOut: "没登录" },
       spentToday: "今天执行会话花了约 {spent}，没设每日预算。",
       spentTodayBudget: "今天执行会话花了约 {spent}，每日预算 {budget}。",
-      missingCommand: "请在本机安装 {runtime}，再点「重新检测」。如果已经安装，可填写可执行文件的完整路径。",
-      enterPath: "填写命令路径",
       signInTerminal: "打开终端登录",
       machines: {
         title: "执行机器",
         kind: { local: "本机", remote: "远端", sandbox: "临时沙箱" },
         platform: { macos: "macOS", linux: "Linux", container: "容器", other: "其他" },
         status: { online: "在线", offline: "离线", draining: "排空中" },
-        noRuntimes: "未上报引擎",
+        machineId: "机器 ID",
+        worktree: "工作树",
+        worktreeYes: "支持",
+        worktreeNo: "不支持",
+        installedCount: "已装引擎",
+        lastSeen: "最近在线",
       },
+      sidebarToggle: "收起或展开引擎列表",
+      refreshAll: "刷新机器与引擎",
+      inspectorTitle: "机器与检查器",
+      inspectorShow: "展开右侧检查器",
+      inspectorHide: "收起右侧检查器",
+      noneInstalled: "未检测到已安装的编码引擎",
+      noneInstalledHint: "在本机或远端主机安装编码引擎后，点刷新即可查看并配置。",
+      remoteSummary: "运行在 {machine} 上，由该执行主机托管。",
+      sessions: "相关会话",
+      noSessions: "暂无活跃或最近的会话。",
+      quickActions: "快捷操作",
     },
     "web.session": {
       log: {
@@ -2509,6 +2528,7 @@ export const catalogs = {
         general: "通用与外观",
         appearance: "外观",
         models: "模型与密钥",
+        skills: "技能",
         voice: "语音与通话",
         connections: "外部连接",
         remote: "远程访问",
@@ -2520,6 +2540,8 @@ export const catalogs = {
       words: {
         general: "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
         models: "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定",
+        skills: "技能 skill skills 内置 安装 指南 提示词",
+        memory: "记忆 memory 来源 source Nowledge EverOS 外部记忆 读 写",
         voice: "电话 通话 MOSS Live 实时 视觉 转写 语音",
         connections: "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
         remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
@@ -2638,6 +2660,9 @@ export const catalogs = {
         newTerminal: "新终端：{name}",
         newChat: "新对话：{name}",
         closeFolder: "关闭文件夹：{name}",
+        closeFolderMenu: "关闭文件夹",
+        repoDetails: "仓库详情",
+        backToRepos: "返回仓库列表",
         mainWorktree: "{label} · 主目录",
         mainLabel: "主目录",
         collapseAll: "折叠全部",
@@ -2707,7 +2732,6 @@ export const catalogs = {
         worktrees: "工作树",
         newWorktree: "新建工作树",
         creatingWorktree: "创建中…",
-        createWorktreeBtn: "新建",
         newBranchPlaceholder: "新分支名，如 feat/login",
         createBtn: "创建",
         mainLabel: "主目录",
@@ -2833,6 +2857,32 @@ export const catalogs = {
         boardBrief: "任务简报",
         boardJumpLatest: "跳到最新",
         boardCount: "{shown}/{total} 条",
+      },
+      repoDetail: {
+        badgeManaged: "VibeValley 仓库",
+        badgeFolder: "本地目录",
+        openFullPage: "打开完整仓库页",
+        copied: "已复制路径",
+        newChat: "新对话",
+        newTerminal: "新终端",
+        sectionOverview: "概览",
+        branch: "当前分支",
+        repoType: "类型",
+        typeGit: "Git 仓库",
+        typeFolder: "普通目录",
+        activity: "工作区",
+        activitySummary: "{worktrees} 工作树 · {tabs} 标签",
+        openIssues: "进行中任务",
+        runningSessions: "运行中会话",
+        maxSessions: "并发上限",
+        pullRequest: "合并请求",
+        prReady: "可用",
+        prUnavailable: "未就绪",
+        commits: "提交数",
+        languages: "语言构成",
+        worktrees: "工作树",
+        tabsCount: "{n} 标签",
+        closeFolder: "从工作区关闭目录",
       },
     },
     "web.tree": { sky: "农场的记忆星空" },
@@ -3416,11 +3466,11 @@ export const catalogs = {
         runs: { label: "Runs & trajectories", hint: "Active sessions, orchestrator approvals, and trajectories" },
         workspace: { hint: "Manage repositories and workspaces", name: "Workspace" },
         content: { label: "Content", hint: "Library, artifacts, and notes" },
-        team: { label: "Team", hint: "Roles, engines, skills, and memory" },
+        runtimes: { label: "Engines", hint: "Installed coding engines across machines" },
+        team: { label: "Team", hint: "Roles and team templates" },
         catalog: { label: "Catalog", hint: "Assets: pixel sprites, cursors, sounds, and workbench UI kit" },
         settings: { label: "Settings", hint: "General & appearance, models & keys, voice, connections, about" },
       },
-      tab: { roles: "Roles", runtimes: "Engines", skills: "Skills", memory: "Memory" },
       link: { connecting: "Connecting", open: "Connected", lost: "Lost, reconnecting" },
       rail: "Workbench",
       farm: "Back to the farm",
@@ -4632,6 +4682,14 @@ export const catalogs = {
         goRuntimes: "Configure engines",
       },
       conversation: { title: "Discussion and delivery", older: "Load earlier messages", empty: "Requirements, execution feedback and deliveries stay here" },
+      attachments: {
+        title: "Attachments",
+        attachFile: "Attach file",
+        count: "{n, plural, one {# attachment} other {# attachments}}",
+        uploadFailed: "Upload failed: {why}",
+        uploading: "Uploading {name}…",
+        remove: "Remove attachment {name}",
+      },
       guide: {
         title: "How issues flow",
         summary: "Assign a helper to launch a worktree session, then inspect changes in Review to complete.",
@@ -4755,7 +4813,6 @@ export const catalogs = {
         exportArtifact: "Export",
         turnIntoIssue: "Turn into ticket",
         issueCreated: "Ticket created",
-        back: "Back",
         source: { all: "All sources", agent: "From helpers", user: "Created by me" },
         artifactType: { all: "All artifacts" },
         inspector: {
@@ -5260,13 +5317,11 @@ export const catalogs = {
       notFound: "not found",
       checking: "checking…",
       noRuntimes: "The machines could not be read: ",
-      list: "Machines",
       usedBy: " · {n} agents",
       reading: "Reading…",
       bundled: "installed with oar",
       commandLine: "command line",
       unsupportedWhy: "Unsupported: {why}",
-      notHere: "Not found on this computer",
       checkedAt: "checked at {clock}",
       recheck: "Check again",
       account: "Account",
@@ -5368,16 +5423,30 @@ export const catalogs = {
       },
       spentToday: "Helpers spent about {spent} today, with no daily budget.",
       spentTodayBudget: "Helpers spent about {spent} today, against a daily budget of {budget}.",
-      missingCommand: "Install {runtime} on this computer, then check again. If it is installed, enter the full path to its executable.",
-      enterPath: "Enter command path",
       signInTerminal: "Open a terminal to sign in",
       machines: {
         title: "Execution machines",
         kind: { local: "Local", remote: "Remote", sandbox: "Ephemeral sandbox" },
         platform: { macos: "macOS", linux: "Linux", container: "Container", other: "Other" },
         status: { online: "Online", offline: "Offline", draining: "Draining" },
-        noRuntimes: "No engines reported",
+        machineId: "Machine ID",
+        worktree: "Worktree",
+        worktreeYes: "Supported",
+        worktreeNo: "Unavailable",
+        installedCount: "Installed",
+        lastSeen: "Last seen",
       },
+      sidebarToggle: "Toggle engines sidebar",
+      refreshAll: "Refresh machines and engines",
+      inspectorTitle: "Machine & Inspector",
+      inspectorShow: "Show inspector",
+      inspectorHide: "Hide inspector",
+      noneInstalled: "No installed coding engines found",
+      noneInstalledHint: "Install a coding engine on this machine or a connected host, then refresh.",
+      remoteSummary: "Hosted on {machine} and dispatched remotely.",
+      sessions: "Related sessions",
+      noSessions: "No active or recent sessions.",
+      quickActions: "Quick actions",
     },
     "web.session": {
       log: {
@@ -5552,6 +5621,7 @@ export const catalogs = {
         general: "General & Appearance",
         appearance: "Appearance",
         models: "Models & Keys",
+        skills: "Skills",
         voice: "Voice",
         connections: "Connections",
         remote: "Remote Access",
@@ -5563,6 +5633,8 @@ export const catalogs = {
       words: {
         general: "language start workbench farm theme dark light size zoom scale font animation motion reduce",
         models: "keys accounts DeepSeek MOSS API key models binding",
+        skills: "skills skill built-in installed library prompt",
+        memory: "memory source sources Nowledge EverOS external read write",
         voice: "call phone recognition speech MOSS live realtime vision transcription",
         connections: "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
         remote: "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
@@ -5681,6 +5753,9 @@ export const catalogs = {
         newTerminal: "New terminal: {name}",
         newChat: "New chat: {name}",
         closeFolder: "Close folder: {name}",
+        closeFolderMenu: "Close folder",
+        repoDetails: "Repository details",
+        backToRepos: "Back to repositories",
         mainWorktree: "{label} · main",
         mainLabel: "main",
         collapseAll: "Collapse all",
@@ -5750,7 +5825,6 @@ export const catalogs = {
         worktrees: "Worktrees",
         newWorktree: "New worktree",
         creatingWorktree: "Creating…",
-        createWorktreeBtn: "New",
         newBranchPlaceholder: "New branch, e.g. feat/login",
         createBtn: "Create",
         mainLabel: "main",
@@ -5876,6 +5950,32 @@ export const catalogs = {
         boardBrief: "Brief",
         boardJumpLatest: "Latest",
         boardCount: "{shown}/{total}",
+      },
+      repoDetail: {
+        badgeManaged: "VibeValley repo",
+        badgeFolder: "Local folder",
+        openFullPage: "Open full repository page",
+        copied: "Path copied",
+        newChat: "New chat",
+        newTerminal: "New terminal",
+        sectionOverview: "Overview",
+        branch: "Branch",
+        repoType: "Type",
+        typeGit: "Git repository",
+        typeFolder: "Folder",
+        activity: "Workspace",
+        activitySummary: "{worktrees} worktrees · {tabs} tabs",
+        openIssues: "Open issues",
+        runningSessions: "Running sessions",
+        maxSessions: "Max sessions",
+        pullRequest: "Pull Request",
+        prReady: "Available",
+        prUnavailable: "Unavailable",
+        commits: "Commits",
+        languages: "Languages",
+        worktrees: "Worktrees",
+        tabsCount: "{n} tabs",
+        closeFolder: "Close folder from workspace",
       },
     },
     "web.tree": { sky: "The farm's sky of memories" },
@@ -6529,6 +6629,8 @@ export interface Messages {
   "web.base.place.issues.label": undefined;
   "web.base.place.runs.hint": undefined;
   "web.base.place.runs.label": undefined;
+  "web.base.place.runtimes.hint": undefined;
+  "web.base.place.runtimes.label": undefined;
   "web.base.place.settings.hint": undefined;
   "web.base.place.settings.label": undefined;
   "web.base.place.team.hint": undefined;
@@ -6590,10 +6692,6 @@ export interface Messages {
   "web.base.shortcuts.say.tool": undefined;
   "web.base.shortcuts.say.voice": undefined;
   "web.base.shortcuts.title": undefined;
-  "web.base.tab.memory": undefined;
-  "web.base.tab.roles": undefined;
-  "web.base.tab.runtimes": undefined;
-  "web.base.tab.skills": undefined;
   "web.base.table.columns": undefined;
   "web.base.table.empty": undefined;
   "web.base.table.next": undefined;
@@ -7343,6 +7441,12 @@ export interface Messages {
   "web.issue.acts.sayAgain": undefined;
   "web.issue.acts.sending": undefined;
   "web.issue.acts.takeBack": undefined;
+  "web.issue.attachments.attachFile": undefined;
+  "web.issue.attachments.count": { readonly n: number };
+  "web.issue.attachments.remove": { readonly name: string | number };
+  "web.issue.attachments.title": undefined;
+  "web.issue.attachments.uploadFailed": { readonly why: string | number };
+  "web.issue.attachments.uploading": { readonly name: string | number };
   "web.issue.board.earlier": { readonly n: string | number };
   "web.issue.board.empty.closed": undefined;
   "web.issue.board.empty.todo": undefined;
@@ -7715,7 +7819,6 @@ export interface Messages {
   "web.issue.trigger.runtime": undefined;
   "web.library.content.artifactType.all": undefined;
   "web.library.content.artifacts": undefined;
-  "web.library.content.back": undefined;
   "web.library.content.exportArtifact": undefined;
   "web.library.content.inspector.copiedPath": undefined;
   "web.library.content.inspector.copyPath": undefined;
@@ -8307,10 +8410,12 @@ export interface Messages {
   "web.runtime.effort": undefined;
   "web.runtime.enabled": undefined;
   "web.runtime.enabledHint": undefined;
-  "web.runtime.enterPath": undefined;
   "web.runtime.env": undefined;
   "web.runtime.envHint": undefined;
   "web.runtime.inProcess": undefined;
+  "web.runtime.inspectorHide": undefined;
+  "web.runtime.inspectorShow": undefined;
+  "web.runtime.inspectorTitle": undefined;
   "web.runtime.left": { readonly pct: string | number };
   "web.runtime.library.body": undefined;
   "web.runtime.library.bodyExample": undefined;
@@ -8341,11 +8446,12 @@ export interface Messages {
   "web.runtime.library.whenHint": undefined;
   "web.runtime.library.where": undefined;
   "web.runtime.library.who": undefined;
-  "web.runtime.list": undefined;
+  "web.runtime.machines.installedCount": undefined;
   "web.runtime.machines.kind.local": undefined;
   "web.runtime.machines.kind.remote": undefined;
   "web.runtime.machines.kind.sandbox": undefined;
-  "web.runtime.machines.noRuntimes": undefined;
+  "web.runtime.machines.lastSeen": undefined;
+  "web.runtime.machines.machineId": undefined;
   "web.runtime.machines.platform.container": undefined;
   "web.runtime.machines.platform.linux": undefined;
   "web.runtime.machines.platform.macos": undefined;
@@ -8354,26 +8460,31 @@ export interface Messages {
   "web.runtime.machines.status.offline": undefined;
   "web.runtime.machines.status.online": undefined;
   "web.runtime.machines.title": undefined;
+  "web.runtime.machines.worktree": undefined;
+  "web.runtime.machines.worktreeNo": undefined;
+  "web.runtime.machines.worktreeYes": undefined;
   "web.runtime.makeAgent": undefined;
   "web.runtime.maxWorking": undefined;
   "web.runtime.maxWorkingHint": undefined;
   "web.runtime.mcp": undefined;
-  "web.runtime.missingCommand": { readonly runtime: string | number };
   "web.runtime.modelCount": { readonly n: string | number };
   "web.runtime.models": undefined;
   "web.runtime.noEffort": undefined;
   "web.runtime.noLimit": undefined;
   "web.runtime.noModels": undefined;
   "web.runtime.noRuntimes": undefined;
+  "web.runtime.noSessions": undefined;
   "web.runtime.noSteer": undefined;
   "web.runtime.noUsage": undefined;
   "web.runtime.none": undefined;
+  "web.runtime.noneInstalled": undefined;
+  "web.runtime.noneInstalledHint": undefined;
   "web.runtime.noneYet": undefined;
   "web.runtime.notFound": undefined;
-  "web.runtime.notHere": undefined;
   "web.runtime.ownDefault": undefined;
   "web.runtime.ownProcess": undefined;
   "web.runtime.queries": undefined;
+  "web.runtime.quickActions": undefined;
   "web.runtime.quota.oneWeek": undefined;
   "web.runtime.quota.session": undefined;
   "web.runtime.quota.signedOut": undefined;
@@ -8382,10 +8493,14 @@ export interface Messages {
   "web.runtime.quota.weekly": undefined;
   "web.runtime.reading": undefined;
   "web.runtime.recheck": undefined;
+  "web.runtime.refreshAll": undefined;
   "web.runtime.refused": undefined;
+  "web.runtime.remoteSummary": { readonly machine: string | number };
   "web.runtime.resets": { readonly moment: string | number };
   "web.runtime.save": undefined;
+  "web.runtime.sessions": undefined;
   "web.runtime.settings": undefined;
+  "web.runtime.sidebarToggle": undefined;
   "web.runtime.signInTerminal": undefined;
   "web.runtime.signedOut": { readonly runtime: string | number };
   "web.runtime.skills": undefined;
@@ -8637,6 +8752,7 @@ export interface Messages {
   "web.setting.nav.models": undefined;
   "web.setting.nav.remote": undefined;
   "web.setting.nav.search": undefined;
+  "web.setting.nav.skills": undefined;
   "web.setting.nav.voice": undefined;
   "web.setting.nav.width": undefined;
   "web.setting.readiness.fix": undefined;
@@ -8665,8 +8781,10 @@ export interface Messages {
   "web.setting.words.about": undefined;
   "web.setting.words.connections": undefined;
   "web.setting.words.general": undefined;
+  "web.setting.words.memory": undefined;
   "web.setting.words.models": undefined;
   "web.setting.words.remote": undefined;
+  "web.setting.words.skills": undefined;
   "web.setting.words.voice": undefined;
   "web.shell.chat.attachFile": undefined;
   "web.shell.chat.chooseModel": undefined;
@@ -8756,7 +8874,6 @@ export interface Messages {
   "web.shell.git.confirmDiscard": undefined;
   "web.shell.git.conflicts": undefined;
   "web.shell.git.createBtn": undefined;
-  "web.shell.git.createWorktreeBtn": undefined;
   "web.shell.git.creatingWorktree": undefined;
   "web.shell.git.currentBranch": { readonly name: string | number };
   "web.shell.git.daysAgo": { readonly n: string | number };
@@ -8818,14 +8935,40 @@ export interface Messages {
   "web.shell.palette.placeholder.files": undefined;
   "web.shell.palette.placeholder.search": undefined;
   "web.shell.palette.searching": undefined;
+  "web.shell.repoDetail.activity": undefined;
+  "web.shell.repoDetail.activitySummary": { readonly tabs: string | number; readonly worktrees: string | number };
+  "web.shell.repoDetail.badgeFolder": undefined;
+  "web.shell.repoDetail.badgeManaged": undefined;
+  "web.shell.repoDetail.branch": undefined;
+  "web.shell.repoDetail.closeFolder": undefined;
+  "web.shell.repoDetail.commits": undefined;
+  "web.shell.repoDetail.copied": undefined;
+  "web.shell.repoDetail.languages": undefined;
+  "web.shell.repoDetail.maxSessions": undefined;
+  "web.shell.repoDetail.newChat": undefined;
+  "web.shell.repoDetail.newTerminal": undefined;
+  "web.shell.repoDetail.openFullPage": undefined;
+  "web.shell.repoDetail.openIssues": undefined;
+  "web.shell.repoDetail.prReady": undefined;
+  "web.shell.repoDetail.prUnavailable": undefined;
+  "web.shell.repoDetail.pullRequest": undefined;
+  "web.shell.repoDetail.repoType": undefined;
+  "web.shell.repoDetail.runningSessions": undefined;
+  "web.shell.repoDetail.sectionOverview": undefined;
+  "web.shell.repoDetail.tabsCount": { readonly n: string | number };
+  "web.shell.repoDetail.typeFolder": undefined;
+  "web.shell.repoDetail.typeGit": undefined;
+  "web.shell.repoDetail.worktrees": undefined;
   "web.shell.section.collapse": { readonly title: string | number };
   "web.shell.section.expand": { readonly title: string | number };
   "web.shell.sidebar.addRepo": undefined;
   "web.shell.sidebar.addRepoButton": undefined;
   "web.shell.sidebar.addRepoTooltip": undefined;
   "web.shell.sidebar.attentionCount": { readonly n: string | number };
+  "web.shell.sidebar.backToRepos": undefined;
   "web.shell.sidebar.chatWaiting": undefined;
   "web.shell.sidebar.closeFolder": { readonly name: string | number };
+  "web.shell.sidebar.closeFolderMenu": undefined;
   "web.shell.sidebar.closeTab": undefined;
   "web.shell.sidebar.collapseAll": undefined;
   "web.shell.sidebar.collapseItem": { readonly name: string | number };
@@ -8852,6 +8995,7 @@ export interface Messages {
   "web.shell.sidebar.readyAgent": { readonly agent: string | number };
   "web.shell.sidebar.readyCount": { readonly n: string | number };
   "web.shell.sidebar.removeWorktree": undefined;
+  "web.shell.sidebar.repoDetails": undefined;
   "web.shell.sidebar.revealInFinder": undefined;
   "web.shell.sidebar.running": undefined;
   "web.shell.sidebar.runningAgent": { readonly agent: string | number };

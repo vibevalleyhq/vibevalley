@@ -7,6 +7,7 @@ import { isFreeUserSession, sessionBranch, sessionChannelId, sessionProfile, ses
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
+import { IconButton } from "../../../design/IconButton";
 import { Empty } from "../../../design/layout";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
@@ -154,11 +155,12 @@ function CronCard(props: { s: CronView }) {
             <If
               when={deleting()}
               else={
-                <Button
+                <IconButton
                   icon="delete"
-                  testID="delete"
-                  accessibilityLabel={t("web.channel.crons.removeWhich", { name: props.s.name })}
-                  onPress={() => deleting.set(true)}
+                  tone="danger"
+                  testid="delete"
+                  label={t("web.channel.crons.removeWhich", { name: props.s.name })}
+                  onClick={() => deleting.set(true)}
                 />
               }
             >

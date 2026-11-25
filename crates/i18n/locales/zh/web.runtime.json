@@ -14,13 +14,11 @@
   "notFound": "没找到",
   "checking": "检测中…",
   "noRuntimes": "读不到引擎：",
-  "list": "引擎列表",
   "usedBy": " · {n} 个 agent",
   "reading": "读取中…",
   "bundled": "随 oar 一起装",
   "commandLine": "命令行",
   "unsupportedWhy": "不支持：{why}",
-  "notHere": "这台机器上没找到",
   "checkedAt": "检测于 {clock}",
   "recheck": "重新检测",
   "account": "账户",
@@ -117,8 +115,6 @@
   },
   "spentToday": "今天执行会话花了约 {spent}，没设每日预算。",
   "spentTodayBudget": "今天执行会话花了约 {spent}，每日预算 {budget}。",
-  "missingCommand": "请在本机安装 {runtime}，再点「重新检测」。如果已经安装，可填写可执行文件的完整路径。",
-  "enterPath": "填写命令路径",
   "signInTerminal": "打开终端登录",
   "machines": {
     "title": "执行机器",
@@ -138,6 +134,22 @@
       "offline": "离线",
       "draining": "排空中"
     },
-    "noRuntimes": "未上报引擎"
-  }
+    "machineId": "机器 ID",
+    "worktree": "工作树",
+    "worktreeYes": "支持",
+    "worktreeNo": "不支持",
+    "installedCount": "已装引擎",
+    "lastSeen": "最近在线"
+  },
+  "sidebarToggle": "收起或展开引擎列表",
+  "refreshAll": "刷新机器与引擎",
+  "inspectorTitle": "机器与检查器",
+  "inspectorShow": "展开右侧检查器",
+  "inspectorHide": "收起右侧检查器",
+  "noneInstalled": "未检测到已安装的编码引擎",
+  "noneInstalledHint": "在本机或远端主机安装编码引擎后，点刷新即可查看并配置。",
+  "remoteSummary": "运行在 {machine} 上，由该执行主机托管。",
+  "sessions": "相关会话",
+  "noSessions": "暂无活跃或最近的会话。",
+  "quickActions": "快捷操作"
 }

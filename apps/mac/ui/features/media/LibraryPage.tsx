@@ -8,6 +8,7 @@ import { Button } from "../../design/Button";
 import { Dialog } from "../../design/Dialog";
 import { Select } from "../../design/Field";
 import { Icon } from "../../design/Icon";
+import { IconButton } from "../../design/IconButton";
 import { Empty, Quiet } from "../../design/layout";
 import { Lightbox, type Picture } from "../../design/Lightbox";
 import { readFiles } from "../../design/picked";
@@ -28,6 +29,7 @@ import {
   contentFocusMediaId,
   contentSidebarOpen,
   isPinned,
+  openContentSearch,
   openTemplatePicker,
   pinnedKeys,
   togglePinned,
@@ -411,7 +413,7 @@ export function LibraryPage() {
   return (
     <View
       testID="library-page"
-      class="relative h-full min-h-0 min-w-0 flex-1"
+      class="relative h-full min-h-0 min-w-0 flex-1 flex-row overflow-hidden"
       onFileDragEnter={() => dragging.set(true)}
       onFileDragLeave={() => dragging.set(false)}
       onFileDrop={(e) => {
@@ -419,59 +421,73 @@ export function LibraryPage() {
         void dropUris(e.uris);
       }}
     >
-      <View
-        role="toolbar"
-        accessibilityLabel={bucketTitle()}
-        class="min-h-9 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-3.5 py-0.5"
-      >
-        <View class="min-w-0 flex-row items-center gap-2">
-          <Text testID="library-bucket-title" class="truncate text-sm font-semibold text-ink">
-            {bucketTitle()}
-          </Text>
-          <CountPill count={totalCount()} />
-        </View>
-        <Segmented
-          label={t("web.library.content.source.all")}
-          testid="library-source"
-          value={source()}
-          onChange={(v) => {
-            source.set(v);
-            selection.set(cancelRemove(untracked(selection)));
-          }}
-          options={sourceFilters.map((value) => ({
-            value,
-            label: t(`web.library.content.source.${value}`),
-          }))}
-        />
-        <View class="min-w-0 flex-1" />
-        <Select
-          label={t("web.library.sortLabel")}
-          testid="library-sort"
-          size="control"
-          quiet
-          value={sort()}
-          onChange={(v) => sort.set(v)}
-          options={LibrarySortValues.map((value) => ({ value, label: t(`web.library.sort.${value}`) }))}
-        />
-        <If when={showsMediaInBucket(bucket())}>
+      <View class="min-h-0 min-w-0 flex-1">
+        <View
+          role="toolbar"
+          accessibilityLabel={bucketTitle()}
+          desktop={{ windowDrag: true }}
+          class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3"
+        >
+          <If when={!contentSidebarOpen.get()}>
+            <IconButton
+              icon="sidebar"
+              size={16}
+              label={t("web.library.content.sidebarToggle")}
+              testid="content-sidebar-toggle"
+              pressed={false}
+              onClick={() => contentSidebarOpen.set(true)}
+            />
+          </If>
+          <View class="min-w-0 flex-row items-center gap-2">
+            <Text testID="library-bucket-title" class="truncate text-sm font-semibold text-ink">
+              {bucketTitle()}
+            </Text>
+            <CountPill count={totalCount()} />
+          </View>
           <Segmented
-            label={t("web.library.tileSize")}
-            testid="library-tile-size"
-            value={tile() <= 128 ? "sm" : tile() >= 220 ? "lg" : "md"}
-            onChange={(v) => setLibraryTile(v === "sm" ? 112 : v === "lg" ? 240 : 160)}
-            options={[
-              { value: "sm", label: "S" },
-              { value: "md", label: "M" },
-              { value: "lg", label: "L" },
-            ]}
+            label={t("web.library.content.source.all")}
+            testid="library-source"
+            value={source()}
+            onChange={(v) => {
+              source.set(v);
+              selection.set(cancelRemove(untracked(selection)));
+            }}
+            options={sourceFilters.map((value) => ({
+              value,
+              label: t(`web.library.content.source.${value}`),
+            }))}
           />
-        </If>
-        <Button testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
-          {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
-        </Button>
-      </View>
+          <View class="min-w-0 flex-1" />
+          <If when={!contentSidebarOpen.get()}>
+            <IconButton icon="search" size={14} label={t("web.library.content.searchAll")} testid="content-search-btn" onClick={() => openContentSearch()} />
+          </If>
+          <Select
+            label={t("web.library.sortLabel")}
+            testid="library-sort"
+            size="control"
+            quiet
+            value={sort()}
+            onChange={(v) => sort.set(v)}
+            options={LibrarySortValues.map((value) => ({ value, label: t(`web.library.sort.${value}`) }))}
+          />
+          <If when={showsMediaInBucket(bucket())}>
+            <Segmented
+              label={t("web.library.tileSize")}
+              testid="library-tile-size"
+              value={tile() <= 128 ? "sm" : tile() >= 220 ? "lg" : "md"}
+              onChange={(v) => setLibraryTile(v === "sm" ? 112 : v === "lg" ? 240 : 160)}
+              options={[
+                { value: "sm", label: "S" },
+                { value: "md", label: "M" },
+                { value: "lg", label: "L" },
+              ]}
+            />
+          </If>
+          <Button size="compact" testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
+            {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
+          </Button>
+        </View>
 
-      <View class="min-h-0 min-w-0 flex-1 flex-row">
         <Scroll testID="library-grid" class="min-h-0 flex-1" contentClass="gap-5 p-4">
           <If
             when={!empty()}
@@ -551,29 +567,29 @@ export function LibraryPage() {
             </If>
           </If>
         </Scroll>
-
-        <If when={inspectorOpen()}>
-          <Inspector
-            items={chosen()}
-            pinned={chosen().length === 1 && isPinned(`media:${chosen()[0]?.attachment.id ?? ""}`)}
-            seen={chosen().length === 1 ? seen().get(chosen()[0]?.attachment.id ?? "") : undefined}
-            understood={chosen().length === 1 ? understoodText(chosen()[0]?.attachment.id ?? "")(jobs()) : undefined}
-            names={names}
-            asking={asking()}
-            act={{
-              channels: collab()?.chat?.channels ?? [],
-              send: (channel) => void send(channel),
-              understand: () => setSearch({ understand: chosen()[0]?.attachment.id }),
-              look: () => look(chosen()[0]?.attachment.id),
-              togglePin: (id) => handleTogglePin(`media:${id}`),
-              ask: () => selection.set(askRemove(untracked(selection))),
-              remove: () => void remove(),
-              keep: () => selection.set(cancelRemove(untracked(selection))),
-              clear: () => selection.set(clearSelection()),
-            }}
-          />
-        </If>
       </View>
+
+      <If when={inspectorOpen()}>
+        <Inspector
+          items={chosen()}
+          pinned={chosen().length === 1 && isPinned(`media:${chosen()[0]?.attachment.id ?? ""}`)}
+          seen={chosen().length === 1 ? seen().get(chosen()[0]?.attachment.id ?? "") : undefined}
+          understood={chosen().length === 1 ? understoodText(chosen()[0]?.attachment.id ?? "")(jobs()) : undefined}
+          names={names}
+          asking={asking()}
+          act={{
+            channels: collab()?.chat?.channels ?? [],
+            send: (channel) => void send(channel),
+            understand: () => setSearch({ understand: chosen()[0]?.attachment.id }),
+            look: () => look(chosen()[0]?.attachment.id),
+            togglePin: (id) => handleTogglePin(`media:${id}`),
+            ask: () => selection.set(askRemove(untracked(selection))),
+            remove: () => void remove(),
+            keep: () => selection.set(cancelRemove(untracked(selection))),
+            clear: () => selection.set(clearSelection()),
+          }}
+        />
+      </If>
 
       <If when={dragging()}>
         <View

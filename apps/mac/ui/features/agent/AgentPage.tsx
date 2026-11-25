@@ -1,16 +1,17 @@
-import { computed, Scroll, signal, Text, View } from "nsh";
+import { computed, effect, keymap, Scroll, signal, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, type AgentProblem, type RuntimeInfo, sessionAppendSystemPrompt } from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
-import { Button, ButtonLink } from "../../design/Button";
-import { ConfirmButton } from "../../design/ConfirmButton";
+import { Button } from "../../design/Button";
 import { type Pose, randomLook, stagePoses } from "../../design/domain/cast";
 import { OpenTerminal } from "../../design/domain/OpenTerminal";
 import { runtimeName } from "../../design/domain/RuntimeBadge";
 import { Icon } from "../../design/Icon";
+import { IconButton } from "../../design/IconButton";
+import { MoreMenu } from "../../design/MoreMenu";
 import { useAgentProblems } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { agentsQuery, ready, useAgents, useQueryClient, useRuntimes } from "../../infra/query";
@@ -103,8 +104,10 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   const isNew = untrack(() => !props.saved);
   const draft = signal(untrack(() => props.start));
   const pose = signal<Pose>("idle");
+  const asking = signal(false);
   const saving = createAct();
   const talking = createAct();
+  const removing = createAct();
   const router = useRouter();
   const client = useQueryClient();
   const runtimes = useRuntimes();
@@ -113,6 +116,11 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   const problems = computed(() => allProblems()[draft().id] ?? []);
   const dirty = computed(() => isNew || !same(props.saved, draft()));
   const nameTaken = computed(() => props.all.some((a) => a.id !== draft().id && a.name === draft().name.trim()));
+
+  effect(() => {
+    if (!asking()) return;
+    return keymap.bind("escape", () => asking.set(false), { when: "always" });
+  });
 
   const save = () => {
     const d = draft();
@@ -125,6 +133,13 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
       if (isNew) router.navigate(`/agents/${encodeURIComponent(got.id)}`);
     });
   };
+
+  const remove = (id: string) =>
+    removing.run(async () => {
+      await api.agent.delete({ id });
+      await client.invalidate({ prefix: ["agents"] });
+      router.navigate("/agents");
+    });
 
   const bar = () => (
     <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
@@ -149,25 +164,31 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
         </View>
         <If when={draft().workdir.startsWith("/") ? draft().workdir : undefined}>{(cwd) => <OpenTerminal cwd={cwd()} title={draft().name} />}</If>
       </View>
-      <View class="flex-row flex-wrap items-center gap-2">
+      <View class="flex-row flex-wrap items-center gap-1.5">
         <If when={props.saved}>
           {(saved) => (
             <>
-              <DeleteButton agent={saved()} />
-              <ButtonLink href={runsHref({ agent: saved().id })} icon="log" testID="agent-runs-link">
-                {t("web.agent.runsLink")}
-              </ButtonLink>
-              <Button
+              <IconButton
+                icon="log"
+                label={t("web.agent.runsLink")}
+                testid="agent-runs-link"
+                onClick={() => router.navigate(runsHref({ agent: saved().id }))}
+              />
+              <IconButton
                 icon="thread"
-                testID="talk"
+                label={t("web.agent.talk")}
+                testid="talk"
                 disabled={talking.busy()}
-                onPress={() => {
+                onClick={() => {
                   const agent = saved().id;
                   void talking.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
                 }}
-              >
-                {t("web.agent.talk")}
-              </Button>
+              />
+              <MoreMenu
+                label={t("web.artifact.page.more")}
+                testid="agent-more"
+                items={[{ key: "delete", label: t("web.agent.remove"), icon: "delete", danger: true, onSelect: () => asking.set(true) }]}
+              />
               <If when={dirty()}>
                 <Button tone="quiet" testID="discard" onPress={() => draft.set(saved())}>
                   {t("web.agent.discard")}
@@ -186,6 +207,17 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
   return (
     <View testID="agent-page" class="h-full min-h-0 flex-1 bg-page px-4 pb-4">
       {bar()}
+      <If when={asking() ? props.saved : undefined}>
+        {(saved) => (
+          <View testID="agent-delete" class="mt-2 shrink-0 flex-row flex-wrap items-center gap-2 rounded-md border border-line bg-bad-soft px-3 py-2">
+            <Text class="min-w-0 flex-1 text-sm text-berry">{t("web.agent.removeWhich", { name: saved().name })}</Text>
+            <Button tone="danger" icon="delete" testID="delete-sure" disabled={removing.busy()} onPress={() => void remove(saved().id)}>
+              {t("web.agent.remove")}
+            </Button>
+            <Button onPress={() => asking.set(false)}>{t("web.base.form.never")}</Button>
+          </View>
+        )}
+      </If>
       <If when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={(a) => draft.set(a)} />}</If>
       <Scroll class="min-h-0 flex-1" contentClass="min-h-full gap-3 pt-3 lg:flex-row">
         <View class="shrink-0 rounded-lg border border-line bg-page p-4 lg:w-76">
@@ -215,21 +247,6 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
       </Scroll>
     </View>
   );
-}
-
-function DeleteButton(props: { agent: Agent }) {
-  const router = useRouter();
-  const client = useQueryClient();
-  const act = createAct();
-  const remove = () => {
-    const id = props.agent.id;
-    return act.run(async () => {
-      await api.agent.delete({ id });
-      await client.invalidate({ prefix: ["agents"] });
-      router.navigate("/agents");
-    });
-  };
-  return <ConfirmButton label={t("web.agent.remove")} question={t("web.agent.removeWhich", { name: props.agent.name })} testid="delete" onConfirm={remove} />;
 }
 
 function Problems(props: { problems: AgentProblem[] }) {

@@ -2,7 +2,7 @@ import { Clipboard, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { Button } from "../../design/Button";
+import { IconButton } from "../../design/IconButton";
 import { CountPill } from "../../design/Tag";
 import { useTimeout } from "../../infra/base/timer";
 
@@ -19,16 +19,13 @@ export function CopyButton(props: { text: string; testID?: string | undefined })
     );
   };
   return (
-    <Button
-      size="compact"
-      tone="quiet"
+    <IconButton
       icon={copied() ? "check" : "copy"}
-      testID={props.testID}
-      accessibilityLabel={copied() ? t("web.devtools.actions.copied") : t("web.devtools.actions.copy")}
-      onPress={copy}
-    >
-      {copied() ? t("web.devtools.actions.copied") : t("web.devtools.actions.copy")}
-    </Button>
+      size={14}
+      label={copied() ? t("web.devtools.actions.copied") : t("web.devtools.actions.copy")}
+      testid={props.testID}
+      onClick={copy}
+    />
   );
 }
 
