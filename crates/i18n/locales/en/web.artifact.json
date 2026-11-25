@@ -159,5 +159,35 @@
     "waiting": "Waiting for the slide deck",
     "empty": "This deck has no slides",
     "loadFailure": "Could not load the slide deck: {reason}"
+  },
+  "standalone": {
+    "missing": "This artifact was deleted, or there is no such artifact.",
+    "version": "v{version}",
+    "live": "Live"
+  },
+  "applet": {
+    "button": "Install as App",
+    "buttonInstalled": "App Installed",
+    "badgeInstalled": "Installed",
+    "modalTitle": "Local Desktop App",
+    "subtitle": "Install this artifact as a standalone Mac app you can launch from Spotlight or the Dock.",
+    "appNameLabel": "App Name",
+    "appNamePlaceholder": "Enter app display name",
+    "alwaysOnTopLabel": "Always on Top",
+    "alwaysOnTopHint": "Keep the standalone applet window floating above other windows.",
+    "statusInstalled": "Installed",
+    "statusNotInstalled": "Not installed",
+    "bundlePathLabel": "Bundle Path",
+    "bundleIdLabel": "Bundle ID",
+    "install": "Install App",
+    "reinstall": "Update & Reinstall",
+    "installing": "Installing…",
+    "open": "Open App",
+    "uninstall": "Uninstall",
+    "installedToast": "Installed “{name}.app”",
+    "uninstalledToast": "Uninstalled “{name}.app”",
+    "openedToast": "Opening “{name}.app”",
+    "nameRequired": "Enter an app name first",
+    "unavailable": "Local desktop app installation is unavailable in this host"
   }
 }

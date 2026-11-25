@@ -2,6 +2,7 @@
 import type { OpenOptions } from "nsh/test";
 
 import { SliceKindValues, type SliceBundle, type SliceKind } from "@vibevalley/protocol";
+import type { AppletInstallInput, ArtifactAppletInfo } from "@vibevalley/protocol/host";
 
 import type { SliceMap } from "../infra/transport";
 
@@ -53,10 +54,38 @@ export function fakeHost(fixture: { state: SliceBundle; responses: Record<string
   const watchedSlices = new Set<SliceKind>();
   let liveRev = 0;
   const subscriptions = new Map<string, { name: string; payload: unknown }>();
+  const installedApplets = new Map<string, ArtifactAppletInfo>();
+  const defaultHostAnswers: Record<string, (payload: unknown) => unknown> = {
+    "host.appletList": () => [...installedApplets.values()],
+    "host.appletInstall": (payload: unknown) => {
+      const input = payload as AppletInstallInput;
+      const slug = input.artifactId.replace(/[^a-zA-Z0-9._-]+/gu, "-").replace(/^-+|-+$/gu, "") || "artifact";
+      const info: ArtifactAppletInfo = {
+        artifactId: input.artifactId,
+        artifactType: input.artifactType,
+        appName: input.appName,
+        bundleId: `dev.vibevalley.applet.${slug}`,
+        bundlePath: `/Users/demo/Applications/VibeValley Apps/${input.appName}.app`,
+        alwaysOnTop: input.alwaysOnTop,
+        installed: true,
+      };
+      installedApplets.set(input.artifactId, info);
+      return info;
+    },
+    "host.appletUninstall": (payload: unknown) => {
+      const { artifactId } = payload as { artifactId: string };
+      return { removed: installedApplets.delete(artifactId) };
+    },
+    "host.appletOpen": (payload: unknown) => {
+      const { artifactId } = payload as { artifactId: string };
+      return { opened: installedApplets.has(artifactId) };
+    },
+  };
   const answer = (op: string, payload: unknown): unknown => {
     if (op === "health") return { bizCode: 0, message: "ok", data: null };
-    if (!(op in responses)) return { bizCode: 100005, message: `the fake server has no answer for ${op}` };
-    const r = responses[op];
+    const hasOverride = op in responses;
+    const r = hasOverride ? responses[op] : defaultHostAnswers[op];
+    if (r === undefined) return { bizCode: 100005, message: `the fake server has no answer for ${op}` };
     const v = typeof r === "function" ? (r as (p: unknown) => unknown)(payload) : r;
     return v !== null && typeof v === "object" && "bizCode" in v ? v : { bizCode: 0, message: "ok", data: v };
   };

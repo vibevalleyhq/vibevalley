@@ -68,6 +68,63 @@ interface CommandLine {
   readonly remove: () => Promise<CommandLineState>;
 }
 
+export interface ArtifactAppletInfo {
+  readonly artifactId: string;
+  readonly artifactType: string;
+  readonly appName: string;
+  readonly bundleId: string;
+  readonly bundlePath: string;
+  readonly alwaysOnTop: boolean;
+  readonly installed: boolean;
+}
+
+export const ArtifactAppletInfo = z.object({
+  artifactId: z.string(),
+  artifactType: z.string(),
+  appName: z.string(),
+  bundleId: z.string(),
+  bundlePath: z.string(),
+  alwaysOnTop: z.boolean(),
+  installed: z.boolean(),
+}) satisfies Codec<ArtifactAppletInfo>;
+
+export interface AppletInstallInput {
+  readonly artifactId: string;
+  readonly artifactType: string;
+  readonly appName: string;
+  readonly alwaysOnTop: boolean;
+}
+
+export const AppletInstallInput = z.object({
+  artifactId: z.string(),
+  artifactType: z.string(),
+  appName: z.string(),
+  alwaysOnTop: z.boolean(),
+}) satisfies Codec<AppletInstallInput>;
+
+export interface AppletRemoveResult {
+  readonly removed: boolean;
+}
+
+export const AppletRemoveResult = z.object({
+  removed: z.boolean(),
+}) satisfies Codec<AppletRemoveResult>;
+
+export interface AppletOpenResult {
+  readonly opened: boolean;
+}
+
+export const AppletOpenResult = z.object({
+  opened: z.boolean(),
+}) satisfies Codec<AppletOpenResult>;
+
+export interface ArtifactApplets {
+  readonly list: () => Promise<readonly ArtifactAppletInfo[]>;
+  readonly install: (input: AppletInstallInput) => Promise<ArtifactAppletInfo>;
+  readonly uninstall: (artifactId: string) => Promise<AppletRemoveResult>;
+  readonly open: (artifactId: string) => Promise<AppletOpenResult>;
+}
+
 export interface Opening {
   readonly phase: "connecting" | "reading" | "loading" | "ready" | "waiting" | "failed";
   readonly progress: number;
@@ -93,6 +150,7 @@ export interface Host {
   readonly opening?: (opening: Opening) => Promise<void>;
   readonly update?: Updates;
   readonly commandLine?: CommandLine;
+  readonly applet?: ArtifactApplets;
 }
 
 declare global {

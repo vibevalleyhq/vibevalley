@@ -11,6 +11,7 @@ import { ready } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { artifactIcon, kindLabel, useArtifact } from "./ArtifactCard";
 import { ArtifactDirectoryView } from "./ArtifactDirectoryView";
+import { InstallAppletButton } from "./InstallAppletModal";
 
 export function ArtifactCanvas(props: { id: string; version?: number | undefined; onClose?: () => void }) {
   const artifact = useArtifact(() => props.id);
@@ -44,6 +45,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
           )}
         </If>
         <View class="shrink-0 flex-row items-center gap-1">
+          <If when={shown()}>{(a) => <InstallAppletButton artifact={a()} testID="artifact-canvas-install-applet" />}</If>
           <A
             href={pageHref()}
             testID="artifact-canvas-page"
