@@ -15,9 +15,9 @@ use crate::db::entity::{attachment, media_input, media_input_pin};
 use crate::db::{Database, DbError, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct MediaInputQuota {
-    pub bytes: i64,
-    pub entries: i64,
+pub(crate) struct MediaInputQuota {
+    pub(crate) bytes: i64,
+    pub(crate) entries: i64,
 }
 
 #[derive(FromQueryResult)]
@@ -139,7 +139,7 @@ async fn pin_media_input_impl<C: ConnectionTrait>(conn: &C, input_id: &str, hold
 }
 
 #[derive(Clone)]
-pub struct StorageService {
+pub(crate) struct StorageService {
     db: Arc<Database>,
 }
 
@@ -148,7 +148,7 @@ impl StorageService {
         Self { db }
     }
 
-    pub async fn insert_attachment(&self, id: &str, name: &str, content_type: &str, size: i64, created_at: i64) -> DbResult<()> {
+    pub(crate) async fn insert_attachment(&self, id: &str, name: &str, content_type: &str, size: i64, created_at: i64) -> DbResult<()> {
         let model = attachment::ActiveModel {
             id: Set(id.to_owned()),
             name: Set(name.to_owned()),
@@ -163,7 +163,7 @@ impl StorageService {
         Ok(())
     }
 
-    pub async fn find_attachment(&self, id: &str) -> DbResult<Option<Attachment>> {
+    pub(crate) async fn find_attachment(&self, id: &str) -> DbResult<Option<Attachment>> {
         Ok(attachment::Entity::find_by_id(id.to_owned())
             .one(self.db.read_conn())
             .await?
@@ -171,7 +171,7 @@ impl StorageService {
     }
 
     /// Looks up all requested attachment ids in a single query, returning a map keyed by id.
-    pub async fn find_attachments_map(&self, ids: &[String]) -> DbResult<HashMap<String, Attachment>> {
+    pub(crate) async fn find_attachments_map(&self, ids: &[String]) -> DbResult<HashMap<String, Attachment>> {
         if ids.is_empty() {
             return Ok(HashMap::new());
         }
@@ -182,38 +182,30 @@ impl StorageService {
         Ok(rows.into_iter().map(|row| (row.id.clone(), attachment_from_model(row))).collect())
     }
 
-    pub async fn find_media_input(&self, id: &str) -> DbResult<Option<MediaInput>> {
+    pub(crate) async fn find_media_input(&self, id: &str) -> DbResult<Option<MediaInput>> {
         find_media_input_impl(self.db.read_conn(), id).await
     }
 
-    pub async fn find_media_input_write(&self, id: &str) -> DbResult<Option<MediaInput>> {
+    pub(crate) async fn find_media_input_write(&self, id: &str) -> DbResult<Option<MediaInput>> {
         find_media_input_impl(self.db.write_conn(), id).await
     }
 
-    pub async fn find_media_input_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<MediaInput>> {
+    pub(crate) async fn find_media_input_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<MediaInput>> {
         find_media_input_impl(tx, id).await
     }
 
-    pub async fn list_media_inputs(&self) -> DbResult<Vec<MediaInput>> {
+    pub(crate) async fn list_media_inputs(&self) -> DbResult<Vec<MediaInput>> {
         list_media_inputs_impl(self.db.read_conn()).await
     }
 
-    pub async fn list_media_inputs_write(&self) -> DbResult<Vec<MediaInput>> {
+    pub(crate) async fn list_media_inputs_write(&self) -> DbResult<Vec<MediaInput>> {
         list_media_inputs_impl(self.db.write_conn()).await
-    }
-
-    pub async fn media_input_quota_in_tx(&self, tx: &Tx) -> DbResult<MediaInputQuota> {
-        media_input_quota_impl(tx).await
-    }
-
-    pub async fn create_media_input_in_tx(&self, tx: &Tx, id: &str, req: &MediaInputRequest, created_at: i64, expires_at: i64) -> DbResult<MediaInput> {
-        create_media_input_impl(tx, id, req, created_at, expires_at).await
     }
 
     /// Atomically checks quota (`entries < max_entries && bytes + req.size <= max_bytes`)
     /// and inserts a `reserved` media input row. Returns `Ok(None)` if quota would be exceeded.
     #[allow(clippy::too_many_arguments)]
-    pub async fn reserve_media_input(
+    pub(crate) async fn reserve_media_input(
         &self,
         id: &str,
         req: &MediaInputRequest,
@@ -248,7 +240,7 @@ impl StorageService {
         }
     }
 
-    pub async fn set_media_input_phase(&self, id: &str, phase: MediaInputPhase) -> DbResult<()> {
+    pub(crate) async fn set_media_input_phase(&self, id: &str, phase: MediaInputPhase) -> DbResult<()> {
         Update::many(media_input::Entity)
             .col_expr(media_input::Column::Phase, Expr::value(phase.as_str()))
             .filter(media_input::Column::Id.eq(id))
@@ -257,7 +249,7 @@ impl StorageService {
         Ok(())
     }
 
-    pub async fn set_media_input_hash(&self, id: &str, hash: &str) -> DbResult<()> {
+    pub(crate) async fn set_media_input_hash(&self, id: &str, hash: &str) -> DbResult<()> {
         Update::many(media_input::Entity)
             .col_expr(media_input::Column::Hash, Expr::value(Some(hash.to_owned())))
             .filter(media_input::Column::Id.eq(id))
@@ -266,7 +258,7 @@ impl StorageService {
         Ok(())
     }
 
-    pub async fn mark_media_input_ready(&self, id: &str, expires_at: i64) -> DbResult<()> {
+    pub(crate) async fn mark_media_input_ready(&self, id: &str, expires_at: i64) -> DbResult<()> {
         Update::many(media_input::Entity)
             .col_expr(media_input::Column::Phase, Expr::value(MediaInputPhase::Ready.as_str()))
             .col_expr(media_input::Column::ExpiresAt, Expr::value(expires_at))
@@ -277,7 +269,7 @@ impl StorageService {
     }
 
     /// Marks any `uploading` inputs interrupted by a crash as `failed`.
-    pub async fn fail_uploading_media_inputs(&self) -> DbResult<u64> {
+    pub(crate) async fn fail_uploading_media_inputs(&self) -> DbResult<u64> {
         let res = Update::many(media_input::Entity)
             .col_expr(media_input::Column::Phase, Expr::value(MediaInputPhase::Failed.as_str()))
             .filter(media_input::Column::Phase.eq(MediaInputPhase::Uploading.as_str()))
@@ -287,7 +279,7 @@ impl StorageService {
     }
 
     /// Transitions an unpinned media input to `deleting`; returns `false` if pinned or missing.
-    pub async fn mark_media_input_deleting_if_unpinned(&self, id: &str) -> DbResult<bool> {
+    pub(crate) async fn mark_media_input_deleting_if_unpinned(&self, id: &str) -> DbResult<bool> {
         let pinned_subquery = Query::select()
             .expr(Expr::val(1))
             .from(media_input_pin::Entity)
@@ -302,13 +294,13 @@ impl StorageService {
         Ok(res.rows_affected > 0)
     }
 
-    pub async fn delete_media_input(&self, id: &str) -> DbResult<()> {
+    pub(crate) async fn delete_media_input(&self, id: &str) -> DbResult<()> {
         media_input::Entity::delete_by_id(id.to_owned()).exec(self.db.write_conn()).await?;
         Ok(())
     }
 
     /// Returns ids of unpinned media inputs that are expired or in `deleting` phase.
-    pub async fn list_sweepable_media_input_ids(&self, now_ms: i64) -> DbResult<Vec<String>> {
+    pub(crate) async fn list_sweepable_media_input_ids(&self, now_ms: i64) -> DbResult<Vec<String>> {
         let pinned_subquery = Query::select()
             .expr(Expr::val(1))
             .from(media_input_pin::Entity)
@@ -329,11 +321,11 @@ impl StorageService {
         Ok(ids)
     }
 
-    pub async fn pin_media_input_in_tx(&self, tx: &Tx, input_id: &str, holder: &str) -> DbResult<()> {
+    pub(crate) async fn pin_media_input_in_tx(&self, tx: &Tx, input_id: &str, holder: &str) -> DbResult<()> {
         pin_media_input_impl(tx, input_id, holder).await
     }
 
-    pub async fn release_media_input_pins(&self, holder: &str) -> DbResult<u64> {
+    pub(crate) async fn release_media_input_pins(&self, holder: &str) -> DbResult<u64> {
         let res = media_input_pin::Entity::delete_many()
             .filter(media_input_pin::Column::Holder.eq(holder))
             .exec(self.db.write_conn())

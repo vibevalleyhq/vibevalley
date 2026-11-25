@@ -5,10 +5,7 @@ import type { IconName } from "../../design/icons";
 import { api } from "../../infra/api";
 import type { QueryClient } from "../../infra/query";
 import type { RouterController } from "../../infra/router/context";
-import { artifactTypeIcon, createTypedArtifact } from "../artifact";
-import { artifactHref } from "../artifact/ArtifactCard";
-import { buildOutlineFromMarkdown } from "../artifact/html";
-import { BOARD_FILE_PATH } from "../artifact/WhiteboardView";
+import { artifactHref, artifactTypeIcon, BOARD_FILE_PATH, buildOutlineFromMarkdown, createTypedArtifact } from "../artifact";
 import type { TemplateCategory } from "./navigation";
 
 type NoteTemplateVariant = "blank" | "tech" | "meeting" | "daily";
@@ -48,14 +45,13 @@ interface TemplateBase {
   readonly key: TemplateItemKey;
   readonly category: Exclude<TemplateCategory, "recommended">;
   readonly recommended: boolean;
-  readonly icon: IconName;
 }
 
 export type ContentTemplate =
-  | (TemplateBase & { readonly kind: "note"; readonly variant: NoteTemplateVariant })
+  | (TemplateBase & { readonly kind: "note"; readonly variant: NoteTemplateVariant; readonly icon: IconName })
   | (TemplateBase & { readonly kind: "whiteboard"; readonly variant: WhiteboardTemplateVariant })
   | (TemplateBase & { readonly kind: "deliverable"; readonly artifactType: DeliverableArtifactType })
-  | (TemplateBase & { readonly kind: "ai"; readonly makeTab: AiMediaMakeTab });
+  | (TemplateBase & { readonly kind: "ai"; readonly makeTab: AiMediaMakeTab; readonly icon: IconName });
 
 export const TEMPLATE_CATEGORIES: readonly TemplateCategory[] = ["recommended", "note", "whiteboard", "deliverable", "ai"];
 
@@ -80,7 +76,6 @@ const DELIVERABLE_TEMPLATES: readonly ContentTemplate[] = ARTIFACT_TYPES.filter(
   key: DELIVERABLE_TEMPLATE_META[artifactType].key,
   category: "deliverable",
   recommended: DELIVERABLE_TEMPLATE_META[artifactType].recommended,
-  icon: artifactTypeIcon[artifactType],
   kind: "deliverable",
   artifactType,
 }));
@@ -90,14 +85,13 @@ export const CONTENT_TEMPLATES: readonly ContentTemplate[] = [
   { id: "tpl-note-tech", key: "noteTech", category: "note", recommended: true, icon: "issues", kind: "note", variant: "tech" },
   { id: "tpl-note-meeting", key: "noteMeeting", category: "note", recommended: false, icon: "chat", kind: "note", variant: "meeting" },
   { id: "tpl-note-daily", key: "noteDaily", category: "note", recommended: false, icon: "calendar", kind: "note", variant: "daily" },
-  { id: "tpl-wb-blank", key: "wbBlank", category: "whiteboard", recommended: true, icon: artifactTypeIcon.whiteboard, kind: "whiteboard", variant: "blank" },
-  { id: "tpl-wb-arch", key: "wbArch", category: "whiteboard", recommended: true, icon: artifactTypeIcon.whiteboard, kind: "whiteboard", variant: "arch" },
+  { id: "tpl-wb-blank", key: "wbBlank", category: "whiteboard", recommended: true, kind: "whiteboard", variant: "blank" },
+  { id: "tpl-wb-arch", key: "wbArch", category: "whiteboard", recommended: true, kind: "whiteboard", variant: "arch" },
   {
     id: "tpl-wb-timeline",
     key: "wbTimeline",
     category: "whiteboard",
     recommended: false,
-    icon: artifactTypeIcon.whiteboard,
     kind: "whiteboard",
     variant: "timeline",
   },
@@ -106,7 +100,6 @@ export const CONTENT_TEMPLATES: readonly ContentTemplate[] = [
     key: "wbJourney",
     category: "whiteboard",
     recommended: false,
-    icon: artifactTypeIcon.whiteboard,
     kind: "whiteboard",
     variant: "journey",
   },
@@ -115,7 +108,6 @@ export const CONTENT_TEMPLATES: readonly ContentTemplate[] = [
     key: "wbWorkshop",
     category: "whiteboard",
     recommended: false,
-    icon: artifactTypeIcon.whiteboard,
     kind: "whiteboard",
     variant: "workshop",
   },
@@ -124,6 +116,18 @@ export const CONTENT_TEMPLATES: readonly ContentTemplate[] = [
   { id: "tpl-ai-speech", key: "aiSpeech", category: "ai", recommended: false, icon: "record", kind: "ai", makeTab: "speech" },
   { id: "tpl-ai-audio", key: "aiAudio", category: "ai", recommended: false, icon: "audio", kind: "ai", makeTab: "audio" },
 ];
+
+export function templateIcon(tpl: ContentTemplate): IconName {
+  switch (tpl.kind) {
+    case "note":
+    case "ai":
+      return tpl.icon;
+    case "whiteboard":
+      return artifactTypeIcon.whiteboard;
+    case "deliverable":
+      return artifactTypeIcon[tpl.artifactType];
+  }
+}
 
 export const templateName = (tpl: ContentTemplate): string => t(`web.library.content.templates.items.${tpl.key}.name`);
 

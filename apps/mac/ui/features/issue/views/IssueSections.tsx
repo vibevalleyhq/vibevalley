@@ -16,7 +16,7 @@ import { useNow } from "../../../infra/base/dom";
 import { shortMomentText, tookText, wallClockText } from "../../../infra/base/format";
 import { ready } from "../../../infra/query";
 import { useIntents } from "../../../infra/state/intent";
-import { SubagentProgress } from "../../session/SubagentProgress";
+import { SubagentProgress } from "../../session";
 import { perform } from "../model/acts";
 import { useIssueRuns } from "../model/history";
 import { issueTag, runText, tagOpen, tagText } from "../model/issue";

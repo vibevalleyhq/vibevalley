@@ -23,8 +23,7 @@ import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
 import { useRouter, useSearchParams } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
-import { artifactTypeLabel, useArtifacts } from "../artifact";
-import { buildOutlineFromMarkdown, inferArtifactFromName } from "../artifact/html";
+import { artifactTypeLabel, buildOutlineFromMarkdown, inferArtifactFromName, useArtifacts } from "../artifact";
 import {
   type ContentBucket,
   contentBrowseBucket,

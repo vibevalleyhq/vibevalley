@@ -11,11 +11,11 @@ use crate::db::entity::{remote_config, remote_device};
 use crate::db::{Database, DbResult, begin_write_tx, commit_tx, rollback_tx};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StoredRemoteConfig {
-    pub enabled: bool,
-    pub bind_addr: Option<String>,
-    pub port: u16,
-    pub updated_at: Millis,
+pub(crate) struct StoredRemoteConfig {
+    pub(crate) enabled: bool,
+    pub(crate) bind_addr: Option<String>,
+    pub(crate) port: u16,
+    pub(crate) updated_at: Millis,
 }
 
 fn summary_from_model(row: remote_device::Model) -> RemoteDeviceSummary {
@@ -31,7 +31,7 @@ fn summary_from_model(row: remote_device::Model) -> RemoteDeviceSummary {
 }
 
 #[derive(Clone)]
-pub struct RemoteService {
+pub(crate) struct RemoteService {
     db: Arc<Database>,
 }
 
@@ -40,7 +40,7 @@ impl RemoteService {
         Self { db }
     }
 
-    pub async fn get_config(&self) -> DbResult<Option<StoredRemoteConfig>> {
+    pub(crate) async fn get_config(&self) -> DbResult<Option<StoredRemoteConfig>> {
         let row = remote_config::Entity::find_by_id(1i64).one(self.db.read_conn()).await?;
         Ok(row.map(|r| StoredRemoteConfig {
             enabled: r.enabled,
@@ -50,7 +50,7 @@ impl RemoteService {
         }))
     }
 
-    pub async fn save_config(&self, enabled: bool, bind_addr: Option<&str>, port: u16, updated_at: Millis) -> DbResult<()> {
+    pub(crate) async fn save_config(&self, enabled: bool, bind_addr: Option<&str>, port: u16, updated_at: Millis) -> DbResult<()> {
         let bind_addr = bind_addr.map(str::trim).filter(|s| !s.is_empty()).map(String::from);
         let model = remote_config::ActiveModel {
             id: Set(1),
@@ -71,7 +71,7 @@ impl RemoteService {
         Ok(())
     }
 
-    pub async fn insert_device(&self, device: &RemoteDeviceSummary, token_hash: &str) -> DbResult<()> {
+    pub(crate) async fn insert_device(&self, device: &RemoteDeviceSummary, token_hash: &str) -> DbResult<()> {
         let platform = db_word(&device.platform)?;
         remote_device::ActiveModel {
             id: Set(device.id.clone()),
@@ -88,7 +88,7 @@ impl RemoteService {
         Ok(())
     }
 
-    pub async fn find_device_by_token_hash(&self, token_hash: &str) -> DbResult<Option<RemoteDeviceSummary>> {
+    pub(crate) async fn find_device_by_token_hash(&self, token_hash: &str) -> DbResult<Option<RemoteDeviceSummary>> {
         let row = remote_device::Entity::find()
             .filter(remote_device::Column::TokenHash.eq(token_hash))
             .one(self.db.read_conn())
@@ -96,12 +96,12 @@ impl RemoteService {
         Ok(row.map(summary_from_model))
     }
 
-    pub async fn find_device_by_id(&self, id: &str) -> DbResult<Option<RemoteDeviceSummary>> {
+    pub(crate) async fn find_device_by_id(&self, id: &str) -> DbResult<Option<RemoteDeviceSummary>> {
         let row = remote_device::Entity::find_by_id(id.to_owned()).one(self.db.read_conn()).await?;
         Ok(row.map(summary_from_model))
     }
 
-    pub async fn list_devices(&self) -> DbResult<Vec<RemoteDeviceSummary>> {
+    pub(crate) async fn list_devices(&self) -> DbResult<Vec<RemoteDeviceSummary>> {
         let rows = remote_device::Entity::find()
             .order_by_desc(remote_device::Column::CreatedAt)
             .order_by_desc(remote_device::Column::Id)
@@ -110,7 +110,7 @@ impl RemoteService {
         Ok(rows.into_iter().map(summary_from_model).collect())
     }
 
-    pub async fn touch_device_last_seen(&self, id: &str, at: Millis) -> DbResult<()> {
+    pub(crate) async fn touch_device_last_seen(&self, id: &str, at: Millis) -> DbResult<()> {
         remote_device::Entity::update_many()
             .col_expr(remote_device::Column::LastSeenAt, Expr::value(Some(at)))
             .filter(remote_device::Column::Id.eq(id))
@@ -119,7 +119,7 @@ impl RemoteService {
         Ok(())
     }
 
-    pub async fn revoke_device(&self, id: &str, at: Millis) -> DbResult<bool> {
+    pub(crate) async fn revoke_device(&self, id: &str, at: Millis) -> DbResult<bool> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
         let outcome: DbResult<bool> = async {
             let Some(device) = remote_device::Entity::find_by_id(id.to_owned()).one(&tx).await? else {

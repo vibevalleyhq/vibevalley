@@ -8,12 +8,13 @@ import { AgentsRoute } from "../features/agent";
 import { ArtifactsPage, PresenterPage } from "../features/artifact";
 import { CatalogPage } from "../features/catalog";
 import { ChannelSidePane, ChatPage } from "../features/channel";
-import { ContentShell, safeLastContentPath } from "../features/content";
+import { safeLastContentPath } from "../features/content";
+import { ContentShell } from "../features/content/ContentShell";
 import { Follow } from "../features/inbox";
 import { issueSearch } from "../features/issue/model/navigation";
 import { IssuesPage } from "../features/issue/views/IssuesPage";
 import { LibraryPage } from "../features/media";
-import { OrchestratorPage } from "../features/orchestrator";
+import { OrchestratorPage, PendingApprovals } from "../features/orchestrator";
 import { ReposPage } from "../features/repo";
 import { sortRepos } from "../features/repo/repos";
 import { RuntimesPage, SkillsPage } from "../features/runtime";
@@ -148,7 +149,7 @@ const routes: readonly RouteDefinition[] = [
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
       { path: "/workspace", meta: { place: "workspace" }, component: () => <View testID="native-workspace" class="flex-1" /> },
       page("/issues", "issues", (rest) => <IssuesPage rest={rest()} />, issueSearch),
-      page("/runs", "runs", () => <RunsPage />),
+      page("/runs", "runs", () => <RunsPage approvals={PendingApprovals} />),
       page("/chat", "chat", () => <ChatPage />),
       page("/settings", "settings", (rest) => <SettingsPage rest={rest()} />),
       { path: "/team", component: () => <Navigate href="/agents" /> },

@@ -192,75 +192,108 @@ fn is_agent(a: &Actor) -> bool {
     matches!(a, Actor::Agent { .. })
 }
 
+struct AudienceSink<'a> {
+    from: &'a str,
+    orchestrators: &'a [String],
+    present: &'a [String],
+    out: Vec<Recipient>,
+}
+
+impl<'a> AudienceSink<'a> {
+    fn new(a: &'a Audience) -> Self {
+        Self {
+            from: &a.from,
+            orchestrators: &a.orchestrators,
+            present: a.present.as_deref().unwrap_or(&a.sessions),
+            out: Vec::new(),
+        }
+    }
+
+    fn push(&mut self, recipient: &str, reason: Reason, wakes: bool) {
+        if recipient == self.from || self.out.iter().any(|d| d.recipient == recipient) {
+            return;
+        }
+        if self.orchestrators.iter().any(|o| o == recipient) || self.present.iter().any(|p| p == recipient) {
+            self.out.push(Recipient::new(recipient, reason, wakes));
+        }
+    }
+}
+
+fn is_silent_audience(a: &Audience) -> bool {
+    matches!(a.kind, MessageKind::Notice | MessageKind::Dispatch) || matches!(a.actor, Actor::System { .. }) || a.spoken
+}
+
+fn add_direct_recipients(a: &Audience, sink: &mut AudienceSink<'_>) {
+    if !is_user(&a.actor) {
+        return;
+    }
+    let peer = a.peer.as_deref().unwrap_or("");
+    let recipient = if a.orchestrators.iter().any(|o| o == peer) {
+        peer
+    } else {
+        a.thread_owner.as_deref().unwrap_or("")
+    };
+    if !recipient.is_empty() {
+        sink.push(recipient, Reason::Direct, true);
+    }
+}
+
+fn add_mention_recipients(a: &Audience, sink: &mut AudienceSink<'_>) {
+    let user_sender = is_user(&a.actor);
+    for mention in &a.mentions {
+        if mention == EVERYONE && user_sender {
+            for s in &a.sessions {
+                sink.push(s, Reason::Everyone, true);
+            }
+        } else if mention != EVERYONE && mention != USER_ID {
+            sink.push(mention, Reason::Mention, true);
+        }
+    }
+}
+
+fn add_place_recipients(a: &Audience, sink: &mut AudienceSink<'_>) {
+    let is_thread = a.channel == ChannelType::Thread;
+    if is_thread && let Some(owner) = a.thread_owner.as_deref().filter(|o| !o.is_empty()) {
+        sink.push(owner, Reason::OwnThread, true);
+    }
+    if !is_user(&a.actor) {
+        return;
+    }
+    if is_thread {
+        for m in &a.members {
+            sink.push(m, Reason::Member, true);
+        }
+        return;
+    }
+    if !a.mentions.iter().any(|m| m != USER_ID) {
+        for m in &a.channel_members {
+            sink.push(m, Reason::Addressed, true);
+        }
+    }
+    for s in &a.sessions {
+        sink.push(s, Reason::Channel, false);
+    }
+}
+
 /// `whoHears`: who hears a message before the brakes.
 pub fn who_hears(a: &Audience) -> Vec<Recipient> {
-    let mut out: Vec<Recipient> = vec![];
-    if matches!(a.kind, MessageKind::Notice | MessageKind::Dispatch) || matches!(a.actor, Actor::System { .. }) || a.spoken {
-        return out;
+    if is_silent_audience(a) {
+        return Vec::new();
     }
-    let present = a.present.as_ref().unwrap_or(&a.sessions);
-    let mut add = |recipient: &str, reason: Reason, wakes: bool| {
-        if recipient == a.from || out.iter().any(|d| d.recipient == recipient) {
-            return;
-        }
-        if !a.orchestrators.iter().any(|o| o == recipient) && !present.iter().any(|p| p == recipient) {
-            return;
-        }
-        out.push(Recipient::new(recipient, reason, wakes));
-    };
+    let mut sink = AudienceSink::new(a);
     if a.channel == ChannelType::Direct {
-        let peer = a.peer.clone().unwrap_or_default();
-        let recipient = if a.orchestrators.contains(&peer) {
-            peer
-        } else {
-            a.thread_owner.clone().unwrap_or_default()
-        };
-        if is_user(&a.actor) && !recipient.is_empty() {
-            add(&recipient, Reason::Direct, true);
-        }
-        return out;
+        add_direct_recipients(a, &mut sink);
+        return sink.out;
     }
     if a.kind == MessageKind::Report {
         for m in &a.channel_members {
-            add(m, Reason::Addressed, a.outcome == Some(Outcome::Failed));
+            sink.push(m, Reason::Addressed, a.outcome == Some(Outcome::Failed));
         }
-        return out;
+        return sink.out;
     }
-    for mention in &a.mentions {
-        if mention == EVERYONE {
-            if is_user(&a.actor) {
-                for s in &a.sessions {
-                    add(s, Reason::Everyone, true);
-                }
-            }
-        } else if mention != USER_ID {
-            add(mention, Reason::Mention, true);
-        }
-    }
-    let thread = a.channel == ChannelType::Thread;
-    let owner = if thread { a.thread_owner.clone().unwrap_or_default() } else { String::new() };
-    if is_user(&a.actor) {
-        if !owner.is_empty() {
-            add(&owner, Reason::OwnThread, true);
-        }
-        if thread {
-            for m in &a.members {
-                add(m, Reason::Member, true);
-            }
-        } else {
-            if !a.mentions.iter().any(|m| m != USER_ID) {
-                for m in &a.channel_members {
-                    add(m, Reason::Addressed, true);
-                }
-            }
-            for s in &a.sessions {
-                add(s, Reason::Channel, false);
-            }
-        }
-    } else if !owner.is_empty() {
-        add(&owner, Reason::OwnThread, true);
-    }
-    out
+    add_mention_recipients(a, &mut sink);
+    add_place_recipients(a, &mut sink);
+    sink.out
 }
 
 pub struct BrakeInput<'a> {
@@ -645,6 +678,40 @@ mod tests {
             ..base.clone()
         };
         assert_eq!(heard(&answering, &s(&["lead"])), vec![Recipient::new("lead", Reason::Mention, true)]);
+
+        let everyone_by_user = Audience {
+            mentions: s(&[EVERYONE, USER_ID]),
+            ..base.clone()
+        };
+        assert_eq!(who_hears(&everyone_by_user), vec![Recipient::new("w1", Reason::Everyone, true)]);
+        let everyone_by_agent = Audience {
+            from: "w1".into(),
+            actor: agent("w1", AgentRole::Worker),
+            mentions: s(&[EVERYONE]),
+            ..base.clone()
+        };
+        assert!(who_hears(&everyone_by_agent).is_empty());
+
+        let silent = Audience { spoken: true, ..base.clone() };
+        assert!(who_hears(&silent).is_empty());
+
+        let report = Audience {
+            kind: MessageKind::Report,
+            outcome: Some(Outcome::Failed),
+            ..base.clone()
+        };
+        assert_eq!(who_hears(&report), vec![Recipient::new("lead", Reason::Addressed, true)]);
+
+        let thread = Audience {
+            channel: ChannelType::Thread,
+            thread_owner: Some("w1".into()),
+            members: s(&["lead"]),
+            ..base
+        };
+        assert_eq!(
+            who_hears(&thread),
+            vec![Recipient::new("w1", Reason::OwnThread, true), Recipient::new("lead", Reason::Member, true)]
+        );
     }
 
     #[test]

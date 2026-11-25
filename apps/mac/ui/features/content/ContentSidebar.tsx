@@ -15,7 +15,7 @@ import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { defineStored } from "../../infra/state/stored";
 import { artifactTypeIcon, artifactTypeLabel, useArtifacts } from "../artifact";
-import { libraryQuery } from "../media/listing";
+import { libraryQuery } from "../media";
 import { type ContentBucket, contentBrowseBucket, countContentHub, countForBucket, openContentSearch, openTemplatePicker, pinnedKeys } from "./navigation";
 import { createQuickBlankNote } from "./templates";
 
@@ -24,7 +24,7 @@ const mediaSectionOpen = defineStored("content.sidebar.media", z.boolean(), true
 
 const artifactFacets = ARTIFACT_TYPES.map((type) => ({
   type,
-  icon: artifactTypeIcon[type],
+  icon: () => artifactTypeIcon[type],
   label: () => artifactTypeLabel(type),
 }));
 
@@ -162,7 +162,7 @@ export function ContentSidebar() {
               return (
                 <NavRow
                   testID={`content-nav-artifact-${facet().type}`}
-                  icon={facet().icon}
+                  icon={facet().icon()}
                   label={facet().label()}
                   count={countForBucket(counts(), { kind: "artifacts", artifactType: facet().type })}
                   active={active()}
