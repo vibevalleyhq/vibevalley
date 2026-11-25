@@ -12507,6 +12507,7 @@ dependencies = [
  "objc2-user-notifications",
  "parking_lot",
  "percent-encoding",
+ "raw-window-handle",
  "reqwest",
  "rustls",
  "rustybuzz",
