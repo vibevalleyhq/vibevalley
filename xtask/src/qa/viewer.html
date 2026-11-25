@@ -86,6 +86,86 @@
         gap: 6px;
         flex-wrap: nowrap;
       }
+      .search-wrap {
+        position: relative;
+        flex: 0 1 270px;
+        min-width: 160px;
+      }
+      #search-input {
+        width: 100%;
+        background: #1e293b;
+        color: #f8fafc;
+        border: 1px solid #475569;
+        border-radius: 6px;
+        padding: 5px 10px;
+        font-size: 12px;
+        outline: none;
+      }
+      #search-input::placeholder {
+        color: #94a3b8;
+      }
+      #search-input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+      }
+      #search-results {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        width: min(440px, 85vw);
+        max-height: 360px;
+        overflow-y: auto;
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+        z-index: 80;
+        display: none;
+        padding: 4px;
+      }
+      .search-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #f8fafc;
+        font-size: 12px;
+      }
+      .search-item:hover,
+      .search-item.active {
+        background: #1e293b;
+      }
+      .search-item .main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .search-item .name {
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .search-item .sub {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: #94a3b8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .search-item .kind-pill {
+        flex-shrink: 0;
+        font-family: var(--mono);
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: #334155;
+        color: #e2e8f0;
+      }
       button.btn {
         background: #1e293b;
         color: #f8fafc;
@@ -514,8 +594,13 @@
           <span>VibeValley UML</span>
           <div id="breadcrumbs" class="breadcrumbs"></div>
         </div>
+        <div class="search-wrap">
+          <input id="search-input" type="search" placeholder="Search classes / components (/ or ⌘K)" autocomplete="off" spellcheck="false" />
+          <div id="search-results"></div>
+        </div>
         <div class="toolbar">
           <button id="btn-back" class="btn" title="Go up (Esc)">← Up</button>
+          <button id="btn-foreign" class="btn" title="Toggle external/foreign ovals (F)">Show Foreign</button>
           <button id="btn-declutter" class="btn primary" title="Cycle 5 declutter modes (D)">Declutter: arrows</button>
           <button id="btn-zoom-out" class="btn" title="Zoom out (Ctrl+-)">−</button>
           <button id="btn-zoom-reset" class="btn" title="Reset zoom (Ctrl+0)">100%</button>
@@ -625,6 +710,7 @@
           data: null,
           scopeStack: ["root"],
           declutterIdx: 0,
+          showForeign: false,
           activeProposalId: null,
           zoom: 1,
           panX: 24,
@@ -635,6 +721,9 @@
           panStartY: 0,
           ctxTargetId: null,
           modalNodeId: null,
+          highlightNodeId: null,
+          searchMatches: [],
+          searchActiveIdx: 0,
           lastMtime: null,
         };
 
@@ -644,6 +733,8 @@
         const ctxMenuEl = document.getElementById("context-menu");
         const modalBackdrop = document.getElementById("modal-backdrop");
         const statusPill = document.getElementById("status-pill");
+        const searchInputEl = document.getElementById("search-input");
+        const searchResultsEl = document.getElementById("search-results");
 
         function setStatus(msg) {
           statusPill.textContent = msg;
@@ -691,18 +782,62 @@
           });
         }
 
-        function rankForNs(ns, prefix, levels) {
+        function matchLevelEntry(ns, prefix, levels) {
           const nsSegs = splitSegs(ns);
           const prefSegs = splitSegs(prefix);
-          let seg = null;
+          let relSegs = null;
           if (prefSegs.length === 0) {
-            seg = nsSegs[0] || null;
+            relSegs = nsSegs;
           } else if (nsSegs.length > prefSegs.length && prefSegs.every((s, idx) => nsSegs[idx] === s)) {
-            seg = nsSegs[prefSegs.length];
+            relSegs = nsSegs.slice(prefSegs.length);
           }
-          if (!seg) return null;
-          const idx = levels.findIndex((grp) => grp.includes(seg));
+          if (!relSegs || relSegs.length === 0) return null;
+          const topSeg = relSegs[0];
+          let best = null;
+          for (let rank = 0; rank < levels.length; rank += 1) {
+            for (const entry of levels[rank]) {
+              const patSegs = splitSegs(entry);
+              if (
+                patSegs.length > 0 &&
+                relSegs.length >= patSegs.length &&
+                patSegs.every((s, idx) => relSegs[idx] === s) &&
+                (!best || patSegs.length > best.patSegs.length)
+              ) {
+                best = { rank, patSegs, topSeg };
+              }
+            }
+          }
+          return best;
+        }
+
+        function topLevelRankForSeg(topSeg, levels) {
+          const idx = levels.findIndex((grp) =>
+            grp.some((entry) => {
+              const segs = splitSegs(entry);
+              return segs.length === 1 && segs[0] === topSeg;
+            }),
+          );
           return idx >= 0 ? idx : null;
+        }
+
+        function rankForNs(ns, prefix, levels) {
+          const m = matchLevelEntry(ns, prefix, levels);
+          return m ? m.rank : null;
+        }
+
+        function isDependencyViolating(fromNs, toNs, prefix, levels) {
+          const fm = matchLevelEntry(fromNs, prefix, levels);
+          const tm = matchLevelEntry(toNs, prefix, levels);
+          if (!fm || !tm) return false;
+          if (fm.topSeg === tm.topSeg) {
+            const minLen = Math.min(fm.patSegs.length, tm.patSegs.length);
+            const isPrefix = fm.patSegs.length !== tm.patSegs.length && fm.patSegs.slice(0, minLen).every((s, i) => tm.patSegs[i] === s);
+            if (isPrefix) return false;
+            return fm.rank < tm.rank;
+          }
+          const fTop = topLevelRankForSeg(fm.topSeg, levels) ?? fm.rank;
+          const tTop = topLevelRankForSeg(tm.topSeg, levels) ?? tm.rank;
+          return fTop < tTop;
         }
 
         function findTreeNode(node, id) {
@@ -730,7 +865,11 @@
           const ir = state.data.ir;
           const omit = getActiveOmit();
           const levels = getActiveLayers();
-          const children = (scopeNode.children || []).filter((c) => !isOmitted(c.id, omit));
+          const children = (scopeNode.children || []).filter((c) => {
+            if (isOmitted(c.id, omit)) return false;
+            const isForeign = (ir.nodes[c.id]?.node_kind || c.node_kind) === "foreign";
+            return state.showForeign || !isForeign;
+          });
 
           const mapChild = (endpoint) => {
             for (const ch of children) {
@@ -745,13 +884,13 @@
 
           for (const e of ir.edges || []) {
             if (isOmitted(e.from, omit) || isOmitted(e.to, omit)) continue;
+            const toIsForeign = ir.nodes[e.to]?.node_kind === "foreign";
+            if (!state.showForeign && toIsForeign) continue;
             const fc = mapChild(e.from);
             const tcDirect = mapChild(e.to);
-            const tc = tcDirect || (ir.nodes[e.to]?.node_kind === "foreign" ? e.to : null);
+            const tc = tcDirect || (state.showForeign && toIsForeign ? e.to : null);
 
-            const fr = rankForNs(e.from, ir.prefix, levels);
-            const tr = rankForNs(e.to, ir.prefix, levels);
-            const violating = e.kind === "dependency" && fr !== null && tr !== null && fr < tr;
+            const violating = e.kind === "dependency" && isDependencyViolating(e.from, e.to, ir.prefix, levels);
 
             const pair = { from: e.from, to: e.to, kind: e.kind, violating, file: e.file, line: e.line };
 
@@ -854,10 +993,12 @@
 
           const visibleIds = new Set(children.map((c) => c.id));
           const extraForeign = [];
-          for (const e of edges) {
-            if (!visibleIds.has(e.to) && ir.nodes[e.to]?.node_kind === "foreign") {
-              visibleIds.add(e.to);
-              extraForeign.push({ id: e.to, name: ir.nodes[e.to].name, node_kind: "foreign", children: [] });
+          if (state.showForeign) {
+            for (const e of edges) {
+              if (!visibleIds.has(e.to) && ir.nodes[e.to]?.node_kind === "foreign") {
+                visibleIds.add(e.to);
+                extraForeign.push({ id: e.to, name: ir.nodes[e.to].name, node_kind: "foreign", children: [] });
+              }
             }
           }
           const displayNodes = [...children, ...extraForeign];
@@ -882,6 +1023,18 @@
           const showNested = mode !== "elements";
           const showClassesOnlyMode = mode === "classes";
           const sortedRows = Array.from(layers.keys()).sort((a, b) => a - b);
+          const FOREIGN_MAX_PER_ROW = 5;
+          const visualRows = [];
+          for (const rKey of sortedRows) {
+            const rowNodes = layers.get(rKey);
+            if (rKey === maxRank + 1 && rowNodes.length > FOREIGN_MAX_PER_ROW) {
+              for (let i = 0; i < rowNodes.length; i += FOREIGN_MAX_PER_ROW) {
+                visualRows.push(rowNodes.slice(i, i + FOREIGN_MAX_PER_ROW));
+              }
+            } else {
+              visualRows.push(rowNodes);
+            }
+          }
 
           const boxW = 220;
           const gapX = 34;
@@ -891,8 +1044,7 @@
 
           let maxX = 240;
           let curY = 20;
-          for (const rKey of sortedRows) {
-            const rowNodes = layers.get(rKey);
+          for (const rowNodes of visualRows) {
             let rowMaxH = 74;
             const computedRow = rowNodes.map((n) => {
               const subAll = (n.children || []).filter((c) => !isOmitted(c.id, getActiveOmit()));
@@ -983,6 +1135,7 @@
           for (const pos of positions.values()) {
             const meta = ir.nodes[pos.node.id];
             const isForeign = (meta?.node_kind || pos.node.node_kind) === "foreign";
+            const isHighlighted = state.highlightNodeId === pos.node.id;
             const fill = meta?.metrics?.fill_color || "#e2e8f0";
             const gBox = svgNode("g", { "data-id": pos.node.id, style: "cursor:pointer;" });
 
@@ -994,8 +1147,8 @@
                   rx: pos.w / 2,
                   ry: pos.h / 2,
                   fill,
-                  stroke: "#64748b",
-                  "stroke-width": 1.6,
+                  stroke: isHighlighted ? "#2563eb" : "#64748b",
+                  "stroke-width": isHighlighted ? 3 : 1.6,
                   "stroke-dasharray": "5 3",
                 }),
               );
@@ -1008,8 +1161,8 @@
                   height: pos.h,
                   rx: 8,
                   fill,
-                  stroke: "#334155",
-                  "stroke-width": 1.6,
+                  stroke: isHighlighted ? "#2563eb" : "#334155",
+                  "stroke-width": isHighlighted ? 3.2 : 1.6,
                 }),
               );
               const cColor = meta?.metrics?.crap_color || "#dc2626";
@@ -1233,6 +1386,7 @@
           const meta = ir.nodes[nodeId];
           if (node && node.children && node.children.length > 0) {
             state.scopeStack.push(nodeId);
+            state.needsFit = true;
             renderAll();
           } else if (meta) {
             openClassModal(nodeId);
@@ -1397,8 +1551,8 @@
             vList.querySelectorAll(".violation-item").forEach((el) => {
               el.addEventListener("click", () => {
                 const parentId = state.data.ir.nodes[el.dataset.from]?.parent || "root";
-                state.scopeStack = ["root"];
-                if (parentId !== "root") state.scopeStack.push(parentId);
+                state.scopeStack = buildScopeChain(parentId);
+                state.needsFit = true;
                 renderAll();
               });
             });
@@ -1422,6 +1576,7 @@
           propList.querySelectorAll(".proposal-item").forEach((el) => {
             el.addEventListener("click", () => {
               state.activeProposalId = el.dataset.prop || null;
+              state.needsFit = true;
               renderAll();
             });
           });
@@ -1453,6 +1608,129 @@
           }
         }
 
+        function buildScopeChain(targetId) {
+          if (!state.data || !targetId || targetId === "root") return ["root"];
+          const nodes = state.data.ir.nodes;
+          const chain = [];
+          let cur = targetId;
+          const guard = new Set();
+          while (cur && cur !== "root" && !guard.has(cur)) {
+            guard.add(cur);
+            chain.push(cur);
+            cur = nodes[cur]?.parent || null;
+          }
+          chain.reverse();
+          return ["root", ...chain];
+        }
+
+        function fuzzyScore(query, target) {
+          const q = query.trim().toLowerCase();
+          if (!q) return 0;
+          const t = String(target || "").toLowerCase();
+          if (t === q) return 1000;
+          if (t.startsWith(q)) return 800 - t.length * 0.1;
+          const subIdx = t.indexOf(q);
+          if (subIdx >= 0) return 600 - subIdx * 0.5 - t.length * 0.05;
+          let qi = 0;
+          let score = 0;
+          let lastMatch = -2;
+          for (let ti = 0; ti < t.length && qi < q.length; ti += 1) {
+            if (t[ti] === q[qi]) {
+              score += ti === lastMatch + 1 ? 14 : ti === 0 || ".::_/-".includes(t[ti - 1]) ? 10 : 4;
+              lastMatch = ti;
+              qi += 1;
+            }
+          }
+          return qi === q.length ? score - t.length * 0.05 : -1;
+        }
+
+        function updateSearchResults() {
+          if (!state.data) return;
+          const q = searchInputEl.value.trim();
+          if (!q) {
+            state.searchMatches = [];
+            searchResultsEl.style.display = "none";
+            searchResultsEl.innerHTML = "";
+            return;
+          }
+          const omit = getActiveOmit();
+          const scored = [];
+          for (const meta of Object.values(state.data.ir.nodes || {})) {
+            if (meta.id === "root" || isOmitted(meta.id, omit)) continue;
+            const nameScore = fuzzyScore(q, meta.name);
+            const idScore = fuzzyScore(q, meta.id) * 0.85;
+            const best = Math.max(nameScore, idScore);
+            if (best > 0) {
+              scored.push({ meta, score: best });
+            }
+          }
+          scored.sort((a, b) => b.score - a.score || a.meta.id.localeCompare(b.meta.id));
+          state.searchMatches = scored.slice(0, 24).map((x) => x.meta);
+          state.searchActiveIdx = 0;
+          renderSearchDropdown();
+        }
+
+        function renderSearchDropdown() {
+          if (!state.searchMatches.length) {
+            if (searchInputEl.value.trim()) {
+              searchResultsEl.innerHTML = `<div class="search-item"><span class="sub">No matching classes or components</span></div>`;
+              searchResultsEl.style.display = "block";
+            } else {
+              searchResultsEl.style.display = "none";
+            }
+            return;
+          }
+          searchResultsEl.innerHTML = state.searchMatches
+            .map((m, idx) => {
+              const kind = m.type_kind || m.node_kind;
+              const active = idx === state.searchActiveIdx ? "active" : "";
+              return `<div class="search-item ${active}" data-id="${escHtml(m.id)}">
+                <div class="main">
+                  <span class="name">${escHtml(m.name)}</span>
+                  <span class="sub">${escHtml(m.id)}</span>
+                </div>
+                <span class="kind-pill">${escHtml(kind)}</span>
+              </div>`;
+            })
+            .join("");
+          searchResultsEl.style.display = "block";
+          searchResultsEl.querySelectorAll(".search-item[data-id]").forEach((el) => {
+            el.addEventListener("mousedown", (ev) => {
+              ev.preventDefault();
+              navigateToSearchMatch(el.dataset.id);
+            });
+          });
+        }
+
+        function closeSearchDropdown() {
+          searchResultsEl.style.display = "none";
+        }
+
+        function navigateToSearchMatch(nodeId) {
+          if (!state.data || !nodeId) return;
+          const ir = state.data.ir;
+          const meta = ir.nodes[nodeId];
+          const treeNode = findTreeNode(ir.root, nodeId);
+          if (!meta) return;
+          if (meta.node_kind === "foreign") {
+            state.showForeign = true;
+          }
+          state.highlightNodeId = nodeId;
+          closeSearchDropdown();
+          searchInputEl.blur();
+          if (treeNode && treeNode.children && treeNode.children.length > 0) {
+            state.scopeStack = buildScopeChain(nodeId);
+            state.needsFit = true;
+            renderAll();
+          } else {
+            const parentId = meta.parent || "root";
+            state.scopeStack = buildScopeChain(parentId);
+            state.needsFit = true;
+            renderAll();
+            openClassModal(nodeId);
+          }
+        }
+
         function renderBreadcrumbs() {
           const bc = document.getElementById("breadcrumbs");
           if (!state.data) return;
@@ -1467,12 +1745,16 @@
             el.addEventListener("click", () => {
               const idx = Number(el.dataset.idx);
               state.scopeStack = state.scopeStack.slice(0, idx + 1);
+              state.needsFit = true;
               renderAll();
             });
           });
         }
 
         function renderAll() {
+          const btnForeign = document.getElementById("btn-foreign");
+          btnForeign.textContent = state.showForeign ? "Show Foreign: On" : "Show Foreign";
+          btnForeign.classList.toggle("primary", state.showForeign);
           document.getElementById("btn-declutter").textContent = DECLUTTER_MODES[state.declutterIdx].label;
           document.getElementById("btn-zoom-reset").textContent = `${Math.round(state.zoom * 100)}%`;
           renderBreadcrumbs();
@@ -1603,16 +1885,52 @@
 
         document.addEventListener("click", (ev) => {
           if (!ctxMenuEl.contains(ev.target)) hideContextMenu();
+          if (!ev.target.closest?.(".search-wrap")) closeSearchDropdown();
+        });
+
+        searchInputEl.addEventListener("input", () => updateSearchResults());
+        searchInputEl.addEventListener("focus", () => {
+          if (searchInputEl.value.trim()) updateSearchResults();
+        });
+        searchInputEl.addEventListener("keydown", (ev) => {
+          if (ev.key === "ArrowDown") {
+            ev.preventDefault();
+            if (state.searchMatches.length > 0) {
+              state.searchActiveIdx = (state.searchActiveIdx + 1) % state.searchMatches.length;
+              renderSearchDropdown();
+            }
+          } else if (ev.key === "ArrowUp") {
+            ev.preventDefault();
+            if (state.searchMatches.length > 0) {
+              state.searchActiveIdx = (state.searchActiveIdx - 1 + state.searchMatches.length) % state.searchMatches.length;
+              renderSearchDropdown();
+            }
+          } else if (ev.key === "Enter") {
+            ev.preventDefault();
+            const picked = state.searchMatches[state.searchActiveIdx] || state.searchMatches[0];
+            if (picked) navigateToSearchMatch(picked.id);
+          } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            closeSearchDropdown();
+            searchInputEl.blur();
+          }
         });
 
         document.getElementById("btn-back").addEventListener("click", () => {
           if (state.scopeStack.length > 1) {
             state.scopeStack.pop();
+            state.needsFit = true;
             renderAll();
           }
         });
+        document.getElementById("btn-foreign").addEventListener("click", () => {
+          state.showForeign = !state.showForeign;
+          state.needsFit = true;
+          renderAll();
+        });
         document.getElementById("btn-declutter").addEventListener("click", () => {
           state.declutterIdx = (state.declutterIdx + 1) % DECLUTTER_MODES.length;
+          state.needsFit = true;
           renderAll();
         });
         document.getElementById("btn-zoom-in").addEventListener("click", () => zoomAt(1.18));
@@ -1689,8 +2007,18 @@
         });
 
         window.addEventListener("keydown", (ev) => {
+          if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "k") {
+            ev.preventDefault();
+            searchInputEl.focus();
+            searchInputEl.select();
+            return;
+          }
           if (ev.target && ["INPUT", "TEXTAREA"].includes(ev.target.tagName)) return;
-          if (ev.key === "Escape") {
+          if (ev.key === "/" && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+            ev.preventDefault();
+            searchInputEl.focus();
+            searchInputEl.select();
+          } else if (ev.key === "Escape") {
             if (ctxMenuEl.style.display === "block") {
               hideContextMenu();
             } else if (modalBackdrop.style.display === "flex") {
@@ -1698,13 +2026,21 @@
               state.modalNodeId = null;
             } else if (state.scopeStack.length > 1) {
               state.scopeStack.pop();
+              state.needsFit = true;
               renderAll();
             }
           } else if (ev.key === "r" || ev.key === "R") {
             if (!ev.ctrlKey && !ev.metaKey) loadState();
+          } else if (ev.key === "f" || ev.key === "F") {
+            if (!ev.ctrlKey && !ev.metaKey) {
+              state.showForeign = !state.showForeign;
+              state.needsFit = true;
+              renderAll();
+            }
           } else if (ev.key === "d" || ev.key === "D") {
             if (!ev.ctrlKey && !ev.metaKey) {
               state.declutterIdx = (state.declutterIdx + 1) % DECLUTTER_MODES.length;
+              state.needsFit = true;
               renderAll();
             }
           } else if ((ev.ctrlKey || ev.metaKey) && (ev.key === "=" || ev.key === "+")) {

@@ -615,6 +615,16 @@ mod tests {
             body_html.contains("for (const sub of pos.subs.slice(0, 8))"),
             "viewer.html must cap nested sub-box iteration to match subPositions slice"
         );
+        assert!(body_html.contains("id=\"btn-foreign\""), "viewer.html must expose Show Foreign toggle button");
+        assert!(body_html.contains("showForeign: false"), "Show Foreign must default to false");
+        assert!(body_html.contains("FOREIGN_MAX_PER_ROW = 5"), "foreign ovals must wrap at 5 per row");
+        assert!(body_html.contains("id=\"search-input\""), "viewer.html must expose quick fuzzy search box");
+        assert!(body_html.contains("navigateToSearchMatch"), "fuzzy search must navigate/open matching nodes");
+        assert!(body_html.contains("matchLevelEntry"), "viewer.html must support multi-segment levels matching");
+        assert!(
+            body_html.contains("isDependencyViolating"),
+            "viewer.html must match Rust dependency violation rules"
+        );
 
         let (code_state, body_state) = send_raw_http(addr, "GET /api/state HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
         assert_eq!(code_state, 200);
