@@ -2,18 +2,18 @@
 
 use std::sync::Arc;
 
-use sea_orm::sea_query::{Expr, OnConflict};
-use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Update};
+use sea_orm::sea_query::OnConflict;
+use sea_orm::{ActiveValue::Set, ConnectionTrait, EntityTrait, QueryOrder};
 use vibevalley_protocol::{ActorKind, Cron, CronWhen};
 
 use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
 use crate::db::entity::cron;
-use crate::db::{Database, DbResult, Tx};
+use crate::db::{Database, DbResult};
 
 #[derive(Debug, Clone)]
-pub struct StoredCron {
-    pub cron: Cron,
-    pub issue_id: Option<String>,
+pub(crate) struct StoredCron {
+    pub(crate) cron: Cron,
+    pub(crate) issue_id: Option<String>,
 }
 
 fn read(r: cron::Model) -> DbResult<StoredCron> {
@@ -87,21 +87,11 @@ async fn upsert_impl<C: ConnectionTrait>(db: &C, c: &Cron, issue_id: Option<&str
 }
 
 async fn set_issue_impl<C: ConnectionTrait>(db: &C, id: &str, issue_id: Option<&str>) -> DbResult<()> {
-    Update::many(cron::Entity)
-        .col_expr(cron::Column::IssueId, Expr::value(issue_id.map(str::to_owned)))
-        .filter(cron::Column::Id.eq(id))
-        .exec(db)
-        .await?;
-    Ok(())
-}
-
-async fn remove_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<()> {
-    cron::Entity::delete_by_id(id.to_owned()).exec(db).await?;
-    Ok(())
+    super::update_col_by_id::<cron::Entity, _, _>(db, cron::Column::Id, id, cron::Column::IssueId, issue_id.map(str::to_owned)).await
 }
 
 #[derive(Clone)]
-pub struct CronService {
+pub(crate) struct CronService {
     db: Arc<Database>,
 }
 
@@ -110,35 +100,19 @@ impl CronService {
         Self { db }
     }
 
-    pub async fn list(&self) -> DbResult<Vec<StoredCron>> {
+    pub(crate) async fn list(&self) -> DbResult<Vec<StoredCron>> {
         list_impl(self.db.read_conn()).await
     }
 
-    pub async fn list_in_tx(&self, tx: &Tx) -> DbResult<Vec<StoredCron>> {
-        list_impl(tx).await
-    }
-
-    pub async fn upsert(&self, cron: &Cron, issue_id: Option<&str>) -> DbResult<()> {
+    pub(crate) async fn upsert(&self, cron: &Cron, issue_id: Option<&str>) -> DbResult<()> {
         upsert_impl(self.db.write_conn(), cron, issue_id).await
     }
 
-    pub async fn upsert_in_tx(&self, tx: &Tx, cron: &Cron, issue_id: Option<&str>) -> DbResult<()> {
-        upsert_impl(tx, cron, issue_id).await
-    }
-
-    pub async fn set_issue(&self, id: &str, issue_id: Option<&str>) -> DbResult<()> {
+    pub(crate) async fn set_issue(&self, id: &str, issue_id: Option<&str>) -> DbResult<()> {
         set_issue_impl(self.db.write_conn(), id, issue_id).await
     }
 
-    pub async fn set_issue_in_tx(&self, tx: &Tx, id: &str, issue_id: Option<&str>) -> DbResult<()> {
-        set_issue_impl(tx, id, issue_id).await
-    }
-
-    pub async fn remove(&self, id: &str) -> DbResult<()> {
-        remove_impl(self.db.write_conn(), id).await
-    }
-
-    pub async fn remove_in_tx(&self, tx: &Tx, id: &str) -> DbResult<()> {
-        remove_impl(tx, id).await
+    pub(crate) async fn remove(&self, id: &str) -> DbResult<()> {
+        super::delete_by_id::<cron::Entity, _>(self.db.write_conn(), id).await
     }
 }

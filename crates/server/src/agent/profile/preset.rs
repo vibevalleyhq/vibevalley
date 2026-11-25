@@ -3,40 +3,16 @@
 //! problems, choosing a profile, the quota in words.
 
 use std::collections::BTreeMap;
-use std::sync::OnceLock;
 
-use serde::Deserialize;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    AccountUsage, Agent, AgentProblem, AgentProblemLevel, Installation, ModelEntry, PersonaMode, RuntimeCapability, RuntimeInfo, RuntimePreset, RuntimeQuota,
-    RuntimeSettings, RuntimeSupport,
+    AccountUsage, Agent, AgentProblem, AgentProblemLevel, Installation, ModelEntry, PersonaMode, RuntimeInfo, RuntimePreset, RuntimeQuota, RuntimeSettings,
+    RuntimeSupport,
 };
 use vibevalley_runtime::oar::{BUILTIN_RUNTIME_SPECS, RefusableOption, runtime_refused_options, runtime_spec};
 
-#[derive(Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-struct PresetSupport {
-    #[serde(default)]
-    steer: bool,
-    #[serde(default)]
-    refused: BTreeMap<String, String>,
-    #[serde(default)]
-    capabilities: Vec<RuntimeCapability>,
-    #[serde(default)]
-    in_process: bool,
-    #[serde(default)]
-    in_session_config: bool,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Presets {
-    default_settings: RuntimeSettings,
-    fallback_preset: RuntimePreset,
-    runtime_presets: Vec<RuntimePreset>,
-    runtime_support: BTreeMap<String, PresetSupport>,
-    runtime_ids: Vec<String>,
-}
+use crate::context::text::runtime_presets;
+pub use crate::context::text::{runtime_label, yuan};
 
 /// Profile-visible session options that `session_options` checks against `RuntimeSupport.refused`.
 const PROFILE_REFUSABLE: [RefusableOption; 4] = [
@@ -46,26 +22,16 @@ const PROFILE_REFUSABLE: [RefusableOption; 4] = [
     RefusableOption::DisallowedTools,
 ];
 
-fn presets() -> &'static Presets {
-    static ZH: OnceLock<Presets> = OnceLock::new();
-    static EN: OnceLock<Presets> = OnceLock::new();
-    if vibevalley_i18n::locale() == "en" {
-        EN.get_or_init(|| serde_json::from_str(include_str!("../../../assets/agent/presets.en.json")).expect("presets.en.json"))
-    } else {
-        ZH.get_or_init(|| serde_json::from_str(include_str!("../../../assets/agent/presets.json")).expect("presets.json"))
-    }
-}
-
 pub fn default_settings() -> RuntimeSettings {
     RuntimeSettings {
         env: BTreeMap::new(),
-        ..presets().default_settings.clone()
+        ..runtime_presets().default_settings.clone()
     }
 }
 
 /// Every runtime the farm knows, in the order the page shows them.
 pub fn runtime_ids() -> Vec<String> {
-    let mut ids = presets().runtime_ids.clone();
+    let mut ids = runtime_presets().runtime_ids.clone();
     for spec in BUILTIN_RUNTIME_SPECS {
         if !ids.iter().any(|id| id == spec.id) {
             ids.push(spec.id.to_string());
@@ -77,7 +43,7 @@ pub fn runtime_ids() -> Vec<String> {
 /// A runtime's name, look and blurb; one with no look gets the fallback,
 /// named by its id.
 pub fn preset_of(runtime: &str) -> RuntimePreset {
-    let p = presets();
+    let p = runtime_presets();
     p.runtime_presets.iter().find(|x| x.id == runtime).cloned().unwrap_or_else(|| RuntimePreset {
         id: runtime.into(),
         label: runtime.into(),
@@ -85,15 +51,11 @@ pub fn preset_of(runtime: &str) -> RuntimePreset {
     })
 }
 
-pub fn runtime_label(runtime: &str) -> String {
-    preset_of(runtime).label
-}
-
 /// What a runtime takes before probing it: built-in OAR runtimes read their
 /// capabilities and refused options from `vibevalley_runtime::oar::BUILTIN_RUNTIME_SPECS`,
 /// enriched with localized prose from `presets*.json`; unknown runtimes accept a prompt only.
 pub fn support_of(runtime: &str) -> RuntimeSupport {
-    let preset = presets().runtime_support.get(runtime);
+    let preset = runtime_presets().runtime_support.get(runtime);
     if let Some(spec) = runtime_spec(runtime) {
         let mut refused = BTreeMap::new();
         for opt in runtime_refused_options(runtime) {
@@ -138,15 +100,6 @@ fn when_text(at: i64) -> String {
             ("time", format!("{:02}:{:02}", local.hour(), local.minute()).into()),
         ],
     )
-}
-
-/// CNY in words; anything positive under a cent says so.
-pub fn yuan(cny: f64) -> String {
-    if cny > 0.0 && cny < 0.01 {
-        t("server.runtime.lessThanCent", &[])
-    } else {
-        format!("¥{cny:.2}")
-    }
 }
 
 struct WindowGroup<'a> {
@@ -519,7 +472,7 @@ pub fn choose_agent(candidates: &[Candidate], brief: &str, named: &str, picked: 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vibevalley_protocol::{AccountUsageOk, UsageWindow};
+    use vibevalley_protocol::{AccountUsageOk, RuntimeCapability, UsageWindow};
 
     #[test]
     fn quota_in_words() {

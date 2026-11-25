@@ -1,13 +1,15 @@
 //! Shared pure prompt templates, text clipping, and domain-to-prose formatting
 //! helpers in `context/text` so domain modules never import `orchestrator`.
 
+use std::collections::BTreeMap;
 use std::sync::{LazyLock, OnceLock};
 
 use serde::Deserialize;
 use vibevalley_core::rules::{closed_text, phase_text, short_title, slice};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ActorKind, ArtifactViewContext, Changes, Cron, CronWhen, Issue, IssueStageKind, IssueStatus, IssueTimeline, Priority, Session, Spent,
+    ActorKind, ArtifactViewContext, Changes, Cron, CronWhen, Issue, IssueStageKind, IssueStatus, IssueTimeline, Priority, RuntimeCapability, RuntimePreset,
+    RuntimeSettings, Session, Spent,
 };
 
 /// Prompt clause prepended to read-only answer issues.
@@ -40,22 +42,35 @@ pub struct Workplaces {
 
 pub static PROMPTS: LazyLock<Prompts> = LazyLock::new(|| serde_json::from_str(include_str!("../../assets/orchestrator/prompts.json")).expect("prompts.json"));
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-struct LabelEntry {
-    id: String,
-    label: String,
+pub struct PresetSupport {
+    #[serde(default)]
+    pub steer: bool,
+    #[serde(default)]
+    pub refused: BTreeMap<String, String>,
+    #[serde(default)]
+    pub capabilities: Vec<RuntimeCapability>,
+    #[serde(default)]
+    pub in_process: bool,
+    #[serde(default)]
+    pub in_session_config: bool,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RuntimeLabels {
-    runtime_presets: Vec<LabelEntry>,
+pub struct RuntimePresets {
+    pub default_settings: RuntimeSettings,
+    pub fallback_preset: RuntimePreset,
+    pub runtime_presets: Vec<RuntimePreset>,
+    pub runtime_support: BTreeMap<String, PresetSupport>,
+    pub runtime_ids: Vec<String>,
 }
 
-fn runtime_labels() -> &'static RuntimeLabels {
-    static ZH: OnceLock<RuntimeLabels> = OnceLock::new();
-    static EN: OnceLock<RuntimeLabels> = OnceLock::new();
+/// Localized runtime presets loaded once per locale from `assets/agent/presets*.json`.
+pub fn runtime_presets() -> &'static RuntimePresets {
+    static ZH: OnceLock<RuntimePresets> = OnceLock::new();
+    static EN: OnceLock<RuntimePresets> = OnceLock::new();
     if vibevalley_i18n::locale() == "en" {
         EN.get_or_init(|| serde_json::from_str(include_str!("../../assets/agent/presets.en.json")).expect("presets.en.json"))
     } else {
@@ -65,7 +80,7 @@ fn runtime_labels() -> &'static RuntimeLabels {
 
 /// Localized display label for a runtime id, falling back to the id itself.
 pub fn runtime_label(runtime: &str) -> String {
-    runtime_labels()
+    runtime_presets()
         .runtime_presets
         .iter()
         .find(|p| p.id == runtime)
@@ -73,6 +88,7 @@ pub fn runtime_label(runtime: &str) -> String {
         .unwrap_or_else(|| runtime.to_string())
 }
 
+/// CNY in words; anything positive under a cent says so.
 pub fn yuan(cny: f64) -> String {
     if cny > 0.0 && cny < 0.01 {
         t("server.runtime.lessThanCent", &[])

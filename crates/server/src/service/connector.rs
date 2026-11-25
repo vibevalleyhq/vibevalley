@@ -12,17 +12,17 @@ use crate::db::entity::{connector_account, connector_inbound, connector_outbox};
 use crate::db::{Database, DbResult, begin_write_tx, commit_tx, rollback_tx};
 
 #[derive(Clone, PartialEq, Eq)]
-pub struct ConnectorAccountRow {
-    pub secrets: String,
+pub(crate) struct ConnectorAccountRow {
+    pub(crate) secrets: String,
     /// `""` until the user pairs by a message.
-    pub user: String,
-    pub pair_code: String,
-    pub cursor: String,
-    pub reply_context: String,
-    pub last_inbound: i64,
-    pub paused_until: i64,
-    pub connected_at: i64,
-    pub channel: Option<String>,
+    pub(crate) user: String,
+    pub(crate) pair_code: String,
+    pub(crate) cursor: String,
+    pub(crate) reply_context: String,
+    pub(crate) last_inbound: i64,
+    pub(crate) paused_until: i64,
+    pub(crate) connected_at: i64,
+    pub(crate) channel: Option<String>,
 }
 
 impl std::fmt::Debug for ConnectorAccountRow {
@@ -42,19 +42,19 @@ impl std::fmt::Debug for ConnectorAccountRow {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ConnectorInboundRow {
-    pub id: String,
-    pub from: String,
-    pub text: String,
-    pub reply: String,
-    pub quoted: String,
+pub(crate) struct ConnectorInboundRow {
+    pub(crate) id: String,
+    pub(crate) from: String,
+    pub(crate) text: String,
+    pub(crate) reply: String,
+    pub(crate) quoted: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ConnectorOutgoingRow {
-    pub seq: i64,
-    pub message: String,
-    pub body: String,
+pub(crate) struct ConnectorOutgoingRow {
+    pub(crate) seq: i64,
+    pub(crate) message: String,
+    pub(crate) body: String,
 }
 
 fn nonempty(value: &str) -> Option<String> {
@@ -77,7 +77,7 @@ async fn forget_impl<C: ConnectionTrait>(db: &C, id: ConnectorID, retired: &str)
 }
 
 #[derive(Clone)]
-pub struct ConnectorService {
+pub(crate) struct ConnectorService {
     db: Arc<Database>,
 }
 
@@ -86,7 +86,7 @@ impl ConnectorService {
         Self { db }
     }
 
-    pub async fn account(&self, id: ConnectorID) -> DbResult<Option<ConnectorAccountRow>> {
+    pub(crate) async fn account(&self, id: ConnectorID) -> DbResult<Option<ConnectorAccountRow>> {
         let row = connector_account::Entity::find_by_id(id.as_str().to_owned()).one(self.db.read_conn()).await?;
         Ok(row.map(|a| ConnectorAccountRow {
             secrets: a.secrets,
@@ -102,7 +102,7 @@ impl ConnectorService {
     }
 
     /// Replacing an account retires its queued work before reopening the bridge.
-    pub async fn connect(&self, id: ConnectorID, secrets: &str, user: &str, pair_code: Option<&str>, at: i64, retired: &str) -> DbResult<()> {
+    pub(crate) async fn connect(&self, id: ConnectorID, secrets: &str, user: &str, pair_code: Option<&str>, at: i64, retired: &str) -> DbResult<()> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
         let outcome: DbResult<()> = async {
             let model = connector_account::ActiveModel {
@@ -146,7 +146,7 @@ impl ConnectorService {
         }
     }
 
-    pub async fn disconnect(&self, id: ConnectorID, retired: &str) -> DbResult<()> {
+    pub(crate) async fn disconnect(&self, id: ConnectorID, retired: &str) -> DbResult<()> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
         let outcome: DbResult<()> = async {
             connector_account::Entity::delete_by_id(id.as_str().to_owned()).exec(&tx).await?;
@@ -163,7 +163,7 @@ impl ConnectorService {
         }
     }
 
-    pub async fn pause(&self, id: ConnectorID, until: Option<i64>) -> DbResult<()> {
+    pub(crate) async fn pause(&self, id: ConnectorID, until: Option<i64>) -> DbResult<()> {
         Update::many(connector_account::Entity)
             .col_expr(connector_account::Column::PausedUntil, Expr::value(until))
             .filter(connector_account::Column::Connector.eq(id.as_str()))
@@ -172,7 +172,7 @@ impl ConnectorService {
         Ok(())
     }
 
-    pub async fn paired(&self, id: ConnectorID, from: &str, ext_id: &str, reply: &str, at: i64) -> DbResult<()> {
+    pub(crate) async fn paired(&self, id: ConnectorID, from: &str, ext_id: &str, reply: &str, at: i64) -> DbResult<()> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
         let outcome: DbResult<()> = async {
             Update::many(connector_account::Entity)
@@ -202,7 +202,7 @@ impl ConnectorService {
         }
     }
 
-    pub async fn replied(&self, id: ConnectorID, reply: &str, at: i64) -> DbResult<()> {
+    pub(crate) async fn replied(&self, id: ConnectorID, reply: &str, at: i64) -> DbResult<()> {
         Update::many(connector_account::Entity)
             .col_expr(connector_account::Column::ReplyContext, Expr::value(nonempty(reply)))
             .col_expr(connector_account::Column::LastInbound, Expr::value(Some(at)))
@@ -212,7 +212,7 @@ impl ConnectorService {
         Ok(())
     }
 
-    pub async fn set_channel(&self, id: ConnectorID, channel: Option<&str>) -> DbResult<()> {
+    pub(crate) async fn set_channel(&self, id: ConnectorID, channel: Option<&str>) -> DbResult<()> {
         Update::many(connector_account::Entity)
             .col_expr(connector_account::Column::ChannelId, Expr::value(channel.map(str::to_owned)))
             .filter(connector_account::Column::Connector.eq(id.as_str()))
@@ -221,7 +221,7 @@ impl ConnectorService {
         Ok(())
     }
 
-    pub async fn accounts_in(&self, channel: &str) -> DbResult<i64> {
+    pub(crate) async fn accounts_in(&self, channel: &str) -> DbResult<i64> {
         let count = connector_account::Entity::find()
             .filter(connector_account::Column::ChannelId.eq(channel))
             .count(self.db.read_conn())
@@ -230,7 +230,7 @@ impl ConnectorService {
     }
 
     /// Only advances the cursor after the whole batch of inbound messages is durable.
-    pub async fn accept(&self, id: ConnectorID, messages: &[ConnectorInboundRow], cursor: &str, at: i64) -> DbResult<bool> {
+    pub(crate) async fn accept(&self, id: ConnectorID, messages: &[ConnectorInboundRow], cursor: &str, at: i64) -> DbResult<bool> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
         let outcome: DbResult<bool> = async {
             let count = connector_account::Entity::find()
@@ -288,7 +288,7 @@ impl ConnectorService {
         }
     }
 
-    pub async fn pending_inbound(&self, id: ConnectorID) -> DbResult<Vec<ConnectorInboundRow>> {
+    pub(crate) async fn pending_inbound(&self, id: ConnectorID) -> DbResult<Vec<ConnectorInboundRow>> {
         let rows = connector_inbound::Entity::find()
             .filter(connector_inbound::Column::Connector.eq(id.as_str()))
             .filter(connector_inbound::Column::Delivered.eq(false))
@@ -307,7 +307,7 @@ impl ConnectorService {
             .collect())
     }
 
-    pub async fn delivered(&self, id: ConnectorID, ext: &str, message: Option<&str>) -> DbResult<()> {
+    pub(crate) async fn delivered(&self, id: ConnectorID, ext: &str, message: Option<&str>) -> DbResult<()> {
         Update::many(connector_inbound::Entity)
             .col_expr(connector_inbound::Column::Delivered, Expr::value(true))
             .col_expr(connector_inbound::Column::Body, Expr::value(String::new()))
@@ -319,7 +319,7 @@ impl ConnectorService {
         Ok(())
     }
 
-    pub async fn add_outgoing(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> DbResult<()> {
+    pub(crate) async fn add_outgoing(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> DbResult<()> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
         let outcome: DbResult<()> = async {
             for piece in pieces {
@@ -349,7 +349,7 @@ impl ConnectorService {
         }
     }
 
-    pub async fn pending_outgoing(&self, id: ConnectorID) -> DbResult<Vec<ConnectorOutgoingRow>> {
+    pub(crate) async fn pending_outgoing(&self, id: ConnectorID) -> DbResult<Vec<ConnectorOutgoingRow>> {
         let rows = connector_outbox::Entity::find()
             .filter(connector_outbox::Column::Connector.eq(id.as_str()))
             .filter(connector_outbox::Column::State.eq("pending"))
@@ -366,7 +366,7 @@ impl ConnectorService {
             .collect())
     }
 
-    pub async fn count_pending(&self, id: ConnectorID) -> DbResult<i64> {
+    pub(crate) async fn count_pending(&self, id: ConnectorID) -> DbResult<i64> {
         let count = connector_outbox::Entity::find()
             .filter(connector_outbox::Column::Connector.eq(id.as_str()))
             .filter(connector_outbox::Column::State.eq("pending"))
@@ -375,7 +375,7 @@ impl ConnectorService {
         Ok(count as i64)
     }
 
-    pub async fn withdraw(&self, message: &str) -> DbResult<()> {
+    pub(crate) async fn withdraw(&self, message: &str) -> DbResult<()> {
         Update::many(connector_outbox::Entity)
             .col_expr(connector_outbox::Column::State, Expr::value("dropped"))
             .col_expr(connector_outbox::Column::Error, Expr::value("withdrawn"))
@@ -386,7 +386,7 @@ impl ConnectorService {
         Ok(())
     }
 
-    pub async fn sent(&self, rows: &[i64], at: i64, ext: &str) -> DbResult<()> {
+    pub(crate) async fn sent(&self, rows: &[i64], at: i64, ext: &str) -> DbResult<()> {
         if rows.is_empty() {
             return Ok(());
         }
@@ -412,7 +412,7 @@ impl ConnectorService {
         }
     }
 
-    pub async fn not_sent(&self, rows: &[i64], error: &str) -> DbResult<()> {
+    pub(crate) async fn not_sent(&self, rows: &[i64], error: &str) -> DbResult<()> {
         if rows.is_empty() {
             return Ok(());
         }
@@ -424,7 +424,7 @@ impl ConnectorService {
         Ok(())
     }
 
-    pub async fn message_of_ext(&self, id: ConnectorID, ext: &str) -> DbResult<Option<String>> {
+    pub(crate) async fn message_of_ext(&self, id: ConnectorID, ext: &str) -> DbResult<Option<String>> {
         if let Some(row) = connector_outbox::Entity::find()
             .filter(connector_outbox::Column::Connector.eq(id.as_str()))
             .filter(connector_outbox::Column::ExtId.eq(ext))
@@ -442,7 +442,7 @@ impl ConnectorService {
         Ok(row.and_then(|r| r.message_id))
     }
 
-    pub async fn prune(&self, before: i64) -> DbResult<()> {
+    pub(crate) async fn prune(&self, before: i64) -> DbResult<()> {
         connector_inbound::Entity::delete_many()
             .filter(connector_inbound::Column::Delivered.eq(true))
             .filter(connector_inbound::Column::CreatedAt.lt(before))
