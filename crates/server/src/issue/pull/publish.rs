@@ -5,13 +5,13 @@
 //! cleanly and `.vibevalley/check` pass before the push.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
 use serde::Deserialize;
+use vibevalley_git::{MergeCheck, Repo};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, BranchCheck, BranchPublication, BranchPublicationState, PublishPlatform, PullRequestState, SubmitBranch};
 
@@ -118,20 +118,15 @@ impl Network for Git {
     }
 }
 
-fn run_git(cwd: &Path, args: &[&str]) -> Option<(i32, String, String)> {
-    let o = Command::new("git").arg("-C").arg(cwd).args(args).output().ok()?;
-    Some((
-        o.status.code().unwrap_or(-1),
-        String::from_utf8_lossy(&o.stdout).into_owned(),
-        String::from_utf8_lossy(&o.stderr).into_owned(),
-    ))
-}
-
 fn git(cwd: &Path, args: &[&str]) -> Result<String, String> {
-    match run_git(cwd, args) {
-        Some((0, out, _)) => Ok(out),
-        Some((_, _, err)) => Err(err.trim().lines().last().unwrap_or("git failed").to_string()),
-        None => Err("git did not run".into()),
+    let repo = Repo::discover(cwd)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "not a git repository".to_string())?;
+    let out = repo.run(args).map_err(|e| e.to_string())?;
+    if out.ok() {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        Err(out.stderr.trim().lines().last().unwrap_or("git failed").to_string())
     }
 }
 
@@ -416,26 +411,16 @@ impl Hosting<'_> {
 /// `checkRepository`: `.vibevalley/check` at cwd: not run when there is
 /// none, passed, or refused with its last lines.
 pub async fn check_repository(cwd: &Path, limit: Duration) -> Result<BranchCheck, ApiError> {
-    let file = cwd.join(".vibevalley").join("check");
-    if tokio::fs::symlink_metadata(&file).await.is_err() {
-        return Ok(BranchCheck::NotRun);
-    }
-    let inherited = std::env::var("PATH").unwrap_or_default();
-    let mut path: Vec<String> = vec![cwd.join("node_modules").join(".bin").display().to_string()];
-    path.extend(inherited.split(':').filter(|p| !p.contains("node_modules/.bin")).map(str::to_string));
-    let mut c = tokio::process::Command::new(&file);
-    c.current_dir(cwd).env("PATH", path.join(":"));
-    let (why, said) = match vibevalley_runtime::oar::run_output_with_timeout(c, limit, None).await {
-        Ok(o) if o.timed_out => (t("server.repo.check.timedOut", &[("seconds", (limit.as_secs() as i64).into())]), String::new()),
-        Ok(o) if o.success() => return Ok(BranchCheck::Passed),
-        Ok(o) => (
-            t("server.repo.check.exited", &[("code", i64::from(o.code().unwrap_or(-1)).into())]),
-            format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr)),
-        ),
-        Err(e) => (t("server.repo.check.failed", &[("why", e.to_string().into())]), String::new()),
+    use crate::runtime::worktree::check::{ScriptOutcome, run_project_check_script, tail};
+
+    let (why, said) = match run_project_check_script(cwd, limit).await {
+        ScriptOutcome::NotConfigured => return Ok(BranchCheck::NotRun),
+        ScriptOutcome::Passed => return Ok(BranchCheck::Passed),
+        ScriptOutcome::TimedOut(limit) => (t("server.repo.check.timedOut", &[("seconds", (limit.as_secs() as i64).into())]), String::new()),
+        ScriptOutcome::Exited { code, output } => (t("server.repo.check.exited", &[("code", i64::from(code).into())]), output),
+        ScriptOutcome::Failed(why) => (t("server.repo.check.failed", &[("why", why.into())]), String::new()),
     };
-    let tail: Vec<&str> = said.trim().lines().collect();
-    let tail = tail[tail.len().saturating_sub(40)..].join("\n");
+    let tail = tail(said.trim(), 40);
     Err(refuse(BizCode::RepoRefused, format!("{why}\n{tail}")))
 }
 
@@ -467,19 +452,22 @@ struct Remote {
     target: HostedRepo,
 }
 
-fn verify_unchanged(cwd: &Path, branch_want: &str, sha_want: &str) -> Result<(), ApiError> {
-    let status = git(cwd, &["status", "--porcelain=v2", "--branch", "--untracked-files=all"]).map_err(|_| refused("git failed; checkout retained"))?;
-    let branch = status.lines().find_map(|l| l.strip_prefix("# branch.head ")).unwrap_or("");
-    let sha = status.lines().find_map(|l| l.strip_prefix("# branch.oid ")).unwrap_or("");
-    let clean = status.lines().all(|l| l.starts_with("# ") || l.is_empty());
-    if branch != branch_want || sha != sha_want || !clean {
+async fn verify_unchanged_async(repo: &Repo, branch_want: &str, sha_want: &str) -> Result<(), ApiError> {
+    let status = repo.status_async().await.map_err(|_| refused("git failed; checkout retained"))?;
+    if status.branch.as_deref() != Some(branch_want) || status.head.as_deref() != Some(sha_want) || !status.entries.is_empty() {
         return Err(refused("checkout changed or dirty"));
     }
     Ok(())
 }
 
-fn read_destination(cwd: &Path) -> Result<Remote, ApiError> {
-    let out = git(cwd, &["config", "--null", "--list"]).map_err(|_| refused("git failed; checkout retained"))?;
+async fn read_destination_async(repo: &Repo) -> Result<Remote, ApiError> {
+    let out = repo
+        .run_async(&["config", "--null", "--list"])
+        .await
+        .ok()
+        .filter(|o| o.ok())
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .ok_or_else(|| refused("git failed; checkout retained"))?;
     let config: Vec<(String, String)> = out
         .split('\0')
         .filter(|e| !e.is_empty())
@@ -540,46 +528,37 @@ impl Publisher {
         }
         let cwd = tokio::fs::canonicalize(&req.cwd).await.map_err(|_| refused("cwd"))?;
         let cwd_for_git = cwd.clone();
-        let (cwd, key) = spawn_blocking_traced(move || {
-            let loc = git(&cwd_for_git, &["rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"])
-                .map_err(|_| refused("git failed; checkout retained"))?;
-            let mut lines = loc.lines();
-            let (top, common) = (lines.next().unwrap_or(""), lines.next().unwrap_or(""));
-            if Path::new(top) != cwd_for_git || common.is_empty() {
+        let (repo, key) = spawn_blocking_traced(move || {
+            let Some(repo) = Repo::discover(&cwd_for_git).map_err(|_| refused("git failed; checkout retained"))? else {
+                return Err(refused("git failed; checkout retained"));
+            };
+            if repo.root() != cwd_for_git {
                 return Err(refused("checkout root"));
             }
-            let common = PathBuf::from(common);
+            let common = vibevalley_git::read::git_common_dir(repo.root()).map_err(|_| refused("git failed; checkout retained"))?;
             let key = if common.file_name().is_some_and(|n| n == ".git") {
                 common.parent().unwrap_or(&common)
             } else {
                 &common
             };
-            Ok((cwd_for_git, key.display().to_string()))
+            Ok((repo, key.display().to_string()))
         })
         .await
         .map_err(|_| refused("git failed; checkout retained"))??;
         let gate = self.serial.lock().entry(key).or_default().clone();
         let _held = gate.lock_owned().await;
-        self.publish_async(&cwd, req).await
+        self.publish_async(&repo, req).await
     }
 
-    async fn publish_async(&self, cwd: &Path, req: &SubmitBranch) -> Result<BranchPublication, ApiError> {
-        let remote = {
-            let cwd = cwd.to_path_buf();
-            let branch = req.branch.clone();
-            let base = req.base.clone();
-            let sha = req.sha.clone();
-            spawn_blocking_traced(move || {
-                let valid = |b: &str| run_git(&cwd, &["check-ref-format", &format!("refs/heads/{b}")]).is_some_and(|r| r.0 == 0);
-                if !valid(&branch) || !valid(&base) || branch.starts_with('-') || base.starts_with('-') {
-                    return Err(refused("branch / base"));
-                }
-                verify_unchanged(&cwd, &branch, &sha)?;
-                read_destination(&cwd)
-            })
-            .await
-            .map_err(|_| refused("git failed; checkout retained"))??
-        };
+    async fn publish_async(&self, repo: &Repo, req: &SubmitBranch) -> Result<BranchPublication, ApiError> {
+        let cwd = repo.root();
+        let branch_ok = repo.check_ref_format_async(&format!("refs/heads/{}", req.branch)).await.unwrap_or(false);
+        let base_ok = repo.check_ref_format_async(&format!("refs/heads/{}", req.base)).await.unwrap_or(false);
+        if !branch_ok || !base_ok || req.branch.starts_with('-') || req.base.starts_with('-') {
+            return Err(refused("branch / base"));
+        }
+        verify_unchanged_async(repo, &req.branch, &req.sha).await?;
+        let remote = read_destination_async(repo).await?;
         let run = if remote.target.platform == PublishPlatform::Github {
             &self.gh
         } else {
@@ -611,26 +590,31 @@ impl Publisher {
             let cwd = cwd.to_path_buf();
             let read = remote.read.clone();
             let base = req.base.clone();
-            let sha = req.sha.clone();
             spawn_blocking_traced(move || {
                 let net = |_: String| refused("git failed; checkout retained");
                 let base_sha = network.tip(&cwd, &read, &base).map_err(net)?;
                 network.fetch(&cwd, &read, &base).map_err(net)?;
-                let merged = run_git(&cwd, &["merge-tree", "--write-tree", "--name-only", "--no-messages", &base_sha, &sha]);
-                match merged {
-                    Some((0, _, _)) => Ok(base_sha),
-                    Some((1, _, _)) => Err(refuse(BizCode::RepoRefused, t("server.repo.conflict", &[("base", base.into())]))),
-                    _ => Err(refused("git failed; checkout retained")),
-                }
+                Ok::<_, ApiError>(base_sha)
             })
             .await
             .map_err(|_| refused("git failed; checkout retained"))??
         };
+        match repo.merge_check_between_async(&base_sha, &req.sha).await {
+            Ok(MergeCheck::Clean | MergeCheck::UpToDate) => {}
+            Ok(MergeCheck::Conflicts(_)) => {
+                return Err(refuse(BizCode::RepoRefused, t("server.repo.conflict", &[("base", req.base.clone().into())])));
+            }
+            Err(_) => return Err(refused("git failed; checkout retained")),
+        }
         result.check = check_repository(cwd, self.check_timeout).await?;
+        let after = read_destination_async(repo).await?;
+        if after.name != remote.name || after.read != remote.read || after.write != remote.write {
+            return Err(refused("remote changed during check"));
+        }
+        verify_unchanged_async(repo, &req.branch, &req.sha).await?;
         {
             let network = self.network.clone();
             let cwd = cwd.to_path_buf();
-            let remote_name = remote.name.clone();
             let remote_read = remote.read.clone();
             let remote_write = remote.write.clone();
             let branch = req.branch.clone();
@@ -638,15 +622,9 @@ impl Publisher {
             let sha = req.sha.clone();
             spawn_blocking_traced(move || {
                 let net = |_: String| refused("git failed; checkout retained");
-                let after = read_destination(&cwd)?;
-                if after.name != remote_name
-                    || after.read != remote_read
-                    || after.write != remote_write
-                    || network.tip(&cwd, &remote_read, &base).map_err(net)? != base_sha
-                {
+                if network.tip(&cwd, &remote_read, &base).map_err(net)? != base_sha {
                     return Err(refused("remote changed during check"));
                 }
-                verify_unchanged(&cwd, &branch, &sha)?;
                 network
                     .push(&cwd, &remote_write, &branch, &sha)
                     .map_err(|_| refuse(BizCode::RepoRefused, t("server.repo.publish.pushUnconfirmed", &[("sha", sha.into())])))

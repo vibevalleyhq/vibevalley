@@ -4,8 +4,7 @@
 //! afterwards. It knows nothing of the board's state: callers name the
 //! issue's number, repository and the worktree its session works in.
 
-mod check;
-mod git;
+pub(crate) mod check;
 
 use std::path::{Path, PathBuf};
 
@@ -148,36 +147,31 @@ impl Worktree {
     /// The repo at `dir`; a folder under the work root that is not one yet
     /// (or not there) becomes one, with a first empty commit.
     pub async fn ensure_repo_async(&self, dir: PathBuf) -> Result<Repo> {
-        let dir_check = dir.clone();
-        if let Some(repo) = crate::log::spawn_blocking_traced(move || Repo::discover(&dir_check))
-            .await
-            .map_err(|e| RuntimeError::Other(e.to_string()))??
-        {
+        if let Some(repo) = Repo::discover_async(&dir).await? {
             return Ok(repo);
         }
         let ours = self.repos_dir.as_ref().is_some_and(|root| dir.starts_with(root));
         if !ours {
             return Err(RuntimeError::NotARepo(dir));
         }
-        tokio::fs::create_dir_all(&dir)
-            .await
-            .map_err(|e| RuntimeError::Other(format!("{}: {e}", dir.display())))?;
-        crate::log::spawn_blocking_traced(move || {
-            let git = |args: &[&str]| {
-                std::process::Command::new("git")
-                    .arg("-C")
-                    .arg(&dir)
-                    .args(["-c", "user.name=vibevalley", "-c", "user.email=vibevalley@localhost"])
-                    .args(args)
-                    .output()
-                    .map_err(|e| RuntimeError::Other(e.to_string()))
-            };
-            git(&["init", "-q", "-b", "main"])?;
-            git(&["commit", "-q", "--allow-empty", "-m", "Start"])?;
-            Repo::discover(&dir)?.ok_or(RuntimeError::NotARepo(dir))
-        })
-        .await
-        .map_err(|e| RuntimeError::Other(e.to_string()))?
+        let repo = vibevalley_git::init_async(&dir, Some("main")).await?;
+        let out = repo
+            .run_async(&[
+                "-c",
+                "user.name=vibevalley",
+                "-c",
+                "user.email=vibevalley@localhost",
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "Start",
+            ])
+            .await?;
+        if !out.ok() {
+            return Err(RuntimeError::Other(out.stderr));
+        }
+        Ok(repo)
     }
 
     /// The repository an issue names, made when it is ours and missing.
@@ -196,12 +190,11 @@ impl Worktree {
     /// Reads the `origin` git remote URL for `repo` if a local checkout exists with one.
     pub fn repo_remote_url(&self, repo: &str) -> Option<String> {
         let found = self.existing(repo).ok().flatten()?;
-        git::remote_origin_url(found.root())
+        found.remote_url("origin").ok().flatten()
     }
 
     pub fn main_branch(main: &Repo) -> Result<String> {
-        main.status()?
-            .branch
+        main.current_branch()?
             .ok_or_else(|| RuntimeError::Other("the main checkout has no branch checked out".into()))
     }
 
@@ -212,7 +205,7 @@ impl Worktree {
             return Self::main_branch(main);
         };
         let branch = issue_branch(parent);
-        if !git::branch_exists(main.root(), &branch)? {
+        if !main.branch_exists(&branch)? {
             main.create_branch(&branch, Some(&Self::main_branch(main)?))?;
         }
         Ok(branch)
@@ -232,20 +225,11 @@ impl Worktree {
             return Ok((dir, branch));
         }
         tokio::fs::create_dir_all(&self.worktrees_dir).await.map_err(io)?;
-        let main = main.clone();
-        let dir_owned = dir.clone();
-        let branch_owned = branch.clone();
-        let base_owned = base.to_string();
-        crate::log::spawn_blocking_traced(move || -> Result<()> {
-            if git::branch_exists(main.root(), &branch_owned)? {
-                git::add_worktree_on(&main, &dir_owned, &branch_owned)?;
-            } else {
-                main.worktree_add(&dir_owned, &branch_owned, Some(&base_owned))?;
-            }
-            Ok(())
-        })
-        .await
-        .map_err(|e| RuntimeError::Other(e.to_string()))??;
+        if main.branch_exists_async(&branch).await? {
+            main.worktree_add_on_async(&dir, &branch).await?;
+        } else {
+            main.worktree_add_async(&dir, &branch, Some(base)).await?;
+        }
         Ok((dir, branch))
     }
 
@@ -253,15 +237,9 @@ impl Worktree {
     /// there before gone: where a draft starts. Its dir, branch and base.
     pub async fn fresh_worktree_async(&self, main: &Repo, number: i64) -> Result<(PathBuf, String, String)> {
         let base = Self::main_branch(main)?;
-        let main_clone = main.clone();
         let dir_old = self.dir_of(main, number);
-        crate::log::spawn_blocking_traced(move || -> Result<()> {
-            git::remove_worktree(&main_clone, &dir_old)?;
-            git::delete_branch(main_clone.root(), &issue_branch(number))?;
-            Ok(())
-        })
-        .await
-        .map_err(|e| RuntimeError::Other(e.to_string()))??;
+        remove_worktree_async(main, &dir_old).await?;
+        main.delete_branch_async(&issue_branch(number)).await?;
         let (dir, branch) = self.worktree_async(main, number, &base).await?;
         Ok((dir, branch, base))
     }
@@ -277,19 +255,19 @@ impl Worktree {
     /// checkout (made when `make` and its branch exists).
     pub async fn checkout_async(&self, main: &Repo, number: i64, worktree: Option<&str>, make: bool) -> Result<Option<Repo>> {
         if let Some(path) = worktree
-            && let Some(repo) = Repo::discover(Path::new(path))?
+            && let Some(repo) = Repo::discover_async(Path::new(path)).await?
         {
             return Ok(Some(repo));
         }
         let dir = self.dir_of(main, number);
         if tokio::fs::try_exists(dir.join(".git")).await.unwrap_or(false) {
-            return Ok(Repo::discover(&dir)?);
+            return Ok(Repo::discover_async(&dir).await?);
         }
-        if !make || !git::branch_exists(main.root(), &issue_branch(number))? {
+        if !make || !main.branch_exists_async(&issue_branch(number)).await? {
             return Ok(None);
         }
         let (dir, _) = self.worktree_async(main, number, &Self::main_branch(main)?).await?;
-        Ok(Repo::discover(&dir)?)
+        Ok(Repo::discover_async(&dir).await?)
     }
 
     pub fn published_changes(main: &Repo, number: i64, revision: ReviewRevision, receipt: &ProjectCheckReceipt, previous: Option<&str>) -> Result<Changes> {
@@ -316,29 +294,34 @@ impl Worktree {
         let branch = issue_branch(issue.number);
         let (place, head) = match self.checkout_async(main, issue.number, issue.worktree, false).await? {
             Some(place) => (place, "HEAD".to_string()),
-            None if git::branch_exists(main.root(), &branch)? => (main.clone(), branch.clone()),
+            None if main.branch_exists_async(&branch).await? => (main.clone(), branch.clone()),
             None => return Err(RuntimeError::Other("never sent".into())),
         };
         let on_worktree = head == "HEAD";
-        let head = git::commit_id(place.root(), &head)?;
-        let from = git::merge_base(place.root(), &base, &head)?;
-        let tree = if on_worktree { place.worktree_tree()? } else { place.tree_id(&head)? };
-        let commits = place.log(Some(&format!("{from}..{head}")), 0, 200)?;
-        let files = tree_diff(&place, &from, &tree)?;
-        let uncommitted = if on_worktree { tree_diff(&place, &head, &tree)? } else { vec![] };
-        let since_review = changes_since(&place, &tree, reviewed_tree)?;
+        let head = place.commit_id_async(&head).await?;
+        let from = place.merge_base_async(&base, &head).await?;
+        let tree = if on_worktree {
+            place.worktree_tree_async().await?
+        } else {
+            place.tree_id_async(&head).await?
+        };
+        let commits = place.log_async(Some(&format!("{from}..{head}")), 0, 200).await?;
+        let files = tree_diff_async(&place, &from, &tree).await?;
+        let uncommitted = if on_worktree { tree_diff_async(&place, &head, &tree).await? } else { vec![] };
+        let since_review = changes_since_async(&place, &tree, reviewed_tree).await?;
         let revision = ReviewRevision { base_commit: from, tree };
         let target = if child { base.clone() } else { Self::main_branch(main)? };
-        let conflicts = if git::branch_exists(main.root(), &branch)? {
-            match main.merge_check_between(&target, &branch)? {
+        let branch_exists = main.branch_exists_async(&branch).await?;
+        let conflicts = if branch_exists {
+            match main.merge_check_between_async(&target, &branch).await? {
                 MergeCheck::Conflicts(files) => files,
                 _ => vec![],
             }
         } else {
             vec![]
         };
-        let behind = if git::branch_exists(main.root(), &branch)? {
-            git::commits_between(main.root(), &branch, &base)?
+        let behind = if branch_exists {
+            main.commits_between_async(&branch, &base).await?
         } else {
             0
         };
@@ -379,7 +362,7 @@ impl Worktree {
                 Deliverable::Answer => Ok(Landed::Landed(Landing::None)),
                 Deliverable::Branch => {
                     let base = base()?;
-                    let has = git::branch_exists(main.root(), &branch)? && git::commits_between(main.root(), &base, &branch)? > 0;
+                    let has = main.branch_exists_async(&branch).await? && main.commits_between_async(&base, &branch).await? > 0;
                     Ok(Landed::Landed(if has { Landing::Kept } else { Landing::None }))
                 }
                 Deliverable::Change => {
@@ -387,7 +370,10 @@ impl Worktree {
                     let checkout = self.checkout_async(main, issue.number, issue.worktree, has_children).await?;
                     let reviewed = evidence.and_then(|e| e.reviews.last());
                     let checked = evidence.and_then(|e| e.check.as_ref());
-                    let current_tree = checkout.as_ref().map(Repo::worktree_tree).transpose()?;
+                    let current_tree = match checkout.as_ref() {
+                        Some(r) => Some(r.worktree_tree_async().await?),
+                        None => None,
+                    };
                     if let Some(tree) = &current_tree
                         && reviewed.is_some_and(|r| &r.revision.tree != tree)
                     {
@@ -399,37 +385,49 @@ impl Worktree {
                         return Ok(Landed::Merged(last.candidate_commit.clone()));
                     }
                     let place = checkout.ok_or_else(|| RuntimeError::Other("never sent: there is no work to merge".into()))?;
-                    if place.status()?.branch.as_deref() != Some(&branch) {
+                    if place.current_branch_async().await?.as_deref() != Some(&branch) {
                         return Err(RuntimeError::Other(format!("expected the issue checkout to be on {branch}")));
                     }
-                    place.commit_all(&format!("Issue #{}: {}", issue.number, issue.title))?;
+                    place.commit_all_async(&format!("Issue #{}: {}", issue.number, issue.title)).await?;
                     let message = format!("Merge issue #{}: {}", issue.number, issue.title);
                     let place_ref = &place;
                     let target_ref = &target;
                     let record = |rev: vibevalley_git::MergeRevision,
                                   result: &std::result::Result<bool, String>|
                      -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + '_>> {
-                        if reviewed.is_some_and(|r| r.revision.tree != rev.source_tree) || place_ref.worktree_tree().ok() != Some(rev.source_tree.clone()) {
-                            return Box::pin(async { Err(RuntimeError::Other(vibevalley_i18n::t("server.issue.reviewChanged", &[]))) });
-                        }
                         let status = match result {
                             Ok(true) => ProjectCheckStatus::Passed,
                             Ok(false) => ProjectCheckStatus::NotConfigured,
                             Err(_) => ProjectCheckStatus::Failed,
                         };
-                        save(ProjectCheckReceipt {
+                        let receipt = ProjectCheckReceipt {
                             target_branch: target_ref.clone(),
                             target_commit: rev.target,
-                            source_tree: rev.source_tree,
+                            source_tree: rev.source_tree.clone(),
                             candidate_commit: rev.candidate,
                             candidate_tree: rev.tree,
                             status,
                             command: (status != ProjectCheckStatus::NotConfigured).then(|| ".vibevalley/check".into()),
                             output: result.as_ref().err().cloned(),
+                        };
+                        let stale_reviewed = reviewed.is_some_and(|r| r.revision.tree != rev.source_tree);
+                        let source_tree = rev.source_tree;
+                        if stale_reviewed {
+                            return Box::pin(async { Err(RuntimeError::Other(vibevalley_i18n::t("server.issue.reviewChanged", &[]))) });
+                        }
+                        let save_fut = save(receipt);
+                        Box::pin(async move {
+                            if place_ref.worktree_tree_async().await.ok().as_ref() != Some(&source_tree) {
+                                return Err(RuntimeError::Other(vibevalley_i18n::t("server.issue.reviewChanged", &[])));
+                            }
+                            save_fut.await
                         })
                     };
                     Ok(
-                        match main.merge_verified_async(&target, &branch, &message, check::run_project_check, record).await? {
+                        match main
+                            .merge_verified_async(&target, &branch, &message, |root| async move { check::run_project_check(&root).await }, record)
+                            .await?
+                        {
                             VerifiedMerge::Conflict(paths) => Landed::Conflict(Conflict {
                                 base: target,
                                 files: paths.into_iter().map(|f| f.to_string_lossy().into_owned()).collect(),
@@ -448,7 +446,7 @@ impl Worktree {
         Ok(last.status != ProjectCheckStatus::Failed
             && last.target_commit != last.candidate_commit
             && worktree_tree.is_none_or(|tree| tree == last.source_tree)
-            && (!git::branch_exists(main.root(), branch)? || main.tree_id(branch)? == last.source_tree)
+            && (!main.branch_exists(branch)? || main.tree_id(branch)? == last.source_tree)
             && main.contains_commit(&format!("refs/heads/{}", last.target_branch), &last.candidate_commit)?)
     }
 
@@ -457,26 +455,29 @@ impl Worktree {
     /// into the branch. Not merged leaves it stuck with the reason; none
     /// when the child has no worktree to join.
     pub async fn join_async(&self, main: &Repo, child: &OnDisk<'_>, parent: &OnDisk<'_>, checks: &CheckoutChecks) -> Result<Option<Joined>> {
-        let Some(place) = child.worktree.and_then(|w| Repo::discover(Path::new(w)).ok().flatten()) else {
+        let Some(wt_path) = child.worktree else {
+            return Ok(None);
+        };
+        let Some(place) = Repo::discover_async(Path::new(wt_path)).await.ok().flatten() else {
             return Ok(None);
         };
         let parent_branch = issue_branch(parent.number);
-        let verified = place
-            .commit_all(&format!("Issue #{}: {}", child.number, child.title))
-            .map_err(|e| e.to_string())
-            .and_then(|_| verify_checkout(place.root(), &parent_branch, checks));
+        let verified = match place.commit_all_async(&format!("Issue #{}: {}", child.number, child.title)).await {
+            Ok(_) => verify_checkout_async(&place, &parent_branch, checks).await,
+            Err(e) => Err(e.to_string()),
+        };
         let frozen = match verified {
             Ok(frozen) => frozen,
             Err(why) => return Ok(Some(Joined::Stuck { why, conflict: None })),
         };
         let checkout = self.checkout_async(main, parent.number, parent.worktree, false).await?;
-        if checkout.is_none() && !git::branch_exists(main.root(), &parent_branch)? {
+        if checkout.is_none() && !main.branch_exists_async(&parent_branch).await? {
             return Err(RuntimeError::Other(format!("issue #{} has no branch", parent.number)));
         }
         let branch = issue_branch(child.number);
         let check = match &checkout {
-            Some(target) => target.merge_check(&branch)?,
-            None => main.merge_check_between(&parent_branch, &branch)?,
+            Some(target) => target.merge_check_async(&branch).await?,
+            None => main.merge_check_between_async(&parent_branch, &branch).await?,
         };
         match check {
             MergeCheck::Conflicts(files) => {
@@ -491,8 +492,8 @@ impl Worktree {
             MergeCheck::Clean => {
                 let message = format!("Merge issue #{} into #{}", child.number, parent.number);
                 match &checkout {
-                    Some(target) => target.merge(&branch, Some(&message))?,
-                    None => main.merge_into(&parent_branch, &branch, &message)?,
+                    Some(target) => target.merge_async(&branch, Some(&message)).await?,
+                    None => main.merge_into_async(&parent_branch, &branch, &message).await?,
                 };
             }
         }
@@ -517,14 +518,14 @@ impl Worktree {
         if leave == Leave::Integrated && dir.exists() {
             main.worktree_remove(&dir, false)?;
         } else {
-            git::remove_worktree(&main, &dir)?;
+            remove_worktree(&main, &dir)?;
         }
         let into = s.base.clone().map(Ok).unwrap_or_else(|| Self::main_branch(&main))?;
-        let discard = leave == Leave::Discard && !git::has_unmerged(main.root(), s.branch, &into).unwrap_or(true);
+        let discard = leave == Leave::Discard && !main.has_unmerged(s.branch, &into).unwrap_or(true);
         if discard || s.drafting {
-            git::delete_branch(main.root(), s.branch)?;
+            main.delete_branch(s.branch)?;
         } else {
-            git::delete_branch_if_merged(main.root(), s.branch, &into)?;
+            main.delete_branch_if_merged(s.branch, &into)?;
         }
         Ok(())
     }
@@ -536,7 +537,7 @@ impl Worktree {
             main.worktree_remove(&dir, false)?;
         }
         let target = Self::main_branch(main)?;
-        git::delete_branch_if_merged(main.root(), &issue_branch(number), &target)?;
+        main.delete_branch_if_merged(&issue_branch(number), &target)?;
         Ok(())
     }
 
@@ -544,12 +545,12 @@ impl Worktree {
     /// unless it has work the main branch lacks (then false, nothing else gone
     /// but the checkout).
     pub fn discard(&self, main: &Repo, number: i64) -> Result<bool> {
-        git::remove_worktree(main, &self.dir_of(main, number))?;
+        remove_worktree(main, &self.dir_of(main, number))?;
         let into = Self::main_branch(main)?;
-        if git::has_unmerged(main.root(), &issue_branch(number), &into).unwrap_or(false) {
+        if main.has_unmerged(&issue_branch(number), &into).unwrap_or(false) {
             return Ok(false);
         }
-        git::delete_branch(main.root(), &issue_branch(number))?;
+        main.delete_branch(&issue_branch(number))?;
         Ok(true)
     }
 
@@ -562,6 +563,22 @@ impl Worktree {
     }
 }
 
+fn remove_worktree(main: &Repo, dir: &Path) -> Result<()> {
+    if dir.exists() {
+        main.worktree_remove(dir, true)?;
+    }
+    let _ = main.worktree_prune();
+    Ok(())
+}
+
+async fn remove_worktree_async(main: &Repo, dir: &Path) -> Result<()> {
+    if tokio::fs::try_exists(dir).await.unwrap_or(false) {
+        main.worktree_remove_async(dir, true).await?;
+    }
+    let _ = main.worktree_prune_async().await;
+    Ok(())
+}
+
 fn tree_diff(repo: &Repo, from: &str, to: &str) -> Result<Vec<vibevalley_git::FileDiff>> {
     Ok(repo.diff(
         &vibevalley_git::DiffTarget::Range {
@@ -570,6 +587,18 @@ fn tree_diff(repo: &Repo, from: &str, to: &str) -> Result<Vec<vibevalley_git::Fi
         },
         None,
     )?)
+}
+
+async fn tree_diff_async(repo: &Repo, from: &str, to: &str) -> Result<Vec<vibevalley_git::FileDiff>> {
+    Ok(repo
+        .diff_async(
+            &vibevalley_git::DiffTarget::Range {
+                from: from.into(),
+                to: to.into(),
+            },
+            None,
+        )
+        .await?)
 }
 
 fn changes_since(repo: &Repo, tree: &str, previous: Option<&str>) -> Result<Option<Vec<vibevalley_git::FileDiff>>> {
@@ -582,23 +611,34 @@ fn changes_since(repo: &Repo, tree: &str, previous: Option<&str>) -> Result<Opti
     Ok(Some(tree_diff(repo, previous, tree)?))
 }
 
+async fn changes_since_async(repo: &Repo, tree: &str, previous: Option<&str>) -> Result<Option<Vec<vibevalley_git::FileDiff>>> {
+    let Some(previous) = previous.filter(|previous| *previous != tree) else {
+        return Ok(None);
+    };
+    if !matches!(previous.len(), 40 | 64) || !previous.bytes().all(|c| c.is_ascii_hexdigit()) || repo.tree_id_async(previous).await? != previous {
+        return Err(RuntimeError::Other("expected a Git tree object ID for the previous review".into()));
+    }
+    Ok(Some(tree_diff_async(repo, previous, tree).await?))
+}
+
 /// A child's checks run in its worktree, against the parent's branch.
 /// Returns the files to freeze for an acceptance child.
-fn verify_checkout(root: &Path, parent_branch: &str, checks: &CheckoutChecks) -> std::result::Result<Option<Vec<String>>, String> {
-    let changed = || git::changed_files(root, parent_branch).map_err(|e| e.to_string());
+async fn verify_checkout_async(place: &Repo, parent_branch: &str, checks: &CheckoutChecks) -> std::result::Result<Option<Vec<String>>, String> {
+    let root = place.root();
     match checks {
         CheckoutChecks::Acceptance { check } => {
             if check.is_empty() {
                 return Err("an acceptance child needs a check command".into());
             }
-            if check::run_command(root, check).is_ok() {
+            if check::run_command(root, check).await.is_ok() {
                 return Err(format!("The acceptance check `{check}` passed; it must fail before the feature is built."));
             }
-            changed().map(Some)
+            place.changed_files_async(parent_branch).await.map_err(|e| e.to_string()).map(Some)
         }
         CheckoutChecks::Plain { frozen, checks } => {
-            let check_frozen = || -> std::result::Result<(), String> {
-                let touched: Vec<String> = changed()?.into_iter().filter(|f| frozen.contains(f)).collect();
+            let check_frozen = || async {
+                let changed = place.changed_files_async(parent_branch).await.map_err(|e| e.to_string())?;
+                let touched: Vec<String> = changed.into_iter().filter(|f| frozen.contains(f)).collect();
                 if touched.is_empty() {
                     Ok(())
                 } else {
@@ -606,15 +646,15 @@ fn verify_checkout(root: &Path, parent_branch: &str, checks: &CheckoutChecks) ->
                 }
             };
             if !frozen.is_empty() {
-                check_frozen()?;
+                check_frozen().await?;
             }
             for check in checks {
-                if let Err(output) = check::run_command(root, check) {
+                if let Err(output) = check::run_command(root, check).await {
                     return Err(format!("The check `{check}` failed:\n{output}"));
                 }
             }
             if !frozen.is_empty() {
-                check_frozen()?;
+                check_frozen().await?;
             }
             Ok(None)
         }

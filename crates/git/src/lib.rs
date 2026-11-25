@@ -1,7 +1,7 @@
-//! git through the system `git` binary only (no git library). Every call
-//! spawns `git` and parses its output, so hooks, signing and user config
-//! behave exactly as in the user's terminal. All functions block; callers run
-//! them on background threads.
+//! git through pure-Rust `.git` metadata/ref readers and the system `git`
+//! binary via Tokio (`tokio::process::Command`). Every subprocess call keeps
+//! isolated repository env protections; synchronous `Repo` methods bridge
+//! cleanly onto the async implementation.
 //!
 //! CONTRACT: the items in this file are the public API other crates compile
 //! against. The owner may add items; do not rename or remove existing ones.
@@ -10,8 +10,9 @@ use std::path::PathBuf;
 
 mod cmd;
 mod diff;
+pub mod read;
 mod repo;
-pub use repo::{RawOutput, clone, init};
+pub use repo::{RawOutput, clone, clone_async, init, init_async};
 mod status;
 mod verified_merge;
 pub use verified_merge::{MergeRevision, VerifiedMerge};

@@ -646,9 +646,10 @@ impl Repo {
                             return None;
                         }
                         let origin = if p.git {
-                            let path = p.path.clone();
-                            crate::log::spawn_blocking_traced(move || github_origin(&git_quiet(&path, &["remote", "get-url", "origin"])))
-                                .await
+                            vibevalley_git::read::remote_url(&p.path, "origin")
+                                .ok()
+                                .flatten()
+                                .map(|u| github_origin(&u))
                                 .unwrap_or_default()
                         } else {
                             String::new()
@@ -871,7 +872,7 @@ async fn ensure_under_async(repos_root: &Path, name: &str) -> Result<PathBuf, Ap
         let p_check = path.clone();
         let initial_short = t("server.repo.commit.initialShort", &[]);
         crate::log::spawn_blocking_traced(move || {
-            if !git_raw(&p_check, &["rev-parse", "--verify", "HEAD"]).is_ok_and(|r| r.ok()) {
+            if vibevalley_git::read::head(&p_check).ok().flatten().is_none() {
                 commit(&p_check, &initial_short)?;
             }
             Ok::<_, ApiError>(())
@@ -929,12 +930,10 @@ async fn repo_dirs_async(root: &Path, max_depth: usize) -> Vec<PathBuf> {
 }
 
 fn global_email() -> String {
-    std::process::Command::new("git")
-        .args(["config", "--global", "user.email"])
-        .output()
+    vibevalley_git::read::global_config_value("user", "email")
         .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_lowercase())
+        .flatten()
+        .map(|e| e.trim().to_lowercase())
         .unwrap_or_default()
 }
 
@@ -945,7 +944,7 @@ pub async fn contributions_of_async(root: PathBuf, extra: Vec<String>) -> Vec<vi
     if dirs.is_empty() {
         return vec![];
     }
-    let global = crate::log::spawn_blocking_traced(global_email).await.unwrap_or_default();
+    let global = global_email();
     let extra_lower: Arc<Vec<String>> = Arc::new(extra.into_iter().map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect());
 
     let sem = Arc::new(Semaphore::new(REPO_CONCURRENCY));
@@ -956,8 +955,8 @@ pub async fn contributions_of_async(root: PathBuf, extra: Vec<String>) -> Vec<vi
             async move {
                 let Ok(_permit) = sem.acquire_owned().await else { return None };
                 crate::log::spawn_blocking_traced(move || {
-                    let common = git_quiet(&dir, &["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-                    (!common.is_empty()).then_some((idx, dir, common))
+                    let common = vibevalley_git::read::git_common_dir(&dir).ok()?;
+                    Some((idx, dir, common))
                 })
                 .await
                 .ok()
@@ -997,11 +996,11 @@ pub async fn contributions_of_async(root: PathBuf, extra: Vec<String>) -> Vec<vi
                         [global, own].into_iter().chain(extra_lower.iter().cloned()).filter(|e| !e.is_empty()).collect();
                     let emails = git_quiet(&dir, &["log", "--all", "--format=%ae"]);
                     let commits = emails.lines().filter(|e| !e.is_empty() && mine.contains(&e.to_lowercase())).count() as i64;
-                    let top = git_quiet(&dir, &["rev-parse", "--show-toplevel"]);
+                    let top = vibevalley_git::read::discover_root(&dir).ok().flatten();
                     (
                         idx,
                         vibevalley_protocol::Repo {
-                            path: if top.is_empty() { dir.display().to_string() } else { top },
+                            path: top.unwrap_or(dir).display().to_string(),
                             commits,
                         },
                     )

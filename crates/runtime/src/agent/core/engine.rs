@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use tokio::process::Command;
 
 use crate::BoxFuture;
 use crate::agent::BrainError;
@@ -1536,16 +1535,12 @@ fn record_tool_file_op(ops: &mut FileOps, tool_name: &str, args: &Value) {
 
 pub async fn git_status_summary(cwd: Option<&Path>) -> Option<String> {
     let dir = cwd?;
-    let output = Command::new("git")
-        .args(["-C", &dir.to_string_lossy(), "status", "--short"])
-        .kill_on_drop(true)
-        .output()
-        .await
-        .ok()?;
-    if !output.status.success() {
+    let repo = vibevalley_git::Repo::discover_async(dir).await.ok().flatten()?;
+    let output = repo.run_async(&["status", "--short"]).await.ok()?;
+    if !output.ok() {
         return None;
     }
-    let raw = String::from_utf8_lossy(&output.stdout);
+    let raw = output.text();
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;

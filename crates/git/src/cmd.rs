@@ -1,10 +1,19 @@
-//! Spawning `git` with a predictable environment.
+//! Spawning `git` via Tokio with a predictable environment.
 
 use std::ffi::{OsStr, OsString};
-use std::io::Write;
+use std::future::Future;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::pin::pin;
+use std::process::Stdio;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock};
+use std::task::{Context, Poll, Wake, Waker};
+use std::thread::Thread;
+
+use tokio::io::AsyncWriteExt;
+use tokio::process::Command;
+use tokio::runtime::{Handle, Runtime};
 
 use crate::{GitError, Result};
 
@@ -19,6 +28,65 @@ const REPO_OVERRIDES: &[&str] = &[
     "GIT_NAMESPACE",
     "GIT_PREFIX",
 ];
+
+fn runtime() -> &'static Runtime {
+    static RUNTIME: OnceLock<Runtime> = OnceLock::new();
+    RUNTIME.get_or_init(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .thread_name("vibevalley-git")
+            .build()
+            .expect("vibevalley-git tokio runtime")
+    })
+}
+
+struct ThreadWaker {
+    thread: Thread,
+    notified: AtomicBool,
+}
+
+impl Wake for ThreadWaker {
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.notified.store(true, Ordering::Release);
+        self.thread.unpark();
+    }
+}
+
+fn block_on_park<F: Future>(future: F) -> F::Output {
+    let mut future = pin!(future);
+    let signal = Arc::new(ThreadWaker {
+        thread: std::thread::current(),
+        notified: AtomicBool::new(false),
+    });
+    let waker = Waker::from(signal.clone());
+    let mut cx = Context::from_waker(&waker);
+    loop {
+        match future.as_mut().poll(&mut cx) {
+            Poll::Ready(output) => return output,
+            Poll::Pending => {
+                while !signal.notified.swap(false, Ordering::Acquire) {
+                    std::thread::park();
+                }
+            }
+        }
+    }
+}
+
+/// Bridges synchronous `Repo` methods onto Tokio without failing when already inside a Tokio runtime.
+pub(crate) fn block_on<F: Future>(future: F) -> F::Output {
+    match Handle::try_current() {
+        Err(_) => runtime().block_on(future),
+        Ok(_) => {
+            let _guard = runtime().enter();
+            block_on_park(future)
+        }
+    }
+}
 
 pub(crate) struct Output {
     pub code: i32,
@@ -100,9 +168,10 @@ impl<'a> Cmd<'a> {
         self.args[0].to_string_lossy().into_owned()
     }
 
-    /// Runs git and returns whatever it exited with.
-    pub fn output(self) -> Result<Output> {
+    /// Runs git asynchronously and returns whatever it exited with.
+    pub async fn output_async(self) -> Result<Output> {
         let mut command = Command::new("git");
+        command.kill_on_drop(true);
         command.current_dir(self.cwd);
         for var in REPO_OVERRIDES {
             command.env_remove(var);
@@ -137,18 +206,17 @@ impl<'a> Cmd<'a> {
             }
         })?;
 
-        // Fed from another thread: git may fill its stdout pipe before it
-        // has read all of a large patch.
-        let writer = self.stdin.map(|data| {
-            let mut pipe = child.stdin.take().expect("stdin was piped");
-            std::thread::spawn(move || {
-                let _ = pipe.write_all(&data);
-            })
-        });
-        let out = child.wait_with_output().map_err(|e| GitError::Io(e.to_string()))?;
-        if let Some(writer) = writer {
-            let _ = writer.join();
-        }
+        // Write stdin concurrently so git cannot deadlock when stdout fills before stdin EOF.
+        let stdin_pipe = child.stdin.take();
+        let stdin_data = self.stdin;
+        let write_stdin = async move {
+            if let (Some(mut pipe), Some(data)) = (stdin_pipe, stdin_data) {
+                let _ = pipe.write_all(&data).await;
+                let _ = pipe.shutdown().await;
+            }
+        };
+        let ((), wait_out) = tokio::join!(write_stdin, child.wait_with_output());
+        let out = wait_out.map_err(|e| GitError::Io(e.to_string()))?;
 
         Ok(Output {
             // Killed by a signal: report as a generic failure.
@@ -158,10 +226,10 @@ impl<'a> Cmd<'a> {
         })
     }
 
-    /// Runs git and fails unless it exits with 0.
-    pub fn run(self) -> Result<Output> {
+    /// Runs git asynchronously and fails unless it exits with 0.
+    pub async fn run_async(self) -> Result<Output> {
         let label = self.label();
-        let out = self.output()?;
+        let out = self.output_async().await?;
         if out.ok() { Ok(out) } else { Err(failure(&label, &out)) }
     }
 }
