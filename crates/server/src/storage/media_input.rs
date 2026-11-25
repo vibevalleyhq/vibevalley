@@ -16,8 +16,8 @@ use vibevalley_protocol::{ApiError, AttachmentFile, BizCode, MediaInput, MediaIn
 use super::attachment::AttachmentStorage;
 use super::validate;
 use crate::context::{Context, Ticker};
-use crate::db::Tx;
 use crate::log::spawn_blocking_traced;
+use crate::service::Tx;
 
 const LIFETIME: i64 = 86_400_000;
 const QUOTA_BYTES: i64 = 2 * 1024 * 1024 * 1024;

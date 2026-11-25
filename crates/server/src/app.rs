@@ -6,6 +6,9 @@ use std::sync::{Arc, OnceLock};
 
 use crate::agent::{Agent, AgentDriver, Mcp, Memory, Orchestrator, OrchestratorParts, PendingExecution, Profile, Resource, ToolRegistry};
 use crate::artifact::Manager as ArtifactManager;
+use crate::boot::{
+    LazyCronOrchestrator, build_runtimes, register_session_reported_outbox, seat_orchestrators_and_watch, spawn_chat_artifact_bridge, spawn_skin_event_bridge,
+};
 use crate::channel::Chat;
 use crate::config::failed;
 pub use crate::config::{Config, StartError};
@@ -14,18 +17,16 @@ use crate::context::port::{CronOrchestratorPort, MemoryRecallPort};
 use crate::context::{Context, Fetch, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup, install_tls};
 use crate::cron::Scheduler as CronScheduler;
 use crate::debug::DebugKit;
+use crate::debug_sources::build_debug_kit;
 use crate::game::Game;
 use crate::gateway::api::{GatewayMeta, GatewayPorts, Server};
 use crate::gateway::remote::Remote;
 use crate::issue::{Board, IssueChat, Publisher, Pull, SessionChat};
 use crate::machine::Machine;
-use crate::projection::{
-    AppCore, LazyCronOrchestrator, build_debug_kit, build_runtimes, finish_boot_and_start_feeds, register_session_reported_outbox,
-    seat_orchestrators_and_watch, spawn_chat_artifact_bridge, spawn_skin_event_bridge,
-};
+use crate::projection::finish_boot_and_start_feeds;
 use crate::provider::Provider;
 use crate::repo::Repo;
-use crate::router::Router;
+use crate::router::{AppCore, Router};
 use crate::runtime::{Runtime, RuntimeConfig, SessionDriver};
 use crate::service::Service;
 use crate::setting::{Setting, SettingConfig};
@@ -313,7 +314,7 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
 
     let game = Game::open_async(&config.home, ctx.clone(), repo.clone()).await;
     game.count_commits(config.git_emails.clone());
-    spawn_skin_event_bridge(&ctx, &game, &runtime, &channel);
+    spawn_skin_event_bridge(&ctx, &game, &runtime, &channel).await;
     register_session_reported_outbox(&ctx, &issue_chat, &session_chat, &agent, &game, &runtime);
 
     let debug = build_debug_kit(
@@ -371,7 +372,7 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
     let gw = GatewayMeta::new(ports, observer, fault_gate, config.host_debug, active_subscriptions);
     let router = Router::new(core.clone(), remote.clone(), gw);
 
-    finish_boot_and_start_feeds(&core);
+    finish_boot_and_start_feeds(&core.ctx, &core.board, &core.channel, &core.cron, &core.artifact, &core.game);
     core.ctx.feed.flush().await;
     core.board.refresh_queue_async().await.map_err(|e| failed("the queue")(&e))?;
     remote.restore_if_enabled_async(router.clone()).await;

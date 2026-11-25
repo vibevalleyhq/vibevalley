@@ -32,7 +32,7 @@ pub(crate) use session::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
 pub use worktree::{Changes, Delivery, Joined, Landed, Leave, Leaving, OnDisk, Worktree, issue_branch};
 
 use crate::context::{Context, now};
-use crate::db::DbError;
+use crate::service::DbError;
 use crate::storage::Storage;
 
 /// Errors returned by [`Runtime`], [`Worktree`], and [`crate::issue::Board`].
@@ -413,7 +413,6 @@ pub async fn reopen_sessions_async(ctx: &Arc<Context>) -> Result<Opened> {
         }
     }
 
-    let mut sessions = Vec::new();
     let mut opened = Opened::default();
     for mut session in stored {
         let lost = session.machine.is_none()
@@ -474,14 +473,6 @@ pub async fn reopen_sessions_async(ctx: &Arc<Context>) -> Result<Opened> {
         }
         if lost {
             opened.lost.extend(session.issue_id().map(String::from));
-        } else {
-            sessions.push(session);
-        }
-    }
-    for (idx, session) in sessions.iter().enumerate() {
-        if vibevalley_core::status::is_farm_worker(session) {
-            let others: Vec<&Session> = sessions.iter().take(idx).collect();
-            ctx.live.ensure_play_station(session, &others, None);
         }
     }
     ctx.mark_dirty(SliceMask::BOARD | SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
@@ -575,6 +566,10 @@ impl Runtime {
 
     pub fn subscribe_events(&self) -> broadcast::Receiver<SessionLifecycleEvent> {
         self.session.subscribe_events()
+    }
+
+    pub fn subscribe_doing(&self) -> broadcast::Receiver<(String, Millis, vibevalley_protocol::Doing)> {
+        self.session.subscribe_doing()
     }
 
     pub fn who(&self, token: &str) -> Option<String> {

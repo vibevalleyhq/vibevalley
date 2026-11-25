@@ -2,111 +2,15 @@
 //! `cooldown`). Inspects only channel tables and types, with zero imports of
 //! `issue`, `runtime`, or `agent`.
 
-use std::collections::HashMap;
-use std::sync::Arc;
-
 use vibevalley_protocol::{Actor, ChannelType, EVERYONE, MessageKind, Outcome, SubjectKind, USER_ID};
 
 use super::model::ChatModel;
-use super::ops::profile_id;
-use super::types::{Committed, actor_of, message_kind, meta_of};
+use super::types::{Committed, DeliveryTargetKind, HeldBy, Reach, Reason, actor_of, message_kind, meta_of, profile_id};
 use crate::service::channel::ParticipantRow;
 
 /// How many times agents' words may wake someone in one place before the
 /// user speaks there again.
 pub const HOP_LIMIT: usize = 4;
-/// A session woken by an agent's words is not woken by another's within
-/// this; an orchestrator always is.
-const AGENT_WAKE_COOLDOWN_MS: i64 = 60_000;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Reason {
-    Mention,
-    Everyone,
-    OwnThread,
-    Member,
-    Channel,
-    Direct,
-    Addressed,
-}
-
-impl Reason {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Reason::Mention => "mention",
-            Reason::Everyone => "everyone",
-            Reason::OwnThread => "own_thread",
-            Reason::Member => "member",
-            Reason::Channel => "channel",
-            Reason::Direct => "direct",
-            Reason::Addressed => "addressed",
-        }
-    }
-
-    pub fn from_db(s: &str) -> Self {
-        match s {
-            "mention" => Reason::Mention,
-            "everyone" => Reason::Everyone,
-            "own_thread" => Reason::OwnThread,
-            "member" => Reason::Member,
-            "channel" => Reason::Channel,
-            "direct" => Reason::Direct,
-            _ => Reason::Addressed,
-        }
-    }
-}
-
-/// Which brake held a delivery back from waking its recipient.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HeldBy {
-    HopLimit,
-    Cooldown,
-}
-
-impl HeldBy {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            HeldBy::HopLimit => "hop_limit",
-            HeldBy::Cooldown => "cooldown",
-        }
-    }
-
-    pub fn from_db(s: &str) -> Option<Self> {
-        match s {
-            "hop_limit" => Some(HeldBy::HopLimit),
-            "cooldown" => Some(HeldBy::Cooldown),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DeliveryTargetKind {
-    Session,
-    Issue,
-    Orchestrator,
-    Direct,
-}
-
-impl DeliveryTargetKind {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            DeliveryTargetKind::Session => "session",
-            DeliveryTargetKind::Issue => "issue",
-            DeliveryTargetKind::Orchestrator => "orchestrator",
-            DeliveryTargetKind::Direct => "direct",
-        }
-    }
-
-    pub fn from_db(s: &str) -> Self {
-        match s {
-            "session" => DeliveryTargetKind::Session,
-            "issue" => DeliveryTargetKind::Issue,
-            "orchestrator" => DeliveryTargetKind::Orchestrator,
-            _ => DeliveryTargetKind::Direct,
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Recipient {
@@ -161,27 +65,6 @@ pub struct PlannedDelivery {
 pub struct DispatchPlan {
     pub deliveries: Vec<PlannedDelivery>,
     pub hop_limit_hit: bool,
-}
-
-/// A durable pending delivery written to `channel_delivery` on commit.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QueuedDelivery {
-    pub id: i64,
-    pub message_id: String,
-    pub channel_id: String,
-    pub recipient_kind: DeliveryTargetKind,
-    pub recipient_id: String,
-    pub reason: Reason,
-    pub wakes: bool,
-    pub held_by: Option<HeldBy>,
-}
-
-/// Non-blocking dispatch notification emitted after a message and its pending
-/// `channel_delivery` rows commit.
-#[derive(Debug, Clone)]
-pub struct ChannelDispatched {
-    pub committed: Arc<Committed>,
-    pub deliveries: Vec<QueuedDelivery>,
 }
 
 fn is_user(a: &Actor) -> bool {
@@ -328,44 +211,6 @@ pub fn brakes(deliveries: Vec<Recipient>, input: &BrakeInput) -> Vec<Recipient> 
             d
         })
         .collect()
-}
-
-/// The hops per place and each session's last wake by agents' words.
-#[derive(Debug, Clone, Default)]
-pub struct Reach {
-    hops_in: HashMap<String, usize>,
-    last_wake_of: HashMap<String, i64>,
-}
-
-impl Reach {
-    pub fn user_spoke(&mut self, scope: &str) {
-        self.hops_in.remove(scope);
-    }
-
-    pub fn hops(&self, scope: &str) -> usize {
-        self.hops_in.get(scope).copied().unwrap_or(0)
-    }
-
-    pub fn cooling(&self, of: &[String], at: i64) -> Vec<String> {
-        of.iter()
-            .filter(|s| self.last_wake_of.get(*s).is_some_and(|last| at - last < AGENT_WAKE_COOLDOWN_MS))
-            .cloned()
-            .collect()
-    }
-
-    pub fn woke(&mut self, scope: &str, session: &str, at: i64) {
-        let last = self.last_wake_of.entry(session.to_string()).or_insert(0);
-        *last = (*last).max(at);
-        *self.hops_in.entry(scope.to_string()).or_insert(0) += 1;
-    }
-
-    pub fn left(&mut self, session: &str) {
-        self.last_wake_of.remove(session);
-    }
-
-    pub fn channel_removed(&mut self, channel: &str) {
-        self.hops_in.remove(&format!("channel:{channel}"));
-    }
 }
 
 fn is_active_orchestrator(p: &ParticipantRow) -> bool {

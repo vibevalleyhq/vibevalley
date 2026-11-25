@@ -16,7 +16,7 @@ use vibevalley_core::{SliceMask, derive_issues, overlay_sessions};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Deliverable, Doing, Issue, IssueAnswer, IssueReportMemoryScope, LastRun, Millis, Outcome, Phase, PhaseDone, PhaseFailed, PhaseResting,
-    PhaseWorking, Question, RunTrigger, Session, SessionAction, SessionSubagents, Spent,
+    PhaseWorking, ProjectCheckStatus, Question, RunTrigger, Session, SessionAction, SessionClose, SessionSubagents, Spent,
 };
 use vibevalley_runtime::agent::durable::BoxFuture;
 use vibevalley_runtime::oar::{ContentBlock, EventKind, McpServer, PermissionDecision, PermissionMode, SessionOptions, StopReason};
@@ -28,9 +28,9 @@ use super::report::{Report, ReportQuestion, ReportStatus};
 use crate::context::error::{LookIn, missing};
 use crate::context::live::LiveSessionSnapshot;
 use crate::context::{Context, now};
-use crate::db::DbError;
 use crate::runtime::worktree::{Leave, Leaving, Worktree};
 use crate::runtime::{IssueChange, Result, RuntimeConfig, RuntimeError, Step, find_issue};
+use crate::service::DbError;
 use crate::service::session::SessionExtra;
 
 pub(crate) use crate::context::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
@@ -39,7 +39,12 @@ pub(crate) use crate::context::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
 #[derive(Debug, Clone)]
 pub enum SessionLifecycleEvent {
     Changed(Box<Session>),
-    Left { at: Millis, id: String },
+    Left {
+        at: Millis,
+        id: String,
+        closed: Option<SessionClose>,
+        merged_commits: Option<i64>,
+    },
 }
 
 pub(super) fn ended_phase(outcome: Outcome) -> Phase {
@@ -110,6 +115,7 @@ pub(super) struct Inner {
     pub config: Arc<RuntimeConfig>,
     pub trajectory: Option<Arc<Trajectory>>,
     events: broadcast::Sender<SessionLifecycleEvent>,
+    doing_events: broadcast::Sender<(String, Millis, Doing)>,
     live: SessionGenerationTable<Arc<dyn vibevalley_runtime::oar::Session>>,
     pub(super) extras: Mutex<HashMap<String, SessionExtra>>,
     door: Mutex<Door>,
@@ -143,6 +149,7 @@ impl SessionEngine {
             );
         }
         let (events, _) = broadcast::channel(256);
+        let (doing_events, _) = broadcast::channel(512);
         Ok(SessionEngine(Arc::new(Inner {
             ctx,
             durable,
@@ -153,6 +160,7 @@ impl SessionEngine {
             config,
             trajectory,
             events,
+            doing_events,
             live: SessionGenerationTable::new(),
             extras: Mutex::new(extras),
             door: Mutex::new(Door::default()),
@@ -191,6 +199,11 @@ impl SessionEngine {
     /// Subscribes to in-domain session lifecycle events (`Changed`, `Left`).
     pub fn subscribe_events(&self) -> broadcast::Receiver<SessionLifecycleEvent> {
         self.0.events.subscribe()
+    }
+
+    /// Subscribes to in-domain working tool/action updates `(session_id, at, doing)`.
+    pub fn subscribe_doing(&self) -> broadcast::Receiver<(String, Millis, Doing)> {
+        self.0.doing_events.subscribe()
     }
 
     pub(super) fn emit_lifecycle(&self, event: SessionLifecycleEvent) {
@@ -581,7 +594,6 @@ impl SessionEngine {
             .as_ref()
             .filter(|s| s.disconnected_at.is_some() && s.root_thread_id == agent.id())
             .cloned();
-        let is_worker = vibevalley_core::status::is_farm_worker(&session);
         let run_id = extra.run.clone();
         {
             let _write = self.0.write_lock.lock().await;
@@ -618,11 +630,6 @@ impl SessionEngine {
             self.0.ctx.mark_dirty(written_dirty);
         }
         self.sync_live_snapshot(&session, run_id.as_deref());
-        if is_worker {
-            let all_sessions = self.sessions_async().await?;
-            let others: Vec<&Session> = all_sessions.iter().filter(|x| x.id != session.id).collect();
-            self.0.ctx.live.ensure_play_station(&session, &others, None);
-        }
         self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(session)));
         if let Some(before) = previous {
             let me = self.clone();
@@ -840,6 +847,45 @@ impl SessionEngine {
         Ok(())
     }
 
+    /// Counts commits merged into the target branch for an integrated issue session
+    /// before its branch is removed by [`Worktree::release`].
+    async fn resolve_integrated_merge_async(&self, session: &Session) -> (Option<SessionClose>, Option<i64>) {
+        let Some(issue_id) = session.issue_id() else {
+            return (Some(SessionClose::Completed), None);
+        };
+        let Ok(Some(issue)) = self.0.ctx.service.issue.get(issue_id).await else {
+            return (Some(SessionClose::Completed), None);
+        };
+        let Some(check) = issue
+            .delivery_evidence
+            .as_ref()
+            .and_then(|e| e.check.as_ref())
+            .filter(|c| c.status != ProjectCheckStatus::Failed && c.target_commit != c.candidate_commit)
+        else {
+            return (Some(SessionClose::Completed), None);
+        };
+        let commits = if session.machine.is_none()
+            && let Some(repo) = session.repo_name()
+            && let Ok(Some(main)) = vibevalley_git::Repo::discover_async(&self.0.worktree.repo_dir(repo)).await
+        {
+            let to_ref = match session.worktree_branch() {
+                Some(branch) if main.branch_exists_async(branch).await.unwrap_or(false) => branch,
+                _ => check.candidate_commit.as_str(),
+            };
+            main.commits_between_async(&check.target_commit, to_ref)
+                .await
+                .ok()
+                .and_then(|n| i64::try_from(n).ok())
+                .filter(|n| *n > 0)
+        } else {
+            None
+        };
+        match commits {
+            Some(n) => (Some(SessionClose::Merged), Some(n)),
+            None => (Some(SessionClose::Completed), None),
+        }
+    }
+
     /// Lets a session go: its agent stops, its open round ends, its
     /// worktree is left as `leave` says, and it leaves the board.
     pub async fn dismiss_async(&self, session_id: &str, leave: Leave) -> Result<()> {
@@ -851,6 +897,10 @@ impl SessionEngine {
         if session.as_ref().is_some_and(|s| s.phase.is_working()) {
             self.end_run_async(session_id, Outcome::Interrupted, "", None).await?;
         }
+        let (closed, merged_commits) = match (&session, leave) {
+            (Some(s), Leave::Integrated) => self.resolve_integrated_merge_async(s).await,
+            _ => (None, None),
+        };
         if let Some(s) = &session
             && s.machine.is_none()
             && let (Some(repo), Some(worktree), Some(branch)) = (s.repo_name(), s.cwd.as_deref(), s.worktree_branch())
@@ -886,10 +936,11 @@ impl SessionEngine {
                 self.0.ctx.mark_dirty(written_dirty);
             }
             self.0.ctx.live.remove_session(session_id);
-            self.0.ctx.live.remove_play(session_id);
             self.emit_lifecycle(SessionLifecycleEvent::Left {
                 at,
                 id: session_id.to_string(),
+                closed,
+                merged_commits,
             });
         } else {
             self.0.ctx.service.session.remove_extra(session_id).await?;
@@ -1225,7 +1276,7 @@ impl SessionEngine {
             snap.phase = Some(phase);
             snap.last_event_at = Some(at);
         });
-        self.0.ctx.live.record_play_working(session_id, at, true, &doing);
+        let _ = self.0.doing_events.send((session_id.to_string(), at, doing));
         self.0.ctx.mark_dirty(SliceMask::SESSIONS | SliceMask::INBOX | SliceMask::FARM);
     }
 
@@ -1405,9 +1456,6 @@ impl SessionEngine {
                 snap.spent = updated_session.spent.clone();
                 snap.last_event_at = Some(at);
             });
-            if let Some(eff) = vibevalley_core::game::session_failed_penalty(&updated_session, outcome) {
-                self.0.ctx.live.push_farm_effect(eff);
-            }
             self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(updated_session)));
         }
         Ok(())
@@ -1827,22 +1875,24 @@ mod tests {
             sessions.go_live_async(agent, session, None).await.unwrap();
             tokio::task::yield_now().await;
 
+            let live_phase = || ctx.live.session("w-quiet").and_then(|s| s.phase);
+
             tokio::time::advance(Duration::from_secs(290)).await;
             tokio::task::yield_now().await;
             assert!(
-                matches!(sessions.session_async("w-quiet").await.unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_none()),
+                matches!(live_phase(), Some(Phase::Working(ref w)) if w.quiet_since.is_none()),
                 "session must not be quiet before quiet_after elapses"
             );
 
             tokio::time::advance(Duration::from_secs(15)).await;
             for _ in 0..8 {
                 tokio::task::yield_now().await;
-                if matches!(sessions.session_async("w-quiet").await.unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_some()) {
+                if matches!(live_phase(), Some(Phase::Working(ref w)) if w.quiet_since.is_some()) {
                     break;
                 }
             }
             assert!(
-                matches!(sessions.session_async("w-quiet").await.unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_some()),
+                matches!(live_phase(), Some(Phase::Working(ref w)) if w.quiet_since.is_some()),
                 "session must become quiet once virtual quiet_after elapses"
             );
             assert!(
@@ -1860,12 +1910,12 @@ mod tests {
             .unwrap();
             for _ in 0..8 {
                 tokio::task::yield_now().await;
-                if matches!(sessions.session_async("w-quiet").await.unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_none()) {
+                if matches!(live_phase(), Some(Phase::Working(ref w)) if w.quiet_since.is_none()) {
                     break;
                 }
             }
             assert!(
-                matches!(sessions.session_async("w-quiet").await.unwrap().phase, Phase::Working(ref w) if w.quiet_since.is_none()),
+                matches!(live_phase(), Some(Phase::Working(ref w)) if w.quiet_since.is_none()),
                 "event arrival must clear quiet_since"
             );
 

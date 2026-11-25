@@ -18,7 +18,7 @@ pub use media_input::MediaInputStorage;
 pub use validate::{AudioFacts, audio_facts};
 
 use crate::context::Context;
-use crate::db::Tx;
+use crate::service::Tx;
 
 /// Unified server file storage: content-addressed attachments, staged media inputs, and artifact directories.
 pub struct Storage {

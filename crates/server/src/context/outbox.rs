@@ -1,4 +1,4 @@
-//! Transactional outbox dispatcher: atomic enqueue inside [`crate::db::Tx`]
+//! Transactional outbox dispatcher: atomic enqueue inside [`crate::service::Tx`]
 //! transactions via [`crate::service::Service`], typed [`OutboxEvent`] payloads,
 //! exponential-backoff retries, and [`TaskGroup`]-bound dispatch.
 
@@ -12,13 +12,13 @@ use parking_lot::RwLock;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
+use vibevalley_core::{SharedClock, system_clock};
 use vibevalley_protocol::{ApiError, BizCode, Millis, Outcome, Spent};
 
 use super::api::BoxFuture;
 use super::task::TaskGroup;
-use crate::db::Tx;
-use crate::service::Service;
 use crate::service::outbox::OutboxItem;
+use crate::service::{Service, Tx};
 
 const DEFAULT_BATCH_SIZE: u64 = 32;
 const DEFAULT_MAX_ATTEMPTS: i64 = 8;
@@ -141,6 +141,7 @@ type OutboxHandler = Arc<dyn Fn(OutboxDelivery) -> BoxFuture<'static, Result<(),
 pub struct Outbox {
     service: Arc<Service>,
     config: OutboxConfig,
+    clock: SharedClock,
     handlers: RwLock<HashMap<String, OutboxHandler>>,
     notify: Notify,
 }
@@ -156,20 +157,27 @@ impl Outbox {
         Self {
             service,
             config,
+            clock: system_clock(),
             handlers: RwLock::new(HashMap::new()),
             notify: Notify::new(),
         }
     }
 
-    /// Enqueues a typed [`OutboxEvent`] standalone on the write pool using the current wall clock.
-    pub async fn enqueue_event(&self, event: &OutboxEvent) -> Result<i64, ApiError> {
-        let payload_json = event.serialize_payload_json()?;
-        self.service.outbox.enqueue(event.topic(), &payload_json, super::now()).await
+    /// Overrides the clock used for enqueue timestamps, recovery, and retry scheduling.
+    pub fn with_clock(mut self, clock: SharedClock) -> Self {
+        self.clock = clock;
+        self
     }
 
-    /// Enqueues a typed [`OutboxEvent`] inside an open write transaction using the current wall clock.
+    /// Enqueues a typed [`OutboxEvent`] standalone on the write pool using the configured clock.
+    pub async fn enqueue_event(&self, event: &OutboxEvent) -> Result<i64, ApiError> {
+        let payload_json = event.serialize_payload_json()?;
+        self.service.outbox.enqueue(event.topic(), &payload_json, self.clock.now_ms()).await
+    }
+
+    /// Enqueues a typed [`OutboxEvent`] inside an open write transaction using the configured clock.
     pub async fn enqueue_event_in_tx(&self, tx: &Tx, event: &OutboxEvent) -> Result<i64, ApiError> {
-        self.enqueue_event_in_tx_at(tx, event, super::now()).await
+        self.enqueue_event_in_tx_at(tx, event, self.clock.now_ms()).await
     }
 
     /// Enqueues a typed [`OutboxEvent`] inside an open write transaction with an explicit timestamp (ms).
@@ -178,9 +186,9 @@ impl Outbox {
         self.service.outbox.enqueue_in_tx(tx, event.topic(), &payload_json, now_ms).await
     }
 
-    /// Enqueues a raw JSON payload inside an open write transaction using the current wall clock.
+    /// Enqueues a raw JSON payload inside an open write transaction using the configured clock.
     pub async fn enqueue_in_tx(&self, tx: &Tx, topic: &str, payload_json: &str) -> Result<i64, ApiError> {
-        self.enqueue_in_tx_at(tx, topic, payload_json, super::now()).await
+        self.enqueue_in_tx_at(tx, topic, payload_json, self.clock.now_ms()).await
     }
 
     /// Enqueues a raw JSON payload inside an open write transaction with an explicit timestamp (ms).
@@ -188,18 +196,26 @@ impl Outbox {
         self.service.outbox.enqueue_in_tx(tx, topic, payload_json, now_ms).await
     }
 
-    /// Registers an async handler for `topic`.
+    /// Registers the sole async handler for `topic`.
+    ///
+    /// Outbox topics are single-handler by design: calling `register` again for an
+    /// already-registered topic replaces the previous handler rather than fanning
+    /// out, so boot-level multiplexers (e.g. `OUTBOX_SESSION_REPORTED`) supersede
+    /// standalone component handlers without double-delivery.
     pub fn register<F, Fut, E>(&self, topic: impl Into<String>, handler: F)
     where
         F: Fn(OutboxDelivery) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<(), E>> + Send + 'static,
         E: Display + 'static,
     {
+        let topic = topic.into();
         let wrapped: OutboxHandler = Arc::new(move |delivery| {
             let fut = handler(delivery);
             Box::pin(async move { fut.await.map_err(|err| err.to_string()) })
         });
-        self.handlers.write().insert(topic.into(), wrapped);
+        if self.handlers.write().insert(topic.clone(), wrapped).is_some() {
+            tracing::debug!(topic = %topic, "outbox.register replacing existing topic handler");
+        }
     }
 
     /// Wakes the background outbox dispatcher (call after committing a transaction that enqueued items).
@@ -219,7 +235,7 @@ impl Outbox {
         let outbox = self.clone();
         let cancel = task.token();
         task.spawn_named("outbox.dispatch", async move {
-            if let Err(err) = outbox.service.outbox.recover_processing(super::now()).await {
+            if let Err(err) = outbox.service.outbox.recover_processing(outbox.clock.now_ms()).await {
                 tracing::warn!(error = %err.message, "outbox.recover_processing failed");
             }
 
@@ -228,7 +244,7 @@ impl Outbox {
                     return;
                 }
 
-                let drained = match outbox.drain_once(super::now()).await {
+                let drained = match outbox.drain_once(outbox.clock.now_ms()).await {
                     Ok(count) => count,
                     Err(err) => {
                         tracing::warn!(error = %err.message, "outbox.drain_once failed");
@@ -245,7 +261,7 @@ impl Outbox {
                     continue;
                 }
 
-                let wait = match outbox.next_wait_duration(super::now()).await {
+                let wait = match outbox.next_wait_duration(outbox.clock.now_ms()).await {
                     Ok(d) => d,
                     Err(err) => {
                         tracing::warn!(error = %err.message, "outbox.next_pending_at failed");
@@ -513,6 +529,55 @@ mod tests {
         let rows = service.outbox.list().await.unwrap();
         assert_eq!(rows.len(), 2);
         assert!(rows.iter().all(|r| r.status == OUTBOX_STATUS_DONE));
+
+        service.close().await;
+    }
+
+    #[tokio::test]
+    async fn with_clock_timestamps_enqueues_and_register_replaces_existing_handler() {
+        let (_dir, service) = test_service().await;
+        let clock = Arc::new(vibevalley_core::ManualClock::new(42_000));
+        let outbox = Arc::new(Outbox::new(service.clone()).with_clock(clock.clone()));
+
+        let first_calls = Arc::new(AtomicUsize::new(0));
+        let second_calls = Arc::new(AtomicUsize::new(0));
+
+        let c1 = first_calls.clone();
+        outbox.register("dup.topic", move |_| {
+            let c1 = c1.clone();
+            async move {
+                c1.fetch_add(1, Ordering::SeqCst);
+                Ok::<_, String>(())
+            }
+        });
+        let c2 = second_calls.clone();
+        outbox.register("dup.topic", move |_| {
+            let c2 = c2.clone();
+            async move {
+                c2.fetch_add(1, Ordering::SeqCst);
+                Ok::<_, String>(())
+            }
+        });
+
+        let outbox_c = outbox.clone();
+        service
+            .write_dirty(move |tx| {
+                Box::pin(async move {
+                    outbox_c.enqueue_in_tx(tx, "dup.topic", r#"{"ok":true}"#).await?;
+                    Ok::<_, ApiError>(((), SliceMask::NONE))
+                })
+            })
+            .await
+            .unwrap();
+
+        let rows = service.outbox.list().await.unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].created_at, 42_000);
+        assert_eq!(rows[0].available_at, 42_000);
+
+        assert_eq!(outbox.drain_once(42_000).await.unwrap(), 1);
+        assert_eq!(first_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(second_calls.load(Ordering::SeqCst), 1);
 
         service.close().await;
     }

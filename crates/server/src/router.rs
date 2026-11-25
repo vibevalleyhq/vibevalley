@@ -1,6 +1,8 @@
 //! Thin compile-time exhaustive [`Router`] implementing [`Server`] over all
 //! `EndpointId` (202), `NativeEndpointId` (3), and `SUBSCRIPTIONS` (8).
 
+mod glue;
+
 use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
 
@@ -8,13 +10,13 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use vibevalley_protocol::{ApiError, BizCode, Caller, EndpointId, EndpointId as E, Envelope, LiveEvent, NativeEndpointId, Op, SUBSCRIPTIONS, SliceKind, ops};
 
+pub(crate) use self::glue::AppCore;
 use crate::context::{SliceSubscription, bridge_live_receiver};
 use crate::gateway::api::{
     BoxFuture, CallerContext, GatewayMeta, GatewayPorts, Server, SharedFaultGate, SharedHostDebug, decode, dispatch_boundary_async, flush_and_snapshot_json,
     flush_and_subscribe_slice, invoke_server_op, ok_json, open_subscription_channel, slice_snapshot_value, watch_slice_value,
 };
 use crate::gateway::remote::Remote;
-use crate::projection::{self as pj, AppCore};
 
 macro_rules! on {
     ($p:expr, $op:ident, |$r:ident| $body:expr) => {
@@ -84,7 +86,7 @@ impl Router {
     }
     #[allow(clippy::result_large_err)]
     async fn open_sub_async(&self, ctx: &CallerContext, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        open_subscription_channel(&self.gw, ctx, name, payload, |sub, sink| pj::open_sub_domain_async(&self.core, sub, sink)).await
+        open_subscription_channel(&self.gw, ctx, name, payload, |sub, sink| glue::open_sub_domain_async(&self.core, sub, sink)).await
     }
     async fn dispatch_op_async(&self, ctx: CallerContext, op: &str, payload: Value) -> Envelope {
         dispatch_boundary_async(
@@ -94,7 +96,7 @@ impl Router {
             op,
             payload,
             |r, c, id, p| r.dispatch_endpoint_async(c, id, p),
-            |r, n| Box::pin(pj::dispatch_native_domain_async(&r.core.storage, n)),
+            |r, n| Box::pin(glue::dispatch_native_domain_async(&r.core.storage, n)),
         )
         .await
     }
@@ -118,7 +120,7 @@ impl Router {
             E::AgentDelete => void!(p, AgentDelete, |r| pr.agent_delete_async(&r.id).await?),
             E::AgentPreviewDelete => on!(p, AgentPreviewDelete, |r| pr.agent_preview_delete(&r.id)?),
             E::AgentTemplateList => ret!(ok_json(pr.templates_async().await)),
-            E::AgentTemplateInstall => on!(p, AgentTemplateInstall, |r| pj::agent_tmpl_install(pr, r).await?),
+            E::AgentTemplateInstall => on!(p, AgentTemplateInstall, |r| glue::agent_tmpl_install(pr, r).await?),
             E::AgentTemplateUpdate => on!(p, AgentTemplateUpdate, |r| pr.agent_template_update_async(&r.agent).await?),
             E::AgentTemplateAdd => on!(p, AgentTemplateAdd, |r| pr.agent_template_add_async(&r.path).await?),
             E::AgentTemplateDelete => void!(p, AgentTemplateDelete, |r| pr.agent_template_delete_async(&r.id).await?),
@@ -133,12 +135,12 @@ impl Router {
             E::RuntimeSettingUpdate => on!(p, RuntimeSettingUpdate, |r| pr.runtime_setting_update_input_async(r).await?),
             E::MemoryList => on!(p, MemoryList, |r| mem.list_endpoint_async(r).await?),
             E::MemoryRecall => on!(p, MemoryRecall, |r| mem.recall_endpoint_async(r).await?),
-            E::MemoryCreate => on!(p, MemoryCreate, |r| pj::memory_create(c, ctx, r).await?),
+            E::MemoryCreate => on!(p, MemoryCreate, |r| glue::memory_create(c, ctx, r).await?),
             E::MemorySearch => on!(p, MemorySearch, |r| mem.search_endpoint_async(r).await?),
             E::MemoryDelete => void!(p, MemoryDelete, |r| mem.delete_endpoint_async(r).await?),
             E::MemoryPreviewDelete => on!(p, MemoryPreviewDelete, |r| mem.preview_delete_endpoint_async(r).await?),
             E::OrchestratorOpen => ret!({
-                pj::orch_open(orch).await?;
+                glue::orch_open(orch).await?;
                 Ok(Value::Null)
             }),
             E::OrchestratorStop => void!(p, OrchestratorStop, |r| orch.stop_endpoint_async(r).await?),
@@ -152,7 +154,7 @@ impl Router {
             E::RepoValidate => on!(p, RepoValidate, |r| c.repo.validate_repo(&r)),
             E::RepoCreate => on!(p, RepoCreate, |r| c.repo.create_repo_async(&r).await?),
             E::RepoLanguageList => on!(p, RepoLanguageList, |r| c.repo.languages_endpoint_async(&r.id).await?),
-            E::RepoTemplateList => on!(p, RepoTemplateList, |r| pj::repo_templates_async(c, &r.id).await?),
+            E::RepoTemplateList => on!(p, RepoTemplateList, |r| glue::repo_templates_async(c, &r.id).await?),
             E::RepoActivityGet => on!(p, RepoActivityGet, |r| c.repo.activity_endpoint_async(&r.id).await?),
             E::SessionStop => void!(p, SessionStop, |r| rt.stop_endpoint_async(&r.id).await?),
             E::SessionList => on!(p, SessionList, |r| rt.list_endpoint_async(r.profile, r.controller).await?),
@@ -160,7 +162,7 @@ impl Router {
             E::SessionEventList => on!(p, SessionEventList, |r| rt.event_list_endpoint_async(&r).await?),
             E::SessionOpenWorkspace => on!(p, SessionOpenWorkspace, |r| rt.open_workspace_endpoint_async(r).await?),
             E::SessionCloseWorkspace => void!(p, SessionCloseWorkspace, |r| rt.close_workspace_endpoint_async(&r.id).await?),
-            E::SessionSend => on!(p, SessionSend, |r| pj::session_send(c, ctx, r).await?),
+            E::SessionSend => on!(p, SessionSend, |r| glue::session_send(c, ctx, r).await?),
             E::SessionRespondPermission => void!(p, SessionRespondPermission, |r| rt.respond_permission_endpoint_async(r).await?),
             E::SessionRespondInteraction => void!(p, SessionRespondInteraction, |r| rt.respond_interaction_endpoint_async(r).await?),
             E::SessionSetConfig => on!(p, SessionSetConfig, |r| rt.set_config_endpoint_async(r).await?),
@@ -168,13 +170,13 @@ impl Router {
             E::SessionBindingAttach => on!(p, SessionBindingAttach, |r| rt.attach_binding_endpoint_async(r).await?),
             E::SessionBindingDetach => on!(p, SessionBindingDetach, |r| rt.detach_binding_endpoint_async(r).await?),
             E::IssueConversationGet => on!(p, IssueConversationGet, |r| brd.issue_conversation_endpoint_async(&r.id).await?),
-            E::IssueCommentCreate => on!(p, IssueCommentCreate, |r| pj::issue_comment(c, r).await?),
-            E::IssueDiffGet => on!(p, IssueDiffGet, |r| pj::issue_diff_req_async(c, ctx.caller, &r.id, r.since_tree.as_deref())
+            E::IssueCommentCreate => on!(p, IssueCommentCreate, |r| glue::issue_comment(c, r).await?),
+            E::IssueDiffGet => on!(p, IssueDiffGet, |r| glue::issue_diff_req_async(c, ctx.caller, &r.id, r.since_tree.as_deref())
                 .await?),
             E::IssueHistoryList => ret!(ok_json(brd.issue_history_list_endpoint_async().await?)),
             E::IssueList => on!(p, IssueList, |r| brd.issue_list_endpoint_async(&r, &*c.ctx.clock).await?),
             E::IssueReview => on!(p, IssueReview, |r| brd.issue_review_endpoint_async(r).await?),
-            E::IssueSplit => on!(p, IssueSplit, |r| pj::issue_split_async(c, &r).await?),
+            E::IssueSplit => on!(p, IssueSplit, |r| glue::issue_split_async(c, &r).await?),
             E::IssueGet => on!(p, IssueGet, |r| brd.issue_get_endpoint_async(&r.id).await?),
             E::IssueRunList => on!(p, IssueRunList, |r| brd.issue_run_list_endpoint_async(&r.id).await?),
             E::IssueTimelineGet => on!(p, IssueTimelineGet, |r| brd.issue_timeline_endpoint_async(&r.id).await?),
@@ -190,7 +192,7 @@ impl Router {
             E::CronUpdate => void!(p, CronUpdate, |r| c.cron.update_endpoint_async(&r.id, r.enabled).await?),
             E::CronDelete => void!(p, CronDelete, |r| c.cron.delete_endpoint_async(&r.id).await?),
             E::CronPreviewDelete => on!(p, CronPreviewDelete, |r| c.cron.preview_delete_endpoint_async(&r.id).await?),
-            E::ChannelMessageSend => void!(p, ChannelMessageSend, |r| pj::channel_send_async(c, r).await?),
+            E::ChannelMessageSend => void!(p, ChannelMessageSend, |r| glue::channel_send_async(c, r).await?),
             E::ChannelCreate => on!(p, ChannelCreate, |r| ch.handle_create(r).await?),
             E::ChannelUpdate => on!(p, ChannelUpdate, |r| ch.handle_update(r).await?),
             E::ChannelDefaultSet => void!(p, ChannelDefaultSet, |r| ch.handle_default_set(r).await?),
@@ -207,7 +209,7 @@ impl Router {
             E::ChannelArchiveSet => void!(p, ChannelArchiveSet, |r| ch.handle_archive_set(r).await?),
             E::ChannelDelete => void!(p, ChannelDelete, |r| ch.handle_delete(r).await?),
             E::ChannelPreviewDelete => on!(p, ChannelPreviewDelete, |r| ch.handle_preview_delete(r).await?),
-            E::ChannelDirectCreate => on!(p, ChannelDirectCreate, |r| pj::channel_direct_async(c, &r.agent).await?),
+            E::ChannelDirectCreate => on!(p, ChannelDirectCreate, |r| glue::channel_direct_async(c, &r.agent).await?),
             E::ChannelNotifySet => void!(p, ChannelNotifySet, |r| ch.handle_notify_set(r).await?),
             E::ChannelMarkUnread => void!(p, ChannelMarkUnread, |r| ch.handle_mark_unread(r).await?),
             E::ChannelList => ret!(ok_json(ch.handle_list().await?)),
@@ -222,8 +224,8 @@ impl Router {
             E::MediaInputList => ret!(ok_json(st.list_inputs_async().await?)),
             E::MediaInputDelete => void!(p, MediaInputDelete, |r| st.delete_input_async(&r.id).await?),
             E::MediaInputPreviewDelete => on!(p, MediaInputPreviewDelete, |r| st.preview_delete_input_async(&r.id).await?),
-            E::MediaDialogueCreate => on!(p, MediaDialogueCreate, |r| pj::media_speakers(c, ctx.caller, r).await?),
-            E::MediaVoiceDesignCreate => on!(p, MediaVoiceDesignCreate, |r| pj::media_voice_design(c, ctx.caller, r).await?),
+            E::MediaDialogueCreate => on!(p, MediaDialogueCreate, |r| glue::media_speakers(c, ctx.caller, r).await?),
+            E::MediaVoiceDesignCreate => on!(p, MediaVoiceDesignCreate, |r| glue::media_voice_design(c, ctx.caller, r).await?),
             E::MediaCloneCreate => on!(p, MediaCloneCreate, |r| med.clone_voice_async(r).await?),
             E::MediaTranscriptionCreate => on!(p, MediaTranscriptionCreate, |r| med.transcription_async(r).await?),
             E::MediaAudioResume => on!(p, MediaAudioResume, |r| med.audio_resume_async(&r.id).await?),
@@ -232,7 +234,7 @@ impl Router {
             E::MediaImageCreate => on!(p, MediaImageCreate, |r| med.create_image_for_caller_async(ctx.caller, r).await?),
             E::MediaUnderstandingCreate => on!(p, MediaUnderstandingCreate, |r| med.understanding_async(r).await?),
             E::MediaUnderstandingAuthorize => on!(p, MediaUnderstandingAuthorize, |r| med.authorize_understanding_async(r).await?),
-            E::MediaUnderstandingStart => on!(p, MediaUnderstandingStart, |r| pj::media_start_u(c, ctx.caller, &r.id).await?),
+            E::MediaUnderstandingStart => on!(p, MediaUnderstandingStart, |r| glue::media_start_u(c, ctx.caller, &r.id).await?),
             E::MediaSpeechCreate => on!(p, MediaSpeechCreate, |r| med.create_speech_for_caller_async(ctx.caller, r).await?),
             E::MediaSpeechResume => on!(p, MediaSpeechResume, |r| med.resume_async(&r.id).await?),
             E::MediaUnderstandingPreviewCleanup => on!(p, MediaUnderstandingPreviewCleanup, |r| med.preview_understanding_cleanup_async(&r.id).await?),
@@ -244,25 +246,25 @@ impl Router {
             E::MediaJobDownload => on!(p, MediaJobDownload, |r| med.retry_download_async(&r.id).await?),
             E::MediaJobList => ret!(ok_json(med.list_async().await?)),
             E::LibraryItemList => on!(p, LibraryItemList, |r| lib.list_async(&r).await?),
-            E::LibraryItemAdd => on!(p, LibraryItemAdd, |r| pj::library_add_async(c, ctx, &r).await?),
+            E::LibraryItemAdd => on!(p, LibraryItemAdd, |r| glue::library_add_async(c, ctx, &r).await?),
             E::LibraryItemDelete => void!(p, LibraryItemDelete, |r| lib.remove_async(&r.id).await?),
             E::LibraryItemPreviewDelete => on!(p, LibraryItemPreviewDelete, |r| lib.preview_remove_async(&r.id).await?),
             E::ArtifactList => on!(p, ArtifactList, |r| art.list_async(&r).await?),
             E::ArtifactGet => on!(p, ArtifactGet, |r| art.get_async(&r.id).await?),
             E::ArtifactContentGet => on!(p, ArtifactContentGet, |r| art.content_async(&r.id, r.version).await?),
             E::ArtifactCreate => on!(p, ArtifactCreate, |r| art.create_async(&art.caller_meta(ctx).0, &r).await?),
-            E::ArtifactVersionCreate => on!(p, ArtifactVersionCreate, |r| pj::artifact_version(art, ctx, &r).await?),
+            E::ArtifactVersionCreate => on!(p, ArtifactVersionCreate, |r| glue::artifact_version(art, ctx, &r).await?),
             E::ArtifactUpdate => on!(p, ArtifactUpdate, |r| art.update_async(&r).await?),
             E::ArtifactDelete => void!(p, ArtifactDelete, |r| art.remove_async(&r.id).await?),
             E::ArtifactPreviewDelete => on!(p, ArtifactPreviewDelete, |r| art.preview_remove_async(&r.id).await?),
             E::ArtifactFileList => on!(p, ArtifactFileList, |r| art.list_files_async(&r).await?),
             E::ArtifactFileGet => on!(p, ArtifactFileGet, |r| art.get_file_async(&r).await?),
-            E::ArtifactFileWrite => on!(p, ArtifactFileWrite, |r| pj::artifact_write(art, ctx, &r).await?),
-            E::ArtifactFileDelete => on!(p, ArtifactFileDelete, |r| pj::artifact_delete_file(art, ctx, &r).await?),
+            E::ArtifactFileWrite => on!(p, ArtifactFileWrite, |r| glue::artifact_write(art, ctx, &r).await?),
+            E::ArtifactFileDelete => on!(p, ArtifactFileDelete, |r| glue::artifact_delete_file(art, ctx, &r).await?),
             E::ArtifactSuggestionList => on!(p, ArtifactSuggestionList, |r| art.suggestions_async(&r.id).await?),
-            E::ArtifactSuggestionCreate => on!(p, ArtifactSuggestionCreate, |r| pj::art_suggest(art, ctx, &r).await?),
-            E::ArtifactSuggestionAccept => on!(p, ArtifactSuggestionAccept, |r| pj::art_accept(art, ctx, &r).await?),
-            E::ArtifactSuggestionReject => on!(p, ArtifactSuggestionReject, |r| pj::artifact_reject(art, ctx, &r).await?),
+            E::ArtifactSuggestionCreate => on!(p, ArtifactSuggestionCreate, |r| glue::art_suggest(art, ctx, &r).await?),
+            E::ArtifactSuggestionAccept => on!(p, ArtifactSuggestionAccept, |r| glue::art_accept(art, ctx, &r).await?),
+            E::ArtifactSuggestionReject => on!(p, ArtifactSuggestionReject, |r| glue::artifact_reject(art, ctx, &r).await?),
             E::ArtifactTypeList => ret!(ok_json(art.list_types_async().await?)),
             E::ArtifactTypeRead => on!(p, ArtifactTypeRead, |r| art.read_type_async(&r).await?),
             E::ArtifactPresenceUpdate => on!(p, ArtifactPresenceUpdate, |r| art.update_presence_async(&r).await?),
@@ -270,7 +272,7 @@ impl Router {
             E::ArtifactHistoryPreview => on!(p, ArtifactHistoryPreview, |r| art.history_preview_async(&r).await?),
             E::ArtifactHistoryRestore => on!(p, ArtifactHistoryRestore, |r| art.history_restore_async(&art.caller_meta(ctx).0, &r).await?),
             E::ArtifactHistoryFork => on!(p, ArtifactHistoryFork, |r| art.history_fork_async(&art.caller_meta(ctx).0, &r).await?),
-            E::ArtifactHistoryUndoOrigin => on!(p, ArtifactHistoryUndoOrigin, |r| pj::artifact_undo_origin(art, ctx, &r).await?),
+            E::ArtifactHistoryUndoOrigin => on!(p, ArtifactHistoryUndoOrigin, |r| glue::artifact_undo_origin(art, ctx, &r).await?),
             E::ArtifactHistoryCompact => on!(p, ArtifactHistoryCompact, |r| art.history_compact_async(&r).await?),
             E::ConnectorList => ret!(ok_json(c.connector.handle_list().await)),
             E::ConnectorLogin => on!(p, ConnectorLogin, |r| c.connector.handle_login(r).await?),
@@ -290,12 +292,12 @@ impl Router {
             E::ProviderModelList => on!(p, ProviderModelList, |r| c.provider.models_async(&r.connection, r.revision).await?),
             E::SettingGet => ret!(ok_json(c.setting.status())),
             E::SettingValidate => on!(p, SettingValidate, |r| c.setting.validate(&r)),
-            E::SettingUpdate => on!(p, SettingUpdate, |r| pj::setting_update(c, r).await?),
-            E::ServerHealthGet => ret!(ok_json(pj::health(c))),
+            E::SettingUpdate => on!(p, SettingUpdate, |r| glue::setting_update(c, r).await?),
+            E::ServerHealthGet => ret!(ok_json(glue::health(c))),
             E::DebugSnapshot => ret!(ok_json(dbg.snapshot_async().await?)),
             E::DebugTimelineList => on!(p, DebugTimelineList, |r| dbg.timeline_list(&r)?),
             E::DebugTimelineClear => ret!({
-                pj::debug_clear(dbg)?;
+                glue::debug_clear(dbg)?;
                 Ok(Value::Null)
             }),
             E::DebugTrajectoryList => ret!(ok_json(dbg.trajectory_list_async().await?)),

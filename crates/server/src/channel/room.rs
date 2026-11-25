@@ -10,10 +10,10 @@ use vibevalley_protocol::{
     SubjectKind, USER_ID,
 };
 
-use super::dispatch::{ChannelDispatched, DeliveryTargetKind, HeldBy, QueuedDelivery, Reason};
 use super::model::{ChatModel, Q, WriteTx};
 use super::types::{
-    AddressedMessage, ChannelEvent, Committed, Info, Place, ReadOptions, ReadResult, Seat, head, info_of, new_id, notify_of, optional, to_message,
+    AddressedMessage, ChannelDispatched, ChannelEvent, Committed, DeliveryTargetKind, HeldBy, Info, Place, QueuedDelivery, ReadOptions, ReadResult, Reason,
+    Seat, head, info_of, new_id, notify_of, optional, to_message,
 };
 use super::words;
 use super::{CATCH_UP_MAX, Chat, FIRST_CHANNEL, LOG_KEEP, NO_NUMBER, READ_LIMIT, THREAD_TITLE_MAX, no_channel, refused};

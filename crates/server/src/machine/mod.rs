@@ -6,8 +6,6 @@
 //! [`StateFeed`](crate::context::StateFeed), and triggers heartbeats on
 //! [`TaskGroup`](crate::context::TaskGroup) system wake notifications.
 
-mod remote;
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -28,7 +26,7 @@ use crate::context::Context;
 use crate::context::api::{MachineBus, MachineConnection, SharedMachineBus};
 use crate::storage::Storage;
 
-pub use remote::{RemoteDispatchMeta, RemoteMachine, RemoteRuntime, RemoteSession, attach_dispatch_meta};
+pub use vibevalley_runtime::machine::{RemoteDispatchMeta, RemoteMachine, RemoteRuntime, RemoteSession, attach_dispatch_meta};
 
 /// Heartbeat interval advertised in `MachineHelloAck` and used by `gateway::http::machine_ws`.
 pub const MACHINE_HEARTBEAT_MS: u64 = 15_000;
@@ -155,7 +153,7 @@ impl Machine {
         self.cancel.cancel();
         let remotes: Vec<_> = self.remotes.read().values().cloned().collect();
         for remote in remotes {
-            remote.inner().close();
+            remote.close();
         }
     }
 
@@ -220,8 +218,8 @@ impl Machine {
         let ping = MachineWireFrame::MachinePing(MachinePing { ts: self.ctx.now() });
         let remotes: Vec<_> = self.remotes.read().values().cloned().collect();
         for remote in remotes {
-            if remote.inner().status() == MachineStatus::Online {
-                let _ = remote.inner().try_send_frame(ping.clone());
+            if remote.status() == MachineStatus::Online {
+                let _ = remote.try_send_frame(ping.clone());
             }
         }
     }
@@ -247,7 +245,7 @@ impl Machine {
         let (remote, attaches) = {
             let mut remotes = self.remotes.write();
             if let Some(existing) = remotes.get(&hello.machine_id).cloned() {
-                let attaches = existing.inner().reconnect(&hello, conn_id, outgoing.clone(), at);
+                let attaches = existing.reconnect(&hello, conn_id, outgoing.clone(), at);
                 (existing, attaches)
             } else {
                 let created = RemoteMachine::new(&hello, conn_id, outgoing.clone(), at);
@@ -273,7 +271,7 @@ impl Machine {
     }
 
     fn handle_disconnect(&self, remote: &Arc<RemoteMachine>, conn_id: u64) {
-        let Some(ephemeral) = remote.inner().on_disconnect(conn_id) else {
+        let Some(ephemeral) = remote.on_disconnect(conn_id) else {
             return;
         };
         let machine_id = remote.machine_id();
@@ -344,7 +342,7 @@ impl Machine {
                     },
                     MachineWireFrame::MachineInventory(inv) => {
                         if let Some(remote) = &active {
-                            remote.inner().update_inventory(inv.runtimes, self.ctx.now());
+                            remote.update_inventory(inv.runtimes, self.ctx.now());
                             self.registry.notify_updated(remote.machine_id());
                             self.emit_changed(remote.protocol_machine());
                         } else {
@@ -360,37 +358,37 @@ impl Machine {
                     }
                     MachineWireFrame::MachinePong(_) => {
                         if let Some(remote) = &active {
-                            remote.inner().touch_last_seen(self.ctx.now());
+                            remote.touch_last_seen(self.ctx.now());
                         }
                     }
                     MachineWireFrame::MachinePing(_) => {
                         if let Some(remote) = &active {
-                            remote.inner().touch_last_seen(self.ctx.now());
+                            remote.touch_last_seen(self.ctx.now());
                         }
                     }
                     MachineWireFrame::MachineSessionOpened(opened) => {
                         if let Some(remote) = &active {
-                            remote.inner().handle_session_opened(opened);
+                            remote.handle_session_opened(opened);
                         }
                     }
                     MachineWireFrame::MachineSessionAck(ack) => {
                         if let Some(remote) = &active {
-                            remote.inner().handle_session_ack(ack);
+                            remote.handle_session_ack(ack);
                         }
                     }
                     MachineWireFrame::MachineSessionEvent(ev) => {
                         if let Some(remote) = &active {
-                            remote.inner().handle_session_event(ev);
+                            remote.handle_session_event(ev);
                         }
                     }
                     MachineWireFrame::MachineSessionRecord(rec) => {
                         if let Some(remote) = &active {
-                            remote.inner().handle_session_record(rec);
+                            remote.handle_session_record(rec);
                         }
                     }
                     MachineWireFrame::MachineWorktreeResult(res) => {
                         if let Some(remote) = &active {
-                            remote.inner().handle_worktree_result(res);
+                            remote.handle_worktree_result(res);
                         }
                     }
                     MachineWireFrame::MachineAttachmentFetch(req) => {
@@ -411,7 +409,7 @@ impl Machine {
                     }
                     MachineWireFrame::MachineWireError(err) => {
                         if let Some(remote) = &active {
-                            remote.inner().handle_wire_error(err);
+                            remote.handle_wire_error(err);
                         }
                     }
                     // Server-to-machine frames should not be sent by peers; ignore gracefully.

@@ -6,6 +6,7 @@
 pub mod agent;
 pub mod app;
 pub mod artifact;
+mod boot;
 pub mod channel;
 pub mod config;
 pub mod connector;
@@ -13,6 +14,7 @@ pub mod context;
 pub mod cron;
 pub mod db;
 pub mod debug;
+mod debug_sources;
 pub mod fake;
 pub mod game;
 pub mod gateway;

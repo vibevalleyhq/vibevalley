@@ -4,7 +4,7 @@ use serde::Deserialize;
 use vibevalley_protocol::{ActorKind, CronRequest, CronWhen, CronWhenDaily, CronWhenEvery, CronWhenExpr, CronWhenOnce, CronWhenWeekly};
 
 use super::{ToolRegistry, Who, given};
-use crate::context::text;
+use crate::agent::profile::text;
 
 #[derive(Deserialize)]
 pub struct Nothing {}

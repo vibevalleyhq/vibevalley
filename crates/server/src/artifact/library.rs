@@ -15,7 +15,7 @@ use vibevalley_protocol::{
 
 use crate::context::http::{PublicBytes, PublicDownload, PublicDownloadError};
 use crate::context::{Context, LookIn, missing};
-use crate::db::DbError;
+use crate::service::DbError;
 use crate::storage::{ATTACHMENT_MAX, Storage};
 
 const LIST_MAX: u64 = 500;

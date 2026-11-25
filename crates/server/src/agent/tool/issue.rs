@@ -8,7 +8,7 @@ use vibevalley_protocol::{
 };
 
 use super::{ToolRegistry, Who, given};
-use crate::context::text;
+use crate::agent::profile::text;
 use crate::issue::ChildDraft;
 use crate::runtime::{Report, ReportQuestion, ReportStatus};
 

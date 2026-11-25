@@ -6,6 +6,7 @@ pub mod preset;
 #[allow(clippy::module_inception)]
 pub mod profile;
 pub mod runtime;
+pub mod text;
 
 use std::path::Path;
 use std::sync::Arc;

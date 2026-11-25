@@ -11,8 +11,8 @@ use vibevalley_protocol::{
 };
 use vibevalley_runtime::oar::{BUILTIN_RUNTIME_SPECS, RefusableOption, runtime_refused_options, runtime_spec};
 
-use crate::context::text::runtime_presets;
-pub use crate::context::text::{runtime_label, yuan};
+use super::text::runtime_presets;
+pub use super::text::{runtime_label, yuan};
 
 /// Profile-visible session options that `session_options` checks against `RuntimeSupport.refused`.
 const PROFILE_REFUSABLE: [RefusableOption; 4] = [

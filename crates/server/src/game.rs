@@ -1,21 +1,24 @@
 //! The farm's ledger: every entry the farm events make is kept in
-//! `<home>/ledger.jsonl`, folded into `progress` (`vibevalley_core::progress`),
+//! `<home>/ledger.jsonl`, folded into `progress` (`vibevalley_core::game::progress`),
 //! reflected into [`LiveState`](crate::context::LiveState), and marked dirty on
 //! [`StateFeed`](crate::context::StateFeed).
 
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use tokio::sync::{Notify, mpsc};
 use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::SliceMask;
-use vibevalley_core::progress::{Folded, family_entry, progress_fold, progress_step};
+use vibevalley_core::game::progress::{Folded, family_entry, progress_fold, progress_step};
+use vibevalley_core::game::{free_station, play_of, played_doing, played_run};
+use vibevalley_core::rules::farm_of;
 use vibevalley_protocol::{
     AchievementList, Actor, AgentRole, ApiError, ChooseTitleRequest, Doing, Issue, LedgerEntry, LedgerEntryCalled, LedgerEntryConflicted, LedgerEntryFailed,
-    LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired, LedgerEntryMoment, LedgerEntryReviewed, LedgerEntryTitled, LedgerEntryTold, Outcome, Session,
-    SessionClose,
+    LedgerEntryHandoff, LedgerEntryHarvested, LedgerEntryHired, LedgerEntryMoment, LedgerEntryReviewed, LedgerEntryTitled, LedgerEntryTold, Millis, Outcome,
+    Session, SessionClose, SessionId, SessionPlay,
 };
 
 use crate::context::Context;
@@ -31,6 +34,7 @@ pub struct Game {
     ctx: Arc<Context>,
     repo: Arc<Repo>,
     folded: Mutex<Folded>,
+    plays: RwLock<BTreeMap<SessionId, SessionPlay>>,
     wanted: Mutex<Option<(i64, i64)>>,
     /// Asks the counting task for a count soon.
     soon: Arc<Notify>,
@@ -90,7 +94,7 @@ where
 
 impl Game {
     /// Opens the farm ledger under `home`, folds existing entries into `progress`,
-    /// seeds `ctx.live`, marks `SliceMask::FARM` dirty, and subscribes to `ctx.outbox`.
+    /// seeds `ctx.live`, and marks `SliceMask::FARM` dirty.
     pub async fn open_async(home: &Path, ctx: Arc<Context>, repo: Arc<Repo>) -> Arc<Self> {
         let file = home.join("ledger.jsonl");
         let folded = progress_fold(&read_ledger_async(&file).await);
@@ -113,19 +117,18 @@ impl Game {
                 let _ = f.flush().await;
             }
         });
-        let game = Arc::new(Self {
+        Arc::new(Self {
             ctx,
             repo,
             folded: Mutex::new(folded),
+            plays: RwLock::new(BTreeMap::new()),
             wanted: Mutex::new(None),
             soon: Arc::new(Notify::new()),
             counter: Mutex::new(None),
             writer_tx: Mutex::new(Some(writer_tx)),
             writer_handle: Mutex::new(Some(writer_handle)),
             asked: std::sync::atomic::AtomicU64::new(0),
-        });
-        game.register_outbox();
-        game
+        })
     }
 
     pub fn progress(&self) -> vibevalley_protocol::Progress {
@@ -232,15 +235,78 @@ impl Game {
         self.ctx.mark_dirty(SliceMask::FARM);
     }
 
+    /// Returns a cloned snapshot of all farm plays for `SliceKind::Farm` projection.
+    pub fn plays_snapshot(&self) -> BTreeMap<SessionId, SessionPlay> {
+        self.plays.read().clone()
+    }
+
+    /// Seeds initial stations for reopened farm worker sessions at startup or after event lag.
+    pub fn seed_sessions(&self, sessions: &[Session]) {
+        let mut changed = false;
+        for (idx, session) in sessions.iter().enumerate() {
+            if vibevalley_core::status::is_farm_worker(session) {
+                let others: Vec<&Session> = sessions.iter().take(idx).collect();
+                changed |= self.ensure_play_station(session, &others, None);
+            }
+        }
+        if changed {
+            self.ctx.mark_dirty(SliceMask::FARM);
+        }
+    }
+
+    /// Ensures a farm worker session has an assigned station and play state.
+    pub fn ensure_play_station(&self, session: &Session, other_sessions: &[&Session], prefer: Option<i64>) -> bool {
+        let mut plays = self.plays.write();
+        if let Some(existing) = plays.get(&session.id)
+            && prefer.is_none_or(|p| existing.station == p)
+        {
+            return false;
+        }
+        let current = play_of(Some(&plays), &session.id);
+        let station = free_station(Some(&plays), other_sessions, farm_of(session), prefer);
+        if prefer.is_some_and(|p| station != p) {
+            return false;
+        }
+        plays.insert(session.id.clone(), SessionPlay { station, ..current });
+        true
+    }
+
+    fn record_play_working(&self, session_id: &str, at: Millis, was_working: bool, doing: &Doing) {
+        let mut plays = self.plays.write();
+        let before = play_of(Some(&plays), session_id);
+        let next = if was_working {
+            played_doing(&before, at, doing.action, &doing.label)
+        } else {
+            played_run(&before, at)
+        };
+        plays.insert(session_id.to_owned(), next);
+    }
+
+    /// Removes farm play state when a session leaves.
+    pub fn remove_play(&self, session_id: &str) {
+        if self.plays.write().remove(session_id).is_some() {
+            self.ctx.mark_dirty(SliceMask::FARM);
+        }
+    }
+
     /// Records a newly hired session on the farm, assigning its station (honouring
-    /// any active `want` window) and appending `LedgerEntry::Hired`.
+    /// any active `want` window for hired workers) and appending `LedgerEntry::Hired`.
     pub fn on_session_hired(&self, session: &Session, other_sessions: &[&Session]) {
-        if !vibevalley_core::status::is_hired(session) {
+        if !vibevalley_core::status::is_farm_worker(session) {
             return;
         }
+        let hired = vibevalley_core::status::is_hired(session);
         let now_ms = self.ctx.now();
-        let prefer = self.wanted.lock().take().and_then(|(station, until)| (until > now_ms).then_some(station));
-        self.ctx.live.ensure_play_station(session, other_sessions, prefer);
+        let prefer = if hired {
+            self.wanted.lock().take().and_then(|(station, until)| (until > now_ms).then_some(station))
+        } else {
+            None
+        };
+        self.ensure_play_station(session, other_sessions, prefer);
+        if !hired {
+            self.ctx.mark_dirty(SliceMask::FARM);
+            return;
+        }
         self.record(LedgerEntry::Hired(LedgerEntryHired {
             at: 0,
             session: session.id.clone(),
@@ -248,12 +314,28 @@ impl Game {
         }));
     }
 
+    /// Ensures an already-known session has a station if a later update made it a farm worker.
+    pub fn on_session_changed(&self, session: &Session, other_sessions: &[&Session]) {
+        if vibevalley_core::status::is_farm_worker(session) && self.ensure_play_station(session, other_sessions, None) {
+            self.ctx.mark_dirty(SliceMask::FARM);
+        }
+    }
+
     /// Records live farm working telemetry for an active farm worker session.
     pub fn on_session_working(&self, session: &Session, was_working: bool, doing: &Doing) {
         if !vibevalley_core::status::is_farm_worker(session) {
             return;
         }
-        self.ctx.live.record_play_working(&session.id, self.ctx.now(), was_working, doing);
+        self.record_play_working(&session.id, self.ctx.now(), was_working, doing);
+        self.ctx.mark_dirty(SliceMask::FARM);
+    }
+
+    /// Records one tool/action step for an active farm worker session at `at`.
+    pub fn on_session_doing(&self, session: &Session, at: Millis, doing: &Doing) {
+        if !vibevalley_core::status::is_farm_worker(session) {
+            return;
+        }
+        self.record_play_working(&session.id, at, true, doing);
         self.ctx.mark_dirty(SliceMask::FARM);
     }
 
@@ -287,7 +369,7 @@ impl Game {
         if !vibevalley_core::status::is_farm_worker(session) {
             return;
         }
-        self.ctx.live.remove_play(&session.id);
+        self.plays.write().remove(&session.id);
         if vibevalley_core::status::is_hired(session)
             && closed == Some(SessionClose::Merged)
             && let Some(commits) = merged_commits.filter(|m| *m > 0)
@@ -351,29 +433,6 @@ impl Game {
                 to: String::new(),
             }));
         }
-    }
-
-    /// Registers `game.session_reported` on `ctx.outbox` so committed session
-    /// reports also drive farm effects asynchronously when dispatched via outbox.
-    pub(crate) fn register_outbox(self: &Arc<Self>) {
-        #[derive(serde::Deserialize)]
-        struct ReportedPayload {
-            session: Session,
-            outcome: Outcome,
-        }
-        let game = Arc::downgrade(self);
-        self.ctx.outbox.register("game.session_reported", move |delivery| {
-            let game = game.clone();
-            async move {
-                let Some(game) = game.upgrade() else {
-                    return Ok::<(), String>(());
-                };
-                if let Ok(payload) = delivery.decode::<ReportedPayload>() {
-                    game.on_session_reported(&payload.session, payload.outcome);
-                }
-                Ok(())
-            }
-        });
     }
 
     /// Records that the user inspected a live session's diff.
@@ -539,7 +598,7 @@ mod tests {
         game.on_session_hired(&real, &others);
         game.on_session_working(&real, false, &idle_doing);
 
-        assert_eq!(ctx.live.plays_snapshot().get("w1").map(|p| p.station), Some(4));
+        assert_eq!(game.plays_snapshot().get("w1").map(|p| p.station), Some(4));
         let progress = game.progress();
         assert_eq!(progress.agents.get("backend").map(|t| t.hired), Some(1));
         assert!(
@@ -639,7 +698,7 @@ mod tests {
         let at_inside = clock.advance(Duration::from_millis((WANT_STATION_FOR_MS - 1) as u64));
         let w_in = issue_worker("w-in", "i1", false, at_inside);
         game.on_session_hired(&w_in, &[]);
-        assert_eq!(ctx.live.plays_snapshot().get("w-in").map(|p| p.station), Some(4));
+        assert_eq!(game.plays_snapshot().get("w-in").map(|p| p.station), Some(4));
 
         // Plant another wish and advance past WANT_STATION_FOR_MS; the wish must expire without assigning station 5.
         game.want(5);
@@ -648,10 +707,93 @@ mod tests {
         game.on_session_hired(&w_out, &[&w_in]);
         assert_eq!(game.progress().agents.get("backend").map(|t| t.hired), Some(2));
         assert_ne!(
-            ctx.live.plays_snapshot().get("w-out").map(|p| p.station),
+            game.plays_snapshot().get("w-out").map(|p| p.station),
             Some(5),
             "expired station wish must not be applied"
         );
+
+        game.close_async().await;
+        ctx.shutdown(Duration::from_secs(2)).await;
+        ctx.service.close().await;
+    }
+
+    #[tokio::test]
+    async fn seed_doing_and_leave_manage_farm_plays_inside_game() {
+        let home = tempfile::tempdir().unwrap();
+        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+        let ctx = test_context(home.path(), clock).await;
+        let repo = Repo::open_async(home.path(), 2).await.unwrap();
+        let game = Game::open_async(home.path(), ctx.clone(), repo).await;
+
+        let w1 = issue_worker("w1", "i1", true, 100);
+        let w2 = issue_worker("w2", "i2", false, 101);
+        let ws = workspace_session("ws1", true);
+        game.seed_sessions(&[w1.clone(), ws.clone(), w2.clone()]);
+
+        let plays = game.plays_snapshot();
+        assert_eq!(plays.get("w1").map(|p| p.station), Some(0));
+        assert_eq!(plays.get("w2").map(|p| p.station), Some(1));
+        assert!(!plays.contains_key("ws1"));
+
+        game.on_session_doing(
+            &w1,
+            250,
+            &Doing {
+                action: SessionAction::EditFile,
+                label: "src/lib.rs".into(),
+            },
+        );
+        game.on_session_doing(
+            &ws,
+            260,
+            &Doing {
+                action: SessionAction::ReadFile,
+                label: "README.md".into(),
+            },
+        );
+        let plays = game.plays_snapshot();
+        assert_eq!(plays.get("w1").map(|p| p.tools_this_run), Some(1));
+        assert_eq!(plays.get("w1").map(|p| p.files.as_slice()), Some(&["src/lib.rs".to_string()][..]));
+        assert!(!plays.contains_key("ws1"));
+
+        game.on_session_left(&w1, None, None);
+        assert!(!game.plays_snapshot().contains_key("w1"));
+        assert!(game.plays_snapshot().contains_key("w2"));
+
+        game.close_async().await;
+        ctx.shutdown(Duration::from_secs(2)).await;
+        ctx.service.close().await;
+    }
+
+    #[tokio::test]
+    async fn on_session_left_records_harvested_only_for_merged_hired_workers_with_commits() {
+        let home = tempfile::tempdir().unwrap();
+        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+        let ctx = test_context(home.path(), clock).await;
+        let repo = Repo::open_async(home.path(), 2).await.unwrap();
+        let game = Game::open_async(home.path(), ctx.clone(), repo).await;
+
+        let w1 = issue_worker("w1", "i1", false, 100);
+        let w2 = issue_worker("w2", "i2", false, 101);
+        let w3 = issue_worker("w3", "i3", false, 102);
+        game.seed_sessions(&[w1.clone(), w2.clone(), w3.clone()]);
+
+        // Non-merged or zero-commit departures clear the station without recording Harvested.
+        game.on_session_left(&w2, Some(SessionClose::Completed), None);
+        game.on_session_left(&w3, Some(SessionClose::Merged), Some(0));
+        assert!(!game.plays_snapshot().contains_key("w2"));
+        assert!(!game.plays_snapshot().contains_key("w3"));
+        assert_eq!(game.progress().counts.get("harvests"), None);
+        assert_eq!(game.progress().coins, 0);
+
+        // Merged departure with positive commit count records Harvested and awards coins.
+        game.on_session_left(&w1, Some(SessionClose::Merged), Some(2));
+        assert!(!game.plays_snapshot().contains_key("w1"));
+        let progress = game.progress();
+        assert_eq!(progress.counts.get("harvests"), Some(&1));
+        assert_eq!(progress.streak, 1);
+        assert!(progress.coins >= vibevalley_core::game::progress::harvest_coins(2, 1));
+        assert_eq!(progress.agents.get("backend").map(|t| t.harvested), Some(1));
 
         game.close_async().await;
         ctx.shutdown(Duration::from_secs(2)).await;

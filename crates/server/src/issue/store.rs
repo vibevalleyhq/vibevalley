@@ -11,9 +11,8 @@ use vibevalley_core::{BoardInput, LiveSnapshot, SessionInput, SliceMask, derive_
 use vibevalley_protocol::{Issue, PullRequest, Session, SliceBundle};
 
 use crate::context::{Context, now};
-use crate::db::DatabaseConfig;
 use crate::runtime::{RuntimeError, derive_all_issues, find_issue};
-use crate::service::Service;
+use crate::service::{DatabaseConfig, Service};
 
 pub use crate::runtime::{BoardConfig, BoardError, IssueChange, Opened, Result, Step, Undelivered};
 

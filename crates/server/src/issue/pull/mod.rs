@@ -21,9 +21,9 @@ use vibevalley_protocol::{ApiError, BizCode, BranchPublication, Caller, PublishP
 use super::board::Board;
 use crate::context::error::refused as refuse;
 use crate::context::{Context, now};
-use crate::db::error::internal_db;
 use crate::log::spawn_blocking_traced;
 use crate::repo::Repo;
+use crate::service::internal_db;
 
 pub use crate::service::issue::{KnownPullEvent, PullRecord, UpsertPullInput};
 use publish::HostRunner;
