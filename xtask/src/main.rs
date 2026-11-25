@@ -58,8 +58,8 @@ Commands:
   crap [options] [<path>...]           Compute cyclomatic complexity & coverage CRAP scores
   dry [options] [<path>...]            Detect normalized structural clones within each language
   mutate [options] [<path>...]         Run incremental hash-cached, coverage-gated mutation tests
-  uml [viewer | --svg <out>] [<path>...]
-                                       Verify dependency rule, export UML SVG, or launch local viewer"
+  uml [viewer | arch | --svg <out>] [<path>...]
+                                       Verify dependency rule, run arch lenses, export UML, or launch viewer"
     );
 }
 

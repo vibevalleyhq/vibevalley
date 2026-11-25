@@ -324,6 +324,39 @@ fn handle_connection(mut stream: TcpStream, ctx: &ServerContext) {
                 Err(err) => send_error(&mut stream, 500, "Internal Server Error", &err),
             }
         }
+        ("GET", "/api/arch") => {
+            let params = parse_query_params(&req.query);
+            let mut opts = super::arch::ArchOptions::default();
+            if let Some(scope) = params.get("scope").filter(|s| !s.trim().is_empty()) {
+                opts.scope = Some(scope.clone());
+            }
+            if let Some(raw_delta) = params.get("min_delta").filter(|s| !s.trim().is_empty()) {
+                let Ok(val) = raw_delta.parse::<f64>() else {
+                    send_error(&mut stream, 400, "Bad Request", "invalid `min_delta` query parameter");
+                    return;
+                };
+                opts.min_delta = val.clamp(0.0, 1.0);
+            }
+            if let Some(raw_commits) = params.get("git_commits").filter(|s| !s.trim().is_empty()) {
+                let Ok(val) = raw_commits.parse::<usize>() else {
+                    send_error(&mut stream, 400, "Bad Request", "invalid `git_commits` query parameter");
+                    return;
+                };
+                opts.git_commits = val;
+            }
+            if let Some(no_git) = params.get("no_git") {
+                opts.no_git = matches!(no_git.as_str(), "1" | "true" | "yes");
+            }
+
+            let _guard = ctx.lock.lock().ok();
+            match build_viewer_state(&ctx.root, false) {
+                Ok(state) => {
+                    let report = super::arch::analyze_architecture(&ctx.root, &state.policy, &state.ir, &opts);
+                    send_json(&mut stream, 200, "OK", &report);
+                }
+                Err(err) => send_error(&mut stream, 500, "Internal Server Error", &err),
+            }
+        }
         ("GET", "/api/source") => {
             let params = parse_query_params(&req.query);
             let Some(file) = params.get("file").filter(|s| !s.is_empty()) else {
@@ -625,6 +658,10 @@ mod tests {
             body_html.contains("isDependencyViolating"),
             "viewer.html must match Rust dependency violation rules"
         );
+        assert!(body_html.contains("id=\"btn-arch-lens\""), "viewer.html must expose Arch Lens toggle button");
+        assert!(body_html.contains("id=\"arch-lens-panel\""), "viewer.html must expose Arch Lens panel");
+        assert!(body_html.contains("/api/arch"), "viewer.html must query /api/arch");
+        assert!(body_html.contains("focusModuleInDiagram"), "Arch Lens module click must focus diagram");
 
         let (code_state, body_state) = send_raw_http(addr, "GET /api/state HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
         assert_eq!(code_state, 200);
@@ -632,6 +669,18 @@ mod tests {
         assert!(state_json.get("policy").is_some());
         assert!(state_json.get("ir").is_some());
         assert!(state_json.get("metrics_mtime").is_some());
+
+        let (code_arch, body_arch) = send_raw_http(addr, "GET /api/arch?no_git=1 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+        assert_eq!(code_arch, 200);
+        let arch_json: serde_json::Value = serde_json::from_str(&body_arch).unwrap();
+        assert!(arch_json.get("summary").is_some());
+        assert!(arch_json.get("modules").is_some());
+        assert!(arch_json.get("sdp_inversions_repo").is_some());
+        assert!(arch_json.get("cycles").is_some());
+        assert!(arch_json.get("misplaced").is_some());
+        assert!(arch_json.get("blast_radius").is_some());
+        assert!(arch_json.get("co_change").is_some());
+        assert!(arch_json.get("findings").is_some());
 
         let (code_src, body_src) = send_raw_http(
             addr,
