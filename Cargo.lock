@@ -12472,6 +12472,7 @@ dependencies = [
  "similar",
  "tempfile",
  "thiserror 2.0.21",
+ "tokio",
 ]
 
 [[package]]
@@ -12635,6 +12636,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "uuid",
+ "vibevalley-git",
  "vibevalley-protocol",
 ]
 

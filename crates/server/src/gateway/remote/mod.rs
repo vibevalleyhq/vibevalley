@@ -3,7 +3,6 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -123,29 +122,7 @@ fn generate_device_token() -> String {
 }
 
 fn server_name() -> String {
-    static NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    NAME.get_or_init(|| {
-        if let Some(name) = std::env::var("VIBEVALLEY_SERVER_NAME")
-            .ok()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-        {
-            return name;
-        }
-        let read_cmd = |bin: &str, args: &[&str]| -> Option<String> {
-            let out = Command::new(bin).args(args).stdin(Stdio::null()).stderr(Stdio::null()).output().ok()?;
-            if !out.status.success() {
-                return None;
-            }
-            let text = String::from_utf8(out.stdout).ok()?;
-            let trimmed = text.trim();
-            (!trimmed.is_empty()).then(|| trimmed.to_string())
-        };
-        read_cmd("scutil", &["--get", "ComputerName"])
-            .or_else(|| read_cmd("hostname", &["-s"]))
-            .unwrap_or_else(|| "VibeValley".into())
-    })
-    .clone()
+    vibevalley_protocol::home::computer_name()
 }
 
 fn bind_failed(addr: &str, why: impl std::fmt::Display) -> ApiError {
