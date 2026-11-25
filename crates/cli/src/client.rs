@@ -1,11 +1,14 @@
 //! Pooled HTTP client, target/auth resolution, typed protocol RPC (`ask`/`mutate`), SSE streaming, and structured CLI errors.
 
-use std::io::{BufRead, BufReader, Read};
+use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use futures_util::{StreamExt, TryStreamExt};
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
+use tokio_util::codec::{FramedRead, LinesCodec};
+use tokio_util::io::StreamReader;
 use vibevalley_protocol::{ApiErrorKind, BizCode, Envelope, Health, Next, Op, Preview, SliceKind, ops};
 
 use crate::auth::{self, AuthConfig, Secret, normalize_server_url_lossy, same_server};
@@ -96,13 +99,13 @@ fn is_loopback_server(server: &str) -> bool {
     host.eq_ignore_ascii_case("localhost") || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
 }
 
-fn build_http_client(server: &str) -> reqwest::blocking::Client {
+fn build_http_client(server: &str) -> reqwest::Client {
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let mut builder = reqwest::blocking::Client::builder().connect_timeout(Duration::from_secs(5));
+    let mut builder = reqwest::Client::builder().connect_timeout(Duration::from_secs(5));
     if is_loopback_server(server) {
         builder = builder.no_proxy();
     }
-    builder.build().expect("reqwest blocking CLI client")
+    builder.build().expect("reqwest CLI client")
 }
 
 /// Origin of the active server base URL.
@@ -213,7 +216,7 @@ pub fn resolve_target(
     }
 }
 
-fn attach_headers(req: reqwest::blocking::RequestBuilder, token: Option<&Secret>) -> reqwest::blocking::RequestBuilder {
+fn attach_headers(req: reqwest::RequestBuilder, token: Option<&Secret>) -> reqwest::RequestBuilder {
     let req = req.header("x-vibevalley-client", "cli");
     match token.filter(|t| !t.is_empty()) {
         Some(secret) => req.header("authorization", format!("Bearer {}", secret.expose())),
@@ -234,7 +237,7 @@ pub struct Client {
     flag_token: Option<Secret>,
     env_token: Option<Secret>,
     stored_auth: Option<AuthConfig>,
-    http: reqwest::blocking::Client,
+    http: reqwest::Client,
 }
 
 impl Client {
@@ -336,36 +339,38 @@ impl Client {
     }
 
     /// Calls a typed protocol op over `POST /api/v1/<op>`.
-    pub fn ask<O: Op>(&self, input: &O::Input) -> Result<O::Result, Failure> {
+    pub async fn ask<O: Op>(&self, input: &O::Input) -> Result<O::Result, Failure> {
         let payload = serde_json::to_value(input).unwrap_or(Value::Null);
-        let value = self.ask_raw(O::NAME, &payload)?;
+        let value = self.ask_raw(O::NAME, &payload).await?;
         serde_json::from_value(value).map_err(decode_failure)
     }
 
     /// Calls an op by name with an explicit JSON payload over `POST /api/v1/<op>`.
-    pub fn ask_raw(&self, op: &str, body: &Value) -> Result<Value, Failure> {
+    pub async fn ask_raw(&self, op: &str, body: &Value) -> Result<Value, Failure> {
         let url = self.url(&format!("/api/v1/{}", op.replace('.', "/")));
         let body = if body.is_null() { json!({}) } else { body.clone() };
         let response = attach_headers(self.http.post(&url).header("content-type", "application/json"), self.token.as_ref())
             .body(body.to_string())
             .send()
+            .await
             .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
-        let text = response.text().map_err(|e| unreachable(&self.server, e))?;
+        let text = response.text().await.map_err(|e| unreachable(&self.server, e))?;
         decode_envelope(status, &text)
     }
 
     /// Probes `/api/v1/health` first (accepting either raw `Health` JSON or a protocol `Envelope`),
     /// falling back to `POST /api/v1/server/health/get` when a server does not expose `GET /api/v1/health`.
-    pub fn probe_health(&self) -> Result<Health, Failure> {
+    pub async fn probe_health(&self) -> Result<Health, Failure> {
         let url = self.url("/api/v1/health");
         let response = attach_headers(self.http.get(&url).header("accept", "application/json"), self.token.as_ref())
             .send()
+            .await
             .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
-        let text = response.text().map_err(|e| unreachable(&self.server, e))?;
+        let text = response.text().await.map_err(|e| unreachable(&self.server, e))?;
         if matches!(status, 404 | 405) {
-            return self.ask::<ops::ServerHealthGet>(&());
+            return self.ask::<ops::ServerHealthGet>(&()).await;
         }
         if status >= 300 {
             return Err(failure_of(status, &text));
@@ -396,13 +401,14 @@ impl Client {
     }
 
     /// Fetches raw response text from a `GET` endpoint.
-    pub fn get_text(&self, path: &str) -> Result<String, Failure> {
+    pub async fn get_text(&self, path: &str) -> Result<String, Failure> {
         let url = self.url(path);
         let response = attach_headers(self.http.get(&url).header("accept", "application/json"), self.token.as_ref())
             .send()
+            .await
             .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
-        let text = response.text().map_err(|e| unreachable(&self.server, e))?;
+        let text = response.text().await.map_err(|e| unreachable(&self.server, e))?;
         if status >= 300 {
             return Err(failure_of(status, &text));
         }
@@ -410,118 +416,112 @@ impl Client {
     }
 
     /// Fetches raw JSON from a `GET` endpoint (e.g. `/api/v1/slice/<name>?once=1`).
-    pub fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, Failure> {
-        serde_json::from_str(&self.get_text(path)?).map_err(decode_failure)
+    pub async fn get_json<T: DeserializeOwned>(&self, path: &str) -> Result<T, Failure> {
+        serde_json::from_str(&self.get_text(path).await?).map_err(decode_failure)
     }
 
     /// Fetches a single typed slice snapshot via `GET /api/v1/slice/<name>?once=1`.
-    pub fn slice<T: DeserializeOwned>(&self, kind: SliceKind) -> Result<T, Failure> {
-        self.get_json(&format!("/api/v1/slice/{}?once=1", kind.as_str()))
+    pub async fn slice<T: DeserializeOwned>(&self, kind: SliceKind) -> Result<T, Failure> {
+        self.get_json(&format!("/api/v1/slice/{}?once=1", kind.as_str())).await
     }
 
     /// Executes a mutating op, or automatically runs its protocol `dry_run` preview op when `--dry-run` is set.
-    pub fn mutate<O: Op>(&self, command: &str, input: &O::Input, format: impl FnOnce(&O::Result) -> String) -> Done {
+    pub async fn mutate<O: Op>(&self, command: &str, input: &O::Input, format: impl FnOnce(&O::Result) -> String) -> Done {
         if self.dry_run {
             let Some(preview_op) = vibevalley_protocol::endpoint(O::NAME).and_then(|e| e.dry_run) else {
                 return Err(no_dry_run(command));
             };
             let payload = serde_json::to_value(input).unwrap_or(Value::Null);
-            let raw = self.ask_raw(preview_op, &payload)?;
+            let raw = self.ask_raw(preview_op, &payload).await?;
             let preview: Preview = serde_json::from_value(raw).map_err(decode_failure)?;
             self.output.show(&preview, |p| p.does.join("\n"));
             return Ok(());
         }
-        let result = self.ask::<O>(input)?;
+        let result = self.ask::<O>(input).await?;
         self.output.show(&result, format);
         Ok(())
     }
 
     /// Downloads raw bytes from a `GET` endpoint (e.g. `/api/v1/attachment/{id}`).
-    pub fn get_bytes(&self, path: &str) -> Result<(Vec<u8>, Option<String>), Failure> {
+    pub async fn get_bytes(&self, path: &str) -> Result<(Vec<u8>, Option<String>), Failure> {
         let url = self.url(path);
-        let response = attach_headers(self.http.get(&url), self.token.as_ref())
+        let mut response = attach_headers(self.http.get(&url), self.token.as_ref())
             .send()
+            .await
             .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
         let content_type = response.headers().get("content-type").and_then(|v| v.to_str().ok()).map(ToString::to_string);
         if status >= 300 {
-            let text = response.text().unwrap_or_default();
+            let text = response.text().await.unwrap_or_default();
             return Err(failure_of(status, &text));
         }
-        let mut bytes = Vec::new();
-        response
-            .take(MAX_DOWNLOAD_BYTES + 1)
-            .read_to_end(&mut bytes)
-            .map_err(|e| unreachable(&self.server, e))?;
-        if bytes.len() as u64 > MAX_DOWNLOAD_BYTES {
+        if let Some(len) = response.content_length()
+            && len > MAX_DOWNLOAD_BYTES
+        {
             return Err(unreachable(&self.server, "response body exceeded 512 MiB limit"));
+        }
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response.chunk().await.map_err(|e| unreachable(&self.server, e))? {
+            if (bytes.len() as u64).saturating_add(chunk.len() as u64) > MAX_DOWNLOAD_BYTES {
+                return Err(unreachable(&self.server, "response body exceeded 512 MiB limit"));
+            }
+            bytes.extend_from_slice(&chunk);
         }
         Ok((bytes, content_type))
     }
 
     /// Streams binary bytes to a `PUT` endpoint and decodes its JSON `Envelope`.
-    pub fn put_bytes<T: DeserializeOwned>(&self, path: &str, content_type: &str, bytes: &[u8]) -> Result<T, Failure> {
+    pub async fn put_bytes<T: DeserializeOwned>(&self, path: &str, content_type: &str, bytes: &[u8]) -> Result<T, Failure> {
         let url = self.url(path);
         let response = attach_headers(self.http.put(&url).header("content-type", content_type), self.token.as_ref())
             .body(bytes.to_vec())
             .send()
+            .await
             .map_err(|e| unreachable(&self.server, e))?;
         let status = response.status().as_u16();
-        let text = response.text().map_err(|e| unreachable(&self.server, e))?;
+        let text = response.text().await.map_err(|e| unreachable(&self.server, e))?;
         let data = decode_envelope(status, &text)?;
         serde_json::from_value(data).map_err(decode_failure)
     }
 
     /// Reads server-sent events from `path`, calling `on` with each event's `data` payload until `on` returns `Ok(false)` or `timeout` elapses.
-    pub fn sse(&self, path: &str, timeout: Option<Duration>, mut on: impl FnMut(&str) -> Result<bool, Failure>) -> Done {
-        let url = self.url(path);
-        let (tx, rx) = std::sync::mpsc::channel::<Result<String, Failure>>();
-        let server = self.server.clone();
-        let http = self.http.clone();
-        let token = self.token.clone();
-        std::thread::spawn(move || {
-            let response = attach_headers(http.get(&url).header("accept", "text/event-stream"), token.as_ref()).send();
-            let response = match response {
-                Ok(r) => r,
-                Err(e) => return drop(tx.send(Err(unreachable(&server, e)))),
-            };
+    pub async fn sse(&self, path: &str, timeout: Option<Duration>, mut on: impl AsyncFnMut(&str) -> Result<bool, Failure>) -> Done {
+        let stream = async {
+            let url = self.url(path);
+            let response = attach_headers(self.http.get(&url).header("accept", "text/event-stream"), self.token.as_ref())
+                .send()
+                .await
+                .map_err(|e| unreachable(&self.server, e))?;
             let status = response.status().as_u16();
             if status != 200 {
-                let text = response.text().unwrap_or_default();
-                return drop(tx.send(Err(failure_of(status, &text))));
+                let text = response.text().await.unwrap_or_default();
+                return Err(failure_of(status, &text));
             }
+            let lines = FramedRead::new(StreamReader::new(response.bytes_stream().map_err(io::Error::other)), LinesCodec::new());
+            tokio::pin!(lines);
             let mut data = String::new();
-            for line in BufReader::new(response).lines() {
-                let Ok(line) = line else {
-                    return drop(tx.send(Err(unreachable(&server, "stream ended"))));
-                };
+            while let Some(item) = lines.next().await {
+                let line = item.map_err(|_| unreachable(&self.server, "stream ended"))?;
                 if let Some(chunk) = line.strip_prefix("data:") {
                     if !data.is_empty() {
                         data.push('\n');
                     }
                     data.push_str(chunk.trim_start());
-                } else if line.is_empty() && !data.is_empty() && tx.send(Ok(std::mem::take(&mut data))).is_err() {
-                    return;
-                }
-            }
-            let _ = tx.send(Err(unreachable(&server, "stream ended")));
-        });
-
-        let deadline = timeout.map(|d| std::time::Instant::now() + d);
-        loop {
-            let next = match deadline {
-                Some(until) => rx.recv_timeout(until.saturating_duration_since(std::time::Instant::now())).map_err(|_| ()),
-                None => rx.recv().map_err(|_| ()),
-            };
-            match next {
-                Ok(Ok(payload)) => {
-                    if !on(&payload)? {
+                } else if line.is_empty() && !data.is_empty() {
+                    let payload = std::mem::take(&mut data);
+                    if !on(&payload).await? {
                         return Ok(());
                     }
                 }
-                Ok(Err(failure)) => return Err(failure),
-                Err(()) => return Err(Failure::new(exit::OTHER, "Timeout", "timed out waiting for server event")),
             }
+            Err(unreachable(&self.server, "stream ended"))
+        };
+
+        match timeout {
+            Some(dur) => tokio::time::timeout(dur, stream)
+                .await
+                .map_err(|_| Failure::new(exit::OTHER, "Timeout", "timed out waiting for server event"))?,
+            None => stream.await,
         }
     }
 }
@@ -627,22 +627,20 @@ mod tests {
         assert_eq!(r.token_source, TokenSource::Env);
     }
 
-    fn spawn_mock(router: axum::Router) -> (std::net::SocketAddr, tokio_util::sync::CancellationToken, tokio_util::sync::DropGuard) {
-        vibevalley_runtime::rt::block_on(async move {
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let addr = listener.local_addr().unwrap();
-            let cancel = tokio_util::sync::CancellationToken::new();
-            let guard = cancel.clone().drop_guard();
-            let shutdown = cancel.clone();
-            tokio::spawn(async move {
-                let _ = axum::serve(listener, router).with_graceful_shutdown(shutdown.cancelled_owned()).await;
-            });
-            (addr, cancel, guard)
-        })
+    async fn spawn_mock(router: axum::Router) -> (std::net::SocketAddr, tokio_util::sync::CancellationToken, tokio_util::sync::DropGuard) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let guard = cancel.clone().drop_guard();
+        let shutdown = cancel.clone();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, router).with_graceful_shutdown(shutdown.cancelled_owned()).await;
+        });
+        (addr, cancel, guard)
     }
 
-    #[test]
-    fn sse_streams_multiline_events_and_enforces_timeout_with_bearer_header() {
+    #[tokio::test]
+    async fn sse_streams_multiline_events_and_enforces_timeout_with_bearer_header() {
         use axum::http::HeaderMap;
         use axum::response::sse::{Event, Sse};
         use axum::routing::get;
@@ -667,7 +665,7 @@ mod tests {
                 async move { Sse::new(stream) }
             }),
         );
-        let (addr, _cancel, _guard) = spawn_mock(router);
+        let (addr, _cancel, _guard) = spawn_mock(router).await;
         let _stream_guard = stream_cancel.drop_guard();
 
         let client = Client::from_parts(
@@ -683,10 +681,11 @@ mod tests {
         );
         let mut seen = Vec::new();
         let err = client
-            .sse("/events", Some(Duration::from_millis(120)), |payload| {
+            .sse("/events", Some(Duration::from_millis(120)), async |payload| {
                 seen.push(payload.to_string());
                 Ok(true)
             })
+            .await
             .unwrap_err();
         let captured_auth = auth_rx.recv_timeout(Duration::from_secs(2)).unwrap();
         assert_eq!(
@@ -698,8 +697,8 @@ mod tests {
         assert_eq!((err.code, err.tag.as_str()), (exit::OTHER, "Timeout"));
     }
 
-    #[test]
-    fn api_download_and_upload_attach_bearer_header() {
+    #[tokio::test]
+    async fn api_download_and_upload_attach_bearer_header() {
         use axum::http::{HeaderMap, StatusCode, Uri, header};
 
         let (req_tx, req_rx) = std::sync::mpsc::channel::<Option<String>>();
@@ -717,7 +716,7 @@ mod tests {
                 (StatusCode::OK, [(header::CONTENT_TYPE, content_type)], body)
             }
         });
-        let (addr, _cancel, _guard) = spawn_mock(router);
+        let (addr, _cancel, _guard) = spawn_mock(router).await;
 
         let client = Client::from_parts(
             PathBuf::from("/tmp"),
@@ -731,12 +730,13 @@ mod tests {
             false,
         );
 
-        let _ = client.ask_raw("server.health.get", &json!({})).unwrap();
-        let _: Value = client.get_json("/api/v1/health").unwrap();
-        let (bytes, _) = client.get_bytes("/api/v1/attachment/att-1").unwrap();
+        let _ = client.ask_raw("server.health.get", &json!({})).await.unwrap();
+        let _: Value = client.get_json("/api/v1/health").await.unwrap();
+        let (bytes, _) = client.get_bytes("/api/v1/attachment/att-1").await.unwrap();
         assert_eq!(bytes, b"hello");
         let _: Value = client
             .put_bytes("/api/v1/media/input/in-1/content", "application/octet-stream", b"abc")
+            .await
             .unwrap();
 
         for i in 0..4 {

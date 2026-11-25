@@ -60,7 +60,7 @@ fn attachment_line(att: &Attachment) -> String {
     line(&[&att.id, &att.name, &att.r#type, &format!("{}B", att.size)])
 }
 
-pub fn run(client: &Client, cmd: AttachmentCmd) -> Done {
+pub async fn run(client: &Client, cmd: AttachmentCmd) -> Done {
     match cmd.action {
         AttachmentAction::Upload { file, name, mime } => {
             if client.dry_run {
@@ -76,10 +76,10 @@ pub fn run(client: &Client, cmd: AttachmentCmd) -> Done {
                 r#type,
                 data: base64::engine::general_purpose::STANDARD.encode(&bytes),
             };
-            client.mutate::<ops::AttachmentCreate>("attachment upload", &request, attachment_line)
+            client.mutate::<ops::AttachmentCreate>("attachment upload", &request, attachment_line).await
         }
         AttachmentAction::Get { id, out } => {
-            let (bytes, content_type) = client.get_bytes(&format!("/api/v1/attachment/{}", url_segment(&id)))?;
+            let (bytes, content_type) = client.get_bytes(&format!("/api/v1/attachment/{}", url_segment(&id))).await?;
             if let Some(path) = out {
                 if let Some(parent) = path.parent()
                     && !parent.as_os_str().is_empty()

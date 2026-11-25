@@ -131,25 +131,29 @@ fn item_line(item: &LibraryItem) -> String {
     ])
 }
 
-pub fn run(client: &Client, cmd: LibraryCmd) -> Done {
+pub async fn run(client: &Client, cmd: LibraryCmd) -> Done {
     match cmd.action {
         LibraryAction::List { origin, file_type, text, sort } => {
-            let items = client.ask::<ops::LibraryItemList>(&LibraryListRequest {
-                origin: origin.map(Into::into),
-                r#type: file_type.map(Into::into),
-                text,
-                sort: sort.map(Into::into),
-            })?;
+            let items = client
+                .ask::<ops::LibraryItemList>(&LibraryListRequest {
+                    origin: origin.map(Into::into),
+                    r#type: file_type.map(Into::into),
+                    text,
+                    sort: sort.map(Into::into),
+                })
+                .await?;
             client.output.show(&items, |list| list.iter().map(item_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
         LibraryAction::Add { attachment, url, path, name } => {
             let request = LibraryAddRequest { attachment, url, path, name };
-            client.mutate::<ops::LibraryItemAdd>("library add", &request, item_line)
+            client.mutate::<ops::LibraryItemAdd>("library add", &request, item_line).await
         }
         LibraryAction::Delete { id } => {
             let key = id.clone();
-            client.mutate::<ops::LibraryItemDelete>("library delete", &LibraryItemDeleteInput { id }, |_| format!("deleted {key}"))
+            client
+                .mutate::<ops::LibraryItemDelete>("library delete", &LibraryItemDeleteInput { id }, |_| format!("deleted {key}"))
+                .await
         }
     }
 }

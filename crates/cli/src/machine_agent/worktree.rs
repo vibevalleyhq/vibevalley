@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use parking_lot::Mutex;
+use vibevalley_git::Repo;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreparedWorktree {
@@ -35,13 +35,11 @@ impl WorktreeManager {
     }
 
     pub fn git_available() -> bool {
-        Command::new("git")
-            .arg("--version")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|s| s.success())
+        let Some(paths) = std::env::var_os("PATH") else {
+            return false;
+        };
+        let bin = if cfg!(windows) { "git.exe" } else { "git" };
+        std::env::split_paths(&paths).any(|dir| is_executable_file(&dir.join(bin)))
     }
 
     /// Creates a deterministic isolated directory under `<root>/sessions/<sanitized_session_id>`
@@ -111,17 +109,26 @@ impl WorktreeManager {
             fs::remove_dir_all(&target).map_err(|e| format!("failed to clear stale directory {}: {e}", target.display()))?;
         }
 
-        let branch_exists = git_ok(&repo_dir, &["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch_name}")]);
+        let repo = Repo::discover(&repo_dir)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("{} is not a git repository", repo_dir.display()))?;
+        let branch_exists = repo
+            .branches()
+            .map_err(|e| e.to_string())?
+            .iter()
+            .any(|b| !b.is_remote && b.name == branch_name);
         let target_str = target.to_string_lossy().to_string();
         if branch_exists {
-            run_git(&repo_dir, &["worktree", "add", &target_str, &branch_name])?;
+            let out = repo.run(&["worktree", "add", &target_str, &branch_name]).map_err(|e| e.to_string())?;
+            if !out.ok() {
+                return Err(format!("git worktree add failed: {}", out.stderr));
+            }
         } else {
             let start_point = base_ref
                 .map(str::trim)
                 .filter(|r| !r.is_empty())
-                .filter(|r| git_ok(&repo_dir, &["rev-parse", "--verify", "--quiet", r]))
-                .unwrap_or("HEAD");
-            run_git(&repo_dir, &["worktree", "add", "-b", &branch_name, &target_str, start_point])?;
+                .filter(|r| repo.run(&["rev-parse", "--verify", "--quiet", r]).is_ok_and(|out| out.ok()));
+            repo.worktree_add(&target, &branch_name, start_point).map_err(|e| e.to_string())?;
         }
 
         let canonical = canonicalize_within(&worktrees_root, &target)?;
@@ -153,10 +160,11 @@ impl WorktreeManager {
             .remove(&canonical)
             .or_else(|| discover_common_git_repo(&canonical));
 
-        if let Some(repo) = repo_dir {
-            let target_str = canonical.to_string_lossy().to_string();
-            let _ = run_git(&repo, &["worktree", "remove", "--force", &target_str]);
-            let _ = run_git(&repo, &["worktree", "prune"]);
+        if let Some(repo_dir) = repo_dir
+            && let Ok(Some(repo)) = Repo::discover(&repo_dir)
+        {
+            let _ = repo.worktree_remove(&canonical, true);
+            let _ = repo.run(&["worktree", "prune"]);
         }
 
         if canonical.exists() {
@@ -213,12 +221,13 @@ impl WorktreeManager {
         fs::create_dir_all(&repos_root).map_err(|e| format!("failed to create repos dir {}: {e}", repos_root.display()))?;
         let slug = sanitize_repo_slug(trimmed);
         let clone_dir = repos_root.join(slug);
-        if clone_dir.is_dir() && is_git_repo(&clone_dir) {
-            let _ = run_git(&clone_dir, &["fetch", "--prune", "origin"]);
+        if clone_dir.is_dir()
+            && let Ok(Some(repo)) = Repo::discover(&clone_dir)
+        {
+            let _ = repo.run(&["fetch", "--prune", "origin"]);
             return fs::canonicalize(&clone_dir).map_err(|e| format!("failed to canonicalize repo {}: {e}", clone_dir.display()));
         }
-        let clone_str = clone_dir.to_string_lossy().to_string();
-        run_git(&repos_root, &["clone", trimmed, &clone_str])?;
+        vibevalley_git::clone(trimmed, &clone_dir).map_err(|e| format!("failed to clone {trimmed}: {e}"))?;
         fs::canonicalize(&clone_dir).map_err(|e| format!("failed to canonicalize cloned repo {}: {e}", clone_dir.display()))
     }
 }
@@ -280,22 +289,29 @@ fn ensure_lexical_child(base: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn is_executable_file(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        fs::metadata(path).is_ok_and(|m| m.is_file() && (m.permissions().mode() & 0o111) != 0)
+    }
+    #[cfg(not(unix))]
+    {
+        path.is_file()
+    }
+}
+
 fn is_git_repo(path: &Path) -> bool {
-    git_ok(path, &["rev-parse", "--git-dir"])
+    Repo::discover(path).is_ok_and(|repo| repo.is_some())
 }
 
 fn discover_common_git_repo(worktree: &Path) -> Option<PathBuf> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(worktree)
-        .args(["rev-parse", "--git-common-dir"])
-        .stdin(Stdio::null())
-        .output()
-        .ok()?;
-    if !out.status.success() {
+    let repo = Repo::discover(worktree).ok()??;
+    let out = repo.run(&["rev-parse", "--git-common-dir"]).ok()?;
+    if !out.ok() {
         return None;
     }
-    let raw = String::from_utf8(out.stdout).ok()?;
+    let raw = out.text();
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;
@@ -308,31 +324,4 @@ fn discover_common_git_repo(worktree: &Path) -> Option<PathBuf> {
     } else {
         Some(canon)
     }
-}
-
-fn git_ok(cwd: &Path, args: &[&str]) -> bool {
-    Command::new("git")
-        .arg("-C")
-        .arg(cwd)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success())
-}
-
-fn run_git(cwd: &Path, args: &[&str]) -> Result<String, String> {
-    let out = Command::new("git")
-        .arg("-C")
-        .arg(cwd)
-        .args(args)
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|e| format!("failed to spawn git {}: {e}", args.join(" ")))?;
-    if !out.status.success() {
-        let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
-        return Err(format!("git {} failed: {stderr}", args.join(" ")));
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }

@@ -92,18 +92,18 @@ fn pair_code_text(code: &RemotePairCode) -> String {
     lines.join("\n")
 }
 
-pub fn run(client: &Client, cmd: RemoteCmd) -> Done {
+pub async fn run(client: &Client, cmd: RemoteCmd) -> Done {
     match cmd.action {
         RemoteAction::Status => {
-            let status = client.ask::<ops::RemoteStatus>(&())?;
+            let status = client.ask::<ops::RemoteStatus>(&()).await?;
             client.output.show(&status, status_text);
             Ok(())
         }
         RemoteAction::Enable { bind, port } => {
             let req = RemoteEnableRequest { bind_addr: bind, port };
-            client.mutate::<ops::RemoteEnable>("remote enable", &req, status_text)
+            client.mutate::<ops::RemoteEnable>("remote enable", &req, status_text).await
         }
-        RemoteAction::Disable => client.mutate::<ops::RemoteDisable>("remote disable", &(), status_text),
+        RemoteAction::Disable => client.mutate::<ops::RemoteDisable>("remote disable", &(), status_text).await,
         RemoteAction::Code { scope } => {
             if client.dry_run {
                 return Err(no_dry_run("remote code"));
@@ -114,10 +114,10 @@ pub fn run(client: &Client, cmd: RemoteCmd) -> Done {
                     if trimmed.is_empty() {
                         return Err(Failure::usage("InvalidValue", "--scope must not be empty"));
                     }
-                    let raw_val = client.ask_raw("remote.pair.create", &json!({ "scope": trimmed }))?;
+                    let raw_val = client.ask_raw("remote.pair.create", &json!({ "scope": trimmed })).await?;
                     serde_json::from_value(raw_val).map_err(decode_failure)?
                 }
-                None => client.ask::<ops::RemotePairCreate>(&())?,
+                None => client.ask::<ops::RemotePairCreate>(&()).await?,
             };
             client.output.show(&code, pair_code_text);
             Ok(())
@@ -128,7 +128,9 @@ pub fn run(client: &Client, cmd: RemoteCmd) -> Done {
                 return Err(Failure::usage("InvalidValue", "DEVICE_ID must not be empty"));
             }
             let label = id.clone();
-            client.mutate::<ops::RemoteDeviceRevoke>("remote revoke", &RemoteDeviceRevokeRequest { id }, |_| format!("revoked {label}"))
+            client
+                .mutate::<ops::RemoteDeviceRevoke>("remote revoke", &RemoteDeviceRevokeRequest { id }, |_| format!("revoked {label}"))
+                .await
         }
     }
 }

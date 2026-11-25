@@ -329,7 +329,7 @@ fn load_description(raw: Option<String>) -> Result<Option<String>, Failure> {
     }
 }
 
-pub fn run(client: &Client, cmd: IssueCmd) -> Done {
+pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
     match cmd.action {
         IssueActionCmd::List {
             status,
@@ -348,7 +348,7 @@ pub fn run(client: &Client, cmd: IssueCmd) -> Done {
                 wants_user: wants_user.then_some(true),
                 closed: closed.then_some(true),
             };
-            let issues = client.ask::<ops::IssueList>(&filter)?;
+            let issues = client.ask::<ops::IssueList>(&filter).await?;
             let shown: Vec<Issue> = issues.iter().take(limit as usize).cloned().collect();
             client.output.show(&shown, |list| {
                 let mut lines: Vec<String> = list.iter().map(issue_line).collect();
@@ -360,19 +360,19 @@ pub fn run(client: &Client, cmd: IssueCmd) -> Done {
             Ok(())
         }
         IssueActionCmd::Show { issue, watch, timeout } => {
-            let found = client.ask::<ops::IssueGet>(&IssueGetInput { id: issue_ref(&issue) })?;
+            let found = client.ask::<ops::IssueGet>(&IssueGetInput { id: issue_ref(&issue) }).await?;
             if !watch {
                 client.output.show(&found, issue_text);
                 return Ok(());
             }
-            wait_for_issue(client, &found, timeout)?;
-            let updated = client.ask::<ops::IssueGet>(&IssueGetInput { id: found.id })?;
+            wait_for_issue(client, &found, timeout).await?;
+            let updated = client.ask::<ops::IssueGet>(&IssueGetInput { id: found.id }).await?;
             client.output.show(&updated, issue_text);
             Ok(())
         }
         IssueActionCmd::Watch { issue, follow } => {
-            let found = client.ask::<ops::IssueGet>(&IssueGetInput { id: issue_ref(&issue) })?;
-            observe(client, &found.id, follow)
+            let found = client.ask::<ops::IssueGet>(&IssueGetInput { id: issue_ref(&issue) }).await?;
+            observe(client, &found.id, follow).await
         }
         IssueActionCmd::Create {
             title,
@@ -393,7 +393,7 @@ pub fn run(client: &Client, cmd: IssueCmd) -> Done {
                 request_key: key,
                 ..Default::default()
             };
-            client.mutate::<ops::IssueCreate>("issue create", &request, applied_line)
+            client.mutate::<ops::IssueCreate>("issue create", &request, applied_line).await
         }
         IssueActionCmd::Edit {
             issue,
@@ -414,7 +414,7 @@ pub fn run(client: &Client, cmd: IssueCmd) -> Done {
                 criteria: (!criterion.is_empty()).then_some(criterion),
                 ..Default::default()
             };
-            client.mutate::<ops::IssueUpdate>("issue edit", &request, applied_line)
+            client.mutate::<ops::IssueUpdate>("issue edit", &request, applied_line).await
         }
         IssueActionCmd::Status { issue, status, comment } => {
             let request = IssueStatusUpdateInput {
@@ -426,7 +426,7 @@ pub fn run(client: &Client, cmd: IssueCmd) -> Done {
                 edit: None,
                 request_key: None,
             };
-            client.mutate::<ops::IssueStatusUpdate>("issue status", &request, applied_line)
+            client.mutate::<ops::IssueStatusUpdate>("issue status", &request, applied_line).await
         }
         IssueActionCmd::Comment { issue, words } => {
             let id = issue_ref(&issue);
@@ -435,7 +435,9 @@ pub fn run(client: &Client, cmd: IssueCmd) -> Done {
                 text: words.join(" "),
                 ..Default::default()
             };
-            client.mutate::<ops::IssueCommentCreate>("issue comment", &request, |_| format!("commented on #{id}"))
+            client
+                .mutate::<ops::IssueCommentCreate>("issue comment", &request, |_| format!("commented on #{id}"))
+                .await
         }
         IssueActionCmd::Review {
             issue,
@@ -454,18 +456,20 @@ pub fn run(client: &Client, cmd: IssueCmd) -> Done {
                 findings: (!finding.is_empty()).then_some(finding),
                 text: comment,
             };
-            client.mutate::<ops::IssueReview>("issue review", &request, issue_line)
+            client.mutate::<ops::IssueReview>("issue review", &request, issue_line).await
         }
         IssueActionCmd::Diff { issue, since_tree } => {
-            let changes = client.ask::<ops::IssueDiffGet>(&IssueDiffGetInput {
-                id: issue_ref(&issue),
-                since_tree,
-            })?;
+            let changes = client
+                .ask::<ops::IssueDiffGet>(&IssueDiffGetInput {
+                    id: issue_ref(&issue),
+                    since_tree,
+                })
+                .await?;
             client.output.show(&changes, changes_text);
             Ok(())
         }
         IssueActionCmd::Timeline { issue } => {
-            let timeline = client.ask::<ops::IssueTimelineGet>(&IssueTimelineGetInput { id: issue_ref(&issue) })?;
+            let timeline = client.ask::<ops::IssueTimelineGet>(&IssueTimelineGetInput { id: issue_ref(&issue) }).await?;
             client.output.show(&timeline, |tl| {
                 let mut lines: Vec<String> = tl
                     .milestones
@@ -485,30 +489,34 @@ pub fn run(client: &Client, cmd: IssueCmd) -> Done {
         }
         IssueActionCmd::Delete { issue } => {
             let id = issue_ref(&issue);
-            client.mutate::<ops::IssueDelete>("issue delete", &IssueDeleteInput { id: id.clone() }, |_| format!("deleted #{id}"))
+            client
+                .mutate::<ops::IssueDelete>("issue delete", &IssueDeleteInput { id: id.clone() }, |_| format!("deleted #{id}"))
+                .await
         }
     }
 }
 
-fn wait_for_issue(client: &Client, issue: &Issue, timeout: Option<i64>) -> Done {
+async fn wait_for_issue(client: &Client, issue: &Issue, timeout: Option<i64>) -> Done {
     let mut last: Option<(IssueStatus, IssueStageKind)> = None;
-    let res = client.sse("/api/v1/slice/board", timeout.map(|s| Duration::from_secs(s.max(0) as u64)), |data| {
-        let slice: BoardSlice = serde_json::from_str(data).map_err(decode_failure)?;
-        let Some(now) = slice.issues.into_iter().find(|i| i.id == issue.id) else {
-            return Err(Failure::new(exit::MISSING, "Missing", format!("issue #{} was removed", issue.number)));
-        };
-        let state = (now.status, now.stage.state);
-        if last == Some(state) {
-            return Ok(true);
-        }
-        last = Some(state);
-        eprintln!(
-            "{}",
-            serde_json::json!({ "issue": issue.number, "status": now.status, "stage": now.stage.state })
-        );
-        let settled = matches!(now.status, IssueStatus::InReview | IssueStatus::Done | IssueStatus::Canceled);
-        Ok(!(settled || now.stage.state.wants_user()))
-    });
+    let res = client
+        .sse("/api/v1/slice/board", timeout.map(|s| Duration::from_secs(s.max(0) as u64)), async |data| {
+            let slice: BoardSlice = serde_json::from_str(data).map_err(decode_failure)?;
+            let Some(now) = slice.issues.into_iter().find(|i| i.id == issue.id) else {
+                return Err(Failure::new(exit::MISSING, "Missing", format!("issue #{} was removed", issue.number)));
+            };
+            let state = (now.status, now.stage.state);
+            if last == Some(state) {
+                return Ok(true);
+            }
+            last = Some(state);
+            eprintln!(
+                "{}",
+                serde_json::json!({ "issue": issue.number, "status": now.status, "stage": now.stage.state })
+            );
+            let settled = matches!(now.status, IssueStatus::InReview | IssueStatus::Done | IssueStatus::Canceled);
+            Ok(!(settled || now.stage.state.wants_user()))
+        })
+        .await;
     match res {
         Err(f) if f.tag == "Timeout" => Err(Failure::new(
             exit::OTHER,
@@ -535,7 +543,7 @@ async fn wait_observe_retry(delay: Duration, cancel: &CancellationToken) -> bool
     }
 }
 
-fn observe(client: &Client, id: &str, follow: bool) -> Done {
+async fn observe(client: &Client, id: &str, follow: bool) -> Done {
     let mut seen: HashMap<String, HashMap<i64, i64>> = HashMap::new();
     let mut previous = String::new();
     let mut gaps: HashMap<String, String> = HashMap::new();
@@ -543,59 +551,61 @@ fn observe(client: &Client, id: &str, follow: bool) -> Done {
     let path = format!("/api/v1/issue/watch/{}", url_segment(id));
     loop {
         let mut received_event = false;
-        let res = client.sse(&path, None, |data| {
-            received_event = true;
-            let row: IssueWatch = serde_json::from_str(data).map_err(|e| Failure::new(exit::OTHER, "WatchProtocol", e.to_string()))?;
-            let rows = match row {
-                IssueWatch::History { session, events } => events
-                    .into_iter()
-                    .map(|event| IssueWatch::Event {
-                        session: session.clone(),
-                        event,
-                    })
-                    .collect(),
-                other => vec![other],
-            };
-            for row in rows {
-                let fresh = match &row {
-                    IssueWatch::Event { session, event } => {
-                        let revisions = seen.entry(session.clone()).or_default();
-                        let newer = revisions.get(&event.seq).is_none_or(|r| *r < event.revision);
-                        if newer {
-                            revisions.insert(event.seq, event.revision);
-                        }
-                        newer
-                    }
-                    IssueWatch::Gap { session, .. } => {
-                        let printed = serde_json::to_string(&row).unwrap_or_default();
-                        gaps.insert(session.clone(), printed.clone()).as_ref() != Some(&printed)
-                    }
-                    IssueWatch::State { session_ids, .. } => {
-                        seen.retain(|s, _| session_ids.contains(s));
-                        gaps.retain(|s, _| session_ids.contains(s));
-                        let printed = serde_json::to_string(&row).unwrap_or_default();
-                        std::mem::replace(&mut previous, printed.clone()) != printed
-                    }
-                    IssueWatch::Missing { .. } | IssueWatch::History { .. } => true,
+        let res = client
+            .sse(&path, None, async |data| {
+                received_event = true;
+                let row: IssueWatch = serde_json::from_str(data).map_err(|e| Failure::new(exit::OTHER, "WatchProtocol", e.to_string()))?;
+                let rows = match row {
+                    IssueWatch::History { session, events } => events
+                        .into_iter()
+                        .map(|event| IssueWatch::Event {
+                            session: session.clone(),
+                            event,
+                        })
+                        .collect(),
+                    other => vec![other],
                 };
-                if !fresh {
-                    continue;
+                for row in rows {
+                    let fresh = match &row {
+                        IssueWatch::Event { session, event } => {
+                            let revisions = seen.entry(session.clone()).or_default();
+                            let newer = revisions.get(&event.seq).is_none_or(|r| *r < event.revision);
+                            if newer {
+                                revisions.insert(event.seq, event.revision);
+                            }
+                            newer
+                        }
+                        IssueWatch::Gap { session, .. } => {
+                            let printed = serde_json::to_string(&row).unwrap_or_default();
+                            gaps.insert(session.clone(), printed.clone()).as_ref() != Some(&printed)
+                        }
+                        IssueWatch::State { session_ids, .. } => {
+                            seen.retain(|s, _| session_ids.contains(s));
+                            gaps.retain(|s, _| session_ids.contains(s));
+                            let printed = serde_json::to_string(&row).unwrap_or_default();
+                            std::mem::replace(&mut previous, printed.clone()) != printed
+                        }
+                        IssueWatch::Missing { .. } | IssueWatch::History { .. } => true,
+                    };
+                    if !fresh {
+                        continue;
+                    }
+                    if client.output.json {
+                        let mut value = serde_json::to_value(&row).unwrap_or_default();
+                        value["version"] = 1.into();
+                        out(&value.to_string());
+                    } else {
+                        out(&watch_text(&row));
+                    }
+                    match &row {
+                        IssueWatch::Missing { .. } => return Ok(false),
+                        IssueWatch::State { settled: true, .. } if !follow => return Ok(false),
+                        _ => {}
+                    }
                 }
-                if client.output.json {
-                    let mut value = serde_json::to_value(&row).unwrap_or_default();
-                    value["version"] = 1.into();
-                    out(&value.to_string());
-                } else {
-                    out(&watch_text(&row));
-                }
-                match &row {
-                    IssueWatch::Missing { .. } => return Ok(false),
-                    IssueWatch::State { settled: true, .. } if !follow => return Ok(false),
-                    _ => {}
-                }
-            }
-            Ok(true)
-        });
+                Ok(true)
+            })
+            .await;
         if received_event {
             unreachable_attempts = 0;
         }
@@ -604,17 +614,15 @@ fn observe(client: &Client, id: &str, follow: bool) -> Done {
             Err(f) if f.tag == "Unreachable" => {
                 let delay = observe_reconnect_delay(unreachable_attempts);
                 unreachable_attempts = unreachable_attempts.saturating_add(1);
-                let interrupted = vibevalley_runtime::rt::block_on(async {
-                    let cancel = CancellationToken::new();
-                    tokio::select! {
-                        biased;
-                        _ = tokio::signal::ctrl_c() => {
-                            cancel.cancel();
-                            true
-                        }
-                        cont = wait_observe_retry(delay, &cancel) => !cont,
+                let cancel = CancellationToken::new();
+                let interrupted = tokio::select! {
+                    biased;
+                    _ = tokio::signal::ctrl_c() => {
+                        cancel.cancel();
+                        true
                     }
-                });
+                    cont = wait_observe_retry(delay, &cancel) => !cont,
+                };
                 if interrupted {
                     return Ok(());
                 }

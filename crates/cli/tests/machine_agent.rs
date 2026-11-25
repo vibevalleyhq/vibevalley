@@ -401,16 +401,20 @@ fn machine_agent_local_mcp_proxy_and_permission_respond_round_trip() {
                 .map(|(_, v)| v.clone())
                 .ok_or_else(|| "missing authorization header on local McpServer".to_string())?;
 
-            let http = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
-            let resp = http
-                .post(url)
-                .header("content-type", "application/json")
-                .header("authorization", auth_header)
-                .body(r#"{"jsonrpc":"2.0","id":7,"method":"tools/list","params":{}}"#)
-                .send()
-                .map_err(|e| format!("local MCP POST failed: {e}"))?;
-            let status = resp.status().as_u16();
-            let body = resp.text().map_err(|e| e.to_string())?;
+            let (status, body) = vibevalley_runtime::rt::block_on(async {
+                let http = reqwest::Client::builder().no_proxy().build().unwrap();
+                let resp = http
+                    .post(url)
+                    .header("content-type", "application/json")
+                    .header("authorization", auth_header)
+                    .body(r#"{"jsonrpc":"2.0","id":7,"method":"tools/list","params":{}}"#)
+                    .send()
+                    .await
+                    .map_err(|e| format!("local MCP POST failed: {e}"))?;
+                let status = resp.status().as_u16();
+                let body = resp.text().await.map_err(|e| e.to_string())?;
+                Ok::<_, String>((status, body))
+            })?;
             Ok(vec![
                 Step::text(format!("mcp_status={status} body={body}")),
                 Step::Permission {
