@@ -4,7 +4,7 @@ help:
 	@printf '%s\n' \
 		'  rust            cargo xtask check' \
 		'  rust-changed    cargo xtask changed' \
-		'  rust-audit      cargo xtask audit' \
+		'  rust-audit      cargo xtask audit (boundaries, ratchets, arch, uml --strict, deps ui --strict)' \
 		'  rust-loom       cargo xtask loom' \
 		'  protocol        cargo xtask protocol' \
 		'  protocol-write  cargo xtask protocol --write' \

@@ -43,8 +43,8 @@ Commands:
   loom                                 Run loom concurrency tests (runtime & server)
   goldens [--check]                    Run vibevalley-core artifact golden tests
   protocol [--write]                   Check (or with --write, regenerate) TS contract & goldens
-  audit [--boundaries] [--ratchets] [--arch]
-                                       Run module-boundary, ratchet, and strict arch audits
+  audit [--boundaries] [--ratchets] [--arch] [--uml] [--deps]
+                                       Run module-boundary, ratchet, arch, UML strict, and UI deps audits
   arch-audit [--report-locks] [--json] Run flat server architecture audit (14 rules) & lock report
   diagnose [--json] [--top <N>]        Compute architectural metrics, hotspots & prescriptive diagnostics
   trace <op|slice|orphans|query> [--layer <name>] [--json]
@@ -196,23 +196,27 @@ fn cmd_audit(root: &Path, args: &[String]) -> Result<i32, String> {
     let mut want_boundaries = false;
     let mut want_ratchets = false;
     let mut want_arch = false;
+    let mut want_uml = false;
+    let mut want_deps = false;
     for arg in args {
         match arg.as_str() {
             "--boundaries" => want_boundaries = true,
             "--ratchets" => want_ratchets = true,
             "--arch" => want_arch = true,
+            "--uml" => want_uml = true,
+            "--deps" => want_deps = true,
             "--help" | "-h" => {
-                println!("Usage: cargo xtask audit [--boundaries] [--ratchets] [--arch]");
+                println!("Usage: cargo xtask audit [--boundaries] [--ratchets] [--arch] [--uml] [--deps]");
                 return Ok(0);
             }
             other => {
-                eprintln!("Usage: cargo xtask audit [--boundaries] [--ratchets] [--arch] (unknown option {other})");
+                eprintln!("Usage: cargo xtask audit [--boundaries] [--ratchets] [--arch] [--uml] [--deps] (unknown option {other})");
                 return Ok(2);
             }
         }
     }
 
-    let run_all = !want_boundaries && !want_ratchets && !want_arch;
+    let run_all = !want_boundaries && !want_ratchets && !want_arch && !want_uml && !want_deps;
     let mut exit_code = 0;
 
     if run_all || want_boundaries {
@@ -229,6 +233,18 @@ fn cmd_audit(root: &Path, args: &[String]) -> Result<i32, String> {
     }
     if run_all || want_arch {
         let code = arch_audit::run(root, &[])?;
+        if code != 0 {
+            exit_code = code;
+        }
+    }
+    if run_all || want_uml {
+        let code = qa::uml::arch::run(root, &["--strict".to_owned(), "--no-git".to_owned()])?;
+        if code != 0 {
+            exit_code = code;
+        }
+    }
+    if run_all || want_deps {
+        let code = deps::run(root, &["ui".to_owned(), "--strict".to_owned()])?;
         if code != 0 {
             exit_code = code;
         }

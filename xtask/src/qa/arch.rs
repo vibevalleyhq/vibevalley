@@ -9,12 +9,13 @@ use serde::Serialize;
 
 use super::{IrNodeMeta, NodeKind, Policy, TopologyIr, qualify_namespace, split_ns_segments};
 use crate::qa::lang::{rust_module_namespace, ts_module_namespace};
-use crate::qa::{Lang, is_qa_source_path, normalize_posix_path};
+use crate::qa::{Lang, Visibility, is_qa_source_path, normalize_posix_path};
 
 pub const DEFAULT_MIN_DELTA: f64 = 0.15;
 pub const DEFAULT_GIT_COMMITS: usize = 200;
 const MAX_MODULES_PER_COMMIT: usize = 12;
 const ZONE_DISTANCE_THRESHOLD: f64 = 0.30;
+const MIN_PAIN_CA: usize = 3;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ArchOptions {
@@ -413,9 +414,11 @@ fn compute_iad_for_graph(graph: &DirectedGraph, type_counts: &BTreeMap<String, (
             round3(abstract_types as f64 / total_types as f64)
         };
         let distance = round3((abstractness + instability - 1.0).abs());
+        // Pure concrete leaf libraries (`ce == 0`) are stable foundations rather than rigid hubs;
+        // only non-leaf modules with real fan-in (`ce > 0 && ca >= MIN_PAIN_CA`) enter Zone of Pain.
         let zone = if ca + ce == 0 {
             ArchZone::Balanced
-        } else if distance > ZONE_DISTANCE_THRESHOLD && (abstractness + instability) < 1.0 && ca > 0 {
+        } else if distance > ZONE_DISTANCE_THRESHOLD && (abstractness + instability) < 1.0 && ce > 0 && ca >= MIN_PAIN_CA {
             ArchZone::Pain
         } else if distance > ZONE_DISTANCE_THRESHOLD && (abstractness + instability) > 1.0 {
             ArchZone::Uselessness
@@ -450,11 +453,16 @@ fn compute_iad_for_graph(graph: &DirectedGraph, type_counts: &BTreeMap<String, (
 fn collect_mod2_type_counts(ir: &TopologyIr, valid_mod2: &BTreeSet<String>) -> BTreeMap<String, (usize, usize)> {
     let mut counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
     for meta in ir.nodes.values() {
-        if meta.node_kind != NodeKind::Class {
-            continue;
-        }
         let tk = meta.type_kind.as_deref();
-        if !is_counted_type_kind(tk) {
+        let is_counted_type = meta.node_kind == NodeKind::Class && is_counted_type_kind(tk);
+        // TypeScript/TSX modules export function components and runtime helpers as module `ops`
+        // alongside `interface` prop types; counting those concrete exports avoids A=1.0 false positives.
+        let ts_concrete_exports = if meta.lang == Some(Lang::TypeScript) && matches!(tk, Some("module" | "component")) {
+            meta.ops.iter().filter(|op| op.visibility == Visibility::Public).count()
+        } else {
+            0
+        };
+        if !is_counted_type && ts_concrete_exports == 0 {
             continue;
         }
         let Some(mod_ns) = resolve_node_module(&meta.id, &ir.nodes) else {
@@ -467,10 +475,13 @@ fn collect_mod2_type_counts(ir: &TopologyIr, valid_mod2: &BTreeSet<String>) -> B
             continue;
         }
         let entry = counts.entry(mod2_id).or_insert((0, 0));
-        entry.1 += 1;
-        if is_abstract_type_kind(tk) {
-            entry.0 += 1;
+        if is_counted_type {
+            entry.1 += 1;
+            if is_abstract_type_kind(tk) {
+                entry.0 += 1;
+            }
         }
+        entry.1 += ts_concrete_exports;
     }
     counts
 }
@@ -740,7 +751,7 @@ fn compute_misplaced_modules(ir: &TopologyIr, valid_mod2: &BTreeSet<String>, cra
     let mut intra: BTreeMap<String, usize> = BTreeMap::new();
     let mut efferent_cross: BTreeMap<String, usize> = BTreeMap::new();
     let mut afferent_cross: BTreeMap<String, usize> = BTreeMap::new();
-    let mut cross_by_crate: BTreeMap<String, BTreeMap<String, usize>> = BTreeMap::new();
+    let mut efferent_by_crate: BTreeMap<String, BTreeMap<String, usize>> = BTreeMap::new();
     let mut module_crates: BTreeMap<String, String> = BTreeMap::new();
 
     for m in valid_mod2 {
@@ -768,11 +779,10 @@ fn compute_misplaced_modules(ir: &TopologyIr, valid_mod2: &BTreeSet<String>, cra
         } else {
             if cb != "protocol" {
                 *efferent_cross.entry(a.clone()).or_insert(0) += 1;
-                *cross_by_crate.entry(a).or_default().entry(cb).or_insert(0) += 1;
+                *efferent_by_crate.entry(a).or_default().entry(cb).or_insert(0) += 1;
             }
             if ca != "protocol" {
-                *afferent_cross.entry(b.clone()).or_insert(0) += 1;
-                *cross_by_crate.entry(b).or_default().entry(ca).or_insert(0) += 1;
+                *afferent_cross.entry(b).or_insert(0) += 1;
             }
         }
     }
@@ -791,12 +801,14 @@ fn compute_misplaced_modules(ir: &TopologyIr, valid_mod2: &BTreeSet<String>, cra
         let eff = efferent_cross.get(module).copied().unwrap_or(0);
         let aff = afferent_cross.get(module).copied().unwrap_or(0);
         let cw = eff + aff;
-        if cw > iw && cw > 0 {
-            let (top_external_crate, top_external_coupling) = cross_by_crate
+        // Only flag modules that actively pull outward to other crates more than their own crate;
+        // lower-layer libraries with high `afferent_cross` are expected to be consumed by upper layers.
+        if eff > iw && eff > 0 {
+            let (top_external_crate, top_external_coupling) = efferent_by_crate
                 .get(module)
                 .and_then(|map| map.iter().max_by(|(k1, v1), (k2, v2)| v1.cmp(v2).then_with(|| k2.cmp(k1))))
                 .map_or_else(|| (String::new(), 0), |(k, v)| (k.clone(), *v));
-            let gravity_ratio = round3(cw as f64 / (iw + cw) as f64);
+            let gravity_ratio = round3(eff as f64 / (iw + eff) as f64);
             misplaced.push(MisplacedModule {
                 module: module.clone(),
                 crate_name: crate_name.clone(),
@@ -812,9 +824,9 @@ fn compute_misplaced_modules(ir: &TopologyIr, valid_mod2: &BTreeSet<String>, cra
     }
 
     misplaced.sort_by(|a, b| {
-        (b.cross_coupling - b.intra_coupling)
-            .cmp(&(a.cross_coupling - a.intra_coupling))
-            .then_with(|| b.cross_coupling.cmp(&a.cross_coupling))
+        (b.efferent_cross - b.intra_coupling)
+            .cmp(&(a.efferent_cross - a.intra_coupling))
+            .then_with(|| b.efferent_cross.cmp(&a.efferent_cross))
             .then_with(|| a.module.cmp(&b.module))
     });
     misplaced
@@ -1160,7 +1172,7 @@ fn build_ranked_findings(
     }
 
     for mm in misplaced {
-        let severity = if mm.cross_coupling >= mm.intra_coupling * 2 && mm.cross_coupling >= 5 {
+        let severity = if mm.efferent_cross >= mm.intra_coupling * 2 && mm.efferent_cross >= 5 {
             FindingSeverity::High
         } else {
             FindingSeverity::Medium
@@ -1170,11 +1182,11 @@ fn build_ranked_findings(
             kind: "misplaced_module".to_owned(),
             title: format!("Misplaced gravity: {}", mm.module),
             detail: format!(
-                "Cross-crate coupling {} exceeds intra-crate {} (top target `{}`={})",
-                mm.cross_coupling, mm.intra_coupling, mm.top_external_crate, mm.top_external_coupling
+                "Efferent cross-crate coupling {} exceeds intra-crate {} (afferent={}, top target `{}`={})",
+                mm.efferent_cross, mm.intra_coupling, mm.afferent_cross, mm.top_external_crate, mm.top_external_coupling
             ),
             modules: vec![mm.module.clone()],
-            score: round1(mm.gravity_ratio * 60.0 + (mm.cross_coupling as f64).min(30.0)),
+            score: round1(mm.gravity_ratio * 60.0 + (mm.efferent_cross as f64).min(30.0)),
         });
     }
 
@@ -1379,14 +1391,14 @@ fn print_human_report(report: &ArchReport) {
         }
     }
 
-    println!("\n[3] Misplaced Modules (cross-crate > intra-crate, excl. protocol):");
+    println!("\n[3] Misplaced Modules (efferent cross-crate > intra-crate, excl. protocol):");
     if report.misplaced.is_empty() {
         println!("  (none)");
     } else {
         for m in report.misplaced.iter().take(15) {
             println!(
-                "  {:<38} intra={} cross={} (ratio={:.2}, top={}:{})",
-                m.module, m.intra_coupling, m.cross_coupling, m.gravity_ratio, m.top_external_crate, m.top_external_coupling
+                "  {:<38} intra={} efferent={} afferent={} (ratio={:.2}, top={}:{})",
+                m.module, m.intra_coupling, m.efferent_cross, m.afferent_cross, m.gravity_ratio, m.top_external_crate, m.top_external_coupling
             );
         }
     }
@@ -1415,14 +1427,24 @@ fn print_human_report(report: &ArchReport) {
     }
 }
 
-pub fn parse_arch_args(args: &[String]) -> Result<(ArchOptions, bool), String> {
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ArchCliFlags {
+    pub json: bool,
+    pub strict: bool,
+}
+
+pub fn parse_arch_args(args: &[String]) -> Result<(ArchOptions, ArchCliFlags), String> {
     let mut opts = ArchOptions::default();
-    let mut json = false;
+    let mut flags = ArchCliFlags::default();
     let mut i = 0usize;
     while i < args.len() {
         match args[i].as_str() {
             "--json" => {
-                json = true;
+                flags.json = true;
+                i += 1;
+            }
+            "--strict" => {
+                flags.strict = true;
                 i += 1;
             }
             "--no-git" => {
@@ -1451,30 +1473,78 @@ pub fn parse_arch_args(args: &[String]) -> Result<(ArchOptions, bool), String> {
             }
             other => {
                 return Err(format!(
-                    "unknown option `{other}` (expected --json, --scope <crate>, --min-delta <f64>, --git-commits <N>, --no-git)"
+                    "unknown option `{other}` (expected --json, --strict, --scope <crate>, --min-delta <f64>, --git-commits <N>, --no-git)"
                 ));
             }
         }
     }
-    Ok((opts, json))
+    Ok((opts, flags))
+}
+
+pub fn strict_violations(report: &ArchReport) -> Vec<String> {
+    let mut out = Vec::new();
+    for (scope, analysis) in [
+        ("crate", &report.cycles.crate_scope),
+        ("mod2", &report.cycles.mod2_scope),
+        ("mod3", &report.cycles.mod3_scope),
+    ] {
+        for scc in &analysis.sccs {
+            out.push(format!("{scope} cycle ({} modules): {}", scc.len(), scc.join(" <-> ")));
+        }
+    }
+    for inv in &report.sdp_inversions_repo {
+        out.push(format!(
+            "repo SDP inversion: {} (I={:.2}) -> {} (I={:.2}, delta=+{:.2}, {} edge(s))",
+            inv.from, inv.from_instability, inv.to, inv.to_instability, inv.delta, inv.edge_count
+        ));
+    }
+    for inv in &report.sdp_inversions_intra {
+        out.push(format!(
+            "intra-crate [{}] SDP inversion: {} (I={:.2}) -> {} (I={:.2}, delta=+{:.2}, {} edge(s))",
+            inv.scope, inv.from, inv.from_instability, inv.to, inv.to_instability, inv.delta, inv.edge_count
+        ));
+    }
+    out
 }
 
 pub fn run(root: &Path, args: &[String]) -> Result<i32, String> {
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("Usage: cargo xtask uml arch [--json] [--scope <crate>] [--min-delta 0.15] [--git-commits 200] [--no-git]");
+        println!("Usage: cargo xtask uml arch [--json] [--strict] [--scope <crate>] [--min-delta 0.15] [--git-commits 200] [--no-git]");
         return Ok(0);
     }
-    let (opts, json) = parse_arch_args(args)?;
+    let (opts, flags) = parse_arch_args(args)?;
     let policy = super::load_or_init_policy(root)?;
     let ir = super::build_topology(root, &policy, &[])?;
     let report = analyze_architecture(root, &policy, &ir, &opts);
-    if json {
+    if flags.json {
         println!(
             "{}",
             serde_json::to_string_pretty(&report).map_err(|err| format!("failed to serialize arch report: {err}"))?
         );
     } else {
         print_human_report(&report);
+    }
+    if flags.strict {
+        let violations = strict_violations(&report);
+        if !violations.is_empty() {
+            let s = &report.summary;
+            eprintln!(
+                "uml arch --strict: {} regression(s) (cycles: crate={}, mod2={}, mod3={}; SDP inversions: repo={}, intra={})",
+                violations.len(),
+                s.crate_cycles,
+                s.mod2_cycles,
+                s.mod3_cycles,
+                s.sdp_repo_inversions,
+                s.sdp_intra_inversions,
+            );
+            for v in &violations {
+                eprintln!("  - {v}");
+            }
+            eprintln!(
+                "Fix: break dependency cycles or invert unstable dependencies behind narrow traits/events before re-running `cargo xtask uml arch --strict`."
+            );
+            return Ok(1);
+        }
     }
     Ok(0)
 }
@@ -1528,9 +1598,10 @@ mod tests {
     #[test]
     fn iad_zone_of_pain_and_sdp_inversion_detection() {
         let dir = temp_dir("iad-sdp");
-        // Stable concrete module `app.concrete_util` (ca=3, ce=0 => I=0.0, A=0.0, D=1.0 -> Pain!)
-        // Wait: make it ALSO depend on `app.unstable_leaf` (ce=1, ca=3 => I=0.25) so we test SDP inversion too!
+        // Concrete leaf `stable_core` (ca=5, ce=0 => I=0.0, A=0.0, D=1.0) is a healthy stable foundation (Balanced).
         write_file(&dir, "crates/core/src/stable_core/mod.rs", "pub struct CoreA {}\npub struct CoreB {}\n");
+        // Rigid non-leaf concrete hub `rigid_hub` (ca=3, ce=1 => I=0.25, A=0.0, D=0.75) enters Zone of Pain.
+        write_file(&dir, "crates/core/src/rigid_hub/mod.rs", "use crate::stable_core;\npub struct Hub {}\n");
         write_file(
             &dir,
             "crates/core/src/mid/mod.rs",
@@ -1546,14 +1617,18 @@ mod tests {
         write_file(
             &dir,
             "crates/core/src/consumer1/mod.rs",
-            "use crate::stable_core;\nuse crate::mid;\npub struct C1 {}\n",
+            "use crate::stable_core;\nuse crate::rigid_hub;\nuse crate::mid;\npub struct C1 {}\n",
         );
         write_file(
             &dir,
             "crates/core/src/consumer2/mod.rs",
-            "use crate::stable_core;\nuse crate::mid;\npub struct C2 {}\n",
+            "use crate::stable_core;\nuse crate::rigid_hub;\nuse crate::mid;\npub struct C2 {}\n",
         );
-        write_file(&dir, "crates/core/src/consumer3/mod.rs", "use crate::stable_core;\npub struct C3 {}\n");
+        write_file(
+            &dir,
+            "crates/core/src/consumer3/mod.rs",
+            "use crate::stable_core;\nuse crate::rigid_hub;\npub struct C3 {}\n",
+        );
 
         let policy = make_multi_crate_policy(&["core"]);
         let ir = build_topology(&dir, &policy, &[]).unwrap();
@@ -1568,12 +1643,34 @@ mod tests {
         );
 
         let stable = report.modules.iter().find(|m| m.module == "vibevalley.core.stable_core").unwrap();
-        assert_eq!(stable.ca, 4);
+        assert_eq!(stable.ca, 5);
         assert_eq!(stable.ce, 0);
         assert_eq!(stable.instability, 0.0);
         assert_eq!(stable.abstractness, 0.0);
         assert_eq!(stable.distance, 1.0);
-        assert_eq!(stable.zone, ArchZone::Pain);
+        assert_eq!(stable.zone, ArchZone::Balanced);
+        assert!(
+            !report
+                .findings
+                .iter()
+                .any(|f| f.kind == "zone_of_pain" && f.modules.iter().any(|m| m == "vibevalley.core.stable_core")),
+            "concrete leaf (Ce=0) must not emit Zone of Pain finding"
+        );
+
+        let hub = report.modules.iter().find(|m| m.module == "vibevalley.core.rigid_hub").unwrap();
+        assert_eq!(hub.ca, 3);
+        assert_eq!(hub.ce, 1);
+        assert_eq!(hub.instability, 0.25);
+        assert_eq!(hub.abstractness, 0.0);
+        assert_eq!(hub.distance, 0.75);
+        assert_eq!(hub.zone, ArchZone::Pain);
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.kind == "zone_of_pain" && f.modules.iter().any(|m| m == "vibevalley.core.rigid_hub")),
+            "rigid non-leaf concrete hub (Ce>0, Ca>=3) must emit Zone of Pain finding"
+        );
 
         let leaf_a = report.modules.iter().find(|m| m.module == "vibevalley.core.leaf_a").unwrap();
         assert_eq!(leaf_a.abstract_types, 1);
@@ -1598,6 +1695,78 @@ mod tests {
                 .any(|inv| inv.scope == "core" && inv.from == "vibevalley.core.mid" && inv.to == "vibevalley.core.volatile"),
             "expected intra-crate SDP inversion"
         );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ts_modules_count_exported_functions_to_avoid_false_uselessness() {
+        let dir = temp_dir("ts-iad");
+        write_file(
+            &dir,
+            "apps/mac/ui/infra/client.ts",
+            "export interface ClientOpts { url: string; }\nexport function createClient(o: ClientOpts) { return o.url; }\n",
+        );
+        write_file(
+            &dir,
+            "apps/mac/ui/design/button.tsx",
+            "export interface ButtonProps { label: string; }\nexport function Button(p: ButtonProps) { return p.label; }\n",
+        );
+        write_file(
+            &dir,
+            "apps/mac/ui/features/board.tsx",
+            "import { Button } from '../design/button';\nexport function Board() { return Button({ label: 'ok' }); }\n",
+        );
+        // Active TS view module with prop interfaces + exported runtime components/functions -> Balanced, NOT Uselessness.
+        write_file(
+            &dir,
+            "apps/mac/ui/app/shell.tsx",
+            "import { createClient } from '../infra/client';\nimport { Button } from '../design/button';\nimport { Board } from '../features/board';\nexport interface ShellProps { title: string; }\nexport function Shell(p: ShellProps) { return [createClient({ url: p.title }), Button({ label: p.title }), Board()]; }\nexport function Header() { return Button({ label: 'h' }); }\nexport function Footer() { return Button({ label: 'f' }); }\n",
+        );
+        // Truly abstract-only unreferenced TS module (only interfaces, no exported runtime functions, Ca=0, Ce=1) -> Uselessness.
+        write_file(
+            &dir,
+            "apps/mac/ui/orphan/types.ts",
+            "import type { ClientOpts } from '../infra/client';\nexport interface UnusedPort { opts: ClientOpts; }\nexport interface ExtraPort { id: string; }\n",
+        );
+
+        let policy = Policy {
+            title: "TS Test".to_owned(),
+            prefix: "vibevalley".to_owned(),
+            hierarchical: true,
+            sources: vec![SourceSpec {
+                lang: Lang::TypeScript,
+                root: "apps/mac/ui".to_owned(),
+                prefix: Some("vibevalley.mac".to_owned()),
+            }],
+            foreign: Vec::new(),
+            order: vec!["mac".to_owned()],
+            levels: Vec::new(),
+            omit: Vec::new(),
+            edge_kinds: BTreeMap::new(),
+            proposals: Vec::new(),
+        };
+
+        let ir = build_topology(&dir, &policy, &[]).unwrap();
+        let report = analyze_architecture(
+            &dir,
+            &policy,
+            &ir,
+            &ArchOptions {
+                no_git: true,
+                ..ArchOptions::default()
+            },
+        );
+
+        let app_mod = report.modules.iter().find(|m| m.module == "vibevalley.mac.app").unwrap();
+        assert_eq!(app_mod.abstract_types, 1);
+        assert!(app_mod.total_types >= 4, "expected exported TS functions counted in total_types: {app_mod:?}");
+        assert_eq!(app_mod.zone, ArchZone::Balanced);
+
+        let orphan_mod = report.modules.iter().find(|m| m.module == "vibevalley.mac.orphan").unwrap();
+        assert_eq!(orphan_mod.abstract_types, 2);
+        assert_eq!(orphan_mod.total_types, 2);
+        assert_eq!(orphan_mod.zone, ArchZone::Uselessness);
 
         let _ = fs::remove_dir_all(&dir);
     }
@@ -1682,7 +1851,7 @@ mod tests {
             },
         );
 
-        // `server.helper` has cross_coupling=2 (runtime.engine, runtime.pool) > intra_coupling=1 (server.api) -> misplaced!
+        // `server.helper` has efferent_cross=2 (runtime.engine, runtime.pool) > intra_coupling=1 (server.api) -> misplaced!
         let helper_misplaced = report.misplaced.iter().find(|m| m.module == "vibevalley.server.helper");
         assert!(
             helper_misplaced.is_some(),
@@ -1691,7 +1860,16 @@ mod tests {
         );
         let hm = helper_misplaced.unwrap();
         assert_eq!(hm.top_external_crate, "runtime");
-        assert!(hm.cross_coupling > hm.intra_coupling);
+        assert_eq!(hm.efferent_cross, 2);
+        assert_eq!(hm.afferent_cross, 0);
+        assert_eq!(hm.intra_coupling, 1);
+        assert_eq!(hm.gravity_ratio, round3(2.0 / 3.0));
+        // Lower-layer library `core.shared` has high afferent_cross (from runtime) but efferent_cross=0 -> NOT misplaced!
+        assert!(
+            !report.misplaced.iter().any(|m| m.module == "vibevalley.core.shared"),
+            "lower-layer library with only afferent cross-crate coupling must not be flagged as misplaced: {:?}",
+            report.misplaced
+        );
         // `protocol` must never be flagged as misplaced
         assert!(!report.misplaced.iter().any(|m| m.crate_name == "protocol"));
 
@@ -1725,5 +1903,114 @@ mod tests {
         // Ensure EdgeKind import is referenced without unused warning in test cfg
         let _ = EdgeKind::Dependency;
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn parse_arch_args_handles_strict_flag() {
+        let args: Vec<String> = vec!["--json", "--strict", "--no-git", "--scope", "server", "--min-delta", "0.25"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        let (opts, flags) = parse_arch_args(&args).unwrap();
+        assert!(flags.json);
+        assert!(flags.strict);
+        assert!(opts.no_git);
+        assert_eq!(opts.scope.as_deref(), Some("server"));
+        assert_eq!(opts.min_delta, 0.25);
+
+        let bad = parse_arch_args(&["--bogus".to_owned()]);
+        assert!(bad.is_err());
+        assert!(bad.unwrap_err().contains("--strict"));
+    }
+
+    #[test]
+    fn strict_mode_exits_zero_on_clean_dag_and_nonzero_on_cycles_or_sdp_inversions() {
+        // 1. Clean acyclic DAG with no SDP inversions: consumer (I=1.0) -> mid (I=0.5) -> leaf (I=0.0).
+        let clean_dir = temp_dir("strict-clean");
+        write_file(&clean_dir, "crates/core/src/leaf/mod.rs", "pub struct Leaf {}\n");
+        write_file(&clean_dir, "crates/core/src/mid/mod.rs", "use crate::leaf::Leaf;\npub struct Mid(pub Leaf);\n");
+        write_file(
+            &clean_dir,
+            "crates/core/src/consumer/mod.rs",
+            "use crate::mid::Mid;\npub struct Consumer(pub Mid);\n",
+        );
+        let clean_policy = make_multi_crate_policy(&["core"]);
+        crate::qa::write_json(&super::super::policy_path(&clean_dir), &clean_policy).unwrap();
+        let clean_ir = build_topology(&clean_dir, &clean_policy, &[]).unwrap();
+        let clean_report = analyze_architecture(
+            &clean_dir,
+            &clean_policy,
+            &clean_ir,
+            &ArchOptions {
+                no_git: true,
+                ..ArchOptions::default()
+            },
+        );
+        assert!(
+            strict_violations(&clean_report).is_empty(),
+            "clean DAG must have zero strict violations: {:?}",
+            strict_violations(&clean_report)
+        );
+        let code = run(&clean_dir, &["--no-git".to_owned(), "--strict".to_owned()]).unwrap();
+        assert_eq!(code, 0);
+        let _ = fs::remove_dir_all(&clean_dir);
+
+        // 2. Mod2 dependency cycle triggers non-zero exit under `--strict`.
+        let cycle_dir = temp_dir("strict-cycle");
+        write_file(&cycle_dir, "crates/server/src/a/mod.rs", "use crate::b;\npub struct A {}\n");
+        write_file(&cycle_dir, "crates/server/src/b/mod.rs", "use crate::a;\npub struct B {}\n");
+        let cycle_policy = make_multi_crate_policy(&["server"]);
+        crate::qa::write_json(&super::super::policy_path(&cycle_dir), &cycle_policy).unwrap();
+        let cycle_ir = build_topology(&cycle_dir, &cycle_policy, &[]).unwrap();
+        let cycle_report = analyze_architecture(
+            &cycle_dir,
+            &cycle_policy,
+            &cycle_ir,
+            &ArchOptions {
+                no_git: true,
+                ..ArchOptions::default()
+            },
+        );
+        let cycle_viols = strict_violations(&cycle_report);
+        assert!(
+            cycle_viols.iter().any(|v| v.contains("mod2 cycle")),
+            "expected mod2 cycle violation, got {cycle_viols:?}"
+        );
+        let code = run(&cycle_dir, &["--no-git".to_owned(), "--strict".to_owned()]).unwrap();
+        assert_eq!(code, 1);
+        let _ = fs::remove_dir_all(&cycle_dir);
+
+        // 3. Acyclic SDP inversion triggers non-zero exit under `--strict`.
+        let sdp_dir = temp_dir("strict-sdp");
+        write_file(&sdp_dir, "crates/core/src/leaf_a/mod.rs", "pub struct A {}\n");
+        write_file(&sdp_dir, "crates/core/src/leaf_b/mod.rs", "pub struct B {}\n");
+        write_file(
+            &sdp_dir,
+            "crates/core/src/volatile/mod.rs",
+            "use crate::leaf_a;\nuse crate::leaf_b;\npub struct Vol {}\n",
+        );
+        write_file(&sdp_dir, "crates/core/src/stable_mid/mod.rs", "use crate::volatile;\npub struct Mid {}\n");
+        write_file(&sdp_dir, "crates/core/src/c1/mod.rs", "use crate::stable_mid;\npub struct C1 {}\n");
+        write_file(&sdp_dir, "crates/core/src/c2/mod.rs", "use crate::stable_mid;\npub struct C2 {}\n");
+        let sdp_policy = make_multi_crate_policy(&["core"]);
+        crate::qa::write_json(&super::super::policy_path(&sdp_dir), &sdp_policy).unwrap();
+        let sdp_ir = build_topology(&sdp_dir, &sdp_policy, &[]).unwrap();
+        let sdp_report = analyze_architecture(
+            &sdp_dir,
+            &sdp_policy,
+            &sdp_ir,
+            &ArchOptions {
+                no_git: true,
+                ..ArchOptions::default()
+            },
+        );
+        let sdp_viols = strict_violations(&sdp_report);
+        assert!(
+            sdp_viols.iter().any(|v| v.contains("SDP inversion")),
+            "expected SDP inversion violation, got {sdp_viols:?}"
+        );
+        let code = run(&sdp_dir, &["--no-git".to_owned(), "--strict".to_owned()]).unwrap();
+        assert_eq!(code, 1);
+        let _ = fs::remove_dir_all(&sdp_dir);
     }
 }

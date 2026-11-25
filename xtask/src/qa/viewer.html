@@ -2124,12 +2124,12 @@
           const misEl = document.getElementById("arch-misplaced-list");
           misEl.innerHTML =
             misplaced.length === 0
-              ? `<div style="font-size:12px;color:#16a34a;">No modules with cross-crate gravity &gt; intra-crate</div>`
+              ? `<div style="font-size:12px;color:#16a34a;">No modules with efferent cross-crate gravity &gt; intra-crate</div>`
               : misplaced
                   .map(
                     (m) => `<div class="arch-row sev-medium">
                       <div>${modChipHtml(m.module)}</div>
-                      <div class="arch-meta">intra=${m.intra_coupling} vs cross=${m.cross_coupling} (ratio ${(m.gravity_ratio * 100).toFixed(0)}%, top=${escHtml(
+                      <div class="arch-meta">intra=${m.intra_coupling} vs efferent=${m.efferent_cross ?? m.cross_coupling} (afferent=${m.afferent_cross ?? 0}, ratio ${(m.gravity_ratio * 100).toFixed(0)}%, top=${escHtml(
                         m.top_external_crate,
                       )}:${m.top_external_coupling})</div>
                     </div>`,

@@ -226,7 +226,16 @@ fn is_thread_sleep_zeroed_zone(path: &str) -> bool {
     (path.starts_with("crates/server/tests/")
         || path.starts_with("apps/mac/src/")
         || path.starts_with("crates/cli/src/")
-        || path.starts_with("crates/runtime/src/"))
+        || path.starts_with("crates/runtime/src/")
+        || path.starts_with("crates/core/")
+        || path.starts_with("crates/git/")
+        || path.starts_with("crates/protocol/")
+        || path.starts_with("crates/i18n/")
+        || path.starts_with("crates/rich/")
+        || path.starts_with("crates/engines/")
+        || path.starts_with("apps/mac/crates/pixel/")
+        || path.starts_with("apps/mac/crates/workspace/")
+        || path.starts_with("apps/mac/crates/terminal/src/"))
         && path.ends_with(".rs")
 }
 
@@ -621,7 +630,10 @@ fn check_no_attach_slots(file: &SourceFile, stripped_rust: &str, non_test_code: 
     let mut violations = Vec::new();
 
     if let Some(code) = non_test_code
-        && (file.path == "crates/server/src/app.rs" || file.path.starts_with("crates/server/src/app/"))
+        && (file.path == "crates/server/src/app.rs"
+            || file.path.starts_with("crates/server/src/app/")
+            || file.path == "crates/server/src/boot.rs"
+            || file.path == "crates/server/src/projection.rs")
     {
         let mut cursor = 0usize;
         while let Some((offset, ident)) = next_ident_after_keyword(code, "fn", &mut cursor) {
