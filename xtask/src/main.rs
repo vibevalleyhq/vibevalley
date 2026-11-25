@@ -4,8 +4,12 @@ pub mod arch_audit;
 pub mod arch_metrics;
 mod boundaries;
 mod changed;
+mod deps;
+mod map;
 mod ratchets;
 mod rust_scan;
+mod ssot;
+mod trace;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -41,7 +45,15 @@ Commands:
   audit [--boundaries] [--ratchets] [--arch]
                                        Run module-boundary, ratchet, and strict arch audits
   arch-audit [--report-locks] [--json] Run flat server architecture audit (14 rules) & lock report
-  diagnose [--json] [--top <N>]        Compute architectural metrics, hotspots & prescriptive diagnostics"
+  diagnose [--json] [--top <N>]        Compute architectural metrics, hotspots & prescriptive diagnostics
+  trace <op|slice|orphans|query> [--layer <name>] [--json]
+                                       Trace a contract symbol, op, or slice across all 6 layers
+  map [filter] [--surface] [--json] [--top <N>]
+                                       Map module facades, pub/pub(crate) surface, and fn complexity
+  deps [crate|ui] [--cycles] [--dot] [--ui] [--json]
+                                       Inspect module/crate dependency graph, cycles, and UI layering
+  ssot-check [--dupes] [--strict] [--min-lines N] [--rule <id>] [--json]
+                                       Audit Rust <-> TS SSOT drift and structural clones"
     );
 }
 
@@ -237,6 +249,10 @@ fn dispatch(root: &Path, args: &[String]) -> Result<i32, String> {
         "audit" => cmd_audit(root, rest),
         "arch-audit" => arch_audit::run(root, rest),
         "diagnose" => arch_metrics::run(root, rest),
+        "trace" => trace::run(root, rest),
+        "map" => map::run(root, rest),
+        "deps" => deps::run(root, rest),
+        "ssot-check" => ssot::run(root, rest),
         other => {
             eprintln!("xtask: unknown subcommand `{other}`\n");
             print_usage();

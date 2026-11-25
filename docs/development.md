@@ -39,6 +39,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 - `make rust`（`cargo xtask check`）：`cargo fmt --check`、`cargo clippy --workspace --all-targets -- -D warnings` 与 `cargo test --workspace`（服务端、命令行、核心规则、原生应用、`xtask`）。
 - `make protocol`（`cargo xtask protocol`）校验 Rust 导出的 TypeScript 契约，并在临时目录生成 artifact 的 golden 与仓库逐个比较。用 `make protocol-write`（`cargo xtask protocol --write`）更新契约产物。
 - `make rust-audit`（`cargo xtask audit`）运行 [boundaries.rs](xtask/src/boundaries.rs) 与 [ratchets.rs](xtask/src/ratchets.rs) 静态检查服务端 `L0`–`L3` 分层、零循环依赖、脊柱与 `apps/mac/src/` 不导入具体业务模块，以及 Rust 异步并发棘轮（纳入 `make verify`）。
+- 跨层导航与 SSOT 巡检：`cargo xtask trace <op|slice|orphans>`（6 层协议到客户端追踪）、`cargo xtask map [filter] --surface`（模块 `pub`/`pub(crate)` 门面与函数复杂度热点）、`cargo xtask deps [crate|ui] --cycles --ui`（模块依赖环与 UI 跨 feature 深层导入）及 `cargo xtask ssot-check [--dupes] [--strict]`（跨端枚举镜像、宿主 DTO 旁路、环境变量漂移与结构克隆雷达）。
 - `vp run mac:check` 对原生页面运行 nsh 类型检查、打包与虚拟时钟 UI 验收套件。[场景用例](apps/mac/ui/app/scenarios.test.tsx)、[交互用例](apps/mac/ui/app/interactions.test.tsx)、[主题令牌用例](apps/mac/ui/app/theme.test.tsx)与[工作区外壳用例](apps/mac/ui/workspace/workspace.test.tsx)
 - `vp run ui:gallery` 启动隔离原生窗口对典型/边界场景（含工作区与农场）一键截图、校验 `dump.json` 零错误并生成离线 HTML 画廊。
 - `vp check`：`apps/mac/ui` 以外的 TS 的格式（oxfmt）、lint（oxlint，带类型）与类型检查；`vp check --fix` 自动格式化。
