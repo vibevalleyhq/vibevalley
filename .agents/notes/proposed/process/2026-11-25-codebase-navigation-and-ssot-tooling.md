@@ -47,6 +47,21 @@ Status: proposed
   - `nav-map-deps`：负责 `xtask/src/map.rs` 与 `xtask/src/deps.rs`
   - `nav-ssot-radar`：负责 `xtask/src/ssot.rs`（含 `--dupes` 结构克隆探测）
 
+### 4. 首轮实测基线（`feat/codebase-nav-and-ssot-tools` 合流后）
+
+| 命令 | 实测基线结果 |
+|---|---|
+| `cargo xtask trace orphans --json` | 索引 197 项协议端点：`zero_caller_orphans=31`、`single_client_gaps=91`、`multi_client_covered=75` |
+| `cargo xtask map crates/server --surface` | 扫描 184 个文件、27 个模块、57,555 非测试 LOC、2,174 `pub`、270 `pub(crate)`、87 重导出；识别 15 个宽门面热点与 15 个高复杂度函数（区分深层嵌套条件与扁平 `match` 分发） |
+| `cargo xtask deps server --cycles --ui` | 服务端 25 个模块、116 条依赖边、0 个强连通环（0 cycles）、3 条底层反向引用（`crates/server/src/config.rs` 指向 `connector`/`issue`/`voice`）；扫描 292 个 UI 文件，检出 21 处跨 feature 深层导入（`ui-cross-feature-deep-import`） |
+| `cargo xtask ssot-check --dupes --json` | 扫描 1,314 个文件，共 318 条发现：`ts-enum-mirror=28`、`host-dto-bypass=18`、`env-registry-drift=44`、`structural-clone-radar=228`（`--min-lines 25`、相似度 `>= 0.80`） |
+
+### 5. 工具链演进路线图（Uncle Bob 静态指标启发）
+
+- **`dryer` 启发式结构克隆雷达（首版已落地）**：`cargo xtask ssot-check --dupes` 对非测试 `crates/server/src` 与 `apps/{mac/ui,mobile}` 做标识符归一化 token 窗口指纹比对（`--min-lines 25`、相似度 `>= 0.80`），已建立 228 处克隆基线，后续可按热点逐步收拢共享辅助函数。
+- **`crapper` 启发式函数复杂度与 diff-CRAP 棘轮（阶段二路线图）**：`cargo xtask map --surface` 已落地按嵌套条件权重计分的函数复杂度榜单（区分扁平 `enum match` 分发与深层分支嵌套）；下一里程碑接入 `cargo llvm-cov --json` 增量行覆盖率，计算变更函数的 CRAP 分数并作为 diff-CRAP 门禁。
+- **`mutator` 启发式变异测试试点（阶段二路线图）**：下一里程碑在快速纯计算模块（仅限定于 `crates/core` 与 `crates/git/src/read.rs`）试点 `cargo-mutants --in-diff`，度量关键领域规则与纯 Rust Git 读取路径的测试杀伤率，不扩散至重编译服务端二进制。
+
 ## Alternatives considered
 
 - **引入独立 `syn` AST 解析器 vs 复用轻量 `xtask/src/rust_scan.rs` 与 `std::fs`**：引入 `syn`/`quote`/`proc-macro2` 会扩大 `xtask/Cargo.toml` 依赖树、拉长首次编译与 `Cargo.lock` 体积，且仍无法覆盖 TS 与跨端边界；复用已有的 [xtask/src/rust_scan.rs](xtask/src/rust_scan.rs)（已实现注释、字面量与 `#[cfg(test)]` 剥离及精确 1-based 行号保留）配合 `std::fs` 与 `serde_json` 可保持零新依赖与毫秒级扫描速度。

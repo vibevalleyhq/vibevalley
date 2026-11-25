@@ -46,12 +46,14 @@ Commands:
                                        Run module-boundary, ratchet, and strict arch audits
   arch-audit [--report-locks] [--json] Run flat server architecture audit (11 rules) & lock report
   diagnose [--json] [--top <N>]        Compute architectural metrics, hotspots & prescriptive diagnostics
-  trace <query> [--layer <name>] [--json]
-                                       Trace a contract symbol or endpoint across all 6 layers
-  map [target] [--surface] [--json]    Map module facades, pub/pub(crate) surface, and file metrics
-  deps [target] [--cycles] [--dot] [--json]
-                                       Inspect module/crate dependency graph and detect cycles
-  ssot-check [--dupes] [--json]        Audit Rust <-> TS SSOT drift and structural clones"
+  trace <op|slice|orphans|query> [--layer <name>] [--json]
+                                       Trace a contract symbol, op, or slice across all 6 layers
+  map [filter] [--surface] [--json] [--top <N>]
+                                       Map module facades, pub/pub(crate) surface, and fn complexity
+  deps [crate|ui] [--cycles] [--dot] [--ui] [--json]
+                                       Inspect module/crate dependency graph, cycles, and UI layering
+  ssot-check [--dupes] [--strict] [--min-lines N] [--rule <id>] [--json]
+                                       Audit Rust <-> TS SSOT drift and structural clones"
     );
 }
 
