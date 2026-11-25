@@ -6,8 +6,8 @@ use vibevalley_protocol::{Outcome, Run, RunTrigger, RunTriggerKind, Spent};
 
 use super::engine::SessionEngine;
 use crate::context::now;
-use crate::db::DbError;
 use crate::runtime::{Result, Step};
+use crate::service::DbError;
 
 pub fn trigger_of(kind: RunTriggerKind, message: Option<String>) -> RunTrigger {
     let message = message.map(|m| m.trim().to_string()).filter(|m| !m.is_empty());

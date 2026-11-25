@@ -12,7 +12,7 @@ import {
   userId,
 } from "@vibevalley/protocol";
 
-import { type ArtifactFacet, artifactFacetOf, mediaKindOf } from "../content";
+import { type ArtifactFacet, artifactFacetOf, mediaKindOf } from "../../infra/state/contentNav";
 
 export type SourceFilter = "all" | "agent" | "user";
 export const sourceFilters: readonly SourceFilter[] = ["all", "agent", "user"];

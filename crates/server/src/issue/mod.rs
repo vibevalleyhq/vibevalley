@@ -9,15 +9,17 @@ pub mod edit;
 pub mod family;
 pub mod pull;
 pub mod refine;
+mod session_chat;
 pub mod store;
 
 pub use board::{Board, NewIssue, Sent};
-pub use chat::{IssueChat, SessionChat};
+pub use chat::IssueChat;
 pub use family::{ChildDraft, MAX_CHILDREN};
 pub use pull::{
     Answer, GitHubCheck, GitHubComment, GitHubPullSnapshot, GitHubReview, HostRun, HostedRepo, KnownPullEvent, Network, Publisher, Pull, PullIndex, PullRecord,
     UpsertPullInput, actions_job_of, checks_fingerprint, checks_verdict, hosted_origin,
 };
+pub use session_chat::SessionChat;
 pub use store::{BoardConfig, BoardError, CronOfIssue, IssueChange, IssueState, Opened, PullOfIssue, Result, Step, Undelivered};
 
 use std::path::PathBuf;

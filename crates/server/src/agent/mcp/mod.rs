@@ -8,12 +8,27 @@ use std::sync::Arc;
 
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
+use vibevalley_protocol::Session;
 
 use crate::BoxFuture;
 use crate::context::api::Mcp as McpGateway;
-use crate::context::port::{ToolDispatchPort, ToolSpecWire};
 
 pub use resource::{Resource, ResourceReadArgs};
+
+/// Tool schema description exposed to the MCP door without importing `agent/tool`.
+#[derive(Debug, Clone)]
+pub struct ToolSpecWire {
+    pub name: String,
+    pub description: String,
+    pub parameters_json: String,
+}
+
+/// Breaks the `agent/mcp <-> agent/tool` cycle so the MCP door dispatches helper tool calls while `agent/tool` reads `vv://` resources.
+pub trait ToolDispatchPort: Send + Sync {
+    fn helper_tools(&self) -> Vec<ToolSpecWire>;
+    fn session_for_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, Option<Session>>;
+    fn call_helper_async<'a>(&'a self, session: Session, name: &'a str, args_json: &'a str) -> BoxFuture<'a, Result<String, String>>;
+}
 
 const UNKNOWN_CALLER: &str = "没认出你是谁：这些工具只给执行会话用";
 const PROTOCOL: &str = "2025-06-18";

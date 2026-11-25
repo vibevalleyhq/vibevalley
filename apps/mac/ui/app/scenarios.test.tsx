@@ -3,8 +3,8 @@ import { expect, open, test } from "nsh/test";
 
 import type { ConnectorState, ConnectorStatus, OrchestratorApproval } from "@vibevalley/protocol";
 
+import { fakeHost } from "../fixtures/fakeHost";
 import { SCENARIO_NOW, type ScenarioDensity, scenarios } from "../fixtures/scenarios";
-import { fakeHost } from "./fakeHost";
 
 type Opened = Awaited<ReturnType<typeof open>>;
 

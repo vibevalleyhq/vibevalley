@@ -4,8 +4,9 @@ use serde::Deserialize;
 use vibevalley_protocol::{Actor, AgentRole, ChannelUpdate};
 
 use super::{ToolRegistry, Who, given};
+use crate::agent::profile::text;
 use crate::channel::{AddressedMessage, ReadOptions, Speaking, Spoken};
-use crate::context::text;
+use crate::context::text::format_artifact_view_context;
 
 fn message_line(m: &AddressedMessage) -> String {
     let from = match &m.actor {
@@ -35,7 +36,7 @@ fn message_line(m: &AddressedMessage) -> String {
     let view = m
         .view_context
         .as_ref()
-        .map(|vc| format!("\n  │ {}", text::format_artifact_view_context(vc).replace('\n', "\n  │ ")))
+        .map(|vc| format!("\n  │ {}", format_artifact_view_context(vc).replace('\n', "\n  │ ")))
         .unwrap_or_default();
     let edited = if m.edited == Some(true) { "（改过）" } else { "" };
     format!("{head}{edited} {}{files}{made}{view}", m.text.trim().replace('\n', "\n  │ "))

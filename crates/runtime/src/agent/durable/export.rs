@@ -5,8 +5,9 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Conversation, Document, Entry, Error, JsonlOptions, Read, Result, Signal, Store, Submission, SubmissionStatus, Task};
-use crate::agent::core::doc::{CONVERSATION_SCOPE, GovernanceState, TASK_SCOPE};
+use super::{
+    CONVERSATION_SCOPE, Conversation, Document, Entry, Error, JsonlOptions, Read, Result, Signal, Store, Submission, SubmissionStatus, TASK_SCOPE, Task,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExportOptions {
@@ -48,10 +49,13 @@ struct CollectedBundle {
 }
 
 impl Store {
-    pub async fn export_conversation_to(&self, conv_id: &str, dest: &Store, opts: ExportOptions) -> Result<ExportManifest> {
+    pub async fn export_conversation_filtered<F>(&self, conv_id: &str, dest: &Store, opts: ExportOptions, transform_doc: F) -> Result<ExportManifest>
+    where
+        F: FnMut(Document, bool) -> Result<Option<Document>> + Send + 'static,
+    {
         let conv_id_owned = conv_id.to_owned();
         let bundle = self
-            .read_async(move |r| Box::pin(async move { collect_bundle(r, &conv_id_owned, opts).await }))
+            .read_async(move |r| Box::pin(async move { collect_bundle(r, &conv_id_owned, opts, transform_doc).await }))
             .await?;
 
         let manifest = ExportManifest {
@@ -109,7 +113,10 @@ impl Store {
         Ok(manifest)
     }
 
-    pub async fn export_conversation_jsonl(&self, conv_id: &str, dest_dir: &Path, opts: ExportOptions) -> Result<ExportManifest> {
+    pub async fn export_conversation_jsonl_filtered<F>(&self, conv_id: &str, dest_dir: &Path, opts: ExportOptions, transform_doc: F) -> Result<ExportManifest>
+    where
+        F: FnMut(Document, bool) -> Result<Option<Document>> + Send + 'static,
+    {
         let dest = Store::jsonl_with_options(
             dest_dir,
             JsonlOptions {
@@ -117,13 +124,16 @@ impl Store {
                 read_only: false,
             },
         )?;
-        let manifest = self.export_conversation_to(conv_id, &dest, opts).await?;
+        let manifest = self.export_conversation_filtered(conv_id, &dest, opts, transform_doc).await?;
         dest.close().await?;
         Ok(manifest)
     }
 }
 
-async fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Result<CollectedBundle> {
+async fn collect_bundle<F>(r: &Read<'_>, conv_id: &str, opts: ExportOptions, mut transform_doc: F) -> Result<CollectedBundle>
+where
+    F: FnMut(Document, bool) -> Result<Option<Document>>,
+{
     let root = r.conversation_async(conv_id).await?;
     if let Some(cut) = opts.at_seq
         && (cut < 0 || cut >= root.next_seq)
@@ -177,10 +187,9 @@ async fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Res
             }
         }
         for doc in r.documents_by_scope_async(CONVERSATION_SCOPE, &anc_id).await? {
-            if should_skip_doc(&doc.doc_kind, opts.at_seq.is_some()) {
+            let Some(doc) = transform_doc(doc, opts.at_seq.is_some())? else {
                 continue;
-            }
-            let doc = sanitize_doc(doc, opts.at_seq.is_some())?;
+            };
             if doc_keys.insert((doc.scope_kind.clone(), doc.scope_id.clone(), doc.doc_kind.clone())) {
                 documents.push(doc);
             }
@@ -201,10 +210,9 @@ async fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Res
             }
         }
         for doc in r.documents_by_scope_async(CONVERSATION_SCOPE, &root.id).await? {
-            if should_skip_doc(&doc.doc_kind, true) {
+            let Some(doc) = transform_doc(doc, true)? else {
                 continue;
-            }
-            let doc = sanitize_doc(doc, true)?;
+            };
             if doc_keys.insert((doc.scope_kind.clone(), doc.scope_id.clone(), doc.doc_kind.clone())) {
                 documents.push(doc);
             }
@@ -224,6 +232,9 @@ async fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Res
                 }
             }
             for doc in r.documents_by_scope_async(CONVERSATION_SCOPE, &cid).await? {
+                let Some(doc) = transform_doc(doc, false)? else {
+                    continue;
+                };
                 if doc_keys.insert((doc.scope_kind.clone(), doc.scope_id.clone(), doc.doc_kind.clone())) {
                     documents.push(doc);
                 }
@@ -257,6 +268,9 @@ async fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Res
                     }
                 }
                 for doc in r.documents_by_scope_async(TASK_SCOPE, &tid).await? {
+                    let Some(doc) = transform_doc(doc, false)? else {
+                        continue;
+                    };
                     if doc_keys.insert((doc.scope_kind.clone(), doc.scope_id.clone(), doc.doc_kind.clone())) {
                         documents.push(doc);
                     }
@@ -295,18 +309,4 @@ async fn collect_bundle(r: &Read<'_>, conv_id: &str, opts: ExportOptions) -> Res
         tasks,
         signals,
     })
-}
-
-fn should_skip_doc(kind: &str, sliced: bool) -> bool {
-    sliced && matches!(kind, "pi.inbox" | "pi.verdict")
-}
-
-fn sanitize_doc(mut doc: Document, sliced: bool) -> Result<Document> {
-    if sliced && doc.doc_kind == "pi.governance" {
-        let mut gov: GovernanceState = serde_json::from_value(doc.state).unwrap_or_default();
-        gov.pending_permissions.clear();
-        gov.last_rubric_verdict = None;
-        doc.state = serde_json::to_value(gov)?;
-    }
-    Ok(doc)
 }

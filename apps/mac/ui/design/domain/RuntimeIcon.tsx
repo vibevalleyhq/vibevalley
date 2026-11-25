@@ -1,8 +1,8 @@
 import { View } from "nsh";
 
-import { RuntimeBadge } from "../domain/RuntimeBadge";
-import { usePixelDir } from "./atlas";
-import { SpriteIcon } from "./icons";
+import { usePixelDir } from "../pixel/atlas";
+import { SpriteIcon } from "../pixel/icons";
+import { RuntimeBadge } from "./RuntimeBadge";
 
 export function RuntimeIcon(props: { runtime: string; size: number }) {
   const dir = usePixelDir();

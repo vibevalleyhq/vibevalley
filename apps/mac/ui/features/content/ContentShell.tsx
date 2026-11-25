@@ -1,9 +1,9 @@
 import { effect, keymap, View, type JSX } from "nsh";
 
 import { useLocation } from "../../infra/router";
+import { contentPresenting, contentSidebarOpen, openTemplatePicker, recordContentPath } from "../../infra/state/contentNav";
 import { ContentSearchModal } from "./ContentSearchModal";
 import { ContentSidebar } from "./ContentSidebar";
-import { contentPresenting, contentSidebarOpen, openTemplatePicker, recordContentPath } from "./navigation";
 import { TemplateModal } from "./TemplateModal";
 
 export function ContentShell(props: { children: JSX.Element }) {

@@ -17,8 +17,8 @@ import { Bubble } from "../../design/Tip";
 import { api } from "../../infra/api";
 import { Keyed } from "../../infra/base/dom";
 import { momentText, wallClockText } from "../../infra/base/format";
+import { channelLabel, topsOf } from "../../infra/channelMeta";
 import { useCollabSlice } from "../../infra/frame";
-import { channelLabel, topsOf } from "../channel";
 
 const connectorLabel: Record<ConnectorID, string> = {
   weixin: t("web.connector.connectors.label.weixin"),

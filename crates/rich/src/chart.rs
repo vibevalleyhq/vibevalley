@@ -7,14 +7,24 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use crate::engine::chart::{RenderOptions, ThemeMode as ChartThemeMode};
+use crate::engine::chart::{RenderOptions, ThemeMode as ChartThemeMode, ThemePalette as ChartThemePalette};
 use nsh_core::element::ImageSrc;
 use nsh_core::prelude::*;
 
 use crate::cache::{CacheStats, LruCache, hash_str};
 use crate::code_block::vv_code_block;
 use crate::highlight::run_offloaded;
-use crate::theme::{AdaptiveUi, vv_chart_palette};
+use crate::theme::{AdaptiveUi, DIAGRAM_FONT_SANS};
+
+/// Builds a resolved `crate::engine::chart::ThemePalette` matching `apps/mac/ui/design/theme.json`.
+///
+/// Uses concrete hex colors (zero CSS `var()`) and VibeValley's macOS UI font stack so
+/// `resvg` renders chart axes, legends, and labels accurately.
+pub fn vv_chart_palette(dark: bool) -> ChartThemePalette {
+    let mut palette = if dark { ChartThemePalette::dark() } else { ChartThemePalette::light() };
+    palette.font_family = DIAGRAM_FONT_SANS.to_owned();
+    palette
+}
 
 const CHART_CACHE_CAPACITY: usize = 64;
 /// Chart specs at or above this byte size offload parsing/SVG rendering off the UI thread.

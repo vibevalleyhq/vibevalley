@@ -24,7 +24,7 @@ use vibevalley_protocol::{
 
 use super::{Maker, Manager, artifact_type_of, encode_manifest_title_if_needed, new_id, q, refused};
 use crate::context::Sink;
-use crate::db::DbError;
+use crate::service::DbError;
 use crate::service::artifact::{ArtifactRow, NewArtifact, NewVersion, StoredSuggestion};
 
 const DEFAULT_PRESENCE_COLORS: [&str; 6] = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];

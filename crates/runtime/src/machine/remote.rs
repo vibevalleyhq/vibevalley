@@ -14,21 +14,20 @@ use vibevalley_protocol::{
     MachineSessionInput, MachineSessionOpen, MachineSessionOpened, MachineSessionRecord, MachineSessionRespond, MachineStatus, MachineWireError,
     MachineWireFrame, MachineWorktreeCleanup, MachineWorktreePrepare, MachineWorktreeResult, Millis, RuntimeCapability,
 };
-use vibevalley_runtime::BoxFuture;
-use vibevalley_runtime::machine::{Machine, MachineDescriptor, MachinePlatform as RtPlatform, MachineStatus as RtStatus, WorkdirHandle, WorkdirSpec};
-use vibevalley_runtime::oar::core::{HISTORY_LIMIT, RECORD_HISTORY_LIMIT, StatusFold};
-use vibevalley_runtime::oar::{
+
+use super::{Machine, MachineDescriptor, MachinePlatform as RtPlatform, MachineStatus as RtStatus, WorkdirHandle, WorkdirSpec};
+use crate::BoxFuture;
+use crate::oar::core::{HISTORY_LIMIT, RECORD_HISTORY_LIMIT, StatusFold};
+use crate::oar::{
     self, AgentError, Capabilities, ContentBlock, ControlAction, ControlOutcome, ControlStatus, Event, EventKind, Installation, InteractionDecision, McpServer,
     ModelInfo, PermissionDecision, PermissionMode, Result as OarResult, Runtime, Session, SessionOptions, SessionStatus, StopReason, Usage, voyage,
 };
-
-use crate::context::now;
 
 const DEFAULT_RPC_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Internal `SessionOptions::env` keys used to pass server-side PR-first
 /// dispatch metadata through the executor-agnostic `oar::SessionOptions`
-/// boundary without modifying `crates/runtime`. Stripped before wire send.
+/// boundary. Stripped before wire send.
 const ENV_SESSION_ID: &str = "__VIBEVALLEY_REMOTE_SESSION_ID";
 const ENV_REPO_REF: &str = "__VIBEVALLEY_REMOTE_REPO_REF";
 const ENV_BRANCH: &str = "__VIBEVALLEY_REMOTE_BRANCH";
@@ -103,7 +102,7 @@ fn extract_dispatch_meta(env: &[(String, String)], mcp_servers: &[McpServer]) ->
     (meta, clean)
 }
 
-pub(crate) fn to_rt_platform(platform: MachinePlatform) -> RtPlatform {
+fn to_rt_platform(platform: MachinePlatform) -> RtPlatform {
     match platform {
         MachinePlatform::Macos => RtPlatform::Macos,
         MachinePlatform::Linux => RtPlatform::Linux,
@@ -112,7 +111,7 @@ pub(crate) fn to_rt_platform(platform: MachinePlatform) -> RtPlatform {
     }
 }
 
-pub(crate) fn to_rt_status(status: MachineStatus) -> RtStatus {
+fn to_rt_status(status: MachineStatus) -> RtStatus {
     match status {
         MachineStatus::Online => RtStatus::Online,
         MachineStatus::Offline => RtStatus::Offline,
@@ -120,7 +119,7 @@ pub(crate) fn to_rt_status(status: MachineStatus) -> RtStatus {
     }
 }
 
-pub(crate) fn capabilities_from_summary(summary: &MachineRuntimeSummary) -> Capabilities {
+fn capabilities_from_summary(summary: &MachineRuntimeSummary) -> Capabilities {
     if let Some(spec) = oar::runtime_spec(&summary.id) {
         let mut caps = spec.capabilities;
         caps.model_selection |= summary.capabilities.contains(&RuntimeCapability::ListModels);
@@ -230,8 +229,8 @@ struct RemoteMeta {
     runtimes: Vec<MachineRuntimeSummary>,
 }
 
-pub(crate) struct RemoteMachineInner {
-    pub(crate) machine_id: String,
+struct RemoteMachineInner {
+    machine_id: String,
     meta: Mutex<RemoteMeta>,
     link: Mutex<Option<LiveLink>>,
     pending: Mutex<HashMap<String, PendingWaiter>>,
@@ -515,14 +514,62 @@ pub struct RemoteMachine {
 }
 
 impl RemoteMachine {
-    pub(crate) fn new(hello: &MachineHello, conn_id: u64, outgoing: mpsc::Sender<MachineWireFrame>, at: Millis) -> Arc<Self> {
+    pub fn new(hello: &MachineHello, conn_id: u64, outgoing: mpsc::Sender<MachineWireFrame>, at: Millis) -> Arc<Self> {
         Arc::new(Self {
             inner: RemoteMachineInner::new(hello, conn_id, outgoing, at),
         })
     }
 
-    pub(crate) fn inner(&self) -> &Arc<RemoteMachineInner> {
-        &self.inner
+    pub fn reconnect(&self, hello: &MachineHello, conn_id: u64, outgoing: mpsc::Sender<MachineWireFrame>, at: Millis) -> Vec<MachineSessionAttach> {
+        self.inner.reconnect(hello, conn_id, outgoing, at)
+    }
+
+    pub fn update_inventory(&self, runtimes: Vec<MachineRuntimeSummary>, at: Millis) {
+        self.inner.update_inventory(runtimes, at);
+    }
+
+    pub fn touch_last_seen(&self, at: Millis) {
+        self.inner.touch_last_seen(at);
+    }
+
+    pub fn on_disconnect(&self, conn_id: u64) -> Option<bool> {
+        self.inner.on_disconnect(conn_id)
+    }
+
+    pub fn close(&self) {
+        self.inner.close();
+    }
+
+    pub fn status(&self) -> MachineStatus {
+        self.inner.status()
+    }
+
+    pub fn try_send_frame(&self, frame: MachineWireFrame) -> Result<(), String> {
+        self.inner.try_send_frame(frame)
+    }
+
+    pub fn handle_session_opened(&self, opened: MachineSessionOpened) {
+        self.inner.handle_session_opened(opened);
+    }
+
+    pub fn handle_session_ack(&self, ack: MachineSessionAck) {
+        self.inner.handle_session_ack(ack);
+    }
+
+    pub fn handle_session_event(&self, ev: MachineSessionEvent) {
+        self.inner.handle_session_event(ev);
+    }
+
+    pub fn handle_session_record(&self, rec: MachineSessionRecord) {
+        self.inner.handle_session_record(rec);
+    }
+
+    pub fn handle_worktree_result(&self, res: MachineWorktreeResult) {
+        self.inner.handle_worktree_result(res);
+    }
+
+    pub fn handle_wire_error(&self, err: MachineWireError) {
+        self.inner.handle_wire_error(err);
     }
 
     pub fn info(&self) -> MachineInfo {
@@ -740,7 +787,7 @@ struct RemoteSessionState {
     disposed: bool,
 }
 
-pub(crate) struct RemoteSessionInner {
+struct RemoteSessionInner {
     session_id: String,
     runtime_id: String,
     machine: Arc<RemoteMachineInner>,
@@ -807,7 +854,7 @@ impl RemoteSessionInner {
                 Event {
                     seq: end_seq,
                     agent_path: Vec::new(),
-                    at_ms: u64::try_from(ev.at).unwrap_or_else(|_| u64::try_from(now()).unwrap_or(0)),
+                    at_ms: u64::try_from(ev.at).unwrap_or_else(|_| voyage::now_ms()),
                     kind: EventKind::SessionEnded,
                 },
             );
@@ -839,7 +886,7 @@ impl RemoteSessionInner {
         if state.ended {
             return;
         }
-        let at_ms = u64::try_from(now()).unwrap_or(0);
+        let at_ms = voyage::now_ms();
         let err_seq = state.last_seq.saturating_add(1);
         Self::emit_local_locked(
             &mut state,
@@ -1154,7 +1201,7 @@ impl RemoteSession {
                 Event {
                     seq: end_seq,
                     agent_path: Vec::new(),
-                    at_ms: u64::try_from(now()).unwrap_or(0),
+                    at_ms: voyage::now_ms(),
                     kind: EventKind::SessionEnded,
                 },
             );

@@ -16,12 +16,11 @@ mod room;
 mod types;
 pub mod words;
 
-pub use dispatch::{ChannelDispatched, DeliveryTargetKind, HeldBy, QueuedDelivery, Reason};
 pub use model::Inner;
-pub use ops::{profile_id, send_message_async};
 pub use types::{
-    AddressedMessage, ArtifactRef, ChannelEvent, ChannelMessageEvent, Committed, FileAt, Info, Made, Meta, Note, Noticing, Picked, Place, Posting, ReadOptions,
-    ReadResult, Saying, Seat, Speaking, Spoken, ThreadSubject, actor_of, line_of, meta_of, meta_text, to_message,
+    AddressedMessage, ArtifactRef, ChannelDispatched, ChannelEvent, ChannelMessageEvent, Committed, DeliveryTargetKind, FileAt, HeldBy, Info, Made, Meta, Note,
+    Noticing, Picked, Place, Posting, QueuedDelivery, ReadOptions, ReadResult, Reason, Saying, Seat, Speaking, Spoken, ThreadSubject, actor_of, line_of,
+    meta_of, meta_text, profile_id, to_message,
 };
 
 use std::sync::{Arc, Weak};
@@ -33,9 +32,8 @@ use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ApiError, BizCode, ChatMessage, DEFAULT_ORCHESTRATOR, Embed, SubjectKind, USER_ID, UserMention};
 
-use self::dispatch::Reach;
 use self::model::{ChatModel, Q, WriteTx};
-use self::types::{Write, Written, new_id};
+use self::types::{Reach, Write, Written, new_id};
 use self::words::ChatTarget;
 use crate::context::{AsyncRequestKeys, Context, LookIn, internal, missing, now, refused as refuse};
 use crate::service::channel::{EventRow, MsgRow, NewDelivery, NewMessage, ParticipantRow};

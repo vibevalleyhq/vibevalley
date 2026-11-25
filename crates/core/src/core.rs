@@ -1271,13 +1271,13 @@ mod tests {
         assert!(working.inbox.items.is_empty());
         assert!(working.farm.view.plots.is_empty());
         assert!(working.farm.view.plays.is_empty());
-        assert!(crate::progress::entries_for(&before, &add_fact, core.state()).is_empty());
+        assert!(crate::game::progress::entries_for(&before, &add_fact, core.state()).is_empty());
 
         let before_fail = core.state().clone();
         let applied = core.apply(vec![fail_fact.clone()]);
         assert!(applied.effects.is_empty());
         assert!(core.inbox_slice().items.is_empty());
-        assert!(crate::progress::entries_for(&before_fail, &fail_fact, core.state()).is_empty());
+        assert!(crate::game::progress::entries_for(&before_fail, &fail_fact, core.state()).is_empty());
     }
 
     #[test]

@@ -23,7 +23,7 @@ use super::adapter::{App, AppFailed, FailedKind, Inbound, LoginIo, Progress, Rec
 use super::digest::{DIGEST_OVER, digest, is_pairing, short_id, split_text, user_line};
 use crate::channel::{Chat, Saying};
 use crate::context::{Context, now};
-use crate::db::DbError;
+use crate::service::DbError;
 use crate::service::connector::{ConnectorAccountRow, ConnectorInboundRow};
 use crate::setting::{Secret, Setting};
 

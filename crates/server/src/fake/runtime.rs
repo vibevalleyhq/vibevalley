@@ -125,7 +125,7 @@ fn turn(ask: &TurnAsk) -> Result<Vec<Step>, String> {
     if input.contains("只起草工单") {
         return Ok(draft(ask, &input));
     }
-    if input.contains(ANSWER_OPENING) || input.contains("结论读不出来") || persona.contains(crate::context::text::ANSWER_ONLY) {
+    if input.contains(ANSWER_OPENING) || input.contains("结论读不出来") || persona.contains(crate::agent::profile::text::ANSWER_ONLY) {
         return Ok(answer(ask, &input));
     }
     if input.contains("必败") {

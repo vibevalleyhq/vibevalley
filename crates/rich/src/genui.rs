@@ -21,7 +21,7 @@ use crate::canvas::vv_canvas;
 use crate::chart::vv_chart;
 use crate::code_block::vv_code_block;
 use crate::diagram::vv_diagram;
-use crate::markdown::{VvMarkdownSize, vv_markdown};
+use crate::markdown_base::{VvMarkdownSize, vv_base_markdown};
 use crate::theme::AdaptiveUi;
 
 /// Props of [`VvGenUi`].
@@ -446,7 +446,7 @@ fn render_node(node: &ResolvedNode, updater: &StateUpdater) -> AnyElement {
         ResolvedNodeKind::Markdown { text: md } => view()
             .test_id(&node_tid)
             .min_w(px(0.0))
-            .child(vv_markdown().text(md.clone()).size(VvMarkdownSize::Sm))
+            .child(vv_base_markdown().text(md.clone()).size(VvMarkdownSize::Sm))
             .into_element(),
         ResolvedNodeKind::Metric { label, value, delta, .. } => {
             let metric_tid = format!("genui-metric-{id}");

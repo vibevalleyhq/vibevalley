@@ -16,7 +16,6 @@ pub mod game;
 mod inbox;
 pub mod moves;
 pub mod pr;
-pub mod progress;
 pub mod projection;
 pub mod prompts;
 pub mod refine;

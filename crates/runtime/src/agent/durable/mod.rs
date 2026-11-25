@@ -25,6 +25,9 @@ pub use telemetry::{JsonlTelemetrySink, MemoryTelemetrySink, NoopTelemetrySink, 
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub const CONVERSATION_SCOPE: &str = "conversation";
+pub const TASK_SCOPE: &str = "task";
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]

@@ -6,7 +6,7 @@ import "@vibevalley/i18n/catalogs";
 import type { RemoteDeviceSummary, RemotePairCode, RemoteStatus } from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
 
-import { fakeHost, type FakeHost } from "../../app/fakeHost";
+import { fakeHost, type FakeHost } from "../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../fixtures/scenarios";
 import { shortMomentText } from "../../infra/base/format";
 

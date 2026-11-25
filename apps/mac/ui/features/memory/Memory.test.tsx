@@ -1,7 +1,7 @@
 import "../../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
-import { fakeHost } from "../../app/fakeHost";
+import { fakeHost } from "../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../fixtures/scenarios";
 
 async function mountMemory(configure?: (fake: ReturnType<typeof fakeHost>) => void) {

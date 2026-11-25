@@ -3,8 +3,8 @@ use vibevalley_protocol::{Millis, Outcome, Run, RunTriggerKind, Session};
 use vibevalley_runtime::agent::durable::{Error, Result as DurableResult, Store, Submission, SubmissionStatus, Tx};
 
 use super::engine::SessionEngine;
-use crate::db::DbError;
 use crate::runtime::Result;
+use crate::service::DbError;
 use crate::service::session::{SessionExtra, SessionService};
 
 pub(crate) fn delivery_conversation(issue: &str) -> String {

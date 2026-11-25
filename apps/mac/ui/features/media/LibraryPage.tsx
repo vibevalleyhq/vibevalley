@@ -22,8 +22,6 @@ import { useCollabSlice, useOpsSlice } from "../../infra/frame";
 import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
 import { useRouter, useSearchParams } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
-import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
-import { artifactTypeLabel, buildOutlineFromMarkdown, inferArtifactFromName, useArtifacts } from "../artifact";
 import {
   type ContentBucket,
   contentBrowseBucket,
@@ -33,7 +31,9 @@ import {
   openTemplatePicker,
   pinnedKeys,
   togglePinned,
-} from "../content";
+} from "../../infra/state/contentNav";
+import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
+import { artifactTypeLabel, buildOutlineFromMarkdown, inferArtifactFromName, useArtifacts } from "../artifact";
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
 import { Inspector } from "./Inspector";

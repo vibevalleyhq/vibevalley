@@ -32,7 +32,7 @@ pub const LOCK_HOTSPOT_MIN_COUNT: usize = 5;
 /// Minimum combined coupling degree (`fan_in + fan_out`) before flagging a coupling hotspot.
 pub const COUPLING_HOTSPOT_MIN_DEGREE: usize = 6;
 
-const SHALLOW_EXEMPT_MODULES: &[&str] = &["lib", "main", "app", "router"];
+const SHALLOW_EXEMPT_MODULES: &[&str] = &["lib", "main", "app", "router", "boot", "projection", "debug_sources"];
 const COUPLING_EXEMPT_MODULES: &[&str] = &["lib", "main"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

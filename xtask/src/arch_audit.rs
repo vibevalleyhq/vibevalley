@@ -21,6 +21,15 @@ pub const APP_RS_NON_TEST_LINE_CEILING: usize = 350;
 /// Non-test code line ceiling for `crates/server/src/router.rs`.
 pub const ROUTER_RS_NON_TEST_LINE_CEILING: usize = 350;
 
+/// Non-test code line ceiling for `crates/server/src/boot.rs`.
+pub const BOOT_RS_NON_TEST_LINE_CEILING: usize = 280;
+
+/// Non-test code line ceiling for `crates/server/src/projection.rs`.
+pub const PROJECTION_RS_NON_TEST_LINE_CEILING: usize = 310;
+
+/// Non-test code line ceiling for `crates/server/src/router/glue.rs`.
+pub const ROUTER_GLUE_RS_NON_TEST_LINE_CEILING: usize = 270;
+
 /// Shrink-only ceiling for non-test `flume::` references under `crates/server/src/`.
 /// Initialized to 0 for strict post-refactor gating; never raise this ceiling.
 pub const SERVER_FLUME_CEILING: usize = 0;
@@ -75,10 +84,10 @@ pub const BLOCKING_REQWEST_CEILING: usize = 0;
 
 const GATEWAY_ALLOWED_ROOT_FILES: &[&str] = &["router.rs", "app.rs", "main.rs", "lib.rs"];
 const DAG_IGNORED_BASE_MODULES: &[&str] = &["context", "log", "db", "service", "setting", "provider", "fake"];
-const DAG_ROOT_MODULES: &[&str] = &["app", "router", "main", "lib"];
-const RUNTIME_FORBIDDEN_TARGETS: &[&str] = &["agent", "issue", "cron"];
+const DAG_ROOT_MODULES: &[&str] = &["app", "router", "boot", "projection", "debug_sources", "main", "lib"];
+const RUNTIME_FORBIDDEN_TARGETS: &[&str] = &["agent", "issue", "cron", "artifact", "connector", "voice", "game", "gateway", "app", "router"];
 const SERVICE_ALLOWED_TARGETS: &[&str] = &["db", "context", "log"];
-const GAME_ALLOWED_TARGETS: &[&str] = &["context", "repo", "log"];
+const GAME_ALLOWED_TARGETS: &[&str] = &["context", "repo"];
 const LEGACY_SERVER_DIRS: &[&str] = &["app", "infra", "content", "collab", "team", "work", "skin", "transport"];
 const LATE_BIND_HOOK_METHODS: &[&str] = &[
     "bind_server",
@@ -89,7 +98,26 @@ const LATE_BIND_HOOK_METHODS: &[&str] = &[
     "attach_machine_bus",
 ];
 const WELL_KNOWN_MODULES: &[&str] = &[
-    "gateway", "runtime", "agent", "issue", "cron", "service", "game", "db", "context", "log", "repo", "setting", "provider", "fake", "app", "router", "main",
+    "gateway",
+    "runtime",
+    "agent",
+    "issue",
+    "cron",
+    "service",
+    "game",
+    "db",
+    "context",
+    "log",
+    "repo",
+    "setting",
+    "provider",
+    "fake",
+    "app",
+    "router",
+    "boot",
+    "projection",
+    "debug_sources",
+    "main",
     "lib",
 ];
 const NON_JSON_VALUE_PREFIXES: &[&str] = &["sea_orm", "sea_query", "sqlx", "toml", "yaml", "serde_yaml"];
@@ -1755,6 +1783,24 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
                     details: Vec::new(),
                 });
             }
+        } else if let Some(ceiling) = match rel {
+            "boot.rs" => Some(BOOT_RS_NON_TEST_LINE_CEILING),
+            "projection.rs" => Some(PROJECTION_RS_NON_TEST_LINE_CEILING),
+            "router/glue.rs" => Some(ROUTER_GLUE_RS_NON_TEST_LINE_CEILING),
+            _ => None,
+        } {
+            let count = count_non_test_code_lines(&non_test_code);
+            if count > ceiling {
+                violations.push(ArchViolation {
+                    rule: ArchAuditRule::ThinAppAndRouter,
+                    file: file.path.clone(),
+                    line: 1,
+                    message: format!("`crates/server/src/{rel}` has {count} non-test code lines, exceeding ceiling {ceiling}"),
+                    fix: format!("Keep `{rel}` thin (<= {ceiling} non-test code lines) by delegating domain logic to domain modules."),
+                    see: ARCH_DOC,
+                    details: Vec::new(),
+                });
+            }
         }
 
         // Rule 7 inputs: flume, sync/async duplicates, and lock inventory
@@ -1834,7 +1880,7 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
                     file: file.path.clone(),
                     line,
                     message: format!("`game` depends on forbidden module `{target_mod}` ({snippet})"),
-                    fix: "Keep `game` a thin projection skin depending only on `{context, repo, log}`.".to_owned(),
+                    fix: "Keep `game` a thin projection skin depending only on `{context, repo}`.".to_owned(),
                     see: ARCH_DOC,
                     details: Vec::new(),
                 });
@@ -2380,10 +2426,7 @@ mod tests {
             "crates/server/src/service/issue.rs",
             "use crate::db::entity::issue;\nuse crate::context::Ctx;\nuse crate::log::Logger;\nuse crate::service::common;\n",
         );
-        clean_dir.write(
-            "crates/server/src/game/mod.rs",
-            "use crate::context::Ctx;\nuse crate::repo::Repo;\nuse crate::log::Logger;\n",
-        );
+        clean_dir.write("crates/server/src/game/mod.rs", "use crate::context::Ctx;\nuse crate::repo::Repo;\n");
         clean_dir.write(
             "crates/server/src/runtime/runner.rs",
             "use crate::channel::Channel;\nuse crate::context::Ctx;\n",

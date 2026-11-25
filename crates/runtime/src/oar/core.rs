@@ -4,7 +4,6 @@
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_swap::ArcSwapOption;
 use parking_lot::{Mutex, MutexGuard};
@@ -12,7 +11,7 @@ use tokio::sync::mpsc;
 
 use crate::BoxFuture;
 use crate::oar::record::Recorder;
-use crate::oar::voyage::normalize_trace_id;
+use crate::oar::voyage::{normalize_trace_id, now_ms};
 use crate::oar::{
     AgentError, Capabilities, ContentBlock, Event, EventKind, InteractionDecision, PermissionDecision, PermissionMode, Result, Session, SessionStatus,
     StopReason, TurnOptions, Usage,
@@ -62,10 +61,6 @@ pub mod rejection {
 
 pub(crate) fn rejected(code: &str, detail: impl AsRef<str>) -> AgentError {
     AgentError::Rejected(format!("{code}: {}", detail.as_ref()))
-}
-
-pub(crate) fn now_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
 /// Derives `SessionStatus` from events, one at a time. The same fold backs

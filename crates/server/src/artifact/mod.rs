@@ -30,7 +30,7 @@ use self::collab::{
 use crate::context::api::{CallerContext, media::SharedSpeechStreams};
 use crate::context::port::ChannelAnnounce;
 use crate::context::{Context, LookIn, missing};
-use crate::db::DbError;
+use crate::service::DbError;
 use crate::service::artifact::{ArtifactRow, NewArtifact, NewVersion, StoredSuggestion, VersionRow};
 use crate::setting::Setting;
 use crate::storage::Storage;

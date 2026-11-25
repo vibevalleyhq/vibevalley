@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::json;
-use vibevalley_core::progress::harvest_coins;
+use vibevalley_core::game::progress::harvest_coins;
 use vibevalley_protocol::{Caller, LedgerEntry, LedgerEntryHarvested, Repo as ProtocolRepo};
 use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use vibevalley_server::game::Game;

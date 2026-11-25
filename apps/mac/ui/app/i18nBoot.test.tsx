@@ -4,8 +4,8 @@ import { expect, open, test } from "nsh/test";
 import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 
+import { fakeHost } from "../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../fixtures/scenarios";
-import { fakeHost } from "./fakeHost";
 
 test("regression: i18nBoot runs before static UI module imports so module-level t() resolves in host locale", async () => {
   setLocale("zh");

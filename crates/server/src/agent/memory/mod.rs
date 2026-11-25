@@ -19,7 +19,7 @@ use crate::agent::profile::Profile;
 use crate::context::Context;
 use crate::context::error::AsyncRequestKeys;
 use crate::context::port::MemoryRecallPort;
-use crate::db::DbError;
+use crate::service::DbError;
 use crate::service::memory::NewMemory;
 
 mod gse;

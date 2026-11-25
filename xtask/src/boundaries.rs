@@ -17,6 +17,7 @@ pub enum BoundaryRule {
     ServerLayerDag,
     ServerModulesAcyclic,
     SeaOrmBoundary,
+    ServerDbBoundary,
     OneTableOneEntityFile,
     LegacyServerDirs,
 }
@@ -29,6 +30,7 @@ impl BoundaryRule {
             Self::ServerLayerDag => "server-layer-dag",
             Self::ServerModulesAcyclic => "server-modules-acyclic",
             Self::SeaOrmBoundary => "no-sea-orm-outside-service",
+            Self::ServerDbBoundary => "no-db-outside-service",
             Self::OneTableOneEntityFile => "one-table-one-entity-file",
             Self::LegacyServerDirs => "no-legacy-dirs",
         }
@@ -604,6 +606,83 @@ fn check_no_sea_orm_outside_service(file_path: &str, code: &str, index: &LineInd
     }
 }
 
+fn server_db_target_path(file_path: &str, path_ref: &PathRef) -> Option<String> {
+    let segs = &path_ref.segments;
+    if segs.first().is_some_and(|s| s == "crate") && segs.get(1).is_some_and(|s| s == "db") {
+        // `db::entity` is already reported with a dedicated SeaORM message by `SeaOrmBoundary`.
+        if segs.get(2).is_some_and(|s| s == "entity") {
+            return None;
+        }
+        return Some(segs.join("::"));
+    }
+    if file_path == "crates/server/src/lib.rs" {
+        if segs.first().is_some_and(|s| s == "self") && segs.get(1).is_some_and(|s| s == "db") {
+            if segs.get(2).is_some_and(|s| s == "entity") {
+                return None;
+            }
+            return Some(segs.join("::"));
+        }
+        if segs.first().is_some_and(|s| s == "db") {
+            if segs.get(1).is_some_and(|s| s == "entity") {
+                return None;
+            }
+            return Some(segs.join("::"));
+        }
+    }
+    if segs.first().is_some_and(|s| s == "super")
+        && let Some(rest) = file_path.strip_prefix("crates/server/src/").and_then(|r| r.strip_suffix(".rs"))
+    {
+        let mut base: Vec<String> = rest.split('/').map(str::to_owned).collect();
+        if base.last().is_some_and(|p| p == "mod") {
+            base.pop();
+        }
+        base.extend(path_ref.inline_mods.iter().cloned());
+        let mut idx = 0usize;
+        while segs.get(idx).is_some_and(|s| s == "super") {
+            base.pop()?;
+            idx += 1;
+        }
+        base.extend(segs[idx..].iter().cloned());
+        if base.first().is_some_and(|s| s == "db") {
+            if base.get(1).is_some_and(|s| s == "entity") {
+                return None;
+            }
+            return Some(segs.join("::"));
+        }
+    }
+    None
+}
+
+fn check_no_db_outside_service(file_path: &str, refs: &[PathRef], index: &LineIndex, violations: &mut Vec<BoundaryViolation>) {
+    let Some(rel) = file_path.strip_prefix("crates/server/src/") else {
+        return;
+    };
+    if !rel.ends_with(".rs") || rel.starts_with("db/") || rel.starts_with("service/") {
+        return;
+    }
+
+    let mut seen_lines = BTreeSet::new();
+    for path_ref in refs {
+        let Some(target) = server_db_target_path(file_path, path_ref) else {
+            continue;
+        };
+        let line = index.line_at(path_ref.offset);
+        if seen_lines.insert(line) {
+            violations.push(BoundaryViolation {
+                rule: BoundaryRule::ServerDbBoundary,
+                file: file_path.to_owned(),
+                line,
+                message: format!(
+                    "direct `crate::db` import `{target}` outside `crates/server/src/{{db,service}}/` ({})",
+                    index.snippet_at(line)
+                ),
+                fix: "Import `DbError`, `Tx`, `DatabaseConfig`, or `internal_db` from `crate::service::` instead of `crate::db::`.".to_owned(),
+                details: Vec::new(),
+            });
+        }
+    }
+}
+
 fn strip_comments_keep_strings(code: &str) -> String {
     let bytes = code.as_bytes();
     let len = bytes.len();
@@ -914,6 +993,7 @@ pub fn audit_files(files: &[SourceFile]) -> Vec<BoundaryViolation> {
 
         check_no_legacy_dirs(&file.path, &mut violations);
         check_no_sea_orm_outside_service(&file.path, code, &index, &mut violations);
+        check_no_db_outside_service(&file.path, &refs, &index, &mut violations);
         check_one_table_one_entity_file(&file.path, raw, &index, &mut violations);
 
         if is_spine_file(&file.path) {
@@ -1499,6 +1579,36 @@ mod tests {
                 "no-legacy-dirs@crates/server/src/work/old.rs:1",
             ]
         );
+    }
+
+    #[test]
+    fn enforces_server_db_boundary_outside_service() {
+        let files = vec![
+            sf("crates/server/src/service/mod.rs", "pub(crate) use crate::db::{DatabaseConfig, DbError, Tx};\n"),
+            sf("crates/server/src/db/mod.rs", "use crate::db::DbError;\n"),
+            sf(
+                "crates/server/src/agent/memory/mod.rs",
+                "#[cfg(test)]\nmod tests {\n    use crate::db::DbBackend;\n}\n",
+            ),
+            sf("crates/server/src/issue/board.rs", "use crate::db::DbError;\n"),
+            sf(
+                "crates/server/src/runtime/mod.rs",
+                "use super::db::Tx;\npub fn bad() { let _ = crate::db::DatabaseConfig::default(); }\n",
+            ),
+            sf("crates/server/src/context/mod.rs", "use crate::db::error::internal_db;\n"),
+        ];
+        let violations = audit_files(&files);
+        let tags: Vec<String> = violations.iter().map(|v| format!("{}@{}:{}", v.rule.as_str(), v.file, v.line)).collect();
+        assert_eq!(
+            tags,
+            vec![
+                "no-db-outside-service@crates/server/src/context/mod.rs:1",
+                "no-db-outside-service@crates/server/src/issue/board.rs:1",
+                "no-db-outside-service@crates/server/src/runtime/mod.rs:1",
+                "no-db-outside-service@crates/server/src/runtime/mod.rs:2",
+            ]
+        );
+        assert!(format_violations(&violations).contains("crate::service::"));
     }
 
     #[test]

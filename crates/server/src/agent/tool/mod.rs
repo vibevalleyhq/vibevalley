@@ -20,14 +20,12 @@ use serde_json::{Value, json};
 use vibevalley_protocol::{Issue, Session};
 
 use crate::BoxFuture;
-use crate::agent::mcp::Resource;
+use crate::agent::mcp::{Resource, ToolDispatchPort, ToolSpecWire};
 use crate::agent::memory::Memory;
-use crate::agent::profile::Profile;
+use crate::agent::profile::{Profile, text};
 use crate::artifact::Manager as ArtifactManager;
 use crate::channel::Chat;
 use crate::context::Context;
-use crate::context::port::{ToolDispatchPort, ToolSpecWire};
-use crate::context::text;
 use crate::cron::Scheduler as CronScheduler;
 use crate::issue::{Board, Pull};
 use crate::repo::Repo;

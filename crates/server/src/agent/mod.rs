@@ -9,7 +9,7 @@ pub mod tool;
 
 use std::sync::Arc;
 
-pub use mcp::{Mcp, Resource, ResourceReadArgs};
+pub use mcp::{Mcp, Resource, ResourceReadArgs, ToolDispatchPort, ToolSpecWire};
 pub use memory::{By, FinishedRun, Memory, Note};
 pub use orchestrator::{Execution, Input, Orchestrator, Parts as OrchestratorParts, PendingExecution, Reply, RuntimeInboxObserver};
 pub use profile::{AgentDriver, Profile, ProfileStore, RuntimeFleet, instructions};

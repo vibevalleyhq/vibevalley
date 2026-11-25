@@ -12,19 +12,11 @@ import {
 import { channelOf, defaultOf, isOrchestratorSession, sessionChannelId, sessionIssueId, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { compareText, or, spelled } from "../../../infra/base/search";
+import { channelLabel, channelName, topsOf } from "../../../infra/channelMeta";
+
+export { channelLabel, channelName, topsOf };
 
 const isTop = (c: Channel) => c.type !== "thread";
-
-const bySidebar = (a: Channel, b: Channel) => {
-  if (a.default !== b.default) return a.default ? -1 : 1;
-  const pa = a.position ?? Number.MAX_SAFE_INTEGER;
-  const pb = b.position ?? Number.MAX_SAFE_INTEGER;
-  if (pa !== pb) return pa - pb;
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-};
-
-export const topsOf = (chat: Chat | undefined): Channel[] =>
-  (chat?.channels.filter((c) => c.type === "channel" && c.archived === undefined) ?? []).toSorted(bySidebar);
 
 export const archivedOf = (chat: Chat | undefined): Channel[] =>
   (chat?.channels.filter((c) => c.type === "channel" && c.archived !== undefined) ?? []).toSorted((a, b) => (b.archived ?? 0) - (a.archived ?? 0));
@@ -59,10 +51,6 @@ export function topOf(chat: Chat | undefined, c: Channel | undefined) {
 
 export const directsOf = (chat: Chat | undefined): Channel[] =>
   (chat?.channels.filter((c) => c.type === "direct") ?? []).toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-
-export const channelName = (c: Channel | undefined) => (c?.type === "direct" ? c.title : (c?.name ?? ""));
-
-export const channelLabel = (c: Channel | undefined) => (c?.type === "direct" ? channelName(c) : `#${channelName(c)}`);
 
 export const chatPath = (c: Channel | undefined) => (!c || c.default ? "/chat" : `/chat/${c.id}`);
 

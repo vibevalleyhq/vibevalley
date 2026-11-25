@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use super::{ToolRegistry, Who, given};
 use crate::agent::memory::{By, Note};
-use crate::context::text;
+use crate::agent::profile::text;
 
 #[derive(Deserialize)]
 pub struct Args {

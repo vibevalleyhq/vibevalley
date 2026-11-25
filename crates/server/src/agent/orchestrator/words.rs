@@ -1,12 +1,7 @@
 //! Orchestrator-specific prompt and situation formatting helpers.
-//! Pure shared helpers live in `crate::context::text` and are
-//! re-exported here for callers inside `agent/orchestrator`.
 
-pub use crate::context::text::{
-    LINE_MAX, NO_AGENT_TO_DISPATCH, PROMPTS, Prompts, STATUS_WORDS, Workplaces, changes_text, channel_line, closed, cron_line, cut_note, failed,
-    format_artifact_view_context, head, issue_detail, issue_line, no_issue, no_profile_named, nobody_on, priority_named, runtime_label, session_line,
-    slice_from, spent_text, stage_waits, status_named, tail, users_language, wire, yuan,
-};
+use crate::agent::profile::text::{LINE_MAX, cut_note, runtime_label, yuan};
+use crate::context::text::{format_artifact_view_context, head};
 
 /// Who woke the orchestrator: what the input's words are worth.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

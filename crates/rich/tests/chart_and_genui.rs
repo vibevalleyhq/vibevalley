@@ -338,3 +338,23 @@ fn vv_chart_streaming_and_large_offload_plus_genui_incremental_streaming_work_cl
     assert!(large_harness.find_test_id("chart-loading").is_some());
     assert!(large_harness.wait_until(Duration::from_secs(5), |h| h.find_test_id("chart-image").is_some()));
 }
+
+#[test]
+fn regression_genui_nested_markdown_does_not_recursively_mount_genui_blocks() {
+    let _guard = CHART_GENUI_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let spec = concat!(
+        "{\"op\":\"set_node\",\"root\":true,\"node\":{\"id\":\"root\",\"kind\":\"markdown\",\"text\":\"Outer **bold**\\n\\n```genui\\n{\\\"op\\\":\\\"set_node\\\",\\\"root\\\":true,\\\"node\\\":{\\\"id\\\":\\\"inner\\\",\\\"kind\\\":\\\"text\\\",\\\"value\\\":\\\"nested\\\"}}\\n```\"}}\n",
+        "{\"op\":\"done\"}",
+    );
+
+    let harness = TestHarness::mount(Root::new::<NativeGenUiRoot>(move || NativeGenUiRootProps {
+        spec: spec.to_owned(),
+        streaming: false,
+    }));
+
+    assert!(harness.find_test_id("genui-surface").is_some());
+    assert!(harness.contains_text("Outer"));
+    assert!(harness.contains_text("bold"));
+    assert!(harness.find_test_id("code-block").is_some());
+    assert!(harness.find_test_id("genui-node-inner").is_none());
+}

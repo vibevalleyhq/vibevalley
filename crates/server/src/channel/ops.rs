@@ -2,18 +2,11 @@
 //! `Channel*` endpoints, keeping `router.rs` free of channel domain logic.
 
 use vibevalley_i18n::t;
-use vibevalley_protocol::{
-    Agent, ApiError, BizCode, CallState, Channel, ChannelUnread, ChannelUpdate, ChatMessage, MessageHit, Op, Preview, SayRequest, USER_ID, ops,
-};
+use vibevalley_protocol::{Agent, ApiError, BizCode, CallState, Channel, ChannelUnread, ChannelUpdate, ChatMessage, MessageHit, Op, Preview, USER_ID, ops};
 
 use super::Chat;
-use super::types::{Picked, Saying, Seat};
+use super::types::{Picked, Saying, Seat, profile_id};
 use crate::context::{LookIn, missing};
-
-/// A helper profile's seat in the chat, the peer of its direct channel.
-pub fn profile_id(agent: &str) -> String {
-    format!("profile:{agent}")
-}
 
 impl Chat {
     /// Seats an orchestrator under its profile name and ensures its direct channel exists.
@@ -182,14 +175,4 @@ impl Chat {
     pub(crate) async fn handle_unread_list(&self) -> Vec<ChannelUnread> {
         self.unread_async(USER_ID, None).await
     }
-}
-
-/// Convenience helper mirroring [`Chat::handle_message_send`] for tests and direct callers.
-pub async fn send_message_async(
-    chat: &Chat,
-    body: SayRequest,
-    picked_agent: Option<String>,
-    on_station: Option<&(dyn Fn(i64) + Send + Sync)>,
-) -> Result<bool, ApiError> {
-    chat.handle_message_send(body, picked_agent, on_station).await
 }

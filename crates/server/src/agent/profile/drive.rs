@@ -8,10 +8,10 @@ use vibevalley_protocol::{Agent, AgentRole, ApiError, BizCode, Deliverable, Issu
 use vibevalley_runtime::oar::McpServer;
 
 use super::Profile;
+use super::text::{ANSWER_ONLY, PROMPTS, runtime_label, users_language};
 use crate::BoxFuture;
 use crate::context::error::LookIn;
 use crate::context::port::MemoryRecallPort;
-use crate::context::text::{ANSWER_ONLY, PROMPTS, runtime_label, users_language};
 use crate::runtime::{AgentProfileInfo, Drive, HelperPlace, Persona, RuntimeError, SessionDriver};
 
 /// `instructions`: the persona, then each of its skills.

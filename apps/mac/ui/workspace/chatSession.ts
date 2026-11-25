@@ -25,7 +25,7 @@ import {
   SessionWorkspace as SessionWorkspaceSchema,
 } from "@vibevalley/protocol/schema";
 
-import { computeTelemetry, extractToolTarget, formatTokens, mergeSteps, shownEvents } from "../features/session/runs";
+import { computeTelemetry, extractToolTarget, formatTokens, mergeSteps, shownEvents } from "../infra/sessionRuns";
 import { transport } from "../infra/transport";
 
 export {

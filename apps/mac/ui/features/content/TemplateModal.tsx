@@ -14,8 +14,8 @@ import { mix } from "../../design/tone";
 import { spelled } from "../../infra/base/search";
 import { ready, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
+import { closeTemplatePicker, type TemplateCategory, templatePickerState } from "../../infra/state/contentNav";
 import { useArtifacts } from "../artifact";
-import { closeTemplatePicker, type TemplateCategory, templatePickerState } from "./navigation";
 import { CONTENT_TEMPLATES, type ContentTemplate, createFromTemplate, TEMPLATE_CATEGORIES, templateDesc, templateIcon, templateName } from "./templates";
 
 export function TemplateModal() {

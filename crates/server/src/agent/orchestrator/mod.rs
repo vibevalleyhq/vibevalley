@@ -40,13 +40,14 @@ use vibevalley_runtime::agent::{AgentEvent, Brain, Message, ModelClient, OpenAiC
 use self::words::Source;
 use crate::BoxFuture;
 use crate::agent::memory::{By, Memory};
-use crate::agent::profile::Profile;
+use crate::agent::profile::{Profile, text};
 use crate::agent::tool::{Route, ToolRegistry, held};
 use crate::artifact::Manager as ArtifactManager;
 use crate::channel::{Chat, Committed, DeliveryTargetKind, Picked, Posting, QueuedDelivery, Saying, actor_of, meta_of};
 use crate::context::Context;
 use crate::context::error::{LookIn, missing, refused};
 use crate::context::port::{CronOrchestratorPort, VoiceOrchestratorPort};
+use crate::context::text::format_artifact_view_context;
 use crate::issue::Board;
 use crate::repo::Repo;
 use crate::runtime::{Runtime, Step};
@@ -560,12 +561,12 @@ impl Orchestrator {
             .view_context
             .as_ref()
             .filter(|_| c.row.deleted_at.is_none())
-            .map(|vc| format!("{}\n", words::format_artifact_view_context(vc)))
+            .map(|vc| format!("{}\n", format_artifact_view_context(vc)))
             .unwrap_or_default();
         let text = c.row.body.trim();
         let said = match meta.voice_mode.as_deref() {
             Some("dictated") => format!("{picked_note}{view_note}{}{}", words::DICTATED, words::user_line(text)),
-            Some("conversation") => format!("{}\n{}", words::PROMPTS.voice, words::user_line(text)),
+            Some("conversation") => format!("{}\n{}", text::PROMPTS.voice, words::user_line(text)),
             _ if from_user && (c.channel_type == ChannelType::Direct || c.row.channel_id == chat.default_channel()) => {
                 format!("{picked_note}{view_note}{}", words::user_line(text))
             }
@@ -639,7 +640,7 @@ impl Orchestrator {
     }
 
     fn system_prompt(&self, id: &str, home: &std::path::Path, memory: &dyn MemoryPort) -> String {
-        let p = &*words::PROMPTS;
+        let p = &*text::PROMPTS;
         let profile = self.profile.agent(id);
         let mut s = p.system.clone() + &p.agent;
         if id != vibevalley_protocol::DEFAULT_ORCHESTRATOR
@@ -871,7 +872,7 @@ impl Orchestrator {
             for h in roster.iter().filter(|h| h.channel_id().unwrap_or(default.as_str()) == c.id) {
                 theirs.push(self.tool.session_line_async(h).await);
             }
-            let head = words::channel_line(&c.name, c.default, &c.description, &c.repo);
+            let head = text::channel_line(&c.name, c.default, &c.description, &c.repo);
             by_channel.push(format!(
                 "{head}\n{}",
                 if theirs.is_empty() {
@@ -894,7 +895,7 @@ impl Orchestrator {
             &agents.join("\n"),
             &by_channel.join("\n"),
             &if direct { words::direct(&target) } else { target },
-            &words::users_language(),
+            &text::users_language(),
         )
     }
 

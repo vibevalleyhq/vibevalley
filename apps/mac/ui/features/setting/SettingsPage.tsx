@@ -2,6 +2,7 @@ import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
+import { Readiness } from "../../design/domain/Readiness";
 import { SettingsPage as Page, SettingsSearch } from "../../design/domain/settings";
 import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
@@ -17,7 +18,6 @@ import { VoiceForm } from "../voice";
 import { AboutPage } from "./AboutPage";
 import { AppearanceGroups } from "./AppearancePage";
 import { GeneralGroups } from "./GeneralPage";
-import { Readiness } from "./Readiness";
 import { RemoteAccessPage } from "./RemoteAccessPage";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
 

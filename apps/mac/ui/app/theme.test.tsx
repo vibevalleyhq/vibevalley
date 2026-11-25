@@ -2,8 +2,8 @@ import "../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
 import themeJson from "../design/theme.json";
+import { fakeHost } from "../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../fixtures/scenarios";
-import { fakeHost } from "./fakeHost";
 
 function normHex(raw: string): string {
   const hex = raw.trim().toLowerCase().replace(/^#/u, "");

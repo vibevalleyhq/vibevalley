@@ -22,7 +22,7 @@ import { ready, useQueryClient } from "../../infra/query";
 import { richNative } from "../../infra/rich";
 import { Link as A, useRouter, useSearch } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
-import { contentPresenting, contentSidebarOpen, isPinned, openTemplatePicker, togglePinned } from "../content";
+import { contentPresenting, contentSidebarOpen, isPinned, openTemplatePicker, togglePinned } from "../../infra/state/contentNav";
 import { artifactHref, kindLabel, useArtifact, useArtifacts } from "./ArtifactCard";
 import { ArtifactDirectoryView } from "./ArtifactDirectoryView";
 import { buildPrototypeDocument } from "./frame";

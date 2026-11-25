@@ -9,7 +9,9 @@ use std::sync::Arc;
 
 #[cfg(test)]
 use crate::db::DbBackend;
-use crate::db::{BoxFuture, Database, DatabaseConfig, DbError, DbResult, Tx, commit_tx, rollback_tx};
+pub(crate) use crate::db::error::internal_db;
+use crate::db::{BoxFuture, Database, commit_tx, rollback_tx};
+pub(crate) use crate::db::{DatabaseConfig, DbError, DbResult, Tx};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PrimaryKeyTrait, QueryFilter, Update};
 use vibevalley_core::SliceMask;

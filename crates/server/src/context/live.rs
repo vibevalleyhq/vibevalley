@@ -1,7 +1,7 @@
 //! Pure in-memory ephemeral live state (`LiveState`): active session stream
-//! snapshots, farm plays and effect bursts, live machine/connector/call/inbox
-//! state, subscription [`Sink`], and `LiveEvent` broadcast fan-out. Never reads
-//! or writes SQL.
+//! snapshots, farm effect bursts, live machine/connector/call/inbox state,
+//! subscription [`Sink`], and `LiveEvent` broadcast fan-out. Never reads or
+//! writes SQL.
 
 use std::collections::{BTreeMap, VecDeque};
 
@@ -11,11 +11,9 @@ use serde_json::Value;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use vibevalley_core::LiveSessionOverlay;
-use vibevalley_core::game::{free_station, play_of, played_doing, played_run};
-use vibevalley_core::rules::farm_of;
 use vibevalley_protocol::{
-    CallState, CommitCount, ConnectorStatus, Doing, GameEffect, InboxItem, LiveEvent, LiveEventNotice, LiveEventRuntime, LiveEventSession, Machine, Millis,
-    NoticeLevel, Phase, Progress, RuntimeInfo, Session, SessionEvent, SessionId, SessionPlay, SessionSubagents, Spent, ToolConnection,
+    CallState, CommitCount, ConnectorStatus, GameEffect, InboxItem, LiveEvent, LiveEventNotice, LiveEventRuntime, LiveEventSession, Machine, Millis,
+    NoticeLevel, Phase, Progress, RuntimeInfo, SessionEvent, SessionId, SessionSubagents, Spent, ToolConnection,
 };
 
 const DEFAULT_LIVE_CAPACITY: usize = 512;
@@ -112,12 +110,11 @@ impl EffectRing {
     }
 }
 
-/// Pure in-memory live state holding ephemeral session stream snapshots, farm plays
-/// and effects, live machines/connectors/call/commits/progress, runtime inbox
+/// Pure in-memory live state holding ephemeral session stream snapshots, farm
+/// effects, live machines/connectors/call/commits/progress, runtime inbox
 /// alerts, and `LiveEvent` broadcast fan-out.
 pub struct LiveState {
     sessions: RwLock<BTreeMap<SessionId, LiveSessionSnapshot>>,
-    plays: RwLock<BTreeMap<SessionId, SessionPlay>>,
     effects: Mutex<EffectRing>,
     machines: RwLock<Vec<Machine>>,
     connectors: RwLock<Vec<ConnectorStatus>>,
@@ -139,7 +136,6 @@ impl LiveState {
         let (live_tx, _) = broadcast::channel(live_capacity.max(1));
         Self {
             sessions: RwLock::new(BTreeMap::new()),
-            plays: RwLock::new(BTreeMap::new()),
             effects: Mutex::new(EffectRing::new(farm_effect_capacity)),
             machines: RwLock::new(Vec::new()),
             connectors: RwLock::new(Vec::new()),
@@ -193,46 +189,8 @@ impl LiveState {
         self.sessions.read().len()
     }
 
-    /// Ensures a farm worker session has an assigned station and play state.
-    pub fn ensure_play_station(&self, session: &Session, other_sessions: &[&Session], prefer: Option<i64>) -> bool {
-        let mut plays = self.plays.write();
-        if let Some(existing) = plays.get(&session.id)
-            && prefer.is_none_or(|p| existing.station == p)
-        {
-            return false;
-        }
-        let current = play_of(Some(&plays), &session.id);
-        let station = free_station(Some(&plays), other_sessions, farm_of(session), prefer);
-        if prefer.is_some_and(|p| station != p) {
-            return false;
-        }
-        plays.insert(session.id.clone(), SessionPlay { station, ..current });
-        true
-    }
-
-    /// Records a run start or working action step in `plays` for a farm worker.
-    pub fn record_play_working(&self, session_id: &str, at: Millis, was_working: bool, doing: &Doing) {
-        let mut plays = self.plays.write();
-        let before = play_of(Some(&plays), session_id);
-        let next = if was_working {
-            played_doing(&before, at, doing.action, &doing.label)
-        } else {
-            played_run(&before, at)
-        };
-        plays.insert(session_id.to_owned(), next);
-    }
-
-    /// Removes farm play state when a session leaves.
-    pub fn remove_play(&self, session_id: &str) {
-        self.plays.write().remove(session_id);
-    }
-
-    /// Returns a cloned snapshot of all farm plays.
-    pub fn plays_snapshot(&self) -> BTreeMap<SessionId, SessionPlay> {
-        self.plays.read().clone()
-    }
-
     /// Builds a [`vibevalley_core::LiveSnapshot`], optionally draining buffered farm effects.
+    /// Farm plays live in `crate::game::Game` and are attached when projecting `SliceKind::Farm`.
     pub fn to_core_snapshot(&self, drain_effects: bool) -> vibevalley_core::LiveSnapshot {
         let effects = if drain_effects {
             self.drain_farm_effects(0).into_iter().map(|e| e.effect).collect()
@@ -241,7 +199,7 @@ impl LiveState {
         };
         vibevalley_core::LiveSnapshot {
             sessions: self.core_session_overlays(),
-            plays: self.plays_snapshot(),
+            plays: BTreeMap::new(),
             effects,
         }
     }

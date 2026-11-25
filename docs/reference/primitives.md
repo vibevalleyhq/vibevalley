@@ -112,6 +112,9 @@
 | `act` | `bridge.ts` | Intent for the shell (VibeValley's own panels): open a file, stage, switch project... |
 | `viewName` | `bridge.ts` | Which surface this view shows (set by Rust before the bundle loads). |
 | `useBridge` | `bridged.ts` |  |
+| `topsOf` | `channelMeta.ts` |  |
+| `channelName` | `channelMeta.ts` |  |
+| `channelLabel` | `channelMeta.ts` |  |
 | `fixtureTransport` | `fixtures.ts` | `subscriptions`: the events each subscription (by name) sends at once; it then stays open, as a quiet stream would. |
 | `useForm` | `form.ts` |  |
 | `createForm` | `form/form.ts` |  |
@@ -208,6 +211,12 @@
 | `attemptCodec` | `router/search.ts` | A decode or an encode, or undefined when it fails; a Schema that decodes asynchronously never admits a value. |
 | `searchParam` | `router/search.ts` | One value of a search key, read with `schema`: a key given twice does not decode. |
 | `search` | `router/search.ts` |  |
+| `stepLimit` | `sessionRuns.ts` | The steps kept for one session's log in the page. |
+| `mergeSteps` | `sessionRuns.ts` | By seq and revision, independent of HTTP/live arrival order; capped to `limit` (default `stepLimit`, `null` for uncapped). |
+| `shownEvents` | `sessionRuns.ts` | A call with its result's output and ok; hidden step types (by default results and run bounds) left out. |
+| `extractToolTarget` | `sessionRuns.ts` | Extracts the target file path, line number, and diff capability from a tool step. |
+| `computeTelemetry` | `sessionRuns.ts` | Aggregates token usage, context fill, turns, and tool counts across a session's steps. |
+| `formatTokens` | `sessionRuns.ts` | Formats a token count compactly (e.g. `62.4k`, `1M`). |
 | `useSaveSettings` | `settings.ts` | Saves, and the settings the server answers with are the cached ones from then on. |
 | `useUpdates` | `settings.ts` | The desktop's own update as it is now and as it changes (Host.update); undefined where the host is not updated from |
 | `createSignal` | `solid.ts` |  |
@@ -235,6 +244,25 @@
 | `subscribeSlice` | `state/atom.ts` | Re-subscribes when a test swaps the registry's source, emitting its current value at once. |
 | `subscribeLink` | `state/atom.ts` | Re-subscribes when a test swaps the registry's source, emitting the current link at once. |
 | `useLatest` | `state/atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
+| `contentSidebarOpen` | `state/contentNav.ts` |  |
+| `contentBrowseBucket` | `state/contentNav.ts` |  |
+| `contentPresenting` | `state/contentNav.ts` |  |
+| `contentFocusMediaId` | `state/contentNav.ts` |  |
+| `templatePickerState` | `state/contentNav.ts` |  |
+| `contentSearchOpen` | `state/contentNav.ts` |  |
+| `pinnedKeys` | `state/contentNav.ts` |  |
+| `isPinned` | `state/contentNav.ts` |  |
+| `togglePinned` | `state/contentNav.ts` |  |
+| `openTemplatePicker` | `state/contentNav.ts` |  |
+| `closeTemplatePicker` | `state/contentNav.ts` |  |
+| `openContentSearch` | `state/contentNav.ts` |  |
+| `closeContentSearch` | `state/contentNav.ts` |  |
+| `recordContentPath` | `state/contentNav.ts` |  |
+| `safeLastContentPath` | `state/contentNav.ts` |  |
+| `artifactFacetOf` | `state/contentNav.ts` |  |
+| `mediaKindOf` | `state/contentNav.ts` |  |
+| `countContentHub` | `state/contentNav.ts` | Single count formula shared by `ContentSidebar` badges and `LibraryPage` bucket views. |
+| `countForBucket` | `state/contentNav.ts` |  |
 | `bySeq` | `state/intent.ts` | A reply that carries the seq of the fold with its change (an issue moved): shown once the slice has caught up. |
 | `defineIntent` | `state/intent.ts` |  |
 | `defineIntent` | `state/intent.ts` |  |

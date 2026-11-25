@@ -15,13 +15,13 @@ import { Tabs } from "../design/Tabs";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
 import { QuickSwitcher, switcher } from "../features/channel";
-import { contentSidebarOpen, openContentSearch, openTemplatePicker, safeLastContentPath } from "../features/content";
 import { waitingOnUser } from "../features/inbox";
 import { Keyed, variant } from "../infra/base/dom";
 import { useInboxSlice, useLink, useSessionsSlice } from "../infra/frame";
 import { readHostParams } from "../infra/hostParams";
 import { NavLink, useLocation, useMatches } from "../infra/router";
 import { useUpdates } from "../infra/settings";
+import { contentSidebarOpen, openContentSearch, openTemplatePicker, safeLastContentPath } from "../infra/state/contentNav";
 import { catalogPlace, type Place, places, runsPlace, settingsPlace } from "./places";
 
 const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;

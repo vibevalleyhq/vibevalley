@@ -5,8 +5,8 @@ import type { IconName } from "../../design/icons";
 import { api } from "../../infra/api";
 import type { QueryClient } from "../../infra/query";
 import type { RouterController } from "../../infra/router/context";
+import type { TemplateCategory } from "../../infra/state/contentNav";
 import { artifactHref, artifactTypeIcon, BOARD_FILE_PATH, buildOutlineFromMarkdown, createTypedArtifact } from "../artifact";
-import type { TemplateCategory } from "./navigation";
 
 type NoteTemplateVariant = "blank" | "tech" | "meeting" | "daily";
 type WhiteboardTemplateVariant = "blank" | "arch" | "timeline" | "journey" | "workshop";

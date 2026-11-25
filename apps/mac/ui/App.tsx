@@ -6,8 +6,9 @@ import { host, mount, Text, View, type Component } from "nsh";
 
 import { setLocale } from "@vibevalley/i18n";
 
-import { HostDesignProvider, installMotionReporter } from "./app/DesignHost";
+import { HostDesignProvider } from "./app/DesignHost";
 import { VibeValley } from "./app/VibeValley";
+import { installMotionReporter } from "./design/appHost";
 import { applyMotion } from "./design/motion";
 import { FarmForm } from "./farm/FarmForm";
 import { FarmPhone } from "./farm/FarmPhone";

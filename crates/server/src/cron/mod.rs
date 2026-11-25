@@ -19,8 +19,8 @@ use crate::context::Context;
 use crate::context::error::{LookIn, missing};
 use crate::context::port::{CronAgentPort, CronOrchestratorPort};
 use crate::context::task::Ticker;
-use crate::db::error::internal_db;
 use crate::issue::{Board, BoardError, NewIssue};
+use crate::service::internal_db;
 
 pub const DEFAULT_CHANNEL: &str = "general";
 const TICK: Duration = Duration::from_secs(20);

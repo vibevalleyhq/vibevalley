@@ -9,16 +9,15 @@ use vibevalley_core::rules::compare_text;
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{ApiError, Channel, ChannelLast, ChannelUnread, DEFAULT_ORCHESTRATOR, EVERYONE, USER_ID};
 
-use super::dispatch::Reach;
 use super::types::{
-    AddressedMessage, ArtifactRef, Committed, FileAt, Place, Seat, ThreadSubject, actor_of, channel_type, meta_of, meta_text, new_id, notify_of, subject_kind,
+    AddressedMessage, ArtifactRef, Committed, FileAt, Place, Reach, Seat, ThreadSubject, actor_of, channel_type, line_of, meta_of, meta_text, new_id,
+    notify_of, subject_kind,
 };
 use super::words::{self, Nameable};
-use super::{CALLERS_MAX, LAST_MAX, THREAD_TITLE_MAX, line_of};
+use super::{CALLERS_MAX, LAST_MAX, THREAD_TITLE_MAX};
 use crate::context::{LookIn, internal, missing, now};
-use crate::db::{DbError, Tx};
-use crate::service::Service;
 use crate::service::channel::{ChannelRow, ChannelService, EventRow, MsgRow, NewThread, ParticipantRow};
+use crate::service::{DbError, Service, Tx};
 use crate::storage::Storage;
 
 pub(super) trait Q<T> {

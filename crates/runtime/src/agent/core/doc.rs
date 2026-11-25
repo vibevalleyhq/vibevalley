@@ -11,8 +11,7 @@ use crate::agent::core::extension::RubricVerdict;
 use crate::agent::core::pipeline::PromptSection;
 use crate::agent::durable::{self, Document, Read, Tx};
 
-pub const CONVERSATION_SCOPE: &str = "conversation";
-pub const TASK_SCOPE: &str = "task";
+pub use crate::agent::durable::{CONVERSATION_SCOPE, TASK_SCOPE};
 
 pub trait DocSpec {
     const KIND: &'static str;

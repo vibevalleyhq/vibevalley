@@ -310,8 +310,8 @@ pub fn default_policy(root: &Path) -> Policy {
             &["server"],
             &["mac.infra"],
             &["mac.design"],
-            &["mac.features", "mac.workspace"],
-            &["mac.app"],
+            &["mac.features"],
+            &["mac.app", "mac.farm", "mac.workspace"],
             &["cli", "mac"],
         ];
         let present: BTreeSet<&str> = order.iter().map(String::as_str).collect();
@@ -2122,8 +2122,8 @@ Subcommands:
   check [<path>...] [--json]                Check Clean Architecture dependency rule violations
   export [--mermaid <path>] [--svg <path>] [<path>...]
                                             Export layered Mermaid or pure-Rust SVG diagram
-  arch [--json] [--scope <crate>] [--min-delta 0.15] [--git-commits 200] [--no-git]
-                                            Run 5 quantitative macro-architecture lenses
+  arch [--json] [--strict] [--scope <crate>] [--min-delta 0.15] [--git-commits 200] [--no-git]
+                                            Run 5 quantitative macro-architecture lenses (--strict fails on cycles or SDP inversions)
   viewer [--port <N>] [--open]              Start standalone local HTTP UML workbench"
     );
 }
@@ -2753,9 +2753,13 @@ mod tests {
         write_file(
             &dir,
             "apps/mac/ui/features/chat.ts",
-            "import { Sidebar } from '../workspace/Sidebar';\nimport { Button } from '../design/Button';\nexport const chat = () => [Sidebar, Button];\n",
+            "import { Button } from '../design/Button';\nexport const chat = () => [Button];\n",
         );
-        write_file(&dir, "apps/mac/ui/workspace/Sidebar.tsx", "export const Sidebar = () => null;\n");
+        write_file(
+            &dir,
+            "apps/mac/ui/workspace/Sidebar.tsx",
+            "import { chat } from '../features/chat';\nexport const Sidebar = () => chat();\n",
+        );
         write_file(
             &dir,
             "apps/mac/ui/app/Shell.tsx",
@@ -2768,8 +2772,12 @@ mod tests {
         assert!(policy.levels.contains(&vec!["server.gateway".to_owned()]));
         assert!(policy.levels.contains(&vec!["mac.infra".to_owned()]));
         assert!(policy.levels.contains(&vec!["mac.design".to_owned()]));
-        assert!(policy.levels.contains(&vec!["mac.features".to_owned(), "mac.workspace".to_owned()]));
-        assert!(policy.levels.contains(&vec!["mac.app".to_owned()]));
+        assert!(policy.levels.contains(&vec!["mac.features".to_owned()]));
+        assert!(
+            policy
+                .levels
+                .contains(&vec!["mac.app".to_owned(), "mac.farm".to_owned(), "mac.workspace".to_owned()])
+        );
 
         let ir = build_topology(&dir, &policy, &[]).unwrap();
 
@@ -2785,6 +2793,17 @@ mod tests {
                 .iter()
                 .any(|v| v.from == "vibevalley.mac.infra.api" && v.to == "vibevalley.mac.design.Button")
         );
+        // `mac.features` must not import peer top-level `mac.workspace` or `mac.farm`.
+        assert!(
+            dependency_violation_ranks(
+                "vibevalley.mac.features.chat",
+                "vibevalley.mac.workspace.Sidebar",
+                &policy.prefix,
+                &policy.levels
+            )
+            .is_some()
+        );
+        assert!(dependency_violation_ranks("vibevalley.mac.features.chat", "vibevalley.mac.farm.Hud", &policy.prefix, &policy.levels).is_some());
 
         // Top-level cross-crate and uncategorized sibling dependencies remain clean
         assert_eq!(

@@ -19,10 +19,10 @@ import {
 import { Button } from "../../design/Button";
 import { Checkbox } from "../../design/Checkbox";
 import { ChipsInput, KeyValueEditor } from "../../design/Chips";
+import { RuntimeIcon } from "../../design/domain/RuntimeIcon";
 import { Select, TextArea, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Toggle } from "../../design/layout";
-import { RuntimeIcon } from "../../design/pixel/RuntimeIcon";
 import { Segmented } from "../../design/Segmented";
 import { Tabs } from "../../design/Tabs";
 import { Bubble } from "../../design/Tip";

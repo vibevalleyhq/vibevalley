@@ -13,10 +13,18 @@ import { ActiveBar, SidebarSection } from "../../design/layout";
 import { ready, useQuery, useQueryClient } from "../../infra/query";
 import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
+import {
+  type ContentBucket,
+  contentBrowseBucket,
+  countContentHub,
+  countForBucket,
+  openContentSearch,
+  openTemplatePicker,
+  pinnedKeys,
+} from "../../infra/state/contentNav";
 import { defineStored } from "../../infra/state/stored";
 import { artifactTypeIcon, artifactTypeLabel, useArtifacts } from "../artifact";
 import { libraryQuery } from "../media";
-import { type ContentBucket, contentBrowseBucket, countContentHub, countForBucket, openContentSearch, openTemplatePicker, pinnedKeys } from "./navigation";
 import { createQuickBlankNote } from "./templates";
 
 const artifactsSectionOpen = defineStored("content.sidebar.artifacts", z.boolean(), true);
