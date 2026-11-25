@@ -16,7 +16,7 @@ import { ready, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { useArtifacts } from "../artifact";
 import { closeTemplatePicker, type TemplateCategory, templatePickerState } from "./navigation";
-import { CONTENT_TEMPLATES, type ContentTemplate, createFromTemplate, TEMPLATE_CATEGORIES, templateDesc, templateName } from "./templates";
+import { CONTENT_TEMPLATES, type ContentTemplate, createFromTemplate, TEMPLATE_CATEGORIES, templateDesc, templateIcon, templateName } from "./templates";
 
 export function TemplateModal() {
   const state = () => templatePickerState.get();
@@ -93,7 +93,7 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
                   <TemplatePreview tpl={tpl()} />
                   <View class="gap-1 p-2.5">
                     <View class="flex-row items-center gap-1.5">
-                      <Icon name={tpl().icon} size={14} tone="muted" />
+                      <Icon name={templateIcon(tpl())} size={14} tone="muted" />
                       <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{templateName(tpl())}</Text>
                     </View>
                     <Text class="line-clamp-2 text-xs leading-snug text-muted">{templateDesc(tpl())}</Text>
@@ -155,7 +155,7 @@ function TemplatePreview(props: { tpl: ContentTemplate }) {
       <If when={tpl().kind === "ai"}>
         <View class="flex-row items-center gap-2.5 rounded-md border border-line bg-page px-3.5 py-2">
           <View class="size-7 items-center justify-center rounded-md bg-ok-soft">
-            <Icon name={tpl().icon} size={16} tone="ok-ink" />
+            <Icon name={templateIcon(tpl())} size={16} tone="ok-ink" />
           </View>
           <View class="gap-1">
             <View class="h-1.5 w-14 rounded-xs bg-ink opacity-70" />

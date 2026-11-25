@@ -703,153 +703,208 @@ fn extract_voyage_system_prompt(voyage: &LoadedVoyage) -> Option<String> {
     None
 }
 
+#[derive(Clone, Copy)]
+struct TurnFlags {
+    has_prompt: bool,
+    has_run_end: bool,
+    has_non_preamble: bool,
+}
+
+fn should_start_session_turn(kind: SessionEventType, last: Option<TurnFlags>) -> bool {
+    let Some(last) = last else {
+        return true;
+    };
+    match kind {
+        SessionEventType::RunStart => last.has_prompt || last.has_run_end,
+        SessionEventType::UserMessage => last.has_prompt || last.has_non_preamble,
+        SessionEventType::MemoryRecalled
+        | SessionEventType::AssistantThinking
+        | SessionEventType::AssistantMessage
+        | SessionEventType::ToolCall
+        | SessionEventType::ToolResult
+        | SessionEventType::PermissionRequest
+        | SessionEventType::PermissionResolved
+        | SessionEventType::InteractionRequest
+        | SessionEventType::InteractionResolved
+        | SessionEventType::LlmRetry
+        | SessionEventType::LlmUsage
+        | SessionEventType::RunError
+        | SessionEventType::RunEnd => false,
+    }
+}
+
+fn turn_flags_of_detail(turn: &DebugTrajectoryTurn) -> TurnFlags {
+    TurnFlags {
+        has_prompt: turn.prompt.is_some(),
+        has_run_end: turn.events.iter().any(|e| e.r#type == SessionEventType::RunEnd),
+        has_non_preamble: turn
+            .events
+            .iter()
+            .any(|e| !matches!(e.r#type, SessionEventType::RunStart | SessionEventType::MemoryRecalled)),
+    }
+}
+
+fn find_turn_index(len: usize, span_id: &str, matches_span: impl Fn(usize) -> bool, started_at: impl Fn(usize) -> i64, received_at: u64) -> usize {
+    if !span_id.is_empty()
+        && let Some(pos) = (0..len).rev().find(|&i| matches_span(i))
+    {
+        return pos;
+    }
+    let ts = received_at as i64;
+    (0..len).rev().find(|&i| started_at(i) <= ts).unwrap_or(0)
+}
+
+fn push_session_event_to_turns(
+    raw_ev: SessionEvent,
+    redactor: &Redactor,
+    count: &mut u32,
+    turns: &mut Vec<DebugTrajectoryTurn>,
+    turn_runs: &mut Vec<Option<String>>,
+    subagent_paths: &mut BTreeSet<String>,
+) {
+    let ev = redactor.redact_session_event(raw_ev, count);
+    if let Some(tid) = &ev.thread_id
+        && !tid.is_empty()
+    {
+        subagent_paths.insert(redactor.redact_str(tid, count));
+    }
+    let start_new = should_start_session_turn(ev.r#type, turns.last().map(turn_flags_of_detail));
+    if start_new {
+        let index = turns.len() as u32;
+        let prompt = (ev.r#type == SessionEventType::UserMessage).then(|| ev.text.clone());
+        turns.push(DebugTrajectoryTurn {
+            index,
+            prompt,
+            started_at: ev.time,
+            ended_at: Some(ev.time),
+            duration_ms: Some(0),
+            events: Vec::new(),
+            raw_entries: Vec::new(),
+            tokens: None,
+            silent_errors: Vec::new(),
+        });
+        turn_runs.push(ev.run.clone());
+    } else if ev.r#type == SessionEventType::UserMessage
+        && let Some(cur) = turns.last_mut()
+        && cur.prompt.is_none()
+    {
+        cur.prompt = Some(ev.text.clone());
+    }
+    let Some(cur) = turns.last_mut() else {
+        return;
+    };
+    if let Some(slot) = turn_runs.last_mut()
+        && slot.is_none()
+        && ev.run.is_some()
+    {
+        *slot = ev.run.clone();
+    }
+    cur.ended_at = Some(cur.ended_at.map_or(ev.time, |end| end.max(ev.time)));
+    if let Some(tokens) = &ev.tokens {
+        merge_tokens(&mut cur.tokens, tokens);
+    }
+    detect_redacted_session_event_errors(&ev, &mut cur.silent_errors);
+    cur.events.push(ev);
+}
+
+fn record_voyage_agent_path(rec: &VoyageRecord, redactor: &Redactor, count: &mut u32, subagent_paths: &mut BTreeSet<String>) {
+    if !rec.agent_path.is_empty() {
+        subagent_paths.insert(redactor.redact_str(&rec.agent_path.join("/"), count));
+    }
+}
+
+fn append_voyage_record_to_turn(
+    rec: &VoyageRecord,
+    cur: &mut DebugTrajectoryTurn,
+    update_tokens: bool,
+    update_ended_at: bool,
+    redactor: &Redactor,
+    count: &mut u32,
+) {
+    if update_ended_at {
+        let t = rec.received_at as i64;
+        cur.ended_at = Some(cur.ended_at.map_or(t, |end| end.max(t)));
+    }
+    if update_tokens && let Some(tokens) = tokens_from_voyage_record(rec) {
+        merge_tokens(&mut cur.tokens, &tokens);
+    }
+    let clean_raw = redacted_raw_text(rec, redactor, count);
+    detect_voyage_record_errors(rec, clean_raw.as_deref(), redactor, count, &mut cur.silent_errors);
+    cur.raw_entries.push(raw_entry_of(rec, clean_raw, redactor, count));
+}
+
+fn build_voyage_only_turns(records: &[VoyageRecord], redactor: &Redactor, count: &mut u32, subagent_paths: &mut BTreeSet<String>) -> Vec<DebugTrajectoryTurn> {
+    let mut turns: Vec<DebugTrajectoryTurn> = Vec::new();
+    let mut active_span: Option<String> = None;
+    for rec in records {
+        record_voyage_agent_path(rec, redactor, count, subagent_paths);
+        let prompt = voyage_turn_prompt(rec).map(|p| redactor.redact_owned(p, count));
+        let span_changed = !rec.span_id.is_empty() && active_span.as_deref().is_some_and(|s| s != rec.span_id);
+        let start_new = turns.is_empty() || prompt.is_some() || span_changed;
+        if start_new {
+            let index = turns.len() as u32;
+            turns.push(DebugTrajectoryTurn {
+                index,
+                prompt,
+                started_at: rec.received_at as i64,
+                ended_at: Some(rec.received_at as i64),
+                duration_ms: Some(0),
+                events: Vec::new(),
+                raw_entries: Vec::new(),
+                tokens: None,
+                silent_errors: Vec::new(),
+            });
+        }
+        if !rec.span_id.is_empty() && (start_new || active_span.is_none()) {
+            active_span = Some(rec.span_id.clone());
+        }
+        if let Some(cur) = turns.last_mut() {
+            append_voyage_record_to_turn(rec, cur, true, true, redactor, count);
+        }
+    }
+    turns
+}
+
+fn attach_voyage_to_turns(
+    records: &[VoyageRecord],
+    turn_runs: &[Option<String>],
+    redactor: &Redactor,
+    count: &mut u32,
+    turns: &mut [DebugTrajectoryTurn],
+    subagent_paths: &mut BTreeSet<String>,
+) {
+    for rec in records {
+        record_voyage_agent_path(rec, redactor, count, subagent_paths);
+        let idx = find_turn_index(
+            turns.len(),
+            &rec.span_id,
+            |i| turn_runs.get(i).and_then(|r| r.as_deref()) == Some(rec.span_id.as_str()),
+            |i| turns[i].started_at,
+            rec.received_at,
+        );
+        if let Some(cur) = turns.get_mut(idx) {
+            let need_tokens = cur.tokens.is_none();
+            append_voyage_record_to_turn(rec, cur, need_tokens, false, redactor, count);
+        }
+    }
+}
+
 fn build_turns(events: Vec<SessionEvent>, voyage: Option<&LoadedVoyage>, redactor: &Redactor, count: &mut u32) -> (Vec<DebugTrajectoryTurn>, BTreeSet<String>) {
     let mut subagent_paths = BTreeSet::new();
     let mut turns: Vec<DebugTrajectoryTurn> = Vec::new();
     let mut turn_runs: Vec<Option<String>> = Vec::new();
 
-    if !events.is_empty() {
-        for raw_ev in events {
-            let ev = redactor.redact_session_event(raw_ev, count);
-            if let Some(tid) = &ev.thread_id
-                && !tid.is_empty()
-            {
-                subagent_paths.insert(redactor.redact_str(tid, count));
-            }
-            let start_new = match ev.r#type {
-                SessionEventType::RunStart => {
-                    turns.is_empty()
-                        || turns
-                            .last()
-                            .is_some_and(|t| t.prompt.is_some() || t.events.iter().any(|e| e.r#type == SessionEventType::RunEnd))
-                }
-                SessionEventType::UserMessage => {
-                    turns.is_empty()
-                        || turns.last().is_some_and(|t| {
-                            t.prompt.is_some()
-                                || t.events
-                                    .iter()
-                                    .any(|e| !matches!(e.r#type, SessionEventType::RunStart | SessionEventType::MemoryRecalled))
-                        })
-                }
-                SessionEventType::MemoryRecalled
-                | SessionEventType::AssistantThinking
-                | SessionEventType::AssistantMessage
-                | SessionEventType::ToolCall
-                | SessionEventType::ToolResult
-                | SessionEventType::PermissionRequest
-                | SessionEventType::PermissionResolved
-                | SessionEventType::InteractionRequest
-                | SessionEventType::InteractionResolved
-                | SessionEventType::LlmRetry
-                | SessionEventType::LlmUsage
-                | SessionEventType::RunError
-                | SessionEventType::RunEnd => turns.is_empty(),
-            };
-            if start_new {
-                let index = turns.len() as u32;
-                let prompt = (ev.r#type == SessionEventType::UserMessage).then(|| ev.text.clone());
-                turns.push(DebugTrajectoryTurn {
-                    index,
-                    prompt,
-                    started_at: ev.time,
-                    ended_at: Some(ev.time),
-                    duration_ms: Some(0),
-                    events: Vec::new(),
-                    raw_entries: Vec::new(),
-                    tokens: None,
-                    silent_errors: Vec::new(),
-                });
-                turn_runs.push(ev.run.clone());
-            } else if ev.r#type == SessionEventType::UserMessage
-                && let Some(cur) = turns.last_mut()
-                && cur.prompt.is_none()
-            {
-                cur.prompt = Some(ev.text.clone());
-            }
-            if let Some(cur) = turns.last_mut() {
-                if let Some(slot) = turn_runs.last_mut()
-                    && slot.is_none()
-                    && ev.run.is_some()
-                {
-                    *slot = ev.run.clone();
-                }
-                cur.ended_at = Some(cur.ended_at.map_or(ev.time, |end| end.max(ev.time)));
-                if let Some(tokens) = &ev.tokens {
-                    merge_tokens(&mut cur.tokens, tokens);
-                }
-                detect_redacted_session_event_errors(&ev, &mut cur.silent_errors);
-                cur.events.push(ev);
-            }
-        }
+    for raw_ev in events {
+        push_session_event_to_turns(raw_ev, redactor, count, &mut turns, &mut turn_runs, &mut subagent_paths);
     }
 
     if let Some(loaded) = voyage {
         if turns.is_empty() {
             // Pure voyage-only trajectory (no SessionEvents in SQLite yet).
-            let mut active_span: Option<String> = None;
-            for rec in &loaded.records {
-                if !rec.agent_path.is_empty() {
-                    subagent_paths.insert(redactor.redact_str(&rec.agent_path.join("/"), count));
-                }
-                let prompt = voyage_turn_prompt(rec).map(|p| redactor.redact_owned(p, count));
-                let span_changed = !rec.span_id.is_empty() && active_span.as_deref().is_some_and(|s| s != rec.span_id);
-                let start_new = turns.is_empty() || prompt.is_some() || span_changed;
-                if start_new {
-                    let index = turns.len() as u32;
-                    turns.push(DebugTrajectoryTurn {
-                        index,
-                        prompt,
-                        started_at: rec.received_at as i64,
-                        ended_at: Some(rec.received_at as i64),
-                        duration_ms: Some(0),
-                        events: Vec::new(),
-                        raw_entries: Vec::new(),
-                        tokens: None,
-                        silent_errors: Vec::new(),
-                    });
-                    if !rec.span_id.is_empty() {
-                        active_span = Some(rec.span_id.clone());
-                    }
-                } else if !rec.span_id.is_empty() && active_span.is_none() {
-                    active_span = Some(rec.span_id.clone());
-                }
-                if let Some(cur) = turns.last_mut() {
-                    let t = rec.received_at as i64;
-                    cur.ended_at = Some(cur.ended_at.map_or(t, |end| end.max(t)));
-                    if let Some(tokens) = tokens_from_voyage_record(rec) {
-                        merge_tokens(&mut cur.tokens, &tokens);
-                    }
-                    let clean_raw = redacted_raw_text(rec, redactor, count);
-                    detect_voyage_record_errors(rec, clean_raw.as_deref(), redactor, count, &mut cur.silent_errors);
-                    cur.raw_entries.push(raw_entry_of(rec, clean_raw, redactor, count));
-                }
-            }
+            turns = build_voyage_only_turns(&loaded.records, redactor, count, &mut subagent_paths);
         } else {
             // Attach voyage records to the best-matching SessionEvent turn by span_id or timestamp.
-            for rec in &loaded.records {
-                if !rec.agent_path.is_empty() {
-                    subagent_paths.insert(redactor.redact_str(&rec.agent_path.join("/"), count));
-                }
-                let idx = if !rec.span_id.is_empty()
-                    && let Some(pos) = turn_runs.iter().rposition(|r| r.as_deref() == Some(rec.span_id.as_str()))
-                {
-                    pos
-                } else {
-                    let ts = rec.received_at as i64;
-                    turns.iter().rposition(|t| t.started_at <= ts).unwrap_or(0)
-                };
-                if let Some(cur) = turns.get_mut(idx) {
-                    if cur.tokens.is_none()
-                        && let Some(tokens) = tokens_from_voyage_record(rec)
-                    {
-                        merge_tokens(&mut cur.tokens, &tokens);
-                    }
-                    let clean_raw = redacted_raw_text(rec, redactor, count);
-                    detect_voyage_record_errors(rec, clean_raw.as_deref(), redactor, count, &mut cur.silent_errors);
-                    cur.raw_entries.push(raw_entry_of(rec, clean_raw, redactor, count));
-                }
-            }
+            attach_voyage_to_turns(&loaded.records, &turn_runs, redactor, count, &mut turns, &mut subagent_paths);
         }
     }
 
@@ -857,6 +912,26 @@ fn build_turns(events: Vec<SessionEvent>, voyage: Option<&LoadedVoyage>, redacto
         turn.duration_ms = turn.ended_at.map(|end| (end - turn.started_at).max(0));
     }
     (turns, subagent_paths)
+}
+
+fn resolve_trajectory_runtime(meta: Option<&SessionStateMeta>, voyage: Option<&LoadedVoyage>, kind: DebugTrajectoryKind) -> String {
+    meta.and_then(|m| m.runtime.clone())
+        .or_else(|| voyage.map(|v| v.header.runtime.clone()).filter(|r| !r.is_empty()))
+        .unwrap_or_else(|| {
+            if kind == DebugTrajectoryKind::Orchestrator {
+                ORCHESTRATOR_RUNTIME.to_string()
+            } else {
+                "unknown".to_string()
+            }
+        })
+}
+
+fn max_voyage_updated_at(mut updated_at: i64, loaded: &LoadedVoyage) -> i64 {
+    updated_at = updated_at.max(loaded.header.created_at as i64);
+    if let Some(last) = loaded.records.last() {
+        updated_at = updated_at.max(last.received_at as i64);
+    }
+    updated_at
 }
 
 pub(crate) async fn build_detail_async(
@@ -904,22 +979,10 @@ pub(crate) async fn build_detail_async(
         updated_at = updated_at.max(turn.ended_at.unwrap_or(turn.started_at));
     }
     if let Some(loaded) = &voyage {
-        updated_at = updated_at.max(loaded.header.created_at as i64);
-        if let Some(last) = loaded.records.last() {
-            updated_at = updated_at.max(last.received_at as i64);
-        }
+        updated_at = max_voyage_updated_at(updated_at, loaded);
     }
 
-    let runtime = meta
-        .and_then(|m| m.runtime.clone())
-        .or_else(|| voyage.as_ref().map(|v| v.header.runtime.clone()).filter(|r| !r.is_empty()))
-        .unwrap_or_else(|| {
-            if kind == DebugTrajectoryKind::Orchestrator {
-                ORCHESTRATOR_RUNTIME.to_string()
-            } else {
-                "unknown".to_string()
-            }
-        });
+    let runtime = resolve_trajectory_runtime(meta, voyage.as_ref(), kind);
     let status = meta.and_then(|m| m.status).unwrap_or("recorded").to_string();
     let raw_title = meta.and_then(|m| m.title.as_deref()).unwrap_or(id);
     let title = redactor.redact_str(raw_title, redacted_count);
@@ -943,6 +1006,109 @@ pub(crate) async fn build_detail_async(
         subagent_paths: subagent_set.into_iter().collect(),
         voyage_record_count,
     })
+}
+
+struct SummaryTurnMeta {
+    started_at: i64,
+    run: Option<String>,
+    has_prompt: bool,
+    has_run_end: bool,
+    has_non_preamble: bool,
+    has_tokens: bool,
+}
+
+fn turn_flags_of_summary(turn: &SummaryTurnMeta) -> TurnFlags {
+    TurnFlags {
+        has_prompt: turn.has_prompt,
+        has_run_end: turn.has_run_end,
+        has_non_preamble: turn.has_non_preamble,
+    }
+}
+
+fn summarize_session_events(
+    events: &[SessionEvent],
+    total_tokens: &mut Option<EventTokens>,
+    updated_at: &mut i64,
+    has_silent_error: &mut bool,
+) -> Vec<SummaryTurnMeta> {
+    let mut turns: Vec<SummaryTurnMeta> = Vec::new();
+    for ev in events {
+        let start_new = should_start_session_turn(ev.r#type, turns.last().map(turn_flags_of_summary));
+        if start_new {
+            turns.push(SummaryTurnMeta {
+                started_at: ev.time,
+                run: ev.run.clone(),
+                has_prompt: ev.r#type == SessionEventType::UserMessage,
+                has_run_end: false,
+                has_non_preamble: false,
+                has_tokens: false,
+            });
+        } else if ev.r#type == SessionEventType::UserMessage
+            && let Some(cur) = turns.last_mut()
+            && !cur.has_prompt
+        {
+            cur.has_prompt = true;
+        }
+        if let Some(cur) = turns.last_mut() {
+            if cur.run.is_none() && ev.run.is_some() {
+                cur.run = ev.run.clone();
+            }
+            if ev.r#type == SessionEventType::RunEnd {
+                cur.has_run_end = true;
+            }
+            if !matches!(ev.r#type, SessionEventType::RunStart | SessionEventType::MemoryRecalled) {
+                cur.has_non_preamble = true;
+            }
+            *updated_at = (*updated_at).max(ev.time);
+            if let Some(tokens) = &ev.tokens {
+                merge_tokens(total_tokens, tokens);
+                cur.has_tokens = true;
+            }
+        }
+        if !*has_silent_error && session_event_has_silent_error(ev) {
+            *has_silent_error = true;
+        }
+    }
+    turns
+}
+
+fn merge_voyage_into_summary_turns(
+    records: &[VoyageRecord],
+    turns: &mut [SummaryTurnMeta],
+    total_tokens: &mut Option<EventTokens>,
+    has_silent_error: &mut bool,
+) {
+    for rec in records {
+        let idx = find_turn_index(
+            turns.len(),
+            &rec.span_id,
+            |i| turns[i].run.as_deref() == Some(rec.span_id.as_str()),
+            |i| turns[i].started_at,
+            rec.received_at,
+        );
+        if let Some(cur) = turns.get_mut(idx)
+            && !cur.has_tokens
+            && let Some(tokens) = tokens_from_voyage_record(rec)
+        {
+            merge_tokens(total_tokens, &tokens);
+            cur.has_tokens = true;
+        }
+        if !*has_silent_error && voyage_record_has_silent_error(rec) {
+            *has_silent_error = true;
+        }
+    }
+}
+
+fn summarize_voyage_only(records: &[VoyageRecord], total_tokens: &mut Option<EventTokens>, updated_at: &mut i64, has_silent_error: &mut bool) {
+    for rec in records {
+        *updated_at = (*updated_at).max(rec.received_at as i64);
+        if let Some(tokens) = tokens_from_voyage_record(rec) {
+            merge_tokens(total_tokens, &tokens);
+        }
+        if !*has_silent_error && voyage_record_has_silent_error(rec) {
+            *has_silent_error = true;
+        }
+    }
 }
 
 async fn build_summary_async(
@@ -975,119 +1141,19 @@ async fn build_summary_async(
     let mut has_silent_error = false;
 
     if !events.is_empty() {
-        struct TurnMeta {
-            started_at: i64,
-            run: Option<String>,
-            has_prompt: bool,
-            has_run_end: bool,
-            has_non_preamble: bool,
-            has_tokens: bool,
-        }
-        let mut turns: Vec<TurnMeta> = Vec::new();
-        for ev in &events {
-            let start_new = match ev.r#type {
-                SessionEventType::RunStart => turns.is_empty() || turns.last().is_some_and(|t| t.has_prompt || t.has_run_end),
-                SessionEventType::UserMessage => turns.is_empty() || turns.last().is_some_and(|t| t.has_prompt || t.has_non_preamble),
-                SessionEventType::MemoryRecalled
-                | SessionEventType::AssistantThinking
-                | SessionEventType::AssistantMessage
-                | SessionEventType::ToolCall
-                | SessionEventType::ToolResult
-                | SessionEventType::PermissionRequest
-                | SessionEventType::PermissionResolved
-                | SessionEventType::InteractionRequest
-                | SessionEventType::InteractionResolved
-                | SessionEventType::LlmRetry
-                | SessionEventType::LlmUsage
-                | SessionEventType::RunError
-                | SessionEventType::RunEnd => turns.is_empty(),
-            };
-            if start_new {
-                turns.push(TurnMeta {
-                    started_at: ev.time,
-                    run: ev.run.clone(),
-                    has_prompt: ev.r#type == SessionEventType::UserMessage,
-                    has_run_end: false,
-                    has_non_preamble: false,
-                    has_tokens: false,
-                });
-            } else if ev.r#type == SessionEventType::UserMessage
-                && let Some(cur) = turns.last_mut()
-                && !cur.has_prompt
-            {
-                cur.has_prompt = true;
-            }
-            if let Some(cur) = turns.last_mut() {
-                if cur.run.is_none() && ev.run.is_some() {
-                    cur.run = ev.run.clone();
-                }
-                if ev.r#type == SessionEventType::RunEnd {
-                    cur.has_run_end = true;
-                }
-                if !matches!(ev.r#type, SessionEventType::RunStart | SessionEventType::MemoryRecalled) {
-                    cur.has_non_preamble = true;
-                }
-                updated_at = updated_at.max(ev.time);
-                if let Some(tokens) = &ev.tokens {
-                    merge_tokens(&mut total_tokens, tokens);
-                    cur.has_tokens = true;
-                }
-            }
-            if !has_silent_error && session_event_has_silent_error(ev) {
-                has_silent_error = true;
-            }
-        }
+        let mut turns = summarize_session_events(&events, &mut total_tokens, &mut updated_at, &mut has_silent_error);
         if let Some(loaded) = &voyage {
-            for rec in &loaded.records {
-                let idx = if !rec.span_id.is_empty()
-                    && let Some(pos) = turns.iter().rposition(|t| t.run.as_deref() == Some(rec.span_id.as_str()))
-                {
-                    pos
-                } else {
-                    let ts = rec.received_at as i64;
-                    turns.iter().rposition(|t| t.started_at <= ts).unwrap_or(0)
-                };
-                if let Some(cur) = turns.get_mut(idx)
-                    && !cur.has_tokens
-                    && let Some(tokens) = tokens_from_voyage_record(rec)
-                {
-                    merge_tokens(&mut total_tokens, &tokens);
-                    cur.has_tokens = true;
-                }
-                if !has_silent_error && voyage_record_has_silent_error(rec) {
-                    has_silent_error = true;
-                }
-            }
+            merge_voyage_into_summary_turns(&loaded.records, &mut turns, &mut total_tokens, &mut has_silent_error);
         }
     } else if let Some(loaded) = &voyage {
-        for rec in &loaded.records {
-            updated_at = updated_at.max(rec.received_at as i64);
-            if let Some(tokens) = tokens_from_voyage_record(rec) {
-                merge_tokens(&mut total_tokens, &tokens);
-            }
-            if !has_silent_error && voyage_record_has_silent_error(rec) {
-                has_silent_error = true;
-            }
-        }
+        summarize_voyage_only(&loaded.records, &mut total_tokens, &mut updated_at, &mut has_silent_error);
     }
 
     if let Some(loaded) = &voyage {
-        updated_at = updated_at.max(loaded.header.created_at as i64);
-        if let Some(last) = loaded.records.last() {
-            updated_at = updated_at.max(last.received_at as i64);
-        }
+        updated_at = max_voyage_updated_at(updated_at, loaded);
     }
 
-    let runtime = meta
-        .and_then(|m| m.runtime.clone())
-        .or_else(|| voyage.as_ref().map(|v| v.header.runtime.clone()).filter(|r| !r.is_empty()))
-        .unwrap_or_else(|| {
-            if kind == DebugTrajectoryKind::Orchestrator {
-                ORCHESTRATOR_RUNTIME.to_string()
-            } else {
-                "unknown".to_string()
-            }
-        });
+    let runtime = resolve_trajectory_runtime(meta, voyage.as_ref(), kind);
     let status = meta.and_then(|m| m.status).unwrap_or("recorded").to_string();
     let raw_title = meta.and_then(|m| m.title.as_deref()).unwrap_or(id);
     let title = redactor.redact_str(raw_title, redacted_count);
@@ -1163,4 +1229,52 @@ pub(crate) async fn export_snapshot_async(
         }
     }
     TrajectoryExport { summaries, details }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn session_turn_splitting_respects_run_start_and_preamble_rules() {
+        assert!(should_start_session_turn(SessionEventType::AssistantMessage, None));
+        let empty_flags = TurnFlags {
+            has_prompt: false,
+            has_run_end: false,
+            has_non_preamble: false,
+        };
+        assert!(!should_start_session_turn(SessionEventType::RunStart, Some(empty_flags)));
+        assert!(!should_start_session_turn(SessionEventType::UserMessage, Some(empty_flags)));
+        assert!(should_start_session_turn(
+            SessionEventType::UserMessage,
+            Some(TurnFlags {
+                has_non_preamble: true,
+                ..empty_flags
+            })
+        ));
+        assert!(should_start_session_turn(
+            SessionEventType::RunStart,
+            Some(TurnFlags {
+                has_run_end: true,
+                ..empty_flags
+            })
+        ));
+        assert!(!should_start_session_turn(
+            SessionEventType::ToolCall,
+            Some(TurnFlags {
+                has_prompt: true,
+                has_run_end: true,
+                has_non_preamble: true,
+            })
+        ));
+    }
+
+    #[test]
+    fn find_turn_index_matches_latest_span_else_timestamp_floor() {
+        let runs = [Some("r1"), Some("r2"), Some("r2")];
+        let starts = [100_i64, 200, 300];
+        assert_eq!(find_turn_index(3, "r2", |i| runs[i] == Some("r2"), |i| starts[i], 150), 2);
+        assert_eq!(find_turn_index(3, "missing", |i| runs[i] == Some("missing"), |i| starts[i], 250), 1);
+        assert_eq!(find_turn_index(3, "", |_| false, |i| starts[i], 50), 0);
+    }
 }

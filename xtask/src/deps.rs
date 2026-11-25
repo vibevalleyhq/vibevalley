@@ -12,11 +12,12 @@ use crate::rust_scan::{
 };
 
 const USAGE: &str = "\
-Usage: cargo xtask deps [crate|ui] [--cycles] [--dot] [--ui] [--json]
+Usage: cargo xtask deps [crate|ui] [--cycles] [--dot] [--ui] [--json] [--strict]
 
 Parse intra-crate `use crate::<mod>` dependencies across top-level modules,
 compute fan-in/fan-out, detect cycles with Tarjan's SCC algorithm, flag reverse-layer
-edges, and (with --ui or target `ui`) audit `apps/mac/ui` TS import layering.";
+edges, and (with --ui or target `ui`) audit `apps/mac/ui` TS import layering.
+With --strict, exits non-zero when reverse-layer or UI boundary violations > 0.";
 
 const GATEWAY_ALLOWED_ROOT_FILES: &[&str] = &["router.rs", "app.rs", "main.rs", "lib.rs"];
 const ENTRY_ALLOWED_ROOT_FILES: &[&str] = &["router.rs", "app.rs", "main.rs", "lib.rs"];
@@ -1210,6 +1211,7 @@ pub fn run(root: &Path, args: &[String]) -> Result<i32, String> {
     let mut dot_output = false;
     let mut include_ui = false;
     let mut json_output = false;
+    let mut strict = false;
     let mut target: Option<String> = None;
 
     for arg in args {
@@ -1222,6 +1224,7 @@ pub fn run(root: &Path, args: &[String]) -> Result<i32, String> {
             "--dot" => dot_output = true,
             "--ui" => include_ui = true,
             "--json" => json_output = true,
+            "--strict" => strict = true,
             other if other.starts_with('-') => {
                 eprintln!("xtask deps: unknown option `{other}`\n\n{USAGE}");
                 return Ok(2);
@@ -1245,12 +1248,46 @@ pub fn run(root: &Path, args: &[String]) -> Result<i32, String> {
     } else {
         write_stdout_line(&format_deps_report(&report, cycles_only))?;
     }
+    if strict && (report.summary.reverse_layer_count > 0 || report.summary.ui_violation_count > 0) {
+        return Ok(1);
+    }
     Ok(0)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
     use super::*;
+
+    static NEXT_TEMP: AtomicU64 = AtomicU64::new(1);
+
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new(prefix: &str) -> Self {
+            let n = NEXT_TEMP.fetch_add(1, Ordering::Relaxed);
+            let dir = std::env::temp_dir().join(format!("{prefix}-{}-{n}", std::process::id()));
+            fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+
+        fn write(&self, rel: &str, content: &str) {
+            let full = self.0.join(rel);
+            if let Some(parent) = full.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
+            fs::write(full, content).unwrap();
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
 
     fn sf(path: &str, text: &str) -> SourceFile {
         SourceFile {
@@ -1409,5 +1446,40 @@ mod tests {
         let json_str = serde_json::to_string(&report).unwrap();
         let val: serde_json::Value = serde_json::from_str(&json_str).unwrap();
         assert_eq!(val["summary"]["cycle_count"], 1);
+    }
+
+    #[test]
+    fn strict_mode_exits_nonzero_on_reverse_or_ui_violations() {
+        let dir = TempDir::new("vv-deps-strict");
+        dir.write("crates/server/src/lib.rs", "pub mod context;\npub mod issue;\n");
+        dir.write("crates/server/src/context/mod.rs", "pub struct Ctx;\n");
+        dir.write("crates/server/src/issue/mod.rs", "use crate::context::Ctx;\npub struct Board;\n");
+        dir.write("apps/mac/ui/features/runtime/index.ts", "export const useSkills = () => [];\n");
+        dir.write("apps/mac/ui/features/runtime/SkillsPage.tsx", "export const useSkills = () => [];\n");
+        dir.write("apps/mac/ui/features/agent/Good.tsx", "import { useSkills } from \"../runtime\";\n");
+
+        assert_eq!(run(&dir.0, &["ui".to_owned(), "--strict".to_owned()]), Ok(0));
+        assert_eq!(run(&dir.0, &["--strict".to_owned()]), Ok(0));
+
+        dir.write("apps/mac/ui/features/agent/Bad.tsx", "import { useSkills } from \"../runtime/SkillsPage\";\n");
+        assert_eq!(run(&dir.0, &["ui".to_owned(), "--strict".to_owned()]), Ok(1));
+        assert_eq!(run(&dir.0, &["--ui".to_owned(), "--strict".to_owned()]), Ok(1));
+        assert_eq!(run(&dir.0, &["ui".to_owned()]), Ok(0));
+
+        dir.write("crates/server/src/context/mod.rs", "use crate::issue::Board;\npub struct Ctx(Board);\n");
+        assert_eq!(run(&dir.0, &["--strict".to_owned()]), Ok(1));
+        assert_eq!(run(&dir.0, &[]), Ok(0));
+    }
+
+    #[test]
+    fn workspace_ui_complies_with_barrel_and_layer_rules() {
+        let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("workspace root");
+        let report = inspect_deps(repo_root, Some("ui"), false).expect("inspect apps/mac/ui");
+        assert!(report.summary.ui_files_scanned > 0);
+        assert_eq!(
+            report.summary.ui_violation_count, 0,
+            "expected 0 UI layering violations, got: {:?}",
+            report.ui_violations
+        );
     }
 }

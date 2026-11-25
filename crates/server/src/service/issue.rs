@@ -178,11 +178,6 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
     Ok(())
 }
 
-async fn remove_issue_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<()> {
-    issue::Entity::delete_by_id(id.to_owned()).exec(db).await?;
-    Ok(())
-}
-
 async fn upsert_pull_impl<C: ConnectionTrait>(db: &C, input: UpsertPullInput) -> DbResult<PullRecord> {
     let model = pull::ActiveModel {
         id: Set(uuid::Uuid::now_v7().to_string()),
@@ -269,15 +264,11 @@ impl IssueService {
         all_issues_impl(self.db.read_conn()).await
     }
 
-    pub async fn all_in_tx(&self, tx: &Tx) -> DbResult<Vec<Issue>> {
-        all_issues_impl(tx).await
-    }
-
-    pub async fn get(&self, id: &str) -> DbResult<Option<Issue>> {
+    pub(crate) async fn get(&self, id: &str) -> DbResult<Option<Issue>> {
         get_issue_impl(self.db.read_conn(), id).await
     }
 
-    pub async fn get_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<Issue>> {
+    pub(crate) async fn get_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<Issue>> {
         get_issue_impl(tx, id).await
     }
 
@@ -285,7 +276,7 @@ impl IssueService {
         put_issue_impl(self.db.write_conn(), issue).await
     }
 
-    pub async fn put_in_tx(&self, tx: &Tx, issue: &Issue) -> DbResult<()> {
+    pub(crate) async fn put_in_tx(&self, tx: &Tx, issue: &Issue) -> DbResult<()> {
         put_issue_impl(tx, issue).await
     }
 
@@ -310,15 +301,11 @@ impl IssueService {
         }
     }
 
-    pub async fn remove(&self, id: &str) -> DbResult<()> {
-        remove_issue_impl(self.db.write_conn(), id).await
+    pub(crate) async fn remove(&self, id: &str) -> DbResult<()> {
+        super::delete_by_id::<issue::Entity, _>(self.db.write_conn(), id).await
     }
 
-    pub async fn remove_in_tx(&self, tx: &Tx, id: &str) -> DbResult<()> {
-        remove_issue_impl(tx, id).await
-    }
-
-    pub async fn keep_words(&self, issue_id: &str, words: &str) -> DbResult<()> {
+    pub(crate) async fn keep_words(&self, issue_id: &str, words: &str) -> DbResult<()> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
         let outcome: DbResult<()> = async {
             let Some(raw) = issue::Entity::find_by_id(issue_id.to_owned())
@@ -349,7 +336,7 @@ impl IssueService {
         }
     }
 
-    pub async fn take_words(&self, issue_id: &str) -> DbResult<Vec<String>> {
+    pub(crate) async fn take_words(&self, issue_id: &str) -> DbResult<Vec<String>> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
         let outcome: DbResult<Vec<String>> = async {
             let Some(raw) = issue::Entity::find_by_id(issue_id.to_owned())
@@ -384,7 +371,7 @@ impl IssueService {
         }
     }
 
-    pub async fn list_pulls(&self) -> DbResult<Vec<PullRecord>> {
+    pub(crate) async fn list_pulls(&self) -> DbResult<Vec<PullRecord>> {
         pull::Entity::find()
             .order_by_asc(pull::Column::CreatedAt)
             .order_by_asc(pull::Column::Id)
@@ -395,31 +382,19 @@ impl IssueService {
             .collect()
     }
 
-    pub async fn upsert_pull(&self, input: UpsertPullInput) -> DbResult<PullRecord> {
+    pub(crate) async fn upsert_pull(&self, input: UpsertPullInput) -> DbResult<PullRecord> {
         upsert_pull_impl(self.db.write_conn(), input).await
     }
 
-    pub async fn upsert_pull_in_tx(&self, tx: &Tx, input: UpsertPullInput) -> DbResult<PullRecord> {
-        upsert_pull_impl(tx, input).await
-    }
-
-    pub async fn set_pull_state(&self, id: &str, state: PullRequestState, at: i64) -> DbResult<PullRecord> {
+    pub(crate) async fn set_pull_state(&self, id: &str, state: PullRequestState, at: i64) -> DbResult<PullRecord> {
         set_pull_state_impl(self.db.write_conn(), id, state, at).await
     }
 
-    pub async fn set_pull_state_in_tx(&self, tx: &Tx, id: &str, state: PullRequestState, at: i64) -> DbResult<PullRecord> {
-        set_pull_state_impl(tx, id, state, at).await
-    }
-
-    pub async fn observe_pull_checks(&self, id: &str, fingerprint: &str, revision: i64, at: i64) -> DbResult<PullRecord> {
+    pub(crate) async fn observe_pull_checks(&self, id: &str, fingerprint: &str, revision: i64, at: i64) -> DbResult<PullRecord> {
         observe_pull_checks_impl(self.db.write_conn(), id, fingerprint, revision, at).await
     }
 
-    pub async fn observe_pull_checks_in_tx(&self, tx: &Tx, id: &str, fingerprint: &str, revision: i64, at: i64) -> DbResult<PullRecord> {
-        observe_pull_checks_impl(tx, id, fingerprint, revision, at).await
-    }
-
-    pub async fn known_pull_events(&self, pull_id: &str) -> DbResult<Vec<KnownPullEvent>> {
+    pub(crate) async fn known_pull_events(&self, pull_id: &str) -> DbResult<Vec<KnownPullEvent>> {
         let rows = pull_event::Entity::find()
             .filter(pull_event::Column::PullId.eq(pull_id))
             .all(self.db.read_conn())
@@ -434,11 +409,7 @@ impl IssueService {
             .collect())
     }
 
-    pub async fn keep_pull_event(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> DbResult<()> {
+    pub(crate) async fn keep_pull_event(&self, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> DbResult<()> {
         keep_pull_event_impl(self.db.write_conn(), pull_id, key, bot_round_key, bot_round).await
-    }
-
-    pub async fn keep_pull_event_in_tx(&self, tx: &Tx, pull_id: &str, key: &str, bot_round_key: Option<&str>, bot_round: Option<i64>) -> DbResult<()> {
-        keep_pull_event_impl(tx, pull_id, key, bot_round_key, bot_round).await
     }
 }

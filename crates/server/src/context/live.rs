@@ -248,18 +248,7 @@ impl LiveState {
 
     /// Upserts an execution machine into `machines` and returns whether it changed.
     pub fn upsert_machine(&self, machine: Machine) -> bool {
-        let mut list = self.machines.write();
-        match list.iter_mut().find(|m| m.id == machine.id) {
-            Some(existing) if *existing == machine => false,
-            Some(existing) => {
-                *existing = machine;
-                true
-            }
-            None => {
-                list.push(machine);
-                true
-            }
-        }
+        upsert_by_id(&self.machines, machine, |m| m.id.as_str())
     }
 
     /// Removes an execution machine by `id` and returns whether one was removed.
@@ -276,18 +265,7 @@ impl LiveState {
 
     /// Upserts a connector status into `connectors` and returns whether it changed.
     pub fn upsert_connector(&self, status: ConnectorStatus) -> bool {
-        let mut list = self.connectors.write();
-        match list.iter_mut().find(|c| c.id == status.id) {
-            Some(existing) if *existing == status => false,
-            Some(existing) => {
-                *existing = status;
-                true
-            }
-            None => {
-                list.push(status);
-                true
-            }
-        }
+        upsert_by_id(&self.connectors, status, |c| c.id.as_str())
     }
 
     pub fn connectors_snapshot(&self) -> Vec<ConnectorStatus> {
@@ -311,12 +289,7 @@ impl LiveState {
 
     /// Replaces `progress` and returns whether it changed.
     pub fn set_progress(&self, next: Option<Progress>) -> bool {
-        let mut guard = self.progress.write();
-        if *guard == next {
-            return false;
-        }
-        *guard = next;
-        true
+        replace_if_changed(&self.progress, next)
     }
 
     pub fn progress_snapshot(&self) -> Option<Progress> {
@@ -325,12 +298,7 @@ impl LiveState {
 
     /// Updates voice call banner state and returns whether it changed.
     pub fn set_call(&self, state: CallState, reason: String) -> bool {
-        let mut guard = self.call.write();
-        if guard.0 == state && guard.1 == reason {
-            return false;
-        }
-        *guard = (state, reason);
-        true
+        replace_if_changed(&self.call, (state, reason))
     }
 
     pub fn call_snapshot(&self) -> (CallState, String) {
@@ -339,12 +307,7 @@ impl LiveState {
 
     /// Replaces projected runtime `pi.inbox` items and returns whether they changed.
     pub fn set_runtime_inbox(&self, items: Vec<InboxItem>) -> bool {
-        let mut guard = self.runtime_inbox.write();
-        if *guard == items {
-            return false;
-        }
-        *guard = items;
-        true
+        replace_if_changed(&self.runtime_inbox, items)
     }
 
     pub fn runtime_inbox_snapshot(&self) -> Vec<InboxItem> {
@@ -417,6 +380,30 @@ impl Default for LiveState {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn upsert_by_id<T: PartialEq>(lock: &RwLock<Vec<T>>, item: T, id_of: impl Fn(&T) -> &str) -> bool {
+    let mut list = lock.write();
+    match list.iter_mut().find(|existing| id_of(existing) == id_of(&item)) {
+        Some(existing) if *existing == item => false,
+        Some(existing) => {
+            *existing = item;
+            true
+        }
+        None => {
+            list.push(item);
+            true
+        }
+    }
+}
+
+fn replace_if_changed<T: PartialEq>(lock: &RwLock<T>, next: T) -> bool {
+    let mut guard = lock.write();
+    if *guard == next {
+        return false;
+    }
+    *guard = next;
+    true
 }
 
 /// Adapts a Tokio `broadcast::Receiver<LiveEvent>` onto an unbounded mpsc receiver

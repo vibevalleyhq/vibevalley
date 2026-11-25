@@ -12,14 +12,14 @@ import {
   userId,
 } from "@vibevalley/protocol";
 
-import { type ArtifactFacet, artifactFacetOf, mediaKindOf } from "../content/navigation";
+import { type ArtifactFacet, artifactFacetOf, mediaKindOf } from "../content";
 
 export type SourceFilter = "all" | "agent" | "user";
 export const sourceFilters: readonly SourceFilter[] = ["all", "agent", "user"];
 
 export type ArtifactTypeFilter = ArtifactFacet;
 
-export const kindOf = mediaKindOf;
+export const kindOf = (mime: string): LibraryFileKind => mediaKindOf(mime);
 
 const isMediaFromSource = (item: LibraryItem, source: SourceFilter): boolean => {
   switch (source) {

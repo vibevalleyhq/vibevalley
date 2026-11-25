@@ -297,11 +297,34 @@ pub fn default_policy(root: &Path) -> Policy {
     }
 
     if !sources.is_empty() {
-        let levels_template: &[&[&str]] = &[&["protocol"], &["core"], &["git", "files", "rich"], &["runtime"], &["server"], &["cli", "mac"]];
+        let levels_template: &[&[&str]] = &[
+            &["protocol"],
+            &["core"],
+            &["git", "files", "rich"],
+            &["runtime"],
+            &["server.db"],
+            &["server.service"],
+            &["server.gateway"],
+            &["server"],
+            &["mac.infra"],
+            &["mac.design"],
+            &["mac.features", "mac.workspace"],
+            &["mac.app"],
+            &["cli", "mac"],
+        ];
         let present: BTreeSet<&str> = order.iter().map(String::as_str).collect();
         let levels: Vec<Vec<String>> = levels_template
             .iter()
-            .map(|grp| grp.iter().copied().filter(|name| present.contains(name)).map(str::to_owned).collect())
+            .map(|grp| {
+                grp.iter()
+                    .copied()
+                    .filter(|name| {
+                        let top = name.split('.').next().unwrap_or(name);
+                        present.contains(top)
+                    })
+                    .map(str::to_owned)
+                    .collect()
+            })
             .filter(|grp: &Vec<String>| !grp.is_empty())
             .collect();
 
@@ -401,17 +424,90 @@ pub fn qualify_namespace(raw_ns: &str, source_prefix: Option<&str>, lang: Lang) 
     }
 }
 
-pub fn rank_for_namespace(ns: &str, prefix: &str, levels: &[Vec<String>]) -> Option<usize> {
+struct LevelMatch<'a> {
+    rank: usize,
+    pat_segs: Vec<&'a str>,
+    top_seg: &'a str,
+}
+
+fn match_level_entry<'a>(ns: &str, prefix: &str, levels: &'a [Vec<String>]) -> Option<LevelMatch<'a>> {
     let ns_segs = split_ns_segments(ns);
     let pref_segs = split_ns_segments(prefix);
-    let target_seg = if pref_segs.is_empty() {
-        ns_segs.first().copied()?
+    let rel_segs = if pref_segs.is_empty() {
+        ns_segs.as_slice()
     } else if ns_segs.len() > pref_segs.len() && ns_segs[..pref_segs.len()] == pref_segs[..] {
-        ns_segs[pref_segs.len()]
+        &ns_segs[pref_segs.len()..]
     } else {
         return None;
     };
-    levels.iter().position(|group| group.iter().any(|entry| entry == target_seg))
+    if rel_segs.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<LevelMatch<'a>> = None;
+    for (rank, group) in levels.iter().enumerate() {
+        for entry in group {
+            let pat_segs = split_ns_segments(entry);
+            if !pat_segs.is_empty()
+                && rel_segs.len() >= pat_segs.len()
+                && rel_segs[..pat_segs.len()] == pat_segs[..]
+                && best.as_ref().is_none_or(|cur| pat_segs.len() > cur.pat_segs.len())
+            {
+                let top_seg = pat_segs[0];
+                best = Some(LevelMatch { rank, pat_segs, top_seg });
+            }
+        }
+    }
+    best
+}
+
+fn top_level_rank_for_seg(top_seg: &str, levels: &[Vec<String>]) -> Option<usize> {
+    levels
+        .iter()
+        .position(|group| group.iter().any(|entry| split_ns_segments(entry).as_slice() == [top_seg]))
+}
+
+pub fn rank_for_namespace(ns: &str, prefix: &str, levels: &[Vec<String>]) -> Option<usize> {
+    match_level_entry(ns, prefix, levels).map(|m| m.rank)
+}
+
+/// Checks whether a `Dependency` edge `from -> to` violates Clean Architecture `levels`.
+/// Cross-crate edges are compared using top-level crate ranks; same-crate edges are compared
+/// using longest matching multi-segment sublayers without false-positiving against parent fallbacks.
+pub fn dependency_violation_ranks(from: &str, to: &str, prefix: &str, levels: &[Vec<String>]) -> Option<(usize, usize)> {
+    let from_match = match_level_entry(from, prefix, levels)?;
+    let to_match = match_level_entry(to, prefix, levels)?;
+
+    if from_match.top_seg == to_match.top_seg {
+        let min_len = from_match.pat_segs.len().min(to_match.pat_segs.len());
+        if from_match.pat_segs.len() != to_match.pat_segs.len() && from_match.pat_segs[..min_len] == to_match.pat_segs[..min_len] {
+            return None;
+        }
+        return (from_match.rank < to_match.rank).then_some((from_match.rank, to_match.rank));
+    }
+
+    let from_top_rank = top_level_rank_for_seg(from_match.top_seg, levels).unwrap_or(from_match.rank);
+    let to_top_rank = top_level_rank_for_seg(to_match.top_seg, levels).unwrap_or(to_match.rank);
+    (from_top_rank < to_top_rank).then_some((from_top_rank, to_top_rank))
+}
+
+pub fn is_excluded_uml_path(rel_posix: &str) -> bool {
+    let norm = crate::qa::normalize_posix_path(rel_posix);
+    let segs: Vec<&str> = norm.split('/').filter(|s| !s.is_empty()).collect();
+    if segs.iter().any(|&s| matches!(s, "tests" | "test" | "__tests__")) {
+        return true;
+    }
+    if segs.len() >= 4 && segs[0] == "crates" && segs[2] == "src" && segs[3] == "fake" {
+        return true;
+    }
+    let Some(file_name) = segs.last().copied() else {
+        return false;
+    };
+    file_name == "tests.rs"
+        || file_name.ends_with("_tests.rs")
+        || file_name.starts_with("tests_")
+        || file_name.contains(".story.")
+        || file_name.contains(".stories.")
 }
 
 pub fn is_omitted(ns: &str, omit: &[String]) -> bool {
@@ -1041,6 +1137,199 @@ fn compute_tree_metadata(
     agg
 }
 
+struct ImportedDep {
+    mod_ns: String,
+    raw_target: String,
+}
+
+fn resolve_dep_module_namespace(af: &AnalyzedSourceFile, rel: &crate::qa::lang::ModuleRelation, crate_map: &BTreeMap<String, String>) -> Option<String> {
+    match af.analysis.lang {
+        Lang::Rust => {
+            if rel.to_namespace == "crate" || rel.to_namespace.starts_with("crate::") {
+                Some(qualify_namespace(&rel.to_namespace, af.source_prefix.as_deref(), Lang::Rust))
+            } else {
+                resolve_rust_external_or_crate_target(&rel.raw_target, crate_map)
+            }
+        }
+        Lang::TypeScript => {
+            if rel.raw_target.starts_with("./") || rel.raw_target.starts_with("../") {
+                Some(qualify_namespace(&rel.to_namespace, af.source_prefix.as_deref(), Lang::TypeScript))
+            } else {
+                resolve_ts_package_target(&rel.raw_target, crate_map)
+            }
+        }
+    }
+}
+
+fn collect_imported_deps(af: &AnalyzedSourceFile, crate_map: &BTreeMap<String, String>) -> Vec<ImportedDep> {
+    af.analysis
+        .relations
+        .iter()
+        .filter(|rel| rel.kind == RelationKind::Dependency)
+        .filter_map(|rel| {
+            let mod_ns = resolve_dep_module_namespace(af, rel, crate_map)?;
+            Some(ImportedDep {
+                mod_ns,
+                raw_target: rel.raw_target.clone(),
+            })
+        })
+        .collect()
+}
+
+fn resolve_type_in_module(
+    mod_ns: &str,
+    type_name: &str,
+    leaf_map: &BTreeMap<String, PendingLeaf>,
+    short_type_targets: &BTreeMap<String, Vec<String>>,
+    allow_crate_reexport: bool,
+) -> Option<String> {
+    let exact = format!("{mod_ns}.{type_name}");
+    if leaf_map.contains_key(&exact) {
+        return Some(exact);
+    }
+    let cands = short_type_targets.get(type_name)?;
+    let prefix_dot = format!("{mod_ns}.");
+    let sub_matches: Vec<&String> = cands.iter().filter(|c| c.starts_with(&prefix_dot)).collect();
+    if sub_matches.len() == 1 {
+        return Some(sub_matches[0].clone());
+    }
+    if allow_crate_reexport {
+        let mut segs = mod_ns.split('.');
+        if let (Some(a), Some(b)) = (segs.next(), segs.next()) {
+            let crate_dot = format!("{a}.{b}.");
+            let crate_matches: Vec<&String> = cands.iter().filter(|c| c.starts_with(&crate_dot)).collect();
+            if crate_matches.len() == 1 {
+                return Some(crate_matches[0].clone());
+            }
+        }
+    }
+    None
+}
+
+struct ResolutionIndex<'a> {
+    crate_map: &'a BTreeMap<String, String>,
+    leaf_map: &'a BTreeMap<String, PendingLeaf>,
+    short_type_targets: &'a BTreeMap<String, Vec<String>>,
+    known_internal_prefixes: &'a BTreeSet<String>,
+    policy: &'a Policy,
+}
+
+fn resolve_non_dependency_target(
+    af: &AnalyzedSourceFile,
+    rel: &crate::qa::lang::ModuleRelation,
+    imported_deps: &[ImportedDep],
+    idx: &ResolutionIndex<'_>,
+) -> Option<(String, bool)> {
+    let crate_map = idx.crate_map;
+    let leaf_map = idx.leaf_map;
+    let short_type_targets = idx.short_type_targets;
+    let known_internal_prefixes = idx.known_internal_prefixes;
+    let policy = idx.policy;
+    match af.analysis.lang {
+        Lang::Rust => {
+            // Qualified crate-local path (e.g. `crate::domain::Port` or resolved `super::Port`)
+            if rel.to_namespace == "crate" || rel.to_namespace.starts_with("crate::") {
+                let qualified = qualify_namespace(&rel.to_namespace, af.source_prefix.as_deref(), Lang::Rust);
+                if leaf_map.contains_key(&qualified) {
+                    return Some((qualified, false));
+                }
+                if let Some((mod_part, type_part)) = qualified.rsplit_once('.') {
+                    if let Some(found) = resolve_type_in_module(mod_part, type_part, leaf_map, short_type_targets, false) {
+                        return Some((found, false));
+                    }
+                    if known_internal_prefixes.contains(mod_part) {
+                        return Some((mod_part.to_owned(), false));
+                    }
+                }
+                return Some((qualified, false));
+            }
+
+            // Explicit external workspace crate path (e.g. `vibevalley_runtime::agent::...::MemoryPort`)
+            if let Some(mod_ns) = resolve_rust_external_or_crate_target(&rel.raw_target, crate_map) {
+                let last_seg = rel.raw_target.rsplit("::").next().unwrap_or("");
+                if !last_seg.is_empty()
+                    && let Some(found) = resolve_type_in_module(&mod_ns, last_seg, leaf_map, short_type_targets, true)
+                {
+                    return Some((found, false));
+                }
+                return Some((mod_ns, false));
+            }
+
+            // Multi-segment non-crate path (e.g. `order::Port` via imported module, or `std::fmt::Display` / `serde::Serialize`)
+            if rel.raw_target.contains("::") {
+                let mut segs = rel.raw_target.split("::").filter(|s| !s.is_empty());
+                if let (Some(first), Some(last)) = (segs.next(), rel.raw_target.rsplit("::").next())
+                    && first != last
+                {
+                    for dep in imported_deps {
+                        let dep_alias = dep.raw_target.rsplit("::").next().unwrap_or("");
+                        if dep_alias == first
+                            && let Some(found) = resolve_type_in_module(&dep.mod_ns, last, leaf_map, short_type_targets, false)
+                        {
+                            return Some((found, false));
+                        }
+                    }
+                }
+                return match_foreign(&rel.raw_target, &policy.foreign).map(|f| (format!("foreign.{f}"), true));
+            }
+
+            // Bare identifier: only match same file, same module, explicitly imported target, or foreign
+            let short = &rel.to_namespace;
+            if let Some(local) = af
+                .analysis
+                .types
+                .iter()
+                .find(|t| t.name == *short)
+                .map(|t| qualify_namespace(&t.namespace, af.source_prefix.as_deref(), Lang::Rust))
+            {
+                return Some((local, false));
+            }
+            let same_mod = format!("{}.{short}", af.qualified_mod_ns);
+            if leaf_map.contains_key(&same_mod) {
+                return Some((same_mod, false));
+            }
+            for dep in imported_deps {
+                let is_glob = dep.raw_target.ends_with("::*");
+                let is_direct = dep.raw_target == *short || dep.raw_target.ends_with(&format!("::{short}"));
+                if (is_direct || is_glob)
+                    && let Some(found) = resolve_type_in_module(&dep.mod_ns, short, leaf_map, short_type_targets, !is_glob)
+                {
+                    return Some((found, false));
+                }
+            }
+            match_foreign(short, &policy.foreign).map(|f| (format!("foreign.{f}"), true))
+        }
+        Lang::TypeScript => {
+            if rel.raw_target.starts_with("./") || rel.raw_target.starts_with("../") {
+                return Some((qualify_namespace(&rel.to_namespace, af.source_prefix.as_deref(), Lang::TypeScript), false));
+            }
+            if let Some(internal) = resolve_ts_package_target(&rel.raw_target, crate_map) {
+                return Some((internal, false));
+            }
+            let short = &rel.to_namespace;
+            if let Some(local) = af
+                .analysis
+                .types
+                .iter()
+                .find(|t| t.name == *short)
+                .map(|t| qualify_namespace(&t.namespace, af.source_prefix.as_deref(), Lang::TypeScript))
+            {
+                return Some((local, false));
+            }
+            let same_mod = format!("{}.{short}", af.qualified_mod_ns);
+            if leaf_map.contains_key(&same_mod) {
+                return Some((same_mod, false));
+            }
+            for dep in imported_deps {
+                if let Some(found) = resolve_type_in_module(&dep.mod_ns, short, leaf_map, short_type_targets, false) {
+                    return Some((found, false));
+                }
+            }
+            match_foreign(&rel.raw_target, &policy.foreign).map(|f| (format!("foreign.{f}"), true))
+        }
+    }
+}
+
 pub fn build_topology(root: &Path, policy: &Policy, path_filters: &[String]) -> Result<TopologyIr, String> {
     let overlay = load_metrics_overlay(root);
     let mut analyzed_files: Vec<AnalyzedSourceFile> = Vec::new();
@@ -1063,6 +1352,9 @@ pub fn build_topology(root: &Path, policy: &Policy, path_filters: &[String]) -> 
         }
         let files = collect_project_files(root, &src_filters, Some(&[src.lang]))?;
         for file in files {
+            if is_excluded_uml_path(&file.rel_path) {
+                continue;
+            }
             if !path_filters.is_empty()
                 && !path_filters
                     .iter()
@@ -1163,83 +1455,39 @@ pub fn build_topology(root: &Path, policy: &Policy, path_filters: &[String]) -> 
     }
 
     let crate_map = workspace_crate_source_map(policy);
+    let res_index = ResolutionIndex {
+        crate_map: &crate_map,
+        leaf_map: &leaf_map,
+        short_type_targets: &short_type_targets,
+        known_internal_prefixes: &known_internal_prefixes,
+        policy,
+    };
     let mut foreign_ids = BTreeSet::new();
     let mut dedup_edges: BTreeMap<(String, String, EdgeKind), IrEdge> = BTreeMap::new();
 
     for af in &analyzed_files {
+        let imported_deps = collect_imported_deps(af, &crate_map);
         for rel in &af.analysis.relations {
             let from_ns = qualify_namespace(&rel.from_namespace, af.source_prefix.as_deref(), af.analysis.lang);
             if is_omitted(&from_ns, &policy.omit) {
                 continue;
             }
 
-            let mut target_foreign = false;
-            let to_ns_opt: Option<String> = match af.analysis.lang {
-                Lang::Rust => {
-                    if rel.to_namespace == "crate" || rel.to_namespace.starts_with("crate::") {
-                        Some(qualify_namespace(&rel.to_namespace, af.source_prefix.as_deref(), Lang::Rust))
-                    } else if let Some(internal) = resolve_rust_external_or_crate_target(&rel.raw_target, &crate_map) {
-                        Some(internal)
-                    } else if rel.kind != RelationKind::Dependency {
-                        let same_file = af
-                            .analysis
-                            .types
-                            .iter()
-                            .find(|t| t.name == rel.to_namespace)
-                            .map(|t| qualify_namespace(&t.namespace, af.source_prefix.as_deref(), Lang::Rust));
-                        if let Some(local) = same_file {
-                            Some(local)
-                        } else if let Some(cands) = short_type_targets.get(&rel.to_namespace)
-                            && cands.len() == 1
-                        {
-                            Some(cands[0].clone())
-                        } else if let Some(f) = match_foreign(&rel.to_namespace, &policy.foreign) {
-                            target_foreign = true;
-                            Some(format!("foreign.{f}"))
-                        } else {
-                            None
-                        }
-                    } else if let Some(f) = match_foreign(&rel.to_namespace, &policy.foreign) {
-                        target_foreign = true;
-                        Some(format!("foreign.{f}"))
-                    } else {
-                        None
-                    }
+            let resolved: Option<(String, bool)> = if rel.kind == RelationKind::Dependency {
+                if let Some(internal) = resolve_dep_module_namespace(af, rel, &crate_map) {
+                    Some((internal, false))
+                } else {
+                    let target_for_foreign = match af.analysis.lang {
+                        Lang::Rust => &rel.to_namespace,
+                        Lang::TypeScript => &rel.raw_target,
+                    };
+                    match_foreign(target_for_foreign, &policy.foreign).map(|f| (format!("foreign.{f}"), true))
                 }
-                Lang::TypeScript => {
-                    if rel.raw_target.starts_with("./") || rel.raw_target.starts_with("../") {
-                        Some(qualify_namespace(&rel.to_namespace, af.source_prefix.as_deref(), Lang::TypeScript))
-                    } else if let Some(internal) = resolve_ts_package_target(&rel.raw_target, &crate_map) {
-                        Some(internal)
-                    } else if rel.kind != RelationKind::Dependency {
-                        let same_file = af
-                            .analysis
-                            .types
-                            .iter()
-                            .find(|t| t.name == rel.to_namespace)
-                            .map(|t| qualify_namespace(&t.namespace, af.source_prefix.as_deref(), Lang::TypeScript));
-                        if let Some(local) = same_file {
-                            Some(local)
-                        } else if let Some(cands) = short_type_targets.get(&rel.to_namespace)
-                            && cands.len() == 1
-                        {
-                            Some(cands[0].clone())
-                        } else if let Some(f) = match_foreign(&rel.to_namespace, &policy.foreign) {
-                            target_foreign = true;
-                            Some(format!("foreign.{f}"))
-                        } else {
-                            None
-                        }
-                    } else if let Some(f) = match_foreign(&rel.raw_target, &policy.foreign) {
-                        target_foreign = true;
-                        Some(format!("foreign.{f}"))
-                    } else {
-                        None
-                    }
-                }
+            } else {
+                resolve_non_dependency_target(af, rel, &imported_deps, &res_index)
             };
 
-            let Some(to_ns) = to_ns_opt else {
+            let Some((to_ns, target_foreign)) = resolved else {
                 continue;
             };
             if to_ns == from_ns || is_omitted(&to_ns, &policy.omit) {
@@ -1252,9 +1500,19 @@ pub fn build_topology(root: &Path, policy: &Policy, path_filters: &[String]) -> 
 
             let base_kind = EdgeKind::from(rel.kind);
             let kind = lookup_edge_kind_override(&from_ns, &to_ns, &policy.edge_kinds).unwrap_or(base_kind);
-            let from_rank = rank_for_namespace(&from_ns, &policy.prefix, &policy.levels);
-            let to_rank = rank_for_namespace(&to_ns, &policy.prefix, &policy.levels);
-            let violating = kind == EdgeKind::Dependency && matches!((from_rank, to_rank), (Some(f), Some(t)) if f < t);
+            let mut from_rank = rank_for_namespace(&from_ns, &policy.prefix, &policy.levels);
+            let mut to_rank = rank_for_namespace(&to_ns, &policy.prefix, &policy.levels);
+            let violating = if kind == EdgeKind::Dependency {
+                if let Some((vr_from, vr_to)) = dependency_violation_ranks(&from_ns, &to_ns, &policy.prefix, &policy.levels) {
+                    from_rank = Some(vr_from);
+                    to_rank = Some(vr_to);
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
 
             dedup_edges.entry((from_ns.clone(), to_ns.clone(), kind)).or_insert_with(|| IrEdge {
                 from: from_ns,
@@ -1438,9 +1696,7 @@ pub fn roll_up_edges(ir: &TopologyIr, scope_id: &str, omit: &[String], levels: &
         if from_child == to_child {
             continue;
         }
-        let from_rank = rank_for_namespace(&edge.from, &ir.prefix, levels);
-        let to_rank = rank_for_namespace(&edge.to, &ir.prefix, levels);
-        let violating = edge.kind == EdgeKind::Dependency && matches!((from_rank, to_rank), (Some(f), Some(t)) if f < t);
+        let violating = edge.kind == EdgeKind::Dependency && dependency_violation_ranks(&edge.from, &edge.to, &ir.prefix, levels).is_some();
 
         grouped.entry((from_child.to_owned(), to_child, edge.kind)).or_default().push(RolledEdgePair {
             from: edge.from.clone(),
@@ -1478,11 +1734,14 @@ pub fn evaluate_proposals(ir: &TopologyIr, proposals: &[Proposal]) -> Vec<Propos
                     edge_violations.push(false);
                     continue;
                 }
-                let from_rank = rank_for_namespace(&edge.from, &ir.prefix, &prop.layers);
-                let to_rank = rank_for_namespace(&edge.to, &ir.prefix, &prop.layers);
-                let violating = edge.kind == EdgeKind::Dependency && matches!((from_rank, to_rank), (Some(f), Some(t)) if f < t);
+                let violation = if edge.kind == EdgeKind::Dependency {
+                    dependency_violation_ranks(&edge.from, &edge.to, &ir.prefix, &prop.layers)
+                } else {
+                    None
+                };
+                let violating = violation.is_some();
                 edge_violations.push(violating);
-                if violating && let (Some(fr), Some(tr)) = (from_rank, to_rank) {
+                if let Some((fr, tr)) = violation {
                     violations.push(DependencyViolation {
                         from: edge.from.clone(),
                         to: edge.to.clone(),
@@ -2310,6 +2569,181 @@ mod tests {
         assert!(svg.starts_with("<svg xmlns=\"http://www.w3.org/2000/svg\""));
         assert!(svg.contains("#dc2626"));
         assert!(svg.contains("</svg>"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn scoped_implements_avoids_false_cross_crate_short_name_collisions() {
+        let dir = temp_dir("scoped-impl");
+        write_file(&dir, "crates/rich/src/engine/genui/value.rs", "pub enum From { Num, Str }\n");
+        write_file(&dir, "crates/runtime/src/agent/durable.rs", "pub struct Error { msg: String }\n");
+        write_file(&dir, "crates/runtime/src/oar/core.rs", "pub trait OarObserver { fn on_event(&self); }\n");
+        write_file(&dir, "crates/runtime/src/oar/mod.rs", "pub mod core;\n");
+        write_file(
+            &dir,
+            "crates/server/src/db/error.rs",
+            "pub struct DbError {}\npub struct ApiError {}\nimpl From<DbError> for ApiError { fn from(_: DbError) -> Self { Self {} } }\nimpl std::fmt::Display for ApiError { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { Ok(()) } }\n",
+        );
+        write_file(
+            &dir,
+            "crates/cli/src/domain.rs",
+            "pub enum CliKind { A }\nimpl From<&str> for CliKind { fn from(_: &str) -> Self { Self::A } }\n",
+        );
+        write_file(
+            &dir,
+            "crates/server/src/debug/collector.rs",
+            "use vibevalley_runtime::oar::OarObserver;\npub struct DebugCollector {}\nimpl OarObserver for DebugCollector { fn on_event(&self) {} }\n",
+        );
+        write_file(
+            &dir,
+            "crates/server/src/agent/memory.rs",
+            "pub struct InlineMem {}\nimpl vibevalley_runtime::oar::core::OarObserver for InlineMem { fn on_event(&self) {} }\n",
+        );
+        write_file(&dir, "apps/mac/ui/infra/api.ts", "export class ApiConnectionError extends Error {}\n");
+
+        let policy = default_policy(&dir);
+        let ir = build_topology(&dir, &policy, &[]).unwrap();
+
+        assert!(
+            !ir.edges
+                .iter()
+                .any(|e| e.kind == EdgeKind::Implements && e.to == "vibevalley.rich.engine.genui.value.From"),
+            "std::convert::From must NOT falsely match rich::From: {:?}",
+            ir.edges
+        );
+        assert!(
+            !ir.edges.iter().any(|e| e.to == "vibevalley.runtime.agent.durable.Error"),
+            "JS global Error must NOT falsely match Rust runtime::Error: {:?}",
+            ir.edges
+        );
+        assert!(
+            ir.edges.iter().any(|e| {
+                e.from == "vibevalley.server.debug.collector.DebugCollector"
+                    && e.to == "vibevalley.runtime.oar.core.OarObserver"
+                    && e.kind == EdgeKind::Implements
+            }),
+            "imported cross-crate trait must keep :implements edge"
+        );
+        assert!(
+            ir.edges.iter().any(|e| {
+                e.from == "vibevalley.server.agent.memory.InlineMem" && e.to == "vibevalley.runtime.oar.core.OarObserver" && e.kind == EdgeKind::Implements
+            }),
+            "inline qualified cross-crate trait must resolve :implements edge"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn excludes_test_story_and_fake_files_from_production_uml() {
+        let dir = temp_dir("exclude-noise");
+        write_file(&dir, "crates/runtime/src/oar/mod.rs", "pub struct Runner {}\n");
+        write_file(&dir, "crates/runtime/src/oar/tests.rs", "pub struct FakeOar {}\n");
+        write_file(&dir, "crates/runtime/tests/integration.rs", "pub struct IntegrationHelper {}\n");
+        write_file(&dir, "crates/server/src/fake/moss.rs", "pub struct FakeMoss {}\n");
+        write_file(&dir, "crates/server/src/agent/rules_tests.rs", "pub struct RuleTestHelper {}\n");
+        write_file(&dir, "apps/mac/ui/app/components.tsx", "export const Button = () => null;\n");
+        write_file(&dir, "apps/mac/ui/app/components.story.tsx", "export const Story = () => null;\n");
+
+        let policy = default_policy(&dir);
+        let ir = build_topology(&dir, &policy, &[]).unwrap();
+
+        assert!(ir.nodes.contains_key("vibevalley.runtime.oar.Runner"));
+        assert!(ir.nodes.contains_key("vibevalley.mac.app.components"));
+        for forbidden in [
+            "vibevalley.runtime.oar.tests",
+            "vibevalley.runtime.oar.tests.FakeOar",
+            "vibevalley.server.fake.moss",
+            "vibevalley.server.fake.moss.FakeMoss",
+            "vibevalley.server.agent.rules_tests",
+            "vibevalley.mac.app.components.story",
+        ] {
+            assert!(!ir.nodes.contains_key(forbidden), "unexpected noise node `{forbidden}`");
+        }
+        assert!(is_excluded_uml_path("crates/runtime/src/oar/tests.rs"));
+        assert!(is_excluded_uml_path("crates/runtime/tests/foo.rs"));
+        assert!(is_excluded_uml_path("apps/mac/ui/app/components.story.tsx"));
+        assert!(is_excluded_uml_path("crates/server/src/fake/moss.rs"));
+        assert!(!is_excluded_uml_path("crates/server/src/gateway/bridge/fake.rs"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn multi_segment_intra_crate_levels_check_internals_and_preserve_top_level_ranks() {
+        let dir = temp_dir("multi-seg-levels");
+        write_file(&dir, "crates/protocol/src/wire.rs", "pub struct Msg {}\n");
+        write_file(&dir, "crates/cli/src/main.rs", "pub fn main() {}\n");
+        write_file(&dir, "crates/server/src/db/pool.rs", "use crate::gateway::http;\npub fn conn() {}\n");
+        write_file(
+            &dir,
+            "crates/server/src/gateway/http.rs",
+            "use crate::service::issue;\nuse crate::context::live;\npub fn serve() {}\n",
+        );
+        write_file(&dir, "crates/server/src/service/issue.rs", "use crate::db::pool;\npub fn list() {}\n");
+        write_file(&dir, "crates/server/src/context/live.rs", "pub fn ctx() {}\n");
+        write_file(
+            &dir,
+            "apps/mac/ui/infra/api.ts",
+            "import { Button } from '../design/Button';\nexport const api = () => Button();\n",
+        );
+        write_file(
+            &dir,
+            "apps/mac/ui/design/Button.tsx",
+            "import '@vibevalley/protocol';\nexport const Button = () => null;\n",
+        );
+        write_file(
+            &dir,
+            "apps/mac/ui/features/chat.ts",
+            "import { Sidebar } from '../workspace/Sidebar';\nimport { Button } from '../design/Button';\nexport const chat = () => [Sidebar, Button];\n",
+        );
+        write_file(&dir, "apps/mac/ui/workspace/Sidebar.tsx", "export const Sidebar = () => null;\n");
+        write_file(
+            &dir,
+            "apps/mac/ui/app/Shell.tsx",
+            "import { chat } from '../features/chat';\nexport const Shell = () => chat();\n",
+        );
+
+        let policy = default_policy(&dir);
+        assert!(policy.levels.contains(&vec!["server.db".to_owned()]));
+        assert!(policy.levels.contains(&vec!["server.service".to_owned()]));
+        assert!(policy.levels.contains(&vec!["server.gateway".to_owned()]));
+        assert!(policy.levels.contains(&vec!["mac.infra".to_owned()]));
+        assert!(policy.levels.contains(&vec!["mac.design".to_owned()]));
+        assert!(policy.levels.contains(&vec!["mac.features".to_owned(), "mac.workspace".to_owned()]));
+        assert!(policy.levels.contains(&vec!["mac.app".to_owned()]));
+
+        let ir = build_topology(&dir, &policy, &[]).unwrap();
+
+        // Expected intra-crate violations: server.db -> server.gateway, mac.infra -> mac.design
+        assert_eq!(ir.violations.len(), 2, "unexpected violations: {:?}", ir.violations);
+        assert!(
+            ir.violations
+                .iter()
+                .any(|v| v.from == "vibevalley.server.db.pool" && v.to == "vibevalley.server.gateway.http")
+        );
+        assert!(
+            ir.violations
+                .iter()
+                .any(|v| v.from == "vibevalley.mac.infra.api" && v.to == "vibevalley.mac.design.Button")
+        );
+
+        // Top-level cross-crate and uncategorized sibling dependencies remain clean
+        assert_eq!(
+            dependency_violation_ranks("vibevalley.mac.design.Button", "vibevalley.cli.main", &policy.prefix, &policy.levels),
+            None
+        );
+        assert!(dependency_violation_ranks("vibevalley.protocol.wire", "vibevalley.server.db.pool", &policy.prefix, &policy.levels).is_some());
+        assert_eq!(
+            dependency_violation_ranks(
+                "vibevalley.server.gateway.http",
+                "vibevalley.server.context.live",
+                &policy.prefix,
+                &policy.levels
+            ),
+            None
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }

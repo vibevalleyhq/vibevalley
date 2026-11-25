@@ -14,9 +14,8 @@ import { spelled } from "../../infra/base/search";
 import { ready, useQuery } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
-import { artifactIcon, kindLabel, useArtifacts } from "../artifact";
-import { artifactHref } from "../artifact/ArtifactCard";
-import { libraryQuery } from "../media/listing";
+import { artifactHref, artifactIcon, kindLabel, useArtifacts } from "../artifact";
+import { libraryQuery } from "../media";
 import { closeContentSearch, contentBrowseBucket, contentFocusMediaId, contentSearchOpen, mediaKindOf } from "./navigation";
 
 export function ContentSearchModal() {

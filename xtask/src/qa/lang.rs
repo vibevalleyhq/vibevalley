@@ -1154,7 +1154,7 @@ fn rust_item_start_line(tokens: &[Token], item_idx: usize) -> usize {
     tokens[item_idx].line
 }
 
-fn parse_rust_impl_target(tokens: &[Token], impl_idx: usize) -> (Option<String>, String, usize) {
+fn parse_rust_impl_target(tokens: &[Token], impl_idx: usize) -> (Option<(String, String)>, String, usize) {
     let mut i = impl_idx + 1;
     i = skip_angle_generics(tokens, i);
     let mut brace_idx = i;
@@ -1177,34 +1177,82 @@ fn parse_rust_impl_target(tokens: &[Token], impl_idx: usize) -> (Option<String>,
         }
     }
 
-    let extract_type_name = |slice: &[Token]| -> String {
+    let extract_type_path = |slice: &[Token]| -> (String, String) {
         let end = slice.iter().position(|t| t.text == "where").unwrap_or(slice.len());
         let before_where = &slice[..end];
-        let mut last_ident = String::new();
+        let mut segs: Vec<String> = Vec::new();
+        let mut expect_seg = true;
         let mut angle = 0usize;
         let mut paren = 0usize;
         for tok in before_where {
             match tok.text.as_str() {
-                "<" => angle += 1,
-                ">" => angle = angle.saturating_sub(1),
-                "(" => paren += 1,
-                ")" => paren = paren.saturating_sub(1),
-                _ if angle == 0 && paren == 0 && tok.kind == TokenKind::Ident => {
-                    last_ident = tok.text.clone();
+                "<" => {
+                    angle += 1;
+                    expect_seg = false;
+                }
+                ">" => {
+                    angle = angle.saturating_sub(1);
+                }
+                "(" => {
+                    paren += 1;
+                    expect_seg = false;
+                }
+                ")" => {
+                    paren = paren.saturating_sub(1);
+                }
+                _ if angle == 0 && paren == 0 => {
+                    if tok.text == "::" {
+                        expect_seg = true;
+                    } else if tok.kind == TokenKind::Ident || (tok.kind == TokenKind::Keyword && matches!(tok.text.as_str(), "crate" | "super" | "self")) {
+                        if !expect_seg {
+                            segs.clear();
+                        }
+                        segs.push(tok.text.clone());
+                        expect_seg = false;
+                    } else {
+                        segs.clear();
+                        expect_seg = true;
+                    }
                 }
                 _ => {}
             }
         }
-        last_ident
+        let short = segs.last().cloned().unwrap_or_default();
+        let full = segs.join("::");
+        (full, short)
     };
 
     if let Some(fp) = for_pos {
-        let trait_name = extract_type_name(&header[..fp]);
-        let type_name = extract_type_name(&header[fp + 1..]);
-        ((!trait_name.is_empty()).then_some(trait_name), type_name, brace_idx)
+        let (trait_path, trait_short) = extract_type_path(&header[..fp]);
+        let (_, type_name) = extract_type_path(&header[fp + 1..]);
+        let trait_info = (!trait_short.is_empty()).then_some((trait_path, trait_short));
+        (trait_info, type_name, brace_idx)
     } else {
-        (None, extract_type_name(header), brace_idx)
+        let (_, type_name) = extract_type_path(header);
+        (None, type_name, brace_idx)
     }
+}
+
+fn resolve_rust_relative_type_path(base_ns: &str, raw_path: &str) -> String {
+    let segs: Vec<&str> = raw_path.split("::").filter(|s| !s.is_empty()).collect();
+    if segs.first().is_some_and(|&s| s == "super") {
+        let mut parts: Vec<&str> = base_ns.split("::").collect();
+        let mut idx = 0usize;
+        while segs.get(idx).is_some_and(|&s| s == "super") {
+            if parts.len() > 1 {
+                parts.pop();
+            }
+            idx += 1;
+        }
+        parts.extend_from_slice(&segs[idx..]);
+        return parts.join("::");
+    }
+    if segs.first().is_some_and(|&s| s == "self") {
+        let mut parts: Vec<&str> = base_ns.split("::").collect();
+        parts.extend_from_slice(&segs[1..]);
+        return parts.join("::");
+    }
+    raw_path.to_owned()
 }
 
 fn parse_rust_use_targets(tokens: &[Token], start: usize, prefix: &[String], out: &mut Vec<Vec<String>>) -> usize {
@@ -1511,14 +1559,15 @@ fn analyze_rust(rel_file: &str, source: &str, tokens: &[Token]) -> FileAnalysis 
                 } else {
                     format!("{mod_ns}::{type_name}")
                 };
-                if let Some(trait_name) = trait_opt {
+                if let Some((trait_raw_path, trait_short)) = trait_opt {
+                    let resolved_trait = resolve_rust_relative_type_path(&mod_ns, &trait_raw_path);
                     relations.push(ModuleRelation {
                         from_namespace: type_ns.clone(),
-                        to_namespace: trait_name.clone(),
+                        to_namespace: resolved_trait,
                         kind: RelationKind::Implements,
                         file: rel_file.to_owned(),
                         line: tok.line,
-                        raw_target: trait_name.clone(),
+                        raw_target: trait_raw_path,
                     });
                     if !type_name.is_empty() {
                         let decl = types_map.entry((type_ns.clone(), type_name.clone())).or_insert_with(|| TypeDecl {
@@ -1531,8 +1580,8 @@ fn analyze_rust(rel_file: &str, source: &str, tokens: &[Token]) -> FileAnalysis 
                             ops: Vec::new(),
                             bases: Vec::new(),
                         });
-                        if !decl.bases.contains(&trait_name) {
-                            decl.bases.push(trait_name);
+                        if !decl.bases.contains(&trait_short) {
+                            decl.bases.push(trait_short);
                         }
                     }
                 }

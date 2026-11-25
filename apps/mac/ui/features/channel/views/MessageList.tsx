@@ -23,7 +23,7 @@ import { createEffect } from "../../../infra/solid";
 import { useLatest } from "../../../infra/state/atom";
 import { useIntents } from "../../../infra/state/intent";
 import { ArtifactCard } from "../../artifact";
-import { RunSteps } from "../../session/WorkLog";
+import { RunSteps } from "../../session";
 import { chatSay, editingId, pendingLines, setEditingId } from "../model/composing";
 import { followed, useMessage } from "../model/follow";
 import { useMarkedFollowed, useMarkRead } from "../model/marks";

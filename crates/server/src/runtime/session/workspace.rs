@@ -118,6 +118,71 @@ fn invalid_input(message: String) -> RuntimeError {
     RuntimeError::Api(ApiError::new(BizCode::InvalidInput, message))
 }
 
+fn apply_workspace_input_updates(session: &mut Session, mut snap: WorkspaceSnapshot, input: &SessionOpenWorkspaceInput) -> WorkspaceMeta {
+    let model_opt = input.model.as_deref().map(str::trim).filter(|m| !m.is_empty());
+    let effort_opt = input.effort.as_deref().map(str::trim).filter(|e| !e.is_empty());
+    let model_changed = model_opt.is_some_and(|m| snap.model.as_deref() != Some(m));
+    if let Some(m) = model_opt {
+        snap.model = Some(m.to_string());
+    }
+    if let Some(e) = effort_opt {
+        snap.effort = Some(e.to_string());
+    } else if model_changed {
+        snap.effort = None;
+    }
+    if let Some(p) = input.permission_mode {
+        snap.permission_mode = p;
+    }
+    if let Some(title) = input.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        snap.title = Some(title.to_string());
+        session.name = title.to_string();
+        if session.brief.is_empty() {
+            session.brief = title.to_string();
+        }
+    }
+    WorkspaceMeta {
+        title: snap.title,
+        model: snap.model,
+        effort: snap.effort,
+        permission_mode: snap.permission_mode,
+    }
+}
+
+async fn apply_live_workspace_config_async(agent: &dyn vibevalley_runtime::oar::Session, input: &SessionOpenWorkspaceInput) -> Result<()> {
+    if input.model.is_none() && input.effort.is_none() && input.permission_mode.is_none() {
+        return Ok(());
+    }
+    match agent
+        .set_config(input.model.as_deref(), input.effort.as_deref(), input.permission_mode.map(to_oar_permission))
+        .await
+    {
+        Ok(()) | Err(AgentError::Unsupported { .. }) => Ok(()),
+        Err(e) => Err(e.into()),
+    }
+}
+
+fn prepare_relaunch_session(session: &mut Session, cwd: String, input: SessionOpenWorkspaceInput, permission_mode: SessionPermissionMode) {
+    let runtime_id = if !input.runtime.trim().is_empty() {
+        input.runtime.trim().to_string()
+    } else {
+        session.runtime.clone()
+    };
+    if let Ok(parsed) = vibevalley_protocol::RuntimeRef::parse(&runtime_id) {
+        session.runtime = parsed.runtime_id.strip_prefix("acp:").unwrap_or(&parsed.runtime_id).to_string();
+        session.machine = (!parsed.is_local()).then_some(parsed.machine_id);
+    } else {
+        session.runtime = runtime_id.strip_prefix("acp:").unwrap_or(&runtime_id).to_string();
+    }
+    if !cwd.is_empty() {
+        session.cwd = Some(cwd);
+    }
+    let next_repo = input.repo.filter(|r| !r.trim().is_empty()).or_else(|| session.repo_name().map(String::from));
+    session.policy = ExecutionPolicy::DirectCwd {
+        repo: next_repo,
+        permission_mode,
+    };
+}
+
 fn refused_session(message: String) -> RuntimeError {
     RuntimeError::Api(ApiError::new(BizCode::SessionRefused, message))
 }
@@ -370,85 +435,34 @@ impl SessionEngine {
     /// Opens a new user workspace session or reconnects an existing one.
     pub async fn open_workspace_async(&self, input: SessionOpenWorkspaceInput) -> Result<SessionWorkspace> {
         let cwd = input.cwd.trim().to_string();
-        if let Some(existing_id) = input.session_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-            let mut session = self.session_async(existing_id).await.ok_or_else(|| missing_session(existing_id))?;
-            if session.controller != SessionController::User {
-                return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
-            }
-            if session.machine.is_none() && (cwd.is_empty() || !Path::new(&cwd).is_dir()) {
-                return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
-            }
-            let mut meta = self.workspace_snapshot(&session.id);
-            let model_opt = input.model.as_deref().map(str::trim).filter(|m| !m.is_empty());
-            let effort_opt = input.effort.as_deref().map(str::trim).filter(|e| !e.is_empty());
-            let model_changed = model_opt.is_some_and(|m| meta.model.as_deref() != Some(m));
-            if let Some(m) = model_opt {
-                meta.model = Some(m.to_string());
-            }
-            if let Some(e) = effort_opt {
-                meta.effort = Some(e.to_string());
-            } else if model_changed {
-                meta.effort = None;
-            }
-            if let Some(p) = input.permission_mode {
-                meta.permission_mode = p;
-            }
-            if let Some(title) = input.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
-                meta.title = Some(title.to_string());
-                session.name = title.to_string();
-                if session.brief.is_empty() {
-                    session.brief = title.to_string();
-                }
-            }
-            if let Some(agent) = self.live_agent(&session.id) {
-                if input.model.is_some() || input.effort.is_some() || input.permission_mode.is_some() {
-                    match agent
-                        .set_config(input.model.as_deref(), input.effort.as_deref(), input.permission_mode.map(to_oar_permission))
-                        .await
-                    {
-                        Ok(()) | Err(AgentError::Unsupported { .. }) => {}
-                        Err(e) => return Err(e.into()),
-                    }
-                }
-                let next_meta = WorkspaceMeta {
-                    title: meta.title,
-                    model: meta.model,
-                    effort: meta.effort,
-                    permission_mode: meta.permission_mode,
-                };
-                self.set_workspace_meta_async(&session.id, next_meta).await;
-                self.notify_workspace(&session.id);
-                return Ok(self.workspace_reply_async(self.session_async(&session.id).await.unwrap_or(session)).await);
-            }
-            let runtime_id = if !input.runtime.trim().is_empty() {
-                input.runtime.trim().to_string()
-            } else {
-                session.runtime.clone()
-            };
-            if let Ok(parsed) = vibevalley_protocol::RuntimeRef::parse(&runtime_id) {
-                session.runtime = parsed.runtime_id.strip_prefix("acp:").unwrap_or(&parsed.runtime_id).to_string();
-                session.machine = (!parsed.is_local()).then_some(parsed.machine_id);
-            } else {
-                session.runtime = runtime_id.strip_prefix("acp:").unwrap_or(&runtime_id).to_string();
-            }
-            if !cwd.is_empty() {
-                session.cwd = Some(cwd);
-            }
-            let next_repo = input.repo.filter(|r| !r.trim().is_empty()).or_else(|| session.repo_name().map(String::from));
-            session.policy = ExecutionPolicy::DirectCwd {
-                repo: next_repo,
-                permission_mode: meta.permission_mode,
-            };
-            let next_meta = WorkspaceMeta {
-                title: meta.title,
-                model: meta.model,
-                effort: meta.effort,
-                permission_mode: meta.permission_mode,
-            };
-            let session = self.launch_workspace_agent_async(session, next_meta, true).await?;
-            return Ok(self.workspace_reply_async(session).await);
+        if let Some(existing_id) = input.session_id.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(String::from) {
+            return self.reconnect_workspace_async(&existing_id, cwd, input).await;
         }
+        self.create_workspace_async(cwd, input).await
+    }
 
+    async fn reconnect_workspace_async(&self, existing_id: &str, cwd: String, input: SessionOpenWorkspaceInput) -> Result<SessionWorkspace> {
+        let mut session = self.session_async(existing_id).await.ok_or_else(|| missing_session(existing_id))?;
+        if session.controller != SessionController::User {
+            return Err(refused_session(t("server.session.workspace.notWorkspace", &[])));
+        }
+        if session.machine.is_none() && (cwd.is_empty() || !Path::new(&cwd).is_dir()) {
+            return Err(invalid_input(t("server.session.workspace.badCwd", &[("cwd", cwd.into())])));
+        }
+        let snap = self.workspace_snapshot(&session.id);
+        let next_meta = apply_workspace_input_updates(&mut session, snap, &input);
+        if let Some(agent) = self.live_agent(&session.id) {
+            apply_live_workspace_config_async(agent.as_ref(), &input).await?;
+            self.set_workspace_meta_async(&session.id, next_meta).await;
+            self.notify_workspace(&session.id);
+            return Ok(self.workspace_reply_async(self.session_async(&session.id).await.unwrap_or(session)).await);
+        }
+        prepare_relaunch_session(&mut session, cwd, input, next_meta.permission_mode);
+        let session = self.launch_workspace_agent_async(session, next_meta, true).await?;
+        Ok(self.workspace_reply_async(session).await)
+    }
+
+    async fn create_workspace_async(&self, cwd: String, input: SessionOpenWorkspaceInput) -> Result<SessionWorkspace> {
         let runtime_id = input.runtime.trim();
         if runtime_id.is_empty() {
             return Err(invalid_input(t("server.session.workspace.runtimeRequired", &[])));
@@ -473,6 +487,7 @@ impl SessionEngine {
             .filter(|_| !drive.runtime.refused_options().contains(&RefusableOption::Effort));
         let title = input.title.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(String::from);
         let repo_name = input.repo.filter(|r| !r.trim().is_empty());
+
         let mut session = Session::new(
             &id,
             SessionController::User,
@@ -495,22 +510,7 @@ impl SessionEngine {
             effort: effective_effort.clone(),
             permission_mode,
         };
-
-        let mut env = drive.env.clone();
-        if !drive.is_local {
-            let repo_ref = repo_name
-                .as_deref()
-                .map(|r| self.0.worktree.repo_remote_url(r).unwrap_or_else(|| r.to_string()));
-            let dispatch = crate::machine::RemoteDispatchMeta {
-                session_id: Some(id.clone()),
-                repo_ref,
-                branch: None,
-                base_ref: None,
-                mcp_session_token: Some(self.mcp_token_for(&id)),
-            };
-            crate::machine::attach_dispatch_meta(&mut env, &dispatch);
-        }
-
+        let env = self.build_workspace_env(&id, &drive, repo_name.as_deref());
         let opts = SessionOptions {
             cwd: PathBuf::from(&cwd),
             model: drive.model.clone(),
@@ -526,6 +526,23 @@ impl SessionEngine {
         self.set_workspace_meta_async(&id, meta).await;
         self.notify_workspace(&id);
         Ok(self.workspace_reply_async(self.session_async(&id).await.unwrap_or(session)).await)
+    }
+
+    fn build_workspace_env(&self, id: &str, drive: &super::driver::Drive, repo_name: Option<&str>) -> Vec<(String, String)> {
+        let mut env = drive.env.clone();
+        if drive.is_local {
+            return env;
+        }
+        let repo_ref = repo_name.map(|r| self.0.worktree.repo_remote_url(r).unwrap_or_else(|| r.to_string()));
+        let dispatch = crate::machine::RemoteDispatchMeta {
+            session_id: Some(id.to_string()),
+            repo_ref,
+            branch: None,
+            base_ref: None,
+            mcp_session_token: Some(self.mcp_token_for(id)),
+        };
+        crate::machine::attach_dispatch_meta(&mut env, &dispatch);
+        env
     }
 
     async fn set_workspace_meta_async(&self, session_id: &str, meta: WorkspaceMeta) {
@@ -1282,5 +1299,46 @@ mod tests {
         assert!(saw_left, "closing a workspace session must emit SessionLifecycleEvent::Left");
         let _ = ctx.shutdown(Duration::from_secs(1)).await;
         ctx.service.close().await;
+    }
+
+    #[test]
+    fn workspace_input_updates_clear_effort_when_model_changes_without_new_effort() {
+        let mut session = Session::new(
+            "w1",
+            SessionController::User,
+            "Old",
+            "claude",
+            ExecutionPolicy::DirectCwd {
+                repo: None,
+                permission_mode: SessionPermissionMode::AcceptEdits,
+            },
+            0,
+        );
+        let snap = WorkspaceSnapshot {
+            title: None,
+            model: Some("sonnet".into()),
+            effort: Some("high".into()),
+            permission_mode: SessionPermissionMode::AcceptEdits,
+            pending_permissions: vec![],
+            pending_interactions: vec![],
+            tokens: None,
+        };
+        let input = SessionOpenWorkspaceInput {
+            runtime: "claude".into(),
+            cwd: "/tmp".into(),
+            repo: None,
+            model: Some("opus".into()),
+            effort: None,
+            permission_mode: Some(SessionPermissionMode::ReadOnly),
+            title: Some("  New title  ".into()),
+            session_id: Some("w1".into()),
+        };
+        let next = apply_workspace_input_updates(&mut session, snap, &input);
+        assert_eq!(next.model.as_deref(), Some("opus"));
+        assert_eq!(next.effort, None);
+        assert_eq!(next.permission_mode, SessionPermissionMode::ReadOnly);
+        assert_eq!(next.title.as_deref(), Some("New title"));
+        assert_eq!(session.name, "New title");
+        assert_eq!(session.brief, "New title");
     }
 }

@@ -7,51 +7,93 @@
 use std::path::Path;
 use std::sync::Arc;
 
+#[cfg(test)]
+use crate::db::DbBackend;
+use crate::db::{BoxFuture, Database, DatabaseConfig, DbError, DbResult, Tx, commit_tx, rollback_tx};
+use sea_orm::sea_query::Expr;
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PrimaryKeyTrait, QueryFilter, Update};
 use vibevalley_core::SliceMask;
 
-use crate::db::{BoxFuture, Database, DatabaseConfig, DbBackend, DbError, DbResult, Tx, commit_tx, rollback_tx};
+pub(crate) mod artifact;
+pub(crate) mod channel;
+pub(crate) mod connector;
+pub(crate) mod cron;
+pub(crate) mod issue;
+pub(crate) mod memory;
+pub(crate) mod outbox;
+pub(crate) mod remote;
+pub(crate) mod session;
+pub(crate) mod storage;
 
-pub mod artifact;
-pub mod channel;
-pub mod connector;
-pub mod cron;
-pub mod issue;
-pub mod memory;
-pub mod outbox;
-pub mod remote;
-pub mod session;
-pub mod storage;
+pub(crate) use artifact::ArtifactService;
+pub(crate) use channel::ChannelService;
+pub(crate) use connector::ConnectorService;
+pub(crate) use cron::CronService;
+pub(crate) use issue::IssueService;
+pub(crate) use memory::MemoryService;
+pub(crate) use outbox::OutboxService;
+pub(crate) use remote::RemoteService;
+pub(crate) use session::SessionService;
+pub(crate) use storage::StorageService;
 
-pub use artifact::ArtifactService;
-pub use channel::ChannelService;
-pub use connector::ConnectorService;
-pub use cron::CronService;
-pub use issue::IssueService;
-pub use memory::MemoryService;
-pub use outbox::OutboxService;
-pub use remote::RemoteService;
-pub use session::SessionService;
-pub use storage::StorageService;
+pub(super) fn escape_like(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' | '%' | '_' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+pub(super) async fn update_col_by_id<E, C, V>(db: &C, id_col: E::Column, id: &str, col: E::Column, val: V) -> DbResult<()>
+where
+    E: EntityTrait + Default,
+    E::Column: ColumnTrait,
+    V: Into<sea_orm::Value>,
+    C: ConnectionTrait,
+{
+    Update::many(E::default())
+        .col_expr(col, Expr::value(val))
+        .filter(id_col.eq(id))
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
+pub(super) async fn delete_by_id<E, C>(db: &C, id: &str) -> DbResult<()>
+where
+    E: EntityTrait,
+    C: ConnectionTrait,
+    <E::PrimaryKey as PrimaryKeyTrait>::ValueType: From<String>,
+{
+    E::delete_by_id(id.to_owned()).exec(db).await?;
+    Ok(())
+}
 
 /// Unified entry point for all server data services across SQLite and PostgreSQL.
 #[derive(Clone)]
 pub struct Service {
     database: Arc<Database>,
-    pub outbox: OutboxService,
-    pub storage: StorageService,
-    pub channel: ChannelService,
-    pub connector: ConnectorService,
-    pub artifact: ArtifactService,
+    pub(crate) outbox: OutboxService,
+    pub(crate) storage: StorageService,
+    pub(crate) channel: ChannelService,
+    pub(crate) connector: ConnectorService,
+    pub(crate) artifact: ArtifactService,
     pub session: SessionService,
     pub issue: IssueService,
-    pub memory: MemoryService,
-    pub cron: CronService,
-    pub remote: RemoteService,
+    pub(crate) memory: MemoryService,
+    pub(crate) cron: CronService,
+    pub(crate) remote: RemoteService,
 }
 
 impl Service {
     /// Wraps an already-open [`Database`] handle with all domain data services.
-    pub fn new(database: Arc<Database>) -> Arc<Self> {
+    pub(crate) fn new(database: Arc<Database>) -> Arc<Self> {
         Arc::new(Self {
             outbox: OutboxService::new(database.clone()),
             storage: StorageService::new(database.clone()),
@@ -72,13 +114,8 @@ impl Service {
         Ok(Self::new(Database::open(home).await?))
     }
 
-    /// Opens a SQLite database at `path` and returns a ready [`Service`].
-    pub async fn open_at(path: &Path) -> DbResult<Arc<Self>> {
-        Ok(Self::new(Database::open_at(path).await?))
-    }
-
     /// Opens a SQLite or PostgreSQL database from `url` and returns a ready [`Service`].
-    pub async fn open_url(url: &str) -> DbResult<Arc<Self>> {
+    pub(crate) async fn open_url(url: &str) -> DbResult<Arc<Self>> {
         Ok(Self::new(Database::open_url(url).await?))
     }
 
@@ -92,7 +129,8 @@ impl Service {
         self.database.close().await;
     }
 
-    pub fn backend(&self) -> DbBackend {
+    #[cfg(test)]
+    pub(crate) fn backend(&self) -> DbBackend {
         self.database.backend()
     }
 
@@ -109,53 +147,42 @@ impl Service {
         &self.database
     }
 
-    pub async fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
+    pub(crate) async fn durable(&self) -> vibevalley_runtime::agent::durable::Result<vibevalley_runtime::agent::durable::Store> {
         self.database.durable().await
     }
 
-    pub async fn next_seq(&self, name: &str, at_least: i64) -> DbResult<i64> {
+    pub(crate) async fn next_seq(&self, name: &str, at_least: i64) -> DbResult<i64> {
         self.database.next_seq(name, at_least).await
     }
 
-    pub async fn next_seq_in_tx(&self, tx: &Tx, name: &str, at_least: i64) -> DbResult<i64> {
-        self.database.next_seq_in_tx(tx, name, at_least).await
-    }
-
-    pub async fn begin_tx(&self) -> DbResult<Tx> {
+    pub(crate) async fn begin_tx(&self) -> DbResult<Tx> {
         self.database.begin_tx().await
     }
 
-    pub async fn commit_tx(&self, tx: Tx) -> DbResult<()> {
+    pub(crate) async fn commit_tx(&self, tx: Tx) -> DbResult<()> {
         commit_tx(tx).await
     }
 
-    pub async fn rollback_tx(&self, tx: Tx) -> DbResult<()> {
+    pub(crate) async fn rollback_tx(&self, tx: Tx) -> DbResult<()> {
         rollback_tx(tx).await
     }
 
-    pub async fn transaction<T, E>(&self, f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<T, E>> + Send) -> Result<T, E>
+    pub(crate) async fn transaction<T, E>(&self, f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<T, E>> + Send) -> Result<T, E>
     where
         E: From<DbError>,
     {
         self.database.transaction(f).await
     }
 
-    pub async fn transaction_with<T, E>(
-        &self,
-        map_err: impl FnMut(DbError) -> E,
-        f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<T, E>> + Send,
-    ) -> Result<T, E> {
-        self.database.transaction_with(map_err, f).await
-    }
-
-    pub async fn write_dirty<T, E>(&self, f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<(T, SliceMask), E>> + Send) -> Result<(T, SliceMask), E>
+    #[cfg(test)]
+    pub(crate) async fn write_dirty<T, E>(&self, f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<(T, SliceMask), E>> + Send) -> Result<(T, SliceMask), E>
     where
         E: From<DbError>,
     {
         self.database.write_dirty(f).await
     }
 
-    pub async fn write_dirty_with<T, E>(
+    pub(crate) async fn write_dirty_with<T, E>(
         &self,
         map_err: impl FnMut(DbError) -> E,
         f: impl for<'a> FnOnce(&'a Tx) -> BoxFuture<'a, Result<(T, SliceMask), E>> + Send,

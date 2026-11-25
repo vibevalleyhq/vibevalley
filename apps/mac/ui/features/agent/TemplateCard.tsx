@@ -14,7 +14,7 @@ import { sortRuntimes } from "../../infra/agents";
 import { api } from "../../infra/api";
 import { ready, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
-import { useSkills } from "../runtime/SkillsPage";
+import { useSkills } from "../runtime";
 
 export type CategoryFilter = "all" | TemplateCategory;
 

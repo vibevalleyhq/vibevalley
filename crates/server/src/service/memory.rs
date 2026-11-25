@@ -11,15 +11,15 @@ use crate::db::entity::memory;
 use crate::db::{Database, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
 
 #[derive(Debug, Clone)]
-pub struct NewMemory {
-    pub id: String,
-    pub agent: String,
-    pub kind: MemoryKind,
-    pub body: String,
-    pub repo: Option<String>,
-    pub session: Option<String>,
-    pub author: ActorKind,
-    pub created_at: i64,
+pub(crate) struct NewMemory {
+    pub(crate) id: String,
+    pub(crate) agent: String,
+    pub(crate) kind: MemoryKind,
+    pub(crate) body: String,
+    pub(crate) repo: Option<String>,
+    pub(crate) session: Option<String>,
+    pub(crate) author: ActorKind,
+    pub(crate) created_at: i64,
 }
 
 fn read_memory(row: memory::Model) -> Memory {
@@ -122,7 +122,7 @@ async fn upsert_issue_memory_impl<C: ConnectionTrait>(db: &C, entry: &NewMemory)
 }
 
 #[derive(Clone)]
-pub struct MemoryService {
+pub(crate) struct MemoryService {
     db: Arc<Database>,
 }
 
@@ -131,29 +131,20 @@ impl MemoryService {
         Self { db }
     }
 
-    pub async fn list(&self, agent: &str) -> DbResult<Vec<Memory>> {
+    pub(crate) async fn list(&self, agent: &str) -> DbResult<Vec<Memory>> {
         list_impl(self.db.read_conn(), agent).await
     }
 
-    pub async fn list_in_tx(&self, tx: &Tx, agent: &str) -> DbResult<Vec<Memory>> {
+    pub(crate) async fn list_in_tx(&self, tx: &Tx, agent: &str) -> DbResult<Vec<Memory>> {
         list_impl(tx, agent).await
     }
 
-    pub async fn insert(&self, entry: &NewMemory) -> DbResult<()> {
+    pub(crate) async fn insert(&self, entry: &NewMemory) -> DbResult<()> {
         insert_impl(self.db.write_conn(), entry).await
     }
 
-    pub async fn insert_in_tx(&self, tx: &Tx, entry: &NewMemory) -> DbResult<()> {
-        insert_impl(tx, entry).await
-    }
-
-    /// Deletes all non-user notes for `agent` inside `tx`.
-    pub async fn delete_agent_notes_in_tx(&self, tx: &Tx, agent: &str) -> DbResult<u64> {
-        delete_agent_notes_impl(tx, agent).await
-    }
-
     /// Atomically replaces all non-user notes for `agent` with `notes`.
-    pub async fn rewrite_agent_notes(&self, agent: &str, notes: &[NewMemory]) -> DbResult<usize> {
+    pub(crate) async fn rewrite_agent_notes(&self, agent: &str, notes: &[NewMemory]) -> DbResult<usize> {
         let tx = begin_write_tx(self.db.write_conn()).await?;
         let outcome: DbResult<usize> = async {
             delete_agent_notes_impl(&tx, agent).await?;
@@ -175,23 +166,15 @@ impl MemoryService {
         }
     }
 
-    pub async fn delete(&self, agent: &str, id: &str) -> DbResult<u64> {
+    pub(crate) async fn delete(&self, agent: &str, id: &str) -> DbResult<u64> {
         delete_impl(self.db.write_conn(), agent, id).await
     }
 
-    pub async fn delete_in_tx(&self, tx: &Tx, agent: &str, id: &str) -> DbResult<u64> {
-        delete_impl(tx, agent, id).await
-    }
-
-    pub async fn delete_many(&self, agent: &str, ids: &[String]) -> DbResult<u64> {
-        delete_many_impl(self.db.write_conn(), agent, ids).await
-    }
-
-    pub async fn delete_many_in_tx(&self, tx: &Tx, agent: &str, ids: &[String]) -> DbResult<u64> {
+    pub(crate) async fn delete_many_in_tx(&self, tx: &Tx, agent: &str, ids: &[String]) -> DbResult<u64> {
         delete_many_impl(tx, agent, ids).await
     }
 
-    pub async fn record_recalled(&self, ids: &[String], at: i64) -> DbResult<u64> {
+    pub(crate) async fn record_recalled(&self, ids: &[String], at: i64) -> DbResult<u64> {
         if ids.is_empty() {
             return Ok(0);
         }
@@ -204,11 +187,7 @@ impl MemoryService {
         Ok(res.rows_affected)
     }
 
-    pub async fn upsert_issue_memory(&self, entry: &NewMemory) -> DbResult<()> {
-        upsert_issue_memory_impl(self.db.write_conn(), entry).await
-    }
-
-    pub async fn upsert_issue_memory_in_tx(&self, tx: &Tx, entry: &NewMemory) -> DbResult<()> {
+    pub(crate) async fn upsert_issue_memory_in_tx(&self, tx: &Tx, entry: &NewMemory) -> DbResult<()> {
         upsert_issue_memory_impl(tx, entry).await
     }
 }

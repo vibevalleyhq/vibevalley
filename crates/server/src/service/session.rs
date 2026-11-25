@@ -17,19 +17,19 @@ use crate::db::entity::{session, session_event, session_mailbox, session_run};
 use crate::db::{Database, DbError, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct SessionConfig {
-    pub title: Option<String>,
-    pub model: Option<String>,
-    pub effort: Option<String>,
-    pub permission_mode: Option<SessionPermissionMode>,
+pub(crate) struct SessionConfig {
+    pub(crate) title: Option<String>,
+    pub(crate) model: Option<String>,
+    pub(crate) effort: Option<String>,
+    pub(crate) permission_mode: Option<SessionPermissionMode>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SessionExtra {
-    pub agent_session: Option<String>,
-    pub base: Option<String>,
+pub(crate) struct SessionExtra {
+    pub(crate) agent_session: Option<String>,
+    pub(crate) base: Option<String>,
     #[serde(default)]
-    pub run: Option<String>,
+    pub(crate) run: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -256,16 +256,8 @@ async fn all_impl<C: ConnectionTrait>(db: &C) -> DbResult<Vec<Session>> {
         .collect()
 }
 
-async fn get_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<Option<Session>> {
-    let stmt = session_select(false, Some(id));
-    db.query_one(&stmt)
-        .await?
-        .map(|row| SessionQueryRow::from_query_result(&row, "").map_err(DbError::from).and_then(read_session))
-        .transpose()
-}
-
-async fn past_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<Option<Session>> {
-    let stmt = session_select(true, Some(id));
+async fn find_by_departed_impl<C: ConnectionTrait>(db: &C, id: &str, departed: bool) -> DbResult<Option<Session>> {
+    let stmt = session_select(departed, Some(id));
     db.query_one(&stmt)
         .await?
         .map(|row| SessionQueryRow::from_query_result(&row, "").map_err(DbError::from).and_then(read_session))
@@ -328,6 +320,7 @@ async fn put_subagents_impl<C: ConnectionTrait>(db: &C, summary: &SessionSubagen
     Ok(())
 }
 
+#[cfg(test)]
 async fn config_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<Option<SessionConfig>> {
     let row = session::Entity::find_by_id(id.to_owned())
         .select_only()
@@ -576,9 +569,9 @@ async fn enqueue_mailbox_impl<C: ConnectionTrait>(
     read_mailbox_row(row)
 }
 
-async fn withdraw_mailbox_impl<C: ConnectionTrait>(db: &C, idempotency_key: &str, at: i64) -> DbResult<bool> {
+async fn transition_mailbox_by_key_impl<C: ConnectionTrait>(db: &C, idempotency_key: &str, to_status: &str, at: i64) -> DbResult<bool> {
     let res = Update::many(session_mailbox::Entity)
-        .col_expr(session_mailbox::Column::Status, Expr::value("withdrawn"))
+        .col_expr(session_mailbox::Column::Status, Expr::value(to_status))
         .col_expr(session_mailbox::Column::UpdatedAt, Expr::value(at))
         .filter(session_mailbox::Column::IdempotencyKey.eq(idempotency_key))
         .filter(session_mailbox::Column::Status.eq("pending"))
@@ -617,17 +610,6 @@ async fn claim_next_mailbox_impl<C: ConnectionTrait>(db: &C, session_id: &str, a
     rows.into_iter().next().map(read_mailbox_row).transpose()
 }
 
-async fn claim_mailbox_by_key_impl<C: ConnectionTrait>(db: &C, idempotency_key: &str, at: i64) -> DbResult<bool> {
-    let res = Update::many(session_mailbox::Entity)
-        .col_expr(session_mailbox::Column::Status, Expr::value("claimed"))
-        .col_expr(session_mailbox::Column::UpdatedAt, Expr::value(at))
-        .filter(session_mailbox::Column::IdempotencyKey.eq(idempotency_key))
-        .filter(session_mailbox::Column::Status.eq("pending"))
-        .exec(db)
-        .await?;
-    Ok(res.rows_affected > 0)
-}
-
 async fn settle_mailbox_impl<C: ConnectionTrait>(db: &C, id: i64, ok: bool, result: Option<&str>, at: i64) -> DbResult<()> {
     let status = db_word(&if ok { MailboxStatus::Done } else { MailboxStatus::Failed })?;
     Update::many(session_mailbox::Entity)
@@ -661,140 +643,97 @@ impl SessionService {
         Self { db }
     }
 
-    pub async fn all(&self) -> DbResult<Vec<Session>> {
+    pub(crate) async fn all(&self) -> DbResult<Vec<Session>> {
         all_impl(self.db.read_conn()).await
     }
 
-    pub async fn all_in_tx(&self, tx: &Tx) -> DbResult<Vec<Session>> {
-        all_impl(tx).await
+    pub(crate) async fn get(&self, id: &str) -> DbResult<Option<Session>> {
+        find_by_departed_impl(self.db.read_conn(), id, false).await
     }
 
-    pub async fn get(&self, id: &str) -> DbResult<Option<Session>> {
-        get_impl(self.db.read_conn(), id).await
+    pub(crate) async fn get_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<Session>> {
+        find_by_departed_impl(tx, id, false).await
     }
 
-    pub async fn get_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<Session>> {
-        get_impl(tx, id).await
-    }
-
-    pub async fn past(&self, id: &str) -> DbResult<Option<Session>> {
-        past_impl(self.db.read_conn(), id).await
-    }
-
-    pub async fn past_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<Session>> {
-        past_impl(tx, id).await
+    pub(crate) async fn past(&self, id: &str) -> DbResult<Option<Session>> {
+        find_by_departed_impl(self.db.read_conn(), id, true).await
     }
 
     pub async fn put(&self, session: &Session, departed: bool) -> DbResult<()> {
         put_impl(self.db.write_conn(), session, departed).await
     }
 
-    pub async fn put_in_tx(&self, tx: &Tx, session: &Session, departed: bool) -> DbResult<()> {
+    pub(crate) async fn put_in_tx(&self, tx: &Tx, session: &Session, departed: bool) -> DbResult<()> {
         put_impl(tx, session, departed).await
     }
 
-    pub async fn put_subagents(&self, summary: &SessionSubagents) -> DbResult<()> {
-        put_subagents_impl(self.db.write_conn(), summary).await
-    }
-
-    pub async fn put_subagents_in_tx(&self, tx: &Tx, summary: &SessionSubagents) -> DbResult<()> {
+    pub(crate) async fn put_subagents_in_tx(&self, tx: &Tx, summary: &SessionSubagents) -> DbResult<()> {
         put_subagents_impl(tx, summary).await
     }
 
-    pub async fn config(&self, id: &str) -> DbResult<Option<SessionConfig>> {
+    #[cfg(test)]
+    pub(crate) async fn config(&self, id: &str) -> DbResult<Option<SessionConfig>> {
         config_impl(self.db.read_conn(), id).await
     }
 
-    pub async fn config_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<SessionConfig>> {
-        config_impl(tx, id).await
-    }
-
-    pub async fn configs(&self) -> DbResult<HashMap<String, SessionConfig>> {
+    pub(crate) async fn configs(&self) -> DbResult<HashMap<String, SessionConfig>> {
         configs_impl(self.db.read_conn()).await
     }
 
-    pub async fn put_config(&self, id: &str, cfg: &SessionConfig) -> DbResult<()> {
+    pub(crate) async fn put_config(&self, id: &str, cfg: &SessionConfig) -> DbResult<()> {
         put_config_impl(self.db.write_conn(), id, cfg).await
     }
 
-    pub async fn put_config_in_tx(&self, tx: &Tx, id: &str, cfg: &SessionConfig) -> DbResult<()> {
-        put_config_impl(tx, id, cfg).await
-    }
-
-    pub async fn extras(&self) -> DbResult<HashMap<String, SessionExtra>> {
+    pub(crate) async fn extras(&self) -> DbResult<HashMap<String, SessionExtra>> {
         extras_impl(self.db.read_conn()).await
     }
 
-    pub async fn extras_in_tx(&self, tx: &Tx) -> DbResult<HashMap<String, SessionExtra>> {
+    pub(crate) async fn extras_in_tx(&self, tx: &Tx) -> DbResult<HashMap<String, SessionExtra>> {
         extras_impl(tx).await
     }
 
-    pub async fn put_extra(&self, session_id: &str, extra: &SessionExtra) -> DbResult<()> {
+    pub(crate) async fn put_extra(&self, session_id: &str, extra: &SessionExtra) -> DbResult<()> {
         put_extra_impl(self.db.write_conn(), session_id, extra).await
     }
 
-    pub async fn put_extra_in_tx(&self, tx: &Tx, session_id: &str, extra: &SessionExtra) -> DbResult<()> {
+    pub(crate) async fn put_extra_in_tx(&self, tx: &Tx, session_id: &str, extra: &SessionExtra) -> DbResult<()> {
         put_extra_impl(tx, session_id, extra).await
     }
 
-    pub async fn remove_extra(&self, session_id: &str) -> DbResult<()> {
+    pub(crate) async fn remove_extra(&self, session_id: &str) -> DbResult<()> {
         remove_extra_impl(self.db.write_conn(), session_id).await
     }
 
-    pub async fn remove_extra_in_tx(&self, tx: &Tx, session_id: &str) -> DbResult<()> {
+    pub(crate) async fn remove_extra_in_tx(&self, tx: &Tx, session_id: &str) -> DbResult<()> {
         remove_extra_impl(tx, session_id).await
     }
 
-    pub async fn clear_run(&self, session_id: &str, run_id: &str) -> DbResult<()> {
-        clear_run_impl(self.db.write_conn(), session_id, run_id).await
-    }
-
-    pub async fn clear_run_in_tx(&self, tx: &Tx, session_id: &str, run_id: &str) -> DbResult<()> {
+    pub(crate) async fn clear_run_in_tx(&self, tx: &Tx, session_id: &str, run_id: &str) -> DbResult<()> {
         clear_run_impl(tx, session_id, run_id).await
     }
 
-    pub async fn active_run(&self, session_id: &str, run_id: &str, root: &str) -> DbResult<bool> {
-        active_run_impl(self.db.read_conn(), session_id, run_id, root).await
-    }
-
-    pub async fn active_run_in_tx(&self, tx: &Tx, session_id: &str, run_id: &str, root: &str) -> DbResult<bool> {
+    pub(crate) async fn active_run_in_tx(&self, tx: &Tx, session_id: &str, run_id: &str, root: &str) -> DbResult<bool> {
         active_run_impl(tx, session_id, run_id, root).await
     }
 
-    pub async fn run(&self, id: &str) -> DbResult<Option<Run>> {
+    pub(crate) async fn run(&self, id: &str) -> DbResult<Option<Run>> {
         run_impl(self.db.read_conn(), id).await
     }
 
-    pub async fn run_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<Run>> {
+    pub(crate) async fn run_in_tx(&self, tx: &Tx, id: &str) -> DbResult<Option<Run>> {
         run_impl(tx, id).await
     }
 
-    pub async fn runs(&self, issue_id: &str) -> DbResult<Vec<Run>> {
+    pub(crate) async fn runs(&self, issue_id: &str) -> DbResult<Vec<Run>> {
         runs_impl(self.db.read_conn(), issue_id).await
     }
 
-    pub async fn runs_in_tx(&self, tx: &Tx, issue_id: &str) -> DbResult<Vec<Run>> {
-        runs_impl(tx, issue_id).await
-    }
-
-    pub async fn put_run(&self, run: &Run) -> DbResult<()> {
-        put_run_impl(self.db.write_conn(), run).await
-    }
-
-    pub async fn put_run_in_tx(&self, tx: &Tx, run: &Run) -> DbResult<()> {
+    pub(crate) async fn put_run_in_tx(&self, tx: &Tx, run: &Run) -> DbResult<()> {
         put_run_impl(tx, run).await
     }
 
-    pub async fn upsert_events(&self, session_id: &str, events: &[SessionEvent]) -> DbResult<()> {
-        upsert_events_impl(self.db.write_conn(), session_id, events).await
-    }
-
-    pub async fn upsert_events_in_tx(&self, tx: &Tx, session_id: &str, events: &[SessionEvent]) -> DbResult<()> {
-        upsert_events_impl(tx, session_id, events).await
-    }
-
     /// Atomically persists batched dirty events across multiple sessions in one write transaction.
-    pub async fn upsert_events_batch(&self, writes: &[(String, Vec<SessionEvent>)]) -> DbResult<()> {
+    pub(crate) async fn upsert_events_batch(&self, writes: &[(String, Vec<SessionEvent>)]) -> DbResult<()> {
         if writes.is_empty() {
             return Ok(());
         }
@@ -815,15 +754,11 @@ impl SessionService {
         }
     }
 
-    pub async fn delete_events(&self, session_id: &str) -> DbResult<()> {
+    pub(crate) async fn delete_events(&self, session_id: &str) -> DbResult<()> {
         delete_events_impl(self.db.write_conn(), session_id).await
     }
 
-    pub async fn delete_events_in_tx(&self, tx: &Tx, session_id: &str) -> DbResult<()> {
-        delete_events_impl(tx, session_id).await
-    }
-
-    pub async fn max_event_seq(&self, session_id: &str) -> DbResult<i64> {
+    pub(crate) async fn max_event_seq(&self, session_id: &str) -> DbResult<i64> {
         let row = session_event::Entity::find()
             .select_only()
             .expr_as(Func::coalesce([Expr::col(session_event::Column::Seq).max(), Expr::val(-1i64)]), "max_seq")
@@ -834,8 +769,12 @@ impl SessionService {
         Ok(row.unwrap_or(-1))
     }
 
-    pub async fn list_events_tail(&self, session_id: &str, run_id: &str, limit: i64) -> DbResult<Vec<SessionEvent>> {
-        let mut rows = event_payload_query(session_id, run_id)
+    async fn list_events_desc(&self, session_id: &str, run_id: &str, before_seq: Option<i64>, limit: i64) -> DbResult<Vec<SessionEvent>> {
+        let mut query = event_payload_query(session_id, run_id);
+        if let Some(seq) = before_seq {
+            query = query.filter(session_event::Column::Seq.lt(seq));
+        }
+        let mut rows = query
             .order_by_desc(session_event::Column::Seq)
             .limit(u64::try_from(limit).unwrap_or(0))
             .into_tuple::<String>()
@@ -848,22 +787,15 @@ impl SessionService {
         Ok(rows)
     }
 
-    pub async fn list_events_before(&self, session_id: &str, run_id: &str, before_seq: i64, limit: i64) -> DbResult<Vec<SessionEvent>> {
-        let mut rows = event_payload_query(session_id, run_id)
-            .filter(session_event::Column::Seq.lt(before_seq))
-            .order_by_desc(session_event::Column::Seq)
-            .limit(u64::try_from(limit).unwrap_or(0))
-            .into_tuple::<String>()
-            .all(self.db.read_conn())
-            .await?
-            .into_iter()
-            .map(read_db_json)
-            .collect::<DbResult<Vec<_>>>()?;
-        rows.reverse();
-        Ok(rows)
+    pub(crate) async fn list_events_tail(&self, session_id: &str, run_id: &str, limit: i64) -> DbResult<Vec<SessionEvent>> {
+        self.list_events_desc(session_id, run_id, None, limit).await
     }
 
-    pub async fn list_events_after(&self, session_id: &str, run_id: &str, after_seq: i64, limit: i64) -> DbResult<Vec<SessionEvent>> {
+    pub(crate) async fn list_events_before(&self, session_id: &str, run_id: &str, before_seq: i64, limit: i64) -> DbResult<Vec<SessionEvent>> {
+        self.list_events_desc(session_id, run_id, Some(before_seq), limit).await
+    }
+
+    pub(crate) async fn list_events_after(&self, session_id: &str, run_id: &str, after_seq: i64, limit: i64) -> DbResult<Vec<SessionEvent>> {
         event_payload_query(session_id, run_id)
             .filter(session_event::Column::Seq.gt(after_seq))
             .order_by_asc(session_event::Column::Seq)
@@ -877,7 +809,7 @@ impl SessionService {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub async fn enqueue_mailbox(
+    pub(crate) async fn enqueue_mailbox(
         &self,
         session_id: &str,
         idempotency_key: &str,
@@ -889,65 +821,27 @@ impl SessionService {
         enqueue_mailbox_impl(self.db.write_conn(), session_id, idempotency_key, source, source_message_id, payload, at).await
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub async fn enqueue_mailbox_in_tx(
-        &self,
-        tx: &Tx,
-        session_id: &str,
-        idempotency_key: &str,
-        source: MailboxSource,
-        source_message_id: Option<&str>,
-        payload: &str,
-        at: i64,
-    ) -> DbResult<MailboxEntry> {
-        enqueue_mailbox_impl(tx, session_id, idempotency_key, source, source_message_id, payload, at).await
+    pub(crate) async fn withdraw_mailbox(&self, idempotency_key: &str, at: i64) -> DbResult<bool> {
+        transition_mailbox_by_key_impl(self.db.write_conn(), idempotency_key, "withdrawn", at).await
     }
 
-    pub async fn withdraw_mailbox(&self, idempotency_key: &str, at: i64) -> DbResult<bool> {
-        withdraw_mailbox_impl(self.db.write_conn(), idempotency_key, at).await
-    }
-
-    pub async fn withdraw_mailbox_in_tx(&self, tx: &Tx, idempotency_key: &str, at: i64) -> DbResult<bool> {
-        withdraw_mailbox_impl(tx, idempotency_key, at).await
-    }
-
-    pub async fn withdraw_mailbox_by_message(&self, message_id: &str, at: i64) -> DbResult<u64> {
+    pub(crate) async fn withdraw_mailbox_by_message(&self, message_id: &str, at: i64) -> DbResult<u64> {
         withdraw_mailbox_by_message_impl(self.db.write_conn(), message_id, at).await
     }
 
-    pub async fn withdraw_mailbox_by_message_in_tx(&self, tx: &Tx, message_id: &str, at: i64) -> DbResult<u64> {
-        withdraw_mailbox_by_message_impl(tx, message_id, at).await
-    }
-
-    pub async fn claim_next_mailbox(&self, session_id: &str, at: i64) -> DbResult<Option<MailboxEntry>> {
+    pub(crate) async fn claim_next_mailbox(&self, session_id: &str, at: i64) -> DbResult<Option<MailboxEntry>> {
         claim_next_mailbox_impl(self.db.write_conn(), session_id, at).await
     }
 
-    pub async fn claim_next_mailbox_in_tx(&self, tx: &Tx, session_id: &str, at: i64) -> DbResult<Option<MailboxEntry>> {
-        claim_next_mailbox_impl(tx, session_id, at).await
+    pub(crate) async fn claim_mailbox_by_key(&self, idempotency_key: &str, at: i64) -> DbResult<bool> {
+        transition_mailbox_by_key_impl(self.db.write_conn(), idempotency_key, "claimed", at).await
     }
 
-    pub async fn claim_mailbox_by_key(&self, idempotency_key: &str, at: i64) -> DbResult<bool> {
-        claim_mailbox_by_key_impl(self.db.write_conn(), idempotency_key, at).await
-    }
-
-    pub async fn claim_mailbox_by_key_in_tx(&self, tx: &Tx, idempotency_key: &str, at: i64) -> DbResult<bool> {
-        claim_mailbox_by_key_impl(tx, idempotency_key, at).await
-    }
-
-    pub async fn settle_mailbox(&self, id: i64, ok: bool, result: Option<&str>, at: i64) -> DbResult<()> {
+    pub(crate) async fn settle_mailbox(&self, id: i64, ok: bool, result: Option<&str>, at: i64) -> DbResult<()> {
         settle_mailbox_impl(self.db.write_conn(), id, ok, result, at).await
     }
 
-    pub async fn settle_mailbox_in_tx(&self, tx: &Tx, id: i64, ok: bool, result: Option<&str>, at: i64) -> DbResult<()> {
-        settle_mailbox_impl(tx, id, ok, result, at).await
-    }
-
-    pub async fn list_mailbox(&self, session_id: &str) -> DbResult<Vec<MailboxEntry>> {
+    pub(crate) async fn list_mailbox(&self, session_id: &str) -> DbResult<Vec<MailboxEntry>> {
         list_mailbox_impl(self.db.read_conn(), session_id).await
-    }
-
-    pub async fn list_mailbox_in_tx(&self, tx: &Tx, session_id: &str) -> DbResult<Vec<MailboxEntry>> {
-        list_mailbox_impl(tx, session_id).await
     }
 }
