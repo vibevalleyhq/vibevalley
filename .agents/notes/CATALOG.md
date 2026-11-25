@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（22 篇）
+## proposed（23 篇）
 
 ### feature
 
@@ -33,4 +33,5 @@
 
 ### process
 
+- 2026-11-25 [基于纯 Rust 零新依赖 xtask 严格对齐 Uncle Bob 规格的质量门禁套件（crap / dry / mutate / uml）](.agents/notes/proposed/process/2026-11-25-rust-native-quality-gates-suite.md)
 - 2026-10-30 [白皮书里还没做的：骨架、重复 lint、流切片、常驻集合和体检，各在什么时候做](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)
