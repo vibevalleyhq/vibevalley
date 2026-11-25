@@ -183,7 +183,14 @@ fn format_logout(out: &AuthLogoutOutput) -> String {
     "logged out".into()
 }
 
-fn run_login(client: &Client, server_url: Option<String>, code: Option<String>, pair_url: Option<String>, name: Option<String>, scope: Option<String>) -> Done {
+async fn run_login(
+    client: &Client,
+    server_url: Option<String>,
+    code: Option<String>,
+    pair_url: Option<String>,
+    name: Option<String>,
+    scope: Option<String>,
+) -> Done {
     if client.dry_run {
         return Err(no_dry_run("auth login"));
     }
@@ -210,7 +217,7 @@ fn run_login(client: &Client, server_url: Option<String>, code: Option<String>, 
         }
         let device_name = requested_name.unwrap_or_else(default_device_name);
         let scope_value = requested_scope.or(parsed.scope).unwrap_or_else(|| SCOPE_REMOTE_CLIENT.to_string());
-        exchange_code(client, parsed.server, parsed.code, device_name, scope_value)?
+        exchange_code(client, parsed.server, parsed.code, device_name, scope_value).await?
     } else if let Some(raw_code) = code {
         let code_trimmed = raw_code.trim();
         if code_trimmed.is_empty() {
@@ -223,14 +230,14 @@ fn run_login(client: &Client, server_url: Option<String>, code: Option<String>, 
         let server = normalize_server_url(&raw_server)?;
         let device_name = requested_name.unwrap_or_else(default_device_name);
         let scope_value = requested_scope.unwrap_or_else(|| SCOPE_REMOTE_CLIENT.to_string());
-        exchange_code(client, server, code_trimmed.to_string(), device_name, scope_value)?
+        exchange_code(client, server, code_trimmed.to_string(), device_name, scope_value).await?
     } else if let Some(token) = client.flag_token().or_else(|| client.env_token()).cloned() {
         let raw_server = server_url
             .filter(|s| !s.trim().is_empty())
             .or_else(|| client.explicit_server().map(ToString::to_string))
             .ok_or_else(|| Failure::usage("MissingArgument", "provide SERVER_URL (or --server) when logging in with --token"))?;
         let server = normalize_server_url(&raw_server)?;
-        login_with_token(client, server, token, requested_name, requested_scope)?
+        login_with_token(client, server, token, requested_name, requested_scope).await?
     } else {
         return Err(Failure::usage(
             "MissingArgument",
@@ -252,14 +259,16 @@ fn run_login(client: &Client, server_url: Option<String>, code: Option<String>, 
     Ok(())
 }
 
-fn exchange_code(client: &Client, server: String, code: String, device_name: String, scope: String) -> Result<AuthConfig, Failure> {
+async fn exchange_code(client: &Client, server: String, code: String, device_name: String, scope: String) -> Result<AuthConfig, Failure> {
     let target = client.for_target(server.clone(), None);
-    let result = target.ask::<ops::RemotePairExchange>(&RemotePairExchangeRequest {
-        code,
-        device_name,
-        platform: RemotePlatform::Cli,
-        scope: Some(scope),
-    })?;
+    let result = target
+        .ask::<ops::RemotePairExchange>(&RemotePairExchangeRequest {
+            code,
+            device_name,
+            platform: RemotePlatform::Cli,
+            scope: Some(scope),
+        })
+        .await?;
     Ok(AuthConfig {
         server,
         token: Secret::new(result.token),
@@ -270,7 +279,7 @@ fn exchange_code(client: &Client, server: String, code: String, device_name: Str
     })
 }
 
-fn login_with_token(
+async fn login_with_token(
     client: &Client,
     server: String,
     token: Secret,
@@ -278,7 +287,7 @@ fn login_with_token(
     requested_scope: Option<String>,
 ) -> Result<AuthConfig, Failure> {
     let target = client.for_target(server.clone(), Some(token.clone()));
-    let whoami = target.ask::<ops::RemoteWhoami>(&())?;
+    let whoami = target.ask::<ops::RemoteWhoami>(&()).await?;
     let device_id = whoami.device.as_ref().map(|d| d.id.clone()).unwrap_or_default();
     let device_name = requested_name
         .or_else(|| whoami.device.as_ref().map(|d| d.name.clone()).filter(|s| !s.trim().is_empty()))
@@ -300,7 +309,7 @@ fn login_with_token(
     })
 }
 
-fn run_status(client: &Client, fail_on_error: bool) -> Done {
+async fn run_status(client: &Client, fail_on_error: bool) -> Done {
     let auth_mode = if client.token().is_some() {
         AuthMode::RemoteBearer
     } else {
@@ -326,7 +335,7 @@ fn run_status(client: &Client, fail_on_error: bool) -> Done {
 
     let mut probe_failure: Option<Failure> = None;
 
-    match client.probe_health() {
+    match client.probe_health().await {
         Ok(health) => {
             report.connected = health.ok;
             if !health.version.is_empty() {
@@ -338,7 +347,7 @@ fn run_status(client: &Client, fail_on_error: bool) -> Done {
                 probe_failure = Some(err);
             } else {
                 match auth_mode {
-                    AuthMode::RemoteBearer => match client.ask::<ops::RemoteWhoami>(&()) {
+                    AuthMode::RemoteBearer => match client.ask::<ops::RemoteWhoami>(&()).await {
                         Ok(whoami) => {
                             report.authenticated = Some(true);
                             if !whoami.caller.is_empty() {
@@ -369,7 +378,7 @@ fn run_status(client: &Client, fail_on_error: bool) -> Done {
                         }
                     },
                     AuthMode::LocalLoopback => {
-                        if let Ok(whoami) = client.ask::<ops::RemoteWhoami>(&()) {
+                        if let Ok(whoami) = client.ask::<ops::RemoteWhoami>(&()).await {
                             if !whoami.caller.is_empty() {
                                 report.caller = Some(whoami.caller);
                             }
@@ -404,7 +413,7 @@ fn run_status(client: &Client, fail_on_error: bool) -> Done {
     Ok(())
 }
 
-fn run_logout(client: &Client, revoke: bool) -> Done {
+async fn run_logout(client: &Client, revoke: bool) -> Done {
     if client.dry_run {
         return Err(no_dry_run("auth logout"));
     }
@@ -425,7 +434,7 @@ fn run_logout(client: &Client, revoke: bool) -> Done {
             owned_target = client.for_target(cfg.server.clone(), Some(cfg.token.clone()));
             &owned_target
         };
-        match revoke_client.ask::<ops::RemoteDeviceRevoke>(&RemoteDeviceRevokeRequest { id }) {
+        match revoke_client.ask::<ops::RemoteDeviceRevoke>(&RemoteDeviceRevokeRequest { id }).await {
             Ok(()) => revoked = true,
             Err(err) => revoke_error = Some(err.text),
         }
@@ -442,7 +451,7 @@ fn run_logout(client: &Client, revoke: bool) -> Done {
     Ok(())
 }
 
-pub fn run(client: &Client, cmd: AuthCmd) -> Done {
+pub async fn run(client: &Client, cmd: AuthCmd) -> Done {
     match cmd.action {
         AuthAction::Login {
             server_url,
@@ -450,9 +459,9 @@ pub fn run(client: &Client, cmd: AuthCmd) -> Done {
             pair_url,
             name,
             scope,
-        } => run_login(client, server_url, code, pair_url, name, scope),
-        AuthAction::Whoami => run_status(client, true),
-        AuthAction::Status => run_status(client, false),
-        AuthAction::Logout { revoke } => run_logout(client, revoke),
+        } => run_login(client, server_url, code, pair_url, name, scope).await,
+        AuthAction::Whoami => run_status(client, true).await,
+        AuthAction::Status => run_status(client, false).await,
+        AuthAction::Logout { revoke } => run_logout(client, revoke).await,
     }
 }

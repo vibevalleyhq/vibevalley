@@ -52,12 +52,17 @@ static HELPER: LazyLock<Vec<Words>> = LazyLock::new(|| words_of(include_str!("..
 /// Where the orchestrator is answering now (`HostContext`).
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Route {
+    #[serde(default)]
     pub agent: String,
+    #[serde(default)]
     pub channel: String,
+    #[serde(default)]
     pub envelope: String,
     /// The helper the user picked in the composer.
+    #[serde(default)]
     pub picked: String,
     /// User-authored words are in the batch.
+    #[serde(default)]
     pub user: bool,
 }
 

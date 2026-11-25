@@ -9,8 +9,9 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use vibevalley_protocol::{
-    JsNumber, MediaAudioSegment, MediaAudioVoice, MediaImageFormat, MediaImageRequest, MediaImageUsage, MediaInputKind, MediaSpeakersRequestSegments,
-    MediaSpeakersRequestSpeakers, MediaUnderstandingResult, MediaUnderstandingResultIncompleteReason, MediaUnderstandingResultUsage, MediaUnderstandingStatus,
+    JsNumber, MediaAudioSegment, MediaAudioUsage, MediaAudioVoice, MediaImageFormat, MediaImageRequest, MediaImageUsage, MediaInputKind,
+    MediaSpeakersRequestSegments, MediaSpeakersRequestSpeakers, MediaUnderstandingResult, MediaUnderstandingResultIncompleteReason,
+    MediaUnderstandingResultUsage, MediaUnderstandingStatus,
 };
 
 use super::Stop;
@@ -159,23 +160,25 @@ struct WireAudioUsage {
     input_audio_seconds: Option<serde_json::Number>,
 }
 
-fn usage_of(u: WireAudioUsage) -> Option<Value> {
-    let mut out = serde_json::Map::new();
-    for (to, val) in [
-        ("inputCharacters", u.input_characters),
-        ("promptTokens", u.prompt_tokens),
-        ("completionTokens", u.completion_tokens),
-        ("totalTokens", u.total_tokens),
-        ("inputAudioSeconds", u.input_audio_seconds),
-    ] {
-        if let Some(n) = val {
-            if !n.as_f64().is_some_and(|f| f.is_finite() && f >= 0.0) {
-                return None;
-            }
-            out.insert(to.into(), Value::Number(n));
-        }
+fn int_usage(n: Option<serde_json::Number>) -> Option<Option<i64>> {
+    match n {
+        None => Some(None),
+        Some(n) => n.as_i64().filter(|&v| v >= 0).map(Some),
     }
-    Some(Value::Object(out))
+}
+
+fn usage_of(u: WireAudioUsage) -> Option<MediaAudioUsage> {
+    let input_audio_seconds = match u.input_audio_seconds {
+        None => None,
+        Some(n) => Some(JsNumber(n.as_f64().filter(|f| f.is_finite() && *f >= 0.0)?)),
+    };
+    Some(MediaAudioUsage {
+        input_characters: int_usage(u.input_characters)?,
+        prompt_tokens: int_usage(u.prompt_tokens)?,
+        completion_tokens: int_usage(u.completion_tokens)?,
+        total_tokens: int_usage(u.total_tokens)?,
+        input_audio_seconds,
+    })
 }
 
 #[derive(Deserialize, Serialize)]
@@ -399,7 +402,7 @@ pub struct Generated {
     pub url: String,
     pub format: String,
     pub content_type: String,
-    pub usage: Option<Value>,
+    pub usage: Option<MediaAudioUsage>,
 }
 
 /// Kind of asynchronous vendor audio task.
@@ -419,7 +422,7 @@ pub enum Task {
     Transcription {
         text: String,
         segments: Vec<MediaAudioSegment>,
-        usage: Option<Value>,
+        usage: Option<MediaAudioUsage>,
     },
 }
 
@@ -448,7 +451,7 @@ pub enum SpeechEvent {
     TaskCreated(String),
     Created { sample_rate: i64, channels: i64, bit_depth: i64 },
     Delta(Vec<u8>),
-    Done { usage: Option<Value>, duration: Option<f64> },
+    Done { usage: Option<MediaAudioUsage>, duration: Option<f64> },
 }
 
 #[derive(Debug, Clone)]
@@ -458,11 +461,11 @@ pub enum TranscriptionEvent {
     Segment {
         index: i64,
         segment: MediaAudioSegment,
-        usage: Option<Value>,
+        usage: Option<MediaAudioUsage>,
     },
     Done {
         text: String,
-        usage: Option<Value>,
+        usage: Option<MediaAudioUsage>,
     },
 }
 

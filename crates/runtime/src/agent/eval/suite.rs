@@ -9,7 +9,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tokio::process::Command;
 
 use crate::agent::ai::ModelClient;
 use crate::agent::core::engine::Request;
@@ -322,49 +321,32 @@ async fn provision_workspace(fixture: &WorkspaceFixture, dst: &Path) -> Result<(
             if let Some(parent) = dst.parent() {
                 fs::create_dir_all(parent).map_err(|e| Error::Invalid(format!("create {}: {e}", parent.display())))?;
             }
-            let clone = Command::new("git")
-                .args(["-c", "advice.detachedHead=false", "clone", "--no-hardlinks"])
-                .arg(repo)
-                .arg(dst)
-                .kill_on_drop(true)
-                .output()
+            let cloned = vibevalley_git::clone_async(&repo.to_string_lossy(), dst)
                 .await
-                .map_err(|e| Error::Invalid(format!("git clone: {e}")))?;
-            if !clone.status.success() {
-                return Err(Error::Invalid(format!(
-                    "git clone {} failed: {}",
-                    repo.display(),
-                    String::from_utf8_lossy(&clone.stderr)
-                )));
-            }
-            let checkout = Command::new("git")
-                .arg("-C")
-                .arg(dst)
-                .args(["-c", "advice.detachedHead=false", "checkout", rev])
-                .kill_on_drop(true)
-                .output()
+                .map_err(|e| Error::Invalid(format!("git clone {} failed: {e}", repo.display())))?;
+            let checkout = cloned
+                .run_async(&["-c", "advice.detachedHead=false", "checkout", rev])
                 .await
                 .map_err(|e| Error::Invalid(format!("git checkout: {e}")))?;
-            if !checkout.status.success() {
-                return Err(Error::Invalid(format!(
-                    "git checkout {rev} failed: {}",
-                    String::from_utf8_lossy(&checkout.stderr)
-                )));
+            if !checkout.ok() {
+                return Err(Error::Invalid(format!("git checkout {rev} failed: {}", checkout.stderr)));
             }
-            run_git(dst, &["config", "user.name", "Eval"]).await?;
-            run_git(dst, &["config", "user.email", "eval@local"]).await?;
+            run_git(&cloned, &["config", "user.name", "Eval"]).await?;
+            run_git(&cloned, &["config", "user.email", "eval@local"]).await?;
         }
     }
     Ok(())
 }
 
 async fn init_git_repo(dir: &Path) -> Result<()> {
-    run_git(dir, &["init"]).await?;
-    run_git(dir, &["config", "user.name", "Eval"]).await?;
-    run_git(dir, &["config", "user.email", "eval@local"]).await?;
-    run_git(dir, &["add", "-A"]).await?;
+    let repo = vibevalley_git::init_async(dir, None)
+        .await
+        .map_err(|e| Error::Invalid(format!("git init: {e}")))?;
+    run_git(&repo, &["config", "user.name", "Eval"]).await?;
+    run_git(&repo, &["config", "user.email", "eval@local"]).await?;
+    run_git(&repo, &["add", "-A"]).await?;
     run_git(
-        dir,
+        &repo,
         &[
             "-c",
             "user.name=Eval",
@@ -380,20 +362,10 @@ async fn init_git_repo(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn run_git(dir: &Path, args: &[&str]) -> Result<()> {
-    let out = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .kill_on_drop(true)
-        .output()
-        .await
-        .map_err(|e| Error::Invalid(format!("git {}: {e}", args.join(" "))))?;
-    if !out.status.success() {
-        return Err(Error::Invalid(format!(
-            "git {} failed: {}",
-            args.join(" "),
-            String::from_utf8_lossy(&out.stderr)
-        )));
+async fn run_git(repo: &vibevalley_git::Repo, args: &[&str]) -> Result<()> {
+    let out = repo.run_async(args).await.map_err(|e| Error::Invalid(format!("git {}: {e}", args.join(" "))))?;
+    if !out.ok() {
+        return Err(Error::Invalid(format!("git {} failed: {}", args.join(" "), out.stderr)));
     }
     Ok(())
 }

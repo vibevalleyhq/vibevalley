@@ -5,16 +5,15 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde_json::Value;
 use tokio::time::Instant;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, MediaAudioJob, MediaAudioResult, MediaAudioSegment, MediaCloneRequest, MediaInputKind, MediaInputPhase, MediaInputReference, MediaSource,
-    MediaSpeakersRequest, MediaTranscriptionRequest, MediaVoiceDesignRequest, Preview,
+    ApiError, MediaAudioJob, MediaAudioResult, MediaAudioSegment, MediaAudioUsage, MediaCloneRequest, MediaInputKind, MediaInputPhase, MediaInputReference,
+    MediaSource, MediaSpeakersRequest, MediaTranscriptionRequest, MediaVoiceDesignRequest, Preview,
 };
 
 use super::Stop;
-use super::job::{Ask, Held, Media, Phase, Record, active, id_ok, refused};
+use super::job::{Ask, Held, Media, Phase, Record, RecordUsage, active, id_ok, refused};
 use super::vendor::{Account, Moss, MossBody, Outcome, StreamError, TranscriptionEvent, VendorError};
 use crate::log::spawn_blocking_traced;
 use crate::setting::Use;
@@ -56,7 +55,7 @@ macro_rules! audio_job {
             format: $r.result_format,
             content_type: $r.content_type.clone(),
             metadata: $r.metadata.clone(),
-            usage: $r.usage.clone().and_then(|u| serde_json::from_value(u).ok()),
+            usage: $r.usage.as_ref().and_then(RecordUsage::as_audio),
             input: $r.input.clone(),
             result_input: $r.result_input.clone(),
             attachment: $r.attachment.clone(),
@@ -274,7 +273,7 @@ impl Media {
         let mut text = String::new();
         let mut segments: Vec<MediaAudioSegment> = vec![];
         let mut seen: HashSet<i64> = HashSet::new();
-        let mut usage: Option<Value> = None;
+        let mut usage: Option<MediaAudioUsage> = None;
         let mut saved: Option<Instant> = None;
         let mut dirty = false;
         let (tx, mut rx) = tokio::sync::mpsc::channel::<TranscriptionEvent>(32);
@@ -337,7 +336,7 @@ impl Media {
         }
     }
 
-    async fn save_transcript_async(&self, id: &str, text: &str, segments: &[MediaAudioSegment], usage: &Option<Value>, complete: bool) {
+    async fn save_transcript_async(&self, id: &str, text: &str, segments: &[MediaAudioSegment], usage: &Option<MediaAudioUsage>, complete: bool) {
         if !complete {
             let _ = self
                 .change_async(id, &[Phase::Generating, Phase::Canceled, Phase::Unknown], |r| {
@@ -345,7 +344,7 @@ impl Media {
                         text: text.to_string(),
                         segments: segments.to_vec(),
                     });
-                    r.usage = usage.clone();
+                    r.usage = usage.clone().map(RecordUsage::Audio);
                 })
                 .await;
             return;
@@ -356,7 +355,7 @@ impl Media {
                     text: text.to_string(),
                     segments: segments.to_vec(),
                 });
-                r.usage = usage.clone();
+                r.usage = usage.clone().map(RecordUsage::Audio);
                 r.phase = Phase::Ready;
                 r.problem.clear();
             })
@@ -368,7 +367,7 @@ impl Media {
                         text: text.to_string(),
                         segments: segments.to_vec(),
                     });
-                    r.usage = usage.clone();
+                    r.usage = usage.clone().map(RecordUsage::Audio);
                 })
                 .await;
         }

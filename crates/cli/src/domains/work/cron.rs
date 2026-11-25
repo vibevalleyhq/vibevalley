@@ -103,10 +103,10 @@ fn parse_at(raw: &str) -> Result<i64, Failure> {
     Err(Failure::usage("InvalidValue", format!("invalid timestamp {raw:?}")))
 }
 
-pub fn run(client: &Client, cmd: CronCmd) -> Done {
+pub async fn run(client: &Client, cmd: CronCmd) -> Done {
     match cmd.action {
         CronAction::List => {
-            let crons = client.ask::<ops::CronList>(&())?;
+            let crons = client.ask::<ops::CronList>(&()).await?;
             client.output.show(&crons, |cs| cs.iter().map(cron_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
@@ -141,7 +141,7 @@ pub fn run(client: &Client, cmd: CronCmd) -> Done {
                 repo,
                 tz: None,
             };
-            client.mutate::<ops::CronCreate>("cron create", &request, cron_line)
+            client.mutate::<ops::CronCreate>("cron create", &request, cron_line).await
         }
         CronAction::Edit { cron, enabled } => {
             let id = cron.clone();
@@ -149,11 +149,13 @@ pub fn run(client: &Client, cmd: CronCmd) -> Done {
                 id: cron,
                 enabled: Some(enabled),
             };
-            client.mutate::<ops::CronUpdate>("cron edit", &request, |_| format!("updated {id}"))
+            client.mutate::<ops::CronUpdate>("cron edit", &request, |_| format!("updated {id}")).await
         }
         CronAction::Delete { cron } => {
             let id = cron.clone();
-            client.mutate::<ops::CronDelete>("cron delete", &CronDeleteInput { id: cron }, |_| format!("deleted {id}"))
+            client
+                .mutate::<ops::CronDelete>("cron delete", &CronDeleteInput { id: cron }, |_| format!("deleted {id}"))
+                .await
         }
     }
 }

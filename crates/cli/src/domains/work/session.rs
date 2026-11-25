@@ -86,15 +86,15 @@ fn event_line(event: &SessionEvent) -> String {
     line(&[&event.seq.to_string(), event.r#type.as_str(), tool, &detail, ok])
 }
 
-pub fn run(client: &Client, cmd: SessionCmd) -> Done {
+pub async fn run(client: &Client, cmd: SessionCmd) -> Done {
     match cmd.action {
         SessionAction::List { profile } => {
-            let sessions = client.ask::<ops::SessionList>(&SessionListInput { profile, controller: None })?;
+            let sessions = client.ask::<ops::SessionList>(&SessionListInput { profile, controller: None }).await?;
             client.output.show(&sessions, |ss| ss.iter().map(session_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
         SessionAction::Show { session } => {
-            let found = client.ask::<ops::SessionGet>(&SessionGetInput { id: session })?;
+            let found = client.ask::<ops::SessionGet>(&SessionGetInput { id: session }).await?;
             client.output.show(&found, |s| {
                 [
                     session_line(s),
@@ -115,13 +115,15 @@ pub fn run(client: &Client, cmd: SessionCmd) -> Done {
             after,
             limit,
         } => {
-            let page = client.ask::<ops::SessionEventList>(&SessionEventListInput {
-                id: session,
-                run,
-                before_seq: before,
-                after_seq: after,
-                limit,
-            })?;
+            let page = client
+                .ask::<ops::SessionEventList>(&SessionEventListInput {
+                    id: session,
+                    run,
+                    before_seq: before,
+                    after_seq: after,
+                    limit,
+                })
+                .await?;
             client.output.show(&page, |p| {
                 let mut lines: Vec<String> = p.events.iter().map(event_line).collect();
                 if p.has_more
@@ -135,7 +137,9 @@ pub fn run(client: &Client, cmd: SessionCmd) -> Done {
         }
         SessionAction::Stop { session } => {
             let id = session.clone();
-            client.mutate::<ops::SessionStop>("session stop", &SessionStopInput { id: session }, |_| format!("stopped {id}"))
+            client
+                .mutate::<ops::SessionStop>("session stop", &SessionStopInput { id: session }, |_| format!("stopped {id}"))
+                .await
         }
     }
 }

@@ -94,11 +94,11 @@ fi
 if [ "$reopen" = 1 ]; then open "$current"; fi
 "#;
 
-fn writable(dir: &Path) -> bool {
+async fn writable(dir: &Path) -> bool {
     let probe = dir.join(format!(".vibevalley-update-{}", std::process::id()));
-    let made = std::fs::OpenOptions::new().write(true).create_new(true).open(&probe).is_ok();
+    let made = tokio::fs::OpenOptions::new().write(true).create_new(true).open(&probe).await.is_ok();
     if made {
-        let _ = std::fs::remove_file(&probe);
+        let _ = tokio::fs::remove_file(&probe).await;
     }
     made
 }
@@ -143,13 +143,13 @@ impl Updater {
     }
 
     /// The manifest of the latest release this app takes; `None` when there is none yet.
-    fn manifest(&self) -> Result<Option<String>, String> {
+    async fn manifest(&self) -> Result<Option<String>, String> {
         match &self.feed {
             Feed::Off => Ok(None),
             Feed::Manifest(url) => Ok(Some(url.clone())),
             Feed::Stage(Stage::Stable) => Ok(Some(STABLE_FEED.to_string())),
             Feed::Stage(stage) => {
-                let (status, body) = fetch::text(RELEASE_LIST)?;
+                let (status, body) = fetch::text(RELEASE_LIST).await?;
                 if status != 200 {
                     return Err(format!("releases: {status}"));
                 }
@@ -159,8 +159,8 @@ impl Updater {
         }
     }
 
-    /// Asks once; blocks while it downloads. Does nothing while a check runs or an update is ready.
-    fn check(&self) {
+    /// Asks once; awaits while it downloads. Does nothing while a check runs or an update is ready.
+    async fn check(&self) {
         {
             let mut state = self.state.lock();
             if state.busy() || self.feed == Feed::Off {
@@ -169,13 +169,13 @@ impl Updater {
             *state = State::Checking;
         }
         eprintln!("update: {}", State::Checking.json(&self.version));
-        let settled = self.look().unwrap_or_else(|why| State::Failed { why });
+        let settled = self.look().await.unwrap_or_else(|why| State::Failed { why });
         self.set(settled);
     }
 
-    fn look(&self) -> Result<State, String> {
-        let Some(feed) = self.manifest()? else { return Ok(State::Idle) };
-        let (status, body) = fetch::text(&feed)?;
+    async fn look(&self) -> Result<State, String> {
+        let Some(feed) = self.manifest().await? else { return Ok(State::Idle) };
+        let (status, body) = fetch::text(&feed).await?;
         // No release yet.
         if status == 404 {
             return Ok(State::Idle);
@@ -199,7 +199,11 @@ impl Updater {
             return Ok(manual(Manual::NoBuild));
         };
         let Some(bundle) = &self.bundle else { return Ok(manual(Manual::ReadOnly)) };
-        let can_write = writable(bundle) && bundle.parent().is_some_and(writable);
+        let can_write = writable(bundle).await
+            && match bundle.parent() {
+                Some(parent) => writable(parent).await,
+                None => false,
+            };
         if let Some(why) = releases::place_problem(&bundle.to_string_lossy(), can_write) {
             return Ok(manual(why));
         }
@@ -210,7 +214,8 @@ impl Updater {
                 next: release.version.clone(),
                 percent,
             });
-        })?;
+        })
+        .await?;
         *self.staged.lock() = Some(Staged { app, bundle: bundle.clone() });
         Ok(State::Ready {
             next: release.version,
@@ -220,20 +225,29 @@ impl Updater {
     }
 
     /// Hands the staged app to the swap script, which waits for this process to go.
-    fn swap(&self, reopen: bool) -> bool {
-        let mut pending = self.staged.lock();
-        let Some(staged) = pending.as_ref() else { return false };
-        let Some(parent) = staged.bundle.parent() else { return false };
+    async fn swap(&self, reopen: bool) -> bool {
+        let Some(staged) = self.staged.lock().take() else { return false };
+        let Some(parent) = staged.bundle.parent() else {
+            *self.staged.lock() = Some(staged);
+            return false;
+        };
         let next = parent.join(format!(".VibeValley-update-{}.app", std::process::id()));
-        let _ = std::fs::remove_dir_all(&next);
-        let copied = std::process::Command::new("/usr/bin/ditto").arg(&staged.app).arg(&next).status();
+        let _ = tokio::fs::remove_dir_all(&next).await;
+        let copied = tokio::process::Command::new("/usr/bin/ditto")
+            .arg(&staged.app)
+            .arg(&next)
+            .kill_on_drop(true)
+            .status()
+            .await;
         if !copied.is_ok_and(|s| s.success()) {
             eprintln!("update: cannot stage beside {}", staged.bundle.display());
+            *self.staged.lock() = Some(staged);
             return false;
         }
         let script = self.dir.join("swap.sh");
-        if let Err(e) = std::fs::write(&script, SWAP_SCRIPT) {
+        if let Err(e) = tokio::fs::write(&script, SWAP_SCRIPT).await {
             eprintln!("update: {}: {e}", script.display());
+            *self.staged.lock() = Some(staged);
             return false;
         }
         use std::os::unix::process::CommandExt as _;
@@ -251,12 +265,10 @@ impl Updater {
             .process_group(0)
             .spawn();
         match spawned {
-            Ok(_) => {
-                *pending = None;
-                true
-            }
+            Ok(_) => true,
             Err(e) => {
                 eprintln!("update: swap: {e}");
+                *self.staged.lock() = Some(staged);
                 false
             }
         }
@@ -377,8 +389,7 @@ pub fn install(cx: &mut App) {
                     biased;
                     _ = task_cancel.cancelled() => break,
                     _ = interval.tick() => {
-                        let check = asking.clone();
-                        let _ = tokio::task::spawn_blocking(move || check.check()).await;
+                        asking.check().await;
                     }
                 }
             }
@@ -389,8 +400,13 @@ pub fn install(cx: &mut App) {
         if let Some(cancel) = &cancel {
             cancel.cancel();
         }
-        updater.swap(false);
-        async {}
+        let updater = updater.clone();
+        let handle = vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+            updater.swap(false).await;
+        });
+        async move {
+            let _ = handle.await;
+        }
     })
     .detach();
 }
@@ -411,21 +427,25 @@ pub fn host_call(op: UpdateOp, reply: crate::hosted::Replier, cx: &mut App) {
     let updater = updater().clone();
     match op {
         UpdateOp::State => reply.send(Envelope::ok(updater.state())),
-        // Answers once it has settled: it blocks while downloading.
+        // Answers once it has settled: it awaits while downloading.
         UpdateOp::Check => {
-            std::thread::spawn(move || {
-                updater.check();
+            vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+                updater.check().await;
                 reply.send(Envelope::ok(Value::Null));
             });
         }
         // Restarts into the new version.
         UpdateOp::Install => {
-            if updater.swap(true) {
-                reply.send(Envelope::ok(Value::Null));
-                cx.quit();
-            } else {
-                reply.send(refusal(BizCode::Refused, "no update is ready"));
-            }
+            let handle = vibevalley_runtime::rt::current_or_global_handle().spawn(async move { updater.swap(true).await });
+            cx.spawn(async move |cx| {
+                if handle.await.unwrap_or(false) {
+                    reply.send(Envelope::ok(Value::Null));
+                    cx.update(|cx| cx.quit());
+                } else {
+                    reply.send(refusal(BizCode::Refused, "no update is ready"));
+                }
+            })
+            .detach();
         }
     }
 }
@@ -519,8 +539,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn an_app_outside_a_bundle_never_asks_and_has_nothing_to_swap() {
+    #[tokio::test]
+    async fn an_app_outside_a_bundle_never_asks_and_has_nothing_to_swap() {
         let dir = tempfile::tempdir().unwrap();
         let updater = Updater {
             version: "0.1.0".into(),
@@ -530,11 +550,11 @@ mod tests {
             state: Mutex::new(State::Idle),
             staged: Mutex::new(None),
         };
-        updater.check();
+        updater.check().await;
         assert_eq!(updater.state()["_tag"], "idle");
-        assert!(!updater.swap(true));
-        assert!(writable(dir.path()));
-        assert!(!writable(&dir.path().join("missing")));
+        assert!(!updater.swap(true).await);
+        assert!(writable(dir.path()).await);
+        assert!(!writable(&dir.path().join("missing")).await);
     }
 
     #[test]

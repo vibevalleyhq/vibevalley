@@ -16,9 +16,10 @@ use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Attachment, BizCode, Caller, JsNumber, MediaAudioFormat, MediaAudioJob, MediaAudioMetadata, MediaAudioMetadataSource, MediaAudioResult,
-    MediaCleanup, MediaCloneRequest, MediaImageJob, MediaImageJobKind, MediaImageRequest, MediaInputKind, MediaInputReference, MediaInputRequest, MediaJob,
-    MediaPhase, MediaSource, MediaSpeakersRequest, MediaSpeechJob, MediaSpeechJobKind, MediaSpeechRequest, MediaTranscriptionRequest, MediaUnderstandingJob,
-    MediaUnderstandingPhase, MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest, Millis, Preview,
+    MediaAudioUsage, MediaCleanup, MediaCloneRequest, MediaImageJob, MediaImageJobKind, MediaImageRequest, MediaImageUsage, MediaInputKind,
+    MediaInputReference, MediaInputRequest, MediaJob, MediaPhase, MediaSource, MediaSpeakersRequest, MediaSpeechJob, MediaSpeechJobKind, MediaSpeechRequest,
+    MediaTranscriptionRequest, MediaUnderstandingJob, MediaUnderstandingPhase, MediaUnderstandingRequest, MediaUnderstandingResult, MediaVoiceDesignRequest,
+    Millis, Preview,
 };
 
 use super::Stop;
@@ -259,6 +260,29 @@ pub(super) enum Held {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub(super) enum RecordUsage {
+    Image(MediaImageUsage),
+    Audio(MediaAudioUsage),
+}
+
+impl RecordUsage {
+    fn as_image(&self) -> Option<MediaImageUsage> {
+        match self {
+            RecordUsage::Image(u) => Some(u.clone()),
+            RecordUsage::Audio(_) => None,
+        }
+    }
+
+    pub(super) fn as_audio(&self) -> Option<MediaAudioUsage> {
+        match self {
+            RecordUsage::Audio(u) => Some(u.clone()),
+            RecordUsage::Image(_) => None,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Record {
     pub(super) ask: Ask,
@@ -273,7 +297,7 @@ pub(super) struct Record {
     pub(super) problem: String,
     pub(super) remote_task: Option<String>,
     pub(super) url: Option<String>,
-    pub(super) usage: Option<Value>,
+    pub(super) usage: Option<RecordUsage>,
     pub(super) metadata: Option<MediaAudioMetadata>,
     pub(super) result_format: Option<MediaAudioFormat>,
     pub(super) content_type: Option<String>,
@@ -380,7 +404,7 @@ impl Record {
                 connection: self.connection.clone(),
                 revision: self.revision,
                 source: self.source.clone(),
-                usage: self.usage.clone().and_then(|u| serde_json::from_value(u).ok()),
+                usage: self.usage.as_ref().and_then(RecordUsage::as_image),
                 phase: self.phase.shown(),
                 phase_text,
                 problem: self.problem.clone(),
@@ -402,7 +426,7 @@ impl Record {
                 format: self.result_format.unwrap_or(r.format),
                 content_type: self.content_type.clone(),
                 metadata: self.metadata.clone(),
-                usage: self.usage.clone().and_then(|u| serde_json::from_value(u).ok()),
+                usage: self.usage.as_ref().and_then(RecordUsage::as_audio),
                 can_resume: Some(self.can_resume()),
                 can_release: self.can_release(),
                 phase: self.phase.shown(),
@@ -996,7 +1020,7 @@ impl Media {
             Ok((url, usage)) => {
                 self.change_async(id, &[Phase::Generating], |r| {
                     r.url = Some(url);
-                    r.usage = serde_json::to_value(usage).ok();
+                    r.usage = Some(RecordUsage::Image(usage));
                     r.phase = Phase::Downloading;
                 })
                 .await
@@ -1045,7 +1069,7 @@ impl Media {
                 r.url = Some(g.url);
                 r.result_format = MediaAudioFormat::ALL.into_iter().find(|f| f.as_str() == g.format);
                 r.content_type = Some(g.content_type);
-                r.usage = g.usage;
+                r.usage = g.usage.map(RecordUsage::Audio);
                 r.phase = Phase::Downloading;
                 r.problem.clear();
             })
@@ -1077,7 +1101,7 @@ impl Media {
                     let _ = self
                         .change_async(id, &[Phase::Generating], |r| {
                             r.made = Some(MediaAudioResult::Transcription { text, segments });
-                            r.usage = usage;
+                            r.usage = usage.map(RecordUsage::Audio);
                             r.phase = Phase::Ready;
                             r.problem.clear();
                         })
@@ -1272,7 +1296,7 @@ impl Media {
             .storage
             .create_input_async(&MediaInputRequest {
                 kind: MediaInputKind::Audio,
-                name: serde_json::from_value(Value::String(name.to_string())).map_err(|e| e.to_string())?,
+                name: name.to_string(),
                 mime: kind.to_string(),
                 size: bytes.len() as i64,
             })
@@ -1320,7 +1344,7 @@ impl Media {
         let mut pending: Vec<u8> = Vec::new();
         let mut sequence = 0i64;
         let mut format: Option<(i64, i64)> = None;
-        let mut usage: Option<Value> = None;
+        let mut usage: Option<vibevalley_protocol::MediaAudioUsage> = None;
         let mut duration: Option<f64> = None;
         let mut complete = false;
         let (tx, mut rx) = tokio::sync::mpsc::channel::<vendor::SpeechEvent>(32);
@@ -1402,7 +1426,7 @@ impl Media {
         match (streamed, saved) {
             (_, Some(Ok(()))) if !stop.aborted() || complete => {
                 if complete {
-                    let _ = self.change_async(id, &[Phase::Ready], |r| r.usage = usage.take()).await;
+                    let _ = self.change_async(id, &[Phase::Ready], |r| r.usage = usage.take().map(RecordUsage::Audio)).await;
                     self.emit_async(id, json!({ "type": "done" }), stop).await;
                 } else {
                     self.emit_async(id, json!({ "type": "failed" }), stop).await;

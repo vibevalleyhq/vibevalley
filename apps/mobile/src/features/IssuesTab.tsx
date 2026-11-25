@@ -104,12 +104,6 @@ export function IssuesTab(props: {
     }
   });
 
-  const quickStatuses = (issue: Issue): readonly IssueStatus[] => {
-    if (issue.moves.length > 0) return issue.moves;
-    const defaults: IssueStatus[] = ["todo", "in_progress", "in_review", "done"];
-    return defaults.filter((status) => status !== issue.status);
-  };
-
   const updateStatus = async (issueId: string, status: IssueStatus) => {
     if (untracked(busy)) return;
     busy.set(true);
@@ -291,22 +285,24 @@ export function IssuesTab(props: {
                 </View>
               </View>
               <If when={issue().description}>{(desc) => <MarkdownText testID="issue-detail-description" text={desc()} size="sm" />}</If>
-              <View class="flex-row flex-wrap gap-2 pt-1">
-                <Each of={quickStatuses(issue())} key={(status) => status}>
-                  {(status) => (
-                    <PillButton
-                      testID={`issue-move-${status()}`}
-                      size="sm"
-                      tone="plain"
-                      label={status()}
-                      disabled={busy()}
-                      onPress={() => {
-                        void updateStatus(issue().id, status());
-                      }}
-                    />
-                  )}
-                </Each>
-              </View>
+              <If when={issue().moves.length > 0}>
+                <View class="flex-row flex-wrap gap-2 pt-1">
+                  <Each of={issue().moves} key={(status) => status}>
+                    {(status) => (
+                      <PillButton
+                        testID={`issue-move-${status()}`}
+                        size="sm"
+                        tone="plain"
+                        label={status()}
+                        disabled={busy()}
+                        onPress={() => {
+                          void updateStatus(issue().id, status());
+                        }}
+                      />
+                    )}
+                  </Each>
+                </View>
+              </If>
             </SectionCard>
 
             <SectionCard class="gap-2.5">

@@ -53,11 +53,25 @@ pub const RUNTIME_OS_THREAD_CEILING: usize = 0;
 
 /// Shrink-only ceiling for non-test `block_on(` calls under `apps/mac/src/`.
 /// Locked at the current baseline; lower as sites migrate to async and never raise this ceiling.
-pub const MAC_BLOCK_ON_CEILING: usize = 7;
+pub const MAC_BLOCK_ON_CEILING: usize = 5;
 
 /// Shrink-only ceiling for non-test `thread::spawn` / `std::thread::Builder` sites under `apps/mac/src/`.
 /// Locked at the current baseline; lower as sites migrate to async and never raise this ceiling.
-pub const MAC_OS_THREAD_CEILING: usize = 4;
+pub const MAC_OS_THREAD_CEILING: usize = 3;
+
+/// Shrink-only ceiling for non-test `Command::new("git")` sites across workspace production source
+/// (excluding `crates/git/src/`, `crates/runtime/src/bin/`, and `fake/`).
+/// Initialized to 0 for strict post-refactor gating; never raise this ceiling.
+pub const RAW_GIT_COMMAND_CEILING: usize = 0;
+
+/// Shrink-only ceiling for non-test `std::process::Command` sites under `crates/server/src/` (excluding `fake/`).
+/// Initialized to 0 for strict post-refactor gating; never raise this ceiling.
+pub const SERVER_SYNC_PROCESS_CEILING: usize = 0;
+
+/// Shrink-only ceiling for non-test `reqwest::blocking` references across workspace production source
+/// (excluding `crates/runtime/src/bin/`).
+/// Initialized to 0 for strict post-refactor gating; never raise this ceiling.
+pub const BLOCKING_REQWEST_CEILING: usize = 0;
 
 const GATEWAY_ALLOWED_ROOT_FILES: &[&str] = &["router.rs", "app.rs", "main.rs", "lib.rs"];
 const DAG_IGNORED_BASE_MODULES: &[&str] = &["context", "log", "db", "service", "setting", "provider", "fake"];
@@ -94,10 +108,13 @@ pub enum ArchAuditRule {
     NoSyncFsInServer,
     NoValueInInternalSig,
     RuntimeAndMacConcurrencyCeilings,
+    NoRawGitCommand,
+    NoSyncProcessInServer,
+    NoBlockingReqwest,
 }
 
 impl ArchAuditRule {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 14] = [
         Self::NoGatewayReverseImport,
         Self::ServerDomainDag,
         Self::NoSeaOrmOutsideService,
@@ -109,6 +126,9 @@ impl ArchAuditRule {
         Self::NoSyncFsInServer,
         Self::NoValueInInternalSig,
         Self::RuntimeAndMacConcurrencyCeilings,
+        Self::NoRawGitCommand,
+        Self::NoSyncProcessInServer,
+        Self::NoBlockingReqwest,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -124,6 +144,9 @@ impl ArchAuditRule {
             Self::NoSyncFsInServer => "no-sync-fs-in-server",
             Self::NoValueInInternalSig => "no-value-in-internal-sig",
             Self::RuntimeAndMacConcurrencyCeilings => "runtime-and-mac-concurrency-ceilings",
+            Self::NoRawGitCommand => "no-raw-git-command",
+            Self::NoSyncProcessInServer => "no-sync-process-in-server",
+            Self::NoBlockingReqwest => "no-blocking-reqwest",
         }
     }
 }
@@ -177,6 +200,9 @@ pub struct ArchAuditConfig {
     pub runtime_os_thread_ceiling: usize,
     pub mac_block_on_ceiling: usize,
     pub mac_os_thread_ceiling: usize,
+    pub raw_git_command_ceiling: usize,
+    pub server_sync_process_ceiling: usize,
+    pub blocking_reqwest_ceiling: usize,
 }
 
 impl ArchAuditConfig {
@@ -193,6 +219,9 @@ impl ArchAuditConfig {
             runtime_os_thread_ceiling: RUNTIME_OS_THREAD_CEILING,
             mac_block_on_ceiling: MAC_BLOCK_ON_CEILING,
             mac_os_thread_ceiling: MAC_OS_THREAD_CEILING,
+            raw_git_command_ceiling: RAW_GIT_COMMAND_CEILING,
+            server_sync_process_ceiling: SERVER_SYNC_PROCESS_CEILING,
+            blocking_reqwest_ceiling: BLOCKING_REQWEST_CEILING,
         }
     }
 }
@@ -221,6 +250,12 @@ pub struct ArchAuditReport {
     pub mac_block_on_ceiling: usize,
     pub mac_os_thread_count: usize,
     pub mac_os_thread_ceiling: usize,
+    pub raw_git_command_count: usize,
+    pub raw_git_command_ceiling: usize,
+    pub server_sync_process_count: usize,
+    pub server_sync_process_ceiling: usize,
+    pub blocking_reqwest_count: usize,
+    pub blocking_reqwest_ceiling: usize,
     pub app_rs_non_test_lines: Option<usize>,
     pub router_rs_non_test_lines: Option<usize>,
     pub lock_inventory: Vec<DomainLockInventory>,
@@ -591,13 +626,20 @@ fn is_sea_orm_allowed_file(rel: &str) -> bool {
     rel == "db.rs" || rel.starts_with("db/") || rel == "service.rs" || rel.starts_with("service/")
 }
 
+fn is_server_fake_rel(rel: &str) -> bool {
+    rel == "fake.rs" || rel.starts_with("fake/") || rel == "gateway/bridge/fake.rs"
+}
+
+fn is_raw_git_exempt_file(path: &str) -> bool {
+    path.starts_with("crates/git/src/") || path.starts_with("crates/runtime/src/bin/") || path.contains("/fake/") || path.ends_with("/fake.rs")
+}
+
+fn is_blocking_reqwest_exempt_file(path: &str) -> bool {
+    path.starts_with("crates/runtime/src/bin/")
+}
+
 fn is_internal_value_sig_exempt_file(rel: &str) -> bool {
-    rel == "router.rs"
-        || rel == "fake.rs"
-        || rel.starts_with("fake/")
-        || rel == "gateway/bridge/fake.rs"
-        || rel == "gateway/api.rs"
-        || rel.starts_with("gateway/api/")
+    rel == "router.rs" || is_server_fake_rel(rel) || rel == "gateway/api.rs" || rel.starts_with("gateway/api/")
 }
 
 fn check_no_gateway_reverse_import(file_path: &str, rel: &str, file_mod_path: &[String], refs: &[PathRef], index: &LineIndex, out: &mut Vec<ArchViolation>) {
@@ -1138,6 +1180,116 @@ fn collect_os_thread_sites(file_path: &str, tokens: &[Token], index: &LineIndex,
     }
 }
 
+fn collect_raw_git_command_sites(file_path: &str, raw_source: &str, tokens: &[Token], index: &LineIndex, out: &mut Vec<CodeSite>) {
+    let mut seen_line = BTreeSet::new();
+    for i in 0..tokens.len() {
+        if tokens[i].kind == TokenKind::Ident
+            && tokens[i].text == "Command"
+            && tokens.get(i + 1).is_some_and(|t| t.text == "::")
+            && tokens.get(i + 2).is_some_and(|t| t.kind == TokenKind::Ident && t.text == "new")
+            && let Some(open_paren) = tokens.get(i + 3).filter(|t| t.text == "(")
+            && let Some(close_paren) = tokens.get(i + 4).filter(|t| t.text == ")")
+        {
+            let raw_arg = &raw_source[open_paren.offset + 1..close_paren.offset];
+            let cleaned_arg = strip_rust_comments_preserving_strings(raw_arg);
+            if parse_rust_string_literal(&cleaned_arg) == Some("git") {
+                let line = index.line_at(tokens[i].offset);
+                if seen_line.insert(line) {
+                    out.push(CodeSite {
+                        file: file_path.to_owned(),
+                        line,
+                        snippet: index.snippet_at(line).to_owned(),
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn collect_server_sync_process_sites(file_path: &str, tokens: &[Token], refs: &[PathRef], index: &LineIndex, out: &mut Vec<CodeSite>) {
+    let mut seen_line = BTreeSet::new();
+    let mut imports_std_process_mod = false;
+
+    for path_ref in refs {
+        let segs = path_ref.segments.as_slice();
+        if segs == ["std", "process"] {
+            imports_std_process_mod = true;
+            continue;
+        }
+        let is_sync_command_import = segs.len() >= 3 && segs[0] == "std" && segs[1] == "process" && (segs[2] == "Command" || segs[2] == "*");
+        if is_sync_command_import {
+            let line = index.line_at(path_ref.offset);
+            if seen_line.insert(line) {
+                out.push(CodeSite {
+                    file: file_path.to_owned(),
+                    line,
+                    snippet: index.snippet_at(line).to_owned(),
+                });
+            }
+        }
+    }
+
+    for i in 0..tokens.len() {
+        let is_qualified = tokens[i].kind == TokenKind::Ident
+            && tokens[i].text == "std"
+            && tokens.get(i + 1).is_some_and(|t| t.text == "::")
+            && tokens.get(i + 2).is_some_and(|t| t.kind == TokenKind::Ident && t.text == "process")
+            && tokens.get(i + 3).is_some_and(|t| t.text == "::")
+            && tokens.get(i + 4).is_some_and(|t| t.kind == TokenKind::Ident && t.text == "Command");
+        let is_mod_qualified = imports_std_process_mod
+            && tokens[i].kind == TokenKind::Ident
+            && tokens[i].text == "process"
+            && !tokens.get(i.saturating_sub(1)).is_some_and(|t| t.text == "::" && i >= 1)
+            && tokens.get(i + 1).is_some_and(|t| t.text == "::")
+            && tokens.get(i + 2).is_some_and(|t| t.kind == TokenKind::Ident && t.text == "Command");
+        if is_qualified || is_mod_qualified {
+            let line = index.line_at(tokens[i].offset);
+            if seen_line.insert(line) {
+                out.push(CodeSite {
+                    file: file_path.to_owned(),
+                    line,
+                    snippet: index.snippet_at(line).to_owned(),
+                });
+            }
+        }
+    }
+}
+
+fn collect_blocking_reqwest_sites(file_path: &str, tokens: &[Token], refs: &[PathRef], index: &LineIndex, out: &mut Vec<CodeSite>) {
+    let mut seen_line = BTreeSet::new();
+
+    for path_ref in refs {
+        let segs = &path_ref.segments;
+        if segs.len() >= 2 && segs[0] == "reqwest" && segs[1] == "blocking" {
+            let line = index.line_at(path_ref.offset);
+            if seen_line.insert(line) {
+                out.push(CodeSite {
+                    file: file_path.to_owned(),
+                    line,
+                    snippet: index.snippet_at(line).to_owned(),
+                });
+            }
+        }
+    }
+
+    for i in 0..tokens.len() {
+        if tokens[i].kind == TokenKind::Ident
+            && tokens[i].text == "reqwest"
+            && tokens.get(i + 1).is_some_and(|t| t.text == "::")
+            && tokens.get(i + 2).is_some_and(|t| t.kind == TokenKind::Ident && t.text == "blocking")
+        {
+            let line = index.line_at(tokens[i].offset);
+            if seen_line.insert(line) {
+                out.push(CodeSite {
+                    file: file_path.to_owned(),
+                    line,
+                    snippet: index.snippet_at(line).to_owned(),
+                });
+            }
+        }
+    }
+}
+
 fn collect_sync_async_dup_sites(file_path: &str, tokens: &[Token], index: &LineIndex, out: &mut Vec<SyncAsyncDupSite>) {
     let mut sync_fns: BTreeMap<String, usize> = BTreeMap::new();
     let mut async_fns: BTreeMap<String, usize> = BTreeMap::new();
@@ -1423,19 +1575,20 @@ fn extract_cycles_from_scc(scc: &[String], graph: &ModuleGraph) -> Vec<Vec<Strin
 }
 
 fn is_audited_rust_path(path: &str) -> bool {
-    path.ends_with(".rs") && (path.starts_with("crates/server/src/") || path.starts_with("crates/runtime/src/") || path.starts_with("apps/mac/src/"))
+    path.ends_with(".rs") && (path.starts_with("crates/") || path.starts_with("apps/mac/")) && path.contains("/src/")
 }
 
 fn push_ratchet_ceiling_violation(out: &mut Vec<ArchViolation>, rule: ArchAuditRule, sites: &[CodeSite], ceiling: usize, zone: &str, subject: &str, fix: &str) {
     if sites.len() > ceiling {
         let first = &sites[0];
+        let see = if rule == ArchAuditRule::NoRawGitCommand { ARCH_DOC } else { CONCURRENCY_DOC };
         out.push(ArchViolation {
             rule,
             file: first.file.clone(),
             line: first.line,
             message: format!("`{zone}` has {} non-test {subject}, exceeding shrink-only ceiling {ceiling}", sites.len()),
             fix: fix.to_owned(),
-            see: CONCURRENCY_DOC,
+            see,
             details: sites.iter().map(|s| format!("site: {}:{}: {}", s.file, s.line, s.snippet)).collect(),
         });
     }
@@ -1487,6 +1640,9 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
     let mut runtime_os_thread_sites = Vec::new();
     let mut mac_block_on_sites = Vec::new();
     let mut mac_os_thread_sites = Vec::new();
+    let mut raw_git_command_sites = Vec::new();
+    let mut server_sync_process_sites = Vec::new();
+    let mut blocking_reqwest_sites = Vec::new();
     let mut locks_by_domain: BTreeMap<String, DomainLockInventory> = BTreeMap::new();
     let mut app_rs_non_test_lines = None;
     let mut router_rs_non_test_lines = None;
@@ -1512,6 +1668,14 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
             .map_or_else(|| strip_rust_non_code(&file.text, &file.path), Clone::clone);
         let index = LineIndex::new(&file.text);
         let tokens = tokenize_rust(&non_test_code);
+        let refs = extract_path_refs(&tokens);
+
+        if !is_raw_git_exempt_file(&file.path) {
+            collect_raw_git_command_sites(&file.path, &file.text, &tokens, &index, &mut raw_git_command_sites);
+        }
+        if !is_blocking_reqwest_exempt_file(&file.path) {
+            collect_blocking_reqwest_sites(&file.path, &tokens, &refs, &index, &mut blocking_reqwest_sites);
+        }
 
         if file.path.starts_with("crates/runtime/src/") {
             // Standalone test fixture binaries under `crates/runtime/src/bin/` are excluded from production runtime ceilings.
@@ -1537,7 +1701,6 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
         let Some(file_mod_path) = server_file_module_path(&file.path) else {
             continue;
         };
-        let refs = extract_path_refs(&tokens);
 
         // Rule 1: no-gateway-reverse-import
         check_no_gateway_reverse_import(&file.path, rel, &file_mod_path, &refs, &index, &mut violations);
@@ -1602,8 +1765,9 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
         check_legacy_items_in_file(&file.path, rel, &tokens, &index, &mut violations);
 
         // Rule 9 input: std::fs:: calls in server (excluding `fake/` test-runtime sync fixture)
-        if rel != "fake.rs" && !rel.starts_with("fake/") {
+        if !is_server_fake_rel(rel) {
             collect_sync_fs_sites(&file.path, &tokens, &index, &mut server_sync_fs_sites);
+            collect_server_sync_process_sites(&file.path, &tokens, &refs, &index, &mut server_sync_process_sites);
         }
 
         // Rule 10 input: pub / pub(crate) fn signatures using serde_json::Value / Value
@@ -1839,6 +2003,39 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
         "Use `cx.background_executor()` or Tokio tasks instead of spawning new OS threads in `apps/mac/src/`; lower `MAC_OS_THREAD_CEILING` as existing sites migrate.",
     );
 
+    // Rule 12: no-raw-git-command
+    push_ratchet_ceiling_violation(
+        &mut violations,
+        ArchAuditRule::NoRawGitCommand,
+        &raw_git_command_sites,
+        config.raw_git_command_ceiling,
+        "workspace production source",
+        "raw `Command::new(\"git\")` site(s)",
+        "Route git reads and commands through `vibevalley_git` (`crates/git/src/read.rs` and `Repo` async methods) instead of spawning raw `Command::new(\"git\")`.",
+    );
+
+    // Rule 13: no-sync-process-in-server
+    push_ratchet_ceiling_violation(
+        &mut violations,
+        ArchAuditRule::NoSyncProcessInServer,
+        &server_sync_process_sites,
+        config.server_sync_process_ceiling,
+        "crates/server/src/",
+        "`std::process::Command` reference(s)",
+        "Replace blocking `std::process::Command` in `crates/server/src/` with `tokio::process::Command` or `vibevalley_git` async APIs.",
+    );
+
+    // Rule 14: no-blocking-reqwest
+    push_ratchet_ceiling_violation(
+        &mut violations,
+        ArchAuditRule::NoBlockingReqwest,
+        &blocking_reqwest_sites,
+        config.blocking_reqwest_ceiling,
+        "workspace production source",
+        "`reqwest::blocking` reference(s)",
+        "Use async `reqwest::Client` on the Tokio runtime instead of `reqwest::blocking`.",
+    );
+
     violations.sort_by(|a, b| {
         a.rule
             .cmp(&b.rule)
@@ -1886,6 +2083,12 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
         mac_block_on_ceiling: config.mac_block_on_ceiling,
         mac_os_thread_count: mac_os_thread_sites.len(),
         mac_os_thread_ceiling: config.mac_os_thread_ceiling,
+        raw_git_command_count: raw_git_command_sites.len(),
+        raw_git_command_ceiling: config.raw_git_command_ceiling,
+        server_sync_process_count: server_sync_process_sites.len(),
+        server_sync_process_ceiling: config.server_sync_process_ceiling,
+        blocking_reqwest_count: blocking_reqwest_sites.len(),
+        blocking_reqwest_ceiling: config.blocking_reqwest_ceiling,
         app_rs_non_test_lines,
         router_rs_non_test_lines,
         lock_inventory,
@@ -1906,18 +2109,18 @@ fn collect_existing_legacy_dirs(repo_root: &Path) -> BTreeSet<String> {
 }
 
 pub fn audit_server_architecture_with_config(repo_root: &Path, config: ArchAuditConfig) -> Result<ArchAuditReport, String> {
-    let files = walk_matching_files(repo_root, &["crates/server/src", "crates/runtime/src", "apps/mac/src"], is_audited_rust_path)?;
+    let files = walk_matching_files(repo_root, &["crates", "apps/mac"], is_audited_rust_path)?;
     let existing_legacy_dirs = collect_existing_legacy_dirs(repo_root);
     Ok(run_arch_audit_on_files(&files, &existing_legacy_dirs, config))
 }
 
-/// Runs all 11 deterministic architecture & full-stack concurrency rules and returns
+/// Runs all 14 deterministic architecture & full-stack concurrency rules and returns
 /// the full structured report (per-rule violation lists, counts, ratchet metrics, and lock inventory).
 pub fn audit_server_architecture_report(repo_root: &Path) -> Result<ArchAuditReport, String> {
     audit_server_architecture_with_config(repo_root, ArchAuditConfig::strict())
 }
 
-/// Strict architecture gate (all 11 rules using exported shrink-only ceilings).
+/// Strict architecture gate (all 14 rules using exported shrink-only ceilings).
 pub fn audit_server_architecture_strict(repo_root: &Path) -> Result<ArchAuditReport, String> {
     audit_server_architecture_with_config(repo_root, ArchAuditConfig::strict())
 }
@@ -1958,13 +2161,15 @@ pub fn format_lock_inventory(report: &ArchAuditReport) -> String {
 
 fn format_metrics_summary(report: &ArchAuditReport) -> String {
     format!(
-        "server(flume={}/{}, sync/async-dup={}/{}, sync-fs={}/{}, internal-value={}/{}), runtime(flume={}/{}, block_on={}/{}, os-thread={}/{}), mac(block_on={}/{}, os-thread={}/{})",
+        "server(flume={}/{}, sync/async-dup={}/{}, sync-fs={}/{}, sync-process={}/{}, internal-value={}/{}), runtime(flume={}/{}, block_on={}/{}, os-thread={}/{}), mac(block_on={}/{}, os-thread={}/{}), workspace(raw-git={}/{}, blocking-reqwest={}/{})",
         report.flume_count,
         report.flume_ceiling,
         report.sync_async_dup_count,
         report.sync_async_dup_ceiling,
         report.server_sync_fs_count,
         report.server_sync_fs_ceiling,
+        report.server_sync_process_count,
+        report.server_sync_process_ceiling,
         report.server_internal_value_count,
         report.server_internal_value_ceiling,
         report.runtime_flume_count,
@@ -1977,6 +2182,10 @@ fn format_metrics_summary(report: &ArchAuditReport) -> String {
         report.mac_block_on_ceiling,
         report.mac_os_thread_count,
         report.mac_os_thread_ceiling,
+        report.raw_git_command_count,
+        report.raw_git_command_ceiling,
+        report.blocking_reqwest_count,
+        report.blocking_reqwest_ceiling,
     )
 }
 
@@ -2034,8 +2243,11 @@ pub fn run(root: &Path, args: &[String]) -> Result<i32, String> {
     }
 
     println!(
-        "arch-audit: {} files ok (11 rules passed; {metrics}, app.rs={:?}, router.rs={:?})",
-        report.files_scanned, report.app_rs_non_test_lines, report.router_rs_non_test_lines
+        "arch-audit: {} files ok ({} rules passed; {metrics}, app.rs={:?}, router.rs={:?})",
+        report.files_scanned,
+        ArchAuditRule::ALL.len(),
+        report.app_rs_non_test_lines,
+        report.router_rs_non_test_lines
     );
     Ok(0)
 }
@@ -2547,8 +2759,8 @@ mod tests {
     fn rule11_runtime_and_mac_concurrency_ceilings_enforce_all_four_buckets() {
         assert_eq!(RUNTIME_BLOCK_ON_CEILING, 0);
         assert_eq!(RUNTIME_OS_THREAD_CEILING, 0);
-        assert_eq!(MAC_BLOCK_ON_CEILING, 7);
-        assert_eq!(MAC_OS_THREAD_CEILING, 4);
+        assert_eq!(MAC_BLOCK_ON_CEILING, 5);
+        assert_eq!(MAC_OS_THREAD_CEILING, 3);
 
         let dir = TempDir::new("vv-arch-r11");
         dir.write(
@@ -2621,5 +2833,217 @@ mod tests {
         let formatted_locks = format_lock_inventory(&report);
         assert!(formatted_locks.contains("total Mutex<=1, RwLock<=0, combined=1"));
         assert!(formatted_locks.contains("issue"));
+    }
+
+    #[test]
+    fn rule12_no_raw_git_command_rejects_production_and_exempts_git_fake_and_tests() {
+        assert_eq!(RAW_GIT_COMMAND_CEILING, 0);
+
+        let dir = TempDir::new("vv-arch-r12");
+        // Allowed exemptions: crates/git/src, fake/, gateway/bridge/fake.rs, runtime/src/bin, #[cfg(test)], comments, strings, non-git commands.
+        dir.write(
+            "crates/git/src/cmd.rs",
+            "pub fn run() { let _ = std::process::Command::new(\"git\"); let _ = tokio::process::Command::new(\"git\"); }\n",
+        );
+        dir.write(
+            "crates/server/src/fake/runtime.rs",
+            "pub fn stub() { let _ = std::process::Command::new(\"git\"); }\n",
+        );
+        dir.write(
+            "crates/server/src/gateway/bridge/fake.rs",
+            "pub fn stub_bridge() { let _ = tokio::process::Command::new(\"git\"); }\n",
+        );
+        dir.write(
+            "crates/runtime/src/bin/vv_test_fixture.rs",
+            "fn main() { let _ = std::process::Command::new(\"git\"); }\n",
+        );
+        dir.write(
+            "crates/cli/src/auth.rs",
+            [
+                "// Command::new(\"git\")",
+                "const S: &str = \"Command::new(\\\"git\\\")\";",
+                "pub fn other(bin: &str) {",
+                "    let _ = std::process::Command::new(\"cargo\");",
+                "    let _ = std::process::Command::new(bin);",
+                "}",
+                "#[cfg(test)]",
+                "mod tests { fn t() { let _ = std::process::Command::new(\"git\"); } }",
+                "#[cfg(test)]",
+                "mod ext_tests;",
+            ]
+            .join("\n")
+            .as_str(),
+        );
+        dir.write(
+            "crates/cli/src/auth/ext_tests.rs",
+            "pub fn helper() { let _ = std::process::Command::new(\"git\"); }\n",
+        );
+
+        let clean = audit_server_architecture_strict(&dir.0).unwrap();
+        assert!(clean.violations.is_empty(), "expected 0 violations, got: {:?}", clean.violations);
+        assert_eq!(clean.raw_git_command_count, 0);
+
+        // Positive rejections across crates/server, crates/cli, crates/runtime, and apps/mac/crates (both std & tokio Command).
+        dir.write(
+            "crates/server/src/agent/tool/issue.rs",
+            "pub async fn diff() { let _ = tokio::process::Command::new(\"git\"); }\n",
+        );
+        dir.write(
+            "crates/cli/src/machine_agent/worktree.rs",
+            "use std::process::Command;\npub fn status() { let _ = Command::new(\"git\"); }\n",
+        );
+        dir.write(
+            "crates/runtime/src/agent/eval/grader.rs",
+            "use tokio::process::Command;\npub async fn check() { let _ = Command::new(r#\"git\"#); }\n",
+        );
+        dir.write(
+            "apps/mac/crates/workspace/src/git.rs",
+            "pub fn head() { let _ = std::process::Command::new(/* tool */ \"git\"); }\n",
+        );
+
+        let dirty = audit_server_architecture_strict(&dir.0).unwrap();
+        assert_eq!(dirty.raw_git_command_count, 4);
+        assert_eq!(tags(&dirty.violations), vec!["no-raw-git-command@apps/mac/crates/workspace/src/git.rs:1"]);
+        let details = &dirty.violations[0].details;
+        assert_eq!(details.len(), 4);
+        assert!(details.iter().any(|d| d.contains("apps/mac/crates/workspace/src/git.rs:1")));
+        assert!(details.iter().any(|d| d.contains("crates/cli/src/machine_agent/worktree.rs:2")));
+        assert!(details.iter().any(|d| d.contains("crates/runtime/src/agent/eval/grader.rs:2")));
+        assert!(details.iter().any(|d| d.contains("crates/server/src/agent/tool/issue.rs:1")));
+    }
+
+    #[test]
+    fn rule13_no_sync_process_in_server_rejects_std_command_and_exempts_fake_tests_and_tokio() {
+        assert_eq!(SERVER_SYNC_PROCESS_CEILING, 0);
+
+        let dir = TempDir::new("vv-arch-r13");
+        // Allowed: tokio::process::Command, std::process::Stdio, fake/, outside crates/server/src/, #[cfg(test)], comments/strings.
+        dir.write(
+            "crates/server/src/fake/runtime.rs",
+            "use std::process::Command;\npub fn stub() { let _ = Command::new(\"sh\"); }\n",
+        );
+        dir.write(
+            "crates/server/src/gateway/bridge/fake.rs",
+            "pub fn stub() { let _ = std::process::Command::new(\"sh\"); }\n",
+        );
+        dir.write(
+            "crates/cli/src/auth.rs",
+            "use std::process::Command;\npub fn host() { let _ = Command::new(\"hostname\"); }\n",
+        );
+        dir.write(
+            "crates/server/src/repo.rs",
+            [
+                "use std::process::Stdio;",
+                "use tokio::process::Command;",
+                "// use std::process::Command;",
+                "const DOC: &str = \"std::process::Command::new\";",
+                "pub async fn ok() { let _ = Command::new(\"sh\").stdin(Stdio::null()); }",
+                "#[cfg(test)]",
+                "mod tests { fn t() { let _ = std::process::Command::new(\"sh\"); } }",
+                "#[cfg(test)]",
+                "mod ext_tests;",
+            ]
+            .join("\n")
+            .as_str(),
+        );
+        dir.write(
+            "crates/server/src/repo/ext_tests.rs",
+            "use std::process::Command;\npub fn t() { let _ = Command::new(\"sh\"); }\n",
+        );
+
+        let clean = audit_server_architecture_strict(&dir.0).unwrap();
+        assert!(clean.violations.is_empty(), "expected 0 violations, got: {:?}", clean.violations);
+        assert_eq!(clean.server_sync_process_count, 0);
+
+        // Positive rejections inside crates/server/src/ (import, grouped import, inline qualified, module-qualified).
+        dir.write(
+            "crates/server/src/gateway/remote/mod.rs",
+            "use std::process::{Command, Stdio};\npub fn name() { let _ = Command::new(\"hostname\").stdin(Stdio::null()); }\n",
+        );
+        dir.write(
+            "crates/server/src/runtime/worktree/check.rs",
+            "pub fn run() { let _ = std::process::Command::new(\"sh\"); }\n",
+        );
+        dir.write(
+            "crates/server/src/issue/pull/mod.rs",
+            "use std::process::{self, Stdio};\npub fn run() { let _ = process::Command::new(\"sh\").stdin(Stdio::null()); }\n",
+        );
+
+        let dirty = audit_server_architecture_strict(&dir.0).unwrap();
+        assert_eq!(dirty.server_sync_process_count, 3);
+        assert_eq!(
+            tags(&dirty.violations),
+            vec!["no-sync-process-in-server@crates/server/src/gateway/remote/mod.rs:1"]
+        );
+        let details = &dirty.violations[0].details;
+        assert_eq!(details.len(), 3);
+        assert!(details.iter().any(|d| d.contains("crates/server/src/gateway/remote/mod.rs:1")));
+        assert!(details.iter().any(|d| d.contains("crates/server/src/issue/pull/mod.rs:2")));
+        assert!(details.iter().any(|d| d.contains("crates/server/src/runtime/worktree/check.rs:1")));
+    }
+
+    #[test]
+    fn rule14_no_blocking_reqwest_rejects_production_and_exempts_tests_comments_and_fixture_bin() {
+        assert_eq!(BLOCKING_REQWEST_CEILING, 0);
+
+        let dir = TempDir::new("vv-arch-r14");
+        // Allowed: async reqwest::Client, comments (like scripted.rs:397), strings, #[cfg(test)], external test mod, runtime/src/bin fixture.
+        dir.write(
+            "crates/runtime/src/oar/scripted.rs",
+            [
+                "// Computed test callbacks may perform blocking git/HTTP work (e.g. `reqwest::blocking`).",
+                "const DOC: &str = \"reqwest::blocking::Client\";",
+                "pub fn ok() { let _ = reqwest::Client::new(); }",
+            ]
+            .join("\n")
+            .as_str(),
+        );
+        dir.write(
+            "crates/runtime/src/bin/vv_test_fixture.rs",
+            "fn main() { let _ = reqwest::blocking::Client::new(); }\n",
+        );
+        dir.write("crates/server/src/gateway/http/mod.rs", "#[cfg(test)]\nmod tests;\npub fn ok() {}\n");
+        dir.write(
+            "crates/server/src/gateway/http/tests.rs",
+            "fn agent() -> reqwest::blocking::Client { reqwest::blocking::Client::new() }\n",
+        );
+        dir.write(
+            "crates/cli/src/lib.rs",
+            "#[cfg(test)]\nmod tests { fn t() { let _ = reqwest::blocking::get(\"http://127.0.0.1\"); } }\n",
+        );
+
+        let clean = audit_server_architecture_strict(&dir.0).unwrap();
+        assert!(clean.violations.is_empty(), "expected 0 violations, got: {:?}", clean.violations);
+        assert_eq!(clean.blocking_reqwest_count, 0);
+
+        // Positive rejections across workspace production source (qualified path + use tree, including fake/ and cli bin).
+        dir.write(
+            "crates/cli/src/client.rs",
+            [
+                "fn build_http_client() -> reqwest::blocking::Client {",
+                "    reqwest::blocking::Client::new()",
+                "}",
+            ]
+            .join("\n")
+            .as_str(),
+        );
+        dir.write(
+            "crates/cli/src/bin/vibevalley_eval.rs",
+            "use reqwest::blocking::{Client, RequestBuilder};\nfn main() {}\n",
+        );
+        dir.write(
+            "crates/server/src/fake/moss.rs",
+            "use reqwest::blocking;\npub fn probe() { let _ = blocking::Client::new(); }\n",
+        );
+
+        let dirty = audit_server_architecture_strict(&dir.0).unwrap();
+        assert_eq!(dirty.blocking_reqwest_count, 4);
+        assert_eq!(tags(&dirty.violations), vec!["no-blocking-reqwest@crates/cli/src/bin/vibevalley_eval.rs:1"]);
+        let details = &dirty.violations[0].details;
+        assert_eq!(details.len(), 4);
+        assert!(details.iter().any(|d| d.contains("crates/cli/src/bin/vibevalley_eval.rs:1")));
+        assert!(details.iter().any(|d| d.contains("crates/cli/src/client.rs:1")));
+        assert!(details.iter().any(|d| d.contains("crates/cli/src/client.rs:2")));
+        assert!(details.iter().any(|d| d.contains("crates/server/src/fake/moss.rs:1")));
     }
 }

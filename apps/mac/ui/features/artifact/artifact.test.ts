@@ -1,7 +1,9 @@
 import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import { ArtifactTypeValues, userId } from "@vibevalley/protocol";
+import { setLocale } from "@vibevalley/i18n";
+import "@vibevalley/i18n/catalogs";
+import { ARTIFACT_TYPE_SPECS, ARTIFACT_TYPES, ArtifactTypeValues, userId } from "@vibevalley/protocol";
 
 import { decodeBase64Utf8 } from "../../infra/attachment";
 import { formatGenUiAction } from "../../infra/rich";
@@ -11,11 +13,32 @@ import { presenceHighlightCommand } from "./shell";
 
 test("covers all 12 ArtifactType metadata entries, labels, icons, suffixes, and entry paths", () => {
   expect(ArtifactTypeValues).toHaveLength(12);
-  for (const type of ArtifactTypeValues) {
+  expect(ARTIFACT_TYPES).toEqual(ArtifactTypeValues);
+  expect(Object.keys(ARTIFACT_TYPE_SPECS)).toEqual([...ARTIFACT_TYPES]);
+  for (const type of ARTIFACT_TYPES) {
+    const spec = ARTIFACT_TYPE_SPECS[type];
+    expect(spec.artifactType).toBe(type);
     expect(artifactTypeLabel(type).length).toBeGreaterThan(0);
     expect(artifactTypeIcon[type].length).toBeGreaterThan(0);
-    expect(artifactSuffixOf({ artifactType: type })).toMatch(/^\./u);
+    expect(artifactSuffixOf({ artifactType: type })).toBe(spec.exportSuffix);
+    expect(entryPathOf(type)).toBe(spec.entryPath);
     expect(entryPathOf(type)).toMatch(/^structure\//u);
+  }
+});
+
+test("regression: all 12 ArtifactType labels render localized Chinese without English fallback", () => {
+  setLocale("zh");
+  try {
+    const labels = ARTIFACT_TYPES.map((type) => [type, artifactTypeLabel(type)] as const);
+    for (const [, label] of labels) {
+      expect(label).toMatch(/\p{Script=Han}/u);
+    }
+    expect(new Map(labels).get("sheet")).toBe("电子表格");
+    expect(new Map(labels).get("prototype")).toBe("交互原型");
+    expect(new Map(labels).get("diagram")).toBe("结构图表");
+    expect(new Map(labels).get("storyboard")).toBe("分镜脚本");
+  } finally {
+    setLocale("en");
   }
 });
 

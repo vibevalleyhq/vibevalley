@@ -52,6 +52,17 @@ export const OpsSlice = z.object({
   mediaSummary: z.exactOptional(MediaSummary),
 }) satisfies Codec<T.OpsSlice>;
 
+export type SliceDecoderMap = { readonly [K in T.SliceKind]: z.ZodType<T.SliceMap[K]> };
+
+export const sliceDecoders: SliceDecoderMap = {
+  board: BoardSlice,
+  sessions: SessionsSlice,
+  collab: CollabSlice,
+  inbox: InboxSlice,
+  ops: OpsSlice,
+  farm: FarmFrame,
+};
+
 export const SliceBundle = z.object({
   seq: z.number(),
   board: BoardSlice,

@@ -309,10 +309,7 @@ impl Journal {
         if self.run.as_deref() != Some(id) {
             return;
         }
-        let text = serde_json::to_value(outcome)
-            .ok()
-            .and_then(|v| v.as_str().map(String::from))
-            .unwrap_or_default();
+        let text = outcome.as_str().to_string();
         self.add(blank(SessionEventType::RunEnd, text), &[]);
         self.run = None;
     }

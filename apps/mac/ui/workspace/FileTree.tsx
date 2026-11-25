@@ -2,6 +2,7 @@
 // they expand), with git status colors.
 import { Clipboard, computed, Text, View } from "nsh";
 import { ContextMenu, MenuItem, MenuSeparator, Tree, type TreeItem } from "nsh/base";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
@@ -13,6 +14,26 @@ import { gitToneIconTone, gitToneTextClass, menuItemClass, menuPopupClass, menuS
 
 export type FileItem = TreeItem & { tone?: string; hidden?: boolean; loading?: boolean; children?: FileItem[] };
 export type FilesFrame = { root?: string; name?: string; items: FileItem[]; expanded?: string[]; selected?: string | null; loading?: boolean };
+
+const fileItemSchema: z.ZodType<FileItem> = z.lazy(() =>
+  z.object({
+    id: z.string(),
+    label: z.string(),
+    tone: z.exactOptional(z.string()),
+    hidden: z.exactOptional(z.boolean()),
+    loading: z.exactOptional(z.boolean()),
+    children: z.exactOptional(z.array(fileItemSchema)),
+  }),
+);
+
+export const filesFrameSchema: z.ZodType<FilesFrame> = z.object({
+  root: z.exactOptional(z.string()),
+  name: z.exactOptional(z.string()),
+  items: z.array(fileItemSchema),
+  expanded: z.exactOptional(z.array(z.string())),
+  selected: z.exactOptional(z.string().nullable()),
+  loading: z.exactOptional(z.boolean()),
+});
 
 function index(items: FileItem[], into: Map<string, FileItem>) {
   for (const i of items) {

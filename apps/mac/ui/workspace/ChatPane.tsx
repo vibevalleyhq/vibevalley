@@ -24,7 +24,6 @@ import {
   computeTelemetry,
   defaultThoughtLevelFor,
   extractToolTarget,
-  FALLBACK_RUNTIMES,
   fetchWorkspaceRuntimes,
   formatTokens,
   mergeChatSteps,
@@ -33,7 +32,6 @@ import {
   preferredModelFor,
   respondWorkspaceInteraction,
   respondWorkspacePermission,
-  runtimeDisplayName,
   sendWorkspaceMessage,
   setWorkspaceConfig,
   stopWorkspaceSession,
@@ -491,9 +489,10 @@ export function WorkspaceChatPane() {
   const hasDraft = computed(() => draft().trim().length > 0);
   const canSend = computed(() => !sending() && (hasDraft() || attachedFiles().length > 0));
   const currentRuntime = computed(() => runtimes().find((r) => r.id === runtime()));
+  const currentRuntimeLabel = computed(() => currentRuntime()?.name || runtime());
   const currentModels = computed(() => currentRuntime()?.models ?? []);
   const currentModelInfo = computed(() => currentModels().find((m) => m.id === model()));
-  const modelTriggerLabel = computed(() => currentModelInfo()?.label ?? runtimeDisplayName(runtime()));
+  const modelTriggerLabel = computed(() => currentModelInfo()?.label ?? currentRuntimeLabel());
   const effortOptions = computed((): readonly ThoughtLevel[] => currentModelInfo()?.effortLevels ?? []);
   const effectiveThoughtLevel = computed((): ThoughtLevel | undefined => clampThoughtLevel(currentModelInfo(), thoughtLevel()));
   const hasAttention = computed(() => pendingInteractions().length > 0 || pendingPermissions().length > 0);
@@ -789,10 +788,9 @@ export function WorkspaceChatPane() {
     }
   };
 
-  const runtimeOptions = computed((): readonly { value: string; label: string; disabled?: boolean }[] => {
-    const list = runtimes().length === 0 ? FALLBACK_RUNTIMES : runtimes();
-    return list.map((r) => ({ value: r.id, label: r.name, disabled: !r.available }));
-  });
+  const runtimeOptions = computed((): readonly { value: string; label: string; disabled?: boolean }[] =>
+    runtimes().map((r) => ({ value: r.id, label: r.name, disabled: !r.available })),
+  );
 
   const modelOptions = computed(() => currentModels().map((m) => ({ value: m.id, label: m.label })));
 
@@ -1140,7 +1138,7 @@ export function WorkspaceChatPane() {
             placeholder={
               effectivePhase() === "working"
                 ? t("web.shell.chat.steerPlaceholder")
-                : t("web.shell.chat.composerPlaceholder", { runtime: runtimeDisplayName(runtime()) })
+                : t("web.shell.chat.composerPlaceholder", { runtime: currentRuntimeLabel() })
             }
             value={draft()}
             onChange={(e) => draft.set(e.value)}

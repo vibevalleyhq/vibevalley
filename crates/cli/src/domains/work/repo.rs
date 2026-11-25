@@ -75,16 +75,16 @@ fn repo_line(repo: &RepoSummary) -> String {
     ])
 }
 
-pub fn run(client: &Client, cmd: RepoCmd) -> Done {
+pub async fn run(client: &Client, cmd: RepoCmd) -> Done {
     match cmd.action {
         RepoAction::List => {
-            let repos = client.ask::<ops::RepoList>(&())?;
+            let repos = client.ask::<ops::RepoList>(&()).await?;
             client.output.show(&repos, |rs| rs.iter().map(repo_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
         RepoAction::Create { name, github } => {
             let request = NewRepo { name, github };
-            client.mutate::<ops::RepoCreate>("repo create", &request, repo_line)
+            client.mutate::<ops::RepoCreate>("repo create", &request, repo_line).await
         }
         RepoAction::Pr(pr) => match pr.action {
             RepoPrAction::Submit {
@@ -105,7 +105,7 @@ pub fn run(client: &Client, cmd: RepoCmd) -> Done {
                     body,
                     dry_run: Some(client.dry_run),
                 };
-                let result = client.ask::<ops::RepoPrSubmit>(&request)?;
+                let result = client.ask::<ops::RepoPrSubmit>(&request).await?;
                 client.output.show(&result, |r| match &r.url {
                     Some(url) => format!("{url}\ncheck: {}", r.check.as_str()),
                     None => format!("preview: {} ({}) -> {}", r.branch, r.sha, r.base),

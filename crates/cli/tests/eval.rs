@@ -37,7 +37,7 @@ fn eval_export_and_inspect_work_end_to_end_on_sqlite_and_jsonl() {
         assert_eq!((sub, help.code, help.out.contains("Examples:")), (sub, 0, true), "{}", help.out);
     }
 
-    let store = vibevalley_runtime::rt::block_on(async {
+    vibevalley_runtime::rt::block_on(async {
         let store = vibevalley_runtime::agent::durable::Store::open(&db_path).await.unwrap();
         store
             .write_async(|tx| {
@@ -67,7 +67,6 @@ fn eval_export_and_inspect_work_end_to_end_on_sqlite_and_jsonl() {
             .unwrap();
         store.close().await.unwrap();
     });
-    let _ = store;
 
     let exported = eval_cli(
         dir.path(),

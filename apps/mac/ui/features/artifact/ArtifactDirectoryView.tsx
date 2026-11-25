@@ -1,7 +1,15 @@
 import { computed, effect, keymap, Scroll, signal, Text, untracked, View, WebView } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type Artifact, type ArtifactFileContent, type ArtifactFileMeta, type ArtifactPresence, type Suggestion, userId } from "@vibevalley/protocol";
+import {
+  ARTIFACT_TYPE_SPECS,
+  type Artifact,
+  type ArtifactFileContent,
+  type ArtifactFileMeta,
+  type ArtifactPresence,
+  type Suggestion,
+  userId,
+} from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -280,12 +288,12 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
     });
 
   // Derived structured views for the 12 artifact types.
-  const docsContent = computed(() => snapshot().contents.get("structure/index.md")?.content ?? "");
-  const outlineDoc = computed(() => parseOutlineDoc(snapshot().contents.get("structure/outline.json")?.content));
+  const docsContent = computed(() => snapshot().contents.get(ARTIFACT_TYPE_SPECS.docs.entryPath)?.content ?? "");
+  const outlineDoc = computed(() => parseOutlineDoc(snapshot().contents.get(ARTIFACT_TYPE_SPECS.outline.entryPath)?.content));
   const outlineRows = computed(() => flattenOutline(outlineDoc()));
 
   const slidesDeck = computed(() => {
-    const deckObj = parseJsonObject(snapshot().contents.get("structure/deck.json")?.content);
+    const deckObj = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS.slides.entryPath)?.content);
     const slides = asRecordArray(deckObj?.slides).map((s, idx) => {
       const file = asString(s.file);
       const slideData = parseJsonObject(file ? snapshot().contents.get(file)?.content : undefined);
@@ -307,7 +315,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   });
 
   const dashboardData = computed(() => {
-    const obj = parseJsonObject(snapshot().contents.get("structure/dashboard.json")?.content);
+    const obj = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS.dashboard.entryPath)?.content);
     const panels = asRecordArray(obj?.panels);
     const datasets = sortedFiles()
       .filter((f) => f.path.startsWith("structure/data/"))
@@ -321,7 +329,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   });
 
   const motionData = computed(() => {
-    const obj = parseJsonObject(snapshot().contents.get("structure/timeline.json")?.content);
+    const obj = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS.motion.entryPath)?.content);
     const scenes = asRecordArray(obj?.scenes).map((sc) => {
       const file = asString(sc.file);
       const detail = parseJsonObject(file ? snapshot().contents.get(file)?.content : undefined);
@@ -363,7 +371,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   );
 
   const designSystemData = computed(() => {
-    const obj = parseJsonObject(snapshot().contents.get("structure/tokens.json")?.content);
+    const obj = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS["design-system"].entryPath)?.content);
     const colorObj = isRecord(obj?.color) ? obj.color : {};
     const colors = Object.entries(colorObj).map(([name, val]) => {
       if (isRecord(val)) {
@@ -392,7 +400,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   });
 
   const sheetData = computed(() => {
-    const wb = parseJsonObject(snapshot().contents.get("structure/workbook.json")?.content);
+    const wb = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS.sheet.entryPath)?.content);
     const sheets = asRecordArray(wb?.sheets).map((sh, idx) => {
       const file = asString(sh.file);
       const data = parseJsonObject(file ? snapshot().contents.get(file)?.content : undefined);
@@ -416,7 +424,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   });
 
   const diagramData = computed(() => {
-    const obj = parseJsonObject(snapshot().contents.get("structure/diagram.json")?.content);
+    const obj = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS.diagram.entryPath)?.content);
     return {
       title: asString(obj?.title, props.artifact.title),
       kind: asString(obj?.kind, "architecture"),
@@ -436,7 +444,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   });
 
   const storyboardData = computed(() => {
-    const obj = parseJsonObject(snapshot().contents.get("structure/shots.json")?.content);
+    const obj = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS.storyboard.entryPath)?.content);
     const styleGuide = isRecord(obj?.styleGuide) ? obj.styleGuide : undefined;
     const palette = Array.isArray(styleGuide?.palette) ? styleGuide.palette.filter((x): x is string => typeof x === "string") : [];
     const shots = asRecordArray(obj?.shots).map((s, idx) => ({
@@ -467,7 +475,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
       ...cur,
       nodes: { ...cur.nodes, [nodeId]: { ...target, checked: target.checked !== true } },
     };
-    void saveJsonContent("structure/outline.json", next, `Toggle ${nodeId}`);
+    void saveJsonContent(ARTIFACT_TYPE_SPECS.outline.entryPath, next, `Toggle ${nodeId}`);
   };
 
   const addOutlineItem = () => {
@@ -479,12 +487,12 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
       rootIds: [...cur.rootIds, id],
       nodes: { ...cur.nodes, [id]: { id, text: "New item", kind: "bullet", children: [] } },
     };
-    void saveJsonContent("structure/outline.json", next, `Add outline item ${id}`);
+    void saveJsonContent(ARTIFACT_TYPE_SPECS.outline.entryPath, next, `Add outline item ${id}`);
   };
 
   const addSlide = () => {
     if (props.version !== undefined) return;
-    const curDeck = parseJsonObject(untracked(() => snapshot().contents.get("structure/deck.json")?.content)) ?? {
+    const curDeck = parseJsonObject(untracked(() => snapshot().contents.get(ARTIFACT_TYPE_SPECS.slides.entryPath)?.content)) ?? {
       title: props.artifact.title,
       aspectRatio: "16:9",
       designSystemId: null,
@@ -503,7 +511,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
     void act.run(async () => {
       await client().writeFiles(
         [
-          { path: "structure/deck.json", content: `${JSON.stringify(nextDeck, null, 2)}\n`, mime: "application/json" },
+          { path: ARTIFACT_TYPE_SPECS.slides.entryPath, content: `${JSON.stringify(nextDeck, null, 2)}\n`, mime: "application/json" },
           { path: slidePath, content: `${JSON.stringify(slideBody, null, 2)}\n`, mime: "application/json" },
         ],
         { summary: `Add slide ${slideId}` },

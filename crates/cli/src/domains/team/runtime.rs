@@ -36,13 +36,17 @@ fn runtime_line(runtime: &RuntimeInfo) -> String {
     format!("{}  {state}", runtime.id)
 }
 
-pub fn run(client: &Client, cmd: RuntimeCmd) -> Done {
+pub async fn run(client: &Client, cmd: RuntimeCmd) -> Done {
     match cmd.action {
         RuntimeAction::List => {
-            let runtimes = client.ask::<ops::RuntimeList>(&())?;
+            let runtimes = client.ask::<ops::RuntimeList>(&()).await?;
             client.output.show(&runtimes, |rs| rs.iter().map(runtime_line).collect::<Vec<_>>().join("\n"));
             Ok(())
         }
-        RuntimeAction::Refresh { runtime } => client.mutate::<ops::RuntimeRefresh>("runtime refresh", &RuntimeRefreshInput { id: runtime }, runtime_line),
+        RuntimeAction::Refresh { runtime } => {
+            client
+                .mutate::<ops::RuntimeRefresh>("runtime refresh", &RuntimeRefreshInput { id: runtime }, runtime_line)
+                .await
+        }
     }
 }

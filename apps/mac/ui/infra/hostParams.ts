@@ -93,7 +93,7 @@ const farmFormParamsSchema = z.object({
 
 const emptyCalls: FarmCalls = { open: false, narrow: false, ringing: null, missed: [], log: [] };
 
-const farmCallsSchema = z.object({
+export const farmCallsSchema = z.object({
   open: z.boolean(),
   narrow: z.boolean(),
   ringing: InboxItem.nullable(),

@@ -5,11 +5,11 @@ use std::fmt;
 use std::fs;
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
+pub use vibevalley_protocol::{ConnectionSaveRequest, DesktopConnectionMode, DesktopConnectionSnapshot, DesktopConnectionSource};
 use vibevalley_protocol::{Envelope, RemotePairExchangeRequest, RemotePairExchangeResult, RemotePlatform, SCOPE_REMOTE_CLIENT};
 
 pub const CONNECTION_FILE: &str = "desktop-connection.json";
@@ -87,11 +87,15 @@ pub enum Mode {
 }
 
 impl Mode {
-    pub const fn as_str(&self) -> &'static str {
+    pub const fn desktop_mode(&self) -> DesktopConnectionMode {
         match self {
-            Mode::Embedded => "embedded",
-            Mode::Remote { .. } => "remote",
+            Mode::Embedded => DesktopConnectionMode::Embedded,
+            Mode::Remote { .. } => DesktopConnectionMode::Remote,
         }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        self.desktop_mode().as_str()
     }
 
     pub fn url(&self) -> Option<&str> {
@@ -133,11 +137,11 @@ pub enum ConnectionSource {
 }
 
 impl ConnectionSource {
-    pub const fn as_str(self) -> &'static str {
+    pub const fn desktop_source(self) -> DesktopConnectionSource {
         match self {
-            ConnectionSource::Env => "env",
-            ConnectionSource::File => "file",
-            ConnectionSource::Default => "default",
+            ConnectionSource::Env => DesktopConnectionSource::Env,
+            ConnectionSource::File => DesktopConnectionSource::File,
+            ConnectionSource::Default => DesktopConnectionSource::Default,
         }
     }
 }
@@ -146,40 +150,6 @@ impl ConnectionSource {
 pub struct ResolvedConnection {
     pub mode: Mode,
     pub source: ConnectionSource,
-}
-
-/// Safe UI-facing snapshot of active vs configured desktop Control Plane connection mode.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DesktopConnectionSnapshot {
-    pub active_mode: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_label: Option<String>,
-    pub configured_mode: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub configured_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub configured_label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub token_hint: Option<String>,
-    pub source: String,
-    pub restart_required: bool,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ConnectionSaveRequest {
-    pub url: String,
-    #[serde(default)]
-    pub token: Option<String>,
-    #[serde(default)]
-    pub pair_code: Option<String>,
-    #[serde(default)]
-    pub device_name: Option<String>,
-    #[serde(default)]
-    pub label: Option<String>,
 }
 
 pub fn connection_path(home: &Path) -> PathBuf {
@@ -361,14 +331,14 @@ pub fn resolve(home: &Path) -> Result<ResolvedConnection, String> {
 
 pub fn snapshot_from(active: &Mode, configured: &ResolvedConnection) -> DesktopConnectionSnapshot {
     DesktopConnectionSnapshot {
-        active_mode: active.as_str().to_string(),
+        active_mode: active.desktop_mode(),
         active_url: active.url().map(str::to_string),
         active_label: active.label().map(str::to_string),
-        configured_mode: configured.mode.as_str().to_string(),
+        configured_mode: configured.mode.desktop_mode(),
         configured_url: configured.mode.url().map(str::to_string),
         configured_label: configured.mode.label().map(str::to_string),
         token_hint: configured.mode.token_hint().or_else(|| active.token_hint()),
-        source: configured.source.as_str().to_string(),
+        source: configured.source.desktop_source(),
         restart_required: !active.same_target(&configured.mode),
     }
 }
@@ -380,19 +350,7 @@ pub fn snapshot(home: &Path, active: &Mode) -> Result<DesktopConnectionSnapshot,
 
 /// Resolves a default display name for this Mac when pairing with a remote Control Plane.
 pub fn default_device_name() -> String {
-    let read_cmd = |bin: &str, args: &[&str]| -> Option<String> {
-        let out = Command::new(bin).args(args).stdin(Stdio::null()).stderr(Stdio::null()).output().ok()?;
-        if !out.status.success() {
-            return None;
-        }
-        let text = String::from_utf8(out.stdout).ok()?;
-        let trimmed = text.trim();
-        (!trimmed.is_empty()).then(|| trimmed.to_string())
-    };
-    read_cmd("hostname", &["-s"])
-        .or_else(|| read_cmd("hostname", &[]))
-        .or_else(|| std::env::var("HOSTNAME").ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()))
-        .unwrap_or_else(|| "VibeValley Mac".into())
+    vibevalley_protocol::home::computer_name()
 }
 
 /// Exchanges a one-time pairing code against `POST <base_url>/api/v1/remote/pair/exchange`
@@ -620,12 +578,12 @@ mod tests {
             source: ConnectionSource::File,
         };
         let snap = snapshot_from(&active, &configured);
-        assert_eq!(snap.active_mode, "embedded");
-        assert_eq!(snap.configured_mode, "remote");
+        assert_eq!(snap.active_mode, DesktopConnectionMode::Embedded);
+        assert_eq!(snap.configured_mode, DesktopConnectionMode::Remote);
         assert_eq!(snap.configured_url.as_deref(), Some("https://hub.ts.net:8791"));
         assert_eq!(snap.configured_label.as_deref(), Some("Studio"));
         assert_eq!(snap.token_hint.as_deref(), Some("…abcd"));
-        assert_eq!(snap.source, "file");
+        assert_eq!(snap.source, DesktopConnectionSource::File);
         assert!(snap.restart_required);
 
         let serialized = serde_json::to_string(&snap).unwrap();

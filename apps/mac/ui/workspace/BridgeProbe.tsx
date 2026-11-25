@@ -2,9 +2,9 @@
 // contract once and reports the results to the shell (debug dump "probe").
 import { Text, View } from "nsh";
 
-import type { BoardSlice, SliceBundle } from "@vibevalley/protocol";
+import type { SliceBundle } from "@vibevalley/protocol";
 
-import { act, call, frame, frameRev, hostApi, onLive, subscribe, type Envelope } from "../infra/bridge";
+import { act, call, frameRev, hostApi, onLive, sliceFrame, subscribe, type Envelope } from "../infra/bridge";
 
 const probeBundle: SliceBundle = {
   seq: 2,
@@ -17,7 +17,7 @@ const probeBundle: SliceBundle = {
 };
 
 export function BridgeProbe() {
-  const board = frame<BoardSlice>("slice:board");
+  const board = sliceFrame("board");
   const rev = frameRev("slice:board");
   const results: Record<string, unknown> = {};
   const live: unknown[] = [];

@@ -68,10 +68,10 @@ fn memory_line(memory: &Memory) -> String {
     format_memory_line(&memory.id, &memory.agent, memory.kind.as_str(), memory.repo.as_deref(), &memory.text)
 }
 
-pub fn run(client: &Client, cmd: MemoryCmd) -> Done {
+pub async fn run(client: &Client, cmd: MemoryCmd) -> Done {
     match cmd.action {
         MemoryAction::List { agent } => {
-            let found = client.ask::<ops::MemoryList>(&MemoryListInput { agent })?;
+            let found = client.ask::<ops::MemoryList>(&MemoryListInput { agent }).await?;
             client
                 .output
                 .show(&found, |list| list.memories.iter().map(memory_line).collect::<Vec<_>>().join("\n"));
@@ -83,7 +83,7 @@ pub fn run(client: &Client, cmd: MemoryCmd) -> Done {
                 agent,
                 repo,
             };
-            let found = client.ask::<ops::MemorySearch>(&request)?;
+            let found = client.ask::<ops::MemorySearch>(&request).await?;
             client.output.show(&found, |hits| {
                 hits.found
                     .iter()
@@ -100,11 +100,13 @@ pub fn run(client: &Client, cmd: MemoryCmd) -> Done {
                 repo,
                 request_key: key,
             };
-            client.mutate::<ops::MemoryCreate>("memory create", &request, memory_line)
+            client.mutate::<ops::MemoryCreate>("memory create", &request, memory_line).await
         }
         MemoryAction::Delete { agent, memory } => {
             let id = memory.clone();
-            client.mutate::<ops::MemoryDelete>("memory delete", &MemoryDeleteInput { agent, memory }, |_| format!("deleted {id}"))
+            client
+                .mutate::<ops::MemoryDelete>("memory delete", &MemoryDeleteInput { agent, memory }, |_| format!("deleted {id}"))
+                .await
         }
     }
 }

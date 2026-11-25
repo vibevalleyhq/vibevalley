@@ -23,6 +23,7 @@ use vibevalley_protocol::{
 };
 use vibevalley_runtime::oar::{PermissionMode, Registry};
 
+pub(crate) use session::delivery::IssueReportDoc;
 pub use session::{
     ANSWER_ONLY, AgentProfileInfo, DraftEnd, Drive, HelperPlace, Hire, Journal, MailboxEntry, MailboxSource, MailboxStatus, News, Persona, Report,
     ReportQuestion, ReportStatus, Rounds, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory, WorkspaceSnapshot, trigger_of,

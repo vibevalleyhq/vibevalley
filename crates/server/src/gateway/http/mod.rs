@@ -404,28 +404,7 @@ async fn slice(
         return sse_with_shutdown(stream, state.shutdown);
     }
 
-    // Fallback for custom `Server` implementations without a `SliceFeed` (e.g. test doubles).
-    let stop = CancellationToken::new();
-    let stop_guard = stop.clone().drop_guard();
-    let watch_stop = stop.clone();
-    let (tx, rx) = tokio::sync::mpsc::channel::<(i64, String)>(1);
-    let watch_server = state.server;
-    crate::log::spawn_blocking_traced(move || {
-        watch_server.watch_slice(kind, after_seq, &watch_stop, &mut |seq, value| {
-            if watch_stop.is_cancelled() {
-                return;
-            }
-            let data = serde_json::to_string(value).unwrap_or_else(|_| "null".into());
-            if tx.blocking_send((seq, data)).is_err() {
-                watch_stop.cancel();
-            }
-        });
-    });
-    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).map(move |(seq, data)| {
-        let _keep = &stop_guard;
-        Event::default().id(seq.to_string()).data(data)
-    });
-    sse_with_shutdown(stream, state.shutdown)
+    refuse(BizCode::ServiceUnavailable, format!("slice stream unavailable for {name}"))
 }
 
 async fn live(State(state): State<HttpState>, _auth: Authenticated) -> Response {
@@ -478,7 +457,7 @@ async fn subscribe(
     }
 }
 
-fn is_artifact_id(id: &str) -> bool {
+pub(super) fn is_media_input_uuid(id: &str) -> bool {
     id.len() == 36 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f' | b'-'))
 }
 
@@ -508,69 +487,121 @@ pub(super) fn parse_byte_range(text: &str, size: u64) -> Option<(u64, u64)> {
     (start <= end && start < size).then_some((start, end))
 }
 
+pub(super) struct FileRangeSpec<'a> {
+    pub(super) path: &'a std::path::Path,
+    pub(super) content_type: &'a str,
+    pub(super) filename: &'a str,
+    pub(super) cache_control: &'a str,
+    pub(super) truncated_msg: &'static str,
+}
+
+pub(super) enum FileServeError {
+    Open(io::Error),
+    Seek(io::Error),
+}
+
+fn rfc5987_encode(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    for &b in name.as_bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {
+            out.push(b as char);
+        } else {
+            use std::fmt::Write as _;
+            let _ = write!(out, "%{b:02X}");
+        }
+    }
+    out
+}
+
+pub(super) async fn serve_file_range(headers: &HeaderMap, spec: FileRangeSpec<'_>) -> Result<Response, FileServeError> {
+    let mut file = tokio::fs::File::open(spec.path).await.map_err(FileServeError::Open)?;
+    let size = file.metadata().await.map_err(FileServeError::Open)?.len();
+    let range_header = headers.get("range");
+    let disposition = format!("inline; filename*=UTF-8''{}", rfc5987_encode(spec.filename));
+
+    if size == 0 {
+        if range_header.is_some() {
+            return Ok((StatusCode::RANGE_NOT_SATISFIABLE, [("content-range", "bytes */0")]).into_response());
+        }
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", spec.content_type)
+            .header("content-length", 0)
+            .header("accept-ranges", "bytes")
+            .header("content-disposition", disposition)
+            .header("cache-control", spec.cache_control)
+            .header("x-content-type-options", "nosniff")
+            .header("content-security-policy", "sandbox")
+            .body(Body::empty())
+            .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response()));
+    }
+
+    let (status, start, end) = match range_header {
+        Some(value) => {
+            let Some((start, end)) = value.to_str().ok().and_then(|s| parse_byte_range(s, size)) else {
+                return Ok((StatusCode::RANGE_NOT_SATISFIABLE, [("content-range", format!("bytes */{size}"))]).into_response());
+            };
+            (StatusCode::PARTIAL_CONTENT, start, end)
+        }
+        None => (StatusCode::OK, 0, size - 1),
+    };
+
+    if start > 0 {
+        file.seek(SeekFrom::Start(start)).await.map_err(FileServeError::Seek)?;
+    }
+    let length = end - start + 1;
+    let stream = file_range_stream(file, length, spec.truncated_msg);
+    let mut response = Response::builder()
+        .status(status)
+        .header("content-type", spec.content_type)
+        .header("content-length", length)
+        .header("accept-ranges", "bytes")
+        .header("content-disposition", disposition)
+        .header("cache-control", spec.cache_control)
+        .header("x-content-type-options", "nosniff")
+        .header("content-security-policy", "sandbox");
+    if status == StatusCode::PARTIAL_CONTENT {
+        response = response.header("content-range", format!("bytes {start}-{end}/{size}"));
+    }
+    Ok(response
+        .body(Body::from_stream(stream))
+        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response()))
+}
+
+fn default_attachment_mime() -> String {
+    "application/octet-stream".into()
+}
+
+#[derive(serde::Deserialize)]
+struct AttachmentFileReply {
+    path: String,
+    #[serde(rename = "type", default = "default_attachment_mime")]
+    r#type: String,
+    #[serde(default)]
+    name: String,
+}
+
 async fn attachment(State(state): State<HttpState>, AuthenticatedQuery(ctx): AuthenticatedQuery, Path(id): Path<String>, headers: HeaderMap) -> Response {
     let server = state.server;
     let envelope = server.call_with_async(ctx, "attachment.file".into(), serde_json::json!({ "id": id })).await;
     if envelope.biz_code != 0 {
         return reply(envelope);
     }
-    let data = envelope.data.unwrap_or_default();
-    let (Some(path), kind) = (data["path"].as_str(), data["type"].as_str().unwrap_or("application/octet-stream")) else {
+    let Some(file_info) = envelope.data.and_then(|d| serde_json::from_value::<AttachmentFileReply>(d).ok()) else {
         return refuse(BizCode::InternalError, "attachment.file answered no path");
     };
-    let mut file = match tokio::fs::File::open(path).await {
-        Ok(file) => file,
-        Err(e) => return refuse(BizCode::NotFound, e.to_string()),
+    let spec = FileRangeSpec {
+        path: std::path::Path::new(&file_info.path),
+        content_type: &file_info.r#type,
+        filename: &file_info.name,
+        cache_control: "private, max-age=31536000, immutable",
+        truncated_msg: "attachment truncated",
     };
-    let size = match file.metadata().await {
-        Ok(meta) => meta.len(),
-        Err(e) => return refuse(BizCode::NotFound, e.to_string()),
-    };
-    let name = data["name"].as_str().unwrap_or_default().replace(['"', '\\', '\r', '\n'], "_");
-    let range_header = headers.get("range");
-    if size == 0 {
-        if range_header.is_some() {
-            return (StatusCode::RANGE_NOT_SATISFIABLE, [("content-range", "bytes */0")]).into_response();
-        }
-        return Response::builder()
-            .status(StatusCode::OK)
-            .header("content-type", kind)
-            .header("content-length", 0)
-            .header("accept-ranges", "bytes")
-            .header("content-disposition", format!("inline; filename=\"{name}\""))
-            .header("cache-control", "private, max-age=31536000, immutable")
-            .body(Body::empty())
-            .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response());
+    match serve_file_range(&headers, spec).await {
+        Ok(response) => response,
+        Err(FileServeError::Open(e)) => refuse(BizCode::NotFound, e.to_string()),
+        Err(FileServeError::Seek(e)) => refuse(BizCode::InternalError, e.to_string()),
     }
-    let (status, start, end) = match range_header {
-        Some(value) => {
-            let Some((start, end)) = value.to_str().ok().and_then(|s| parse_byte_range(s, size)) else {
-                return (StatusCode::RANGE_NOT_SATISFIABLE, [("content-range", format!("bytes */{size}"))]).into_response();
-            };
-            (StatusCode::PARTIAL_CONTENT, start, end)
-        }
-        None => (StatusCode::OK, 0, size - 1),
-    };
-    if start > 0
-        && let Err(e) = file.seek(SeekFrom::Start(start)).await
-    {
-        return refuse(BizCode::InternalError, e.to_string());
-    }
-    let length = end - start + 1;
-    let stream = file_range_stream(file, length, "attachment truncated");
-    let mut response = Response::builder()
-        .status(status)
-        .header("content-type", kind)
-        .header("content-length", length)
-        .header("accept-ranges", "bytes")
-        .header("content-disposition", format!("inline; filename=\"{name}\""))
-        .header("cache-control", "private, max-age=31536000, immutable");
-    if status == StatusCode::PARTIAL_CONTENT {
-        response = response.header("content-range", format!("bytes {start}-{end}/{size}"));
-    }
-    response
-        .body(Body::from_stream(stream))
-        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
 async fn issue_watch(State(state): State<HttpState>, Authenticated(ctx): Authenticated, Path(id): Path<String>) -> Response {

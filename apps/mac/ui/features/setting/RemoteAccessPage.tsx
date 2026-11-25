@@ -1,8 +1,7 @@
 import { Clipboard, computed, signal, Text, View } from "nsh";
-import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import type { RemoteDeviceSummary, RemotePairCode, RemotePlatform, RemoteStatus } from "@vibevalley/protocol";
+import type { ConnectionSaveRequest, DesktopConnectionSnapshot, RemoteDeviceSummary, RemotePairCode, RemotePlatform, RemoteStatus } from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
 
 import { createAct } from "../../design/act";
@@ -18,24 +17,10 @@ import { Tag } from "../../design/Tag";
 import { api, reasonOf } from "../../infra/api";
 import { shortMomentText } from "../../infra/base/format";
 import { useTimeout } from "../../infra/base/timer";
-import { hostApi, type DesktopConnectionSaveInput, type DesktopConnectionSnapshot } from "../../infra/bridge";
+import { hostApi } from "../../infra/bridge";
 import { onSettled } from "../../infra/solid";
 
 type AuthMethod = "pair" | "token";
-
-const DesktopConnectionModeSchema = z.enum(["embedded", "remote"]);
-const DesktopConnectionSourceSchema = z.enum(["env", "file", "default"]);
-const DesktopConnectionSnapshotSchema = z.object({
-  activeMode: DesktopConnectionModeSchema,
-  activeUrl: z.exactOptional(z.string()),
-  activeLabel: z.exactOptional(z.string()),
-  configuredMode: DesktopConnectionModeSchema,
-  configuredUrl: z.exactOptional(z.string()),
-  configuredLabel: z.exactOptional(z.string()),
-  tokenHint: z.exactOptional(z.string()),
-  source: DesktopConnectionSourceSchema,
-  restartRequired: z.boolean(),
-});
 
 const DEFAULT_CONNECTION: DesktopConnectionSnapshot = {
   activeMode: "embedded",
@@ -43,11 +28,6 @@ const DEFAULT_CONNECTION: DesktopConnectionSnapshot = {
   source: "default",
   restartRequired: false,
 };
-
-function decodeConnectionSnapshot(raw: unknown): DesktopConnectionSnapshot | undefined {
-  const parsed = DesktopConnectionSnapshotSchema.safeParse(raw);
-  return parsed.success ? parsed.data : undefined;
-}
 
 function ControlPlaneConnectionSection() {
   const conn = signal<DesktopConnectionSnapshot>(DEFAULT_CONNECTION);
@@ -66,8 +46,7 @@ function ControlPlaneConnectionSection() {
     const env = await hostApi.connectionState();
     if (!alive) return;
     if (env.bizCode === 0) {
-      const decoded = decodeConnectionSnapshot(env.data);
-      if (decoded) conn.set(decoded);
+      if (env.data !== undefined) conn.set(env.data);
       return;
     }
     if (env.bizCode !== BizCode.RouteNotFound && env.bizCode !== BizCode.ServiceUnavailable) {
@@ -104,7 +83,7 @@ function ControlPlaneConnectionSection() {
     try {
       const url = urlDraft().trim();
       const trimmedLabel = labelDraft().trim();
-      const input: DesktopConnectionSaveInput =
+      const input: ConnectionSaveRequest =
         method() === "pair"
           ? {
               url,
@@ -122,8 +101,7 @@ function ControlPlaneConnectionSection() {
         errorText.set(env.message);
         return;
       }
-      const decoded = decodeConnectionSnapshot(env.data);
-      if (decoded) conn.set(decoded);
+      if (env.data !== undefined) conn.set(env.data);
       codeDraft.set("");
       tokenDraft.set("");
       editing.set(false);
@@ -143,8 +121,7 @@ function ControlPlaneConnectionSection() {
         errorText.set(env.message);
         return;
       }
-      const decoded = decodeConnectionSnapshot(env.data);
-      if (decoded) conn.set(decoded);
+      if (env.data !== undefined) conn.set(env.data);
       editing.set(false);
     } finally {
       if (alive) busy.set(false);

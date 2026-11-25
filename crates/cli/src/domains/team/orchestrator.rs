@@ -68,15 +68,23 @@ pub enum ApprovalAction {
     },
 }
 
-pub fn run(client: &Client, cmd: OrchestratorCmd) -> Done {
+pub async fn run(client: &Client, cmd: OrchestratorCmd) -> Done {
     match cmd.action {
-        OrchestratorAction::Open => client.mutate::<ops::OrchestratorOpen>("orchestrator open", &(), |_| "orchestrator open".into()),
+        OrchestratorAction::Open => {
+            client
+                .mutate::<ops::OrchestratorOpen>("orchestrator open", &(), |_| "orchestrator open".into())
+                .await
+        }
         OrchestratorAction::Stop { agent } => {
-            client.mutate::<ops::OrchestratorStop>("orchestrator stop", &OrchestratorStopInput { agent }, |_| "orchestrator stopped".into())
+            client
+                .mutate::<ops::OrchestratorStop>("orchestrator stop", &OrchestratorStopInput { agent }, |_| "orchestrator stopped".into())
+                .await
         }
         OrchestratorAction::Approval(approval) => match approval.action {
             ApprovalAction::List { conversation } => {
-                let approvals = client.ask::<ops::OrchestratorApprovalList>(&OrchestratorApprovalListInput { conversation_id: conversation })?;
+                let approvals = client
+                    .ask::<ops::OrchestratorApprovalList>(&OrchestratorApprovalListInput { conversation_id: conversation })
+                    .await?;
                 client.output.show(&approvals, |items| {
                     items
                         .iter()
@@ -97,17 +105,21 @@ pub fn run(client: &Client, cmd: OrchestratorCmd) -> Done {
                 tool_call,
                 decision,
                 reason,
-            } => client.mutate::<ops::OrchestratorApprovalResolve>(
-                "orchestrator approval resolve",
-                &OrchestratorApprovalResolveInput {
-                    conversation_id: conversation,
-                    task_id: task,
-                    tool_call_id: tool_call,
-                    approved: matches!(decision, ApprovalDecision::Approve),
-                    reason,
-                },
-                |_| "saved".into(),
-            ),
+            } => {
+                client
+                    .mutate::<ops::OrchestratorApprovalResolve>(
+                        "orchestrator approval resolve",
+                        &OrchestratorApprovalResolveInput {
+                            conversation_id: conversation,
+                            task_id: task,
+                            tool_call_id: tool_call,
+                            approved: matches!(decision, ApprovalDecision::Approve),
+                            reason,
+                        },
+                        |_| "saved".into(),
+                    )
+                    .await
+            }
         },
     }
 }

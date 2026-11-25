@@ -411,10 +411,10 @@ impl RemoteServer {
         })
     }
 
-    async fn call_http_inner(client: &reqwest::Client, base_url: &str, token: &Secret, op: &str, payload: Value) -> Envelope {
-        let url = op_url(base_url, op);
+    async fn call_http(&self, op: &str, payload: Value) -> Envelope {
+        let url = op_url(&self.base_url, op);
         let body = if payload.is_null() { Value::Object(Default::default()) } else { payload };
-        let req = attach_headers(client.post(&url).timeout(CALL_TIMEOUT).json(&body), token);
+        let req = attach_headers(self.client.post(&url).timeout(CALL_TIMEOUT).json(&body), &self.token);
         let response = match req.send().await {
             Ok(res) => res,
             Err(err) => return refusal(BizCode::ServiceUnavailable, format!("remote control plane unreachable: {err}")),
@@ -427,13 +427,12 @@ impl RemoteServer {
         parse_envelope_or_fallback(status, &text)
     }
 
-    async fn call_http(&self, op: &str, payload: Value) -> Envelope {
-        Self::call_http_inner(&self.client, &self.base_url, &self.token, op, payload).await
-    }
-
-    async fn slice_snapshot_json_http_inner(client: &reqwest::Client, base_url: &str, token: &Secret, slice: SliceKind) -> Arc<str> {
-        let url = format!("{base_url}/api/v1/slice/{}?once=1", slice.as_str());
-        let req = attach_headers(client.get(&url).header("accept", "application/json").timeout(SNAPSHOT_TIMEOUT), token);
+    async fn slice_snapshot_json_http(&self, slice: SliceKind) -> Arc<str> {
+        let url = format!("{}/api/v1/slice/{}?once=1", self.base_url, slice.as_str());
+        let req = attach_headers(
+            self.client.get(&url).header("accept", "application/json").timeout(SNAPSHOT_TIMEOUT),
+            &self.token,
+        );
         let Ok(response) = req.send().await else {
             return Arc::<str>::from("null");
         };
@@ -450,29 +449,16 @@ impl RemoteServer {
         }
     }
 
-    async fn slice_snapshot_json_http(&self, slice: SliceKind) -> Arc<str> {
-        Self::slice_snapshot_json_http_inner(&self.client, &self.base_url, &self.token, slice).await
-    }
-
     #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
-    #[allow(clippy::too_many_arguments)]
-    async fn subscribe_http_inner(
-        client: reqwest::Client,
-        base_url: String,
-        token: Secret,
-        subs: Arc<Mutex<HashMap<u64, CancellationToken>>>,
-        sub_id: u64,
-        shutdown: CancellationToken,
-        name: &str,
-        payload: Value,
-    ) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
+    async fn subscribe_http(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
+        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
         let payload_json = serde_json::to_string(&if payload.is_null() { Value::Object(Default::default()) } else { payload }).unwrap_or_else(|_| "{}".into());
 
-        let mut url = url::Url::parse(&format!("{base_url}/api/v1/subscribe/{name}"))
+        let mut url = url::Url::parse(&format!("{}/api/v1/subscribe/{name}", self.base_url))
             .map_err(|e| refusal(BizCode::InvalidInput, format!("invalid subscription URL: {e}")))?;
         url.query_pairs_mut().append_pair("payload", &payload_json);
 
-        let req = attach_headers(client.get(url).header("accept", "text/event-stream"), &token);
+        let req = attach_headers(self.client.get(url).header("accept", "text/event-stream"), &self.token);
         let response = req
             .send()
             .await
@@ -488,10 +474,10 @@ impl RemoteServer {
             return Err(parse_envelope_or_fallback(status, &text));
         }
 
-        let cancel = shutdown.child_token();
+        let cancel = self.shutdown.child_token();
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Value>();
-        subs.lock().insert(sub_id, cancel.clone());
-        let subs_for_task = subs;
+        self.subs.lock().insert(sub_id, cancel.clone());
+        let subs_for_task = self.subs.clone();
 
         vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
             let mut last_seq = None;
@@ -511,31 +497,11 @@ impl RemoteServer {
 
         Ok((sub_id, rx))
     }
-
-    #[allow(clippy::result_large_err, reason = "Server::subscribe's contract returns the refusal envelope itself")]
-    async fn subscribe_http(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
-        Self::subscribe_http_inner(
-            self.client.clone(),
-            self.base_url.clone(),
-            self.token.clone(),
-            self.subs.clone(),
-            sub_id,
-            self.shutdown.clone(),
-            name,
-            payload,
-        )
-        .await
-    }
 }
 
 impl Server for RemoteServer {
     fn call(&self, op: &str, payload: Value) -> Envelope {
-        let client = self.client.clone();
-        let base_url = self.base_url.clone();
-        let token = self.token.clone();
-        let op = op.to_string();
-        vibevalley_runtime::rt::block_on(async move { Self::call_http_inner(&client, &base_url, &token, &op, payload).await })
+        vibevalley_runtime::rt::block_on(self.call_http(op, payload))
     }
 
     fn call_with_async(self: Arc<Self>, _ctx: CallerContext, op: String, payload: Value) -> BoxFuture<'static, Envelope> {
@@ -543,10 +509,7 @@ impl Server for RemoteServer {
     }
 
     fn slice_snapshot(&self, slice: SliceKind) -> Value {
-        let client = self.client.clone();
-        let base_url = self.base_url.clone();
-        let token = self.token.clone();
-        let json = vibevalley_runtime::rt::block_on(async move { Self::slice_snapshot_json_http_inner(&client, &base_url, &token, slice).await });
+        let json = vibevalley_runtime::rt::block_on(self.slice_snapshot_json_http(slice));
         serde_json::from_str(&json).unwrap_or(Value::Null)
     }
 
@@ -711,14 +674,7 @@ impl Server for RemoteServer {
     }
 
     fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
-        let client = self.client.clone();
-        let base_url = self.base_url.clone();
-        let token = self.token.clone();
-        let subs = self.subs.clone();
-        let sub_id = self.next_sub_id.fetch_add(1, Ordering::Relaxed);
-        let shutdown = self.shutdown.clone();
-        let name = name.to_string();
-        vibevalley_runtime::rt::block_on(async move { Self::subscribe_http_inner(client, base_url, token, subs, sub_id, shutdown, &name, payload).await })
+        vibevalley_runtime::rt::block_on(self.subscribe_http(name, payload))
     }
 
     fn subscribe_with_async(
@@ -838,6 +794,10 @@ mod tests {
 
         fn watch_slice(&self, slice: SliceKind, after_seq: Option<i64>, stop: &CancellationToken, receive: &mut dyn FnMut(i64, &Value)) {
             self.inner.watch_slice(slice, after_seq, stop, receive);
+        }
+
+        fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
+            self.inner.subscribe_slice(slice)
         }
 
         fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<LiveEvent> {
