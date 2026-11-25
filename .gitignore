@@ -37,4 +37,8 @@ target/
 target-*/
 .tools/
 
+# Local quality-gate snapshots and UML workbench cache
+.metrics/
+.uml/
+
 apps/mac/dist/
