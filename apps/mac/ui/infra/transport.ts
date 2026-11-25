@@ -1,22 +1,6 @@
-import type { BoardSlice, CollabSlice, FarmFrame, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceKind } from "@vibevalley/protocol";
+import type { Envelope, LiveEvent, SliceKind, SliceMap } from "@vibevalley/protocol";
 
-/** Each kind's payload, as the server pushes it. */
-export interface SliceMap {
-  readonly board: BoardSlice;
-  readonly sessions: SessionsSlice;
-  readonly collab: CollabSlice;
-  readonly inbox: InboxSlice;
-  readonly ops: OpsSlice;
-  readonly farm: FarmFrame;
-}
-
-/** VibeValley's response envelope, `{ bizCode, message, data?, error? }`. */
-export interface Envelope {
-  readonly bizCode: number;
-  readonly message: string;
-  readonly data?: unknown;
-  readonly error?: unknown;
-}
+export type { Envelope, SliceMap };
 
 export interface Transport {
   /** `op` as VibeValley names it: `issue.status.update`. */

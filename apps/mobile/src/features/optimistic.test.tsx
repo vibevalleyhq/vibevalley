@@ -674,3 +674,50 @@ test("ChannelsTab switches channels cleanly in dual-pane and updates rendered me
   expect(app.texts()).toContain("Mobile channel message");
   expect(app.count("id:channel-message-msg-1")).toBe(0);
 });
+
+test("IssuesTab renders only server-provided moves and omits quick transitions when moves is empty", async () => {
+  const board = {
+    seq: 5,
+    issues: [
+      sampleBoardSlice.issues[0],
+      {
+        ...sampleBoardSlice.issues[0],
+        id: "issue-no-moves",
+        number: 103,
+        title: "Locked status issue",
+        moves: [],
+      },
+    ],
+  };
+
+  const app = await open("../../App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: harnessStorage(),
+    network: {
+      [`GET ${BASE}/api/v1/slice/inbox`]: sseResponse([{ id: "1", data: sampleInboxSlice }]),
+      [`GET ${BASE}/api/v1/slice/collab`]: sseResponse([{ id: "2", data: sampleCollabSlice }]),
+      [`GET ${BASE}/api/v1/slice/sessions`]: sseResponse([{ id: "3", data: sampleSessionsSlice }]),
+      [`GET ${BASE}/api/v1/slice/board`]: sseResponse([{ id: "5", data: board }]),
+    },
+  });
+
+  await app.press("id:tab-issues");
+  await app.waitFor("id:issue-row-issue-1");
+  await app.press("id:issue-row-issue-1");
+  await app.waitFor("id:issue-move-todo");
+  expect(app.count("id:issue-move-todo")).toBe(1);
+  expect(app.count("id:issue-move-done")).toBe(1);
+  expect(app.count("id:issue-move-in_progress")).toBe(0);
+
+  await app.press("id:issue-back");
+  await app.waitFor("id:issue-row-issue-no-moves");
+  await app.press("id:issue-row-issue-no-moves");
+  await app.waitFor("id:issue-detail-status");
+  expect(app.count("id:issue-move-todo")).toBe(0);
+  expect(app.count("id:issue-move-in_progress")).toBe(0);
+  expect(app.count("id:issue-move-in_review")).toBe(0);
+  expect(app.count("id:issue-move-done")).toBe(0);
+});

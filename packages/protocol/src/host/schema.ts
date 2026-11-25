@@ -210,6 +210,30 @@ export const HostMotionChoice = z.enum(T.HostMotionChoiceValues) satisfies Codec
 
 export const HostOpeningPhase = z.enum(T.HostOpeningPhaseValues) satisfies Codec<T.HostOpeningPhase>;
 
+export const DesktopConnectionMode = z.enum(T.DesktopConnectionModeValues) satisfies Codec<T.DesktopConnectionMode>;
+
+export const DesktopConnectionSource = z.enum(T.DesktopConnectionSourceValues) satisfies Codec<T.DesktopConnectionSource>;
+
+export const DesktopConnectionSnapshot = z.object({
+  activeMode: DesktopConnectionMode,
+  activeUrl: z.exactOptional(z.string()),
+  activeLabel: z.exactOptional(z.string()),
+  configuredMode: DesktopConnectionMode,
+  configuredUrl: z.exactOptional(z.string()),
+  configuredLabel: z.exactOptional(z.string()),
+  tokenHint: z.exactOptional(z.string()),
+  source: DesktopConnectionSource,
+  restartRequired: z.boolean(),
+}) satisfies Codec<T.DesktopConnectionSnapshot>;
+
+export const ConnectionSaveRequest = z.object({
+  url: z.string(),
+  token: z.exactOptional(z.string()),
+  pairCode: z.exactOptional(z.string()),
+  deviceName: z.exactOptional(z.string()),
+  label: z.exactOptional(z.string()),
+}) satisfies Codec<T.ConnectionSaveRequest>;
+
 export const HostSoundName = z.enum(T.HostSoundNameValues) satisfies Codec<T.HostSoundName>;
 
 export const HostFontPayload = z.object({

@@ -213,10 +213,26 @@ export interface ApiErrorEnvelopeShape {
   readonly error?: ApiErrorDetail;
 }
 
-/** Wire envelope for every failed JSON HTTP response: `{ bizCode, message, error? }`. */
+/** Wire envelope for failed JSON HTTP responses: `{ bizCode, message, error? }`. */
 export const ApiErrorEnvelope: z.ZodType<ApiErrorEnvelopeShape> = z.object({
   bizCode: BizErrorCodeSchema,
   message: z.string(),
+  error: z.exactOptional(ApiErrorDetailSchema),
+});
+
+/** VibeValley's response envelope: `{ bizCode, message, data?, error? }`. `bizCode` 0 is success. */
+export interface Envelope<T = unknown> {
+  readonly bizCode: number;
+  readonly message: string;
+  readonly data?: T;
+  readonly error?: ApiErrorDetail;
+}
+
+/** Shared wire envelope schema used by HTTP remote and desktop bridge transports. */
+export const EnvelopeSchema: z.ZodType<Envelope> = z.object({
+  bizCode: z.number(),
+  message: z.string(),
+  data: z.exactOptional(z.unknown()),
   error: z.exactOptional(ApiErrorDetailSchema),
 });
 
