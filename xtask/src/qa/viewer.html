@@ -629,6 +629,7 @@
           zoom: 1,
           panX: 24,
           panY: 24,
+          needsFit: true,
           panning: false,
           panStartX: 0,
           panStartY: 0,
@@ -888,6 +889,7 @@
           const positions = new Map();
           const subPositions = new Map();
 
+          let maxX = 240;
           let curY = 20;
           for (const rKey of sortedRows) {
             const rowNodes = layers.get(rKey);
@@ -922,8 +924,23 @@
                 });
               });
               curX += boxW + gapX;
+              maxX = Math.max(maxX, curX);
             }
             curY += rowMaxH + gapY;
+          }
+
+          if (state.needsFit) {
+            const rect = wrapEl.getBoundingClientRect();
+            const availW = Math.max(320, rect.width - 40);
+            const availH = Math.max(240, rect.height - 40);
+            const contentW = Math.max(240, maxX);
+            const contentH = Math.max(120, curY);
+            const fit = Math.min(1, availW / contentW, availH / contentH);
+            state.zoom = Math.max(0.35, Math.min(1, fit));
+            state.panX = Math.max(16, (rect.width - contentW * state.zoom) / 2);
+            state.panY = 20;
+            state.needsFit = false;
+            document.getElementById("btn-zoom-reset").textContent = `${Math.round(state.zoom * 100)}%`;
           }
 
           svgEl.innerHTML = "";
@@ -1007,9 +1024,10 @@
               );
             }
 
-            // Nested child boxes inside component
-            for (const sub of pos.subs) {
+            // Nested child boxes inside component (match layout cap of 8)
+            for (const sub of pos.subs.slice(0, 8)) {
               const sp = subPositions.get(sub.id);
+              if (!sp) continue;
               const subMeta = ir.nodes[sub.id];
               const subFill = subMeta?.metrics?.fill_color || "#f1f5f9";
               const subG = svgNode("g", { "data-id": sub.id, style: "cursor:pointer;" });
@@ -1062,7 +1080,7 @@
               );
             }
 
-            if ((pos.node.children || []).length > 8 && showNested) {
+            if (pos.subs.length > 8 && showNested) {
               layerTitles.appendChild(
                 svgNode(
                   "text",
@@ -1074,7 +1092,7 @@
                     fill: "#334155",
                     "pointer-events": "none",
                   },
-                  `+${pos.node.children.length - 8} more`,
+                  `+${pos.subs.length - 8} more`,
                 ),
               );
             }
@@ -1463,13 +1481,17 @@
         }
 
         async function loadState(quiet = false) {
-          if (!quiet) setStatus("Loading state…");
-          const res = await fetch("/api/state");
-          const data = await res.json();
-          state.data = data;
-          state.lastMtime = data.metrics_mtime;
-          renderAll();
-          if (!quiet) setStatus(`Loaded ${data.ir.stats.total_classes} classes, ${data.ir.stats.total_edges} edges`);
+          try {
+            if (!quiet) setStatus("Loading state…");
+            const res = await fetch("/api/state");
+            const data = await res.json();
+            state.data = data;
+            state.lastMtime = data.metrics_mtime;
+            renderAll();
+            if (!quiet) setStatus(`Loaded ${data.ir.stats.total_classes} classes, ${data.ir.stats.total_edges} edges`);
+          } catch (err) {
+            setStatus(`Render error: ${err?.message || err}`);
+          }
         }
 
         async function savePolicyPatch(patch) {

@@ -611,6 +611,10 @@ mod tests {
         let (code_html, body_html) = send_raw_http(addr, "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
         assert_eq!(code_html, 200);
         assert!(body_html.contains("VibeValley UML Viewer"));
+        assert!(
+            body_html.contains("for (const sub of pos.subs.slice(0, 8))"),
+            "viewer.html must cap nested sub-box iteration to match subPositions slice"
+        );
 
         let (code_state, body_state) = send_raw_http(addr, "GET /api/state HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
         assert_eq!(code_state, 200);
