@@ -134,6 +134,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   };
 
   const backlog = () => props.item.status === "backlog";
+  const closed = () => props.item.status === "done" || props.item.status === "canceled";
   const drafting = () => props.item.refining;
   const refined = () => isRefined(props.item);
   const questions = () => props.item.questions;
@@ -318,7 +319,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         </View>
         {talk()}
       </If>
-      <IssueAttachments files={d().attachments} editable busy={busy()} onAdd={addAttachment} onRemove={removeAttachment} />
+      <IssueAttachments files={d().attachments} editable={!closed()} busy={busy()} onAdd={addAttachment} onRemove={removeAttachment} />
       <IssueThread issue={props.item.id} />
       <IssueArtifacts issue={props.item.id} heading={<SheetLabel>{t("web.artifact.issue.title")}</SheetLabel>} />
     </>
@@ -329,8 +330,12 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <SheetLabel first>{t("web.issue.detail.properties")}</SheetLabel>
       <Property label={t("web.issue.todo.status")}>
         <View class="flex-row items-center gap-2">
-          <View class={`h-2 w-2 rounded-full ${backlog() ? "bg-wheat" : "bg-water"}`} />
-          <Text class="text-sm text-ink">{backlog() ? t("web.issue.todo.draftStatus") : t("web.issue.todo.todoStatus")}</Text>
+          <View
+            class={`h-2 w-2 rounded-full ${props.item.status === "done" ? "bg-leaf" : props.item.status === "canceled" ? "bg-faint" : backlog() ? "bg-wheat" : "bg-water"}`}
+          />
+          <Text class="text-sm text-ink">
+            {closed() ? t(`shared.status.${props.item.status}`) : backlog() ? t("web.issue.todo.draftStatus") : t("web.issue.todo.todoStatus")}
+          </Text>
         </View>
       </Property>
       <Property label={t("web.issue.detail.helper")}>

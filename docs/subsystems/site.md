@@ -9,7 +9,7 @@
 | 管 | 不管（谁管） |
 |---|---|
 | 双语落地页、404、分享元信息、站点地图与 Cloudflare 发布 | 应用内的首页场景（[客户端](docs/subsystems/app.md)） |
-| 构建时转换 WebP、裁剪像素字体、生成分享图 | 原始贴图的生成与切分（[工程流程](docs/subsystems/process.md#怎么走)） |
+| 构建时转换 WebP 英雄图与截图、生成分享图 | 原始 Papertrails 素材的生成与同步（[工程流程](docs/subsystems/process.md#怎么走)） |
 | 展示数字与其源码出处 | 农场内的业务与游戏规则（各自子系统） |
 
 包命令、测试入口和演讲稿归档见 [apps/site/README.md](apps/site/README.md)。
@@ -22,7 +22,7 @@
 | `apps/site/scripts/build.ts`、`prerender.ts` | 构建客户端和临时服务端，调用页面处理函数，写出 HTML 与站点地图 |
 | `apps/site/src/Document.tsx`、`App.tsx`、`sections/` | 文档、路由选择与页面区块 |
 | `apps/site/src/ui/` | 滚动、可见性、进入退出、图片展开和订阅清理 |
-| `apps/site/scripts/images.ts`、`prepare.ts`、`card.ts` | 转图、字体子集、图标和分享卡片 |
+| `apps/site/scripts/images.ts`、`prepare.ts`、`card.ts` | 转图、图标复制与 Papertrails 分享卡片 |
 | `apps/site/src/base/`、`i18n/` | 场景与叙事规则、展示数字、双语文案和生成的图片清单 |
 | `apps/site/wrangler.jsonc`、`public/_headers` | 静态部署与响应头 |
 
@@ -39,21 +39,21 @@
 
 ## 怎么走
 
-1. `prepare.ts` 调图片转换、字体裁剪和分享图生成。
+1. `prepare.ts` 调图片转换、复制应用图标并生成分享图。
 2. Vite 编译同一份 Solid 文档与页面，输出客户端资源和构建用的服务端处理函数。
 3. `prerender.ts` 请求三条路由，验证全部响应，再写静态 HTML；`build.ts` 补站点地图。
 4. `wrangler` 只发布客户端目录；不存在的地址返回 404 页面和 404 状态。
 
 ## 和谁打交道
 
-- **主应用素材**：只读 `assets/` 的贴图、精灵清单和字体，以及 `docs/images/` 的截图。缺少输入就使构建失败。
+- **主应用素材**：只读 `assets/{site,icons,avatars,engines}/` 的 Papertrails 产物以及 `docs/images/` 的截图。缺少输入就使构建失败。
 - **根工具链**：官网与应用、库共用 workspace、catalog、锁文件和类型检查，不另装一套依赖。
 
 ## 为什么这样
 
 - **静态生成加单根接管**：保留无脚本内容、SEO 和首屏 CSS，又让 Solid 2 在同一文档中一次性保留服务端节点。屏幕内外不拆接管根，避免后来的根退回客户端重建。
 - **使用 Vite 插件的公开入口**：生成器只调用公开的请求处理函数，不改框架的接管全局量，不引入 SolidStart 或私有运行时。
-- **构建时转图和裁字**：压缩官网副本而不改原图；分享图的字形转成路径，不依赖构建机字体。
+- **构建时转图与生成分享卡**：压缩官网副本而不改原图，并复用同步的 Papertrails 英雄图、瓷砖与明信片底图。
 
 ## 怎么验证
 

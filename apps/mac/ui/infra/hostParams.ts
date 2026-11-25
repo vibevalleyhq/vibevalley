@@ -14,7 +14,7 @@ export interface HostParams {
   readonly motion?: MotionChoiceType | undefined;
   readonly route?: string | undefined;
   readonly role?: string | undefined;
-  readonly pixelDir?: string | undefined;
+  readonly assetsDir?: string | undefined;
   readonly globalShell: boolean;
   readonly connectionMode?: HostConnectionMode | undefined;
 }
@@ -64,7 +64,7 @@ const hostParamsSchema = z.object({
   motion: motionSchema,
   route: optString,
   role: optString,
-  pixelDir: optString,
+  assetsDir: optString,
   globalShell: z.boolean().catch(false),
   connectionMode: connectionModeSchema,
 });

@@ -44,5 +44,31 @@
   },
   "files": {
     "missingInWorktree": "This file is unavailable in the issue worktree: {path}"
+  },
+  "startup": {
+    "titleSchema": "Database Schema Mismatch",
+    "titleFailed": "VibeValley Failed to Start",
+    "titleLogs": "Startup Logs",
+    "subtitle": "{channel} · v{version}",
+    "schemaSummary": "The database at {path} does not match this build's schema, or comes from an older build without migration tracking.",
+    "schemaSummaryNoPath": "The database does not match this build's schema, or comes from an older build without migration tracking.",
+    "genericSummary": "Startup failed: {summary}",
+    "slowHint": "Still starting the local server…",
+    "viewLogs": "View Startup Logs",
+    "detailHeading": "Diagnostic Details",
+    "logsHeading": "Recent Logs",
+    "emptyLogs": "No log lines captured yet.",
+    "logFileLabel": "Log file: {path}",
+    "copyReport": "Copy Diagnostics",
+    "copied": "Copied",
+    "openFolder": "Open Data Folder",
+    "backupReset": "Backup & Reset Database",
+    "backupConfirm": "Confirm Backup & Restart",
+    "backupBusy": "Backing up…",
+    "backupDoneManual": "Backed up the old database to {path}. Please relaunch the app to recreate a clean database.",
+    "backupFailed": "Backup failed: {error}",
+    "refreshLogs": "Refresh",
+    "closeLogs": "Close",
+    "quit": "Quit"
   }
 }

@@ -24,23 +24,23 @@ impl Shell {
             }
             Action::GlobalRoute { path } => {
                 let next_native = path == "/workspace";
-                let had_pixel = self.chrome.native_pixel.is_some();
+                let had_diorama = self.chrome.native_diorama.is_some();
                 let route_changed = self.chrome.last_route.as_deref() != Some(path.as_str());
                 let native_changed = self.chrome.native_workspace != next_native;
                 self.chrome.native_workspace = next_native;
                 if self.chrome.native_workspace {
                     self.with_workspace_project(window, cx, |_, _, _, _| {});
                 }
-                if !path.starts_with("/farm") && path != "/tree" && path != "/map" {
-                    self.chrome.native_pixel = None;
+                if !path.starts_with("/farm") {
+                    self.chrome.native_diorama = None;
                 }
-                let pixel_changed = had_pixel != self.chrome.native_pixel.is_some();
+                let diorama_changed = had_diorama != self.chrome.native_diorama.is_some();
                 self.sync_devtools_route(&path);
                 if route_changed {
                     self.chrome.last_route = Some(path);
                     self.save_settings(cx);
                 }
-                if route_changed || native_changed || pixel_changed {
+                if route_changed || native_changed || diorama_changed {
                     self.publish_host_debug(cx);
                     cx.notify();
                 }
@@ -116,10 +116,10 @@ impl Shell {
             Action::OpenFile { path } => self.open_file(PathBuf::from(path), None, window, cx),
             Action::OpenFarm { repo } => {
                 let props = if repo.is_empty() { json!({}) } else { json!({ "repo": repo }) };
-                self.show_pixel("farm", props, window, cx)
+                self.show_diorama("farm", props, window, cx)
             }
-            Action::OpenRepoMap => self.show_pixel("map", json!({}), window, cx),
-            Action::OpenTree => self.show_pixel("tree", json!({}), window, cx),
+            Action::OpenRepoMap => self.navigate_workbench("/repos", cx),
+            Action::OpenTree => self.navigate_workbench("/settings/memory", cx),
             Action::OpenDiff { path, staged } => {
                 let spec = if staged {
                     vibevalley_workspace::DiffSpec::Staged
@@ -192,13 +192,13 @@ impl Shell {
         }
     }
 
-    /// A pixel scene's ask: a VibeValley page (the hosted `vv` view, given
-    /// the route) or a terminal.
-    pub fn on_pixel_event(&mut self, event: crate::pixel::view::PixelEvent, window: &mut Window, cx: &mut Context<Self>) {
+    /// Handles events emitted by a [`crate::diorama::DioramaView`] (sound cues,
+    /// bridge host calls, workbench routes, and worktree terminals).
+    pub fn on_diorama_event(&mut self, event: crate::diorama::DioramaEvent, window: &mut Window, cx: &mut Context<Self>) {
         match event {
-            crate::pixel::view::PixelEvent::Sound(name) => self.chrome.workbench.read(cx).play_farm_sound(name, cx),
-            crate::pixel::view::PixelEvent::HostCall { op, reply } => self.host_call(op, reply, window, cx),
-            crate::pixel::view::PixelEvent::Route(route) => self.open_pane(
+            crate::diorama::DioramaEvent::Sound(name) => self.chrome.workbench.read(cx).play_farm_sound(name, cx),
+            crate::diorama::DioramaEvent::HostCall { op, reply } => self.host_call(op, reply, window, cx),
+            crate::diorama::DioramaEvent::Route(route) => self.open_pane(
                 PaneKind::Hosted {
                     module: "vv".into(),
                     props: json!({ "route": route }),
@@ -206,8 +206,7 @@ impl Shell {
                 window,
                 cx,
             ),
-            crate::pixel::view::PixelEvent::Pixel { scene, props } => self.open_pane(PaneKind::Pixel { scene, props }, window, cx),
-            crate::pixel::view::PixelEvent::Terminal { cwd, title } => {
+            crate::diorama::DioramaEvent::Terminal { cwd, title } => {
                 self.open_terminal_at(PathBuf::from(cwd), Some(title), None, window, cx, |_| {});
             }
         }
@@ -341,7 +340,7 @@ impl Shell {
             }
             HostOp::Opening(state) => {
                 if let Some(opening) = &self.overlays.launch {
-                    let phase = crate::serving::opening_pixel_phase(state.phase);
+                    let phase = crate::serving::opening_phase(state.phase);
                     opening.update(cx, |view, _| view.set_phase(phase, (state.progress as f32).clamp(0.0, 100.0)));
                 }
                 self.overlays.opening = Some(serde_json::to_value(&state).unwrap_or(Value::Null));
@@ -579,18 +578,18 @@ impl Shell {
                 });
                 return;
             }
-            // VibeValley's built pixel art: sprites.json and its PNGs.
-            HostOp::PixelDir => {
+            // VibeValley's processed Papertrails assets directory (`avatars/`, `engines/`, `brand/`, ...).
+            HostOp::AssetsDir => {
                 Self::bg(
                     cx,
                     || {
-                        let dir = crate::pixel::assets_dir().join("pixel");
-                        dir.join("sprites.json").is_file().then_some(dir)
+                        let dir = crate::assets::assets_dir();
+                        dir.is_dir().then_some(dir)
                     },
                     move |_, found, _| {
                         reply.send(match found {
                             Some(dir) => Envelope::ok(json!({ "path": dir })),
-                            None => refusal(BizCode::NotFound, "the pixel art is not installed"),
+                            None => refusal(BizCode::NotFound, "the assets directory is not installed"),
                         });
                     },
                 );
@@ -648,7 +647,7 @@ impl Shell {
                 );
                 return;
             }
-            stateless @ (HostOp::PixelManifest | HostOp::Sha256(_) | HostOp::RandomBytes(_) | HostOp::Qr(_)) => {
+            stateless @ (HostOp::Sha256(_) | HostOp::RandomBytes(_) | HostOp::Qr(_)) => {
                 crate::host::handle_stateless_op(&stateless).expect("stateless HostOp handled")
             }
         };
@@ -698,7 +697,7 @@ fn host_info_payload(settings: &crate::theme::Settings, fonts: &[String]) -> Val
         "uiFontSize": settings.ui_font_size,
         "theme": settings.theme.as_str(),
         "motion": settings.effective_motion().as_str(),
-        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet"],
+        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "assetsDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet"],
     })
 }
 

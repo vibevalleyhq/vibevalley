@@ -175,7 +175,6 @@ pub(super) fn shell_palette_commands() -> Vec<HostPaletteItem> {
         cmd("nav.team", "前往团队", "/agents", "导航", None),
         cmd("nav.runtimes", "前往引擎", "/runtimes", "导航", None),
         cmd("nav.repos", "前往仓库", "/repos", "导航", None),
-        cmd("nav.catalog", "前往素材图鉴", "/catalog", "导航", None),
         cmd("nav.farm", "前往农场", "/farm", "导航", None),
         cmd("nav.settings", "前往设置", "/settings", "导航", Some("mod+,")),
         cmd("theme.dark", "切换主题：深色", "dark", "外观", None),

@@ -361,7 +361,7 @@ describe("what a rule says", () => {
 
   it("names the catalog the file's words belong in", () => {
     expect(catalogOf("/repo/apps/mac/ui/features/issue/views/Board.tsx")).toBe("web.issue");
-    expect(catalogOf("/repo/apps/mac/ui/design/pixel/Toast.tsx")).toBe("web.ui.pixel");
+    expect(catalogOf("/repo/apps/mac/ui/farm/phone/Panel.tsx")).toBe("web.farm.phone");
     expect(catalogOf("/repo/apps/mac/ui/design/Button.tsx")).toBe("web");
     expect(catalogOf("/repo/apps/mac/ui/app/Shell.tsx")).toBe("web");
     expect(catalogOf("/repo/apps/mac/ui/workspace/Sidebar.tsx")).toBe("web.shell");

@@ -1043,10 +1043,8 @@ pub enum HostOp {
     StopAudio,
     #[serde(rename = "host.readFile")]
     ReadFile(HostReadFilePayload),
-    #[serde(rename = "host.pixelDir")]
-    PixelDir,
-    #[serde(rename = "host.pixelManifest")]
-    PixelManifest,
+    #[serde(rename = "host.assetsDir")]
+    AssetsDir,
     #[serde(rename = "host.sha256")]
     Sha256(HostSha256Payload),
     #[serde(rename = "host.randomBytes")]
@@ -1100,8 +1098,7 @@ impl HostOp {
         "host.pcmAppend",
         "host.stopAudio",
         "host.readFile",
-        "host.pixelDir",
-        "host.pixelManifest",
+        "host.assetsDir",
         "host.sha256",
         "host.randomBytes",
         "host.qr",
@@ -1152,8 +1149,7 @@ impl HostOp {
             HostOp::PcmAppend(_) => "host.pcmAppend",
             HostOp::StopAudio => "host.stopAudio",
             HostOp::ReadFile(_) => "host.readFile",
-            HostOp::PixelDir => "host.pixelDir",
-            HostOp::PixelManifest => "host.pixelManifest",
+            HostOp::AssetsDir => "host.assetsDir",
             HostOp::Sha256(_) => "host.sha256",
             HostOp::RandomBytes(_) => "host.randomBytes",
             HostOp::Qr(_) => "host.qr",
@@ -1239,8 +1235,7 @@ impl HostOp {
             "host.pcmAppend" => serde_json::from_value(payload).map(HostOp::PcmAppend).map_err(|e| format!("pcmAppend: {e}")),
             "host.stopAudio" => expect_empty(&payload).map(|()| HostOp::StopAudio),
             "host.readFile" => serde_json::from_value(payload).map(HostOp::ReadFile).map_err(|e| format!("readFile: {e}")),
-            "host.pixelDir" => expect_empty(&payload).map(|()| HostOp::PixelDir),
-            "host.pixelManifest" => expect_empty(&payload).map(|()| HostOp::PixelManifest),
+            "host.assetsDir" => expect_empty(&payload).map(|()| HostOp::AssetsDir),
             "host.sha256" => serde_json::from_value(payload).map(HostOp::Sha256).map_err(|e| format!("sha256: {e}")),
             "host.randomBytes" => serde_json::from_value(payload)
                 .map(HostOp::RandomBytes)
@@ -1481,8 +1476,7 @@ mod tests {
                 json!({ "path": "/tmp/note.txt" }),
                 HostOp::ReadFile(HostReadFilePayload { path: "/tmp/note.txt".into() }),
             ),
-            ("host.pixelDir", json!({}), HostOp::PixelDir),
-            ("host.pixelManifest", json!({}), HostOp::PixelManifest),
+            ("host.assetsDir", json!({}), HostOp::AssetsDir),
             (
                 "host.sha256",
                 json!({ "text": "abc" }),
@@ -1543,7 +1537,10 @@ mod tests {
     #[test]
     fn host_op_from_wire_rejects_unknown_ops_and_malformed_payloads() {
         assert!(!HostOp::is_known_op("host.unknown"));
+        assert!(!HostOp::is_known_op("host.pixelDir"));
+        assert!(!HostOp::is_known_op("host.pixelManifest"));
         assert_eq!(HostOp::from_wire("host.unknown", json!({})).unwrap_err(), "the host has no op host.unknown");
+        assert!(HostOp::from_wire("host.assetsDir", json!({ "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.info", json!({ "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.locale", json!("fr")).is_err());
         assert!(HostOp::from_wire("host.theme", json!("sepia")).is_err());

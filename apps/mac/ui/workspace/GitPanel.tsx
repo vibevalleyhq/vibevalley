@@ -34,7 +34,7 @@ const autoDirection: TextStyle = { writingDirection: "auto" };
 export type GitRow = { path: string; code: string; tone: string };
 export type GitWorktree = {
   path: string;
-  branch: string | null;
+  branch?: string | null;
   main: boolean;
   locked: boolean;
   current?: boolean;
@@ -56,7 +56,7 @@ export type GitFrame = {
   staged?: GitRow[];
   changes?: GitRow[];
   conflicts?: GitRow[];
-  branches?: { name: string; head: boolean; upstream: string | null }[];
+  branches?: { name: string; head: boolean; upstream?: string | null }[];
   worktrees?: GitWorktree[];
   log?: { id: string; short: string; summary: string; author: string; time: number }[];
 };
@@ -64,7 +64,7 @@ export type GitFrame = {
 const gitRowSchema = z.object({ path: z.string(), code: z.string(), tone: z.string() });
 const gitWorktreeSchema = z.object({
   path: z.string(),
-  branch: z.string().nullable(),
+  branch: z.exactOptional(z.string().nullable()),
   main: z.boolean(),
   locked: z.boolean(),
   current: z.exactOptional(z.boolean()),
@@ -87,7 +87,7 @@ export const gitFrameSchema: z.ZodType<GitFrame> = z.object({
   staged: z.exactOptional(z.array(gitRowSchema)),
   changes: z.exactOptional(z.array(gitRowSchema)),
   conflicts: z.exactOptional(z.array(gitRowSchema)),
-  branches: z.exactOptional(z.array(z.object({ name: z.string(), head: z.boolean(), upstream: z.string().nullable() }))),
+  branches: z.exactOptional(z.array(z.object({ name: z.string(), head: z.boolean(), upstream: z.exactOptional(z.string().nullable()) }))),
   worktrees: z.exactOptional(z.array(gitWorktreeSchema)),
   log: z.exactOptional(z.array(z.object({ id: z.string(), short: z.string(), summary: z.string(), author: z.string(), time: z.number() }))),
 });

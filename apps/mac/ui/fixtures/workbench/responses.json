@@ -3289,8 +3289,8 @@
     "fading": false
   },
   "memory.delete": null,
-  "host.pixelDir": {
-    "path": "/Users/lucasay/.gemini/antigravity-cli/worktrees/eecf84d4-ca91-4328-8eea-8a493d9fd003/swarm-art-ui-e24e3144-vibevalley/assets/pixel"
+  "host.assetsDir": {
+    "path": "/Users/lucasay/orca/projects/vibevalley/assets"
   },
   "host.playSound": null,
   "artifact.list": [

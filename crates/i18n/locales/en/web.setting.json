@@ -63,7 +63,7 @@
     "voice": "call phone recognition speech MOSS live realtime vision transcription",
     "connections": "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
     "remote": "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
-    "about": "version home folder settings data catalog"
+    "about": "version home folder settings data"
   },
   "scope": {
     "farm": "For all of VibeValley",
@@ -123,10 +123,6 @@
     "copy": "Copy the path",
     "copied": "Path copied",
     "reveal": "Show in Finder",
-    "devTools": "Developer tools",
-    "catalog": "Asset catalog",
-    "catalogHint": "Inspect sprites, cursors, sounds, and workbench UI components",
-    "openCatalog": "Open catalog",
     "update": "Updates",
     "updateHint": "The desktop app updates itself from the releases on GitHub",
     "upToDate": "Up to date",

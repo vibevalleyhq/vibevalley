@@ -5,7 +5,8 @@ import { setLocale, t } from "@vibevalley/i18n";
 import type { Changes, Issue, IssueAct, RepoTemplates } from "@vibevalley/protocol";
 
 import { TextArea } from "../design/Field";
-import { SpriteIcon } from "../design/pixel/icons";
+import { Icon } from "../design/Icon";
+import type { IconName } from "../design/icons";
 import { actionOf, perform } from "../features/issue/model/acts";
 import { approveShownChanges } from "../features/issue/model/changes";
 import { useIssueChanges } from "../features/issue/model/history";
@@ -22,8 +23,8 @@ const close = () => host.post("action", { type: "dismiss_farm_form" });
 const route = (path: string) => host.post("action", { type: "global_route", path });
 
 function Words(props: { children: JSX.Element; size?: 16 | 18 }) {
-  const sizeClass = props.size === 18 ? "text-[18px]" : props.size === 16 ? "text-lg" : "text-sm";
-  return <Text class={`font-pixel text-bark-800 ${sizeClass}`}>{props.children}</Text>;
+  const sizeClass = props.size === 18 ? "text-lg font-semibold" : props.size === 16 ? "text-base font-medium" : "text-sm";
+  return <Text class={`font-sans text-bark-800 ${sizeClass}`}>{props.children}</Text>;
 }
 
 function Key(props: { title: string; primary?: boolean; disabled?: boolean; id?: string; onPress: () => void }) {
@@ -45,16 +46,22 @@ function Buttons(props: { children: JSX.Element }) {
   return <View class="flex-row flex-wrap items-center gap-1.5">{props.children}</View>;
 }
 
-function Shell(props: { title: string; icon: string; children: JSX.Element }) {
+function Shell(props: { title: string; icon: IconName; children: JSX.Element }) {
   return (
     <View class="flex-1 gap-3 border-2 border-bark-900 bg-cream-50 p-4">
       <View class="flex-row items-center gap-[7px]">
-        <SpriteIcon name={props.icon} size={24} />
+        <Icon name={props.icon} size={20} tone="bark" />
         <View class="flex-1">
           <Words size={18}>{props.title}</Words>
         </View>
-        <View role="button" testID="farm-close" accessibilityLabel={t("web.farm.native.close")} onPress={close}>
-          <SpriteIcon name="button-close" size={18} />
+        <View
+          role="button"
+          testID="farm-close"
+          accessibilityLabel={t("web.farm.native.close")}
+          onPress={close}
+          class="size-6 items-center justify-center rounded-sm hover:bg-cream-200"
+        >
+          <Icon name="close" size={16} tone="bark" />
         </View>
       </View>
       <Scroll class="flex-1" contentClass="gap-2 pb-2">
@@ -119,7 +126,7 @@ function Sow() {
     }
   };
   return (
-    <Shell title={t("web.farm.panel.sow", { plot: station + 1 })} icon="icon-seeds">
+    <Shell title={t("web.farm.panel.sow", { plot: station + 1 })} icon="add">
       <If when={editsKept()}>
         <Words>{t("web.issue.new.editsKept")}</Words>
       </If>
@@ -129,9 +136,7 @@ function Sow() {
           <>
             <Words>{t("web.farm.sow.homeless")}</Words>
             <Words>{ready(repos, []).length > 0 ? t("web.farm.sow.toMap") : t("web.farm.sow.noRepos")}</Words>
-            <If when={ready(repos, []).length > 0} else={<Key title={t("web.farm.sow.makeRepo")} onPress={() => route("/repos")} />}>
-              <Key title={t("web.farm.native.map")} onPress={() => route("/map")} />
-            </If>
+            <Key title={ready(repos, []).length > 0 ? t("web.farm.menu.repos") : t("web.farm.sow.makeRepo")} onPress={() => route("/repos")} />
           </>
         }
       >
@@ -235,7 +240,7 @@ function Work(props: { kind: string; issue: () => Issue }) {
             ? t("web.farm.panel.harvest", { name: name() })
             : t("web.farm.plotOf", { name: name() })
       }
-      icon={props.kind === "water" ? "icon-water" : props.kind === "harvest" ? "icon-harvest" : "icon-hand"}
+      icon={props.kind === "water" ? "chat" : props.kind === "harvest" ? "check" : "info"}
     >
       <Words size={16}>
         #{props.issue().number} {props.issue().title}
@@ -332,7 +337,7 @@ function Content() {
     <If
       when={issue()}
       else={
-        <Shell title={t("web.farm.menu.issues")} icon="icon-tasks">
+        <Shell title={t("web.farm.menu.issues")} icon="issues">
           <Words>{t("web.farm.water.moved")}</Words>
         </Shell>
       }

@@ -27,7 +27,6 @@ import {
 } from "../model/cards";
 import { laneOrder, type Ordering } from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
-import { emptyLaneGuide } from "../model/onboarding";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
 /** Under the closed ones: how many older are folded away, or back to the recent ones. */
@@ -52,6 +51,43 @@ const emptyText: Record<Lane, string> = {
   working: t("web.issue.board.empty.working"),
   waiting: t("web.issue.board.empty.waiting"),
   closed: t("web.issue.board.empty.closed"),
+};
+
+interface EmptyLaneGuide {
+  readonly icon: IconName;
+  readonly titleKey:
+    | "web.issue.board.emptyGuide.todoTitle"
+    | "web.issue.board.emptyGuide.workingTitle"
+    | "web.issue.board.emptyGuide.waitingTitle"
+    | "web.issue.board.emptyGuide.closedTitle";
+  readonly bodyKey:
+    | "web.issue.board.emptyGuide.todoBody"
+    | "web.issue.board.emptyGuide.workingBody"
+    | "web.issue.board.emptyGuide.waitingBody"
+    | "web.issue.board.emptyGuide.closedBody";
+}
+
+const emptyLaneGuide: Record<Lane, EmptyLaneGuide> = {
+  todo: {
+    icon: "add",
+    titleKey: "web.issue.board.emptyGuide.todoTitle",
+    bodyKey: "web.issue.board.emptyGuide.todoBody",
+  },
+  working: {
+    icon: "play",
+    titleKey: "web.issue.board.emptyGuide.workingTitle",
+    bodyKey: "web.issue.board.emptyGuide.workingBody",
+  },
+  waiting: {
+    icon: "diff",
+    titleKey: "web.issue.board.emptyGuide.waitingTitle",
+    bodyKey: "web.issue.board.emptyGuide.waitingBody",
+  },
+  closed: {
+    icon: "check",
+    titleKey: "web.issue.board.emptyGuide.closedTitle",
+    bodyKey: "web.issue.board.emptyGuide.closedBody",
+  },
 };
 
 export interface BoardProps {

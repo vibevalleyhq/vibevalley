@@ -18,8 +18,16 @@
   "channelsTitle": "频道",
   "directsTitle": "私聊",
   "newChannel": "创建频道",
-  "helpers": "执行会话",
-  "noHelpers": "没有在场的执行会话",
+  "newChat": "发起聊天",
+  "filter": {
+    "label": "筛选会话",
+    "all": "全部",
+    "group": "频道",
+    "direct": "私聊"
+  },
+  "emptyPreview": "暂无消息",
+  "emptyList": "这里还没有对话",
+  "runsEntry": "查看执行会话",
   "mood": {
     "idle": "在歇着",
     "listening": "在听",
@@ -165,8 +173,7 @@
     "removeWill": "删除以后：",
     "archivedTitle": "已归档",
     "muted": "不提醒",
-    "mentionsOnly": "只 @",
-    "drag": "拖到另一个频道上，排在它前面"
+    "mentionsOnly": "只 @"
   },
   "threadList": {
     "title": "这个频道的话题",
@@ -201,7 +208,6 @@
     "failed": "没搜成：{why}"
   },
   "direct": {
-    "add": "开一个私聊",
     "pick": "和谁私聊",
     "none": "还没有角色",
     "open": "和{name}私聊"
@@ -281,6 +287,5 @@
     }
   },
   "lacks": "回不了话：{why}",
-  "lacksFix": "去设置",
-  "orchestratorRuns": "查看主助手轨迹与待审批调用"
+  "lacksFix": "去设置"
 }

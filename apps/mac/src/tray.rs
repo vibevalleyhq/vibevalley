@@ -59,14 +59,14 @@ struct InstalledTray {
 
 thread_local! { static TRAY: RefCell<Option<InstalledTray>> = const { RefCell::new(None) }; }
 
-const FALLBACK_ICON_REL: &str = "pixel/app-sprout.png";
+const FALLBACK_ICON_REL: &str = "brand/tray-release.png";
 
 const fn channel_icon_rel(channel: ReleaseChannel) -> &'static str {
     match channel {
         ReleaseChannel::Release => FALLBACK_ICON_REL,
-        ReleaseChannel::Beta => "pixel/app-sprout-beta.png",
-        ReleaseChannel::Alpha => "pixel/app-sprout-alpha.png",
-        ReleaseChannel::Dev => "pixel/app-sprout-dev.png",
+        ReleaseChannel::Beta => "brand/tray-beta.png",
+        ReleaseChannel::Alpha => "brand/tray-alpha.png",
+        ReleaseChannel::Dev => "brand/tray-dev.png",
     }
 }
 
@@ -127,7 +127,7 @@ pub fn install(cx: &mut App) {
     .detach();
     let item = NSStatusBar::systemStatusBar().statusItemWithLength(-1.0);
     if let Some(button) = item.button(mtm) {
-        let image = tray_icon_candidates(&crate::pixel::assets_dir(), channel)
+        let image = tray_icon_candidates(&crate::assets::assets_dir(), channel)
             .into_iter()
             .filter(|path| path.is_file())
             .find_map(|path| NSImage::initWithContentsOfFile(NSImage::alloc(), &NSString::from_str(&path.to_string_lossy())));
@@ -204,31 +204,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tray_icon_candidates_pick_channel_sprite_with_sprout_fallback() {
+    fn tray_icon_candidates_pick_channel_brand_icon_with_release_fallback() {
         let assets = Path::new("/repo/assets");
         assert_eq!(
             tray_icon_candidates(assets, ReleaseChannel::Release),
-            vec![PathBuf::from("/repo/assets/pixel/app-sprout.png")]
+            vec![PathBuf::from("/repo/assets/brand/tray-release.png")]
         );
         assert_eq!(
             tray_icon_candidates(assets, ReleaseChannel::Beta),
             vec![
-                PathBuf::from("/repo/assets/pixel/app-sprout-beta.png"),
-                PathBuf::from("/repo/assets/pixel/app-sprout.png"),
+                PathBuf::from("/repo/assets/brand/tray-beta.png"),
+                PathBuf::from("/repo/assets/brand/tray-release.png"),
             ]
         );
         assert_eq!(
             tray_icon_candidates(assets, ReleaseChannel::Alpha),
             vec![
-                PathBuf::from("/repo/assets/pixel/app-sprout-alpha.png"),
-                PathBuf::from("/repo/assets/pixel/app-sprout.png"),
+                PathBuf::from("/repo/assets/brand/tray-alpha.png"),
+                PathBuf::from("/repo/assets/brand/tray-release.png"),
             ]
         );
         assert_eq!(
             tray_icon_candidates(assets, ReleaseChannel::Dev),
             vec![
-                PathBuf::from("/repo/assets/pixel/app-sprout-dev.png"),
-                PathBuf::from("/repo/assets/pixel/app-sprout.png"),
+                PathBuf::from("/repo/assets/brand/tray-dev.png"),
+                PathBuf::from("/repo/assets/brand/tray-release.png"),
             ]
         );
     }

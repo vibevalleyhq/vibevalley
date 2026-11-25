@@ -170,6 +170,10 @@ pub fn plist_bundle_id(xml: &str) -> Option<&str> {
     plist_string(xml, "CFBundleIdentifier").filter(|id| !id.is_empty())
 }
 
+pub fn plist_update_feed(xml: &str) -> Option<&str> {
+    plist_string(xml, "VibeValleyUpdateFeed").filter(|feed| !feed.is_empty())
+}
+
 pub fn is_channel_bundle_id(id: &str) -> bool {
     CHANNEL_BUNDLE_IDS.contains(&id)
 }
@@ -200,8 +204,14 @@ pub fn beside(feed: &str, file: &str) -> Option<String> {
     if file.is_empty() || !file.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b)) || file.contains("..") {
         return None;
     }
+    if feed.starts_with("file://") && !feed.starts_with("file:///") {
+        return None;
+    }
     let end = feed.find(['?', '#']).unwrap_or(feed.len());
     let slash = feed[..end].rfind('/')?;
+    if feed.starts_with("file:///") && slash < "file://".len() {
+        return None;
+    }
     Some(format!("{}{file}", &feed[..=slash]))
 }
 
@@ -373,6 +383,14 @@ mod tests {
     }
 
     #[test]
+    fn the_info_plists_update_feed_is_read_when_present() {
+        let xml = "<dict>\n\t<key>VibeValleyUpdateFeed</key>\n\t<string>file:///Users/dev/dist/release.json</string>\n</dict>";
+        assert_eq!(plist_update_feed(xml), Some("file:///Users/dev/dist/release.json"));
+        assert_eq!(plist_update_feed("<dict><key>VibeValleyUpdateFeed</key><string>  </string></dict>"), None);
+        assert_eq!(plist_update_feed("<dict/>"), None);
+    }
+
+    #[test]
     fn a_release_is_read_from_its_manifest_and_gives_the_build_of_an_architecture() {
         let text = r#"{"version":"0.2.0","notes":["One"],"schema":"old field","page":"https://example.test/v0.2.0",
             "builds":[{"arch":"arm64","file":"VibeValley-0.2.0-arm64.zip","size":12,"sha512":"ab"}]}"#;
@@ -407,6 +425,16 @@ mod tests {
             beside("http://127.0.0.1:9/good/release.json?x=1/2", "a.zip").as_deref(),
             Some("http://127.0.0.1:9/good/a.zip")
         );
+        assert_eq!(
+            beside("file:///abs/dist/release.json", "VibeValley-0.1.0-alpha.2-arm64.zip").as_deref(),
+            Some("file:///abs/dist/VibeValley-0.1.0-alpha.2-arm64.zip")
+        );
+        assert_eq!(
+            beside("file:///Users/a/My%20Apps/dist/release.json", "VibeValley-0.1.0-alpha.2-arm64.zip").as_deref(),
+            Some("file:///Users/a/My%20Apps/dist/VibeValley-0.1.0-alpha.2-arm64.zip")
+        );
+        assert_eq!(beside("file://host/dist/release.json", "a.zip"), None);
+        assert_eq!(beside("file:///abs/dist/release.json", "../evil.zip"), None);
         assert_eq!(beside("https://example.test/release.json", "../evil.zip"), None);
         assert_eq!(beside("https://example.test/release.json", "https://evil.test/a.zip"), None);
         assert_eq!(beside("https://example.test/release.json", ""), None);

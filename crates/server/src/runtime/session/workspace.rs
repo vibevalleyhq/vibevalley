@@ -74,7 +74,7 @@ impl Default for WorkspaceMeta {
             title: None,
             model: None,
             effort: None,
-            permission_mode: SessionPermissionMode::AcceptEdits,
+            permission_mode: SessionPermissionMode::Bypass,
         }
     }
 }
@@ -85,7 +85,7 @@ impl From<SessionConfig> for WorkspaceMeta {
             title: cfg.title,
             model: cfg.model,
             effort: cfg.effort,
-            permission_mode: cfg.permission_mode.unwrap_or(SessionPermissionMode::AcceptEdits),
+            permission_mode: cfg.permission_mode.unwrap_or(SessionPermissionMode::Bypass),
         }
     }
 }
@@ -480,7 +480,7 @@ impl SessionEngine {
             self.0.ctx.service.next_seq("session", 0).await?
         };
         let id = format!("w{number}");
-        let permission_mode = input.permission_mode.unwrap_or(SessionPermissionMode::AcceptEdits);
+        let permission_mode = input.permission_mode.unwrap_or(SessionPermissionMode::Bypass);
         let effective_effort = drive
             .effort
             .clone()
@@ -1190,10 +1190,7 @@ mod tests {
             now(),
         );
         sessions.persist_session_update_async(&session).await.unwrap();
-        assert_eq!(
-            sessions.load_workspace_meta_async("u1").await.permission_mode,
-            SessionPermissionMode::AcceptEdits
-        );
+        assert_eq!(sessions.load_workspace_meta_async("u1").await.permission_mode, SessionPermissionMode::Bypass);
 
         let meta = WorkspaceMeta {
             title: Some("Refactor".into()),

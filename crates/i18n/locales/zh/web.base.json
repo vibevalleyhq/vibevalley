@@ -33,10 +33,6 @@
       "label": "团队",
       "hint": "角色与团队模板"
     },
-    "catalog": {
-      "label": "素材图鉴",
-      "hint": "像素与界面素材：每张图、指针、声音和工作台零件"
-    },
     "settings": {
       "label": "设置",
       "hint": "通用与外观、模型与密钥、语音与通话、外部连接、关于与数据"
@@ -199,7 +195,7 @@
       "issues": "任务",
       "pictures": "看图",
       "library": "媒体库",
-      "farm": "像素农场",
+      "farm": "农场",
       "desktop": "桌面版（系统全局）"
     },
     "say": {
@@ -249,5 +245,7 @@
     "offline": "没连上 VibeValley，这一下没发出去"
   },
   "pickTooLarge": "{name} 没加上：超过 512 MiB 了",
-  "openTerminal": "在这里打开终端"
+  "openTerminal": "在这里打开终端",
+  "play": "播放",
+  "stop": "停止"
 }

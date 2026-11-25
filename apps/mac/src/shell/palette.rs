@@ -48,7 +48,7 @@ impl Shell {
         self.overlays.palette = None;
         if self.chrome.native_workspace {
             self.focus_active_pane(window, cx);
-        } else if self.chrome.native_pixel.is_some() {
+        } else if self.chrome.native_diorama.is_some() {
             window.focus(&self.focus, cx);
         } else {
             let handle = self.chrome.workbench.read(cx).focus_handle(cx);
@@ -165,7 +165,6 @@ impl Shell {
             "nav.team" | "nav.agents" => self.navigate_workbench("/agents", cx),
             "nav.runtimes" => self.navigate_workbench("/runtimes", cx),
             "nav.repos" => self.navigate_workbench("/repos", cx),
-            "nav.catalog" => self.navigate_workbench("/catalog", cx),
             "nav.farm" => self.navigate_workbench("/farm", cx),
             "nav.workspace" => {
                 self.show_workspace(cx);

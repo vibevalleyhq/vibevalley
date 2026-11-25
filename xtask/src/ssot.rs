@@ -39,15 +39,6 @@ const INTERNAL_HOST_DTO_ALLOWLIST: &[(&str, &str, &str)] = &[
         "local desktop-connection.json redacted token wrapper",
     ),
     ("apps/mac/src/hosted/connection.rs", "Mode", "local desktop-connection.json persistence enum"),
-    ("apps/mac/src/host.rs", "SpriteManifestEntry", "local assets/pixel/sprites.json manifest parser"),
-    ("apps/mac/src/pixel/level.rs", "RawFile", "LDtk level JSON file parser"),
-    ("apps/mac/src/pixel/level.rs", "RawLevel", "LDtk level JSON file parser"),
-    ("apps/mac/src/pixel/level.rs", "RawLayer", "LDtk level JSON file parser"),
-    ("apps/mac/src/pixel/level.rs", "RawEntity", "LDtk level JSON file parser"),
-    ("apps/mac/src/pixel/level.rs", "RawField", "LDtk level JSON file parser"),
-    ("apps/mac/src/pixel/atlas.rs", "RawSprite", "local sprite atlas JSON parser"),
-    ("apps/mac/src/pixel/farm/capture.rs", "Motion", "internal pixel shot-capture harness config"),
-    ("apps/mac/src/pixel/farm/islands.rs", "RepoSummary", "internal pixel farm island cache snapshot"),
     ("apps/mac/src/update/releases.rs", "Build", "external updater release.json feed schema"),
     ("apps/mac/src/update/releases.rs", "Release", "external updater release.json feed schema"),
     ("apps/mac/src/update/releases.rs", "ListedRelease", "external GitHub Releases API schema"),
@@ -2228,11 +2219,11 @@ pub struct Settings {
 "#,
         );
         dir.write(
-            "apps/mac/src/pixel/atlas.rs",
+            "apps/mac/src/update/releases.rs",
             r#"
 #[derive(Deserialize)]
-struct RawSprite {
-    w: f32,
+struct Build {
+    version: String,
 }
 "#,
         );

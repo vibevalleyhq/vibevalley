@@ -266,9 +266,7 @@ const RULES: readonly Rule[] = [
   {
     name: "the orchestrator under the manager name",
     pattern: /\b(Manager|Manager[A-Z]\w*|manager[A-Z]\w*|\w+Manager\w*)\b/u,
-    says: "Orchestrator, defaultOrchestrator, OrchestratorShape, forOrchestrator; the farm's art and map keep their manager names (manager-face, Manager)",
-    // The village map's entity is Manager (public/village.ldtk).
-    except: /^apps\/(?:web\/src|mac\/ui)\/farm\/world\/(level|world)\.ts$/u,
+    says: "Orchestrator, defaultOrchestrator, OrchestratorShape, forOrchestrator; Papertrails avatar files keep their manager-* filenames",
   },
   {
     name: "the orchestrator under the assistant name",
@@ -279,9 +277,8 @@ const RULES: readonly Rule[] = [
     name: "an issue's state in farm words",
     pattern: /收获|收成|缺肥|种植计划|活熟了|\bPhaseRipe\b|_tag (?:===|!==|:) "ripe"|"graph-ripe"|act: "harvest"|\bHarvest(?:Deps|Review)\b|\bharvesting\(/u,
     says: "the issue's own words (docs/subsystems/issue.md 状态和用语): 完成 (complete) and what it delivered (合进了主分支…), 改动, 问题 (等你回答), 计划; phase done, graph ready; farm words are for the farm's skin",
-    // The farm's skin (with the pixel pieces the skins share) and the game say it their way.
-    except:
-      /^(apps\/(?:web\/src\/(?:farm|ui\/pixel)|mac\/ui\/(?:farm|design\/pixel))\/|apps\/web\/test\/farm-|apps\/server\/src\/modules\/game\/|crates\/server\/src\/skin\/game(?:\.rs|\/))/u,
+    // The farm's skin and the game say it their way.
+    except: /^(apps\/(?:web\/src\/farm|mac\/ui\/farm)\/|apps\/web\/test\/farm-|apps\/server\/src\/modules\/game\/|crates\/server\/src\/skin\/game(?:\.rs|\/))/u,
   },
   {
     name: "a word list for an issue's or a session's state outside the protocol's rules",
@@ -311,8 +308,8 @@ const RULES: readonly Rule[] = [
       "apps/mac/ui/infra",
       "apps/mac/ui/design",
     ],
-    // What the user types in a test is the user's words; the pixel pieces are the skins' own.
-    except: /\.test\.ts$|^apps\/(?:web\/src\/ui|mac\/ui\/design)\/pixel\//u,
+    // What the user types in a test is the user's words.
+    except: /\.test\.ts$/u,
   },
   {
     name: "the repo map's farm words in the workbench",
@@ -422,7 +419,7 @@ const RULES: readonly Rule[] = [
   },
   {
     name: "the orchestrator in a local called manager",
-    // The village's manager sprite and keys are strings (yard.manager.hint, "manager-face").
+    // Papertrails orchestrator portrait filenames keep their manager-* string keys.
     pattern: /\b(?:const|let|var|function)\s+manager\b|\(manager[,:)]|(?<![."\w-])manager\??\.[a-z]/u,
     says: "orchestrator (or the profile's id): manager is only the English farm's word for 主助手",
   },

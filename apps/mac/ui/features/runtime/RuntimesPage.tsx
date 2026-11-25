@@ -522,9 +522,7 @@ function RuntimeWorkspace(props: {
   return (
     <View testID="runtime-detail" class="mx-auto w-full max-w-4xl gap-4">
       <View class="flex-row items-center gap-4 rounded-lg border border-line bg-side p-4">
-        <View class="h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-line bg-page">
-          <RuntimeIcon runtime={entry().runtimeId} size={46} />
-        </View>
+        <RuntimeIcon runtime={entry().runtimeId} size={52} />
         <View class="min-w-0 flex-1 gap-1">
           <View class="flex-row flex-wrap items-center gap-2">
             <Text role="header" class="text-lg font-semibold text-ink">

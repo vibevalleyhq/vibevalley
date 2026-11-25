@@ -49,7 +49,7 @@ fn translates_zh_and_en_across_shared_and_web_namespaces() {
         ("web.issue.family.children", "子任务", "Child issues"),
         ("web.artifact.page.delete", "删掉", "Delete"),
         ("web.setting.language.title", "语言", "Language"),
-        ("web.farm.panel.shop", "商店", "Shop"),
+        ("web.farm.hud.workbench", "工作台", "Workbench"),
     ];
 
     for (key, expected_zh, expected_en) in static_cases {
@@ -158,7 +158,7 @@ fn quickjs_native_module_calls_translate_synchronously() {
             [rich.translate("en", "web.issue.detail.noCriteria", JSON.stringify({ answer: true })), "This ticket has no criteria for done: judge by its answer when it comes back."],
             [rich.translate("en", "web.issue.detail.noCriteria", JSON.stringify({ answer: false })), "This ticket has no criteria for done: judge by its changes when it comes back."],
             // Fallbacks: unknown locale -> zh, malformed JSON -> no params, unknown key -> key
-            [rich.translate("de", "web.farm.panel.shop"), "商店"],
+            [rich.translate("de", "web.farm.hud.workbench"), "工作台"],
             [rich.translate("en", "web.artifact.page.delete", "{broken"), "Delete"],
             [rich.translate("en", "missing.key.check", JSON.stringify({ a: 1 })), "missing.key.check"],
         ];

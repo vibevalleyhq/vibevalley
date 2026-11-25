@@ -1,16 +1,16 @@
 # 工程流程
 
-管理代码库周边的工程约束：文档分层与 Agent Notes 沉淀、`docs:verify` 九项检查、Rust 的 clippy 与测试、TS 的静态门禁、验证 skill 规范，以及像素素材流水线。
+管理代码库周边的工程约束：文档分层与 Agent Notes 沉淀、`docs:verify` 检查、Rust 的 clippy 与测试、TS 的静态门禁、验证 skill 规范，以及 Papertrails 素材同步流水线。
 
 ## 管什么，不管什么
 
 | 管 | 不管（谁管） |
 |---|---|
 | 「代码 → 静态检查 → 文字 → 人审」四层防错原则 | 根目录常驻规则条文（[AGENTS.md](AGENTS.md#规矩)） |
-| 文档分层、Agent Notes 沉淀流程与 `docs:verify` 九项检查 | 文档目录规矩（[docs/AGENTS.md](docs/AGENTS.md)）与 Note 格式（[.agents/notes/README.md](.agents/notes/README.md)） |
+| 文档分层、Agent Notes 沉淀流程与 `docs:verify` 检查 | 文档目录规矩（[docs/AGENTS.md](docs/AGENTS.md)）与 Note 格式（[.agents/notes/README.md](.agents/notes/README.md)） |
 | 死代码检查与回归测试保护 | 服务端与前端业务测试（[地基](docs/subsystems/foundation.md)、[客户端](docs/subsystems/app.md)） |
 | 仓库 skill 结构（`.agents/skills/`）与验证 skill 六节规范 | 各 skill 的具体执行步骤（[.agents/skills/README.md](.agents/skills/README.md)） |
-| 像素素材生成（`design/pixel/gen.sh`）与切图流水线（`process.py`） | 页面贴图加载（[农场的皮](docs/subsystems/farm.md)）与命令速查（[开发](docs/development.md#素材音效和官网)） |
+| Papertrails 素材打包与同步流水线（`design/sync-assets.sh`、`design/diorama.sh`） | 场景与工作台加载（[农场的皮](docs/subsystems/farm.md)）与命令速查（[开发](docs/development.md#素材音效和官网)） |
 
 ## 在哪
 
@@ -24,7 +24,7 @@
 | `Makefile` 与 `xtask/`、`vite.config.ts` 的 `mac:check` | `cargo xtask check`（fmt、clippy `-D warnings` 与测试）、`cargo xtask loom`（四个并发内核模型检验）、`cargo xtask protocol`（TS 契约与 golden）、`vp run mac:check`（原生页面 nsh 类型检查） |
 | `scripts/audit/comment-review.ts` | 调用模型审查新增注释 |
 | `.agents/notes/`、`.agents/skills/` | Agent Notes 目录与仓库 skills（`.claude/skills` 软链至此） |
-| `design/pixel/gen.sh`、`process.py`、`design/art.sh` | 像素素材生成、去品红切格缩放脚本与原图仓库软链 |
+| `design/sync-assets.sh`、`design/diorama.sh` | 从独立 `vibevalley-assets` 仓同步 Papertrails 纸雕、品牌、图标、头像、引擎与官网轻量产物并重生成 macOS 通道图标 |
 
 ## 模型和不变量
 
@@ -53,11 +53,10 @@
 3. **文字与 Skill**：无法静态检查的准则写进 `AGENTS.md` 或 `.agents/skills/`。
 4. **人工审查**：仅关注产品方向与架构取舍。
 
-**生成与切分像素素材**
+**同步 Papertrails 素材**
 
-1. 运行 `design/art.sh` 链接 `vibevalley-art` 原图目录。
-2. 运行 `design/pixel/gen.sh <名字>` 生成品红底整图到 `design/pixel/raw/`。
-3. 在 `design/pixel/process.py` 登记行列与名称，运行脚本输出 `assets/pixel/` 与 `sprites.json`。
+1. 在同级仓库 `vibevalley-assets` 中修改或生成原始素材（3D 纸雕、品牌图标、角色肖像、引擎徽标与官网配图）。
+2. 运行 `design/sync-assets.sh --all`（或按需加 `--with-avatars` / `--with-diorama`）打包并仅同步轻量成品到 `assets/` 与 `apps/mac/resources/`。
 
 ## 和谁打交道
 
@@ -70,7 +69,7 @@
 - **优先用代码和检查拦错，报错自带 `Fix:` 与 `See`**：让 agent 看到报错即可一次改对，避免猜解法或绕过规则。
 - **Note 做完即删，子系统文档是唯一长期沉淀处**：避免几十篇旧 Note 散落并与现行代码失步。
 - **共用原语自动生成清单（`primitives.md`）**：从 TS 地基目录导出与首行 JSDoc 生成并由 `docs:verify` 守住，让 agent 先复用已有原语；Rust 的不在里面。
-- **整张生成角色贴图，脚本确定性切图**：单张生成同一角色全部动作保证长相一致；400MB 原图放独立仓库 `vibevalley-art` 保持主仓轻量。
+- **原素材与轻量成品分仓**：原始高清图、生成脚本与中间产物全部留在独立仓库 `vibevalley-assets`，代码仓只经 `design/sync-assets.sh` / `design/diorama.sh` 同步轻量成品，保持主仓干净。
 
 ## 还没做的
 

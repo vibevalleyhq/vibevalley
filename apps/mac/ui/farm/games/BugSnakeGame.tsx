@@ -2,7 +2,7 @@ import { View, type CanvasRenderingContext2D } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { playSound } from "../../design/pixel/sound";
+import { playSound } from "../../design/sound";
 import { createSignal } from "../../infra/solid";
 import {
   type BugSnake,

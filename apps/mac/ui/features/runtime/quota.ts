@@ -41,21 +41,6 @@ export function quotaOf(info: RuntimeInfo | undefined): Quota {
   return { level: quotaLevel(left), fill: left === undefined ? 0 : left / 100, short: left === undefined ? "" : `${numberText(left)}%`, text };
 }
 
-export function bottleSprite(q: Quota) {
-  switch (q.level) {
-    case "plenty":
-      return q.fill >= 0.875 ? "energy-plenty-100" : q.fill >= 0.625 ? "energy-plenty-75" : "energy-plenty-50";
-    case "low":
-      return q.fill >= 0.325 ? "energy-low-40" : "energy-low-25";
-    case "empty":
-      return q.fill > 0.02 ? "energy-empty-10" : "energy-empty-0";
-    case "unknown":
-      return "energy-unknown";
-    case "gold":
-      return "energy-gold";
-  }
-}
-
 export interface InstalledSkill {
   readonly name: string;
   readonly description?: string;

@@ -1,14 +1,14 @@
 # 验收应用
 
-[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：起一个和用户的数据隔开的原生应用（`apps/mac`），用脚本一步一步驱动它，把要看的页面和像素场景截成 PNG，拿眼睛看。不用看屏幕，锁屏时也能跑。命令以 `apps/mac/src/debug.rs` 为准。
+[验收](.agents/skills/vv-acceptance/SKILL.md)的一份分册：起一个和用户的数据隔开的原生应用（`apps/mac`），用脚本一步一步驱动它，把要看的页面和纸雕农场场景截成 PNG，拿眼睛看。不用看屏幕，锁屏时也能跑。命令以 `apps/mac/src/debug.rs` 为准。
 
 ## 什么时候用
 
 - 改了 `apps/mac/ui`（工作台的页面、外壳的面、令牌）。
-- 改了 `apps/mac/src`（外壳、宿主能力、终端、像素场景）或 `assets` 的贴图、字体、地图。
+- 改了 `apps/mac/src`（外壳、宿主能力、终端、纸雕场景）或 `assets` 的纸雕、品牌、头像、引擎素材。
 - 改了形状，想看服务端的新字段在页面上画出来。
 
-不用它：只改了 `apps/mac/ui/infra` 或 feature 里的纯函数、测试已经覆盖的；只改了像素场景的规则、`apps/mac/src/pixel/tests.rs` 已经覆盖的（设 `VIBEVALLEY_PIXEL_OUT=<目录>` 跑 `cargo test -p vibevalley-mac pixel`，看它写出的 PNG）。
+不用它：只改了 `apps/mac/ui/infra` 或 feature 里的纯函数、测试已经覆盖的；只改了纸雕映射规则、`apps/mac/src/diorama/` 或 `apps/mac/crates/diorama/` 单测已经覆盖的。
 
 ## 准备
 
@@ -43,7 +43,7 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
    {"shell":"wait:1500"}
    {"shell":"shot:/tmp/vv-app/farm.png"}
    {"shell":"close_kind:hosted"}
-   {"shell":"close_kind:pixel"}
+   {"shell":"close_kind:diorama"}
    {"shell":"quit"}
    ```
 
@@ -65,9 +65,8 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
    | 步骤 | 做什么 |
    |---|---|
    | `{"shell":"hosted:<视图>[ <参数 JSON>]"}` | 开一个托管视图的窗格；工作台是 `vv`，参数 `route` 是打开的路由 |
-   | `{"shell":"pixel:<场景>[ <参数 JSON>]"}` | 开一个像素窗格：`farm`（参数 `repo`）、`map`、`tree`、`catalog`、`opening` |
-   | `pixel_tap:<x>,<y>[,right]`、`pixel_point:<x>,<y>` | 在当前像素窗格上点、指，坐标是画里的像素 |
-   | `pixel_clock:<0..1>[,<速度>]` | 定住农场的昼夜时间 |
+   | `{"shell":"diorama:<场景>[ <参数 JSON>]"}` | 开一个 3D 纸雕窗格：`farm`（参数 `repo`） |
+   | `diorama_clock:<0..1>` | 定住农场的昼夜时间 |
    | `shot:<文件.png>`、`draw` | 画一帧并把窗口截成 PNG；只画一帧 |
    | `key:cmd-1 cmd-shift-p`、`type:<文字>` | 按键走快捷键的分发；逐字敲 |
    | `mouse:<down\|up\|move\|drag\|click>,x,y[,right]` | 鼠标事件，坐标是窗口里的点 |
@@ -76,10 +75,10 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
    | `palette:<files\|commands\|search>`、`query:<文字>`、`close_palette` | 命令面板 |
    | `resize:<宽>,<高>` | 调整窗口尺寸（点），验窄窗布局 |
    | `toggle_theme`、`save`、`wait:<毫秒>`、`quit` | 换主题、存布局、等、退出 |
-   | `close_kind:<pixel\|hosted\|terminal>[@<标题里的字>]`、`close_tab_id:<id>` | 关掉脚本自己开的窗格（布局会存下来） |
+   | `close_kind:<diorama\|hosted\|terminal>[@<标题里的字>]`、`close_tab_id:<id>` | 关掉脚本自己开的窗格（布局会存下来） |
    | 不带 `shell` 的一行 JSON | 当成页面发来的动作（`apps/mac/src/hosted/bridge.rs` 的 `Action`），如 `{"type":"openFarm","repo":""}` |
 
-4. 读证据：截图；`dump.json`（每秒重写：项目、布局、每个终端可见的字、每个托管视图收到的帧和报的错、像素窗格的状态）；每个开着的像素窗格另有一张 `dump.<场景>-<标签页>.png`，是同一帧在 CPU 上画的；`app.log` 里 `debug script:` 开头的行是每一步和它的结果。
+4. 读证据：截图；`dump.json`（每秒重写：项目、布局、每个终端可见的字、每个托管视图收到的帧和报的错、纸雕窗格的状态 `diorama`）；`app.log` 里 `debug script:` 开头的行是每一步和它的结果。
 5. 打开截图，对照改动检查内容、用语、溢出和重叠，浅色、深色各看一张。空状态只能证明空状态，不能代替列表、卡片和详情的验收。
 
 ## 验证宿主存储隔离
@@ -94,7 +93,7 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 
 - 脚本文件、起应用的命令、`app.log` 里每步的行。
 - 和改动有关的截图，以及截图里对应的变化；改了布局时附一张窄窗口的。
-- 切主题后核对画面颜色确实变化，不能只看 `theme_dark`；打开农场再缩窄窗口，`dump.json` 的 `pixel.kind` 应仍是 `farm`，不能先缩窄再重新打开农场代替这一步。
+- 切主题后核对画面颜色确实变化，不能只看 `theme_dark`；打开农场再缩窄窗口，`dump.json` 的 `diorama.kind` 应仍是 `farm`，不能先缩窄再重新打开农场代替这一步。
 - `dump.json` 里托管视图没有报错（`hosted` 下的错误是空的）。
 
 ## 出错时
@@ -103,7 +102,7 @@ vp run ui:gallery -- --out /tmp/vv-app-gallery
 - **`shot` 没写出文件**：构建没带 `--features shot`，或路径的目录不存在；看 `app.log`。
 - **页面是空的或一直在读**：`dump.json` 里看那个视图有没有收到 `state` 帧；用真服务端时看 `app.log` 里 `vibevalley server:` 的行。
 - **`key` 一步写着 `handled=false`**：焦点不在认这个快捷键的地方；先 `mouse:click` 到那个窗格。
-- **像素窗格是空的**：`assets/` 找不到（`VIBEVALLEY_ASSETS` 指过去），或素材没切（[开发](docs/development.md#素材音效和官网)）。
+- **纸雕窗格是空的**：`assets/` 找不到（`VIBEVALLEY_ASSETS` 指过去），或未同步 Papertrails 产物（[开发](docs/development.md#素材音效和官网)）。
 
 ## 验收三张并行工单
 

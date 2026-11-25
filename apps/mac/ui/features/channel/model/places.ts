@@ -21,16 +21,26 @@ const isTop = (c: Channel) => c.type !== "thread";
 export const archivedOf = (chat: Chat | undefined): Channel[] =>
   (chat?.channels.filter((c) => c.type === "channel" && c.archived !== undefined) ?? []).toSorted((a, b) => (b.archived ?? 0) - (a.archived ?? 0));
 
-interface ChannelGroup {
-  readonly category?: string;
-  readonly channels: readonly Channel[];
-}
+export type ChatFilter = "all" | "group" | "direct";
 
-export function groupsOf(channels: readonly Channel[]): ChannelGroup[] {
-  const loose = channels.filter((c) => !c.category);
-  const named = new Map<string, Channel[]>();
-  for (const c of channels) if (c.category) named.set(c.category, [...(named.get(c.category) ?? []), c]);
-  return [...(loose.length > 0 || named.size === 0 ? [{ channels: loose }] : []), ...[...named].map(([category, cs]) => ({ category, channels: cs }))];
+export const directPeerOf = (c: Channel | undefined): string | undefined => (c?.type === "direct" ? c.peer?.replace(/^profile:/u, "") : undefined);
+
+export function sidebarChannelsOf(chat: Chat | undefined, filter: ChatFilter = "all"): Channel[] {
+  const list = (chat?.channels ?? []).filter((c) => {
+    if (c.archived !== undefined) return false;
+    switch (filter) {
+      case "all":
+        return c.type === "channel" || c.type === "direct";
+      case "group":
+        return c.type === "channel";
+      case "direct":
+        return c.type === "direct";
+    }
+  });
+  return list.toSorted((a, b) => {
+    if (a.default !== b.default) return a.default ? -1 : 1;
+    return or((b.last?.at ?? b.at) - (a.last?.at ?? a.at), compareText(a.id, b.id));
+  });
 }
 
 export const threadsIn = (chat: Chat | undefined, channel: Channel, archived = false): Channel[] =>
@@ -48,9 +58,6 @@ export function topOf(chat: Chat | undefined, c: Channel | undefined) {
   if (isTop(c)) return c;
   return channelOf(chat, c.parent) ?? defaultOf(chat);
 }
-
-export const directsOf = (chat: Chat | undefined): Channel[] =>
-  (chat?.channels.filter((c) => c.type === "direct") ?? []).toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 export const chatPath = (c: Channel | undefined) => (!c || c.default ? "/chat" : `/chat/${c.id}`);
 
@@ -213,6 +220,20 @@ export function workbenchClock(at: number) {
   const d = new Date(Math.round(at));
   const h12 = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;
   return t("web.base.time.clock", { am: d.getHours() < 12, hh: String(h12).padStart(2, "0"), mm: String(d.getMinutes()).padStart(2, "0") });
+}
+
+export function channelTime(at: number | undefined, now = Date.now()): string {
+  if (at === undefined || at <= 0) return "";
+  const d = new Date(Math.round(at));
+  const ref = new Date(Math.round(now));
+  if (sameDay(d, ref)) {
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  const yesterday = new Date(ref);
+  yesterday.setDate(ref.getDate() - 1);
+  if (sameDay(d, yesterday)) return t("web.base.time.yesterday");
+  if (d.getFullYear() === ref.getFullYear()) return `${d.getMonth() + 1}/${d.getDate()}`;
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 export interface SwitchTarget {

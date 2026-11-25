@@ -212,7 +212,7 @@ function AttachmentPart(props: { file: Attachment; onKnown: (path: string) => vo
                   >
                     <IconButton
                       icon={playing() === props.file.id ? "stop" : "play"}
-                      label={playing() === props.file.id ? t("web.catalog.stop") : t("web.catalog.play")}
+                      label={playing() === props.file.id ? t("web.base.stop") : t("web.base.play")}
                       onClick={() => play(f().path)}
                       testid="attachment-play"
                     />

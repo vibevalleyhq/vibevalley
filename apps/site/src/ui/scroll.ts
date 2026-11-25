@@ -1,4 +1,4 @@
-import { animate, inView, motionValue, resize, scroll, steps, type DOMKeyframesDefinition, type MotionValue } from "motion";
+import { animate, inView, motionValue, resize, scroll, type DOMKeyframesDefinition, type MotionValue } from "motion";
 import { createSignal, onCleanup, onSettled } from "solid-js";
 
 export interface ElementRef<T extends HTMLElement> {
@@ -89,7 +89,7 @@ export function createReveal<T extends HTMLElement>() {
           const animation = animate(
             element,
             { opacity: 1, transform: "translateY(0px)" },
-            { duration: 0.4, ease: steps(4), delay: (Number.isNaN(delay) ? 0 : delay) / 1000 },
+            { duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: (Number.isNaN(delay) ? 0 : delay) / 1000 },
           );
           stops.push(() => animation.cancel());
           stop();

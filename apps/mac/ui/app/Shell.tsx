@@ -3,11 +3,11 @@ import { colorScheme, effect, host, keymap, Scroll, Text, View, windowSize, type
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession } from "@vibevalley/protocol/rules";
 
+import { useAssetsDir } from "../design/art";
 import { OrchestratorFace } from "../design/domain/Face";
 import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
 import { motionClass } from "../design/motion";
-import { usePixelDir } from "../design/pixel/atlas";
 import { ShortcutSheet } from "../design/ShortcutSheet";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
@@ -19,7 +19,7 @@ import { readHostParams } from "../infra/hostParams";
 import { NavLink, useLocation, useMatches } from "../infra/router";
 import { useUpdates } from "../infra/settings";
 import { safeLastContentPath } from "../infra/state/contentNav";
-import { catalogPlace, type Place, places, runsPlace, settingsPlace } from "./places";
+import { type Place, places, runsPlace, settingsPlace } from "./places";
 
 const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;
 
@@ -85,7 +85,7 @@ const railIcon = (name: IconName, current: () => boolean) => () => <Icon name={n
 const railGroups = ["work", "setup"] as const;
 
 function Rail(props: { here?: Place | undefined; farm: boolean }) {
-  const pixelDir = usePixelDir();
+  const assetsDir = useAssetsDir();
   const sessions = useSessionsSlice();
   const inbox = useInboxSlice();
   const link = useLink();
@@ -127,7 +127,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
             <View class="relative">
               <View class="overflow-hidden rounded-md border border-line">
                 <If
-                  when={pixelDir()}
+                  when={assetsDir()}
                   else={
                     <View class="h-9.5 w-9.5 items-center justify-center bg-page">
                       <Icon name="farm" size={20} tone="leaf" />
@@ -256,7 +256,6 @@ export function Shell(props: { children: JSX.Element }) {
   const here = () => {
     const id = meta()?.place;
     if (id === runsPlace.id) return runsPlace;
-    if (id === catalogPlace.id) return catalogPlace;
     return places.find((place) => place.id === id);
   };
   const inFarm = () => meta()?.skin === "farm";
@@ -268,8 +267,17 @@ export function Shell(props: { children: JSX.Element }) {
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <View class="min-w-0 flex-1">
-        {/* Chat, Content, and Runtimes draw their own 3-column top bars; native workspace fills its own pane. */}
-        <If when={!inFarm() && here()?.id !== "chat" && here()?.id !== "content" && here()?.id !== "runtimes" && location().pathname !== "/workspace"}>
+        {/* Issues, Chat, Content, and Runtimes draw their own top bars; native workspace fills its own pane. */}
+        <If
+          when={
+            !inFarm() &&
+            here()?.id !== "issues" &&
+            here()?.id !== "chat" &&
+            here()?.id !== "content" &&
+            here()?.id !== "runtimes" &&
+            location().pathname !== "/workspace"
+          }
+        >
           <Desk place={here()} />
         </If>
         <View class="min-h-0 flex-1">{props.children}</View>

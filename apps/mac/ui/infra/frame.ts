@@ -271,7 +271,7 @@ export function useThreadOwner(thread: Accessor<Channel>): Accessor<SessionView 
 
 export type OrchestratorMood = "idle" | "listening" | "thinking" | "speaking";
 
-export const orchestratorSession = (sessions: readonly SessionView[] | undefined, agent = defaultOrchestrator) =>
+const orchestratorSession = (sessions: readonly SessionView[] | undefined, agent = defaultOrchestrator) =>
   sessions?.find((session) => isOrchestratorSession(session) && sessionProfile(session) === agent);
 
 export function orchestratorMood(sessions: readonly SessionView[] | undefined, agent = defaultOrchestrator): OrchestratorMood {

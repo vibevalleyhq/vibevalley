@@ -90,11 +90,8 @@ export function SectionHead(props: {
   const labelRow = () => (
     <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
       <If when={props.collapsible === true}>
-        <View
-          class={`size-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
-          style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
-        >
-          <Icon name="expand" size={10} tone={hovered() ? "ink" : "muted"} />
+        <View class="h-4 w-4 shrink-0 items-center justify-center">
+          <Icon name={open() ? "choose" : "expand"} size={14} tone={hovered() ? "ink" : "muted"} />
         </View>
       </If>
       <Text role="header" class={`truncate text-2xs font-semibold tracking-wide ${titleClass()}`}>

@@ -1,4 +1,4 @@
-import { cleanup, Clipboard, computed, effect, host, Image, keymap, Scroll, signal, Text, View } from "nsh";
+import { cleanup, Clipboard, computed, effect, host, keymap, Scroll, signal, Text, View } from "nsh";
 import { Button } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -58,7 +58,7 @@ function MetaRow(props: { label: string; value: string; mono?: boolean; toneClas
   );
 }
 
-export function RepoDetailPanel(props: { repo: RepoDetailTarget; spriteSrc: (name: string | undefined) => string | undefined; onClose: () => void }) {
+export function RepoDetailPanel(props: { repo: RepoDetailTarget; onClose: () => void }) {
   const copied = signal(false);
   const activity = signal<RepoActivityData | null>(null);
   const languages = signal<RepoLanguagesData | null>(null);
@@ -91,7 +91,6 @@ export function RepoDetailPanel(props: { repo: RepoDetailTarget; spriteSrc: (nam
     });
   });
 
-  const plotSrc = computed(() => (props.repo.vibevalley ? props.spriteSrc(props.repo.active ? "plot-flowering" : "plot-leafy") : undefined));
   const isGit = computed(() => props.repo.git === true || Boolean(props.repo.branch) || props.repo.worktrees.length > 1);
 
   const topLanguages = computed(() => languageShares(languages()?.languages ?? [], 4));
@@ -138,9 +137,7 @@ export function RepoDetailPanel(props: { repo: RepoDetailTarget; spriteSrc: (nam
         <View class="gap-2.5">
           <View class="flex-row items-center gap-2.5">
             <View class="size-8 shrink-0 items-center justify-center rounded-lg border border-line bg-elevated">
-              <If when={plotSrc()} else={<Icon name="folder" size={16} tone={props.repo.active ? "ink" : "muted"} />}>
-                {(src) => <Image src={src()} class="size-5 object-contain" />}
-              </If>
+              <Icon name={props.repo.vibevalley ? "repos" : "folder"} size={16} tone={props.repo.active ? "leaf" : "muted"} />
             </View>
             <View class="min-w-0 flex-1 gap-0.5">
               <Text testID="repo-detail-name" class="truncate text-sm font-semibold text-ink">

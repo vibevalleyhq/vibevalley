@@ -63,7 +63,7 @@
     "voice": "电话 通话 MOSS Live 实时 视觉 转写 语音",
     "connections": "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
     "remote": "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
-    "about": "版本 家目录 设置文件 数据 素材图鉴 version catalog"
+    "about": "版本 家目录 设置文件 数据 version"
   },
   "scope": {
     "farm": "对整个 VibeValley",
@@ -75,7 +75,7 @@
     "startHint": "打开应用、或者打开首页时先进哪里",
     "starts": {
       "workbench": "工作台",
-      "farm": "像素农场"
+      "farm": "农场"
     }
   },
   "appearance": {
@@ -94,7 +94,7 @@
       "system": "跟随系统"
     },
     "scale": "界面大小",
-    "scaleHint": "缩放整个工作台；像素农场按整数倍放大，不跟着变",
+    "scaleHint": "缩放整个工作台；农场按整数倍放大，不跟着变",
     "monoFont": "终端与代码字体",
     "monoFontRow": "终端与代码字体（支持 Nerd Font）",
     "monoFontHint": "用于终端、Diff 与文件预览的等宽字体，内置 Nerd Font 图标回退链",
@@ -123,10 +123,6 @@
     "copy": "复制路径",
     "copied": "路径复制好了",
     "reveal": "在访达里显示",
-    "devTools": "开发与图鉴",
-    "catalog": "素材图鉴",
-    "catalogHint": "查看像素角色、指针、声音与工作台组件样式",
-    "openCatalog": "打开素材图鉴",
     "update": "更新",
     "updateHint": "桌面版从 GitHub 上的发布自己更新",
     "upToDate": "已是最新",

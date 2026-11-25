@@ -1,5 +1,5 @@
 import { computed, effect, host, keymap, Scroll, signal, Text, untracked, View } from "nsh";
-import { Input, Menu, MenuItem, MenuSeparator, TextView } from "nsh/base";
+import { Input, Menu, MenuItem, MenuSeparator, Popover, TextView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import type { PhaseView } from "@vibevalley/protocol";
@@ -43,7 +43,6 @@ import {
   type SessionEvent,
   type SessionInteractionRequest,
   type SessionPermissionDecision,
-  type SessionPermissionMode,
   type SessionPermissionRequest,
   type SessionSwarmState,
   type ThoughtLevel,
@@ -70,36 +69,6 @@ function phaseFromSessionTag(tag: PhaseView["_tag"]): ChatPhase {
   }
 }
 
-function phaseTone(phase: ChatPhase): "leaf" | "water" | "wheat" | "berry" | "idle" {
-  switch (phase) {
-    case "working":
-      return "water";
-    case "waiting":
-      return "wheat";
-    case "error":
-      return "berry";
-    case "ready":
-      return "leaf";
-    case "starting":
-      return "idle";
-  }
-}
-
-function phaseLabel(phase: ChatPhase): string {
-  switch (phase) {
-    case "starting":
-      return t("web.shell.chat.statusStarting");
-    case "ready":
-      return t("web.shell.chat.statusReady");
-    case "working":
-      return t("web.shell.chat.statusWorking");
-    case "waiting":
-      return t("web.shell.chat.statusWaiting");
-    case "error":
-      return t("web.shell.chat.statusError");
-  }
-}
-
 function thoughtLabel(level: ThoughtLevel): string {
   switch (level) {
     case "minimal":
@@ -114,11 +83,6 @@ function thoughtLabel(level: ThoughtLevel): string {
     case "max":
       return t("web.shell.chat.thoughtMax");
   }
-}
-
-function basenameOf(path: string): string {
-  const trimmed = path.replace(/\/+$/u, "");
-  return trimmed.split("/").pop() || trimmed || "/";
 }
 
 function ChatMarkdown(props: {
@@ -462,7 +426,6 @@ export function WorkspaceChatPane() {
   const runtime = signal<string>(initialRuntime);
   const model = signal<string>("");
   const thoughtLevel = signal<ThoughtLevel | undefined>(undefined);
-  const permissionMode = signal<SessionPermissionMode>("acceptEdits");
   const phase = signal<ChatPhase>(initialSessionId ? "starting" : "ready");
   const steps = signal<SessionEvent[]>([]);
   const steeredSeqs = signal<ReadonlySet<number>>(new Set());
@@ -530,7 +493,6 @@ export function WorkspaceChatPane() {
           } else if (ev.effort === undefined || (info !== undefined && info.effortLevels.length === 0)) {
             thoughtLevel.set(undefined);
           }
-          permissionMode.set(ev.permissionMode);
           pendingPermissions.set(ev.pendingPermissions);
           pendingInteractions.set(ev.pendingInteractions);
           if (ev.tokens !== undefined) latestTokens.set(ev.tokens);
@@ -625,7 +587,7 @@ export function WorkspaceChatPane() {
       runtime: untracked(runtime),
       model: untracked(model) || undefined,
       ...(effort !== undefined ? { effort } : {}),
-      permissionMode: untracked(permissionMode),
+      permissionMode: "bypass",
     });
     if (!res.ok) {
       phase.set("error");
@@ -642,7 +604,6 @@ export function WorkspaceChatPane() {
     } else if (info !== undefined && info.effortLevels.length === 0) {
       thoughtLevel.set(undefined);
     }
-    permissionMode.set(ws.permissionMode);
     sessionId.set(ws.id);
     if (host.available() && tabId > 0) {
       act({ type: "bind_chat_session", tab_id: tabId, session_id: ws.id, runtime: ws.session.runtime });
@@ -741,7 +702,7 @@ export function WorkspaceChatPane() {
     else phase.set("ready");
   };
 
-  const applyConfig = async (patch: { model?: string; effort?: ThoughtLevel; permissionMode?: SessionPermissionMode }) => {
+  const applyConfig = async (patch: { model?: string; effort?: ThoughtLevel }) => {
     const sid = untracked(sessionId);
     if (!sid) return;
     const res = await setWorkspaceConfig(sid, patch);
@@ -790,17 +751,27 @@ export function WorkspaceChatPane() {
 
   const modelOptions = computed(() => currentModels().map((m) => ({ value: m.id, label: m.label })));
 
-  const permissionOptions: readonly { value: SessionPermissionMode; label: string }[] = [
-    { value: "ask", label: t("web.shell.chat.modeAsk") },
-    { value: "acceptEdits", label: t("web.shell.chat.modeAcceptEdits") },
-    { value: "bypass", label: t("web.shell.chat.modeBypass") },
-    { value: "readOnly", label: t("web.shell.chat.modeReadOnly") },
-  ];
-
-  const hasTelemetry = computed(() => telemetry().turns > 0 || telemetry().contextUsed > 0 || currentRuntime()?.quotaPct !== undefined);
-  const telemetryWarn = computed(() => {
+  const hasSessionTelemetry = computed(() => telemetry().turns > 0 || telemetry().contextUsed > 0);
+  const hasTelemetry = computed(() => hasSessionTelemetry() || currentRuntime()?.quotaPct !== undefined);
+  const quotaPct = computed(() => {
     const q = currentRuntime()?.quotaPct;
+    return q === undefined ? undefined : Math.max(0, Math.min(100, Math.round(q)));
+  });
+  const showQuotaPill = computed(() => telemetry().contextUsed === 0 && quotaPct() !== undefined);
+  const telemetryWarn = computed(() => {
+    const q = quotaPct();
     return telemetry().contextPct >= 85 || (q !== undefined && q <= 15);
+  });
+  const telemetryTooltip = computed(() => {
+    const parts: string[] = [];
+    if (telemetry().contextUsed > 0 || telemetry().turns > 0) {
+      parts.push(t("web.shell.chat.telemetryContext", { pct: telemetry().contextPct }));
+    }
+    const q = quotaPct();
+    if (q !== undefined) {
+      parts.push(t("web.shell.chat.telemetryQuota", { pct: q }));
+    }
+    return parts.join(" · ") || t("web.shell.chat.telemetryDetails");
   });
   const cachedBarPercent = computed(() => {
     const tel = telemetry();
@@ -819,104 +790,8 @@ export function WorkspaceChatPane() {
   const composerMenuClass = `${menuPopupClass} ${motionClass("transition-opacity duration-120 ease-out")}`;
   const composerMenuItemClass = "h-7 flex-row items-center justify-between gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
 
-  const permissionLabel = computed(() => permissionOptions.find((o) => o.value === permissionMode())?.label ?? permissionMode());
-
   return (
     <View testID="workspace-chat-pane" class="min-h-0 flex-1 bg-page">
-      <View testID="chat-header" class="h-8 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3">
-        <View class="min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden">
-          <View class="h-5 shrink-0 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5">
-            <Dot tone={phaseTone(effectivePhase())} size={6} ring={false} />
-            <Text testID="chat-phase-label" class="text-2xs font-medium text-muted">
-              {phaseLabel(effectivePhase())}
-            </Text>
-          </View>
-          <If when={cwd.length > 0}>
-            <View
-              testID="chat-cwd-chip"
-              tooltip={<Bubble text={cwd} />}
-              class="h-5 min-w-0 max-w-36 shrink flex-row items-center gap-1 overflow-hidden rounded-sm border border-line bg-side px-1.5"
-            >
-              <View class="shrink-0">
-                <Icon name="folder" size={12} tone="faint" />
-              </View>
-              <Text class="min-w-0 shrink truncate font-mono text-2xs text-muted">{basenameOf(cwd)}</Text>
-            </View>
-          </If>
-          <If when={swarm()}>
-            {(sw) => (
-              <View
-                role="button"
-                testID="chat-swarm-pill"
-                accessibilityLabel={swarmOpen() ? t("web.shell.swarm.closeDrawer") : t("web.shell.swarm.openDrawer")}
-                accessibilityState={{ expanded: swarmOpen() }}
-                tooltip={<Bubble text={sw().title ?? t("web.shell.swarm.openDrawer")} />}
-                onPress={() => swarmOpen.set(!swarmOpen())}
-                class={`h-5 shrink-0 flex-row items-center gap-1 rounded-sm border border-line px-1.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
-                  swarmOpen() ? "bg-selected" : "bg-side"
-                }`}
-              >
-                <Dot tone={sw().workingCount > 0 ? "leaf" : "idle"} size={6} ring={false} />
-                <Text class="font-mono text-2xs font-medium text-ink tabular-nums">
-                  {t("web.shell.swarm.pill", { working: sw().workingCount, active: sw().activeCount })}
-                </Text>
-              </View>
-            )}
-          </If>
-        </View>
-        <View class="shrink-0 flex-row items-center gap-1">
-          <Menu
-            placement="bottom"
-            align="end"
-            offset={4}
-            popupClass={composerMenuClass}
-            popupStartingClass={popupTransition("opacity-0")}
-            popupEndingClass={popupTransition("opacity-0")}
-            trigger={
-              <View
-                testID="chat-permission-mode"
-                accessibilityLabel={t("web.shell.chat.permissionMode")}
-                tooltip={<Bubble text={t("web.shell.chat.permissionMode")} />}
-                class="h-6 shrink-0 flex-row items-center gap-1 rounded-md px-1.5 hover:bg-hover aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
-              >
-                <Text class="text-xs font-medium text-muted">{permissionLabel()}</Text>
-                <View class="shrink-0" style={{ transform: [{ rotate: "90deg" }] }}>
-                  <Icon name="expand" size={9} tone="faint" />
-                </View>
-              </View>
-            }
-          >
-            <Each of={permissionOptions} key={(opt) => opt.value}>
-              {(opt) => (
-                <MenuItem
-                  testID={`chat-permission-mode-${opt().value}`}
-                  onSelect={() => {
-                    const next = opt().value;
-                    permissionMode.set(next);
-                    void applyConfig({ permissionMode: next });
-                  }}
-                  class={composerMenuItemClass}
-                >
-                  <Text class="text-xs text-ink">{opt().label}</Text>
-                  <If when={permissionMode() === opt().value}>
-                    <Icon name="check" size={12} tone="accent" />
-                  </If>
-                </MenuItem>
-              )}
-            </Each>
-          </Menu>
-          <If when={cwd.length > 0}>
-            <ShellIconButton
-              compact
-              icon="terminal"
-              size={13}
-              label={t("web.shell.chat.openTerminal")}
-              onPress={() => act({ type: "new_terminal_at", path: cwd })}
-            />
-          </If>
-        </View>
-      </View>
-
       <If when={swarmOpen() && swarm() !== undefined}>
         <SwarmPanel sessionId={sessionId()} swarm={swarm()!} onClose={() => swarmOpen.set(false)} />
       </If>
@@ -1037,62 +912,6 @@ export function WorkspaceChatPane() {
           <View testID="chat-steering-banner" class="flex-row items-center gap-1.5 rounded-md px-2.5 py-1" style={{ backgroundColor: mix("water", 0.1) }}>
             <Dot tone="water" size={6} ring={false} />
             <Text class="min-w-0 flex-1 truncate text-xs font-medium text-water">{t("web.shell.chat.steeringBanner")}</Text>
-          </View>
-        </If>
-
-        <If when={telemetryOpen() && hasTelemetry()}>
-          <View testID="chat-telemetry-drawer" class="flex-row flex-wrap gap-2 rounded-lg border border-line bg-side p-2.5">
-            <View class="min-w-48 flex-1 gap-1.5 rounded-lg border border-line bg-page p-2.5">
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryContextTitle")}</Text>
-                <Text class="shrink-0 font-mono text-xs text-ink tabular-nums">
-                  {`${telemetry().contextPct}% · ${formatTokens(telemetry().contextUsed)}/${formatTokens(telemetry().contextWindow)}`}
-                </Text>
-              </View>
-              <ContextBar cached={cachedBarPercent()} uncached={uncachedBarPercent()} class="h-1.5 flex-row overflow-hidden rounded-full bg-selected" />
-              <View class="flex-row flex-wrap gap-2">
-                <Text class="font-mono text-2xs text-ok-ink">{`${t("web.shell.chat.telemetryCached")} ${formatTokens(telemetry().cachedRead)}`}</Text>
-                <Text class="font-mono text-2xs text-water">{`${t("web.shell.chat.telemetryUncached")} ${formatTokens(telemetry().uncachedInput)}`}</Text>
-                <Text class="font-mono text-2xs text-muted">{`${t("web.shell.chat.telemetryOutput")} ${formatTokens(telemetry().output)}`}</Text>
-                <If when={telemetry().reasoning > 0}>
-                  <Text class="font-mono text-2xs text-warn-ink">{`${t("web.shell.chat.telemetryReasoning")} ${formatTokens(telemetry().reasoning)}`}</Text>
-                </If>
-              </View>
-            </View>
-
-            <View class="min-w-48 flex-1 gap-1.5 rounded-lg border border-line bg-page p-2.5">
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryCacheTitle")}</Text>
-                <Text class="shrink-0 font-mono text-xs font-semibold text-ok-ink tabular-nums">
-                  {t("web.shell.chat.telemetryCache", { pct: telemetry().cacheHitPct })}
-                </Text>
-              </View>
-              <Text class="font-mono text-sm font-semibold text-ink tabular-nums">
-                {t("web.shell.chat.telemetryTurns", { turns: telemetry().turns, tools: telemetry().toolCount })}
-              </Text>
-            </View>
-
-            <View class="min-w-48 flex-1 gap-1.5 rounded-lg border border-line bg-page p-2.5">
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryQuotaTitle")}</Text>
-                <If when={currentRuntime()?.quotaPct !== undefined}>
-                  <Text class="shrink-0 font-mono text-xs text-ink tabular-nums">
-                    {t("web.shell.chat.telemetryQuota", { pct: Math.round(currentRuntime()?.quotaPct ?? 0) })}
-                  </Text>
-                </If>
-              </View>
-              <If
-                when={currentRuntime()?.quotaPct !== undefined}
-                else={<Text class="text-2xs text-faint">{t("web.shell.chat.telemetryQuotaUnavailable")}</Text>}
-              >
-                <View class="gap-1">
-                  <View class="h-1.5 overflow-hidden rounded-full bg-selected">
-                    <View class="h-full bg-accent" style={{ width: `${Math.min(100, Math.max(0, Math.round(currentRuntime()?.quotaPct ?? 0)))}%` }} />
-                  </View>
-                  <If when={currentRuntime()?.quotaText}>{(label) => <Text class="text-2xs text-faint">{label()}</Text>}</If>
-                </View>
-              </If>
-            </View>
           </View>
         </If>
 
@@ -1280,25 +1099,127 @@ export function WorkspaceChatPane() {
             </View>
 
             <View class="shrink-0 flex-row items-center gap-1">
+              <If when={swarm()}>
+                {(sw) => (
+                  <View
+                    role="button"
+                    testID="chat-swarm-pill"
+                    accessibilityLabel={swarmOpen() ? t("web.shell.swarm.closeDrawer") : t("web.shell.swarm.openDrawer")}
+                    accessibilityState={{ expanded: swarmOpen() }}
+                    tooltip={<Bubble text={sw().title ?? t("web.shell.swarm.openDrawer")} />}
+                    onPress={() => swarmOpen.set(!swarmOpen())}
+                    class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md border border-line px-1.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
+                      swarmOpen() ? "bg-selected" : "bg-side"
+                    }`}
+                  >
+                    <Dot tone={sw().workingCount > 0 ? "leaf" : "idle"} size={6} ring={false} />
+                    <Text class="font-mono text-2xs font-medium text-ink tabular-nums">
+                      {t("web.shell.swarm.pill", { working: sw().workingCount, active: sw().activeCount })}
+                    </Text>
+                  </View>
+                )}
+              </If>
               <If when={hasTelemetry()}>
-                <View
-                  role="button"
-                  testID="chat-telemetry-toggle"
-                  tooltip={<Bubble text={t("web.shell.chat.telemetryContext", { pct: telemetry().contextPct })} />}
-                  accessibilityLabel={telemetryOpen() ? t("web.shell.chat.telemetryHide") : t("web.shell.chat.telemetryDetails")}
-                  accessibilityState={{ expanded: telemetryOpen() }}
-                  onPress={() => telemetryOpen.set(!telemetryOpen())}
-                  class={`h-6 shrink-0 flex-row items-center gap-1.5 rounded-md px-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
-                    telemetryOpen() ? "bg-selected" : ""
-                  }`}
+                <Popover
+                  open={telemetryOpen()}
+                  onOpenChange={(e) => telemetryOpen.set(e.open)}
+                  placement="top"
+                  align="end"
+                  offset={8}
+                  popupClass={`w-72 rounded-xl border border-line bg-elevated p-2.5 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
+                  popupStartingClass={popupTransition("opacity-0")}
+                  trigger={
+                    <View
+                      role="button"
+                      testID="chat-telemetry-toggle"
+                      tooltip={
+                        <If when={!telemetryOpen()}>
+                          <Bubble text={telemetryTooltip()} />
+                        </If>
+                      }
+                      accessibilityLabel={telemetryOpen() ? t("web.shell.chat.telemetryHide") : t("web.shell.chat.telemetryDetails")}
+                      accessibilityState={{ expanded: telemetryOpen() }}
+                      class={`h-6 shrink-0 flex-row items-center gap-1.5 rounded-full border border-line bg-side px-2 shadow-raise hover:bg-hover aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus ${
+                        telemetryOpen() ? "bg-selected" : ""
+                      }`}
+                    >
+                      <If
+                        when={showQuotaPill()}
+                        else={
+                          <ContextBar
+                            cached={cachedBarPercent()}
+                            uncached={uncachedBarPercent()}
+                            class="h-1.5 w-6 shrink-0 flex-row overflow-hidden rounded-full bg-selected"
+                          />
+                        }
+                      >
+                        <View class="h-1.5 w-6 shrink-0 overflow-hidden rounded-full bg-selected">
+                          <View class={(quotaPct() ?? 100) <= 15 ? "h-full bg-wheat" : "h-full bg-accent"} style={{ width: `${quotaPct() ?? 0}%` }} />
+                        </View>
+                      </If>
+                      <Text class={`font-mono text-2xs tabular-nums ${telemetryWarn() ? "text-warn-ink" : "text-muted"}`}>
+                        {`${showQuotaPill() ? (quotaPct() ?? 0) : telemetry().contextPct}%`}
+                      </Text>
+                    </View>
+                  }
                 >
-                  <ContextBar
-                    cached={cachedBarPercent()}
-                    uncached={uncachedBarPercent()}
-                    class="h-1.5 w-6 shrink-0 flex-row overflow-hidden rounded-full bg-selected"
-                  />
-                  <Text class={`font-mono text-2xs tabular-nums ${telemetryWarn() ? "text-warn-ink" : "text-faint"}`}>{`${telemetry().contextPct}%`}</Text>
-                </View>
+                  <View testID="chat-telemetry-drawer" class="gap-2">
+                    <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
+                      <View class="flex-row items-center justify-between gap-2">
+                        <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryQuotaTitle")}</Text>
+                        <If when={quotaPct() !== undefined}>
+                          <Text class={`shrink-0 font-mono text-xs tabular-nums ${(quotaPct() ?? 100) <= 15 ? "font-semibold text-warn-ink" : "text-ink"}`}>
+                            {t("web.shell.chat.telemetryQuota", { pct: quotaPct() ?? 0 })}
+                          </Text>
+                        </If>
+                      </View>
+                      <If when={quotaPct() !== undefined} else={<Text class="text-2xs text-faint">{t("web.shell.chat.telemetryQuotaUnavailable")}</Text>}>
+                        <View class="gap-1">
+                          <View class="h-1.5 overflow-hidden rounded-full bg-selected">
+                            <View class={(quotaPct() ?? 100) <= 15 ? "h-full bg-wheat" : "h-full bg-accent"} style={{ width: `${quotaPct() ?? 0}%` }} />
+                          </View>
+                          <If when={currentRuntime()?.quotaText}>{(label) => <Text class="text-2xs text-faint">{label()}</Text>}</If>
+                        </View>
+                      </If>
+                    </View>
+
+                    <If when={hasSessionTelemetry()}>
+                      <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
+                        <View class="flex-row items-center justify-between gap-2">
+                          <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryContextTitle")}</Text>
+                          <Text class="shrink-0 font-mono text-xs text-ink tabular-nums">
+                            {`${telemetry().contextPct}% · ${formatTokens(telemetry().contextUsed)}/${formatTokens(telemetry().contextWindow)}`}
+                          </Text>
+                        </View>
+                        <ContextBar
+                          cached={cachedBarPercent()}
+                          uncached={uncachedBarPercent()}
+                          class="h-1.5 flex-row overflow-hidden rounded-full bg-selected"
+                        />
+                        <View class="flex-row flex-wrap gap-2">
+                          <Text class="font-mono text-2xs text-ok-ink">{`${t("web.shell.chat.telemetryCached")} ${formatTokens(telemetry().cachedRead)}`}</Text>
+                          <Text class="font-mono text-2xs text-water">{`${t("web.shell.chat.telemetryUncached")} ${formatTokens(telemetry().uncachedInput)}`}</Text>
+                          <Text class="font-mono text-2xs text-muted">{`${t("web.shell.chat.telemetryOutput")} ${formatTokens(telemetry().output)}`}</Text>
+                          <If when={telemetry().reasoning > 0}>
+                            <Text class="font-mono text-2xs text-warn-ink">{`${t("web.shell.chat.telemetryReasoning")} ${formatTokens(telemetry().reasoning)}`}</Text>
+                          </If>
+                        </View>
+                      </View>
+
+                      <View class="flex-row items-center justify-between gap-2 rounded-lg border border-line bg-side px-2.5 py-2">
+                        <View class="min-w-0 gap-0.5">
+                          <Text class="truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryCacheTitle")}</Text>
+                          <Text class="font-mono text-xs font-semibold text-ink tabular-nums">
+                            {t("web.shell.chat.telemetryTurns", { turns: telemetry().turns, tools: telemetry().toolCount })}
+                          </Text>
+                        </View>
+                        <Text class="shrink-0 font-mono text-xs font-semibold text-ok-ink tabular-nums">
+                          {t("web.shell.chat.telemetryCache", { pct: telemetry().cacheHitPct })}
+                        </Text>
+                      </View>
+                    </If>
+                  </View>
+                </Popover>
               </If>
 
               <If when={effectivePhase() === "working"}>

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession, isOrchestratorSession, sessionBranch, sessionIssueId, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
 
+import { engineLogoUrl } from "../design/art";
 import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
 import { ActiveBar } from "../design/layout";
@@ -35,7 +36,7 @@ type RailTab = {
 
 type RailWorktree = {
   path: string;
-  branch: string | null;
+  branch?: string | null;
   main: boolean;
 };
 
@@ -79,7 +80,7 @@ const railTabSchema: z.ZodType<RailTab> = z.object({
 
 const railWorktreeSchema: z.ZodType<RailWorktree> = z.object({
   path: z.string(),
-  branch: z.string().nullable(),
+  branch: z.exactOptional(z.string().nullable()),
   main: z.boolean(),
 });
 
@@ -150,12 +151,8 @@ type ActivitySummary = {
 const ROW_BASE_PAD = 10;
 const INDENT_STEP = 12;
 
-const KNOWN_RUNTIME_LOGOS = new Set(["claude", "codex", "opencode", "cursor", "kimi", "pi", "grok", "antigravity"]);
-
-function runtimeLogoOf(agent: string | undefined): string | undefined {
-  if (!agent) return undefined;
-  const key = agent.toLowerCase().replace(/^acp:/u, "");
-  return KNOWN_RUNTIME_LOGOS.has(key) ? `logo-${key}` : undefined;
+function formatDisplayPath(path: string): string {
+  return path.replace(/^\/(?:Users|home)\/[^/]+/u, "~");
 }
 
 function normPath(p: string | undefined): string {
@@ -328,13 +325,10 @@ function ChevronButton(props: { expanded: boolean; label: string; onToggle: () =
     <Button
       onPress={props.onToggle}
       accessibilityLabel={props.label}
-      class={`h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
+      class={`h-4.5 w-4 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
     >
-      <View
-        class={`size-2.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
-        style={{ transform: [{ rotate: props.expanded ? "90deg" : "0deg" }] }}
-      >
-        <Icon name="expand" size={10} tone="muted" />
+      <View class="h-4 w-4 shrink-0 items-center justify-center">
+        <Icon name={props.expanded ? "choose" : "expand"} size={14} tone="muted" />
       </View>
     </Button>
   );
@@ -357,7 +351,7 @@ interface SidebarTreeCtx {
   readonly openMenuKey: () => string | null;
   readonly setOpenMenuKey: (key: string | null) => void;
   readonly sweepPhase: () => boolean;
-  readonly spriteSrc: (name: string | undefined) => string | undefined;
+  readonly engineLogoSrc: (agent: string | undefined) => string | undefined;
   readonly isRepoExpanded: (repo: RepoNode) => boolean;
   readonly isGroupExpanded: (group: WorktreeGroup) => boolean;
   readonly setFold: (key: string, expanded: boolean) => void;
@@ -458,7 +452,7 @@ function TabRow(props: { group: WorktreeGroup; tab: RailTab; depth: number; ctx:
   // Each terminal/chat tab displays strictly its own status (never polluted by group.sessionRunning).
   const state = computed(() => (props.tab.kind === "terminal" || props.tab.kind === "chat" ? tabRunningState(props.tab) : "idle"));
   const ownAgent = () => (props.tab.kind === "terminal" || props.tab.kind === "chat" ? props.tab.runningAgent : undefined);
-  const logoSrc = () => props.ctx.spriteSrc(runtimeLogoOf(ownAgent() ?? undefined));
+  const logoSrc = () => props.ctx.engineLogoSrc(ownAgent() ?? undefined);
   const canClose = computed(() => props.tab.kind === "terminal" || props.tab.kind === "chat" || props.group.tabs.length > 1);
   const tabIconTone = () => (state() === "working" ? "leaf" : isSelected() ? "ink" : "muted");
   const fallbackIcon = (): IconName =>
@@ -576,7 +570,7 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
   const isHovered = computed(() => props.ctx.hoveredKey() === rowKey());
   const isSelected = computed(() => props.group.active && props.group.tabs.length === 0);
   const summary = computed(() => summarizeGroup(props.group));
-  const sessionLogo = () => (props.group.sessionRunning ? props.ctx.spriteSrc(runtimeLogoOf(props.group.sessionAgent)) : undefined);
+  const sessionLogo = () => (props.group.sessionRunning ? props.ctx.engineLogoSrc(props.group.sessionAgent) : undefined);
   const tipText = () =>
     formatSummaryTooltip(
       props.group.isMain
@@ -615,6 +609,9 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
                 <Text class="shrink truncate text-sm font-medium text-ink">{props.group.label}</Text>
                 <If when={props.group.isMain}>
                   <Text class="shrink-0 text-2xs font-medium text-faint">{t("web.shell.sidebar.mainLabel")}</Text>
+                </If>
+                <If when={expanded() && props.group.tabs.length > 0}>
+                  <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{String(props.group.tabs.length)}</Text>
                 </If>
               </View>
             </Button>
@@ -704,9 +701,8 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
   const summary = computed(() => summarizeRepo(props.repo));
   const showActiveCard = computed(() => props.repo.active && expandable() && expanded());
   const isRepoSelected = computed(() => props.repo.active && (!expandable() || !expanded()));
-  const plotSrc = () => (props.repo.vibevalley ? props.ctx.spriteSrc(props.repo.active ? "plot-flowering" : "plot-leafy") : undefined);
   const mainSessionRunning = computed(() => !hasMultipleWorktrees() && mainGroup().sessionRunning);
-  const mainSessionLogo = () => (mainSessionRunning() ? props.ctx.spriteSrc(runtimeLogoOf(mainGroup().sessionAgent)) : undefined);
+  const mainSessionLogo = () => (mainSessionRunning() ? props.ctx.engineLogoSrc(mainGroup().sessionAgent) : undefined);
   const repoTip = () => formatSummaryTooltip(props.repo.path, summary(), expandable() && !expanded());
 
   return (
@@ -721,27 +717,30 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
               if (props.ctx.hoveredKey() === rowKey()) props.ctx.setHoveredKey(null);
             }}
             tooltip={<Bubble text={repoTip()} />}
-            class={`${rowClass(isRepoSelected())} pl-2.5`}
+            class={`relative min-h-11 flex-row items-start gap-1.5 rounded-md py-1.5 pr-1.5 pl-2.5 ${isRepoSelected() ? "bg-selected" : "hover:bg-hover"}`}
           >
             <If when={isRepoSelected()}>
               <ActiveBar />
             </If>
             <Button
               onPress={() => act({ type: "activate_path", path: props.repo.path })}
-              class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
+              class="min-w-0 flex-1 flex-row items-start gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <View class="size-4 shrink-0 items-center justify-center">
-                <If when={plotSrc()} else={<Icon name="folder" size={14} tone={props.repo.active ? "ink" : "muted"} />}>
-                  {(src) => <Image src={src()} class="size-4 object-contain" />}
-                </If>
+              <View class="mt-0.5 size-4 shrink-0 items-center justify-center">
+                <Icon name={props.repo.vibevalley ? "repos" : "folder"} size={14} tone={props.repo.active ? "leaf" : "muted"} />
               </View>
-              <View class="min-w-0 flex-1 flex-row items-center gap-1">
-                <Text class="shrink truncate text-sm font-semibold text-ink">{props.repo.name}</Text>
-                <If when={props.parentHint}>{(hint) => <Text class="shrink truncate text-2xs text-faint">{hint()}</Text>}</If>
+              <View class="min-w-0 flex-1 gap-0.5">
+                <View class="min-w-0 flex-row items-center gap-1">
+                  <Text class="shrink truncate text-sm font-semibold text-ink">{props.repo.name}</Text>
+                  <If when={props.parentHint}>{(hint) => <Text class="shrink truncate text-2xs text-faint">{hint()}</Text>}</If>
+                </View>
+                <Text testID={`sidebar-repo-path-${props.repo.name}`} class="truncate font-mono text-2xs text-faint">
+                  {formatDisplayPath(props.repo.path)}
+                </Text>
               </View>
             </Button>
 
-            <View class="shrink-0 flex-row items-center gap-0.5">
+            <View class="mt-0.5 shrink-0 flex-row items-center gap-0.5">
               <If
                 when={isHovered()}
                 else={
@@ -828,6 +827,18 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
           }
         >
           <View class="gap-px">
+            <If when={mainGroup().tabs.length > 0}>
+              <View
+                testID={`sidebar-tabs-group-${props.repo.name}`}
+                class="h-6 flex-row items-center justify-between pr-1.5"
+                style={{ paddingLeft: ROW_BASE_PAD + INDENT_STEP }}
+              >
+                <View class="flex-row items-center gap-1.5">
+                  <Text class="text-2xs font-semibold text-faint">{t("web.shell.sidebar.tabsGroup")}</Text>
+                  <Text class="font-mono text-2xs text-faint tabular-nums">{String(mainGroup().tabs.length)}</Text>
+                </View>
+              </View>
+            </If>
             <Each of={mainGroup().tabs} key={(tab) => tab.id}>
               {(tab) => <TabRow group={mainGroup()} tab={tab()} depth={1} ctx={props.ctx} />}
             </Each>
@@ -873,7 +884,7 @@ export function Sidebar() {
   const isInspector = hostParams.role === "inspector";
   const board = isInspector ? () => null : sliceFrame("board");
   const sessionsSlice = isInspector ? () => null : sliceFrame("sessions");
-  const pixelDir = signal<string | undefined>(hostParams.pixelDir);
+  const assetsDir = signal<string | undefined>(hostParams.assetsDir);
   const foldOverrides = signal<Record<string, boolean>>({});
   const hoveredKey = signal<string | null>(null);
   const openMenuKey = signal<string | null>(null);
@@ -910,9 +921,9 @@ export function Sidebar() {
   });
 
   if (host.available()) {
-    if (!untracked(pixelDir)) {
-      void hostApi.pixelDir().then((env) => {
-        if (env.bizCode === 0 && env.data?.path) pixelDir.set(env.data.path);
+    if (!untracked(assetsDir)) {
+      void hostApi.assetsDir().then((env) => {
+        if (env.bizCode === 0 && env.data?.path) assetsDir.set(env.data.path);
       });
     }
     if (hostParams.role !== "inspector") {
@@ -929,9 +940,9 @@ export function Sidebar() {
 
   const panel = () => rail()?.panel ?? "files";
 
-  const spriteSrc = (name: string | undefined) => {
-    const dir = pixelDir();
-    return dir && name ? `file://${encodeURI(`${dir}/${name}.png`)}` : undefined;
+  const engineLogoSrc = (agent: string | undefined) => {
+    const dir = assetsDir();
+    return dir ? engineLogoUrl(dir, agent) : undefined;
   };
 
   const gitTab = signal<GitTab>("changes");
@@ -1271,7 +1282,7 @@ export function Sidebar() {
     openMenuKey: () => openMenuKey(),
     setOpenMenuKey: (key) => openMenuKey.set(key),
     sweepPhase: () => sweepPhase(),
-    spriteSrc,
+    engineLogoSrc,
     isRepoExpanded,
     isGroupExpanded,
     setFold,
@@ -1331,7 +1342,7 @@ export function Sidebar() {
           </>
         }
       >
-        {(repo) => <RepoDetailPanel repo={repo()} spriteSrc={spriteSrc} onClose={() => detailRepoPath.set(null)} />}
+        {(repo) => <RepoDetailPanel repo={repo()} onClose={() => detailRepoPath.set(null)} />}
       </If>
     </View>
   );

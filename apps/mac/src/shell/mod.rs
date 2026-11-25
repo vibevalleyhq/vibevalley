@@ -12,6 +12,7 @@ mod panes;
 mod projects;
 mod render;
 mod settings;
+mod startup_error;
 
 pub use devtools::devtools_enabled;
 pub use menus::{bind_keys, update_menus};
@@ -90,8 +91,8 @@ pub struct PaneSlot {
     pub(super) _sub: Subscription,
 }
 
-pub struct PixelSlot {
-    pub view: Entity<crate::pixel::view::PixelView>,
+pub struct DioramaSlot {
+    pub view: Entity<crate::diorama::DioramaView>,
     pub(super) _sub: Subscription,
 }
 
@@ -133,7 +134,7 @@ pub struct HostChrome {
     pub inspector: Option<InspectorSlot>,
     pub workbench: Entity<HostedView>,
     pub native_workspace: bool,
-    pub native_pixel: Option<PixelSlot>,
+    pub native_diorama: Option<DioramaSlot>,
     pub global_rail_width: f32,
     pub panel: Panel,
     pub inspector_open: bool,
@@ -154,7 +155,8 @@ pub struct NativeOverlays {
     pub(super) island: Option<crate::island::Island>,
     pub(super) island_client: Option<Arc<vibevalley_server::gateway::bridge::Client>>,
     /// VibeValley's opening over the window until the projects are in (`VIBEVALLEY_NO_OPENING=1` skips it).
-    pub launch: Option<Entity<crate::pixel::view::PixelView>>,
+    pub launch: Option<Entity<crate::diorama::OpeningView>>,
+    pub(super) startup: startup_error::StartupUiState,
     pub palette: Option<Palette>,
     pub devtools: devtools::DevtoolsSlot,
     /// Last `host.tray` summary, `host.locale` and `host.opening` from the views.
@@ -267,6 +269,10 @@ impl Shell {
         });
         let startup_rx = cx.try_global::<crate::hosted::ServerStartup>().map(|s| s.0.clone());
         let already_settled = startup_rx.as_ref().and_then(|rx| rx.borrow().clone());
+        let initial_failure = match &already_settled {
+            Some(Err(failure)) => Some(failure.clone()),
+            _ => None,
+        };
         let ui_settings = Ui::get(cx).settings.clone();
         let mut shell = Shell {
             workspace: WorkspaceProjects {
@@ -276,10 +282,7 @@ impl Shell {
                 loaded: false,
                 server_ready: matches!(already_settled, Some(Ok(()))),
                 workbench_ready: false,
-                load_error: match &already_settled {
-                    Some(Err(e)) => Some(e.clone()),
-                    _ => None,
-                },
+                load_error: initial_failure.as_ref().map(|f| f.summary.clone()),
                 projects: HashMap::new(),
                 git_summaries: HashMap::new(),
                 terminals: HashMap::new(),
@@ -299,7 +302,7 @@ impl Shell {
                 inspector: None,
                 workbench,
                 native_workspace: false,
-                native_pixel: None,
+                native_diorama: None,
                 global_rail_width: 76.0,
                 panel: Panel::Files,
                 inspector_open: ui_settings.inspector_open,
@@ -320,7 +323,8 @@ impl Shell {
                 launch: (std::env::var_os("VIBEVALLEY_NO_OPENING").is_none()
                     && ui_settings.effective_motion() != MotionChoice::Off
                     && !matches!(already_settled, Some(Err(_))))
-                .then(|| cx.new(|cx| crate::pixel::view::PixelView::new("opening:launch", json!({}), cx))),
+                .then(|| cx.new(crate::diorama::OpeningView::new)),
+                startup: startup_error::StartupUiState::new(initial_failure),
                 palette: None,
                 devtools: devtools::DevtoolsSlot::new(devtools_enabled()),
                 tray: None,
@@ -340,21 +344,40 @@ impl Shell {
                         break;
                     }
                 }
-                let result = startup.borrow().clone().unwrap_or_else(|| Err("the server startup channel closed".into()));
+                let result = startup.borrow().clone().unwrap_or_else(|| {
+                    Err(crate::hosted::StartupFailure::simple(
+                        crate::hosted::StartupFailureKind::ServerBoot,
+                        "the server startup channel closed",
+                        crate::hosted::server_home(),
+                    ))
+                });
                 let _ = this.update(cx, |shell, cx| {
                     match result {
                         Ok(()) => {
                             shell.workspace.server_ready = true;
+                            shell.overlays.startup.slow = false;
                             shell.sync_chat_watches(cx);
                             shell.finish_opening(true, cx);
                         }
-                        Err(error) => {
-                            eprintln!("{error}");
-                            shell.workspace.load_error = Some(error);
+                        Err(failure) => {
+                            eprintln!("{}", failure.summary);
+                            shell.workspace.load_error = Some(failure.summary.clone());
+                            shell.overlays.startup.failure = Some(failure);
+                            shell.overlays.startup.slow = false;
                             shell.finish_opening(false, cx);
                         }
                     }
                     cx.notify();
+                });
+            })
+            .detach();
+            cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(std::time::Duration::from_secs(15)).await;
+                let _ = this.update(cx, |shell, cx| {
+                    if !shell.workspace.server_ready && shell.overlays.startup.failure.is_none() {
+                        shell.overlays.startup.slow = true;
+                        cx.notify();
+                    }
                 });
             })
             .detach();
@@ -477,7 +500,7 @@ impl Shell {
                                 PaneKind::File { .. } => "file",
                                 PaneKind::Diff { .. } => "diff",
                                 PaneKind::Hosted { .. } => "hosted",
-                                PaneKind::Pixel { .. } => "pixel",
+                                PaneKind::Diorama { .. } => "diorama",
                             },
                             "title": crate::panes::tab_title(self, t, cx),
                         })
@@ -492,7 +515,7 @@ impl Shell {
                 })
             })
             .collect();
-        let active_pixel = self.chrome.native_pixel.as_ref().map(|slot| {
+        let active_diorama = self.chrome.native_diorama.as_ref().map(|slot| {
             let view = slot.view.read(cx);
             json!({
                 "kind": view.kind,
@@ -508,7 +531,7 @@ impl Shell {
             "inspectorOpen": self.chrome.inspector_open,
             "activeProjectId": active_project,
             "projects": projects,
-            "activePixel": active_pixel,
+            "activeDiorama": active_diorama,
         });
         let caches = vec![
             crate::hosted::DebugCacheEntry {
@@ -642,6 +665,14 @@ impl Shell {
                 }
                 Err(e) => {
                     eprintln!("could not load projects: {e}");
+                    tracing::error!(error = %e, "could not load workspace store");
+                    if this.overlays.startup.failure.is_none() {
+                        this.overlays.startup.failure = Some(crate::hosted::StartupFailure::simple(
+                            crate::hosted::StartupFailureKind::WorkspaceStore,
+                            e.clone(),
+                            crate::hosted::server_home(),
+                        ));
+                    }
                     this.workspace.load_error = Some(e);
                     this.workspace.loaded = true;
                     this.finish_opening(false, cx);
@@ -660,9 +691,9 @@ impl Shell {
         opening.update(cx, |v, _| {
             v.set_phase(
                 if ok {
-                    crate::pixel::opening::Phase::Ready
+                    crate::diorama::opening::Phase::Ready
                 } else {
-                    crate::pixel::opening::Phase::Failed
+                    crate::diorama::opening::Phase::Failed
                 },
                 100.0,
             )

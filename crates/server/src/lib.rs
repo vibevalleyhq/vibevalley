@@ -33,7 +33,7 @@ pub mod voice;
 
 pub use vibevalley_protocol::home;
 
-pub use crate::app::{App, Config, StartError, TestInternals, create_app, create_app_blocking};
+pub use crate::app::{App, Config, StartError, StartErrorKind, TestInternals, create_app, create_app_blocking};
 pub use crate::context::{Sink, SliceFeed, SliceFrame, SliceSubscription, install_tls, now};
 pub use crate::gateway::api::*;
 pub use crate::log::spawn_blocking_traced;

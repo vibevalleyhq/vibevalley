@@ -7,7 +7,6 @@ import { z } from "zod";
 import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../design/Icon";
-import { motionClass } from "../design/motion";
 import { SkeletonBar, SkeletonLines, useDelayedBusy } from "../design/Skeleton";
 import { act, hostApi } from "../infra/bridge";
 import { gitToneIconTone, gitToneTextClass, menuItemClass, menuPopupClass, menuSeparatorClass, PanelEmpty, SectionHead, ShellIconButton } from "./chrome";
@@ -45,6 +44,7 @@ function index(items: FileItem[], into: Map<string, FileItem>) {
 
 export function FileTree(props: { frame: FilesFrame | null }) {
   const byId = computed(() => index(props.frame?.items ?? [], new Map()));
+  const expandedIds = computed(() => new Set(props.frame?.expanded ?? []));
   const hasItems = computed(() => (props.frame?.items.length ?? 0) > 0);
   const isLoadingTree = computed(() => !props.frame || (props.frame.items.length === 0 && props.frame.loading === true));
   const showLoading = useDelayedBusy(isLoadingTree);
@@ -134,13 +134,9 @@ export function FileTree(props: { frame: FilesFrame | null }) {
             };
             const renderRow = () => (
               <View class="h-6.5 flex-row items-center gap-1.5 pr-2" style={{ paddingLeft: 6 + entry.depth * 14 }}>
-                <View class="size-3.5 shrink-0 items-center justify-center">
+                <View class="h-4 w-4 shrink-0 items-center justify-center">
                   <If when={entry.folder}>
-                    <View
-                      class={`size-3.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")} group-aria-expanded:rotate-90`}
-                    >
-                      <Icon name="expand" size={10} tone="muted" />
-                    </View>
+                    <Icon name={expandedIds().has(entry.id) ? "choose" : "expand"} size={14} tone="muted" />
                   </If>
                 </View>
                 <If when={!isPlaceholder() && !isLoadingRow()}>

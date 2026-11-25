@@ -131,14 +131,14 @@ function eventPage(events: SessionEvent[]): SessionEventPage {
 }
 
 function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<string, unknown> {
-  const pixelDir = { path: decodeURI(new URL("../../../../../assets/pixel", import.meta.url).pathname) };
+  const assetsDir = { path: decodeURI(new URL("../../../../../assets", import.meta.url).pathname) };
   const baseSettings = (baseResponses["setting.get"] as Record<string, unknown> | undefined) ?? {};
   const messages = buildMessages(density, SCENARIO_NOW);
 
   if (density === "empty") {
     return {
       ...baseResponses,
-      "host.pixelDir": pixelDir,
+      "host.assetsDir": assetsDir,
       "agent.list": [],
       "agent.template.list": [],
       "agent.validate": [],
@@ -169,7 +169,7 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
 
   return {
     ...baseResponses,
-    "host.pixelDir": pixelDir,
+    "host.assetsDir": assetsDir,
     "orchestrator.approval.list": [],
     "issue.history.list": buildHistory(bundle),
     "issue.timeline.get": {

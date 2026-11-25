@@ -1,26 +1,11 @@
 import type { JSX } from "@solidjs/web";
-import { steps, type MotionValue } from "motion";
-import { createEffect, createMemo, createSignal, onCleanup, onSettled } from "solid-js";
+import type { MotionValue } from "motion";
+import { createMemo, createSignal, onSettled } from "solid-js";
 
-import {
-  BACK,
-  FIELD,
-  JOB,
-  NEAR,
-  PACE,
-  PLACES,
-  START,
-  branchAt,
-  momentAt,
-  stageOf,
-  workAt,
-  type Art,
-  type Moment,
-  type Pose,
-  type StoryArt,
-} from "../base/story";
+import { BACK, FIELD, JOB, NEAR, PACE, PLACES, START, branchAt, momentAt, stageOf, workAt, type BubbleIcon, type Moment, type StoryArt } from "../base/story";
 import type { Copy } from "../i18n/zh";
 import { createEntrance } from "../ui/entrance";
+import { Icon } from "../ui/icons";
 import { Presence } from "../ui/Presence";
 import { createElementRef, createMotionValue, createScrollPosition, readMotion, reducedMotion, createReveal } from "../ui/scroll";
 import { Section } from "../ui/ui";
@@ -32,99 +17,103 @@ const dotTones = {
 };
 
 const viewStyles = {
-  spriteGeometry: (left: number, top: number, width: number, height: number): JSX.CSSProperties => ({
+  cutoutGeometry: (left: number, bottomY: number, width: number): JSX.CSSProperties => ({
     left: `${left}px`,
-    top: `${top}px`,
+    top: `${bottomY}px`,
     width: `${width}px`,
-    height: `${height}px`,
   }),
-  dotPosition: (left: string, top: number): JSX.CSSProperties => ({ left: left, top: `${top}px` }),
+  dotPosition: (left: string, top: number): JSX.CSSProperties => ({ left, top: `${top}px` }),
 };
+
 interface Props {
   copy: Copy["how"];
-  icons: string[];
-  /** Keys match the pose and prop lists in lib/story.ts. */
+  /** Papertrails isometric diorama cutouts (src/base/story.ts). */
   art: StoryArt;
 }
+
 export default function How(props: Props) {
   const root = createReveal<HTMLElement>();
   return (
-    <>
-      <Section ref={root.set} id="how" title={props.copy.title}>
-        <Story copy={props.copy} icons={props.icons} art={props.art} />
-        <noscript>
-          <Finished copy={props.copy} icons={props.icons} art={props.art} />
-        </noscript>
-      </Section>
-    </>
+    <Section ref={root.set} id="how" title={props.copy.title}>
+      <Story copy={props.copy} art={props.art} />
+      <noscript>
+        <Finished copy={props.copy} art={props.art} />
+      </noscript>
+    </Section>
   );
 }
+
 function Finished(props: Props) {
   const grown = PLACES.map((_, i) => stageOf(i, { place: PLACES.length - 1, working: true, work: 1, x: 0 }));
   return (
     <div>
       <div
         aria-hidden="true"
-        class="relative mb-12 overflow-hidden border-2 border-bark-900 bg-[image:var(--scene-field-background)] [box-shadow:4px_4px_0_var(--color-drop)]"
+        class="relative mb-12 overflow-hidden rounded-lg border border-border-soft/50 bg-[image:var(--scene-field-background)] shadow-card"
       >
-        <div class="grid grid-cols-4 items-end gap-5.5 px-3 sm:px-6 lg:px-0 pt-6 sm:pt-8">
+        <div class="grid grid-cols-4 items-end gap-5.5 px-3 sm:px-6 lg:px-8 pt-6 sm:pt-8">
           {grown.map((stage) => (
             <div class="flex justify-center">
-              <img loading="lazy" src={props.art[stage].src} alt="" class="w-17 sm:w-25.5 lg:w-34 max-w-none [image-rendering:pixelated]" />
+              <img loading="lazy" src={props.art[stage]} alt="" class="w-24 sm:w-32 lg:w-40 max-w-none drop-shadow-[0_4px_6px_rgb(91_67_43_/_0.2)]" />
             </div>
           ))}
         </div>
-        <div class="relative mt-2 mb-3 sm:mb-4 h-10 sm:h-12 border-y-2 border-(--color-path-edge) bg-[image:repeating-linear-gradient(90deg,var(--color-path)_0_22px,var(--color-path-groove)_22px_26px)]">
+        <div class="relative mt-2 mb-3 sm:mb-4 h-10 sm:h-12 border-y border-(--color-path-edge)/45 bg-[image:repeating-linear-gradient(90deg,var(--color-path)_0_28px,var(--color-path-groove)_28px_30px)]">
           <img
             loading="lazy"
-            src={props.art.cheer.src}
+            src={props.art.helper}
             alt=""
-            class="absolute right-[4%] bottom-1.5 h-14 sm:h-21 lg:h-28 w-auto max-w-none [image-rendering:pixelated]"
+            class="absolute right-[5%] bottom-1.5 h-16 sm:h-22 lg:h-26 w-auto max-w-none drop-shadow-[0_4px_8px_rgb(91_67_43_/_0.28)]"
           />
         </div>
       </div>
       <div class="mb-12">
-        <Branch copy={props.copy.git} now={{ place: PLACES.length - 1, working: true, work: 1, x: 0 }} check={props.art["mark-check"].src} />
+        <Branch copy={props.copy.git} now={{ place: PLACES.length - 1, working: true, work: 1, x: 0 }} />
       </div>
       <ol role="list" class="grid grid-cols-[minmax(0,1fr)] sm:grid-cols-2 lg:grid-cols-4 gap-5.5">
         {props.copy.steps.map((s, i) => (
           <li
             data-reveal={i * 80}
-            class="relative mt-2.5 sm:mt-0 border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] px-5.5 pt-6.5 pb-5.5"
+            class="relative mt-2.5 sm:mt-0 rounded-lg border border-border-soft/45 bg-card [box-shadow:var(--inset-shadow-rim),_var(--shadow-card)] px-5.5 pt-7 pb-5.5"
           >
-            <span class="absolute -top-4 left-4.5 border-2 border-bark-900 bg-leaf-500 px-2.5 py-1.5 font-pixel text-lg leading-none text-cream-50">
+            <span class="absolute -top-3.5 left-4.5 rounded-sm border border-leaf-700/80 bg-leaf-500 px-2.5 py-1 font-sans text-sm font-semibold leading-none text-paper-core shadow-card-sm">
               {i + 1}
             </span>
-            <img loading="lazy" src={props.icons[i]} alt="" class="mb-3 w-14 h-14 object-contain [image-rendering:pixelated]" />
-            <h3 class="mb-1.5 text-2xl">{s.title}</h3>
-            <p class="text-base text-bark-800">{s.text}</p>
+            <span class="mb-3 grid h-11 w-11 place-items-center rounded-md border border-border-soft/35 bg-cream-100 text-bark-800">
+              <Icon name={s.icon} class="h-5.5 w-5.5" />
+            </span>
+            <h3 class="mb-1.5 text-xl">{s.title}</h3>
+            <p class="text-[length:15px] text-bark-800">{s.text}</p>
           </li>
         ))}
       </ol>
     </div>
   );
 }
+
 // Position updates are imperative; only drawing state triggers reactive updates.
 const sameDrawing = (a: Moment, b: Moment) => a.place === b.place && a.working === b.working && Math.floor(a.work * 40) === Math.floor(b.work * 40);
+
 function Story(props: Props) {
   const track = createElementRef<HTMLDivElement>();
   const stage = createElementRef<HTMLDivElement>();
   const helper = createElementRef<HTMLImageElement>();
-  // The field's size on the screen: k screen pixels to an art pixel, and how much of the field shows across.
-  const [k, setK] = createSignal(3);
-  let shows = 373;
+  const [scale, setScale] = createSignal(1);
+  const [facing, setFacing] = createSignal<1 | -1>(1);
+  let shows = 900;
   const [now, setNow] = createSignal<Moment>(() => momentAt(0));
   const camera = createMotionValue(0);
   const at = createMotionValue(START);
   const position = readMotion(at);
   const cameraFor = (x: number) => Math.min(Math.max(0, x - shows / 2), Math.max(0, FIELD.w - shows));
+
   onSettled(() => {
     const el = stage.get();
     if (!el) return;
     const measure = () => {
-      const scale = Math.max(1, Math.round(el.clientHeight / FIELD.h));
-      setK(scale);
-      shows = el.clientWidth / scale;
+      const next = Math.max(0.65, el.clientHeight / FIELD.h);
+      setScale(next);
+      shows = el.clientWidth / next;
       camera.set(cameraFor(at.get()));
     };
     measure();
@@ -132,69 +121,23 @@ function Story(props: Props) {
     watch.observe(el);
     return () => watch.disconnect();
   });
-  // Walking frames change without updating the reactive story state.
-  let pose: {
-    name: Pose;
-    facing: 1 | -1;
-  } = { name: "side", facing: 1 };
-  function show(name: Pose, facing: 1 | -1 = pose.facing) {
-    const img = helper.get();
-    const a = props.art[name];
-    if (!img) return;
-    pose = { name, facing };
-    img.src = a.src;
-    img.style.left = `${-a.ax}px`;
-    img.style.top = `${-a.ay}px`;
-    img.style.transformOrigin = `${a.ax}px ${a.ay}px`;
-    img.style.scale = facing < 0 ? "-1 1" : "1 1";
-  }
-  // Walking: a step every 6 art pixels (step, stand, step, stand), facing the way it goes, standing once the page rests.
-  let walked = 0;
-  let rest = 0;
-  onCleanup(() => clearTimeout(rest));
+
   createScrollPosition((p) => {
     const m = momentAt(p);
-    // For those who ask for less motion, the helper is where the step is done, without the walk there.
     const place = PLACES[m.place];
     if (!place) throw new RangeError(`Invalid story place ${m.place}`);
     const x = reducedMotion() ? place.at : m.x;
     const dx = x - at.get();
     at.set(x);
     camera.set(cameraFor(x));
-    if (!reducedMotion() && !m.working && Math.abs(dx) > 0.01) {
-      walked += Math.abs(dx);
-      const frame = Math.floor(walked / 6) % 4;
-      show(frame === 0 ? "side-1" : frame === 2 ? "side-2" : "side", dx < 0 ? -1 : 1);
-      window.clearTimeout(rest);
-      rest = window.setTimeout(() => show("side"), 160);
-    }
+    if (!m.working && Math.abs(dx) > 0.2) setFacing(dx < 0 ? -1 : 1);
+    else if (m.working) setFacing(1);
     setNow((before) => (sameDrawing(before, m) ? before : m));
   }, track);
+
   const work = createMemo(() => workAt(now().place, now().work));
-  const poses = createMemo(() => (now().working ? work().poses.join(" ") : ""));
-  createEffect(
-    () => poses(),
-    () => {
-      if (!poses()) return;
-      window.clearTimeout(rest);
-      const turns = work().poses;
-      let i = 0;
-      show(turns[0], 1);
-      if (turns.length < 2) return;
-      const timer = window.setInterval(() => {
-        const next = turns[++i % turns.length];
-        if (next === undefined) throw new RangeError(`Invalid work animation frame ${i}`);
-        show(next, 1);
-      }, 220);
-      return () => window.clearInterval(timer);
-    },
-  );
-  onSettled(() => {
-    for (const a of Object.values(props.art)) new Image().src = a.src;
-    show("side", 1);
-  });
+
   return (
-    // The story's length: a screen to hold the field, and most of one more for each step.
     <div
       ref={track.set}
       data-testid="how-track"
@@ -209,21 +152,21 @@ function Story(props: Props) {
           ref={stage.set}
           data-testid="how-stage"
           aria-hidden="true"
-          class="relative h-66 lg:h-99 shrink-0 overflow-hidden border-2 border-bark-900 bg-(--color-story-sky) [box-shadow:4px_4px_0_var(--color-drop)]"
+          class="relative h-70 lg:h-96 shrink-0 overflow-hidden rounded-lg border border-border-soft/55 bg-(--color-story-sky) shadow-card-lg"
         >
           <div
             class="absolute top-0 left-0 [transform-origin:0_0]"
             style={{
               width: `${FIELD.w}px`,
               height: `${FIELD.h}px`,
-              scale: k(),
+              transform: `scale(${scale()})`,
             }}
           >
             <Sky camera={camera} />
             <Hills camera={camera} />
             <Pass camera={camera} pace={PACE.back}>
               {BACK.map((b) => (
-                <Sprite art={props.art[b.name]} x={b.x} y={74} class="[scale:75%_75%] [filter:brightness(95%)_saturate(75%)]" />
+                <Cutout src={props.art[b.name]} x={b.x} y={178} width={b.width} class="opacity-85 [filter:saturate(82%)]" />
               ))}
             </Pass>
             <Pass camera={camera} pace={PACE.field}>
@@ -239,61 +182,63 @@ function Story(props: Props) {
               >
                 <img
                   ref={helper.set}
-                  src={props.art.side.src}
+                  src={props.art.helper}
                   alt=""
-                  class="absolute max-w-none [image-rendering:pixelated]"
+                  class="absolute bottom-0 left-0 w-18 -translate-x-1/2 max-w-none drop-shadow-[0_6px_10px_rgb(91_67_43_/_0.3)] transition-transform duration-150"
                   style={{
-                    left: `${-props.art.side.ax}px`,
-                    top: `${-props.art.side.ay}px`,
+                    transform: facing() < 0 ? "scaleX(-1)" : "scaleX(1)",
                   }}
                 />
                 <Presence
                   value={now().working ? work().bubble : undefined}
-                  enter={{ scale: [0, 1], opacity: [0, 1] }}
-                  exit={{ scale: 0, opacity: 0 }}
-                  transition={{ duration: 0.22, ease: steps(3) }}
+                  enter={{ scale: [0.6, 1], opacity: [0, 1] }}
+                  exit={{ scale: 0.6, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  {(bubble, ref) => <Pop ref={ref} art={props.art[bubble]} x={0} y={-62} />}
+                  {(bubble, ref) => <Pop ref={ref} icon={bubble} x={0} y={-114} />}
                 </Presence>
               </div>
             </Pass>
             <Pass camera={camera} pace={PACE.near}>
-              {/* Low and small: they brush past the helper's feet, never over what it is doing. */}
               {NEAR.map((n) => (
-                <Sprite art={props.art[n.name]} x={n.x} y={FIELD.h + 30} class="[scale:55%_55%] [filter:brightness(75%)]" />
+                <Cutout src={props.art[n.name]} x={n.x} y={FIELD.h + 18} width={n.width} class="opacity-90 drop-shadow-[0_4px_8px_rgb(91_67_43_/_0.25)]" />
               ))}
             </Pass>
           </div>
         </div>
-        <Branch copy={props.copy.git} now={now()} check={props.art["mark-check"].src} />
-        <Caption copy={props.copy} icons={props.icons} now={now()} />
+        <Branch copy={props.copy.git} now={now()} />
+        <Caption copy={props.copy} now={now()} />
       </div>
     </div>
   );
 }
-function Caption(props: { copy: Copy["how"]; icons: string[]; now: Moment }) {
+
+function Caption(props: { copy: Copy["how"]; now: Moment }) {
   return (
-    <div class="relative min-h-44 border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] px-5 pt-4 pb-5">
-      <ol role="list" class="mb-3 flex flex-wrap gap-2">
+    <div class="relative min-h-42 rounded-lg border border-border-soft/45 bg-card [box-shadow:var(--inset-shadow-rim),_var(--shadow-card)] px-5.5 pt-4.5 pb-5">
+      <ol role="list" class="mb-3.5 flex flex-wrap gap-2">
         {props.copy.steps.map((s, i) => (
           <li
             aria-current={i === props.now.place ? "step" : undefined}
             class={[
-              "border-2 border-bark-900 px-2 py-1",
-              "font-pixel text-base leading-none transition-[color,background-color,border-color] duration-300 ease-[steps(3)]",
-              i < props.now.place ? "bg-leaf-500 text-cream-50" : i === props.now.place ? "bg-wheat" : "bg-cream-100 text-bark-500",
+              "rounded-sm border px-2.5 py-1 font-sans text-xs font-semibold leading-none transition-[color,background-color,border-color] duration-250 ease-out",
+              i < props.now.place
+                ? "border-leaf-700/75 bg-leaf-500 text-paper-core"
+                : i === props.now.place
+                  ? "border-bark-800/70 bg-wheat text-bark-900 shadow-card-sm"
+                  : "border-border-soft/35 bg-cream-100 text-bark-500",
             ]}
           >
-            {i + 1} {s.title}
+            {i + 1} · {s.title}
           </li>
         ))}
       </ol>
       <Presence
         value={props.now.place}
         initial={false}
-        enter={{ opacity: [0, 1], x: [16, 0] }}
-        exit={{ opacity: 0, x: -16 }}
-        transition={{ duration: 0.24, ease: steps(4) }}
+        enter={{ opacity: [0, 1], x: [14, 0] }}
+        exit={{ opacity: 0, x: -14 }}
+        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       >
         {(index, ref) => {
           const step = createMemo(() => {
@@ -303,10 +248,12 @@ function Caption(props: { copy: Copy["how"]; icons: string[]; now: Moment }) {
           });
           return (
             <div ref={ref} class="flex items-start gap-4">
-              <img src={props.icons[index]} alt="" class="w-12 h-12 flex-none object-contain [image-rendering:pixelated]" />
+              <span class="grid h-12 w-12 flex-none place-items-center rounded-md border border-border-soft/35 bg-cream-100 text-bark-800">
+                <Icon name={step().icon} class="h-6 w-6" />
+              </span>
               <div>
-                <h3 class="mb-1 text-2xl">{step().title}</h3>
-                <p class="text-base text-bark-800">{step().text}</p>
+                <h3 class="mb-1 text-xl">{step().title}</h3>
+                <p class="text-[length:15px] text-bark-800">{step().text}</p>
               </div>
             </div>
           );
@@ -315,6 +262,7 @@ function Caption(props: { copy: Copy["how"]; icons: string[]; now: Moment }) {
     </div>
   );
 }
+
 /** A layer of the field passing the camera at its pace (the field itself at 1). */
 function Pass(props: { camera: MotionValue<number>; pace: number; children: JSX.Element }) {
   const value = readMotion(props.camera);
@@ -329,17 +277,19 @@ function Pass(props: { camera: MotionValue<number>; pace: number; children: JSX.
     </div>
   );
 }
+
 function Sky(props: { camera: MotionValue<number> }) {
   return (
     <>
       <div class="absolute inset-0 bg-[image:var(--scene-story-background)]" />
       <Pass camera={props.camera} pace={PACE.sky}>
         {[
-          { y: 8, w: 46, d: 70, delay: -10 },
-          { y: 20, w: 30, d: 95, delay: -60 },
+          { y: 18, w: 96, d: 74, delay: -10 },
+          { y: 42, w: 68, d: 98, delay: -60 },
+          { y: 24, w: 84, d: 86, delay: -34 },
         ].map((c) => (
           <span
-            class="absolute left-0 h-2.5 [animation-name:title-cloud] [animation-duration:160000ms] [animation-timing-function:linear] [animation-iteration-count:infinite] rounded-[3px] bg-cream-50/90 shadow-story-cloud"
+            class="absolute left-0 h-5 [animation-name:title-cloud] [animation-duration:160000ms] [animation-timing-function:linear] [animation-iteration-count:infinite] rounded-full bg-paper-core/80 shadow-story-cloud"
             style={{
               top: `${c.y}px`,
               width: `${c.w}px`,
@@ -352,13 +302,14 @@ function Sky(props: { camera: MotionValue<number> }) {
     </>
   );
 }
-/** Two bands of rolling hills, in steps of an art pixel. */
+
+/** Soft Papertrails layered Jiangnan hills. */
 function Hills(props: { camera: MotionValue<number> }) {
   const band = (top: number, rise: number, length: number, seed: number) => {
     const points: string[] = [`0,${FIELD.h}`];
-    for (let x = 0; x <= FIELD.w; x += 4) {
-      const y = Math.round(top - rise * (0.5 + 0.5 * Math.sin(x / length + seed)) - 3 * Math.sin(x / 13 + seed * 2));
-      points.push(`${x},${y}`, `${x + 4},${y}`);
+    for (let x = 0; x <= FIELD.w; x += 24) {
+      const y = Math.round(top - rise * (0.5 + 0.5 * Math.sin(x / length + seed)) - 6 * Math.sin(x / 38 + seed * 2));
+      points.push(`${x},${y}`);
     }
     points.push(`${FIELD.w},${FIELD.h}`);
     return points.join(" ");
@@ -366,144 +317,111 @@ function Hills(props: { camera: MotionValue<number> }) {
   return (
     <>
       <Pass camera={props.camera} pace={PACE.hills * 0.6}>
-        <svg class="absolute inset-0" width={FIELD.w} height={FIELD.h} shape-rendering="crispEdges">
-          <polygon points={band(60, 16, 70, 1)} fill="#8db5a0" />
+        <svg class="absolute inset-0" width={FIELD.w} height={FIELD.h}>
+          <polygon points={band(128, 34, 150, 1)} fill="#c2d2c7" />
         </svg>
       </Pass>
       <Pass camera={props.camera} pace={PACE.hills}>
-        <svg class="absolute inset-0" width={FIELD.w} height={FIELD.h} shape-rendering="crispEdges">
-          <polygon points={band(76, 10, 46, 3)} fill="#7aa95a" />
+        <svg class="absolute inset-0" width={FIELD.w} height={FIELD.h}>
+          <polygon points={band(156, 22, 105, 3)} fill="#b8c79b" />
         </svg>
       </Pass>
     </>
   );
 }
+
 function Ground() {
   return (
     <>
-      <div
-        class="absolute inset-x-0 bottom-0 bg-[image:var(--scene-field-background)]"
-        style={{
-          top: `${74}px`,
-        }}
-      />
-      <div
-        class="absolute inset-x-0 border-y border-(--color-path-edge) bg-[image:repeating-linear-gradient(90deg,var(--color-path)_0_11px,var(--color-path-groove)_11px_13px)]"
-        style={{
-          top: `${FIELD.path - 9}px`,
-          height: `${14}px`,
-        }}
-      />
+      <div class="absolute inset-x-0 top-42 bottom-0 bg-[image:var(--scene-field-background)]" />
+      <div class="absolute inset-x-0 top-56 h-8 border-y border-(--color-path-edge)/45 bg-[image:repeating-linear-gradient(90deg,var(--color-path)_0_22px,var(--color-path-groove)_22px_24px)]" />
     </>
   );
 }
-/** A picture standing on the field at x, its feet at y. */
-function Sprite(props: { art: Art; x: number; y: number; class?: JSX.ClassValue | undefined }) {
+
+/** A Papertrails cutout standing on the field at (x, y) bottom-center. */
+function Cutout(props: { src: string; x: number; y: number; width: number; class?: JSX.ClassValue | undefined }) {
   return (
     <img
-      src={props.art.src}
+      src={props.src}
       alt=""
-      class={["[image-rendering:pixelated] absolute max-w-none origin-bottom", props.class]}
-      style={viewStyles.spriteGeometry(props.x - props.art.ax, props.y - props.art.ay, props.art.w, props.art.h)}
+      class={["absolute max-w-none -translate-x-1/2 -translate-y-full drop-shadow-[0_6px_8px_rgb(91_67_43_/_0.24)]", props.class]}
+      style={viewStyles.cutoutGeometry(props.x, props.y, props.width)}
     />
   );
 }
+
 function Spot(props: { place: (typeof PLACES)[number]; index: number; now: Moment; art: StoryArt }) {
   const stage = createMemo(() => stageOf(props.index, props.now));
   const here = createMemo(() => props.now.place === props.index && props.now.working);
   const done = createMemo(() => props.now.place > props.index);
   const plot = createElementRef<HTMLDivElement>();
-  createEntrance(plot, () => stage(), { scale: [0.7, 1] }, { duration: 0.3, ease: steps(3) });
+  createEntrance(plot, () => stage(), { scale: [0.82, 1] }, { duration: 0.34, ease: [0.22, 1, 0.36, 1] });
   return (
     <>
-      <Sprite art={props.art[props.place.thing.name]} x={props.place.thing.x} y={FIELD.stand} />
+      <Cutout src={props.art[props.place.thing.name]} x={props.place.thing.x} y={FIELD.stand} width={props.place.thing.width} />
       <div
         ref={plot.set}
-        class="absolute"
+        class="absolute [transform-origin:50%_100%]"
         style={{
           left: `${props.place.plot}px`,
-          top: `${FIELD.stand}px`,
-          "transform-origin": "50% 100%",
+          top: `${FIELD.stand + 6}px`,
         }}
       >
-        <Sprite art={props.art[stage()]} x={0} y={0} />
+        <Cutout src={props.art[stage()]} x={0} y={0} width={104} />
       </div>
       <Presence
         value={props.index === 0 && here() && props.now.work > 0.12 && props.now.work < 0.5 ? true : undefined}
-        enter={{ scale: [0, 1], opacity: [0, 1] }}
-        exit={{ scale: 0, opacity: 0 }}
-        transition={{ duration: 0.22, ease: steps(3) }}
+        enter={{ scale: [0.6, 1], opacity: [0, 1] }}
+        exit={{ scale: 0.6, opacity: 0 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       >
-        {(_, ref) => <Pop ref={ref} art={props.art["act-speaking_text"]} x={props.place.thing.x} y={FIELD.stand - 66} />}
+        {(_, ref) => <Pop ref={ref} icon="chat" x={props.place.thing.x} y={FIELD.stand - 130} />}
       </Presence>
       <Presence
-        value={props.index === 3 && here() && props.now.work > 0.45 ? true : undefined}
-        enter={{ opacity: [0, 1, 1, 0], y: [FIELD.stand - 46, FIELD.stand - 86] }}
+        value={props.index === 3 && (done() || (here() && props.now.work > 0.65)) ? true : undefined}
+        enter={{ scale: [1.3, 1], opacity: [0, 1] }}
         exit={{}}
-        transition={{ duration: 1.4, ease: steps(7) }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       >
         {(_, ref) => (
           <div
             ref={ref}
-            class="absolute top-0"
+            class="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-paper-core bg-leaf-500 p-2 text-paper-core shadow-card"
             style={{
-              left: `${props.place.plot}px`,
+              left: `${props.place.plot + 36}px`,
+              top: `${FIELD.stand - 66}px`,
             }}
           >
-            <Sprite art={props.art["coins-stack"]} x={0} y={0} class="[scale:50%_50%]" />
-          </div>
-        )}
-      </Presence>
-      <Presence
-        value={props.index === 3 && (done() || (here() && props.now.work > 0.75)) ? true : undefined}
-        enter={{ scale: [1.8, 1], opacity: [0, 1] }}
-        exit={{}}
-        transition={{ duration: 0.25, ease: steps(3) }}
-      >
-        {(_, ref) => (
-          <div
-            ref={ref}
-            class="absolute"
-            style={{
-              left: `${props.place.plot + 24}px`,
-              top: `${FIELD.stand - 34}px`,
-            }}
-          >
-            <Sprite art={props.art["stamp-done"]} x={0} y={0} class="[scale:50%_50%]" />
+            <Icon name="check" class="h-5 w-5" />
           </div>
         )}
       </Presence>
     </>
   );
 }
-function Pop(props: { art: Art; x: number; y: number; ref: (element: HTMLElement) => void }) {
+
+function Pop(props: { icon: BubbleIcon; x: number; y: number; ref: (element: HTMLElement) => void }) {
   return (
     <div
       ref={props.ref}
-      class="absolute"
+      class="absolute [transform-origin:50%_100%]"
       style={{
         left: `${props.x}px`,
         top: `${props.y}px`,
-        "transform-origin": "50% 100%",
       }}
     >
-      <div class="absolute bottom-0 left-0 -translate-x-1/2 border border-bark-900 bg-cream-50 p-0.5 [box-shadow:1px_1px_0_var(--color-drop)]">
-        <img
-          src={props.art.src}
-          alt=""
-          class="block max-w-none [image-rendering:pixelated]"
-          style={{
-            width: `${Math.round(props.art.w * 0.55)}px`,
-            height: `${Math.round(props.art.h * 0.55)}px`,
-          }}
-        />
+      <div class="absolute bottom-0 left-0 -translate-x-1/2 rounded-md border border-border-soft/60 bg-card p-2 text-bark-900 shadow-card">
+        <Icon name={props.icon} class="h-5 w-5" />
       </div>
     </div>
   );
 }
+
 /** Where the branch's marks sit across the picture (shares of its width). */
 const GIT = { fork: 0.16, commits: [0.36, 0.5, 0.64], join: 0.84 } as const;
-function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string }) {
+
+function Branch(props: { copy: Copy["how"]["git"]; now: Moment }) {
   const b = createMemo(() => branchAt(props.now));
   const lane = 30;
   const main = 74;
@@ -524,31 +442,60 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
   );
   return (
     <div
-      class="relative border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] px-4 pt-3 pb-2"
+      class="relative rounded-lg border border-border-soft/45 bg-card [box-shadow:var(--inset-shadow-rim),_var(--shadow-card)] px-4.5 pt-3.5 pb-2.5"
       aria-hidden="true"
     >
-      <div class="flex flex-wrap items-center gap-2 font-pixel text-sm sm:text-base leading-none sm:leading-none">
-        <span class={["border-2 border-bark-900 px-2 py-1", b().forked ? "bg-leaf-300" : "bg-cream-100 text-bark-500"]}>
+      <div class="flex flex-wrap items-center gap-2 font-mono text-xs sm:text-sm leading-none">
+        <span
+          class={[
+            "rounded-sm border px-2.5 py-1.5 font-medium",
+            b().forked ? "border-leaf-600/50 bg-leaf-300/75 text-bark-900" : "border-border-soft/35 bg-cream-100 text-bark-500",
+          ]}
+        >
           {props.copy.branch}
           <span class="hidden sm:inline"> · {props.copy.worktree}</span>
         </span>
-        <span class="ml-auto border-2 border-bark-900 bg-cream-100 px-2 py-1 tabular-nums">
+        <span class="ml-auto rounded-sm border border-border-soft/35 bg-cream-100 px-2.5 py-1.5 tabular-nums text-bark-800">
           {b().commits} {props.copy.commits}
         </span>
-        <span class="border-2 border-bark-900 bg-cream-100 px-2 py-1 tabular-nums">
+        <span class="rounded-sm border border-border-soft/35 bg-cream-100 px-2.5 py-1.5 tabular-nums">
           <span class="text-leaf-700">+{b().plus}</span> <span class="text-berry">−{b().minus}</span>
         </span>
-        <span class={["border-2 border-bark-900 px-2 py-1", "tabular-nums", b().tests === JOB.tests ? "bg-leaf-500 text-cream-50" : "bg-cream-100"]}>
+        <span
+          class={[
+            "rounded-sm border px-2.5 py-1.5 tabular-nums",
+            b().tests === JOB.tests ? "border-leaf-700/75 bg-leaf-500 text-paper-core" : "border-border-soft/35 bg-cream-100 text-bark-800",
+          ]}
+        >
           {props.copy.tests} {b().tests}/{JOB.tests}
         </span>
       </div>
       <div class="relative mt-1 h-23">
-        <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 92" preserveAspectRatio="none" shape-rendering="crispEdges">
-          <line x1="0" y1={main} x2="100" y2={main} stroke="var(--color-bark-900)" stroke-width="3" vector-effect="non-scaling-stroke" />
-          {path() && <path d={path()} fill="none" stroke="var(--color-leaf-600)" stroke-width="3" vector-effect="non-scaling-stroke" />}
+        <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 92" preserveAspectRatio="none">
+          <line
+            x1="0"
+            y1={main}
+            x2="100"
+            y2={main}
+            stroke="var(--color-bark-800)"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            vector-effect="non-scaling-stroke"
+          />
+          {path() && (
+            <path
+              d={path()}
+              fill="none"
+              stroke="var(--color-leaf-600)"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              vector-effect="non-scaling-stroke"
+            />
+          )}
         </svg>
         <span
-          class="absolute left-0 font-pixel text-sm leading-none text-bark-800"
+          class="absolute left-0 font-mono text-xs font-semibold leading-none text-bark-800"
           style={{
             top: `${main - 22}px`,
           }}
@@ -564,19 +511,19 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
           value={b().merged ? true : undefined}
           enter={{ opacity: [0, 1], y: [6, 0] }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2, ease: steps(3) }}
+          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
         >
           {(_, ref) => (
             <span
               ref={ref}
-              class="absolute flex -translate-x-1/2 items-center gap-1 border-2 border-bark-900 bg-wheat px-1.5 py-0.5 font-pixel text-sm leading-none whitespace-nowrap"
+              class="absolute flex -translate-x-1/2 items-center gap-1 rounded-sm border border-bark-800/70 bg-wheat px-2 py-1 font-sans text-xs font-semibold leading-none whitespace-nowrap text-bark-900 shadow-card-sm"
               style={{
                 left: `${GIT.join * 100}%`,
                 top: `${main - 42}px`,
               }}
             >
               {props.copy.merged}
-              <img src={props.check} alt="" class="w-3.5 h-3.5 object-contain [image-rendering:pixelated]" />
+              <Icon name="check" class="w-3.5 h-3.5" />
             </span>
           )}
         </Presence>
@@ -584,13 +531,18 @@ function Branch(props: { copy: Copy["how"]["git"]; now: Moment; check: string })
     </div>
   );
 }
+
 function Dot(props: { x: number; y: number; shown: boolean; tone: keyof typeof dotTones; large?: boolean }) {
   return (
-    <Presence value={props.shown ? true : undefined} enter={{ scale: [0, 1] }} exit={{ scale: 0 }} transition={{ duration: 0.18, ease: steps(3) }}>
+    <Presence value={props.shown ? true : undefined} enter={{ scale: [0, 1] }} exit={{ scale: 0 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}>
       {(_, ref) => (
         <span
           ref={ref}
-          class={["absolute -translate-1/2 border-2 border-bark-900", props.large === true ? "w-4 h-4" : "w-3 h-3", dotTones[props.tone]]}
+          class={[
+            "absolute -translate-1/2 rounded-full border-2 border-paper-core shadow-card-sm",
+            props.large === true ? "w-4 h-4" : "w-3 h-3",
+            dotTones[props.tone],
+          ]}
           style={viewStyles.dotPosition(`${props.x * 100}%`, props.y)}
         />
       )}

@@ -1,7 +1,6 @@
 import catalog from "./images.generated.json";
 import type { Scene } from "./scene";
 
-export const titleArt: Readonly<Record<string, string>> = catalog.title;
 export const backgrounds: Readonly<Record<Scene, string>> = catalog.backgrounds;
 
 export interface Screenshot {

@@ -220,7 +220,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
       </If>
       <If when={props.saved}>{(saved) => <FromTemplate agent={saved()} onUpdated={(a) => draft.set(a)} />}</If>
       <Scroll class="min-h-0 flex-1" contentClass="min-h-full gap-3 pt-3 lg:flex-row">
-        <View class="shrink-0 rounded-lg border border-line bg-page p-4 lg:w-76">
+        <View class="shrink-0 rounded-lg border border-line bg-page p-4 lg:w-84">
           <LookPanel draft={draft()} onChange={(look) => draft.set({ ...draft(), look })} />
         </View>
         <View class="min-h-104 flex-1 overflow-hidden rounded-lg border border-line bg-page">

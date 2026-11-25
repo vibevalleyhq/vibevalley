@@ -1,6 +1,7 @@
 import { cleanup, computed, effect, keymap, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
+import type { RuntimeInfo } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
@@ -15,8 +16,9 @@ import { ready, useRepos, useRuntimes } from "../../../infra/query";
 import { useRouter } from "../../../infra/router";
 import { prefsNow } from "../../../infra/state/prefs";
 import { canSubmitDraft, type DraftSubmitEvent, type DraftSubmitState, draftSubmitTransition, initialDraftSubmit } from "../model/draftSubmit";
-import { isRuntimeReady } from "../model/onboarding";
 import { createAttachmentUploader, IssueAttachmentStrip } from "./IssueAttachments";
+
+const isRuntimeReady = (runtime: RuntimeInfo) => runtime.installation.status === "available" && runtime.settings.enabled;
 
 /** The repo, helper, optional execution machine, starter template text, or attachment ids for a new issue. */
 export interface NewIssueAt {

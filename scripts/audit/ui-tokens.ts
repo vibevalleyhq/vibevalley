@@ -12,8 +12,6 @@ const EXCLUDE_GLOBS = [
   "design/domain/cast.ts",
   // Runtime token lookup & alpha blender (`tone`, `mix`).
   "design/tone.ts",
-  // Pixel asset registry, sprite manifests, and procedural pixel renderers.
-  "design/pixel/**",
   "**/*.test.*",
   "**/*.story.*",
   "**/*.stories.*",
@@ -77,7 +75,7 @@ export interface Finding {
 }
 
 const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
-  // Farm machine sprite fallback palette (moved from `design/pixel/RuntimeIcon.tsx`).
+  // Runtime emblem fallback palette.
   "apps/mac/ui/design/domain/RuntimeIcon.tsx": ["hardcoded-color"],
   // Third-party WeChat/Feishu/QQ brand stand-ins and QR quiet frame.
   "apps/mac/ui/features/connector/ConnectorsPage.tsx": ["hardcoded-color"],

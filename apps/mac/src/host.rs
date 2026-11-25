@@ -136,44 +136,6 @@ const MAX_READ: u64 = 50 << 20;
 /// Maximum byte count `random_bytes_hex` yields in a single call.
 const MAX_RANDOM_BYTES: usize = 4096;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SpriteManifestEntry {
-    pub w: f64,
-    pub h: f64,
-    pub ax: f64,
-    pub ay: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hx: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hy: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rail_size: Option<f64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub yard: Option<Vec<f64>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sheet: Option<String>,
-}
-
-pub type PixelManifest = std::collections::BTreeMap<String, SpriteManifestEntry>;
-
-fn load_pixel_manifest(path: &Path) -> Result<PixelManifest, String> {
-    let raw = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    serde_json::from_str(&raw).map_err(|e| format!("{}: {e}", path.display()))
-}
-
-/// Reads and caches `assets/pixel/sprites.json` once per process so the UI bundle
-/// does not inline the 105 KB manifest.
-pub fn pixel_manifest() -> Result<&'static PixelManifest, String> {
-    static CACHED: OnceLock<PixelManifest> = OnceLock::new();
-    if let Some(manifest) = CACHED.get() {
-        return Ok(manifest);
-    }
-    let path = crate::pixel::assets_dir().join("pixel/sprites.json");
-    let parsed = load_pixel_manifest(&path)?;
-    Ok(CACHED.get_or_init(|| parsed))
-}
-
 fn encode_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut out = String::with_capacity(bytes.len() * 2);
@@ -232,8 +194,8 @@ pub fn decode_host_op(op: &str, payload: Value) -> Result<vibevalley_protocol::H
     })
 }
 
-/// Handles fast, stateless host ops (`host.sha256`, `host.randomBytes`, `host.qr`,
-/// `host.pixelManifest`) on either the engine thread or the shell fallback path.
+/// Handles fast, stateless host ops (`host.sha256`, `host.randomBytes`, `host.qr`)
+/// on either the engine thread or the shell fallback path.
 pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalley_server::gateway::bridge::Envelope> {
     use serde_json::json;
     use vibevalley_protocol::HostOp;
@@ -248,10 +210,6 @@ pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalle
         HostOp::Qr(req) => Some(match crate::qr::encode(&req.text, req.border.unwrap_or(2) as usize) {
             Ok(matrix) => Envelope::ok(json!(matrix)),
             Err(e) => refusal(BizCode::InvalidInput, e),
-        }),
-        HostOp::PixelManifest => Some(match pixel_manifest() {
-            Ok(manifest) => Envelope::ok(json!(manifest)),
-            Err(e) => refusal(BizCode::NotFound, e),
         }),
         HostOp::Info
         | HostOp::UpdateState
@@ -288,7 +246,7 @@ pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalle
         | HostOp::PcmAppend(_)
         | HostOp::StopAudio
         | HostOp::ReadFile(_)
-        | HostOp::PixelDir
+        | HostOp::AssetsDir
         | HostOp::AppletList
         | HostOp::AppletInstall(_)
         | HostOp::AppletUninstall(_)
@@ -877,10 +835,10 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for OsLogLayer {
 fn channel_icon_names(channel: vibevalley_protocol::home::ReleaseChannel) -> (&'static str, &'static str) {
     use vibevalley_protocol::home::ReleaseChannel;
     match channel {
-        ReleaseChannel::Release => ("icon.icns", "pixel/app-sprout.png"),
-        ReleaseChannel::Beta => ("icon-beta.icns", "pixel/app-sprout-beta.png"),
-        ReleaseChannel::Alpha => ("icon-alpha.icns", "pixel/app-sprout-alpha.png"),
-        ReleaseChannel::Dev => ("icon-dev.icns", "pixel/app-sprout-dev.png"),
+        ReleaseChannel::Release => ("icon.icns", "appicon-release.png"),
+        ReleaseChannel::Beta => ("icon-beta.icns", "appicon-beta.png"),
+        ReleaseChannel::Alpha => ("icon-alpha.icns", "appicon-alpha.png"),
+        ReleaseChannel::Dev => ("icon-dev.icns", "appicon-dev.png"),
     }
 }
 
@@ -899,19 +857,17 @@ fn bundled_resources_icon(exe: Option<&Path>) -> Option<PathBuf> {
 }
 
 fn app_icon_candidates(channel: vibevalley_protocol::home::ReleaseChannel, exe: Option<&Path>, manifest_dir: &Path, assets_dir: &Path) -> Vec<PathBuf> {
-    let (icns, png) = channel_icon_names(channel);
+    let (icns, appicon_png) = channel_icon_names(channel);
     let mut candidates = Vec::with_capacity(5);
     if let Some(bundled) = bundled_resources_icon(exe) {
         candidates.push(bundled);
     }
     candidates.push(manifest_dir.join("resources").join(icns));
-    candidates.push(assets_dir.join(png));
+    candidates.push(manifest_dir.join("resources").join(appicon_png));
     if icns != "icon.icns" {
         candidates.push(manifest_dir.join("resources/icon.icns"));
     }
-    if png != "pixel/app-sprout.png" {
-        candidates.push(assets_dir.join("pixel/app-sprout.png"));
-    }
+    candidates.push(assets_dir.join("icons/app-256.png"));
     candidates
 }
 
@@ -926,7 +882,7 @@ pub fn set_app_icon() {
     let app = NSApplication::sharedApplication(mtm);
     app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
     let exe = std::env::current_exe().ok();
-    let dir = crate::pixel::assets_dir();
+    let dir = crate::assets::assets_dir();
     let candidate = app_icon_candidates(
         vibevalley_protocol::home::current_channel(),
         exe.as_deref(),
@@ -1121,9 +1077,9 @@ mod tests {
             vec![
                 PathBuf::from("/Applications/VibeValley.app/Contents/Resources/icon.icns"),
                 PathBuf::from("/repo/apps/mac/resources/icon-alpha.icns"),
-                PathBuf::from("/repo/assets/pixel/app-sprout-alpha.png"),
+                PathBuf::from("/repo/apps/mac/resources/appicon-alpha.png"),
                 PathBuf::from("/repo/apps/mac/resources/icon.icns"),
-                PathBuf::from("/repo/assets/pixel/app-sprout.png"),
+                PathBuf::from("/repo/assets/icons/app-256.png"),
             ]
         );
 
@@ -1132,22 +1088,23 @@ mod tests {
             dev,
             vec![
                 PathBuf::from("/repo/apps/mac/resources/icon-dev.icns"),
-                PathBuf::from("/repo/assets/pixel/app-sprout-dev.png"),
+                PathBuf::from("/repo/apps/mac/resources/appicon-dev.png"),
                 PathBuf::from("/repo/apps/mac/resources/icon.icns"),
-                PathBuf::from("/repo/assets/pixel/app-sprout.png"),
+                PathBuf::from("/repo/assets/icons/app-256.png"),
             ]
         );
 
         let beta = app_icon_candidates(ReleaseChannel::Beta, None, manifest, assets);
         assert_eq!(beta[0], PathBuf::from("/repo/apps/mac/resources/icon-beta.icns"));
-        assert_eq!(beta[1], PathBuf::from("/repo/assets/pixel/app-sprout-beta.png"));
+        assert_eq!(beta[1], PathBuf::from("/repo/apps/mac/resources/appicon-beta.png"));
 
         let release = app_icon_candidates(ReleaseChannel::Release, None, manifest, assets);
         assert_eq!(
             release,
             vec![
                 PathBuf::from("/repo/apps/mac/resources/icon.icns"),
-                PathBuf::from("/repo/assets/pixel/app-sprout.png"),
+                PathBuf::from("/repo/apps/mac/resources/appicon-release.png"),
+                PathBuf::from("/repo/assets/icons/app-256.png"),
             ]
         );
     }
@@ -1252,9 +1209,9 @@ mod tests {
         let malformed = decode_host_op("host.sha256", serde_json::json!({})).unwrap_err();
         assert_eq!(malformed.biz_code, vibevalley_server::gateway::bridge::BizCode::InvalidInput.code());
 
-        let manifest = pixel_manifest().unwrap();
-        assert!(manifest.len() > 700);
-        assert!(manifest.contains_key("bear-farmer-down"));
+        let assets_op = decode_host_op("host.assetsDir", serde_json::json!({})).unwrap();
+        assert_eq!(assets_op, vibevalley_protocol::HostOp::AssetsDir);
+        assert!(handle_stateless_op(&assets_op).is_none());
     }
 
     #[test]

@@ -499,7 +499,6 @@ export const catalogs = {
         content: { label: "内容", hint: "媒体库、作品与笔记" },
         runtimes: { label: "引擎", hint: "本机与远端已安装的编码引擎" },
         team: { label: "团队", hint: "角色与团队模板" },
-        catalog: { label: "素材图鉴", hint: "像素与界面素材：每张图、指针、声音和工作台零件" },
         settings: { label: "设置", hint: "通用与外观、模型与密钥、语音与通话、外部连接、关于与数据" },
       },
       link: { connecting: "连接中", open: "已连上", lost: "断了，重连中" },
@@ -592,7 +591,7 @@ export const catalogs = {
           issues: "任务",
           pictures: "看图",
           library: "媒体库",
-          farm: "像素农场",
+          farm: "农场",
           desktop: "桌面版（系统全局）",
         },
         say: {
@@ -640,63 +639,8 @@ export const catalogs = {
       intent: { timedOut: "等了太久没回音，可以重试", offline: "没连上 VibeValley，这一下没发出去" },
       pickTooLarge: "{name} 没加上：超过 512 MiB 了",
       openTerminal: "在这里打开终端",
-    },
-    "web.catalog": {
-      ground: { check: "格子", grass: "草地", night: "夜里" },
-      tab: { sprites: "图", cursors: "指针", sounds: "音效" },
-      shelves: "图鉴的书架",
-      find: "找素材",
-      background: "底色",
-      categories: "分类",
-      all: "全部",
-      count: "{n} 张，切自 design/pixel/raw。",
-      pick: "点一张看大图：尺寸、落脚点、会动的帧，和它是从哪张原图切出来的、怎么重画。",
-      findHint: "找：名字、类别、动物、衣服（熊、雨衣、lang-、icon-……）",
-      noMatch: "没有对得上的。",
-      moves: "动",
-      copied: "复制了",
-      copy: "复制",
-      anchor: "落脚点",
-      head: "头",
-      zoom: "放大",
-      marks: "落脚点和头",
-      stop: "停",
       play: "播放",
-      frames: "{n} 帧",
-      fps: "每秒几帧",
-      perSecond: "{n} 帧/秒",
-      size: "尺寸",
-      pixels: "{w} × {h} 像素",
-      from: "来自",
-      unrecorded: "没记下来（不再用的旧图）",
-      redraw: "重画",
-      recut: "重新切",
-      cursorsIntro: "鼠标在农场里的样子：平时、指着能点的、拿着工具时。",
-      cursorsFind: "找：指针的名字（glove、water、harvest……）",
-      cursorsNote:
-        "红点是点下去落在哪。平时是手套，指着能点的伸出食指；拿着工具时是那件工具，能用的带闪光，用不上的带禁止标记。切自 design/pixel/raw/ui-cursors.png（design/pixel/process.py ui-cursors）。",
-      noCursors: "这个版本没有带上指针的图（assets/cursors）。",
-      soundsIntro: "农场里的每个声音，点一下就能听。",
-      soundsFind: "找：声音的名字或分组（浇水、院子、coin……）",
-      soundsRecipes: "音效都是现合成的，没有音频文件：配方在",
-      soundsMuted: "。关了音效就听不到。",
-      playSound: "播放 {name}",
-      shelf: {
-        helpers: { label: "帮工", hint: "七种动物、四套衣服：站、走、干活、欢呼、发愁；在建筑前坐、读、敲、修" },
-        orchestrator: { hint: "六种样子，各有说话、听和头像" },
-        dog: { label: "狗", hint: "睡、醒、伸懒腰、摇尾巴、叫、跳、翻肚皮……" },
-        plots: { label: "地块", hint: "从空地到熟了，长草、干了、枯了、锁着" },
-        yard: { label: "院子", hint: "地图、道具、镜头前的草木、小动物" },
-        map: { label: "地图", hint: "每个仓库一座岛，罗盘、云、排队的种子袋、空位的木桩" },
-        machines: { label: "农机", hint: "每台是一种 runtime" },
-        icons: { label: "图标", hint: "面板、入口和提示用的" },
-        acts: { label: "在做什么", hint: "帮工头上的小图标：读、改、跑命令、搜……" },
-        medals: { label: "奖章与成就", hint: "奖章、成就图案、印章、金币" },
-        logos: { hint: "农机上的 agent、聊天软件、网页和桌面的图标" },
-        langs: { label: "语言", hint: "仓库页上种了什么" },
-        ui: { label: "界面", hint: "精力瓶、田头的按钮、日历的格子" },
-        other: { label: "其他", hint: "没归上类的" },
-      },
+      stop: "停止",
     },
     "web.channel": {
       tab: { chat: "聊天", issues: "任务", crons: "定时任务" },
@@ -714,8 +658,11 @@ export const catalogs = {
       channelsTitle: "频道",
       directsTitle: "私聊",
       newChannel: "创建频道",
-      helpers: "执行会话",
-      noHelpers: "没有在场的执行会话",
+      newChat: "发起聊天",
+      filter: { label: "筛选会话", all: "全部", group: "频道", direct: "私聊" },
+      emptyPreview: "暂无消息",
+      emptyList: "这里还没有对话",
+      runsEntry: "查看执行会话",
       mood: { idle: "在歇着", listening: "在听", thinking: "在想", speaking: "在说" },
       orchestrator: "主助手",
       nobodyOnIt: "现在没有执行会话在干，串还留着",
@@ -843,7 +790,6 @@ export const catalogs = {
         archivedTitle: "已归档",
         muted: "不提醒",
         mentionsOnly: "只 @",
-        drag: "拖到另一个频道上，排在它前面",
       },
       threadList: {
         title: "这个频道的话题",
@@ -871,7 +817,7 @@ export const catalogs = {
         searching: "在找…",
         failed: "没搜成：{why}",
       },
-      direct: { add: "开一个私聊", pick: "和谁私聊", none: "还没有角色", open: "和{name}私聊" },
+      direct: { pick: "和谁私聊", none: "还没有角色", open: "和{name}私聊" },
       emoji: { open: "表情", groups: { frequent: "常用", faces: "表情", hands: "手势", things: "东西", nature: "自然", signs: "符号" }, more: "更多表情" },
       media: {
         pdf: "PDF · 在新标签页里看",
@@ -908,7 +854,6 @@ export const catalogs = {
       },
       lacks: "回不了话：{why}",
       lacksFix: "去设置",
-      orchestratorRuns: "查看主助手轨迹与待审批调用",
     },
     "web.connector": {
       connectors: {
@@ -1081,73 +1026,9 @@ export const catalogs = {
       status: { loading: "加载中…", error: "加载开发者工具数据失败：{reason}", disabled: "服务端未启用开发者工具。", empty: "暂无数据。" },
     },
     "web.farm": {
-      panel: {
-        shop: "商店",
-        warehouse: "仓库",
-        graphs: "任务与成就",
-        log: "农场日志",
-        orchestrator: "助手和宠物",
-        harvest: "收获{name}的地",
-        sow: "播种 · 第 {plot} 块地",
-        water: "给{name}浇水",
-        menu: "菜单",
-        shopClosed: "商店还在装修，下一版开张。现在有 {coins} 金币，先攒着。",
-      },
-      menu: {
-        agents: "帮工名册",
-        runtimes: "农具",
-        skills: "技能书",
-        issues: "工单",
-        catalog: "图鉴",
-        chat: "田头（频道）",
-        connectors: "连接器",
-        repos: "仓库",
-      },
-      tool: {
-        hand: { hint: "点一块地看详情，点空地播种" },
-        water: { hint: "给帮工带句话，正在干活的会中途收到" },
-        bug: { hint: "活没做成（地里有虫）：让它接着修" },
-        weed: { hint: "没过验收的意见会长成杂草：帮工修完、下一次验收通过就拔掉" },
-        harvest: { hint: "熟了的地：收下成果，帮工收工" },
-        shovel: { hint: "正在干活的叫停；没在干活的请它收工" },
-      },
-      native: {
-        islandWorking: "{repo} · {count}/{limit} 在干活",
-        islandQueued: " · 排队 {count}",
-        islandGone: "{repo} · 不在仓库列表里",
-        ledger: "账本与时间",
-        achievements: "任务与成就",
-        log: "农场日志",
-        warehouse: "仓库里的工单",
-        shop: "小摊",
-        workbench: "工作台",
-        map: "群岛",
-        tree: "记忆树",
-        phone: "像素手机",
-        noMessages: "还没有消息",
-        empty: "这里还没有记录",
-        progress: "Lv.{level} · 经验 {xp}/{need}",
-        coins: "金币 {coins}",
-        workers: "在田帮工 {count} 名",
-        dawn: "清晨",
-        noon: "正午",
-        dusk: "黄昏",
-        night: "夜晚",
-        previous: "上一页",
-        next: "下一页 · {page}/{pages}",
-        score: "得分 {score}",
-        restart: "点击或按空格重开",
-        steer: "方向键 / WASD 控制",
-        pending: "正在发送…",
-        accepted: "已收到",
-        close: "关闭",
-        loading: "载入中…",
-        treeCounts: "叶 {leaves} · 果 {fruits} · 种 {seeds}",
-        treeGrowth: "{rounds} 轮 · 长到 {growth}%",
-        leaf: "叶片记忆",
-        fruit: "果实原则",
-        seed: "种子习惯",
-      },
+      panel: { harvest: "收获{name}的地", sow: "播种 · 第 {plot} 块地", water: "给{name}浇水" },
+      menu: { issues: "工单", repos: "仓库" },
+      native: { close: "关闭", loading: "载入中…" },
       chat: {
         channels: "频道",
         enlarge: "放大对话窗口",
@@ -1156,21 +1037,10 @@ export const catalogs = {
           "这里是田头，你、助手和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每张工单下面挂着它的工单串。",
         send: "发送",
       },
-      friends: { helpers: "帮工" },
-      hud: { toLevel: "{xp}/{need} commit", toLevelNext: "{xp}/{need} commit · Lv.{next} 开垦", tree: "记忆树", workbench: "工作台" },
-      overlay: {
-        clearAt: "Lv.{level} 开垦",
-        idle: "今天种点什么？",
-        click: "点击：{text}",
-        unclaimed: "没开垦的地",
-        flowerbed: "花坛",
-        bare: "第 {plot} 块地 · 空地",
-      },
-      quota: { left: "剩余额度", quota: "额度" },
-      sign: { noRepo: "没有仓库", repo: "仓库" },
+      hud: { workbench: "工作台" },
       sow: {
         homeless: "这座农场不是哪个仓库的",
-        toMap: "种地要先进一个仓库的农场：回地图挑一座岛。",
+        toMap: "种地要先进一个仓库的农场：去「仓库」里挑一个仓库。",
         noRepos: "工作台里还没有仓库：先在「仓库」页开一个。",
         makeRepo: "去开一个仓库",
         plantIn: "种在 {repo}",
@@ -1196,39 +1066,6 @@ export const catalogs = {
       },
       harvest: { repo: "仓库 {repo}", counts: "{commits} 个提交 · {files} 个文件", letGo: "请它收工", take: "确认收获，合进 {base}", resolve: "让它解决冲突" },
       plotOf: "{name}的地",
-      aim: {
-        flowerbed: "开垦好的花坛",
-        clearAt: "Lv.{level} 开垦这块地",
-        unread: "这块地的工单还没读到",
-        look: "看看这块地",
-        sow: "播种",
-        water: "给{name}浇水（带句话）",
-        nothingYet: "还没种东西，先用手播种",
-        bug: "杀虫：让它接着修",
-        noBugs: "这块地没有虫",
-        weeds: "帮工修完、验收通过草就拔了",
-        noWeeds: "没有杂草",
-        harvestRipe: "收获，帮工收工",
-        harvestLook: "收获：看看它改了什么",
-        nothingToHarvest: "空地没有东西可收",
-        shovelStop: "铲除：叫停",
-        shovelDismiss: "铲除：请它收工",
-        noShovel: "空地不用铲",
-        unavailable: "这张工单{state}，先打开地块看看",
-      },
-      crop: {
-        empty: "空地",
-        seeded: "刚播种",
-        sprout: "发芽",
-        leafy: "长叶",
-        flowering: "开花",
-        wheat: "成熟",
-        withered: "枯萎",
-        weeds: "长草",
-        dry: "干旱",
-        harvested: "收完了",
-        locked: "没开垦",
-      },
     },
     "web.farm.phone": {
       ringing: "来电…",
@@ -1246,8 +1083,6 @@ export const catalogs = {
       hangUp: "挂断",
       app: { missed: "未接", channels: "频道", games: "游戏" },
       game: { blocks: "方块", sokoban: "推箱子", dino: "小恐龙", bugs: "贪吃虫", merge: "种田 2048" },
-      phone: "手机",
-      new: "新",
       brand: "农场通",
       openChat: "展开田头",
       key: { up: "上", left: "左", right: "右", down: "下" },
@@ -1351,7 +1186,15 @@ export const catalogs = {
         order: "排序",
         reset: "恢复默认",
       },
-      list: { noRepo: "没有仓库", all: "全部任务", unfold: "展开 {group}", fold: "收起 {group}", writeIn: "在「{group}」写一张" },
+      list: {
+        noRepo: "没有仓库",
+        all: "全部任务",
+        unfold: "展开 {group}",
+        fold: "收起 {group}",
+        writeIn: "在「{group}」写一张",
+        empty: "暂无任务，按 C 或点右上角「新任务」写下第一条。",
+        emptyFiltered: "当前筛选条件下没有匹配的任务。",
+      },
       page: {
         pickFirst: "还差一点：选好派哪个执行会话、在哪个仓库里做，再点「开工」。",
         notDrafted: "先没起草：{why}",
@@ -1646,56 +1489,6 @@ export const catalogs = {
         uploadFailed: "附件上传失败：{why}",
         uploading: "正在上传 {name}…",
         remove: "移除附件 {name}",
-      },
-      guide: {
-        title: "任务流转指南",
-        summary: "写下需求并指派角色，执行会话在独立 worktree 改代码，完成后经验收合入主分支。",
-        collapse: "收起指南",
-        expand: "展开指南",
-        stage: {
-          todo: "写下目标、挑好仓库和角色，按先后排好待办。",
-          working: "确认派发或拖入此列，执行会话自动开 worktree 干活。",
-          waiting: "跑完一轮后在此验收改动、回答问题，或打回继续修。",
-          closed: "验收通过后完成交付并合入主分支，需要时可随时重开。",
-        },
-      },
-      onboarding: {
-        title: "开始使用 VibeValley",
-        subtitle: "完成下面三步准备工作，就能让执行会话在独立 worktree 里帮你改代码。",
-        progress: "{done} / {total} 已就绪",
-        step1Title: "添加代码仓库",
-        step1Desc: "绑定本机 Git 仓库，执行会话会在独立工作区里改动代码。",
-        step1Action: "添加仓库",
-        step1Manage: "管理仓库",
-        step1Ready: "{n} 个仓库已就绪",
-        step2Title: "检查或配置引擎",
-        step2Desc: "确认本机已安装并启用编码引擎（如 Claude Code、Codex 等）。",
-        step2Action: "配置引擎",
-        step2Manage: "管理引擎",
-        step2Ready: "{n} 个引擎已就绪",
-        step3Title: "创建第一条任务，或在聊天中派活",
-        step3Desc: "写下需求直接派给执行会话，按 C 键快速新建，或从下方模板一键预填。",
-        step3Ready: "{n} 条任务",
-        newIssue: "新建任务",
-        openChat: "去聊天派活",
-        templatesTitle: "或选一个起步模板快速开始",
-        templates: {
-          bug: {
-            title: "修复缺陷",
-            desc: "定位报错或异常行为并补回归测试",
-            prompt: "修复：[简述问题现象]\n\n复现步骤：\n1. \n预期结果：\n验收标准：补充回归测试并通过检查",
-          },
-          feature: {
-            title: "新增功能",
-            desc: "明确范围、交互和验收标准后交给执行会话",
-            prompt: "实现：[简述功能目标]\n\n范围：\n- \n不涉及：\n- \n验收标准：补齐测试并验证关键路径",
-          },
-          refactor: {
-            title: "排查并重构",
-            desc: "清理重复逻辑、收敛边界并保持行为一致",
-            prompt: "重构：[目标模块或路径]\n\n目标：\n- 简化结构，消除重复逻辑\n- 保持对外行为和现有测试不变",
-          },
-        },
       },
     },
     "web.library": {
@@ -2545,14 +2338,14 @@ export const catalogs = {
         voice: "电话 通话 MOSS Live 实时 视觉 转写 语音",
         connections: "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
         remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
-        about: "版本 家目录 设置文件 数据 素材图鉴 version catalog",
+        about: "版本 家目录 设置文件 数据 version",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
       general: {
         languageHint: "界面、主助手和执行会话说的话都用它",
         start: "启动时打开",
         startHint: "打开应用、或者打开首页时先进哪里",
-        starts: { workbench: "工作台", farm: "像素农场" },
+        starts: { workbench: "工作台", farm: "农场" },
       },
       appearance: {
         theme: "主题",
@@ -2562,7 +2355,7 @@ export const catalogs = {
         motionHint: "关闭后跳过界面过渡动画与背景帧循环，更适合 UI 测试与专注模式。",
         motionOption: { off: "无动画", on: "动画", system: "跟随系统" },
         scale: "界面大小",
-        scaleHint: "缩放整个工作台；像素农场按整数倍放大，不跟着变",
+        scaleHint: "缩放整个工作台；农场按整数倍放大，不跟着变",
         monoFont: "终端与代码字体",
         monoFontRow: "终端与代码字体（支持 Nerd Font）",
         monoFontHint: "用于终端、Diff 与文件预览的等宽字体，内置 Nerd Font 图标回退链",
@@ -2586,10 +2379,6 @@ export const catalogs = {
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
-        devTools: "开发与图鉴",
-        catalog: "素材图鉴",
-        catalogHint: "查看像素角色、指针、声音与工作台组件样式",
-        openCatalog: "打开素材图鉴",
         update: "更新",
         updateHint: "桌面版从 GitHub 上的发布自己更新",
         upToDate: "已是最新",
@@ -2656,6 +2445,7 @@ export const catalogs = {
         readyCount: "{n} 待命",
         attentionCount: "{n} 需要关注",
         closeTab: "关闭标签",
+        tabsGroup: "标签页",
         tabMore: "更多操作",
         newTerminal: "新终端：{name}",
         newChat: "新对话：{name}",
@@ -2768,17 +2558,7 @@ export const catalogs = {
         thoughtMedium: "中",
         thoughtHigh: "高",
         thoughtMax: "极深",
-        permissionMode: "权限模式",
-        modeAsk: "逐次确认",
-        modeAcceptEdits: "放行编辑",
-        modeBypass: "自动放行",
-        modeReadOnly: "只读模式",
-        openTerminal: "在此目录打开终端",
-        statusStarting: "连接引擎中…",
-        statusReady: "就绪",
-        statusWorking: "执行中",
         statusWaiting: "等待确认",
-        statusError: "会话异常",
         emptyTitle: "在当前工作区直接对话",
         emptyHint: "选择引擎后直接提问，工具调用结果可一键在右侧分栏打开源码或 Diff。",
         you: "你",
@@ -2883,43 +2663,6 @@ export const catalogs = {
         worktrees: "工作树",
         tabsCount: "{n} 标签",
         closeFolder: "从工作区关闭目录",
-      },
-    },
-    "web.tree": { sky: "农场的记忆星空" },
-    "web.ui.pixel": {
-      sound: {
-        group: { ui: "界面", tools: "农具", field: "地里", yard: "院子", reward: "奖励", voice: "语音" },
-        label: {
-          tap: "点击",
-          nope: "点不了",
-          pick: "拿工具",
-          open: "展开",
-          close: "收起",
-          water: "浇水",
-          spray: "杀虫",
-          weed: "除草",
-          harvest: "收获",
-          shovel: "铲除",
-          plant: "播种",
-          ripe: "熟了",
-          bug: "长虫",
-          coin: "金币",
-          levelUp: "升级",
-          achievement: "成就",
-          arrive: "帮工到了",
-          rustle: "草叶沙沙",
-          splash: "扑通",
-          thud: "踩土",
-          woof: "小狗叫",
-          meow: "小猫叫",
-          mew: "小猫短叫",
-          purr: "小猫呼噜",
-          yip: "小狗跳",
-          pant: "小狗喘气",
-          voiceOn: "语音接通",
-          voiceOff: "语音挂断",
-          ring: "来电",
-        },
       },
     },
     "web.voice": {
@@ -3468,7 +3211,6 @@ export const catalogs = {
         content: { label: "Content", hint: "Library, artifacts, and notes" },
         runtimes: { label: "Engines", hint: "Installed coding engines across machines" },
         team: { label: "Team", hint: "Roles and team templates" },
-        catalog: { label: "Catalog", hint: "Assets: pixel sprites, cursors, sounds, and workbench UI kit" },
         settings: { label: "Settings", hint: "General & appearance, models & keys, voice, connections, about" },
       },
       link: { connecting: "Connecting", open: "Connected", lost: "Lost, reconnecting" },
@@ -3624,63 +3366,8 @@ export const catalogs = {
       intent: { timedOut: "No answer in time; try again", offline: "Not connected to the farm, so this was not sent" },
       pickTooLarge: "{name} was not added: it is over 512 MiB",
       openTerminal: "Open a terminal here",
-    },
-    "web.catalog": {
-      ground: { check: "Checks", grass: "Grass", night: "Night" },
-      tab: { sprites: "Pictures", cursors: "Cursors", sounds: "Sounds" },
-      shelves: "The catalog's shelves",
-      find: "Find a picture",
-      background: "Background",
-      categories: "Categories",
-      all: "All",
-      count: "{n} pictures, cut from design/pixel/raw.",
-      pick: "Click one for a big view: its size, anchor, animation frames, and which source sheet it was cut from and how to redraw it.",
-      findHint: "Find: name, kind, animal, outfit (bear, raincoat, lang-, icon-…)",
-      noMatch: "Nothing matches.",
-      moves: "anim",
-      copied: "Copied",
-      copy: "Copy",
-      anchor: "Anchor",
-      head: "Head",
-      zoom: "Zoom",
-      marks: "Anchor and head",
-      stop: "Stop",
       play: "Play",
-      frames: "{n} frames",
-      fps: "Frames per second",
-      perSecond: "{n} fps",
-      size: "Size",
-      pixels: "{w} × {h} px",
-      from: "From",
-      unrecorded: "Not recorded (an old picture no longer used)",
-      redraw: "Redraw",
-      recut: "Cut again",
-      cursorsIntro: "The mouse on the farm: normally, over something clickable, and holding a tool.",
-      cursorsFind: "Find: a cursor's name (glove, water, harvest…)",
-      cursorsNote:
-        "The red dot is where a click lands. Normally a glove, a pointing finger over something clickable; holding a tool, that tool, sparkling where it can be used and with a no-entry mark where it cannot. Cut from design/pixel/raw/ui-cursors.png (design/pixel/process.py ui-cursors).",
-      noCursors: "This build has no cursor pictures (assets/cursors).",
-      soundsIntro: "Every sound on the farm: click one to hear it.",
-      soundsFind: "Find: a sound's name or group (water, yard, coin…)",
-      soundsRecipes: "The sounds are synthesized on the fly, with no audio files: the recipes are in",
-      soundsMuted: ". With sound off they are silent.",
-      playSound: "Play {name}",
-      shelf: {
-        helpers: { label: "Helpers", hint: "Seven animals, four outfits: stand, walk, work, cheer, worry; sit, read, type and fix by the buildings" },
-        orchestrator: { hint: "Six looks, each with talking, listening and a portrait" },
-        dog: { label: "Dog", hint: "Sleep, wake, stretch, wag, bark, jump, roll over…" },
-        plots: { label: "Plots", hint: "From bare soil to ripe, weedy, dry, withered and locked" },
-        yard: { label: "Yard", hint: "The map, props, plants in front of the camera, little animals" },
-        map: { label: "Map", hint: "An island for each repo, the compass, clouds, queued seed bags, stumps for free spots" },
-        machines: { label: "Machines", hint: "Each is a runtime" },
-        icons: { label: "Icons", hint: "For panels, entries and hints" },
-        acts: { label: "Doing", hint: "The little icons over a helper's head: read, edit, run a command, search…" },
-        medals: { label: "Medals and badges", hint: "Medals, badge emblems, stamps, coins" },
-        logos: { hint: "The agents on the machines, the chat apps, the web and desktop icons" },
-        langs: { label: "Languages", hint: "What a repo page has planted" },
-        ui: { label: "Interface", hint: "The energy bottle, the farm chat's buttons, the calendar's cells" },
-        other: { label: "Other", hint: "What fits no shelf" },
-      },
+      stop: "Stop",
     },
     "web.channel": {
       tab: { chat: "Chat", issues: "Tickets", crons: "Scheduled tasks" },
@@ -3698,8 +3385,11 @@ export const catalogs = {
       channelsTitle: "Channels",
       directsTitle: "Direct messages",
       newChannel: "Create a channel",
-      helpers: "Helpers",
-      noHelpers: "No helpers here",
+      newChat: "New chat",
+      filter: { label: "Filter chats", all: "All", group: "Channels", direct: "Direct" },
+      emptyPreview: "No messages yet",
+      emptyList: "No chats yet",
+      runsEntry: "View running sessions",
       mood: { idle: "resting", listening: "listening", thinking: "thinking", speaking: "speaking" },
       orchestrator: "Assistant",
       nobodyOnIt: "No helper is on it now; the thread stays",
@@ -3830,7 +3520,6 @@ export const catalogs = {
         archivedTitle: "Archived",
         muted: "Muted",
         mentionsOnly: "Only @",
-        drag: "Drop on another channel to place it before that one",
       },
       threadList: {
         title: "This channel's threads",
@@ -3858,7 +3547,7 @@ export const catalogs = {
         searching: "Searching…",
         failed: "The search failed: {why}",
       },
-      direct: { add: "New direct message", pick: "Talk with", none: "No profiles yet", open: "Talk with {name}" },
+      direct: { pick: "Talk with", none: "No profiles yet", open: "Talk with {name}" },
       emoji: {
         open: "Emoji",
         groups: { frequent: "Frequent", faces: "Faces", hands: "Hands", things: "Things", nature: "Nature", signs: "Signs" },
@@ -3904,7 +3593,6 @@ export const catalogs = {
       },
       lacks: "cannot answer: {why}",
       lacksFix: "Settings",
-      orchestratorRuns: "View assistant trajectory and pending approvals",
     },
     "web.connector": {
       connectors: {
@@ -4084,73 +3772,9 @@ export const catalogs = {
       },
     },
     "web.farm": {
-      panel: {
-        shop: "Shop",
-        warehouse: "Warehouse",
-        graphs: "Tasks and achievements",
-        log: "Farm log",
-        orchestrator: "Assistant and pets",
-        harvest: "Harvest {name}'s plot",
-        sow: "Sow · plot {plot}",
-        water: "Water {name}",
-        menu: "Menu",
-        shopClosed: "The shop is being done up and opens in the next version. You have {coins} coins: save them for now.",
-      },
-      menu: {
-        agents: "Helper roster",
-        runtimes: "Machines",
-        skills: "Skill book",
-        issues: "Tickets",
-        catalog: "Catalog",
-        chat: "Farm chat (channels)",
-        connectors: "Connectors",
-        repos: "Repos",
-      },
-      tool: {
-        hand: { hint: "Click a plot for its details, an empty one to sow" },
-        water: { hint: "Pass a helper a word; one at work hears it on the way" },
-        bug: { hint: "The job failed (bugs in the plot): have it go on fixing" },
-        weed: { hint: "Review notes that did not pass grow as weeds: pulled when the helper fixes them and the next review passes" },
-        harvest: { hint: "A ripe plot: bring in the result and let the helper go" },
-        shovel: { hint: "Stops one at work; lets one not at work go" },
-      },
-      native: {
-        islandWorking: "{repo} · {count}/{limit} working",
-        islandQueued: " · {count} queued",
-        islandGone: "{repo} · repository unavailable",
-        ledger: "Ledger & clock",
-        achievements: "Achievements",
-        log: "Farm log",
-        warehouse: "Stored issues",
-        shop: "Shop",
-        workbench: "Workbench",
-        map: "Islands",
-        tree: "Memory tree",
-        phone: "Pixel phone",
-        noMessages: "No messages yet",
-        empty: "No records yet",
-        progress: "Lv.{level} · XP {xp}/{need}",
-        coins: "Coins {coins}",
-        workers: "Helpers here: {count}",
-        dawn: "Dawn",
-        noon: "Noon",
-        dusk: "Dusk",
-        night: "Night",
-        previous: "Previous",
-        next: "Next · {page}/{pages}",
-        score: "Score {score}",
-        restart: "Click or Space to restart",
-        steer: "Arrow keys / WASD",
-        pending: "Sending…",
-        accepted: "Accepted",
-        close: "Close",
-        loading: "Loading…",
-        treeCounts: "Leaves {leaves} · Fruits {fruits} · Seeds {seeds}",
-        treeGrowth: "{rounds} rounds · {growth}% grown",
-        leaf: "Memory",
-        fruit: "Principle",
-        seed: "Habit",
-      },
+      panel: { harvest: "Harvest {name}'s plot", sow: "Sow · plot {plot}", water: "Water {name}" },
+      menu: { issues: "Tickets", repos: "Repos" },
+      native: { close: "Close", loading: "Loading…" },
       chat: {
         channels: "Channels",
         enlarge: "Enlarge the chat window",
@@ -4159,21 +3783,10 @@ export const catalogs = {
           'This is the farm chat, where you, the assistant and the helpers talk. Tell me something to do, such as "have the tester run the tests".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.',
         send: "Send",
       },
-      friends: { helpers: "Helpers" },
-      hud: { toLevel: "{xp}/{need} commits", toLevelNext: "{xp}/{need} commits · Lv.{next} clears a plot", tree: "Memory tree", workbench: "Workbench" },
-      overlay: {
-        clearAt: "Lv.{level} clears it",
-        idle: "What shall we plant today?",
-        click: "Click: {text}",
-        unclaimed: "Uncleared plot",
-        flowerbed: "Flowerbed",
-        bare: "Plot {plot} · empty",
-      },
-      quota: { left: "Allowance left", quota: "Allowance" },
-      sign: { noRepo: "No repo", repo: "Repo" },
+      hud: { workbench: "Workbench" },
       sow: {
         homeless: "This farm belongs to no repo",
-        toMap: "To plant, enter a repo's farm first: go back to the map and pick an island.",
+        toMap: "To plant, enter a repo's farm first: open Repos and pick a repository.",
         noRepos: "No repos in the workbench yet: make one on the Repos page first.",
         makeRepo: "Make a repo",
         plantIn: "Planting in {repo}",
@@ -4205,39 +3818,6 @@ export const catalogs = {
         resolve: "Have it resolve the conflict",
       },
       plotOf: "{name}'s plot",
-      aim: {
-        flowerbed: "A cleared flowerbed",
-        clearAt: "Lv.{level} clears this plot",
-        unread: "This plot's ticket has not been read yet",
-        look: "Look at this plot",
-        sow: "Sow",
-        water: "Water {name} (pass a word)",
-        nothingYet: "Nothing planted yet: sow with the hand first",
-        bug: "Spray: have it go on fixing",
-        noBugs: "No bugs in this plot",
-        weeds: "Weeds are pulled once the helper fixes them and the review passes",
-        noWeeds: "No weeds",
-        harvestRipe: "Harvest, let the helper go",
-        harvestLook: "Harvest: see what it changed",
-        nothingToHarvest: "Nothing to harvest on an empty plot",
-        shovelStop: "Shovel: stop it",
-        shovelDismiss: "Shovel: let it go",
-        noShovel: "Nothing to shovel on an empty plot",
-        unavailable: "This ticket is {state}: open the plot to see",
-      },
-      crop: {
-        empty: "empty",
-        seeded: "just sown",
-        sprout: "sprouting",
-        leafy: "leafy",
-        flowering: "flowering",
-        wheat: "ripe",
-        withered: "withered",
-        weeds: "weedy",
-        dry: "dry",
-        harvested: "harvested",
-        locked: "uncleared",
-      },
     },
     "web.farm.phone": {
       ringing: "Incoming…",
@@ -4258,8 +3838,6 @@ export const catalogs = {
       hangUp: "Hang up",
       app: { missed: "Missed", channels: "Chat", games: "Games" },
       game: { blocks: "Blocks", sokoban: "Sokoban", dino: "Dino", bugs: "Bug snake", merge: "Farm 2048" },
-      phone: "Phone",
-      new: "NEW",
       brand: "FarmTel",
       openChat: "Open the farm chat",
       key: { up: "Up", left: "Left", right: "Right", down: "Down" },
@@ -4387,7 +3965,15 @@ export const catalogs = {
         order: "Order",
         reset: "Reset",
       },
-      list: { noRepo: "No repo", all: "All tickets", unfold: "Unfold {group}", fold: "Fold {group}", writeIn: 'Write one in "{group}"' },
+      list: {
+        noRepo: "No repo",
+        all: "All tickets",
+        unfold: "Unfold {group}",
+        fold: "Fold {group}",
+        writeIn: 'Write one in "{group}"',
+        empty: "No tickets yet. Press C or click New issue to create one.",
+        emptyFiltered: "No tickets match the current filter.",
+      },
       page: {
         pickFirst: "Almost: pick which helper and which repo, then press Start.",
         notDrafted: "Not drafted: {why}",
@@ -4689,57 +4275,6 @@ export const catalogs = {
         uploadFailed: "Upload failed: {why}",
         uploading: "Uploading {name}…",
         remove: "Remove attachment {name}",
-      },
-      guide: {
-        title: "How issues flow",
-        summary: "Assign a helper to launch a worktree session, then inspect changes in Review to complete.",
-        collapse: "Hide guide",
-        expand: "Show guide",
-        stage: {
-          todo: "Capture work, pick a repo and helper, and order your queue.",
-          working: "Dispatch or drag here to launch an isolated worktree session.",
-          waiting: "Review changes, answer questions, or send back for another round.",
-          closed: "Complete to merge into the base branch, or reopen anytime.",
-        },
-      },
-      onboarding: {
-        title: "Get started with VibeValley",
-        subtitle: "Complete these three steps to dispatch tickets to helpers in isolated worktrees.",
-        progress: "{done} / {total} ready",
-        step1Title: "Add a Git repository",
-        step1Desc: "Link a local Git repository so helpers can work in isolated worktrees.",
-        step1Action: "Add repository",
-        step1Manage: "Manage repos",
-        step1Ready: "{n, plural, one {# repo ready} other {# repos ready}}",
-        step2Title: "Connect a coding engine",
-        step2Desc: "Verify a local coding engine (such as Claude Code or Codex) is installed and enabled.",
-        step2Action: "Configure engines",
-        step2Manage: "Manage engines",
-        step2Ready: "{n, plural, one {# engine ready} other {# engines ready}}",
-        step3Title: "Create your first ticket",
-        step3Desc: "Describe what to build, press C to create a ticket, or pick a starter template below.",
-        step3Ready: "{n, plural, one {# ticket} other {# tickets}}",
-        newIssue: "New ticket",
-        openChat: "Open chat",
-        templatesTitle: "Or start from a template",
-        templates: {
-          bug: {
-            title: "Fix a bug",
-            desc: "Track down a failure and add a regression test",
-            prompt: "Fix: [describe the issue]\n\nSteps to reproduce:\n1. \nExpected behavior:\nAcceptance criteria: add a regression test and pass checks",
-          },
-          feature: {
-            title: "Add a feature",
-            desc: "Define scope and criteria for a helper to build",
-            prompt: "Add: [describe the feature]\n\nScope:\n- \nOut of scope:\n- \nAcceptance criteria: cover the main flow with tests",
-          },
-          refactor: {
-            title: "Audit & refactor",
-            desc: "Simplify boundaries while keeping behavior intact",
-            prompt:
-              "Refactor: [target module or path]\n\nGoals:\n- Simplify structure and remove duplication\n- Keep external behavior and existing tests unchanged",
-          },
-        },
       },
     },
     "web.library": {
@@ -5638,7 +5173,7 @@ export const catalogs = {
         voice: "call phone recognition speech MOSS live realtime vision transcription",
         connections: "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
         remote: "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
-        about: "version home folder settings data catalog",
+        about: "version home folder settings data",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
       general: {
@@ -5679,10 +5214,6 @@ export const catalogs = {
         copy: "Copy the path",
         copied: "Path copied",
         reveal: "Show in Finder",
-        devTools: "Developer tools",
-        catalog: "Asset catalog",
-        catalogHint: "Inspect sprites, cursors, sounds, and workbench UI components",
-        openCatalog: "Open catalog",
         update: "Updates",
         updateHint: "The desktop app updates itself from the releases on GitHub",
         upToDate: "Up to date",
@@ -5749,6 +5280,7 @@ export const catalogs = {
         readyCount: "{n} ready",
         attentionCount: "{n} attention",
         closeTab: "Close tab",
+        tabsGroup: "Tabs",
         tabMore: "More actions",
         newTerminal: "New terminal: {name}",
         newChat: "New chat: {name}",
@@ -5861,17 +5393,7 @@ export const catalogs = {
         thoughtMedium: "Med",
         thoughtHigh: "High",
         thoughtMax: "Max",
-        permissionMode: "Permissions",
-        modeAsk: "Ask",
-        modeAcceptEdits: "Accept edits",
-        modeBypass: "Bypass",
-        modeReadOnly: "Read-only",
-        openTerminal: "Open terminal here",
-        statusStarting: "Connecting…",
-        statusReady: "Ready",
-        statusWorking: "Working",
         statusWaiting: "Needs reply",
-        statusError: "Error",
         emptyTitle: "Direct coding chat in this workspace",
         emptyHint: "Pick a runtime and start chatting. Tool call cards open files and diffs directly in an adjacent split pane.",
         you: "You",
@@ -5976,43 +5498,6 @@ export const catalogs = {
         worktrees: "Worktrees",
         tabsCount: "{n} tabs",
         closeFolder: "Close folder from workspace",
-      },
-    },
-    "web.tree": { sky: "The farm's sky of memories" },
-    "web.ui.pixel": {
-      sound: {
-        group: { ui: "Interface", tools: "Tools", field: "In the field", yard: "Yard", reward: "Rewards", voice: "Voice" },
-        label: {
-          tap: "Tap",
-          nope: "Nope",
-          pick: "Pick a tool",
-          open: "Open",
-          close: "Close",
-          water: "Water",
-          spray: "Spray",
-          weed: "Weed",
-          harvest: "Harvest",
-          shovel: "Shovel",
-          plant: "Sow",
-          ripe: "Ripe",
-          bug: "Bugs",
-          coin: "Coin",
-          levelUp: "Level up",
-          achievement: "Achievement",
-          arrive: "Helper arrives",
-          rustle: "Rustling grass",
-          splash: "Splash",
-          thud: "Footstep",
-          woof: "Puppy barks",
-          meow: "Kitten meows",
-          mew: "Kitten mews",
-          purr: "Kitten purrs",
-          yip: "Puppy jumps",
-          pant: "Puppy pants",
-          voiceOn: "Call connected",
-          voiceOff: "Call ended",
-          ring: "Ringing",
-        },
       },
     },
     "web.voice": {
@@ -6619,8 +6104,6 @@ export interface Messages {
   "web.base.openTerminal": undefined;
   "web.base.orchestrator": undefined;
   "web.base.pickTooLarge": { readonly name: string | number };
-  "web.base.place.catalog.hint": undefined;
-  "web.base.place.catalog.label": undefined;
   "web.base.place.chat.hint": undefined;
   "web.base.place.chat.label": undefined;
   "web.base.place.content.hint": undefined;
@@ -6637,6 +6120,7 @@ export interface Messages {
   "web.base.place.team.label": undefined;
   "web.base.place.workspace.hint": undefined;
   "web.base.place.workspace.name": undefined;
+  "web.base.play": undefined;
   "web.base.query.invalidResponse": undefined;
   "web.base.rail": undefined;
   "web.base.reading": undefined;
@@ -6692,6 +6176,7 @@ export interface Messages {
   "web.base.shortcuts.say.tool": undefined;
   "web.base.shortcuts.say.voice": undefined;
   "web.base.shortcuts.title": undefined;
+  "web.base.stop": undefined;
   "web.base.table.columns": undefined;
   "web.base.table.empty": undefined;
   "web.base.table.next": undefined;
@@ -6736,74 +6221,6 @@ export interface Messages {
   "web.base.user": undefined;
   "web.base.working": { readonly n: string | number };
   "web.base.write": undefined;
-  "web.catalog.all": undefined;
-  "web.catalog.anchor": undefined;
-  "web.catalog.background": undefined;
-  "web.catalog.categories": undefined;
-  "web.catalog.copied": undefined;
-  "web.catalog.copy": undefined;
-  "web.catalog.count": { readonly n: string | number };
-  "web.catalog.cursorsFind": undefined;
-  "web.catalog.cursorsIntro": undefined;
-  "web.catalog.cursorsNote": undefined;
-  "web.catalog.find": undefined;
-  "web.catalog.findHint": undefined;
-  "web.catalog.fps": undefined;
-  "web.catalog.frames": { readonly n: string | number };
-  "web.catalog.from": undefined;
-  "web.catalog.ground.check": undefined;
-  "web.catalog.ground.grass": undefined;
-  "web.catalog.ground.night": undefined;
-  "web.catalog.head": undefined;
-  "web.catalog.marks": undefined;
-  "web.catalog.moves": undefined;
-  "web.catalog.noCursors": undefined;
-  "web.catalog.noMatch": undefined;
-  "web.catalog.perSecond": { readonly n: string | number };
-  "web.catalog.pick": undefined;
-  "web.catalog.pixels": { readonly h: string | number; readonly w: string | number };
-  "web.catalog.play": undefined;
-  "web.catalog.playSound": { readonly name: string | number };
-  "web.catalog.recut": undefined;
-  "web.catalog.redraw": undefined;
-  "web.catalog.shelf.acts.hint": undefined;
-  "web.catalog.shelf.acts.label": undefined;
-  "web.catalog.shelf.dog.hint": undefined;
-  "web.catalog.shelf.dog.label": undefined;
-  "web.catalog.shelf.helpers.hint": undefined;
-  "web.catalog.shelf.helpers.label": undefined;
-  "web.catalog.shelf.icons.hint": undefined;
-  "web.catalog.shelf.icons.label": undefined;
-  "web.catalog.shelf.langs.hint": undefined;
-  "web.catalog.shelf.langs.label": undefined;
-  "web.catalog.shelf.logos.hint": undefined;
-  "web.catalog.shelf.machines.hint": undefined;
-  "web.catalog.shelf.machines.label": undefined;
-  "web.catalog.shelf.map.hint": undefined;
-  "web.catalog.shelf.map.label": undefined;
-  "web.catalog.shelf.medals.hint": undefined;
-  "web.catalog.shelf.medals.label": undefined;
-  "web.catalog.shelf.orchestrator.hint": undefined;
-  "web.catalog.shelf.other.hint": undefined;
-  "web.catalog.shelf.other.label": undefined;
-  "web.catalog.shelf.plots.hint": undefined;
-  "web.catalog.shelf.plots.label": undefined;
-  "web.catalog.shelf.ui.hint": undefined;
-  "web.catalog.shelf.ui.label": undefined;
-  "web.catalog.shelf.yard.hint": undefined;
-  "web.catalog.shelf.yard.label": undefined;
-  "web.catalog.shelves": undefined;
-  "web.catalog.size": undefined;
-  "web.catalog.soundsFind": undefined;
-  "web.catalog.soundsIntro": undefined;
-  "web.catalog.soundsMuted": undefined;
-  "web.catalog.soundsRecipes": undefined;
-  "web.catalog.stop": undefined;
-  "web.catalog.tab.cursors": undefined;
-  "web.catalog.tab.sounds": undefined;
-  "web.catalog.tab.sprites": undefined;
-  "web.catalog.unrecorded": undefined;
-  "web.catalog.zoom": undefined;
   "web.channel.channels": undefined;
   "web.channel.channelsTitle": undefined;
   "web.channel.closeThread": undefined;
@@ -6876,7 +6293,6 @@ export interface Messages {
   "web.channel.dialog.repoNone": undefined;
   "web.channel.dialog.save": undefined;
   "web.channel.dialog.settingsOf": { readonly name: string | number };
-  "web.channel.direct.add": undefined;
   "web.channel.direct.none": undefined;
   "web.channel.direct.open": { readonly name: string | number };
   "web.channel.direct.pick": undefined;
@@ -6890,16 +6306,21 @@ export interface Messages {
   "web.channel.emoji.more": undefined;
   "web.channel.emoji.open": undefined;
   "web.channel.empty": { readonly label: string | number };
+  "web.channel.emptyList": undefined;
+  "web.channel.emptyPreview": undefined;
   "web.channel.farmSearch.failed": { readonly why: string | number };
   "web.channel.farmSearch.filters": undefined;
   "web.channel.farmSearch.hint": undefined;
   "web.channel.farmSearch.none": undefined;
   "web.channel.farmSearch.searching": undefined;
   "web.channel.farmSearch.title": undefined;
+  "web.channel.filter.all": undefined;
+  "web.channel.filter.direct": undefined;
+  "web.channel.filter.group": undefined;
+  "web.channel.filter.label": undefined;
   "web.channel.find": undefined;
   "web.channel.findHint": undefined;
   "web.channel.findMessages": undefined;
-  "web.channel.helpers": undefined;
   "web.channel.inChannel": undefined;
   "web.channel.issues.empty": undefined;
   "web.channel.issues.thread": undefined;
@@ -6910,7 +6331,6 @@ export interface Messages {
   "web.channel.manage.archivedTitle": undefined;
   "web.channel.manage.category": undefined;
   "web.channel.manage.categoryHint": undefined;
-  "web.channel.manage.drag": undefined;
   "web.channel.manage.members": undefined;
   "web.channel.manage.membersHint": undefined;
   "web.channel.manage.mentionsOnly": undefined;
@@ -6988,16 +6408,16 @@ export interface Messages {
   "web.channel.names.talkThread": { readonly who: string | number };
   "web.channel.names.thread": undefined;
   "web.channel.newChannel": undefined;
-  "web.channel.noHelpers": undefined;
+  "web.channel.newChat": undefined;
   "web.channel.nobodyOnIt": undefined;
   "web.channel.orchestrator": undefined;
-  "web.channel.orchestratorRuns": undefined;
   "web.channel.pins.failed": { readonly why: string | number };
   "web.channel.pins.none": undefined;
   "web.channel.pins.open": undefined;
   "web.channel.pins.title": undefined;
   "web.channel.replies": { readonly n: number };
   "web.channel.reply": undefined;
+  "web.channel.runsEntry": undefined;
   "web.channel.sayInThread": { readonly name: string | number };
   "web.channel.sendTo": { readonly label: string | number };
   "web.channel.settings": undefined;
@@ -7192,108 +6612,23 @@ export interface Messages {
   "web.devtools.trajectory.turnIndex": { readonly index: string | number };
   "web.devtools.trajectory.turns": undefined;
   "web.devtools.trajectory.voyageRecords": undefined;
-  "web.farm.aim.bug": undefined;
-  "web.farm.aim.clearAt": { readonly level: string | number };
-  "web.farm.aim.flowerbed": undefined;
-  "web.farm.aim.harvestLook": undefined;
-  "web.farm.aim.harvestRipe": undefined;
-  "web.farm.aim.look": undefined;
-  "web.farm.aim.noBugs": undefined;
-  "web.farm.aim.noShovel": undefined;
-  "web.farm.aim.noWeeds": undefined;
-  "web.farm.aim.nothingToHarvest": undefined;
-  "web.farm.aim.nothingYet": undefined;
-  "web.farm.aim.shovelDismiss": undefined;
-  "web.farm.aim.shovelStop": undefined;
-  "web.farm.aim.sow": undefined;
-  "web.farm.aim.unavailable": { readonly state: string | number };
-  "web.farm.aim.unread": undefined;
-  "web.farm.aim.water": { readonly name: string | number };
-  "web.farm.aim.weeds": undefined;
   "web.farm.chat.channels": undefined;
   "web.farm.chat.enlarge": undefined;
   "web.farm.chat.fold": undefined;
   "web.farm.chat.greeting": undefined;
   "web.farm.chat.send": undefined;
-  "web.farm.crop.dry": undefined;
-  "web.farm.crop.empty": undefined;
-  "web.farm.crop.flowering": undefined;
-  "web.farm.crop.harvested": undefined;
-  "web.farm.crop.leafy": undefined;
-  "web.farm.crop.locked": undefined;
-  "web.farm.crop.seeded": undefined;
-  "web.farm.crop.sprout": undefined;
-  "web.farm.crop.weeds": undefined;
-  "web.farm.crop.wheat": undefined;
-  "web.farm.crop.withered": undefined;
-  "web.farm.friends.helpers": undefined;
   "web.farm.harvest.counts": { readonly commits: string | number; readonly files: string | number };
   "web.farm.harvest.letGo": undefined;
   "web.farm.harvest.repo": { readonly repo: string | number };
   "web.farm.harvest.resolve": undefined;
   "web.farm.harvest.take": { readonly base: string | number };
-  "web.farm.hud.toLevel": { readonly need: string | number; readonly xp: string | number };
-  "web.farm.hud.toLevelNext": { readonly need: string | number; readonly next: string | number; readonly xp: string | number };
-  "web.farm.hud.tree": undefined;
   "web.farm.hud.workbench": undefined;
-  "web.farm.menu.agents": undefined;
-  "web.farm.menu.catalog": undefined;
-  "web.farm.menu.chat": undefined;
-  "web.farm.menu.connectors": undefined;
   "web.farm.menu.issues": undefined;
   "web.farm.menu.repos": undefined;
-  "web.farm.menu.runtimes": undefined;
-  "web.farm.menu.skills": undefined;
-  "web.farm.native.accepted": undefined;
-  "web.farm.native.achievements": undefined;
   "web.farm.native.close": undefined;
-  "web.farm.native.coins": { readonly coins: string | number };
-  "web.farm.native.dawn": undefined;
-  "web.farm.native.dusk": undefined;
-  "web.farm.native.empty": undefined;
-  "web.farm.native.fruit": undefined;
-  "web.farm.native.islandGone": { readonly repo: string | number };
-  "web.farm.native.islandQueued": { readonly count: string | number };
-  "web.farm.native.islandWorking": { readonly count: string | number; readonly limit: string | number; readonly repo: string | number };
-  "web.farm.native.leaf": undefined;
-  "web.farm.native.ledger": undefined;
   "web.farm.native.loading": undefined;
-  "web.farm.native.log": undefined;
-  "web.farm.native.map": undefined;
-  "web.farm.native.next": { readonly page: string | number; readonly pages: string | number };
-  "web.farm.native.night": undefined;
-  "web.farm.native.noMessages": undefined;
-  "web.farm.native.noon": undefined;
-  "web.farm.native.pending": undefined;
-  "web.farm.native.phone": undefined;
-  "web.farm.native.previous": undefined;
-  "web.farm.native.progress": { readonly level: string | number; readonly need: string | number; readonly xp: string | number };
-  "web.farm.native.restart": undefined;
-  "web.farm.native.score": { readonly score: string | number };
-  "web.farm.native.seed": undefined;
-  "web.farm.native.shop": undefined;
-  "web.farm.native.steer": undefined;
-  "web.farm.native.tree": undefined;
-  "web.farm.native.treeCounts": { readonly fruits: string | number; readonly leaves: string | number; readonly seeds: string | number };
-  "web.farm.native.treeGrowth": { readonly growth: string | number; readonly rounds: string | number };
-  "web.farm.native.warehouse": undefined;
-  "web.farm.native.workbench": undefined;
-  "web.farm.native.workers": { readonly count: string | number };
-  "web.farm.overlay.bare": { readonly plot: string | number };
-  "web.farm.overlay.clearAt": { readonly level: string | number };
-  "web.farm.overlay.click": { readonly text: string | number };
-  "web.farm.overlay.flowerbed": undefined;
-  "web.farm.overlay.idle": undefined;
-  "web.farm.overlay.unclaimed": undefined;
-  "web.farm.panel.graphs": undefined;
   "web.farm.panel.harvest": { readonly name: string | number };
-  "web.farm.panel.log": undefined;
-  "web.farm.panel.menu": undefined;
-  "web.farm.panel.orchestrator": undefined;
-  "web.farm.panel.shop": undefined;
-  "web.farm.panel.shopClosed": { readonly coins: string | number };
   "web.farm.panel.sow": { readonly plot: string | number };
-  "web.farm.panel.warehouse": undefined;
   "web.farm.panel.water": { readonly name: string | number };
   "web.farm.phone.again": undefined;
   "web.farm.phone.answer": undefined;
@@ -7364,14 +6699,12 @@ export interface Messages {
   "web.farm.phone.merge.stages": undefined;
   "web.farm.phone.merge.start": undefined;
   "web.farm.phone.missed": { readonly n: string | number };
-  "web.farm.phone.new": undefined;
   "web.farm.phone.noCalls": undefined;
   "web.farm.phone.noMissed": undefined;
   "web.farm.phone.openChat": undefined;
   "web.farm.phone.paused": undefined;
   "web.farm.phone.phase.idle": undefined;
   "web.farm.phone.phase.live": undefined;
-  "web.farm.phone.phone": undefined;
   "web.farm.phone.pressA": { readonly what: string | number };
   "web.farm.phone.resume": undefined;
   "web.farm.phone.ringing": undefined;
@@ -7393,10 +6726,6 @@ export interface Messages {
   "web.farm.phone.sokoban.undo": undefined;
   "web.farm.phone.start": undefined;
   "web.farm.plotOf": { readonly name: string | number };
-  "web.farm.quota.left": undefined;
-  "web.farm.quota.quota": undefined;
-  "web.farm.sign.noRepo": undefined;
-  "web.farm.sign.repo": undefined;
   "web.farm.sow.draft": undefined;
   "web.farm.sow.homeless": undefined;
   "web.farm.sow.how": { readonly repo: string | number };
@@ -7412,12 +6741,6 @@ export interface Messages {
   "web.farm.sow.start": undefined;
   "web.farm.sow.toMap": undefined;
   "web.farm.sow.who": undefined;
-  "web.farm.tool.bug.hint": undefined;
-  "web.farm.tool.hand.hint": undefined;
-  "web.farm.tool.harvest.hint": undefined;
-  "web.farm.tool.shovel.hint": undefined;
-  "web.farm.tool.water.hint": undefined;
-  "web.farm.tool.weed.hint": undefined;
   "web.farm.water.drops.0": undefined;
   "web.farm.water.drops.1": undefined;
   "web.farm.water.drops.2": undefined;
@@ -7625,14 +6948,6 @@ export interface Messages {
   "web.issue.display.show": undefined;
   "web.issue.family.children": undefined;
   "web.issue.family.parent": undefined;
-  "web.issue.guide.collapse": undefined;
-  "web.issue.guide.expand": undefined;
-  "web.issue.guide.stage.closed": undefined;
-  "web.issue.guide.stage.todo": undefined;
-  "web.issue.guide.stage.waiting": undefined;
-  "web.issue.guide.stage.working": undefined;
-  "web.issue.guide.summary": undefined;
-  "web.issue.guide.title": undefined;
   "web.issue.issue.and": undefined;
   "web.issue.issue.asking": { readonly n: number; readonly who: string | number };
   "web.issue.issue.askingLine": undefined;
@@ -7684,6 +6999,8 @@ export interface Messages {
   "web.issue.issue.whoRuntime": { readonly name: string | number; readonly runtime: string | number };
   "web.issue.later": undefined;
   "web.issue.list.all": undefined;
+  "web.issue.list.empty": undefined;
+  "web.issue.list.emptyFiltered": undefined;
   "web.issue.list.fold": { readonly group: string | number };
   "web.issue.list.noRepo": undefined;
   "web.issue.list.unfold": { readonly group: string | number };
@@ -7704,34 +7021,6 @@ export interface Messages {
   "web.issue.new.title": undefined;
   "web.issue.new.words": undefined;
   "web.issue.noHelper": undefined;
-  "web.issue.onboarding.newIssue": undefined;
-  "web.issue.onboarding.openChat": undefined;
-  "web.issue.onboarding.progress": { readonly done: string | number; readonly total: string | number };
-  "web.issue.onboarding.step1Action": undefined;
-  "web.issue.onboarding.step1Desc": undefined;
-  "web.issue.onboarding.step1Manage": undefined;
-  "web.issue.onboarding.step1Ready": { readonly n: number };
-  "web.issue.onboarding.step1Title": undefined;
-  "web.issue.onboarding.step2Action": undefined;
-  "web.issue.onboarding.step2Desc": undefined;
-  "web.issue.onboarding.step2Manage": undefined;
-  "web.issue.onboarding.step2Ready": { readonly n: number };
-  "web.issue.onboarding.step2Title": undefined;
-  "web.issue.onboarding.step3Desc": undefined;
-  "web.issue.onboarding.step3Ready": { readonly n: number };
-  "web.issue.onboarding.step3Title": undefined;
-  "web.issue.onboarding.subtitle": undefined;
-  "web.issue.onboarding.templates.bug.desc": undefined;
-  "web.issue.onboarding.templates.bug.prompt": undefined;
-  "web.issue.onboarding.templates.bug.title": undefined;
-  "web.issue.onboarding.templates.feature.desc": undefined;
-  "web.issue.onboarding.templates.feature.prompt": undefined;
-  "web.issue.onboarding.templates.feature.title": undefined;
-  "web.issue.onboarding.templates.refactor.desc": undefined;
-  "web.issue.onboarding.templates.refactor.prompt": undefined;
-  "web.issue.onboarding.templates.refactor.title": undefined;
-  "web.issue.onboarding.templatesTitle": undefined;
-  "web.issue.onboarding.title": undefined;
   "web.issue.orchestrator": undefined;
   "web.issue.page.allHelpers": undefined;
   "web.issue.page.allRepos": undefined;
@@ -8644,8 +7933,6 @@ export interface Messages {
   "web.session.trajectory.want": undefined;
   "web.session.trajectory.wantHint": undefined;
   "web.session.trajectory.wrong": undefined;
-  "web.setting.about.catalog": undefined;
-  "web.setting.about.catalogHint": undefined;
   "web.setting.about.check": undefined;
   "web.setting.about.checking": undefined;
   "web.setting.about.cli": undefined;
@@ -8657,7 +7944,6 @@ export interface Messages {
   "web.setting.about.cliTaken": { readonly link: string | number };
   "web.setting.about.copied": undefined;
   "web.setting.about.copy": undefined;
-  "web.setting.about.devTools": undefined;
   "web.setting.about.download": undefined;
   "web.setting.about.downloading": { readonly next: string | number; readonly percent: string | number };
   "web.setting.about.failed": { readonly why: string | number };
@@ -8669,7 +7955,6 @@ export interface Messages {
   "web.setting.about.manual.readOnly": { readonly next: string | number };
   "web.setting.about.manual.translocated": { readonly next: string | number };
   "web.setting.about.newFarmQuestion": undefined;
-  "web.setting.about.openCatalog": undefined;
   "web.setting.about.ready": { readonly next: string | number };
   "web.setting.about.readyNewFarm": { readonly next: string | number };
   "web.setting.about.repos": undefined;
@@ -8798,27 +8083,17 @@ export interface Messages {
   "web.shell.chat.interactionCustomPlaceholder": undefined;
   "web.shell.chat.interactionDecline": undefined;
   "web.shell.chat.interactionDeclined": undefined;
-  "web.shell.chat.modeAcceptEdits": undefined;
-  "web.shell.chat.modeAsk": undefined;
-  "web.shell.chat.modeBypass": undefined;
-  "web.shell.chat.modeReadOnly": undefined;
   "web.shell.chat.model": undefined;
-  "web.shell.chat.openTerminal": undefined;
   "web.shell.chat.permissionAllowOnce": undefined;
   "web.shell.chat.permissionAllowSession": undefined;
   "web.shell.chat.permissionBadge": undefined;
   "web.shell.chat.permissionDeny": undefined;
-  "web.shell.chat.permissionMode": undefined;
   "web.shell.chat.removeFile": { readonly name: string | number };
   "web.shell.chat.respondFailed": { readonly why: string | number };
   "web.shell.chat.runtime": undefined;
   "web.shell.chat.send": undefined;
   "web.shell.chat.sendFailed": { readonly why: string | number };
-  "web.shell.chat.statusError": undefined;
-  "web.shell.chat.statusReady": undefined;
-  "web.shell.chat.statusStarting": undefined;
   "web.shell.chat.statusWaiting": undefined;
-  "web.shell.chat.statusWorking": undefined;
   "web.shell.chat.steer": undefined;
   "web.shell.chat.steerPlaceholder": undefined;
   "web.shell.chat.steerTag": undefined;
@@ -9000,6 +8275,7 @@ export interface Messages {
   "web.shell.sidebar.running": undefined;
   "web.shell.sidebar.runningAgent": { readonly agent: string | number };
   "web.shell.sidebar.tabMore": undefined;
+  "web.shell.sidebar.tabsGroup": undefined;
   "web.shell.sidebar.terminalCount": { readonly n: string | number };
   "web.shell.sidebar.title": undefined;
   "web.shell.sidebar.workingCount": { readonly n: string | number };
@@ -9030,42 +8306,6 @@ export interface Messages {
   "web.shell.swarm.transcriptRefresh": undefined;
   "web.shell.swarm.transcriptThinking": undefined;
   "web.shell.swarm.transcriptTitle": undefined;
-  "web.tree.sky": undefined;
-  "web.ui.pixel.sound.group.field": undefined;
-  "web.ui.pixel.sound.group.reward": undefined;
-  "web.ui.pixel.sound.group.tools": undefined;
-  "web.ui.pixel.sound.group.ui": undefined;
-  "web.ui.pixel.sound.group.voice": undefined;
-  "web.ui.pixel.sound.group.yard": undefined;
-  "web.ui.pixel.sound.label.achievement": undefined;
-  "web.ui.pixel.sound.label.arrive": undefined;
-  "web.ui.pixel.sound.label.bug": undefined;
-  "web.ui.pixel.sound.label.close": undefined;
-  "web.ui.pixel.sound.label.coin": undefined;
-  "web.ui.pixel.sound.label.harvest": undefined;
-  "web.ui.pixel.sound.label.levelUp": undefined;
-  "web.ui.pixel.sound.label.meow": undefined;
-  "web.ui.pixel.sound.label.mew": undefined;
-  "web.ui.pixel.sound.label.nope": undefined;
-  "web.ui.pixel.sound.label.open": undefined;
-  "web.ui.pixel.sound.label.pant": undefined;
-  "web.ui.pixel.sound.label.pick": undefined;
-  "web.ui.pixel.sound.label.plant": undefined;
-  "web.ui.pixel.sound.label.purr": undefined;
-  "web.ui.pixel.sound.label.ring": undefined;
-  "web.ui.pixel.sound.label.ripe": undefined;
-  "web.ui.pixel.sound.label.rustle": undefined;
-  "web.ui.pixel.sound.label.shovel": undefined;
-  "web.ui.pixel.sound.label.splash": undefined;
-  "web.ui.pixel.sound.label.spray": undefined;
-  "web.ui.pixel.sound.label.tap": undefined;
-  "web.ui.pixel.sound.label.thud": undefined;
-  "web.ui.pixel.sound.label.voiceOff": undefined;
-  "web.ui.pixel.sound.label.voiceOn": undefined;
-  "web.ui.pixel.sound.label.water": undefined;
-  "web.ui.pixel.sound.label.weed": undefined;
-  "web.ui.pixel.sound.label.woof": undefined;
-  "web.ui.pixel.sound.label.yip": undefined;
   "web.voice.moss.connecting": undefined;
   "web.voice.moss.hangUp": undefined;
   "web.voice.moss.intro": undefined;

@@ -40,6 +40,8 @@ impl Render for Shell {
                 )
         });
         let launch = self.overlays.launch.clone().map(|o| div().absolute().inset_0().child(o));
+        let startup_pill = self.render_slow_startup_pill(cx);
+        let startup_diagnostics = self.render_startup_diagnostics(cx);
         let devtools_overlay = self.render_devtools_overlay(cx);
         let devtools_capsule = self.render_devtools_capsule(cx);
         let show_inspector = should_mount_inspector(
@@ -218,7 +220,7 @@ impl Render for Shell {
                     }))
                     .children(inspector_view.map(|view| div().w(inspector_w).h_full().flex_none().child(view)))
             }))
-            .children(self.chrome.native_pixel.as_ref().map(|slot| {
+            .children(self.chrome.native_diorama.as_ref().map(|slot| {
                 div()
                     .absolute()
                     .top_0()
@@ -264,7 +266,9 @@ impl Render for Shell {
             }))
             .children(devtools_overlay)
             .children(devtools_capsule)
-            .children(launch);
+            .children(launch)
+            .children(startup_pill)
+            .children(startup_diagnostics);
         if let Some(started) = frame_start {
             let duration_us = started.elapsed().as_micros() as u64;
             let ms = duration_us as f64 / 1000.0;

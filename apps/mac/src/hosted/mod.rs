@@ -35,7 +35,66 @@ pub struct BridgeHub(
 
 impl gpui::Global for BridgeHub {}
 
-pub struct ServerStartup(pub tokio::sync::watch::Receiver<Option<Result<(), String>>>);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StartupFailureKind {
+    DatabaseSchema,
+    Database,
+    ServerBoot,
+    HttpBind,
+    RemoteConnection,
+    WorkspaceStore,
+}
+
+impl StartupFailureKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::DatabaseSchema => "database_schema",
+            Self::Database => "database",
+            Self::ServerBoot => "server_boot",
+            Self::HttpBind => "http_bind",
+            Self::RemoteConnection => "remote_connection",
+            Self::WorkspaceStore => "workspace_store",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StartupFailure {
+    pub kind: StartupFailureKind,
+    pub summary: String,
+    pub detail: Option<String>,
+    pub db_path: Option<std::path::PathBuf>,
+    pub home_dir: std::path::PathBuf,
+}
+
+impl StartupFailure {
+    pub fn simple(kind: StartupFailureKind, summary: impl Into<String>, home_dir: std::path::PathBuf) -> Self {
+        Self {
+            kind,
+            summary: summary.into(),
+            detail: None,
+            db_path: None,
+            home_dir,
+        }
+    }
+
+    pub fn from_start_error(err: &vibevalley_server::StartError, home_dir: std::path::PathBuf) -> Self {
+        let kind = match err.kind {
+            vibevalley_server::StartErrorKind::DatabaseSchema => StartupFailureKind::DatabaseSchema,
+            vibevalley_server::StartErrorKind::Database => StartupFailureKind::Database,
+            vibevalley_server::StartErrorKind::Storage | vibevalley_server::StartErrorKind::Boot => StartupFailureKind::ServerBoot,
+        };
+        Self {
+            kind,
+            summary: err.to_string(),
+            detail: err.detail.clone(),
+            db_path: err.db_path.clone(),
+            home_dir,
+        }
+    }
+}
+
+pub struct ServerStartup(pub tokio::sync::watch::Receiver<Option<Result<(), StartupFailure>>>);
 impl gpui::Global for ServerStartup {}
 
 /// Control Plane connection mode active in this running desktop process.
@@ -410,7 +469,11 @@ impl BridgeHub {
                 let fake = read_opt("state.json")
                     .and_then(|s| read_opt("responses.json").map(|r| (s, r)))
                     .and_then(|(s, r)| vibevalley_server::gateway::bridge::fake::FakeServer::from_fixture_strs(s.as_deref(), r.as_deref()));
-                let _ = ready.send_replace(Some(fake.as_ref().map(|_| ()).map_err(ToString::to_string)));
+                let _ = ready.send_replace(Some(
+                    fake.as_ref()
+                        .map(|_| ())
+                        .map_err(|e| StartupFailure::simple(StartupFailureKind::ServerBoot, e.to_string(), server_home())),
+                ));
                 Arc::new(fake.unwrap_or_else(|_| vibevalley_server::gateway::bridge::fake::FakeServer::new()))
             }
             None => match connection::resolve(&server_home()) {
@@ -421,6 +484,7 @@ impl BridgeHub {
                     let connection::Mode::Remote { url, token, label } = resolved.mode else {
                         unreachable!("checked Mode::Remote above");
                     };
+                    tracing::info!(remote_url = %url, "connecting to remote VibeValley control plane");
                     match remote::RemoteServer::new(url.clone(), token, label) {
                         Ok(remote_server) => {
                             host_debug_for_boot.set_boot_info(url, boot_started.elapsed().as_millis() as u64);
@@ -429,7 +493,12 @@ impl BridgeHub {
                         }
                         Err(e) => {
                             let reason = format!("remote control plane: {e}");
-                            let _ = ready.send_replace(Some(Err(reason.clone())));
+                            tracing::error!(error = %reason, "failed to connect to remote control plane");
+                            let _ = ready.send_replace(Some(Err(StartupFailure::simple(
+                                StartupFailureKind::RemoteConnection,
+                                reason.clone(),
+                                server_home(),
+                            ))));
                             Arc::new(FailedServer::new(reason))
                         }
                     }
@@ -438,6 +507,7 @@ impl BridgeHub {
                     cx.set_global(ActiveDesktopConnection(Arc::new(connection::Mode::Embedded)));
                     Arc::new(late::LateServer::spawn(move || {
                         let home = server_home();
+                        tracing::info!(home = %home.display(), "starting embedded VibeValley server");
                         let mut config: vibevalley_server::Config = crate::serving::config(&home, crate::serving::work_root());
                         config.host_debug = Some(Arc::new(host_debug_for_boot.clone()));
                         match vibevalley_server::create_app_blocking(config) {
@@ -452,6 +522,7 @@ impl BridgeHub {
                                 }) {
                                     Ok(listener) => {
                                         let url = listener.url();
+                                        tracing::info!(url = %url, boot_ms = boot_started.elapsed().as_millis() as u64, "embedded VibeValley server listening");
                                         host_debug_for_boot.set_boot_info(url.clone(), boot_started.elapsed().as_millis() as u64);
                                         app.set_mcp_url(format!("{url}/mcp"));
                                         match vibevalley_server::home::announce(&home, &url) {
@@ -460,13 +531,17 @@ impl BridgeHub {
                                                 (Some(listener), Some(announced))
                                             }
                                             Err(e) => {
-                                                let _ = ready.send_replace(Some(Err(format!("server.json: {e}"))));
+                                                let reason = format!("server.json: {e}");
+                                                tracing::error!(error = %reason, "failed to announce server.json");
+                                                let _ =
+                                                    ready.send_replace(Some(Err(StartupFailure::simple(StartupFailureKind::HttpBind, reason, home.clone()))));
                                                 (Some(listener), None)
                                             }
                                         }
                                     }
                                     Err(e) => {
-                                        let _ = ready.send_replace(Some(Err(e)));
+                                        tracing::error!(error = %e, "failed to bind embedded HTTP listener");
+                                        let _ = ready.send_replace(Some(Err(StartupFailure::simple(StartupFailureKind::HttpBind, e, home.clone()))));
                                         (None, None)
                                     }
                                 };
@@ -481,8 +556,10 @@ impl BridgeHub {
                                 server
                             }
                             Err(e) => {
-                                let reason = format!("vibevalley server: {e}");
-                                let _ = ready.send_replace(Some(Err(reason.clone())));
+                                let failure = StartupFailure::from_start_error(&e, home);
+                                tracing::error!(kind = failure.kind.as_str(), error = %failure.summary, "embedded VibeValley server startup failed");
+                                let reason = failure.summary.clone();
+                                let _ = ready.send_replace(Some(Err(failure)));
                                 Arc::new(FailedServer::new(reason))
                             }
                         }
@@ -492,7 +569,12 @@ impl BridgeHub {
                     drop(running_tx);
                     cx.set_global(ActiveDesktopConnection(Arc::new(connection::Mode::Embedded)));
                     let reason = format!("desktop connection config: {e}");
-                    let _ = ready.send_replace(Some(Err(reason.clone())));
+                    tracing::error!(error = %reason, "desktop connection resolution failed");
+                    let _ = ready.send_replace(Some(Err(StartupFailure::simple(
+                        StartupFailureKind::RemoteConnection,
+                        reason.clone(),
+                        server_home(),
+                    ))));
                     Arc::new(FailedServer::new(reason))
                 }
             },
@@ -569,15 +651,15 @@ pub fn server_home() -> std::path::PathBuf {
 }
 
 /// The bundle's capabilities with the folders the views show files from
-/// added to `fs.read`: VibeValley's pixel art and the farm (attachments).
+/// added to `fs.read`: VibeValley's assets and the farm (attachments).
 /// Added here because they are only known at run time.
 fn capabilities_from(raw: &str) -> String {
     let mut caps: Value = serde_json::from_str(raw).unwrap_or_else(|_| json!({}));
-    let assets = crate::pixel::assets_dir();
+    let assets = crate::assets::assets_dir();
     let home = server_home();
     let work_root = crate::serving::work_root();
     let _ = std::fs::create_dir_all(&home);
-    let roots = [assets.join("pixel"), assets.join("cursors"), home, work_root];
+    let roots = [assets, home, work_root];
     if !caps["fs"].is_object() {
         caps["fs"] = json!({ "read": [], "write": [] });
     }
@@ -708,7 +790,7 @@ fn load_bundle_slot(workbench: bool, bytecode: &[u8], js: &str, fallback_caps: &
     build_embedded_bundle(bytecode, js, &caps_json)
 }
 
-/// Full workbench bundle for `"vv"`/`"vibevalley"` and pixel farm overlays, lightweight shell
+/// Full workbench bundle for `"vv"`/`"vibevalley"` and diorama overlays, lightweight shell
 /// bundle for all other hosted surfaces (including `"devtools"`), cached process-wide so views
 /// share one load.
 fn bundle_for(view: &str) -> Bundle {
@@ -798,10 +880,10 @@ impl HostedView {
             params.entry("motion").or_insert_with(|| json!(motion.as_str()));
             params.entry("connectionMode").or_insert_with(|| json!(active_connection.as_str()));
             params.entry("randomSeed").or_insert_with(|| json!(crate::host::random_seed_hex()));
-            let pixel_dir = crate::pixel::assets_dir().join("pixel");
-            let has_pixel_dir = pixel_dir.join("sprites.json").is_file();
-            if has_pixel_dir {
-                params.insert("pixelDir".into(), json!(pixel_dir));
+            let assets_dir = crate::assets::assets_dir();
+            let has_assets_dir = assets_dir.is_dir();
+            if has_assets_dir {
+                params.insert("assetsDir".into(), json!(assets_dir));
             }
             let identity = client_identity_for(&name, &params);
             host.set_params(params);
@@ -837,14 +919,14 @@ impl HostedView {
                                 let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));
                             }
                         }
-                        Ok(vibevalley_protocol::HostOp::PixelDir) => {
+                        Ok(vibevalley_protocol::HostOp::AssetsDir) => {
                             if !id.is_empty() {
-                                let env = if has_pixel_dir {
-                                    vibevalley_server::gateway::bridge::Envelope::ok(json!({ "path": pixel_dir }))
+                                let env = if has_assets_dir {
+                                    vibevalley_server::gateway::bridge::Envelope::ok(json!({ "path": assets_dir }))
                                 } else {
                                     vibevalley_server::gateway::bridge::refusal(
                                         vibevalley_server::gateway::bridge::BizCode::NotFound,
-                                        "the pixel art is not installed",
+                                        "the assets directory is not installed",
                                     )
                                 };
                                 let _ = reply_host.send(format!("reply:{id}"), serde_json::to_value(env).unwrap_or(Value::Null));

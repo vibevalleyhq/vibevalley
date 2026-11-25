@@ -10,6 +10,7 @@ pub mod family;
 pub mod pull;
 pub mod refine;
 mod session_chat;
+pub mod starter;
 pub mod store;
 
 pub use board::{Board, NewIssue, Sent};

@@ -1,11 +1,17 @@
 use sea_orm::{DbErr, RuntimeErr, SqlErr};
 use vibevalley_protocol::{ApiError, BizCode};
 
-/// Opaque database error wrapping the underlying driver error so callers outside
-/// `crate::db` never depend on `sea_orm::DbErr`.
+use crate::db::verify::SchemaMismatchReport;
+
+/// Opaque database error wrapping the underlying driver error or schema drift
+/// diagnostics so callers outside `crate::db` never depend on `sea_orm::DbErr`.
 #[derive(Debug, thiserror::Error)]
-#[error("{0}")]
-pub struct DbError(DbErr);
+pub enum DbError {
+    #[error("{0}")]
+    Driver(#[from] DbErr),
+    #[error("{0}")]
+    SchemaMismatch(Box<SchemaMismatchReport>),
+}
 
 /// Result alias returned by [`crate::db::Database`] and `crate::service::*` methods.
 pub type DbResult<T> = Result<T, DbError>;
@@ -30,41 +36,53 @@ pub(crate) fn is_fk_violation_err(err: &DbErr) -> bool {
 
 impl DbError {
     pub fn custom(message: impl Into<String>) -> Self {
-        Self(DbErr::Custom(message.into()))
+        Self::Driver(DbErr::Custom(message.into()))
     }
 
     pub fn not_found(message: impl Into<String>) -> Self {
-        Self(DbErr::RecordNotFound(message.into()))
+        Self::Driver(DbErr::RecordNotFound(message.into()))
+    }
+
+    pub fn from_schema_mismatch(report: SchemaMismatchReport) -> Self {
+        Self::SchemaMismatch(Box::new(report))
+    }
+
+    pub fn schema_mismatch(&self) -> Option<&SchemaMismatchReport> {
+        match self {
+            Self::SchemaMismatch(report) => Some(report.as_ref()),
+            Self::Driver(_) => None,
+        }
+    }
+
+    pub fn is_schema_mismatch(&self) -> bool {
+        matches!(self, Self::SchemaMismatch(_))
     }
 
     pub fn is_unique_violation(&self) -> bool {
-        is_unique_violation_err(&self.0)
+        matches!(self, Self::Driver(err) if is_unique_violation_err(err))
     }
 
     pub fn is_fk_violation(&self) -> bool {
-        is_fk_violation_err(&self.0)
+        matches!(self, Self::Driver(err) if is_fk_violation_err(err))
     }
 
     pub fn is_not_found(&self) -> bool {
-        matches!(self.0, DbErr::RecordNotFound(_))
+        matches!(self, Self::Driver(DbErr::RecordNotFound(_)))
     }
 
     pub fn with_biz_code(&self, code: BizCode) -> ApiError {
-        ApiError::new(code, self.0.to_string())
+        ApiError::new(code, self.to_string())
     }
 
     pub fn into_api_error(self) -> ApiError {
-        ApiError::new(BizCode::InternalError, self.0.to_string())
+        ApiError::new(BizCode::InternalError, self.to_string())
     }
 
     pub fn into_durable_error(self) -> vibevalley_runtime::agent::durable::Error {
-        vibevalley_runtime::agent::durable::Error::Db(self.0)
-    }
-}
-
-impl From<DbErr> for DbError {
-    fn from(err: DbErr) -> Self {
-        Self(err)
+        match self {
+            Self::Driver(err) => vibevalley_runtime::agent::durable::Error::Db(err),
+            Self::SchemaMismatch(report) => vibevalley_runtime::agent::durable::Error::Db(DbErr::Custom(report.to_string())),
+        }
     }
 }
 

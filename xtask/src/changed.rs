@@ -101,7 +101,7 @@ pub fn parse_changed_packages(metadata: &CargoMetadata, changed_files: &[String]
         }
     }
 
-    // Sort longest relative directory first so nested crates (e.g. `apps/mac/crates/pixel`)
+    // Sort longest relative directory first so nested crates (e.g. `apps/mac/crates/diorama`)
     // win over enclosing crates (e.g. `apps/mac`).
     let mut dirs: Vec<(&str, String)> = members
         .iter()
@@ -339,7 +339,7 @@ mod tests {
                 "vibevalley-core 0.1.0".to_owned(),
                 "vibevalley-server 0.1.0".to_owned(),
                 "vibevalley-cli 0.1.0".to_owned(),
-                "vibevalley-pixel 0.1.0".to_owned(),
+                "vibevalley-diorama 0.1.0".to_owned(),
                 "vibevalley-terminal 0.1.0".to_owned(),
                 "vibevalley-mac 0.1.0".to_owned(),
             ],
@@ -348,9 +348,13 @@ mod tests {
                 pkg("vibevalley-core", "crates/core", &["vibevalley-protocol"]),
                 pkg("vibevalley-server", "crates/server", &["vibevalley-core", "vibevalley-protocol"]),
                 pkg("vibevalley-cli", "crates/cli", &["vibevalley-protocol"]),
-                pkg("vibevalley-pixel", "apps/mac/crates/pixel", &[]),
+                pkg("vibevalley-diorama", "apps/mac/crates/diorama", &[]),
                 pkg("vibevalley-terminal", "apps/mac/crates/terminal", &[]),
-                pkg("vibevalley-mac", "apps/mac", &["vibevalley-server", "vibevalley-pixel", "vibevalley-terminal"]),
+                pkg(
+                    "vibevalley-mac",
+                    "apps/mac",
+                    &["vibevalley-server", "vibevalley-diorama", "vibevalley-terminal"],
+                ),
             ],
         }
     }
@@ -379,8 +383,8 @@ mod tests {
                     packages: s(&[
                         "vibevalley-cli",
                         "vibevalley-core",
+                        "vibevalley-diorama",
                         "vibevalley-mac",
-                        "vibevalley-pixel",
                         "vibevalley-protocol",
                         "vibevalley-server",
                         "vibevalley-terminal",
@@ -431,10 +435,10 @@ mod tests {
     fn matches_nested_crate_dirs_first_and_includes_non_rs_assets() {
         let meta = sample_metadata();
         assert_eq!(
-            parse_changed_packages(&meta, &s(&["apps/mac/crates/pixel/src/lib.rs"]), ROOT),
+            parse_changed_packages(&meta, &s(&["apps/mac/crates/diorama/src/lib.rs"]), ROOT),
             ChangedPackagesResult {
                 all: false,
-                packages: s(&["vibevalley-mac", "vibevalley-pixel"]),
+                packages: s(&["vibevalley-diorama", "vibevalley-mac"]),
             }
         );
         assert_eq!(

@@ -113,8 +113,8 @@ export function farmWords(glossary: Glossary): Avoided[] {
   );
 }
 
-/** Namespaces that are a skin: the farm, the memory tree, the pixel pieces they share, the game and the art catalog. */
-export const isSkin = (namespace: string) => /^(web\.farm|web\.tree|web\.ui\.pixel|web\.catalog|server\.game)(\.|$)/u.test(namespace);
+/** Namespaces that are a skin: the farm and the game. */
+export const isSkin = (namespace: string) => /^(web\.farm|server\.game)(\.|$)/u.test(namespace);
 
 /** Keys outside a skin's namespace that still speak of the skin: the shortcuts table lists the farm's hotbar keys. */
 const skinKeys: ReadonlySet<string> = new Set(["web.base.shortcuts.say.tool", "web.base.shortcuts.say.farmMenu"]);

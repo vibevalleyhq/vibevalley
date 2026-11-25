@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 
 import { expect, test } from "vite-plus/test";
 
+import { localUpdateFeedUrl, resolvePackageOptions } from "./build.ts";
 import { buildFinderLayoutScript } from "./dmg-layout.ts";
 import {
   channelBundleId,
@@ -17,6 +18,7 @@ import {
   requireDeveloperId,
   verifyMacExecutable,
 } from "./package-platform.ts";
+import { renderInfoPlist } from "./package.ts";
 
 test("channel helpers resolve bundle names, bundle IDs, icons, and DMG background across all channels", () => {
   const root = resolve(import.meta.dirname, "../..");
@@ -77,6 +79,10 @@ test("buildFinderLayoutScript targets channel bundle name and exact Retina windo
   expect(script).toContain('set background picture of viewOptions to file ".background:background.png"');
   expect(script).toContain('set position of item "VibeValley-Alpha.app" of container window to {180, 210}');
   expect(script).toContain('set position of item "Applications" of container window to {500, 210}');
+
+  const byMount = buildFinderLayoutScript("VibeValley-Alpha 0.4.0-alpha.1", "VibeValley-Alpha.app", "/Volumes/VibeValley-Alpha 0.4.0-alpha.1 1");
+  expect(byMount).toContain('POSIX file "/Volumes/VibeValley-Alpha 0.4.0-alpha.1 1" as alias');
+  expect(byMount).toContain("tell folder targetDisk");
 });
 
 test("regression: unknown package architectures and non-distribution signatures fail", () => {
@@ -112,5 +118,76 @@ test.skipIf(process.platform !== "darwin")("compileAppIconCatalog emits Assets.c
     expect(statSync(car).size).toBeGreaterThan(0);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("renderInfoPlist embeds VibeValleyUpdateFeed only when non-empty and escapes XML", () => {
+  const withFeed = renderInfoPlist({
+    bundleId: "dev.vibevalley.app.alpha",
+    bundleName: "VibeValley-Alpha",
+    version: "0.1.0-alpha.2",
+    updateFeed: "file:///Users/dev/a&b/dist/release.json",
+  });
+  expect(withFeed).toContain("<key>VibeValleyUpdateFeed</key><string>file:///Users/dev/a&amp;b/dist/release.json</string>");
+
+  const withoutFeed = renderInfoPlist({
+    bundleId: "dev.vibevalley.app.beta",
+    bundleName: "VibeValley-Beta",
+    version: "0.1.0-beta.1",
+  });
+  expect(withoutFeed).not.toContain("VibeValleyUpdateFeed");
+});
+
+test("alpha builds default to zip + local file:// update feed while beta and release never pass a local feed", () => {
+  const outDir = "/Users/dev/My Apps/dist";
+  const alpha = resolvePackageOptions({
+    channel: "alpha",
+    targetVersion: "0.1.0-alpha.2",
+    outDir,
+    noDmg: false,
+    noZip: false,
+    noLocalFeed: false,
+    verify: false,
+    skipVerify: false,
+    skipBuild: false,
+  });
+  expect(alpha.makeZip).toBe(true);
+  expect(alpha.localFeed).toBe(localUpdateFeedUrl(outDir));
+  expect(alpha.localFeed).toBe("file:///Users/dev/My%20Apps/dist/release.json");
+  expect(alpha.packageArgs).toContain("--update-feed");
+  expect(alpha.packageArgs).toContain("file:///Users/dev/My%20Apps/dist/release.json");
+
+  const alphaNoFeed = resolvePackageOptions({
+    channel: "alpha",
+    targetVersion: "0.1.0-alpha.2",
+    outDir,
+    noDmg: false,
+    noZip: false,
+    noLocalFeed: true,
+    verify: false,
+    skipVerify: false,
+    skipBuild: false,
+  });
+  expect(alphaNoFeed.localFeed).toBeUndefined();
+  expect(alphaNoFeed.packageArgs).not.toContain("--update-feed");
+
+  for (const [channel, targetVersion] of [
+    ["beta", "0.1.0-beta.1"],
+    ["release", "0.1.0"],
+  ] as const) {
+    const plan = resolvePackageOptions({
+      channel,
+      targetVersion,
+      outDir,
+      noDmg: false,
+      noZip: false,
+      noLocalFeed: false,
+      verify: false,
+      skipVerify: false,
+      skipBuild: false,
+    });
+    expect(plan.makeZip).toBe(true);
+    expect(plan.localFeed).toBeUndefined();
+    expect(plan.packageArgs).not.toContain("--update-feed");
   }
 });

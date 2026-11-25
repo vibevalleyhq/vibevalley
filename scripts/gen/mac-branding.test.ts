@@ -60,11 +60,11 @@ describe("mac-branding", () => {
       try {
         const rawDir = join(dir, "raw");
         const outDir = join(dir, "out");
+        const iconsDir = join(dir, "icons");
         mkdirSync(rawDir, { recursive: true });
         writeFileSync(join(rawDir, "app-icon.png"), makeSolidPng(64, 64, 120, 180, 90));
-        writeFileSync(join(rawDir, "dmg-background.png"), makeSolidPng(1536, 1024, 248, 240, 224));
 
-        expect(generateMacBranding(rawDir, outDir)).toBe(0);
+        expect(generateMacBranding(rawDir, outDir, false, iconsDir)).toBe(0);
 
         for (const name of ["appicon-release.png", "appicon-alpha.png", "appicon-beta.png", "appicon-dev.png"]) {
           const path = join(outDir, name);
@@ -78,6 +78,14 @@ describe("mac-branding", () => {
           const path = join(outDir, icns);
           expect(existsSync(path)).toBe(true);
           expect(readFileSync(path).subarray(0, 4).toString("ascii")).toBe("icns");
+        }
+
+        for (const dim of [32, 64, 256]) {
+          const iconPath = join(iconsDir, `app-${dim}.png`);
+          expect(existsSync(iconPath)).toBe(true);
+          const iconInfo = execFileSync("sips", ["-g", "pixelWidth", "-g", "pixelHeight", iconPath], { encoding: "utf8" });
+          expect(iconInfo).toContain(`pixelWidth: ${dim}`);
+          expect(iconInfo).toContain(`pixelHeight: ${dim}`);
         }
 
         const dmg = join(outDir, "dmg-background.png");

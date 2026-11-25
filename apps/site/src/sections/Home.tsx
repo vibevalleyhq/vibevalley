@@ -1,8 +1,7 @@
-import { RUNTIMES, WALKERS, pixelArt, storyArt } from "../base/assets";
+import { RUNTIMES, WALKERS, avatarArt, engineArt, storyArt, tileArt } from "../base/assets";
 import { FACTS } from "../base/facts";
-import { backgrounds, screenshotOf, titleArt } from "../base/images";
+import { backgrounds, screenshotOf } from "../base/images";
 import { COMMANDS, NATIVE_SOURCE } from "../base/links";
-import { FRONT } from "../base/scene";
 /** @jsxImportSource @solidjs/web */
 import type { Copy } from "../i18n/zh";
 import Bar from "./Bar";
@@ -16,8 +15,20 @@ import Parade from "./Parade";
 import Screens from "./Screens";
 import Start from "./Start";
 
-const field = ["plot-wheat", "plot-carrot", "plot-leafy", "plot-flowering", "plot-sprout", "plot-seeded"];
-const ripe = (count: number, from: number) => Array.from({ length: count }, (_, index) => pixelArt((index + from) % 3 === 2 ? "plot-carrot" : "plot-wheat"));
+const paradeTiles = ["t_crop_wheat", "t_crop_sprout", "t_paddy_water", "t_soil_bed", "t_bridge_arch", "t_grass"] as const;
+const paradeFront = ["p_bamboo", "p_willow", "p_lantern_post", "p_bamboo", "p_willow"] as const;
+const ripe = (count: number, from: number) => Array.from({ length: count }, (_, index) => tileArt((index + from) % 3 === 2 ? "t_crop_sprout" : "t_crop_wheat"));
+
+function tallyArt(art: (typeof FACTS)[number]["art"]): { src: string; framed: boolean } {
+  switch (art.kind) {
+    case "tile":
+      return { src: tileArt(art.name), framed: false };
+    case "avatar":
+      return { src: avatarArt(art.name), framed: true };
+    case "engine":
+      return { src: engineArt(art.name), framed: false };
+  }
+}
 
 export default function Home(props: { copy: Copy }) {
   return (
@@ -27,63 +38,31 @@ export default function Home(props: { copy: Copy }) {
         github={NATIVE_SOURCE}
       />
       <main>
-        <Hero
-          copy={props.copy.hero}
-          art={titleArt}
-          backgrounds={backgrounds}
-          hint={pixelArt("button-next")}
-          frame={{
-            branchLeft: pixelArt("fg-branch-left"),
-            branchRight: pixelArt("fg-branch-right"),
-            bushLeft: pixelArt("fg-bush-left"),
-            bushRight: pixelArt("fg-bush-right"),
-          }}
-          github={NATIVE_SOURCE}
-        />
+        <Hero copy={props.copy.hero} backgrounds={backgrounds} github={NATIVE_SOURCE} />
         <Parade
           copy={props.copy.parade}
-          plots={Array.from({ length: 16 }, (_, index) => {
-            const plot = field[(index * 5) % field.length];
-            if (plot === undefined) throw new RangeError(`Missing parade plot at index ${index}`);
-            return pixelArt(plot);
+          plots={Array.from({ length: 14 }, (_, index) => {
+            const tile = paradeTiles[(index * 5) % paradeTiles.length];
+            if (tile === undefined) throw new RangeError(`Missing parade tile at index ${index}`);
+            return tileArt(tile);
           })}
-          walkers={WALKERS.map((walker) => walker.frames)}
-          front={Array.from({ length: 12 }, (_, index) => {
-            const name = FRONT[index % FRONT.length];
+          walkers={WALKERS}
+          front={Array.from({ length: 10 }, (_, index) => {
+            const name = paradeFront[index % paradeFront.length];
             if (name === undefined) throw new RangeError(`Missing parade foreground at index ${index}`);
-            const image = titleArt[name];
-            if (image === undefined) throw new Error(`Missing parade foreground image ${name}`);
-            return image;
+            return tileArt(name);
           })}
         />
-        <Harvest
-          copy={props.copy.harvest}
-          rows={[ripe(18, 0), ripe(14, 1)]}
-          coins={pixelArt("coins-stack")}
-          icons={{ harvest: pixelArt("icon-harvest"), check: pixelArt("mark-check") }}
-        />
-        <How copy={props.copy.how} icons={props.copy.how.steps.map((step) => pixelArt(step.icon))} art={storyArt()} />
+        <Harvest copy={props.copy.harvest} rows={[ripe(16, 0), ripe(12, 1)]} lantern={tileArt("p_lantern_post")} />
+        <How copy={props.copy.how} art={storyArt()} />
         <Features
           copy={{ features: props.copy.features, runtimes: props.copy.runtimes }}
-          icons={props.copy.features.items.map((feature) => pixelArt(feature.icon))}
-          tallies={FACTS.map((fact) => pixelArt(fact.icon))}
-          runtimes={[
-            ...RUNTIMES.map((runtime) => ({ name: runtime.name, logo: pixelArt(runtime.logo) })),
-            { name: props.copy.runtimes.own, logo: pixelArt("app-sprout") },
-          ]}
+          tallies={FACTS.map((fact) => tallyArt(fact.art))}
+          runtimes={[...RUNTIMES, { name: props.copy.runtimes.own, logo: engineArt("vibevalley") }]}
         />
         <Devices copy={props.copy.devices} mac={screenshotOf("native-farm")} />
-        <Screens
-          copy={props.copy.screens}
-          shots={props.copy.screens.items.map((shot) => ({ ...screenshotOf(shot.image), caption: shot.caption }))}
-          close={pixelArt("button-close")}
-        />
-        <Start
-          copy={{ start: props.copy.start, safety: props.copy.safety }}
-          commands={COMMANDS}
-          readme={`${NATIVE_SOURCE}#readme`}
-          icons={{ warn: pixelArt("mark-warn"), check: pixelArt("mark-check"), copy: pixelArt("button-copy") }}
-        />
+        <Screens copy={props.copy.screens} shots={props.copy.screens.items.map((shot) => ({ ...screenshotOf(shot.image), caption: shot.caption }))} />
+        <Start copy={{ start: props.copy.start, safety: props.copy.safety }} commands={COMMANDS} readme={`${NATIVE_SOURCE}#readme`} />
       </main>
       <Foot copy={props.copy} />
     </>

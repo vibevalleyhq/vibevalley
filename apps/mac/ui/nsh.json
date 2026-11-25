@@ -41,14 +41,12 @@
     },
     "fontFamily": {
       "sans": "PingFang SC",
-      "mono": "Menlo",
-      "pixel": "Fusion Pixel 12px Prop zh-Hans"
+      "mono": "Menlo"
     },
     "shadow": {
       "float": "0 8px 24px #0000002e",
       "raise": "0 1px 2px #00000018",
-      "toggle-thumb": "0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a",
-      "px": "2px 2px 0 #1e140a73"
+      "toggle-thumb": "0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a"
     }
   }
 }

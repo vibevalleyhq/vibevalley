@@ -39,7 +39,8 @@ test("workbench surfaces and text inks resolve to theme.json tokens in both ligh
   expect(app.viewStyle("id:rail")?.backgroundColor).toBe(normHex(lightTokens.rail));
   expect(app.viewStyle("id:lane-todo")?.backgroundColor).toBe(normHex(lightTokens.side));
   expect(app.viewStyle("id:issue-card >> nth=0")?.backgroundColor).toBe(normHex(lightTokens.elevated));
-  expect(app.spanStyle("id:desk >> text:任务").color).toBe(normHex(lightTokens.ink));
+  expect(app.count("id:desk")).toBe(0);
+  expect(app.spanStyle("id:lane-todo >> text:待办").color).toBe(normHex(lightTokens.ink));
   expect(app.spanStyle("id:lane-todo >> text:3").color).toBe(normHex(lightTokens.muted));
 
   await app.host.send("route", "/issues/i18");
@@ -52,13 +53,14 @@ test("workbench surfaces and text inks resolve to theme.json tokens in both ligh
   expect(app.viewStyle("id:workbench-page")?.backgroundColor).toBe(normHex(darkTokens.page));
   expect(app.viewStyle("id:rail")?.backgroundColor).toBe(normHex(darkTokens.rail));
   expect(app.viewStyle("id:issue-inspector")?.backgroundColor).toBe(normHex(darkTokens.side));
-  expect(app.spanStyle("id:desk >> text:任务").color).toBe(normHex(darkTokens.ink));
+  expect(app.count("id:desk")).toBe(0);
 
   await app.host.send("route", "/issues");
   await fake.pump(app);
   await fake.pump(app);
   expect(app.viewStyle("id:lane-todo")?.backgroundColor).toBe(normHex(darkTokens.side));
   expect(app.viewStyle("id:issue-card >> nth=0")?.backgroundColor).toBe(normHex(darkTokens.elevated));
+  expect(app.spanStyle("id:lane-todo >> text:待办").color).toBe(normHex(darkTokens.ink));
   expect(app.spanStyle("id:lane-todo >> text:3").color).toBe(normHex(darkTokens.muted));
 
   expect(normHex(lightTokens.page)).not.toBe(normHex(darkTokens.page));
@@ -69,7 +71,7 @@ test("workbench surfaces and text inks resolve to theme.json tokens in both ligh
 });
 
 test("workspace palette and inspector surfaces resolve to identical theme.json tokens in light and dark modes", async () => {
-  const pixelDir = decodeURI(new URL("../../../../assets/pixel", import.meta.url).pathname);
+  const assetsDir = decodeURI(new URL("../../../../assets", import.meta.url).pathname);
   let paletteRev = 0;
 
   const paletteApp = await open("../ShellApp.story.tsx", {
@@ -78,7 +80,7 @@ test("workspace palette and inspector surfaces resolve to identical theme.json t
     colorScheme: "light",
     platform: "macos",
     host: {
-      params: { view: "palette", pixelDir },
+      params: { view: "palette", assetsDir },
       handlers: { action: null, ready: null },
     },
   });
@@ -99,7 +101,7 @@ test("workspace palette and inspector surfaces resolve to identical theme.json t
     colorScheme: "light",
     platform: "macos",
     host: {
-      params: { view: "sidebar", role: "inspector", pixelDir },
+      params: { view: "sidebar", role: "inspector", assetsDir },
       handlers: { action: null, ready: null },
     },
   });

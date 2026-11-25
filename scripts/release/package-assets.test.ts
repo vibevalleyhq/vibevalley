@@ -6,16 +6,16 @@ import { expect, test } from "vite-plus/test";
 
 import { shouldPackageAsset } from "./package-assets.ts";
 
-test("shouldPackageAsset excludes website-only title assets and keeps app assets", () => {
+test("shouldPackageAsset excludes website-only site assets and keeps app assets", () => {
   const excluded = [
-    "title",
-    "title/fern.png",
-    "title/sprites.json",
-    "title\\cloud-big-1.png",
-    "pixel/title-day.jpg",
-    "pixel/title-morning.jpg",
-    "pixel/title-evening.jpg",
-    "pixel/title-night.jpg",
+    "site",
+    "site/hero-day.webp",
+    "site/hero-morning.webp",
+    "site/hero-evening.webp",
+    "site/hero-night.webp",
+    "site/postcard.png",
+    "site/tiles/b_notice_pavilion.webp",
+    "site\\tiles\\crop_wheat.webp",
   ];
   for (const path of excluded) {
     expect(shouldPackageAsset(path), `expected excluded: ${path}`).toBe(false);
@@ -24,12 +24,15 @@ test("shouldPackageAsset excludes website-only title assets and keeps app assets
   const included = [
     "",
     "brand/opening-day.webp",
-    "fonts/fusion-pixel-12px-proportional-zh_hans.otf",
-    "cursors/hand.png",
+    "brand/tray-release.png",
     "icons/app-256.png",
-    "pixel/map.png",
-    "pixel/banner-title.png",
-    "village.ldtk",
+    "avatars/avatar-orchestrator.png",
+    "avatars/rail/manager-default-2x.png",
+    "engines/claude.png",
+    "engines/vibevalley.png",
+    "diorama/manifest.json",
+    "diorama/meshes.bin",
+    "diorama/print/materials_2k.vvtex",
   ];
   for (const path of included) {
     expect(shouldPackageAsset(path), `expected included: ${path}`).toBe(true);
@@ -41,16 +44,19 @@ test("cpSync with shouldPackageAsset omits excluded website assets from copied t
   const srcRoot = join(work, "assets");
   const dstRoot = join(work, "out");
   try {
-    mkdirSync(join(srcRoot, "title"), { recursive: true });
-    mkdirSync(join(srcRoot, "pixel"), { recursive: true });
+    mkdirSync(join(srcRoot, "site/tiles"), { recursive: true });
     mkdirSync(join(srcRoot, "brand"), { recursive: true });
-    mkdirSync(join(srcRoot, "fonts"), { recursive: true });
-    writeFileSync(join(srcRoot, "title/fern.png"), "site-only");
-    writeFileSync(join(srcRoot, "pixel/title-day.jpg"), "site-only");
-    writeFileSync(join(srcRoot, "pixel/map.png"), "app");
+    mkdirSync(join(srcRoot, "icons"), { recursive: true });
+    mkdirSync(join(srcRoot, "avatars/rail"), { recursive: true });
+    mkdirSync(join(srcRoot, "engines"), { recursive: true });
+    mkdirSync(join(srcRoot, "diorama"), { recursive: true });
+    writeFileSync(join(srcRoot, "site/hero-day.webp"), "site-only");
+    writeFileSync(join(srcRoot, "site/tiles/b_notice_pavilion.webp"), "site-only");
     writeFileSync(join(srcRoot, "brand/opening-day.webp"), "app");
-    writeFileSync(join(srcRoot, "fonts/fusion-pixel-12px-proportional-zh_hans.otf"), "app");
-    writeFileSync(join(srcRoot, "village.ldtk"), "app");
+    writeFileSync(join(srcRoot, "icons/app-256.png"), "app");
+    writeFileSync(join(srcRoot, "avatars/rail/manager-default-2x.png"), "app");
+    writeFileSync(join(srcRoot, "engines/claude.png"), "app");
+    writeFileSync(join(srcRoot, "diorama/manifest.json"), "app");
 
     cpSync(srcRoot, dstRoot, {
       recursive: true,
@@ -58,12 +64,13 @@ test("cpSync with shouldPackageAsset omits excluded website assets from copied t
       filter: (src) => shouldPackageAsset(relative(srcRoot, src)),
     });
 
-    expect(existsSync(join(dstRoot, "title"))).toBe(false);
-    expect(existsSync(join(dstRoot, "pixel/title-day.jpg"))).toBe(false);
-    expect(existsSync(join(dstRoot, "pixel/map.png"))).toBe(true);
+    expect(existsSync(join(dstRoot, "site"))).toBe(false);
+    expect(existsSync(join(dstRoot, "site/hero-day.webp"))).toBe(false);
     expect(existsSync(join(dstRoot, "brand/opening-day.webp"))).toBe(true);
-    expect(existsSync(join(dstRoot, "fonts/fusion-pixel-12px-proportional-zh_hans.otf"))).toBe(true);
-    expect(existsSync(join(dstRoot, "village.ldtk"))).toBe(true);
+    expect(existsSync(join(dstRoot, "icons/app-256.png"))).toBe(true);
+    expect(existsSync(join(dstRoot, "avatars/rail/manager-default-2x.png"))).toBe(true);
+    expect(existsSync(join(dstRoot, "engines/claude.png"))).toBe(true);
+    expect(existsSync(join(dstRoot, "diorama/manifest.json"))).toBe(true);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

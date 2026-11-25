@@ -12,10 +12,10 @@ use gpui::{
 use vibevalley_workspace::{Axis, Group, Layout, Node, PaneKind, Tab, TabId};
 
 use crate::diff::DiffView;
+use crate::diorama::DioramaView;
 use crate::hosted::HostedView;
 use crate::icon::{TOOLTIP_SHOW_DELAY, gpui_icon, gpui_tooltip};
 use crate::markdown_pane::MarkdownView;
-use crate::pixel::view::PixelView;
 use crate::shell::Shell;
 use crate::theme::{Palette, Ui};
 use crate::viewer::FileViewer;
@@ -37,7 +37,7 @@ pub enum PaneEntity {
     Markdown(Entity<MarkdownView>),
     Diff(Entity<DiffView>),
     Hosted(Entity<HostedView>),
-    Pixel(Entity<PixelView>),
+    Diorama(Entity<DioramaView>),
 }
 
 impl PaneEntity {
@@ -47,7 +47,7 @@ impl PaneEntity {
             PaneEntity::Markdown(v) => v.read(cx).focus_handle(cx),
             PaneEntity::Diff(v) => v.read(cx).focus_handle(cx),
             PaneEntity::Hosted(view) => view.read(cx).focus_handle(cx),
-            PaneEntity::Pixel(v) => v.read(cx).focus_handle(cx),
+            PaneEntity::Diorama(v) => v.read(cx).focus_handle(cx),
         }
     }
 
@@ -57,7 +57,7 @@ impl PaneEntity {
             PaneEntity::Markdown(v) => v.clone().into_any_element(),
             PaneEntity::Diff(v) => v.clone().into_any_element(),
             PaneEntity::Hosted(view) => view.clone().into_any_element(),
-            PaneEntity::Pixel(v) => v.clone().into_any_element(),
+            PaneEntity::Diorama(v) => v.clone().into_any_element(),
         }
     }
 }
@@ -444,11 +444,8 @@ pub fn tab_title(shell: &Shell, tab: &Tab, cx: &App) -> String {
             Some(path) => format!("{} ({module})", path.rsplit('/').next().unwrap_or(path)),
             None => module.clone(),
         },
-        PaneKind::Pixel { scene, .. } => match scene.as_str() {
-            "farm" => "农场".into(),
-            "map" => "地图".into(),
-            "tree" => "记忆树".into(),
-            "opening" => "开场".into(),
+        PaneKind::Diorama { scene, .. } => match scene.as_str() {
+            "farm" | "diorama" => "农场".into(),
             other => other.to_string(),
         },
     }

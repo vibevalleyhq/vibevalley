@@ -2,6 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, onCleanup, onSettled } from "solid-js";
 
 import type { Copy } from "../i18n/zh";
+import { Icon } from "../ui/icons";
 import { createImageTransition } from "../ui/image";
 import { Presence } from "../ui/Presence";
 import { createElementRef, createReveal, createScrollAnimation } from "../ui/scroll";
@@ -17,7 +18,6 @@ interface Shot {
 interface Props {
   copy: Copy["screens"];
   shots: Shot[];
-  close: string;
 }
 const SIZES = [
   "(min-width: 1024px) 640px, calc(100vw - 48px)",
@@ -35,15 +35,12 @@ export default function Screens(props: Props) {
         <div class="grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] items-start gap-7">
           {props.shots.map((shot, i) => (
             <Drift rate={DRIFT[i] ?? 0} class={[i === 0 && "lg:row-span-2", i === 1 && "lg:mt-15"]}>
-              <figure
-                data-reveal
-                class="m-0 border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] p-2.5"
-              >
+              <figure data-reveal class="m-0 rounded-lg border border-border-soft/45 bg-card [box-shadow:var(--inset-shadow-rim),_var(--shadow-card)] p-2.5">
                 <button
                   type="button"
                   data-testid={`screenshot-${i}`}
                   title={props.copy.open}
-                  class="block w-full cursor-zoom-in"
+                  class="block w-full cursor-zoom-in overflow-hidden rounded-sm"
                   onClick={(event) => {
                     const source = event.currentTarget.querySelector("img");
                     if (source) setOpen({ shot, source });
@@ -58,7 +55,7 @@ export default function Screens(props: Props) {
                     decoding="async"
                     width={shot.width}
                     height={shot.height}
-                    class="block h-auto w-full border-2 border-bark-900"
+                    class="block h-auto w-full rounded-sm border border-border-soft/35"
                   />
                 </button>
                 <figcaption class="px-1 pt-2.5 pb-0.5 text-[length:15px] text-bark-800">{shot.caption}</figcaption>
@@ -68,9 +65,7 @@ export default function Screens(props: Props) {
         </div>
       </Section>
       <Presence value={open()} enter={{ opacity: [0, 1] }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-        {(value, ref) => (
-          <Large shot={value.shot} source={value.source} label={props.copy.close} icon={props.close} onClose={() => setOpen(undefined)} ref={ref} />
-        )}
+        {(value, ref) => <Large shot={value.shot} source={value.source} label={props.copy.close} onClose={() => setOpen(undefined)} ref={ref} />}
       </Presence>
     </>
   );
@@ -87,7 +82,7 @@ function Drift(props: { rate: number; class?: JSX.ClassValue | undefined; childr
   );
 }
 
-function Large(props: { shot: Shot; source: HTMLImageElement; label: string; icon: string; onClose: () => void; ref: (element: HTMLElement) => void }) {
+function Large(props: { shot: Shot; source: HTMLImageElement; label: string; onClose: () => void; ref: (element: HTMLElement) => void }) {
   const button = createElementRef<HTMLButtonElement>();
   const image = createElementRef<HTMLImageElement>();
   let cancel = () => {};
@@ -127,13 +122,18 @@ function Large(props: { shot: Shot; source: HTMLImageElement; label: string; ico
       aria-label={props.shot.caption}
       data-testid="screenshot-dialog"
       onClick={close}
-      class="fixed inset-0 z-50 grid place-items-center bg-[color-mix(in_oklab,_var(--color-shade)_80%,_transparent)] p-4 sm:p-8"
+      class="fixed inset-0 z-50 grid place-items-center bg-[color-mix(in_oklab,_var(--color-shade)_78%,_transparent)] backdrop-blur-xs p-4 sm:p-8"
     >
       <figure
         onClick={(event) => event.stopPropagation()}
-        class="relative m-0 border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] p-2.5"
+        class="relative m-0 rounded-lg border border-border-soft/55 bg-card [box-shadow:var(--inset-shadow-rim),_var(--shadow-card-lg)] p-2.5"
       >
-        <img ref={image.set} src={props.shot.src} alt={props.shot.caption} class="block h-auto max-h-[80svh] w-auto max-w-full border-2 border-bark-900" />
+        <img
+          ref={image.set}
+          src={props.shot.src}
+          alt={props.shot.caption}
+          class="block h-auto max-h-[80svh] w-auto max-w-full rounded-sm border border-border-soft/35"
+        />
         <figcaption class="px-1 pt-2.5 pb-0.5 text-[length:15px] text-bark-800">{props.shot.caption}</figcaption>
         <button
           ref={button.set}
@@ -141,9 +141,9 @@ function Large(props: { shot: Shot; source: HTMLImageElement; label: string; ico
           data-testid="screenshot-close"
           onClick={close}
           aria-label={props.label}
-          class="absolute -top-4 -right-4 grid w-11 h-11 cursor-pointer place-items-center border-2 border-bark-900 bg-cream-50 hover:bg-cream-hover [box-shadow:inset_2px_2px_0_var(--color-rim),_3px_3px_0_var(--color-drop)]"
+          class="absolute -top-4 -right-4 grid w-10 h-10 cursor-pointer place-items-center rounded-full border border-border-soft/65 bg-card hover:bg-cream-hover text-bark-900 shadow-card"
         >
-          <img src={props.icon} alt="" class="w-6 h-6 [image-rendering:pixelated]" />
+          <Icon name="close" class="w-5 h-5" />
         </button>
       </figure>
     </div>

@@ -1,4 +1,4 @@
-import { Image, Scroll, signal, Text, View, type JSX } from "nsh";
+import { Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
@@ -9,8 +9,6 @@ import { Button } from "../../design/Button";
 import { AgentFace } from "../../design/domain/Face";
 import { Field, TextInput } from "../../design/Field";
 import { Card, Quiet } from "../../design/layout";
-import { spriteUrl, usePixelDir } from "../../design/pixel/atlas";
-import { SpriteOr } from "../../design/pixel/icons";
 import { Segmented } from "../../design/Segmented";
 import { Bubble } from "../../design/Tip";
 import { mix } from "../../design/tone";
@@ -19,7 +17,7 @@ import { api, reasonOf } from "../../infra/api";
 import { type QueryResult, ready, useQueryClient } from "../../infra/query";
 import { createMemo } from "../../infra/solid";
 import { calendarOf, type CalendarDay, dayText, streaksOf } from "./calendar";
-import { langIcon, languageShares, number, percent } from "./repos";
+import { languageShares, number, percent } from "./repos";
 
 const tile = 12;
 const tileGap = 3;
@@ -44,22 +42,13 @@ function Bar(props: { share: number; color: string }) {
   );
 }
 
-/** A language's mark: its colour, where VibeValley draws its pixel logo. */
+/** A language's colour swatch. */
 function LangMark(props: { color: string; size: number }) {
   return <View class="shrink-0 rounded-sm border border-line" style={{ width: props.size, height: props.size, backgroundColor: props.color }} />;
 }
 
-/** A calendar day's tile: bare to in flower in the leaf's shades. */
-function DayTile(props: { level: number; dir: string | undefined }) {
-  // A year of tiles: one folder lookup for the calendar (props.dir), not one query per tile.
-  return (
-    <If when={props.dir} else={<DayStandIn level={props.level} />}>
-      {(dir) => <Image src={spriteUrl(dir(), `day-${props.level}`)} style={{ width: tile, height: tile }} />}
-    </If>
-  );
-}
-
-function DayStandIn(props: { level: number }) {
+/** A calendar day's tile shaded by commit activity level. */
+function DayTile(props: { level: number }) {
   return (
     <View
       class="rounded-xs"
@@ -79,11 +68,10 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
       <If when={!(props.languages.error() && !data())} else={<NotCounted reason={reasonOf(props.languages.error())} />}>
         <If when={data()} else={<View class="h-12 rounded-md bg-hover" />}>
           <If when={shares().length > 0} else={<Quiet>{t("web.repo.empty")}</Quiet>}>
-            {/* Bark, not a token: the pixel logos are drawn to sit on it. */}
             <View
               role="image"
               accessibilityLabel={list(shares().map((s) => `${s.label} ${percent(s.share)}`))}
-              class="h-14 flex-row gap-px overflow-hidden rounded-md bg-bark p-1"
+              class="h-14 flex-row gap-px overflow-hidden rounded-md border border-line bg-side p-1"
             >
               <Each of={shares()} key={(s) => s.label}>
                 {(s) => (
@@ -99,9 +87,7 @@ export function Languages(props: { languages: Asked<RepoLanguages> }) {
               <Each of={shares()} key={(s) => s.label}>
                 {(s) => (
                   <View class="flex-row items-center gap-3">
-                    <SpriteOr name={langIcon(s().id)} size={32}>
-                      <LangMark color={s().color} size={32} />
-                    </SpriteOr>
+                    <LangMark color={s().color} size={28} />
                     <View class="min-w-0 flex-1 gap-1">
                       <View class="flex-row items-baseline gap-2">
                         <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{s().label}</Text>
@@ -143,7 +129,6 @@ function NotCounted(props: { reason: string }) {
 const levelName = (level: number) => (level === 0 || level === 1 || level === 2 || level === 3 || level === 4 ? t(`web.repo.level.${level}`) : "");
 
 export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
-  const pixelDir = usePixelDir();
   const pointed = signal<CalendarDay | undefined>(undefined);
   const worked = () => ready(props.activity, undefined);
   const calendar = createMemo(() => calendarOf(worked()?.days ?? [], new Date()));
@@ -206,7 +191,7 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
                     <Each of={week()}>
                       {(d) => (
                         <View onMouseEnter={() => pointed.set(d())} style={{ opacity: d().future ? 0 : worked() ? 1 : 0.5 }}>
-                          <DayTile level={d().level} dir={pixelDir()} />
+                          <DayTile level={d().level} />
                         </View>
                       )}
                     </Each>
@@ -223,7 +208,7 @@ export function CommitCalendar(props: { activity: Asked<RepoActivity> }) {
             <Each of={[0, 1, 2, 3, 4]}>
               {(l) => (
                 <View tooltip={<Bubble text={levelName(l())} />}>
-                  <DayTile level={l()} dir={pixelDir()} />
+                  <DayTile level={l()} />
                 </View>
               )}
             </Each>

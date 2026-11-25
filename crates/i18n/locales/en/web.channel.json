@@ -18,8 +18,16 @@
   "channelsTitle": "Channels",
   "directsTitle": "Direct messages",
   "newChannel": "Create a channel",
-  "helpers": "Helpers",
-  "noHelpers": "No helpers here",
+  "newChat": "New chat",
+  "filter": {
+    "label": "Filter chats",
+    "all": "All",
+    "group": "Channels",
+    "direct": "Direct"
+  },
+  "emptyPreview": "No messages yet",
+  "emptyList": "No chats yet",
+  "runsEntry": "View running sessions",
   "mood": {
     "idle": "resting",
     "listening": "listening",
@@ -165,8 +173,7 @@
     "removeWill": "Deleting it:",
     "archivedTitle": "Archived",
     "muted": "Muted",
-    "mentionsOnly": "Only @",
-    "drag": "Drop on another channel to place it before that one"
+    "mentionsOnly": "Only @"
   },
   "threadList": {
     "title": "This channel's threads",
@@ -201,7 +208,6 @@
     "failed": "The search failed: {why}"
   },
   "direct": {
-    "add": "New direct message",
     "pick": "Talk with",
     "none": "No profiles yet",
     "open": "Talk with {name}"
@@ -281,6 +287,5 @@
     }
   },
   "lacks": "cannot answer: {why}",
-  "lacksFix": "Settings",
-  "orchestratorRuns": "View assistant trajectory and pending approvals"
+  "lacksFix": "Settings"
 }

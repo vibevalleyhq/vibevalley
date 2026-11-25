@@ -117,7 +117,7 @@ flowchart LR
 | 逻辑平面 | 物理载体 | 应负责（Owns） | 不应负责（Does NOT Own） | 对外唯一端口 |
 |---|---|---|---|---|
 | **总控端 `Control Plane`** | [crates/server](crates/server/src/lib.rs) | 持久化单一真源（`db/` + `service/`）、`Outbox`、`LiveState`、6 路 `StateFeed` 投影、任务队列与依赖推进、频道投递、主助手轮次、作品目录与统一实时协同、记忆持久化、三类 `Principal` 鉴权、`machine/` 注册表 | 具体的子进程管理、远端宿主机文件读写、UI 组件树排版 | `gateway/api/`（含 `Router` 与 `GatewayPorts`）及单一 HTTP/WS 网关（`gateway/http/` + `gateway/remote/`） |
-| **桌面端 GUI `Desktop`** | [apps/mac](apps/mac/Cargo.toml) + [apps/mac/ui](apps/mac/ui) | GPUI 原生窗口、工作台页面、本地终端（`terminal`）、像素农场渲染（`pixel`）、可选「单机合体启动器」与可选连接远端总控端 | 业务规则计算、擅自改写服务端持久化状态、越过协议直调服务端内部业务域 | `Client Protocol`（连远端总控端）或 `gateway/bridge/` + 进程内主机端口 |
+| **桌面端 GUI `Desktop`** | [apps/mac](apps/mac/Cargo.toml) + [apps/mac/ui](apps/mac/ui) | GPUI 原生窗口、工作台页面、本地终端（`terminal`）、3D 纸雕农场渲染（`diorama`）、可选「单机合体启动器」与可选连接远端总控端 | 业务规则计算、擅自改写服务端持久化状态、越过协议直调服务端内部业务域 | `Client Protocol`（连远端总控端）或 `gateway/bridge/` + 进程内主机端口 |
 | **手机端 `Mobile`** | [apps/mobile](apps/mobile) | iOS / Android 移动界面（收件箱、频道、会话、任务）、设备配对、Keychain / Keystore 凭据存储、折叠屏双栏自适应 | 任何服务端状态存储、本地模型或 CLI 执行 | `Client Protocol`（`@vibevalley/protocol/remote`） |
 | **命令行 `CLI`** | [crates/cli](crates/cli/src/main.rs) | 1）`Client` 模式：经认证向总控端查询、创建任务、频道发言与提交作品版本；2）`Machine` 模式：在执行机上探针 CLI、维持反向 WS、驱动子进程 | 总控端全量状态镜像、多用户看板 UI 呈现 | `Client Protocol`（模式 1）与 `Machine Protocol`（模式 2） |
 | **执行层 `Execution Layer`** | `Machine` + `Runtime`（含 [crates/runtime/src/oar](crates/runtime/src/oar/mod.rs)） | `Machine` 在线注册、会话持久化存活、工作目录预置与清理、驱动 `claude`/`codex`/`acp` 子进程、回传事件与轨迹、本地 MCP 代理隧道 | 任务优先级队列、频道受众路由、用户账号或跨机器授权策略 | `Machine` trait 与 `Runtime` trait |

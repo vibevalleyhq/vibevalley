@@ -22,7 +22,7 @@ function parseSliceTopic(topic: string | undefined): SliceKind | undefined {
 export interface FakeHost {
   readonly options: NonNullable<OpenOptions["host"]>;
   readonly calls: { op: string; payload: unknown }[];
-  /** The actions for the shell itself (`act`: openFarm, openTree, ...), in order. */
+  /** The actions for the shell itself (`act`: openFarm, ...), in order. */
   readonly acts: { type: string; [key: string]: unknown }[];
   /** Override or add a canned/function RPC answer at runtime. */
   respond(op: string, answer: unknown): void;

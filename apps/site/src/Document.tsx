@@ -17,7 +17,6 @@ export default function Document(props: { children?: JSX.Element }) {
         <meta name="theme-color" content="#2f1f13" />
         <link rel="icon" type="image/png" sizes="32x32" href="/gen/icon-32.png" />
         <link rel="apple-touch-icon" href="/gen/icon-256.png" />
-        <link rel="preload" href="/gen/pixel.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
         {route.lost ? (
           <meta name="robots" content="noindex" />
         ) : (

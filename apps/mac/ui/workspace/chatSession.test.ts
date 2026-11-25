@@ -196,6 +196,22 @@ test("toWorkspaceRuntime preserves empty effortLevels for models on runtimes tha
   );
   expect(refused.models.map((m) => m.effortLevels)).toEqual([[], []]);
   expect(refused.models.map((m) => m.defaultEffort)).toEqual([undefined, undefined]);
+
+  const withQuota = toWorkspaceRuntime(
+    makeRuntimeInfo({
+      quota: { left: 74, text: "5h window" },
+    }),
+  );
+  expect(withQuota.quotaPct).toBe(74);
+  expect(withQuota.quotaText).toBe("5h window");
+
+  const withWindowFallback = toWorkspaceRuntime(
+    makeRuntimeInfo({
+      usage: { status: "ok", subscription: null, windows: [{ label: "Gemini · 5h", usedPercent: 28, resetsAt: null }] },
+    }),
+  );
+  expect(withWindowFallback.quotaPct).toBe(72);
+  expect(withWindowFallback.quotaText).toBe("Gemini · 5h");
 });
 
 test("preferredModelFor, defaultThoughtLevelFor, and clampThoughtLevel select and clamp model effort cleanly", () => {

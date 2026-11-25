@@ -632,6 +632,10 @@ async fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
     assert_eq!(spawn["AGY_CLI_DISABLE_AUTO_UPDATE"], "1");
     assert_eq!(spawn["PYTHONUNBUFFERED"], "1");
     let argv: Vec<&str> = spawn["argv"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
+    assert!(
+        argv.contains(&"--dangerously-skip-permissions"),
+        "Bypass must launch agy acp in YOLO mode: {argv:?}"
+    );
     assert!(argv.windows(2).any(|w| w[0] == "--add-dir" && w[1] == extra_dir.to_string_lossy()));
 
     let methods: Vec<&str> = entries
@@ -707,6 +711,12 @@ async fn antigravity_v2_handshake_auth_append_prompt_config_order_and_models() {
     resumed.dispose().await;
 
     let res_entries = read_jsonl(&trace_resume);
+    let res_spawn = res_entries.iter().find(|e| e["kind"] == "spawn").expect("resume spawn entry");
+    let res_argv: Vec<&str> = res_spawn["argv"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
+    assert!(
+        !res_argv.contains(&"--dangerously-skip-permissions"),
+        "Ask mode must not pass --dangerously-skip-permissions: {res_argv:?}"
+    );
     let resume_msg = res_entries
         .iter()
         .find(|e| e.pointer("/msg/method").and_then(Value::as_str) == Some("session/resume"))

@@ -29,7 +29,7 @@ pub struct SpaceState {
     /// Each orchestrator not at rest, by its profile id, as its last orchestrator fact says; one not here is idle.
     pub sessions: Vec<Session>,
     pub crons: Vec<Cron>,
-    /// The farm's pixel-only station and step history, by session; no business rule reads it.
+    /// The farm scene's station and step history, by session; no business rule reads it.
     pub plays: Option<BTreeMap<String, SessionPlay>>,
     /// Durable runtime inbox alerts projected into `InboxSlice` via `Fact::RuntimeInboxChanged`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

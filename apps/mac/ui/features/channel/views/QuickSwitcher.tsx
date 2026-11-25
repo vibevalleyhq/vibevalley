@@ -17,7 +17,7 @@ import { useBoardSlice, useCollabSlice, useSessionsSlice } from "../../../infra/
 import { useRouter } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
 import { defineAtom } from "../../../infra/state/atom";
-import { chatPath, type SwitchTarget, switchTargets } from "../model/places";
+import { chatPath, directPeerOf, type SwitchTarget, switchTargets } from "../model/places";
 import { Count, HelperFace } from "./presence";
 
 const shown = defineAtom(false);
@@ -81,7 +81,7 @@ function SwitcherBody(props: { onClose: () => void }) {
   const directPeer = (target: SwitchTarget): string | undefined => {
     if (target.kind === "profile") return target.id;
     if (target.kind !== "direct") return undefined;
-    return channelOf(collab()?.chat, target.id)?.peer?.replace(/^profile:/u, "");
+    return directPeerOf(channelOf(collab()?.chat, target.id));
   };
   return (
     <Command

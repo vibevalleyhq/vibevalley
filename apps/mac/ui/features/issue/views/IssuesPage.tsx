@@ -29,7 +29,6 @@ import { issueMove, movedCards, sendMove } from "../model/moves";
 import { issueSearch } from "../model/navigation";
 import { writeIssue } from "../model/write";
 import { IssueBoard } from "./Board";
-import { BoardOnboarding } from "./BoardOnboarding";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { DisplayMenu } from "./DisplayMenu";
 import { FamilyDetail } from "./FamilyDetail";
@@ -38,7 +37,6 @@ import { IssueList, type ListAdd } from "./IssueList";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { createIssueChrome, IssueChromeContext } from "./Sheet";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
-import { WorkflowGuide } from "./WorkflowGuide";
 
 type Closing = { issue: Issue; session: Session | undefined; review: boolean; lane?: Lane };
 
@@ -74,7 +72,6 @@ export function IssuesPage(props: { rest: string }) {
   const fromScene = () => {
     if (!router.location().pathname.startsWith("/issues/")) return;
     const path = router.history.previous()?.pathname;
-    if (path === "/map") return t("web.farm.native.map");
     if (path === "/farm" || path?.startsWith("/farm/") === true) return t("web.base.farm");
   };
   const returnTo = signal<string>();
@@ -172,49 +169,40 @@ export function IssuesPage(props: { rest: string }) {
                 {reasonOf(history.error())}
               </Text>
             </If>
-            <If when={history.loading() || history.error() !== undefined || history.rows() === undefined || all().length > 0}>
-              <Toolbar filter={filter()} cards={all()} shown={shown().length} onFilter={setFilter} look={look()} onLook={setLook} onNew={() => startNew({})} />
-            </If>
+            <Toolbar filter={filter()} cards={all()} shown={shown().length} onFilter={setFilter} look={look()} onLook={setLook} onNew={() => startNew({})} />
             <If
-              when={!history.loading() && !history.error() && history.rows() !== undefined && all().length === 0}
+              when={look().view === "board"}
               else={
-                <If
-                  when={look().view === "board"}
-                  else={
-                    <IssueList
-                      cards={shown()}
-                      loading={history.loading()}
-                      selected={returnTo()}
-                      older={older()}
-                      grouping={look().grouping}
-                      ordering={look().ordering}
-                      onOlder={() => older.set(!older())}
-                      onOpen={open}
-                      onAdd={addInList}
-                    />
-                  }
-                >
-                  <WorkflowGuide />
-                  <IssueBoard
-                    cards={shown()}
-                    summary={board()?.boardSummary}
-                    filtered={filterAny(filter())}
-                    loading={history.loading()}
-                    selected={returnTo()}
-                    older={older()}
-                    ordering={look().ordering}
-                    onOlder={() => older.set(!older())}
-                    onOpen={open}
-                    onDrop={(c, to) => void drop(c, to)}
-                    onRetry={(c) => void retry(c)}
-                    onPutBack={(c) => c.move && moves.drop(c.move.key)}
-                    onPlace={(c, before) => void place(c, before)}
-                    onNew={() => startNew({})}
-                  />
-                </If>
+                <IssueList
+                  cards={shown()}
+                  filtered={filterAny(filter())}
+                  loading={history.loading()}
+                  selected={returnTo()}
+                  older={older()}
+                  grouping={look().grouping}
+                  ordering={look().ordering}
+                  onOlder={() => older.set(!older())}
+                  onOpen={open}
+                  onAdd={addInList}
+                />
               }
             >
-              <BoardOnboarding issueCount={all().length} onNavigate={(path) => router.navigate(path)} onNew={(where) => startNew(where)} />
+              <IssueBoard
+                cards={shown()}
+                summary={board()?.boardSummary}
+                filtered={filterAny(filter())}
+                loading={history.loading()}
+                selected={returnTo()}
+                older={older()}
+                ordering={look().ordering}
+                onOlder={() => older.set(!older())}
+                onOpen={open}
+                onDrop={(c, to) => void drop(c, to)}
+                onRetry={(c) => void retry(c)}
+                onPutBack={(c) => c.move && moves.drop(c.move.key)}
+                onPlace={(c, before) => void place(c, before)}
+                onNew={() => startNew({})}
+              />
             </If>
           </>
         }
@@ -356,7 +344,7 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
   return (
     <IssueChromeContext.Provider value={chrome}>
       <View testID="issue" class="min-h-0 flex-1">
-        <View class="h-9 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3.5">
+        <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3.5">
           <View
             role="button"
             testID="issue-close"
@@ -401,7 +389,7 @@ function Toolbar(props: {
   const agentOptions = createMemo(() => agents().map((a) => ({ value: a, label: nameOf()(a) })));
   const isFiltered = createMemo(() => filterAny(props.filter));
   return (
-    <View class="flex-row flex-wrap items-center gap-2 px-3.5 py-2">
+    <View desktop={{ windowDrag: true }} class="flex-row flex-wrap items-center gap-2 px-3.5 py-2">
       <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
         <SearchField
           testid="issue-search"

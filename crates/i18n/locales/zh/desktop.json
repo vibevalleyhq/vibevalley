@@ -44,5 +44,31 @@
   },
   "files": {
     "missingInWorktree": "此任务的工作区中无法打开 {path}"
+  },
+  "startup": {
+    "titleSchema": "数据库结构不匹配",
+    "titleFailed": "VibeValley 无法启动",
+    "titleLogs": "启动日志",
+    "subtitle": "通道 {channel} · v{version}",
+    "schemaSummary": "检测到数据库 {path} 的表结构与当前版本不匹配，或来自尚未接入迁移跟踪的旧版本。",
+    "schemaSummaryNoPath": "检测到当前数据库的表结构与当前版本不匹配，或来自尚未接入迁移跟踪的旧版本。",
+    "genericSummary": "服务启动失败：{summary}",
+    "slowHint": "正在启动本地服务，等待时间较长…",
+    "viewLogs": "查看启动日志",
+    "detailHeading": "诊断详情",
+    "logsHeading": "最近日志",
+    "emptyLogs": "暂无日志输出。",
+    "logFileLabel": "日志文件：{path}",
+    "copyReport": "复制诊断信息",
+    "copied": "已复制",
+    "openFolder": "打开数据目录",
+    "backupReset": "备份并重置数据库",
+    "backupConfirm": "确认备份并重启",
+    "backupBusy": "正在备份…",
+    "backupDoneManual": "已将旧数据库备份至 {path}，请手动重启应用以重建新库。",
+    "backupFailed": "备份失败：{error}",
+    "refreshLogs": "刷新",
+    "closeLogs": "关闭",
+    "quit": "退出"
   }
 }

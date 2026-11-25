@@ -898,7 +898,7 @@ function AudioJobCard(props: { job: MediaAudioJob }) {
                             role="button"
                             testID={`audio-seek-${segment().start}`}
                             accessibilityLabel={`${audioTimestamp(segment().start)} – ${audioTimestamp(segment().end)}`}
-                            tooltip={<Bubble text={t("web.catalog.play")} />}
+                            tooltip={<Bubble text={t("web.base.play")} />}
                             disabled={!props.job.input}
                             onPress={() => {
                               const input = props.job.input;

@@ -17,8 +17,8 @@ pub fn config(home: &Path, work_root: PathBuf) -> vibevalley_server::Config {
     config
 }
 
-pub fn opening_pixel_phase(phase: vibevalley_protocol::HostOpeningPhase) -> crate::pixel::opening::Phase {
-    use crate::pixel::opening::Phase;
+pub fn opening_phase(phase: vibevalley_protocol::HostOpeningPhase) -> crate::diorama::opening::Phase {
+    use crate::diorama::opening::Phase;
     use vibevalley_protocol::HostOpeningPhase;
     match phase {
         HostOpeningPhase::Connecting | HostOpeningPhase::Waiting => Phase::Connecting,

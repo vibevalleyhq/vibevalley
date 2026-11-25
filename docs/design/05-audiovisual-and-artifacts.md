@@ -13,12 +13,12 @@
 - **语音朗读状态机（`apps/mac/src/speech_audio.rs`）**：围绕四态枚举 `Phase` 运转：`Idle` → `Playing` → `Draining` → `Stopping`，并通过 `Claim` 句柄绑定服务端 `SharedSpeechStreams` 的生命周期回收通知。
 - **实时双工通话（`apps/mac/src/live_voice.rs`）**：独立 `moss-live` 线程建立 WebSocket 语音流，维护四态 `Phase`（`Idle` / `Connecting` / `Live` / `Stopping`）、静音开关 `muted` 以及实时识别双轨字幕 `heard` / `said`。
 
-### 程序化 8-bit 音效合成器（`apps/mac/src/audio.rs` 与 `apps/mac/ui/design/pixel/sound.ts`）
+### 程序化音效合成器（`apps/mac/src/audio.rs` 与 `apps/mac/ui/design/sound.ts`）
 
-像素农场的界面动作与帮工提示音由原生合成器实时计算 PCM 波形并缓存标准 WAV 字节序列：
+纸雕农场的界面动作与帮工提示音由原生合成器实时计算 PCM 波形并缓存标准 WAV 字节序列：
 
 - `apps/mac/src/audio.rs` 中的 `synth` 模块提供 `Pen` 音轨画笔（音调、白噪声与滤波原语）与 `compose()` 作曲配方，按 `32 kHz` 采样率渲染并缓存全部音效，通过 `play_sound()` 直接播放，无需磁盘 I/O。
-- `sound.ts` 定义全量音效表 `SOUNDS`（涵盖农具使用、收获金币、来电铃声、到达跳跃 `arrive` 等）与分组 `SOUND_GROUPS`，经 `hostApi.playSound` 统一交由原生音频驱动执行。
+- `sound.ts` 经 `hostApi.playSound` 将具名音效请求交由原生音频驱动执行。
 
 ## 5.2 多模态媒体查看与素材库
 

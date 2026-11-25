@@ -33,10 +33,6 @@
       "label": "Team",
       "hint": "Roles and team templates"
     },
-    "catalog": {
-      "label": "Catalog",
-      "hint": "Assets: pixel sprites, cursors, sounds, and workbench UI kit"
-    },
     "settings": {
       "label": "Settings",
       "hint": "General & appearance, models & keys, voice, connections, about"
@@ -249,5 +245,7 @@
     "offline": "Not connected to the farm, so this was not sent"
   },
   "pickTooLarge": "{name} was not added: it is over 512 MiB",
-  "openTerminal": "Open a terminal here"
+  "openTerminal": "Open a terminal here",
+  "play": "Play",
+  "stop": "Stop"
 }

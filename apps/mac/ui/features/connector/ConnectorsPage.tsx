@@ -1,15 +1,15 @@
-import { signal, Text, View, type JSX } from "nsh";
+import { Image, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type ConnectorID, ConnectorIDValues, type ConnectorLogin, type ConnectorState, type ConnectorStatus } from "@vibevalley/protocol";
 import { defaultOf } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
+import { connectorEmblemUrl, useAssetsDir } from "../../design/art";
 import { Button } from "../../design/Button";
 import { ConfirmButton } from "../../design/ConfirmButton";
 import { Field, Select, TextInput } from "../../design/Field";
 import { Banner, Card, ListCard, ListRow, Quiet, SecretInput, Split } from "../../design/layout";
-import { SpriteOr } from "../../design/pixel/icons";
 import { Qr } from "../../design/Qr";
 import { CountPill } from "../../design/Tag";
 import { TextLink } from "../../design/TextLink";
@@ -77,26 +77,23 @@ function StateBadge(props: { state: ConnectorState }) {
   );
 }
 
-/** Each app's own colour, where its sprite (connector-<id>) has its logo. */
-const appColor: Record<ConnectorID, string> = { weixin: "#07c160", feishu: "#3370ff", qq: "#12b7f5" };
-
 function ConnectorMark(props: { id: ConnectorID; size: number }) {
+  const assetsDir = useAssetsDir();
+  const src = () => {
+    const dir = assetsDir();
+    return dir ? connectorEmblemUrl(dir, props.id) : undefined;
+  };
   return (
-    <SpriteOr name={`connector-${props.id}`} size={props.size}>
-      <MarkStandIn {...props} />
-    </SpriteOr>
+    <If when={src()} else={<MarkStandIn {...props} />}>
+      {(url) => <Image src={url()} class="shrink-0" style={{ width: props.size, height: props.size, objectFit: "contain" }} />}
+    </If>
   );
 }
 
 function MarkStandIn(props: { id: ConnectorID; size: number }) {
   return (
-    <View
-      class="shrink-0 items-center justify-center rounded-md"
-      style={{ width: props.size, height: props.size, backgroundColor: `${appColor[props.id]}26`, borderWidth: 2, borderColor: `${appColor[props.id]}80` }}
-    >
-      <Text class="text-sm font-semibold" style={{ color: appColor[props.id] }}>
-        {connectorLabel[props.id].slice(0, 1)}
-      </Text>
+    <View class="shrink-0 items-center justify-center rounded-md border border-line bg-paper" style={{ width: props.size, height: props.size }}>
+      <Text class="text-sm font-semibold text-ink">{connectorLabel[props.id].slice(0, 1)}</Text>
     </View>
   );
 }

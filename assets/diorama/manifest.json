@@ -1,0 +1,2745 @@
+{
+  "version": 2,
+  "sourceSha256": "155c9717a0a6932a45e15f9d08cd51835af1215bf4308bdeab563333483c5fe4",
+  "groundSize": 16.0,
+  "groundThickness": 0.28,
+  "cardThickness": 0.026,
+  "atlases": [
+    {
+      "index": 0,
+      "file": "print/cutouts_yard.png",
+      "width": 4,
+      "height": 4
+    },
+    {
+      "index": 1,
+      "file": "print/cutouts_helpers.png",
+      "width": 4,
+      "height": 4
+    },
+    {
+      "index": 2,
+      "file": "print/yard_ground.png",
+      "width": 2048,
+      "height": 2048
+    }
+  ],
+  "meshes": {
+    "b_guild_hall": {
+      "atlasIndex": 0,
+      "vertexOffset": 17993,
+      "vertexCount": 7219,
+      "indexOffset": 27120,
+      "indexCount": 10782,
+      "obbHalf": [
+        0.60099995,
+        0.6745,
+        0.57199997
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "unused_1",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "lantern_swing",
+          "parent": 0,
+          "pivot": [
+            -0.17,
+            0.43,
+            0.47
+          ]
+        },
+        {
+          "name": "roof_lid",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.82,
+            -0.35
+          ]
+        },
+        {
+          "name": "lantern_swing_2",
+          "parent": 0,
+          "pivot": [
+            0.17,
+            0.43,
+            0.47
+          ]
+        }
+      ]
+    },
+    "b_library": {
+      "atlasIndex": 0,
+      "vertexOffset": 7417,
+      "vertexCount": 5946,
+      "indexOffset": 11340,
+      "indexCount": 8886,
+      "obbHalf": [
+        0.551,
+        0.5945,
+        0.53199995
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "unused_1",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "lantern_swing",
+          "parent": 0,
+          "pivot": [
+            -0.36,
+            0.4,
+            0.46
+          ]
+        },
+        {
+          "name": "roof_lid",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.7,
+            -0.32
+          ]
+        },
+        {
+          "name": "lantern_swing_2",
+          "parent": 0,
+          "pivot": [
+            0.36,
+            0.4,
+            0.46
+          ]
+        }
+      ]
+    },
+    "b_orchestrator_desk": {
+      "atlasIndex": 0,
+      "vertexOffset": 42912,
+      "vertexCount": 2972,
+      "indexOffset": 63984,
+      "indexCount": 4422,
+      "obbHalf": [
+        0.62455755,
+        0.58125,
+        0.717
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "unused_1",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "lantern_swing",
+          "parent": 0,
+          "pivot": [
+            0.20264992,
+            0.55,
+            0.351
+          ]
+        },
+        {
+          "name": "unused_3",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "lantern_swing_2",
+          "parent": 0,
+          "pivot": [
+            -0.20264997,
+            0.55,
+            0.351
+          ]
+        },
+        {
+          "name": "lantern_swing_3",
+          "parent": 0,
+          "pivot": [
+            -0.40529984,
+            0.55,
+            -2.7894973e-8
+          ]
+        },
+        {
+          "name": "lantern_swing_4",
+          "parent": 0,
+          "pivot": [
+            0.40529984,
+            0.55,
+            -2.7894973e-8
+          ]
+        }
+      ]
+    },
+    "b_radio_kiosk": {
+      "atlasIndex": 0,
+      "vertexOffset": 38065,
+      "vertexCount": 4847,
+      "indexOffset": 56754,
+      "indexCount": 7230,
+      "obbHalf": [
+        0.511,
+        0.70500004,
+        0.492
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "b_stall": {
+      "atlasIndex": 0,
+      "vertexOffset": 30514,
+      "vertexCount": 1203,
+      "indexOffset": 45810,
+      "indexCount": 1782,
+      "obbHalf": [
+        0.545,
+        0.40124997,
+        0.335
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "b_task_board": {
+      "atlasIndex": 0,
+      "vertexOffset": 13363,
+      "vertexCount": 4630,
+      "indexOffset": 20226,
+      "indexCount": 6894,
+      "obbHalf": [
+        0.59099996,
+        0.5345,
+        0.40199998
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "b_trophy_arch": {
+      "atlasIndex": 0,
+      "vertexOffset": 31717,
+      "vertexCount": 6348,
+      "indexOffset": 47592,
+      "indexCount": 9162,
+      "obbHalf": [
+        0.631,
+        0.6245,
+        0.282
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "b_warehouse": {
+      "atlasIndex": 0,
+      "vertexOffset": 25212,
+      "vertexCount": 5302,
+      "indexOffset": 37902,
+      "indexCount": 7908,
+      "obbHalf": [
+        0.65099996,
+        0.6045,
+        0.552
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "b_workshop": {
+      "atlasIndex": 0,
+      "vertexOffset": 627,
+      "vertexCount": 6790,
+      "indexOffset": 1200,
+      "indexCount": 10140,
+      "obbHalf": [
+        0.648625,
+        0.6909815,
+        0.62100005
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "waterwheel",
+          "parent": 0,
+          "pivot": [
+            -0.54,
+            0.4,
+            0.14
+          ]
+        },
+        {
+          "name": "lantern_swing",
+          "parent": 0,
+          "pivot": [
+            0.4,
+            0.51,
+            0.51
+          ]
+        },
+        {
+          "name": "roof_lid",
+          "parent": 0,
+          "pivot": [
+            0.04,
+            0.79,
+            -0.34
+          ]
+        },
+        {
+          "name": "lantern_swing_2",
+          "parent": 0,
+          "pivot": [
+            -0.34,
+            0.51,
+            0.51
+          ]
+        }
+      ]
+    },
+    "c_carrot_ripe": {
+      "atlasIndex": 0,
+      "vertexOffset": 97989,
+      "vertexCount": 894,
+      "indexOffset": 142446,
+      "indexCount": 996,
+      "obbHalf": [
+        0.3220183,
+        0.283,
+        0.282
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "c_dry": {
+      "atlasIndex": 0,
+      "vertexOffset": 99399,
+      "vertexCount": 452,
+      "indexOffset": 143988,
+      "indexCount": 522,
+      "obbHalf": [
+        0.29164296,
+        0.25,
+        0.28924644
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "c_flowering": {
+      "atlasIndex": 0,
+      "vertexOffset": 95472,
+      "vertexCount": 1252,
+      "indexOffset": 139746,
+      "indexCount": 1302,
+      "obbHalf": [
+        0.31488475,
+        0.3485371,
+        0.29067373
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "c_leafy": {
+      "atlasIndex": 0,
+      "vertexOffset": 94824,
+      "vertexCount": 648,
+      "indexOffset": 139098,
+      "indexCount": 648,
+      "obbHalf": [
+        0.40043214,
+        0.25,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "c_seeded": {
+      "atlasIndex": 0,
+      "vertexOffset": 93226,
+      "vertexCount": 843,
+      "indexOffset": 137406,
+      "indexCount": 867,
+      "obbHalf": [
+        0.32913208,
+        0.25,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "c_sprout": {
+      "atlasIndex": 0,
+      "vertexOffset": 94069,
+      "vertexCount": 755,
+      "indexOffset": 138273,
+      "indexCount": 825,
+      "obbHalf": [
+        0.28526372,
+        0.25,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "c_weeds": {
+      "atlasIndex": 0,
+      "vertexOffset": 98883,
+      "vertexCount": 516,
+      "indexOffset": 143442,
+      "indexCount": 546,
+      "obbHalf": [
+        0.3002466,
+        0.337,
+        0.30092067
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "c_wheat_ripe": {
+      "atlasIndex": 0,
+      "vertexOffset": 96724,
+      "vertexCount": 1265,
+      "indexOffset": 141048,
+      "indexCount": 1398,
+      "obbHalf": [
+        0.25908068,
+        0.43700615,
+        0.2716689
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "c_withered": {
+      "atlasIndex": 0,
+      "vertexOffset": 99851,
+      "vertexCount": 348,
+      "indexOffset": 144510,
+      "indexCount": 408,
+      "obbHalf": [
+        0.25,
+        0.25,
+        0.25801656
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "fx_firefly": {
+      "atlasIndex": 0,
+      "vertexOffset": 63532,
+      "vertexCount": 24,
+      "indexOffset": 94386,
+      "indexCount": 24,
+      "obbHalf": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": true
+    },
+    "fx_petal": {
+      "atlasIndex": 0,
+      "vertexOffset": 63520,
+      "vertexCount": 12,
+      "indexOffset": 94374,
+      "indexCount": 12,
+      "obbHalf": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "fx_splash": {
+      "atlasIndex": 0,
+      "vertexOffset": 63556,
+      "vertexCount": 18,
+      "indexOffset": 94410,
+      "indexCount": 18,
+      "obbHalf": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "ground_slab": {
+      "atlasIndex": 2,
+      "vertexOffset": 0,
+      "vertexCount": 97,
+      "indexOffset": 0,
+      "indexCount": 408,
+      "obbHalf": [
+        8.0,
+        0.14,
+        8.0
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "h_bear": {
+      "atlasIndex": 1,
+      "vertexOffset": 70535,
+      "vertexCount": 4330,
+      "indexOffset": 103920,
+      "indexCount": 6366,
+      "obbHalf": [
+        0.25,
+        0.36050388,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "torso",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.19,
+            0.0
+          ]
+        },
+        {
+          "name": "head",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.43,
+            0.0
+          ]
+        },
+        {
+          "name": "arm_l",
+          "parent": 1,
+          "pivot": [
+            -0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "arm_r",
+          "parent": 1,
+          "pivot": [
+            0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "leg_l",
+          "parent": 0,
+          "pivot": [
+            -0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "leg_r",
+          "parent": 0,
+          "pivot": [
+            0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "tail",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.21,
+            -0.056
+          ]
+        }
+      ]
+    },
+    "h_cat": {
+      "atlasIndex": 1,
+      "vertexOffset": 83810,
+      "vertexCount": 4787,
+      "indexOffset": 123522,
+      "indexCount": 7074,
+      "obbHalf": [
+        0.25,
+        0.37892324,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "torso",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.19,
+            0.0
+          ]
+        },
+        {
+          "name": "head",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.43,
+            0.0
+          ]
+        },
+        {
+          "name": "arm_l",
+          "parent": 1,
+          "pivot": [
+            -0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "arm_r",
+          "parent": 1,
+          "pivot": [
+            0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "leg_l",
+          "parent": 0,
+          "pivot": [
+            -0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "leg_r",
+          "parent": 0,
+          "pivot": [
+            0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "tail",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.21,
+            -0.056
+          ]
+        }
+      ]
+    },
+    "h_fox": {
+      "atlasIndex": 1,
+      "vertexOffset": 65730,
+      "vertexCount": 4805,
+      "indexOffset": 96816,
+      "indexCount": 7104,
+      "obbHalf": [
+        0.27888685,
+        0.38792324,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "torso",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.19,
+            0.0
+          ]
+        },
+        {
+          "name": "head",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.43,
+            0.0
+          ]
+        },
+        {
+          "name": "arm_l",
+          "parent": 1,
+          "pivot": [
+            -0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "arm_r",
+          "parent": 1,
+          "pivot": [
+            0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "leg_l",
+          "parent": 0,
+          "pivot": [
+            -0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "leg_r",
+          "parent": 0,
+          "pivot": [
+            0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "tail",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.21,
+            -0.056
+          ]
+        }
+      ]
+    },
+    "h_owl": {
+      "atlasIndex": 1,
+      "vertexOffset": 74865,
+      "vertexCount": 4045,
+      "indexOffset": 110286,
+      "indexCount": 5988,
+      "obbHalf": [
+        0.25,
+        0.36292323,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "torso",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.19,
+            0.0
+          ]
+        },
+        {
+          "name": "head",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.43,
+            0.0
+          ]
+        },
+        {
+          "name": "arm_l",
+          "parent": 1,
+          "pivot": [
+            -0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "arm_r",
+          "parent": 1,
+          "pivot": [
+            0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "leg_l",
+          "parent": 0,
+          "pivot": [
+            -0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "leg_r",
+          "parent": 0,
+          "pivot": [
+            0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "tail",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.21,
+            -0.056
+          ]
+        }
+      ]
+    },
+    "h_rabbit": {
+      "atlasIndex": 1,
+      "vertexOffset": 88597,
+      "vertexCount": 4629,
+      "indexOffset": 130596,
+      "indexCount": 6810,
+      "obbHalf": [
+        0.28149998,
+        0.43192324,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "torso",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.19,
+            0.0
+          ]
+        },
+        {
+          "name": "head",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.43,
+            0.0
+          ]
+        },
+        {
+          "name": "arm_l",
+          "parent": 1,
+          "pivot": [
+            -0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "arm_r",
+          "parent": 1,
+          "pivot": [
+            0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "leg_l",
+          "parent": 0,
+          "pivot": [
+            -0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "leg_r",
+          "parent": 0,
+          "pivot": [
+            0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "tail",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.21,
+            -0.056
+          ]
+        }
+      ]
+    },
+    "h_shiba": {
+      "atlasIndex": 1,
+      "vertexOffset": 78910,
+      "vertexCount": 4900,
+      "indexOffset": 116274,
+      "indexCount": 7248,
+      "obbHalf": [
+        0.25,
+        0.36792323,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "torso",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.19,
+            0.0
+          ]
+        },
+        {
+          "name": "head",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.43,
+            0.0
+          ]
+        },
+        {
+          "name": "arm_l",
+          "parent": 1,
+          "pivot": [
+            -0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "arm_r",
+          "parent": 1,
+          "pivot": [
+            0.145,
+            0.38,
+            0.044
+          ]
+        },
+        {
+          "name": "leg_l",
+          "parent": 0,
+          "pivot": [
+            -0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "leg_r",
+          "parent": 0,
+          "pivot": [
+            0.072,
+            0.2,
+            -0.022
+          ]
+        },
+        {
+          "name": "tail",
+          "parent": 1,
+          "pivot": [
+            0.0,
+            0.21,
+            -0.056
+          ]
+        }
+      ]
+    },
+    "p_bamboo": {
+      "atlasIndex": 0,
+      "vertexOffset": 105044,
+      "vertexCount": 2300,
+      "indexOffset": 151146,
+      "indexCount": 2820,
+      "obbHalf": [
+        0.40731737,
+        0.5302526,
+        0.3399034
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_boat": {
+      "atlasIndex": 0,
+      "vertexOffset": 52934,
+      "vertexCount": 946,
+      "indexOffset": 78570,
+      "indexCount": 1410,
+      "obbHalf": [
+        0.8324884,
+        0.25,
+        0.252
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "unused_1",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "lantern_swing",
+          "parent": 0,
+          "pivot": [
+            0.64,
+            0.4,
+            0.0
+          ]
+        }
+      ]
+    },
+    "p_bridge_arch": {
+      "atlasIndex": 0,
+      "vertexOffset": 47606,
+      "vertexCount": 5328,
+      "indexOffset": 70968,
+      "indexCount": 7602,
+      "obbHalf": [
+        1.26,
+        0.5335,
+        0.57645786
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "unused_1",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "lantern_swing",
+          "parent": 0,
+          "pivot": [
+            -0.90720004,
+            0.49199194,
+            0.575
+          ]
+        },
+        {
+          "name": "unused_3",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "lantern_swing_2",
+          "parent": 0,
+          "pivot": [
+            -0.45360002,
+            0.7299123,
+            0.575
+          ]
+        },
+        {
+          "name": "lantern_swing_3",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.83000004,
+            0.575
+          ]
+        },
+        {
+          "name": "lantern_swing_4",
+          "parent": 0,
+          "pivot": [
+            0.45360002,
+            0.7299123,
+            0.575
+          ]
+        },
+        {
+          "name": "lantern_swing_5",
+          "parent": 0,
+          "pivot": [
+            0.90720004,
+            0.49199194,
+            0.575
+          ]
+        }
+      ]
+    },
+    "p_bush": {
+      "atlasIndex": 0,
+      "vertexOffset": 102892,
+      "vertexCount": 660,
+      "indexOffset": 148473,
+      "indexCount": 660,
+      "obbHalf": [
+        0.4659912,
+        0.268,
+        0.37135187
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_dock_crates": {
+      "atlasIndex": 0,
+      "vertexOffset": 53880,
+      "vertexCount": 360,
+      "indexOffset": 79980,
+      "indexCount": 540,
+      "obbHalf": [
+        0.6225,
+        0.29999998,
+        0.34
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_fence": {
+      "atlasIndex": 0,
+      "vertexOffset": 54988,
+      "vertexCount": 140,
+      "indexOffset": 81636,
+      "indexCount": 210,
+      "obbHalf": [
+        0.69,
+        0.25,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_flower_bush": {
+      "atlasIndex": 0,
+      "vertexOffset": 63574,
+      "vertexCount": 1348,
+      "indexOffset": 94428,
+      "indexCount": 1428,
+      "obbHalf": [
+        0.45667714,
+        0.25,
+        0.38167307
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_house_a": {
+      "atlasIndex": 0,
+      "vertexOffset": 55128,
+      "vertexCount": 4202,
+      "indexOffset": 81846,
+      "indexCount": 6276,
+      "obbHalf": [
+        0.491,
+        0.6245,
+        0.502
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_house_b": {
+      "atlasIndex": 0,
+      "vertexOffset": 59330,
+      "vertexCount": 4190,
+      "indexOffset": 88122,
+      "indexCount": 6252,
+      "obbHalf": [
+        0.61099994,
+        0.5445,
+        0.51199996
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_lantern": {
+      "atlasIndex": 0,
+      "vertexOffset": 45884,
+      "vertexCount": 1722,
+      "indexOffset": 68406,
+      "indexCount": 2562,
+      "obbHalf": [
+        0.25,
+        0.518,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": true,
+      "bones": [
+        {
+          "name": "root",
+          "parent": -1,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "unused_1",
+          "parent": 0,
+          "pivot": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "lantern_swing",
+          "parent": 0,
+          "pivot": [
+            0.18,
+            0.78,
+            0.0
+          ]
+        }
+      ]
+    },
+    "p_mountain_ridge": {
+      "atlasIndex": 0,
+      "vertexOffset": 54484,
+      "vertexCount": 504,
+      "indexOffset": 80880,
+      "indexCount": 756,
+      "obbHalf": [
+        2.9,
+        0.9365899,
+        0.361
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_reed": {
+      "atlasIndex": 0,
+      "vertexOffset": 64922,
+      "vertexCount": 808,
+      "indexOffset": 95856,
+      "indexCount": 960,
+      "obbHalf": [
+        0.29531515,
+        0.4405119,
+        0.2716568
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_terrace_hill": {
+      "atlasIndex": 0,
+      "vertexOffset": 54240,
+      "vertexCount": 244,
+      "indexOffset": 80520,
+      "indexCount": 360,
+      "obbHalf": [
+        1.6,
+        0.34,
+        0.9986093
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_tree_oak": {
+      "atlasIndex": 0,
+      "vertexOffset": 102025,
+      "vertexCount": 867,
+      "indexOffset": 147480,
+      "indexCount": 993,
+      "obbHalf": [
+        0.41368365,
+        0.5105225,
+        0.38331005
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_tree_pine": {
+      "atlasIndex": 0,
+      "vertexOffset": 101518,
+      "vertexCount": 507,
+      "indexOffset": 146874,
+      "indexCount": 606,
+      "obbHalf": [
+        0.3611841,
+        0.49536452,
+        0.3704726
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "p_willow": {
+      "atlasIndex": 0,
+      "vertexOffset": 103552,
+      "vertexCount": 1492,
+      "indexOffset": 149133,
+      "indexCount": 2013,
+      "obbHalf": [
+        0.42949784,
+        0.51070535,
+        0.42612416
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "plot_frame": {
+      "atlasIndex": 2,
+      "vertexOffset": 97,
+      "vertexCount": 530,
+      "indexOffset": 408,
+      "indexCount": 792,
+      "obbHalf": [
+        0.853,
+        0.074099995,
+        0.703
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "s_ask": {
+      "atlasIndex": 0,
+      "vertexOffset": 100199,
+      "vertexCount": 337,
+      "indexOffset": 144918,
+      "indexCount": 504,
+      "obbHalf": [
+        0.25,
+        0.37150002,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "s_bug": {
+      "atlasIndex": 0,
+      "vertexOffset": 100877,
+      "vertexCount": 641,
+      "indexOffset": 145926,
+      "indexCount": 948,
+      "obbHalf": [
+        0.25,
+        0.37150002,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    },
+    "s_review": {
+      "atlasIndex": 0,
+      "vertexOffset": 100536,
+      "vertexCount": 341,
+      "indexOffset": 145422,
+      "indexCount": 504,
+      "obbHalf": [
+        0.25,
+        0.37150002,
+        0.25
+      ],
+      "uvRect": [
+        0.0,
+        0.0,
+        1.0,
+        1.0
+      ],
+      "cross": false,
+      "isLamp": false
+    }
+  },
+  "quality": {
+    "groundMeanLuma": 0.54652375,
+    "cardsMeanLuma": 0.42,
+    "lumaDelta": 0.12652376,
+    "groundMeanSat": 0.3220777,
+    "cardsMeanSat": 0.44,
+    "satDelta": 0.117922306,
+    "totalDistBytes": 13269947,
+    "totalVertices": 107344,
+    "totalTriangles": 51322
+  },
+  "scene": {
+    "buildings": [
+      {
+        "asset": "b_orchestrator_desk",
+        "id": "manager",
+        "label": "主助手亭",
+        "opens": "chat",
+        "pos": [
+          1.38,
+          0.0,
+          1.45
+        ],
+        "scale": 2.02,
+        "yawDeg": -12.0
+      },
+      {
+        "asset": "b_task_board",
+        "id": "taskBoard",
+        "label": "工单板",
+        "opens": "/issues",
+        "pos": [
+          0.55,
+          0.0,
+          -1.6
+        ],
+        "scale": 1.75,
+        "yawDeg": 12.0
+      },
+      {
+        "asset": "b_stall",
+        "id": "shop",
+        "label": "小摊",
+        "opens": "panel:shop",
+        "pos": [
+          2.25,
+          0.0,
+          -0.45
+        ],
+        "scale": 1.68,
+        "yawDeg": -24.0
+      },
+      {
+        "asset": "b_guild_hall",
+        "id": "agents",
+        "label": "档案室",
+        "opens": "/agents",
+        "pos": [
+          1.45,
+          0.0,
+          -3.75
+        ],
+        "scale": 2.3,
+        "yawDeg": -6.0
+      },
+      {
+        "asset": "b_workshop",
+        "id": "runtimes",
+        "label": "工坊",
+        "opens": "/runtimes",
+        "pos": [
+          5.45,
+          0.0,
+          0.95
+        ],
+        "scale": 2.35,
+        "yawDeg": -34.0
+      },
+      {
+        "asset": "b_library",
+        "id": "skills",
+        "label": "书屋",
+        "opens": "/settings/skills",
+        "pos": [
+          5.95,
+          0.0,
+          -2.55
+        ],
+        "scale": 2.18,
+        "yawDeg": -22.0
+      },
+      {
+        "asset": "b_warehouse",
+        "id": "warehouse",
+        "label": "仓库",
+        "opens": "panel:warehouse",
+        "pos": [
+          6.1,
+          0.0,
+          3.55
+        ],
+        "scale": 2.15,
+        "yawDeg": -16.0
+      },
+      {
+        "asset": "b_trophy_arch",
+        "id": "tasks",
+        "label": "成就碑",
+        "opens": "panel:achievements",
+        "pos": [
+          -3.65,
+          0.0,
+          -4.95
+        ],
+        "scale": 2.12,
+        "yawDeg": 14.0
+      },
+      {
+        "asset": "b_radio_kiosk",
+        "id": "log",
+        "label": "电台日志",
+        "opens": "panel:log",
+        "pos": [
+          5.65,
+          0.0,
+          -5.6
+        ],
+        "scale": 2.15,
+        "yawDeg": -18.0
+      }
+    ],
+    "helpers": [
+      {
+        "asset": "h_bear",
+        "defaultSpot": "skills",
+        "homePlot": 0,
+        "id": "architect",
+        "name": "Bear Architect",
+        "role": "架构师"
+      },
+      {
+        "asset": "h_fox",
+        "defaultSpot": "runtimes",
+        "homePlot": 1,
+        "id": "coder",
+        "name": "Fox Coder",
+        "role": "程序员"
+      },
+      {
+        "asset": "h_owl",
+        "defaultSpot": "taskBoard",
+        "homePlot": 4,
+        "id": "reviewer",
+        "name": "Owl Reviewer",
+        "role": "审查员"
+      },
+      {
+        "asset": "h_shiba",
+        "defaultSpot": "runtimes",
+        "homePlot": 2,
+        "id": "tester",
+        "name": "Shiba Tester",
+        "role": "测试员"
+      },
+      {
+        "asset": "h_cat",
+        "defaultSpot": "shop",
+        "homePlot": 5,
+        "id": "designer",
+        "name": "Cat Designer",
+        "role": "设计师"
+      },
+      {
+        "asset": "h_rabbit",
+        "defaultSpot": "manager",
+        "homePlot": 3,
+        "id": "orchestrator",
+        "name": "Rabbit Lead",
+        "role": "主助手"
+      }
+    ],
+    "plots": [
+      {
+        "index": 0,
+        "pos": [
+          -6.1,
+          0.0,
+          -2.5
+        ],
+        "size": [
+          1.26,
+          1.06
+        ],
+        "station": 0,
+        "unlockLevel": null
+      },
+      {
+        "index": 1,
+        "pos": [
+          -4.45,
+          0.0,
+          -2.5
+        ],
+        "size": [
+          1.26,
+          1.06
+        ],
+        "station": 1,
+        "unlockLevel": null
+      },
+      {
+        "index": 2,
+        "pos": [
+          -2.8,
+          0.0,
+          -2.5
+        ],
+        "size": [
+          1.26,
+          1.06
+        ],
+        "station": 2,
+        "unlockLevel": null
+      },
+      {
+        "index": 3,
+        "pos": [
+          -6.1,
+          0.0,
+          -0.75
+        ],
+        "size": [
+          1.26,
+          1.06
+        ],
+        "station": 3,
+        "unlockLevel": null
+      },
+      {
+        "index": 4,
+        "pos": [
+          -4.45,
+          0.0,
+          -0.75
+        ],
+        "size": [
+          1.26,
+          1.06
+        ],
+        "station": 4,
+        "unlockLevel": null
+      },
+      {
+        "index": 5,
+        "pos": [
+          -2.8,
+          0.0,
+          -0.75
+        ],
+        "size": [
+          1.26,
+          1.06
+        ],
+        "station": 5,
+        "unlockLevel": null
+      },
+      {
+        "index": 6,
+        "pos": [
+          -6.1,
+          0.0,
+          1.0
+        ],
+        "size": [
+          1.26,
+          1.06
+        ],
+        "station": -1,
+        "unlockLevel": 5
+      },
+      {
+        "index": 7,
+        "pos": [
+          -4.45,
+          0.0,
+          1.0
+        ],
+        "size": [
+          1.26,
+          1.06
+        ],
+        "station": -1,
+        "unlockLevel": 8
+      },
+      {
+        "index": 8,
+        "pos": [
+          -2.8,
+          0.0,
+          1.0
+        ],
+        "size": [
+          1.26,
+          1.06
+        ],
+        "station": -1,
+        "unlockLevel": 12
+      }
+    ],
+    "props": [
+      {
+        "asset": "p_bridge_arch",
+        "pos": [
+          -0.85,
+          0.0,
+          0.55
+        ],
+        "scale": 1.06,
+        "yawDeg": -4.0
+      },
+      {
+        "asset": "p_bridge_arch",
+        "pos": [
+          3.92,
+          0.0,
+          -1.65
+        ],
+        "scale": 0.94,
+        "yawDeg": 6.0
+      },
+      {
+        "asset": "p_house_a",
+        "pos": [
+          0.25,
+          0.0,
+          -5.75
+        ],
+        "scale": 2.08,
+        "yawDeg": 8.0
+      },
+      {
+        "asset": "p_house_b",
+        "pos": [
+          2.1,
+          0.0,
+          -6.15
+        ],
+        "scale": 2.02,
+        "yawDeg": -10.0
+      },
+      {
+        "asset": "p_house_a",
+        "pos": [
+          7.05,
+          0.0,
+          -4.2
+        ],
+        "scale": 1.98,
+        "yawDeg": -28.0
+      },
+      {
+        "asset": "p_house_b",
+        "pos": [
+          -0.3,
+          0.0,
+          -3.55
+        ],
+        "scale": 1.88,
+        "yawDeg": 16.0
+      },
+      {
+        "asset": "p_boat",
+        "pos": [
+          -1.05,
+          0.0,
+          -2.85
+        ],
+        "scale": 1.1,
+        "yawDeg": 78.0
+      },
+      {
+        "asset": "p_boat",
+        "pos": [
+          -0.15,
+          0.0,
+          2.75
+        ],
+        "scale": 1.18,
+        "yawDeg": 44.0
+      },
+      {
+        "asset": "p_boat",
+        "pos": [
+          2.25,
+          0.0,
+          4.8
+        ],
+        "scale": 1.24,
+        "yawDeg": 28.0
+      },
+      {
+        "asset": "p_boat",
+        "pos": [
+          3.95,
+          0.0,
+          2.35
+        ],
+        "scale": 1.05,
+        "yawDeg": 90.0
+      },
+      {
+        "asset": "p_dock_crates",
+        "pos": [
+          4.55,
+          0.0,
+          3.9
+        ],
+        "scale": 1.25,
+        "yawDeg": -15.0
+      },
+      {
+        "asset": "p_dock_crates",
+        "pos": [
+          0.72,
+          0.0,
+          2.65
+        ],
+        "scale": 0.95,
+        "yawDeg": 38.0
+      },
+      {
+        "asset": "p_terrace_hill",
+        "pos": [
+          -6.45,
+          0.0,
+          -6.15
+        ],
+        "scale": 1.65,
+        "yawDeg": 18.0
+      },
+      {
+        "asset": "p_terrace_hill",
+        "pos": [
+          -4.45,
+          0.0,
+          -6.75
+        ],
+        "scale": 1.25,
+        "yawDeg": -8.0
+      },
+      {
+        "asset": "p_terrace_hill",
+        "pos": [
+          6.85,
+          0.0,
+          -6.75
+        ],
+        "scale": 1.35,
+        "yawDeg": -22.0
+      },
+      {
+        "asset": "p_mountain_ridge",
+        "pos": [
+          -5.8,
+          0.0,
+          -7.6
+        ],
+        "scale": 1.48,
+        "yawDeg": 6.0
+      },
+      {
+        "asset": "p_mountain_ridge",
+        "pos": [
+          -1.8,
+          0.0,
+          -7.68
+        ],
+        "scale": 1.6,
+        "yawDeg": 2.0
+      },
+      {
+        "asset": "p_mountain_ridge",
+        "pos": [
+          2.2,
+          0.0,
+          -7.72
+        ],
+        "scale": 1.62,
+        "yawDeg": -3.0
+      },
+      {
+        "asset": "p_mountain_ridge",
+        "pos": [
+          6.1,
+          0.0,
+          -7.6
+        ],
+        "scale": 1.45,
+        "yawDeg": -8.0
+      },
+      {
+        "asset": "p_fence",
+        "pos": [
+          -5.85,
+          0.0,
+          2.05
+        ],
+        "scale": 1.0,
+        "yawDeg": 0.0
+      },
+      {
+        "asset": "p_fence",
+        "pos": [
+          -4.45,
+          0.0,
+          2.05
+        ],
+        "scale": 1.0,
+        "yawDeg": 0.0
+      },
+      {
+        "asset": "p_fence",
+        "pos": [
+          -3.05,
+          0.0,
+          2.05
+        ],
+        "scale": 1.0,
+        "yawDeg": 0.0
+      },
+      {
+        "asset": "p_fence",
+        "pos": [
+          -1.98,
+          0.0,
+          -1.45
+        ],
+        "scale": 0.95,
+        "yawDeg": 82.0
+      },
+      {
+        "asset": "p_fence",
+        "pos": [
+          -1.62,
+          0.0,
+          2.22
+        ],
+        "scale": 0.95,
+        "yawDeg": 68.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": true,
+        "pos": [
+          -1.98,
+          0.0,
+          -0.05
+        ],
+        "scale": 1.12,
+        "yawDeg": 0.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": true,
+        "pos": [
+          0.3,
+          0.0,
+          1.15
+        ],
+        "scale": 1.12,
+        "yawDeg": 175.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": true,
+        "pos": [
+          2.65,
+          0.0,
+          1.35
+        ],
+        "scale": 1.12,
+        "yawDeg": 8.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": true,
+        "pos": [
+          3.05,
+          0.0,
+          -2.3
+        ],
+        "scale": 1.12,
+        "yawDeg": -8.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": true,
+        "pos": [
+          4.75,
+          0.0,
+          2.35
+        ],
+        "scale": 1.12,
+        "yawDeg": 170.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": true,
+        "pos": [
+          -0.35,
+          0.0,
+          1.95
+        ],
+        "scale": 1.08,
+        "yawDeg": 160.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": true,
+        "pos": [
+          0.58,
+          0.0,
+          2.35
+        ],
+        "scale": 1.05,
+        "yawDeg": 150.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": true,
+        "pos": [
+          1.65,
+          0.0,
+          2.55
+        ],
+        "scale": 1.08,
+        "yawDeg": 22.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": true,
+        "pos": [
+          2.48,
+          0.0,
+          2.05
+        ],
+        "scale": 1.05,
+        "yawDeg": 12.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": true,
+        "pos": [
+          2.95,
+          0.0,
+          0.65
+        ],
+        "scale": 1.05,
+        "yawDeg": -5.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": false,
+        "pos": [
+          -4.45,
+          0.0,
+          -3.75
+        ],
+        "scale": 1.05,
+        "yawDeg": 15.0
+      },
+      {
+        "asset": "p_lantern",
+        "isLamp": false,
+        "pos": [
+          0.72,
+          0.0,
+          -2.75
+        ],
+        "scale": 1.05,
+        "yawDeg": 0.0
+      },
+      {
+        "asset": "p_willow",
+        "pos": [
+          -2.35,
+          0.0,
+          -4.15
+        ],
+        "scale": 1.85,
+        "yawDeg": -20.0
+      },
+      {
+        "asset": "p_willow",
+        "pos": [
+          4.68,
+          0.0,
+          -4.1
+        ],
+        "scale": 1.8,
+        "yawDeg": -16.0
+      },
+      {
+        "asset": "p_willow",
+        "pos": [
+          -6.95,
+          0.0,
+          4.45
+        ],
+        "scale": 2.05,
+        "yawDeg": 14.0
+      },
+      {
+        "asset": "p_bamboo",
+        "pos": [
+          -7.35,
+          0.0,
+          -3.85
+        ],
+        "scale": 2.05,
+        "yawDeg": 18.0
+      },
+      {
+        "asset": "p_bamboo",
+        "pos": [
+          -7.4,
+          0.0,
+          0.55
+        ],
+        "scale": 1.95,
+        "yawDeg": -14.0
+      },
+      {
+        "asset": "p_bamboo",
+        "pos": [
+          7.35,
+          0.0,
+          -1.05
+        ],
+        "scale": 2.05,
+        "yawDeg": -20.0
+      },
+      {
+        "asset": "p_bamboo",
+        "pos": [
+          -5.25,
+          0.0,
+          -4.75
+        ],
+        "scale": 1.8,
+        "yawDeg": -12.0
+      },
+      {
+        "asset": "p_tree_pine",
+        "pos": [
+          -7.25,
+          0.0,
+          -5.45
+        ],
+        "scale": 2.2,
+        "yawDeg": 12.0
+      },
+      {
+        "asset": "p_tree_oak",
+        "pos": [
+          -2.55,
+          0.0,
+          -6.55
+        ],
+        "scale": 2.15,
+        "yawDeg": -16.0
+      },
+      {
+        "asset": "p_tree_pine",
+        "pos": [
+          3.75,
+          0.0,
+          -6.95
+        ],
+        "scale": 2.25,
+        "yawDeg": 10.0
+      },
+      {
+        "asset": "p_tree_oak",
+        "pos": [
+          7.25,
+          0.0,
+          -5.85
+        ],
+        "scale": 2.1,
+        "yawDeg": -24.0
+      },
+      {
+        "asset": "p_bush",
+        "pos": [
+          -1.88,
+          0.0,
+          -2.55
+        ],
+        "scale": 0.88,
+        "yawDeg": 8.0
+      },
+      {
+        "asset": "p_flower_bush",
+        "pos": [
+          2.85,
+          0.0,
+          -3.2
+        ],
+        "scale": 0.9,
+        "yawDeg": -14.0
+      },
+      {
+        "asset": "p_flower_bush",
+        "pos": [
+          2.68,
+          0.0,
+          2.15
+        ],
+        "scale": 0.92,
+        "yawDeg": 22.0
+      },
+      {
+        "asset": "p_bush",
+        "pos": [
+          -4.85,
+          0.0,
+          3.55
+        ],
+        "scale": 0.92,
+        "yawDeg": -12.0
+      },
+      {
+        "asset": "p_flower_bush",
+        "pos": [
+          6.85,
+          0.0,
+          1.85
+        ],
+        "scale": 0.94,
+        "yawDeg": 20.0
+      },
+      {
+        "asset": "p_flower_bush",
+        "pos": [
+          -3.05,
+          0.0,
+          -3.65
+        ],
+        "scale": 0.88,
+        "yawDeg": -6.0
+      },
+      {
+        "asset": "p_bush",
+        "pos": [
+          1.1,
+          0.0,
+          -4.95
+        ],
+        "scale": 0.86,
+        "yawDeg": 14.0
+      },
+      {
+        "asset": "p_reed",
+        "pos": [
+          -1.52,
+          0.0,
+          -1.95
+        ],
+        "scale": 0.95,
+        "yawDeg": 18.0
+      },
+      {
+        "asset": "p_reed",
+        "pos": [
+          -1.38,
+          0.0,
+          2.15
+        ],
+        "scale": 1.02,
+        "yawDeg": -22.0
+      },
+      {
+        "asset": "p_reed",
+        "pos": [
+          3.35,
+          0.0,
+          0.45
+        ],
+        "scale": 0.92,
+        "yawDeg": 12.0
+      },
+      {
+        "asset": "p_reed",
+        "pos": [
+          3.45,
+          0.0,
+          3.65
+        ],
+        "scale": 1.0,
+        "yawDeg": -15.0
+      },
+      {
+        "asset": "p_bamboo",
+        "pos": [
+          -6.95,
+          0.0,
+          6.75
+        ],
+        "scale": 3.25,
+        "yawDeg": 24.0
+      },
+      {
+        "asset": "p_willow",
+        "pos": [
+          -4.45,
+          0.0,
+          7.25
+        ],
+        "scale": 3.05,
+        "yawDeg": -14.0
+      },
+      {
+        "asset": "p_willow",
+        "pos": [
+          -1.25,
+          0.0,
+          7.45
+        ],
+        "scale": 2.75,
+        "yawDeg": 16.0
+      },
+      {
+        "asset": "p_willow",
+        "pos": [
+          1.55,
+          0.0,
+          7.45
+        ],
+        "scale": 2.65,
+        "yawDeg": -18.0
+      },
+      {
+        "asset": "p_bamboo",
+        "pos": [
+          6.55,
+          0.0,
+          6.95
+        ],
+        "scale": 3.35,
+        "yawDeg": -22.0
+      },
+      {
+        "asset": "p_bush",
+        "pos": [
+          -5.65,
+          0.0,
+          7.2
+        ],
+        "scale": 1.45,
+        "yawDeg": 10.0
+      },
+      {
+        "asset": "p_bush",
+        "pos": [
+          5.35,
+          0.0,
+          7.3
+        ],
+        "scale": 1.4,
+        "yawDeg": -16.0
+      }
+    ]
+  }
+}

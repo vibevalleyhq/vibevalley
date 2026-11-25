@@ -302,9 +302,6 @@ test("typical scenario verifies multi-stage BDD transitions and virtual-clock po
   await app.press("id:agents-clear-filter");
   expect(app.count("id:agent-card-laozhou")).toBe(1);
   row.stepsPassed++;
-  await visit(app, fake, "/catalog", row, () => {
-    expect(app.count("id:catalog-page")).toBe(1);
-  });
   await visit(app, fake, "/repos", row, () => {
     expect(app.count("id:repos-page")).toBe(1);
   });
@@ -643,7 +640,7 @@ test("english locale renders issues, chat, and settings cleanly with zero crashe
   const chatTexts = app.texts();
   expect(chatTexts).toContain("Chat");
   expect(chatTexts).toContain("Channels");
-  expect(chatTexts).toContain("Helpers");
+  expect(chatTexts).toContain("Direct");
 
   await app.host.send("route", "/settings/general");
   await fake.pump(app);

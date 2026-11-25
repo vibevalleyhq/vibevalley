@@ -88,8 +88,6 @@
 | `spanText` | `base/format.ts` | How long, in round words: rounded relative duration. |
 | `isObject` | `base/guards.ts` | Not null, not an array: a record to read keys of. |
 | `isObjectOrArray` | `base/guards.ts` | An object or an array. |
-| `SpriteManifest` | `base/manifests.ts` |  |
-| `CursorManifest` | `base/manifests.ts` |  |
 | `spelled` | `base/search.ts` | The text holds the query, ignoring case, or spells it in pinyin; query is lower case. |
 | `matches` | `base/search.ts` | Every word of the query is somewhere in the texts (spelled), ignoring case; an empty query matches everything. |
 | `compareText` | `base/search.ts` |  |
@@ -137,7 +135,6 @@
 | `useSession` | `frame.ts` |  |
 | `useIssue` | `frame.ts` |  |
 | `useThreadOwner` | `frame.ts` |  |
-| `orchestratorSession` | `frame.ts` |  |
 | `orchestratorMood` | `frame.ts` |  |
 | `subscribeLive` | `frame.ts` | Listens to the live events; returns how to stop. |
 | `followChannel` | `gateway.ts` | What is said in a channel after the message numbered after, then from now on. |
@@ -156,17 +153,13 @@
 | `readFarmFormParams` | `hostParams.ts` |  |
 | `readFarmPhoneParams` | `hostParams.ts` |  |
 | `readDevToolsParams` | `hostParams.ts` |  |
-| `loadSpriteManifest` | `pixelManifests.ts` | Lazily fetches `sprites.json` from Rust on first `useSprites()` call instead of inlining 105 KB into `bundle.js`. |
-| `cursorManifest` | `pixelManifests.ts` |  |
 | `retryRead` | `query.ts` |  |
 | `refetchOnRelink` | `query.ts` |  |
-| `cursorsQuery` | `query.ts` |  |
 | `agentsQuery` | `query.ts` |  |
 | `providerVoicesQuery` | `query.ts` |  |
 | `providerQuery` | `query.ts` |  |
 | `settingsQuery` | `query.ts` |  |
 | `runtimesQuery` | `query.ts` |  |
-| `useSprites` | `query.ts` |  |
 | `useAgents` | `query.ts` |  |
 | `useAgentTemplates` | `query.ts` |  |
 | `useRepos` | `query.ts` |  |

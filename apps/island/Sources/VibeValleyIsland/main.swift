@@ -1,6 +1,6 @@
 // The island: a helper with no Dock icon and no menu (an accessory app). The desktop app starts it and writes a glance
 // a line on its stdin; it answers with the issue the owner clicked on its stdout. Its stdin closing means the app has
-// gone, and so does the island. Usage: VibeValleyIsland [--font <path to the pixel font>] [--snapshot <dir>]
+// gone, and so does the island. Usage: VibeValleyIsland [--font <path to custom font>] [--snapshot <dir>]
 // --snapshot draws each glance into dir as well (Island.swift, snapshot), for checking how it looks.
 
 import AppKit

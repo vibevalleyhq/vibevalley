@@ -58,6 +58,9 @@ pub(crate) fn check_installation(path: PathBuf, version: Option<String>) -> Inst
 
 pub(crate) fn spawn_args(base_args: &[String], opts: &SessionOptions) -> Vec<String> {
     let mut args = base_args.to_vec();
+    if opts.permission_mode == PermissionMode::Bypass && !args.iter().any(|a| a == "--dangerously-skip-permissions") {
+        args.push("--dangerously-skip-permissions".to_string());
+    }
     for dir in &opts.additional_directories {
         args.push("--add-dir".to_string());
         args.push(dir.to_string_lossy().into_owned());
@@ -307,8 +310,9 @@ pub(crate) fn parse_interaction(tool_call: &Value, options: &Value) -> (String, 
 }
 
 /// Client-side auto-approval policy for non-interaction tool permission requests.
-/// `agy acp` rejects `yolo` / `auto_edit` wire modes, so permission policy is
-/// enforced here while keeping the server in its default mode.
+/// `agy acp` rejects `yolo` / `auto_edit` wire modes; under `PermissionMode::Bypass`
+/// we spawn `agy acp --dangerously-skip-permissions` for native YOLO execution and
+/// keep this client-side fallback for any permission request that still crosses the wire.
 pub(crate) fn client_auto_allow(mode: PermissionMode, tool_kind: Option<&str>) -> bool {
     match mode {
         PermissionMode::Bypass => true,
@@ -1286,6 +1290,32 @@ mod tests {
         assert_eq!(parsed[0].id, "prod");
         assert_eq!(parsed[0].warning.as_deref(), Some("Writes directly to production"));
         assert_eq!(extract_security_warnings(&options), vec!["Writes directly to production"]);
+    }
+
+    #[test]
+    fn spawn_args_passes_dangerously_skip_permissions_only_in_bypass_mode() {
+        let base = vec!["acp".to_string()];
+        let bypass = SessionOptions {
+            permission_mode: PermissionMode::Bypass,
+            additional_directories: vec![PathBuf::from("/extra")],
+            ..Default::default()
+        };
+        assert_eq!(spawn_args(&base, &bypass), vec!["acp", "--dangerously-skip-permissions", "--add-dir", "/extra"]);
+
+        // Does not duplicate the flag if base_args already includes it.
+        let already = vec!["acp".to_string(), "--dangerously-skip-permissions".to_string()];
+        assert_eq!(
+            spawn_args(&already, &bypass),
+            vec!["acp", "--dangerously-skip-permissions", "--add-dir", "/extra"]
+        );
+
+        for mode in [PermissionMode::Ask, PermissionMode::AcceptEdits, PermissionMode::Plan] {
+            let opts = SessionOptions {
+                permission_mode: mode,
+                ..Default::default()
+            };
+            assert_eq!(spawn_args(&base, &opts), vec!["acp"]);
+        }
     }
 
     #[test]

@@ -10,7 +10,6 @@ import { Dialog } from "../../../design/Dialog";
 import { OrchestratorFace } from "../../../design/domain/Face";
 import { Select, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
-import { motionClass } from "../../../design/motion";
 import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
@@ -326,11 +325,8 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
           class="group mt-1 h-7 flex-row items-center gap-1.5 rounded-md px-1.5 hover:bg-hover"
           onPress={() => showArchived.set(!showArchived())}
         >
-          <View
-            class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
-            style={{ transform: [{ rotate: showArchived() ? "90deg" : "0deg" }] }}
-          >
-            <Icon name="expand" size={10} tone="faint" />
+          <View class="h-4 w-4 shrink-0 items-center justify-center">
+            <Icon name={showArchived() ? "choose" : "expand"} size={14} tone="muted" />
           </View>
           <Text class="text-xs font-medium text-muted group-hover:text-ink">{t("web.channel.threadList.archived", { n: archived().length })}</Text>
         </View>

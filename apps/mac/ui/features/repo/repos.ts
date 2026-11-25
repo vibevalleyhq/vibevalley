@@ -72,8 +72,6 @@ function languageOf(name: string): Language {
   return { id, label: id === "other" && name.trim() ? name.trim() : def.label, color: def.color };
 }
 
-export const langIcon = (id: string) => `lang-${id}`;
-
 interface LanguageShare extends Language {
   /** Prose in Markdown counts as comments. */
   readonly lines: number;

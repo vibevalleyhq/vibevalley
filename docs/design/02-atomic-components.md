@@ -81,18 +81,17 @@
 
 ## 2.5 领域原子与附件磁贴
 
-位于 `apps/mac/ui/design/domain/` 与 `apps/mac/ui/design/pixel/`：
+位于 `apps/mac/ui/design/domain/` 与 `apps/mac/ui/design/art.ts`：
 
 | 原语 | 文件 | 用途 |
 | --- | --- | --- |
 | `AttachmentTile` | `apps/mac/ui/design/domain/AttachmentTile.tsx` | 以固定磁贴形态展示附件：按类型映射图标、文件名、体积，以及图片/媒体内联缩略图或点击放大入口 |
-| `AgentFace` / `OrchestratorFace` | `apps/mac/ui/design/domain/Face.tsx` | 按档案与农机特征渲染像素头像（无图片资源或加载中时退回首字母色块兜底）；读取 `apps/mac/ui/design/domain/cast.ts` 的 `castHash` / `castPrefix` 确定小动物物种与服饰前缀 |
-| `PoseSprite` | `apps/mac/ui/design/domain/PoseSprite.tsx` | 从像素精灵图集中截取当前姿态帧渲染在工作台档案卡或状态条上 |
-| `RuntimeBadge` / `RuntimeIcon` | `apps/mac/ui/design/domain/RuntimeBadge.tsx`、`apps/mac/ui/design/domain/RuntimeIcon.tsx` | 将农机 ID（Claude Code / Codex / Cursor / OpenCode 等）映射为可辨识图标与标签 |
+| `AgentFace` / `OrchestratorFace` / `UserFace` | `apps/mac/ui/design/domain/Face.tsx` | 渲染 Papertrails 纸雕角色头像、物种肖像、主助手与用户肖像（无图片资源或加载中时退回首字母色块兜底）；读取 `apps/mac/ui/design/domain/cast.ts` 确定默认物种与造型 |
+| `RuntimeBadge` / `RuntimeIcon` | `apps/mac/ui/design/domain/RuntimeBadge.tsx`、`apps/mac/ui/design/domain/RuntimeIcon.tsx` | 从 `assets/engines/*.png` 渲染纸雕卡纸衬底的引擎徽标与标签（缺图退回 `<Icon name="runtimes" />`） |
 | `OpenTerminal` | `apps/mac/ui/design/domain/OpenTerminal.tsx` | 一键通知桌面宿主在指定仓库或 worktree 工作目录拉起嵌入式原生终端标签页 |
 | `Qr` | `apps/mac/ui/design/Qr.tsx` | 本机/配对服务链接的二维码矢量绘制组件 |
 | `SettingsPage` / `SettingsGroup` / `SettingRow` / `KeyRow` | `apps/mac/ui/design/domain/settings.tsx` | 设置二级页共用布局壳，串联 `SettingsSearch` 实现设置项关键词检索与 `mix("wheat", 0.15)` 高亮匹配行 |
-| `usePixelDir` / `useSpriteUrl` / `useCursorUrl` | `apps/mac/ui/design/pixel/atlas.ts` | 通过 `host.pixelDir` 向原生壳索取本机图片目录路径并拼接 `file://` URL；缺图目录时静默退回占位 |
+| `useAssetsDir` / `roleAvatarUrl` / `engineLogoUrl` | `apps/mac/ui/design/art.ts` | 通过 `host.assetsDir` 向原生壳索取本机 `assets/` 目录路径并拼接 `file://` URL；缺图目录时静默退回占位 |
 
 ## 2.6 工作区外壳共享原语（`apps/mac/ui/workspace/chrome.tsx`）
 

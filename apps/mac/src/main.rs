@@ -1,16 +1,18 @@
 mod applet;
+mod assets;
 mod audio;
 mod command_line;
 mod debug;
 mod diff;
+mod diorama;
 mod host;
 mod hosted;
 mod icon;
 mod island;
 mod live_voice;
+mod log;
 mod markdown_pane;
 mod panes;
-mod pixel;
 mod qr;
 mod serving;
 mod shell;
@@ -64,26 +66,8 @@ where
     args.into_iter().any(|arg| arg.as_ref() == "--background")
 }
 
-fn init_tracing() {
-    use tracing_subscriber::EnvFilter;
-    use tracing_subscriber::layer::SubscriberExt as _;
-    use tracing_subscriber::util::SubscriberInitExt as _;
-
-    let filter = std::env::var("VIBEVALLEY_LOG")
-        .ok()
-        .filter(|s| !s.trim().is_empty())
-        .or_else(|| std::env::var("RUST_LOG").ok().filter(|s| !s.trim().is_empty()))
-        .and_then(|raw| EnvFilter::try_new(raw).ok())
-        .unwrap_or_else(|| EnvFilter::new(if shell::devtools_enabled() { "info" } else { "warn" }));
-    let _ = tracing_subscriber::registry()
-        .with(filter)
-        .with(tracing_subscriber::fmt::layer().with_target(true))
-        .with(host::OsLogLayer::new())
-        .try_init();
-}
-
 fn main() {
-    init_tracing();
+    log::init();
     host::disable_default_font_smoothing();
     update::enter_bundle();
     vibevalley_i18n::set_locale(vibevalley_server::home::saved_locale(&hosted::server_home()));
@@ -103,9 +87,6 @@ fn main() {
         hosted::BridgeHub::install(cx);
         applet::AppletHost::install(cx);
         update::install(cx);
-        if !pixel::element::load_font(cx) {
-            eprintln!("pixel font not found under the repo's assets/");
-        }
         if !background {
             ensure_main_window(cx);
             cx.activate(true);

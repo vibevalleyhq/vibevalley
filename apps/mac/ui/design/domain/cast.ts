@@ -1,15 +1,5 @@
 import { t } from "@vibevalley/i18n";
-import {
-  BuildValues,
-  type Crop,
-  HeadValues,
-  type Look,
-  type OrchestratorLook,
-  type Outfit,
-  OutfitValues,
-  type Species,
-  SpeciesValues,
-} from "@vibevalley/protocol";
+import { BuildValues, HeadValues, type Look, type OrchestratorLook, type Outfit, OutfitValues, type Species, SpeciesValues } from "@vibevalley/protocol";
 
 export const speciesLabel: Record<Species, string> = {
   bear: t("web.base.cast.species.bear"),
@@ -67,41 +57,17 @@ export const castOf = (look: Look | undefined, agentId: string): Cast => ({
   outfit: look?.outfit ?? "farmer",
 });
 
-/** The sprite prefix of a profile's animal and outfit, as far as the drawings go. */
-export function castPrefix(look: Look | undefined, agentId: string, has: (name: string) => boolean) {
-  const { species, outfit } = castOf(look, agentId);
-  return [`${species}-${outfit}`, `${species}-farmer`, "bear-farmer"].find((p) => has(`${p}-down`)) ?? "bear-farmer";
-}
-
 export type Pose = "idle" | "walk" | "think" | "work" | "cheer" | "worry";
 
-const pixelPose: Record<Pose, string> = { idle: "down", think: "side", walk: "down-1", work: "work", cheer: "cheer", worry: "worry" };
-
-/** Its outfit's, else the farmer's, else the farmer attention. */
-export const castSprite = (cast: Cast, pose: Pose, has: (name: string) => boolean) =>
-  [`${cast.species}-${cast.outfit}-${pixelPose[pose]}`, `${cast.species}-farmer-${pixelPose[pose]}`, `${cast.species}-farmer-down`].find(has) ??
-  `${cast.species}-farmer-down`;
-
-/** Without a cycle for this outfit, the stepping pose and the attention pose take turns. */
-export function walkFrames(cast: Cast, has: (name: string) => boolean): string[] {
-  const base = `${cast.species}-${cast.outfit}-down`;
-  if (has(`${base}-1`)) return [`${base}-1`, base, has(`${base}-2`) ? `${base}-2` : base, base];
-  return [castSprite(cast, "walk", has), castSprite(cast, "idle", has)];
-}
-
-export const cropSprite = (crop: Crop) => `plot-${crop}`;
-
-/** The creator's stage: each pose on the bed it goes with. */
-export const stagePoses: readonly { pose: Pose; label: string; crop: Crop }[] = [
-  { pose: "idle", label: t("web.base.cast.pose.idle"), crop: "empty" },
-  { pose: "walk", label: t("web.base.cast.pose.walk"), crop: "seeded" },
-  { pose: "think", label: t("web.base.cast.pose.think"), crop: "sprout" },
-  { pose: "work", label: t("web.base.cast.pose.work"), crop: "leafy" },
-  { pose: "cheer", label: t("web.base.cast.pose.cheer"), crop: "wheat" },
-  { pose: "worry", label: t("web.base.cast.pose.worry"), crop: "withered" },
+export const stagePoses: readonly { pose: Pose; label: string }[] = [
+  { pose: "idle", label: t("web.base.cast.pose.idle") },
+  { pose: "walk", label: t("web.base.cast.pose.walk") },
+  { pose: "think", label: t("web.base.cast.pose.think") },
+  { pose: "work", label: t("web.base.cast.pose.work") },
+  { pose: "cheer", label: t("web.base.cast.pose.cheer") },
+  { pose: "worry", label: t("web.base.cast.pose.worry") },
 ];
 
-// Sprite manager-<id>; farmer is the plain one.
 export const orchestratorLooks: readonly { readonly id: OrchestratorLook; readonly name: string; readonly blurb: string }[] = [
   { id: "farmer", name: t("web.orchestrator.looks.farmer.name"), blurb: t("web.orchestrator.looks.farmer.blurb") },
   { id: "foreman", name: t("web.orchestrator.looks.foreman.name"), blurb: t("web.orchestrator.looks.foreman.blurb") },

@@ -25,8 +25,10 @@ pub(crate) mod column;
 pub(crate) mod entity;
 pub mod error;
 pub mod migration;
+pub mod verify;
 
 pub use error::{DbError, DbResult, internal_db};
+pub use verify::{SchemaMismatchReport, TableDrift};
 
 /// Active database write transaction passed to `*_in_tx` methods on `crate::service::Service` sub-services.
 pub type Tx = DatabaseTransaction;
@@ -128,6 +130,20 @@ pub struct Database {
     durable: Mutex<Option<vibevalley_runtime::agent::durable::Store>>,
 }
 
+async fn run_migrations_and_verify(conn: &DatabaseConnection, backend: DbBackend, db_path: Option<&Path>) -> DbResult<()> {
+    tracing::info!(backend = ?backend, path = ?db_path, "running database migrations");
+    crate::db::migration::Migrator::up(conn, None).await?;
+    vibevalley_runtime::agent::durable::migration::Migrator::up(conn, None).await?;
+
+    if let Err(err) = verify::verify_schema(conn, backend, db_path).await {
+        if let Some(report) = err.schema_mismatch() {
+            tracing::error!(backend = ?backend, detail = %report.format_detail(), "post-migration database schema verification failed");
+        }
+        return Err(err);
+    }
+    Ok(())
+}
+
 impl Database {
     /// Opens `<home>/server.db` with split read/write connections and runs all migrations.
     pub async fn open(home: &Path) -> DbResult<Arc<Self>> {
@@ -171,8 +187,7 @@ impl Database {
                     .await
                     .map_err(|e| DbErr::Conn(sea_orm::RuntimeErr::SqlxError(Arc::new(e))))?;
                 let write_conn = SqlxSqliteConnector::from_sqlx_sqlite_pool(write_pool);
-                crate::db::migration::Migrator::up(&write_conn, None).await?;
-                vibevalley_runtime::agent::durable::migration::Migrator::up(&write_conn, None).await?;
+                run_migrations_and_verify(&write_conn, DbBackend::Sqlite, Some(path.as_path())).await?;
 
                 let read_options = SqliteConnectOptions::new().filename(path).read_only(true).busy_timeout(Duration::from_secs(5));
                 let read_pool = SqlitePoolOptions::new()
@@ -191,8 +206,7 @@ impl Database {
                 let conn = SeaDatabase::connect(opts).await.inspect_err(|err| {
                     tracing::error!(url = %redact_db_url(url), error = %err, "failed to connect to postgres database");
                 })?;
-                crate::db::migration::Migrator::up(&conn, None).await?;
-                vibevalley_runtime::agent::durable::migration::Migrator::up(&conn, None).await?;
+                run_migrations_and_verify(&conn, DbBackend::Postgres, None).await?;
                 (DbBackendState::Postgres, conn.clone(), conn)
             }
         };

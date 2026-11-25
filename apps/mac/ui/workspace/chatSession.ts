@@ -121,7 +121,7 @@ export function toWorkspaceRuntime(rt: ProtocolRuntimeInfo): WorkspaceRuntimeOpt
   const firstWindow = rt.usage?.status === "ok" ? rt.usage.windows[0] : undefined;
   const quotaPct =
     rt.quota?.left !== undefined
-      ? Math.round(rt.quota.left * 100)
+      ? Math.max(0, Math.min(100, Math.round(rt.quota.left)))
       : firstWindow !== undefined
         ? Math.max(0, Math.min(100, Math.round(100 - firstWindow.usedPercent)))
         : undefined;

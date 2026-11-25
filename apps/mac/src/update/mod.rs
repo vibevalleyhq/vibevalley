@@ -46,17 +46,31 @@ impl State {
 #[derive(Debug, Clone, PartialEq)]
 enum Feed {
     Off,
-    /// One manifest (`VIBEVALLEY_UPDATE_FEED`).
+    /// One manifest (`VIBEVALLEY_UPDATE_FEED` or `Info.plist` `VibeValleyUpdateFeed`).
     Manifest(String),
     Stage(Stage),
 }
 
-fn feed_of(asked: Option<&str>, packaged: bool, version: &str) -> Feed {
+fn valid_https_url(url: &str) -> bool {
+    url::Url::parse(url).is_ok_and(|parsed| parsed.scheme() == "https" && parsed.host().is_some())
+}
+
+fn feed_of(asked: Option<&str>, plist_feed: Option<&str>, packaged: bool, version: &str) -> Feed {
     match asked {
         Some("off") => Feed::Off,
         Some(url) if !url.is_empty() && packaged => Feed::Manifest(url.to_string()),
         _ if !packaged || version == "0.0.0" => Feed::Off,
-        _ => releases::stage_of(version).map_or(Feed::Off, Feed::Stage),
+        _ => {
+            let Some(stage) = releases::stage_of(version) else {
+                return Feed::Off;
+            };
+            if let Some(feed) = plist_feed.map(str::trim).filter(|s| !s.is_empty())
+                && ((stage == Stage::Alpha && feed.starts_with("file://")) || valid_https_url(feed))
+            {
+                return Feed::Manifest(feed.to_string());
+            }
+            Feed::Stage(stage)
+        }
     }
 }
 
@@ -117,10 +131,16 @@ impl Updater {
     fn from_env() -> Updater {
         let exe = std::env::current_exe().ok();
         let bundle = exe.as_deref().and_then(Path::to_str).and_then(releases::bundle_of).map(PathBuf::from);
-        let version = bundle_version();
+        let plist = bundle.as_deref().and_then(|b| std::fs::read_to_string(b.join("Contents/Info.plist")).ok());
+        let version = plist
+            .as_deref()
+            .and_then(releases::plist_version)
+            .map(str::to_string)
+            .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string());
+        let plist_feed = plist.as_deref().and_then(releases::plist_update_feed);
         let asked = std::env::var("VIBEVALLEY_UPDATE_FEED").ok();
         Updater {
-            feed: feed_of(asked.as_deref(), bundle.is_some(), &version),
+            feed: feed_of(asked.as_deref(), plist_feed, bundle.is_some(), &version),
             version,
             bundle,
             dir: crate::hosted::server_home().join("updates"),
@@ -489,19 +509,80 @@ mod tests {
 
     #[test]
     fn only_a_packaged_tagged_app_asks_and_within_its_own_stage() {
-        assert_eq!(feed_of(None, false, "0.4.0"), Feed::Off);
-        assert_eq!(feed_of(Some("http://127.0.0.1:1/release.json"), false, "0.4.0"), Feed::Off);
-        assert_eq!(feed_of(None, true, "0.0.0"), Feed::Off);
-        assert_eq!(feed_of(None, true, "not a version"), Feed::Off);
-        assert_eq!(feed_of(None, true, "0.4.0"), Feed::Stage(Stage::Stable));
-        assert_eq!(feed_of(None, true, "0.4.0-beta.2"), Feed::Stage(Stage::Beta));
-        assert_eq!(feed_of(None, true, "0.4.0-alpha.1"), Feed::Stage(Stage::Alpha));
-        assert_eq!(feed_of(Some(""), true, "0.4.0"), Feed::Stage(Stage::Stable));
-        assert_eq!(feed_of(Some("off"), true, "0.4.0"), Feed::Off);
+        assert_eq!(feed_of(None, None, false, "0.4.0"), Feed::Off);
+        assert_eq!(feed_of(Some("http://127.0.0.1:1/release.json"), None, false, "0.4.0"), Feed::Off);
+        assert_eq!(feed_of(None, Some("file:///dist/release.json"), false, "0.4.0-alpha.1"), Feed::Off);
+        assert_eq!(feed_of(None, None, true, "0.0.0"), Feed::Off);
+        assert_eq!(feed_of(None, Some("file:///dist/release.json"), true, "0.0.0"), Feed::Off);
+        assert_eq!(feed_of(None, None, true, "not a version"), Feed::Off);
+        assert_eq!(feed_of(None, None, true, "0.4.0"), Feed::Stage(Stage::Stable));
+        assert_eq!(feed_of(None, None, true, "0.4.0-beta.2"), Feed::Stage(Stage::Beta));
+        assert_eq!(feed_of(None, None, true, "0.4.0-alpha.1"), Feed::Stage(Stage::Alpha));
+        assert_eq!(feed_of(Some(""), None, true, "0.4.0"), Feed::Stage(Stage::Stable));
+        assert_eq!(feed_of(Some("off"), Some("file:///dist/release.json"), true, "0.4.0-alpha.1"), Feed::Off);
         assert_eq!(
-            feed_of(Some("http://127.0.0.1:1/release.json"), true, "0.0.0"),
+            feed_of(Some("http://127.0.0.1:1/release.json"), Some("file:///dist/release.json"), true, "0.0.0"),
             Feed::Manifest("http://127.0.0.1:1/release.json".into())
         );
+    }
+
+    #[test]
+    fn alpha_uses_local_plist_file_feed_while_beta_and_release_ignore_it() {
+        let local = "file:///Users/dev/vibevalley/apps/mac/dist/release.json";
+        assert_eq!(feed_of(None, Some(local), true, "0.1.0-alpha.1"), Feed::Manifest(local.into()));
+        assert_eq!(feed_of(Some(""), Some(local), true, "0.1.0-alpha.1"), Feed::Manifest(local.into()));
+        // Beta and Release never read local file:// feeds from Info.plist.
+        assert_eq!(feed_of(None, Some(local), true, "0.1.0-beta.1"), Feed::Stage(Stage::Beta));
+        assert_eq!(feed_of(None, Some(local), true, "0.1.0"), Feed::Stage(Stage::Stable));
+        // Valid https:// plist feeds are accepted across packaged channels; plain http:// is ignored.
+        let https = "https://releases.vibevalley.dev/release.json";
+        assert_eq!(feed_of(None, Some(https), true, "0.1.0-beta.1"), Feed::Manifest(https.into()));
+        assert_eq!(feed_of(None, Some(https), true, "0.1.0"), Feed::Manifest(https.into()));
+        assert_eq!(
+            feed_of(None, Some("http://127.0.0.1:8787/release.json"), true, "0.1.0-alpha.1"),
+            Feed::Stage(Stage::Alpha)
+        );
+    }
+
+    #[tokio::test]
+    async fn manual_recheck_recovers_from_failed_and_idle_without_clobbering_ready() {
+        let dir = tempfile::tempdir().unwrap();
+        let manifest = dir.path().join("release.json");
+        let feed_url = url::Url::from_file_path(&manifest).unwrap().to_string();
+        let updater = Updater {
+            version: "0.1.0-alpha.1".into(),
+            bundle: None,
+            dir: dir.path().join("updates"),
+            feed: Feed::Manifest(feed_url),
+            state: Mutex::new(State::Failed { why: "previous error".into() }),
+            staged: Mutex::new(None),
+        };
+
+        // Re-checking from Failed when release.json does not exist yet settles cleanly to Idle.
+        updater.check().await;
+        assert_eq!(*updater.state.lock(), State::Idle);
+
+        // Writing a newer local alpha manifest is picked up immediately on the next Idle check.
+        std::fs::write(&manifest, r#"{"version":"0.1.0-alpha.2","notes":["Local fix"],"page":"","builds":[]}"#).unwrap();
+        updater.check().await;
+        assert_eq!(
+            *updater.state.lock(),
+            State::Manual {
+                next: "0.1.0-alpha.2".into(),
+                why: Manual::NoBuild,
+                page: String::new(),
+            }
+        );
+
+        // Once Ready, an extra check must not disturb the staged update.
+        let ready = State::Ready {
+            next: "0.1.0-alpha.2".into(),
+            notes: vec!["Local fix".into()],
+            page: String::new(),
+        };
+        *updater.state.lock() = ready.clone();
+        updater.check().await;
+        assert_eq!(*updater.state.lock(), ready);
     }
 
     #[test]

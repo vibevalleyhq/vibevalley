@@ -10,7 +10,6 @@ import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import type { IconName } from "../../design/icons";
 import { ActiveBar } from "../../design/layout";
-import { motionClass } from "../../design/motion";
 import { ready, useQuery, useQueryClient } from "../../infra/query";
 import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
@@ -254,14 +253,9 @@ function NavSection(props: {
             }
             accessibilityState={{ expanded: props.open }}
             onPress={() => props.onToggle()}
-            class="h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
+            class="h-4 w-4 shrink-0 items-center justify-center rounded-sm hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
           >
-            <View
-              class={`size-2.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
-              style={{ transform: [{ rotate: props.open ? "90deg" : "0deg" }] }}
-            >
-              <Icon name="expand" size={10} tone={props.active ? "muted" : "faint"} />
-            </View>
+            <Icon name={props.open ? "choose" : "expand"} size={14} tone="muted" />
           </View>
           <View
             role="button"
