@@ -313,7 +313,10 @@ fn attachments_are_served_from_the_path_the_server_gives() {
     let res = agent().get(format!("{}/api/v1/attachment/a1", l.url())).send().unwrap();
     assert_eq!(res.status().as_u16(), 200);
     assert_eq!(res.headers().get("content-type").unwrap(), "image/png");
-    assert_eq!(res.headers().get("content-disposition").unwrap(), "inline; filename=\"shot _1_.png\"");
+    assert_eq!(res.headers().get("x-content-type-options").unwrap(), "nosniff");
+    assert_eq!(res.headers().get("content-security-policy").unwrap(), "sandbox");
+    assert_eq!(res.headers().get("accept-ranges").unwrap(), "bytes");
+    assert_eq!(res.headers().get("content-disposition").unwrap(), "inline; filename*=UTF-8''shot%20%221%22.png");
     assert_eq!(res.bytes().unwrap().as_ref(), b"\x89PNG fake");
     assert_eq!(fake.calls().last().unwrap(), &("attachment.file".to_string(), json!({ "id": "a1" })));
 
@@ -409,10 +412,10 @@ fn loopback_and_artifact_route_validators_match_exact_ascii_rules() {
         assert!(!is_loopback(bad), "{bad}");
     }
 
-    assert!(is_artifact_id("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3f"));
-    assert!(!is_artifact_id("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3"));
-    assert!(!is_artifact_id("0196F8E2-7c0a-7f10-8b2d-9e5a4c1d2e3f"));
-    assert!(!is_artifact_id("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3g"));
+    assert!(is_media_input_uuid("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3f"));
+    assert!(!is_media_input_uuid("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3"));
+    assert!(!is_media_input_uuid("0196F8E2-7c0a-7f10-8b2d-9e5a4c1d2e3f"));
+    assert!(!is_media_input_uuid("0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3g"));
 }
 
 struct StaticRemoteAuth {
@@ -458,6 +461,9 @@ impl Server for WithRemoteAuth {
     }
     fn watch_slice(&self, kind: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, emit: &mut dyn FnMut(i64, &Value)) {
         self.inner.watch_slice(kind, after_seq, stop, emit)
+    }
+    fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
+        self.inner.subscribe_slice(slice)
     }
     fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
         self.inner.live()
@@ -723,4 +729,179 @@ async fn listener_shutdown_ends_active_sse_stream_without_blocking() {
     while let Some(chunk) = res.chunk().await.unwrap() {
         let _ = chunk;
     }
+}
+
+struct StaticMediaInputs {
+    path: std::path::PathBuf,
+    content_type: String,
+    name: String,
+}
+
+impl crate::gateway::api::media::MediaInputs for StaticMediaInputs {
+    fn upload_async(
+        self: Arc<Self>,
+        _id: String,
+        _source: Box<dyn std::io::Read + Send>,
+    ) -> BoxFuture<'static, Result<vibevalley_protocol::MediaInput, ApiError>> {
+        Box::pin(async { Err(ApiError::new(BizCode::InvalidInput, "unused")) })
+    }
+
+    fn content_async(self: Arc<Self>, _id: String) -> BoxFuture<'static, Result<vibevalley_protocol::AttachmentFile, ApiError>> {
+        let path = self.path.to_string_lossy().into_owned();
+        let r#type = self.content_type.clone();
+        let name = self.name.clone();
+        Box::pin(async move { Ok(vibevalley_protocol::AttachmentFile { path, r#type, name }) })
+    }
+}
+
+struct WithMediaInputs {
+    inner: Arc<FakeServer>,
+    inputs: Arc<dyn crate::gateway::api::media::MediaInputs>,
+}
+
+impl Server for WithMediaInputs {
+    fn call(&self, op: &str, payload: Value) -> Envelope {
+        self.inner.call(op, payload)
+    }
+    fn call_with(&self, ctx: &CallerContext, op: &str, payload: Value) -> Envelope {
+        self.inner.call_with(ctx, op, payload)
+    }
+    fn slice_snapshot(&self, kind: SliceKind) -> Value {
+        self.inner.slice_snapshot(kind)
+    }
+    fn watch_slice(&self, kind: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, emit: &mut dyn FnMut(i64, &Value)) {
+        self.inner.watch_slice(kind, after_seq, stop, emit)
+    }
+    fn subscribe_slice(&self, slice: SliceKind) -> Option<SliceSubscription> {
+        self.inner.subscribe_slice(slice)
+    }
+    fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
+        self.inner.live()
+    }
+    fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
+        self.inner.subscribe(name, payload)
+    }
+    fn unsubscribe(&self, id: u64) {
+        self.inner.unsubscribe(id)
+    }
+    fn ports(&self) -> GatewayPorts {
+        GatewayPorts {
+            media_input: Some(self.inputs.clone()),
+            ..Default::default()
+        }
+    }
+}
+
+#[test]
+fn attachment_and_media_content_share_security_headers_rfc5987_ranges_and_zero_byte_policy() {
+    let dir = tempfile::tempdir().unwrap();
+    let non_empty_path = dir.path().join("payload.bin");
+    let empty_path = dir.path().join("empty.bin");
+    std::fs::write(&non_empty_path, b"0123456789").unwrap();
+    std::fs::write(&empty_path, b"").unwrap();
+
+    let raw_name = "报告 \"1\".png";
+    let expected_disposition = "inline; filename*=UTF-8''%E6%8A%A5%E5%91%8A%20%221%22.png";
+    let media_id = "0196f8e2-7c0a-7f10-8b2d-9e5a4c1d2e3f";
+
+    // 1. Non-empty file on both attachment and media::content: full 200, Range 206, OOB 416.
+    let fake = Arc::new(FakeServer::new());
+    fake.respond("attachment.file", json!({ "path": non_empty_path, "type": "image/png", "name": raw_name }));
+    let media_server: Shared = Arc::new(WithMediaInputs {
+        inner: fake.clone(),
+        inputs: Arc::new(StaticMediaInputs {
+            path: non_empty_path.clone(),
+            content_type: "image/png".into(),
+            name: raw_name.into(),
+        }),
+    });
+    let l = serve(media_server, "127.0.0.1:0".parse().unwrap()).unwrap();
+
+    for url in [
+        format!("{}/api/v1/attachment/a-nonempty", l.url()),
+        format!("{}/api/v1/media/input/{media_id}/content", l.url()),
+    ] {
+        let full = agent().get(&url).send().unwrap();
+        assert_eq!(full.status().as_u16(), 200, "{url}");
+        assert_eq!(full.headers()["x-content-type-options"], "nosniff", "{url}");
+        assert_eq!(full.headers()["content-security-policy"], "sandbox", "{url}");
+        assert_eq!(full.headers()["accept-ranges"], "bytes", "{url}");
+        assert_eq!(full.headers()["content-disposition"], expected_disposition, "{url}");
+        assert_eq!(full.headers()["content-length"], "10", "{url}");
+        assert_eq!(full.bytes().unwrap().as_ref(), b"0123456789", "{url}");
+
+        let partial = agent().get(&url).header("range", "bytes=2-5").send().unwrap();
+        assert_eq!(partial.status().as_u16(), 206, "{url}");
+        assert_eq!(partial.headers()["x-content-type-options"], "nosniff", "{url}");
+        assert_eq!(partial.headers()["content-security-policy"], "sandbox", "{url}");
+        assert_eq!(partial.headers()["accept-ranges"], "bytes", "{url}");
+        assert_eq!(partial.headers()["content-disposition"], expected_disposition, "{url}");
+        assert_eq!(partial.headers()["content-range"], "bytes 2-5/10", "{url}");
+        assert_eq!(partial.headers()["content-length"], "4", "{url}");
+        assert_eq!(partial.bytes().unwrap().as_ref(), b"2345", "{url}");
+
+        let oob = agent().get(&url).header("range", "bytes=99-").send().unwrap();
+        assert_eq!(oob.status().as_u16(), 416, "{url}");
+        assert_eq!(oob.headers()["content-range"], "bytes */10", "{url}");
+    }
+
+    // 2. 0-byte file on both attachment and media::content: 200 (no Range) with headers, 416 (with Range).
+    let empty_fake = Arc::new(FakeServer::new());
+    empty_fake.respond("attachment.file", json!({ "path": empty_path, "type": "text/plain", "name": raw_name }));
+    let empty_server: Shared = Arc::new(WithMediaInputs {
+        inner: empty_fake,
+        inputs: Arc::new(StaticMediaInputs {
+            path: empty_path,
+            content_type: "text/plain".into(),
+            name: raw_name.into(),
+        }),
+    });
+    let l_empty = serve(empty_server, "127.0.0.1:0".parse().unwrap()).unwrap();
+
+    for url in [
+        format!("{}/api/v1/attachment/a-empty", l_empty.url()),
+        format!("{}/api/v1/media/input/{media_id}/content", l_empty.url()),
+    ] {
+        let full = agent().get(&url).send().unwrap();
+        assert_eq!(full.status().as_u16(), 200, "{url}");
+        assert_eq!(full.headers()["x-content-type-options"], "nosniff", "{url}");
+        assert_eq!(full.headers()["content-security-policy"], "sandbox", "{url}");
+        assert_eq!(full.headers()["accept-ranges"], "bytes", "{url}");
+        assert_eq!(full.headers()["content-disposition"], expected_disposition, "{url}");
+        assert_eq!(full.headers()["content-length"], "0", "{url}");
+        assert_eq!(full.bytes().unwrap().as_ref(), b"", "{url}");
+
+        let ranged = agent().get(&url).header("range", "bytes=0-0").send().unwrap();
+        assert_eq!(ranged.status().as_u16(), 416, "{url}");
+        assert_eq!(ranged.headers()["content-range"], "bytes */0", "{url}");
+    }
+}
+
+#[test]
+fn slice_returns_service_unavailable_when_server_has_no_async_subscription() {
+    struct NoSliceFeed;
+    impl Server for NoSliceFeed {
+        fn call(&self, _: &str, _: Value) -> Envelope {
+            Envelope::void()
+        }
+        fn slice_snapshot(&self, _: SliceKind) -> Value {
+            json!({ "seq": 0 })
+        }
+        fn watch_slice(&self, _: SliceKind, _: Option<i64>, _: &tokio_util::sync::CancellationToken, _: &mut dyn FnMut(i64, &Value)) {
+            panic!("http::slice must never invoke blocking watch_slice fallback");
+        }
+        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
+            tokio::sync::mpsc::unbounded_channel().1
+        }
+        fn subscribe(&self, _: &str, _: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
+            Err(Envelope::failure(&ApiError::new(BizCode::RouteNotFound, "none")))
+        }
+        fn unsubscribe(&self, _: u64) {}
+    }
+
+    let listener = serve(Arc::new(NoSliceFeed), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let res = agent().get(format!("{}/api/v1/slice/board", listener.url())).send().unwrap();
+    assert_eq!(res.status().as_u16(), 503);
+    let body: Value = res.json().unwrap();
+    assert_eq!(body["bizCode"], BizCode::ServiceUnavailable.code());
 }

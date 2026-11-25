@@ -47,28 +47,68 @@ pub struct Picked {
     pub repo: Option<String>,
 }
 
+fn is_empty_opt_str(v: &Option<String>) -> bool {
+    v.as_deref().is_none_or(str::is_empty)
+}
+
+fn is_empty_opt_vec<T>(v: &Option<Vec<T>>) -> bool {
+    v.as_ref().is_none_or(Vec::is_empty)
+}
+
+fn is_not_true(v: &Option<bool>) -> bool {
+    !matches!(v, Some(true))
+}
+
+fn is_empty_opt_value(v: &Option<Value>) -> bool {
+    match v {
+        None | Some(Value::Null) => true,
+        Some(Value::String(s)) => s.is_empty(),
+        Some(Value::Bool(b)) => !*b,
+        Some(Value::Array(a)) => a.is_empty(),
+        _ => false,
+    }
+}
+
 /// `channel_message.meta`. Written with empty values left out, as
 /// VibeValley's `metaText` does.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Meta {
+    #[serde(default, skip_serializing_if = "is_empty_opt_str")]
     pub run: Option<String>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_vec")]
     pub mentions: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_str")]
     pub session: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub outcome: Option<Outcome>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spent: Option<Spent>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_str")]
     pub code: Option<String>,
+    #[serde(default, skip_serializing_if = "is_not_true")]
     pub spoken: Option<bool>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_vec")]
     pub attachments: Option<Vec<Attachment>>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_vec")]
     pub embeds: Option<Vec<Embed>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artifact: Option<ArtifactCard>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub view_context: Option<ArtifactViewContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub picked: Option<Picked>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_str")]
     pub ingress_source: Option<String>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_str")]
     pub ingress_recipient: Option<String>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_str")]
     pub issue: Option<String>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_value")]
     pub trigger: Option<Value>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_str")]
     pub response_port: Option<String>,
+    #[serde(default, skip_serializing_if = "is_empty_opt_str")]
     pub voice_mode: Option<String>,
 }
 
@@ -79,21 +119,7 @@ pub fn meta_of(raw: Option<&str>) -> Meta {
 
 /// `metaText`: empty strings, false and empty lists left out.
 pub fn meta_text(m: Option<&Meta>) -> Option<String> {
-    let m = m?;
-    let Ok(Value::Object(map)) = serde_json::to_value(m) else {
-        return Some("{}".into());
-    };
-    let kept: serde_json::Map<String, Value> = map
-        .into_iter()
-        .filter(|(_, v)| match v {
-            Value::Null => false,
-            Value::String(s) => !s.is_empty(),
-            Value::Bool(b) => *b,
-            Value::Array(a) => !a.is_empty(),
-            _ => true,
-        })
-        .collect();
-    Some(Value::Object(kept).to_string())
+    m.and_then(|meta| serde_json::to_string(meta).ok())
 }
 
 /// Reactions in the order they came: `{"emoji": ["participant", …]}`.
@@ -125,25 +151,26 @@ pub(super) fn reactions_text(r: &[(String, Vec<String>)]) -> Option<String> {
     let kept: Vec<String> = r
         .iter()
         .filter(|(_, by)| !by.is_empty())
-        .map(|(e, by)| format!("{}:{}", Value::from(e.as_str()), serde_json::to_string(by).unwrap_or_default()))
+        .filter_map(|(e, by)| Some(format!("{}:{}", serde_json::to_string(e).ok()?, serde_json::to_string(by).ok()?)))
         .collect();
     (!kept.is_empty()).then(|| format!("{{{}}}", kept.join(",")))
 }
 
 pub(super) fn message_kind(kind: &str) -> MessageKind {
-    serde_json::from_value(Value::from(kind)).unwrap_or(MessageKind::Chat)
+    MessageKind::ALL.into_iter().find(|v| v.as_str() == kind).unwrap_or(MessageKind::Chat)
 }
 
 pub(super) fn channel_type(kind: &str) -> ChannelType {
-    serde_json::from_value(Value::from(kind)).unwrap_or(ChannelType::Channel)
+    ChannelType::ALL.into_iter().find(|v| v.as_str() == kind).unwrap_or(ChannelType::Channel)
 }
 
 pub(super) fn subject_kind(kind: Option<&str>) -> Option<SubjectKind> {
-    serde_json::from_value(Value::from(kind?)).ok()
+    let kind = kind?;
+    SubjectKind::ALL.into_iter().find(|v| v.as_str() == kind)
 }
 
 pub(super) fn notify_of(n: &str) -> Notify {
-    serde_json::from_value(Value::from(n)).unwrap_or(Notify::All)
+    Notify::ALL.into_iter().find(|v| v.as_str() == n).unwrap_or(Notify::All)
 }
 
 /// `actorOf`: an agent's seat that speaks for a profile is a helper's, one
@@ -487,4 +514,77 @@ pub(super) struct Written {
     pub(super) event: Option<EventRow>,
     pub(super) deliveries: Vec<QueuedDelivery>,
     pub(super) hop_limit_hit: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn meta_text_omits_empty_values_and_round_trips() {
+        assert_eq!(meta_text(None), None);
+        assert_eq!(meta_text(Some(&Meta::default())).as_deref(), Some("{}"));
+
+        let empty_vals = Meta {
+            run: Some(String::new()),
+            mentions: Some(vec![]),
+            spoken: Some(false),
+            attachments: Some(vec![]),
+            embeds: Some(vec![]),
+            trigger: Some(Value::Bool(false)),
+            ..Meta::default()
+        };
+        assert_eq!(meta_text(Some(&empty_vals)).as_deref(), Some("{}"));
+
+        let full = Meta {
+            run: Some("r1".into()),
+            mentions: Some(vec!["a1".into()]),
+            spoken: Some(true),
+            outcome: Some(Outcome::Completed),
+            picked: Some(Picked {
+                agent: Some("ag".into()),
+                repo: None,
+            }),
+            ..Meta::default()
+        };
+        let encoded = meta_text(Some(&full)).unwrap();
+        let decoded = meta_of(Some(&encoded));
+        assert_eq!(decoded.run.as_deref(), Some("r1"));
+        assert_eq!(decoded.mentions, Some(vec!["a1".into()]));
+        assert_eq!(decoded.spoken, Some(true));
+        assert_eq!(decoded.outcome, Some(Outcome::Completed));
+        assert_eq!(decoded.picked.and_then(|p| p.agent).as_deref(), Some("ag"));
+    }
+
+    #[test]
+    fn typed_wire_enum_parsers_match_all_variants_and_fallbacks() {
+        for k in MessageKind::ALL {
+            assert_eq!(message_kind(k.as_str()), k);
+        }
+        assert_eq!(message_kind("unknown"), MessageKind::Chat);
+
+        for t in ChannelType::ALL {
+            assert_eq!(channel_type(t.as_str()), t);
+        }
+        assert_eq!(channel_type("unknown"), ChannelType::Channel);
+
+        for s in SubjectKind::ALL {
+            assert_eq!(subject_kind(Some(s.as_str())), Some(s));
+        }
+        assert_eq!(subject_kind(Some("unknown")), None);
+        assert_eq!(subject_kind(None), None);
+
+        for n in Notify::ALL {
+            assert_eq!(notify_of(n.as_str()), n);
+        }
+        assert_eq!(notify_of("unknown"), Notify::All);
+    }
+
+    #[test]
+    fn reactions_text_and_of_preserve_order() {
+        let input = vec![("👍".into(), vec!["u1".into()]), ("👀".into(), vec![])];
+        let encoded = reactions_text(&input).unwrap();
+        assert_eq!(reactions_of(Some(&encoded)), vec![("👍".into(), vec!["u1".into()])]);
+        assert_eq!(reactions_text(&[("👀".into(), vec![])]), None);
+    }
 }
