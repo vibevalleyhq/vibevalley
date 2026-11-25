@@ -4,6 +4,7 @@ pub mod arch_audit;
 pub mod arch_metrics;
 mod boundaries;
 mod changed;
+mod qa;
 mod ratchets;
 mod rust_scan;
 
@@ -41,7 +42,12 @@ Commands:
   audit [--boundaries] [--ratchets] [--arch]
                                        Run module-boundary, ratchet, and strict arch audits
   arch-audit [--report-locks] [--json] Run flat server architecture audit (11 rules) & lock report
-  diagnose [--json] [--top <N>]        Compute architectural metrics, hotspots & prescriptive diagnostics"
+  diagnose [--json] [--top <N>]        Compute architectural metrics, hotspots & prescriptive diagnostics
+  crap [options] [<path>...]           Compute cyclomatic complexity & coverage CRAP scores
+  dry [options] [<path>...]            Detect normalized structural clones within each language
+  mutate [options] [<path>...]         Run incremental hash-cached, coverage-gated mutation tests
+  uml [viewer | --svg <out>] [<path>...]
+                                       Verify dependency rule, export UML SVG, or launch local viewer"
     );
 }
 
@@ -237,6 +243,10 @@ fn dispatch(root: &Path, args: &[String]) -> Result<i32, String> {
         "audit" => cmd_audit(root, rest),
         "arch-audit" => arch_audit::run(root, rest),
         "diagnose" => arch_metrics::run(root, rest),
+        "crap" => qa::crap::run(root, rest),
+        "dry" => qa::dry::run(root, rest),
+        "mutate" => qa::mutate::run(root, rest),
+        "uml" => qa::uml::run(root, rest),
         other => {
             eprintln!("xtask: unknown subcommand `{other}`\n");
             print_usage();
