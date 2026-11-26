@@ -3,19 +3,17 @@
 //! [`crate::channel::Chat`] for session seating, direct-talk reports,
 //! message-removal mailbox withdrawals, and per-target direct-channel lanes.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle as TaskHandle;
 use tokio_util::sync::CancellationToken;
-use tokio_util::task::TaskTracker;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{ChannelType, MessageKind, Outcome, Session};
 
 use super::board::Board;
-use super::chat::{CHAT_CLOSE_GRACE, IssueChat, REPORT_MAX, view_context_of};
+use super::chat::{IssueChat, KeyedLaneQueue, REPORT_MAX, view_context_of};
 use crate::channel::{ChannelDispatched, Chat, Committed, DeliveryTargetKind, Meta, Note, Noticing, QueuedDelivery, Seat, profile_id};
 use crate::context::Context;
 use crate::context::text::{format_artifact_view_context, head};
@@ -34,8 +32,7 @@ pub struct SessionChat {
     channel: Arc<Chat>,
     cancel: CancellationToken,
     coordinator: Mutex<Option<TaskHandle<()>>>,
-    lanes: Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<DirectWake>>>,
-    lane_tasks: TaskTracker,
+    lanes: KeyedLaneQueue<DirectWake>,
 }
 
 impl SessionChat {
@@ -48,8 +45,7 @@ impl SessionChat {
             channel: channel.clone(),
             cancel: cancel.clone(),
             coordinator: Mutex::new(None),
-            lanes: Mutex::new(HashMap::new()),
-            lane_tasks: TaskTracker::new(),
+            lanes: KeyedLaneQueue::new(cancel.clone()),
         });
 
         {
@@ -168,26 +164,7 @@ impl SessionChat {
     }
 
     pub async fn close_async(&self) {
-        self.cancel.cancel();
-        self.lanes.lock().clear();
-        let coordinator = self.coordinator.lock().take();
-        let timed_out = tokio::time::timeout(CHAT_CLOSE_GRACE, async {
-            if let Some(handle) = coordinator {
-                let _ = handle.await;
-            }
-            self.lanes.lock().clear();
-            self.lane_tasks.close();
-            self.lane_tasks.wait().await;
-        })
-        .await
-        .is_err();
-        if timed_out {
-            tracing::warn!(
-                remaining = self.lane_tasks.len(),
-                timeout_secs = CHAT_CLOSE_GRACE.as_secs(),
-                "session-chat close timed out waiting for lane tasks"
-            );
-        }
+        self.lanes.close_async(&self.coordinator, "session-chat").await;
     }
 
     async fn sync_seats_async(&self) {
@@ -255,52 +232,15 @@ impl SessionChat {
     }
 
     fn enqueue_lane(self: &Arc<Self>, agent_id: String, wake: DirectWake) {
-        if self.cancel.is_cancelled() {
-            return;
-        }
-        let mut lanes = self.lanes.lock();
-        if let Some(tx) = lanes.get(&agent_id)
-            && tx.send(wake.clone()).is_ok()
-        {
-            return;
-        }
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<DirectWake>();
-        let _ = tx.send(wake);
-        lanes.insert(agent_id.clone(), tx);
         let sc = Arc::downgrade(self);
-        let key = agent_id;
-        let cancel = self.cancel.clone();
-        let handle = vibevalley_runtime::rt::current_or_global_handle();
-        self.lane_tasks.spawn_on(
+        self.lanes.enqueue(agent_id, wake, move |item| {
+            let sc = sc.clone();
             async move {
-                loop {
-                    if cancel.is_cancelled() {
-                        return;
-                    }
-                    let item = match rx.try_recv() {
-                        Ok(item) => item,
-                        Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
-                            let Some(sc) = sc.upgrade() else { return };
-                            let mut lanes = sc.lanes.lock();
-                            match rx.try_recv() {
-                                Ok(item) => item,
-                                Err(_) => {
-                                    lanes.remove(&key);
-                                    return;
-                                }
-                            }
-                        }
-                        Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
-                    };
-                    let Some(sc) = sc.upgrade() else { return };
-                    if sc.cancel.is_cancelled() {
-                        return;
-                    }
+                if let Some(sc) = sc.upgrade() {
                     sc.on_direct_async(item).await;
                 }
-            },
-            &handle,
-        );
+            }
+        });
     }
 
     async fn on_direct_async(&self, wake: DirectWake) {

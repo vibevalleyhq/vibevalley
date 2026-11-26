@@ -10,7 +10,7 @@ use std::sync::Arc;
 #[cfg(test)]
 use crate::db::DbBackend;
 pub(crate) use crate::db::error::internal_db;
-use crate::db::{BoxFuture, Database, commit_tx, rollback_tx};
+use crate::db::{BoxFuture, Database, begin_write_tx, commit_tx, rollback_tx};
 pub(crate) use crate::db::{DatabaseConfig, DbError, DbResult, Tx};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PrimaryKeyTrait, QueryFilter, Update};
@@ -75,6 +75,24 @@ where
 {
     E::delete_by_id(id.to_owned()).exec(db).await?;
     Ok(())
+}
+
+/// Runs a write transaction, committing on `Ok` and rolling back on `Err`.
+pub(super) async fn with_write_tx<T, E>(db: &Database, f: impl AsyncFnOnce(&Tx) -> Result<T, E>) -> Result<T, E>
+where
+    E: From<DbError>,
+{
+    let tx = begin_write_tx(db.write_conn()).await.map_err(E::from)?;
+    match f(&tx).await {
+        Ok(val) => {
+            commit_tx(tx).await.map_err(E::from)?;
+            Ok(val)
+        }
+        Err(err) => {
+            let _ = rollback_tx(tx).await;
+            Err(err)
+        }
+    }
 }
 
 /// Unified entry point for all server data services across SQLite and PostgreSQL.

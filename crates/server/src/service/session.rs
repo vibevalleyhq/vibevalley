@@ -12,9 +12,10 @@ use serde::{Deserialize, Serialize};
 use vibevalley_protocol::{Run, Session, SessionEvent, SessionPermissionMode, SessionSubagents};
 use vibevalley_runtime::agent::durable::entities::durable_document;
 
+use super::with_write_tx;
 use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
 use crate::db::entity::{session, session_event, session_mailbox, session_run};
-use crate::db::{Database, DbError, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
+use crate::db::{Database, DbError, DbResult, Tx};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct SessionConfig {
@@ -737,21 +738,13 @@ impl SessionService {
         if writes.is_empty() {
             return Ok(());
         }
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
+        with_write_tx(&self.db, async |tx| {
             for (session_id, events) in writes {
-                upsert_events_impl(&tx, session_id, events).await?;
+                upsert_events_impl(tx, session_id, events).await?;
             }
             Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn delete_events(&self, session_id: &str) -> DbResult<()> {

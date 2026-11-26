@@ -6,8 +6,9 @@ use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter, QueryOrder, QuerySelect};
 use vibevalley_protocol::ApiError;
 
+use super::with_write_tx;
 use crate::db::entity::outbox_item;
-use crate::db::{Database, DbError, Tx, begin_write_tx, commit_tx, rollback_tx};
+use crate::db::{Database, DbError, Tx};
 
 pub(crate) const OUTBOX_STATUS_PENDING: &str = "pending";
 pub(crate) const OUTBOX_STATUS_PROCESSING: &str = "processing";
@@ -101,15 +102,14 @@ impl OutboxService {
         if limit == 0 {
             return Ok(Vec::new());
         }
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: Result<Vec<OutboxItem>, ApiError> = async {
+        with_write_tx(&self.db, async |tx| {
             let candidates = outbox_item::Entity::find()
                 .filter(outbox_item::Column::Status.eq(OUTBOX_STATUS_PENDING))
                 .filter(outbox_item::Column::AvailableAt.lte(now_ms))
                 .order_by_asc(outbox_item::Column::AvailableAt)
                 .order_by_asc(outbox_item::Column::Id)
                 .limit(limit)
-                .all(&tx)
+                .all(tx)
                 .await
                 .map_err(DbError::from)?;
             if candidates.is_empty() {
@@ -121,23 +121,13 @@ impl OutboxService {
                 .col_expr(outbox_item::Column::Attempts, Expr::col(outbox_item::Column::Attempts).add(1i64))
                 .filter(outbox_item::Column::Id.is_in(ids))
                 .filter(outbox_item::Column::Status.eq(OUTBOX_STATUS_PENDING))
-                .exec_with_returning(&tx)
+                .exec_with_returning(tx)
                 .await
                 .map_err(DbError::from)?;
             claimed.sort_by_key(|row| (row.available_at, row.id));
             Ok(claimed.into_iter().map(OutboxItem::from).collect())
-        }
-        .await;
-        match outcome {
-            Ok(rows) => {
-                commit_tx(tx).await?;
-                Ok(rows)
-            }
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     /// Earliest `available_at` timestamp among `pending` items, if any.

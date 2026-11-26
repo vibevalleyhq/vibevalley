@@ -11,8 +11,9 @@ use sea_orm::{
 };
 use vibevalley_protocol::{Attachment, MediaInput, MediaInputPhase, MediaInputRequest};
 
+use super::with_write_tx;
 use crate::db::entity::{attachment, media_input, media_input_pin};
-use crate::db::{Database, DbError, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
+use crate::db::{Database, DbError, DbResult, Tx};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct MediaInputQuota {
@@ -214,30 +215,15 @@ impl StorageService {
         max_entries: i64,
         max_bytes: i64,
     ) -> DbResult<Option<MediaInput>> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<Option<MediaInput>> = async {
-            let quota = media_input_quota_impl(&tx).await?;
+        with_write_tx(&self.db, async |tx| {
+            let quota = media_input_quota_impl(tx).await?;
             if quota.entries >= max_entries || quota.bytes + req.size > max_bytes {
                 return Ok(None);
             }
-            let created = create_media_input_impl(&tx, id, req, created_at, expires_at).await?;
+            let created = create_media_input_impl(tx, id, req, created_at, expires_at).await?;
             Ok(Some(created))
-        }
-        .await;
-        match outcome {
-            Ok(Some(created)) => {
-                commit_tx(tx).await?;
-                Ok(Some(created))
-            }
-            Ok(None) => {
-                let _ = rollback_tx(tx).await;
-                Ok(None)
-            }
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn set_media_input_phase(&self, id: &str, phase: MediaInputPhase) -> DbResult<()> {

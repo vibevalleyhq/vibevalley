@@ -6,9 +6,10 @@ use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use vibevalley_protocol::{Millis, RemoteDeviceSummary, RemotePlatform};
 
+use super::with_write_tx;
 use crate::db::column::{db_word, read_db_word};
 use crate::db::entity::{remote_config, remote_device};
-use crate::db::{Database, DbResult, begin_write_tx, commit_tx, rollback_tx};
+use crate::db::{Database, DbResult};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StoredRemoteConfig {
@@ -120,9 +121,8 @@ impl RemoteService {
     }
 
     pub(crate) async fn revoke_device(&self, id: &str, at: Millis) -> DbResult<bool> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<bool> = async {
-            let Some(device) = remote_device::Entity::find_by_id(id.to_owned()).one(&tx).await? else {
+        with_write_tx(&self.db, async |tx| {
+            let Some(device) = remote_device::Entity::find_by_id(id.to_owned()).one(tx).await? else {
                 return Ok(false);
             };
             if device.revoked_at.is_none() {
@@ -130,25 +130,11 @@ impl RemoteService {
                     .col_expr(remote_device::Column::RevokedAt, Expr::value(Some(at)))
                     .filter(remote_device::Column::Id.eq(id))
                     .filter(remote_device::Column::RevokedAt.is_null())
-                    .exec(&tx)
+                    .exec(tx)
                     .await?;
             }
             Ok(true)
-        }
-        .await;
-        match outcome {
-            Ok(found) => {
-                if found {
-                    commit_tx(tx).await?;
-                } else {
-                    let _ = rollback_tx(tx).await;
-                }
-                Ok(found)
-            }
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 }

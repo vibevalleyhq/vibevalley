@@ -11,9 +11,10 @@ use sea_orm::{
 };
 use vibevalley_protocol::{Attachment, LibraryFileKind, LibraryItem, LibraryListRequest, LibraryOrigin, LibrarySort, Suggestion};
 
+use super::with_write_tx;
 use crate::db::column::{db_json, read_db_json, read_db_word};
 use crate::db::entity::{artifact, artifact_change, artifact_collab, artifact_suggestion, artifact_version, attachment, media_job, media_library_item};
-use crate::db::{Database, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
+use crate::db::{Database, DbResult, Tx};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ArtifactRow {
@@ -746,29 +747,21 @@ impl ArtifactService {
     /// Soft-removes generated items (`source_job_id IS NOT NULL`) so they are not re-recorded,
     /// and hard-deletes uploaded/fetched items.
     pub(crate) async fn remove_library_item(&self, attachment_id: &str, at: i64) -> DbResult<()> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<()> = async {
+        with_write_tx(&self.db, async |tx| {
             Update::many(media_library_item::Entity)
                 .col_expr(media_library_item::Column::RemovedAt, Expr::value(Some(at)))
                 .filter(media_library_item::Column::AttachmentId.eq(attachment_id))
                 .filter(media_library_item::Column::SourceJobId.is_not_null())
-                .exec(&tx)
+                .exec(tx)
                 .await?;
             media_library_item::Entity::delete_many()
                 .filter(media_library_item::Column::AttachmentId.eq(attachment_id))
                 .filter(media_library_item::Column::SourceJobId.is_null())
-                .exec(&tx)
+                .exec(tx)
                 .await?;
             Ok(())
-        }
-        .await;
-        match outcome {
-            Ok(()) => commit_tx(tx).await,
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     // --- Media jobs ---

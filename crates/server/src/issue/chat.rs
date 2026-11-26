@@ -85,6 +85,99 @@ enum IssueWake {
 
 type DeliveryWaiter = (u64, oneshot::Sender<()>);
 
+/// Per-key serialized async work queue drained on `TaskTracker` until each key goes idle or is cancelled.
+pub(super) struct KeyedLaneQueue<T> {
+    cancel: CancellationToken,
+    lanes: Arc<Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<T>>>>,
+    tasks: TaskTracker,
+}
+
+impl<T: Send + 'static> KeyedLaneQueue<T> {
+    pub(super) fn new(cancel: CancellationToken) -> Self {
+        Self {
+            cancel,
+            lanes: Arc::new(Mutex::new(HashMap::new())),
+            tasks: TaskTracker::new(),
+        }
+    }
+
+    pub(super) fn enqueue<F, Fut>(&self, key: String, item: T, mut handle_item: F)
+    where
+        F: FnMut(T) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
+    {
+        if self.cancel.is_cancelled() {
+            return;
+        }
+        let mut lanes = self.lanes.lock();
+        let item = match lanes.get(&key) {
+            Some(tx) => match tx.send(item) {
+                Ok(()) => return,
+                Err(tokio::sync::mpsc::error::SendError(returned)) => returned,
+            },
+            None => item,
+        };
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<T>();
+        let _ = tx.send(item);
+        lanes.insert(key.clone(), tx);
+        let lanes_ref = Arc::downgrade(&self.lanes);
+        let cancel = self.cancel.clone();
+        let handle = vibevalley_runtime::rt::current_or_global_handle();
+        self.tasks.spawn_on(
+            async move {
+                loop {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
+                    let next = match rx.try_recv() {
+                        Ok(item) => item,
+                        Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                            let Some(lanes_arc) = lanes_ref.upgrade() else { return };
+                            let mut lanes = lanes_arc.lock();
+                            match rx.try_recv() {
+                                Ok(item) => item,
+                                Err(_) => {
+                                    lanes.remove(&key);
+                                    return;
+                                }
+                            }
+                        }
+                        Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
+                    };
+                    if cancel.is_cancelled() {
+                        return;
+                    }
+                    handle_item(next).await;
+                }
+            },
+            &handle,
+        );
+    }
+
+    pub(super) async fn close_async(&self, coordinator: &Mutex<Option<TaskHandle<()>>>, label: &str) {
+        self.cancel.cancel();
+        self.lanes.lock().clear();
+        let coordinator = coordinator.lock().take();
+        let timed_out = tokio::time::timeout(CHAT_CLOSE_GRACE, async {
+            if let Some(handle) = coordinator {
+                let _ = handle.await;
+            }
+            self.lanes.lock().clear();
+            self.tasks.close();
+            self.tasks.wait().await;
+        })
+        .await
+        .is_err();
+        if timed_out {
+            tracing::warn!(
+                remaining = self.tasks.len(),
+                timeout_secs = CHAT_CLOSE_GRACE.as_secs(),
+                "{label} close timed out waiting for lane tasks"
+            );
+        }
+    }
+}
+
 /// Bridges session lifecycle events, durable outbox reports, and `Chat` deliveries onto
 /// issue threads and [`Board::tell_message_async`] asynchronously per issue.
 pub struct IssueChat {
@@ -94,8 +187,7 @@ pub struct IssueChat {
     opening: tokio::sync::Mutex<()>,
     cancel: CancellationToken,
     coordinator: Mutex<Option<TaskHandle<()>>>,
-    lanes: Mutex<HashMap<String, tokio::sync::mpsc::UnboundedSender<IssueWake>>>,
-    lane_tasks: TaskTracker,
+    lanes: KeyedLaneQueue<IssueWake>,
     next_waiter_id: AtomicU64,
     delivery_waiters: Mutex<HashMap<String, Vec<DeliveryWaiter>>>,
 }
@@ -111,8 +203,7 @@ impl IssueChat {
             opening: tokio::sync::Mutex::new(()),
             cancel: cancel.clone(),
             coordinator: Mutex::new(None),
-            lanes: Mutex::new(HashMap::new()),
-            lane_tasks: TaskTracker::new(),
+            lanes: KeyedLaneQueue::new(cancel.clone()),
             next_waiter_id: AtomicU64::new(1),
             delivery_waiters: Mutex::new(HashMap::new()),
         });
@@ -178,25 +269,7 @@ impl IssueChat {
     pub async fn close_async(&self) {
         self.cancel.cancel();
         self.delivery_waiters.lock().clear();
-        self.lanes.lock().clear();
-        let coordinator = self.coordinator.lock().take();
-        let timed_out = tokio::time::timeout(CHAT_CLOSE_GRACE, async {
-            if let Some(handle) = coordinator {
-                let _ = handle.await;
-            }
-            self.lanes.lock().clear();
-            self.lane_tasks.close();
-            self.lane_tasks.wait().await;
-        })
-        .await
-        .is_err();
-        if timed_out {
-            tracing::warn!(
-                remaining = self.lane_tasks.len(),
-                timeout_secs = CHAT_CLOSE_GRACE.as_secs(),
-                "issue-chat close timed out waiting for lane tasks"
-            );
-        }
+        self.lanes.close_async(&self.coordinator, "issue-chat").await;
     }
 
     /// `issue.comment.create`: router handler returning the current sequence number.
@@ -675,52 +748,15 @@ impl IssueChat {
     }
 
     fn enqueue_lane(self: &Arc<Self>, issue_id: String, wake: IssueWake) {
-        if self.cancel.is_cancelled() {
-            return;
-        }
-        let mut lanes = self.lanes.lock();
-        if let Some(tx) = lanes.get(&issue_id)
-            && tx.send(wake.clone()).is_ok()
-        {
-            return;
-        }
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IssueWake>();
-        let _ = tx.send(wake);
-        lanes.insert(issue_id.clone(), tx);
         let ic = Arc::downgrade(self);
-        let id_for_task = issue_id;
-        let cancel = self.cancel.clone();
-        let handle = vibevalley_runtime::rt::current_or_global_handle();
-        self.lane_tasks.spawn_on(
+        self.lanes.enqueue(issue_id, wake, move |item| {
+            let ic = ic.clone();
             async move {
-                loop {
-                    if cancel.is_cancelled() {
-                        return;
-                    }
-                    let item = match rx.try_recv() {
-                        Ok(item) => item,
-                        Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
-                            let Some(ic) = ic.upgrade() else { return };
-                            let mut lanes = ic.lanes.lock();
-                            match rx.try_recv() {
-                                Ok(item) => item,
-                                Err(_) => {
-                                    lanes.remove(&id_for_task);
-                                    return;
-                                }
-                            }
-                        }
-                        Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
-                    };
-                    let Some(ic) = ic.upgrade() else { return };
-                    if ic.cancel.is_cancelled() {
-                        return;
-                    }
+                if let Some(ic) = ic.upgrade() {
                     ic.handle_wake_async(item).await;
                 }
-            },
-            &handle,
-        );
+            }
+        });
     }
 
     async fn handle_wake_async(&self, wake: IssueWake) {
@@ -898,15 +934,15 @@ mod tests {
         let board = Board::open_standalone_async(ctx.clone(), Arc::new(vibevalley_runtime::oar::Registry::new()), BoardConfig::under(dir))
             .await
             .unwrap();
+        let cancel = ctx.task.child_token();
         let ic = Arc::new(IssueChat {
             ctx: ctx.clone(),
             board: board.clone(),
             channel: channel.clone(),
             opening: tokio::sync::Mutex::new(()),
-            cancel: ctx.task.child_token(),
+            cancel: cancel.clone(),
             coordinator: Mutex::new(None),
-            lanes: Mutex::new(HashMap::new()),
-            lane_tasks: TaskTracker::new(),
+            lanes: KeyedLaneQueue::new(cancel),
             next_waiter_id: AtomicU64::new(1),
             delivery_waiters: Mutex::new(HashMap::new()),
         });

@@ -18,9 +18,10 @@ use serde_json::json;
 use tokio::sync::mpsc::UnboundedSender;
 use vibevalley_rich::{NativeMarkdownDoc, NativeMarkdownEvent, native_markdown_root};
 
-use crate::host::{EditorOption, EditorTarget};
+use crate::host::EditorTarget;
 use crate::icon::{editor_popover, gpui_icon, icon_button, icon_caret_button};
 use crate::theme::{Palette, Ui};
+use crate::viewer::{EditorToolbarState, split_display_path};
 
 const MAX_BYTES: u64 = 8 * 1024 * 1024;
 
@@ -48,10 +49,7 @@ pub struct MarkdownView {
     reloads: u64,
     load_gen: u64,
     show_skeleton: bool,
-    copied: bool,
-    copy_gen: u64,
-    editor_menu_open: bool,
-    editor_options: Vec<EditorOption>,
+    toolbar: EditorToolbarState,
 }
 
 impl MarkdownView {
@@ -101,57 +99,19 @@ impl MarkdownView {
             reloads: 0,
             load_gen: 0,
             show_skeleton: false,
-            copied: false,
-            copy_gen: 0,
-            editor_menu_open: false,
-            editor_options: crate::host::cached_editor_options(),
+            toolbar: EditorToolbarState::new(),
         };
-        view.refresh_editors(cx);
+        EditorToolbarState::refresh_editors(cx, |v: &mut Self| &mut v.toolbar);
         view.reload(cx);
         view
     }
 
-    fn refresh_editors(&mut self, cx: &mut Context<Self>) {
-        let task = cx.background_spawn(async { crate::host::detect_editors_blocking() });
-        cx.spawn(async move |this, cx| {
-            let options = task.await;
-            let _ = this.update(cx, |v, cx| {
-                if v.editor_options != options {
-                    v.editor_options = options;
-                    cx.notify();
-                }
-            });
-        })
-        .detach();
-    }
-
     fn copy_path(&mut self, cx: &mut Context<Self>) {
-        cx.write_to_clipboard(ClipboardItem::new_string(self.path.to_string_lossy().into_owned()));
-        self.copied = true;
-        self.copy_gen = self.copy_gen.wrapping_add(1);
-        let generation = self.copy_gen;
-        cx.notify();
-        cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(1500)).await;
-            let _ = this.update(cx, |v, cx| {
-                if v.copy_gen == generation && v.copied {
-                    v.copied = false;
-                    cx.notify();
-                }
-            });
-        })
-        .detach();
+        self.toolbar.copy_path(&self.path, cx, |v| &mut v.toolbar);
     }
 
     fn toggle_editor_menu(&mut self, was_open: bool, window: &mut Window, cx: &mut Context<Self>) {
-        // Use render-time `was_open`: `on_mouse_down_out` already cleared
-        // `editor_menu_open` during capture when clicking the trigger to close.
-        self.editor_menu_open = !was_open;
-        if self.editor_menu_open {
-            window.focus(&self.focus, cx);
-            self.refresh_editors(cx);
-        }
-        cx.notify();
+        self.toolbar.toggle_editor_menu(was_open, &self.focus, window, cx, |v| &mut v.toolbar);
     }
 
     pub fn path(&self) -> &Path {
@@ -474,8 +434,8 @@ fn error_card(detail: String, colors: &Palette) -> AnyElement {
 impl Render for MarkdownView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = Ui::get(cx).colors.clone();
-        let (file_name, parent_dir) = crate::viewer::split_display_path(&self.path);
-        let menu_open = self.editor_menu_open;
+        let (file_name, parent_dir) = split_display_path(&self.path);
+        let menu_open = self.toolbar.editor_menu_open;
         let toolbar = div()
             .h(px(34.0))
             .flex_none()
@@ -530,8 +490,8 @@ impl Render for MarkdownView {
                     .child(
                         icon_button(
                             "md-copy-path",
-                            if self.copied { "check" } else { "copy" },
-                            if self.copied { "Copied" } else { "Copy path" },
+                            if self.toolbar.copied { "check" } else { "copy" },
+                            if self.toolbar.copied { "Copied" } else { "Copy path" },
                             false,
                             &colors,
                         )
@@ -556,19 +516,19 @@ impl Render for MarkdownView {
             let dismiss_entity = cx.entity();
             editor_popover(
                 "md-editor-menu",
-                &self.editor_options,
+                &self.toolbar.editor_options,
                 &colors,
                 move |target, _, cx| {
                     select_entity.update(cx, |v, cx| {
-                        v.editor_menu_open = false;
+                        v.toolbar.editor_menu_open = false;
                         cx.emit(MarkdownPaneEvent::OpenInEditor(target));
                         cx.notify();
                     });
                 },
                 move |_, cx| {
                     dismiss_entity.update(cx, |v, cx| {
-                        if v.editor_menu_open {
-                            v.editor_menu_open = false;
+                        if v.toolbar.editor_menu_open {
+                            v.toolbar.editor_menu_open = false;
                             cx.notify();
                         }
                     });
@@ -589,8 +549,8 @@ impl Render for MarkdownView {
             .track_focus(&self.focus)
             .key_context("MarkdownView")
             .on_key_down(cx.listener(|v, event: &KeyDownEvent, _, cx| {
-                if v.editor_menu_open && event.keystroke.key == "escape" {
-                    v.editor_menu_open = false;
+                if v.toolbar.editor_menu_open && event.keystroke.key == "escape" {
+                    v.toolbar.editor_menu_open = false;
                     cx.stop_propagation();
                     cx.notify();
                 }
@@ -639,7 +599,7 @@ mod tests {
 
     #[test]
     fn split_display_path_separates_file_name_and_parent() {
-        let (name, parent) = crate::viewer::split_display_path(Path::new("/tmp/repo/docs/guide.md"));
+        let (name, parent) = split_display_path(Path::new("/tmp/repo/docs/guide.md"));
         assert_eq!(name, "guide.md");
         assert_eq!(parent.as_deref(), Some("/tmp/repo/docs"));
     }

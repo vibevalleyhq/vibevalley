@@ -13,11 +13,12 @@ use vibevalley_protocol::{
     DebugTrajectoryTurn, EventTokens, Issue, ORCHESTRATOR_RUNTIME, Phase, Session, SessionController, SessionEvent, SessionEventType,
 };
 use vibevalley_runtime::oar::voyage::{Header as VoyageHeader, Kind as VoyageKind, Reader as VoyageReader, Record as VoyageRecord};
-use vibevalley_runtime::oar::{EventKind as OarEventKind, StopReason, Usage as OarUsage};
+use vibevalley_runtime::oar::{EventKind as OarEventKind, StopReason};
 
 use super::collector::clip_utf8;
 use super::redact::{Redactor, contains_ascii_ci};
 use super::types::DebugDataSource;
+use crate::runtime::session::journal::event_tokens_of;
 
 const RAW_PAYLOAD_MAX_BYTES: usize = 4096;
 const SILENT_ERROR_MARKERS: [&str; 6] = [
@@ -248,34 +249,11 @@ fn merge_tokens(dst: &mut Option<EventTokens>, src: &EventTokens) {
     }
 }
 
-fn tokens_from_oar_usage(usage: &OarUsage) -> Option<EventTokens> {
-    if usage.input_tokens.is_none()
-        && usage.output_tokens.is_none()
-        && usage.cache_read_tokens.is_none()
-        && usage.cache_write_tokens.is_none()
-        && usage.reasoning_tokens.is_none()
-        && usage.context_used_tokens.is_none()
-        && usage.context_window_tokens.is_none()
-    {
-        return None;
-    }
-    let to_i64 = |v: Option<u64>| v.and_then(|n| i64::try_from(n).ok());
-    Some(EventTokens {
-        input: to_i64(usage.input_tokens).unwrap_or(0),
-        cache_read: to_i64(usage.cache_read_tokens).unwrap_or(0),
-        output: to_i64(usage.output_tokens).unwrap_or(0),
-        cache_write: to_i64(usage.cache_write_tokens),
-        reasoning: to_i64(usage.reasoning_tokens),
-        context_used: to_i64(usage.context_used_tokens),
-        context_window: to_i64(usage.context_window_tokens),
-    })
-}
-
 fn tokens_from_voyage_record(rec: &VoyageRecord) -> Option<EventTokens> {
     let mut total: Option<EventTokens> = None;
     for native in &rec.native_events {
         if let OarEventKind::TurnFinished { usage, .. } = &native.kind
-            && let Some(t) = tokens_from_oar_usage(usage)
+            && let Some(t) = event_tokens_of(usage)
         {
             merge_tokens(&mut total, &t);
         }

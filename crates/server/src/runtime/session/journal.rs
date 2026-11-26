@@ -462,7 +462,7 @@ impl Journal {
     }
 }
 
-pub(super) fn event_tokens_of(usage: &vibevalley_runtime::oar::Usage) -> Option<EventTokens> {
+pub(crate) fn event_tokens_of(usage: &vibevalley_runtime::oar::Usage) -> Option<EventTokens> {
     if usage.input_tokens.is_none()
         && usage.output_tokens.is_none()
         && usage.cache_read_tokens.is_none()

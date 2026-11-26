@@ -85,6 +85,76 @@ enum State {
     Error(String),
 }
 
+pub(crate) struct EditorToolbarState {
+    pub(crate) copied: bool,
+    copy_gen: u64,
+    pub(crate) editor_menu_open: bool,
+    pub(crate) editor_options: Vec<EditorOption>,
+}
+
+impl EditorToolbarState {
+    pub(crate) fn new() -> Self {
+        Self {
+            copied: false,
+            copy_gen: 0,
+            editor_menu_open: false,
+            editor_options: crate::host::cached_editor_options(),
+        }
+    }
+
+    pub(crate) fn refresh_editors<V: 'static>(cx: &mut Context<V>, field: fn(&mut V) -> &mut Self) {
+        let task = cx.background_spawn(async { crate::host::detect_editors_blocking() });
+        cx.spawn(async move |this, cx| {
+            let options = task.await;
+            let _ = this.update(cx, |v, cx| {
+                let state = field(v);
+                if state.editor_options != options {
+                    state.editor_options = options;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    pub(crate) fn copy_path<V: 'static>(&mut self, path: &Path, cx: &mut Context<V>, field: fn(&mut V) -> &mut Self) {
+        cx.write_to_clipboard(ClipboardItem::new_string(path.to_string_lossy().into_owned()));
+        self.copied = true;
+        self.copy_gen = self.copy_gen.wrapping_add(1);
+        let generation = self.copy_gen;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(Duration::from_millis(1500)).await;
+            let _ = this.update(cx, |v, cx| {
+                let state = field(v);
+                if state.copy_gen == generation && state.copied {
+                    state.copied = false;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    pub(crate) fn toggle_editor_menu<V: 'static>(
+        &mut self,
+        was_open: bool,
+        focus: &FocusHandle,
+        window: &mut Window,
+        cx: &mut Context<V>,
+        field: fn(&mut V) -> &mut Self,
+    ) {
+        // Use render-time `was_open`: `on_mouse_down_out` already cleared
+        // `editor_menu_open` during capture when clicking the trigger to close.
+        self.editor_menu_open = !was_open;
+        if self.editor_menu_open {
+            window.focus(focus, cx);
+            Self::refresh_editors(cx, field);
+        }
+        cx.notify();
+    }
+}
+
 pub struct FileViewer {
     path: PathBuf,
     state: State,
@@ -94,10 +164,7 @@ pub struct FileViewer {
     reloads: u64,
     load_gen: u64,
     show_skeleton: bool,
-    copied: bool,
-    copy_gen: u64,
-    editor_menu_open: bool,
-    editor_options: Vec<EditorOption>,
+    toolbar: EditorToolbarState,
     html_mode: HtmlViewMode,
     html_preview: Option<Entity<AppView>>,
     html_preview_dark: Option<bool>,
@@ -235,67 +302,29 @@ impl FileViewer {
             reloads: 0,
             load_gen: 0,
             show_skeleton: false,
-            copied: false,
-            copy_gen: 0,
-            editor_menu_open: false,
-            editor_options: crate::host::cached_editor_options(),
+            toolbar: EditorToolbarState::new(),
             html_mode,
             html_preview: None,
             html_preview_dark: None,
             html_preview_error: None,
         };
-        viewer.refresh_editors(cx);
+        EditorToolbarState::refresh_editors(cx, |v: &mut Self| &mut v.toolbar);
         viewer.reload(cx);
         viewer
     }
 
-    fn refresh_editors(&mut self, cx: &mut Context<Self>) {
-        let task = cx.background_spawn(async { crate::host::detect_editors_blocking() });
-        cx.spawn(async move |this, cx| {
-            let options = task.await;
-            let _ = this.update(cx, |v, cx| {
-                if v.editor_options != options {
-                    v.editor_options = options;
-                    cx.notify();
-                }
-            });
-        })
-        .detach();
-    }
-
     fn copy_path(&mut self, cx: &mut Context<Self>) {
-        cx.write_to_clipboard(ClipboardItem::new_string(self.path.to_string_lossy().into_owned()));
-        self.copied = true;
-        self.copy_gen = self.copy_gen.wrapping_add(1);
-        let generation = self.copy_gen;
-        cx.notify();
-        cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(Duration::from_millis(1500)).await;
-            let _ = this.update(cx, |v, cx| {
-                if v.copy_gen == generation && v.copied {
-                    v.copied = false;
-                    cx.notify();
-                }
-            });
-        })
-        .detach();
+        self.toolbar.copy_path(&self.path, cx, |v| &mut v.toolbar);
     }
 
     fn toggle_editor_menu(&mut self, was_open: bool, window: &mut Window, cx: &mut Context<Self>) {
-        // Use render-time `was_open`: `on_mouse_down_out` already cleared
-        // `editor_menu_open` during capture when clicking the trigger to close.
-        self.editor_menu_open = !was_open;
-        if self.editor_menu_open {
-            window.focus(&self.focus, cx);
-            self.refresh_editors(cx);
-        }
+        self.toolbar.toggle_editor_menu(was_open, &self.focus, window, cx, |v| &mut v.toolbar);
         self.sync_html_covered(cx);
-        cx.notify();
     }
 
     fn set_editor_menu_open(&mut self, open: bool, cx: &mut Context<Self>) {
-        if self.editor_menu_open != open {
-            self.editor_menu_open = open;
+        if self.toolbar.editor_menu_open != open {
+            self.toolbar.editor_menu_open = open;
             self.sync_html_covered(cx);
             cx.notify();
         }
@@ -303,7 +332,7 @@ impl FileViewer {
 
     fn sync_html_covered(&self, cx: &gpui::App) {
         if let Some(app) = &self.html_preview {
-            let _ = app.read(cx).host().send("covered", serde_json::Value::Bool(self.editor_menu_open));
+            let _ = app.read(cx).host().send("covered", serde_json::Value::Bool(self.toolbar.editor_menu_open));
         }
     }
 
@@ -334,7 +363,7 @@ impl FileViewer {
             }
         };
         crate::hosted::ensure_ui_sets();
-        let covered = self.editor_menu_open;
+        let covered = self.toolbar.editor_menu_open;
         let options = AppOptions {
             appearance: Appearance::System,
             data_dir: Some(crate::host::Storage::configured().views),
@@ -739,7 +768,7 @@ impl Render for FileViewer {
             self.ensure_html_preview(html, window, cx);
         }
         let show_html_toggle = is_html && !matches!(self.state, State::Binary(_) | State::TooLarge(_) | State::Error(_));
-        let menu_open = self.editor_menu_open;
+        let menu_open = self.toolbar.editor_menu_open;
         let toolbar = div()
             .h(px(34.0))
             .flex_none()
@@ -815,8 +844,8 @@ impl Render for FileViewer {
                     .child(
                         icon_button(
                             "copy-path",
-                            if self.copied { "check" } else { "copy" },
-                            if self.copied { "Copied" } else { "Copy path" },
+                            if self.toolbar.copied { "check" } else { "copy" },
+                            if self.toolbar.copied { "Copied" } else { "Copy path" },
                             false,
                             &colors,
                         )
@@ -839,7 +868,7 @@ impl Render for FileViewer {
             let dismiss_entity = cx.entity();
             editor_popover(
                 "viewer-editor-menu",
-                &self.editor_options,
+                &self.toolbar.editor_options,
                 &colors,
                 move |target, _, cx| {
                     select_entity.update(cx, |v, cx| {
@@ -994,7 +1023,7 @@ impl Render for FileViewer {
             .track_focus(&self.focus)
             .key_context("FileViewer")
             .on_key_down(cx.listener(|v, event: &KeyDownEvent, _, cx| {
-                if v.editor_menu_open && event.keystroke.key == "escape" {
+                if v.toolbar.editor_menu_open && event.keystroke.key == "escape" {
                     v.set_editor_menu_open(false, cx);
                     cx.stop_propagation();
                 }

@@ -6,9 +6,10 @@ use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, ExprTrait, QueryFilter, QueryOrder};
 use vibevalley_protocol::{ActorKind, Memory, MemoryKind};
 
+use super::with_write_tx;
 use crate::db::column::{db_word, read_db_word};
 use crate::db::entity::memory;
-use crate::db::{Database, DbResult, Tx, begin_write_tx, commit_tx, rollback_tx};
+use crate::db::{Database, DbResult, Tx};
 
 #[derive(Debug, Clone)]
 pub(crate) struct NewMemory {
@@ -145,25 +146,14 @@ impl MemoryService {
 
     /// Atomically replaces all non-user notes for `agent` with `notes`.
     pub(crate) async fn rewrite_agent_notes(&self, agent: &str, notes: &[NewMemory]) -> DbResult<usize> {
-        let tx = begin_write_tx(self.db.write_conn()).await?;
-        let outcome: DbResult<usize> = async {
-            delete_agent_notes_impl(&tx, agent).await?;
+        with_write_tx(&self.db, async |tx| {
+            delete_agent_notes_impl(tx, agent).await?;
             for entry in notes {
-                insert_impl(&tx, entry).await?;
+                insert_impl(tx, entry).await?;
             }
             Ok(notes.len())
-        }
-        .await;
-        match outcome {
-            Ok(count) => {
-                commit_tx(tx).await?;
-                Ok(count)
-            }
-            Err(err) => {
-                let _ = rollback_tx(tx).await;
-                Err(err)
-            }
-        }
+        })
+        .await
     }
 
     pub(crate) async fn delete(&self, agent: &str, id: &str) -> DbResult<u64> {

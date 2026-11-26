@@ -14,5 +14,6 @@ mod registry;
 #[cfg(test)]
 mod tests;
 
+pub use chat::message_line;
 pub use dispatch::{Held, Tool, held, helper, orchestrator, unrun};
 pub use registry::{Route, ToolRegistry, Who, Words};
