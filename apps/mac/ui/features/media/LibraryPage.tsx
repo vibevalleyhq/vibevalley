@@ -1,4 +1,5 @@
 import { effect, keymap, Picker, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
+import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { type Artifact, type LibraryItem, type LibrarySort, LibrarySortValues, type MediaJob } from "@vibevalley/protocol";
@@ -19,9 +20,9 @@ import { api, reasonOf } from "../../infra/api";
 import { attachmentData, decodeBase64Utf8 } from "../../infra/attachment";
 import { fileUrl, importLocalAttachment, localPathFromUri, useAttachmentFile } from "../../infra/attachmentFile";
 import { hostApi } from "../../infra/bridge";
-import { useCollabSlice, useOpsSlice } from "../../infra/frame";
+import { useBoardSlice, useCollabSlice, useOpsSlice, useSessionsSlice } from "../../infra/frame";
 import { currentHost } from "../../infra/host";
-import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
+import { ready, useAgents, useQuery, useQueryClient, useRepos } from "../../infra/query";
 import { useRouter, useSearchParams } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import {
@@ -41,7 +42,23 @@ import { artifactTypeLabel, buildOutlineFromMarkdown, inferArtifactFromName, Ins
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
 import { Inspector } from "./Inspector";
-import { type ArtifactTypeFilter, justify, kindOf, making, type Names, neighbor, shownArtifacts, shownMedia, understoodText } from "./items";
+import {
+  type ArtifactTypeFilter,
+  buildCategoryFilterOptions,
+  type ContentCategoryFilter,
+  type ContentContextLookup,
+  countCategoryFilters,
+  emptyCategoryFilter,
+  hasAnyCategoryFilter,
+  justify,
+  kindOf,
+  making,
+  type Names,
+  neighbor,
+  shownArtifacts,
+  shownMedia,
+  understoodText,
+} from "./items";
 import {
   activeFileId,
   askRemove,
@@ -120,12 +137,16 @@ function titleOfBucket(bucket: ContentBucket): string {
 
 export function LibraryPage() {
   const ops = useOpsSlice();
+  const board = useBoardSlice();
   const collab = useCollabSlice();
+  const sessions = useSessionsSlice();
   const agents = useAgents();
+  const reposQuery = useRepos();
   const router = useRouter();
   const queries = useQueryClient();
   const [search, setSearch] = useSearchParams();
   const sort = signal<LibrarySort>("recent");
+  const category = signal<ContentCategoryFilter>(emptyCategoryFilter);
   const items = useQuery(() => libraryQuery({ text: "", sort: sort() }), { interval: () => 10_000, keepPrevious: true });
   const artifactsQuery = useArtifacts(() => ({}));
   const installedApplets = useInstalledApplets();
@@ -162,6 +183,34 @@ export function LibraryPage() {
   const pinnedOnly = () => isPinnedBucket(bucket());
   const appsOnly = () => isAppsBucket(bucket());
 
+  const contextLookup = createMemo((): ContentContextLookup => ({
+    issuesById: new Map((board()?.issues ?? []).map((issue) => [issue.id, issue])),
+    channelsById: new Map((collab()?.chat?.channels ?? []).map((ch) => [ch.id, ch])),
+    sessionsById: new Map((sessions()?.sessions ?? []).map((s) => [s.id, s])),
+    jobsById: new Map(jobs().map((job) => [job.id, job])),
+  }));
+  const effectiveCategory = createMemo((): ContentCategoryFilter => {
+    const cur = category();
+    return showsMediaInBucket(bucket()) ? cur : { ...cur, origin: undefined };
+  });
+  const categoryOptions = createMemo(() =>
+    buildCategoryFilterOptions({
+      artifacts: allArtifacts(),
+      media: allMedia(),
+      lookup: contextLookup(),
+      extraRepos: ready(reposQuery, []).map((r) => r.name),
+    }),
+  );
+  const hasCategoryOptions = createMemo(
+    () => categoryOptions().repos.length > 0 || categoryOptions().issues.length > 0 || categoryOptions().channels.length > 0,
+  );
+  const activeCategoryCount = createMemo(() => countCategoryFilters(effectiveCategory()));
+  const compactToolbar = createMemo(() => {
+    const measured = gridWidth();
+    const w = measured !== undefined && measured > 0 ? measured : windowSize().width - (contentSidebarOpen.get() ? 232 : 0) - 76;
+    return w < 920;
+  });
+
   const visibleArtifacts = createMemo(() => {
     if (!showsArtifactsInBucket(bucket())) return [];
     const base = shownArtifacts(allArtifacts(), {
@@ -169,6 +218,8 @@ export function LibraryPage() {
       sort: effectiveSort(),
       pinnedOnly: pinnedOnly(),
       pinned: pinnedSet(),
+      category: effectiveCategory(),
+      lookup: contextLookup(),
     });
     return appsOnly() ? base.filter((a) => installedMap().has(a.id)) : base;
   });
@@ -178,6 +229,8 @@ export function LibraryPage() {
           fileKind: bucketFileKind(bucket()),
           pinnedOnly: pinnedOnly(),
           pinned: pinnedSet(),
+          category: effectiveCategory(),
+          lookup: contextLookup(),
         })
       : [],
   );
@@ -453,6 +506,152 @@ export function LibraryPage() {
             </Text>
             <CountPill count={totalCount()} />
           </View>
+          <If when={hasCategoryOptions()}>
+            <If
+              when={!compactToolbar()}
+              else={
+                <Popover
+                  placement="bottom"
+                  align="start"
+                  offset={6}
+                  popupClass="w-72 gap-2.5 rounded-lg border border-line bg-elevated p-3 shadow-float"
+                  popupStyle={{ maxWidth: Math.max(240, windowSize().width - 24) }}
+                  trigger={
+                    <View
+                      testID="library-filter-popover"
+                      role="button"
+                      accessibilityLabel={t("web.issue.page.filter")}
+                      class={`h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border border-line px-2.5 ${
+                        activeCategoryCount() > 0 ? "bg-selected" : "bg-page hover:bg-hover"
+                      }`}
+                    >
+                      <Icon name="filter" size={14} tone={activeCategoryCount() > 0 ? "accent" : "muted"} />
+                      <Text class="text-sm text-ink">{t("web.issue.page.filter")}</Text>
+                      <If when={activeCategoryCount() > 0}>
+                        <CountPill count={activeCategoryCount()} active />
+                      </If>
+                    </View>
+                  }
+                >
+                  <View testID="library-filter-popover-menu" class="gap-2.5">
+                    <If when={categoryOptions().repos.length > 0}>
+                      <View class="gap-1">
+                        <Text class="text-xs font-medium text-muted">{t("web.issue.page.byRepo")}</Text>
+                        <Select
+                          size="control"
+                          class="w-full"
+                          label={t("web.issue.page.byRepo")}
+                          testid="library-filter-repo"
+                          filter
+                          value={category().repo ?? ""}
+                          placeholder={t("web.issue.page.allRepos")}
+                          options={categoryOptions().repos}
+                          onChange={(repo) => category.set({ ...category(), repo: repo || undefined })}
+                        />
+                      </View>
+                    </If>
+                    <If when={categoryOptions().issues.length > 0}>
+                      <View class="gap-1">
+                        <Text class="text-xs font-medium text-muted">{t("web.base.place.issues.label")}</Text>
+                        <Select
+                          size="control"
+                          class="w-full"
+                          label={t("web.base.place.issues.label")}
+                          testid="library-filter-issue"
+                          filter
+                          value={category().issueId ?? ""}
+                          placeholder={t("web.issue.list.all")}
+                          options={categoryOptions().issues}
+                          onChange={(issueId) => category.set({ ...category(), issueId: issueId || undefined })}
+                        />
+                      </View>
+                    </If>
+                    <If when={categoryOptions().channels.length > 0}>
+                      <View class="gap-1">
+                        <Text class="text-xs font-medium text-muted">{t("web.channel.channelsTitle")}</Text>
+                        <Select
+                          size="control"
+                          class="w-full"
+                          label={t("web.channel.channelsTitle")}
+                          testid="library-filter-channel"
+                          filter
+                          value={category().channelId ?? ""}
+                          placeholder={t("web.channel.filter.all")}
+                          options={categoryOptions().channels}
+                          onChange={(channelId) => category.set({ ...category(), channelId: channelId || undefined })}
+                        />
+                      </View>
+                    </If>
+                    <If when={hasAnyCategoryFilter(effectiveCategory())}>
+                      <View class="flex-row justify-end border-t border-line pt-2">
+                        <Button size="compact" tone="quiet" testID="library-filter-clear" onPress={() => category.set(emptyCategoryFilter)}>
+                          {t("web.issue.page.clear")}
+                        </Button>
+                      </View>
+                    </If>
+                  </View>
+                </Popover>
+              }
+            >
+              <View testID="library-filter-bar" class="shrink-0 flex-row items-center rounded-md border border-line bg-side pl-2">
+                <Icon name="filter" size={14} tone={activeCategoryCount() > 0 ? "accent" : "faint"} />
+                <If when={categoryOptions().repos.length > 0}>
+                  <View class="mx-1.5 h-3.5 w-px bg-line" />
+                  <Select
+                    quiet
+                    size="control"
+                    class="max-w-24"
+                    label={t("web.issue.page.byRepo")}
+                    testid="library-filter-repo"
+                    filter
+                    value={category().repo ?? ""}
+                    placeholder={t("web.issue.page.allRepos")}
+                    options={categoryOptions().repos}
+                    onChange={(repo) => category.set({ ...category(), repo: repo || undefined })}
+                  />
+                </If>
+                <If when={categoryOptions().issues.length > 0}>
+                  <View class="h-3.5 w-px bg-line" />
+                  <Select
+                    quiet
+                    size="control"
+                    class="max-w-28"
+                    label={t("web.base.place.issues.label")}
+                    testid="library-filter-issue"
+                    filter
+                    value={category().issueId ?? ""}
+                    placeholder={t("web.issue.list.all")}
+                    options={categoryOptions().issues}
+                    onChange={(issueId) => category.set({ ...category(), issueId: issueId || undefined })}
+                  />
+                </If>
+                <If when={categoryOptions().channels.length > 0}>
+                  <View class="h-3.5 w-px bg-line" />
+                  <Select
+                    quiet
+                    size="control"
+                    class="max-w-24"
+                    label={t("web.channel.channelsTitle")}
+                    testid="library-filter-channel"
+                    filter
+                    value={category().channelId ?? ""}
+                    placeholder={t("web.channel.filter.all")}
+                    options={categoryOptions().channels}
+                    onChange={(channelId) => category.set({ ...category(), channelId: channelId || undefined })}
+                  />
+                </If>
+              </View>
+              <If when={hasAnyCategoryFilter(effectiveCategory())}>
+                <IconButton
+                  icon="close"
+                  size={14}
+                  testid="library-filter-clear"
+                  label={t("web.issue.page.clear")}
+                  onClick={() => category.set(emptyCategoryFilter)}
+                />
+              </If>
+            </If>
+          </If>
           <View class="min-w-0 flex-1" />
           <If when={!contentSidebarOpen.get()}>
             <IconButton icon="search" size={14} label={t("web.library.content.searchAll")} testid="content-search-btn" onClick={() => openContentSearch()} />
@@ -546,6 +745,11 @@ export function LibraryPage() {
                   testid={appsOnly() ? "library-apps-empty" : "library-nothing-shown"}
                   action={
                     <View class="flex-row flex-wrap items-center justify-center gap-2">
+                      <If when={hasAnyCategoryFilter(effectiveCategory())}>
+                        <Button icon="close" testID="library-filter-clear-empty" onPress={() => category.set(emptyCategoryFilter)}>
+                          {t("web.issue.page.clear")}
+                        </Button>
+                      </If>
                       <If when={bucket().kind === "artifacts"}>
                         <Button tone="primary" icon="add" onPress={() => openTemplatePicker(templatePickerContextFor(bucket()))}>
                           {t("web.library.content.new")}

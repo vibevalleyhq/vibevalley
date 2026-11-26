@@ -305,3 +305,48 @@ test("Library sidebar folds 0-count types behind collapsible toggle and dark mod
   await fake.pump(app);
   expect(app.count("id:content-nav-artifact-sheet")).toBe(0);
 });
+
+test("LibraryPage filters artifacts and media by repo, issue, and channel and collapses filter bar on narrow widths", async () => {
+  setLocale("en");
+  const { app, fake } = await mountLibrary(
+    [
+      makeArtifact({ id: "art-vv", title: "VV Architecture", artifactType: "docs" }),
+      makeArtifact({ id: "art-other", title: "Standalone Note", artifactType: "outline" }),
+    ],
+    (f) => {
+      f.respond("artifact.list", [
+        { ...makeArtifact({ id: "art-vv", title: "VV Architecture", artifactType: "docs" }), issue: "i18", channel: "general" },
+        { ...makeArtifact({ id: "art-other", title: "Standalone Note", artifactType: "outline" }) },
+      ]);
+      f.respond("repo.list", [
+        { name: "vibevalley", path: "/tmp/vibevalley", branch: "main", branches: ["main"], dirty: false, maxSessions: 4 },
+        { name: "site", path: "/tmp/site", branch: "main", branches: ["main"], dirty: false, maxSessions: 2 },
+      ]);
+    },
+  );
+
+  expect(app.count("id:library-filter-bar")).toBe(1);
+  expect(app.count("id:library-filter-repo")).toBe(1);
+  expect(app.count("id:library-filter-issue")).toBe(1);
+  expect(app.count("id:library-filter-channel")).toBe(1);
+  expect(app.count("id:library-artifact-art-vv")).toBe(1);
+  expect(app.count("id:library-artifact-art-other")).toBe(1);
+
+  // Filter by repo `vibevalley`: narrows down to `art-vv` and media from `#general` (`vibevalley`), hiding `art-other`.
+  await app.press("id:library-filter-repo");
+  await fake.pump(app);
+  await app.press("text:vibevalley");
+  await fake.pump(app);
+  expect(app.count("id:library-artifact-art-vv")).toBe(1);
+  expect(app.count("id:library-artifact-art-other")).toBe(0);
+  expect(app.count("id:library-filter-clear")).toBe(1);
+
+  await app.press("id:library-filter-clear");
+  await fake.pump(app);
+  expect(app.count("id:library-artifact-art-other")).toBe(1);
+
+  // Narrow viewport collapses inline filter bar into a filter popover cleanly.
+  await app.setViewport(900, 720);
+  await fake.pumpUntil(app, () => app.count("id:library-filter-popover") === 1);
+  expect(app.count("id:library-filter-bar")).toBe(0);
+});
