@@ -212,6 +212,7 @@ impl Orchestrator {
             picked: meta.picked.clone(),
             messages: vec![c.row.id.clone()],
             port: meta.response_port.clone(),
+            cron_id: None,
         };
         let heard = intake.hear_async(input).await;
         if heard {

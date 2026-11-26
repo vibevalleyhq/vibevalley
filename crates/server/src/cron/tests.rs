@@ -20,7 +20,7 @@ struct CountingOrchestrator {
 }
 
 impl CronOrchestratorPort for CountingOrchestrator {
-    fn hear_cron<'a>(&'a self, _agent: &'a str, _channel: &'a str, _words: &'a str) -> crate::BoxFuture<'a, bool> {
+    fn hear_cron<'a>(&'a self, _agent: &'a str, _channel: &'a str, _cron_id: &'a str, _words: &'a str) -> crate::BoxFuture<'a, bool> {
         self.heard.fetch_add(1, Ordering::SeqCst);
         Box::pin(std::future::ready(true))
     }

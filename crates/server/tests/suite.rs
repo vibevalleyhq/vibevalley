@@ -2,6 +2,7 @@ mod support;
 
 mod agent;
 mod artifact;
+mod auth_hard_gate;
 mod channel;
 mod connector;
 mod contract;

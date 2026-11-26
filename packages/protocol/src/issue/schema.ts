@@ -137,11 +137,24 @@ const Assignment = z.object({
 
 const MandateStrength = z.enum(T.MandateStrengthValues) satisfies Codec<T.MandateStrength>;
 
+const HumanPauseSource = z.enum(T.HumanPauseSourceValues) satisfies Codec<T.HumanPauseSource>;
+
+const ResumeCondition = z.enum(T.ResumeConditionValues) satisfies Codec<T.ResumeCondition>;
+
+const HumanPause = z.object({
+  source: HumanPauseSource,
+  clearCondition: ResumeCondition,
+  pausedAt: z.number(),
+  sessionId: z.exactOptional(z.string()),
+  note: z.exactOptional(z.string()),
+}) satisfies Codec<T.HumanPause>;
+
 const IssueMandate = z.object({
   originTriggerId: z.exactOptional(z.string()),
   strength: MandateStrength,
   maxBotReviewRounds: z.number().int(),
   autoSubmitPr: z.boolean(),
+  pause: z.exactOptional(HumanPause),
 }) satisfies Codec<T.IssueMandate>;
 
 export const IssueConstraints = z.object({

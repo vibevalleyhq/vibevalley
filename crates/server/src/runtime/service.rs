@@ -25,11 +25,14 @@ use crate::storage::Storage;
 pub async fn reopen_sessions_async(ctx: &Arc<Context>) -> Result<Opened> {
     let durable = ctx.service.durable().await?;
     let stored = ctx.service.session.all().await?;
+    let issues = ctx.service.issue.all().await?;
+    let paused_issues: HashSet<String> = issues.into_iter().filter(|i| i.mandate.is_paused()).map(|i| i.id).collect();
     let all_extras = ctx.service.session.extras().await?;
     let mut recoverable_ids = HashSet::new();
     for s in &stored {
         if s.phase.is_working()
             && !s.is_refining()
+            && s.issue_id().is_none_or(|id| !paused_issues.contains(id))
             && s.runtime == vibevalley_runtime::agent::runtime::ID
             && let Some(extra) = all_extras.get(&s.id)
             && let (Some(run_id), Some(vendor)) = (extra.run.as_deref(), extra.agent_session.as_deref())
@@ -232,7 +235,7 @@ impl Runtime {
         self.session.who(token)
     }
 
-    pub fn opening_session(&self, id: &str) -> Option<vibevalley_protocol::Session> {
+    pub fn opening_session(&self, id: &str) -> Option<Session> {
         self.session.opening_session(id)
     }
 
@@ -266,6 +269,10 @@ impl Runtime {
 
     pub async fn stop_async(&self, id: &str) -> std::result::Result<(), ApiError> {
         self.session.stop_async(id).await
+    }
+
+    pub async fn stop_with_pause_async(&self, id: &str, source: Option<vibevalley_protocol::HumanPauseSource>) -> std::result::Result<(), ApiError> {
+        self.session.stop_with_pause_async(id, source).await
     }
 
     pub async fn report_async(&self, session: &str, report: &Report) -> Result<()> {

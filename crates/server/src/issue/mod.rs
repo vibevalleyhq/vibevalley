@@ -86,6 +86,14 @@ impl crate::context::port::CronBoardPort for Board {
 
     fn move_to_todo_async<'a>(&'a self, id: &'a str, words: Option<&'a str>) -> crate::BoxFuture<'a, std::result::Result<(), vibevalley_protocol::ApiError>> {
         Box::pin(async move {
+            if let Some(issue) = Board::issue_async(self, id).await.map_err(board_err)?
+                && issue.mandate.is_paused()
+            {
+                return Err(vibevalley_protocol::ApiError::new(
+                    vibevalley_protocol::BizCode::IssueRefused,
+                    "工单已由人工暂停，定时任务不能自动恢复，需由用户明确恢复".to_string(),
+                ));
+            }
             Board::move_to_async(self, id, vibevalley_protocol::IssueStatus::Todo, words)
                 .await
                 .map(|_| ())
@@ -94,7 +102,17 @@ impl crate::context::port::CronBoardPort for Board {
     }
 
     fn tell_async<'a>(&'a self, id: &'a str, words: &'a str) -> crate::BoxFuture<'a, std::result::Result<(), vibevalley_protocol::ApiError>> {
-        Box::pin(async move { Board::tell_async(self, id, words).await.map_err(board_err) })
+        Box::pin(async move {
+            if let Some(issue) = Board::issue_async(self, id).await.map_err(board_err)?
+                && issue.mandate.is_paused()
+            {
+                return Err(vibevalley_protocol::ApiError::new(
+                    vibevalley_protocol::BizCode::IssueRefused,
+                    "工单已由人工暂停，定时任务不能自动唤醒，需由用户明确恢复".to_string(),
+                ));
+            }
+            Board::tell_async(self, id, words).await.map_err(board_err)
+        })
     }
 }
 

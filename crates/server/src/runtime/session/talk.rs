@@ -117,7 +117,7 @@ impl SessionEngine {
             system_prompt,
             ..Default::default()
         };
-        let agent = drive.runtime.open(opts).await?;
+        let agent = self.open_runtime_for_session_async(drive.runtime.as_ref(), &session, opts).await?;
         session.phase = Phase::working(now(), SessionAction::Thinking, "");
         self.go_live_async(agent.clone(), session.clone(), None).await?;
         let prompt = self.with_recall_async(&session, prompt).await;

@@ -130,10 +130,10 @@ pub(crate) fn build_runtimes(setting: &Arc<Setting>, home: &std::path::Path, exe
 pub(crate) struct LazyCronOrchestrator(pub Arc<OnceLock<Arc<dyn CronOrchestratorPort>>>);
 
 impl CronOrchestratorPort for LazyCronOrchestrator {
-    fn hear_cron<'a>(&'a self, agent: &'a str, channel: &'a str, line: &'a str) -> BoxFuture<'a, bool> {
+    fn hear_cron<'a>(&'a self, agent: &'a str, channel: &'a str, cron_id: &'a str, line: &'a str) -> BoxFuture<'a, bool> {
         Box::pin(async move {
             match self.0.get() {
-                Some(o) => o.hear_cron(agent, channel, line).await,
+                Some(o) => o.hear_cron(agent, channel, cron_id, line).await,
                 None => false,
             }
         })

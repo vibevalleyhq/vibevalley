@@ -6,16 +6,18 @@ use tokio_util::sync::CancellationToken;
 use vibevalley_core::rules::session_ids_of;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, Session, SessionChildTranscript, SessionChildTranscriptInput, SessionController,
-    SessionEventListInput, SessionEventPage, SessionId, SessionOpenWorkspaceInput, SessionRespondInteractionInput, SessionRespondPermissionInput,
-    SessionSendInput, SessionSetConfigInput, SessionWatchEvent, SessionWatchPayload, SessionWorkspace, SliceKind,
+    ApiError, HumanPause, HumanPauseSource, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, ResumeCondition, Session, SessionChildTranscript,
+    SessionChildTranscriptInput, SessionController, SessionEventListInput, SessionEventPage, SessionId, SessionOpenWorkspaceInput,
+    SessionRespondInteractionInput, SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionWatchEvent, SessionWatchPayload,
+    SessionWorkspace, SliceKind,
 };
 
 use super::engine::SessionEngine;
 use super::types::{helper_ref, session_error};
 use crate::context::error::{LookIn, missing};
 use crate::context::feed::SliceSubscription;
-use crate::runtime::derive_all_issues;
+use crate::context::now;
+use crate::runtime::{IssueChange, derive_all_issues};
 use crate::storage::Storage;
 
 fn send_watch_event<T: serde::Serialize>(sink: &crate::context::Sink, event: &T) -> bool {
@@ -50,9 +52,29 @@ impl SessionEngine {
     }
 
     pub async fn stop_async(&self, id: &str) -> Result<(), ApiError> {
+        self.stop_with_pause_async(id, None).await
+    }
+
+    /// Stops a live session and, when invoked by a human (`source`), persists
+    /// an explicit human pause on its bound issue across restarts.
+    pub async fn stop_with_pause_async(&self, id: &str, source: Option<HumanPauseSource>) -> Result<(), ApiError> {
         let Some(session) = self.session_async(id).await.filter(|s| self.is_live(&s.id)) else {
             return Err(helper_ref(id));
         };
+        if let Some(src) = source
+            && let Some(issue_id) = session.issue_id()
+        {
+            let pause = HumanPause {
+                source: src,
+                clear_condition: ResumeCondition::ExplicitUserResume,
+                paused_at: now(),
+                session_id: Some(session.id.clone()),
+                note: None,
+            };
+            self.apply_issue_change_async(issue_id, IssueChange::Paused(pause))
+                .await
+                .map_err(session_error)?;
+        }
         if session.phase.is_working() {
             let _ = self.abort_turn_async(&session.id).await;
         }
@@ -60,7 +82,7 @@ impl SessionEngine {
     }
 
     pub(crate) async fn stop_endpoint_async(&self, id: &str) -> Result<(), ApiError> {
-        self.stop_async(id).await
+        self.stop_with_pause_async(id, Some(HumanPauseSource::UserStop)).await
     }
 
     pub(crate) async fn open_workspace_endpoint_async(&self, input: SessionOpenWorkspaceInput) -> Result<SessionWorkspace, ApiError> {

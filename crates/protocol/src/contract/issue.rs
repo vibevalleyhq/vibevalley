@@ -610,6 +610,58 @@ impl MandateStrength {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum HumanPauseSource {
+    #[serde(rename = "user_stop")]
+    UserStop,
+    #[serde(rename = "user_chat")]
+    UserChat,
+}
+
+impl HumanPauseSource {
+    pub const ALL: [HumanPauseSource; 2] = [HumanPauseSource::UserStop, HumanPauseSource::UserChat];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            HumanPauseSource::UserStop => "user_stop",
+            HumanPauseSource::UserChat => "user_chat",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum ResumeCondition {
+    #[serde(rename = "explicit_user_resume")]
+    ExplicitUserResume,
+}
+
+impl ResumeCondition {
+    pub const ALL: [ResumeCondition; 1] = [ResumeCondition::ExplicitUserResume];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ResumeCondition::ExplicitUserResume => "explicit_user_resume",
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct HumanPause {
+    pub source: HumanPauseSource,
+    pub clear_condition: ResumeCondition,
+    pub paused_at: i64,
+    pub session_id: Option<String>,
+    pub note: Option<String>,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -620,6 +672,8 @@ pub struct IssueMandate {
     pub strength: MandateStrength,
     pub max_bot_review_rounds: i64,
     pub auto_submit_pr: bool,
+    #[serde(default)]
+    pub pause: Option<HumanPause>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1519,6 +1573,9 @@ crate::typescript::module! {
     ProjectCheckStatus,
     ProjectCheckReceipt,
     DeliveryEvidence,
+    HumanPauseSource,
+    ResumeCondition,
+    HumanPause,
     IssueMandate,
     IssueReportMemoryScope,
     IssueReportMemory,

@@ -92,18 +92,15 @@ impl Report {
 pub fn instructions(deliver: Deliverable) -> String {
     let work = match deliver {
         Deliverable::Change | Deliverable::Branch | Deliverable::PullRequest => {
-            "You work in a git worktree on the issue's own branch. Commit your work there with a clear message; \
-             do not switch branches, push or merge."
+            "你在工单自己的 git worktree 分支上干活。提交清晰的 git commit；不要切换分支、不要 push、也不要合并。"
         }
         Deliverable::Answer => ANSWER_ONLY,
     };
     format!(
-        "You are working on an issue from VibeValley's board. {work}\n\n\
-         When you finish a round, call the issue_report tool of the vibevalley MCP server with a one or two \
-         sentence summary, any questions for the user, and for an answer issue the answer."
+        "你正在处理 VibeValley 工单板上的任务。{work}\n\n\
+         完成本轮后，调用 vibevalley MCP 服务的 issue_report 工具交回一两句结果摘要、待用户回答的问题，并在只读问答任务中填写 answer。"
     )
 }
 
 /// What an answer issue's helper is told beside its rules.
-pub const ANSWER_ONLY: &str = "This issue asks for an answer, not a change: investigate read-only (read code, run read-only \
-     commands) and do not modify or commit files; anything you change is thrown away.";
+pub const ANSWER_ONLY: &str = "这项任务只要结论，不改代码：只读调研（读代码、跑只读命令），严禁修改或提交文件；任何改动交回来都会被丢弃。";

@@ -822,7 +822,11 @@ impl IssueChat {
         if !earlier_lines.is_empty() {
             text = format!("{text}\n\n{}", wake_input(&earlier_lines));
         }
-        let tell_res = self.board.tell_message_async(&delivery.recipient_id, &text, &delivery.message_id).await;
+        let from_user = c.row.sender_kind == "user";
+        let tell_res = self
+            .board
+            .tell_message_from_async(&delivery.recipient_id, &text, &delivery.message_id, from_user)
+            .await;
         match tell_res {
             Ok(()) => {
                 let _ = self.channel.settle_delivery_async(delivery.id, true).await;
@@ -859,6 +863,7 @@ impl IssueChat {
             .unwrap_or_default();
         let mut settled_ids: Vec<(i64, String)> = Vec::new();
         let mut lines: Vec<String> = Vec::new();
+        let mut from_user = false;
         for d in pending {
             let loaded = if d.id == delivery.id {
                 match committed.clone() {
@@ -870,6 +875,9 @@ impl IssueChat {
             };
             match loaded {
                 Some(ec) => {
+                    if ec.row.sender_kind == "user" {
+                        from_user = true;
+                    }
                     lines.push(line_of(&self.channel, &ec));
                     settled_ids.push((d.id, d.message_id));
                 }
@@ -882,7 +890,7 @@ impl IssueChat {
             return;
         }
         let body = wake_input(&lines);
-        let tell_res = self.board.tell_message_async(issue_id, &body, &delivery.message_id).await;
+        let tell_res = self.board.tell_message_from_async(issue_id, &body, &delivery.message_id, from_user).await;
         match tell_res {
             Ok(()) => {
                 for (did, _) in &settled_ids {

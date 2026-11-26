@@ -18,7 +18,7 @@ use super::state::{Orchestrator, Parts, Reply};
 use super::types::{Input, Instance};
 use super::words::Source;
 use crate::BoxFuture;
-use crate::agent::tool::Route;
+use crate::agent::tool::{Route, RouteSource};
 use crate::artifact::Manager as ArtifactManager;
 use crate::channel::{Chat, Posting, Saying};
 use crate::context::port::{CronOrchestratorPort, VoiceOrchestratorPort};
@@ -173,6 +173,23 @@ impl Orchestrator {
         true
     }
 
+    /// Hands a patrol alert without user words to the channel's orchestrator.
+    pub async fn hear_patrol_async(self: &Arc<Self>, channel: &str, line: &str) -> bool {
+        let agent = self.chat.orchestrator_in(channel);
+        self.hear_async(Input {
+            agent: Some(agent),
+            channel: channel.to_string(),
+            source: Source::Patrol,
+            line: line.to_string(),
+            user: false,
+            picked: None,
+            messages: vec![],
+            port: None,
+            cron_id: None,
+        })
+        .await
+    }
+
     /// `answerer("phone")`: the user's spoken words go into the chat as any
     /// of theirs do, and the turn they wake is answered here as well.
     pub async fn answer_async(self: &Arc<Self>, text: &str) -> Result<Reply, ApiError> {
@@ -204,6 +221,7 @@ impl Orchestrator {
             picked: None,
             messages: vec![],
             port: Some(reply.id.clone()),
+            cron_id: None,
         })
         .await
         .then_some(reply)
@@ -293,6 +311,20 @@ impl Orchestrator {
     async fn turn_async(&self, me: &Instance, pending: Vec<(String, Input)>) -> Vec<String> {
         let (requests, batch): (Vec<_>, Vec<_>) = pending.into_iter().unzip();
         let Some(last) = batch.last().cloned() else { return Vec::new() };
+        let has_user = batch.iter().any(|i| i.user);
+        let source = if has_user {
+            RouteSource::User
+        } else {
+            match last.source {
+                Source::User => RouteSource::User,
+                Source::Chat => RouteSource::Chat,
+                Source::Issue => RouteSource::Issue,
+                Source::Cron => RouteSource::Cron,
+                Source::Patrol => RouteSource::Patrol,
+                Source::Call => RouteSource::Call,
+            }
+        };
+        let cron_id = batch.iter().rev().find_map(|i| i.cron_id.clone());
         let route = Route {
             agent: me.id.clone(),
             channel: last.channel.clone(),
@@ -302,7 +334,9 @@ impl Orchestrator {
                 .rev()
                 .find_map(|i| i.picked.as_ref().and_then(|p| p.agent.clone()))
                 .unwrap_or_default(),
-            user: batch.iter().any(|i| i.user),
+            user: has_user,
+            source: Some(source),
+            cron_id,
         };
         // Taken now: a turn that cannot start ends them unanswered.
         let ports: Vec<mpsc::UnboundedSender<String>> = {
@@ -415,7 +449,7 @@ impl VoiceOrchestratorPort for Orchestrator {
 }
 
 impl CronOrchestratorPort for Orchestrator {
-    fn hear_cron<'a>(&'a self, agent: &'a str, channel: &'a str, line: &'a str) -> BoxFuture<'a, bool> {
+    fn hear_cron<'a>(&'a self, agent: &'a str, channel: &'a str, cron_id: &'a str, line: &'a str) -> BoxFuture<'a, bool> {
         Box::pin(async move {
             let Some(me) = self.me.upgrade() else { return false };
             me.hear_async(Input {
@@ -427,6 +461,7 @@ impl CronOrchestratorPort for Orchestrator {
                 picked: None,
                 messages: vec![],
                 port: None,
+                cron_id: Some(cron_id.to_string()),
             })
             .await
         })

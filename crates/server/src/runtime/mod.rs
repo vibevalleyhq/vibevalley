@@ -14,7 +14,7 @@ pub use service::{Runtime, reopen_sessions_async};
 pub(crate) use session::delivery::IssueReportDoc;
 pub use session::{
     ANSWER_ONLY, AgentProfileInfo, DraftEnd, Drive, HelperPlace, Hire, Journal, MailboxEntry, MailboxSource, MailboxStatus, News, PermissionEvent, Persona,
-    Report, ReportQuestion, ReportStatus, Rounds, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory, WorkspaceSnapshot,
+    Report, ReportQuestion, ReportStatus, Rounds, RunMode, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory, WorkspaceSnapshot,
     trigger_of,
 };
 pub(crate) use session::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};

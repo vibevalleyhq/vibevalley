@@ -17,5 +17,5 @@ pub mod toolset;
 
 pub use chat::message_line;
 pub use dispatch::{Held, Tool, held, held_for, helper, orchestrator, unrun};
-pub use registry::{Route, ToolRegistry, Who, Words};
+pub use registry::{Route, RouteSource, ToolRegistry, Who, Words};
 pub use toolset::{Role, ToolAccess, access_of, allows, can_role, denied_message, toolset_of};

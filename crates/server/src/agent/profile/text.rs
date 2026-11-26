@@ -14,8 +14,7 @@ use vibevalley_protocol::{
 use crate::context::text::head;
 
 /// Prompt clause prepended to read-only answer issues.
-pub const ANSWER_ONLY: &str = "This issue asks for an answer, not a change: investigate read-only (read code, run read-only \
-     commands) and do not modify or commit files; anything you change is thrown away.";
+pub const ANSWER_ONLY: &str = "这项任务只要结论，不改代码：只读调研（读代码、跑只读命令），严禁修改或提交文件；任何改动交回来都会被丢弃。";
 
 /// `prompts.json`, written by `gen/orchestrator.ts` from VibeValley.
 #[derive(Deserialize)]
@@ -39,6 +38,8 @@ pub struct Workplaces {
     #[serde(rename = "pullRequest")]
     pub pull_request: String,
     pub folder: String,
+    pub draft: String,
+    pub answer: String,
 }
 
 pub static PROMPTS: LazyLock<Prompts> =

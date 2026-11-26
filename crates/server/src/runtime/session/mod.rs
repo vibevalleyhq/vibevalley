@@ -16,7 +16,7 @@ mod talk;
 mod types;
 mod workspace;
 
-pub use driver::{AgentProfileInfo, Drive, HelperPlace, Persona, RuntimeDriver, SessionDriver};
+pub use driver::{AgentProfileInfo, Drive, HelperPlace, Persona, RunMode, RuntimeDriver, SessionDriver};
 pub use engine::{DraftEnd, Hire, PermissionEvent, Rounds, SessionEngine, SessionLifecycleEvent};
 pub(crate) use engine::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
 pub use journal::{Journal, Trajectory};

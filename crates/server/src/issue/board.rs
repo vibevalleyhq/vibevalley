@@ -16,8 +16,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::{Move, status_move};
 use vibevalley_protocol::{
-    ActorRef, ApiError, AppliedIssue, Assignment, Attachment, BizCode, Deliverable, Issue, IssueCanceled, IssueConstraints, IssueStageKind as StageKind,
-    IssueStatus, JsNumber, Landing, Priority, Run, RunTriggerKind, Session, SliceBundle, StuckReason,
+    ActorRef, ApiError, AppliedIssue, Assignment, Attachment, BizCode, Deliverable, HumanPause, HumanPauseSource, Issue, IssueCanceled, IssueConstraints,
+    IssueMandate, IssueStageKind as StageKind, IssueStatus, JsNumber, Landing, Priority, ResumeCondition, Run, RunTriggerKind, Session, SliceBundle,
+    StuckReason,
 };
 use vibevalley_runtime::oar::Registry;
 
@@ -62,6 +63,9 @@ pub struct NewIssue {
     /// Explicit user mandate allowing the helper to open a PR itself.
     #[serde(default)]
     pub auto_submit_pr: bool,
+    /// Optional explicit/inferred mandate supplied by internal callers (e.g. tools).
+    #[serde(default)]
+    pub mandate: Option<IssueMandate>,
     /// Uploaded attachment ids bound to this issue.
     #[serde(default)]
     pub attachments: Vec<String>,
@@ -526,7 +530,12 @@ impl Board {
             issue.start_at = normalize_timestamp(new.start_at);
             issue.due_at = normalize_timestamp(new.due_at);
             issue.owner = normalize_owner_with_driver(self.runtime.driver().as_ref(), new.owner).or_else(|| Some(ActorRef::self_user()));
-            if new.auto_submit_pr {
+            if let Some(mut m) = new.mandate {
+                if new.auto_submit_pr {
+                    m.auto_submit_pr = true;
+                }
+                issue.mandate = m;
+            } else if new.auto_submit_pr {
                 issue.mandate = vibevalley_protocol::IssueMandate::explicit("", true);
             }
             let agent = new.agent.trim().to_string();
@@ -585,6 +594,9 @@ impl Board {
                 let mv = status_move(&issue, to).map_err(BoardError::Refused)?;
                 match mv {
                     Move::Start => {
+                        if issue.mandate.is_paused() {
+                            self.change_async(&issue.id, IssueChange::Resumed).await?;
+                        }
                         if let Some(w) = &words {
                             self.keep_words_async(&issue.id, w).await?;
                         }
@@ -694,12 +706,15 @@ impl Board {
             let _issue_guard = self.issue_lock(&initial.id).await;
             let (issue, board_session) = {
                 let _work = self.work.lock().await;
-                let issue = self.stored_async(&initial.id).await?;
+                let mut issue = self.stored_async(&initial.id).await?;
                 if issue.status.is_closed() {
                     return Err(BoardError::Api(ApiError::new(
                         BizCode::IssueRefused,
                         vibevalley_i18n::t("server.issue.closedReopen", &[]),
                     )));
+                }
+                if issue.mandate.is_paused() {
+                    issue = self.change_async(&issue.id, IssueChange::Resumed).await?;
                 }
                 let session = self.on_board_async(&issue).await;
                 (issue, session)
@@ -733,18 +748,34 @@ impl Board {
     }
 
     pub async fn tell_message_async(&self, reference: &str, words: &str, key: &str) -> Result<()> {
+        self.tell_message_from_async(reference, words, key, false).await
+    }
+
+    /// Delivers a thread message to an issue; only `from_user == true` clears
+    /// an active human pause (`ExplicitUserResume`).
+    pub async fn tell_message_from_async(&self, reference: &str, words: &str, key: &str, from_user: bool) -> Result<()> {
         if key.trim().is_empty() || words.trim().is_empty() {
             return Err(BoardError::WordsRequired);
         }
         let initial = self.stored_async(reference).await?;
         let _issue_guard = self.issue_lock(&initial.id).await;
-        let issue = self.stored_async(&initial.id).await?;
+        let mut issue = self.stored_async(&initial.id).await?;
+        if issue.mandate.is_paused() && !from_user {
+            return Err(BoardError::Api(ApiError::new(
+                BizCode::IssueRefused,
+                "工单已由人工暂停，仅用户明确回复或恢复后才能继续".to_string(),
+            )));
+        }
         let sessions = self.session_engine();
         let sub = sessions.submit_words_async(&issue.id, key, words).await?;
         match sub.status {
             vibevalley_runtime::agent::durable::SubmissionStatus::Done | vibevalley_runtime::agent::durable::SubmissionStatus::Placed => return Ok(()),
             vibevalley_runtime::agent::durable::SubmissionStatus::Unanswered => return Err(BoardError::Other(sub.result.to_string())),
             vibevalley_runtime::agent::durable::SubmissionStatus::Queued => (),
+        }
+        if issue.mandate.is_paused() && from_user {
+            let _work = self.work.lock().await;
+            issue = self.change_async(&issue.id, IssueChange::Resumed).await?;
         }
         let board_session = self.on_board_async(&issue).await;
         let mail_owner = board_session.as_ref().map(|s| s.id.clone()).unwrap_or_else(|| format!("issue:{}", issue.id));
@@ -791,6 +822,9 @@ impl Board {
     }
 
     async fn dispatch_replies_for_issue_async(&self, issue: &Issue) -> Result<()> {
+        if issue.mandate.is_paused() {
+            return Ok(());
+        }
         {
             let _work = self.work.lock().await;
             if self.room_for_round_async(issue).await.is_err() {
@@ -805,12 +839,38 @@ impl Board {
     }
 
     /// Stops the running turn of the issue's session (its drafter's while
-    /// it is drafted).
+    /// it is drafted) and records a persistent human pause.
     pub async fn stop_async(&self, reference: &str) -> Result<()> {
+        self.stop_with_pause_async(reference, HumanPauseSource::UserStop).await
+    }
+
+    /// Stops/pauses an issue on behalf of a human (`source`), persisting the pause
+    /// across restarts until explicitly resumed by a user action.
+    pub async fn stop_with_pause_async(&self, reference: &str, source: HumanPauseSource) -> Result<()> {
         let issue = self.stored_async(reference).await?;
+        if issue.status.is_closed() {
+            return Err(BoardError::Other("closed issue cannot be paused".into()));
+        }
         let refining = issue.refining.as_ref().map(|r| r.session.clone());
         let session = refining.or_else(|| issue.latest_session_id().cloned());
-        self.session_engine().abort_turn_async(&session.unwrap_or_default()).await
+        let pause = HumanPause {
+            source,
+            clear_condition: ResumeCondition::ExplicitUserResume,
+            paused_at: now(),
+            session_id: session.clone(),
+            note: None,
+        };
+        {
+            let _work = self.work.lock().await;
+            self.change_async(&issue.id, IssueChange::Paused(pause)).await?;
+        }
+        if let Some(sid) = session
+            && self.session_engine().is_live(&sid)
+            && self.session_engine().session_async(&sid).await.is_some_and(|s| s.phase.is_working())
+        {
+            self.session_engine().abort_turn_async(&sid).await?;
+        }
+        Ok(())
     }
 
     /// Sends queued issues while there is room, in board order. Children in
@@ -831,7 +891,7 @@ impl Board {
             match self.issues_async().await {
                 Ok(issues) => issues
                     .into_iter()
-                    .filter(|t| t.status == IssueStatus::Todo && t.queued_at.is_some())
+                    .filter(|t| t.status == IssueStatus::Todo && t.queued_at.is_some() && !t.mandate.is_paused())
                     .map(|t| t.id)
                     .collect::<Vec<_>>(),
                 Err(e) => {
@@ -860,7 +920,7 @@ impl Board {
         };
         let queued: Vec<String> = issues
             .iter()
-            .filter(|t| t.status == IssueStatus::Todo && t.queued_at.is_some())
+            .filter(|t| t.status == IssueStatus::Todo && t.queued_at.is_some() && !t.mandate.is_paused())
             .map(|t| t.id.clone())
             .collect();
         for id in queued {
@@ -895,12 +955,15 @@ impl Board {
         };
         for issue in issues
             .into_iter()
-            .filter(|i| matches!(i.status, IssueStatus::InReview | IssueStatus::InProgress))
+            .filter(|i| matches!(i.status, IssueStatus::InReview | IssueStatus::InProgress) && !i.mandate.is_paused())
         {
             let _issue_guard = self.issue_lock(&issue.id).await;
             let Some(fresh) = self.issue_async(&issue.id).await.ok().flatten() else {
                 continue;
             };
+            if fresh.mandate.is_paused() {
+                continue;
+            }
             if self.on_board_async(&fresh).await.is_some_and(|s| s.phase.is_working()) {
                 continue;
             }
@@ -972,6 +1035,12 @@ impl Board {
             let (issue, all_issues, session, _slot_guard, words, retry_words) = {
                 let _work = self.work.lock().await;
                 let issue = self.stored_async(id).await?;
+                if issue.mandate.is_paused() {
+                    return Err(BoardError::Api(ApiError::new(
+                        BizCode::IssueRefused,
+                        "工单已由人工暂停，等待用户明确恢复".to_string(),
+                    )));
+                }
                 let all_issues = self.issues_async().await?;
                 let blocked = vibevalley_core::blocked_issues(&issue, &all_issues);
                 let session = self.on_board_async(&issue).await;
@@ -1055,6 +1124,12 @@ impl Board {
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Sent>> + Send + 'a>> {
         Box::pin(async move {
             let issue = self.stored_async(id).await?;
+            if issue.mandate.is_paused() {
+                return Err(BoardError::Api(ApiError::new(
+                    BizCode::IssueRefused,
+                    "工单已由人工暂停，等待用户明确恢复".to_string(),
+                )));
+            }
             let all_issues = self.issues_async().await?;
             let blocked = vibevalley_core::blocked_issues(&issue, &all_issues);
             let session = self.on_board_async(&issue).await;

@@ -361,6 +361,9 @@ impl Board {
                 self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
             }
             self.change_async(&issue.id, IssueChange::Assigned(agent.to_string())).await?;
+            if issue.mandate.is_paused() {
+                self.change_async(&issue.id, IssueChange::Resumed).await?;
+            }
             let kind = if mv == vibevalley_core::Move::Start {
                 self.change_async(&issue.id, IssueChange::Queued).await?;
                 vibevalley_protocol::RunTriggerKind::Issue
@@ -372,6 +375,12 @@ impl Board {
             self.refresh_queue_locked_async().await;
             Ok(mv)
         })
+    }
+
+    /// Upgrades an issue's mandate (e.g. from `Inferred` to `Explicit` when a user explicitly starts it).
+    pub async fn set_mandate_async(&self, id: &str, mandate: vibevalley_protocol::IssueMandate) -> Result<Issue> {
+        let _work = self.work.lock().await;
+        self.change_async(id, IssueChange::Mandate(mandate)).await
     }
 
     /// Why one more session cannot start on `issue` now (`noRoom`), or ""

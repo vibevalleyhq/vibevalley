@@ -4,37 +4,17 @@ use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use serde_json::{Value, json};
+use serde_json::Value;
 use vibevalley_mcp::{
     McpHandler, RequestContext, ResourceContent, ResourceDef, ResourceTemplateDef, RpcError, ServerCapabilities, ServerInfo, SkillCatalog, ToolCallResult,
     ToolDef, dispatch_json, error_code, scrub_resource_content, scrub_tool_result,
 };
 
-use super::skills;
-use super::{ToolDispatchPort, ToolSpecWire};
+use super::{ToolDispatchPort, mode, skills};
 use crate::BoxFuture;
 use crate::context::api::Mcp as McpGateway;
 
 const UNKNOWN_CALLER: &str = "没认出你是谁：这些工具只给执行会话用";
-
-fn is_readonly_issue_tool(name: &str) -> bool {
-    matches!(name, "issue_list" | "issue_get")
-}
-
-fn to_tool_defs(specs: Vec<ToolSpecWire>) -> Vec<ToolDef> {
-    specs
-        .into_iter()
-        .map(|t| {
-            let mut schema: Value = serde_json::from_str(&t.parameters_json).unwrap_or_else(|_| json!({}));
-            schema["type"] = json!("object");
-            ToolDef {
-                name: t.name,
-                description: t.description,
-                input_schema: schema,
-            }
-        })
-        .collect()
-}
 
 /// JSON-RPC MCP endpoint serving helper tools, `vv://` resources, and SEP-2640 skills over `POST /mcp`.
 pub struct Mcp {
@@ -46,7 +26,7 @@ pub struct Mcp {
 
 impl Mcp {
     pub fn new(dispatch: Arc<dyn ToolDispatchPort>, version: String) -> Arc<Mcp> {
-        let tools = to_tool_defs(dispatch.helper_tools());
+        let tools = mode::to_tool_defs(dispatch.helper_tools());
         Arc::new(Mcp {
             dispatch,
             tools,
@@ -56,7 +36,7 @@ impl Mcp {
     }
 
     pub fn with_home(dispatch: Arc<dyn ToolDispatchPort>, version: String, home: PathBuf) -> Arc<Mcp> {
-        let tools = to_tool_defs(dispatch.helper_tools());
+        let tools = mode::to_tool_defs(dispatch.helper_tools());
         Arc::new(Mcp {
             dispatch,
             tools,
@@ -95,14 +75,9 @@ impl McpHandler for Mcp {
 
     fn list_tools<'a>(&'a self, ctx: &'a RequestContext) -> vibevalley_mcp::BoxFuture<'a, Result<Vec<ToolDef>, RpcError>> {
         Box::pin(async move {
-            let token = ctx.bearer_token.as_deref().unwrap_or("");
-            if token.is_empty() {
-                return Ok(self.tools.clone());
-            }
-            let Some(me) = self.dispatch.session_for_token(token).await else {
-                return Err(RpcError::unauthorized(UNKNOWN_CALLER));
-            };
-            Ok(to_tool_defs(self.dispatch.helper_tools_for(Some(&me))))
+            mode::tools_for_token_async(self.dispatch.as_ref(), &self.tools, ctx.bearer_token.as_deref())
+                .await
+                .ok_or_else(|| RpcError::unauthorized(UNKNOWN_CALLER))
         })
     }
 
@@ -110,20 +85,10 @@ impl McpHandler for Mcp {
         Box::pin(async move {
             let token = ctx.bearer_token.as_deref().unwrap_or("");
             let args_json = serde_json::to_string(&arguments).unwrap_or_else(|_| "{}".to_string());
-            let called = if token.is_empty() {
-                if !is_readonly_issue_tool(name) {
-                    return Ok(ToolCallResult::error(UNKNOWN_CALLER));
-                }
-                self.dispatch.call_readonly_issue_tool_async(name, &args_json).await
-            } else {
-                let Some(me) = self.dispatch.session_for_token(token).await else {
-                    return Ok(ToolCallResult::error(UNKNOWN_CALLER));
-                };
-                self.dispatch.call_helper_async(me, name, &args_json).await
-            };
+            let called = mode::dispatch_tool_for_token_async(self.dispatch.as_ref(), ctx.bearer_token.as_deref(), name, &args_json, UNKNOWN_CALLER).await;
             let mut result = match called {
                 Ok(text) => ToolCallResult::text(text),
-                Err(why) if why.starts_with("没成：") => ToolCallResult::error(why),
+                Err(why) if why == UNKNOWN_CALLER || why.starts_with("没成：") => ToolCallResult::error(why),
                 Err(why) => ToolCallResult::error(format!("没成：{why}")),
             };
             if !token.is_empty() {
@@ -217,7 +182,7 @@ impl McpGateway for Mcp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::mcp::{McpResourceContentWire, McpResourceTemplateWire, McpResourceWire};
+    use crate::agent::mcp::{McpResourceContentWire, McpResourceTemplateWire, McpResourceWire, ToolSpecWire};
     use vibevalley_mcp::{EXT_SKILLS, HttpHeaders, PROTOCOL_STATELESS, dispatch_http, error_code};
     use vibevalley_protocol::Session;
 
@@ -234,6 +199,10 @@ mod tests {
 
         fn session_for_token<'a>(&'a self, _token: &'a str) -> BoxFuture<'a, Option<Session>> {
             Box::pin(async { None })
+        }
+
+        fn session_mode_async<'a>(&'a self, _session: &'a Session) -> BoxFuture<'a, crate::agent::mcp::HelperRunMode> {
+            Box::pin(async { crate::agent::mcp::HelperRunMode::Execution })
         }
 
         fn call_helper_async<'a>(&'a self, _session: Session, _name: &'a str, _args_json: &'a str) -> BoxFuture<'a, Result<String, String>> {

@@ -3,12 +3,14 @@ use std::sync::{Arc, LazyLock};
 use parking_lot::Mutex;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use vibevalley_protocol::{Agent, Session};
+use vibevalley_protocol::{Agent, Deliverable, Session};
 
 use super::registry::{Route, ToolRegistry, Who, Words};
 use super::{chat, content, issue, memory, plan, toolset};
 use crate::BoxFuture;
-use crate::agent::mcp::{McpResourceContentWire, McpResourceTemplateWire, McpResourceWire, ResourceReader, ToolDispatchPort, ToolSpecWire};
+use crate::agent::mcp::{
+    HelperRunMode, McpResourceContentWire, McpResourceTemplateWire, McpResourceWire, ResourceReader, ToolDispatchPort, ToolSpecWire, tool_allowed_in_mode,
+};
 
 fn words_of(json: &str) -> Vec<Words> {
     serde_json::from_str(json).expect("tool words")
@@ -36,7 +38,24 @@ impl ToolRegistry {
             .collect()
     }
 
+    pub async fn session_mode_async(&self, session: &Session) -> HelperRunMode {
+        if session.is_refining() {
+            return HelperRunMode::Drafting;
+        }
+        if let Some(issue_id) = session.issue_id()
+            && let Ok(Some(item)) = self.ctx.service.issue.get(issue_id).await
+            && item.deliver == Deliverable::Answer
+        {
+            return HelperRunMode::ReadOnlyAnswer;
+        }
+        HelperRunMode::Execution
+    }
+
     pub async fn call_helper_async(&self, session: Session, name: &str, args_json: &str) -> Result<String, String> {
+        let mode = self.session_mode_async(&session).await;
+        if !tool_allowed_in_mode(name, mode) {
+            return Err(format!("没成：当前{}模式只读，不能调用 {name}", mode.label_zh()));
+        }
         let tools = helper();
         match tools.into_iter().find(|t| t.words.name == name) {
             Some(t) => t.run_async(self, &Who::Helper(Box::new(session)), args_json).await,
@@ -67,6 +86,10 @@ impl ToolDispatchPort for ToolRegistry {
 
     fn session_for_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, Option<Session>> {
         Box::pin(self.session_for_token_async(token))
+    }
+
+    fn session_mode_async<'a>(&'a self, session: &'a Session) -> BoxFuture<'a, HelperRunMode> {
+        Box::pin(ToolRegistry::session_mode_async(self, session))
     }
 
     fn call_helper_async<'a>(&'a self, session: Session, name: &'a str, args_json: &'a str) -> BoxFuture<'a, Result<String, String>> {

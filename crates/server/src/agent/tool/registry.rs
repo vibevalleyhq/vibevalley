@@ -26,6 +26,18 @@ pub struct Words {
     pub parameters: Value,
 }
 
+/// Trigger provenance attached to an orchestrator turn for hard authorization checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RouteSource {
+    User,
+    Chat,
+    Issue,
+    Cron,
+    Patrol,
+    Call,
+}
+
 /// Where the orchestrator is answering now (`HostContext`).
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Route {
@@ -41,6 +53,12 @@ pub struct Route {
     /// User-authored words are in the batch.
     #[serde(default)]
     pub user: bool,
+    /// Normalized source of the batch (`User` when any user input is present).
+    #[serde(default)]
+    pub source: Option<RouteSource>,
+    /// Cron job id when triggered by a scheduled cron turn.
+    #[serde(default)]
+    pub cron_id: Option<String>,
 }
 
 /// Who calls a tool.

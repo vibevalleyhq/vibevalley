@@ -118,6 +118,26 @@ impl AgentDriver {
     }
 }
 
+fn format_workplace_template(template: &str, place: &HelperPlace) -> String {
+    let house_head = "\n\n## 这台机器上所有仓库的约定\n{house}";
+    let template = if place.house.trim().is_empty() {
+        template.replace(house_head, "")
+    } else {
+        template.to_string()
+    };
+    let mut rules = template
+        .replace("{repo}", &place.repo)
+        .replace("{branch}", place.branch.as_deref().unwrap_or(""))
+        .replace("{cwd}", &place.cwd)
+        .replace("{id}", &place.id)
+        .replace("{house}", place.house.trim());
+    let language = users_language();
+    if language != "中文" {
+        rules = rules.replace("中文", &language);
+    }
+    rules
+}
+
 impl SessionDriver for AgentDriver {
     fn recall<'a>(&'a self, agent: &'a str, session: &'a str, repo: &'a str, input: &'a str) -> BoxFuture<'a, String> {
         Box::pin(async move {
@@ -147,31 +167,20 @@ impl SessionDriver for AgentDriver {
 
     fn rules(&self, place: &HelperPlace, deliver: Deliverable) -> String {
         let words = &PROMPTS.workplace;
+        if deliver == Deliverable::Answer {
+            let answer = format_workplace_template(&words.answer, place);
+            return format!("{ANSWER_ONLY}\n\n{answer}");
+        }
         let template = match (&place.branch, place.pull_request) {
             (Some(_), true) => &words.pull_request,
             (Some(_), false) => &words.branch,
             (None, _) => &words.folder,
         };
-        let house_head = "\n\n## 这台机器上所有仓库的约定\n{house}";
-        let template = if place.house.trim().is_empty() {
-            template.replace(house_head, "")
-        } else {
-            template.clone()
-        };
-        let mut rules = template
-            .replace("{repo}", &place.repo)
-            .replace("{branch}", place.branch.as_deref().unwrap_or(""))
-            .replace("{cwd}", &place.cwd)
-            .replace("{id}", &place.id)
-            .replace("{house}", place.house.trim());
-        let language = users_language();
-        if language != "中文" {
-            rules = rules.replace("中文", &language);
-        }
-        if deliver == Deliverable::Answer {
-            rules = format!("{ANSWER_ONLY}\n\n{rules}");
-        }
-        rules
+        format_workplace_template(template, place)
+    }
+
+    fn draft_rules(&self, place: &HelperPlace) -> String {
+        format_workplace_template(&PROMPTS.workplace.draft, place)
     }
 
     fn talk_rules(&self, cwd: &str, channel: &str, id: &str) -> String {

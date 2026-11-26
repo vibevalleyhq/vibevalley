@@ -21,7 +21,7 @@ use vibevalley_protocol::{
 use vibevalley_runtime::agent::durable::BoxFuture;
 use vibevalley_runtime::oar::{ContentBlock, EventKind, McpServer, PermissionDecision, PermissionMode, SessionOptions, StopReason};
 
-use super::driver::{Drive, HelperPlace, Persona, SessionDriver};
+use super::driver::{Drive, HelperPlace, Persona, RunMode, SessionDriver};
 use super::gen_table::SessionGenerationTable;
 use super::journal::Trajectory;
 use super::report::{Report, ReportQuestion, ReportStatus};
@@ -376,9 +376,25 @@ impl SessionEngine {
         self.0.door.lock().tokens.get(token).cloned()
     }
 
-    /// Snapshot of a session whose runtime handle is currently opening before `go_live_async` persists it.
-    pub fn opening_session(&self, id: &str) -> Option<Session> {
-        self.0.door.lock().opening.get(id).cloned()
+    /// Snapshot of a session currently being opened before `go_live_async` commits it to the DB.
+    pub fn opening_session(&self, session: &str) -> Option<Session> {
+        self.0.door.lock().opening.get(session).cloned()
+    }
+
+    pub(super) async fn open_runtime_for_session_async(
+        &self,
+        runtime: &dyn vibevalley_runtime::oar::Runtime,
+        session: &Session,
+        opts: SessionOptions,
+    ) -> Result<Arc<dyn vibevalley_runtime::oar::Session>> {
+        self.0.door.lock().opening.insert(session.id.clone(), session.clone());
+        match runtime.open(opts).await {
+            Ok(agent) => Ok(agent),
+            Err(e) => {
+                self.0.door.lock().opening.remove(&session.id);
+                Err(e.into())
+            }
+        }
     }
 
     /// Mints (or reuses) the per-session MCP bearer token so remote sessions can
@@ -567,18 +583,18 @@ impl SessionEngine {
         resume: bool,
     ) -> Result<(Arc<dyn vibevalley_runtime::oar::Session>, String)> {
         let cwd = PathBuf::from(session.cwd.clone().unwrap_or_default());
-        let instructions = if session.is_refining() {
-            "You are drafting an issue for VibeValley's board. Do not change or commit files.".to_string()
-        } else {
-            let place = HelperPlace {
-                repo: session.repo_name().unwrap_or("").to_string(),
-                branch: session.worktree_branch().map(String::from),
-                cwd: session.cwd.clone().unwrap_or_default(),
-                id: session.id.clone(),
-                pull_request: issue.deliver == Deliverable::PullRequest || !drive.is_local,
-                house: self.0.worktree.house_rules_async().await,
-            };
-            self.0.drivers.rules(&place, issue.deliver)
+        let mode = RunMode::from_session_issue(session, Some(issue));
+        let place = HelperPlace {
+            repo: session.repo_name().unwrap_or("").to_string(),
+            branch: session.worktree_branch().map(String::from),
+            cwd: session.cwd.clone().unwrap_or_default(),
+            id: session.id.clone(),
+            pull_request: issue.deliver == Deliverable::PullRequest || !drive.is_local,
+            house: self.0.worktree.house_rules_async().await,
+        };
+        let instructions = match mode {
+            RunMode::Drafting => self.0.drivers.draft_rules(&place),
+            RunMode::ReadOnlyAnswer | RunMode::Execution => self.0.drivers.rules(&place, issue.deliver),
         };
         let system_prompt = match &drive.persona {
             Some(Persona::Replace(persona)) => Some(persona.clone()),
@@ -609,28 +625,47 @@ impl SessionEngine {
             };
             crate::machine::attach_dispatch_meta(&mut env, &meta);
         }
+        let permission_mode = if mode.is_read_only() {
+            PermissionMode::Plan
+        } else {
+            self.0.config.permission
+        };
+        let mut disallowed_tools = drive.disallowed_tools.clone();
+        if mode.is_read_only()
+            && !vibevalley_runtime::oar::runtime_refused_options(drive.runtime.id()).contains(&vibevalley_runtime::oar::RefusableOption::DisallowedTools)
+        {
+            for tool in [
+                "write",
+                "edit",
+                "bash",
+                "Write",
+                "Edit",
+                "MultiEdit",
+                "NotebookEdit",
+                "Bash",
+                "WriteFile",
+                "EditFile",
+            ] {
+                if !disallowed_tools.iter().any(|t| t == tool) {
+                    disallowed_tools.push(tool.to_string());
+                }
+            }
+        }
         let opts = SessionOptions {
             cwd,
             model: drive.model.clone(),
             resume: if resume { self.extra(&session.id).agent_session } else { None },
-            permission_mode: self.0.config.permission,
+            permission_mode,
             append_system_prompt,
             env,
             record_to: Some(self.record_path(&session.id)),
             effort: drive.effort.clone(),
             mcp_servers,
-            disallowed_tools: drive.disallowed_tools.clone(),
+            disallowed_tools,
             system_prompt,
             ..Default::default()
         };
-        self.0.door.lock().opening.insert(session.id.clone(), session.clone());
-        let agent = match drive.runtime.open(opts).await {
-            Ok(agent) => agent,
-            Err(err) => {
-                self.0.door.lock().opening.remove(&session.id);
-                return Err(err.into());
-            }
-        };
+        let agent = self.open_runtime_for_session_async(drive.runtime.as_ref(), session, opts).await?;
         Ok((agent, prompt))
     }
 
@@ -698,6 +733,7 @@ impl SessionEngine {
                 .await?;
             self.0.ctx.mark_dirty(written_dirty);
         }
+        self.0.door.lock().opening.remove(&id);
         let seeded_telemetry = if session.telemetry.is_some() {
             session.telemetry.clone()
         } else {
@@ -825,7 +861,7 @@ impl SessionEngine {
         }
     }
 
-    async fn apply_issue_change_async(&self, id: &str, change: IssueChange) -> Result<()> {
+    pub(super) async fn apply_issue_change_async(&self, id: &str, change: IssueChange) -> Result<()> {
         let _write = self.0.write_lock.lock().await;
         let service = self.0.ctx.service.clone();
         let raw = service.issue.all().await?;
@@ -1075,7 +1111,25 @@ impl SessionEngine {
                 return;
             }
             if self.0.live.remove_if_current(&session_id, generation).is_some() {
-                self.on_workspace_pump_exited_async(&session_id).await;
+                if !state.turn_settled
+                    && self.extra(&session_id).run.is_some()
+                    && let Some(session) = self.session_async(&session_id).await
+                    && session.controller != vibevalley_protocol::SessionController::User
+                {
+                    let disconnect_error = state
+                        .failure
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or("会话连接在未结束前意外断开");
+                    self.finish_async(&session_id, StopReason::Error, None, &state.said, &state.asked, Some(disconnect_error))
+                        .await;
+                    if let Some(rounds) = self.0.rounds.get() {
+                        rounds.after().await;
+                    }
+                } else {
+                    self.on_workspace_pump_exited_async(&session_id).await;
+                }
             }
         }
         .instrument(span)
@@ -1107,6 +1161,7 @@ impl SessionEngine {
                 state.said.clear();
                 state.asked.clear();
                 state.failure = None;
+                state.turn_settled = false;
                 let phase = Phase::working(now(), SessionAction::Thinking, "");
                 let _ = self.persist_phase_change_async(session_id, phase, None, None).await;
             }
@@ -1179,6 +1234,7 @@ impl SessionEngine {
             }
             EventKind::TurnFinished { reason, usage } if root => {
                 state.observed_run = None;
+                state.turn_settled = true;
                 let spent = reported_spent(&usage);
                 if let Some(tokens) = super::journal::event_tokens_of(&usage) {
                     self.0.ctx.live.update_session(session_id, |snap| {
@@ -1603,9 +1659,21 @@ impl SessionEngine {
         };
         let report = Report::read_async(&self.report_path(session_id)).await;
         let failed = matches!(reason, StopReason::Error | StopReason::MaxTurns);
-        let mut round = read_round(&issue, reason, report.as_ref(), output.as_deref().unwrap_or(said), asked);
-        if failed && let Some(error) = failure {
-            round.summary = vibevalley_core::text::clip(error, 400);
+        let mut round = read_round(&issue, reason.clone(), report.as_ref(), output.as_deref().unwrap_or(said), asked);
+        if failed {
+            let error_fact = failure.map(str::trim).filter(|e| !e.is_empty()).or_else(|| {
+                report.as_ref().map(|_| match reason {
+                    StopReason::MaxTurns => "达到最大轮次",
+                    _ => "会话连接异常断开",
+                })
+            });
+            if let Some(error) = error_fact {
+                round.summary = combine_report_and_failure(report.as_ref(), error);
+            }
+        } else if let Some(error) = failure.map(str::trim).filter(|e| !e.is_empty())
+            && round.outcome == Outcome::Interrupted
+        {
+            round.summary = combine_report_and_failure(report.as_ref(), error);
         }
         let run_id = extra.run;
         let outcome = round.outcome;
@@ -1663,6 +1731,28 @@ struct PumpState {
     said: String,
     asked: Vec<Question>,
     failure: Option<String>,
+    turn_settled: bool,
+}
+
+fn combine_report_and_failure(report: Option<&Report>, error: &str) -> String {
+    let error = error.trim();
+    if let Some(rep_summary) = report.map(|r| r.summary.trim()).filter(|s| !s.is_empty()) {
+        if error.is_empty() {
+            return vibevalley_core::text::clip(rep_summary, 400);
+        }
+        let joined = format!("{rep_summary}（连接异常：{error}）");
+        if joined.encode_utf16().count() <= 400 {
+            joined
+        } else {
+            format!(
+                "{}（连接异常：{}）",
+                vibevalley_core::text::clip(rep_summary, 240),
+                vibevalley_core::text::clip(error, 140)
+            )
+        }
+    } else {
+        vibevalley_core::text::clip(error, 400)
+    }
 }
 
 fn reported_spent(usage: &vibevalley_runtime::oar::Usage) -> Option<Spent> {
@@ -2024,5 +2114,163 @@ mod tests {
         }
         .with_subscriber(subscriber)
         .await;
+    }
+
+    #[test]
+    fn combine_report_and_failure_retains_both_summary_and_disconnect_error() {
+        let rep = super::Report {
+            summary: "已修改 auth.rs 并提交 abc123".into(),
+            ..Default::default()
+        };
+        let combined = super::combine_report_and_failure(Some(&rep), "websocket disconnected unexpectedly");
+        assert!(combined.contains("已修改 auth.rs 并提交 abc123"), "{combined}");
+        assert!(combined.contains("websocket disconnected unexpectedly"), "{combined}");
+
+        let long_summary = "修".repeat(350);
+        let long_rep = super::Report {
+            summary: long_summary,
+            ..Default::default()
+        };
+        let clipped = super::combine_report_and_failure(Some(&long_rep), "remote stream dropped after report");
+        assert!(clipped.encode_utf16().count() <= 400, "len={}", clipped.encode_utf16().count());
+        assert!(clipped.contains("修"), "{clipped}");
+        assert!(clipped.contains("remote stream dropped"), "{clipped}");
+    }
+
+    #[tokio::test]
+    async fn disconnect_after_issue_report_without_turn_finished_retains_both_facts() {
+        let dir = tempfile::tempdir().unwrap();
+        let service = Service::open(dir.path()).await.unwrap();
+        let outbox = Arc::new(Outbox::new(service.clone()));
+        let ctx = Arc::new(Context::new(
+            service,
+            TaskGroup::new(),
+            Arc::new(LiveState::new()),
+            outbox,
+            Arc::new(StateFeed::new()),
+            vibevalley_core::system_clock(),
+            Arc::new(Http),
+            Arc::new(PublicDownload),
+        ));
+        let _opened = reopen_sessions_async(&ctx).await.unwrap();
+        let config = Arc::new(RuntimeConfig::under(dir.path()));
+        let worktree = Arc::new(Worktree::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
+        let mut registry = Registry::new();
+        registry.register(Arc::new(StubRuntime));
+        let drivers = Arc::new(RuntimeDriver {
+            registry: Arc::new(registry),
+            model: None,
+        });
+        let sessions = SessionEngine::new_async(ctx.clone(), Arc::new(tokio::sync::Mutex::new(())), drivers, worktree, config, None)
+            .await
+            .unwrap();
+
+        let issue = vibevalley_protocol::Issue::new("i1", 1, "Disconnect retention", now());
+        ctx.service
+            .write_dirty_with(crate::runtime::RuntimeError::Store, |tx| {
+                let svc = ctx.service.clone();
+                let issue = issue.clone();
+                Box::pin(async move {
+                    svc.issue.put_in_tx(tx, &issue).await?;
+                    Ok(((), vibevalley_core::SliceMask::BOARD))
+                })
+            })
+            .await
+            .unwrap();
+
+        let (tx, rx) = mpsc::unbounded_channel();
+        let agent = Arc::new(StubSession {
+            id: "stub-disc".into(),
+            tx: tx.clone(),
+            rx: Mutex::new(Some(rx)),
+        });
+        let mut session = Session::new("w1", SessionController::IssueBoard, "Worker #1", "stub", ExecutionPolicy::SandboxDir, now());
+        session.attach_binding(vibevalley_protocol::ContextRef::Issue {
+            id: issue.id.clone(),
+            refining: None,
+        });
+        session.phase = Phase::working(now(), SessionAction::Thinking, "");
+
+        sessions
+            .go_live_async(
+                agent,
+                session,
+                Some((
+                    issue.id.as_str(),
+                    crate::runtime::IssueChange::Started {
+                        session: "w1".into(),
+                        worker: true,
+                    },
+                )),
+            )
+            .await
+            .unwrap();
+        let _run_id = sessions
+            .begin_run_async(
+                "w1",
+                &issue.id,
+                vibevalley_protocol::RunTrigger {
+                    kind: vibevalley_protocol::RunTriggerKind::Issue,
+                    message: None,
+                    channel: None,
+                    cron: None,
+                    missed: None,
+                },
+            )
+            .await
+            .unwrap();
+
+        tx.send(Event {
+            seq: 1,
+            at_ms: now() as u64,
+            agent_path: vec![],
+            kind: EventKind::TurnStarted { prompt: String::new() },
+        })
+        .unwrap();
+        // Worker calls `issue_report`, then disconnects with an error & abrupt SessionEnded (no TurnFinished).
+        sessions
+            .report_async(
+                "w1",
+                &super::Report {
+                    summary: "已提交关键修复 commit deadbeef".into(),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        tx.send(Event {
+            seq: 2,
+            at_ms: now() as u64,
+            agent_path: vec![],
+            kind: EventKind::Error {
+                message: "ssh transport reset by peer".into(),
+            },
+        })
+        .unwrap();
+        tx.send(Event {
+            seq: 3,
+            at_ms: now() as u64,
+            agent_path: vec![],
+            kind: EventKind::SessionEnded,
+        })
+        .unwrap();
+
+        for _ in 0..50 {
+            if let Some(s) = sessions.session_async("w1").await
+                && !s.phase.is_working()
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        let settled = sessions.session_async("w1").await.unwrap();
+        assert!(!settled.phase.is_working(), "{:?}", settled.phase);
+        let lr = settled.last_run.expect("last_run recorded on abrupt disconnect");
+        assert_eq!(lr.outcome, vibevalley_protocol::Outcome::Failed);
+        assert!(lr.summary.contains("已提交关键修复 commit deadbeef"), "{}", lr.summary);
+        assert!(lr.summary.contains("ssh transport reset by peer"), "{}", lr.summary);
+
+        let _ = ctx.shutdown(Duration::from_secs(1)).await;
+        ctx.service.close().await;
     }
 }

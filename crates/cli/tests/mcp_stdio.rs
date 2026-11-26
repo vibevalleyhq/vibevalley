@@ -143,6 +143,7 @@ impl MockIssueState {
                 strength: MandateStrength::Explicit,
                 max_bot_review_rounds: 0,
                 auto_submit_pr: false,
+                pause: None,
             },
             conflict: None,
             repo: req.repo,

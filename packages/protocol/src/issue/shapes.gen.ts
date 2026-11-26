@@ -121,7 +121,15 @@ export type ProjectCheckReceipt = { targetBranch: string, targetCommit: string, 
 
 export type DeliveryEvidence = { reviews: Array<CodeReview>, check?: ProjectCheckReceipt, mergedCommit?: string, };
 
-export type IssueMandate = { originTriggerId?: string, strength: MandateStrength, maxBotReviewRounds: number, autoSubmitPr: boolean, };
+export const HumanPauseSourceValues = ["user_stop", "user_chat"] as const;
+export type HumanPauseSource = (typeof HumanPauseSourceValues)[number];
+
+export const ResumeConditionValues = ["explicit_user_resume"] as const;
+export type ResumeCondition = (typeof ResumeConditionValues)[number];
+
+export type HumanPause = { source: HumanPauseSource, clearCondition: ResumeCondition, pausedAt: number, sessionId?: string, note?: string, };
+
+export type IssueMandate = { originTriggerId?: string, strength: MandateStrength, maxBotReviewRounds: number, autoSubmitPr: boolean, pause?: HumanPause, };
 
 export const IssueReportMemoryScopeValues = ["repo", "all"] as const;
 export type IssueReportMemoryScope = (typeof IssueReportMemoryScopeValues)[number];

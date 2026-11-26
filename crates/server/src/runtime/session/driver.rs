@@ -5,8 +5,41 @@
 
 use std::sync::Arc;
 
-use vibevalley_protocol::{Deliverable, Issue, LOCAL_MACHINE_ID};
+use vibevalley_protocol::{Deliverable, Issue, LOCAL_MACHINE_ID, Session};
 use vibevalley_runtime::oar::{Installation, Registry, Runtime};
+
+/// The 3 execution modes for issue-bound helper sessions (`执行 / 起草 / 只读问答`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunMode {
+    Execution,
+    Drafting,
+    ReadOnlyAnswer,
+}
+
+impl RunMode {
+    /// Derives the run mode from a session and its bound issue.
+    pub fn from_session_issue(session: &Session, issue: Option<&Issue>) -> Self {
+        if session.is_refining() {
+            Self::Drafting
+        } else if issue.is_some_and(|i| i.deliver == Deliverable::Answer) {
+            Self::ReadOnlyAnswer
+        } else {
+            Self::Execution
+        }
+    }
+
+    pub fn is_read_only(self) -> bool {
+        matches!(self, Self::Drafting | Self::ReadOnlyAnswer)
+    }
+
+    pub fn label_zh(self) -> &'static str {
+        match self {
+            Self::Execution => "执行",
+            Self::Drafting => "起草",
+            Self::ReadOnlyAnswer => "只读问答",
+        }
+    }
+}
 
 use crate::BoxFuture;
 use crate::runtime::{Result, RuntimeError};
@@ -95,6 +128,11 @@ pub trait SessionDriver: Send + Sync {
     /// The rules a helper works an issue by (its appended system prompt).
     fn rules(&self, _place: &HelperPlace, deliver: Deliverable) -> String {
         super::report::instructions(deliver)
+    }
+
+    /// The rules a drafting session works by (`起草` mode, read-only).
+    fn draft_rules(&self, _place: &HelperPlace) -> String {
+        "你处于「起草」模式，只读查看代码与上下文以整理 VibeValley 工单草案；严禁修改、创建或提交任何文件，也不要调用写工具。".to_string()
     }
 
     /// The rules a helper talks by in a channel, with no issue.

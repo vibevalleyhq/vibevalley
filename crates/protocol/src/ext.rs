@@ -113,6 +113,7 @@ impl IssueMandate {
             strength: MandateStrength::Explicit,
             max_bot_review_rounds: DEFAULT_BOT_REVIEW_ROUNDS,
             auto_submit_pr,
+            pause: None,
         }
     }
 
@@ -122,6 +123,11 @@ impl IssueMandate {
             strength: MandateStrength::Inferred,
             ..IssueMandate::explicit(origin_trigger_id, false)
         }
+    }
+
+    /// True when an explicit human pause blocks automated/background resumption.
+    pub fn is_paused(&self) -> bool {
+        self.pause.is_some()
     }
 }
 

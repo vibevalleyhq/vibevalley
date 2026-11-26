@@ -452,7 +452,7 @@ impl Scheduler {
             .await;
         }
         let agent = self.chat.as_ref().map(|chat| chat.orchestrator_in(&channel)).unwrap_or_default();
-        if o.hear_cron(&agent, &channel, words).await {
+        if o.hear_cron(&agent, &channel, &cron.id, words).await {
             Ok(())
         } else {
             Err(unserved())

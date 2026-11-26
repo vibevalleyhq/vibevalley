@@ -403,6 +403,15 @@ impl Board {
 
     /// Creates an issue from an [`IssueRequest`] (used by tools and `issue.create`).
     pub async fn create_from_request_async(&self, req: &IssueRequest) -> Result<Issue, ApiError> {
+        self.create_from_request_with_mandate_async(req, None).await
+    }
+
+    /// Creates an issue from an [`IssueRequest`] with an explicit/inferred caller mandate.
+    pub async fn create_from_request_with_mandate_async(
+        &self,
+        req: &IssueRequest,
+        mandate: Option<vibevalley_protocol::IssueMandate>,
+    ) -> Result<Issue, ApiError> {
         let raw_agent = req.agent.as_deref().unwrap_or("");
         let agent = resolve_agent(self, raw_agent);
         let on_duty = self.runtime().driver().profile_info(&agent).is_some_and(|p| p.is_orchestrator);
@@ -425,6 +434,7 @@ impl Board {
             constraints: req.constraints.clone(),
             cron: None,
             auto_submit_pr: req.auto_submit_pr == Some(true),
+            mandate,
             attachments: req.attachments.clone().unwrap_or_default(),
             tags: req.tags.clone().unwrap_or_default(),
             start_at: req.start_at,
@@ -500,6 +510,11 @@ impl Board {
                 }
             }
             let settled = settle(&item, input.status, input.text.as_deref().unwrap_or(""))?;
+            if input.status == IssueStatus::Todo && item.mandate.strength == vibevalley_protocol::MandateStrength::Inferred {
+                let mut upgraded = vibevalley_protocol::IssueMandate::explicit("user", item.mandate.auto_submit_pr);
+                upgraded.max_bot_review_rounds = item.mandate.max_bot_review_rounds;
+                self.set_mandate_async(&item.id, upgraded).await.map_err(api)?;
+            }
             let words = (!settled.said.is_empty()).then_some(settled.said.as_str());
             if settled.mv == Move::Round && words.is_some() && item.stage.state == IssueStageKind::Reviewing {
                 self.review_async(&item.id, false, &findings_of(&settled.said), "", None).await.map_err(api)?;
