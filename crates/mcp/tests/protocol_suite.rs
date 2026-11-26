@@ -13,8 +13,8 @@ use serde_json::{Value, json};
 use vibevalley_mcp::{
     BoxFuture, ContentBlock, EXT_SKILLS, HEADER_METHOD, HEADER_NAME, HEADER_PROTOCOL_VERSION, HttpHeaders, META_CLIENT_CAPABILITIES, META_PROTOCOL_VERSION,
     McpHandler, McpServerConfig, McpTransportSpec, PROTOCOL_LEGACY, PROTOCOL_STATELESS, RequestContext, ResourceContent, ResourceDef, ResourceTemplateDef,
-    RpcError, SUPPORTED_PROTOCOLS, ServerCapabilities, ServerInfo, SkillCatalog, ToolCallResult, ToolDef, dispatch_http, error_code, scrub_resource_content,
-    scrub_secrets, scrub_tool_result, serve_io,
+    RpcError, SUPPORTED_PROTOCOLS, ServerCapabilities, ServerInfo, SkillCatalog, ToolCallResult, ToolDef, builtin_artifact_skills, dispatch_http, error_code,
+    scrub_resource_content, scrub_secrets, scrub_tool_result, serve_io,
 };
 
 struct DemoHandler {
@@ -426,4 +426,42 @@ fn secret_redaction_scrubs_longest_first_across_text_tool_and_resource() {
     let mut res = ResourceContent::text("vv://x", "text/plain", "key=secret-xyz");
     scrub_resource_content(&mut res, &["secret-xyz"]);
     assert_eq!(res.text.as_deref(), Some("key=[redacted]"));
+}
+
+#[tokio::test]
+async fn builtin_artifact_skills_catalog_exposes_all_12_types_and_merges_local() {
+    let mut catalog = builtin_artifact_skills();
+    assert_eq!(catalog.len(), 12);
+    for slug in [
+        "dashboard",
+        "design",
+        "design-system",
+        "diagram",
+        "docs",
+        "motion",
+        "outline",
+        "prototype",
+        "sheet",
+        "slides",
+        "storyboard",
+        "whiteboard",
+    ] {
+        let uri = format!("skill://artifact/{slug}");
+        let doc = catalog.get(&uri, None).unwrap_or_else(|| panic!("missing {uri}"));
+        assert_eq!(doc.uri, uri);
+        assert!(doc.files.iter().any(|f| f == "SKILL.en.md"), "{slug} missing SKILL.en.md");
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let local_skill = dir.path().join("triage");
+    std::fs::create_dir_all(&local_skill).unwrap();
+    std::fs::write(local_skill.join("SKILL.md"), "# triage: Local triage\nCheck issues.\n").unwrap();
+    catalog.merge(SkillCatalog::from_directory("local", dir.path()).unwrap());
+    assert_eq!(catalog.len(), 13);
+
+    let handler = DemoHandler::new(catalog);
+    let list_req = json!({ "jsonrpc": "2.0", "id": 1, "method": "skills/list", "params": { "tag": "artifact" } }).to_string();
+    let reply = dispatch_http(&handler, &HttpHeaders::default(), None, &list_req).await;
+    let body: Value = serde_json::from_str(reply.body.as_deref().unwrap()).unwrap();
+    assert_eq!(body["result"]["skills"].as_array().unwrap().len(), 12);
 }

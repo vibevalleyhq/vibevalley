@@ -3,12 +3,27 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
 use crate::protocol::{ResourceContent, ResourceDef, ResourceTemplateDef};
 
 pub const SKILL_URI_SCHEME: &str = "skill://";
+
+include!(concat!(env!("OUT_DIR"), "/artifact_skills.rs"));
+
+static BUILTIN_ARTIFACT_SKILLS: LazyLock<SkillCatalog> = LazyLock::new(|| SkillCatalog::from_embedded_entries("artifact", ARTIFACT_SKILL_ENTRIES));
+
+/// Returns the cached SEP-2640 catalog containing all 12 built-in `skill://artifact/*` guides.
+pub fn builtin_artifact_skill_catalog() -> &'static SkillCatalog {
+    &BUILTIN_ARTIFACT_SKILLS
+}
+
+/// Returns a cloned SEP-2640 catalog containing all 12 built-in `skill://artifact/*` guides.
+pub fn builtin_artifact_skills() -> SkillCatalog {
+    BUILTIN_ARTIFACT_SKILLS.clone()
+}
 
 /// Skill metadata entry returned by `skills/list`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,6 +95,19 @@ impl SkillCatalog {
 
     pub fn len(&self) -> usize {
         self.skills.len()
+    }
+
+    /// Merges entries from `other` into `self` (overwriting any skill with the same URI).
+    pub fn merge(&mut self, other: SkillCatalog) {
+        for (uri, stored) in other.skills {
+            if let Some(ns) = extract_namespace(&uri)
+                && !self.namespaces.iter().any(|existing| existing == ns)
+            {
+                self.namespaces.push(ns.to_owned());
+            }
+            self.skills.insert(uri, stored);
+        }
+        self.namespaces.sort();
     }
 
     /// True when `uri` uses the `skill://` scheme.

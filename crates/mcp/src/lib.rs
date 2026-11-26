@@ -25,7 +25,9 @@ pub use protocol::{
     ToolCallResult, ToolDef, ToolsCapability, error_code,
 };
 pub use redact::{REDACTED_MARKER, scrub_resource_content, scrub_secrets, scrub_tool_result};
-pub use skills::{SKILL_URI_SCHEME, SkillCatalog, SkillDef, SkillDocument, SkillGetParams, SkillListParams};
+pub use skills::{
+    SKILL_URI_SCHEME, SkillCatalog, SkillDef, SkillDocument, SkillGetParams, SkillListParams, builtin_artifact_skill_catalog, builtin_artifact_skills,
+};
 pub use stateless::{
     BoxFuture, HttpHeaders, HttpReply, HttpValidationError, McpHandler, RequestContext, ResponseHeaders, ValidatedHttpBody, build_response_headers,
     dispatch_http, dispatch_json, dispatch_line, dispatch_request,

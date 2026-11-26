@@ -3,6 +3,7 @@
 //! and a mock loopback VDP WebSocket server, verifying JSON-RPC 2.0 framing, Issues CRUD,
 //! VDP live inspection + screenshot image content block, error resilience, and zero token leakage.
 
+use std::collections::{BTreeMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -20,16 +21,74 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::net::TcpListener;
 use tokio_util::sync::{CancellationToken, DropGuard};
+use vibevalley_core::artifact::{apply_json_merge_patch, infer_mime, type_spec};
 use vibevalley_protocol::{
-    Applied, AppliedIssue, Assignment, Attachment, AttachmentUpload, Deliverable, Issue, IssueCommentCreateInput, IssueConversationGetInput, IssueFilter,
-    IssueGetInput, IssueMandate, IssueRequest, IssueStage, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueUpdateInput, MandateStrength, Priority,
-    SayRequest, VDP_PROTOCOL_VERSION, VdpCommand, VdpEndpointInfo, VdpError, VdpInputResult, VdpRequest, VdpResponse, VdpScreenshotResult, VdpTarget,
-    VdpTargetKind, VdpTargetListResult, VdpUiBounds, VdpUiNode, VdpUiPressResult, VdpUiQueryResult, VdpVersionInfo, home,
+    Applied, AppliedIssue, Artifact, ArtifactFileContent, ArtifactFileDeleteRequest, ArtifactFileDeleteResult, ArtifactFileEncoding, ArtifactFileGetRequest,
+    ArtifactFileListRequest, ArtifactFileListResult, ArtifactFileMeta, ArtifactFileWriteRequest, ArtifactFileWriteResult, ArtifactGetInput,
+    ArtifactListRequest, ArtifactRequest, ArtifactSaid, ArtifactSuggestionAcceptInput, ArtifactSuggestionCreateInput, ArtifactSuggestionListInput,
+    ArtifactVersion, ArtifactVersionRequest, Assignment, Attachment, AttachmentUpload, Deliverable, Issue, IssueCommentCreateInput, IssueConversationGetInput,
+    IssueFilter, IssueGetInput, IssueMandate, IssueRequest, IssueStage, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueUpdateInput, MandateStrength,
+    Priority, SayRequest, Suggestion, SuggestionChange, SuggestionStatus, VDP_PROTOCOL_VERSION, VdpCommand, VdpEndpointInfo, VdpError, VdpInputResult,
+    VdpRequest, VdpResponse, VdpScreenshotResult, VdpTarget, VdpTargetKind, VdpTargetListResult, VdpUiBounds, VdpUiNode, VdpUiPressResult, VdpUiQueryResult,
+    VdpVersionInfo, home,
 };
 
 // ---------------------------------------------------------------------------
-// Mock VibeValley HTTP RPC Server (Issues + Attachments + Channel)
+// Mock VibeValley HTTP RPC Server (Issues + Artifacts + Attachments + Channel)
 // ---------------------------------------------------------------------------
+
+#[derive(Clone)]
+struct MockFileEntry {
+    content: String,
+    encoding: ArtifactFileEncoding,
+    mime: String,
+    hash: String,
+    updated_at: i64,
+}
+
+#[derive(Clone)]
+struct MockArtifactRecord {
+    wire: Artifact,
+    files: BTreeMap<String, MockFileEntry>,
+    version_snapshots: BTreeMap<i64, BTreeMap<String, MockFileEntry>>,
+    human_touched: HashSet<String>,
+    commits: Vec<(i64, Option<String>, Vec<String>)>,
+    suggestions: Vec<Suggestion>,
+}
+
+fn mock_hash(content: &str) -> String {
+    let mut h1: u64 = 0xcbf29ce484222325;
+    let mut h2: u64 = 0x84222325cbf29ce4;
+    for &b in content.as_bytes() {
+        h1 ^= b as u64;
+        h1 = h1.wrapping_mul(0x100000001b3);
+        h2 = h2.wrapping_mul(31).wrapping_add(b as u64);
+    }
+    format!("{h1:016x}{h2:016x}")
+}
+
+fn mock_file_entry(path: &str, content: String, encoding: Option<ArtifactFileEncoding>, mime: Option<String>, ts: i64) -> MockFileEntry {
+    let enc = encoding.unwrap_or(ArtifactFileEncoding::Utf8);
+    let m = mime.unwrap_or_else(|| infer_mime(path).to_owned());
+    let hash = mock_hash(&content);
+    MockFileEntry {
+        content,
+        encoding: enc,
+        mime: m,
+        hash,
+        updated_at: ts,
+    }
+}
+
+fn file_meta(path: &str, entry: &MockFileEntry) -> ArtifactFileMeta {
+    ArtifactFileMeta {
+        path: path.to_owned(),
+        mime: entry.mime.clone(),
+        size: entry.content.len() as i64,
+        hash: entry.hash.clone(),
+        updated_at: entry.updated_at,
+    }
+}
 
 #[derive(Clone)]
 struct MockIssueState {
@@ -37,7 +96,9 @@ struct MockIssueState {
     comments: Arc<Mutex<Vec<(String, String)>>>,
     channel_messages: Arc<Mutex<Vec<SayRequest>>>,
     attachments: Arc<Mutex<Vec<Attachment>>>,
+    artifacts: Arc<Mutex<Vec<MockArtifactRecord>>>,
     next_number: Arc<Mutex<i64>>,
+    next_suggestion: Arc<Mutex<i64>>,
 }
 
 impl MockIssueState {
@@ -47,7 +108,9 @@ impl MockIssueState {
             comments: Arc::new(Mutex::new(Vec::new())),
             channel_messages: Arc::new(Mutex::new(Vec::new())),
             attachments: Arc::new(Mutex::new(Vec::new())),
+            artifacts: Arc::new(Mutex::new(Vec::new())),
             next_number: Arc::new(Mutex::new(1)),
+            next_suggestion: Arc::new(Mutex::new(1)),
         }
     }
 
@@ -259,11 +322,374 @@ async fn handle_attachment_create(State(state): State<MockIssueState>, axum::Jso
     ok_envelope(att)
 }
 
+async fn handle_artifact_list(State(state): State<MockIssueState>, axum::Json(req): axum::Json<ArtifactListRequest>) -> impl IntoResponse {
+    let list: Vec<Artifact> = state
+        .artifacts
+        .lock()
+        .iter()
+        .filter(|rec| req.artifact_type.is_none_or(|t| rec.wire.artifact_type == t))
+        .filter(|rec| req.channel.as_deref().is_none_or(|c| rec.wire.channel.as_deref() == Some(c)))
+        .filter(|rec| req.issue.as_deref().is_none_or(|i| rec.wire.issue.as_deref() == Some(i)))
+        .map(|rec| rec.wire.clone())
+        .collect();
+    ok_envelope(list)
+}
+
+async fn handle_artifact_get(State(state): State<MockIssueState>, axum::Json(req): axum::Json<ArtifactGetInput>) -> impl IntoResponse {
+    let artifacts = state.artifacts.lock();
+    match artifacts.iter().find(|rec| rec.wire.id == req.id) {
+        Some(rec) => ok_envelope(rec.wire.clone()).into_response(),
+        None => err_envelope(StatusCode::NOT_FOUND, 1004, &format!("artifact not found: {}", req.id)).into_response(),
+    }
+}
+
+async fn handle_artifact_create(State(state): State<MockIssueState>, axum::Json(req): axum::Json<ArtifactRequest>) -> impl IntoResponse {
+    let mut artifacts = state.artifacts.lock();
+    let idx = artifacts.len() + 1;
+    let id = format!("art-{idx}");
+    let spec = type_spec(req.artifact_type);
+    let ts = 1_700_000_000_000 + idx as i64;
+    let mut files = BTreeMap::new();
+    let manifest = json!({
+        "id": id,
+        "artifactType": req.artifact_type,
+        "title": req.title,
+        "entry": spec.entry_path,
+    })
+    .to_string();
+    files.insert(
+        "manifest.json".to_owned(),
+        mock_file_entry("manifest.json", manifest, Some(ArtifactFileEncoding::Utf8), Some("application/json".into()), ts),
+    );
+    let default_entry = if req.artifact_type == vibevalley_protocol::ArtifactType::Docs {
+        format!("# {}\n", req.title)
+    } else {
+        json!({ "title": req.title, "nodes": [] }).to_string()
+    };
+    let entry_body = req.content.unwrap_or(default_entry);
+    files.insert(
+        spec.entry_path.to_owned(),
+        mock_file_entry(spec.entry_path, entry_body, Some(ArtifactFileEncoding::Utf8), Some(spec.entry_mime.into()), ts),
+    );
+    if let Some(extra) = req.files {
+        for item in extra {
+            files.insert(item.path.clone(), mock_file_entry(&item.path, item.content, item.encoding, item.mime, ts));
+        }
+    }
+    let ver1 = ArtifactVersion {
+        version: 1,
+        size: files.values().map(|f| f.content.len() as i64).sum(),
+        note: req.note.clone().unwrap_or_default(),
+        by: "agent:mcp".into(),
+        by_name: "mcp".into(),
+        at: ts,
+        channel: req.channel.clone().unwrap_or_default(),
+        number: req.announce.unwrap_or(false).then_some(1),
+    };
+    let wire = Artifact {
+        id: id.clone(),
+        title: req.title,
+        artifact_type: req.artifact_type,
+        is_default: req.is_default.unwrap_or(false),
+        channel: req.channel.clone(),
+        said: req.channel.map(|ch| ArtifactSaid { channel: ch, number: 1 }),
+        issue: req.issue,
+        by: "agent:mcp".into(),
+        by_name: "mcp".into(),
+        version: 1,
+        seq: 1,
+        versions: vec![ver1],
+        at: ts,
+        updated: ts,
+        preview: None,
+        cover: None,
+    };
+    let mut snapshots = BTreeMap::new();
+    snapshots.insert(1, files.clone());
+    let paths: Vec<String> = files.keys().cloned().collect();
+    artifacts.push(MockArtifactRecord {
+        wire: wire.clone(),
+        files,
+        version_snapshots: snapshots,
+        human_touched: HashSet::new(),
+        commits: vec![(1, Some("agent:mcp".into()), paths)],
+        suggestions: Vec::new(),
+    });
+    ok_envelope(wire)
+}
+
+async fn handle_artifact_version_create(State(state): State<MockIssueState>, axum::Json(req): axum::Json<ArtifactVersionRequest>) -> impl IntoResponse {
+    let mut artifacts = state.artifacts.lock();
+    let Some(rec) = artifacts.iter_mut().find(|r| r.wire.id == req.id) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("artifact not found: {}", req.id)).into_response();
+    };
+    let next_ver = rec.wire.version + 1;
+    let ts = rec.wire.updated + 1000;
+    rec.wire.version = next_ver;
+    rec.wire.updated = ts;
+    rec.wire.versions.push(ArtifactVersion {
+        version: next_ver,
+        size: rec.files.values().map(|f| f.content.len() as i64).sum(),
+        note: req.note.unwrap_or_default(),
+        by: "agent:mcp".into(),
+        by_name: "mcp".into(),
+        at: ts,
+        channel: rec.wire.channel.clone().unwrap_or_default(),
+        number: None,
+    });
+    rec.version_snapshots.insert(next_ver, rec.files.clone());
+    ok_envelope(rec.wire.clone()).into_response()
+}
+
+async fn handle_artifact_file_list(State(state): State<MockIssueState>, axum::Json(req): axum::Json<ArtifactFileListRequest>) -> impl IntoResponse {
+    let artifacts = state.artifacts.lock();
+    let Some(rec) = artifacts.iter().find(|r| r.wire.id == req.id) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("artifact not found: {}", req.id)).into_response();
+    };
+    let files: Vec<ArtifactFileMeta> = rec
+        .files
+        .iter()
+        .filter(|(path, _)| req.prefix.as_deref().is_none_or(|p| path.starts_with(p)))
+        .map(|(path, entry)| file_meta(path, entry))
+        .collect();
+    ok_envelope(ArtifactFileListResult {
+        artifact_id: rec.wire.id.clone(),
+        seq: rec.wire.seq,
+        files,
+    })
+    .into_response()
+}
+
+async fn handle_artifact_file_get(State(state): State<MockIssueState>, axum::Json(req): axum::Json<ArtifactFileGetRequest>) -> impl IntoResponse {
+    let artifacts = state.artifacts.lock();
+    let Some(rec) = artifacts.iter().find(|r| r.wire.id == req.id) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("artifact not found: {}", req.id)).into_response();
+    };
+    let map = match req.version {
+        Some(v) => match rec.version_snapshots.get(&v) {
+            Some(snap) => snap,
+            None => return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("version not found: {v}")).into_response(),
+        },
+        None => &rec.files,
+    };
+    let Some(entry) = map.get(&req.path) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("file not found: {}", req.path)).into_response();
+    };
+    ok_envelope(ArtifactFileContent {
+        artifact_id: rec.wire.id.clone(),
+        path: req.path,
+        mime: entry.mime.clone(),
+        encoding: entry.encoding,
+        content: entry.content.clone(),
+        size: entry.content.len() as i64,
+        hash: entry.hash.clone(),
+        updated_at: entry.updated_at,
+    })
+    .into_response()
+}
+
+async fn handle_artifact_file_write(State(state): State<MockIssueState>, axum::Json(req): axum::Json<ArtifactFileWriteRequest>) -> impl IntoResponse {
+    let mut artifacts = state.artifacts.lock();
+    let Some(rec) = artifacts.iter_mut().find(|r| r.wire.id == req.id) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("artifact not found: {}", req.id)).into_response();
+    };
+    let is_agent = req.origin.as_deref() != Some("user");
+    let mut direct_items = Vec::new();
+    let mut diverted = Vec::new();
+    for item in req.files {
+        if let Some(expected) = item.expected_hash.as_deref() {
+            let current = rec.files.get(&item.path).map(|f| f.hash.as_str()).unwrap_or("");
+            if current != expected {
+                return err_envelope(
+                    StatusCode::BAD_REQUEST,
+                    1005,
+                    &format!("file {} changed concurrently (expected hash {expected}, current {current})", item.path),
+                )
+                .into_response();
+            }
+        }
+        if is_agent && rec.human_touched.contains(&item.path) {
+            let mut next_sug = state.next_suggestion.lock();
+            let sug_id = format!("sug-{}", *next_sug);
+            *next_sug += 1;
+            let sug = Suggestion {
+                id: sug_id,
+                artifact_id: rec.wire.id.clone(),
+                path: item.path.clone(),
+                author: req.origin.clone().unwrap_or_else(|| "agent:mcp".into()),
+                base_rev: rec.wire.seq,
+                base_hash: rec.files.get(&item.path).map(|f| f.hash.clone()),
+                change: SuggestionChange {
+                    content: Some(item.content),
+                    patch: None,
+                    target: None,
+                    delete: None,
+                    summary: req.summary.clone(),
+                },
+                status: SuggestionStatus::Open,
+                created_at: rec.wire.updated + 100,
+                resolved_at: None,
+                resolved_by: None,
+                cursor_start: None,
+                cursor_end: None,
+                start_offset: None,
+                end_offset: None,
+            };
+            rec.suggestions.push(sug.clone());
+            diverted.push(sug);
+        } else {
+            direct_items.push(item);
+        }
+    }
+
+    if direct_items.is_empty() {
+        return ok_envelope(ArtifactFileWriteResult {
+            artifact_id: rec.wire.id.clone(),
+            seq: rec.wire.seq,
+            files: Vec::new(),
+            frontiers: None,
+            suggestions: (!diverted.is_empty()).then_some(diverted),
+        })
+        .into_response();
+    }
+
+    let ts = rec.wire.updated + 500;
+    let mut written_metas = Vec::new();
+    let mut written_paths = Vec::new();
+    for item in direct_items {
+        let entry = mock_file_entry(&item.path, item.content, item.encoding, item.mime, ts);
+        written_metas.push(file_meta(&item.path, &entry));
+        written_paths.push(item.path.clone());
+        rec.files.insert(item.path, entry);
+    }
+    rec.wire.seq += 1;
+    rec.wire.updated = ts;
+    let frontiers = format!("frontiers-{}", rec.wire.seq);
+    rec.commits.push((rec.wire.seq, req.origin.clone(), written_paths));
+    ok_envelope(ArtifactFileWriteResult {
+        artifact_id: rec.wire.id.clone(),
+        seq: rec.wire.seq,
+        files: written_metas,
+        frontiers: Some(frontiers),
+        suggestions: (!diverted.is_empty()).then_some(diverted),
+    })
+    .into_response()
+}
+
+async fn handle_artifact_file_delete(State(state): State<MockIssueState>, axum::Json(req): axum::Json<ArtifactFileDeleteRequest>) -> impl IntoResponse {
+    let mut artifacts = state.artifacts.lock();
+    let Some(rec) = artifacts.iter_mut().find(|r| r.wire.id == req.id) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("artifact not found: {}", req.id)).into_response();
+    };
+    if rec.files.remove(&req.path).is_none() {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("file not found: {}", req.path)).into_response();
+    }
+    rec.wire.seq += 1;
+    rec.commits.push((rec.wire.seq, req.origin, vec![req.path.clone()]));
+    ok_envelope(ArtifactFileDeleteResult {
+        artifact_id: rec.wire.id.clone(),
+        seq: rec.wire.seq,
+        path: req.path,
+        frontiers: Some(format!("frontiers-{}", rec.wire.seq)),
+    })
+    .into_response()
+}
+
+async fn handle_artifact_suggestion_list(State(state): State<MockIssueState>, axum::Json(req): axum::Json<ArtifactSuggestionListInput>) -> impl IntoResponse {
+    let artifacts = state.artifacts.lock();
+    let Some(rec) = artifacts.iter().find(|r| r.wire.id == req.id) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("artifact not found: {}", req.id)).into_response();
+    };
+    ok_envelope(rec.suggestions.clone()).into_response()
+}
+
+async fn handle_artifact_suggestion_create(
+    State(state): State<MockIssueState>,
+    axum::Json(req): axum::Json<ArtifactSuggestionCreateInput>,
+) -> impl IntoResponse {
+    let mut artifacts = state.artifacts.lock();
+    let Some(rec) = artifacts.iter_mut().find(|r| r.wire.id == req.id) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("artifact not found: {}", req.id)).into_response();
+    };
+    let mut next_sug = state.next_suggestion.lock();
+    let sug_id = format!("sug-{}", *next_sug);
+    *next_sug += 1;
+    let sug = Suggestion {
+        id: sug_id,
+        artifact_id: rec.wire.id.clone(),
+        path: req.path.clone(),
+        author: "agent:mcp".into(),
+        base_rev: req.base_rev,
+        base_hash: req.base_hash.or_else(|| rec.files.get(&req.path).map(|f| f.hash.clone())),
+        change: req.change,
+        status: SuggestionStatus::Open,
+        created_at: rec.wire.updated + 200,
+        resolved_at: None,
+        resolved_by: None,
+        cursor_start: req.cursor_start,
+        cursor_end: req.cursor_end,
+        start_offset: req.start_offset,
+        end_offset: req.end_offset,
+    };
+    rec.suggestions.push(sug.clone());
+    ok_envelope(sug).into_response()
+}
+
+async fn handle_artifact_suggestion_accept(
+    State(state): State<MockIssueState>,
+    axum::Json(req): axum::Json<ArtifactSuggestionAcceptInput>,
+) -> impl IntoResponse {
+    let mut artifacts = state.artifacts.lock();
+    let Some(rec) = artifacts.iter_mut().find(|r| r.wire.id == req.id) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("artifact not found: {}", req.id)).into_response();
+    };
+    let Some(idx) = rec.suggestions.iter().position(|s| s.id == req.suggestion) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("suggestion not found: {}", req.suggestion)).into_response();
+    };
+    let mut sug = rec.suggestions[idx].clone();
+    let ts = rec.wire.updated + 300;
+    if sug.change.delete == Some(true) {
+        rec.files.remove(&sug.path);
+    } else if let Some(patch_raw) = sug.change.patch.as_deref() {
+        let current = rec.files.get(&sug.path).map(|f| f.content.as_str());
+        let merged = apply_json_merge_patch(current, patch_raw).unwrap();
+        let entry = mock_file_entry(&sug.path, merged, Some(ArtifactFileEncoding::Utf8), None, ts);
+        rec.files.insert(sug.path.clone(), entry);
+    } else if let Some(content) = sug.change.content.clone() {
+        let entry = mock_file_entry(&sug.path, content, Some(ArtifactFileEncoding::Utf8), None, ts);
+        rec.files.insert(sug.path.clone(), entry);
+    }
+    rec.wire.seq += 1;
+    sug.status = SuggestionStatus::Accepted;
+    sug.resolved_at = Some(ts);
+    sug.resolved_by = Some("user".into());
+    rec.suggestions[idx] = sug.clone();
+    ok_envelope(sug).into_response()
+}
+
+async fn handle_artifact_suggestion_reject(
+    State(state): State<MockIssueState>,
+    axum::Json(req): axum::Json<ArtifactSuggestionAcceptInput>,
+) -> impl IntoResponse {
+    let mut artifacts = state.artifacts.lock();
+    let Some(rec) = artifacts.iter_mut().find(|r| r.wire.id == req.id) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("artifact not found: {}", req.id)).into_response();
+    };
+    let Some(sug) = rec.suggestions.iter_mut().find(|s| s.id == req.suggestion) else {
+        return err_envelope(StatusCode::NOT_FOUND, 1004, &format!("suggestion not found: {}", req.suggestion)).into_response();
+    };
+    sug.status = SuggestionStatus::Rejected;
+    sug.resolved_at = Some(rec.wire.updated + 300);
+    sug.resolved_by = Some("user".into());
+    ok_envelope(sug.clone()).into_response()
+}
+
 struct MockIssueServer {
     url: String,
     comments: Arc<Mutex<Vec<(String, String)>>>,
     channel_messages: Arc<Mutex<Vec<SayRequest>>>,
     attachments: Arc<Mutex<Vec<Attachment>>>,
+    artifacts: Arc<Mutex<Vec<MockArtifactRecord>>>,
     _guard: DropGuard,
 }
 
@@ -273,6 +699,7 @@ impl MockIssueServer {
         let comments = state.comments.clone();
         let channel_messages = state.channel_messages.clone();
         let attachments = state.attachments.clone();
+        let artifacts = state.artifacts.clone();
         let (url, guard) = vibevalley_runtime::rt::block_on(async move {
             let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let addr = listener.local_addr().unwrap();
@@ -286,6 +713,18 @@ impl MockIssueServer {
                 .route("/api/v1/issue/conversation/get", post(handle_issue_conversation_get))
                 .route("/api/v1/channel/message/send", post(handle_channel_message_send))
                 .route("/api/v1/attachment/create", post(handle_attachment_create))
+                .route("/api/v1/artifact/list", post(handle_artifact_list))
+                .route("/api/v1/artifact/get", post(handle_artifact_get))
+                .route("/api/v1/artifact/create", post(handle_artifact_create))
+                .route("/api/v1/artifact/version/create", post(handle_artifact_version_create))
+                .route("/api/v1/artifact/file/list", post(handle_artifact_file_list))
+                .route("/api/v1/artifact/file/get", post(handle_artifact_file_get))
+                .route("/api/v1/artifact/file/write", post(handle_artifact_file_write))
+                .route("/api/v1/artifact/file/delete", post(handle_artifact_file_delete))
+                .route("/api/v1/artifact/suggestion/list", post(handle_artifact_suggestion_list))
+                .route("/api/v1/artifact/suggestion/create", post(handle_artifact_suggestion_create))
+                .route("/api/v1/artifact/suggestion/accept", post(handle_artifact_suggestion_accept))
+                .route("/api/v1/artifact/suggestion/reject", post(handle_artifact_suggestion_reject))
                 .with_state(state);
             let cancel = CancellationToken::new();
             let guard = cancel.clone().drop_guard();
@@ -299,6 +738,7 @@ impl MockIssueServer {
             comments,
             channel_messages,
             attachments,
+            artifacts,
             _guard: guard,
         }
     }
@@ -671,6 +1111,13 @@ fn mcp_stdio_end_to_end_issues_vdp_screenshot_and_security() {
         "vv_issue_update",
         "vv_issue_comment",
         "vv_attachment_upload",
+        "vv_artifact_list",
+        "vv_artifact_get",
+        "vv_artifact_create",
+        "vv_artifact_read",
+        "vv_artifact_write",
+        "vv_artifact_patch",
+        "vv_artifact_suggest",
         "vv_vdp_discover",
         "vv_vdp_targets",
         "vv_vdp_state",
@@ -886,6 +1333,284 @@ fn mcp_stdio_end_to_end_issues_vdp_screenshot_and_security() {
     assert!(recorded_methods.contains(&"Page.captureScreenshot".to_string()));
     assert!(recorded_methods.contains(&"UI.query".to_string()));
     assert!(recorded_methods.contains(&"UI.press".to_string()));
+
+    assert_eq!(mcp.finish(), 0);
+}
+
+#[test]
+fn mcp_stdio_end_to_end_artifacts_collab_suggestions_and_sep2640_skills() {
+    let srv = MockIssueServer::start();
+    let isolated_home = tempfile::tempdir().unwrap();
+    let mut mcp = McpProcess::spawn(isolated_home.path(), &srv.url, &[]);
+
+    // 1. SEP-2575 stateless discovery & SEP-2640 12 artifact skills.
+    let discover = mcp.request(1, "server/discover", json!({}));
+    assert_eq!(discover["result"]["stateless"], true, "{discover}");
+    assert_eq!(
+        discover["result"]["capabilities"]["extensions"]["io.modelcontextprotocol/skills"]["directoryRead"],
+        true
+    );
+
+    let skills_list = mcp.request(2, "skills/list", json!({ "tag": "artifact" }));
+    let skills = skills_list["result"]["skills"].as_array().unwrap();
+    assert_eq!(skills.len(), 12, "{skills:?}");
+    for slug in [
+        "dashboard",
+        "design",
+        "design-system",
+        "diagram",
+        "docs",
+        "motion",
+        "outline",
+        "prototype",
+        "sheet",
+        "slides",
+        "storyboard",
+        "whiteboard",
+    ] {
+        let expected_uri = format!("skill://artifact/{slug}");
+        assert!(skills.iter().any(|s| s["uri"] == expected_uri), "missing {expected_uri}");
+    }
+
+    let skill_doc = mcp.request(3, "skills/get", json!({ "uri": "skill://artifact/outline" }));
+    assert_eq!(skill_doc["result"]["uri"], "skill://artifact/outline");
+    assert!(skill_doc["result"]["content"].as_str().unwrap().contains("outline"));
+
+    let skill_ref = mcp.request(4, "skills/get", json!({ "uri": "skill://artifact/docs", "file": "references/structure.md" }));
+    assert_eq!(skill_ref["result"]["uri"], "skill://artifact/docs/references/structure.md");
+    assert!(!skill_ref["result"]["content"].as_str().unwrap().is_empty());
+
+    let res_read = mcp.request(5, "resources/read", json!({ "uri": "skill://artifact/slides/SKILL.en.md" }));
+    assert_eq!(res_read["result"]["contents"][0]["uri"], "skill://artifact/slides/SKILL.en.md");
+    assert_eq!(res_read["result"]["contents"][0]["mimeType"], "text/markdown");
+
+    // 2. tools/list exposes vv_artifact_* tools with SEP-2640 skill:// guidance.
+    let list_resp = mcp.request(6, "tools/list", json!({}));
+    let tools = list_resp["result"]["tools"].as_array().unwrap();
+    let create_tool = tools.iter().find(|t| t["name"] == "vv_artifact_create").unwrap();
+    assert!(create_tool["description"].as_str().unwrap().contains("skill://artifact/<type>"));
+    assert!(create_tool["description"].as_str().unwrap().contains("skills/list"));
+
+    // 3. Create docs and outline artifacts + reject invalid ArtifactType / invalid isDefault.
+    let bad_type = mcp.call_tool(10, "vv_artifact_create", json!({ "title": "Bad", "artifactType": "bogus" }));
+    assert_eq!(bad_type["isError"], true, "{bad_type}");
+
+    let bad_default = mcp.call_tool(
+        11,
+        "vv_artifact_create",
+        json!({ "title": "Not DS", "artifactType": "docs", "isDefault": true }),
+    );
+    assert_eq!(bad_default["isError"], true, "{bad_default}");
+
+    let docs_created = mcp.call_tool(
+        12,
+        "vv_artifact_create",
+        json!({
+            "title": "MCP Architecture RFC",
+            "artifactType": "docs",
+            "content": "# Overview\nInitial draft.\n",
+            "channel": "general",
+            "issue": "#7",
+            "announce": true,
+            "note": "Initial RFC"
+        }),
+    );
+    assert_ne!(docs_created["isError"], true, "{docs_created}");
+    let docs_art: Value = serde_json::from_str(docs_created["content"][0]["text"].as_str().unwrap()).unwrap();
+    let docs_id = docs_art["id"].as_str().unwrap().to_string();
+    assert_eq!(docs_art["artifactType"], "docs");
+    assert_eq!(docs_art["issue"], "7");
+
+    let outline_created = mcp.call_tool(
+        13,
+        "vv_artifact_create",
+        json!({
+            "title": "Launch Outline",
+            "artifactType": "outline",
+            "content": "{\"title\":\"Launch Outline\",\"status\":\"draft\",\"nodes\":[]}",
+            "files": [{ "path": "structure/notes.md", "content": "Extra notes" }]
+        }),
+    );
+    assert_ne!(outline_created["isError"], true, "{outline_created}");
+    let outline_art: Value = serde_json::from_str(outline_created["content"][0]["text"].as_str().unwrap()).unwrap();
+    let outline_id = outline_art["id"].as_str().unwrap().to_string();
+
+    // 4. vv_artifact_list filters cleanly.
+    let listed = mcp.call_tool(14, "vv_artifact_list", json!({ "artifactType": "docs", "channel": "general", "issue": "#7" }));
+    let listed_json: Value = serde_json::from_str(listed["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(listed_json["count"], 1, "{listed_json}");
+    assert_eq!(listed_json["artifacts"][0]["id"], docs_id);
+
+    // 5. vv_artifact_get returns metadata, manifest, files, versions, openSuggestions, and skillUri.
+    let got = mcp.call_tool(15, "vv_artifact_get", json!({ "id": outline_id }));
+    assert_ne!(got["isError"], true, "{got}");
+    let got_json: Value = serde_json::from_str(got["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(got_json["skillUri"], "skill://artifact/outline");
+    assert_eq!(got_json["manifest"]["artifactType"], "outline");
+    assert_eq!(got_json["versions"].as_array().unwrap().len(), 1);
+    assert!(got_json["files"].as_array().unwrap().iter().any(|f| f["path"] == "structure/notes.md"));
+
+    // 6. vv_artifact_read reads entry file, prefix directory list, and specific path.
+    let read_entry = mcp.call_tool(16, "vv_artifact_read", json!({ "id": docs_id, "includeFiles": true }));
+    assert_ne!(read_entry["isError"], true, "{read_entry}");
+    let read_entry_json: Value = serde_json::from_str(read_entry["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(read_entry_json["path"], "structure/index.md");
+    assert_eq!(read_entry_json["content"], "# Overview\nInitial draft.\n");
+    assert!(!read_entry_json["files"].as_array().unwrap().is_empty());
+
+    let read_prefix = mcp.call_tool(17, "vv_artifact_read", json!({ "id": outline_id, "prefix": "structure/" }));
+    let prefix_json: Value = serde_json::from_str(read_prefix["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(prefix_json["files"].as_array().unwrap().len(), 2);
+
+    // 7. vv_artifact_write writes with origin attribution & version snapshot, enforces expectedHash, and deletes files.
+    let written = mcp.call_tool(
+        18,
+        "vv_artifact_write",
+        json!({
+            "id": docs_id,
+            "path": "structure/01-context.md",
+            "content": "## Context\nLine A\nLine B\n",
+            "origin": "session:s1:turn:2",
+            "summary": "Add context section",
+            "createVersion": true,
+            "versionNote": "v2 with context"
+        }),
+    );
+    assert_ne!(written["isError"], true, "{written}");
+    let written_json: Value = serde_json::from_str(written["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(written_json["write"]["seq"], 2);
+    assert_eq!(written_json["artifact"]["version"], 2);
+    let context_hash = written_json["write"]["files"][0]["hash"].as_str().unwrap().to_string();
+
+    // Version 1 snapshot preserves original files without 01-context.md.
+    let v1_read = mcp.call_tool(
+        19,
+        "vv_artifact_read",
+        json!({ "id": docs_id, "path": "structure/01-context.md", "version": 1 }),
+    );
+    assert_eq!(v1_read["isError"], true, "{v1_read}");
+
+    // Stale expectedHash fails cleanly.
+    let stale_write = mcp.call_tool(
+        20,
+        "vv_artifact_write",
+        json!({
+            "id": docs_id,
+            "path": "structure/01-context.md",
+            "content": "Overwrite",
+            "expectedHash": "deadbeef"
+        }),
+    );
+    assert_eq!(stale_write["isError"], true, "{stale_write}");
+
+    // Delete auxiliary file in outline.
+    let deleted_aux = mcp.call_tool(
+        21,
+        "vv_artifact_write",
+        json!({
+            "id": outline_id,
+            "deletePath": "structure/notes.md",
+            "origin": "agent:mcp-test",
+            "summary": "Drop scratch notes"
+        }),
+    );
+    assert_ne!(deleted_aux["isError"], true, "{deleted_aux}");
+
+    // 8. vv_artifact_patch: JSON Merge Patch + targeted text find/replace & append with origin attribution.
+    let json_patched = mcp.call_tool(
+        22,
+        "vv_artifact_patch",
+        json!({
+            "id": outline_id,
+            "patch": { "status": "approved", "owner": "agent" },
+            "origin": "agent:claude",
+            "summary": "Approve outline metadata"
+        }),
+    );
+    assert_ne!(json_patched["isError"], true, "{json_patched}");
+
+    let outline_after = mcp.call_tool(23, "vv_artifact_read", json!({ "id": outline_id }));
+    let outline_after_json: Value = serde_json::from_str(outline_after["content"][0]["text"].as_str().unwrap()).unwrap();
+    let outline_body: Value = serde_json::from_str(outline_after_json["content"].as_str().unwrap()).unwrap();
+    assert_eq!(outline_body["title"], "Launch Outline");
+    assert_eq!(outline_body["status"], "approved");
+    assert_eq!(outline_body["owner"], "agent");
+
+    let text_patched = mcp.call_tool(
+        24,
+        "vv_artifact_patch",
+        json!({
+            "id": docs_id,
+            "path": "structure/01-context.md",
+            "find": "Line A",
+            "replace": "Line A (updated)",
+            "append": "Line C\n",
+            "expectedHash": context_hash,
+            "origin": "agent:codex",
+            "summary": "Refine context"
+        }),
+    );
+    assert_ne!(text_patched["isError"], true, "{text_patched}");
+    let ctx_after = mcp.call_tool(25, "vv_artifact_read", json!({ "id": docs_id, "path": "structure/01-context.md" }));
+    let ctx_after_json: Value = serde_json::from_str(ctx_after["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(ctx_after_json["content"], "## Context\nLine A (updated)\nLine B\nLine C\n");
+
+    // 9. Human-owned file write diversion + vv_artifact_suggest create / list / accept / reject.
+    {
+        let mut artifacts = srv.artifacts.lock();
+        let rec = artifacts.iter_mut().find(|r| r.wire.id == docs_id).unwrap();
+        rec.human_touched.insert("structure/index.md".to_owned());
+        assert!(rec.commits.iter().any(|(_, origin, _)| origin.as_deref() == Some("session:s1:turn:2")));
+        assert!(rec.commits.iter().any(|(_, origin, _)| origin.as_deref() == Some("agent:codex")));
+    }
+    let diverted = mcp.call_tool(
+        26,
+        "vv_artifact_write",
+        json!({
+            "id": docs_id,
+            "path": "structure/index.md",
+            "content": "# Overview\nAgent rewrite\n",
+            "origin": "agent:mcp",
+            "summary": "Polish intro"
+        }),
+    );
+    assert_ne!(diverted["isError"], true, "{diverted}");
+    let diverted_json: Value = serde_json::from_str(diverted["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(diverted_json["suggestions"].as_array().unwrap().len(), 1);
+    let sug1_id = diverted_json["suggestions"][0]["id"].as_str().unwrap().to_string();
+
+    let sug_list = mcp.call_tool(27, "vv_artifact_suggest", json!({ "action": "list", "id": docs_id }));
+    let sug_list_json: Value = serde_json::from_str(sug_list["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(sug_list_json["openCount"], 1);
+
+    let sug_accept = mcp.call_tool(28, "vv_artifact_suggest", json!({ "action": "accept", "id": docs_id, "suggestionId": sug1_id }));
+    assert_ne!(sug_accept["isError"], true, "{sug_accept}");
+    let sug_accept_json: Value = serde_json::from_str(sug_accept["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(sug_accept_json["status"], "accepted");
+
+    let sug_create = mcp.call_tool(
+        29,
+        "vv_artifact_suggest",
+        json!({
+            "action": "create",
+            "id": docs_id,
+            "content": "# Overview\nSecond proposal\n",
+            "summary": "Alternative intro"
+        }),
+    );
+    assert_ne!(sug_create["isError"], true, "{sug_create}");
+    let sug2_json: Value = serde_json::from_str(sug_create["content"][0]["text"].as_str().unwrap()).unwrap();
+    let sug2_id = sug2_json["id"].as_str().unwrap().to_string();
+
+    let sug_reject = mcp.call_tool(30, "vv_artifact_suggest", json!({ "action": "reject", "id": docs_id, "suggestionId": sug2_id }));
+    assert_ne!(sug_reject["isError"], true, "{sug_reject}");
+    let sug_reject_json: Value = serde_json::from_str(sug_reject["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(sug_reject_json["status"], "rejected");
+
+    let got_after = mcp.call_tool(31, "vv_artifact_get", json!({ "id": docs_id }));
+    let got_after_json: Value = serde_json::from_str(got_after["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(got_after_json["openSuggestions"].as_array().unwrap().len(), 0);
+    assert_eq!(got_after_json["suggestions"].as_array().unwrap().len(), 2);
 
     assert_eq!(mcp.finish(), 0);
 }
