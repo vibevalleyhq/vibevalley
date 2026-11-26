@@ -524,6 +524,7 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
       await saveCredentials(stored, tokenStore);
       if (disposed || controller.signal.aborted) return false;
       credentials.set(stored);
+      ready.set(true);
       connectWith(stored);
       void trackTask(requestNotificationPermissionSafe());
       hapticNotification("success");

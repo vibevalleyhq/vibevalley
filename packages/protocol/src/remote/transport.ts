@@ -463,6 +463,24 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
     }
   };
 
+  const waitBackoff = async (attempt: number, signal: AbortSignal): Promise<"retry" | "resumed" | "stopped"> => {
+    const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)] ?? 8000;
+    const backoffController = new AbortController();
+    const backoffLink = combineSignals(signal, backoffController.signal);
+    attemptControllers.add(backoffController);
+    const generationBeforeBackoff = resumeGeneration;
+    let waited = false;
+    try {
+      waited = await backoff.wait(delay, backoffLink.signal);
+    } finally {
+      attemptControllers.delete(backoffController);
+      backoffLink.cleanup();
+    }
+    if (signal.aborted || closed || unauthorized) return "stopped";
+    if (suspended || resumeGeneration !== generationBeforeBackoff) return "resumed";
+    return waited ? "retry" : "stopped";
+  };
+
   const runReconnectableSse = async (
     signal: AbortSignal,
     url: string,
@@ -535,25 +553,10 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
       }
 
       reportState("reconnecting");
-      const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)] ?? 8000;
-      attempt++;
-      const backoffController = new AbortController();
-      const backoffLink = combineSignals(signal, backoffController.signal);
-      attemptControllers.add(backoffController);
-      const generationBeforeBackoff = resumeGeneration;
-      let waited = false;
-      try {
-        waited = await backoff.wait(delay, backoffLink.signal);
-      } finally {
-        attemptControllers.delete(backoffController);
-        backoffLink.cleanup();
-      }
-      if (signal.aborted || closed || unauthorized) return;
-      if (suspended || resumeGeneration !== generationBeforeBackoff) {
-        attempt = 0;
-        continue;
-      }
-      if (!waited) return;
+      const nextStep = await waitBackoff(attempt, signal);
+      if (nextStep === "stopped") return;
+      if (nextStep === "resumed") attempt = 0;
+      else attempt++;
     }
   };
 
@@ -593,7 +596,9 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
 
   const subscribe: HttpRemoteTransport["subscribe"] = (name, payload, on, ended) => {
     let finished = false;
+    let lastEventId: string | undefined;
     return trackStream(async (signal) => {
+      let attempt = 0;
       const finish = (why: RemoteEnvelope | null) => {
         if (finished || signal.aborted || closed) return;
         finished = true;
@@ -604,6 +609,7 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
         if (suspended) {
           const resumed = await waitWhileSuspended(signal);
           if (!resumed || signal.aborted || closed || unauthorized) return;
+          attempt = 0;
         }
 
         const attemptController = new AbortController();
@@ -615,14 +621,25 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
           const query = encodeURIComponent(JSON.stringify(payload ?? {}));
           const res = await fetchImpl(`${base}/api/v1/subscribe/${encodeURIComponent(name)}?payload=${query}`, {
             method: "GET",
-            headers: authHeaders({ accept: "text/event-stream" }),
+            headers: authHeaders({
+              accept: "text/event-stream",
+              ...(lastEventId ? { "last-event-id": lastEventId } : {}),
+            }),
             signal: attemptLink.signal,
           });
           if (res.status === 401) {
+            await res.body?.cancel().catch(() => undefined);
             markUnauthorized();
+            finish({
+              bizCode: BizCode.Unauthorized,
+              message: "Unauthorized",
+            });
+            return;
           }
           const contentType = res.headers.get("content-type") ?? "";
-          if (!res.ok || contentType.includes("application/json")) {
+          if (!res.ok && res.status >= 500 && !contentType.includes("application/json")) {
+            await res.body?.cancel().catch(() => undefined);
+          } else if (!res.ok || contentType.includes("application/json")) {
             const text = await res.text();
             const parsed = parseJsonSafe(text);
             const env = toEnvelope(parsed) ?? {
@@ -631,36 +648,46 @@ export function createHttpRemoteTransport(options: HttpRemoteTransportOptions): 
             };
             finish(env);
             return;
-          }
-          if (!res.body) {
+          } else if (!res.body) {
             finish(null);
             return;
-          }
-          await readSseStream(res.body, attemptLink.signal, (msg) => {
-            if (attemptLink.signal.aborted || signal.aborted || closed) return;
-            const parsed = parseJsonSafe(msg.data);
-            if (parsed !== undefined) on(parsed);
-          });
-          if (signal.aborted || closed) return;
-          if (suspended || resumeGeneration !== generationAtStart) {
+          } else {
+            attempt = 0;
+            await readSseStream(res.body, attemptLink.signal, (msg) => {
+              if (attemptLink.signal.aborted || signal.aborted || closed) return;
+              if (msg.id) lastEventId = msg.id;
+              const parsed = parseJsonSafe(msg.data);
+              if (parsed !== undefined) on(parsed);
+            });
+            if (signal.aborted || closed) return;
+            if (!suspended && resumeGeneration === generationAtStart) {
+              finish(null);
+              return;
+            }
+            attempt = 0;
             continue;
           }
-          finish(null);
-          return;
-        } catch (err: unknown) {
+        } catch {
           if (signal.aborted || closed) return;
           if (suspended || resumeGeneration !== generationAtStart) {
+            attempt = 0;
             continue;
           }
-          finish({
-            bizCode: BizCode.ServiceUnavailable,
-            message: err instanceof Error ? err.message : String(err),
-          });
-          return;
         } finally {
           attemptControllers.delete(attemptController);
           attemptLink.cleanup();
         }
+
+        if (signal.aborted || closed || unauthorized) return;
+        if (suspended || resumeGeneration !== generationAtStart) {
+          attempt = 0;
+          continue;
+        }
+
+        const nextStep = await waitBackoff(attempt, signal);
+        if (nextStep === "stopped") return;
+        if (nextStep === "resumed") attempt = 0;
+        else attempt++;
       }
     });
   };

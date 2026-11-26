@@ -170,8 +170,10 @@ pub struct DioramaView {
     phone: Option<(Entity<HostedView>, Subscription)>,
     sheet_request: Option<Value>,
     sheet: Option<(Entity<HostedView>, Subscription)>,
+    last_dark: Option<bool>,
     /// Only reveals the cold-load indicator after 150ms so fast loads never flash.
     show_loading: bool,
+    _theme_sub: Subscription,
     _slice_task: gpui::Task<()>,
     _bridge: Arc<vibevalley_server::gateway::bridge::Client>,
 }
@@ -191,6 +193,7 @@ impl DioramaView {
         let slice_task = cx.spawn(async move |this, cx| {
             pump_diorama_slices(rx, ack_client, |topic, data| this.update(cx, |v, cx| v.on_slice(topic, data, cx)).is_ok()).await;
         });
+        let theme_sub = cx.observe_global::<crate::theme::Ui>(|_, cx| cx.notify());
 
         let task = cx.background_executor().spawn(async move {
             let dir = crate::assets::diorama_dir();
@@ -239,7 +242,9 @@ impl DioramaView {
             phone: None,
             sheet_request: None,
             sheet: None,
+            last_dark: None,
             show_loading: false,
+            _theme_sub: theme_sub,
             _slice_task: slice_task,
             _bridge: client,
         }
@@ -336,7 +341,8 @@ impl DioramaView {
 
     fn overlay(&mut self, name: &'static str, request: Value, window: &mut Window, cx: &mut Context<Self>) -> (Entity<HostedView>, Subscription) {
         let params = request.as_object().cloned().unwrap_or_default();
-        let view = cx.new(|cx| HostedView::new(name, params, false, window, cx));
+        let dark = app_dark(window, cx);
+        let view = cx.new(|cx| HostedView::new(name, params, dark, window, cx));
         let sub = cx.subscribe_in(&view, window, move |this, _, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(crate::hosted::Action::DismissFarmForm) => {
                 if name == "farm-phone" {
@@ -391,6 +397,16 @@ impl DioramaView {
     }
 
     fn mount_sheet(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let dark = app_dark(window, cx);
+        if self.last_dark != Some(dark) {
+            self.last_dark = Some(dark);
+            if let Some((view, _)) = &self.phone {
+                view.update(cx, |v, cx| v.set_dark(dark, cx));
+            }
+            if let Some((view, _)) = &self.sheet {
+                view.update(cx, |v, cx| v.set_dark(dark, cx));
+            }
+        }
         if let Some(request) = self.sheet_request.take() {
             self.sheet = Some(self.overlay("farm-form", request, window, cx));
         }
@@ -511,7 +527,7 @@ impl DioramaView {
         }
     }
 
-    fn render_hud(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn render_hud(&mut self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let SceneState::Ready(d) = &mut self.scene else {
             return None;
         };
@@ -538,7 +554,7 @@ impl DioramaView {
         let toast_text = d.active_toast().map(str::to_string);
         let has_missed = d.phone.ringing.is_some() || d.phone.missed(&d.frame.inbox).next().is_some();
 
-        let ui_dark = cx.try_global::<crate::theme::Ui>().is_some_and(|ui| ui.colors.dark);
+        let ui_dark = app_dark(window, cx);
         let palette = HudPalette::for_scene(ui_dark, active_tod);
         let hover_bg = palette.hover;
 
@@ -939,6 +955,17 @@ fn phone_notification_dot(palette: &HudPalette) -> gpui::Div {
         .child(div().w(px(5.0)).h(px(5.0)).rounded_full().bg(palette.badge_dot))
 }
 
+fn resolve_dark(ui: Option<&crate::theme::Ui>, appearance: gpui::WindowAppearance) -> bool {
+    ui.map_or_else(
+        || matches!(appearance, gpui::WindowAppearance::Dark | gpui::WindowAppearance::VibrantDark),
+        |ui| ui.colors.dark,
+    )
+}
+
+fn app_dark(window: &Window, cx: &App) -> bool {
+    resolve_dark(cx.try_global::<crate::theme::Ui>(), window.appearance())
+}
+
 fn motion_enabled(cx: &App) -> bool {
     cx.try_global::<crate::theme::Ui>()
         .is_none_or(|ui| ui.settings.effective_motion() != crate::theme::MotionChoice::Off)
@@ -1004,7 +1031,7 @@ impl Render for DioramaView {
             .into_any_element()
         });
 
-        let hud = self.render_hud(cx);
+        let hud = self.render_hud(window, cx);
         let canvas_layer = div()
             .id("diorama")
             .track_focus(&self.focus)
@@ -1174,6 +1201,12 @@ impl Render for DioramaView {
             _ => None,
         });
 
+        let sheet_scrim = if app_dark(window, cx) {
+            gpui::rgba(0x00000080)
+        } else {
+            gpui::rgba(0x1c191740)
+        };
+
         div()
             .relative()
             .size_full()
@@ -1187,7 +1220,7 @@ impl Render for DioramaView {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .bg(gpui::rgba(0x2f1f134d))
+                    .bg(sheet_scrim)
                     .child(div().w(px(540.0)).max_w_full().h(px(430.0)).max_h_full().child(view))
             }))
     }
@@ -1273,6 +1306,17 @@ mod tests {
 
     use super::{HudPalette, hud_cutaway_label_key, hud_tod_label_key, phone_overlay_size};
     use crate::diorama::phone::Phone;
+
+    #[test]
+    fn resolve_dark_uses_ui_global_then_window_appearance_fallback() {
+        let light_ui = crate::theme::Ui::new(crate::theme::Settings::default(), false);
+        let dark_ui = crate::theme::Ui::new(crate::theme::Settings::default(), true);
+        assert!(!super::resolve_dark(Some(&light_ui), gpui::WindowAppearance::Dark));
+        assert!(super::resolve_dark(Some(&dark_ui), gpui::WindowAppearance::Light));
+        assert!(!super::resolve_dark(None, gpui::WindowAppearance::Light));
+        assert!(super::resolve_dark(None, gpui::WindowAppearance::Dark));
+        assert!(super::resolve_dark(None, gpui::WindowAppearance::VibrantDark));
+    }
 
     #[test]
     fn hud_palette_adapts_to_ui_theme_and_night_diorama() {

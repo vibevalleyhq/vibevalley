@@ -11,6 +11,7 @@ import {
   encodePermissionNotificationId,
   isHighPriorityInboxKind,
 } from "./src/infra/notifications";
+import { createRemoteSession } from "./src/infra/session";
 import {
   clearCredentials,
   loadCredentials,
@@ -1289,4 +1290,61 @@ test("MobileApp manual refresh triggers immediate resync and connection recovery
   await revokedApp.waitFor("id:connection-repair-button");
   await revokedApp.press("id:connection-repair-button");
   await revokedApp.waitFor("id:pair-screen");
+});
+
+test("createRemoteSession keeps ready() false until async tokenStore settles and MobileApp avoids PairScreen when paired", async () => {
+  let resolveToken: (value: string | undefined) => void = () => {};
+  let notifyGetToken: () => void = () => {};
+  const tokenRequested = new Promise<void>((resolve) => {
+    notifyGetToken = resolve;
+  });
+  const deferredStore: SecureTokenStore = {
+    backend: "native-keychain",
+    getToken: () => {
+      notifyGetToken();
+      return new Promise<string | undefined>((resolve) => {
+        resolveToken = resolve;
+      });
+    },
+    setToken: () => Promise.resolve(),
+    deleteToken: () => Promise.resolve(),
+  };
+
+  await saveCredentials({ baseUrl: BASE, token: TOKEN, deviceName: "iPhone", serverName: "Lucas MacBook Pro" }, deferredStore);
+
+  const session = createRemoteSession({
+    tokenStore: deferredStore,
+    fetch: () => Promise.resolve(new Response("", { status: 200 })),
+  });
+  try {
+    expect(session.ready()).toBe(false);
+    expect(session.credentials()).toBeUndefined();
+
+    await tokenRequested;
+    expect(session.ready()).toBe(false);
+
+    resolveToken(TOKEN);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(session.ready()).toBe(true);
+    expect(session.credentials()?.token).toBe(TOKEN);
+  } finally {
+    session.dispose();
+    await clearCredentials(deferredStore);
+  }
+
+  const keychain = createHostKeychainStub(TOKEN);
+  const app = await open("./App.story.tsx", {
+    platform: "ios",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: profileOnlyStorage("iPhone"),
+    host: keychain.host,
+    network: createFullNetwork(),
+  });
+
+  await app.waitFor("id:mobile-home");
+  expect(app.count("id:mobile-splash")).toBe(0);
+  expect(app.count("id:pair-screen")).toBe(0);
 });

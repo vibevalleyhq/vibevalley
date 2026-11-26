@@ -1,8 +1,8 @@
 import "../infra/polyfill";
-import { cleanup, computed, effect, host, keymap, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
+import { cleanup, computed, effect, ErrorBoundary, host, keymap, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 import { z } from "zod";
 
-import { t, setLocale } from "@vibevalley/i18n";
+import { setLocale, t } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
 import { InboxSlice } from "@vibevalley/protocol/schema";
 
@@ -13,7 +13,6 @@ import type { IconName } from "../design/icons";
 import { useFollowed } from "../features/channel/model/follow";
 import { api, newSendKey, reasonOf } from "../infra/api";
 import { callDecoded, frame } from "../infra/bridge";
-import { useBridge } from "../infra/bridged";
 import { useCollabSlice } from "../infra/frame";
 import { farmCallsSchema, readFarmPhoneParams, readHostLocale, type FarmCalls } from "../infra/hostParams";
 import { Root } from "../infra/Root";
@@ -35,40 +34,102 @@ const close = () => host.post("action", { type: "dismiss_farm_form" });
 const route = (path: string) => host.post("action", { type: "global_route", path });
 
 const labelTone = {
-  ink: "text-lcd-ink",
-  pale: "text-lcd-pale",
-  muted: "text-bark-500",
-  cream: "text-cream-50",
-  error: "text-phone-failed",
+  ink: "text-ink",
+  onAccent: "text-page",
+  muted: "text-muted",
+  faint: "text-faint",
+  accent: "text-accent",
+  error: "text-berry",
 } as const;
 
-function Label(props: { children: JSX.Element; size?: 14 | 18 | 20; tone?: keyof typeof labelTone }) {
-  const sizeClass = props.size === 20 ? "text-xl font-semibold" : props.size === 18 ? "text-lg font-medium" : props.size === 14 ? "text-base" : "text-xs";
-  return <Text class={`font-mono ${sizeClass} ${labelTone[props.tone ?? "ink"]}`}>{props.children}</Text>;
+function Label(props: { children: JSX.Element; size?: 14 | 18 | 20; tone?: keyof typeof labelTone; mono?: boolean; class?: string }) {
+  const sizeClass =
+    props.size === 20 ? "text-lg font-semibold" : props.size === 18 ? "text-base font-medium" : props.size === 14 ? "text-sm font-medium" : "text-xs";
+  const familyClass = props.mono === true ? "font-mono tabular-nums" : "font-sans";
+  return <Text class={`${familyClass} ${sizeClass} ${labelTone[props.tone ?? "ink"]} ${props.class ?? ""}`}>{props.children}</Text>;
 }
-function Press(props: { children: JSX.Element; run: () => void; id?: string; selected?: boolean; disabled?: boolean }) {
+
+function Press(props: { children: JSX.Element; run: () => void; id?: string; selected?: boolean; disabled?: boolean; class?: string }) {
   return (
     <View
       testID={props.id}
       role="button"
       disabled={props.disabled}
-      onPress={props.run}
-      class={`px-1.5 py-1 ${props.selected === true ? "bg-lcd-dark" : "bg-lcd-light"} ${props.disabled === true ? "opacity-50" : ""}`}
+      onPress={() => {
+        if (props.disabled !== true) props.run();
+      }}
+      class={`items-center justify-center rounded-md border px-2.5 py-1.5 ${
+        props.selected === true ? "border-accent bg-accent" : "border-line bg-elevated hover:bg-hover"
+      } ${props.disabled === true ? "opacity-50" : ""} ${props.class ?? ""}`}
     >
-      <Label tone={props.selected === true ? "pale" : "ink"}>{props.children}</Label>
-    </View>
-  );
-}
-function IconKey(props: { label: string; run: () => void; children: JSX.Element; id: string }) {
-  return (
-    <View testID={props.id} role="button" accessibilityLabel={props.label} onPress={props.run} class="items-center gap-1">
-      <View class="h-11 w-11 items-center justify-center border-2 border-lcd-dark bg-lcd-pale">{props.children}</View>
-      <Label>{props.label}</Label>
+      <Label tone={props.selected === true ? "onAccent" : "ink"}>{props.children}</Label>
     </View>
   );
 }
 
-function Chat(props: { fold: () => void; large: () => boolean; resize: () => void; heard: () => string; said: () => string }) {
+function IconKey(props: { label: string; run: () => void; children: JSX.Element; id: string }) {
+  return (
+    <View testID={props.id} role="button" accessibilityLabel={props.label} onPress={props.run} class="group items-center gap-1.5">
+      <View class="h-11 w-11 items-center justify-center rounded-xl border border-line bg-elevated shadow-raise group-hover:border-line-strong group-hover:bg-hover">
+        {props.children}
+      </View>
+      <Label tone="muted" class="text-center">
+        {props.label}
+      </Label>
+    </View>
+  );
+}
+
+function PhoneIdleCard() {
+  return (
+    <View testID="farm-phone-idle" class="flex-1 items-center justify-center p-2">
+      <View class="w-full flex-1 items-center justify-center gap-3 rounded-2xl border border-line-strong bg-elevated p-5 shadow-float">
+        <OrchestratorFace size={44} />
+        <View class="items-center gap-1">
+          <Label size={18}>{t("web.farm.phone.brand")}</Label>
+          <Label tone="muted" class="text-center">
+            {t("web.farm.phone.phase.idle")}
+          </Label>
+        </View>
+        <View class="flex-row items-center gap-2 pt-1">
+          <Press id="farm-phone-idle-workbench" run={() => route("/issues")}>
+            {t("web.farm.hud.workbench")}
+          </Press>
+          <Press id="farm-phone-idle-close" run={close}>
+            {t("web.farm.native.close")}
+          </Press>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function PhoneErrorFallback(props: { readonly error: unknown; readonly reset: () => void }) {
+  const detail = () => (props.error instanceof Error ? props.error.message : String(props.error));
+  return (
+    <View testID="farm-error-fallback" class="flex-1 items-center justify-center p-2">
+      <View class="w-full flex-1 items-center justify-center gap-3 rounded-2xl border border-line-strong bg-elevated p-5 shadow-float">
+        <View class="size-10 items-center justify-center rounded-full border border-berry bg-bad-soft">
+          <Icon name="warn" size={18} tone="berry" />
+        </View>
+        <Label size={14}>{t("web.base.unreachable")}</Label>
+        <Label tone="muted" class="text-center">
+          {detail()}
+        </Label>
+        <View class="flex-row items-center gap-2 pt-1">
+          <Press id="farm-error-retry" selected run={props.reset}>
+            {t("web.farm.sow.retry")}
+          </Press>
+          <Press id="farm-error-close" run={close}>
+            {t("web.farm.native.close")}
+          </Press>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function Chat(props: { fold: () => void; large: () => boolean; resize: () => void; chatOnly: () => boolean; heard: () => string; said: () => string }) {
   const collab = useCollabSlice();
   const chosen = signal<string | undefined>(undefined);
   const menu = signal(false);
@@ -99,20 +160,20 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
     }
   };
   return (
-    <View testID="farm-chat" class="min-w-0 flex-1 bg-cream-50">
-      <View class="flex-row items-center gap-[3px] bg-cream-200 p-1">
-        <View role="button" testID="chat-channel" onPress={() => menu.set(!menu())} class="flex-1">
-          <Label>{room()?.title ?? t("web.farm.chat.channels")}</Label>
+    <View testID="farm-chat" class={`min-w-0 flex-1 bg-page ${props.chatOnly() ? "" : "border-l border-line"}`}>
+      <View class="flex-row items-center gap-1 border-b border-line bg-side px-2.5 py-1.5">
+        <View role="button" testID="chat-channel" onPress={() => menu.set(!menu())} class="min-w-0 flex-1 rounded-sm px-1 py-0.5 hover:bg-hover">
+          <Label size={14}>{room()?.title ?? t("web.farm.chat.channels")}</Label>
         </View>
-        <View role="button" accessibilityLabel={t("web.farm.chat.enlarge")} onPress={props.resize} class="p-0.5">
-          <Icon name="enlarge" size={14} tone="bark" />
+        <View role="button" accessibilityLabel={t("web.farm.chat.enlarge")} onPress={props.resize} class="rounded-sm p-1 hover:bg-hover">
+          <Icon name="enlarge" size={14} tone="muted" />
         </View>
-        <View role="button" accessibilityLabel={t("web.farm.chat.fold")} testID="chat-fold" onPress={props.fold} class="p-0.5">
-          <Icon name="collapse" size={14} tone="bark" />
+        <View role="button" accessibilityLabel={t("web.farm.chat.fold")} testID="chat-fold" onPress={props.fold} class="rounded-sm p-1 hover:bg-hover">
+          <Icon name="collapse" size={14} tone="muted" />
         </View>
       </View>
       <If when={menu()}>
-        <Scroll class="max-h-[172px]">
+        <Scroll class="max-h-44 border-b border-line bg-side" contentClass="gap-1 p-1.5">
           <Each of={rooms()} key={(c) => c.id}>
             {(c) => (
               <Press
@@ -128,25 +189,45 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
           </Each>
         </Scroll>
       </If>
-      <Scroll class="flex-1" contentClass="gap-1.5 p-2">
+      <Scroll class="flex-1" contentClass="gap-2 p-2.5">
         <If when={messages().messages.length === 0}>
-          <Label>{t("web.farm.chat.greeting")}</Label>
+          <View class="rounded-lg border border-line bg-side p-2.5">
+            <Label tone="muted">{t("web.farm.chat.greeting")}</Label>
+          </View>
         </If>
         <Each of={messages().messages} key={(m) => m.id}>
           {(m) => (
-            <View testID="farm-message" class="bg-cream-100 p-1.5">
-              <Label tone="muted">{m().name}</Label>
+            <View testID="farm-message" class="gap-0.5 rounded-lg border border-line bg-elevated px-2.5 py-1.5 shadow-raise">
+              <Label tone="accent">{m().name}</Label>
               <Label>{m().text}</Label>
             </View>
           )}
         </Each>
-        <If when={props.heard()}>{(s) => <Label>{s()}</Label>}</If>
-        <If when={props.said()}>{(s) => <Label>{s()}</Label>}</If>
+        <If when={props.heard()}>
+          {(s) => (
+            <View class="rounded-lg border border-line bg-side px-2.5 py-1.5">
+              <Label>{s()}</Label>
+            </View>
+          )}
+        </If>
+        <If when={props.said()}>
+          {(s) => (
+            <View class="rounded-lg border border-line bg-side px-2.5 py-1.5">
+              <Label>{s()}</Label>
+            </View>
+          )}
+        </If>
       </Scroll>
-      <If when={problem()}>{(s) => <Label tone="error">{s()}</Label>}</If>
-      <View class="gap-1 p-[5px]">
+      <If when={problem()}>
+        {(s) => (
+          <View class="mx-2 mb-1 rounded-md border border-berry bg-bad-soft px-2.5 py-1.5">
+            <Label tone="error">{s()}</Label>
+          </View>
+        )}
+      </If>
+      <View class="gap-1.5 border-t border-line bg-side p-2">
         <TextArea value={input()} onInput={(v) => input.set(v)} rows={2} submit testID="farm-chat-input" onSubmit={(s) => void send(s)} />
-        <Press id="farm-chat-send" disabled={!canSend()} run={() => void send(untracked(input))}>
+        <Press id="farm-chat-send" selected={canSend()} disabled={!canSend()} run={() => void send(untracked(input))}>
           {t("web.farm.chat.send")}
         </Press>
       </View>
@@ -252,18 +333,20 @@ function Handset(props: { calls: () => Calls }) {
   const time = () => [clock().getHours(), clock().getMinutes()].map((n) => String(n).padStart(2, "0")).join(":");
   return (
     <View class="flex-1 flex-row items-stretch">
-      <View testID="farm-phone" class="flex-1 border-2 border-bark-900 bg-bark-600 px-2 pt-2 pb-2.5">
-        <View class="mb-2 h-1 w-10 self-center bg-bark-950" />
-        <View class="flex-1 border-2 border-bark-900 bg-lcd-paper">
-          <View class="flex-row items-center gap-1 border-b-2 border-lcd-dark px-1.5 py-0.5">
-            <View class="flex-row items-end gap-[1px]">
-              <Each of={[3, 5, 7, 9]}>{(h) => <View class="w-0.5 bg-lcd-ink" style={{ height: h() }} />}</Each>
+      <View testID="farm-phone" class="flex-1 rounded-2xl border border-line-strong bg-side p-2 shadow-float">
+        <View class="mb-2 h-1 w-10 self-center rounded-full bg-line-strong" />
+        <View class="flex-1 overflow-hidden rounded-xl border border-line bg-page">
+          <View class="flex-row items-center gap-1.5 border-b border-line bg-side px-2.5 py-1.5">
+            <View class="flex-row items-end gap-0.5">
+              <Each of={[3, 5, 7, 9]}>{(h) => <View class="w-0.5 rounded-xs bg-accent" style={{ height: h() }} />}</Each>
             </View>
             <View role="button" testID="phone-home" onPress={back} class="flex-1">
-              <Label>{t("web.farm.phone.brand")}</Label>
+              <Label size={14}>{t("web.farm.phone.brand")}</Label>
             </View>
-            <Label>{time()}</Label>
-            <View class="h-2 w-[14px] border-2 border-lcd-ink bg-lcd-light" />
+            <Label mono tone="muted">
+              {time()}
+            </Label>
+            <View class="h-2.5 w-3.5 rounded-xs border border-line-strong bg-leaf" />
           </View>
           <View class="flex-1 flex-row">
             <If when={!chatOnly()}>
@@ -273,12 +356,12 @@ function Handset(props: { calls: () => Calls }) {
                   else={
                     <>
                       <If when={app() === "home"}>
-                        <View class="grid grid-cols-3 gap-x-1 gap-y-3 px-2 pt-4">
+                        <View class="grid grid-cols-3 gap-x-2 gap-y-3.5 px-3 pt-4">
                           <Each of={helpers} key={(a) => a.id}>
                             {(a) => (
                               <IconKey id={a().id} label={a().label} run={a().run}>
                                 <If when={a().icon} else={<OrchestratorFace size={28} />}>
-                                  {(icon) => <Icon name={icon()} size={22} tone="bark" />}
+                                  {(icon) => <Icon name={icon()} size={20} tone="ink" />}
                                 </If>
                               </IconKey>
                             )}
@@ -286,7 +369,7 @@ function Handset(props: { calls: () => Calls }) {
                         </View>
                       </If>
                       <If when={app() === "games"}>
-                        <View testID="phone-games" class="grid grid-cols-3 gap-x-1 gap-y-3 px-2 pt-4">
+                        <View testID="phone-games" class="grid grid-cols-3 gap-x-2 gap-y-3.5 px-3 pt-4">
                           <Each of={games}>
                             {(g) => (
                               <IconKey id={g()} label={t(`web.farm.phone.game.${g()}`)} run={() => app.set(g())}>
@@ -298,34 +381,40 @@ function Handset(props: { calls: () => Calls }) {
                       </If>
                       <If when={game()}>{(id) => <PhoneGame id={id()} onBack={() => app.set("games")} />}</If>
                       <If when={app() === "log" || app() === "missed"}>
-                        <View class="flex-row">
-                          <Press selected={app() === "missed"} run={() => app.set("missed")}>
+                        <View class="flex-row gap-1.5 border-b border-line bg-side p-2">
+                          <Press class="flex-1" selected={app() === "missed"} run={() => app.set("missed")}>
                             {t("web.farm.phone.missed", { n: props.calls().missed.length })}
                           </Press>
-                          <Press selected={app() === "log"} run={() => app.set("log")}>
+                          <Press class="flex-1" selected={app() === "log"} run={() => app.set("log")}>
                             {t("web.farm.phone.log")}
                           </Press>
                         </View>
-                        <Scroll class="flex-1" contentClass="gap-1 p-1.5">
+                        <Scroll class="flex-1" contentClass="gap-2 p-2.5">
                           <If
                             when={app() === "missed"}
                             else={
                               <>
                                 <If when={props.calls().log.length === 0}>
-                                  <Label>{t("web.farm.phone.noCalls")}</Label>
+                                  <View class="rounded-lg border border-line bg-side p-3">
+                                    <Label tone="muted">{t("web.farm.phone.noCalls")}</Label>
+                                  </View>
                                 </If>
                                 <Each of={props.calls().log}>
                                   {(e) => (
-                                    <Label>
-                                      {e().call.who} · {e().call.words.label} · {e().answered ? t("web.farm.phone.answered") : t("web.farm.phone.declined")}
-                                    </Label>
+                                    <View class="rounded-lg border border-line bg-elevated px-2.5 py-2 shadow-raise">
+                                      <Label>
+                                        {e().call.who} · {e().call.words.label} · {e().answered ? t("web.farm.phone.answered") : t("web.farm.phone.declined")}
+                                      </Label>
+                                    </View>
                                   )}
                                 </Each>
                               </>
                             }
                           >
                             <If when={props.calls().missed.length === 0}>
-                              <Label>{t("web.farm.phone.noMissed")}</Label>
+                              <View class="rounded-lg border border-line bg-side p-3">
+                                <Label tone="muted">{t("web.farm.phone.noMissed")}</Label>
+                              </View>
                             </If>
                             <Each of={props.calls().missed}>
                               {(c) => (
@@ -336,14 +425,20 @@ function Handset(props: { calls: () => Calls }) {
                             </Each>
                           </If>
                         </Scroll>
-                        <Press run={() => void dial()}>{t("web.farm.phone.callOrchestrator")}</Press>
+                        <View class="border-t border-line bg-side p-2">
+                          <Press selected run={() => void dial()}>
+                            {t("web.farm.phone.callOrchestrator")}
+                          </Press>
+                        </View>
                       </If>
                       <If when={app() === "orchestrator"}>
-                        <View class="flex-1 items-center justify-center gap-2">
+                        <View class="flex-1 items-center justify-center gap-3 p-4">
                           <OrchestratorFace size={60} />
                           <Label size={18}>{t("web.farm.phone.manager")}</Label>
-                          <Label>{error() || activeCall().problem || t(active() ? "web.farm.phone.phase.live" : "web.farm.phone.phase.idle")}</Label>
-                          <Press run={() => (active() ? void voice("host.voiceStop") : void dial())}>
+                          <Label tone={error() || activeCall().problem ? "error" : "muted"} class="text-center">
+                            {error() || activeCall().problem || t(active() ? "web.farm.phone.phase.live" : "web.farm.phone.phase.idle")}
+                          </Label>
+                          <Press selected={!active()} run={() => (active() ? void voice("host.voiceStop") : void dial())}>
                             {t(active() ? "web.farm.phone.hangUp" : "web.farm.phone.callOrchestrator")}
                           </Press>
                         </View>
@@ -352,17 +447,17 @@ function Handset(props: { calls: () => Calls }) {
                   }
                 >
                   {(item) => (
-                    <View class="flex-1 items-center justify-center gap-3">
-                      <Label>{t("web.farm.phone.ringing")}</Label>
+                    <View class="flex-1 items-center justify-center gap-3 p-4">
+                      <Label tone="accent">{t("web.farm.phone.ringing")}</Label>
                       <OrchestratorFace size={60} />
                       <Label size={20}>{item().who}</Label>
-                      <Label>{item().words.label}</Label>
-                      <Label>{item().text}</Label>
-                      <View class="flex-row gap-4">
+                      <Label tone="muted">{item().words.label}</Label>
+                      <Label class="text-center">{item().text}</Label>
+                      <View class="flex-row gap-3 pt-1">
                         <Press id="decline" run={() => settle(item(), false)}>
                           {t("web.farm.phone.decline")}
                         </Press>
-                        <Press id="answer" run={() => settle(item(), true)}>
+                        <Press id="answer" selected run={() => settle(item(), true)}>
                           {t("web.farm.phone.answer")}
                         </Press>
                       </View>
@@ -376,6 +471,7 @@ function Handset(props: { calls: () => Calls }) {
                 fold={() => unfolded.set(false)}
                 large={large}
                 resize={() => large.set(!large())}
+                chatOnly={chatOnly}
                 heard={() => activeCall().heard}
                 said={() => activeCall().said}
               />
@@ -392,9 +488,9 @@ function Handset(props: { calls: () => Calls }) {
           accessibilityLabel={t("web.farm.phone.openChat")}
           testID="phone-chat"
           onPress={() => unfolded.set(true)}
-          class="mt-16 w-8 self-start border-2 border-bark-900 bg-bark-600 p-1.5"
+          class="mt-14 w-8 items-center self-start rounded-r-xl border border-l-0 border-line-strong bg-elevated px-1.5 py-2.5 shadow-raise hover:bg-hover"
         >
-          <Label tone="cream" size={14}>
+          <Label tone="ink" size={14}>
             {[...t("web.farm.phone.chatTab")].join("\n")}
           </Label>
         </View>
@@ -403,17 +499,24 @@ function Handset(props: { calls: () => Calls }) {
   );
 }
 
-export function FarmPhone() {
+function FarmPhoneBody() {
   setLocale(readHostLocale());
-  useBridge();
   const initial = readFarmPhoneParams().calls;
   const updates = frame("calls", farmCallsSchema);
   const calls = () => updates() ?? initial;
   return (
     <Root>
-      <If when={calls().open}>
+      <If when={calls().open} else={<PhoneIdleCard />}>
         <Handset calls={calls} />
       </If>
     </Root>
+  );
+}
+
+export function FarmPhone() {
+  return (
+    <ErrorBoundary fallback={(err, reset) => <PhoneErrorFallback error={err} reset={reset} />}>
+      <FarmPhoneBody />
+    </ErrorBoundary>
   );
 }
