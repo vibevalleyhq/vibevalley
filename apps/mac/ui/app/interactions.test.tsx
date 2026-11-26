@@ -310,8 +310,16 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
   expect(app.count("id:desk")).toBe(0);
   expect(app.count("id:content-sidebar")).toBe(1);
   expect(app.count("id:content-nav-artifact-outline")).toBe(1);
-  expect(app.count("id:content-nav-artifact-sheet")).toBe(1);
   expect(app.count("id:content-nav-artifact-prototype")).toBe(1);
+  expect(app.count("id:content-nav-artifact-sheet")).toBe(0);
+  expect(app.count("id:content-nav-artifact-diagram")).toBe(0);
+  expect(app.count("id:content-nav-artifact-storyboard")).toBe(0);
+  expect(app.count("id:content-nav-artifacts-more")).toBe(1);
+  expect(app.count("id:content-new-note-btn")).toBe(0);
+
+  await app.press("id:content-nav-artifacts-more");
+  await fake.pump(app);
+  expect(app.count("id:content-nav-artifact-sheet")).toBe(1);
   expect(app.count("id:content-nav-artifact-diagram")).toBe(1);
   expect(app.count("id:content-nav-artifact-storyboard")).toBe(1);
 
@@ -340,11 +348,12 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
   await fake.pumpUntil(app, () => app.count("id:artifacts") === 1 && app.count("id:artifact-directory-view") === 1);
   const createCall = fake.calls.find((c) => c.op === "artifact.create");
   expect(createCall?.payload).toMatchObject({ artifactType: "outline" });
-
-  fake.clearCalls();
-  await app.press("id:content-new-note-btn");
-  await fake.pumpUntil(app, () => created.length === 2 && app.value("id:artifact-title") === created[1]?.title);
-  expect(fake.calls.find((c) => c.op === "artifact.create")?.payload).toMatchObject({ artifactType: "outline" });
+  expect(app.texts()).toContain(created[0]?.title);
+  await app.press("id:artifact-title");
+  await fake.pump(app);
+  expect(app.value("id:artifact-title")).toBe(created[0]?.title);
+  await app.keyboard.press("escape");
+  await fake.pump(app);
 
   await app.press("id:content-nav-artifacts-all");
   await fake.pump(app);

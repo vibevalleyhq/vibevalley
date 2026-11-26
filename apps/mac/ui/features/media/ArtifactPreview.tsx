@@ -112,6 +112,18 @@ function OutlinePreview(props: { readonly data: PreviewByTag<"outline"> }) {
   );
 }
 
+function CoverImage(props: { readonly testID: string; readonly src: string; readonly width: number; readonly height: number }) {
+  const isDark = () => colorScheme() === "dark";
+  return (
+    <View class="relative overflow-hidden" style={{ width: props.width, height: props.height }}>
+      <Image testID={props.testID} src={props.src} style={{ width: props.width, height: props.height, objectFit: "cover" }} />
+      <If when={isDark()}>
+        <View testID={`${props.testID}-scrim`} class="pointer-events-none absolute inset-0 border border-line" style={{ backgroundColor: mix("page", 0.14) }} />
+      </If>
+    </View>
+  );
+}
+
 function DesignSystemPreview(props: { readonly data: PreviewByTag<"design-system"> }) {
   const swatches = computed(() => props.data.swatches.slice(0, 6));
   const fontLine = computed(() => props.data.fonts.slice(0, 2).join(" · "));
@@ -120,22 +132,22 @@ function DesignSystemPreview(props: { readonly data: PreviewByTag<"design-system
       <If
         when={swatches().length > 0}
         else={
-          <View class="flex-1 flex-row overflow-hidden rounded-md border border-line bg-page">
-            <View class="flex-1 bg-side" />
-            <View class="flex-1 bg-accent" />
-            <View class="flex-1 bg-wheat" />
-            <View class="flex-1 bg-water" />
+          <View class="flex-1 flex-row gap-1.5">
+            <View class="flex-1 rounded-sm border border-line bg-page" />
+            <View class="flex-1 rounded-sm border border-line bg-accent" />
+            <View class="flex-1 rounded-sm border border-line bg-wheat" />
+            <View class="flex-1 rounded-sm border border-line bg-water" />
           </View>
         }
       >
-        <View class="flex-1 flex-row overflow-hidden rounded-md border border-line bg-page">
+        <View class="flex-1 flex-row gap-1.5">
           <Each of={swatches()} key="index">
             {(swatch) => {
               const fill = () => {
                 const dark = colorScheme() === "dark";
                 return dark && swatch().dark !== undefined && swatch().dark !== "" ? swatch().dark : swatch().light;
               };
-              return <View class="flex-1" style={{ backgroundColor: fill() }} />;
+              return <View testID="design-system-swatch" class="flex-1 rounded-sm border border-line" style={{ backgroundColor: fill() }} />;
             }}
           </Each>
         </View>
@@ -150,31 +162,32 @@ function DesignSystemPreview(props: { readonly data: PreviewByTag<"design-system
   );
 }
 
-function DashboardPreview(props: { readonly data: PreviewByTag<"dashboard"> }) {
+function DashboardPreview(props: { readonly data: PreviewByTag<"dashboard">; readonly height: number }) {
   const kpis = computed(() => props.data.kpis.slice(0, 3));
   const series = computed(() => props.data.series.slice(0, 12));
+  const maxBarPx = computed(() => Math.max(36, Math.min(68, Math.round(props.height * 0.34))));
   return (
-    <View class="flex-1 justify-between gap-2 overflow-hidden p-3">
+    <View class="flex-1 gap-2 overflow-hidden p-3">
       <If when={kpis().length > 0}>
-        <View class="flex-row gap-1.5">
+        <View class="shrink-0 flex-row gap-1.5">
           <Each of={kpis()} key="index">
             {(kpi) => (
-              <View class="min-w-0 flex-1 gap-0.5 rounded-sm border border-line bg-page px-2 py-1.5">
-                <Text class="truncate text-2xs text-faint">{kpi().label}</Text>
-                <Text class="truncate font-mono text-xs font-semibold text-ink tabular-nums">{kpi().value}</Text>
+              <View class="min-w-0 flex-1 gap-0.5 rounded-sm border border-line bg-page px-2.5 py-2">
+                <Text class="truncate text-2xs font-medium text-muted">{kpi().label}</Text>
+                <Text class="truncate font-mono text-sm font-semibold text-ink tabular-nums">{kpi().value}</Text>
               </View>
             )}
           </Each>
         </View>
       </If>
       <If when={series().length > 0}>
-        <View class="h-11 flex-row items-end gap-1 rounded-sm border border-line bg-page px-2 pt-2 pb-1.5">
+        <View class="min-h-14 flex-1 flex-row items-end gap-1 rounded-sm border border-line bg-page px-2.5 pt-2.5 pb-2">
           <Each of={series()} key="index">
             {(val, idx) => {
-              const barHeight = () => Math.max(3, Math.round(Math.min(1, Math.max(0, val())) * 28));
+              const barHeight = () => Math.max(4, Math.round(Math.min(1, Math.max(0, val())) * maxBarPx()));
               const barColor = () => {
                 colorScheme();
-                return mix("accent", idx() === series().length - 1 ? 0.85 : 0.3);
+                return mix("accent", idx() === series().length - 1 ? 0.85 : 0.32);
               };
               return <View class="flex-1 rounded-xs" style={{ height: barHeight(), backgroundColor: barColor() }} />;
             }}
@@ -187,17 +200,17 @@ function DashboardPreview(props: { readonly data: PreviewByTag<"dashboard"> }) {
 
 function SheetPreview(props: { readonly data: PreviewByTag<"sheet"> }) {
   const cols = computed(() => props.data.columns.slice(0, 4));
-  const rows = computed(() => props.data.rows.slice(0, 3));
+  const rows = computed(() => props.data.rows.slice(0, 5));
   const hasCounts = () => props.data.totalRows > 0 || props.data.totalCols > 0;
   return (
     <View class="flex-1 justify-between gap-1.5 overflow-hidden p-2.5">
-      <View class="flex-1 overflow-hidden rounded-sm border border-line bg-page">
+      <View class="shrink overflow-hidden rounded-sm border border-line bg-page">
         <If when={cols().length > 0}>
           <View class="flex-row border-b border-line bg-side">
             <Each of={cols()} key="index">
               {(col, idx) => (
-                <View class={`min-w-0 flex-1 px-1.5 py-1 ${idx() < cols().length - 1 ? "border-r border-line" : ""}`}>
-                  <Text class="truncate font-mono text-2xs font-medium text-muted">{col()}</Text>
+                <View class={`min-w-0 flex-1 px-2 py-1.5 ${idx() < cols().length - 1 ? "border-r border-line" : ""}`}>
+                  <Text class="truncate font-mono text-2xs font-semibold text-muted">{col()}</Text>
                 </View>
               )}
             </Each>
@@ -213,7 +226,7 @@ function SheetPreview(props: { readonly data: PreviewByTag<"sheet"> }) {
               <View class={`flex-row ${rIdx() < rows().length - 1 ? "border-b border-line" : ""}`}>
                 <Each of={cells()} key="index">
                   {(cell, cIdx) => (
-                    <View class={`min-w-0 flex-1 px-1.5 py-1 ${cIdx() < cells().length - 1 ? "border-r border-line" : ""}`}>
+                    <View class={`min-w-0 flex-1 px-2 py-1.5 ${cIdx() < cells().length - 1 ? "border-r border-line" : ""}`}>
                       <Text class="truncate text-2xs text-ink tabular-nums">{cell()}</Text>
                     </View>
                   )}
@@ -224,8 +237,8 @@ function SheetPreview(props: { readonly data: PreviewByTag<"sheet"> }) {
         </Each>
       </View>
       <If when={hasCounts() || (props.data.sheetName !== undefined && props.data.sheetName !== "")}>
-        <View class="flex-row items-center justify-between gap-2 px-0.5">
-          <Text class="min-w-0 flex-1 truncate text-2xs text-faint">{props.data.sheetName ?? ""}</Text>
+        <View class="shrink-0 flex-row items-center justify-between gap-2 px-0.5">
+          <Text class="min-w-0 flex-1 truncate text-2xs text-muted">{props.data.sheetName ?? ""}</Text>
           <If when={hasCounts()}>
             <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{`${props.data.totalRows}×${props.data.totalCols}`}</Text>
           </If>
@@ -376,7 +389,7 @@ function DesignPreview(props: { readonly data: PreviewByTag<"design">; readonly 
         </View>
       }
     >
-      {(src) => <Image testID={`library-artifact-frame-${props.id}`} src={src()} style={{ width: props.width, height: props.height, objectFit: "cover" }} />}
+      {(src) => <CoverImage testID={`library-artifact-frame-${props.id}`} src={src()} width={props.width} height={props.height} />}
     </If>
   );
 }
@@ -412,7 +425,7 @@ function StoryboardPreview(props: { readonly data: PreviewByTag<"storyboard">; r
         </View>
       }
     >
-      {(src) => <Image testID={`library-artifact-frame-${props.id}`} src={src()} style={{ width: props.width, height: props.height, objectFit: "cover" }} />}
+      {(src) => <CoverImage testID={`library-artifact-frame-${props.id}`} src={src()} width={props.width} height={props.height} />}
     </If>
   );
 }
@@ -448,7 +461,7 @@ function MotionPreview(props: { readonly data: PreviewByTag<"motion">; readonly 
         </View>
       }
     >
-      {(src) => <Image testID={`library-artifact-frame-${props.id}`} src={src()} style={{ width: props.width, height: props.height, objectFit: "cover" }} />}
+      {(src) => <CoverImage testID={`library-artifact-frame-${props.id}`} src={src()} width={props.width} height={props.height} />}
     </If>
   );
 }
@@ -481,7 +494,7 @@ function StructuredPreview(props: { readonly preview: ArtifactPreviewData; reado
       <If when={props.preview._tag === "docs" ? props.preview : undefined}>{(d) => <DocsPreview data={d()} />}</If>
       <If when={props.preview._tag === "outline" ? props.preview : undefined}>{(d) => <OutlinePreview data={d()} />}</If>
       <If when={props.preview._tag === "design-system" ? props.preview : undefined}>{(d) => <DesignSystemPreview data={d()} />}</If>
-      <If when={props.preview._tag === "dashboard" ? props.preview : undefined}>{(d) => <DashboardPreview data={d()} />}</If>
+      <If when={props.preview._tag === "dashboard" ? props.preview : undefined}>{(d) => <DashboardPreview data={d()} height={props.height} />}</If>
       <If when={props.preview._tag === "sheet" ? props.preview : undefined}>{(d) => <SheetPreview data={d()} />}</If>
       <If when={props.preview._tag === "slides" ? props.preview : undefined}>{(d) => <SlidesPreview data={d()} fallbackTitle={props.artifact.title} />}</If>
       <If when={props.preview._tag === "whiteboard" ? props.preview : undefined}>
@@ -522,9 +535,7 @@ export function ArtifactPreview(props: { readonly artifact: Artifact; readonly w
         </If>
       }
     >
-      {(src) => (
-        <Image testID={`library-artifact-cover-${props.artifact.id}`} src={src()} style={{ width: props.width, height: props.height, objectFit: "cover" }} />
-      )}
+      {(src) => <CoverImage testID={`library-artifact-cover-${props.artifact.id}`} src={src()} width={props.width} height={props.height} />}
     </If>
   );
 }
