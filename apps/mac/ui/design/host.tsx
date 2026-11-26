@@ -3,6 +3,7 @@ import { context, type JSX } from "nsh";
 
 import type { MotionChoice } from "@vibevalley/protocol/host";
 
+import { installScrollbarTheme } from "./scrollbar";
 import { toast as pushToast, type Tone as ToastTone } from "./toasts";
 
 export interface QrMatrix {
@@ -42,6 +43,7 @@ export function useDesignHost(): DesignHost {
 }
 
 export function DesignHostProvider(props: { host: DesignHost; children: JSX.Element }) {
+  installScrollbarTheme();
   return <DesignHostContext.Provider value={props.host}>{props.children}</DesignHostContext.Provider>;
 }
 
