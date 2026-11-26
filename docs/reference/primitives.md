@@ -285,3 +285,7 @@
 | `transport` | `transport.ts` |  |
 | `setTransport` | `transport.ts` | Swaps the transport (at start-up: the bridge, or a story's fixtures). |
 | `onTransportChange` | `transport.ts` |  |
+| `isVdpEnabled` | `vdpProbe.ts` | Returns whether VDP probing is active in the current hosted view. |
+| `registerVdpNode` | `vdpProbe.ts` | Registers an inspectable/pressable UI node when VDP is enabled; instant no-op when off. |
+| `useVdpNode` | `vdpProbe.ts` | Registers an inspectable UI node tied to the current nsh reactive owner lifetime. |
+| `installVdpProbe` | `vdpProbe.ts` | Installs the VDP UI probe on the current hosted view. |
