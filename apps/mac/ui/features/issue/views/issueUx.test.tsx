@@ -324,3 +324,94 @@ test("Board uses professional PM lane labels without concurrency badge, renders 
   await fake.pumpUntil(app, () => app.count("id:issue") === 1);
   expect(app.count("id:issue-peek-modal")).toBe(0);
 });
+
+test("Board renders tags, parent badges, scope toggle, and TodoDetail supports triage, tags, parent, sub-issues, and dates", async () => {
+  setLocale("zh");
+  const parentIssue = makeIssueFixture({
+    id: "i-parent-10",
+    number: 10,
+    title: "Parent epic issue",
+    status: "backlog",
+    tags: ["架构", "MCP"],
+    startAt: Date.UTC(2026, 10, 26),
+    dueAt: Date.UTC(2026, 11, 5),
+    stage: { state: "draft", acts: [] },
+  });
+  const childIssue = makeIssueFixture({
+    id: "i-child-11",
+    number: 11,
+    title: "Child backlog issue",
+    status: "backlog",
+    parent: parentIssue.id,
+    tags: ["UX"],
+    stage: { state: "draft", acts: [] },
+  });
+  const canceledIssue = makeIssueFixture({
+    id: "i-canceled-12",
+    number: 12,
+    title: "Discarded idea",
+    status: "canceled",
+    stage: { state: "canceled", acts: [] },
+  });
+
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 20, issues: [parentIssue, childIssue, canceledIssue] },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "zh" });
+  fake.respond("issue.history.list", [
+    { issue: parentIssue, sessions: [], missingSessions: [] },
+    { issue: childIssue, sessions: [], missingSessions: [] },
+    { issue: canceledIssue, sessions: [], missingSessions: [] },
+  ]);
+  fake.respond("issue.status.update", (payload: unknown) => {
+    const p = payload as { id: string; status: Issue["status"] };
+    return { ...childIssue, id: p.id as IssueId, status: p.status, seq: 21 };
+  });
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 3);
+
+  // Tags and parent badge render on cards, and scope/tag filter controls exist.
+  expect(app.count("id:issue-scope")).toBe(1);
+  expect(app.count("id:filter-tag")).toBe(1);
+  expect(app.count("id:card-parent-badge")).toBe(1);
+  expect(app.count("id:issue-tag-pill")).toBeGreaterThanOrEqual(3);
+
+  // Scope toggle filters to Backlog (2) and Canceled (1).
+  await app.press("id:issue-scope-backlog");
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 2);
+  await app.press("id:issue-scope-canceled");
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 1);
+  await app.press("id:issue-scope-all");
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 3);
+
+  // Open child draft directly to verify TodoDetail inspector controls and one-click triage actions.
+  await app.host.send("route", `/issues/${childIssue.id}`);
+  await fake.pumpUntil(app, () => app.count("id:todo-triage-actions") === 1);
+  expect(app.count("id:issue-parent-picker")).toBe(1);
+  expect(app.count("id:issue-tag-editor")).toBe(1);
+  expect(app.count("id:issue-start-at")).toBe(1);
+  expect(app.count("id:issue-due-at")).toBe(1);
+  expect(app.count("id:todo-mark-ready")).toBe(1);
+  expect(app.count("id:todo-mark-done")).toBe(1);
+  expect(app.count("id:todo-mark-canceled")).toBe(1);
+
+  await app.press("id:todo-mark-done");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.status.update"));
+  const statusCall = fake.calls.find((c) => c.op === "issue.status.update");
+  expect((statusCall?.payload as { status?: string } | undefined)?.status).toBe("done");
+
+  // Open parent issue: sub-issues section with progress bar renders cleanly.
+  await app.host.send("route", `/issues/${parentIssue.id}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-sub-issues") === 1);
+  expect(app.count("id:issue-sub-progress-bar")).toBe(1);
+  expect(app.count("id:sub-issue-row")).toBe(1);
+});

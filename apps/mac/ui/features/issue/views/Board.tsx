@@ -30,6 +30,7 @@ import {
 } from "../model/cards";
 import { laneOrder, type Ordering } from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
+import { ParentBadge, TagPills } from "./IssueMetaControls";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
 /** Under the closed ones: how many older are folded away, or back to the recent ones. */
@@ -445,8 +446,19 @@ function CardView(props: {
   const unassignedTodo = computed(
     () => props.card.kind === "todo" && props.card.lane === "todo" && props.card.issue.status !== "backlog" && !cardAgent(props.card),
   );
+  const parentIssue = computed(() => (props.card.issue.parent ? issues().find((item) => item.id === props.card.issue.parent) : undefined));
+  const tags = computed(() => props.card.issue.tags ?? []);
   const attachmentCount = computed(() => props.card.issue.attachments?.length ?? 0);
-  const marks = computed(() => showsStatus() || unassignedTodo() || !!look().progress || attachmentCount() > 0 || look().flags.length > 0);
+  const marks = computed(
+    () =>
+      showsStatus() ||
+      unassignedTodo() ||
+      Boolean(look().progress) ||
+      Boolean(parentIssue()) ||
+      tags().length > 0 ||
+      attachmentCount() > 0 ||
+      look().flags.length > 0,
+  );
   const draggable = computed(() => props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving");
   // Dragging sends a synthetic press on mouse-up; suppress opening the card right after a drag ends.
   let suppressPressUntil = 0;
@@ -540,6 +552,8 @@ function CardView(props: {
               </View>
             </If>
             <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
+            <If when={parentIssue()}>{(p) => <ParentBadge parent={p()} onOpen={props.onOpen} testid="card-parent-badge" />}</If>
+            <TagPills tags={tags()} max={3} testid="card-tags" />
             <If when={attachmentCount() > 0}>
               <View
                 testID="card-attachments"

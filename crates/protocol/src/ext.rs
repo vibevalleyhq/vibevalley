@@ -177,6 +177,9 @@ impl Issue {
             answer: None,
             stage: IssueStage::draft(created_at),
             attachments: vec![],
+            tags: vec![],
+            start_at: None,
+            due_at: None,
         }
     }
 }

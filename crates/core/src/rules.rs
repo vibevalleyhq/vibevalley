@@ -194,7 +194,7 @@ pub fn room_left(sessions: &[Session], repo: &str, space: usize, per_repo: usize
     let busy: Vec<&Session> = sessions.iter().filter(|h| h.is_board_worker() && is_busy(h) && h.id != except).collect();
     let in_repo = busy.iter().filter(|h| h.repo_name() == Some(repo)).count();
     Room {
-        farm: space.saturating_sub(busy.len()),
+        farm: if space == 0 { usize::MAX } else { space.saturating_sub(busy.len()) },
         repo: (per_repo > 0).then(|| per_repo.saturating_sub(in_repo)),
         busy: busy.len(),
         in_repo,
@@ -442,5 +442,31 @@ mod tests {
         assert!(cut_english.ends_with('…'));
         assert!(cut_english.chars().count() <= TITLE_MAX);
         assert!(!cut_english.ends_with("tru…"));
+    }
+
+    #[test]
+    fn room_left_unbounded_when_space_and_per_repo_are_zero() {
+        let sessions: Vec<Session> = (1..=10)
+            .map(|i| {
+                let mut s = Session::new(
+                    format!("s{i}"),
+                    SessionController::IssueBoard,
+                    format!("worker-{i}"),
+                    "claude",
+                    ExecutionPolicy::ManagedWorktree {
+                        repo: "app".into(),
+                        branch: None,
+                    },
+                    100,
+                );
+                s.phase = Phase::working(100, SessionAction::EditFile, "edit");
+                s
+            })
+            .collect();
+        let room = room_left(&sessions, "app", 0, 0, "");
+        assert_eq!(room.farm, usize::MAX);
+        assert_eq!(room.repo, None);
+        assert_eq!(room.busy, 10);
+        assert_eq!(room.in_repo, 10);
     }
 }

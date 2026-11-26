@@ -87,6 +87,49 @@ impl Board {
             if let Some(ids) = &upd.attachments {
                 issue.attachments = self.resolve_attachments_async(ids).await?;
             }
+            if let Some(raw_parent) = upd.parent.as_deref().map(str::trim) {
+                if raw_parent.is_empty() {
+                    issue.parent = None;
+                } else {
+                    let all_issues = self.issues_async().await?;
+                    let target = crate::runtime::find_issue(&all_issues, raw_parent).ok_or_else(|| BoardError::NoIssue(raw_parent.to_string()))?;
+                    if target.id == was.id {
+                        return Err(BoardError::Other("an issue cannot be its own parent".into()));
+                    }
+                    let mut cursor = Some(target.id.as_str());
+                    let mut visited = std::collections::HashSet::new();
+                    while let Some(curr) = cursor {
+                        if curr == was.id {
+                            return Err(BoardError::Other("cannot set a descendant issue as parent (cycle)".into()));
+                        }
+                        if !visited.insert(curr) {
+                            break;
+                        }
+                        cursor = all_issues.iter().find(|i| i.id == curr).and_then(|i| i.parent.as_deref());
+                    }
+                    let graph: Vec<(String, Option<String>, Vec<String>)> = all_issues
+                        .iter()
+                        .map(|t| {
+                            let parent = if t.id == was.id { Some(target.id.clone()) } else { t.parent.clone() };
+                            (t.id.clone(), parent, t.blocked_by.clone())
+                        })
+                        .collect();
+                    let problems = vibevalley_core::dependency_problems(&graph);
+                    if !problems.is_empty() {
+                        return Err(BoardError::Other(format!("the dependencies do not form a DAG: {problems:?}")));
+                    }
+                    issue.parent = Some(target.id.clone());
+                }
+            }
+            if let Some(tags) = &upd.tags {
+                issue.tags = super::board::clean_tags(tags);
+            }
+            if let Some(start_at) = upd.start_at {
+                issue.start_at = super::board::normalize_timestamp(Some(start_at));
+            }
+            if let Some(due_at) = upd.due_at {
+                issue.due_at = super::board::normalize_timestamp(Some(due_at));
+            }
             let mut edited = vec![issue];
             if let Some(before) = &upd.before {
                 for placed in self.placed_async(&was.id, before).await? {
@@ -321,15 +364,16 @@ impl Board {
         let except = issue.latest_session_id().cloned().unwrap_or_default();
         let repo = issue.repo.clone().unwrap_or_default();
         let config = self.config();
+        let (space_limit, per_repo) = super::board::effective_limits(config);
         let sessions = self.sessions_async().await.unwrap_or_default();
-        let room = vibevalley_core::rules::room_left(&sessions, &repo, config.space_limit, config.per_repo, &except);
+        let room = vibevalley_core::rules::room_left(&sessions, &repo, space_limit, per_repo, &except);
         if room.farm == 0 {
-            return t("server.session.noRoom.farm", &[("max", config.space_limit.into())]);
+            return t("server.session.noRoom.farm", &[("max", space_limit.into())]);
         }
         if room.repo == Some(0) {
             return t(
                 "server.session.noRoom.repo",
-                &[("repo", repo.into()), ("on", room.in_repo.into()), ("max", config.per_repo.into())],
+                &[("repo", repo.into()), ("on", room.in_repo.into()), ("max", per_repo.into())],
             );
         }
         String::new()

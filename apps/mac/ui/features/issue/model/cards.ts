@@ -20,6 +20,7 @@ import { matches } from "../../../infra/base/search";
 import { describeSubagents } from "../../session";
 import { endedAt, assignedOnDuty, issueSession, issueTag, needsWorktreeCheck, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
 import { localizeIssueError } from "./issueError";
+import { type IssueScope, scopeMatches } from "./meta";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
 
@@ -110,6 +111,7 @@ export type BoardCard = (
 
 export const cardRepo = (c: BoardCard) => c.issue.repo;
 export const cardAgent = (c: BoardCard) => assignedAgentOf(c.issue);
+export const cardTags = (c: BoardCard) => c.issue.tags ?? [];
 
 export function buildCards(
   rows: IssueHistory[],
@@ -216,17 +218,18 @@ export function cardPreviewOf(card: BoardCard): CardPreview | undefined {
 }
 
 function cardWords(c: BoardCard): (string | undefined)[] {
+  const tags = c.issue.tags ?? [];
   switch (c.kind) {
     case "family":
     case "todo":
     case "missing":
-      return [c.issue.title, c.issue.description, c.issue.repo];
+      return [c.issue.title, c.issue.description, c.issue.repo, ...tags];
     case "issue": {
       const head = c.sessions.at(-1);
-      return [c.issue.title, c.issue.description, head?.name, c.issue.repo, c.issue.id, head?.lastRun?.summary];
+      return [c.issue.title, c.issue.description, head?.name, c.issue.repo, c.issue.id, head?.lastRun?.summary, ...tags];
     }
     case "orchestrator":
-      return [c.issue.title, c.issue.description, c.issue.repo, c.issue.id, t("web.issue.card.orchestrator")];
+      return [c.issue.title, c.issue.description, c.issue.repo, c.issue.id, t("web.issue.card.orchestrator"), ...tags];
   }
 }
 
@@ -234,12 +237,18 @@ export interface BoardFilter {
   query: string;
   repo: string;
   agent: string;
+  tag: string;
+  scope: IssueScope;
 }
 
-export const noFilter: BoardFilter = { query: "", repo: "", agent: "" };
-export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.repo !== "" || f.agent !== "";
+export const noFilter: BoardFilter = { query: "", repo: "", agent: "", tag: "", scope: "all" };
+export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.repo !== "" || f.agent !== "" || f.tag !== "" || f.scope !== "all";
 export const filterShows = (f: BoardFilter, c: BoardCard) =>
-  (f.repo === "" || cardRepo(c) === f.repo) && (f.agent === "" || cardAgent(c) === f.agent) && matches(f.query, cardWords(c));
+  scopeMatches(f.scope, c.issue) &&
+  (f.repo === "" || cardRepo(c) === f.repo) &&
+  (f.agent === "" || cardAgent(c) === f.agent) &&
+  (f.tag === "" || cardTags(c).includes(f.tag)) &&
+  matches(f.query, cardWords(c));
 
 /** What a card and a list row both show. `detail` is everything else: it is the hover tip. */
 interface CardLook {

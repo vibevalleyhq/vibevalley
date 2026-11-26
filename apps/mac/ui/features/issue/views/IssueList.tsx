@@ -17,6 +17,7 @@ import { type BoardCard, cardAgent, cardLook, cardRepo, closedShown, laneLabel, 
 import { type Grouping, groupRows, laneOrder, type Ordering, orderRows, type RowGroup, rowKeys } from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
 import { EmptyNote, OlderLink } from "./Board";
+import { ParentBadge, TagPills } from "./IssueMetaControls";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 import type { NewIssueAt } from "./NewIssue";
 import { useWidth } from "./Sheet";
@@ -207,8 +208,10 @@ function Row(props: {
   const look = computed(() => cardLook(props.card, props.nameOf, issues(), now()));
   const repo = computed(() => cardRepo(props.card));
   const shownFlags = computed(() => (props.wide ? look().flags : look().flags.slice(0, 1)));
+  const parentIssue = computed(() => (props.card.issue.parent ? issues().find((item) => item.id === props.card.issue.parent) : undefined));
+  const tags = computed(() => props.card.issue.tags ?? []);
   const attachmentCount = computed(() => props.card.issue.attachments?.length ?? 0);
-  const hasTrailingMarks = computed(() => Boolean(look().progress) || shownFlags().length > 0 || attachmentCount() > 0);
+  const hasTrailingMarks = computed(() => Boolean(look().progress) || tags().length > 0 || shownFlags().length > 0 || attachmentCount() > 0);
   return (
     <View
       role="button"
@@ -242,11 +245,15 @@ function Row(props: {
         <Text class="w-11 shrink-0 truncate font-mono text-xs text-faint tabular-nums">{look().number ?? ""}</Text>
       </If>
       <View class="min-w-0 flex-1 gap-0.5">
-        <Text class="truncate text-sm font-medium text-ink">{look().title}</Text>
+        <View class="min-w-0 flex-row items-center gap-1.5">
+          <Text class="min-w-0 shrink truncate text-sm font-medium text-ink">{look().title}</Text>
+          <If when={parentIssue()}>{(p) => <ParentBadge parent={p()} showTitle={props.wide} onOpen={props.onOpen} testid="row-parent-badge" />}</If>
+        </View>
         <If when={look().wait}>{(wait) => <Text class="truncate text-xs text-water">{wait()}</Text>}</If>
       </View>
       <If when={hasTrailingMarks()}>
         <View class="shrink-0 flex-row items-center gap-1.5">
+          <TagPills tags={tags()} max={props.wide ? 3 : 1} testid="row-tags" />
           <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
           <If when={attachmentCount() > 0}>
             <View

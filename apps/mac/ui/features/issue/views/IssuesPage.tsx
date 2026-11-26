@@ -21,10 +21,23 @@ import { useRouter, useSearchValues } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { rememberPick } from "../../../infra/state/prefs";
-import { type BoardCard, type BoardFilter, buildCards, cardAgent, cardMove, cardRepo, filterAny, filterShows, type Lane, noFilter } from "../model/cards";
+import {
+  type BoardCard,
+  type BoardFilter,
+  buildCards,
+  cardAgent,
+  cardMove,
+  cardRepo,
+  cardTags,
+  filterAny,
+  filterShows,
+  type Lane,
+  noFilter,
+} from "../model/cards";
 import { type BoardLook, boardLook, boardViews, viewLabel } from "../model/display";
 import { useIssueHistory, useNameOf } from "../model/history";
 import { issueIs } from "../model/issue";
+import { type IssueScope, issueScopes, issueTagPresets } from "../model/meta";
 import { issueMove, movedCards, sendMove } from "../model/moves";
 import { issueSearch } from "../model/navigation";
 import { writeIssue } from "../model/write";
@@ -52,11 +65,21 @@ export function IssuesPage(props: { rest: string }) {
   const [searchValues, setSearchValues] = useSearchValues(issueSearch);
   const repo = () => searchValues().repo ?? "";
   const agent = () => searchValues().agent ?? "";
+  const tag = () => searchValues().tag ?? "";
+  const scope = (): IssueScope => searchValues().scope ?? "all";
   const query = signal("");
-  const filter = (): BoardFilter => ({ query: query(), repo: repo(), agent: agent() });
+  const filter = (): BoardFilter => ({ query: query(), repo: repo(), agent: agent(), tag: tag(), scope: scope() });
   const setFilter = (f: BoardFilter) => {
     query.set(f.query);
-    setSearchValues(() => ({ repo: f.repo || undefined, agent: f.agent || undefined }), { replace: true });
+    setSearchValues(
+      () => ({
+        repo: f.repo || undefined,
+        agent: f.agent || undefined,
+        tag: f.tag || undefined,
+        scope: f.scope === "all" ? undefined : f.scope,
+      }),
+      { replace: true },
+    );
   };
   const older = signal(false);
   const closing = signal<Closing>();
@@ -67,7 +90,9 @@ export function IssuesPage(props: { rest: string }) {
   const setLook = boardLook.set;
   // The filter's part of the address goes along, so closing an issue comes back to the board as filtered.
   const kept = () => {
-    const search = new URLSearchParams(Object.entries({ repo: repo(), agent: agent() }).filter(([, v]) => v !== "")).toString();
+    const search = new URLSearchParams(
+      Object.entries({ repo: repo(), agent: agent(), tag: tag(), scope: scope() === "all" ? "" : scope() }).filter(([, v]) => v !== ""),
+    ).toString();
     return search ? `?${search}` : "";
   };
   const fromScene = () => {
@@ -161,7 +186,7 @@ export function IssuesPage(props: { rest: string }) {
     { when: "notEditing" },
   );
   const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
-    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? "", where.attachments));
+    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? "", where.attachments, where.tags));
     if (!made) return false;
     rememberPick(where.agent ?? "", where.repo ?? "");
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
@@ -327,6 +352,7 @@ function Detail(props: {
             sessions={cardOf("issue").sessions}
             session={cardOf("issue").session}
             onClose={(session, review) => props.onClose(cardOf("issue").issue, session, review)}
+            onOpen={props.open}
             onParent={cardOf("issue").issue.parent ? () => props.open(cardOf("issue").issue.parent) : undefined}
           />
         )}
@@ -379,7 +405,7 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
   return (
     <IssueChromeContext.Provider value={chrome}>
       <View testID="issue" class="min-h-0 flex-1">
-        <View desktop={{ windowDrag: true }} class="h-10 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4">
+        <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4">
           <View
             role="button"
             testID="issue-close"
@@ -420,13 +446,31 @@ function Toolbar(props: {
   const agents = createMemo(() =>
     [...new Set(props.cards.map(cardAgent).filter((a): a is string => !!a))].toSorted((a, b) => nameOf()(a).localeCompare(nameOf()(b))),
   );
+  const tags = createMemo(() => {
+    const present = props.cards.flatMap(cardTags);
+    return [...new Set([...issueTagPresets(), ...present])];
+  });
   const repoOptions = createMemo(() => repos().map((p) => ({ value: p, label: p })));
   const agentOptions = createMemo(() => agents().map((a) => ({ value: a, label: nameOf()(a) })));
+  const tagOptions = createMemo(() => tags().map((tag) => ({ value: tag, label: tag })));
+  const scopeOptions = createMemo(() =>
+    issueScopes.map((s) => ({
+      value: s,
+      label: t(`web.issue.scope.${s}`),
+    })),
+  );
   const isFiltered = createMemo(() => filterAny(props.filter));
-  const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "");
+  const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "" || props.filter.tag !== "");
   return (
-    <View desktop={{ windowDrag: true }} class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-4 py-1.5">
-      <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
+    <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-4">
+      <View class="min-w-0 flex-1 flex-row items-center gap-2">
+        <Segmented
+          label={t("web.issue.scope.label")}
+          testid="issue-scope"
+          value={props.filter.scope}
+          onChange={(scope) => props.onFilter({ ...props.filter, scope })}
+          options={scopeOptions()}
+        />
         <SearchField
           testid="issue-search"
           clearTestid="issue-search-clear"
@@ -434,7 +478,7 @@ function Toolbar(props: {
           onInput={(query) => props.onFilter({ ...props.filter, query })}
           placeholder={t("web.issue.page.find")}
           label={t("web.issue.page.findLabel")}
-          class="w-56"
+          class="w-40 shrink"
         />
         <View
           testID="issue-filter-bar"
@@ -446,7 +490,7 @@ function Toolbar(props: {
           <Select
             quiet
             size="control"
-            class="max-w-44"
+            class="max-w-32"
             label={t("web.issue.page.byRepo")}
             testid="filter-repo"
             filter
@@ -459,7 +503,7 @@ function Toolbar(props: {
           <Select
             quiet
             size="control"
-            class="max-w-44"
+            class="max-w-32"
             label={t("web.issue.page.byHelper")}
             testid="filter-agent"
             filter
@@ -468,22 +512,35 @@ function Toolbar(props: {
             options={agentOptions()}
             onChange={(agent) => props.onFilter({ ...props.filter, agent })}
           />
+          <View class="h-3.5 w-px bg-line" />
+          <Select
+            quiet
+            size="control"
+            class="max-w-28"
+            label={t("web.issue.tags.byTag")}
+            testid="filter-tag"
+            filter
+            value={props.filter.tag}
+            placeholder={t("web.issue.tags.allTags")}
+            options={tagOptions()}
+            onChange={(tag) => props.onFilter({ ...props.filter, tag })}
+          />
         </View>
         <If when={isFiltered()}>
-          <Text class="text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+          <Text class="shrink-0 text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
             {t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}
           </Text>
           <View
             role="button"
             testID="filter-clear"
             onPress={() => props.onFilter(noFilter)}
-            class={`h-7 flex-row items-center rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
+            class={`h-7 shrink-0 flex-row items-center rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
           >
             <Text class="text-xs font-medium text-water">{t("web.issue.page.clear")}</Text>
           </View>
         </If>
       </View>
-      <View class="ml-auto flex-row items-center gap-1.5">
+      <View class="ml-auto shrink-0 flex-row items-center gap-1.5">
         <Segmented
           label={t("web.issue.page.view")}
           testid="issue-view"

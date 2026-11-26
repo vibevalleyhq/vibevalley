@@ -105,11 +105,13 @@ pub fn status_move(issue: &Issue, to: IssueStatus) -> Result<Move, Refusal> {
                 Some(r) => return Err(Refusal::Drafting { name: r.name.clone() }),
                 None => return Ok(Move::Start),
             },
+            Done => return Ok(Move::Complete),
             Canceled => return Ok(Move::Drop),
             _ => {}
         },
         Todo => match to {
             Backlog => return Ok(Move::Unqueue),
+            Done => return Ok(Move::Complete),
             Canceled => return Ok(Move::Drop),
             _ => {}
         },
@@ -154,4 +156,41 @@ pub fn status_move(issue: &Issue, to: IssueStatus) -> Result<Move, Refusal> {
 
 pub fn status_moves(issue: &Issue) -> Vec<IssueStatus> {
     IssueStatus::ALL.into_iter().filter(|to| status_move(issue, *to).is_ok()).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn backlog_and_todo_allow_direct_done_and_canceled() {
+        let mut issue = Issue::new("i1", 1, "Manual UX review", 100);
+        assert_eq!(status_move(&issue, IssueStatus::Done), Ok(Move::Complete));
+        assert_eq!(status_move(&issue, IssueStatus::Canceled), Ok(Move::Drop));
+        assert_eq!(status_move(&issue, IssueStatus::Todo), Ok(Move::Start));
+
+        issue.status = IssueStatus::Todo;
+        assert_eq!(status_move(&issue, IssueStatus::Done), Ok(Move::Complete));
+        assert_eq!(status_move(&issue, IssueStatus::Canceled), Ok(Move::Drop));
+        assert_eq!(status_move(&issue, IssueStatus::Backlog), Ok(Move::Unqueue));
+
+        // Unsent manual completion can revive back to backlog.
+        issue.status = IssueStatus::Done;
+        issue.delivered = Some(Landing::None);
+        issue.closed_at = Some(200);
+        assert_eq!(status_move(&issue, IssueStatus::Backlog), Ok(Move::Revive));
+    }
+
+    #[test]
+    fn running_and_failed_sessions_keep_completion_safety() {
+        let mut issue = Issue::new("i2", 2, "Running issue", 100);
+        issue.status = IssueStatus::InProgress;
+        issue.stage.state = IssueStageKind::Working;
+        assert_eq!(status_move(&issue, IssueStatus::Done), Err(Refusal::Working));
+        assert_eq!(status_move(&issue, IssueStatus::Canceled), Ok(Move::Cancel));
+
+        issue.stage.state = IssueStageKind::Stuck;
+        issue.stage.stuck = Some(StuckReason::Failed);
+        assert_eq!(status_move(&issue, IssueStatus::Done), Err(Refusal::Failed));
+    }
 }

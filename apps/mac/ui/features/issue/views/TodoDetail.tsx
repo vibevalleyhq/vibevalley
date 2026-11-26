@@ -23,10 +23,12 @@ import { createEffect, createSignal, untrack } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { rememberPick } from "../../../infra/state/prefs";
 import { IssueArtifacts } from "../../artifact";
+import { useIssues } from "../model/history";
 import { isRefined, newIssueTitle } from "../model/issue";
 import { issueMove, issueMoveOf, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
+import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { IssueThread } from "./IssueThread";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
 import { IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
@@ -40,6 +42,10 @@ interface Draft {
   priority: Priority;
   deliver: Deliverable;
   attachments: readonly Attachment[];
+  parent: string;
+  tags: readonly string[];
+  startAt: number | undefined;
+  dueAt: number | undefined;
 }
 
 const draftOf = (i: Issue): Draft => ({
@@ -51,6 +57,10 @@ const draftOf = (i: Issue): Draft => ({
   priority: i.priority,
   deliver: i.deliver,
   attachments: i.attachments ?? [],
+  parent: i.parent ?? "",
+  tags: i.tags ?? [],
+  startAt: i.startAt,
+  dueAt: i.dueAt,
 });
 
 const criteriaList = (text: string) =>
@@ -81,6 +91,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const editingCriteria = signal(false);
   const refineOpen = signal(false);
   const agents = useWorkAgents(true);
+  const allIssues = useIssues();
   const repoList = useRepos();
   const repos = computed(() => ready(repoList, []).map((p) => p.name));
   const agentOptions = computed(() => agents().map((a) => ({ value: a.id, label: a.runtime ? `${a.name} · ${a.runtime}` : a.name })));
@@ -122,6 +133,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     deliver: x.deliver,
     criteria: criteriaList(x.criteria),
     attachments: x.attachments.map((a) => a.id),
+    parent: x.parent,
+    tags: [...x.tags],
+    ...(x.startAt !== props.item.startAt ? { startAt: x.startAt ?? 0 } : {}),
+    ...(x.dueAt !== props.item.dueAt ? { dueAt: x.dueAt ?? 0 } : {}),
   });
 
   // Saving goes with the act (edit): the server saves the fields before it acts on them. Taken when asked, so a call
@@ -187,6 +202,13 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const id = props.item.id;
     return sendMove(moves, { id, status: "backlog" }).done;
   };
+  const markStatus = (status: "done" | "canceled" | "backlog") => {
+    const id = props.item.id;
+    const pendingEdit = status === "done" ? unsaved() : undefined;
+    return sendMove(moves, { id, status, ...(pendingEdit ? { edit: pendingEdit } : {}) }).done.then((done) => {
+      if (done?.replied && pendingEdit) saved(done.replied.reply);
+    });
+  };
   const remove = () => {
     const id = props.item.id;
     const done = props.onDone;
@@ -196,6 +218,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     });
   };
 
+  const parentIssue = computed(() => (d().parent ? allIssues().find((i) => i.id === d().parent) : undefined));
   const criteria = computed(() => criteriaList(d().criteria));
   const heading = (
     <View>
@@ -211,11 +234,16 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             </>
           )}
         </If>
-        <If when={props.item.parent}>
-          {(parent) => (
+        <If when={d().parent}>
+          {(parentId) => (
             <>
-              <View role="button" testID="parent-issue" class="rounded-md px-1.5 py-0.5 hover:bg-hover" onPress={() => props.onDone(parent())}>
-                <Text class="text-xs text-water">{t("web.issue.family.parent")}</Text>
+              <View
+                role="button"
+                testID="parent-issue"
+                class="flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:bg-hover"
+                onPress={() => props.onDone(parentId())}
+              >
+                <Text class="text-xs text-water">{parentIssue() ? `#${parentIssue()!.number} ${parentIssue()!.title}` : t("web.issue.family.parent")}</Text>
               </View>
               <Icon name="next" size={12} tone="faint" />
             </>
@@ -450,6 +478,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         {talk()}
       </If>
       <IssueAttachments files={d().attachments} editable={!closed()} busy={busy()} onAdd={addAttachment} onRemove={removeAttachment} />
+      <SubIssuesSection issueId={props.item.id} allIssues={allIssues()} onOpen={(id) => props.onDone(id)} />
       <IssueThread issue={props.item.id} />
       <IssueArtifacts
         issue={props.item.id}
@@ -541,8 +570,34 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           label={t("web.issue.detail.deliver")}
           testid="issue-deliver"
           value={d().deliver}
+          disabled={closed()}
           onChange={(v) => edit({ deliver: v })}
           options={deliverOptions()}
+        />
+      </Property>
+      <Property label={t("web.issue.family.parent")} icon={<Icon name="indent" size={13} tone="muted" />} inset>
+        <ParentPicker issueId={props.item.id} parentId={d().parent} allIssues={allIssues()} disabled={closed()} onChange={(parent) => edit({ parent })} />
+      </Property>
+      <Property align="start" label={t("web.issue.tags.label")} icon={<Icon name="catalog" size={13} tone="muted" />} inset>
+        <TagEditor tags={d().tags} disabled={closed()} onChange={(tags) => edit({ tags })} />
+      </Property>
+      <SheetLabel divider>{t("web.issue.detail.time")}</SheetLabel>
+      <Property label={t("web.issue.dates.startAt")} icon={<Icon name="calendar" size={13} tone="muted" />} inset>
+        <DatePropertyEditor
+          label={t("web.issue.dates.startAt")}
+          value={d().startAt}
+          disabled={closed()}
+          testid="issue-start-at"
+          onCommit={(ms) => edit({ startAt: ms > 0 ? ms : undefined })}
+        />
+      </Property>
+      <Property label={t("web.issue.dates.dueAt")} icon={<Icon name="calendar" size={13} tone="muted" />} inset>
+        <DatePropertyEditor
+          label={t("web.issue.dates.dueAt")}
+          value={d().dueAt}
+          disabled={closed()}
+          testid="issue-due-at"
+          onCommit={(ms) => edit({ dueAt: ms > 0 ? ms : undefined })}
         />
       </Property>
       <More>
@@ -581,9 +636,41 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             </Button>
           </View>
         </If>
-        <View class="flex-row flex-wrap items-center gap-2">
-          <ConfirmButton testid="issue-remove" tone="danger" label={t("web.issue.todo.remove")} disabled={busy()} onConfirm={remove} />
-        </View>
+        <If
+          when={!closed()}
+          else={
+            <View class="flex-row flex-wrap items-center gap-2">
+              <Button testID="todo-revive" tone="plain" disabled={busy()} onPress={() => void markStatus("backlog")}>
+                {t("web.issue.todo.revive")}
+              </Button>
+              <ConfirmButton testid="issue-remove" tone="danger" label={t("web.issue.todo.remove")} disabled={busy()} onConfirm={remove} />
+            </View>
+          }
+        >
+          <View testID="todo-triage-actions" class="flex-row flex-wrap items-center gap-1.5">
+            <If when={backlog()}>
+              <Button
+                size="compact"
+                tone="plain"
+                testID="todo-mark-ready"
+                disabled={!startable()}
+                accessibilityLabel={d().agent ? undefined : t("web.issue.todo.pickHelper")}
+                onPress={() => void start()}
+              >
+                {t("web.issue.todo.markReady")}
+              </Button>
+            </If>
+            <Button size="compact" tone="plain" icon="check" testID="todo-mark-done" disabled={busy()} onPress={() => void markStatus("done")}>
+              {t("web.issue.todo.markDone")}
+            </Button>
+            <Button size="compact" tone="danger" testID="todo-mark-canceled" disabled={busy()} onPress={() => void markStatus("canceled")}>
+              {t("web.issue.todo.markCanceled")}
+            </Button>
+          </View>
+          <View class="flex-row flex-wrap items-center gap-2 pt-1">
+            <ConfirmButton testid="issue-remove" tone="danger" label={t("web.issue.todo.remove")} disabled={busy()} onConfirm={remove} />
+          </View>
+        </If>
       </View>
     </>
   );

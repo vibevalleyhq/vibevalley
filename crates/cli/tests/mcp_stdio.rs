@@ -116,6 +116,9 @@ impl MockIssueState {
                 acts: Vec::new(),
             },
             attachments: Vec::new(),
+            tags: req.tags.unwrap_or_default(),
+            start_at: req.start_at,
+            due_at: req.due_at,
         }
     }
 }

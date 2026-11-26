@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use sea_orm::sea_query::{Alias, Expr, Func, OnConflict};
 use sea_orm::{ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Update};
-use vibevalley_protocol::{Issue, PublishPlatform, PullRequestState};
+use vibevalley_protocol::{Issue, JsNumber, PublishPlatform, PullRequestState};
 
 use crate::db::column::{db_json, db_word, read_db_json, read_db_word};
 use crate::db::entity::{issue, pull, pull_event};
@@ -72,6 +72,9 @@ fn read_issue(r: issue::Model) -> DbResult<Issue> {
     item.questions = read_db_json(r.questions)?;
     item.assignments = read_db_json(r.assignments)?;
     item.attachments = read_db_json(r.attachments)?;
+    item.tags = read_db_json(r.tags_json)?;
+    item.start_at = r.start_at.map(JsNumber::from);
+    item.due_at = r.due_at.map(JsNumber::from);
     item.constraints = r.constraints.map(read_db_json).transpose()?;
     item.conflict = r.conflict.map(read_db_json).transpose()?;
     item.last_run = r.last_run.map(read_db_json).transpose()?;
@@ -144,6 +147,9 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
         questions: Set(db_json(&t.questions)?),
         assignments: Set(db_json(&t.assignments)?),
         attachments: Set(db_json(&t.attachments)?),
+        tags_json: Set(db_json(&t.tags)?),
+        start_at: Set(t.start_at.map(|v| v.get().round() as i64)),
+        due_at: Set(t.due_at.map(|v| v.get().round() as i64)),
     };
     let on_conflict = OnConflict::column(issue::Column::Id)
         .update_columns([
@@ -175,6 +181,9 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
             issue::Column::Questions,
             issue::Column::Assignments,
             issue::Column::Attachments,
+            issue::Column::TagsJson,
+            issue::Column::StartAt,
+            issue::Column::DueAt,
         ])
         .to_owned();
     issue::Entity::insert(model).on_conflict(on_conflict).exec(db).await?;

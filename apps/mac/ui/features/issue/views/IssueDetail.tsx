@@ -38,6 +38,7 @@ import { issueSet, labeledIssue, sendLabel, updateIssueAttachments } from "../mo
 import { ActLines } from "./ActLines";
 import { ChangesBody, ChangesHead, ConflictFiles } from "./CloseDialog";
 import { IssueAttachments } from "./IssueAttachments";
+import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
 import { IssueThread } from "./IssueThread";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
@@ -60,6 +61,7 @@ export function IssueDetail(props: {
   sessions: Session[];
   session?: SessionView | undefined;
   onClose: (session: Session, review: boolean) => void;
+  onOpen?: ((id: string) => void) | undefined;
   onParent?: (() => void) | undefined;
 }) {
   const board = useBoardSlice();
@@ -120,7 +122,11 @@ export function IssueDetail(props: {
     toast(t("web.base.rich.copied"));
   };
 
-  const parent = createMemo(() => issues().find((item) => item.id === props.issue.parent));
+  const openIssue = (id: string) => {
+    if (props.onOpen) props.onOpen(id);
+    else props.onParent?.();
+  };
+  const parent = createMemo(() => (live().parent ? issues().find((item) => item.id === live().parent) : undefined));
   const tone = computed(() => stageTone[s().stage.state]);
   const statusParts = computed(() => s().statusParts(now(), timeline()?.spent?.cny));
   const stageMeta = computed(() => statusParts().slice(1).filter(Boolean));
@@ -138,11 +144,16 @@ export function IssueDetail(props: {
             </>
           )}
         </If>
-        <If when={s().inFamily ? props.onParent : undefined}>
-          {(onParent) => (
+        <If when={live().parent}>
+          {(parentId) => (
             <>
-              <View role="button" testID="parent-issue" onPress={() => onParent()()} class="rounded-md px-1.5 py-0.5 hover:bg-hover">
-                <Text class="text-xs text-water">{parent()?.title ?? t("web.issue.family.parent")}</Text>
+              <View
+                role="button"
+                testID="parent-issue"
+                onPress={() => openIssue(parentId())}
+                class="flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:bg-hover"
+              >
+                <Text class="text-xs text-water">{parent() ? `#${parent()!.number} ${parent()!.title}` : t("web.issue.family.parent")}</Text>
               </View>
               <Icon name="next" size={12} tone="faint" />
             </>
@@ -329,6 +340,7 @@ export function IssueDetail(props: {
         onAdd={addAttachment}
         onRemove={removeAttachment}
       />
+      <SubIssuesSection issueId={props.issue.id} allIssues={issues()} onOpen={openIssue} />
 
       <View accessibilityLabel={t("web.issue.detail.progress")} testID="issue-progress" class={hasAboveProgress() ? "mt-7 border-t border-line pt-5" : ""}>
         <View class="mb-2.5 flex-row items-center justify-between gap-2">
@@ -591,7 +603,38 @@ export function IssueDetail(props: {
           </Property>
         )}
       </If>
+      <Property label={t("web.issue.family.parent")} icon={<Icon name="indent" size={13} tone="muted" />} inset>
+        <ParentPicker
+          issueId={props.issue.id}
+          parentId={live().parent ?? ""}
+          allIssues={issues()}
+          disabled={busy() || !s().open}
+          state={labeled().state("parent")}
+          onChange={(parent) => setLabel({ parent })}
+        />
+      </Property>
+      <Property align="start" label={t("web.issue.tags.label")} icon={<Icon name="catalog" size={13} tone="muted" />} inset>
+        <TagEditor tags={live().tags ?? []} disabled={busy() || !s().open} onChange={(tags) => setLabel({ tags })} />
+      </Property>
       <SheetLabel divider>{t("web.issue.detail.time")}</SheetLabel>
+      <Property label={t("web.issue.dates.startAt")} icon={<Icon name="calendar" size={13} tone="muted" />} inset>
+        <DatePropertyEditor
+          label={t("web.issue.dates.startAt")}
+          value={live().startAt}
+          disabled={busy() || !s().open}
+          testid="issue-start-at"
+          onCommit={(startAt) => setLabel({ startAt })}
+        />
+      </Property>
+      <Property label={t("web.issue.dates.dueAt")} icon={<Icon name="calendar" size={13} tone="muted" />} inset>
+        <DatePropertyEditor
+          label={t("web.issue.dates.dueAt")}
+          value={live().dueAt}
+          disabled={busy() || !s().open}
+          testid="issue-due-at"
+          onCommit={(dueAt) => setLabel({ dueAt })}
+        />
+      </Property>
       <Property label={t("web.issue.detail.opened")}>
         <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.issue.createdAt, now())}</Text>
       </Property>
