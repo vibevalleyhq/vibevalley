@@ -205,6 +205,7 @@
 | `attemptCodec` | `router/search.ts` | A decode or an encode, or undefined when it fails; a Schema that decodes asynchronously never admits a value. |
 | `searchParam` | `router/search.ts` | One value of a search key, read with `schema`: a key given twice does not decode. |
 | `search` | `router/search.ts` |  |
+| `localizeRuntimeError` | `runtimeError.ts` | Maps raw English runtime API-key errors (e.g. `no API key is set for the model`) into localized copy with a Settings link. |
 | `stepLimit` | `sessionRuns.ts` | The steps kept for one session's log in the page. |
 | `mergeSteps` | `sessionRuns.ts` | By seq and revision, independent of HTTP/live arrival order; capped to `limit` (default `stepLimit`, `null` for uncapped). |
 | `shownEvents` | `sessionRuns.ts` | A call with its result's output and ok; hidden step types (by default results and run bounds) left out. |

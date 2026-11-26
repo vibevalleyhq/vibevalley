@@ -128,7 +128,7 @@
     "folderHint": "The path of a template folder on this machine (with agent.json in it)",
     "add": "Add it",
     "added": "The template \"{name}\" is added, not installed yet",
-    "onServer": "Runs on VibeValley's own agent",
+    "onServer": "Uses built-in",
     "notHere": "Written for {runtime}, which this machine lacks: once installed, pick another machine in the profile",
     "noPersona": "No persona.",
     "addedHere": " · added on this machine",

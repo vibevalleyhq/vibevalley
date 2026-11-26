@@ -103,3 +103,52 @@ test("TodoDetail renders issue attachments and persists removed attachments on S
   const updateCall = fake.calls.find((c) => c.op === "issue.update");
   expect((updateCall?.payload as { attachments?: string[] } | undefined)?.attachments).toEqual(["att-log"]);
 });
+
+test("TodoDetail wraps long draft titles without truncation and uses compact description min-height", async () => {
+  const longTitle =
+    "Investigate and redesign the multi-repository draft issue title input so titles over sixty characters wrap cleanly without horizontal clipping";
+  const baseTodo =
+    scenarios.typical.state.board.issues.find((i) => i.status === "backlog") ?? scenarios.typical.state.board.issues.find((i) => i.status === "todo");
+  if (!baseTodo) throw new Error("typical scenario must include a backlog or todo issue");
+  const { refining: _refining, queuedAt: _queuedAt, ...rest } = baseTodo;
+  const draftTodo = {
+    ...rest,
+    title: longTitle,
+    description: "Short draft summary.",
+    status: "backlog" as const,
+    stage: { state: "draft" as const, acts: [] },
+  };
+  const state = {
+    ...scenarios.typical.state,
+    board: {
+      ...scenarios.typical.state.board,
+      issues: scenarios.typical.state.board.issues.map((i) => (i.id === draftTodo.id ? draftTodo : i)),
+    },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${draftTodo.id}` });
+  const app = await open("../../../app/main.tsx", {
+    width: 1200,
+    height: 800,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-title") === 1 && app.count("id:issue-description") === 1);
+
+  expect(app.value("id:issue-title")).toBe(longTitle);
+  const titleBox = app.layout("id:issue-title");
+  expect(titleBox).toBeDefined();
+  // Multiline title wraps across >= 2 lines (> single-line ~42px height).
+  expect(titleBox!.height).toBeGreaterThan(56);
+
+  // Typing into the multiline title field stays interactive and updates the draft value.
+  await app.type("id:issue-title", " updated");
+  expect(app.value("id:issue-title")).toContain("updated");
+
+  // Short description box uses the tighter 88px minimum height rather than the old 144px gap.
+  const descBox = app.layout("id:issue-description");
+  expect(descBox).toBeDefined();
+  expect(descBox!.height).toBeGreaterThanOrEqual(88);
+  expect(descBox!.height).toBeLessThan(120);
+});

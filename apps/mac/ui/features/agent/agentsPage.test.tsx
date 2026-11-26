@@ -86,8 +86,10 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   expect(app.texts().some((line) => line.includes("no DeepSeek API key is set"))).toBe(false);
   expect(app.count("id:agent-card-fix-laozhou")).toBe(1);
 
-  // Template cards render description below header and preview toggle button.
+  // Template cards render description below header, preview toggle button, and concise built-in runtime label.
   expect(app.count("id:template-look")).toBeGreaterThan(0);
+  expect(app.texts()).toContain("跑在内置引擎");
+  expect(app.texts().some((line) => line.includes("跑在 VibeValley 自己的 agent"))).toBe(false);
 
   // Clicking 去设置 navigates directly to /settings/models.
   await app.press("id:agent-card-fix-laozhou");

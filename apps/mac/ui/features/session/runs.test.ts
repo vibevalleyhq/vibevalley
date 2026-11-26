@@ -1,7 +1,7 @@
 import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import { setLocale } from "@vibevalley/i18n";
+import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 import type { SessionEvent } from "@vibevalley/protocol";
 
@@ -107,4 +107,12 @@ test("collapsedStepSummary strips internal orchestrator prompt scaffolding while
 
   const plain = "Fix login timeout";
   expect(collapsedStepSummary(userStep(plain), plain)).toBe("Fix login timeout");
+
+  const apiKeyReport = [
+    "【现在】2026-11-26 21:06",
+    "[来源：群聊]（帮工写的是它的汇报）",
+    "【群聊】#general:1 里有给你的话：",
+    "[target=#general:1 msg=4 from=w1 Ada #4] no API key is set for the model",
+  ].join("\n");
+  expect(collapsedStepSummary(userStep(apiKeyReport), apiKeyReport)).toBe(`#general:1 · w1 Ada #4: ${t("web.issue.error.missingApiKey")}`);
 });

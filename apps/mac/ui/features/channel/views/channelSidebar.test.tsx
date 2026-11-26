@@ -3,7 +3,7 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import type { Channel, Chat, SettingsStatus, SliceBundle } from "@vibevalley/protocol";
+import type { Channel, Chat, MessageId, SettingsStatus, SliceBundle } from "@vibevalley/protocol";
 
 import { fakeHost, type FakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, type ScenarioDensity, scenarios } from "../../../fixtures/scenarios";
@@ -197,4 +197,70 @@ test("Sidebar only renders channel-readiness-alert when orchestrator readiness i
   // Rail, sidebar header, and chat tab use unified 对话 terminology.
   expect(missingChat.app.texts()).not.toContain("聊天");
   expect(missingChat.app.texts().filter((line) => line === "对话").length).toBeGreaterThanOrEqual(2);
+});
+
+test("Chat localizes raw runtime API-key error in channel sidebar preview, thread preview card, and threads list", async () => {
+  setLocale("zh");
+  const rawErr = "no API key is set for the model";
+  const localized = t("web.issue.error.missingApiKey");
+  const base = scenarios.typical;
+  const general = makeChannel("general", {
+    default: true,
+    orchestrator: "orchestrator",
+    members: ["orchestrator"],
+    last: { from: "w1", name: "Ada #4", text: rawErr, at: SCENARIO_NOW - 2 * min },
+  });
+  const thread = makeChannel("general:1", {
+    type: "thread",
+    parent: "general",
+    root: "m-root" as MessageId,
+    rootNumber: 1,
+    title: "Ada #4",
+    name: "Ada #4",
+    replies: 1,
+    last: { from: "w1", name: "Ada #4", text: rawErr, at: SCENARIO_NOW - min },
+  });
+  const state: SliceBundle = {
+    ...base.state,
+    collab: {
+      ...base.state.collab,
+      chat: {
+        userMentions: [],
+        channels: [general, thread],
+      },
+      channelSummary: undefined,
+    },
+  };
+  const { app, fake } = await mountChat(
+    "typical",
+    (f) => {
+      f.respond("channel.message.list", [
+        {
+          id: "m-root",
+          channel: "general",
+          number: 1,
+          from: "orchestrator",
+          name: "全能主助手",
+          actor: { kind: "agent", role: "orchestrator", id: "orchestrator" },
+          kind: "chat",
+          text: "已派 Ada 处理 #4",
+          at: SCENARIO_NOW - 3 * min,
+          attachments: [],
+          embeds: [],
+          reactions: [],
+        },
+      ]);
+    },
+    { locale: "zh", state },
+  );
+  await fake.pumpUntil(app, () => app.count("id:thread-preview-general:1") === 1);
+
+  expect(app.texts().join("\n")).not.toContain("no API key is set");
+  expect(app.shows(`id:channel-row-general >> text:Ada #4: ${localized}`)).toBe(true);
+  expect(app.shows(`id:thread-preview-general:1 >> text:${localized}`)).toBe(true);
+
+  await app.press("id:threads-toggle");
+  await fake.pumpUntil(app, () => app.count("id:thread-general:1") === 1);
+  expect(app.texts().join("\n")).not.toContain("no API key is set");
+  expect(app.shows(`id:thread-general:1 >> text:${t("shared.join.labeled", { label: "Ada #4", text: localized })}`)).toBe(true);
 });

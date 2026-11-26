@@ -88,6 +88,8 @@ export function IssueList(props: {
                 const hidden = computed(() => (folding() ? ordered().length - closedShown : 0));
                 const isFolded = computed(() => folded().has(g().key));
                 const showOlder = computed(() => hidden() > 0 || (groupLane() === "closed" && props.older && g().rows.length > closedShown));
+                const isEmpty = computed(() => rows().length === 0 && !showOlder());
+                const showBody = computed(() => !isFolded() && !isEmpty());
                 const label = computed(() => {
                   const l = groupLane();
                   return props.grouping === "status" && l
@@ -101,19 +103,28 @@ export function IssueList(props: {
                         : t("web.issue.list.all");
                 });
                 return (
-                  <View accessibilityLabel={label()} testID="issue-group" class="mb-3 overflow-hidden rounded-lg border border-line bg-page">
-                    <View class={`h-8.5 flex-row items-center bg-side pr-1.5 ${isFolded() ? "" : "border-b border-line"}`}>
+                  <View
+                    accessibilityLabel={label()}
+                    testID="issue-group"
+                    class={`mb-3 overflow-hidden rounded-lg border border-line bg-page ${isEmpty() ? "opacity-75" : ""}`}
+                  >
+                    <View
+                      class={`h-8.5 flex-row items-center pr-1.5 ${
+                        isEmpty() ? "rounded-lg bg-page" : showBody() ? "border-b border-line bg-side" : "rounded-lg bg-side"
+                      }`}
+                    >
                       <View
                         role="button"
                         testID={`issue-group-${g().key || "none"}`}
                         onPress={() => fold(g().key)}
                         accessibilityLabel={isFolded() ? t("web.issue.list.unfold", { group: label() }) : t("web.issue.list.fold", { group: label() })}
+                        accessibilityState={{ expanded: showBody() }}
                         class="h-full min-w-0 flex-1 flex-row items-center gap-2 px-2.5 hover:bg-hover"
                       >
                         <View
                           class="w-4 shrink-0 items-center justify-center"
                           style={{
-                            transform: [{ rotate: isFolded() ? "0deg" : "90deg" }],
+                            transform: [{ rotate: showBody() ? "90deg" : "0deg" }],
                             ...(motionOff() ? {} : { transitionProperty: "transform", transitionDuration: motionDuration(120) }),
                           }}
                         >
@@ -136,7 +147,7 @@ export function IssueList(props: {
                             </If>
                           </View>
                         </If>
-                        <Text class="truncate text-xs font-semibold text-ink">{label()}</Text>
+                        <Text class={`truncate text-xs font-semibold ${isEmpty() ? "text-muted" : "text-ink"}`}>{label()}</Text>
                         <CountPill count={g().rows.length} />
                       </View>
                       <If when={canAdd(g())}>
@@ -149,8 +160,8 @@ export function IssueList(props: {
                         />
                       </If>
                     </View>
-                    <If when={!isFolded()}>
-                      <View>
+                    <If when={showBody()}>
+                      <View testID="issue-group-body">
                         <Each of={rows()} key={(c) => c.id}>
                           {(c, i) => (
                             <Row

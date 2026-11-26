@@ -7,6 +7,7 @@ import { omitUndefined, oneLine } from "@vibevalley/protocol/rules";
 import { jsonString } from "@vibevalley/protocol/schema";
 
 import { big, tookText } from "../../infra/base/format";
+import { localizeRuntimeError } from "../../infra/runtimeError";
 import { mergeSteps, shownEvents, stepLimit } from "../../infra/sessionRuns";
 
 export { mergeSteps, shownEvents };
@@ -235,6 +236,10 @@ function firstPayloadLine(block: string): string {
 
 /** Strips internal orchestrator prompt-injection scaffolding for collapsed trajectory rows; expanded views keep the full raw text. */
 export function collapsedStepSummary(step: SessionEvent, body: string): string {
+  return localizeRuntimeError(collapsedStepSummaryRaw(step, body)).text;
+}
+
+function collapsedStepSummaryRaw(step: SessionEvent, body: string): string {
   if (step.type !== "user/message" || !PROMPT_SCAFFOLDING_RE.test(body)) {
     return oneLine(body).trim();
   }

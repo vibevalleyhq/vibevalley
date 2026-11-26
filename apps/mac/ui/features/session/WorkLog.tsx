@@ -14,6 +14,7 @@ import { mix, tone } from "../../design/tone";
 import { useNow } from "../../infra/base/dom";
 import { ago, tookText } from "../../infra/base/format";
 import { useTimeout } from "../../infra/base/timer";
+import { localizeRuntimeError } from "../../infra/runtimeError";
 import { createEffect } from "../../infra/solid";
 import { createRunEvents } from "./events";
 import {
@@ -176,7 +177,7 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
       <If when={props.run.asked}>
         {(asked) => (
           <View class="rounded-md border-l-2 px-3 py-2" style={{ backgroundColor: mix("wheat", 0.14), borderColor: mix("wheat", 0.65) }}>
-            <Folded text={asked().text} lines={4} />
+            <Folded text={localizeRuntimeError(asked().text).text} lines={4} />
           </View>
         )}
       </If>
@@ -277,7 +278,7 @@ function Line(props: { mark: IconName; step: SessionEvent; now: number; kind: Li
       <View class="mt-0.5 h-3.5 w-3.5 shrink-0 items-center justify-center">
         <Icon name={props.mark} size={12} tone={style().iconTone} />
       </View>
-      <Text class={`min-w-0 flex-1 text-xs tabular-nums ${style().text}`}>{props.text ?? props.step.text}</Text>
+      <Text class={`min-w-0 flex-1 text-xs tabular-nums ${style().text}`}>{props.text ?? localizeRuntimeError(props.step.text).text}</Text>
       <When at={props.step.time} now={props.now} />
     </View>
   );
@@ -291,7 +292,7 @@ export function WorkLogStep(props: { step: SessionEvent; now: number }) {
     <>
       <If when={type() === "user/message"}>
         <Box tint={mix("wheat", 0.14)} label={sub() ? t("web.session.log.subagentGot") : t("web.session.log.told")} step={props.step} now={props.now}>
-          <Folded text={props.step.text} lines={4} />
+          <Folded text={localizeRuntimeError(props.step.text).text} lines={4} />
         </Box>
       </If>
       <If when={type() === "memory/recalled"}>

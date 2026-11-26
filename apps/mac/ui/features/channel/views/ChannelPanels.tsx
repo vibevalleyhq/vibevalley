@@ -18,6 +18,7 @@ import { api } from "../../../infra/api";
 import { Keyed, useNow } from "../../../infra/base/dom";
 import { orchestratorMood, useBoardSlice, useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { Link as A, useRouter } from "../../../infra/router";
+import { localizeRuntimeError } from "../../../infra/runtimeError";
 import { useLatest } from "../../../infra/state/atom";
 import { useIntents } from "../../../infra/state/intent";
 import { archiveSet, markState, notifySet, sameMessage, setMark, useMarkedChat } from "../model/marks";
@@ -80,7 +81,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
                 <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{m().from === userId ? t("web.channel.messages.user") : m().name}</Text>
                 <Text class="shrink-0 text-2xs text-faint tabular-nums">{workbenchClock(m().at)}</Text>
               </View>
-              <Text class="line-clamp-3 text-sm text-ink">{m().text}</Text>
+              <Text class="line-clamp-3 text-sm text-ink">{localizeRuntimeError(m().text).text}</Text>
             </View>
           )}
         </Each>
@@ -384,7 +385,10 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
             <If when={props.thread.last}>
               {(m) => (
                 <Text class="truncate text-xs text-muted">
-                  {t("shared.join.labeled", { label: m().from === userId ? t("web.channel.messages.user") : m().name, text: m().text })}
+                  {t("shared.join.labeled", {
+                    label: m().from === userId ? t("web.channel.messages.user") : m().name,
+                    text: localizeRuntimeError(m().text).text,
+                  })}
                 </Text>
               )}
             </If>
@@ -528,7 +532,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
                   <Text class="text-xs font-semibold text-ink">{h().message.from === userId ? t("web.channel.messages.user") : h().message.name}</Text>
                   <Text class="text-xs text-muted tabular-nums">{workbenchClock(h().message.at)}</Text>
                 </View>
-                <Text class="line-clamp-2 text-sm text-ink">{h().message.text}</Text>
+                <Text class="line-clamp-2 text-sm text-ink">{localizeRuntimeError(h().message.text).text}</Text>
               </View>
             )}
           </Each>

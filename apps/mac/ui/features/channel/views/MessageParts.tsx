@@ -22,6 +22,7 @@ import { hostApi } from "../../../infra/bridge";
 import { useCollabSlice } from "../../../infra/frame";
 import { formatGenUiAction, type VvGenUiActionEvent } from "../../../infra/rich";
 import { useRouter } from "../../../infra/router";
+import { localizeRuntimeError } from "../../../infra/runtimeError";
 import { createEffect } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { transport } from "../../../infra/transport";
@@ -59,7 +60,9 @@ export function ReplyQuote(props: { channel: string; number: number }) {
         {(m) => (
           <If when={m().deleted === undefined} else={<Text class="text-xs text-muted italic">{t("web.channel.messages.replyGone")}</Text>}>
             <Text class="shrink-0 text-xs font-medium text-ink">{nameOf(m())}</Text>
-            <Text class="min-w-0 flex-1 truncate text-xs text-muted">{m().text || list(m().attachments.map((a) => a.name))}</Text>
+            <Text class="min-w-0 flex-1 truncate text-xs text-muted">
+              {m().text ? localizeRuntimeError(m().text).text : list(m().attachments.map((a) => a.name))}
+            </Text>
           </If>
         )}
       </If>
@@ -106,7 +109,11 @@ export function MessageBody(props: { m: ChatMessage }) {
               fold.set(!isLong ? "short" : prev === "short" ? "folded" : prev);
             }}
           >
-            <Markdown text={props.m.text} mentions onGenUiAction={(ev) => handleChannelGenUiAction(props.m, ev)} />
+            <Markdown
+              text={props.m.actor.kind === "user" ? props.m.text : localizeRuntimeError(props.m.text).text}
+              mentions
+              onGenUiAction={(ev) => handleChannelGenUiAction(props.m, ev)}
+            />
           </View>
         </View>
         <If when={fold() !== "short"}>
@@ -598,7 +605,9 @@ function LinkedCard(props: { at: LinkedMessage }) {
       <If when={m()}>
         {(said) => (
           <If when={said().deleted === undefined} else={<Text class="text-sm text-muted italic">{t("web.channel.messages.replyGone")}</Text>}>
-            <Text class="line-clamp-3 text-sm text-ink">{said().text || list(said().attachments.map((a) => a.name))}</Text>
+            <Text class="line-clamp-3 text-sm text-ink">
+              {said().text ? localizeRuntimeError(said().text).text : list(said().attachments.map((a) => a.name))}
+            </Text>
           </If>
         )}
       </If>

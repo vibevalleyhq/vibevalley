@@ -18,6 +18,7 @@ import { mix, tone } from "../../design/tone";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { useTimeout } from "../../infra/base/timer";
+import { localizeRuntimeError } from "../../infra/runtimeError";
 import { createEffect, createMemo } from "../../infra/solid";
 import { createSessionEvents } from "./events";
 import {
@@ -134,7 +135,7 @@ function tagToneOf(step: SessionEvent): TagTone {
 }
 
 function stepTextOf(step: SessionEvent): string {
-  if (step.text) return step.text;
+  if (step.text) return localizeRuntimeError(step.text).text;
   if (step.type === "llm/usage" && step.tokens) {
     return t("web.session.trajectory.tokens", {
       input: tokensText(Math.round(step.tokens.input + step.tokens.cacheRead)),

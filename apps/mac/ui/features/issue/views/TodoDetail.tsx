@@ -226,9 +226,11 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         </View>
       </If>
       <Input
+        multiline
+        submitBehavior="submit"
         testID="issue-title"
         value={d().title}
-        onChange={(e) => edit({ title: e.value })}
+        onChange={(e) => edit({ title: e.value.replace(/[\r\n]+/gu, " ") })}
         placeholder={t("web.issue.todo.titleHint")}
         accessibilityLabel={t("web.issue.todo.title")}
         class={`${bare} -mx-2 px-2 py-1 text-2xl leading-snug font-semibold`}
@@ -320,8 +322,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           onChange={(e) => edit({ description: e.value })}
           placeholder={t("web.issue.todo.descriptionHint")}
           accessibilityLabel={t("web.issue.todo.description")}
-          class={`${bare} -mx-2 px-2 py-1.5 text-base`}
-          style={{ minHeight: 6 * 22 + 12 }}
+          class={`${bare} -mx-2 min-h-22 px-2 py-1.5 text-base`}
         />
         <View class="mt-4 overflow-hidden rounded-lg border border-line bg-page px-3.5">
           <Fold

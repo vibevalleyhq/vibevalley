@@ -21,6 +21,7 @@ import { orchestratorMood, type OrchestratorMood, useCollabSlice, useSessionsSli
 import { ready, settingsQuery, useAgents, useQuery } from "../../../infra/query";
 import { fixOf } from "../../../infra/readiness";
 import { useRouter } from "../../../infra/router";
+import { localizeRuntimeError } from "../../../infra/runtimeError";
 import { runsHref } from "../../session";
 import { useMarkedChat } from "../model/marks";
 import { archivedOf, type ChatFilter, channelName, channelTime, chatPath, directPeerOf, sidebarChannelsOf, unreadTotal, unreadUnder } from "../model/places";
@@ -372,7 +373,7 @@ function ChannelRow(props: {
     }
     const last = props.channel.last;
     if (last) {
-      const body = last.text.replace(/\s+/gu, " ").trim();
+      const body = localizeRuntimeError(last.text.replace(/\s+/gu, " ").trim()).text;
       if (body) {
         const who = last.from === userId ? t("web.channel.messages.user") : last.name;
         const formatted = props.channel.type === "channel" ? (who ? `${who}: ${body}` : body) : last.from === userId ? `${who}: ${body}` : body;

@@ -226,4 +226,15 @@ test("Board integrates filter bar, preserves long card titles, and suppresses un
   expect(app.texts()).toContain(LONG_TITLE);
   // Only the confirmed todo shows card-unassigned; backlog draft avoids double badge noise.
   expect(app.count("id:card-unassigned")).toBe(1);
+
+  // Switch to List view: empty status groups omit the body container and stay compact without hollow bars.
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
+
+  // Todo group has 2 issues; working/waiting/closed are empty (0 rows) and render no group body.
+  expect(app.count("id:issue-group")).toBeGreaterThanOrEqual(3);
+  expect(app.count("id:issue-group-body")).toBe(1);
+  expect(app.count("id:issue-group-todo")).toBe(1);
+  expect(app.count("id:issue-group-working")).toBe(1);
+  expect(app.count("id:issue-group-waiting")).toBe(1);
 });

@@ -22,6 +22,7 @@ import { useTimeout } from "../../infra/base/timer";
 import { useBoardSlice, useSessionsSlice } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useAgents, useQuery } from "../../infra/query";
 import { useRouter, useSearch } from "../../infra/router";
+import { localizeRuntimeError } from "../../infra/runtimeError";
 import { createEffect, createMemo } from "../../infra/solid";
 import {
   buildRunEntries,
@@ -137,7 +138,7 @@ function entryName(entry: RunEntry): string {
 function entrySubtitle(entry: RunEntry): string {
   switch (entry.kind) {
     case "orchestrator":
-      return entry.live?.phaseText || entry.agent.duty || t("web.agent.list.orchestratorLine");
+      return (entry.live?.phaseText ? localizeRuntimeError(entry.live.phaseText).text : "") || entry.agent.duty || t("web.agent.list.orchestratorLine");
     case "worker":
       if (entry.issue) return entry.issue.title;
       return oneLine(entry.session.brief).trim() || sessionRepo(entry.session) || "";

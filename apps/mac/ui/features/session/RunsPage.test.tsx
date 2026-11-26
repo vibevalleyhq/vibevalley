@@ -1,6 +1,9 @@
 import "../../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
+import { setLocale, t } from "@vibevalley/i18n";
+import "@vibevalley/i18n/catalogs";
+
 import { fakeHost } from "../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../fixtures/scenarios";
 
@@ -141,4 +144,37 @@ test("RunsPage shows active rail bar, strips collapsed prompt scaffolding while 
   await app.press("id:place-issues");
   await fake.pumpUntil(app, () => app.count("id:issues-page") === 1);
   expect(app.count("id:rail-runs-active-bar")).toBe(0);
+});
+
+test("RunsPage localizes raw runtime API-key errors in trajectory step summaries and run/error rows", async () => {
+  setLocale("zh");
+  const localized = t("web.issue.error.missingApiKey");
+  const threadReportPrompt = [
+    "【现在】2026-11-26 21:05",
+    "[来源：群聊]（帮工写的是它的汇报）",
+    "【群聊】#general:1 里有给你的话：",
+    "[target=#general:1 msg=2 from=w1 Ada #4] no API key is set for the model",
+  ].join("\n");
+
+  const fake = fakeHost(scenarios.typical, { route: "/runs?session=orchestrator", locale: "zh" });
+  fake.respond("session.event.list", () => ({
+    events: [
+      { seq: 1, run: "r1", type: "user/message", text: threadReportPrompt, time: SCENARIO_NOW - 10_000, revision: 1 },
+      { seq: 2, run: "r1", type: "run/error", text: "no API key is set for the model", time: SCENARIO_NOW - 9_000, revision: 1 },
+    ],
+  }));
+
+  const app = await open("../../app/main.tsx", {
+    width: 1200,
+    height: 800,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:step-toggle-1") === 1 && app.count("id:step-toggle-2") === 1);
+
+  expect(app.texts().join("\n")).not.toContain("no API key is set");
+  expect(app.shows(`id:step-toggle-1 >> text:#general:1 · w1 Ada #4: ${localized}`)).toBe(true);
+  expect(app.shows(`id:step-toggle-2 >> text:${localized}`)).toBe(true);
 });
