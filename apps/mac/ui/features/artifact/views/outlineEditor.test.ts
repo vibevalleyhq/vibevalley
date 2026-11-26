@@ -27,7 +27,7 @@ function sampleDoc(): OutlineDocument {
     version: 1,
     rootIds: ["h1", "b1", "t1", "t2"],
     nodes: {
-      h1: { id: "h1", text: "Plan", kind: "heading", children: [] },
+      h1: { id: "h1", text: "Goals", kind: "heading", children: [] },
       b1: { id: "b1", text: "Overview", kind: "bullet", children: ["b1a", "b1b"] },
       b1a: { id: "b1a", text: "Child A", kind: "bullet", children: [] },
       b1b: { id: "b1b", text: "Child B", kind: "todo", checked: true, children: [] },
