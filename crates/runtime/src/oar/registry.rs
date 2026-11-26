@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
+use vibevalley_mcp::McpServerConfig;
+
+use super::mcp_install::{McpHostId, McpHostReport, McpInstallError};
 use super::traits::{Runtime, find_runtime};
 use super::types::{AgentError, Event, Result};
-use super::{acp, claude, codex, process, record, scripted, sdk};
+use super::{acp, claude, codex, mcp_install, process, record, scripted, sdk};
 
 pub struct Registry {
     runtimes: Vec<Arc<dyn Runtime>>,
@@ -31,6 +34,22 @@ impl Registry {
 
     pub fn require(&self, id: &str) -> Result<Arc<dyn Runtime>> {
         self.get(id).ok_or_else(|| AgentError::UnknownRuntime(id.to_string()))
+    }
+
+    pub fn list_mcp_hosts(&self, desired: &McpServerConfig) -> Vec<McpHostReport> {
+        mcp_install::list_mcp_hosts(desired)
+    }
+
+    pub fn mcp_status(&self, host: McpHostId, desired: &McpServerConfig) -> McpHostReport {
+        mcp_install::mcp_status(host, desired)
+    }
+
+    pub fn install_mcp_host(&self, host: McpHostId, config: &McpServerConfig) -> std::result::Result<McpHostReport, McpInstallError> {
+        mcp_install::install_mcp_host(host, config)
+    }
+
+    pub fn uninstall_mcp_host(&self, host: McpHostId, server_name: &str) -> std::result::Result<McpHostReport, McpInstallError> {
+        mcp_install::uninstall_mcp_host(host, server_name)
     }
 }
 

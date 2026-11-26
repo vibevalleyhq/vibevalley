@@ -1109,3 +1109,164 @@ async fn core_session_records_read_back_from_disk_and_cap_in_memory_history() {
     mem_session.dispose().await;
     until(&mut mem_rx, |k| matches!(k, EventKind::SessionEnded)).await;
 }
+
+#[test]
+fn acp_mcp_forwarding_preserves_http_headers_stateless_meta_and_stdio_v1_v2() {
+    use serde_json::json;
+    use vibevalley_mcp::{EXT_SKILLS, HEADER_PROTOCOL_VERSION, META_PROTOCOL_VERSION, McpServerConfig, PROTOCOL_STATELESS, SKILL_URI_SCHEME};
+
+    let vv_http = McpServerConfig::streamable_http("vibevalley", "http://127.0.0.1:8789/mcp", true)
+        .with_header("Authorization", "Bearer tok-xyz")
+        .with_header("X-VibeValley-Session", "sess-1");
+    let local_stdio = McpServerConfig::stdio(
+        "local-tools",
+        "/usr/local/bin/vibevalley",
+        vec!["mcp".into(), "--channel".into(), "alpha".into()],
+    )
+    .with_env("VIBEVALLEY_CHANNEL", "alpha");
+
+    // Round-trip McpServerConfig <-> oar::McpServer keeps stateless flag & headers.
+    let converted = McpServer::from_mcp_config(&vv_http);
+    let round_tripped = converted.to_mcp_config();
+    assert_eq!(round_tripped.name, "vibevalley");
+    assert!(matches!(
+        round_tripped.transport,
+        vibevalley_mcp::McpTransportSpec::StreamableHttp {
+            ref url,
+            ref headers,
+            stateless: true,
+        } if url == "http://127.0.0.1:8789/mcp"
+            && headers.get("Authorization").map(String::as_str) == Some("Bearer tok-xyz")
+            && headers.get(HEADER_PROTOCOL_VERSION).map(String::as_str) == Some(PROTOCOL_STATELESS)
+    ));
+
+    // ACP v2 (Antigravity): HTTP preserves headers + stateless/skills _meta; Stdio carries `type: "stdio"`.
+    let v2 = crate::oar::acp::encode_acp_mcp_server_configs(crate::oar::acp::AcpFlavor::Antigravity, &[vv_http.clone(), local_stdio.clone()]).unwrap();
+    assert_eq!(v2.len(), 2);
+    assert_eq!(v2[0]["type"], "http");
+    assert_eq!(v2[0]["name"], "vibevalley");
+    assert_eq!(v2[0]["url"], "http://127.0.0.1:8789/mcp");
+    let v2_headers = v2[0]["headers"].as_array().unwrap();
+    assert!(v2_headers.contains(&json!({ "name": "Authorization", "value": "Bearer tok-xyz" })));
+    assert!(v2_headers.contains(&json!({ "name": "X-VibeValley-Session", "value": "sess-1" })));
+    assert!(v2_headers.contains(&json!({ "name": HEADER_PROTOCOL_VERSION, "value": PROTOCOL_STATELESS })));
+    assert_eq!(v2[0]["_meta"][META_PROTOCOL_VERSION], PROTOCOL_STATELESS);
+    assert_eq!(v2[0]["_meta"][EXT_SKILLS]["scheme"], SKILL_URI_SCHEME);
+
+    assert_eq!(v2[1]["type"], "stdio");
+    assert_eq!(v2[1]["name"], "local-tools");
+    assert_eq!(v2[1]["command"], "/usr/local/bin/vibevalley");
+    assert_eq!(v2[1]["args"], json!(["mcp", "--channel", "alpha"]));
+    assert_eq!(v2[1]["env"], json!([{ "name": "VIBEVALLEY_CHANNEL", "value": "alpha" }]));
+
+    // ACP v1 (Generic): HTTP validates against v1 schema without dropping headers or _meta; Stdio is untagged.
+    let v1 = crate::oar::acp::encode_acp_mcp_server_configs(crate::oar::acp::AcpFlavor::Generic, &[vv_http, local_stdio]).unwrap();
+    assert_eq!(v1.len(), 2);
+    assert_eq!(v1[0]["type"], "http");
+    assert_eq!(v1[0]["url"], "http://127.0.0.1:8789/mcp");
+    assert_eq!(v1[0]["_meta"][META_PROTOCOL_VERSION], PROTOCOL_STATELESS);
+    assert_eq!(v1[0]["_meta"][EXT_SKILLS]["scheme"], SKILL_URI_SCHEME);
+    let v1_headers = v1[0]["headers"].as_array().unwrap();
+    assert!(v1_headers.contains(&json!({ "name": "Authorization", "value": "Bearer tok-xyz" })));
+    assert!(v1_headers.contains(&json!({ "name": HEADER_PROTOCOL_VERSION, "value": PROTOCOL_STATELESS })));
+    assert!(v1[1].get("type").is_none());
+    assert_eq!(v1[1]["command"], "/usr/local/bin/vibevalley");
+
+    // Capability probes handle both ACP v1 and v2 shapes.
+    assert!(crate::oar::acp::agent_supports_http_mcp(
+        crate::oar::acp::AcpFlavor::Generic,
+        &json!({ "agentCapabilities": { "mcpCapabilities": { "http": true } } })
+    ));
+    assert!(crate::oar::acp::agent_supports_http_mcp(
+        crate::oar::acp::AcpFlavor::Antigravity,
+        &json!({ "agentCapabilities": { "session": { "mcp": { "http": {} } } } })
+    ));
+    assert!(!crate::oar::acp::agent_supports_http_mcp(
+        crate::oar::acp::AcpFlavor::Generic,
+        &json!({ "agentCapabilities": {} })
+    ));
+}
+
+#[tokio::test]
+async fn acp_runtime_open_forwards_stateless_http_mcp_and_headers_over_wire() {
+    use std::os::unix::fs::PermissionsExt;
+
+    use serde_json::json;
+    use vibevalley_mcp::{EXT_SKILLS, HEADER_PROTOCOL_VERSION, META_PROTOCOL_VERSION, McpServerConfig, PROTOCOL_STATELESS, SKILL_URI_SCHEME};
+
+    let dir = tempfile::tempdir().unwrap();
+    let log_path = dir.path().join("acp-wire.jsonl");
+    let fake_agy = dir.path().join("fake-agy-acp");
+    std::fs::write(
+        &fake_agy,
+        format!(
+            r#"#!/usr/bin/env python3
+import json, sys
+
+log_path = {log_path:?}
+for raw in sys.stdin:
+    line = raw.strip()
+    if not line:
+        continue
+    with open(log_path, "a", encoding="utf-8") as fh:
+        fh.write(line + "\n")
+    msg = json.loads(line)
+    method = msg.get("method")
+    msg_id = msg.get("id")
+    if method == "initialize":
+        reply = {{
+            "jsonrpc": "2.0",
+            "id": msg_id,
+            "result": {{
+                "protocolVersion": 2,
+                "agentCapabilities": {{"session": {{"mcp": {{"http": {{}}, "stdio": {{}}}}}}}},
+            }},
+        }}
+        sys.stdout.write(json.dumps(reply) + "\n")
+        sys.stdout.flush()
+    elif method == "session/new":
+        reply = {{
+            "jsonrpc": "2.0",
+            "id": msg_id,
+            "result": {{"sessionId": "sess-acp-1"}},
+        }}
+        sys.stdout.write(json.dumps(reply) + "\n")
+        sys.stdout.flush()
+"#,
+            log_path = log_path.to_string_lossy()
+        ),
+    )
+    .unwrap();
+    std::fs::set_permissions(&fake_agy, PermissionsExt::from_mode(0o755)).unwrap();
+
+    let vv_mcp = McpServerConfig::streamable_http("vibevalley", "http://127.0.0.1:8789/mcp", true).with_header("Authorization", "Bearer vv-acp-token");
+    let runtime = crate::oar::acp::AcpRuntime::new(crate::oar::acp::AcpAgentSpec::new("antigravity", "Antigravity CLI", "agy", ["acp"]));
+    let session = runtime
+        .open(SessionOptions {
+            cwd: dir.path().to_path_buf(),
+            bin_path: Some(fake_agy),
+            request_timeout: Some(Duration::from_secs(5)),
+            mcp_servers: vec![McpServer::from_mcp_config(&vv_mcp)],
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    session.dispose().await;
+
+    let captured = std::fs::read_to_string(&log_path).unwrap();
+    let new_req: Value = captured
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .find(|v| v["method"] == "session/new")
+        .expect("session/new request logged");
+    let servers = new_req["params"]["mcpServers"].as_array().expect("mcpServers array");
+    assert_eq!(servers.len(), 1);
+    assert_eq!(servers[0]["type"], "http");
+    assert_eq!(servers[0]["name"], "vibevalley");
+    assert_eq!(servers[0]["url"], "http://127.0.0.1:8789/mcp");
+    let headers = servers[0]["headers"].as_array().unwrap();
+    assert!(headers.contains(&json!({ "name": "Authorization", "value": "Bearer vv-acp-token" })));
+    assert!(headers.contains(&json!({ "name": HEADER_PROTOCOL_VERSION, "value": PROTOCOL_STATELESS })));
+    assert_eq!(servers[0]["_meta"][META_PROTOCOL_VERSION], PROTOCOL_STATELESS);
+    assert_eq!(servers[0]["_meta"][EXT_SKILLS]["scheme"], SKILL_URI_SCHEME);
+}

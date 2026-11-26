@@ -476,6 +476,115 @@ fn typed<T: serde::de::DeserializeOwned>(value: Value) -> std::result::Result<T,
     serde_json::from_value(value).map_err(|e| agent_client_protocol::Error::internal_error().data(e.to_string()))
 }
 
+/// Checks whether the agent's ACP `initialize` capabilities advertise HTTP MCP support
+/// (ACP v2 `agentCapabilities.session.mcp.http` or ACP v1 `agentCapabilities.mcpCapabilities.http`).
+#[cfg_attr(not(test), allow(dead_code))]
+pub(crate) fn agent_supports_http_mcp(flavor: AcpFlavor, init: &Value) -> bool {
+    let caps = init.get("agentCapabilities").unwrap_or(&Value::Null);
+    match flavor {
+        AcpFlavor::Antigravity => {
+            caps.pointer("/session/mcp/http").is_some_and(|v| !v.is_null() && v.as_bool() != Some(false))
+                || caps.pointer("/mcpCapabilities/http").and_then(Value::as_bool) == Some(true)
+        }
+        AcpFlavor::Generic => {
+            caps.pointer("/mcpCapabilities/http").and_then(Value::as_bool) == Some(true)
+                || caps.pointer("/session/mcp/http").is_some_and(|v| !v.is_null() && v.as_bool() != Some(false))
+        }
+    }
+}
+
+/// Encodes OAR [`McpServer`] specs into ACP `mcpServers` JSON entries for `session/new`,
+/// `session/resume`, and `session/load`.
+///
+/// - Preserves all HTTP headers verbatim (including `Authorization` and `MCP-Protocol-Version`).
+/// - For SEP-2575 stateless Streamable HTTP endpoints (`MCP-Protocol-Version: 2026-07-28`),
+///   attaches `_meta` advertising protocol version and SEP-2640 `skill://` resource discovery.
+/// - Emits ACP v2 tagged `"type": "stdio"` for `AcpFlavor::Antigravity` and ACP v1 untagged
+///   stdio for `AcpFlavor::Generic`, validating v1 entries against `agent_client_protocol::v1::schema::McpServer`.
+pub(crate) fn encode_acp_mcp_servers(flavor: AcpFlavor, servers: &[McpServer]) -> Result<Vec<Value>> {
+    let mut encoded = Vec::with_capacity(servers.len());
+    for server in servers {
+        match server {
+            McpServer::Stdio { name, command, args, env, .. } => {
+                if name.trim().is_empty() || command.trim().is_empty() {
+                    return Err(AgentError::Protocol("ACP stdio MCP server requires non-empty name and command".into()));
+                }
+                let env_entries: Vec<Value> = env.iter().map(|(k, v)| json!({ "name": k, "value": v })).collect();
+                let mut entry = json!({
+                    "name": name,
+                    "command": command,
+                    "args": args,
+                    "env": env_entries,
+                });
+                match flavor {
+                    AcpFlavor::Antigravity => {
+                        if let Value::Object(ref mut map) = entry {
+                            map.insert("type".into(), json!("stdio"));
+                        }
+                        encoded.push(entry);
+                    }
+                    AcpFlavor::Generic => {
+                        let validated: agent_client_protocol::v1::schema::McpServer =
+                            typed(entry).map_err(|e| AgentError::Protocol(acp_error("mcp servers", &e)))?;
+                        let value = serde_json::to_value(&validated).map_err(|e| AgentError::Protocol(format!("mcp servers: {e}")))?;
+                        encoded.push(value);
+                    }
+                }
+            }
+            McpServer::Http { name, url, headers } => {
+                if name.trim().is_empty() || url.trim().is_empty() {
+                    return Err(AgentError::Protocol("ACP HTTP MCP server requires non-empty name and url".into()));
+                }
+                let header_entries: Vec<Value> = headers.iter().map(|(k, v)| json!({ "name": k, "value": v })).collect();
+                let is_stateless = headers
+                    .iter()
+                    .any(|(k, v)| k.eq_ignore_ascii_case(vibevalley_mcp::HEADER_PROTOCOL_VERSION) && v.trim() == vibevalley_mcp::PROTOCOL_STATELESS);
+                let mut entry = json!({
+                    "type": "http",
+                    "name": name,
+                    "url": url,
+                    "headers": header_entries,
+                });
+                if is_stateless && let Value::Object(ref mut map) = entry {
+                    map.insert(
+                        "_meta".into(),
+                        json!({
+                            vibevalley_mcp::META_PROTOCOL_VERSION: vibevalley_mcp::PROTOCOL_STATELESS,
+                            vibevalley_mcp::EXT_SKILLS: {
+                                "scheme": vibevalley_mcp::SKILL_URI_SCHEME,
+                            },
+                        }),
+                    );
+                }
+                match flavor {
+                    AcpFlavor::Antigravity => {
+                        encoded.push(entry);
+                    }
+                    AcpFlavor::Generic => {
+                        let validated: agent_client_protocol::v1::schema::McpServer =
+                            typed(entry).map_err(|e| AgentError::Protocol(acp_error("mcp servers", &e)))?;
+                        let value = serde_json::to_value(&validated).map_err(|e| AgentError::Protocol(format!("mcp servers: {e}")))?;
+                        encoded.push(value);
+                    }
+                }
+            }
+        }
+    }
+    Ok(encoded)
+}
+
+#[cfg(test)]
+pub(crate) fn encode_acp_mcp_server_configs(flavor: AcpFlavor, configs: &[vibevalley_mcp::McpServerConfig]) -> Result<Vec<Value>> {
+    let servers: Vec<McpServer> = configs.iter().map(McpServer::from_mcp_config).collect();
+    encode_acp_mcp_servers(flavor, &servers)
+}
+
+fn attach_mcp_servers(params: &mut Value, servers: &[Value]) {
+    if let Value::Object(map) = params {
+        map.insert("mcpServers".into(), Value::Array(servers.to_vec()));
+    }
+}
+
 async fn send_set_config_option(
     cx: &ConnectionTo<Agent>,
     session_id: &str,
@@ -613,22 +722,7 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
         }
     };
 
-    let mcp_servers: Vec<agent_client_protocol::v1::schema::McpServer> = typed(json!(
-        opts.mcp_servers
-            .iter()
-            .map(|server| match server {
-                McpServer::Stdio { name, command, args, env, .. } => json!({
-                    "name": name, "command": command, "args": args,
-                    "env": env.iter().map(|(k, v)| json!({ "name": k, "value": v })).collect::<Vec<_>>(),
-                }),
-                McpServer::Http { name, url, headers } => json!({
-                    "type": "http", "name": name, "url": url,
-                    "headers": headers.iter().map(|(k, v)| json!({ "name": k, "value": v })).collect::<Vec<_>>(),
-                }),
-            })
-            .collect::<Vec<_>>()
-    ))
-    .map_err(|e| AgentError::Protocol(acp_error("mcp servers", &e)))?;
+    let mcp_servers = encode_acp_mcp_servers(shared.flavor, &opts.mcp_servers)?;
 
     let open_error = |context: &str, error: agent_client_protocol::Error| {
         if is_auth_required(shared.flavor, &error) {
@@ -642,14 +736,15 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
 
     let (session_id, session) = match &opts.resume {
         None => {
-            let mut request = NewSessionRequest::new(&opts.cwd).mcp_servers(mcp_servers.clone());
+            let mut request = NewSessionRequest::new(&opts.cwd);
             if !meta.is_empty() {
                 request.meta = Some(meta.clone());
             }
             if let Some(prompt) = system_prompt {
                 request = request.system_prompt(prompt);
             }
-            let params = serde_json::to_value(&request).map_err(|e| AgentError::Protocol(format!("session/new: {e}")))?;
+            let mut params = serde_json::to_value(&request).map_err(|e| AgentError::Protocol(format!("session/new: {e}")))?;
+            attach_mcp_servers(&mut params, &mcp_servers);
             let msg = UntypedMessage::new("session/new", params).map_err(|e| AgentError::Protocol(acp_error("session/new", &e)))?;
             let reply = cx.send_request(msg).block_task().await.map_err(|e| open_error("session/new", e))?;
             let id = str_of(&reply, "sessionId")
@@ -658,27 +753,29 @@ async fn handshake(cx: &ConnectionTo<Agent>, shared: &Shared, opts: &SessionOpti
             (id, reply)
         }
         Some(id) if session_capability("resume") => {
-            let mut request = ResumeSessionRequest::new(id.clone(), &opts.cwd).mcp_servers(mcp_servers.clone());
+            let mut request = ResumeSessionRequest::new(id.clone(), &opts.cwd);
             if !meta.is_empty() {
                 request.meta = Some(meta.clone());
             }
             if let Some(prompt) = system_prompt {
                 request = request.system_prompt(prompt);
             }
-            let params = serde_json::to_value(&request).map_err(|e| AgentError::Protocol(format!("session/resume: {e}")))?;
+            let mut params = serde_json::to_value(&request).map_err(|e| AgentError::Protocol(format!("session/resume: {e}")))?;
+            attach_mcp_servers(&mut params, &mcp_servers);
             let msg = UntypedMessage::new("session/resume", params).map_err(|e| AgentError::Protocol(acp_error("session/resume", &e)))?;
             let reply = cx.send_request(msg).block_task().await.map_err(|e| open_error("session/resume", e))?;
             (id.clone(), reply)
         }
         Some(id) if capabilities.get("loadSession").and_then(Value::as_bool) == Some(true) || session_capability("load") => {
-            let mut request = LoadSessionRequest::new(id.clone(), &opts.cwd).mcp_servers(mcp_servers.clone());
+            let mut request = LoadSessionRequest::new(id.clone(), &opts.cwd);
             if !meta.is_empty() {
                 request.meta = Some(meta.clone());
             }
             if let Some(prompt) = system_prompt {
                 request = request.system_prompt(prompt);
             }
-            let params = serde_json::to_value(&request).map_err(|e| AgentError::Protocol(format!("session/load: {e}")))?;
+            let mut params = serde_json::to_value(&request).map_err(|e| AgentError::Protocol(format!("session/load: {e}")))?;
+            attach_mcp_servers(&mut params, &mcp_servers);
             let msg = UntypedMessage::new("session/load", params).map_err(|e| AgentError::Protocol(acp_error("session/load", &e)))?;
             let _replay = shared.turn.enter_replay();
             let reply = cx.send_request(msg).block_task().await;

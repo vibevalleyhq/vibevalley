@@ -280,6 +280,76 @@ impl McpServer {
             McpServer::Http { url, headers, .. } => serde_json::json!({ "type": "http", "url": url, "headers": map(headers) }),
         }
     }
+
+    /// Converts a pure `vibevalley_mcp::McpServerConfig` into an OAR session `McpServer`.
+    ///
+    /// When `stateless` is set on `StreamableHttp`, ensures the SEP-2243
+    /// `MCP-Protocol-Version` header is present so ACP and CLI agents negotiate
+    /// stateless Streamable HTTP cleanly.
+    pub fn from_mcp_config(config: &vibevalley_mcp::McpServerConfig) -> Self {
+        match &config.transport {
+            vibevalley_mcp::McpTransportSpec::Stdio { command, args, env } => Self::Stdio {
+                name: config.name.clone(),
+                command: command.clone(),
+                args: args.clone(),
+                env: env.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                cwd: None,
+            },
+            vibevalley_mcp::McpTransportSpec::StreamableHttp { url, headers, stateless } => {
+                let mut pairs: Vec<(String, String)> = headers.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                if *stateless && !pairs.iter().any(|(k, _)| k.eq_ignore_ascii_case(vibevalley_mcp::HEADER_PROTOCOL_VERSION)) {
+                    pairs.push((
+                        vibevalley_mcp::HEADER_PROTOCOL_VERSION.to_owned(),
+                        vibevalley_mcp::PROTOCOL_STATELESS.to_owned(),
+                    ));
+                }
+                Self::Http {
+                    name: config.name.clone(),
+                    url: url.clone(),
+                    headers: pairs,
+                }
+            }
+        }
+    }
+
+    /// Converts this OAR session `McpServer` into a transport-agnostic `McpServerConfig`.
+    pub fn to_mcp_config(&self) -> vibevalley_mcp::McpServerConfig {
+        match self {
+            Self::Stdio { name, command, args, env, .. } => vibevalley_mcp::McpServerConfig {
+                name: name.clone(),
+                transport: vibevalley_mcp::McpTransportSpec::Stdio {
+                    command: command.clone(),
+                    args: args.clone(),
+                    env: env.iter().cloned().collect(),
+                },
+            },
+            Self::Http { name, url, headers } => {
+                let stateless = headers
+                    .iter()
+                    .any(|(k, v)| k.eq_ignore_ascii_case(vibevalley_mcp::HEADER_PROTOCOL_VERSION) && v.trim() == vibevalley_mcp::PROTOCOL_STATELESS);
+                vibevalley_mcp::McpServerConfig {
+                    name: name.clone(),
+                    transport: vibevalley_mcp::McpTransportSpec::StreamableHttp {
+                        url: url.clone(),
+                        headers: headers.iter().cloned().collect(),
+                        stateless,
+                    },
+                }
+            }
+        }
+    }
+}
+
+impl From<vibevalley_mcp::McpServerConfig> for McpServer {
+    fn from(config: vibevalley_mcp::McpServerConfig) -> Self {
+        Self::from_mcp_config(&config)
+    }
+}
+
+impl From<&vibevalley_mcp::McpServerConfig> for McpServer {
+    fn from(config: &vibevalley_mcp::McpServerConfig) -> Self {
+        Self::from_mcp_config(config)
+    }
 }
 
 /// `{ "mcpServers": { name: entry } }`.
