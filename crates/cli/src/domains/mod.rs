@@ -2,6 +2,7 @@
 
 pub mod collab;
 pub mod content;
+pub mod debug;
 pub mod infra;
 pub mod team;
 pub mod work;
@@ -88,6 +89,8 @@ pub enum Command {
     Machine(infra::machine::MachineCmd),
     /// Verify home, server, SSE slice stream, runtimes, and model key
     Doctor(infra::doctor::DoctorCmd),
+    /// Discover and live-debug running VibeValley instances over VDP
+    Debug(debug::DebugCmd),
 }
 
 pub async fn run(client: &Client, command: Command) -> Done {
@@ -116,5 +119,6 @@ pub async fn run(client: &Client, command: Command) -> Done {
         Command::Remote(cmd) => infra::remote::run(client, cmd).await,
         Command::Machine(cmd) => infra::machine::run(client, cmd).await,
         Command::Doctor(cmd) => infra::doctor::run(client, cmd).await,
+        Command::Debug(cmd) => debug::run(client, cmd).await,
     }
 }
