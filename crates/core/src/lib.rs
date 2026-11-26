@@ -19,6 +19,7 @@ pub mod pr;
 pub mod projection;
 pub mod prompts;
 pub mod refine;
+pub mod retro;
 pub mod rules;
 #[cfg(any(test, feature = "scenarios"))]
 pub mod scenario;
@@ -39,6 +40,7 @@ pub use crate::projection::{
     project_collab, project_farm, project_inbox, project_ops, project_sessions,
 };
 pub use crate::prompts::work_constraints;
+pub use crate::retro::issue_retro;
 pub use crate::status::{issue_order, pick_issues};
 
 #[cfg(test)]

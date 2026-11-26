@@ -17,7 +17,25 @@ export {
   SuggestionId,
   Validation,
 } from "./common/schema";
-export { BoardSlice, CollabSlice, Health, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceBundle, sliceDecoders, SliceKind } from "./core/schema";
+export {
+  BoardSlice,
+  CollabSlice,
+  Health,
+  InboxSlice,
+  IssueRetroGetInput,
+  IssueRetroReport,
+  LiveEvent,
+  OpsSlice,
+  RetroBreakdownBucket,
+  RetroDurationStats,
+  RetroOverdueItem,
+  RetroReworkItem,
+  RetroWindow,
+  SessionsSlice,
+  SliceBundle,
+  sliceDecoders,
+  SliceKind,
+} from "./core/schema";
 export { EnvelopeSchema } from "./endpoint";
 export { Agent, AgentTemplate, AgentValidateRequest, AgentValidation, Build, Outfit, PersonaMode, Skill, Species } from "./agent/schema";
 export {

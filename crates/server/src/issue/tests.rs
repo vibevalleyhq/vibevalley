@@ -552,3 +552,100 @@ async fn unsent_issue_workflow_tracks_in_progress_in_review_and_criteria_persist
     board3.close_async().await;
     let _ = ctx3.shutdown(Duration::from_secs(1)).await;
 }
+
+#[tokio::test]
+async fn issue_retro_uses_injected_clock_and_full_persisted_issues() {
+    use vibevalley_protocol::{DAY_MS, Finding, IssueRetroGetInput, IssueStatus, JsNumber, RetroWindow};
+
+    let dir = tempfile::tempdir().unwrap();
+    let service = Service::open(dir.path()).await.unwrap();
+    let outbox = Arc::new(Outbox::new(service.clone()));
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let now_ms = 1_800_000_000_000_i64;
+    let clock = Arc::new(ManualClock::new(now_ms));
+    let ctx = Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        outbox,
+        Arc::new(StateFeed::new()),
+        clock.clone(),
+        http.clone(),
+        http,
+    ));
+    let board = Board::open_standalone_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+
+    let mut recent_done = board
+        .create_async(NewIssue {
+            title: "recent-done".into(),
+            tags: vec!["retro".into()],
+            due_at: Some(JsNumber::from(now_ms - DAY_MS)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    recent_done.created_at = now_ms - 4 * DAY_MS;
+    recent_done.queued_at = Some(now_ms - 3 * DAY_MS);
+    recent_done.reviewed_at = Some(now_ms - 2 * DAY_MS);
+    recent_done.closed_at = Some(now_ms - 2 * DAY_MS);
+    recent_done.delivered = Some(Landing::Merged);
+    recent_done.status = IssueStatus::Done;
+    recent_done.findings.push(Finding {
+        id: "f1".into(),
+        text: "needs edge test".into(),
+        at: now_ms - 2 * DAY_MS,
+        resolved: true,
+    });
+
+    let mut older_done = board
+        .create_async(NewIssue {
+            title: "older-done".into(),
+            tags: vec!["legacy".into()],
+            due_at: Some(JsNumber::from(now_ms - 12 * DAY_MS)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    older_done.created_at = now_ms - 15 * DAY_MS;
+    older_done.closed_at = Some(now_ms - 10 * DAY_MS);
+    older_done.delivered = Some(Landing::Merged);
+    older_done.status = IssueStatus::Done;
+
+    board.state().put_issues_async(&[recent_done, older_done]).await.unwrap();
+
+    let report_7d = board
+        .issue_retro_endpoint_async(
+            &IssueRetroGetInput {
+                window: Some(RetroWindow::Days7),
+            },
+            clock.as_ref(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(report_7d.total_issues, 1);
+    assert_eq!(report_7d.completed_count, 1);
+    assert_eq!(report_7d.on_time_count, 1);
+    assert_eq!(report_7d.rework_issue_count, 1);
+    assert_eq!(report_7d.cycle_time.median_ms, Some(2 * DAY_MS));
+    assert_eq!(report_7d.review_wait.median_ms, Some(DAY_MS));
+
+    let report_14d = board
+        .issue_retro_endpoint_async(
+            &IssueRetroGetInput {
+                window: Some(RetroWindow::Days14),
+            },
+            clock.as_ref(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(report_14d.total_issues, 2);
+    assert_eq!(report_14d.completed_count, 2);
+    assert_eq!(report_14d.on_time_count, 1);
+    assert_eq!(report_14d.overdue_count, 1);
+    assert_eq!(report_14d.overdue_items.len(), 1);
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}

@@ -637,6 +637,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Issue"),
     },
     Endpoint {
+        op: "issue.retro.get",
+        module: "issue",
+        about: &[],
+        can: &[Caller::User, Caller::Remote, Caller::Orchestrator],
+        dry_run: None,
+        input: Some("IssueRetroGetInput"),
+        result: Some("IssueRetroReport"),
+    },
+    Endpoint {
         op: "cron.create",
         module: "cron",
         about: &[],
@@ -2194,6 +2203,13 @@ pub mod ops {
         type Input = t::IssueRefineInput;
         type Result = t::Issue;
     }
+    /// Deterministic issue cycle-time and retro analytics for a time window.
+    pub struct IssueRetroGet;
+    impl Op for IssueRetroGet {
+        const NAME: &'static str = "issue.retro.get";
+        type Input = t::IssueRetroGetInput;
+        type Result = t::IssueRetroReport;
+    }
     pub struct CronCreate;
     impl Op for CronCreate {
         const NAME: &'static str = "cron.create";
@@ -3204,6 +3220,7 @@ endpoint_ids! {
     IssueStatusUpdate => "issue.status.update",
     IssueStatusPreviewUpdate => "issue.status.previewUpdate",
     IssueRefine => "issue.refine",
+    IssueRetroGet => "issue.retro.get",
     // cron
     CronCreate => "cron.create",
     CronList => "cron.list",

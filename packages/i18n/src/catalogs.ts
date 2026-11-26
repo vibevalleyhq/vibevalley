@@ -607,7 +607,63 @@ export const catalogs = {
       dashboard: {
         title: "总览仪表盘",
         tabsLabel: "仪表盘视图",
-        tab: { overview: "概览", runs: "运行记录" },
+        tab: { overview: "概览", retro: "复盘", runs: "运行记录" },
+        retro: {
+          title: "工单周期与复盘",
+          subtitle: "当前窗口共 {n} 张工单",
+          windowLabel: "复盘时间窗口",
+          window: { "7d": "7 天", "14d": "14 天", "30d": "30 天", all: "全部" },
+          copyReport: "复制复盘 Markdown 报告",
+          copiedReport: "已复制复盘报告",
+          copiedToast: "复盘 Markdown 报告已复制到剪贴板",
+          copyFailed: "未能复制复盘报告到剪贴板",
+          retry: "重试",
+          empty: "这个时间窗口内暂无工单记录。",
+          kpi: {
+            throughput: "完成与取消",
+            throughputSub: "完成 {done} · 取消 {canceled} · 进行中 {open}",
+            completionRate: "完成率 {pct}%",
+            cycleTime: "总周期（创建 → 关闭）",
+            reviewWait: "等待验收（排队 → 验收）",
+            medianP90: "中位 {median} · P90 {p90}",
+            samples: "{n} 条样本",
+            dueSla: "按期交付",
+            dueSub: "按期 {onTime} · 逾期 {overdue} · 未设截止 {noDue}",
+            rework: "打回返工",
+            reworkSub: "{issues} 张工单 · {findings} 条问题（未解决 {unresolved}）",
+          },
+          breakdown: {
+            byRepo: "按仓库分布",
+            byTag: "按标签分布",
+            byAgent: "按角色分布",
+            empty: "当前窗口内暂无分布数据。",
+            bucketMeta: "{done} 完成 · {rework} 返工 · {overdue} 逾期",
+            medianShort: "中位 {median}",
+            noRepo: "未关联仓库",
+            untagged: "无标签",
+            unassigned: "未指派",
+          },
+          overdue: { title: "逾期工单", empty: "当前窗口内没有逾期工单。", issue: "工单", status: "状态", owner: "仓库 / 角色", delay: "逾期时长" },
+          rework: {
+            title: "返工与验收问题",
+            empty: "当前窗口内没有打回返工记录。",
+            issue: "工单",
+            status: "状态",
+            owner: "仓库 / 角色",
+            findings: "问题数",
+            unresolved: "{n} 未解决",
+            allResolved: "已全部解决",
+          },
+          markdown: {
+            heading: "工单复盘报告（{window}）",
+            summary: "核心指标",
+            throughputLine: "吞吐：完成 {done}，取消 {canceled}，进行中 {open}（共 {total} 张）",
+            cycleLine: "总周期（创建 → 关闭）：中位 {median}，P90 {p90}（{n} 条样本）",
+            reviewLine: "等待验收（排队 → 验收）：中位 {median}，P90 {p90}（{n} 条样本）",
+            dueLine: "按期率：{onTimeRate}（按期 {onTime}，逾期 {overdue}，未设截止 {noDue}）",
+            reworkLine: "返工率：{reworkRate}（{issues} 张工单，{findings} 条问题，未解决 {unresolved} 条）",
+          },
+        },
         profile: { defaultName: "工作台用户", defaultTagline: "在工作台与默认频道统筹角色与工单", edit: "编辑个人资料" },
         stats: { working: "运行中会话", waiting: "等你回应", issues: "待办与进行中", review: "待验收" },
         pulse: {
@@ -4185,7 +4241,70 @@ export const catalogs = {
       dashboard: {
         title: "Dashboard",
         tabsLabel: "Dashboard views",
-        tab: { overview: "Overview", runs: "Runs" },
+        tab: { overview: "Overview", retro: "Retro", runs: "Runs" },
+        retro: {
+          title: "Cycle Time & Retro",
+          subtitle: "{n} issues in window",
+          windowLabel: "Retro time window",
+          window: { "7d": "7d", "14d": "14d", "30d": "30d", all: "All" },
+          copyReport: "Copy Retro Markdown Report",
+          copiedReport: "Copied Retro Report",
+          copiedToast: "Retro Markdown report copied to clipboard",
+          copyFailed: "Could not copy retro report to clipboard",
+          retry: "Retry",
+          empty: "No issues recorded in this time window.",
+          kpi: {
+            throughput: "Throughput",
+            throughputSub: "{done} done · {canceled} canceled · {open} open",
+            completionRate: "{pct}% completion",
+            cycleTime: "Cycle Time (Created → Closed)",
+            reviewWait: "Review Wait (Queued → Reviewed)",
+            medianP90: "P50 {median} · P90 {p90}",
+            samples: "{n} samples",
+            dueSla: "Due Date SLA",
+            dueSub: "{onTime} on time · {overdue} overdue · {noDue} no due date",
+            rework: "Findings Rework",
+            reworkSub: "{issues} issues · {findings} findings ({unresolved} open)",
+          },
+          breakdown: {
+            byRepo: "By Repository",
+            byTag: "By Tag",
+            byAgent: "By Agent",
+            empty: "No breakdown entries in this window.",
+            bucketMeta: "{done} done · {rework} rework · {overdue} overdue",
+            medianShort: "P50 {median}",
+            noRepo: "No repository",
+            untagged: "Untagged",
+            unassigned: "Unassigned",
+          },
+          overdue: {
+            title: "Overdue Items",
+            empty: "No overdue items in this window.",
+            issue: "Issue",
+            status: "Status",
+            owner: "Repo / Agent",
+            delay: "Overdue",
+          },
+          rework: {
+            title: "Rework & Findings Items",
+            empty: "No rework findings recorded in this window.",
+            issue: "Issue",
+            status: "Status",
+            owner: "Repo / Agent",
+            findings: "Findings",
+            unresolved: "{n} open",
+            allResolved: "All resolved",
+          },
+          markdown: {
+            heading: "Issue Retro Report ({window})",
+            summary: "Summary",
+            throughputLine: "Throughput: {done} done, {canceled} canceled, {open} open (total {total})",
+            cycleLine: "Cycle time (Created -> Closed): median {median}, P90 {p90} ({n} samples)",
+            reviewLine: "Review wait (Queued -> Reviewed): median {median}, P90 {p90} ({n} samples)",
+            dueLine: "Due SLA: {onTimeRate} on-time ({onTime} on time, {overdue} overdue, {noDue} without due date)",
+            reworkLine: "Rework: {reworkRate} ({issues} issues, {findings} findings, {unresolved} unresolved)",
+          },
+        },
         profile: { defaultName: "Workspace User", defaultTagline: "Coordinating roles and issues across your workspace", edit: "Edit profile" },
         stats: { working: "Active sessions", waiting: "Needs response", issues: "Open issues", review: "In review" },
         pulse: {
@@ -7976,11 +8095,81 @@ export interface Messages {
   "web.base.dashboard.quick.title": undefined;
   "web.base.dashboard.recent.empty": undefined;
   "web.base.dashboard.recent.title": undefined;
+  "web.base.dashboard.retro.breakdown.bucketMeta": { readonly done: string | number; readonly overdue: string | number; readonly rework: string | number };
+  "web.base.dashboard.retro.breakdown.byAgent": undefined;
+  "web.base.dashboard.retro.breakdown.byRepo": undefined;
+  "web.base.dashboard.retro.breakdown.byTag": undefined;
+  "web.base.dashboard.retro.breakdown.empty": undefined;
+  "web.base.dashboard.retro.breakdown.medianShort": { readonly median: string | number };
+  "web.base.dashboard.retro.breakdown.noRepo": undefined;
+  "web.base.dashboard.retro.breakdown.unassigned": undefined;
+  "web.base.dashboard.retro.breakdown.untagged": undefined;
+  "web.base.dashboard.retro.copiedReport": undefined;
+  "web.base.dashboard.retro.copiedToast": undefined;
+  "web.base.dashboard.retro.copyFailed": undefined;
+  "web.base.dashboard.retro.copyReport": undefined;
+  "web.base.dashboard.retro.empty": undefined;
+  "web.base.dashboard.retro.kpi.completionRate": { readonly pct: string | number };
+  "web.base.dashboard.retro.kpi.cycleTime": undefined;
+  "web.base.dashboard.retro.kpi.dueSla": undefined;
+  "web.base.dashboard.retro.kpi.dueSub": { readonly noDue: string | number; readonly onTime: string | number; readonly overdue: string | number };
+  "web.base.dashboard.retro.kpi.medianP90": { readonly median: string | number; readonly p90: string | number };
+  "web.base.dashboard.retro.kpi.reviewWait": undefined;
+  "web.base.dashboard.retro.kpi.rework": undefined;
+  "web.base.dashboard.retro.kpi.reworkSub": { readonly findings: string | number; readonly issues: string | number; readonly unresolved: string | number };
+  "web.base.dashboard.retro.kpi.samples": { readonly n: string | number };
+  "web.base.dashboard.retro.kpi.throughput": undefined;
+  "web.base.dashboard.retro.kpi.throughputSub": { readonly canceled: string | number; readonly done: string | number; readonly open: string | number };
+  "web.base.dashboard.retro.markdown.cycleLine": { readonly median: string | number; readonly n: string | number; readonly p90: string | number };
+  "web.base.dashboard.retro.markdown.dueLine": {
+    readonly noDue: string | number;
+    readonly onTime: string | number;
+    readonly onTimeRate: string | number;
+    readonly overdue: string | number;
+  };
+  "web.base.dashboard.retro.markdown.heading": { readonly window: string | number };
+  "web.base.dashboard.retro.markdown.reviewLine": { readonly median: string | number; readonly n: string | number; readonly p90: string | number };
+  "web.base.dashboard.retro.markdown.reworkLine": {
+    readonly findings: string | number;
+    readonly issues: string | number;
+    readonly reworkRate: string | number;
+    readonly unresolved: string | number;
+  };
+  "web.base.dashboard.retro.markdown.summary": undefined;
+  "web.base.dashboard.retro.markdown.throughputLine": {
+    readonly canceled: string | number;
+    readonly done: string | number;
+    readonly open: string | number;
+    readonly total: string | number;
+  };
+  "web.base.dashboard.retro.overdue.delay": undefined;
+  "web.base.dashboard.retro.overdue.empty": undefined;
+  "web.base.dashboard.retro.overdue.issue": undefined;
+  "web.base.dashboard.retro.overdue.owner": undefined;
+  "web.base.dashboard.retro.overdue.status": undefined;
+  "web.base.dashboard.retro.overdue.title": undefined;
+  "web.base.dashboard.retro.retry": undefined;
+  "web.base.dashboard.retro.rework.allResolved": undefined;
+  "web.base.dashboard.retro.rework.empty": undefined;
+  "web.base.dashboard.retro.rework.findings": undefined;
+  "web.base.dashboard.retro.rework.issue": undefined;
+  "web.base.dashboard.retro.rework.owner": undefined;
+  "web.base.dashboard.retro.rework.status": undefined;
+  "web.base.dashboard.retro.rework.title": undefined;
+  "web.base.dashboard.retro.rework.unresolved": { readonly n: string | number };
+  "web.base.dashboard.retro.subtitle": { readonly n: string | number };
+  "web.base.dashboard.retro.title": undefined;
+  "web.base.dashboard.retro.window.14d": undefined;
+  "web.base.dashboard.retro.window.30d": undefined;
+  "web.base.dashboard.retro.window.7d": undefined;
+  "web.base.dashboard.retro.window.all": undefined;
+  "web.base.dashboard.retro.windowLabel": undefined;
   "web.base.dashboard.stats.issues": undefined;
   "web.base.dashboard.stats.review": undefined;
   "web.base.dashboard.stats.waiting": undefined;
   "web.base.dashboard.stats.working": undefined;
   "web.base.dashboard.tab.overview": undefined;
+  "web.base.dashboard.tab.retro": undefined;
   "web.base.dashboard.tab.runs": undefined;
   "web.base.dashboard.tabsLabel": undefined;
   "web.base.dashboard.title": undefined;

@@ -35,6 +35,8 @@ export interface IssueHandlers {
   readonly "issue.status.previewUpdate": (a: { readonly id: string } & T.IssueStatusRequest) => Promise<T.Preview>;
   /** A session reads the code and writes the backlog issue to the issue's format (title, description, criteria), then leaves. */
   readonly "issue.refine": (a: { readonly id: string } & T.IssueRefineRequest) => Promise<T.Issue>;
+  /** Deterministic issue cycle-time and retro analytics for a time window. */
+  readonly "issue.retro.get": (a: T.IssueRetroGetInput) => Promise<T.IssueRetroReport>;
 }
 
 export const issueEndpoints: readonly Endpoint[] = [
@@ -151,6 +153,13 @@ export const issueEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: input({ id: z.string() }, S.IssueRefineRequest),
     result: S.Issue,
+    can: ["user", "remote", "orchestrator"],
+  },
+  {
+    op: "issue.retro.get",
+    about: [],
+    input: S.IssueRetroGetInput,
+    result: S.IssueRetroReport,
     can: ["user", "remote", "orchestrator"],
   },
 ];

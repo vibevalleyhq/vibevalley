@@ -1,4 +1,4 @@
-import type { ChatMessage, IssueHistory, SessionEvent, SessionEventPage, SliceBundle } from "@vibevalley/protocol";
+import type { ChatMessage, IssueHistory, IssueRetroReport, RetroWindow, SessionEvent, SessionEventPage, SliceBundle } from "@vibevalley/protocol";
 import { SliceBundle as SliceBundleSchema } from "@vibevalley/protocol/schema";
 
 import workbenchResponsesJson from "../workbench/responses.json";
@@ -22,6 +22,32 @@ function buildHistory(bundle: SliceBundle): IssueHistory[] {
     const sessions = issue.assignments.flatMap((a) => a.executions.map((e) => byId.get(e.session))).filter((s): s is NonNullable<typeof s> => s !== undefined);
     return { issue, sessions, missingSessions: [] };
   });
+}
+
+function emptyRetro(window: RetroWindow): IssueRetroReport {
+  return {
+    window,
+    generatedAt: SCENARIO_NOW,
+    totalIssues: 0,
+    openCount: 0,
+    completedCount: 0,
+    canceledCount: 0,
+    cycleTime: { sampleCount: 0 },
+    reviewWait: { sampleCount: 0 },
+    withDueCount: 0,
+    withoutDueCount: 0,
+    onTimeCount: 0,
+    overdueCount: 0,
+    upcomingDueCount: 0,
+    reworkIssueCount: 0,
+    totalFindingsCount: 0,
+    unresolvedFindingsCount: 0,
+    overdueItems: [],
+    reworkItems: [],
+    byRepo: [],
+    byTag: [],
+    byAgent: [],
+  };
 }
 
 function buildSessionEvents(now: number, working: boolean, dense: boolean): SessionEvent[] {
@@ -146,6 +172,7 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
       "repo.list": [],
       "runtime.list": [],
       "issue.history.list": [],
+      "issue.retro.get": emptyRetro("7d"),
       "issue.run.list": [],
       "issue.timeline.get": { milestones: [] },
       "issue.diff.get": { files: [], truncated: false },
@@ -172,6 +199,7 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
     "host.assetsDir": assetsDir,
     "orchestrator.approval.list": [],
     "issue.history.list": buildHistory(bundle),
+    "issue.retro.get": emptyRetro("7d"),
     "issue.timeline.get": {
       milestones: [
         { at: SCENARIO_NOW - 40 * MIN_MS, kind: "opened", text: "写下这张工单" },

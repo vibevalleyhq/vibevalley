@@ -71,6 +71,7 @@ export const servedEndpoints = [
   { op: "issue.status.update", can: ["user", "remote", "orchestrator"], about: ["id"], dryRun: "issue.status.previewUpdate" },
   { op: "issue.status.previewUpdate", can: ["user", "remote", "orchestrator"], about: ["id"] },
   { op: "issue.refine", can: ["user", "remote", "orchestrator"], about: ["id"] },
+  { op: "issue.retro.get", can: ["user", "remote", "orchestrator"], about: [] },
   { op: "cron.create", can: ["user", "remote", "orchestrator"], about: [] },
   { op: "cron.list", can: ["user", "remote", "orchestrator"], about: [] },
   { op: "cron.update", can: ["user", "remote"], about: ["id"] },

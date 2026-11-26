@@ -438,6 +438,11 @@ export class VibeValleyApi {
       previewUpdate: (a: { id: string } & T.IssueStatusRequest, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
         this.call<T.Preview>("issue.status.previewUpdate", "/api/v1/issue/status/previewUpdate", a, options),
     },
+    retro: {
+      /** Deterministic issue cycle-time and retro analytics for a time window. */
+      get: (a: T.IssueRetroGetInput, options?: { signal?: AbortSignal }): Promise<T.IssueRetroReport> =>
+        this.call<T.IssueRetroReport>("issue.retro.get", "/api/v1/issue/retro/get", a, options),
+    },
   };
 
   readonly session = {

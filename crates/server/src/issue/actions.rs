@@ -634,6 +634,16 @@ impl Board {
         Ok(vibevalley_core::pick_issues(&issues, filter, clock.now_ms()))
     }
 
+    pub(crate) async fn issue_retro_endpoint_async(
+        &self,
+        input: &vibevalley_protocol::IssueRetroGetInput,
+        clock: &dyn Clock,
+    ) -> Result<vibevalley_protocol::IssueRetroReport, ApiError> {
+        let issues = self.issues_async().await.map_err(api)?;
+        let window = input.window.unwrap_or(vibevalley_protocol::RetroWindow::Days7);
+        Ok(vibevalley_core::issue_retro(&issues, window, clock.now_ms()))
+    }
+
     pub(crate) async fn issue_get_endpoint_async(&self, id: &str) -> Result<Issue, ApiError> {
         self.get_async(id).await
     }

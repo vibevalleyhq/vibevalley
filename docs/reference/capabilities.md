@@ -208,6 +208,7 @@ MOSS Live 语音通话
 | `issue.status.update` | 挪任务的状态：派活、再来一轮、完成或取消 | `/api/v1/issue/status/update` | ✓ | ✓ | ✓ |   |
 | `issue.status.previewUpdate` | 试挪任务的状态：说会发生什么，不动手 | `/api/v1/issue/status/previewUpdate` | ✓ | ✓ | ✓ |   |
 | `issue.refine` | 让一个执行会话读代码，把备选的任务起草好 | `/api/v1/issue/refine` | ✓ | ✓ | ✓ |   |
+| `issue.retro.get` | 按时间窗口统计任务吞吐、阶段耗时、逾期情况、返工率与按仓库、标签、角色分布 | `/api/v1/issue/retro/get` | ✓ | ✓ | ✓ |   |
 
 ## session
 

@@ -18,8 +18,20 @@ import { ready, useAgents, useQuery, useSettings } from "../../infra/query";
 import { Link as A, useRouter } from "../../infra/router";
 import { waitingOnUser } from "../inbox";
 import { allSessionsQuery, buildRunEntries, runActivityAt, type RunApprovals, type RunEntry, RunsPage, type RunStatusBadge, runStatusOf } from "../session";
+import { RetroView } from "./RetroView";
 
-export type DashboardTab = "overview" | "runs";
+export type DashboardTab = "overview" | "retro" | "runs";
+
+function tabPath(tab: DashboardTab): string {
+  switch (tab) {
+    case "overview":
+      return "/dashboard";
+    case "retro":
+      return "/dashboard/retro";
+    case "runs":
+      return "/dashboard/runs";
+  }
+}
 
 function statusDot(badge: RunStatusBadge): DotTone {
   switch (badge) {
@@ -321,6 +333,7 @@ export function DashboardPage(props: { tab?: DashboardTab | undefined; approvals
           value={tab()}
           options={[
             { value: "overview", label: t("web.base.dashboard.tab.overview") },
+            { value: "retro", label: t("web.base.dashboard.tab.retro") },
             {
               value: "runs",
               label: t("web.base.dashboard.tab.runs"),
@@ -328,10 +341,16 @@ export function DashboardPage(props: { tab?: DashboardTab | undefined; approvals
               countTone: "water",
             },
           ]}
-          onChange={(next) => router.navigate(next === "runs" ? "/dashboard/runs" : "/dashboard")}
+          onChange={(next) => router.navigate(tabPath(next))}
         />
       </View>
-      <If when={tab() === "runs"} else={<DashboardOverview />}>
+      <If when={tab() === "overview"}>
+        <DashboardOverview />
+      </If>
+      <If when={tab() === "retro"}>
+        <RetroView />
+      </If>
+      <If when={tab() === "runs"}>
         <View class="min-h-0 flex-1">
           <RunsPage approvals={props.approvals} />
         </View>

@@ -192,6 +192,7 @@ impl Router {
             E::IssueStatusUpdate => on!(p, IssueStatusUpdate, |r| brd.issue_status_update_endpoint_async(&r).await?),
             E::IssueStatusPreviewUpdate => on!(p, IssueStatusPreviewUpdate, |r| brd.issue_status_preview_update_endpoint_async(&r).await?),
             E::IssueRefine => on!(p, IssueRefine, |r| brd.issue_refine_endpoint_async(&r).await?),
+            E::IssueRetroGet => on!(p, IssueRetroGet, |r| brd.issue_retro_endpoint_async(&r, &*c.ctx.clock).await?),
             E::CronCreate => on!(p, CronCreate, |r| c.cron.create_endpoint_async(ctx.caller, r).await?),
             E::CronList => ret!(ok_json(c.cron.list_endpoint_async().await?)),
             E::CronUpdate => void!(p, CronUpdate, |r| c.cron.update_endpoint_async(&r.id, r.enabled).await?),

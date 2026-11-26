@@ -47,7 +47,76 @@
     "tabsLabel": "仪表盘视图",
     "tab": {
       "overview": "概览",
+      "retro": "复盘",
       "runs": "运行记录"
+    },
+    "retro": {
+      "title": "工单周期与复盘",
+      "subtitle": "当前窗口共 {n} 张工单",
+      "windowLabel": "复盘时间窗口",
+      "window": {
+        "7d": "7 天",
+        "14d": "14 天",
+        "30d": "30 天",
+        "all": "全部"
+      },
+      "copyReport": "复制复盘 Markdown 报告",
+      "copiedReport": "已复制复盘报告",
+      "copiedToast": "复盘 Markdown 报告已复制到剪贴板",
+      "copyFailed": "未能复制复盘报告到剪贴板",
+      "retry": "重试",
+      "empty": "这个时间窗口内暂无工单记录。",
+      "kpi": {
+        "throughput": "完成与取消",
+        "throughputSub": "完成 {done} · 取消 {canceled} · 进行中 {open}",
+        "completionRate": "完成率 {pct}%",
+        "cycleTime": "总周期（创建 → 关闭）",
+        "reviewWait": "等待验收（排队 → 验收）",
+        "medianP90": "中位 {median} · P90 {p90}",
+        "samples": "{n} 条样本",
+        "dueSla": "按期交付",
+        "dueSub": "按期 {onTime} · 逾期 {overdue} · 未设截止 {noDue}",
+        "rework": "打回返工",
+        "reworkSub": "{issues} 张工单 · {findings} 条问题（未解决 {unresolved}）"
+      },
+      "breakdown": {
+        "byRepo": "按仓库分布",
+        "byTag": "按标签分布",
+        "byAgent": "按角色分布",
+        "empty": "当前窗口内暂无分布数据。",
+        "bucketMeta": "{done} 完成 · {rework} 返工 · {overdue} 逾期",
+        "medianShort": "中位 {median}",
+        "noRepo": "未关联仓库",
+        "untagged": "无标签",
+        "unassigned": "未指派"
+      },
+      "overdue": {
+        "title": "逾期工单",
+        "empty": "当前窗口内没有逾期工单。",
+        "issue": "工单",
+        "status": "状态",
+        "owner": "仓库 / 角色",
+        "delay": "逾期时长"
+      },
+      "rework": {
+        "title": "返工与验收问题",
+        "empty": "当前窗口内没有打回返工记录。",
+        "issue": "工单",
+        "status": "状态",
+        "owner": "仓库 / 角色",
+        "findings": "问题数",
+        "unresolved": "{n} 未解决",
+        "allResolved": "已全部解决"
+      },
+      "markdown": {
+        "heading": "工单复盘报告（{window}）",
+        "summary": "核心指标",
+        "throughputLine": "吞吐：完成 {done}，取消 {canceled}，进行中 {open}（共 {total} 张）",
+        "cycleLine": "总周期（创建 → 关闭）：中位 {median}，P90 {p90}（{n} 条样本）",
+        "reviewLine": "等待验收（排队 → 验收）：中位 {median}，P90 {p90}（{n} 条样本）",
+        "dueLine": "按期率：{onTimeRate}（按期 {onTime}，逾期 {overdue}，未设截止 {noDue}）",
+        "reworkLine": "返工率：{reworkRate}（{issues} 张工单，{findings} 条问题，未解决 {unresolved} 条）"
+      }
     },
     "profile": {
       "defaultName": "工作台用户",

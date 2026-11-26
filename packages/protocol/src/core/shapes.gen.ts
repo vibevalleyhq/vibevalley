@@ -1,12 +1,12 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { ChannelSummary, Chat, FactChannelChanged, FactChannelRemoved, FactMessageChanged, FactUserMentionsChanged } from "../channel/shapes.gen";
-import type { SessionId } from "../common/shapes.gen";
+import type { IssueId, SessionId } from "../common/shapes.gen";
 import type { ConnectorStatus, FactConnectorChanged } from "../connector/shapes.gen";
 import type { Cron, CronView, FactCronChanged, FactCronRemoved } from "../cron/shapes.gen";
 import type { CommitCount, FactProgressChanged, FarmFrame, Progress, SessionPlay } from "../game/shapes.gen";
 import type { FactRuntimeInboxChanged, InboxItem } from "../inbox/shapes.gen";
-import type { BoardSummary, FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue } from "../issue/shapes.gen";
+import type { BoardSummary, FactIssueChanged, FactIssueRemoved, FactSessionReported, Issue, IssueStatus } from "../issue/shapes.gen";
 import type { FactMediaChanged, MediaJob, MediaSummary } from "../media/shapes.gen";
 import type { RuntimeInfo } from "../runtime/shapes.gen";
 import type { FactMachineChanged, FactMachineRemoved, FactSessionChanged, FactSessionLeft, FactSessionPhaseChanged, FactSessionSubagentsChanged, FactSessionToolChanged, FactSessionToolsReset, Machine, Session, SessionEvent, SessionView } from "../session/shapes.gen";
@@ -80,3 +80,18 @@ export type ChannelReportsPayload = { after?: string, };
 export type ArtifactFollowPayload = { id: string, after: number, };
 
 export type ArtifactSuggestionFollowPayload = { id: string, };
+
+export const RetroWindowValues = ["7d", "14d", "30d", "all"] as const;
+export type RetroWindow = (typeof RetroWindowValues)[number];
+
+export type IssueRetroGetInput = { window?: RetroWindow, };
+
+export type RetroDurationStats = { sampleCount: number, medianMs?: number, p90Ms?: number, };
+
+export type RetroOverdueItem = { id: IssueId, number: number, title: string, status: IssueStatus, repo?: string, agent?: string, dueAt: number, closedAt?: number, overdueMs: number, };
+
+export type RetroReworkItem = { id: IssueId, number: number, title: string, status: IssueStatus, repo?: string, agent?: string, findingsCount: number, unresolvedCount: number, };
+
+export type RetroBreakdownBucket = { key: string, totalCount: number, completedCount: number, canceledCount: number, overdueCount: number, reworkCount: number, medianCycleMs?: number, };
+
+export type IssueRetroReport = { window: RetroWindow, generatedAt: number, windowStartAt?: number, totalIssues: number, openCount: number, completedCount: number, canceledCount: number, completionRatePct?: number, cycleTime: RetroDurationStats, reviewWait: RetroDurationStats, withDueCount: number, withoutDueCount: number, onTimeCount: number, overdueCount: number, upcomingDueCount: number, onTimeRatePct?: number, overdueRatePct?: number, reworkIssueCount: number, totalFindingsCount: number, unresolvedFindingsCount: number, reworkRatePct?: number, overdueItems: Array<RetroOverdueItem>, reworkItems: Array<RetroReworkItem>, byRepo: Array<RetroBreakdownBucket>, byTag: Array<RetroBreakdownBucket>, byAgent: Array<RetroBreakdownBucket>, };
