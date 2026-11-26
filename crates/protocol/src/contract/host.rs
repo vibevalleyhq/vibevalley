@@ -1084,6 +1084,16 @@ pub struct HostLocalFile {
     pub size: u64,
 }
 
+/// Local directory metadata returned by `host.pickFolder`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostLocalFolder {
+    pub path: String,
+    pub name: String,
+    pub git: bool,
+}
+
 /// Native live-voice playback/call phase (`host.voice*`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -1181,6 +1191,8 @@ pub enum HostOp {
     OpenFile(HostOpenFilePayload),
     #[serde(rename = "host.pickFile")]
     PickFile,
+    #[serde(rename = "host.pickFolder")]
+    PickFolder,
     #[serde(rename = "host.saveFile")]
     SaveFile(HostSaveFilePayload),
     #[serde(rename = "host.speechState")]
@@ -1258,6 +1270,7 @@ impl HostOp {
         "host.openUrl",
         "host.openFile",
         "host.pickFile",
+        "host.pickFolder",
         "host.saveFile",
         "host.speechState",
         "host.speechStart",
@@ -1312,6 +1325,7 @@ impl HostOp {
             HostOp::OpenUrl(_) => "host.openUrl",
             HostOp::OpenFile(_) => "host.openFile",
             HostOp::PickFile => "host.pickFile",
+            HostOp::PickFolder => "host.pickFolder",
             HostOp::SaveFile(_) => "host.saveFile",
             HostOp::SpeechState(_) => "host.speechState",
             HostOp::SpeechStart(_) => "host.speechStart",
@@ -1385,6 +1399,7 @@ impl HostOp {
             "host.openUrl" => serde_json::from_value(payload).map(HostOp::OpenUrl).map_err(|e| format!("openUrl: {e}")),
             "host.openFile" => serde_json::from_value(payload).map(HostOp::OpenFile).map_err(|e| format!("openFile: {e}")),
             "host.pickFile" => expect_empty(&payload).map(|()| HostOp::PickFile),
+            "host.pickFolder" => expect_empty(&payload).map(|()| HostOp::PickFolder),
             "host.saveFile" => serde_json::from_value(payload).map(HostOp::SaveFile).map_err(|e| format!("saveFile: {e}")),
             "host.speechState" => serde_json::from_value(optional_object(payload))
                 .map(HostOp::SpeechState)
@@ -1505,6 +1520,7 @@ crate::typescript::module! {
     HostCommandLineState,
     QrMatrix,
     HostLocalFile,
+    HostLocalFolder,
     HostLiveVoicePhase,
     HostLiveVoiceState,
     HostSpeechAudioPhase,
@@ -1603,6 +1619,7 @@ mod tests {
                 }),
             ),
             ("host.pickFile", json!({}), HostOp::PickFile),
+            ("host.pickFolder", json!({}), HostOp::PickFolder),
             (
                 "host.saveFile",
                 json!({ "path": "/tmp/a.png", "name": "export.png" }),

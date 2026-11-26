@@ -302,6 +302,7 @@ const HostFontSchema = z.object({
 const OpenTerminalSchema = z.object({ terminalId: z.string() });
 const AssetsDirSchema = z.object({ path: z.string() });
 const PickFileSchema = z.object({ path: z.string(), name: z.string(), type: z.string() }).nullable();
+const PickFolderSchema = z.object({ path: z.string(), name: z.string(), git: z.boolean() }).nullable();
 const ReadFileSchema = z.object({ data: z.string(), type: z.string(), name: z.string() });
 const AppletListSchema = z.array(ArtifactAppletInfo);
 
@@ -361,6 +362,9 @@ export const hostApi = {
   playSound: (name: string) => call("host.playSound", { name }),
   /** Opens the native file picker and returns the chosen path, or null when canceled. */
   pickFile: () => callDecoded("host.pickFile", {}, PickFileSchema),
+
+  /** Opens the native folder picker and returns the chosen directory, or null when canceled. */
+  pickFolder: () => callDecoded("host.pickFolder", {}, PickFolderSchema),
   /** A dropped or picked file's bytes (an absolute path or a file: URL; at most 50 MB). */
   readFile: (path: string) => callDecoded("host.readFile", { path }, ReadFileSchema),
   cliState: () => callDecoded("host.cliState", null, CommandLineState),

@@ -94,29 +94,47 @@ pub struct Worktree {
     worktrees_dir: PathBuf,
     repos_dir: Option<PathBuf>,
     data_dir: PathBuf,
+    repo: Option<std::sync::Arc<crate::repo::Repo>>,
 }
 
 impl Worktree {
     pub fn new(worktrees_dir: PathBuf, repos_dir: Option<PathBuf>, data_dir: PathBuf) -> Worktree {
+        Self::with_repo(worktrees_dir, repos_dir, data_dir, None)
+    }
+
+    pub fn with_repo(worktrees_dir: PathBuf, repos_dir: Option<PathBuf>, data_dir: PathBuf, repo: Option<std::sync::Arc<crate::repo::Repo>>) -> Worktree {
         Worktree {
             worktrees_dir,
             repos_dir,
             data_dir,
+            repo,
         }
     }
 
-    /// Where an issue's `repo` is: a bare name under `repos_dir`, else the
-    /// path as written.
+    /// Where an issue's `repo` is: a mounted external repo by name, a bare
+    /// name under `repos_dir`, else the path as written.
     pub fn repo_dir(&self, repo: &str) -> PathBuf {
+        if !repo.is_empty()
+            && !repo.contains('/')
+            && !repo.contains('\\')
+            && let Some(mounted) = self.repo.as_ref().and_then(|r| r.mounted_path(repo))
+        {
+            return mounted;
+        }
         match &self.repos_dir {
             Some(root) if !repo.is_empty() && !repo.contains('/') => root.join(repo),
             _ => PathBuf::from(repo),
         }
     }
 
-    /// How an issue names a repository's top: its name when it is right
-    /// under `repos_dir`, else its path.
+    /// How an issue names a repository's top: its managed/mounted name when
+    /// registered in `Repo` or right under `repos_dir`, else its path.
     pub async fn repo_ref_async(&self, top: &Path) -> String {
+        if let Some(repo) = &self.repo
+            && let Some(name) = repo.name_for_path_async(top).await
+        {
+            return name;
+        }
         if let Some(root) = &self.repos_dir {
             let root = tokio::fs::canonicalize(root).await.unwrap_or_else(|_| root.clone());
             let top = tokio::fs::canonicalize(top).await.unwrap_or_else(|_| top.to_path_buf());
@@ -205,7 +223,12 @@ impl Worktree {
     }
 
     fn dir_of(&self, main: &Repo, number: i64) -> PathBuf {
-        let name = main.root().file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let name = self
+            .repo
+            .as_ref()
+            .and_then(|r| r.name_for_path_sync(main.root()))
+            .or_else(|| main.root().file_name().map(|n| n.to_string_lossy().into_owned()))
+            .unwrap_or_default();
         self.worktrees_dir.join(format!("{name}.{number}"))
     }
 

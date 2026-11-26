@@ -90,6 +90,7 @@ export const RepoSummary = z.object({
   name: z.string(),
   path: z.string(),
   git: z.boolean(),
+  external: z.boolean(),
   last: z.exactOptional(z.number()),
   maxSessions: z.number(),
   pullRequest: PullRequestCapability,
@@ -99,6 +100,16 @@ export const NewRepo = z.object({
   name: z.string(),
   github: z.exactOptional(z.string()),
 }) satisfies Codec<T.NewRepo>;
+
+export const MountRepo = z.object({
+  path: z.string(),
+  name: z.exactOptional(z.string()),
+  initGit: z.exactOptional(z.boolean()),
+}) satisfies Codec<T.MountRepo>;
+
+export const RepoUnmountInput = z.object({
+  id: z.string(),
+}) satisfies Codec<T.RepoUnmountInput>;
 
 const Commit = z.object({
   hash: z.string(),

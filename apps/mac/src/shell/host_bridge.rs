@@ -468,6 +468,31 @@ impl Shell {
                 .detach();
                 return;
             }
+            HostOp::PickFolder => {
+                let chosen = cx.prompt_for_paths(PathPromptOptions {
+                    files: false,
+                    directories: true,
+                    multiple: false,
+                    prompt: None,
+                });
+                cx.spawn(async move |_, cx| {
+                    let result = match chosen.await {
+                        Ok(Ok(Some(paths))) => match paths.into_iter().next() {
+                            Some(path) => cx.background_spawn(async move { crate::host::folder_info(&path) }).await.map(Some),
+                            None => Ok(None),
+                        },
+                        Ok(Ok(None)) => Ok(None),
+                        Ok(Err(error)) => Err(error.to_string()),
+                        Err(error) => Err(error.to_string()),
+                    };
+                    reply.send(match result {
+                        Ok(folder) => Envelope::ok(json!(folder)),
+                        Err(error) => refusal(BizCode::Refused, error),
+                    });
+                })
+                .detach();
+                return;
+            }
             HostOp::SaveFile(req) => {
                 let source = PathBuf::from(req.path);
                 if !source.is_absolute() {
@@ -751,7 +776,7 @@ fn host_info_payload(settings: &crate::theme::Settings, fonts: &[String]) -> Val
         "uiFontSize": settings.ui_font_size,
         "theme": settings.theme.as_str(),
         "motion": settings.effective_motion().as_str(),
-        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "assetsDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet", "captureWebView", "vdp"],
+        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "assetsDir", "playAudio", "readFile", "commandLine", "pickFile", "pickFolder", "saveFile", "update", "mossVoice", "applet", "captureWebView", "vdp"],
     })
 }
 

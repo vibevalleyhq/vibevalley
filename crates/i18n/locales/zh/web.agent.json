@@ -196,5 +196,12 @@
   "targetMachineTip": "将此角色固定到某台执行机器，或保持「自动」由总控端优先调度本机或在线机器。",
   "targetMachineAuto": "自动（优先本机或在线）",
   "targetMachineOffline": "{name}（离线）",
-  "targetMachineDraining": "{name}（排空中）"
+  "targetMachineDraining": "{name}（排空中）",
+  "selector": {
+    "ready": "就绪",
+    "warn": "提醒",
+    "error": "不可用",
+    "checking": "检测中…",
+    "fix": "去设置"
+  }
 }

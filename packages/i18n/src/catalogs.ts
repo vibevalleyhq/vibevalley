@@ -242,6 +242,7 @@ export const catalogs = {
       targetMachineAuto: "自动（优先本机或在线）",
       targetMachineOffline: "{name}（离线）",
       targetMachineDraining: "{name}（排空中）",
+      selector: { ready: "就绪", warn: "提醒", error: "不可用", checking: "检测中…", fix: "去设置" },
     },
     "web.artifact": {
       card: { version: "第 {version} 稿", open: "打开「{title}」" },
@@ -1598,6 +1599,7 @@ export const catalogs = {
         whichRepo: "在哪个仓库里做",
         firstRepo: "还没有仓库：新建一个",
         newRepoLink: "新建仓库",
+        mountLocalLink: "关联本地仓库",
         priority: "优先级",
         inQueue: "排队中：{ago}排上的，有并发上限就按看板上的先后自动开工。",
         unqueue: "不排了",
@@ -2691,6 +2693,23 @@ export const catalogs = {
       download: "下载到工作区",
       create: "创建仓库",
       otherLang: "其他",
+      mountLocal: "关联本地仓库",
+      local: "本地目录",
+      localPath: "本地目录路径",
+      localPathHint: "直接关联磁盘上已有的 Git 仓库，不搬运也不复制原目录文件。",
+      localPathPlaceholder: "/Users/你的名字/projects/my-repo",
+      pickFolder: "选择文件夹",
+      mount: "关联仓库",
+      mounting: "正在关联…",
+      initGit: "若还不是 Git 仓库则顺便初始化",
+      initGitHint: "如果所选目录尚未初始化 Git，会创建仓库并提交初始空提交以便派发工作树。",
+      nameOptionalHint: "可选；留空默认使用目录名，若重名会自动追加后缀。",
+      badgeManaged: "工作区托管",
+      badgeLocal: "本地关联",
+      unmount: "取消关联",
+      unmounting: "取消中…",
+      unmounted: "已取消关联 {name}（磁盘原目录已保留）",
+      unmountTip: "仅从 VibeValley 列表移除关联，不会删除磁盘上的本地文件夹",
     },
     "web.runtime": {
       capability: {
@@ -3416,6 +3435,7 @@ export const catalogs = {
       },
       repoDetail: {
         badgeManaged: "VibeValley 仓库",
+        badgeMounted: "本地关联仓库",
         badgeFolder: "本地目录",
         openFullPage: "打开完整仓库页",
         copied: "已复制路径",
@@ -3729,6 +3749,7 @@ export const catalogs = {
       targetMachineAuto: "Auto (local or online)",
       targetMachineOffline: "{name} (offline)",
       targetMachineDraining: "{name} (draining)",
+      selector: { ready: "Ready", warn: "Warning", error: "Unavailable", checking: "Checking…", fix: "Fix" },
     },
     "web.artifact": {
       card: { version: "Version {version}", open: 'Open "{title}"' },
@@ -5169,6 +5190,7 @@ export const catalogs = {
         whichRepo: "Which repo",
         firstRepo: "No repo yet: make one",
         newRepoLink: "New repo",
+        mountLocalLink: "Mount local repo",
         priority: "Priority",
         inQueue: "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
         unqueue: "Unqueue",
@@ -6313,6 +6335,23 @@ export const catalogs = {
       download: "Download to the work folder",
       create: "Create the repo",
       otherLang: "Other",
+      mountLocal: "Mount local repo",
+      local: "Local folder",
+      localPath: "Folder path",
+      localPathHint: "Mount an existing Git repository from anywhere on disk without moving or copying its files.",
+      localPathPlaceholder: "/Users/name/projects/my-repo",
+      pickFolder: "Choose folder",
+      mount: "Mount repository",
+      mounting: "Mounting…",
+      initGit: "Initialize Git repository if needed",
+      initGitHint: "Creates an initial Git commit if the chosen folder is not yet tracked by Git.",
+      nameOptionalHint: "Optional. Defaults to the folder name and appends a suffix if that name is already taken.",
+      badgeManaged: "Workspace",
+      badgeLocal: "Local mount",
+      unmount: "Unmount",
+      unmounting: "Unmounting…",
+      unmounted: "Unmounted {name} (files on disk were kept)",
+      unmountTip: "Stop managing this external folder in VibeValley without deleting files on disk",
     },
     "web.runtime": {
       capability: {
@@ -7058,6 +7097,7 @@ export const catalogs = {
       },
       repoDetail: {
         badgeManaged: "VibeValley repo",
+        badgeMounted: "Local mount",
         badgeFolder: "Local folder",
         openFullPage: "Open full repository page",
         copied: "Path copied",
@@ -7318,6 +7358,11 @@ export interface Messages {
   "web.agent.save": undefined;
   "web.agent.saved": undefined;
   "web.agent.saving": undefined;
+  "web.agent.selector.checking": undefined;
+  "web.agent.selector.error": undefined;
+  "web.agent.selector.fix": undefined;
+  "web.agent.selector.ready": undefined;
+  "web.agent.selector.warn": undefined;
   "web.agent.steer": undefined;
   "web.agent.tab.env": undefined;
   "web.agent.tab.memory": undefined;
@@ -8936,6 +8981,7 @@ export interface Messages {
   "web.issue.todo.markCanceled": undefined;
   "web.issue.todo.markDone": undefined;
   "web.issue.todo.markReady": undefined;
+  "web.issue.todo.mountLocalLink": undefined;
   "web.issue.todo.newRepo": undefined;
   "web.issue.todo.newRepoLink": undefined;
   "web.issue.todo.pickForMe": undefined;
@@ -9878,6 +9924,8 @@ export interface Messages {
   "web.repo.add": undefined;
   "web.repo.all": undefined;
   "web.repo.allLine": undefined;
+  "web.repo.badgeLocal": undefined;
+  "web.repo.badgeManaged": undefined;
   "web.repo.busiest": { readonly day: string | number; readonly n: string | number };
   "web.repo.busy": undefined;
   "web.repo.byLines": undefined;
@@ -9907,6 +9955,8 @@ export interface Messages {
   "web.repo.githubHint": undefined;
   "web.repo.how": undefined;
   "web.repo.inYear": undefined;
+  "web.repo.initGit": undefined;
+  "web.repo.initGitHint": undefined;
   "web.repo.install": undefined;
   "web.repo.kinds": { readonly n: string | number };
   "web.repo.languages": undefined;
@@ -9918,12 +9968,20 @@ export interface Messages {
   "web.repo.lines": { readonly n: string | number };
   "web.repo.linesAndFiles": { readonly files: string | number; readonly lines: string | number };
   "web.repo.list": undefined;
+  "web.repo.local": undefined;
+  "web.repo.localPath": undefined;
+  "web.repo.localPathHint": undefined;
+  "web.repo.localPathPlaceholder": undefined;
   "web.repo.longest": undefined;
   "web.repo.making": undefined;
   "web.repo.more": undefined;
+  "web.repo.mount": undefined;
+  "web.repo.mountLocal": undefined;
+  "web.repo.mounting": undefined;
   "web.repo.name": undefined;
   "web.repo.nameExample": undefined;
   "web.repo.nameHint": undefined;
+  "web.repo.nameOptionalHint": undefined;
   "web.repo.noCommits": undefined;
   "web.repo.noCommitsThatDay": undefined;
   "web.repo.noTokei": undefined;
@@ -9933,6 +9991,7 @@ export interface Messages {
   "web.repo.openWorkspace": undefined;
   "web.repo.or": undefined;
   "web.repo.otherLang": undefined;
+  "web.repo.pickFolder": undefined;
   "web.repo.readingCommits": undefined;
   "web.repo.recency.day": undefined;
   "web.repo.recency.label": { readonly label: string | number };
@@ -9954,6 +10013,10 @@ export interface Messages {
   "web.repo.thenRecount": undefined;
   "web.repo.times": { readonly n: string | number };
   "web.repo.uncounted": undefined;
+  "web.repo.unmount": undefined;
+  "web.repo.unmountTip": undefined;
+  "web.repo.unmounted": { readonly name: string | number };
+  "web.repo.unmounting": undefined;
   "web.repo.whatLanguages": undefined;
   "web.repo.who": undefined;
   "web.repo.whoWhen": undefined;
@@ -10604,6 +10667,7 @@ export interface Messages {
   "web.shell.repoDetail.activitySummary": { readonly tabs: string | number; readonly worktrees: string | number };
   "web.shell.repoDetail.badgeFolder": undefined;
   "web.shell.repoDetail.badgeManaged": undefined;
+  "web.shell.repoDetail.badgeMounted": undefined;
   "web.shell.repoDetail.branch": undefined;
   "web.shell.repoDetail.closeFolder": undefined;
   "web.shell.repoDetail.commits": undefined;

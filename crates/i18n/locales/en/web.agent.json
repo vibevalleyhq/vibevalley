@@ -196,5 +196,12 @@
   "targetMachineTip": "Pin this profile to a specific execution machine, or leave on Auto to route to the local or best online machine.",
   "targetMachineAuto": "Auto (local or online)",
   "targetMachineOffline": "{name} (offline)",
-  "targetMachineDraining": "{name} (draining)"
+  "targetMachineDraining": "{name} (draining)",
+  "selector": {
+    "ready": "Ready",
+    "warn": "Warning",
+    "error": "Unavailable",
+    "checking": "Checking…",
+    "fix": "Fix"
+  }
 }

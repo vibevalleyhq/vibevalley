@@ -36,9 +36,13 @@ export type RepoTemplates = { repo: string, stack: RepoStack, recent: Array<stri
 
 export type PullRequestCapability = { available: boolean, reason: string, };
 
-export type RepoSummary = { name: string, path: string, git: boolean, last?: number, maxSessions: number, pullRequest: PullRequestCapability, };
+export type RepoSummary = { name: string, path: string, git: boolean, external: boolean, last?: number, maxSessions: number, pullRequest: PullRequestCapability, };
 
 export type NewRepo = { name: string, github?: string, };
+
+export type MountRepo = { path: string, name?: string, initGit?: boolean, };
+
+export type RepoUnmountInput = { id: string, };
 
 export type Commit = { hash: string, subject: string, at: number, };
 

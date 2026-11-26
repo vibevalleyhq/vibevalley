@@ -5,12 +5,13 @@ import type { RuntimeInfo } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
+import { AgentReadinessNote, AgentSelect } from "../../../design/domain/AgentSelect";
 import { Select, TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { Banner } from "../../../design/layout";
 import { toast } from "../../../design/toasts";
-import { useWorkAgents } from "../../../infra/agents";
+import { useWorkAgentReadiness, useWorkAgents } from "../../../infra/agents";
 import { newSendKey } from "../../../infra/api";
 import { useSessionsSlice } from "../../../infra/frame";
 import { ready, useRepos, useRuntimes } from "../../../infra/query";
@@ -61,6 +62,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
   });
   const draft = () => flow().draft;
   const agents = useWorkAgents(true);
+  const agentReadiness = useWorkAgentReadiness(true);
   const repoList = useRepos();
   const runtimeList = useRuntimes();
   const repos = computed(() => ready(repoList, []).map((p) => p.name));
@@ -71,7 +73,6 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
   const noReadyRuntimes = computed(() => runtimeList.status() === "success" && ready(runtimeList, []).filter(isRuntimeReady).length === 0);
   const canSubmit = computed(() => canSubmitDraft(flow()));
   const repoOptions = computed(() => [...new Set([...repos(), ...(draft().repo ? [draft().repo] : [])])].map((p) => ({ value: p, label: p })));
-  const agentOptions = computed(() => agents().map((a) => ({ value: a.id, label: a.name })));
   const machineOptions = computed(() => machines().map((m) => ({ value: m.id, label: m.name })));
   const goTo = (path: string) => {
     props.onClose();
@@ -165,15 +166,16 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
                 />
               </If>
               <If when={!noReadyRuntimes()}>
-                <Select
+                <AgentSelect
                   quiet
                   size="control"
                   label={t("web.issue.detail.helper")}
                   testid="issue-new-helper"
                   value={draft().agent}
+                  agents={agents()}
+                  readiness={agentReadiness}
                   placeholder={t("web.issue.todo.pickForMe")}
                   onChange={(agent) => dispatch({ kind: "setAgent", agent })}
-                  options={agentOptions()}
                 />
               </If>
               <If when={hasMultipleMachines()}>
@@ -189,6 +191,9 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
                 />
               </If>
             </View>
+          </If>
+          <If when={!noReadyRuntimes() && draft().agent !== ""}>
+            <AgentReadinessNote agentId={draft().agent} readiness={agentReadiness} testid="issue-new-helper-status" onNavigate={goTo} />
           </If>
           <View class="gap-1">
             <Text class="text-xs font-medium text-muted">{t("web.issue.tags.label")}</Text>

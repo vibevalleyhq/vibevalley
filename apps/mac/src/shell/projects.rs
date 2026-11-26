@@ -15,6 +15,17 @@ use crate::panes::PaneEntity;
 
 use super::{ACTIVE_KEY, GitSummary, ProjectView, Shell};
 
+/// Resolves the main git repository root to mount for a Workspace directory, or `None` when not a git repo.
+fn git_repo_mount_root(path: &Path) -> Option<PathBuf> {
+    let repo = Repo::discover(path).ok()??;
+    if let Ok(worktrees) = repo.worktrees()
+        && let Some(main) = worktrees.into_iter().find(|w| w.is_main)
+    {
+        return Some(main.path);
+    }
+    Some(repo.root().to_path_buf())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct SidebarTopics {
     pub rail: bool,
@@ -124,6 +135,7 @@ impl Shell {
                         let id = shell.workspace.ws.open(loaded.unwrap_or_else(|| shell.transient_project(&path)));
                         shell.ensure_project_view(id, cx);
                         shell.sync_chat_watches(cx);
+                        shell.sync_repo_mounts(vec![path], cx);
                         id
                     });
                     then(shell, id, window, cx);
@@ -185,8 +197,12 @@ impl Shell {
                 let _ = this.update(cx, |s, cx| match loaded {
                     Ok(p) => {
                         let id = s.workspace.ws.open(p);
+                        let root = s.workspace.ws.project(id).map(|proj| proj.root().to_path_buf());
                         s.activate_project(id, window, cx);
                         s.refresh_summaries(cx);
+                        if let Some(root) = root {
+                            s.sync_repo_mounts(vec![root], cx);
+                        }
                     }
                     Err(e) => eprintln!("add project: {e}"),
                 });
@@ -331,6 +347,64 @@ impl Shell {
                 }
             },
         );
+    }
+
+    /// Ensures every git repository currently open in Workspace is mounted on the server.
+    pub(super) fn sync_all_project_mounts(&self, cx: &mut Context<Self>) {
+        let roots: Vec<PathBuf> = self.workspace.ws.projects().iter().map(|p| p.root().to_path_buf()).collect();
+        self.sync_repo_mounts(roots, cx);
+    }
+
+    /// Discovers main git repository roots for `paths` and mounts them via `repo.mount`.
+    pub(super) fn sync_repo_mounts(&self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
+        if paths.is_empty() || !self.workspace.server_ready {
+            return;
+        }
+        let Some(server) = cx.try_global::<crate::hosted::BridgeHub>().map(|b| b.0.server().clone()) else {
+            return;
+        };
+        cx.spawn(async move |this, cx| {
+            let repo_roots = cx
+                .background_spawn(async move {
+                    let mut unique = BTreeSet::new();
+                    for path in paths {
+                        if let Some(root) = git_repo_mount_root(&path) {
+                            unique.insert(root);
+                        }
+                    }
+                    unique.into_iter().collect::<Vec<_>>()
+                })
+                .await;
+            if repo_roots.is_empty() {
+                return;
+            }
+            let (tx, rx) = flume::bounded(1);
+            let rt = vibevalley_runtime::rt::current_or_global_handle();
+            rt.spawn(async move {
+                let mut any_mounted = false;
+                for root in repo_roots {
+                    let env = Arc::clone(&server)
+                        .call_with_async(
+                            vibevalley_server::gateway::bridge::CallerContext::local(),
+                            "repo.mount".into(),
+                            json!({ "path": root.to_string_lossy() }),
+                        )
+                        .await;
+                    if env.data.is_some() {
+                        any_mounted = true;
+                    }
+                }
+                let _ = tx.send(any_mounted);
+            });
+            if rx.recv_async().await.unwrap_or(false) {
+                let _ = this.update(cx, |shell, cx| {
+                    shell.chrome.workbench.update(cx, |view, cx| view.notify_repos_changed(cx));
+                    shell.chrome.sidebar.update(cx, |view, cx| view.notify_repos_changed(cx));
+                    shell.push_sidebar_topics(SidebarTopics::RAIL, cx);
+                });
+            }
+        })
+        .detach();
     }
 
     /// Reads the branch and worktrees of every project the sidebar lists.

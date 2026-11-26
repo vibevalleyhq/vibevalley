@@ -37,5 +37,12 @@
   "publish.platformFailed": "Hosting platform failed: {stage}. Check installation and login.",
   "publish.pushedWithoutLink": "SHA {sha} was pushed, but no PR/MR link was confirmed: {why}. Retry to recover an open request.",
   "publish.userOnly": "Only the user on this computer can publish an existing branch",
-  "publish.pushUnconfirmed": "Push of SHA {sha} was not confirmed. No PR/MR creation was attempted; inspect the remote before retrying."
+  "publish.pushUnconfirmed": "Push of SHA {sha} was not confirmed. No PR/MR creation was attempted; inspect the remote before retrying.",
+  "mount": {
+    "emptyPath": "Provide a local repository folder path",
+    "notFound": "Folder does not exist: {path}",
+    "notDir": "Path is not a folder: {path}",
+    "notGit": "\"{path}\" is not a Git repository yet (enable Git initialization to mount it)",
+    "unmountManaged": "\"{name}\" is a managed workspace repository and cannot be unmounted"
+  }
 }

@@ -544,6 +544,9 @@
    "op": "host.pickFile"
   },
   {
+   "op": "host.pickFolder"
+  },
+  {
    "op": "host.saveFile",
    "payload": {
     "path": "/tmp/a.png",

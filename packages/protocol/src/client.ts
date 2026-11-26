@@ -617,6 +617,9 @@ export class VibeValleyApi {
       this.call<T.Validation>("repo.validate", "/api/v1/repo/validate", a, options),
     create: (a: T.NewRepo, options?: { signal?: AbortSignal }): Promise<T.RepoSummary> =>
       this.call<T.RepoSummary>("repo.create", "/api/v1/repo/create", a, options),
+    mount: (a: T.MountRepo, options?: { signal?: AbortSignal }): Promise<T.RepoSummary> =>
+      this.call<T.RepoSummary>("repo.mount", "/api/v1/repo/mount", a, options),
+    unmount: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("repo.unmount", "/api/v1/repo/unmount", a, options),
     pr: {
       submit: (a: T.SubmitBranch, options?: { signal?: AbortSignal }): Promise<T.BranchPublication> =>
         this.call<T.BranchPublication>("repo.pr.submit", "/api/v1/repo/pr/submit", a, options),

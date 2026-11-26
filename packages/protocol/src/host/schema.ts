@@ -372,6 +372,7 @@ export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.openUrl"), payload: HostOpenUrlPayload }),
   z.object({ op: z.literal("host.openFile"), payload: HostOpenFilePayload }),
   z.object({ op: z.literal("host.pickFile") }),
+  z.object({ op: z.literal("host.pickFolder") }),
   z.object({ op: z.literal("host.saveFile"), payload: HostSaveFilePayload }),
   z.object({ op: z.literal("host.speechState"), payload: HostIdPayload }),
   z.object({ op: z.literal("host.speechStart"), payload: HostIdPayload }),

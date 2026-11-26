@@ -156,6 +156,8 @@ impl Router {
             E::RepoList => ret!(ok_json(c.repo.list_summaries_async().await)),
             E::RepoValidate => on!(p, RepoValidate, |r| c.repo.validate_repo(&r)),
             E::RepoCreate => on!(p, RepoCreate, |r| c.repo.create_repo_async(&r).await?),
+            E::RepoMount => on!(p, RepoMount, |r| c.repo.mount_repo_async(&r).await?),
+            E::RepoUnmount => void!(p, RepoUnmount, |r| c.repo.unmount_repo_async(&r.id).await?),
             E::RepoLanguageList => on!(p, RepoLanguageList, |r| c.repo.languages_endpoint_async(&r.id).await?),
             E::RepoTemplateList => on!(p, RepoTemplateList, |r| glue::repo_templates_async(c, &r.id).await?),
             E::RepoActivityGet => on!(p, RepoActivityGet, |r| c.repo.activity_endpoint_async(&r.id).await?),

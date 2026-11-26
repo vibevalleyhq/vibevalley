@@ -216,18 +216,19 @@ async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Resu
     .await
     .map_err(|e| failed("artifacts")(&e.message))?;
 
-    let board_config = RuntimeConfig {
-        worktrees_dir: config.work_root.join("worktrees"),
-        data_dir: config.home.join("issues"),
-        repos_dir: Some(config.work_root.join("repos")),
-        ..RuntimeConfig::under(&config.home)
-    };
-    let repo = Box::pin(Repo::open_async(&config.work_root, board_config.per_repo))
+    let repo = Box::pin(Repo::open_async(&config.work_root, RuntimeConfig::under(&config.home).per_repo))
         .await
         .map_err(|e| failed("the repos")(&e))?;
     if config.probe_runtimes {
         repo.probe_in_context(&ctx);
     }
+    let board_config = RuntimeConfig {
+        worktrees_dir: config.work_root.join("worktrees"),
+        data_dir: config.home.join("issues"),
+        repos_dir: Some(config.work_root.join("repos")),
+        repo: Some(repo.clone()),
+        ..RuntimeConfig::under(&config.home)
+    };
 
     let drivers: Arc<dyn SessionDriver> = Arc::new(AgentDriver::new(profile.clone(), Some(memory.clone() as Arc<dyn MemoryRecallPort>)));
     let (runtime, opened) = Box::pin(Runtime::open_async(ctx.clone(), drivers, board_config))

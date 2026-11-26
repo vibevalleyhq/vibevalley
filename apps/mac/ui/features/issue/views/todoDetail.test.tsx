@@ -187,3 +187,31 @@ test("TodoDetail defaults to preview-first Markdown, Compare, visual criteria ch
   await app.press("id:issue-draft-toggle");
   await fake.pumpUntil(app, () => app.count("id:issue-talk") === 1);
 });
+
+test("TodoDetail displays agent.validate readiness diagnostics and can mount a local repository", async () => {
+  const { app, fake } = await mountTodoIssue();
+  fake.respond("agent.validate", [
+    { id: "ahua", problems: [{ field: "runtime", level: "error", text: "OpenCode 没装" }] },
+    { id: "xiaolin", problems: [{ field: "persona", level: "warn", text: "还没写人设" }] },
+  ]);
+  fake.respond("host.pickFolder", () => ({ path: "/Users/dev/local-repo", name: "local-repo", git: true }));
+  fake.respond("repo.mount", () => ({
+    name: "local-repo",
+    path: "/Users/dev/local-repo",
+    git: true,
+    external: true,
+    maxSessions: 2,
+    pullRequest: { available: false, reason: "" },
+  }));
+
+  await fake.pumpUntil(app, () => app.count("id:issue-helper") === 1);
+  await app.press("id:issue-helper");
+  await fake.pump(app);
+  await app.press("text:小林");
+  await fake.pumpUntil(app, () => app.count("id:issue-helper-status") === 1);
+  expect(app.texts()).toContain("还没写人设");
+
+  await app.press("id:mount-local-repo");
+  await fake.pump(app);
+  expect(fake.calls.some((c) => c.op === "repo.mount")).toBe(true);
+});

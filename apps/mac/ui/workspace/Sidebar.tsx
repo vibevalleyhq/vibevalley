@@ -1,4 +1,4 @@
-import { Clipboard, computed, effect, host, Image, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
+import { cleanup, Clipboard, computed, effect, host, Image, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 import { Button, ContextMenu, Menu, MenuItem, MenuSeparator } from "nsh/base";
 import { z } from "zod";
 
@@ -62,6 +62,7 @@ type VvRepo = {
   name: string;
   path: string;
   git?: boolean;
+  external?: boolean;
   last?: number;
   maxSessions?: number;
   pullRequest?: { available: boolean; reason: string };
@@ -110,6 +111,7 @@ const vvRepoSchema: z.ZodType<VvRepo> = z.object({
   name: z.string(),
   path: z.string(),
   git: z.exactOptional(z.boolean()),
+  external: z.exactOptional(z.boolean()),
   last: z.exactOptional(z.number()),
   maxSessions: z.exactOptional(z.number()),
   pullRequest: z.exactOptional(z.object({ available: z.boolean(), reason: z.string() })),
@@ -975,6 +977,14 @@ export function Sidebar() {
     return [...names].toSorted().join("\0");
   });
 
+  const railProjectsKey = computed(() =>
+    (rail()?.projects ?? [])
+      .map((p) => normPath(p.path))
+      .filter(Boolean)
+      .toSorted()
+      .join("\0"),
+  );
+
   const hasWorkingTab = computed(() => {
     for (const proj of rail()?.projects ?? []) {
       for (const tab of proj.tabs ?? []) {
@@ -997,14 +1007,18 @@ export function Sidebar() {
       });
     }
     if (hostParams.role !== "inspector") {
-      effect(() => {
-        void repoNamesKey();
+      const refreshVvRepos = () =>
         void callDecoded("repo.list", {}, z.array(vvRepoSchema)).then((env) => {
           if (env.bizCode === 0 && env.data) {
             vvRepos.set(env.data);
           }
         });
+      effect(() => {
+        void repoNamesKey();
+        void railProjectsKey();
+        refreshVvRepos();
       });
+      cleanup(host.on("repos-changed", refreshVvRepos));
     }
   }
 
@@ -1327,6 +1341,7 @@ export function Sidebar() {
       branch: repo.branch,
       active: repo.active,
       vibevalley: repo.vibevalley,
+      external: vv?.external,
       git: vv?.git,
       maxSessions: vv?.maxSessions,
       pullRequest: vv?.pullRequest,

@@ -260,6 +260,7 @@
    "name": "s600",
    "path": "s601",
    "git": true,
+   "external": false,
    "last": 603,
    "maxSessions": 604,
    "pullRequest": {
@@ -271,6 +272,7 @@
    "name": "s607",
    "path": "s608",
    "git": false,
+   "external": true,
    "maxSessions": 610,
    "pullRequest": {
     "available": false,
