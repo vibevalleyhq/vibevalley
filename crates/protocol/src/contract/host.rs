@@ -1001,6 +1001,40 @@ pub struct HostCaptureWebViewPayload {
     pub height: Option<u32>,
 }
 
+/// Request payload for `host.vdpDiscover`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostVdpDiscoverPayload {
+    #[serde(default)]
+    pub extra_homes: Option<Vec<String>>,
+}
+
+/// Request payload for `host.vdpCall`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostVdpCallPayload {
+    #[serde(default)]
+    pub ws_url: Option<String>,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub token: Option<String>,
+    pub method: String,
+    #[serde(default)]
+    #[cfg_attr(feature = "ts-gen", ts(optional, type = "unknown"))]
+    pub params: Option<serde_json::Value>,
+    #[serde(default)]
+    pub session_id: Option<String>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
+}
+
 /// Captured raster image returned by `host.captureWebView`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -1192,6 +1226,10 @@ pub enum HostOp {
     AppletOpen(HostAppletIdPayload),
     #[serde(rename = "host.captureWebView")]
     CaptureWebView(HostCaptureWebViewPayload),
+    #[serde(rename = "host.vdpDiscover")]
+    VdpDiscover(HostVdpDiscoverPayload),
+    #[serde(rename = "host.vdpCall")]
+    VdpCall(HostVdpCallPayload),
 }
 
 impl HostOp {
@@ -1240,6 +1278,8 @@ impl HostOp {
         "host.appletUninstall",
         "host.appletOpen",
         "host.captureWebView",
+        "host.vdpDiscover",
+        "host.vdpCall",
     ];
 
     pub fn is_known_op(op: &str) -> bool {
@@ -1292,6 +1332,8 @@ impl HostOp {
             HostOp::AppletUninstall(_) => "host.appletUninstall",
             HostOp::AppletOpen(_) => "host.appletOpen",
             HostOp::CaptureWebView(_) => "host.captureWebView",
+            HostOp::VdpDiscover(_) => "host.vdpDiscover",
+            HostOp::VdpCall(_) => "host.vdpCall",
         }
     }
 
@@ -1387,6 +1429,10 @@ impl HostOp {
             "host.captureWebView" => serde_json::from_value(optional_object(payload))
                 .map(HostOp::CaptureWebView)
                 .map_err(|e| format!("captureWebView: {e}")),
+            "host.vdpDiscover" => serde_json::from_value(optional_object(payload))
+                .map(HostOp::VdpDiscover)
+                .map_err(|e| format!("vdpDiscover: {e}")),
+            "host.vdpCall" => serde_json::from_value(payload).map(HostOp::VdpCall).map_err(|e| format!("vdpCall: {e}")),
             other => Err(format!("the host has no op {other}")),
         }
     }
@@ -1448,6 +1494,8 @@ crate::typescript::module! {
     AppletRemoveResult,
     AppletOpenResult,
     HostCaptureWebViewPayload,
+    HostVdpDiscoverPayload,
+    HostVdpCallPayload,
     HostCapturedImage,
     HostCommandLineState,
     QrMatrix,
@@ -1680,6 +1728,35 @@ mod tests {
                     height: Some(400),
                 }),
             ),
+            ("host.vdpDiscover", json!(null), HostOp::VdpDiscover(HostVdpDiscoverPayload::default())),
+            (
+                "host.vdpDiscover",
+                json!({ "extraHomes": ["/tmp/sandbox-home"] }),
+                HostOp::VdpDiscover(HostVdpDiscoverPayload {
+                    extra_homes: Some(vec!["/tmp/sandbox-home".into()]),
+                }),
+            ),
+            (
+                "host.vdpCall",
+                json!({
+                    "wsUrl": "ws://127.0.0.1:9222/devtools",
+                    "port": 9222,
+                    "token": "abc",
+                    "method": "Target.list",
+                    "params": {},
+                    "sessionId": "s1",
+                    "timeoutMs": 5000
+                }),
+                HostOp::VdpCall(HostVdpCallPayload {
+                    ws_url: Some("ws://127.0.0.1:9222/devtools".into()),
+                    port: Some(9222),
+                    token: Some("abc".into()),
+                    method: "Target.list".into(),
+                    params: Some(json!({})),
+                    session_id: Some("s1".into()),
+                    timeout_ms: Some(5000),
+                }),
+            ),
         ];
 
         let mut seen = std::collections::BTreeSet::new();
@@ -1723,6 +1800,9 @@ mod tests {
         assert!(HostOp::from_wire("host.appletUninstall", json!({})).is_err());
         assert!(HostOp::from_wire("host.appletOpen", json!({ "artifactId": "art-1", "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.captureWebView", json!({ "width": 640, "extra": true })).is_err());
+        assert!(HostOp::from_wire("host.vdpDiscover", json!({ "extra": true })).is_err());
+        assert!(HostOp::from_wire("host.vdpCall", json!({})).is_err());
+        assert!(HostOp::from_wire("host.vdpCall", json!({ "method": "Target.list", "extra": 1 })).is_err());
     }
 
     #[test]

@@ -8,10 +8,12 @@ pub mod home;
 mod native;
 #[cfg(feature = "ts-gen")]
 pub mod typescript;
+pub mod vdp;
 pub mod wire;
 
 pub use contract::*;
 pub use envelope::*;
 pub use ext::*;
 pub use native::*;
+pub use vdp::*;
 pub use wire::*;
