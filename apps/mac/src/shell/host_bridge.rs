@@ -695,10 +695,10 @@ impl Shell {
     }
 
     pub(super) fn subscribe_hosted(&mut self, view: &Entity<HostedView>, window: &mut Window, cx: &mut Context<Self>) -> Subscription {
-        cx.subscribe_in(view, window, move |this, _, event: &HostedEvent, window, cx| match event {
+        cx.subscribe_in(view, window, move |this, view, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(a) => this.on_action(a.clone(), window, cx),
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
-            HostedEvent::Ready => {}
+            HostedEvent::Ready => view.read(cx).push_update_state(crate::update::state(), cx),
         })
     }
 
