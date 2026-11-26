@@ -80,9 +80,9 @@ fn png_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
     (w > 0 && h > 0).then_some((w, h))
 }
 
-fn cover_wire(artifact_id: &str, root: &Path, meta: &StoredCoverMeta) -> ArtifactCover {
+fn cover_wire(artifact_id: &str, canonical_path: &Path, meta: &StoredCoverMeta) -> ArtifactCover {
     ArtifactCover {
-        path: root.join(&meta.file).to_string_lossy().into_owned(),
+        path: canonical_path.to_string_lossy().into_owned(),
         url: format!("/api/v1/artifact/{artifact_id}/cover?seq={}", meta.seq),
         mime: meta.mime.clone(),
         seq: meta.seq,
@@ -567,7 +567,9 @@ impl ArtifactStorage {
             Some(rel) if validate_artifact_path(rel).ok() == Some(ArtifactPathZone::Asset) => {
                 let abs = root.join(rel);
                 if tokio::fs::metadata(&abs).await.is_ok_and(|m| m.is_file()) {
-                    Some(abs.to_string_lossy().into_owned())
+                    // Canonicalize so symlinked VIBEVALLEY_HOME matches nsh's canonical fs.read grants.
+                    let canonical = tokio::fs::canonicalize(&abs).await.unwrap_or(abs);
+                    Some(canonical.to_string_lossy().into_owned())
                 } else {
                     None
                 }
@@ -642,7 +644,8 @@ impl ArtifactStorage {
         if !tokio::fs::metadata(&abs).await.is_ok_and(|m| m.is_file()) {
             return None;
         }
-        Some(cover_wire(artifact_id, &root, &meta))
+        let canonical = tokio::fs::canonicalize(&abs).await.unwrap_or(abs);
+        Some(cover_wire(artifact_id, &canonical, &meta))
     }
 
     /// Reads the derived auto-cover metadata for `artifact_id` if present (cached in memory).
@@ -702,7 +705,8 @@ impl ArtifactStorage {
         };
         let meta_bytes = serde_json::to_vec(&meta).map_err(internal)?;
 
-        write_atomic_async(&root.join(&filename), &bytes).await.map_err(internal)?;
+        let cover_abs = root.join(&filename);
+        write_atomic_async(&cover_abs, &bytes).await.map_err(internal)?;
         write_atomic_async(&root.join(COVER_META_FILE), &meta_bytes).await.map_err(internal)?;
 
         // Clean up superseded derived cover files so disk stays tidy.
@@ -716,7 +720,8 @@ impl ArtifactStorage {
             }
         }
 
-        let wire = cover_wire(artifact_id, &root, &meta);
+        let canonical = tokio::fs::canonicalize(&cover_abs).await.unwrap_or(cover_abs);
+        let wire = cover_wire(artifact_id, &canonical, &meta);
         self.cover_cache.write().insert(artifact_id.to_owned(), Some(wire.clone()));
         Ok(wire)
     }
