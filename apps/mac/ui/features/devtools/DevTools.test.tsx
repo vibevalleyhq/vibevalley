@@ -688,3 +688,242 @@ test("regression: timeline and trajectory tabs do not overlap duplicate in-fligh
   await host.releaseDeferred(app);
   await host.pumpUntil(app, () => app.count("id:trajectory-item-sess-1") === 1);
 });
+
+test("DevTools Remote VDP discovers instances, attaches, drives remote shell/screenshot/UI probe/RPC/logs, and disconnects cleanly", async () => {
+  setLocale("en");
+  let remoteRoute = "/issues";
+  let remoteDark = false;
+  let remoteWidth = 1280;
+  let remoteHeight = 800;
+  let logPollCount = 0;
+
+  const samplePngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  const discoveredInstances = [
+    {
+      protocolVersion: "1",
+      pid: 4242,
+      channel: "dev",
+      appVersion: "0.9.0-dev",
+      home: "/Users/test/.vibevalley-sandbox",
+      port: 9222,
+      httpUrl: "http://127.0.0.1:9222",
+      wsUrl: "ws://127.0.0.1:9222/devtools",
+      token: "secret-vdp-token",
+      startedAt: NOW - 10_000,
+    },
+  ];
+
+  const host = createDevToolsHost(
+    { detached: false },
+    {
+      "debug.snapshot": () => sampleSnapshot,
+      "debug.graph": () => sampleGraph,
+      "host.vdpDiscover": () => discoveredInstances,
+      "host.vdpCall": (payload: unknown) => {
+        const req = payload as { wsUrl?: string; port?: number; token?: string; method: string; params?: Record<string, unknown> };
+        switch (req.method) {
+          case "Target.list":
+            return {
+              targets: [
+                { id: "shell", kind: "shell", title: "Main Window", attached: true },
+                { id: "view:vibevalley", kind: "view", title: "vibevalley", attached: false },
+                { id: "webview:0", kind: "webview", title: "Prototype Preview", attached: false },
+              ],
+            };
+          case "Shell.getState":
+            return { route: remoteRoute, dark: remoteDark, window: { width: remoteWidth, height: remoteHeight } };
+          case "Page.getMetrics":
+            return { width: remoteWidth, height: remoteHeight, scaleFactor: 2, themeDark: remoteDark, lastFrameMs: 3.4 };
+          case "Shell.navigate":
+            remoteRoute = typeof req.params?.route === "string" ? req.params.route : remoteRoute;
+            return { ok: true, route: remoteRoute };
+          case "Shell.setTheme":
+            remoteDark = typeof req.params?.dark === "boolean" ? req.params.dark : !remoteDark;
+            return { ok: true, dark: remoteDark };
+          case "Shell.resize":
+            remoteWidth = Number(req.params?.width ?? remoteWidth);
+            remoteHeight = Number(req.params?.height ?? remoteHeight);
+            return { ok: true, width: remoteWidth, height: remoteHeight };
+          case "Page.captureScreenshot":
+            return { mime: "image/png", data: samplePngBase64, width: 640, height: 400 };
+          case "UI.query":
+            return {
+              view: "vibevalley",
+              nodes: [
+                {
+                  testId: "place-library",
+                  role: "link",
+                  text: "Library",
+                  bounds: { x: 8, y: 120, width: 64, height: 48 },
+                  pressable: true,
+                },
+              ],
+            };
+          case "UI.getTree":
+            return {
+              view: "vibevalley",
+              route: remoteRoute,
+              nodes: [{ testId: "view:vibevalley", role: "root", children: [{ testId: "place-library", role: "link", text: "Library", pressable: true }] }],
+            };
+          case "UI.press":
+            return { view: "vibevalley", testId: typeof req.params?.testId === "string" ? req.params.testId : "", pressed: true };
+          case "Server.slice":
+            return { slice: req.params?.name ?? "board", seq: 99 };
+          case "Log.enable":
+            return { ok: true };
+          case "Log.disable":
+            return { ok: true };
+          case "Log.getEntries": {
+            logPollCount += 1;
+            const sinceId = Number(req.params?.sinceId ?? 0);
+            if (sinceId === 0) {
+              return {
+                entries: [
+                  {
+                    id: 1,
+                    event: {
+                      method: "UI.console",
+                      params: { view: "vibevalley", level: "warn", message: "Remote console notice", timestamp: NOW - 500 },
+                    },
+                  },
+                ],
+                latestId: 1,
+              };
+            }
+            return {
+              entries: [
+                {
+                  id: 2,
+                  event: {
+                    method: "Log.entry",
+                    params: { level: "info", source: "shell", message: "Route switched cleanly", timestamp: NOW },
+                  },
+                },
+              ],
+              latestId: 2,
+            };
+          }
+          default:
+            return { bizCode: BizCode.RouteNotFound, message: `unknown VDP method ${req.method}` };
+        }
+      },
+    },
+  );
+
+  const app = await open("../../ShellApp.story.tsx", {
+    width: 1100,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: NOW },
+    host: host.options,
+  });
+  const clock = app.clock;
+  if (!clock) throw new Error("virtual clock required");
+
+  await host.pumpUntil(app, () => app.count("id:devtools-overview") === 1);
+  await app.press("id:devtools-tab-remote");
+  await host.pumpUntil(app, () => app.count("id:vdp-instance-9222") === 1);
+
+  expect(app.texts()).toContain(":9222");
+  expect(app.texts()).toContain("pid 4242");
+  expect(app.texts()).toContain("/Users/test/.vibevalley-sandbox");
+
+  await app.press("id:vdp-attach-9222");
+  await host.pumpUntil(app, () => app.count("id:vdp-attached-view") === 1);
+
+  expect(app.count("id:devtools-vdp-badge")).toBe(1);
+  expect(app.count("id:vdp-target-shell")).toBe(1);
+  expect(app.count("id:vdp-target-view:vibevalley")).toBe(1);
+  expect(app.texts()).toContain("/issues");
+  expect(app.texts()).toContain("1280×800");
+
+  await app.press("id:vdp-quick-route-library");
+  await host.pumpUntil(app, () => app.texts().includes("/library"));
+  expect(
+    host.calls.some(
+      (c) =>
+        c.op === "host.vdpCall" &&
+        (c.payload as { method?: string; params?: { route?: string }; token?: string }).method === "Shell.navigate" &&
+        (c.payload as { params?: { route?: string } }).params?.route === "/library" &&
+        (c.payload as { token?: string }).token === "secret-vdp-token",
+    ),
+  ).toBe(true);
+
+  await app.press("id:vdp-toggle-theme");
+  await host.pumpUntil(app, () => app.texts().includes(t("web.devtools.remote.themeDark")));
+
+  await app.press("id:vdp-capture-shell");
+  await host.pumpUntil(app, () => app.count("id:vdp-screenshot-img") === 1);
+  expect(app.texts()).toContain("640×400");
+
+  await app.type("id:vdp-ui-testid", "place-library");
+  await app.press("id:vdp-ui-query-btn");
+  await host.pumpUntil(app, () => app.count("id:vdp-ui-node-place-library") === 1);
+  expect(app.texts()).toContain("8,120 64×48");
+
+  await app.press("id:vdp-ui-press-place-library");
+  await host.pumpUntil(app, () => app.count("id:vdp-feedback") === 1);
+  expect(app.texts()).toContain(t("web.devtools.remote.pressedFeedback", { testId: "place-library" }));
+
+  await app.press("id:vdp-ui-tree-btn");
+  await host.pumpUntil(app, () => app.count("id:vdp-ui-tree-json") === 1);
+
+  await app.type("id:vdp-rpc-method", "Server.slice");
+  await app.type("id:vdp-rpc-params", '{"name":"board"}');
+  await app.press("id:vdp-rpc-send");
+  await host.pumpUntil(app, () => app.count("id:vdp-rpc-response") === 1);
+  expect(app.texts().some((s) => s.includes('"seq": 99'))).toBe(true);
+
+  await app.press("id:vdp-log-toggle");
+  await host.pumpUntil(app, () => app.texts().includes("Remote console notice"));
+  await clock.fastForward(2_100);
+  await host.pumpUntil(app, () => logPollCount >= 2 && app.texts().includes("Route switched cleanly"));
+
+  await app.press("id:vdp-disconnect");
+  await host.pumpUntil(app, () => app.count("id:vdp-manual-form") === 1);
+  expect(app.count("id:devtools-vdp-badge")).toBe(0);
+});
+
+test("DevTools Remote VDP stays accessible when local debug.snapshot is disabled and supports manual port/token connect", async () => {
+  setLocale("en");
+  const host = createDevToolsHost(
+    { detached: false },
+    {
+      "debug.snapshot": { bizCode: BizCode.Forbidden, message: "DevTools are disabled on the server." },
+      "host.vdpDiscover": () => [],
+      "host.vdpCall": (payload: unknown) => {
+        const req = payload as { port?: number; token?: string; method: string };
+        if (req.token !== "manual-tok") {
+          return { bizCode: BizCode.Forbidden, message: "Unauthorized" };
+        }
+        if (req.method === "Target.list") return { targets: [{ id: "shell", kind: "shell", title: "Remote Shell", attached: true }] };
+        if (req.method === "Shell.getState") return { route: "/farm", dark: true };
+        if (req.method === "Page.getMetrics") return { width: 1024, height: 768, themeDark: true };
+        return { ok: true };
+      },
+    },
+  );
+
+  const app = await open("../../ShellApp.story.tsx", {
+    width: 1000,
+    height: 700,
+    colorScheme: "dark",
+    platform: "macos",
+    clock: { time: NOW },
+    host: host.options,
+  });
+  await host.pumpUntil(app, () => app.count("id:devtools-disabled") === 1);
+
+  await app.press("id:devtools-tab-remote");
+  await host.pumpUntil(app, () => app.count("id:vdp-discover-empty") === 1);
+
+  await app.type("id:vdp-manual-port", "9333");
+  await app.type("id:vdp-manual-token", "manual-tok");
+  await app.press("id:vdp-manual-connect");
+  await host.pumpUntil(app, () => app.count("id:vdp-attached-view") === 1);
+
+  expect(app.texts()).toContain("127.0.0.1:9333");
+  expect(app.texts()).toContain("/farm");
+  expect(app.count("id:vdp-target-shell")).toBe(1);
+});

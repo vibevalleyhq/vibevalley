@@ -15,6 +15,7 @@ import { FarmPhone } from "./farm/FarmPhone";
 import { viewName } from "./infra/bridge";
 import { useBridge } from "./infra/bridged";
 import { readHostMotion } from "./infra/hostParams";
+import { installVdpProbe } from "./infra/vdpProbe";
 
 function Unknown() {
   return (
@@ -38,7 +39,10 @@ host.on("locale", (loc) => {
 installMotionReporter();
 applyMotion(readHostMotion());
 host.on("motion", applyMotion);
-if (host.available()) useBridge();
+if (host.available()) {
+  useBridge();
+  installVdpProbe();
+}
 
 const Surface = views[viewName()] ?? Unknown;
 mount(() => (

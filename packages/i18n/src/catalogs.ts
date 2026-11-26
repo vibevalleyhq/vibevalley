@@ -1013,7 +1013,7 @@ export const catalogs = {
     },
     "web.devtools": {
       title: "开发者工具",
-      tabs: { overview: "概览", routes: "路由", timeline: "时间线", trajectory: "轨迹", state: "状态与缓存", lab: "实验与覆盖" },
+      tabs: { overview: "概览", routes: "路由", timeline: "时间线", trajectory: "轨迹", state: "状态与缓存", lab: "实验与覆盖", remote: "远程实例" },
       actions: {
         refresh: "刷新",
         autoRefresh: "自动刷新",
@@ -1111,6 +1111,60 @@ export const catalogs = {
         applied: "覆盖配置已应用。",
         resetDone: "已恢复默认配置。",
         warning: "已启用故障注入，将影响当前进程内的所有视图。",
+      },
+      remote: {
+        discover: "本机可调试实例",
+        scan: "扫描",
+        scanning: "扫描中…",
+        emptyDiscover: "未发现可调试的 VibeValley 实例。请使用 --remote-debugging-port=<端口> 或 VIBEVALLEY_DEBUG_PORT=0 启动另一实例。",
+        attach: "附加",
+        attaching: "连接中…",
+        disconnect: "断开",
+        connected: "已连接",
+        manualTitle: "手动连接",
+        port: "端口",
+        portPlaceholder: "如 9222",
+        token: "令牌",
+        tokenPlaceholder: "粘贴调试令牌…",
+        connect: "连接",
+        invalidPort: "请输入有效的 TCP 端口（1–65535）。",
+        targets: "目标列表",
+        emptyTargets: "远程实例未上报目标。",
+        shellTitle: "远程外壳与快捷操作",
+        route: "当前路由",
+        theme: "主题",
+        themeDark: "深色",
+        themeLight: "浅色",
+        viewport: "视口尺寸",
+        navigate: "跳转",
+        routePlaceholder: "如 /issues 或 /library",
+        toggleTheme: "切换主题",
+        resize: "调整尺寸",
+        width: "宽度",
+        height: "高度",
+        captureShell: "截取窗口",
+        captureWebView: "截取网页",
+        capturing: "截图中…",
+        screenshot: "实时截图",
+        uiProbeTitle: "界面探针",
+        testIdPlaceholder: "testID（精确）",
+        textPlaceholder: "包含文字…",
+        rolePlaceholder: "角色（如 link）",
+        query: "查询",
+        tree: "节点树",
+        press: "触发点击",
+        pressedFeedback: "已触发 {testId}",
+        emptyUi: "未匹配到界面节点。",
+        rpcTitle: "原始 VDP JSON-RPC",
+        rpcMethod: "方法名",
+        rpcMethodPlaceholder: "如 Shell.getState",
+        rpcParams: "参数 (JSON)",
+        rpcSend: "发送 RPC",
+        invalidJson: "参数必须是合法的 JSON。",
+        logsTitle: "事件与日志流",
+        logsEnable: "开启日志流",
+        logsDisable: "停止日志流",
+        emptyLogs: "暂无远程事件记录。",
       },
       status: { loading: "加载中…", error: "加载开发者工具数据失败：{reason}", disabled: "服务端未启用开发者工具。", empty: "暂无数据。" },
     },
@@ -4265,7 +4319,15 @@ export const catalogs = {
     },
     "web.devtools": {
       title: "DevTools",
-      tabs: { overview: "Overview", routes: "Routes", timeline: "Timeline", trajectory: "Trajectory", state: "State & Cache", lab: "Lab & Overrides" },
+      tabs: {
+        overview: "Overview",
+        routes: "Routes",
+        timeline: "Timeline",
+        trajectory: "Trajectory",
+        state: "State & Cache",
+        lab: "Lab & Overrides",
+        remote: "Remote VDP",
+      },
       actions: {
         refresh: "Refresh",
         autoRefresh: "Auto-refresh",
@@ -4363,6 +4425,60 @@ export const catalogs = {
         applied: "Overrides applied.",
         resetDone: "Overrides reset to defaults.",
         warning: "Active fault injection affects all views in this process.",
+      },
+      remote: {
+        discover: "Local Instances",
+        scan: "Scan",
+        scanning: "Scanning…",
+        emptyDiscover: "No debuggable VibeValley instances found. Launch another instance with --remote-debugging-port=<port> or VIBEVALLEY_DEBUG_PORT=0.",
+        attach: "Attach",
+        attaching: "Attaching…",
+        disconnect: "Disconnect",
+        connected: "Connected",
+        manualTitle: "Manual Connect",
+        port: "Port",
+        portPlaceholder: "e.g. 9222",
+        token: "Token",
+        tokenPlaceholder: "Paste debug token…",
+        connect: "Connect",
+        invalidPort: "Enter a valid TCP port (1–65535).",
+        targets: "Targets",
+        emptyTargets: "No targets reported by remote instance.",
+        shellTitle: "Remote Shell & Actions",
+        route: "Route",
+        theme: "Theme",
+        themeDark: "Dark",
+        themeLight: "Light",
+        viewport: "Viewport",
+        navigate: "Navigate",
+        routePlaceholder: "e.g. /issues or /library",
+        toggleTheme: "Toggle Theme",
+        resize: "Resize",
+        width: "Width",
+        height: "Height",
+        captureShell: "Capture Shell",
+        captureWebView: "Capture WebView",
+        capturing: "Capturing…",
+        screenshot: "Live Screenshot",
+        uiProbeTitle: "UI Probe",
+        testIdPlaceholder: "testID (exact)",
+        textPlaceholder: "text contains…",
+        rolePlaceholder: "role (e.g. link)",
+        query: "Query",
+        tree: "Tree",
+        press: "Press",
+        pressedFeedback: "Pressed {testId}",
+        emptyUi: "No UI nodes matched.",
+        rpcTitle: "Raw VDP JSON-RPC",
+        rpcMethod: "Method",
+        rpcMethodPlaceholder: "e.g. Shell.getState",
+        rpcParams: "Params (JSON)",
+        rpcSend: "Send RPC",
+        invalidJson: "Params must be valid JSON.",
+        logsTitle: "Event & Log Stream",
+        logsEnable: "Enable Stream",
+        logsDisable: "Stop Stream",
+        emptyLogs: "No remote events recorded yet.",
       },
       status: {
         loading: "Loading…",
@@ -7690,6 +7806,58 @@ export interface Messages {
   "web.devtools.overview.version": undefined;
   "web.devtools.overview.watches": undefined;
   "web.devtools.overview.workRoot": undefined;
+  "web.devtools.remote.attach": undefined;
+  "web.devtools.remote.attaching": undefined;
+  "web.devtools.remote.captureShell": undefined;
+  "web.devtools.remote.captureWebView": undefined;
+  "web.devtools.remote.capturing": undefined;
+  "web.devtools.remote.connect": undefined;
+  "web.devtools.remote.connected": undefined;
+  "web.devtools.remote.disconnect": undefined;
+  "web.devtools.remote.discover": undefined;
+  "web.devtools.remote.emptyDiscover": undefined;
+  "web.devtools.remote.emptyLogs": undefined;
+  "web.devtools.remote.emptyTargets": undefined;
+  "web.devtools.remote.emptyUi": undefined;
+  "web.devtools.remote.height": undefined;
+  "web.devtools.remote.invalidJson": undefined;
+  "web.devtools.remote.invalidPort": undefined;
+  "web.devtools.remote.logsDisable": undefined;
+  "web.devtools.remote.logsEnable": undefined;
+  "web.devtools.remote.logsTitle": undefined;
+  "web.devtools.remote.manualTitle": undefined;
+  "web.devtools.remote.navigate": undefined;
+  "web.devtools.remote.port": undefined;
+  "web.devtools.remote.portPlaceholder": undefined;
+  "web.devtools.remote.press": undefined;
+  "web.devtools.remote.pressedFeedback": { readonly testId: string | number };
+  "web.devtools.remote.query": undefined;
+  "web.devtools.remote.resize": undefined;
+  "web.devtools.remote.rolePlaceholder": undefined;
+  "web.devtools.remote.route": undefined;
+  "web.devtools.remote.routePlaceholder": undefined;
+  "web.devtools.remote.rpcMethod": undefined;
+  "web.devtools.remote.rpcMethodPlaceholder": undefined;
+  "web.devtools.remote.rpcParams": undefined;
+  "web.devtools.remote.rpcSend": undefined;
+  "web.devtools.remote.rpcTitle": undefined;
+  "web.devtools.remote.scan": undefined;
+  "web.devtools.remote.scanning": undefined;
+  "web.devtools.remote.screenshot": undefined;
+  "web.devtools.remote.shellTitle": undefined;
+  "web.devtools.remote.targets": undefined;
+  "web.devtools.remote.testIdPlaceholder": undefined;
+  "web.devtools.remote.textPlaceholder": undefined;
+  "web.devtools.remote.theme": undefined;
+  "web.devtools.remote.themeDark": undefined;
+  "web.devtools.remote.themeLight": undefined;
+  "web.devtools.remote.toggleTheme": undefined;
+  "web.devtools.remote.token": undefined;
+  "web.devtools.remote.tokenPlaceholder": undefined;
+  "web.devtools.remote.tree": undefined;
+  "web.devtools.remote.uiProbeTitle": undefined;
+  "web.devtools.remote.viewport": undefined;
+  "web.devtools.remote.width": undefined;
   "web.devtools.routes.empty": undefined;
   "web.devtools.routes.searchPlaceholder": undefined;
   "web.devtools.state.agents": undefined;
@@ -7713,6 +7881,7 @@ export interface Messages {
   "web.devtools.status.loading": undefined;
   "web.devtools.tabs.lab": undefined;
   "web.devtools.tabs.overview": undefined;
+  "web.devtools.tabs.remote": undefined;
   "web.devtools.tabs.routes": undefined;
   "web.devtools.tabs.state": undefined;
   "web.devtools.tabs.timeline": undefined;

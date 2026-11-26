@@ -1,4 +1,4 @@
-import { effect, Text, untracked, View, type JSX } from "nsh";
+import { effect, Text, untracked, View, type JSX, type ViewRef } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
@@ -22,12 +22,13 @@ import { Keyed } from "../infra/base/dom";
 import { act } from "../infra/bridge";
 import { ready, useRepos } from "../infra/query";
 import { Root } from "../infra/Root";
-import { Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useParams } from "../infra/router";
+import { appHistory, Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useParams } from "../infra/router";
 import type { RouterHistory } from "../infra/router/history";
 import { safeLastContentPath } from "../infra/state/contentNav";
 import { prefsNow } from "../infra/state/prefs";
 import { isStorageHydrated } from "../infra/state/storage";
 import { defineStored } from "../infra/state/stored";
+import { isVdpEnabled, useVdpNode } from "../infra/vdpProbe";
 import { WorkbenchDesignHost } from "./DesignHost";
 import { places } from "./places";
 import { Shell } from "./Shell";
@@ -190,11 +191,28 @@ const routes: readonly RouteDefinition[] = [
 ];
 
 export function App(props: { history?: RouterHistory }) {
+  let pageRef: ViewRef | undefined;
+  useVdpNode({
+    testId: "workbench-page",
+    role: "main",
+    route: () => (props.history ?? appHistory).read().pathname,
+    getRef: () => pageRef,
+  });
   return (
     <Root history={props.history}>
       <WorkbenchDesignHost>
         <Follow />
-        <View testID="workbench-page" class="flex-1 bg-page">
+        <View
+          testID="workbench-page"
+          ref={
+            isVdpEnabled()
+              ? (node) => {
+                  pageRef = node;
+                }
+              : undefined
+          }
+          class="flex-1 bg-page"
+        >
           <Routes routes={routes} fallback={() => <MissingPage />} invalid={() => <MissingPage invalid />} />
           <ToastHost />
         </View>
