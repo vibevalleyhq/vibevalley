@@ -2,11 +2,12 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（28 篇）
+## proposed（29 篇）
 
 ### feature
 
 - 2026-11-26 [稳定大纲编辑器：统一几何网格、零抖动编辑与键盘流](.agents/notes/proposed/feature/2026-11-26-stable-outline-editor.md)
+- 2026-11-26 [流畅、可恢复、透明的桌面自动更新体验](.agents/notes/proposed/feature/2026-11-26-auto-update-experience.md)
 - 2026-11-11 [工单详情的经过合成一条活动流](.agents/notes/proposed/feature/2026-11-11-issue-activity-stream.md)
 - 2026-11-04 [网页 Artifact 的元素锚点、锚点评论与高度回报](.agents/notes/proposed/feature/2026-11-04-html-artifact-display.md)
 - 2026-10-22 [记忆树：接真数据与手艺播种](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)
