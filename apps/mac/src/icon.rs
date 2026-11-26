@@ -432,6 +432,8 @@ mod tests {
             "open",
             "choose",
             "terminal",
+            "plug",
+            "ticked",
             "file",
             "collapseAll",
             "expandAll",

@@ -1034,17 +1034,6 @@ impl Session {
     }
 }
 
-pub(crate) fn run(
-    opts: crate::SpawnOptions,
-    pty: Pty,
-    shared: Arc<Shared>,
-    rx: flume::Receiver<Msg>,
-    on_event: Box<dyn Fn(TermEvent)>,
-    ready: flume::Sender<Result<(), TermError>>,
-) {
-    run_with_history(opts, "", pty, shared, rx, on_event, ready);
-}
-
 pub(crate) fn run_with_history(
     opts: crate::SpawnOptions,
     history: &str,
@@ -1154,7 +1143,7 @@ mod tests {
 
         wait_for_screen(&session, &rx, "%");
         session.send_text(&format!(
-            "trap 'touch {}; exit 0' HUP; /bin/sh -c 'trap \"touch {}; exit 0\" INT; echo FG_READY; sleep 30'\n",
+            "trap 'touch {}; exit 0' HUP; /bin/sh -c 'trap \"touch {}; exit 0\" INT; printf \"FG_%s\\n\" READY; sleep 30'\n",
             shell_marker.display(),
             fg_marker.display()
         ));
@@ -1207,7 +1196,7 @@ mod tests {
         wait_for_screen(&session, &rx, "%");
 
         session.send_text(&format!(
-            "trap 'touch {}; exit 0' HUP; /bin/sh -c 'trap \"\" INT; echo FG_NOINT; sleep 30'\n",
+            "trap 'touch {}; exit 0' HUP; /bin/sh -c 'trap \"\" INT; printf \"FG_%s\\n\" NOINT; sleep 30'\n",
             shell_marker.display()
         ));
         wait_for_screen(&session, &rx, "FG_NOINT");

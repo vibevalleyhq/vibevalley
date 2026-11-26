@@ -100,6 +100,9 @@ if [[ -n "${VV_TERM_HISTORY_FILE:-}" ]]; then
   precmd_functions+=(_vv_load_tab_history)
   zshaddhistory_functions+=(_vv_append_tab_history)
 fi
+if [[ -n "${VV_TERM_HOOK_ZSH:-}" && -r "$VV_TERM_HOOK_ZSH" ]]; then
+  builtin source "$VV_TERM_HOOK_ZSH"
+fi
 "#;
 
 const ZLOGIN_SHIM: &str = r#"# Managed by VibeValley; forwards to user .zlogin (for non-interactive login shells).
@@ -194,41 +197,46 @@ fn write_if_changed(path: &Path, contents: &str) -> std::io::Result<()> {
     std::fs::rename(&tmp, path)
 }
 
-pub(crate) fn apply_pty_env(cmd: &mut CommandBuilder, env: &[(String, String)]) {
+pub(crate) fn apply_pty_env(cmd: &mut CommandBuilder, env: &[(String, String)]) -> bool {
     let mut shim_dir: Option<&str> = None;
-    let mut explicit_zdotdir: Option<&str> = None;
-    let mut explicit_orig_zdotdir: Option<&str> = None;
 
     for (key, value) in env {
         cmd.env(key, value);
-        match key.as_str() {
-            ENV_SHIM_ZDOTDIR => shim_dir = Some(value.as_str()),
-            "ZDOTDIR" => explicit_zdotdir = Some(value.as_str()),
-            ENV_ORIG_ZDOTDIR => explicit_orig_zdotdir = Some(value.as_str()),
-            _ => {}
+        if key == ENV_SHIM_ZDOTDIR {
+            shim_dir = Some(value.as_str());
         }
     }
 
     let Some(shim) = shim_dir.filter(|s| !s.is_empty()) else {
-        return;
+        return false;
     };
     let shim_path = Path::new(shim);
     if let Err(err) = ensure_zdotdir(shim_path) {
         eprintln!("terminal zdotdir shim {}: {err}", shim_path.display());
-        return;
+        return false;
     }
 
+    apply_zdotdir_forwarding(cmd, env, shim_path);
+    true
+}
+
+pub(crate) fn apply_zdotdir_forwarding(cmd: &mut CommandBuilder, env: &[(String, String)], shim_path: &Path) {
+    let shim = shim_path.to_string_lossy();
+    let explicit_orig_zdotdir = env.iter().rfind(|(k, _)| k == ENV_ORIG_ZDOTDIR).map(|(_, v)| v.as_str());
+    let explicit_zdotdir = env.iter().rfind(|(k, _)| k == "ZDOTDIR").map(|(_, v)| v.as_str());
+
     let orig = explicit_orig_zdotdir
-        .filter(|s| !s.is_empty() && *s != shim)
+        .filter(|s| !s.is_empty() && *s != shim.as_ref())
         .map(std::ffi::OsString::from)
-        .or_else(|| explicit_zdotdir.filter(|s| !s.is_empty() && *s != shim).map(std::ffi::OsString::from))
-        .or_else(|| std::env::var_os("ZDOTDIR").filter(|s| !s.is_empty() && s.to_string_lossy() != shim));
+        .or_else(|| explicit_zdotdir.filter(|s| !s.is_empty() && *s != shim.as_ref()).map(std::ffi::OsString::from))
+        .or_else(|| std::env::var_os("ZDOTDIR").filter(|s| !s.is_empty() && s.to_string_lossy() != shim.as_ref()));
 
     match orig {
         Some(orig) => cmd.env(ENV_ORIG_ZDOTDIR, orig),
         None => cmd.env_remove(ENV_ORIG_ZDOTDIR),
     }
-    cmd.env("ZDOTDIR", shim);
+    cmd.env(ENV_SHIM_ZDOTDIR, shim_path);
+    cmd.env("ZDOTDIR", shim_path);
 }
 
 #[cfg(test)]

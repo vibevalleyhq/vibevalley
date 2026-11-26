@@ -48,7 +48,24 @@
     "noProject": "Open a project to start a terminal.",
     "missingFolder": "This working directory no longer exists. The terminal could not open here.",
     "dismiss": "OK",
-    "agentTurnDone": "{agent} finished its turn"
+    "agentTurnDone": "{agent} finished its turn",
+    "hooks": {
+      "title": "Terminal Hooks",
+      "subtitle": "Scoped to this tab/workspace · global dotfiles untouched",
+      "tooltipOff": "Terminal hooks: Off (click to configure)",
+      "tooltipActive": "Active hooks: {hooks}",
+      "tooltipPending": "Hooks updated ({hooks}) · restart shell to apply",
+      "tabSection": "This tab",
+      "workspaceSection": "Workspace default",
+      "workspaceToggle": "Enable {hook} for new tabs in {repo}",
+      "sourceWorkspace": "Workspace",
+      "sourceTab": "Tab",
+      "sourceOff": "Off",
+      "pendingRestart": "Restart shell to apply updated hooks",
+      "restartAction": "Restart Shell",
+      "activeSummary": "Active: {hooks} (isolated env / PATH / ZDOTDIR)",
+      "disabledSummary": "Disabled · zero env vars or PATH shims injected"
+    }
   },
   "files": {
     "missingInWorktree": "This file is unavailable in the issue worktree: {path}"

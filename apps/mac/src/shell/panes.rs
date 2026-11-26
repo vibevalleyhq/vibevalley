@@ -541,6 +541,7 @@ impl Shell {
                 let PaneKind::Terminal {
                     terminal_id,
                     link: Some(origin),
+                    ..
                 } = &tab.kind
                 else {
                     return None;
@@ -563,7 +564,7 @@ impl Shell {
             }
         }
         let unused = project.layout.active_tab().and_then(|tab| {
-            let PaneKind::Terminal { terminal_id, link: None } = &tab.kind else {
+            let PaneKind::Terminal { terminal_id, link: None, .. } = &tab.kind else {
                 return None;
             };
             (project.saved_terminal(terminal_id).is_none() && !self.workspace.terminals.contains_key(terminal_id)).then(|| (terminal_id.clone(), tab.id))
@@ -595,6 +596,7 @@ impl Shell {
             env: Vec::new(),
             history: None,
             title: None,
+            hooks: Default::default(),
         };
         self.new_terminal(Some(spec), window, cx);
     }
@@ -642,6 +644,7 @@ impl Shell {
                 PaneKind::Terminal {
                     terminal_id: id.clone(),
                     link: None,
+                    hooks: Default::default(),
                 },
             )
             .is_none()
@@ -779,6 +782,7 @@ impl Shell {
                             env: Vec::new(),
                             history: Some(saved.scrollback).filter(|s| !s.trim().is_empty()),
                             title: saved.title.clone(),
+                            hooks: Default::default(),
                         },
                         None => SpawnSpec {
                             project_root: Some(root.clone()),
@@ -803,6 +807,20 @@ impl Shell {
         if spec.project_root.is_none() {
             spec.project_root = self.workspace.ws.active().map(|p| p.root().to_path_buf());
         }
+        let owner_project = self
+            .workspace
+            .ws
+            .projects()
+            .iter()
+            .find(|p| p.layout.terminal_ids().iter().any(|tid| tid == id))
+            .or_else(|| self.workspace.ws.active());
+        let workspace_root = spec.project_root.as_deref().or_else(|| owner_project.map(|p| p.root()));
+        let tab_overrides = owner_project.and_then(|p| p.layout.terminal_hook_overrides(id)).cloned().unwrap_or_default();
+        let resolved_hooks = self.workspace.terminal_hooks.resolve_for_tab(workspace_root, &tab_overrides);
+        if !resolved_hooks.is_empty() {
+            resolved_hooks.apply_to_spawn_env(&mut spec.env);
+        }
+        spec.hooks = resolved_hooks;
         let history_dir = terminal_history_dir();
         vibevalley_terminal::history::configure_env(&mut spec.env, &history_dir.join("zdotdir"), &terminal_history_path_in(&history_dir, id));
         let cwd = spec.cwd.clone();
@@ -1067,6 +1085,166 @@ impl Shell {
             PaneKind::Terminal { .. } => unreachable!("terminals are kept in Shell::workspace.terminals"),
         }
     }
+
+    pub(crate) fn terminal_hook_status_for_tab(&self, tab: &vibevalley_workspace::Tab, cx: &gpui::App) -> crate::terminal::TerminalHookStatus {
+        let PaneKind::Terminal { terminal_id, hooks, .. } = &tab.kind else {
+            return crate::terminal::TerminalHookStatus::default();
+        };
+        if let Some(slot) = self.workspace.terminals.get(terminal_id) {
+            return slot.view.read(cx).hook_status();
+        }
+        let workspace_root = self.workspace.ws.projects().iter().find(|p| p.layout.tab(tab.id).is_some()).map(|p| p.root());
+        let resolved = self.workspace.terminal_hooks.resolve_for_tab(workspace_root, hooks);
+        crate::terminal::TerminalHookStatus::from_resolved(&resolved, &resolved)
+    }
+
+    pub(crate) fn terminal_hook_menu_model(&self, pid: ProjectId, tab: &vibevalley_workspace::Tab, cx: &gpui::App) -> Option<TerminalHookMenuModel> {
+        let PaneKind::Terminal { hooks, .. } = &tab.kind else {
+            return None;
+        };
+        let project = self.workspace.ws.project(pid)?;
+        let root = project.root();
+        let repo_name = root
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| project.info.name.clone());
+        let resolved = self.workspace.terminal_hooks.resolve_for_tab(Some(root), hooks);
+        let status = self.terminal_hook_status_for_tab(tab, cx);
+        let entries = self
+            .workspace
+            .terminal_hooks
+            .catalog()
+            .into_iter()
+            .map(|tmpl| {
+                let workspace_enabled = self.workspace.terminal_hooks.is_workspace_hook_enabled(Some(root), &tmpl.id);
+                let active_entry = resolved.active.iter().find(|a| a.id == tmpl.id);
+                let tab_enabled = active_entry.is_some();
+                let source = active_entry.map(|a| a.source);
+                TerminalHookMenuEntry {
+                    id: tmpl.id,
+                    label: tmpl.label,
+                    description: tmpl.description,
+                    tab_enabled,
+                    workspace_enabled,
+                    source,
+                }
+            })
+            .collect();
+        Some(TerminalHookMenuModel { repo_name, status, entries })
+    }
+
+    pub(crate) fn toggle_terminal_tab_hook(&mut self, pid: ProjectId, tab_id: TabId, hook_id: &str, cx: &mut Context<Self>) {
+        let Some(project) = self.workspace.ws.project_mut(pid) else { return };
+        let root = project.root().to_path_buf();
+        let workspace_default = self.workspace.terminal_hooks.is_workspace_hook_enabled(Some(&root), hook_id);
+        let Some(vibevalley_workspace::Tab {
+            kind: PaneKind::Terminal { terminal_id, hooks, .. },
+            ..
+        }) = project.layout.tab_mut(tab_id)
+        else {
+            return;
+        };
+        let tid = terminal_id.clone();
+        let resolved_before = self.workspace.terminal_hooks.resolve_for_tab(Some(&root), hooks);
+        let norm_id = vibevalley_terminal::hooks::normalize_hook_id(hook_id).unwrap_or_else(|| hook_id.to_string());
+        let currently_enabled = resolved_before.active.iter().any(|h| h.id == norm_id);
+        hooks.set_enabled(&norm_id, workspace_default, !currently_enabled);
+        self.schedule_save(cx);
+        self.apply_terminal_hook_change(pid, &tid, cx);
+        cx.notify();
+    }
+
+    pub(crate) fn toggle_workspace_terminal_hook(&mut self, pid: ProjectId, hook_id: &str, cx: &mut Context<Self>) {
+        let Some(root) = self.workspace.ws.project(pid).map(|p| p.root().to_path_buf()) else {
+            return;
+        };
+        let currently_enabled = self.workspace.terminal_hooks.is_workspace_hook_enabled(Some(&root), hook_id);
+        self.workspace.terminal_hooks.set_workspace_hook_enabled(&root, hook_id, !currently_enabled);
+        self.save_terminal_hooks_async(cx);
+        let terminal_ids = self.workspace.ws.project(pid).map(|p| p.layout.terminal_ids()).unwrap_or_default();
+        for tid in terminal_ids {
+            self.apply_terminal_hook_change(pid, &tid, cx);
+        }
+        cx.notify();
+    }
+
+    pub(crate) fn restart_terminal_tab(&mut self, pid: ProjectId, tab_id: TabId, cx: &mut Context<Self>) {
+        let Some(project) = self.workspace.ws.project(pid) else { return };
+        let root = project.root().to_path_buf();
+        let Some(vibevalley_workspace::Tab {
+            kind: PaneKind::Terminal { terminal_id, hooks, .. },
+            ..
+        }) = project.layout.tab(tab_id)
+        else {
+            return;
+        };
+        let tid = terminal_id.clone();
+        let resolved = self.workspace.terminal_hooks.resolve_for_tab(Some(&root), hooks);
+        if let Some(slot) = self.workspace.terminals.get(&tid) {
+            slot.view.update(cx, |view, cx| view.respawn_with_hooks(resolved, cx));
+        }
+        self.workspace.terminal_hooks_menu_group = None;
+        cx.notify();
+    }
+
+    fn apply_terminal_hook_change(&mut self, pid: ProjectId, terminal_id: &str, cx: &mut Context<Self>) {
+        let Some(project) = self.workspace.ws.project(pid) else { return };
+        let root = project.root().to_path_buf();
+        let overrides = project.layout.terminal_hook_overrides(terminal_id).cloned().unwrap_or_default();
+        let resolved = self.workspace.terminal_hooks.resolve_for_tab(Some(&root), &overrides);
+        let Some(slot) = self.workspace.terminals.get(terminal_id) else {
+            return;
+        };
+        let (unchanged, action) = {
+            let view = slot.view.read(cx);
+            let unchanged = *view.desired_hooks() == resolved;
+            let action = crate::terminal::classify_hook_toggle_action(view.is_alive(), view.has_foreground_process());
+            (unchanged, action)
+        };
+        if unchanged {
+            return;
+        }
+        match action {
+            crate::terminal::HookToggleAction::RespawnNow => {
+                slot.view.update(cx, |view, cx| view.respawn_with_hooks(resolved, cx));
+            }
+            crate::terminal::HookToggleAction::PendingRestart => {
+                slot.view.update(cx, |view, cx| view.set_desired_hooks(resolved, cx));
+            }
+        }
+    }
+
+    fn save_terminal_hooks_async(&self, cx: &mut Context<Self>) {
+        let Some(store) = self.workspace.store.clone() else { return };
+        let config = self.workspace.terminal_hooks.clone();
+        Self::bg(
+            cx,
+            move || vibevalley_workspace::save_terminal_hooks(&*store, &config),
+            |_, r, _| {
+                if let Err(e) = r {
+                    eprintln!("save terminal hooks: {e}");
+                }
+            },
+        );
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TerminalHookMenuEntry {
+    pub id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub tab_enabled: bool,
+    pub workspace_enabled: bool,
+    pub source: Option<vibevalley_terminal::HookSource>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TerminalHookMenuModel {
+    pub repo_name: String,
+    pub status: crate::terminal::TerminalHookStatus,
+    pub entries: Vec<TerminalHookMenuEntry>,
 }
 
 fn resolve_project_directory(cwd: PathBuf, known_roots: Vec<PathBuf>) -> Result<(PathBuf, PathBuf), String> {
@@ -1338,6 +1516,7 @@ mod url_tests {
             super::closed_chat_session_id(Some(&PaneKind::Terminal {
                 terminal_id: "t1".into(),
                 link: None,
+                hooks: Default::default(),
             })),
             None
         );
@@ -1427,5 +1606,28 @@ mod url_tests {
         vibevalley_terminal::history::remove_history_file(&tab_a);
         assert!(!tab_a.exists());
         assert!(tab_b.exists());
+    }
+
+    #[test]
+    fn terminal_hooks_resolution_stays_empty_by_default_and_respects_workspace_and_tab_toggles() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+
+        let mut cfg = vibevalley_terminal::TerminalHooksConfig::default();
+        let default_resolved = cfg.resolve_for_tab(Some(&repo), &Default::default());
+        assert!(default_resolved.is_empty());
+
+        let mut tab_overrides = vibevalley_terminal::TabHookOverrides::default();
+        tab_overrides.set_enabled("idegraph", false, true);
+        let tab_enabled = cfg.resolve_for_tab(Some(&repo), &tab_overrides);
+        assert_eq!(tab_enabled.active_ids(), vec!["idegraph"]);
+
+        // Enabling at workspace level while tab disables keeps it off on that tab.
+        cfg.set_workspace_hook_enabled(&repo, "idegraph", true);
+        let mut tab_disabled = vibevalley_terminal::TabHookOverrides::default();
+        tab_disabled.set_enabled("idegraph", true, false);
+        assert!(cfg.resolve_for_tab(Some(&repo), &tab_disabled).is_empty());
+        assert_eq!(cfg.resolve_for_tab(Some(&repo), &Default::default()).active_ids(), vec!["idegraph"]);
     }
 }

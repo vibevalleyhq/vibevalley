@@ -137,6 +137,7 @@ impl<T: TerminalHandle> OpenProject<T> {
                 PaneKind::Terminal {
                     terminal_id: new_id(),
                     link: None,
+                    hooks: Default::default(),
                 },
             );
         }
@@ -164,6 +165,7 @@ impl<T: TerminalHandle> OpenProject<T> {
             PaneKind::Terminal {
                 terminal_id: id.clone(),
                 link: None,
+                hooks: Default::default(),
             },
         );
         (id, tab)

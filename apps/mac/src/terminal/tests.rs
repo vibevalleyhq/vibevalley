@@ -3,8 +3,11 @@ use std::time::{Duration, Instant};
 use gpui::{point, px};
 use vibevalley_terminal::{TermEvent, TermSize};
 
-use super::status::{AgentTurnTracker, classify_busy_label, classify_terminal_status, coalesce_term_events, detect_agent_token, detect_inline_agent};
-use super::{Geometry, RunningState, TerminalStatus};
+use super::status::{
+    AgentTurnTracker, HookBadgeItem, HookToggleAction, classify_busy_label, classify_hook_toggle_action, classify_terminal_status, coalesce_term_events,
+    detect_agent_token, detect_inline_agent, hook_badge_label, hook_badge_tooltip,
+};
+use super::{Geometry, RunningState, SpawnSpec, TerminalHookStatus, TerminalStatus};
 
 #[test]
 fn geometry_cell_at_exact_rejects_padding_and_out_of_bounds() {
@@ -188,4 +191,54 @@ fn classify_busy_label_distinguishes_idle_running_agent_and_exited() {
     // Exited terminals are never busy regardless of stale command/status fields.
     assert_eq!(classify_busy_label(false, true, Some("cargo test"), &cmd, Some("cargo"), "zsh"), None);
     assert_eq!(classify_busy_label(false, false, Some("agy"), &agent, None, "zsh"), None);
+}
+
+#[test]
+fn terminal_hook_status_badge_and_toggle_action_behave_as_expected() {
+    use std::path::PathBuf;
+    use vibevalley_terminal::{HookSource, TabHookOverrides, TerminalHooksConfig};
+
+    let spec = SpawnSpec::shell(PathBuf::from("/work/repo"));
+    assert!(spec.hooks.is_empty());
+    assert!(spec.env.is_empty());
+
+    let empty_status = TerminalHookStatus::default();
+    assert_eq!(hook_badge_label(&empty_status), None);
+    assert!(hook_badge_tooltip(&empty_status).contains("Off") || hook_badge_tooltip(&empty_status).contains("未启用"));
+
+    let cfg = TerminalHooksConfig::default();
+    let mut overrides = TabHookOverrides::default();
+    overrides.set_enabled("idegraph", false, true);
+    let resolved_one = cfg.resolve_for_tab(Some(PathBuf::from("/work/repo").as_path()), &overrides);
+    let active_one = TerminalHookStatus::from_resolved(&resolved_one, &resolved_one);
+    assert!(!active_one.pending_restart);
+    assert_eq!(hook_badge_label(&active_one).as_deref(), Some("idegraph"));
+    assert!(hook_badge_tooltip(&active_one).contains("idegraph"));
+
+    let multi = TerminalHookStatus {
+        active_hooks: vec![
+            HookBadgeItem {
+                id: "idegraph".into(),
+                label: "idegraph".into(),
+                source: HookSource::Workspace,
+            },
+            HookBadgeItem {
+                id: "custom".into(),
+                label: "custom".into(),
+                source: HookSource::Tab,
+            },
+        ],
+        desired_hooks: Vec::new(),
+        pending_restart: false,
+    };
+    assert_eq!(hook_badge_label(&multi).as_deref(), Some("idegraph +1"));
+
+    let pending = TerminalHookStatus::from_resolved(&vibevalley_terminal::ResolvedTerminalHooks::default(), &resolved_one);
+    assert!(pending.pending_restart);
+    assert_eq!(hook_badge_label(&pending).as_deref(), Some("idegraph"));
+    assert!(hook_badge_tooltip(&pending).contains("idegraph"));
+
+    assert_eq!(classify_hook_toggle_action(false, false), HookToggleAction::RespawnNow);
+    assert_eq!(classify_hook_toggle_action(true, false), HookToggleAction::RespawnNow);
+    assert_eq!(classify_hook_toggle_action(true, true), HookToggleAction::PendingRestart);
 }

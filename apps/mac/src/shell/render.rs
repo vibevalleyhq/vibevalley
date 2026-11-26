@@ -148,8 +148,12 @@ impl Render for Shell {
                 }
             }))
             .capture_key_down(cx.listener(|s, e: &gpui::KeyDownEvent, _, cx| {
-                if s.workspace.chat_menu_group.is_some() && e.keystroke.key == "escape" && !e.keystroke.modifiers.modified() {
+                if (s.workspace.chat_menu_group.is_some() || s.workspace.terminal_hooks_menu_group.is_some())
+                    && e.keystroke.key == "escape"
+                    && !e.keystroke.modifiers.modified()
+                {
                     s.workspace.chat_menu_group = None;
+                    s.workspace.terminal_hooks_menu_group = None;
                     cx.stop_propagation();
                     cx.notify();
                 }
@@ -157,7 +161,11 @@ impl Render for Shell {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|s, e: &gpui::MouseDownEvent, window, cx| {
-                    if s.workspace.chat_menu_group.take().is_some() {
+                    let mut dismissed = s.workspace.chat_menu_group.take().is_some();
+                    if s.workspace.terminal_hooks_menu_group.take().is_some() {
+                        dismissed = true;
+                    }
+                    if dismissed {
                         cx.notify();
                     }
                     if s.overlays.palette.as_ref().is_none_or(|p| !p.open)

@@ -137,6 +137,8 @@ impl Shell {
                 chat_statuses: HashMap::new(),
                 chat_watches: HashMap::new(),
                 chat_menu_group: None,
+                terminal_hooks: Default::default(),
+                terminal_hooks_menu_group: None,
                 save_pending: false,
                 fs_tx,
                 dir_refresh_pending: BTreeSet::new(),
@@ -319,11 +321,13 @@ impl Shell {
                     }
                 }
                 let settings: Settings = vibevalley_workspace::persist::load_setting(&store, SETTINGS_KEY);
+                let terminal_hooks = vibevalley_workspace::load_terminal_hooks(&store);
                 let active: Option<ProjectId> = store.setting(ACTIVE_KEY).ok().flatten().and_then(|v| v.as_i64());
-                Ok((Arc::new(store), projects, settings, active))
+                Ok((Arc::new(store), projects, settings, terminal_hooks, active))
             },
             |this, result, cx| match result {
-                Ok((store, projects, settings, active)) => {
+                Ok((store, projects, settings, terminal_hooks, active)) => {
+                    this.workspace.terminal_hooks = terminal_hooks;
                     let was_dark = Ui::get(cx).colors.dark;
                     let was_ui_size = Ui::get(cx).settings.ui_font_size;
                     let was_motion = Ui::get(cx).settings.effective_motion();
