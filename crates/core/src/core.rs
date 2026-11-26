@@ -551,6 +551,7 @@ pub(crate) fn session_view(h: &Session, conflict: Option<&Conflict>) -> SessionV
         spent: h.spent.clone(),
         subagents: h.subagents.clone(),
         tool_connections: h.tool_connections.clone(),
+        telemetry: h.telemetry.clone(),
         machine: h.machine.clone(),
         phase_text: phase_words(h, conflict),
     }

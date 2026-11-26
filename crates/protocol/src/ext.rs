@@ -316,6 +316,7 @@ impl Session {
             spent: None,
             subagents: None,
             tool_connections: None,
+            telemetry: None,
             machine: None,
             phase: Phase::resting(),
         }

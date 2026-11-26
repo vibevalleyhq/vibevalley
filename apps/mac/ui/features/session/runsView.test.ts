@@ -1,9 +1,28 @@
 import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import { defaultOrchestrator, type Agent, type Issue, type IssueId, type Session, type SessionId, type SessionView } from "@vibevalley/protocol";
+import {
+  defaultOrchestrator,
+  type Agent,
+  type Issue,
+  type IssueId,
+  type Session,
+  type SessionEvent,
+  type SessionId,
+  type SessionView,
+} from "@vibevalley/protocol";
 
-import { buildRunEntries, filterRunEntries, parseRunsSearch, resolveSelectedRun, runActivityAt, runsHref, runStatusOf } from "./runsView";
+import {
+  buildRunEntries,
+  filterRunEntries,
+  isRecoverableRun,
+  parseRunsSearch,
+  resolveSelectedRun,
+  runActivityAt,
+  runsHref,
+  runStatusOf,
+  runTelemetryOf,
+} from "./runsView";
 
 const sid = (id: string) => id as SessionId;
 const iid = (id: string) => id as IssueId;
@@ -276,4 +295,113 @@ test("filterRunEntries and resolveSelectedRun handle scope, agentId, issueId, qu
   expect(resolveSelectedRun(entries, "orch-live")?.id).toBe(defaultOrchestrator);
   expect(resolveSelectedRun(entries, "missing")?.id).toBe("w1");
   expect(resolveSelectedRun([], "w1")).toBeUndefined();
+});
+
+test("runTelemetryOf folds session telemetry and step events and isRecoverableRun gates worker recovery", () => {
+  const withTel = makeSession({
+    id: "w-tel",
+    name: "老周",
+    spent: { tokens: 12_000, cny: 0.25 },
+    telemetry: {
+      inputTokens: 6_000,
+      cacheReadTokens: 4_000,
+      outputTokens: 2_000,
+      contextUsed: 64_000,
+      contextWindow: 128_000,
+      llmRetries: 2,
+      runErrors: 1,
+    },
+    phase: { _tag: "failed" },
+  });
+  const entryWithTel: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-tel",
+    session: withTel,
+    live: undefined,
+    active: false,
+  };
+  const rollupTel = runTelemetryOf(entryWithTel);
+  expect(rollupTel.spent?.tokens).toBe(12_000);
+  expect(rollupTel.spent?.cny).toBe(0.25);
+  expect(rollupTel.llmRetries).toBe(2);
+  expect(rollupTel.runErrors).toBe(1);
+  expect(rollupTel.contextUsed).toBe(64_000);
+  expect(rollupTel.contextWindow).toBe(128_000);
+  expect(rollupTel.contextPct).toBe(50);
+  expect(rollupTel.hasContext).toBe(true);
+  expect(isRecoverableRun(entryWithTel)).toBe(true);
+
+  const bareSession = makeSession({
+    id: "w-steps",
+    name: "小林",
+    phase: { _tag: "resting" },
+  });
+  const steps: SessionEvent[] = [
+    {
+      seq: 1,
+      revision: 1,
+      run: "r1",
+      type: "llm/usage",
+      text: "",
+      time: 10,
+      tokens: { input: 2_000, cacheRead: 1_000, output: 500, contextUsed: 45_000, contextWindow: 100_000 },
+    },
+    { seq: 2, revision: 1, run: "r1", type: "llm/retry", text: "retrying", time: 11 },
+    { seq: 3, revision: 1, run: "r1", type: "run/error", text: "timeout", time: 12 },
+  ];
+  const entryFromSteps: ReturnType<typeof buildRunEntries>[number] = {
+    kind: "worker",
+    id: "w-steps",
+    session: bareSession,
+    live: undefined,
+    active: false,
+  };
+  const rollupSteps = runTelemetryOf(entryFromSteps, steps);
+  expect(rollupSteps.spent?.tokens).toBe(3_500);
+  expect(rollupSteps.llmRetries).toBe(1);
+  expect(rollupSteps.runErrors).toBe(1);
+  expect(rollupSteps.contextPct).toBe(45);
+  expect(isRecoverableRun(entryFromSteps)).toBe(true);
+
+  expect(
+    isRecoverableRun({
+      kind: "worker",
+      id: "w-int",
+      session: makeSession({
+        id: "w-int",
+        name: "小林",
+        phase: { _tag: "resting" },
+        lastRun: { outcome: "interrupted", summary: "", at: 12 },
+      }),
+      live: undefined,
+      active: false,
+    }),
+  ).toBe(true);
+  expect(
+    isRecoverableRun({
+      kind: "worker",
+      id: "w-done",
+      session: makeSession({ id: "w-done", name: "小林", phase: { _tag: "done" } }),
+      live: undefined,
+      active: false,
+    }),
+  ).toBe(false);
+  expect(
+    isRecoverableRun({
+      kind: "worker",
+      id: "w-work",
+      session: makeSession({ id: "w-work", name: "小林", phase: { _tag: "working", since: 1, doing: { action: "run_command", label: "test" } } }),
+      live: undefined,
+      active: true,
+    }),
+  ).toBe(false);
+  expect(
+    isRecoverableRun({
+      kind: "worker",
+      id: "w-closed",
+      session: makeSession({ id: "w-closed", name: "小林", phase: { _tag: "closed", at: 12, closed: "merged" } }),
+      live: undefined,
+      active: false,
+    }),
+  ).toBe(false);
 });

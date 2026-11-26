@@ -36,8 +36,9 @@ pub use crate::deps::{
 };
 pub use crate::moves::{Move, Refusal, status_move, status_moves};
 pub use crate::projection::{
-    BoardInput, CollabInput, FarmInput, InboxInput, LiveSessionOverlay, LiveSnapshot, OpsInput, SessionInput, derive_issues, overlay_sessions, project_board,
-    project_collab, project_farm, project_inbox, project_ops, project_sessions,
+    BoardInput, CollabInput, FarmInput, InboxInput, LiveSessionOverlay, LiveSnapshot, OpsInput, SessionInput, apply_session_telemetry, derive_issues,
+    fold_session_telemetry, merge_session_telemetry_usage, overlay_sessions, project_board, project_collab, project_farm, project_inbox, project_ops,
+    project_sessions,
 };
 pub use crate::prompts::work_constraints;
 pub use crate::retro::issue_retro;

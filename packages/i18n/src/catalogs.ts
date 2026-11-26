@@ -2965,6 +2965,17 @@ export const catalogs = {
       remoteSummary: "运行在 {machine} 上，由该执行主机托管。",
       sessions: "相关会话",
       noSessions: "暂无活跃或最近的会话。",
+      stats: {
+        title: "近期运行统计",
+        runs: "近期轮次",
+        sessions: "{n} 个会话",
+        failureRate: "失败率",
+        retryRate: "重试率",
+        failuresDetail: "{failed} 失败 · {errors} 次错误",
+        retriesDetail: "{retried} 个会话 · {retries} 次重试",
+        cumulativeSpend: "累计用量与花费",
+        empty: "该引擎暂无近期运行记录。",
+      },
       quickActions: "快捷操作",
       installation: "安装与路径",
       source: "安装方式",
@@ -3093,6 +3104,31 @@ export const catalogs = {
         openProfile: "看角色",
         orchestratorRole: "主助手",
         status: { working: "进行中", listening: "在听", resting: "待命", done: "已完成", failed: "失败", interrupted: "已中断", closed: "已结束" },
+        telemetry: {
+          tokenBreakdown: "输入 {input} · 缓存 {cached} · 输出 {output}",
+          context: "上下文 {pct}%（{used}/{window}）",
+          contextCompact: "上下文 {pct}%",
+          retries: "重试 {n} 次",
+          errors: "错误 {n} 次",
+        },
+        recovery: {
+          resumeSame: "按原配置继续",
+          retrySame: "按原配置重试",
+          rerunOther: "换个角色/引擎重跑",
+          openWorktree: "打开 Worktree 终端",
+          resumedToast: "已按原配置重新发起运行",
+          rerunTitle: "换个角色或引擎重新运行",
+          rerunTarget: "选择角色或引擎",
+          rerunTargetPlaceholder: "选择一个角色或引擎",
+          rerunNote: "补充说明（可选）",
+          rerunNotePlaceholder: "可补充指引，留空则沿用当前任务继续重跑…",
+          rerunConfirm: "开始重跑",
+          rerunStartedToast: "已交由 {target} 重新运行",
+          resumePrompt: "从上一步继续执行并完成任务。",
+          groupExperts: "角色",
+          groupEngines: "引擎",
+          noWorktree: "该会话未记录工作区目录",
+        },
       },
       subagents: {
         heading: "子代理任务",
@@ -6790,6 +6826,17 @@ export const catalogs = {
       remoteSummary: "Hosted on {machine} and dispatched remotely.",
       sessions: "Related sessions",
       noSessions: "No active or recent sessions.",
+      stats: {
+        title: "Recent run summary",
+        runs: "Recent runs",
+        sessions: "{n, plural, one {# session} other {# sessions}}",
+        failureRate: "Failure rate",
+        retryRate: "Retry rate",
+        failuresDetail: "{failed} failed · {errors} errors",
+        retriesDetail: "{retried} sessions · {retries} retries",
+        cumulativeSpend: "Cumulative usage",
+        empty: "No recent runs recorded for this engine.",
+      },
       quickActions: "Quick actions",
       installation: "Installation",
       source: "Install source",
@@ -6928,6 +6975,31 @@ export const catalogs = {
         openProfile: "Open profile",
         orchestratorRole: "Assistant",
         status: { working: "Working", listening: "Listening", resting: "Idle", done: "Done", failed: "Failed", interrupted: "Interrupted", closed: "Closed" },
+        telemetry: {
+          tokenBreakdown: "in {input} · cached {cached} · out {output}",
+          context: "Context {pct}% ({used}/{window})",
+          contextCompact: "Ctx {pct}%",
+          retries: "{n, plural, one {# retry} other {# retries}}",
+          errors: "{n, plural, one {# error} other {# errors}}",
+        },
+        recovery: {
+          resumeSame: "Resume with same config",
+          retrySame: "Retry with same config",
+          rerunOther: "Rerun with another expert/engine",
+          openWorktree: "Open Worktree Terminal",
+          resumedToast: "Resumed run with current configuration",
+          rerunTitle: "Rerun with another expert or engine",
+          rerunTarget: "Expert or engine",
+          rerunTargetPlaceholder: "Choose an expert or engine",
+          rerunNote: "Guidance for this run (optional)",
+          rerunNotePlaceholder: "Add extra context or leave blank to rerun from the current task…",
+          rerunConfirm: "Start rerun",
+          rerunStartedToast: "Started rerun with {target}",
+          resumePrompt: "Resume from the previous step and finish the task.",
+          groupExperts: "Experts",
+          groupEngines: "Engines",
+          noWorktree: "No worktree directory recorded for this session",
+        },
       },
       subagents: {
         heading: "Subtasks",
@@ -10627,6 +10699,15 @@ export interface Messages {
   "web.runtime.source": undefined;
   "web.runtime.spentToday": { readonly spent: string | number };
   "web.runtime.spentTodayBudget": { readonly budget: string | number; readonly spent: string | number };
+  "web.runtime.stats.cumulativeSpend": undefined;
+  "web.runtime.stats.empty": undefined;
+  "web.runtime.stats.failureRate": undefined;
+  "web.runtime.stats.failuresDetail": { readonly errors: string | number; readonly failed: string | number };
+  "web.runtime.stats.retriesDetail": { readonly retried: string | number; readonly retries: string | number };
+  "web.runtime.stats.retryRate": undefined;
+  "web.runtime.stats.runs": undefined;
+  "web.runtime.stats.sessions": { readonly n: number };
+  "web.runtime.stats.title": undefined;
   "web.runtime.steer": undefined;
   "web.runtime.subscription": { readonly tier: string | number };
   "web.runtime.tools": undefined;
@@ -10649,6 +10730,22 @@ export interface Messages {
   "web.session.hub.openProfile": undefined;
   "web.session.hub.orchestratorRole": undefined;
   "web.session.hub.pick": undefined;
+  "web.session.hub.recovery.groupEngines": undefined;
+  "web.session.hub.recovery.groupExperts": undefined;
+  "web.session.hub.recovery.noWorktree": undefined;
+  "web.session.hub.recovery.openWorktree": undefined;
+  "web.session.hub.recovery.rerunConfirm": undefined;
+  "web.session.hub.recovery.rerunNote": undefined;
+  "web.session.hub.recovery.rerunNotePlaceholder": undefined;
+  "web.session.hub.recovery.rerunOther": undefined;
+  "web.session.hub.recovery.rerunStartedToast": { readonly target: string | number };
+  "web.session.hub.recovery.rerunTarget": undefined;
+  "web.session.hub.recovery.rerunTargetPlaceholder": undefined;
+  "web.session.hub.recovery.rerunTitle": undefined;
+  "web.session.hub.recovery.resumePrompt": undefined;
+  "web.session.hub.recovery.resumeSame": undefined;
+  "web.session.hub.recovery.resumedToast": undefined;
+  "web.session.hub.recovery.retrySame": undefined;
   "web.session.hub.scope.active": undefined;
   "web.session.hub.scope.all": undefined;
   "web.session.hub.scope.orchestrator": undefined;
@@ -10663,6 +10760,11 @@ export interface Messages {
   "web.session.hub.status.listening": undefined;
   "web.session.hub.status.resting": undefined;
   "web.session.hub.status.working": undefined;
+  "web.session.hub.telemetry.context": { readonly pct: string | number; readonly used: string | number; readonly window: string | number };
+  "web.session.hub.telemetry.contextCompact": { readonly pct: string | number };
+  "web.session.hub.telemetry.errors": { readonly n: number };
+  "web.session.hub.telemetry.retries": { readonly n: number };
+  "web.session.hub.telemetry.tokenBreakdown": { readonly cached: string | number; readonly input: string | number; readonly output: string | number };
   "web.session.log.all": undefined;
   "web.session.log.failed": undefined;
   "web.session.log.farm": undefined;

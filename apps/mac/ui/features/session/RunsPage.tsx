@@ -1,12 +1,14 @@
 import { Clipboard, computed, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Look, OrchestratorEval } from "@vibevalley/protocol";
-import { oneLine, sessionIssueId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
+import type { Look, OrchestratorEval, SessionEvent, Spent } from "@vibevalley/protocol";
+import { oneLine, sessionIssueId, sessionProfile, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
 
+import { createAct } from "../../design/act";
 import { Button, ButtonLink } from "../../design/Button";
+import { Dialog } from "../../design/Dialog";
 import { AgentFace, OrchestratorFace } from "../../design/domain/Face";
-import { SearchField } from "../../design/Field";
+import { Field, SearchField, Select, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { ActiveBar, Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
@@ -14,19 +16,23 @@ import { CountPill, Dot, type DotTone } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { mix } from "../../design/tone";
-import { useOrchestrators } from "../../infra/agents";
+import { useOrchestrators, useWorkAgents } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { Keyed, useNow } from "../../infra/base/dom";
-import { ago } from "../../infra/base/format";
+import { ago, spentText, yuan } from "../../infra/base/format";
 import { useTimeout } from "../../infra/base/timer";
+import { hostApi } from "../../infra/bridge";
 import { useBoardSlice, useSessionsSlice } from "../../infra/frame";
-import { defineQuery, ready, retryRead, useAgents, useQuery } from "../../infra/query";
+import { defineQuery, ready, retryRead, useAgents, useQuery, useQueryClient, useRuntimes } from "../../infra/query";
 import { useLocation, useRouter, useSearch } from "../../infra/router";
 import { localizeRuntimeError } from "../../infra/runtimeError";
+import { formatTokens } from "../../infra/sessionRuns";
 import { createEffect, createMemo } from "../../infra/solid";
+import { createSessionEvents } from "./events";
 import {
   buildRunEntries,
   filterRunEntries,
+  isRecoverableRun,
   parseRunsSearch,
   resolveSelectedRun,
   runActivityAt,
@@ -36,6 +42,8 @@ import {
   runsScopes,
   type RunStatusBadge,
   runStatusOf,
+  runTelemetryOf,
+  type RunTelemetryRollup,
 } from "./runsView";
 import { TrajectoryLog } from "./Trajectory";
 
@@ -374,6 +382,7 @@ export function RunsPage(props: { approvals?: RunApprovals }) {
                 now={now()}
                 showBack={!wide()}
                 onBack={() => narrowPane.set("list")}
+                onOpenSession={(id) => router.navigate(runsHref({ ...parsed(), session: id }, basePath()), { replace: true })}
                 approvals={props.approvals}
               />
             )}
@@ -400,12 +409,52 @@ export function RunsPage(props: { approvals?: RunApprovals }) {
   );
 }
 
+function formatCompactSpend(spent: Spent): string {
+  const tokens = formatTokens(spent.tokens);
+  return spent.cny !== undefined ? `${yuan(spent.cny)} · ${tokens}` : tokens;
+}
+
+function saturationTone(pct: number): { readonly bar: string; readonly text: string } {
+  if (pct >= 85) return { bar: "bg-berry", text: "text-berry" };
+  if (pct >= 65) return { bar: "bg-wheat", text: "text-warn-ink" };
+  return { bar: "bg-leaf", text: "text-muted" };
+}
+
+function ContextSaturationMeter(props: { rollup: RunTelemetryRollup; compact?: boolean; testID?: string }) {
+  const tone = () => saturationTone(props.rollup.contextPct);
+  const label = () =>
+    t("web.session.hub.telemetry.context", {
+      pct: props.rollup.contextPct,
+      used: formatTokens(props.rollup.contextUsed),
+      window: formatTokens(props.rollup.contextWindow),
+    });
+  return (
+    <View
+      testID={props.testID}
+      role="progressbar"
+      accessibilityLabel={label()}
+      accessibilityValue={{ min: 0, max: 100, now: props.rollup.contextPct }}
+      tooltip={<Bubble text={label()} />}
+      class="shrink-0 flex-row items-center gap-1.5"
+    >
+      <View class={`overflow-hidden rounded-full bg-hover ${props.compact === true ? "h-1 w-9" : "h-1.5 w-16"}`}>
+        <View class={`h-full rounded-full ${tone().bar}`} style={{ width: `${props.rollup.contextPct}%` }} />
+      </View>
+      <Text class={`font-mono text-2xs tabular-nums ${tone().text}`}>
+        {props.compact === true ? t("web.session.hub.telemetry.contextCompact", { pct: props.rollup.contextPct }) : label()}
+      </Text>
+    </View>
+  );
+}
+
 function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected: boolean; now: number; onSelect: () => void }) {
   const status = () => statusMeta(runStatusOf(props.entry));
   const at = () => runActivityAt(props.entry);
   const when = () => (at() > 0 ? ago(at(), props.now) : "");
   const issueNum = () => (props.entry.kind === "worker" && props.entry.issue ? `#${props.entry.issue.number}` : undefined);
   const repo = () => (props.entry.kind === "worker" ? sessionRepo(props.entry.session) : undefined);
+  const rollup = createMemo(() => runTelemetryOf(props.entry));
+  const hasTelemetry = () => rollup().spent !== undefined || rollup().hasContext || rollup().llmRetries > 0 || rollup().runErrors > 0;
   return (
     <View
       role="button"
@@ -467,17 +516,217 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
             )}
           </If>
         </View>
+        <If when={hasTelemetry()}>
+          <View class="mt-0.5 flex-row flex-wrap items-center gap-1.5">
+            <If when={rollup().spent}>
+              {(s) => (
+                <Text testID={`run-row-cost-${props.entry.id}`} class="font-mono text-2xs text-muted tabular-nums">
+                  {formatCompactSpend(s())}
+                </Text>
+              )}
+            </If>
+            <If when={rollup().llmRetries > 0}>
+              <View testID={`run-row-retry-${props.entry.id}`} class="flex-row items-center gap-0.5 rounded-sm bg-warn-soft px-1 py-px">
+                <Icon name="retry" size={10} tone="warn-ink" />
+                <Text class="font-mono text-2xs font-medium text-warn-ink tabular-nums">
+                  {t("web.session.hub.telemetry.retries", { n: rollup().llmRetries })}
+                </Text>
+              </View>
+            </If>
+            <If when={rollup().runErrors > 0}>
+              <View testID={`run-row-error-${props.entry.id}`} class="flex-row items-center gap-0.5 rounded-sm bg-bad-soft px-1 py-px">
+                <Icon name="cross" size={10} tone="berry" />
+                <Text class="font-mono text-2xs font-medium text-berry tabular-nums">{t("web.session.hub.telemetry.errors", { n: rollup().runErrors })}</Text>
+              </View>
+            </If>
+            <If when={rollup().hasContext}>
+              <ContextSaturationMeter rollup={rollup()} compact testID={`run-row-context-${props.entry.id}`} />
+            </If>
+          </View>
+        </If>
       </View>
     </View>
   );
 }
 
-function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: number; showBack: boolean; onBack: () => void; approvals?: RunApprovals }) {
+function lastUserPromptOf(steps: readonly SessionEvent[]): string | undefined {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const s = steps[i];
+    if (s !== undefined && s.type === "user/message" && s.under === undefined && s.text.trim().length > 0) {
+      return s.text.trim();
+    }
+  }
+  return undefined;
+}
+
+function RerunDialog(props: {
+  open: boolean;
+  onClose: () => void;
+  entry: Extract<RunEntry, { kind: "worker" }>;
+  lastPrompt?: string | undefined;
+  onRerunDone: (newSessionId?: string) => void;
+}) {
+  const client = useQueryClient();
+  const agents = useWorkAgents(true);
+  const runtimes = useRuntimes();
+  const target = signal("");
+  const note = signal("");
+  const submitting = createAct((msg) => toast(msg));
+
+  const issueId = () => sessionIssueId(props.entry.session);
+  const currentProfile = () => sessionProfile(props.entry.session);
+  const currentRuntime = () => props.entry.session.runtime;
+
+  const targetOptions = createMemo(() => {
+    const runtimeList = ready(runtimes, []);
+    const runtimeLabelById = new Map(runtimeList.map((r) => [r.id, r.preset.label]));
+    const opts: { value: string; label: string; group?: string }[] = [];
+    if (issueId() !== undefined) {
+      for (const a of agents()) {
+        const rtLabel = runtimeLabelById.get(a.runtime) ?? a.runtime;
+        opts.push({
+          value: `agent:${a.id}`,
+          label: `${a.name} · ${rtLabel}`,
+          group: t("web.session.hub.recovery.groupExperts"),
+        });
+      }
+    }
+    for (const r of runtimeList) {
+      if (r.installation.status === "available" && r.settings.enabled) {
+        opts.push({
+          value: `runtime:${r.id}`,
+          label: r.preset.label,
+          group: t("web.session.hub.recovery.groupEngines"),
+        });
+      }
+    }
+    return opts;
+  });
+
+  createEffect(
+    () => props.open,
+    (open) => {
+      if (!open) return;
+      note.set("");
+      const opts = targetOptions();
+      const currentAgentValue = currentProfile() ? `agent:${currentProfile()}` : undefined;
+      const currentRuntimeValue = `runtime:${currentRuntime()}`;
+      const preferred = opts.find((o) => o.value !== currentAgentValue && o.value !== currentRuntimeValue) ?? opts[0];
+      target.set(preferred?.value ?? "");
+    },
+  );
+
+  const selectedLabel = () => targetOptions().find((o) => o.value === target())?.label ?? target();
+
+  const submit = () => {
+    const chosen = target().trim();
+    if (!chosen || submitting.busy()) return;
+    const rawId = chosen.startsWith("agent:") ? chosen.slice(6) : chosen.startsWith("runtime:") ? chosen.slice(8) : chosen;
+    const label = selectedLabel();
+    const guidance = note().trim();
+    void submitting.run(async () => {
+      const id = issueId();
+      if (id !== undefined) {
+        await api.issue.status.update({
+          id,
+          status: "todo",
+          agent: rawId,
+          ...(guidance.length > 0 ? { text: guidance } : {}),
+        });
+        await client.invalidate(allSessionsQuery());
+        toast(t("web.session.hub.recovery.rerunStartedToast", { target: label }));
+        props.onClose();
+        props.onRerunDone();
+        return;
+      }
+      const session = props.entry.live ?? props.entry.session;
+      const cwd = session.cwd ?? "";
+      const repo = sessionRepo(session);
+      const ws = await api.session.openWorkspace({
+        runtime: rawId,
+        cwd,
+        ...(repo !== undefined ? { repo } : {}),
+        ...(session.name ? { title: session.name } : {}),
+      });
+      const promptText = guidance || props.lastPrompt || t("web.session.hub.recovery.resumePrompt");
+      const deliverSessionPrompt = api.session.send;
+      await deliverSessionPrompt({ id: ws.id, text: promptText });
+      await client.invalidate(allSessionsQuery());
+      toast(t("web.session.hub.recovery.rerunStartedToast", { target: label }));
+      props.onClose();
+      props.onRerunDone(ws.id);
+    });
+  };
+
+  return (
+    <Dialog
+      open={props.open}
+      onClose={() => props.onClose()}
+      title={t("web.session.hub.recovery.rerunTitle")}
+      size="sm"
+      testid="run-rerun-dialog"
+      footer={
+        <View class="flex-row items-center justify-end gap-2">
+          <Button size="compact" tone="quiet" testID="run-rerun-cancel" onPress={() => props.onClose()}>
+            {t("shared.act.close")}
+          </Button>
+          <Button size="compact" tone="primary" icon="shuffle" testID="run-rerun-confirm" disabled={!target() || submitting.busy()} onPress={submit}>
+            {t("web.session.hub.recovery.rerunConfirm")}
+          </Button>
+        </View>
+      }
+    >
+      <View class="gap-3">
+        <Field label={t("web.session.hub.recovery.rerunTarget")}>
+          <Select
+            searchable
+            testid="run-rerun-target"
+            label={t("web.session.hub.recovery.rerunTarget")}
+            placeholder={t("web.session.hub.recovery.rerunTargetPlaceholder")}
+            value={target()}
+            onChange={(v) => target.set(v)}
+            options={targetOptions()}
+          />
+        </Field>
+        <Field label={t("web.session.hub.recovery.rerunNote")}>
+          <TextInput
+            testID="run-rerun-note"
+            accessibilityLabel={t("web.session.hub.recovery.rerunNote")}
+            placeholder={t("web.session.hub.recovery.rerunNotePlaceholder")}
+            value={note()}
+            onInput={(v) => note.set(v)}
+            onSubmit={submit}
+          />
+        </Field>
+      </View>
+    </Dialog>
+  );
+}
+
+function RunDetail(props: {
+  entry: RunEntry;
+  look?: Look | undefined;
+  now: number;
+  showBack: boolean;
+  onBack: () => void;
+  onOpenSession: (id: string) => void;
+  approvals?: RunApprovals;
+}) {
+  const client = useQueryClient();
   const copiedId = signal(false);
+  const rerunOpen = signal(false);
   const resetCopy = useTimeout();
+  const resumeAct = createAct((msg) => toast(msg));
+  const steps = createSessionEvents(
+    () => props.entry.id,
+    () => true,
+  );
   createEffect(
     () => props.entry.id,
-    () => copiedId.set(false),
+    () => {
+      copiedId.set(false);
+      rerunOpen.set(false);
+    },
     { defer: true },
   );
   const copyRunId = () => {
@@ -491,7 +740,8 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
       () => undefined,
     );
   };
-  const status = computed(() => statusMeta(runStatusOf(props.entry)));
+  const runStatus = computed(() => runStatusOf(props.entry));
+  const status = computed(() => statusMeta(runStatus()));
   const pillStyle = () => {
     const bg = status().pillBg;
     return bg ? { backgroundColor: bg() } : undefined;
@@ -501,6 +751,46 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
   const workerIssueNumber = () => (props.entry.kind === "worker" ? props.entry.issue?.number : undefined);
   const timing = () => entryTiming(props.entry, props.now);
   const repo = () => (props.entry.kind === "worker" ? sessionRepo(props.entry.session) : undefined);
+  const rollup = createMemo(() => runTelemetryOf(props.entry, steps()));
+  const recoverable = createMemo(() => isRecoverableRun(props.entry));
+  const terminalCwd = () => {
+    if (props.entry.kind !== "worker") return undefined;
+    const s = props.entry.live ?? props.entry.session;
+    return sessionWorktree(s) ?? s.cwd;
+  };
+  const hasTelemetryBar = createMemo(
+    () => rollup().spent !== undefined || rollup().hasContext || rollup().llmRetries > 0 || rollup().runErrors > 0 || recoverable(),
+  );
+  const tokenBreakdownText = () =>
+    t("web.session.hub.telemetry.tokenBreakdown", {
+      input: formatTokens(rollup().inputTokens),
+      cached: formatTokens(rollup().cacheReadTokens),
+      output: formatTokens(rollup().outputTokens),
+    });
+
+  const resumeSameConfig = () => {
+    if (props.entry.kind !== "worker" || resumeAct.busy()) return;
+    const worker = props.entry;
+    const issueId = sessionIssueId(worker.session);
+    const prompt = lastUserPromptOf(steps()) ?? t("web.session.hub.recovery.resumePrompt");
+    void resumeAct.run(async () => {
+      if (issueId !== undefined) {
+        if (worker.issue?.stage.state === "stuck" || runStatus() === "failed" || runStatus() === "interrupted") {
+          await api.issue.status.update({ id: issueId, status: "todo" });
+        } else if (worker.issue && worker.issue.status !== "done" && worker.issue.status !== "canceled") {
+          await api.issue.comment.create({ id: issueId, text: t("web.session.hub.recovery.resumePrompt") });
+        } else {
+          await api.issue.status.update({ id: issueId, status: "todo", text: t("web.session.hub.recovery.resumePrompt") });
+        }
+      } else {
+        const deliverSessionPrompt = api.session.send;
+        await deliverSessionPrompt({ id: worker.id, text: prompt });
+      }
+      await client.invalidate(allSessionsQuery());
+      toast(t("web.session.hub.recovery.resumedToast"));
+    });
+  };
+
   const subLine = computed(() => {
     const parts: string[] = [];
     if (props.entry.kind === "orchestrator") {
@@ -515,66 +805,143 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
 
   return (
     <View class="h-full min-h-0 flex-1 bg-page">
-      <View desktop={{ windowDrag: true }} testID="run-detail-header" class="h-11 shrink-0 flex-row items-center gap-2.5 border-b border-line bg-page px-4">
-        <If when={props.showBack}>
-          <View
-            role="button"
-            testID="runs-back"
-            onPress={props.onBack}
-            class="-ml-1 flex-row items-center gap-1 rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
-          >
-            <Icon name="back" size={12} tone="muted" />
-            <Text class="text-xs font-medium text-muted">{t("web.session.hub.back")}</Text>
+      <View desktop={{ windowDrag: true }} testID="run-detail-header" class="shrink-0 border-b border-line bg-page">
+        <View class="min-h-11 flex-row items-center gap-2.5 px-4">
+          <If when={props.showBack}>
+            <View
+              role="button"
+              testID="runs-back"
+              onPress={props.onBack}
+              class="-ml-1 flex-row items-center gap-1 rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+            >
+              <Icon name="back" size={12} tone="muted" />
+              <Text class="text-xs font-medium text-muted">{t("web.session.hub.back")}</Text>
+            </View>
+          </If>
+          <View class="shrink-0">
+            <If
+              when={props.entry.kind === "orchestrator"}
+              else={
+                <If when={props.entry.kind === "worker" ? props.entry : undefined}>
+                  {(w) => (
+                    <AgentFace agentId={sessionProfile(w().session) ?? ""} name={w().session.name} runtime={w().session.runtime} look={props.look} size={24} />
+                  )}
+                </If>
+              }
+            >
+              <OrchestratorFace size={24} agent={props.entry.id} />
+            </If>
           </View>
-        </If>
-        <View class="shrink-0">
-          <If
-            when={props.entry.kind === "orchestrator"}
-            else={
-              <If when={props.entry.kind === "worker" ? props.entry : undefined}>
-                {(w) => (
-                  <AgentFace agentId={sessionProfile(w().session) ?? ""} name={w().session.name} runtime={w().session.runtime} look={props.look} size={24} />
+          <View class="min-w-0 flex-1 flex-row items-center gap-2">
+            <Text role="header" class="shrink-0 truncate text-sm font-semibold text-ink">
+              {entryName(props.entry)}
+            </Text>
+            <View class={`h-5 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 ${status().pillClass}`} style={pillStyle()}>
+              <Dot tone={status().dot} size={6} ring={false} />
+              <Text class={`text-2xs font-medium ${status().textClass}`}>{status().label}</Text>
+            </View>
+            <If when={subLine()}>
+              <Text class="min-w-0 flex-1 truncate text-xs text-muted">{subLine()}</Text>
+            </If>
+          </View>
+          <View class="shrink-0 flex-row items-center gap-1.5">
+            <Button
+              size="compact"
+              testID="run-copy-id"
+              icon={copiedId() ? "check" : "copy"}
+              tooltip={<Bubble text={copiedId() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
+              onPress={copyRunId}
+            >
+              {copiedId() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
+            </Button>
+            <If when={workerIssueId()}>
+              {(issueId) => (
+                <ButtonLink size="compact" href={`/issues/${encodeURIComponent(issueId())}`} icon="issues" testID="run-open-issue">
+                  {workerIssueNumber() !== undefined ? `#${workerIssueNumber()} ${t("web.session.hub.openIssue")}` : t("web.session.hub.openIssue")}
+                </ButtonLink>
+              )}
+            </If>
+            <ButtonLink size="compact" href={`/agents/${encodeURIComponent(profileId())}`} icon="agents" testID="run-open-profile">
+              {t("web.session.hub.openProfile")}
+            </ButtonLink>
+          </View>
+        </View>
+        <If when={hasTelemetryBar()}>
+          <View testID="run-detail-telemetry" class="flex-row flex-wrap items-center justify-between gap-2 border-t border-line bg-side px-4 py-1.5">
+            <View class="flex-row flex-wrap items-center gap-2">
+              <If when={rollup().spent}>
+                {(s) => (
+                  <View
+                    testID="run-detail-spent"
+                    tooltip={
+                      <If when={rollup().inputTokens + rollup().cacheReadTokens + rollup().outputTokens > 0}>
+                        <Bubble text={tokenBreakdownText()} />
+                      </If>
+                    }
+                    class="h-5 flex-row items-center gap-1 rounded-sm border border-line bg-page px-1.5"
+                  >
+                    <Icon name="spend" size={11} tone="muted" />
+                    <Text class="font-mono text-2xs font-medium text-ink tabular-nums">{spentText(s())}</Text>
+                  </View>
                 )}
               </If>
-            }
-          >
-            <OrchestratorFace size={24} agent={props.entry.id} />
-          </If>
-        </View>
-        <View class="min-w-0 flex-1 flex-row items-center gap-2">
-          <Text role="header" class="shrink-0 truncate text-sm font-semibold text-ink">
-            {entryName(props.entry)}
-          </Text>
-          <View class={`h-5 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 ${status().pillClass}`} style={pillStyle()}>
-            <Dot tone={status().dot} size={6} ring={false} />
-            <Text class={`text-2xs font-medium ${status().textClass}`}>{status().label}</Text>
+              <If when={rollup().hasContext}>
+                <ContextSaturationMeter rollup={rollup()} testID="run-detail-context-meter" />
+              </If>
+              <If when={rollup().llmRetries > 0}>
+                <View testID="run-detail-retry-badge" class="h-5 flex-row items-center gap-1 rounded-sm bg-warn-soft px-1.5">
+                  <Icon name="retry" size={11} tone="warn-ink" />
+                  <Text class="font-mono text-2xs font-medium text-warn-ink tabular-nums">
+                    {t("web.session.hub.telemetry.retries", { n: rollup().llmRetries })}
+                  </Text>
+                </View>
+              </If>
+              <If when={rollup().runErrors > 0}>
+                <View testID="run-detail-error-badge" class="h-5 flex-row items-center gap-1 rounded-sm bg-bad-soft px-1.5">
+                  <Icon name="cross" size={11} tone="berry" />
+                  <Text class="font-mono text-2xs font-medium text-berry tabular-nums">{t("web.session.hub.telemetry.errors", { n: rollup().runErrors })}</Text>
+                </View>
+              </If>
+            </View>
+            <If when={recoverable()}>
+              <View testID="run-detail-recovery" class="flex-row flex-wrap items-center gap-1.5">
+                <Button size="compact" tone="primary" icon="retry" testID="run-resume-same" disabled={resumeAct.busy()} onPress={resumeSameConfig}>
+                  {runStatus() === "failed" ? t("web.session.hub.recovery.retrySame") : t("web.session.hub.recovery.resumeSame")}
+                </Button>
+                <Button size="compact" icon="shuffle" testID="run-rerun-other" onPress={() => rerunOpen.set(true)}>
+                  {t("web.session.hub.recovery.rerunOther")}
+                </Button>
+                <Button
+                  size="compact"
+                  icon="terminal"
+                  testID="run-open-worktree-terminal"
+                  disabled={terminalCwd() === undefined}
+                  tooltip={terminalCwd() === undefined ? <Bubble text={t("web.session.hub.recovery.noWorktree")} /> : undefined}
+                  onPress={() => {
+                    const cwd = terminalCwd();
+                    if (cwd !== undefined) void hostApi.openTerminal({ cwd, title: entryName(props.entry) });
+                  }}
+                >
+                  {t("web.session.hub.recovery.openWorktree")}
+                </Button>
+              </View>
+            </If>
           </View>
-          <If when={subLine()}>
-            <Text class="min-w-0 flex-1 truncate text-xs text-muted">{subLine()}</Text>
-          </If>
-        </View>
-        <View class="shrink-0 flex-row items-center gap-1.5">
-          <Button
-            size="compact"
-            testID="run-copy-id"
-            icon={copiedId() ? "check" : "copy"}
-            tooltip={<Bubble text={copiedId() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
-            onPress={copyRunId}
-          >
-            {copiedId() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
-          </Button>
-          <If when={workerIssueId()}>
-            {(issueId) => (
-              <ButtonLink size="compact" href={`/issues/${encodeURIComponent(issueId())}`} icon="issues" testID="run-open-issue">
-                {workerIssueNumber() !== undefined ? `#${workerIssueNumber()} ${t("web.session.hub.openIssue")}` : t("web.session.hub.openIssue")}
-              </ButtonLink>
-            )}
-          </If>
-          <ButtonLink size="compact" href={`/agents/${encodeURIComponent(profileId())}`} icon="agents" testID="run-open-profile">
-            {t("web.session.hub.openProfile")}
-          </ButtonLink>
-        </View>
+        </If>
       </View>
+      <If when={props.entry.kind === "worker" ? props.entry : undefined}>
+        {(worker) => (
+          <RerunDialog
+            open={rerunOpen()}
+            onClose={() => rerunOpen.set(false)}
+            entry={worker()}
+            lastPrompt={lastUserPromptOf(steps())}
+            onRerunDone={(newId) => {
+              if (newId !== undefined) props.onOpenSession(newId);
+            }}
+          />
+        )}
+      </If>
       <View class="min-h-0 flex-1 px-4 pt-2.5 pb-3">
         <View class="min-h-0 w-full max-w-6xl flex-1 gap-2.5">
           <If when={props.entry.kind === "orchestrator" ? props.approvals : undefined}>

@@ -13,7 +13,7 @@ use tokio_util::sync::CancellationToken;
 use vibevalley_core::LiveSessionOverlay;
 use vibevalley_protocol::{
     CallState, CommitCount, ConnectorStatus, GameEffect, InboxItem, LiveEvent, LiveEventNotice, LiveEventRuntime, LiveEventSession, Machine, Millis,
-    NoticeLevel, Phase, Progress, RuntimeInfo, SessionEvent, SessionId, SessionSubagents, Spent, ToolConnection,
+    NoticeLevel, Phase, Progress, RuntimeInfo, SessionEvent, SessionId, SessionSubagents, SessionTelemetry, Spent, ToolConnection,
 };
 
 const DEFAULT_LIVE_CAPACITY: usize = 512;
@@ -51,6 +51,7 @@ pub struct LiveSessionSnapshot {
     pub spent: Option<Spent>,
     pub tool_connections: Option<Vec<ToolConnection>>,
     pub subagents: Option<SessionSubagents>,
+    pub telemetry: Option<SessionTelemetry>,
     pub last_event_at: Option<Millis>,
 }
 
@@ -63,6 +64,7 @@ impl LiveSessionSnapshot {
             spent: self.spent.clone(),
             subagents: self.subagents.as_ref().map(|s| Some(s.clone())),
             tool_connections: self.tool_connections.clone(),
+            telemetry: self.telemetry.clone(),
         }
     }
 }

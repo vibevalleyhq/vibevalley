@@ -1,4 +1,4 @@
-import { type Agent, defaultOrchestrator, type Issue, type Session, type SessionView } from "@vibevalley/protocol";
+import { type Agent, defaultOrchestrator, type Issue, type Session, type SessionEvent, type SessionView, type Spent } from "@vibevalley/protocol";
 import { isOrchestratorSession, sessionIssueId, sessionProfile, sessionRepo } from "@vibevalley/protocol/rules";
 
 export type RunsScope = "all" | "active" | "orchestrator" | "worker";
@@ -308,4 +308,103 @@ export function resolveSelectedRun(entries: readonly RunEntry[], sessionId: stri
     if (exact) return exact;
   }
   return entries[0];
+}
+
+export interface RunTelemetryRollup {
+  readonly inputTokens: number;
+  readonly cacheReadTokens: number;
+  readonly outputTokens: number;
+  readonly totalTokens: number;
+  readonly spent?: Spent | undefined;
+  readonly contextUsed: number;
+  readonly contextWindow: number;
+  readonly contextPct: number;
+  readonly hasContext: boolean;
+  readonly llmRetries: number;
+  readonly runErrors: number;
+}
+
+/** Projects aggregated token usage, Spent cost, context saturation, and retry/error counts for a run entry. */
+export function runTelemetryOf(entry: RunEntry, steps: readonly SessionEvent[] = []): RunTelemetryRollup {
+  const session = entry.kind === "worker" ? (entry.live ?? entry.session) : entry.live;
+  const baseTel = session?.telemetry;
+  const spent =
+    entry.kind === "worker"
+      ? (entry.live?.spent ?? entry.session.spent ?? entry.live?.lastRun?.spent ?? entry.session.lastRun?.spent)
+      : (entry.live?.spent ?? entry.live?.lastRun?.spent);
+  const phase = session?.phase;
+  const lastOutcome = session?.lastRun?.outcome;
+
+  let stepIn = 0;
+  let stepCache = 0;
+  let stepOut = 0;
+  let stepCtxUsed = 0;
+  let stepCtxWindow = 0;
+  let stepRetries = 0;
+  let stepErrors = 0;
+  for (const s of steps) {
+    if (s.type === "llm/retry") stepRetries += 1;
+    else if (s.type === "run/error") stepErrors += 1;
+    if (s.tokens) {
+      const i = Math.max(0, Math.round(s.tokens.input));
+      const c = Math.max(0, Math.round(s.tokens.cacheRead));
+      const o = Math.max(0, Math.round(s.tokens.output));
+      stepIn += i;
+      stepCache += c;
+      stepOut += o;
+      if (s.tokens.contextUsed !== undefined && s.tokens.contextUsed > 0) {
+        stepCtxUsed = Math.round(s.tokens.contextUsed);
+      } else {
+        const fallback = Math.max(i, c);
+        if (fallback > 0) stepCtxUsed = fallback;
+      }
+      if (s.tokens.contextWindow !== undefined && s.tokens.contextWindow > 0) {
+        stepCtxWindow = Math.round(s.tokens.contextWindow);
+      }
+    }
+  }
+
+  const inputTokens = Math.max(baseTel?.inputTokens ?? 0, stepIn);
+  const cacheReadTokens = Math.max(baseTel?.cacheReadTokens ?? 0, stepCache);
+  const outputTokens = Math.max(baseTel?.outputTokens ?? 0, stepOut);
+  const telemetryTokens = inputTokens + cacheReadTokens + outputTokens;
+  const totalTokens = Math.max(spent?.tokens ?? 0, telemetryTokens);
+
+  const effectiveSpent: Spent | undefined =
+    spent !== undefined
+      ? { tokens: Math.max(spent.tokens, totalTokens), ...(spent.cny !== undefined ? { cny: spent.cny } : {}) }
+      : totalTokens > 0
+        ? { tokens: totalTokens }
+        : undefined;
+
+  const contextUsed = stepCtxUsed > 0 ? stepCtxUsed : (baseTel?.contextUsed ?? 0);
+  const contextWindow = stepCtxWindow > 0 ? stepCtxWindow : (baseTel?.contextWindow ?? 0);
+  const hasContext = contextUsed > 0 && contextWindow > 0;
+  const contextPct = hasContext ? Math.min(100, Math.round((contextUsed / contextWindow) * 100)) : 0;
+
+  const liveRetry = phase?._tag === "working" && phase.retry !== undefined ? Math.max(1, phase.retry.attempt) : 0;
+  const llmRetries = Math.max(baseTel?.llmRetries ?? 0, stepRetries, liveRetry);
+  const failedFlag = phase?._tag === "failed" || lastOutcome === "failed" ? 1 : 0;
+  const runErrors = Math.max(baseTel?.runErrors ?? 0, stepErrors, failedFlag);
+
+  return {
+    inputTokens,
+    cacheReadTokens,
+    outputTokens,
+    totalTokens,
+    ...(effectiveSpent !== undefined ? { spent: effectiveSpent } : {}),
+    contextUsed,
+    contextWindow,
+    contextPct,
+    hasContext,
+    llmRetries,
+    runErrors,
+  };
+}
+
+/** Whether a run entry is in a recoverable stopped state (`failed`, `interrupted`, or `resting`). */
+export function isRecoverableRun(entry: RunEntry): boolean {
+  if (entry.kind !== "worker") return false;
+  const status = runStatusOf(entry);
+  return status === "failed" || status === "interrupted" || status === "resting";
 }

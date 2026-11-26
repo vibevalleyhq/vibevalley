@@ -12,6 +12,7 @@ import type {
   McpServerToggleInput,
   RuntimeInfo,
   SessionsSlice,
+  SessionView,
   SliceBundle,
 } from "@vibevalley/protocol";
 
@@ -595,4 +596,92 @@ test("RuntimesPage: MCP InventoryCard displays real host entries and supports ad
   // Remove entry -> disappears from inventory card.
   await app.press("id:mcp-server-remove-context7");
   await fake.pumpUntil(app, () => app.count("id:mcp-server-row-context7") === 0);
+});
+
+test("RuntimesPage shows per-engine recent run stats summary alongside MCP card and updates reactively", async () => {
+  setLocale("en");
+  const base = scenarios.typical.state;
+  const seed = base.sessions.sessions[0];
+  if (seed === undefined) throw new Error("typical scenario must include at least one session");
+  const firstSession: SessionView = {
+    ...seed,
+    id: "claude-ok" as SliceBundle["sessions"]["sessions"][number]["id"],
+    runtime: "claude",
+    runs: 3,
+    spent: { tokens: 12_000, cny: 0.3 },
+    telemetry: {
+      inputTokens: 7_000,
+      cacheReadTokens: 3_000,
+      outputTokens: 2_000,
+      llmRetries: 1,
+      runErrors: 0,
+    },
+    phase: { _tag: "resting" },
+    lastRun: { outcome: "completed", summary: "ok", at: SCENARIO_NOW - 10_000 },
+  };
+  const claudeSessions: SessionView[] = [
+    firstSession,
+    {
+      ...seed,
+      id: "claude-fail" as SliceBundle["sessions"]["sessions"][number]["id"],
+      runtime: "claude",
+      runs: 2,
+      spent: { tokens: 8_000, cny: 0.2 },
+      telemetry: {
+        inputTokens: 5_000,
+        cacheReadTokens: 2_000,
+        outputTokens: 1_000,
+        llmRetries: 1,
+        runErrors: 2,
+      },
+      phase: { _tag: "failed" },
+      lastRun: { outcome: "failed", summary: "boom", at: SCENARIO_NOW - 5_000 },
+    },
+  ];
+  const initialState: SliceBundle = {
+    ...base,
+    sessions: {
+      ...base.sessions,
+      sessions: claudeSessions,
+    },
+  };
+
+  const { app, fake } = await mountRoute("/runtimes/local/claude", initialState);
+  await fake.pumpUntil(app, () => app.count("id:runtime-run-stats") === 1);
+
+  expect(app.texts()).toContain("MCP servers");
+  expect(app.count("id:mcp-server-add")).toBe(1);
+  expect(app.count("id:runtime-stats-runs")).toBe(1);
+  expect(app.count("id:runtime-stats-failure-rate")).toBe(1);
+  expect(app.count("id:runtime-stats-retry-rate")).toBe(1);
+  expect(app.shows("id:runtime-run-stats >> text:5")).toBe(true);
+  expect(app.shows("id:runtime-run-stats >> text:50%")).toBe(true);
+  expect(app.shows("id:runtime-run-stats >> text:100%")).toBe(true);
+  expect(app.shows("id:runtime-stats-usage >> text:20k tok")).toBe(true);
+  expect(app.shows("id:runtime-stats-usage >> text:¥0.50")).toBe(true);
+
+  // Pushing a third healthy session updates the stats card without extra polling subscriptions.
+  await fake.setSlice(app, "sessions", {
+    ...initialState.sessions,
+    sessions: [
+      ...claudeSessions,
+      {
+        ...firstSession,
+        id: "claude-three" as SliceBundle["sessions"]["sessions"][number]["id"],
+        runs: 1,
+        spent: { tokens: 5_000, cny: 0.1 },
+        telemetry: {
+          inputTokens: 3_000,
+          cacheReadTokens: 1_000,
+          outputTokens: 1_000,
+          llmRetries: 0,
+          runErrors: 0,
+        },
+      },
+    ],
+  });
+  await fake.pumpUntil(app, () => app.shows("id:runtime-run-stats >> text:6"));
+  expect(app.shows("id:runtime-run-stats >> text:33%")).toBe(true);
+  expect(app.shows("id:runtime-stats-usage >> text:25k tok")).toBe(true);
+  expect(app.shows("id:runtime-stats-usage >> text:¥0.60")).toBe(true);
 });

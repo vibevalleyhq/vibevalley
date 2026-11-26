@@ -74,7 +74,7 @@ export type SessionSubagents = { run: string, rootThreadId: string, disconnected
 
 export type FactSessionSubagentsChanged = { "type": "sessionSubagentsChanged", at: number, id: SessionId, subagents?: SessionSubagents, };
 
-export type Session = { id: SessionId, controller: SessionController, role?: AgentRole, name: string, profile?: string, runtime: string, brief: string, cwd?: string, policy: ExecutionPolicy, bindings: Array<ContextRef>, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>,
+export type Session = { id: SessionId, controller: SessionController, role?: AgentRole, name: string, profile?: string, runtime: string, brief: string, cwd?: string, policy: ExecutionPolicy, bindings: Array<ContextRef>, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>, telemetry?: SessionTelemetry,
 /**
  * The machine it works on; none for an agent hosted in the server's process.
  */
@@ -83,7 +83,7 @@ machine?: string, phase: Phase, };
 /**
  * reduce never sees these: the words are the frame's (projection/frame.ts).
  */
-export type SessionView = { id: SessionId, controller: SessionController, role?: AgentRole, name: string, profile?: string, runtime: string, brief: string, cwd?: string, policy: ExecutionPolicy, bindings: Array<ContextRef>, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>, machine?: string, phase: PhaseView, phaseText: string, };
+export type SessionView = { id: SessionId, controller: SessionController, role?: AgentRole, name: string, profile?: string, runtime: string, brief: string, cwd?: string, policy: ExecutionPolicy, bindings: Array<ContextRef>, hiredAt: number, runs: number, lastRun?: LastRun, spent?: Spent, subagents?: SessionSubagents, toolConnections?: Array<ToolConnection>, telemetry?: SessionTelemetry, machine?: string, phase: PhaseView, phaseText: string, };
 
 export const SessionEventTypeValues = ["run/start", "user/message", "memory/recalled", "assistant/thinking", "assistant/message", "tool/call", "tool/result", "permission/request", "permission/resolved", "interaction/request", "interaction/resolved", "llm/retry", "llm/usage", "run/error", "run/end"] as const;
 export type SessionEventType = (typeof SessionEventTypeValues)[number];
@@ -92,6 +92,11 @@ export const ToolActionValues = ["run_command", "read_file", "edit_file", "searc
 export type ToolAction = (typeof ToolActionValues)[number];
 
 export type EventTokens = { input: number, cacheRead: number, output: number, cacheWrite?: number, reasoning?: number, contextUsed?: number, contextWindow?: number, };
+
+/**
+ * Aggregated token usage, context saturation, and retry/error counts for a session.
+ */
+export type SessionTelemetry = { inputTokens: number, cacheReadTokens: number, outputTokens: number, cacheWriteTokens?: number, reasoningTokens?: number, contextUsed?: number, contextWindow?: number, llmRetries: number, runErrors: number, };
 
 export const SessionPermissionModeValues = ["ask", "acceptEdits", "bypass", "readOnly"] as const;
 export type SessionPermissionMode = (typeof SessionPermissionModeValues)[number];

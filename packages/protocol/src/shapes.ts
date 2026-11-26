@@ -140,6 +140,7 @@ export {
   type SessionSwarmOverview,
   type SessionSwarmState,
   type SessionSwarmThread,
+  type SessionTelemetry,
   type SessionView,
   type SessionWatchEvent,
   type SessionWorkspace,

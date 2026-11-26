@@ -129,6 +129,31 @@
       "failed": "Failed",
       "interrupted": "Interrupted",
       "closed": "Closed"
+    },
+    "telemetry": {
+      "tokenBreakdown": "in {input} · cached {cached} · out {output}",
+      "context": "Context {pct}% ({used}/{window})",
+      "contextCompact": "Ctx {pct}%",
+      "retries": "{n, plural, one {# retry} other {# retries}}",
+      "errors": "{n, plural, one {# error} other {# errors}}"
+    },
+    "recovery": {
+      "resumeSame": "Resume with same config",
+      "retrySame": "Retry with same config",
+      "rerunOther": "Rerun with another expert/engine",
+      "openWorktree": "Open Worktree Terminal",
+      "resumedToast": "Resumed run with current configuration",
+      "rerunTitle": "Rerun with another expert or engine",
+      "rerunTarget": "Expert or engine",
+      "rerunTargetPlaceholder": "Choose an expert or engine",
+      "rerunNote": "Guidance for this run (optional)",
+      "rerunNotePlaceholder": "Add extra context or leave blank to rerun from the current task…",
+      "rerunConfirm": "Start rerun",
+      "rerunStartedToast": "Started rerun with {target}",
+      "resumePrompt": "Resume from the previous step and finish the task.",
+      "groupExperts": "Experts",
+      "groupEngines": "Engines",
+      "noWorktree": "No worktree directory recorded for this session"
     }
   },
   "subagents": {

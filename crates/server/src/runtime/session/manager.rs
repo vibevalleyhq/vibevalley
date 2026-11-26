@@ -29,7 +29,7 @@ fn watch_stopped(sink: &crate::context::Sink) -> bool {
 impl SessionEngine {
     pub(crate) async fn list_endpoint_async(&self, profile: Option<String>, controller: Option<SessionController>) -> Result<Vec<Session>, ApiError> {
         let profile = profile.unwrap_or_default();
-        let all = self.sessions_async().await.map_err(session_error)?;
+        let all = self.sessions_with_telemetry_async().await.map_err(session_error)?;
         let mut out: Vec<_> = all
             .into_iter()
             .filter(|x| (profile.is_empty() || x.profile_id() == Some(profile.as_str())) && controller.is_none_or(|c| x.controller == c))
@@ -39,7 +39,7 @@ impl SessionEngine {
     }
 
     pub(crate) async fn get_endpoint_async(&self, id: &str) -> Result<Session, ApiError> {
-        self.session_async(id).await.ok_or_else(|| helper_ref(id))
+        self.session_with_telemetry_async(id).await.ok_or_else(|| helper_ref(id))
     }
 
     pub(crate) async fn event_list_endpoint_async(&self, input: &SessionEventListInput) -> Result<SessionEventPage, ApiError> {

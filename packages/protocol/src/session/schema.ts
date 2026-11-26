@@ -120,6 +120,18 @@ export const ContextRef = z.discriminatedUnion("kind", [
   }),
 ]) satisfies Codec<T.ContextRef>;
 
+export const SessionTelemetry = z.object({
+  inputTokens: z.number(),
+  cacheReadTokens: z.number(),
+  outputTokens: z.number(),
+  cacheWriteTokens: z.exactOptional(z.number()),
+  reasoningTokens: z.exactOptional(z.number()),
+  contextUsed: z.exactOptional(z.number()),
+  contextWindow: z.exactOptional(z.number()),
+  llmRetries: z.number(),
+  runErrors: z.number(),
+}) satisfies Codec<T.SessionTelemetry>;
+
 const sessionFields = {
   id: SessionId,
   controller: SessionController,
@@ -137,6 +149,7 @@ const sessionFields = {
   spent: z.exactOptional(Spent),
   subagents: z.exactOptional(SessionSubagents),
   toolConnections: z.exactOptional(z.array(ToolConnection)),
+  telemetry: z.exactOptional(SessionTelemetry),
   machine: z.exactOptional(z.string()),
 };
 

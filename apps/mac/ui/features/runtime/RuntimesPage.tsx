@@ -45,7 +45,17 @@ import {
   type SelectedMachineRuntime,
   useMergedMachines,
 } from "./machines";
-import { capabilityLabel, InventoryCard, mcpEntryDescription, mcpHostOf, ModelsCard, SettingsCard, SupportCard, Usage } from "./RuntimeCards";
+import {
+  capabilityLabel,
+  InventoryCard,
+  mcpEntryDescription,
+  mcpHostOf,
+  ModelsCard,
+  RuntimeRunStatsCard,
+  SettingsCard,
+  SupportCard,
+  Usage,
+} from "./RuntimeCards";
 
 function compactVersion(raw: string): string {
   const cleaned = raw.replace(/\s*\([^)]*\)\s*$/u, "").trim();
@@ -786,6 +796,8 @@ function RuntimeWorkspace(props: {
         </If>
       </SettingsGroup>
 
+      <RuntimeRunStatsCard sessions={props.sessions} />
+
       <SettingsGroup title={t("web.runtime.sessions")} note={props.sessions.length > 0 ? String(props.sessions.length) : undefined}>
         <If
           when={props.sessions.length > 0}
@@ -798,7 +810,7 @@ function RuntimeWorkspace(props: {
           <Each of={props.sessions.slice(0, 6)} key={(s) => s.id}>
             {(s, i) => (
               <A
-                href="/runs"
+                href={`/runs?session=${encodeURIComponent(s().id)}`}
                 testID={`runtime-session-${s().id}`}
                 class={`min-h-11 flex-row items-center gap-2.5 px-4 py-2.5 hover:bg-hover ${
                   i() === Math.min(props.sessions.length, 6) - 1 ? "" : "border-b border-line"

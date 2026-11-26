@@ -151,6 +151,17 @@
   "remoteSummary": "Hosted on {machine} and dispatched remotely.",
   "sessions": "Related sessions",
   "noSessions": "No active or recent sessions.",
+  "stats": {
+    "title": "Recent run summary",
+    "runs": "Recent runs",
+    "sessions": "{n, plural, one {# session} other {# sessions}}",
+    "failureRate": "Failure rate",
+    "retryRate": "Retry rate",
+    "failuresDetail": "{failed} failed · {errors} errors",
+    "retriesDetail": "{retried} sessions · {retries} retries",
+    "cumulativeSpend": "Cumulative usage",
+    "empty": "No recent runs recorded for this engine."
+  },
   "quickActions": "Quick actions",
   "installation": "Installation",
   "source": "Install source",

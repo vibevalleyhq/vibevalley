@@ -260,6 +260,15 @@ impl SessionEngine {
         overlay_sessions(&[stored], &overlays).into_iter().next()
     }
 
+    pub(crate) async fn session_with_telemetry_async(&self, id: &str) -> Option<Session> {
+        let mut stored = self.0.ctx.service.session.get(id).await.ok().flatten()?;
+        if let Ok(Some(tel)) = self.0.ctx.service.session.telemetry_for_session(id).await {
+            stored.telemetry = Some(tel);
+        }
+        let overlays = self.0.ctx.live.core_session_overlays();
+        overlay_sessions(&[stored], &overlays).into_iter().next()
+    }
+
     pub async fn get_async(&self, id: &str) -> Option<Session> {
         self.session_async(id).await
     }
@@ -270,6 +279,17 @@ impl SessionEngine {
 
     pub async fn sessions_async(&self) -> Result<Vec<Session>> {
         let stored = self.0.ctx.service.session.all().await?;
+        let overlays = self.0.ctx.live.core_session_overlays();
+        Ok(overlay_sessions(&stored, &overlays))
+    }
+
+    pub(crate) async fn sessions_with_telemetry_async(&self) -> Result<Vec<Session>> {
+        let (mut stored, mut telemetry_map) = tokio::try_join!(self.0.ctx.service.session.all(), self.0.ctx.service.session.telemetry_by_session(),)?;
+        for s in &mut stored {
+            if let Some(tel) = telemetry_map.remove(&s.id) {
+                s.telemetry = Some(tel);
+            }
+        }
         let overlays = self.0.ctx.live.core_session_overlays();
         Ok(overlay_sessions(&stored, &overlays))
     }
@@ -664,7 +684,12 @@ impl SessionEngine {
                 .await?;
             self.0.ctx.mark_dirty(written_dirty);
         }
-        self.sync_live_snapshot(&session, run_id.as_deref());
+        let seeded_telemetry = if session.telemetry.is_some() {
+            session.telemetry.clone()
+        } else {
+            self.0.ctx.service.session.telemetry_for_session(&id).await.ok().flatten()
+        };
+        self.sync_live_snapshot(&session, run_id.as_deref(), seeded_telemetry);
         self.emit_lifecycle(SessionLifecycleEvent::Changed(Box::new(session)));
         if let Some(before) = previous {
             let me = self.clone();
@@ -698,7 +723,7 @@ impl SessionEngine {
         Ok(())
     }
 
-    pub(super) fn sync_live_snapshot(&self, session: &Session, run_id: Option<&str>) {
+    pub(super) fn sync_live_snapshot(&self, session: &Session, run_id: Option<&str>, telemetry: Option<vibevalley_protocol::SessionTelemetry>) {
         self.0.ctx.live.set_session(
             session.id.clone(),
             LiveSessionSnapshot {
@@ -709,6 +734,7 @@ impl SessionEngine {
                 spent: session.spent.clone(),
                 tool_connections: session.tool_connections.clone(),
                 subagents: session.subagents.clone(),
+                telemetry,
                 last_event_at: Some(now()),
             },
         );
@@ -1128,9 +1154,29 @@ impl SessionEngine {
             EventKind::InteractionResolved { request_id, .. } => {
                 self.on_workspace_interaction_resolved(session_id, &request_id);
             }
-            EventKind::Error { message } if root => state.failure = Some(message),
+            EventKind::Error { message } if root => {
+                state.failure = Some(message);
+                self.0.ctx.live.update_session(session_id, |snap| {
+                    let tel = snap.telemetry.get_or_insert_with(Default::default);
+                    tel.run_errors += 1;
+                    snap.last_event_at = Some(now());
+                });
+                self.0.ctx.mark_dirty(SliceMask::SESSIONS);
+            }
             EventKind::TurnFinished { reason, usage } if root => {
                 state.observed_run = None;
+                let spent = reported_spent(&usage);
+                if let Some(tokens) = super::journal::event_tokens_of(&usage) {
+                    self.0.ctx.live.update_session(session_id, |snap| {
+                        let tel = snap.telemetry.get_or_insert_with(Default::default);
+                        vibevalley_core::merge_session_telemetry_usage(tel, &tokens);
+                        if let Some(s) = &spent {
+                            snap.spent = Some(s.clone());
+                        }
+                        snap.last_event_at = Some(now());
+                    });
+                    self.0.ctx.mark_dirty(SliceMask::SESSIONS);
+                }
                 let is_user = self
                     .session_async(session_id)
                     .await
@@ -1138,7 +1184,7 @@ impl SessionEngine {
                 if is_user {
                     self.on_workspace_turn_finished(session_id, &usage);
                 }
-                self.finish_async(session_id, reason, reported_spent(&usage), &state.said, &state.asked, state.failure.as_deref())
+                self.finish_async(session_id, reason, spent, &state.said, &state.asked, state.failure.as_deref())
                     .await;
                 if !is_user && let Some(rounds) = self.0.rounds.get() {
                     rounds.after().await;

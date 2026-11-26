@@ -448,6 +448,7 @@ pub struct Session {
     pub spent: Option<Spent>,
     pub subagents: Option<SessionSubagents>,
     pub tool_connections: Option<Vec<ToolConnection>>,
+    pub telemetry: Option<SessionTelemetry>,
     /// The machine it works on; none for an agent hosted in the server's process.
     pub machine: Option<String>,
     pub phase: Phase,
@@ -477,6 +478,7 @@ pub struct SessionView {
     pub spent: Option<Spent>,
     pub subagents: Option<SessionSubagents>,
     pub tool_connections: Option<Vec<ToolConnection>>,
+    pub telemetry: Option<SessionTelemetry>,
     pub machine: Option<String>,
     pub phase: PhaseView,
     pub phase_text: String,
@@ -619,6 +621,24 @@ pub struct EventTokens {
     pub reasoning: Option<i64>,
     pub context_used: Option<i64>,
     pub context_window: Option<i64>,
+}
+
+/// Aggregated token usage, context saturation, and retry/error counts for a session.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct SessionTelemetry {
+    pub input_tokens: i64,
+    pub cache_read_tokens: i64,
+    pub output_tokens: i64,
+    pub cache_write_tokens: Option<i64>,
+    pub reasoning_tokens: Option<i64>,
+    pub context_used: Option<i64>,
+    pub context_window: Option<i64>,
+    pub llm_retries: i64,
+    pub run_errors: i64,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -1367,6 +1387,7 @@ crate::typescript::module! {
     SessionEventType,
     ToolAction,
     EventTokens,
+    SessionTelemetry,
     SessionPermissionMode,
     SessionPermissionDecision,
     SessionPermissionRequest,

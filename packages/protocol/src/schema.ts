@@ -94,6 +94,7 @@ export {
   SessionPermissionDecision,
   SessionPermissionMode,
   SessionPermissionRequest,
+  SessionTelemetry,
   SessionWatchEvent,
   SessionWorkspace,
 } from "./session/schema";

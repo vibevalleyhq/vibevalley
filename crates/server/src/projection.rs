@@ -49,9 +49,20 @@ pub(crate) async fn project_slice_json(sources: &SliceSources, kind: SliceKind, 
             encode_slice(&project_board(&input, &live, seq)).map_err(err)
         }
         SliceKind::Sessions => {
-            let (raw_sessions, raw_issues) = tokio::join!(sources.ctx.service.session.all(), sources.board.raw_issues_async());
+            let (raw_sessions, telemetry_map, raw_issues) = tokio::join!(
+                sources.ctx.service.session.all(),
+                sources.ctx.service.session.telemetry_by_session(),
+                sources.board.raw_issues_async(),
+            );
+            let mut sessions = raw_sessions.map_err(dberr)?;
+            let mut telemetry_map = telemetry_map.map_err(dberr)?;
+            for s in &mut sessions {
+                if let Some(tel) = telemetry_map.remove(&s.id) {
+                    s.telemetry = Some(tel);
+                }
+            }
             let input = SessionInput {
-                sessions: raw_sessions.map_err(dberr)?,
+                sessions,
                 issues: raw_issues.map_err(|e| e.to_string())?,
                 machines: sources.ctx.live.machines_snapshot(),
             };

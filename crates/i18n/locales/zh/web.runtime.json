@@ -151,6 +151,17 @@
   "remoteSummary": "运行在 {machine} 上，由该执行主机托管。",
   "sessions": "相关会话",
   "noSessions": "暂无活跃或最近的会话。",
+  "stats": {
+    "title": "近期运行统计",
+    "runs": "近期轮次",
+    "sessions": "{n} 个会话",
+    "failureRate": "失败率",
+    "retryRate": "重试率",
+    "failuresDetail": "{failed} 失败 · {errors} 次错误",
+    "retriesDetail": "{retried} 个会话 · {retries} 次重试",
+    "cumulativeSpend": "累计用量与花费",
+    "empty": "该引擎暂无近期运行记录。"
+  },
   "quickActions": "快捷操作",
   "installation": "安装与路径",
   "source": "安装方式",
