@@ -250,7 +250,8 @@ pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalle
         | HostOp::AppletList
         | HostOp::AppletInstall(_)
         | HostOp::AppletUninstall(_)
-        | HostOp::AppletOpen(_) => None,
+        | HostOp::AppletOpen(_)
+        | HostOp::CaptureWebView(_) => None,
     }
 }
 

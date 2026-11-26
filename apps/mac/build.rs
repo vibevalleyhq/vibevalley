@@ -10,6 +10,7 @@ use std::process::Command;
 
 fn main() {
     build_audio();
+    build_webview_capture();
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let repo = manifest.join("../..").canonicalize().unwrap();
     let ui = manifest.join("ui");
@@ -171,5 +172,47 @@ fn build_audio() {
     println!("cargo:rustc-link-search=native={}", out.display());
     println!("cargo:rustc-link-lib=static=vibevalley_audio");
     println!("cargo:rustc-link-lib=framework=AVFoundation");
+    println!("cargo:rustc-link-lib=framework=Foundation");
+}
+
+fn build_webview_capture() {
+    let out = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    let object = out.join("webview_capture.o");
+    let archive = out.join("libvibevalley_webview_capture.a");
+    println!("cargo:rerun-if-changed=src/webview_capture.m");
+    let arch = match std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() {
+        Ok("aarch64") => "arm64",
+        Ok("x86_64") => "x86_64",
+        other => panic!("unsupported macOS architecture: {other:?}"),
+    };
+    let status = Command::new("/usr/bin/clang")
+        .args(["-arch", arch])
+        .args([
+            "-fobjc-arc",
+            "-fblocks",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-Wno-unused-parameter",
+            "-c",
+            "src/webview_capture.m",
+            "-o",
+        ])
+        .arg(&object)
+        .status()
+        .expect("compile the WebKit capture adapter");
+    assert!(status.success(), "the WebKit capture adapter did not compile");
+    let status = Command::new("/usr/bin/ar")
+        .arg("rcs")
+        .arg(&archive)
+        .arg(&object)
+        .status()
+        .expect("archive the WebKit capture adapter");
+    assert!(status.success(), "the WebKit capture adapter was not archived");
+    println!("cargo:rustc-link-search=native={}", out.display());
+    println!("cargo:rustc-link-lib=static=vibevalley_webview_capture");
+    println!("cargo:rustc-link-lib=framework=WebKit");
+    println!("cargo:rustc-link-lib=framework=AppKit");
+    println!("cargo:rustc-link-lib=framework=CoreGraphics");
     println!("cargo:rustc-link-lib=framework=Foundation");
 }

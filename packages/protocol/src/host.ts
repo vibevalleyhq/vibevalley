@@ -125,6 +125,25 @@ export interface ArtifactApplets {
   readonly open: (artifactId: string) => Promise<AppletOpenResult>;
 }
 
+export interface HostCapturedImage {
+  readonly mime: string;
+  readonly data: string;
+  readonly width: number;
+  readonly height: number;
+}
+
+export const HostCapturedImage = z.object({
+  mime: z.string(),
+  data: z.string(),
+  width: z.number(),
+  height: z.number(),
+}) satisfies Codec<HostCapturedImage>;
+
+export interface HostCaptureWebViewOptions {
+  readonly width?: number;
+  readonly height?: number;
+}
+
 export interface Opening {
   readonly phase: "connecting" | "reading" | "loading" | "ready" | "waiting" | "failed";
   readonly progress: number;
@@ -151,6 +170,7 @@ export interface Host {
   readonly update?: Updates;
   readonly commandLine?: CommandLine;
   readonly applet?: ArtifactApplets;
+  readonly captureWebView?: (options?: HostCaptureWebViewOptions) => Promise<HostCapturedImage | null>;
 }
 
 declare global {

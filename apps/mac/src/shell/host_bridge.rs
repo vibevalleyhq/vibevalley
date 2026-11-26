@@ -643,6 +643,10 @@ impl Shell {
                 );
                 return;
             }
+            HostOp::CaptureWebView(req) => {
+                crate::capture::capture_webview_for_reply(window, req.width, req.height, reply, cx);
+                return;
+            }
             stateless @ (HostOp::Sha256(_) | HostOp::RandomBytes(_) | HostOp::Qr(_)) => {
                 crate::host::handle_stateless_op(&stateless).expect("stateless HostOp handled")
             }
@@ -720,7 +724,7 @@ fn host_info_payload(settings: &crate::theme::Settings, fonts: &[String]) -> Val
         "uiFontSize": settings.ui_font_size,
         "theme": settings.theme.as_str(),
         "motion": settings.effective_motion().as_str(),
-        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "assetsDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet"],
+        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "assetsDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet", "captureWebView"],
     })
 }
 
@@ -751,6 +755,7 @@ mod tests {
             let caps = info["capabilities"].as_array().expect("capabilities array");
             assert!(caps.iter().any(|c| c == "theme"));
             assert!(caps.iter().any(|c| c == "applet"));
+            assert!(caps.iter().any(|c| c == "captureWebView"));
             assert!(!caps.iter().any(|c| c == "seekAudio" || c == "pcm"));
         }
     }
