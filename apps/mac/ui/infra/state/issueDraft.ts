@@ -8,5 +8,5 @@ export interface PendingNewIssueDraft {
   readonly repo?: string;
 }
 
-/** Prefilled issue draft handed off from a channel message when promoting to a ticket. */
+/** Prefilled issue draft handed off from a channel message when promoting to an issue. */
 export const pendingNewIssue = defineAtom<PendingNewIssueDraft | undefined>(undefined);

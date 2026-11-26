@@ -269,6 +269,7 @@
 | `defineIntent` | `state/intent.ts` |  |
 | `sendReplacing` | `state/intent.ts` | A setting the user changes again before the first change showed (a reaction off and on, a level picked twice). |
 | `useIntents` | `state/intent.ts` | A type's intents in the page's registry, with the list as an accessor. |
+| `pendingNewIssue` | `state/issueDraft.ts` | Prefilled issue draft handed off from a channel message when promoting to an issue. |
 | `ScaleValues` | `state/prefs.ts` | The workbench's size, in percent; the farm keeps its own whole-number scaling. |
 | `StartValues` | `state/prefs.ts` | Where / opens. |
 | `prefsNow` | `state/prefs.ts` | The choices now; read in a computation or a component, it follows them. |
