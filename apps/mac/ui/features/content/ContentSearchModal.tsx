@@ -8,13 +8,14 @@ import { Dialog } from "../../design/Dialog";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
 import { Kbd } from "../../design/layout";
+import { Segmented } from "../../design/Segmented";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { spelled } from "../../infra/base/search";
 import { ready, useQuery } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
-import { closeContentSearch, contentBrowseBucket, contentFocusMediaId, contentSearchOpen, mediaKindOf } from "../../infra/state/contentNav";
+import { closeContentSearch, contentBrowseBucket, contentFocusMediaId, contentSearchOpen, isPinned, mediaKindOf } from "../../infra/state/contentNav";
 import { artifactHref, artifactIcon, kindLabel, useArtifacts } from "../artifact";
 import { libraryQuery } from "../media";
 
@@ -65,16 +66,18 @@ function SearchBody() {
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
 
   const query = signal("");
+  const scope = signal<"all" | "artifacts" | "media">("all");
   const active = signal(0);
 
   const hits = createMemo((): readonly SearchHit[] => {
     const q = query().trim().toLowerCase();
-    const allArtifacts = ready(artifacts, undefined) ?? [];
-    const allMedia = ready(media, undefined) ?? [];
+    const curScope = scope();
+    const allArtifacts = curScope === "media" ? [] : (ready(artifacts, undefined) ?? []);
+    const allMedia = curScope === "artifacts" ? [] : (ready(media, undefined) ?? []);
     const currentNow = now();
 
     const artifactHits: SearchHit[] = allArtifacts
-      .filter((a) => !q || spelled(a.title, q) || spelled(kindLabel(a), q))
+      .filter((a) => !q || spelled(a.title, q) || spelled(kindLabel(a), q) || spelled(a.byName, q) || a.artifactType.toLowerCase().includes(q))
       .map((a) => ({
         key: `artifact:${a.id}`,
         kind: "artifact",
@@ -175,6 +178,23 @@ function SearchBody() {
         </If>
       </View>
 
+      <View class="flex-row items-center justify-between gap-2">
+        <Segmented
+          testid="content-search-scope"
+          label={t("web.library.content.search.title")}
+          value={scope()}
+          onChange={(v) => {
+            scope.set(v);
+            active.set(0);
+          }}
+          options={[
+            { value: "all", label: t("web.library.content.search.scopeAll") },
+            { value: "artifacts", label: t("web.library.content.search.scopeArtifacts") },
+            { value: "media", label: t("web.library.content.search.scopeMedia") },
+          ]}
+        />
+      </View>
+
       <Scroll accessibilityLabel={t("web.library.content.search.title")} style={{ maxHeight: Math.max(240, windowSize().height * 0.54) }} contentClass="gap-1">
         <If when={hits().length === 0}>
           <Text class="px-2 py-6 text-center text-sm text-muted">{t("web.library.content.search.empty")}</Text>
@@ -197,6 +217,9 @@ function SearchBody() {
                   <Text class="truncate text-sm font-medium text-ink">{hit().title}</Text>
                   <Text class="truncate text-xs text-muted">{hit().subtitle}</Text>
                 </View>
+                <If when={isPinned(hit().key)}>
+                  <Icon name="pin" size={11} tone="wheat" />
+                </If>
                 <View class="shrink-0 rounded-sm border border-line bg-side px-1.5 py-0.5">
                   <Text class="text-2xs font-medium text-muted">{hit().badge}</Text>
                 </View>

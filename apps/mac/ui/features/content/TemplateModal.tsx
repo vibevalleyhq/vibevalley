@@ -11,12 +11,21 @@ import { Quiet } from "../../design/layout";
 import { motionClass } from "../../design/motion";
 import { Segmented } from "../../design/Segmented";
 import { mix } from "../../design/tone";
-import { spelled } from "../../infra/base/search";
 import { ready, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { closeTemplatePicker, type TemplateCategory, templatePickerState } from "../../infra/state/contentNav";
 import { useArtifacts } from "../artifact";
-import { CONTENT_TEMPLATES, type ContentTemplate, createFromTemplate, TEMPLATE_CATEGORIES, templateDesc, templateIcon, templateName } from "./templates";
+import {
+  CONTENT_TEMPLATES,
+  type ContentTemplate,
+  createFromTemplate,
+  TEMPLATE_CATEGORIES,
+  templateBadge,
+  templateDesc,
+  templateIcon,
+  templateMatchesQuery,
+  templateName,
+} from "./templates";
 
 export function TemplateModal() {
   const state = () => templatePickerState.get();
@@ -36,12 +45,19 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
   const query = signal("");
 
   const filtered = computed(() => {
-    const q = query().trim().toLowerCase();
+    const q = query().trim();
     return CONTENT_TEMPLATES.filter((tpl) => {
-      const catMatch = q ? true : category() === "recommended" ? tpl.recommended : tpl.category === category();
+      const catMatch = q
+        ? true
+        : category() === "recommended"
+          ? tpl.recommended
+          : category() === "apps"
+            ? tpl.standaloneApp === true
+            : category() === "engineering"
+              ? tpl.engineering === true
+              : tpl.category === category();
       if (!catMatch) return false;
-      if (!q) return true;
-      return spelled(templateName(tpl), q) || spelled(templateDesc(tpl), q);
+      return templateMatchesQuery(tpl, q);
     });
   });
   const hasFiltered = computed(() => filtered().length > 0);
@@ -62,19 +78,31 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
       <View class="flex-row flex-wrap items-center gap-2.5">
         <SearchField
           testid="content-template-search"
+          autoFocus
           value={query()}
           onInput={(v) => query.set(v)}
+          onSubmit={() => {
+            const first = filtered().at(0);
+            if (first !== undefined) pick(first);
+          }}
           placeholder={t("web.library.content.templates.search")}
           label={t("web.library.content.templates.search")}
           class="w-60 min-w-44"
         />
-        <Segmented
-          testid="content-template-category"
-          label={t("web.library.content.templates.title")}
-          value={category()}
-          onChange={(v) => category.set(v)}
-          options={categoryOptions}
-        />
+        <View class={query().trim().length > 0 ? "opacity-50" : undefined}>
+          <Segmented
+            testid="content-template-category"
+            label={t("web.library.content.templates.title")}
+            value={category()}
+            onChange={(v) => category.set(v)}
+            options={categoryOptions}
+          />
+        </View>
+        <If when={query().trim().length > 0}>
+          <Text testID="content-template-search-count" class="text-xs text-muted tabular-nums">
+            {t("web.library.content.templates.searchCount", { n: filtered().length })}
+          </Text>
+        </If>
       </View>
 
       <Scroll style={{ maxHeight: Math.max(280, windowSize().height * 0.62) }} contentClass="pb-1">
@@ -111,7 +139,7 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
 function TemplatePreview(props: { tpl: ContentTemplate }) {
   const tpl = () => props.tpl;
   return (
-    <View class="h-20 w-full items-center justify-center border-b border-line bg-side px-4 py-2.5">
+    <View class="relative h-20 w-full items-center justify-center border-b border-line bg-side px-4 py-2.5">
       <If when={tpl().kind === "note"}>
         <View class="h-full w-full justify-center gap-1.5 rounded-sm border border-line bg-page px-3 py-2">
           <View class="flex-row items-center gap-1.5">
@@ -163,11 +191,22 @@ function TemplatePreview(props: { tpl: ContentTemplate }) {
           </View>
         </View>
       </If>
+
+      <View class="absolute top-1.5 right-1.5 flex-row items-center gap-1">
+        <If when={tpl().standaloneApp === true}>
+          <View class="size-5 items-center justify-center rounded-sm border border-line bg-page">
+            <Icon name="devices" size={12} tone="accent" />
+          </View>
+        </If>
+        <View class="rounded-sm border border-line bg-page px-1.5 py-0.5">
+          <Text class="text-2xs font-medium text-muted">{templateBadge(tpl())}</Text>
+        </View>
+      </View>
     </View>
   );
 }
 
-type DeliverablePreviewKind = "design-system" | "dashboard" | "slides" | "design" | "motion" | "prototype" | "document";
+type DeliverablePreviewKind = "design-system" | "dashboard" | "slides" | "design" | "motion" | "prototype" | "diagram" | "sheet" | "storyboard" | "document";
 
 function deliverablePreviewKind(type: ArtifactType): DeliverablePreviewKind {
   switch (type) {
@@ -177,13 +216,13 @@ function deliverablePreviewKind(type: ArtifactType): DeliverablePreviewKind {
     case "design":
     case "motion":
     case "prototype":
+    case "diagram":
+    case "sheet":
+    case "storyboard":
       return type;
     case "docs":
     case "outline":
     case "whiteboard":
-    case "sheet":
-    case "diagram":
-    case "storyboard":
       return "document";
   }
 }
@@ -260,6 +299,56 @@ function DeliverablePreview(props: { tpl: ContentTemplate }) {
           <View class="flex-1 items-center justify-center gap-1.5 px-3">
             <View class="h-2 w-24 rounded-xs bg-ink opacity-70" />
             <View class="h-2.5 w-14 rounded-xs bg-accent" />
+          </View>
+        </View>
+      </If>
+      <If when={previewKind() === "diagram"}>
+        <View class="h-full w-full flex-row items-center justify-center gap-1.5">
+          <View class="h-7 w-10 items-center justify-center rounded-sm border border-line bg-page">
+            <View class="h-1.5 w-5 rounded-xs bg-ink opacity-70" />
+          </View>
+          <View class="h-0.5 w-3 bg-accent" />
+          <View class="h-7 w-10 items-center justify-center rounded-sm border border-accent bg-ok-soft">
+            <View class="h-1.5 w-5 rounded-xs bg-ok-ink opacity-80" />
+          </View>
+          <View class="h-0.5 w-3 bg-water" />
+          <View class="h-7 w-10 items-center justify-center rounded-sm border border-line bg-page">
+            <View class="h-1.5 w-5 rounded-xs bg-water opacity-80" />
+          </View>
+        </View>
+      </If>
+      <If when={previewKind() === "sheet"}>
+        <View class="h-full w-40 justify-center gap-1 rounded-sm border border-line bg-page p-2">
+          <View class="flex-row gap-1 border-b border-line pb-1">
+            <View class="h-1.5 flex-1 rounded-xs bg-accent opacity-75" />
+            <View class="h-1.5 flex-1 rounded-xs bg-ink opacity-60" />
+            <View class="h-1.5 flex-1 rounded-xs bg-ink opacity-60" />
+          </View>
+          <View class="flex-row gap-1">
+            <View class="h-1.5 flex-1 rounded-xs bg-faint opacity-50" />
+            <View class="h-1.5 flex-1 rounded-xs bg-faint opacity-45" />
+            <View class="h-1.5 flex-1 rounded-xs bg-ok-soft" />
+          </View>
+          <View class="flex-row gap-1">
+            <View class="h-1.5 flex-1 rounded-xs bg-faint opacity-50" />
+            <View class="h-1.5 flex-1 rounded-xs bg-faint opacity-45" />
+            <View class="h-1.5 flex-1 rounded-xs bg-wheat opacity-65" />
+          </View>
+        </View>
+      </If>
+      <If when={previewKind() === "storyboard"}>
+        <View class="h-full w-full flex-row items-center justify-center gap-1.5">
+          <View class="h-11 w-12 justify-between rounded-sm border border-line bg-page p-1">
+            <View class="h-5 rounded-xs bg-selected" />
+            <View class="h-1 w-6 rounded-xs bg-faint opacity-50" />
+          </View>
+          <View class="h-11 w-12 justify-between rounded-sm border border-accent bg-page p-1">
+            <View class="h-5 rounded-xs bg-ok-soft" />
+            <View class="h-1 w-7 rounded-xs bg-accent opacity-70" />
+          </View>
+          <View class="h-11 w-12 justify-between rounded-sm border border-line bg-page p-1">
+            <View class="h-5 rounded-xs bg-selected" />
+            <View class="h-1 w-6 rounded-xs bg-faint opacity-50" />
           </View>
         </View>
       </If>

@@ -10,8 +10,8 @@ use serde_json::{Value, json};
 use vibevalley_diorama::pick::pick;
 use vibevalley_diorama::world::is_cutaway_building;
 use vibevalley_diorama::{
-    AssetBundle, DioramaHit, DioramaWorld, HelperTaskSync, MetalRenderer, PlotStage, PlotTicketSync, RenderQuality, RenderSceneInput, ScreenAnchor, TimeOfDay,
-    YardSnapshotSync, prepare_scene_input,
+    AssetBundle, DioramaHit, DioramaWorld, DofMode, HelperTaskSync, MetalRenderer, PlotStage, PlotTicketSync, RenderQuality, RenderSceneInput, ScreenAnchor,
+    TimeOfDay, YardSnapshotSync, prepare_scene_input,
 };
 use vibevalley_protocol::{
     Agent, BoardSlice, CallState, CollabSlice, Crop, FarmFrame, GameEffect, InboxSlice, Issue, IssueStage, IssueStageKind, SessionView, SessionsSlice,
@@ -23,6 +23,7 @@ use super::phone::Phone;
 
 const IDLE_PACE_MS: u64 = 66;
 const ACTIVE_PACE_MS: u64 = 16;
+const CAMERA_SETTLE: Duration = Duration::from_millis(300);
 const ACTIVE_WINDOW: Duration = Duration::from_secs(2);
 const ANCHOR_SYNC_INTERVAL: Duration = Duration::from_millis(250);
 
@@ -104,7 +105,7 @@ pub struct TelemetrySnapshot {
 pub struct RenderedFrame {
     pub width: u32,
     pub height: u32,
-    pub rgba: PooledFrameBuf,
+    pub bgra: PooledFrameBuf,
     pub telemetry: TelemetrySnapshot,
 }
 
@@ -178,14 +179,14 @@ impl RenderWorker {
             if !alive.load(Ordering::Acquire) {
                 return;
             }
-            if let Ok((stats, rgba_vec)) = guard.render_scene_input_with_buf(&req.scene_input, req.width, req.height, req.quality, reuse_buf)
+            if let Ok((stats, bgra)) = guard.render_bgra_with_buf(&req.scene_input, req.width, req.height, req.quality, reuse_buf)
                 && let Ok(mut out) = completed.lock()
             {
                 *out = Some(RenderedFrame {
                     width: req.width,
                     height: req.height,
-                    rgba: PooledFrameBuf {
-                        data: Some(rgba_vec),
+                    bgra: PooledFrameBuf {
+                        data: Some(bgra),
                         pool: buf_pool,
                         expected_bytes,
                     },
@@ -237,6 +238,7 @@ pub struct DioramaScene {
     latest_frame: Option<RenderedFrame>,
     last_tick: Instant,
     last_activity: Instant,
+    last_camera_motion: Instant,
     last_submit: Instant,
     last_anchors_at: Instant,
     heard_farm: Option<u64>,
@@ -273,6 +275,7 @@ impl DioramaScene {
             latest_frame: None,
             last_tick: now,
             last_activity: now,
+            last_camera_motion: now,
             last_submit: now.checked_sub(Duration::from_millis(100)).unwrap_or(now),
             last_anchors_at: now.checked_sub(ANCHOR_SYNC_INTERVAL).unwrap_or(now),
             heard_farm: None,
@@ -308,9 +311,9 @@ impl DioramaScene {
         self.toast.as_ref().map(|(m, _)| m.as_str())
     }
 
-    pub fn set_time_of_day(&mut self, tod: TimeOfDay) {
+    pub fn set_time_of_day(&mut self, tod: TimeOfDay, snap: bool) {
         self.manual_tod = Some(tod);
-        self.world.set_time_of_day(tod, false);
+        self.world.set_time_of_day(tod, snap);
         self.touch();
     }
 
@@ -549,14 +552,21 @@ impl DioramaScene {
         });
     }
 
-    pub fn tick_and_submit(&mut self, view_w: f32, view_h: f32, scale_factor: f32, active: bool) {
-        self.view_size = (view_w.max(1.0), view_h.max(1.0));
+    pub fn tick_and_submit(&mut self, view_w: f32, view_h: f32, scale_factor: f32, active: bool, animate: bool) {
         let now = Instant::now();
-        let dt = now.duration_since(self.last_tick).as_secs_f32().clamp(0.0, 0.05);
+        let size = (view_w.max(1.0), view_h.max(1.0));
+        if self.view_size != size || self.world.camera.is_moving() {
+            self.last_camera_motion = now;
+        }
+        self.view_size = size;
+        let dt = now.duration_since(self.last_tick).as_secs_f32();
         self.last_tick = now;
 
         self.phone.tick(now);
         self.world.step(dt);
+        if !animate {
+            self.world.settle_view();
+        }
         self.refresh_anchors(false);
 
         let Some(worker) = &self.worker else { return };
@@ -582,9 +592,14 @@ impl DioramaScene {
             return;
         }
 
-        let (rw, rh) = align_render_dims(view_w, view_h, scale_factor);
+        let settled = !animate || (self.latest_frame.is_some() && now.duration_since(self.last_camera_motion) >= CAMERA_SETTLE);
+        let (rw, rh) = align_render_dims(view_w, view_h, scale_factor, settled);
+        if !animate && !self.changed_since_submit() && (self.last_telemetry.width, self.last_telemetry.height) == (rw, rh) {
+            return;
+        }
         let aspect = self.view_size.0 / self.view_size.1.max(1.0);
-        let scene_input = prepare_scene_input(&self.world, &self.bundle, aspect);
+        let mut scene_input = prepare_scene_input(&self.world, &self.bundle, aspect);
+        scene_input.dof_mode = DofMode::Crisp;
         if worker.submit(RenderRequest {
             scene_input,
             width: rw,
@@ -596,14 +611,24 @@ impl DioramaScene {
     }
 
     pub fn is_active_motion(&self) -> bool {
-        self.latest_frame.is_none()
-            || Instant::now().duration_since(self.last_activity) < ACTIVE_WINDOW
-            || self.world.camera.is_focused()
-            || self.world.roof_cutaway_open()
+        self.latest_frame.is_none() || Instant::now().duration_since(self.last_activity) < ACTIVE_WINDOW || self.world.camera.is_moving()
     }
 
-    pub fn latest_rgba(&self) -> Option<(u32, u32, u64, &[u8])> {
-        self.latest_frame.as_ref().map(|f| (f.width, f.height, self.frame_gen, f.rgba.bytes()))
+    fn changed_since_submit(&self) -> bool {
+        self.last_activity > self.last_submit || self.last_camera_motion > self.last_submit
+    }
+
+    pub fn needs_frame(&self) -> bool {
+        self.latest_frame.is_none()
+            || self.changed_since_submit()
+            || self
+                .worker
+                .as_ref()
+                .is_some_and(|w| w.busy.load(Ordering::Acquire) || w.completed.lock().is_ok_and(|slot| slot.is_some()))
+    }
+
+    pub fn latest_bgra(&self) -> Option<(u32, u32, u64, &[u8])> {
+        self.latest_frame.as_ref().map(|f| (f.width, f.height, self.frame_gen, f.bgra.bytes()))
     }
 
     pub fn hover_at(&mut self, nx: f32, ny: f32) {
@@ -813,13 +838,14 @@ pub fn wall_clock_time_of_day() -> TimeOfDay {
     }
 }
 
-pub fn align_render_dims(view_w: f32, view_h: f32, scale_factor: f32) -> (u32, u32) {
+fn align_render_dims(view_w: f32, view_h: f32, scale_factor: f32, settled: bool) -> (u32, u32) {
+    let (max_w, max_h) = if settled { (2048, 1312) } else { (1280, 832) };
     let scale = scale_factor.clamp(1.0, 2.0);
     let rw = view_w.max(128.0) * scale;
     let rh = view_h.max(96.0) * scale;
-    let cap = (1280.0 / rw).min(832.0 / rh).min(1.0);
-    let w = ((rw * cap).round() as u32 & !1).clamp(128, 1280);
-    let h = ((rh * cap).round() as u32 & !1).clamp(96, 832);
+    let cap = (max_w as f32 / rw).min(max_h as f32 / rh).min(1.0);
+    let w = ((rw * cap).round() as u32 & !1).clamp(128, max_w);
+    let h = ((rh * cap).round() as u32 & !1).clamp(96, max_h);
     (w, h)
 }
 
@@ -903,9 +929,17 @@ mod tests {
     }
 
     #[test]
+    fn regression_retina_view_recovers_detail_after_camera_motion() {
+        assert_eq!(align_render_dims(960.0, 600.0, 2.0, false), (1280, 800));
+        assert_eq!(align_render_dims(960.0, 600.0, 2.0, true), (1920, 1200));
+        assert_eq!(align_render_dims(1800.0, 1125.0, 2.0, true), (2048, 1280));
+        assert_eq!(align_render_dims(960.0, 600.0, 1.0, true), (960, 600));
+    }
+
+    #[test]
     fn align_render_dims_preserves_aspect_and_bounds() {
         for (vw, vh, sf) in [(640.0, 400.0, 1.0), (1100.0, 720.0, 2.0), (2000.0, 1400.0, 2.0), (100.0, 80.0, 1.0)] {
-            let (w, h) = align_render_dims(vw, vh, sf);
+            let (w, h) = align_render_dims(vw, vh, sf, false);
             assert!(w.is_multiple_of(2) && h.is_multiple_of(2));
             assert!((128..=1280).contains(&w));
             assert!((96..=832).contains(&h));

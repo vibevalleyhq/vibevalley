@@ -42,13 +42,12 @@ enum SceneState {
     Ready(Box<DioramaScene>),
 }
 
-/// Uploads the off-thread wgpu RGBA8 framebuffer into a persistent GPUI dynamic texture.
+/// Uploads the off-thread wgpu BGRA8 framebuffer into a persistent GPUI dynamic texture.
 #[derive(Default)]
 struct FrameSurface {
     texture: Option<gpui::DynamicTexture>,
     dims: (u32, u32),
     uploaded_gen: u64,
-    bgra_scratch: Vec<u8>,
 }
 
 impl Drop for FrameSurface {
@@ -60,8 +59,8 @@ impl Drop for FrameSurface {
 }
 
 impl FrameSurface {
-    fn paint_rgba_frame(&mut self, rgba: &[u8], w: u32, h: u32, frame_gen: u64, bounds: Bounds<Pixels>, window: &mut Window) -> bool {
-        if w == 0 || h == 0 || rgba.len() < (w as usize) * (h as usize) * 4 {
+    fn paint_bgra_frame(&mut self, bgra: &[u8], w: u32, h: u32, frame_gen: u64, bounds: Bounds<Pixels>, window: &mut Window) -> bool {
+        if w == 0 || h == 0 || bgra.len() < (w as usize) * (h as usize) * 4 {
             return false;
         }
         if self.dims == (w, h)
@@ -79,17 +78,17 @@ impl FrameSurface {
             self.dims = (w, h);
         }
         let byte_len = (w as usize) * (h as usize) * 4;
-        vibevalley_diorama::rgba_to_bgra(&rgba[..byte_len], &mut self.bgra_scratch);
+        let pixels = &bgra[..byte_len];
         let texture = if let Some(texture) = self.texture {
             if window
-                .update_dynamic_texture(texture, Bounds::new(point(DevicePixels(0), DevicePixels(0)), sz), &self.bgra_scratch, w * 4)
+                .update_dynamic_texture(texture, Bounds::new(point(DevicePixels(0), DevicePixels(0)), sz), pixels, w * 4)
                 .is_err()
             {
                 return false;
             }
             texture
         } else {
-            let Ok(texture) = window.create_dynamic_texture(sz, &self.bgra_scratch, w * 4) else {
+            let Ok(texture) = window.create_dynamic_texture(sz, pixels, w * 4) else {
                 return false;
             };
             self.texture = Some(texture);
@@ -118,6 +117,7 @@ pub struct DioramaView {
     focus: FocusHandle,
     surface: FrameSurface,
     bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
+    display_scale: f32,
     drag_start: Option<Point<Pixels>>,
     drag_last: Option<Point<Pixels>>,
     drag_moved: f32,
@@ -205,6 +205,7 @@ impl DioramaView {
             focus: cx.focus_handle(),
             surface: FrameSurface::default(),
             bounds: Rc::new(Cell::new(None)),
+            display_scale: 1.0,
             drag_start: None,
             drag_last: None,
             drag_moved: 0.0,
@@ -447,7 +448,7 @@ impl DioramaView {
                 x if x < 0.82 => vibevalley_diorama::TimeOfDay::Dusk,
                 _ => vibevalley_diorama::TimeOfDay::Night,
             };
-            d.set_time_of_day(choice);
+            d.set_time_of_day(choice, true);
         }
     }
 
@@ -461,7 +462,7 @@ impl DioramaView {
             json!({
                 "w": f32::from(b.size.width),
                 "h": f32::from(b.size.height),
-                "scale": 1.0,
+                "scale": self.display_scale,
             })
         });
         json!({
@@ -474,14 +475,14 @@ impl DioramaView {
         })
     }
 
-    pub fn draw_unpainted(&mut self) {
+    pub fn draw_unpainted(&mut self, cx: &App) {
         if let SceneState::Ready(d) = &mut self.scene {
             let (vw, vh) = self
                 .bounds
                 .get()
                 .map(|b| (f32::from(b.size.width), f32::from(b.size.height)))
                 .unwrap_or(d.view_size);
-            d.tick_and_submit(vw, vh, 2.0, true);
+            d.tick_and_submit(vw, vh, self.display_scale, true, motion_enabled(cx));
             self.unpainted_draws += 1;
         }
     }
@@ -543,7 +544,7 @@ impl DioramaView {
                     cx.listener(move |v, _, _, cx| {
                         cx.stop_propagation();
                         if let SceneState::Ready(d) = &mut v.scene {
-                            d.set_time_of_day(tod);
+                            d.set_time_of_day(tod, false);
                             cx.notify();
                         }
                     }),
@@ -807,12 +808,16 @@ impl DioramaView {
     }
 }
 
+fn motion_enabled(cx: &App) -> bool {
+    cx.try_global::<crate::theme::Ui>()
+        .is_none_or(|ui| ui.settings.effective_motion() != crate::theme::MotionChoice::Off)
+}
+
 impl Render for DioramaView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.display_scale = window.scale_factor();
         self.mount_sheet(window, cx);
-        let allow_animation = cx
-            .try_global::<crate::theme::Ui>()
-            .is_none_or(|ui| ui.settings.effective_motion() != crate::theme::MotionChoice::Off);
+        let allow_animation = motion_enabled(cx);
         let is_ready = matches!(self.scene, SceneState::Ready(_));
         let mut sounds = Vec::new();
         if let SceneState::Ready(d) = &mut self.scene {
@@ -822,12 +827,12 @@ impl Render for DioramaView {
                 .map(|b| (f32::from(b.size.width), f32::from(b.size.height)))
                 .unwrap_or(d.view_size);
             let active = window.is_window_active();
-            d.tick_and_submit(vw, vh, window.scale_factor(), active);
+            d.tick_and_submit(vw, vh, window.scale_factor(), active, allow_animation);
             sounds.extend(d.drain_sounds());
-            if allow_animation && (active || d.latest_rgba().is_none()) {
-                if d.is_active_motion() {
+            if active || d.latest_bgra().is_none() {
+                if allow_animation && d.is_active_motion() {
                     window.request_animation_frame();
-                } else {
+                } else if allow_animation || d.needs_frame() {
                     self.schedule_pump(cx);
                 }
             }
@@ -854,11 +859,10 @@ impl Render for DioramaView {
                             let vw = f32::from(bounds.size.width);
                             let vh = f32::from(bounds.size.height);
                             if (d.view_size.0 - vw).abs() > 1.0 || (d.view_size.1 - vh).abs() > 1.0 {
-                                d.view_size = (vw.max(1.0), vh.max(1.0));
-                                d.tick_and_submit(vw, vh, window.scale_factor(), window.is_window_active());
+                                d.tick_and_submit(vw, vh, window.scale_factor(), window.is_window_active(), allow_animation);
                             }
-                            if let Some((w, h, frame_gen, rgba)) = d.latest_rgba() {
-                                surface.paint_rgba_frame(rgba, w, h, frame_gen, bounds, window);
+                            if let Some((w, h, frame_gen, bgra)) = d.latest_bgra() {
+                                surface.paint_bgra_frame(bgra, w, h, frame_gen, bounds, window);
                             }
                         }
                         v.surface = surface;
@@ -908,22 +912,22 @@ impl Render for DioramaView {
                         cx.notify();
                     }
                     "1" => {
-                        d.set_time_of_day(vibevalley_diorama::TimeOfDay::Dawn);
+                        d.set_time_of_day(vibevalley_diorama::TimeOfDay::Dawn, false);
                         cx.stop_propagation();
                         cx.notify();
                     }
                     "2" => {
-                        d.set_time_of_day(vibevalley_diorama::TimeOfDay::Noon);
+                        d.set_time_of_day(vibevalley_diorama::TimeOfDay::Noon, false);
                         cx.stop_propagation();
                         cx.notify();
                     }
                     "3" => {
-                        d.set_time_of_day(vibevalley_diorama::TimeOfDay::Dusk);
+                        d.set_time_of_day(vibevalley_diorama::TimeOfDay::Dusk, false);
                         cx.stop_propagation();
                         cx.notify();
                     }
                     "4" => {
-                        d.set_time_of_day(vibevalley_diorama::TimeOfDay::Night);
+                        d.set_time_of_day(vibevalley_diorama::TimeOfDay::Night, false);
                         cx.stop_propagation();
                         cx.notify();
                     }

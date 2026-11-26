@@ -34,6 +34,8 @@ test("StandaloneArtifactPage renders chromeless artifact view without workbench 
   await fake.pumpUntil(app, () => app.count("id:standalone-artifact-title") === 1);
   expect(app.count("id:standalone-artifact-page")).toBe(1);
   expect(app.count("id:standalone-artifact-header")).toBe(1);
+  expect(app.count("id:artifact-collab-bar")).toBe(0);
+  expect(app.count("id:artifact-view-mode")).toBe(1);
   expect(app.count("id:rail")).toBe(0);
   expect(app.count("id:artifacts")).toBe(0);
   expect(app.count("id:content-sidebar")).toBe(0);
@@ -150,4 +152,40 @@ test("InstallAppletModal surfaces install errors and wires ArtifactCanvas button
   const browser = await mountRoute("/artifacts/art-launch-board", undefined, { view: undefined });
   await browser.fake.pumpUntil(browser.app, () => browser.app.count("id:artifact-header") === 1);
   expect(browser.app.count("id:artifact-install-applet")).toBe(0);
+});
+
+test("Content Hub provides per-card install-as-app actions and dedicated Installed Apps bucket", async () => {
+  setLocale("en");
+  const { app, fake } = await mountRoute("/library");
+
+  await fake.pumpUntil(app, () => app.count("id:content-nav-apps") === 1 && app.count("id:library-artifact-art-launch-board") === 1);
+  expect(app.count("id:library-artifact-install-app-art-launch-board")).toBe(1);
+  expect(app.count("id:library-artifact-install-app-art-login")).toBe(1);
+
+  await app.press("id:content-nav-apps");
+  await fake.pumpUntil(app, () => app.count("id:library-apps-empty") === 1);
+  expect(app.texts()).toContain(t("web.library.content.installedAppsEmpty"));
+
+  await app.press("id:content-nav-recent");
+  await fake.pumpUntil(app, () => app.count("id:library-artifact-install-app-art-launch-board") === 1);
+
+  await app.press("id:library-artifact-install-app-art-launch-board");
+  await fake.pumpUntil(app, () => app.count("id:install-applet-modal") === 1);
+  await app.press("id:install-applet-submit");
+  await fake.pumpUntil(app, () => app.count("id:install-applet-meta") === 1);
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => app.count("id:install-applet-modal") === 0);
+
+  await app.press("id:content-nav-apps");
+  await fake.pumpUntil(app, () => app.count("id:library-artifact-art-launch-board") === 1);
+  expect(app.count("id:library-artifact-art-login")).toBe(0);
+  expect(app.count("id:library-artifact-open-app-art-launch-board")).toBe(1);
+  expect(app.count("id:library-artifact-manage-app-art-launch-board")).toBe(1);
+
+  await app.press("id:library-artifact-open-app-art-launch-board");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "host.appletOpen"));
+  expect(fake.calls.findLast((c) => c.op === "host.appletOpen")?.payload).toEqual({ artifactId: "art-launch-board" });
+
+  await app.press("id:content-nav-recent");
+  await fake.pump(app);
 });

@@ -16,7 +16,7 @@ import { Button } from "../../design/Button";
 import { TextArea, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
-import { Banner, Empty } from "../../design/layout";
+import { Banner } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { toast } from "../../design/toasts";
 import { tone } from "../../design/tone";
@@ -24,9 +24,28 @@ import { api } from "../../infra/api";
 import { useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { buildPrototypeDocument } from "./frame";
-import { entryPathOf, type OutlineDocument, type OutlineNode } from "./html";
+import { entryPathOf, type OutlineDocument } from "./html";
 import { presenterHref } from "./slides";
-import { exportCsvFile, formatCellValue, useArtifactDirectory, useArtifactPresence, useArtifactSuggestions, useReportViewContext } from "./store";
+import { exportCsvFile, useArtifactDirectory, useArtifactPresence, useArtifactSuggestions, useReportViewContext } from "./store";
+import { DesignSystemView } from "./views/DesignSystemView";
+import { DesignView } from "./views/DesignView";
+import { DocsView } from "./views/DocsView";
+import { MotionView } from "./views/MotionView";
+import { OutlineView } from "./views/OutlineView";
+import {
+  asNumber,
+  asRecordArray,
+  asString,
+  parseDesignFrame,
+  parseDesignSystem,
+  parseJsonObject,
+  parseOutlineDoc,
+  parseStoryboard,
+} from "./views/previewModel";
+import { PrototypeView } from "./views/PrototypeView";
+import { type SlideItem, SlidesView } from "./views/SlidesView";
+import { StoryboardView } from "./views/StoryboardView";
+import { DashboardView, DiagramView, type SheetTab, SheetView } from "./views/StructuredViews";
 import { WhiteboardView } from "./WhiteboardView";
 
 export type ArtifactViewTab = "preview" | "files";
@@ -48,70 +67,6 @@ export interface ArtifactDirectoryViewProps {
   readonly onMeta?: ((meta: ArtifactDirectoryMeta) => void) | undefined;
   readonly onPresent?: ((on: boolean) => void) | undefined;
   readonly onOpenChat?: (() => void) | undefined;
-}
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-function parseJsonObject(raw: string | undefined): Record<string, unknown> | undefined {
-  if (!raw) return undefined;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return isRecord(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function asString(v: unknown, fallback = ""): string {
-  return typeof v === "string" ? v : fallback;
-}
-
-function asNumber(v: unknown, fallback = 0): number {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
-}
-
-function asRecordArray(v: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(v)) return [];
-  return v.filter(isRecord);
-}
-
-function parseOutlineDoc(raw: string | undefined): OutlineDocument {
-  const obj = parseJsonObject(raw);
-  if (!obj) return { version: 1, rootIds: [], nodes: {} };
-  const rootIds = Array.isArray(obj.rootIds) ? obj.rootIds.filter((x): x is string => typeof x === "string") : [];
-  const rawNodes = isRecord(obj.nodes) ? obj.nodes : {};
-  const nodes: Record<string, OutlineNode> = {};
-  for (const [id, val] of Object.entries(rawNodes)) {
-    if (!isRecord(val)) continue;
-    const rawKind = val.kind;
-    const kind: OutlineNode["kind"] = rawKind === "heading" || rawKind === "todo" ? rawKind : "bullet";
-    const children = Array.isArray(val.children) ? val.children.filter((x): x is string => typeof x === "string") : [];
-    nodes[id] = {
-      id: asString(val.id, id),
-      text: asString(val.text),
-      kind,
-      ...(typeof val.checked === "boolean" ? { checked: val.checked } : {}),
-      children,
-    };
-  }
-  return { version: asNumber(obj.version, 1), rootIds, nodes };
-}
-
-function flattenOutline(doc: OutlineDocument): { readonly node: OutlineNode; readonly depth: number }[] {
-  const out: { readonly node: OutlineNode; readonly depth: number }[] = [];
-  const visited = new Set<string>();
-  const walk = (id: string, depth: number) => {
-    if (visited.has(id)) return;
-    visited.add(id);
-    if (!Object.hasOwn(doc.nodes, id)) return;
-    const node = doc.nodes[id];
-    out.push({ node, depth });
-    for (const child of node.children) walk(child, depth + 1);
-  };
-  for (const id of doc.rootIds) walk(id, 0);
-  return out;
 }
 
 export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
@@ -138,6 +93,8 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   const lastLoadedHash = signal<string | undefined>(undefined);
   const newFilePath = signal("");
   const addingFile = signal(false);
+  const deletingPath = signal<string | undefined>(undefined);
+  const fileHtmlMode = signal<"code" | "preview">("code");
   const slideIndex = signal(0);
   const activeSheetIndex = signal(0);
   const activeFramePath = signal<string | undefined>(undefined);
@@ -172,7 +129,6 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   // Report live view context for Chat/Orchestrator messages (skip for whiteboard since WhiteboardView reports its own).
   effect(() => {
     if (props.artifact.artifactType === "whiteboard" && tab() === "preview") return;
-    // Also publish lightweight selection presence when switching active files.
     const path = activePath();
     if (props.version === undefined && path) {
       presence.publish({
@@ -228,7 +184,6 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
     });
   };
 
-  // Tab accepts and Esc rejects the active open suggestion when not typing in an input.
   effect(() => {
     const sug = topSuggestion();
     if (!sug) return;
@@ -243,6 +198,10 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
 
   const selectFile = (path: string) => {
     selectedPath.set(path);
+    deletingPath.set(undefined);
+    if (!/\.(?:html|htm)$/iu.test(path)) {
+      fileHtmlMode.set("code");
+    }
     if (!snapshot().contents.has(path)) {
       void client().readFile(path);
     }
@@ -264,6 +223,12 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
     });
   };
 
+  const canSaveFilesShortcut = computed(() => tab() === "files" && props.version === undefined && dirty() && !act.busy());
+  effect(() => {
+    if (!canSaveFilesShortcut()) return;
+    return keymap.bind("mod+s", () => saveActiveFile(), { when: "always" });
+  });
+
   const createNewFile = () => {
     const raw = newFilePath().trim();
     if (!raw) return;
@@ -280,6 +245,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
 
   const deleteSelectedFile = (path: string) => {
     if (path === "manifest.json" || path === primaryEntry()) return;
+    deletingPath.set(undefined);
     void act.run(async () => {
       await client().deleteFile(path, { summary: `Delete ${path}` });
       if (selectedPath() === path) selectedPath.set(primaryEntry());
@@ -291,7 +257,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
     void act.run(async () => {
       const updated = await api.artifact.version.create({
         id: props.artifact.id,
-        note: "Snapshot",
+        note: t("web.artifact.page.snapshotNote"),
       });
       await queries.invalidate({ prefix: ["artifacts"] });
       toast(t("web.artifact.edit.saved", { version: updated.version }));
@@ -314,11 +280,10 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   // Derived structured views for the 12 artifact types.
   const docsContent = computed(() => snapshot().contents.get(ARTIFACT_TYPE_SPECS.docs.entryPath)?.content ?? "");
   const outlineDoc = computed(() => parseOutlineDoc(snapshot().contents.get(ARTIFACT_TYPE_SPECS.outline.entryPath)?.content));
-  const outlineRows = computed(() => flattenOutline(outlineDoc()));
 
   const slidesDeck = computed(() => {
     const deckObj = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS.slides.entryPath)?.content);
-    const slides = asRecordArray(deckObj?.slides).map((s, idx) => {
+    const slides: SlideItem[] = asRecordArray(deckObj?.slides).map((s, idx) => {
       const file = asString(s.file);
       const slideData = parseJsonObject(file ? snapshot().contents.get(file)?.content : undefined);
       return {
@@ -345,9 +310,15 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
       .filter((f) => f.path.startsWith("structure/data/"))
       .map((f) => {
         const parsed = parseJsonObject(snapshot().contents.get(f.path)?.content);
+        const schema = asRecordArray(parsed?.schema).map((s) => ({
+          name: asString(s.name),
+          label: asString(s.label, asString(s.name)),
+          type: asString(s.type, "string"),
+        }));
         const rows = asRecordArray(parsed?.rows);
-        const cols = rows.length > 0 ? [...new Set(rows.slice(0, 50).flatMap((r) => Object.keys(r)))] : [];
-        return { path: f.path, name: f.path.slice("structure/data/".length), rows, cols };
+        const cols =
+          schema.length > 0 ? schema.map((s) => s.name).filter(Boolean) : rows.length > 0 ? [...new Set(rows.slice(0, 50).flatMap((r) => Object.keys(r)))] : [];
+        return { path: f.path, name: f.path.slice("structure/data/".length), schema, rows, cols };
       });
     return { title: asString(obj?.title, props.artifact.title), panels, datasets };
   });
@@ -380,52 +351,22 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   const designFrames = computed(() =>
     sortedFiles()
       .filter((f) => f.path.startsWith("structure/frames/") && f.path.endsWith(".json"))
-      .map((f) => {
-        const obj = parseJsonObject(snapshot().contents.get(f.path)?.content);
-        return {
-          path: f.path,
-          id: asString(obj?.id, f.path),
-          name: asString(obj?.name, f.path),
-          width: asNumber(obj?.width, 1280),
-          height: asNumber(obj?.height, 800),
-          background: asString(obj?.background, tone("page")),
-          nodes: asRecordArray(obj?.nodes),
-        };
-      }),
+      .map((f) => parseDesignFrame(f.path, snapshot().contents.get(f.path)?.content)),
   );
 
-  const designSystemData = computed(() => {
-    const obj = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS["design-system"].entryPath)?.content);
-    const colorObj = isRecord(obj?.color) ? obj.color : {};
-    const colors = Object.entries(colorObj).map(([name, val]) => {
-      if (isRecord(val)) {
-        return { name, light: asString(val.light), dark: asString(val.dark) };
-      }
-      return { name, light: asString(val), dark: asString(val) };
-    });
-    const components = sortedFiles()
-      .filter((f) => f.path.startsWith("structure/components/") && f.path.endsWith(".json"))
-      .map((f) => {
-        const c = parseJsonObject(snapshot().contents.get(f.path)?.content);
-        return {
-          path: f.path,
-          id: asString(c?.id, f.path),
-          name: asString(c?.name, f.path),
-          variants: Array.isArray(c?.variants) ? c.variants.filter((x): x is string => typeof x === "string") : [],
-          states: Array.isArray(c?.states) ? c.states.filter((x): x is string => typeof x === "string") : [],
-        };
-      });
-    return {
-      name: asString(obj?.name, props.artifact.title),
-      version: asString(obj?.version, "1.0.0"),
-      colors,
-      components,
-    };
-  });
+  const designSystemData = computed(() =>
+    parseDesignSystem(
+      snapshot().contents.get(ARTIFACT_TYPE_SPECS["design-system"].entryPath)?.content,
+      sortedFiles()
+        .filter((f) => f.path.startsWith("structure/components/") && f.path.endsWith(".json"))
+        .map((f) => ({ path: f.path, content: snapshot().contents.get(f.path)?.content })),
+      props.artifact.title,
+    ),
+  );
 
   const sheetData = computed(() => {
     const wb = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS.sheet.entryPath)?.content);
-    const sheets = asRecordArray(wb?.sheets).map((sh, idx) => {
+    const sheets: SheetTab[] = asRecordArray(wb?.sheets).map((sh, idx) => {
       const file = asString(sh.file);
       const data = parseJsonObject(file ? snapshot().contents.get(file)?.content : undefined);
       const columns = asRecordArray(data?.columns).map((c) => ({
@@ -439,12 +380,20 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
     return { locale: asString(wb?.locale, "en-US"), currency: asString(wb?.currency, "USD"), sheets };
   });
 
-  const prototypeHtml = computed(() => {
+  const rawFilesMap = computed(() => {
     const map = new Map<string, string>();
     for (const [path, file] of snapshot().contents) {
       map.set(path, file.content);
     }
-    return buildPrototypeDocument(map);
+    return map;
+  });
+
+  const isHtmlFile = computed(() => /\.(?:html|htm)$/iu.test(activePath()));
+  const activeFileHtmlPreview = computed(() => {
+    const map = new Map(rawFilesMap());
+    const current = activePath();
+    map.set(current, draftContent());
+    return buildPrototypeDocument(map, current);
   });
 
   const diagramData = computed(() => {
@@ -467,51 +416,16 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
     };
   });
 
-  const storyboardData = computed(() => {
-    const obj = parseJsonObject(snapshot().contents.get(ARTIFACT_TYPE_SPECS.storyboard.entryPath)?.content);
-    const styleGuide = isRecord(obj?.styleGuide) ? obj.styleGuide : undefined;
-    const palette = Array.isArray(styleGuide?.palette) ? styleGuide.palette.filter((x): x is string => typeof x === "string") : [];
-    const shots = asRecordArray(obj?.shots).map((s, idx) => ({
-      id: asString(s.id, `sh${idx + 1}`),
-      scene: asString(s.scene),
-      durationSec: asNumber(s.durationSec, 3),
-      framing: asString(s.framing),
-      camera: asString(s.camera),
-      visual: asString(s.visual),
-      dialogue: asString(s.dialogue),
-      status: asString(s.status, "draft"),
-    }));
-    return {
-      aspectRatio: asString(obj?.aspectRatio, "16:9"),
-      fps: asNumber(obj?.fps, 30),
-      visualTone: asString(styleGuide?.visualTone),
-      palette,
-      shots,
-    };
+  const diagramMmdSource = computed(() => {
+    const mmdFile = sortedFiles().find((f) => f.path.endsWith(".mmd"));
+    return mmdFile ? snapshot().contents.get(mmdFile.path)?.content : undefined;
   });
 
-  const toggleOutlineTodo = (nodeId: string) => {
-    if (props.version !== undefined) return;
-    const cur = untracked(outlineDoc);
-    if (!Object.hasOwn(cur.nodes, nodeId)) return;
-    const target = cur.nodes[nodeId];
-    const next: OutlineDocument = {
-      ...cur,
-      nodes: { ...cur.nodes, [nodeId]: { ...target, checked: target.checked !== true } },
-    };
-    void saveJsonContent(ARTIFACT_TYPE_SPECS.outline.entryPath, next, `Toggle ${nodeId}`);
-  };
+  const storyboardData = computed(() => parseStoryboard(snapshot().contents.get(ARTIFACT_TYPE_SPECS.storyboard.entryPath)?.content, props.artifact.title));
 
-  const addOutlineItem = () => {
+  const saveOutlineDoc = (next: OutlineDocument, summary: string) => {
     if (props.version !== undefined) return;
-    const cur = untracked(outlineDoc);
-    const id = `n_${Date.now().toString(36)}`;
-    const next: OutlineDocument = {
-      ...cur,
-      rootIds: [...cur.rootIds, id],
-      nodes: { ...cur.nodes, [id]: { id, text: "New item", kind: "bullet", children: [] } },
-    };
-    void saveJsonContent(ARTIFACT_TYPE_SPECS.outline.entryPath, next, `Add outline item ${id}`);
+    void saveJsonContent(ARTIFACT_TYPE_SPECS.outline.entryPath, next, summary);
   };
 
   const addSlide = () => {
@@ -545,25 +459,66 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
     });
   };
 
-  const currentSlide = computed(() => {
-    const list = slidesDeck().slides;
-    if (list.length === 0) return undefined;
-    const idx = Math.max(0, Math.min(slideIndex(), list.length - 1));
-    return list[idx];
-  });
+  const saveSlideEdit = (
+    slide: SlideItem,
+    next: { readonly title: string; readonly subtitle: string; readonly layout: string; readonly bullets: readonly string[]; readonly notes: string },
+  ) => {
+    if (props.version !== undefined || !slide.file) return;
+    const curSlide = parseJsonObject(untracked(() => snapshot().contents.get(slide.file)?.content)) ?? { id: slide.id };
+    const nextSlide = {
+      ...curSlide,
+      id: slide.id,
+      layout: next.layout,
+      title: next.title,
+      subtitle: next.subtitle,
+      blocks: next.bullets.map((text) => ({ kind: "bullet", text })),
+      notes: next.notes,
+    };
+    const curDeck = parseJsonObject(untracked(() => snapshot().contents.get(ARTIFACT_TYPE_SPECS.slides.entryPath)?.content));
+    const writes = [{ path: slide.file, content: `${JSON.stringify(nextSlide, null, 2)}\n`, mime: "application/json" }];
+    if (curDeck && next.title !== slide.title) {
+      const nextDeck = {
+        ...curDeck,
+        slides: asRecordArray(curDeck.slides).map((s) => (asString(s.id) === slide.id || asString(s.file) === slide.file ? { ...s, title: next.title } : s)),
+      };
+      writes.push({ path: ARTIFACT_TYPE_SPECS.slides.entryPath, content: `${JSON.stringify(nextDeck, null, 2)}\n`, mime: "application/json" });
+    }
+    void act.run(async () => {
+      await client().writeFiles(writes, { summary: `Edit slide ${slide.id}` });
+      void queries.invalidate({ prefix: ["artifacts"] });
+    });
+  };
 
-  const currentSheet = computed(() => {
-    const list = sheetData().sheets;
-    if (list.length === 0) return undefined;
-    const idx = Math.max(0, Math.min(activeSheetIndex(), list.length - 1));
-    return list[idx];
-  });
+  const updateSheetCell = (sheet: SheetTab, rowIndex: number, colKey: string, value: string, colType: string) => {
+    if (props.version !== undefined || !sheet.file) return;
+    const rawSheet = parseJsonObject(untracked(() => snapshot().contents.get(sheet.file)?.content)) ?? {
+      id: sheet.id,
+      title: sheet.title,
+      columns: sheet.columns,
+      rows: sheet.rows,
+    };
+    const rows = asRecordArray(rawSheet.rows);
+    if (rowIndex < 0 || rowIndex >= rows.length) return;
+    const parsedValue = colType === "number" && value.trim() !== "" && Number.isFinite(Number(value)) ? Number(value) : value;
+    const nextRows = rows.map((r, i) => (i === rowIndex ? { ...r, [colKey]: parsedValue } : r));
+    void saveJsonContent(sheet.file, { ...rawSheet, rows: nextRows }, `Edit cell ${colKey} row ${rowIndex + 1}`);
+  };
 
-  const currentFrame = computed(() => {
-    const frames = designFrames();
-    const chosen = activeFramePath();
-    return frames.find((f) => f.path === chosen) ?? frames[0];
-  });
+  const addSheetRow = (sheet: SheetTab) => {
+    if (props.version !== undefined || !sheet.file) return;
+    const rawSheet = parseJsonObject(untracked(() => snapshot().contents.get(sheet.file)?.content)) ?? {
+      id: sheet.id,
+      title: sheet.title,
+      columns: sheet.columns,
+      rows: sheet.rows,
+    };
+    const rows = asRecordArray(rawSheet.rows);
+    const emptyRow: Record<string, unknown> = {};
+    for (const col of sheet.columns) {
+      emptyRow[col.key] = col.type === "number" ? 0 : "";
+    }
+    void saveJsonContent(sheet.file, { ...rawSheet, rows: [...rows, emptyRow] }, `Add row to ${sheet.title}`);
+  };
 
   const isWhiteboardPreview = () => props.artifact.artifactType === "whiteboard" && tab() === "preview";
 
@@ -573,12 +528,15 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
         <View testID="artifact-collab-bar" class="min-h-9 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-side px-3 py-1">
           <Segmented
             testid="artifact-view-mode"
-            label="View mode"
+            label={t("web.artifact.page.viewMode")}
             value={tab()}
             onChange={(v) => setTab(v)}
             options={[
-              { value: "preview" as const, label: "Preview" },
-              { value: "files" as const, label: `Files (${sortedFiles().length})` },
+              { value: "preview" as const, label: t("web.artifact.page.previewTab") },
+              {
+                value: "files" as const,
+                label: sortedFiles().length > 0 ? t("web.artifact.page.filesTabCount", { n: sortedFiles().length }) : t("web.artifact.page.filesTab"),
+              },
             ]}
           />
 
@@ -664,402 +622,97 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
       <If when={tab() === "preview" && !isWhiteboardPreview()}>
         <View class="min-h-0 min-w-0 flex-1">
           <If when={props.artifact.artifactType === "docs"}>
-            <Scroll testID="artifact-docs-view" class="min-h-0 flex-1" contentClass="mx-auto w-full max-w-3xl gap-3 px-6 py-5">
-              <If when={props.version === undefined} else={<Text class="text-sm leading-relaxed text-ink select-text">{docsContent()}</Text>}>
-                <View class="gap-2">
-                  <TextArea
-                    testID="artifact-docs-editor"
-                    accessibilityLabel={props.artifact.title}
-                    rows={18}
-                    value={activePath() === "structure/index.md" ? draftContent() : docsContent()}
-                    onInput={(v) => {
-                      if (selectedPath() !== "structure/index.md") selectedPath.set("structure/index.md");
-                      draftContent.set(v);
-                    }}
-                  />
-                  <View class="flex-row items-center justify-between gap-2">
-                    <Text class="font-mono text-2xs text-muted">structure/index.md</Text>
-                    <Button tone="primary" size="compact" testID="artifact-file-save" disabled={act.busy() || !dirty()} onPress={saveActiveFile}>
-                      {t("web.artifact.whiteboard.save")}
-                    </Button>
-                  </View>
-                </View>
-              </If>
-            </Scroll>
-          </If>
-
-          <If when={props.artifact.artifactType === "outline"}>
-            <Scroll testID="artifact-outline-view" class="min-h-0 flex-1" contentClass="mx-auto w-full max-w-2xl gap-2 px-5 py-4">
-              <If when={props.version === undefined}>
-                <View class="flex-row items-center justify-between pb-1">
-                  <Text class="font-mono text-2xs text-muted">structure/outline.json</Text>
-                  <Button size="compact" icon="add" testID="outline-add-item" disabled={act.busy()} onPress={addOutlineItem}>
-                    {t("web.artifact.page.new")}
-                  </Button>
-                </View>
-              </If>
-              <If when={outlineRows().length > 0} else={<Empty icon="notes">{t("web.artifact.blocks.start")}</Empty>}>
-                <Each of={outlineRows()} key={(row) => row.node.id}>
-                  {(row) => (
-                    <View
-                      testID={`outline-node-${row().node.id}`}
-                      class="flex-row items-start gap-2 rounded-md px-2 py-1 hover:bg-hover"
-                      style={{ paddingLeft: 8 + row().depth * 18 }}
-                    >
-                      <If when={row().node.kind === "todo"}>
-                        <View
-                          role="button"
-                          testID={`outline-todo-${row().node.id}`}
-                          onPress={() => toggleOutlineTodo(row().node.id)}
-                          class={`mt-0.5 size-4 shrink-0 items-center justify-center rounded-xs border ${
-                            row().node.checked === true ? "border-accent bg-accent" : "border-idle bg-page"
-                          }`}
-                        >
-                          <If when={row().node.checked === true}>
-                            <Icon name="ticked" size={12} tone="page" />
-                          </If>
-                        </View>
-                      </If>
-                      <If when={row().node.kind === "bullet"}>
-                        <View class="mt-2 size-1.5 shrink-0 rounded-full bg-faint" />
-                      </If>
-                      <Text
-                        class={
-                          row().node.kind === "heading"
-                            ? "flex-1 text-base font-semibold text-ink"
-                            : row().node.checked === true
-                              ? "flex-1 text-sm text-muted line-through"
-                              : "flex-1 text-sm text-ink"
-                        }
-                      >
-                        {row().node.text}
-                      </Text>
-                    </View>
-                  )}
-                </Each>
-              </If>
-            </Scroll>
-          </If>
-
-          <If when={props.artifact.artifactType === "slides"}>
-            <View testID="artifact-slides-view" class="min-h-0 flex-1">
-              <View class="min-h-0 flex-1 items-center justify-center bg-side p-6">
-                <If when={currentSlide()} else={<Empty icon="present">{t("web.artifact.presenter.empty")}</Empty>}>
-                  {(slide) => (
-                    <View class="aspect-video w-full max-w-3xl justify-center gap-3 rounded-xl border border-line bg-page p-8 shadow-raise">
-                      <Text class="font-mono text-2xs text-accent">{slide().layout.toUpperCase()}</Text>
-                      <Text testID="slide-title" class="text-2xl font-semibold text-ink">
-                        {slide().title}
-                      </Text>
-                      <If when={slide().subtitle}>
-                        <Text class="text-base text-muted">{slide().subtitle}</Text>
-                      </If>
-                      <If when={slide().blocks.length > 0}>
-                        <View class="gap-1.5 pt-2">
-                          <Each of={slide().blocks} key={(_, idx) => String(idx)}>
-                            {(blk) => <Text class="text-sm text-ink">{asString(blk().text, JSON.stringify(blk()))}</Text>}
-                          </Each>
-                        </View>
-                      </If>
-                      <If when={slide().notes}>
-                        <View class="mt-auto border-t border-line pt-2">
-                          <Text class="text-xs text-faint">{slide().notes}</Text>
-                        </View>
-                      </If>
-                    </View>
-                  )}
-                </If>
-              </View>
-              <View class="shrink-0 flex-row items-center gap-2 border-t border-line bg-page px-3 py-2">
-                <IconButton
-                  icon="previous"
-                  label={t("web.artifact.slides.previous")}
-                  testid="slides-previous"
-                  disabled={slideIndex() <= 0}
-                  onClick={() => slideIndex.set(Math.max(0, slideIndex() - 1))}
-                />
-                <Text testID="slides-at" class="font-mono text-xs text-muted tabular-nums">
-                  {`${Math.min(slideIndex() + 1, Math.max(1, slidesDeck().slides.length))} / ${slidesDeck().slides.length}`}
-                </Text>
-                <IconButton
-                  icon="next"
-                  label={t("web.artifact.slides.next")}
-                  testid="slides-next"
-                  disabled={slideIndex() >= slidesDeck().slides.length - 1}
-                  onClick={() => slideIndex.set(Math.min(slidesDeck().slides.length - 1, slideIndex() + 1))}
-                />
-                <View class="flex-1" />
-                <If when={props.version === undefined}>
-                  <Button size="compact" icon="add" testID="slides-add" disabled={act.busy()} onPress={addSlide}>
-                    {t("web.artifact.slidesStore.addSlide")}
-                  </Button>
-                </If>
-                <If when={props.onPresent}>
-                  <IconButton icon="present" label={t("web.artifact.slides.present")} testid="slides-present" onClick={() => props.onPresent?.(true)} />
-                </If>
-                <IconButton
-                  icon="presenter"
-                  label={t("web.artifact.slides.presenter")}
-                  testid="slides-presenter"
-                  onClick={() => router.navigate(presenterHref({ id: props.artifact.id, version: props.version ?? Math.max(1, props.artifact.version) }))}
-                />
-              </View>
-            </View>
-          </If>
-
-          <If when={props.artifact.artifactType === "dashboard"}>
-            <Scroll testID="artifact-dashboard-view" class="min-h-0 flex-1" contentClass="gap-4 p-5">
-              <View class="flex-row flex-wrap gap-3">
-                <Each of={dashboardData().panels} key={(p) => asString(p.id, "panel")}>
-                  {(panel) => (
-                    <View class="min-w-48 flex-1 gap-1 rounded-lg border border-line bg-side p-3.5">
-                      <Text class="text-xs font-medium text-muted">{asString(panel().label, asString(panel().id))}</Text>
-                      <Text class="font-mono text-xs text-ink">{asString(panel().kind, "kpi")}</Text>
-                    </View>
-                  )}
-                </Each>
-              </View>
-              <Each of={dashboardData().datasets} key={(ds) => ds.path}>
-                {(ds) => (
-                  <View class="gap-2 rounded-lg border border-line bg-page p-3">
-                    <View class="flex-row items-center justify-between gap-2">
-                      <Text class="font-mono text-xs font-semibold text-ink">{ds().path}</Text>
-                      <IconButton
-                        icon="download"
-                        size={14}
-                        label={t("web.artifact.dashboard.exportCsv")}
-                        disabled={act.busy()}
-                        onClick={() => void act.run(() => exportCsvFile(ds().name, ds().rows))}
-                      />
-                    </View>
-                    <Each of={ds().rows.slice(0, 20)} key={(_, idx) => String(idx)}>
-                      {(row) => (
-                        <View class="flex-row gap-3 border-t border-line py-1">
-                          <Each of={ds().cols} key={(col) => col}>
-                            {(col) => <Text class="min-w-0 flex-1 truncate font-mono text-xs text-ink">{`${col()}: ${formatCellValue(row()[col()])}`}</Text>}
-                          </Each>
-                        </View>
-                      )}
-                    </Each>
-                  </View>
-                )}
-              </Each>
-            </Scroll>
-          </If>
-
-          <If when={props.artifact.artifactType === "motion"}>
-            <Scroll testID="artifact-motion-view" class="min-h-0 flex-1" contentClass="gap-4 p-5">
-              <View class="flex-row flex-wrap items-center gap-3 rounded-lg border border-line bg-side p-3.5">
-                <Text class="font-mono text-xs font-semibold text-ink">{`${motionData().width}×${motionData().height}`}</Text>
-                <Text class="font-mono text-xs text-muted">{`${motionData().fps} fps`}</Text>
-                <Text class="font-mono text-xs text-muted">{`${motionData().duration}s`}</Text>
-              </View>
-              <View class="gap-2">
-                <Each of={motionData().scenes} key={(sc) => sc.id}>
-                  {(sc) => (
-                    <View class="gap-1.5 rounded-lg border border-line bg-page p-3">
-                      <View class="flex-row items-center justify-between">
-                        <Text class="text-sm font-semibold text-ink">{sc().title}</Text>
-                        <Text class="font-mono text-2xs text-muted tabular-nums">{`${sc().start}s – ${sc().end}s`}</Text>
-                      </View>
-                      <Text class="font-mono text-2xs text-faint">{`${sc().file} · ${sc().layers.length} layers`}</Text>
-                    </View>
-                  )}
-                </Each>
-              </View>
-            </Scroll>
-          </If>
-
-          <If when={props.artifact.artifactType === "design"}>
-            <View testID="artifact-design-view" class="min-h-0 flex-1">
-              <If when={designFrames().length > 1}>
-                <Scroll horizontal class="shrink-0 border-b border-line bg-side px-3 py-1.5" contentClass="flex-row gap-1.5">
-                  <Each of={designFrames()} key={(f) => f.path}>
-                    {(f) => (
-                      <Button size="compact" tone={currentFrame()?.path === f().path ? "primary" : "plain"} onPress={() => activeFramePath.set(f().path)}>
-                        {f().name}
-                      </Button>
-                    )}
-                  </Each>
-                </Scroll>
-              </If>
-              <Scroll class="min-h-0 flex-1" contentClass="gap-3 p-5">
-                <If when={currentFrame()} else={<Empty icon="devices">{t("web.artifact.design.noProps")}</Empty>}>
-                  {(frame) => (
-                    <View class="gap-3 rounded-lg border border-line bg-side p-4">
-                      <View class="flex-row items-center justify-between">
-                        <Text class="text-sm font-semibold text-ink">{frame().name}</Text>
-                        <Text class="font-mono text-xs text-muted tabular-nums">{`${frame().width} × ${frame().height}`}</Text>
-                      </View>
-                      <Text class="font-mono text-2xs text-faint">{`${frame().path} · ${frame().nodes.length} nodes`}</Text>
-                    </View>
-                  )}
-                </If>
-              </Scroll>
-            </View>
-          </If>
-
-          <If when={props.artifact.artifactType === "design-system"}>
-            <Scroll testID="artifact-design-system-view" class="min-h-0 flex-1" contentClass="gap-4 p-5">
-              <View class="flex-row items-center justify-between">
-                <Text class="text-base font-semibold text-ink">{designSystemData().name}</Text>
-                <Text class="font-mono text-xs text-muted">{`v${designSystemData().version}`}</Text>
-              </View>
-              <View class="flex-row flex-wrap gap-2.5">
-                <Each of={designSystemData().colors} key={(c) => c.name}>
-                  {(c) => (
-                    <View class="w-40 gap-1.5 rounded-lg border border-line bg-side p-2.5">
-                      <View class="flex-row gap-1.5">
-                        <View class="h-8 flex-1 rounded-sm border border-line bg-page" style={c().light ? { backgroundColor: c().light } : undefined} />
-                        <View class="h-8 flex-1 rounded-sm border border-line bg-ink" style={c().dark ? { backgroundColor: c().dark } : undefined} />
-                      </View>
-                      <Text class="truncate text-xs font-semibold text-ink">{c().name}</Text>
-                      <Text class="truncate font-mono text-2xs text-muted">{`${c().light} / ${c().dark}`}</Text>
-                    </View>
-                  )}
-                </Each>
-              </View>
-              <If when={designSystemData().components.length > 0}>
-                <View class="gap-2">
-                  <Text class="text-xs font-semibold text-muted">{t("web.artifact.designSystem.components")}</Text>
-                  <Each of={designSystemData().components} key={(comp) => comp.path}>
-                    {(comp) => (
-                      <View class="gap-1 rounded-lg border border-line bg-page p-3">
-                        <Text class="text-sm font-semibold text-ink">{comp().name}</Text>
-                        <Text class="font-mono text-2xs text-muted">{comp().variants.join(" · ")}</Text>
-                      </View>
-                    )}
-                  </Each>
-                </View>
-              </If>
-            </Scroll>
-          </If>
-
-          <If when={props.artifact.artifactType === "sheet"}>
-            <View testID="artifact-sheet-view" class="min-h-0 flex-1">
-              <View class="shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-side px-3 py-1.5">
-                <View class="flex-row items-center gap-1.5">
-                  <Each of={sheetData().sheets} key={(s) => s.id}>
-                    {(sh, idx) => (
-                      <Button size="compact" tone={activeSheetIndex() === idx() ? "primary" : "plain"} onPress={() => activeSheetIndex.set(idx())}>
-                        {sh().title}
-                      </Button>
-                    )}
-                  </Each>
-                </View>
-                <If when={currentSheet()}>
-                  {(sh) => (
-                    <IconButton
-                      icon="download"
-                      size={14}
-                      label={t("web.artifact.dashboard.exportCsv")}
-                      disabled={act.busy()}
-                      onClick={() => void act.run(() => exportCsvFile(sh().title, sh().rows))}
-                    />
-                  )}
-                </If>
-              </View>
-              <Scroll class="min-h-0 flex-1" contentClass="gap-1 p-4">
-                <If when={currentSheet()} else={<Empty icon="log">No sheets</Empty>}>
-                  {(sh) => (
-                    <View class="rounded-lg border border-line bg-page">
-                      <View class="flex-row border-b border-line bg-side px-3 py-2">
-                        <Each of={sh().columns} key={(col) => col.key}>
-                          {(col) => <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{col().title}</Text>}
-                        </Each>
-                      </View>
-                      <Each of={sh().rows} key={(_, idx) => String(idx)}>
-                        {(row) => (
-                          <View class="flex-row border-t border-line px-3 py-1.5">
-                            <Each of={sh().columns} key={(col) => col.key}>
-                              {(col) => (
-                                <Text class="min-w-0 flex-1 truncate font-mono text-xs text-ink">
-                                  {formatCellValue(row()[col().key] ?? row()[col().title])}
-                                </Text>
-                              )}
-                            </Each>
-                          </View>
-                        )}
-                      </Each>
-                    </View>
-                  )}
-                </If>
-              </Scroll>
-            </View>
-          </If>
-
-          <If when={props.artifact.artifactType === "prototype"}>
-            {/* Strictly sandboxed WebView: incognito + strict CSP via buildPrototypeDocument (never shares host origin). */}
-            <WebView
-              testID="artifact-prototype-webview"
-              accessibilityLabel={props.artifact.title}
-              html={prototypeHtml()}
-              incognito
-              class="min-h-0 w-full flex-1 bg-page"
-              style={props.covered === true ? { opacity: 0 } : undefined}
+            <DocsView
+              title={props.artifact.title}
+              version={props.version}
+              content={docsContent()}
+              draft={activePath() === "structure/index.md" ? draftContent() : docsContent()}
+              dirty={activePath() === "structure/index.md" && dirty()}
+              busy={act.busy()}
+              onDraftChange={(v) => {
+                if (selectedPath() !== "structure/index.md") selectedPath.set("structure/index.md");
+                draftContent.set(v);
+              }}
+              onSave={() => {
+                if (selectedPath() !== "structure/index.md") selectedPath.set("structure/index.md");
+                saveActiveFile();
+              }}
+              onRevert={() => draftContent.set(docsContent())}
             />
           </If>
 
+          <If when={props.artifact.artifactType === "outline"}>
+            <OutlineView doc={outlineDoc()} version={props.version} busy={act.busy()} onSaveDoc={saveOutlineDoc} />
+          </If>
+
+          <If when={props.artifact.artifactType === "slides"}>
+            <SlidesView
+              artifactId={props.artifact.id}
+              deckTitle={slidesDeck().title}
+              slides={slidesDeck().slides}
+              slideIndex={slideIndex()}
+              version={props.version}
+              busy={act.busy()}
+              onSlideIndexChange={(idx) => slideIndex.set(idx)}
+              onAddSlide={addSlide}
+              onSaveSlide={saveSlideEdit}
+              onPresent={props.onPresent}
+              onOpenPresenter={() => router.navigate(presenterHref({ id: props.artifact.id, version: props.version ?? Math.max(1, props.artifact.version) }))}
+            />
+          </If>
+
+          <If when={props.artifact.artifactType === "dashboard"}>
+            <DashboardView
+              panels={dashboardData().panels}
+              datasets={dashboardData().datasets}
+              busy={act.busy()}
+              onExportCsv={(name, rows) => void act.run(() => exportCsvFile(name, rows))}
+            />
+          </If>
+
+          <If when={props.artifact.artifactType === "motion"}>
+            <MotionView
+              width={motionData().width}
+              height={motionData().height}
+              fps={motionData().fps}
+              duration={motionData().duration}
+              background={motionData().background}
+              chapters={motionData().chapters}
+              scenes={motionData().scenes}
+            />
+          </If>
+
+          <If when={props.artifact.artifactType === "design"}>
+            <DesignView frames={designFrames()} activeFramePath={activeFramePath()} onSelectFrame={(p) => activeFramePath.set(p)} />
+          </If>
+
+          <If when={props.artifact.artifactType === "design-system"}>
+            <DesignSystemView model={designSystemData()} />
+          </If>
+
+          <If when={props.artifact.artifactType === "sheet"}>
+            <SheetView
+              sheets={sheetData().sheets}
+              activeIndex={activeSheetIndex()}
+              readOnly={props.version !== undefined}
+              busy={act.busy()}
+              onSelectSheet={(idx) => activeSheetIndex.set(idx)}
+              onExportCsv={(name, rows) => void act.run(() => exportCsvFile(name, rows))}
+              onUpdateCell={updateSheetCell}
+              onAddRow={addSheetRow}
+            />
+          </If>
+
+          <If when={props.artifact.artifactType === "prototype"}>
+            <PrototypeView artifact={props.artifact} files={rawFilesMap()} compact={props.compact} covered={props.covered} onOpenChat={props.onOpenChat} />
+          </If>
+
           <If when={props.artifact.artifactType === "diagram"}>
-            <Scroll testID="artifact-diagram-view" class="min-h-0 flex-1" contentClass="gap-4 p-5">
-              <View class="flex-row items-center gap-2">
-                <Text class="text-sm font-semibold text-ink">{diagramData().title}</Text>
-                <Text class="font-mono text-2xs text-muted">{`${diagramData().kind} · ${diagramData().direction}`}</Text>
-              </View>
-              <View class="flex-row flex-wrap gap-2.5">
-                <Each of={diagramData().nodes} key={(n) => n.id}>
-                  {(n) => (
-                    <View class="min-w-36 gap-0.5 rounded-lg border border-line bg-side px-3 py-2">
-                      <Text class="text-xs font-semibold text-ink">{n().label}</Text>
-                      <Text class="font-mono text-2xs text-muted">{`${n().id} · ${n().kind}`}</Text>
-                    </View>
-                  )}
-                </Each>
-              </View>
-              <If when={diagramData().edges.length > 0}>
-                <View class="gap-1 rounded-lg border border-line bg-page p-3">
-                  <Each of={diagramData().edges} key={(e) => e.id}>
-                    {(e) => <Text class="font-mono text-xs text-muted">{`${e().from} → ${e().to}${e().label ? ` (${e().label})` : ""}`}</Text>}
-                  </Each>
-                </View>
-              </If>
-            </Scroll>
+            <DiagramView data={diagramData()} mmdSource={diagramMmdSource()} />
           </If>
 
           <If when={props.artifact.artifactType === "storyboard"}>
-            <Scroll testID="artifact-storyboard-view" class="min-h-0 flex-1" contentClass="gap-4 p-5">
-              <View class="flex-row flex-wrap items-center gap-2">
-                <Text class="font-mono text-xs text-muted">{`${storyboardData().aspectRatio} · ${storyboardData().fps} fps`}</Text>
-                <If when={storyboardData().visualTone}>
-                  <Text class="text-xs text-ink">{storyboardData().visualTone}</Text>
-                </If>
-                <View class="flex-row items-center gap-1">
-                  <Each of={storyboardData().palette} key={(hex) => hex}>
-                    {(hex) => <View class="size-4 rounded-xs border border-line" style={{ backgroundColor: hex() }} />}
-                  </Each>
-                </View>
-              </View>
-              <View class="gap-2.5">
-                <Each of={storyboardData().shots} key={(sh) => sh.id}>
-                  {(sh) => (
-                    <View class="gap-1.5 rounded-lg border border-line bg-side p-3">
-                      <View class="flex-row items-center justify-between gap-2">
-                        <Text class="text-sm font-semibold text-ink">{`${sh().id} · ${sh().scene || "Shot"}`}</Text>
-                        <Text class="font-mono text-2xs text-muted tabular-nums">
-                          {`${sh().durationSec}s · ${sh().framing} · ${sh().camera} · ${sh().status}`}
-                        </Text>
-                      </View>
-                      <If when={sh().visual}>
-                        <Text class="text-xs text-ink">{sh().visual}</Text>
-                      </If>
-                      <If when={sh().dialogue}>
-                        <Text class="text-xs text-muted">{sh().dialogue}</Text>
-                      </If>
-                    </View>
-                  )}
-                </Each>
-              </View>
-            </Scroll>
+            <StoryboardView model={storyboardData()} />
           </If>
         </View>
       </If>
@@ -1068,7 +721,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
         <View testID="artifact-files-view" class="min-h-0 min-w-0 flex-1 flex-row">
           <View class="w-60 shrink-0 border-r border-line bg-side">
             <View class="flex-row items-center justify-between border-b border-line px-2.5 py-1.5">
-              <Text class="text-xs font-semibold text-muted">Directory</Text>
+              <Text class="text-xs font-semibold text-muted">{t("web.artifact.page.directory")}</Text>
               <If when={props.version === undefined}>
                 <IconButton
                   icon="add"
@@ -1085,8 +738,9 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
                   testID="artifact-file-new-path"
                   value={newFilePath()}
                   onInput={(v) => newFilePath.set(v)}
+                  onSubmit={createNewFile}
                   placeholder="structure/notes.md"
-                  accessibilityLabel="New file path"
+                  accessibilityLabel={t("web.artifact.page.newFileLabel")}
                 />
                 <Button size="compact" tone="primary" testID="artifact-file-new-submit" disabled={act.busy()} onPress={createNewFile}>
                   {t("web.artifact.page.new")}
@@ -1109,13 +763,15 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
                       <Icon name="file" size={12} tone={selected() ? "ink" : "muted"} />
                       <Text class={`min-w-0 flex-1 truncate font-mono text-2xs ${selected() ? "font-semibold text-ink" : "text-muted"}`}>{f().path}</Text>
                       <If when={deletable()}>
-                        <IconButton
-                          icon="delete"
-                          size={12}
-                          label={t("web.artifact.page.delete")}
-                          testid={`artifact-file-delete-${f().path}`}
-                          onClick={() => deleteSelectedFile(f().path)}
-                        />
+                        <View class="opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+                          <IconButton
+                            icon="delete"
+                            size={12}
+                            label={t("web.artifact.page.delete")}
+                            testid={`artifact-file-delete-${f().path}`}
+                            onClick={() => deletingPath.set(f().path)}
+                          />
+                        </View>
                       </If>
                     </View>
                   );
@@ -1125,24 +781,89 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
           </View>
 
           <View class="min-h-0 min-w-0 flex-1 p-3">
+            <If when={deletingPath()}>
+              {(target) => (
+                <View
+                  testID="artifact-file-delete-confirm"
+                  class="mb-2 flex-row flex-wrap items-center gap-2 rounded-md border border-line bg-bad-soft px-3 py-2"
+                >
+                  <Text class="min-w-0 flex-1 text-xs text-berry">{t("web.artifact.page.deleteFileAsk", { path: target() })}</Text>
+                  <Button size="compact" tone="danger" testID="artifact-file-delete-sure" disabled={act.busy()} onPress={() => deleteSelectedFile(target())}>
+                    {t("web.artifact.page.delete")}
+                  </Button>
+                  <Button size="compact" tone="quiet" onPress={() => deletingPath.set(undefined)}>
+                    {t("web.base.form.never")}
+                  </Button>
+                </View>
+              )}
+            </If>
             <View class="mb-2 flex-row items-center justify-between gap-2">
-              <Text testID="artifact-file-active-path" class="truncate font-mono text-xs font-semibold text-ink">
-                {activePath()}
-              </Text>
-              <If when={props.version === undefined}>
-                <Button size="compact" tone="primary" testID="artifact-file-save" disabled={act.busy() || !dirty()} onPress={saveActiveFile}>
-                  {t("web.artifact.whiteboard.save")}
-                </Button>
-              </If>
+              <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                <Text testID="artifact-file-active-path" class="truncate font-mono text-xs font-semibold text-ink">
+                  {activePath()}
+                </Text>
+                <If when={activeFile()}>{(file) => <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{`${file().size} B`}</Text>}</If>
+                <If when={dirty() && props.version === undefined}>
+                  <View class="flex-row items-center gap-1 rounded-sm bg-warn-soft px-1.5 py-0.5">
+                    <View class="size-1.5 rounded-full bg-wheat" />
+                    <Text class="text-2xs font-medium text-warn-ink">{t("web.artifact.page.unsaved")}</Text>
+                  </View>
+                </If>
+              </View>
+              <View class="shrink-0 flex-row items-center gap-1.5">
+                <If when={isHtmlFile()}>
+                  <Segmented
+                    testid="artifact-file-html-mode"
+                    label={t("web.artifact.page.viewMode")}
+                    value={fileHtmlMode()}
+                    onChange={(v) => fileHtmlMode.set(v)}
+                    options={[
+                      { value: "code" as const, label: t("web.artifact.files.codeMode") },
+                      { value: "preview" as const, label: t("web.artifact.files.htmlPreviewMode") },
+                    ]}
+                  />
+                </If>
+                <If when={props.version === undefined}>
+                  <View class="shrink-0 flex-row items-center gap-1.5">
+                    <If when={dirty()}>
+                      <Button
+                        size="compact"
+                        tone="quiet"
+                        testID="artifact-file-revert"
+                        disabled={act.busy()}
+                        onPress={() => draftContent.set(activeFile()?.content ?? "")}
+                      >
+                        {t("web.artifact.page.discard")}
+                      </Button>
+                    </If>
+                    <Button size="compact" tone="primary" testID="artifact-file-save" disabled={act.busy() || !dirty()} onPress={saveActiveFile}>
+                      {t("web.artifact.whiteboard.save")}
+                    </Button>
+                  </View>
+                </If>
+              </View>
             </View>
-            <TextArea
-              testID="artifact-file-editor"
-              accessibilityLabel={activePath()}
-              rows={20}
-              value={draftContent()}
-              onInput={(v) => draftContent.set(v)}
-              class="min-h-0 flex-1 font-mono text-xs"
-            />
+            <If
+              when={isHtmlFile() && fileHtmlMode() === "preview"}
+              else={
+                <TextArea
+                  testID="artifact-file-editor"
+                  accessibilityLabel={activePath()}
+                  rows={20}
+                  value={draftContent()}
+                  onInput={(v) => draftContent.set(v)}
+                  class="min-h-0 flex-1 font-mono text-xs"
+                />
+              }
+            >
+              <WebView
+                testID="artifact-file-html-preview"
+                accessibilityLabel={activePath()}
+                html={activeFileHtmlPreview()}
+                incognito
+                class="min-h-0 w-full flex-1 rounded-md border border-line bg-page"
+              />
+            </If>
           </View>
         </View>
       </If>

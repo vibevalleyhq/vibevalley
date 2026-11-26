@@ -32,6 +32,12 @@ impl FlapSpring {
         self.delay = delay.max(0.0);
     }
 
+    pub fn settle(&mut self) {
+        self.pos = self.target;
+        self.vel = 0.0;
+        self.delay = 0.0;
+    }
+
     pub fn impulse(&mut self, kick: f32) {
         self.vel += kick;
     }

@@ -1,7 +1,7 @@
 /** @jsxImportSource @solidjs/web */
 import { HydrationScript, type JSX } from "@solidjs/web";
 
-import { backgrounds } from "./base/images";
+import { backgrounds, heroWideSizes, heroPortraitSizes } from "./base/images";
 import { page } from "./i18n/page";
 
 export default function Document(props: { children?: JSX.Element }) {
@@ -35,7 +35,22 @@ export default function Document(props: { children?: JSX.Element }) {
             <meta property="og:image:height" content="630" />
             <meta property="og:image:alt" content={copy.title} />
             <meta name="twitter:card" content="summary_large_image" />
-            <link rel="preload" as="image" href={backgrounds.morning} fetchpriority="high" />
+            <link
+              rel="preload"
+              as="image"
+              media="(orientation: portrait)"
+              imagesrcset={backgrounds.morning.portraitSrcset}
+              imagesizes={heroPortraitSizes}
+              fetchpriority="high"
+            />
+            <link
+              rel="preload"
+              as="image"
+              media="(orientation: landscape)"
+              imagesrcset={backgrounds.morning.srcset}
+              imagesizes={heroWideSizes}
+              fetchpriority="high"
+            />
           </>
         )}
         <HydrationScript />

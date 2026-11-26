@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "sourceSha256": "155c9717a0a6932a45e15f9d08cd51835af1215bf4308bdeab563333483c5fe4",
+  "sourceSha256": "3557305235fe7eb3bdb97fd2ba495bc38c114576f7518fb620c94b1b16427c1f",
   "groundSize": 16.0,
   "groundThickness": 0.28,
   "cardThickness": 0.026,
@@ -1775,7 +1775,7 @@
     "groundMeanSat": 0.3220777,
     "cardsMeanSat": 0.44,
     "satDelta": 0.117922306,
-    "totalDistBytes": 13269947,
+    "totalDistBytes": 16066137,
     "totalVertices": 107344,
     "totalTriangles": 51322
   },

@@ -945,13 +945,10 @@ impl DioramaWorld {
     pub fn set_roof_cutaway_snap(&mut self, open: bool, snap: bool) {
         self.roof_cutaway_open = open;
         let target = if open { 1.0 } else { 0.0 };
+        self.roof_cutaway_spring.set_target(target, 0.0);
         if snap {
-            self.roof_cutaway_spring.pos = target;
-            self.roof_cutaway_spring.vel = 0.0;
-            self.roof_cutaway_spring.target = target;
-            self.roof_cutaway_spring.delay = 0.0;
+            self.roof_cutaway_spring.settle();
         } else {
-            self.roof_cutaway_spring.set_target(target, 0.0);
             self.pending_sounds.push(if open { SoundKind::FoldUp } else { SoundKind::CardTap });
         }
     }
@@ -2625,14 +2622,33 @@ impl DioramaWorld {
         self.push_undo(snap);
     }
 
-    pub fn step(&mut self, dt: f32) {
-        let dt = dt.min(0.05);
+    pub fn settle_view(&mut self) {
+        self.tod_blend = 1.0;
+        self.camera.settle();
+        self.roof_cutaway_spring.settle();
+        for building in &mut self.buildings {
+            building.spring.settle();
+        }
+        for prop in &mut self.props {
+            prop.spring.settle();
+        }
+        for plot in &mut self.plots {
+            plot.crop_spring.settle();
+            plot.sign_spring.settle();
+        }
+        for helper in &mut self.helpers {
+            helper.spring.settle();
+        }
+    }
+
+    pub fn step(&mut self, elapsed: f32) {
+        let dt = elapsed.min(0.05);
         self.elapsed += dt;
         self.camera.update(dt);
         self.roof_cutaway_spring.step(dt);
 
         if self.tod_blend < 1.0 {
-            self.tod_blend = (self.tod_blend + dt / 1.1).min(1.0);
+            self.tod_blend = (self.tod_blend + elapsed / 1.1).min(1.0);
         }
 
         for p in &mut self.plots {
@@ -3372,6 +3388,31 @@ mod tests {
             },
             16.0,
         )
+    }
+
+    #[test]
+    fn regression_lighting_finishes_after_an_idle_gap_without_advancing_physics_by_seconds() {
+        let mut world = sample_world();
+        world.set_time_of_day(TimeOfDay::Night, true);
+        world.set_time_of_day(TimeOfDay::Noon, false);
+        let before = world.elapsed;
+        world.step(2.0);
+        assert_eq!(world.tod_blend, 1.0);
+        assert!((world.elapsed - before - 0.05).abs() < 1e-5);
+    }
+
+    #[test]
+    fn regression_reduced_motion_paints_the_destination_light_and_folds() {
+        let mut world = sample_world();
+        world.set_time_of_day(TimeOfDay::Night, true);
+        world.set_time_of_day(TimeOfDay::Noon, false);
+        world.toggle_roof_cutaway();
+        world.plots[0].sign_spring.fold_down_and_rise(0.2);
+        world.settle_view();
+        assert_eq!(world.tod_blend, 1.0);
+        assert!(world.roof_cutaway_open() && !world.roof_cutaway_spring.is_moving());
+        assert!(!world.camera.is_moving());
+        assert_eq!(world.plots[0].sign_spring.pos, 1.0);
     }
 
     #[test]

@@ -17,12 +17,18 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
   }
 
   private let statusView: ShimStatusView
+  private let artifactId: String?
+  private let storage: AppletStorage?
   private var mode: ContentMode = .status
   private var isAttached = false
+  private var currentTitle: String
 
   var alwaysOnTop: Bool {
     didSet {
       window.level = alwaysOnTop ? .floating : .normal
+      if case .webview(let container) = mode {
+        container.setPinned(alwaysOnTop)
+      }
       onAlwaysOnTopChanged?(alwaysOnTop)
     }
   }
@@ -30,12 +36,17 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
   var onEmit: ((ShimToHost) -> Void)?
   var onReconnectRequested: (() -> Void)?
   var onAlwaysOnTopChanged: ((Bool) -> Void)?
+  var onOpenInHostRequested: (() -> Void)?
 
-  init(title: String, alwaysOnTop: Bool) {
+  init(title: String, artifactId: String?, serverHome: String, alwaysOnTop: Bool) {
     self.alwaysOnTop = alwaysOnTop
+    self.currentTitle = title
+    let cleanArtifact = artifactId?.trimmingCharacters(in: .whitespacesAndNewlines)
+    self.artifactId = (cleanArtifact?.isEmpty == false) ? cleanArtifact : nil
+    self.storage = self.artifactId.map { AppletStorage(serverHome: serverHome, artifactId: $0) }
     self.window = NSWindow(
       contentRect: NSRect(x: 0, y: 0, width: 1120, height: 760),
-      styleMask: [.titled, .closable, .miniaturizable, .resizable],
+      styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
       backing: .buffered,
       defer: false
     )
@@ -43,17 +54,35 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
     super.init()
 
     window.title = title
+    window.titlebarAppearsTransparent = true
+    window.titleVisibility = .hidden
+    window.titlebarSeparatorStyle = .none
+    window.toolbarStyle = .unifiedCompact
     window.minSize = NSSize(width: 360, height: 240)
     window.level = alwaysOnTop ? .floating : .normal
     window.acceptsMouseMovedEvents = true
     window.isReleasedWhenClosed = false
-    window.center()
+    if let id = self.artifactId {
+      let autosaveName = AppletStorage.windowAutosaveName(forArtifactId: id)
+      window.setFrameAutosaveName(autosaveName)
+      if !window.setFrameUsingName(autosaveName) {
+        window.center()
+      }
+    } else {
+      window.center()
+    }
     window.delegate = self
 
     statusView.onReconnect = { [weak self] in
       self?.onReconnectRequested?()
     }
     window.contentView = statusView
+  }
+
+  func resetWindowSize() {
+    window.setContentSize(NSSize(width: 1120, height: 760))
+    window.center()
+    emitResizeIfAttached()
   }
 
   func showWindow() {
@@ -127,16 +156,16 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
   func handleHostMessage(_ message: HostToShim) {
     switch message {
     case .readyLayer(let contextId, let title, _):
-      if !title.isEmpty { window.title = title }
+      if !title.isEmpty { updateTitle(title) }
       showLayer(contextId: contextId)
     case .readyWebview(let html, let title, _):
-      if !title.isEmpty { window.title = title }
+      if !title.isEmpty { updateTitle(title) }
       showWebview(html: html)
     case .updateWebview(let html, let title):
-      if !title.isEmpty { window.title = title }
+      if !title.isEmpty { updateTitle(title) }
       showWebview(html: html)
     case .setTitle(let title):
-      window.title = title
+      updateTitle(title)
     case .setAlwaysOnTop(let enabled):
       alwaysOnTop = enabled
     case .error(let message):
@@ -154,6 +183,14 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
         spinning: false,
         showReconnect: true
       )
+    }
+  }
+
+  private func updateTitle(_ title: String) {
+    currentTitle = title
+    window.title = title
+    if case .webview(let container) = mode {
+      container.setTitle(title)
     }
   }
 
@@ -181,11 +218,20 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
 
   private func showWebview(html: String) {
     if case .webview(let container) = mode {
+      container.setTitle(currentTitle)
+      container.setPinned(alwaysOnTop)
       container.loadHTML(html)
       return
     }
     let frame = window.contentView?.bounds ?? window.contentLayoutRect
-    let container = ShimWebViewContainer(frame: frame)
+    let container = ShimWebViewContainer(
+      frame: frame,
+      title: currentTitle,
+      alwaysOnTop: alwaysOnTop,
+      storage: storage,
+      onTogglePin: { [weak self] in self?.alwaysOnTop.toggle() },
+      onOpenInHost: { [weak self] in self?.onOpenInHostRequested?() }
+    )
     container.loadHTML(html)
     mode = .webview(container)
     window.contentView = container
@@ -219,6 +265,9 @@ final class ShimWindowController: NSObject, NSWindowDelegate {
 
 @MainActor
 private final class ShimLayerView: NSView {
+  private static let immersiveHeaderHeight: Double = 38
+  private static let rightControlsWidth: Double = 220
+
   private let hostLayer: CALayer?
   private let emit: (ShimToHost) -> Void
   private var trackingArea: NSTrackingArea?
@@ -295,6 +344,16 @@ private final class ShimLayerView: NSView {
   }
 
   override func mouseDown(with event: NSEvent) {
+    let pt = gpuiPoint(for: event)
+    let dragLimitX = max(0, Double(bounds.width) - Self.rightControlsWidth)
+    if pt.y <= Self.immersiveHeaderHeight && pt.x < dragLimitX {
+      if event.clickCount == 2 {
+        window?.performZoom(nil)
+      } else {
+        window?.performDrag(with: event)
+      }
+      return
+    }
     window?.makeFirstResponder(self)
     emitMouseDown(event)
   }
@@ -490,17 +549,70 @@ private final class ShimLayerView: NSView {
 }
 
 @MainActor
-private final class ShimWebViewContainer: NSView {
-  let webView: WKWebView
+private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
+  weak var target: (any WKScriptMessageHandler)?
+
+  init(target: any WKScriptMessageHandler) {
+    self.target = target
+  }
+
+  func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+    target?.userContentController(userContentController, didReceive: message)
+  }
+}
+
+@MainActor
+private final class ShimDragStripView: NSView {
+  private let titleLabel = NSTextField(labelWithString: "")
+  private let pinButton = NSButton()
+  private let openHostButton = NSButton()
+
+  var onTogglePin: (() -> Void)?
+  var onOpenInHost: (() -> Void)?
 
   override init(frame frameRect: NSRect) {
-    let configuration = WKWebViewConfiguration()
-    configuration.websiteDataStore = WKWebsiteDataStore.nonPersistent()
-    self.webView = WKWebView(frame: NSRect(origin: .zero, size: frameRect.size), configuration: configuration)
     super.init(frame: frameRect)
-    autoresizingMask = [.width, .height]
-    webView.autoresizingMask = [.width, .height]
-    addSubview(webView)
+    titleLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+    titleLabel.textColor = .secondaryLabelColor
+    titleLabel.alignment = .center
+    titleLabel.lineBreakMode = .byTruncatingTail
+    titleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+    configureActionButton(
+      pinButton,
+      symbolName: "pin",
+      accessibility: "Always on Top",
+      tooltip: "Always on Top (⇧⌘P)",
+      action: #selector(handleTogglePin)
+    )
+    configureActionButton(
+      openHostButton,
+      symbolName: "arrow.up.forward.app",
+      accessibility: "Open in VibeValley",
+      tooltip: "Open in VibeValley (⌘E)",
+      action: #selector(handleOpenInHost)
+    )
+
+    addSubview(titleLabel)
+    addSubview(pinButton)
+    addSubview(openHostButton)
+    NSLayoutConstraint.activate([
+      openHostButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+      openHostButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+      openHostButton.widthAnchor.constraint(equalToConstant: 22),
+      openHostButton.heightAnchor.constraint(equalToConstant: 22),
+
+      pinButton.centerYAnchor.constraint(equalTo: centerYAnchor),
+      pinButton.trailingAnchor.constraint(equalTo: openHostButton.leadingAnchor, constant: -4),
+      pinButton.widthAnchor.constraint(equalToConstant: 22),
+      pinButton.heightAnchor.constraint(equalToConstant: 22),
+
+      titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+      titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 80),
+      titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: pinButton.leadingAnchor, constant: -8),
+      titleLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+    ])
+    setPinned(false)
   }
 
   @available(*, unavailable)
@@ -508,8 +620,151 @@ private final class ShimWebViewContainer: NSView {
     fatalError("init(coder:) is not supported")
   }
 
+  override var mouseDownCanMoveWindow: Bool { true }
+
+  override func mouseDown(with event: NSEvent) {
+    if event.clickCount == 2 {
+      window?.performZoom(nil)
+    } else {
+      super.mouseDown(with: event)
+    }
+  }
+
+  func setTitle(_ title: String) {
+    titleLabel.stringValue = title
+  }
+
+  func setPinned(_ pinned: Bool) {
+    pinButton.image = NSImage(
+      systemSymbolName: pinned ? "pin.fill" : "pin",
+      accessibilityDescription: "Always on Top"
+    )
+    pinButton.contentTintColor = pinned ? .controlAccentColor : .tertiaryLabelColor
+  }
+
+  private func configureActionButton(
+    _ button: NSButton,
+    symbolName: String,
+    accessibility: String,
+    tooltip: String,
+    action: Selector
+  ) {
+    button.isBordered = false
+    button.bezelStyle = .regularSquare
+    button.imagePosition = .imageOnly
+    button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: accessibility)
+    button.contentTintColor = .tertiaryLabelColor
+    button.toolTip = tooltip
+    button.target = self
+    button.action = action
+    button.translatesAutoresizingMaskIntoConstraints = false
+  }
+
+  @objc private func handleTogglePin() {
+    onTogglePin?()
+  }
+
+  @objc private func handleOpenInHost() {
+    onOpenInHost?()
+  }
+}
+
+@MainActor
+private final class ShimWebViewContainer: NSView, WKScriptMessageHandler {
+  private static let headerHeight: CGFloat = 32
+  private static let storeChannel = "vvStore"
+  private let dragStrip = ShimDragStripView(frame: .zero)
+  private let storage: AppletStorage?
+  let webView: WKWebView
+
+  init(
+    frame frameRect: NSRect,
+    title: String,
+    alwaysOnTop: Bool,
+    storage: AppletStorage?,
+    onTogglePin: (() -> Void)?,
+    onOpenInHost: (() -> Void)?
+  ) {
+    self.storage = storage
+    let configuration = WKWebViewConfiguration()
+    configuration.websiteDataStore = WKWebsiteDataStore.nonPersistent()
+    let userController = WKUserContentController()
+    configuration.userContentController = userController
+    self.webView = WKWebView(frame: .zero, configuration: configuration)
+    super.init(frame: frameRect)
+    autoresizingMask = [.width, .height]
+    userController.add(WeakScriptMessageHandler(target: self), name: Self.storeChannel)
+
+    dragStrip.setTitle(title)
+    dragStrip.setPinned(alwaysOnTop)
+    dragStrip.onTogglePin = onTogglePin
+    dragStrip.onOpenInHost = onOpenInHost
+
+    addSubview(dragStrip)
+    addSubview(webView)
+    layoutChildren()
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) is not supported")
+  }
+
+  override func layout() {
+    super.layout()
+    layoutChildren()
+  }
+
+  private func layoutChildren() {
+    let h = bounds.height
+    let headerH = min(Self.headerHeight, h)
+    dragStrip.frame = NSRect(x: 0, y: h - headerH, width: bounds.width, height: headerH)
+    webView.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(0, h - headerH))
+  }
+
+  func setTitle(_ title: String) {
+    dragStrip.setTitle(title)
+  }
+
+  func setPinned(_ pinned: Bool) {
+    dragStrip.setPinned(pinned)
+  }
+
   func loadHTML(_ html: String) {
+    let ucc = webView.configuration.userContentController
+    ucc.removeAllUserScripts()
+    if let storage {
+      ucc.addUserScript(
+        WKUserScript(
+          source: storage.bootstrapScript(),
+          injectionTime: .atDocumentStart,
+          forMainFrameOnly: true
+        )
+      )
+    }
     webView.loadHTMLString(html, baseURL: nil)
+  }
+
+  func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+    guard message.name == Self.storeChannel,
+      let storage,
+      let body = message.body as? [String: Any],
+      let op = body["op"] as? String
+    else { return }
+    switch op {
+    case "set":
+      if let key = body["key"] as? String, let value = body["value"] as? String {
+        storage.set(key: key, value: value)
+      }
+    case "remove":
+      if let key = body["key"] as? String {
+        storage.remove(key: key)
+      }
+    case "clear":
+      storage.clear()
+    default:
+      break
+    }
   }
 }
 
@@ -521,6 +776,8 @@ private final class ShimStatusView: NSView {
   private let reconnectButton = NSButton(title: "Reconnect", target: nil, action: nil)
 
   var onReconnect: (() -> Void)?
+
+  override var mouseDownCanMoveWindow: Bool { true }
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)

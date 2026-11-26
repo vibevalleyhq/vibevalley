@@ -283,7 +283,7 @@ impl AssetBundle {
         let card_fibre_bc = load_vvtex_optional(&dist_dir.join("stock/card_fibre.vvtex"))?;
         let page_fibre_bc = load_vvtex_optional(&dist_dir.join("stock/page_fibre.vvtex"))?;
         let cut_edge_bc = load_vvtex_optional(&dist_dir.join("stock/cut_edge.vvtex"))?;
-        let materials_bc = load_vvtex_optional(&dist_dir.join("print/materials_2k.vvtex"))?;
+        let materials_bc = load_vvtex_optional(&dist_dir.join("print/materials.vvtex"))?;
 
         // Skip redundant PNG decoding when offline-baked .vvtex BC pyramids exist on disk
         // (~6.25 MB startup RGBA decode eliminated; PNGs remain lazily loadable via `load_rgba_fallback`)

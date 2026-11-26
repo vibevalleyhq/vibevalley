@@ -1,7 +1,15 @@
 import catalog from "./images.generated.json";
 import type { Scene } from "./scene";
 
-export const backgrounds: Readonly<Record<Scene, string>> = catalog.backgrounds;
+export interface HeroArt {
+  src: string;
+  srcset: string;
+  portraitSrcset: string;
+}
+
+export const heroWideSizes = "(min-aspect-ratio: 16/9) 106vw, 189vh";
+export const heroPortraitSizes = "(max-aspect-ratio: 9/16) 60vh, 106vw";
+export const backgrounds: Readonly<Record<Scene, HeroArt>> = catalog.backgrounds;
 
 export interface Screenshot {
   src: string;

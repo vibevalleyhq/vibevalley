@@ -152,8 +152,120 @@ fn extract_attr(attrs: &str, name: &str) -> Option<String> {
 }
 
 fn lookup_rel_file<'a>(files: &'a HashMap<String, String>, raw_ref: &str) -> Option<&'a str> {
-    let rel = raw_ref.strip_prefix("./").unwrap_or(raw_ref);
-    files.get(&format!("structure/{rel}")).or_else(|| files.get(rel)).map(String::as_str)
+    let mut rel = raw_ref;
+    while let Some(rest) = rel.strip_prefix("../") {
+        rel = rest;
+    }
+    rel = rel.strip_prefix("./").unwrap_or(rel);
+    files
+        .get(&format!("structure/{rel}"))
+        .or_else(|| files.get(rel))
+        .or_else(|| files.get(&format!("asset/{rel}")))
+        .map(String::as_str)
+}
+
+fn encode_uri_component(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    for &b in raw.as_bytes() {
+        let safe = b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')');
+        if safe {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
+fn replace_attr_double_quoted(attrs: &str, name: &str, new_val: &str) -> Option<String> {
+    let bytes = attrs.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        let key_start = i;
+        while i < bytes.len() && !bytes[i].is_ascii_whitespace() && bytes[i] != b'=' {
+            i += 1;
+        }
+        let key = &attrs[key_start..i];
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() || bytes[i] != b'=' {
+            continue;
+        }
+        i += 1;
+        while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+        if i >= bytes.len() {
+            break;
+        }
+        let val_start = i;
+        let val_end = if bytes[i] == b'"' || bytes[i] == b'\'' {
+            let quote = bytes[i];
+            i += 1;
+            while i < bytes.len() && bytes[i] != quote {
+                i += 1;
+            }
+            if i < bytes.len() {
+                i += 1;
+            }
+            i
+        } else {
+            while i < bytes.len() && !bytes[i].is_ascii_whitespace() {
+                i += 1;
+            }
+            i
+        };
+        if key.eq_ignore_ascii_case(name) {
+            let mut out = String::with_capacity(attrs.len() + new_val.len());
+            out.push_str(&attrs[..val_start]);
+            out.push('"');
+            out.push_str(new_val);
+            out.push('"');
+            out.push_str(&attrs[val_end..]);
+            return Some(out);
+        }
+    }
+    None
+}
+
+fn inline_svg_images(html: &str, files: &HashMap<String, String>) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut cursor = 0usize;
+    while let Some(rel) = find_ascii_ci(&html[cursor..], "<img") {
+        let start = cursor + rel;
+        let after = &html[start + "<img".len()..];
+        let boundary_ok = after.as_bytes().first().is_some_and(|b| b.is_ascii_whitespace() || *b == b'>' || *b == b'/');
+        if !boundary_ok {
+            out.push_str(&html[cursor..start + "<img".len()]);
+            cursor = start + "<img".len();
+            continue;
+        }
+        let Some(gt) = after.find('>') else {
+            break;
+        };
+        let tag_end = start + "<img".len() + gt + 1;
+        let attrs = &after[..gt];
+        if let Some(src) = extract_attr(attrs, "src")
+            && src.to_ascii_lowercase().ends_with(".svg")
+            && let Some(svg) = lookup_rel_file(files, &src)
+            && let Some(replaced_attrs) = replace_attr_double_quoted(attrs, "src", &format!("data:image/svg+xml;charset=utf-8,{}", encode_uri_component(svg)))
+        {
+            out.push_str(&html[cursor..start]);
+            out.push_str("<img");
+            out.push_str(&replaced_attrs);
+            out.push('>');
+            cursor = tag_end;
+            continue;
+        }
+        out.push_str(&html[cursor..tag_end]);
+        cursor = tag_end;
+    }
+    out.push_str(&html[cursor..]);
+    out
 }
 
 fn inline_css_links(html: &str, files: &HashMap<String, String>) -> String {
@@ -237,11 +349,27 @@ fn inline_scripts(html: &str, files: &HashMap<String, String>) -> String {
     out
 }
 
+fn pick_html_entry(files: &HashMap<String, String>) -> &str {
+    if let Some(primary) = files.get("structure/index.html") {
+        return primary.as_str();
+    }
+    let mut candidates: Vec<(&String, &String)> = files
+        .iter()
+        .filter(|(k, _)| {
+            let lower = k.to_ascii_lowercase();
+            lower.ends_with(".html") || lower.ends_with(".htm")
+        })
+        .collect();
+    candidates.sort_by(|a, b| a.0.cmp(b.0));
+    candidates.first().map(|(_, v)| v.as_str()).unwrap_or(DEFAULT_HTML)
+}
+
 /// Assembles a self-contained, CSP-sandboxed document for a `prototype` artifact directory.
 pub fn build_prototype_document(files: &HashMap<String, String>) -> String {
-    let raw_html = files.get("structure/index.html").map(String::as_str).unwrap_or(DEFAULT_HTML);
+    let raw_html = pick_html_entry(files);
     let with_css = inline_css_links(raw_html, files);
-    let with_js = inline_scripts(&with_css, files);
+    let with_svg = inline_svg_images(&with_css, files);
+    let with_js = inline_scripts(&with_svg, files);
     with_policy(&with_js)
 }
 
@@ -329,6 +457,23 @@ mod tests {
         let doc = build_prototype_document(&partial);
         assert!(doc.contains("href=\"./missing.css\""));
         assert!(doc.contains("src=\"./missing.js\""));
+    }
+
+    #[test]
+    fn falls_back_to_alternate_html_entry_and_inlines_svg_assets() {
+        let files = HashMap::from([
+            (
+                "structure/demo.html".into(),
+                "<!doctype html><html><head></head><body><img alt=\"badge\" src=\"../asset/badge.svg\"></body></html>".into(),
+            ),
+            (
+                "asset/badge.svg".into(),
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 12 12\"><rect width=\"10\" height=\"10\"/></svg>".into(),
+            ),
+        ]);
+        let doc = build_prototype_document(&files);
+        assert!(doc.contains("data:image/svg+xml;charset=utf-8,"));
+        assert!(doc.contains("connect-src 'none'"));
     }
 
     #[test]

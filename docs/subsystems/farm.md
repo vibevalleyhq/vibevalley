@@ -17,7 +17,7 @@
 |---|---|
 | `apps/mac/crates/diorama/` | 跨平台纯 Rust `vibevalley-diorama`（`wgpu` + WGSL）：VVM2 网格、BC1/BC3 `.vvtex`、`DioramaWorld` 领域同步、弹簧偶人骨骼、河道/拱桥寻路、阴影/DoF 合成与射线拾取 |
 | `apps/mac/src/diorama/scene.rs` | `DioramaScene`：把服务端切片映射到 `YardSnapshotSync`，管理帧缓冲池与按需节流（交互 `16ms` / 空闲 `66ms` / 切走或失活 `0 FPS`） |
-| `apps/mac/src/diorama/view.rs` | `DioramaView`：场景窗格容器，异步加载场景、订阅切片、`call_with_async` 调服务端，经 `FrameSurface::paint_rgba_frame` 与 `frame_gen` 去重上传至 GPUI `DynamicTexture`，并叠放暖羊皮纸浮层控件、紧急徽章与内景聚焦栏 |
+| `apps/mac/src/diorama/view.rs` | `DioramaView`：场景窗格容器，异步加载场景、订阅切片、`call_with_async` 调服务端，经 `FrameSurface::paint_bgra_frame` 与 `frame_gen` 去重上传至 GPUI `DynamicTexture`，并叠放暖羊皮纸浮层控件、紧急徽章与内景聚焦栏 |
 | `apps/mac/src/diorama/frame.rs` | 合并 `FarmFrame`、`BoardSlice`、`SessionsSlice`、`InboxSlice` 与 `CollabSlice` 为场景消费视图，定义 9 块地 `BEDS` 与动作去处 `place_of_action` |
 | `apps/mac/src/diorama/phone.rs`、`apps/mac/ui/farm/PhoneGames.tsx` | 农场手机与 5 款内置小游戏（共用 `Phone` 状态与 `farm-phone` 浮层） |
 | `apps/mac/src/diorama/opening.rs` | `OpeningView`：按本机时段解码 `assets/brand/opening-{morning,day,night}.webp` 的 Papertrails 开场欢迎画 |
@@ -51,13 +51,13 @@
 **画一帧**
 
 1. `DioramaView` 分别订阅 `SliceKind::Farm`、`Board`、`Sessions`、`Inbox` 与 `Collab`，`diorama/frame.rs` 合并出在场的帮工、工单、收件箱、`view.plots` 与单次特效 `effects`。
-2. `DioramaScene` 由 `DioramaWorld::step` 推进偶人弹簧/过桥步态、屋顶掀顶铰链与昼夜状态，并将不可变帧输入交 `vibevalley_runtime::rt::current_or_global_handle().spawn_blocking` 异步离屏渲染，再经 `FrameSurface::paint_rgba_frame` 与 `frame_gen` 去重写入 GPUI `DynamicTexture`（失活或离开 `/farm` 时完全停帧，`0 FPS`）。
+2. `DioramaScene` 由 `DioramaWorld::step` 推进偶人弹簧/过桥步态、屋顶掀顶铰链与昼夜状态，并将不可变帧输入交 `vibevalley_runtime::rt::current_or_global_handle().spawn_blocking` 异步离屏渲染，再经 `FrameSurface::paint_bgra_frame` 与 `frame_gen` 去重写入 GPUI `DynamicTexture`（失活或离开 `/farm` 时完全停帧，`0 FPS`）。
 
 ## 和谁打交道
 
 - **核心状态与游戏（`core`、`game`）**：订阅独立 `FarmFrame`（`view`、`progress`、`effects`）以及 `board`、`sessions`、`inbox`、`collab` 切片，按需调 `game.achievement.list` 读成就与进度。
 - **外壳（`apps/mac/src/shell/host_bridge.rs`）**：`DioramaEvent` 交给 `Shell::on_diorama_event`，由它开工作台的页或开终端。
-- **素材流水线**：全部 3D 纸雕源资产与渲染器位于同级 `vibevalley-assets` 仓，经 `design/diorama.sh`（或 `design/sync-assets.sh --all`）编译并同步最小运行包至 `assets/diorama/`（`VIBEVALLEY_ASSETS` 可覆盖素材根目录）。
+- **素材流水线**：全部 3D 纸雕源资产与渲染器位于同级 `vibevalley-assets` 仓，经 `design/diorama.sh --build`（或 `design/sync-assets.sh --all`）编译并同步最小运行包至 `assets/diorama/`。同步源由 `VIBEVALLEY_ASSETS_REPO` 指定，应用查找成品的根目录由 `VIBEVALLEY_ASSETS` 指定。
 
 ## 为什么这样
 

@@ -9,6 +9,7 @@ import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { Banner, Empty } from "../../design/layout";
+import { Markdown } from "../../design/Markdown";
 import { type MoreItem, MoreMenu } from "../../design/MoreMenu";
 import { motionClass } from "../../design/motion";
 import { Segmented } from "../../design/Segmented";
@@ -320,7 +321,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
     snapshotting.run(async () => {
       const updated = await api.artifact.version.create({
         id: props.artifact.id,
-        note: "Snapshot",
+        note: t("web.artifact.page.snapshotNote"),
       });
       await queries.invalidate({ prefix: ["artifacts"] });
       toast(t("web.artifact.edit.saved", { version: updated.version }));
@@ -406,14 +407,23 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
         <If when={!presenting()}>
           <View testID="artifact-header" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
             <If when={!contentSidebarOpen.get()}>
-              <IconButton
-                icon="sidebar"
-                size={16}
-                label={t("web.library.content.sidebarToggle")}
-                testid="content-sidebar-toggle"
-                pressed={false}
-                onClick={() => contentSidebarOpen.set(true)}
-              />
+              <>
+                <IconButton
+                  icon="sidebar"
+                  size={16}
+                  label={t("web.library.content.sidebarToggle")}
+                  testid="content-sidebar-toggle"
+                  pressed={false}
+                  onClick={() => contentSidebarOpen.set(true)}
+                />
+                <IconButton
+                  icon="back"
+                  size={14}
+                  label={t("web.artifact.page.backToLibrary")}
+                  testid="artifact-back-library"
+                  onClick={() => router.navigate("/library")}
+                />
+              </>
             </If>
             <View class="min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden">
               <Title artifact={props.artifact} />
@@ -436,25 +446,52 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
                       selectedVersion() === undefined ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
                     }`}
                   >
-                    <Text class={`font-mono text-2xs font-medium ${selectedVersion() === undefined ? "text-ink" : "text-muted"}`}>live</Text>
+                    <Text class={`font-mono text-2xs font-medium ${selectedVersion() === undefined ? "text-ink" : "text-muted"}`}>
+                      {t("web.artifact.page.liveVersion")}
+                    </Text>
                   </View>
-                  <Each of={props.artifact.versions.toReversed()} key={(v) => v.version}>
-                    {(v) => (
-                      <View
-                        role="button"
-                        testID={`artifact-version-${v().version}`}
-                        accessibilityState={{ selected: v().version === selectedVersion()?.version }}
-                        onPress={() => pickVersion(v().version)}
-                        class={`h-5 items-center justify-center rounded-sm border px-1.5 ${
-                          v().version === selectedVersion()?.version ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
-                        }`}
-                      >
-                        <Text class={`font-mono text-2xs font-medium tabular-nums ${v().version === selectedVersion()?.version ? "text-ink" : "text-muted"}`}>
-                          {`v${v().version}`}
-                        </Text>
+                  <If
+                    when={props.artifact.versions.length <= 3}
+                    else={
+                      <View class="flex-row items-center gap-1">
+                        <If when={selectedVersion()}>
+                          {(sv) => (
+                            <View class="h-5 items-center justify-center rounded-sm border border-accent bg-selected px-1.5">
+                              <Text class="font-mono text-2xs font-medium text-ink tabular-nums">{`v${sv().version}`}</Text>
+                            </View>
+                          )}
+                        </If>
+                        <MoreMenu
+                          icon="choose"
+                          label={t("web.artifact.card.version", { version: selectedVersion()?.version ?? props.artifact.version })}
+                          testid="artifact-version-menu"
+                          items={props.artifact.versions.toReversed().map((v) => ({
+                            key: String(v.version),
+                            label: `v${v.version}${v.note ? ` · ${v.note}` : ""}`,
+                            onSelect: () => pickVersion(v.version),
+                          }))}
+                        />
                       </View>
-                    )}
-                  </Each>
+                    }
+                  >
+                    <Each of={props.artifact.versions.toReversed()} key={(v) => v.version}>
+                      {(v) => (
+                        <View
+                          role="button"
+                          testID={`artifact-version-${v().version}`}
+                          accessibilityState={{ selected: v().version === selectedVersion()?.version }}
+                          onPress={() => pickVersion(v().version)}
+                          class={`h-5 items-center justify-center rounded-sm border px-1.5 ${
+                            v().version === selectedVersion()?.version ? "border-accent bg-selected" : "border-line bg-page hover:bg-hover"
+                          }`}
+                        >
+                          <Text class={`font-mono text-2xs font-medium tabular-nums ${v().version === selectedVersion()?.version ? "text-ink" : "text-muted"}`}>
+                            {`v${v().version}`}
+                          </Text>
+                        </View>
+                      )}
+                    </Each>
+                  </If>
                 </View>
               </If>
               <If when={issue()}>
@@ -485,12 +522,15 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
               <If when={!historyPreview()}>
                 <Segmented
                   testid="artifact-view-mode"
-                  label="View mode"
+                  label={t("web.artifact.page.viewMode")}
                   value={viewTab()}
                   onChange={(v) => viewTab.set(v)}
                   options={[
-                    { value: "preview" as const, label: "Preview" },
-                    { value: "files" as const, label: dirMeta().fileCount > 0 ? `Files (${dirMeta().fileCount})` : "Files" },
+                    { value: "preview" as const, label: t("web.artifact.page.previewTab") },
+                    {
+                      value: "files" as const,
+                      label: dirMeta().fileCount > 0 ? t("web.artifact.page.filesTabCount", { n: dirMeta().fileCount }) : t("web.artifact.page.filesTab"),
+                    },
                   ]}
                 />
                 <View class="mx-0.5 h-4 w-px shrink-0 bg-line" />
@@ -658,7 +698,12 @@ function HistoryPreviewBody(props: { artifact: Artifact; preview: ArtifactHistor
                         <Text class="font-mono text-xs font-semibold text-ink">{file().path}</Text>
                         <Text class="font-mono text-2xs text-faint">{`${file().mime} · ${file().size} B`}</Text>
                       </View>
-                      <Text class="font-mono text-xs leading-relaxed text-ink select-text">{file().content}</Text>
+                      <If
+                        when={file().path.endsWith(".md") || file().path.endsWith(".markdown")}
+                        else={<Text class="font-mono text-xs leading-relaxed text-ink select-text">{file().content}</Text>}
+                      >
+                        <Markdown size="doc" text={file().content} />
+                      </If>
                     </View>
                   )}
                 </Each>

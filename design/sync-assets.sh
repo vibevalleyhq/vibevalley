@@ -33,7 +33,11 @@ done
 
 if [ "$build" -eq 1 ]; then
   echo "==> Running pack_all.sh in $assets_repo..."
-  bash "$assets_repo/scripts/pack_all.sh"
+  if [ "$with_diorama" -eq 1 ]; then
+    bash "$assets_repo/scripts/pack_all.sh" --all
+  else
+    bash "$assets_repo/scripts/pack_all.sh"
+  fi
 fi
 
 sync_clean_dir() {

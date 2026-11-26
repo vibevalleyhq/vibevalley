@@ -83,6 +83,10 @@ const RULE_EXEMPTIONS: Readonly<Record<string, readonly ViolationRule[]>> = {
   "apps/mac/ui/features/artifact/shell.ts": ["hardcoded-color"],
   // Pure whiteboard SVG illustrations, canvas themes, and WebView runtime stylesheet.
   "apps/mac/ui/features/artifact/whiteboard.ts": ["hardcoded-color"],
+  // Starter artifact HTML/design JSON seed templates authored for user sandboxes.
+  "apps/mac/ui/features/content/appSeeds.ts": ["hardcoded-color"],
+  "apps/mac/ui/features/content/templateSeeds.ts": ["hardcoded-color"],
+  "apps/mac/ui/features/content/visualSeeds.ts": ["hardcoded-color"],
   // Emoji grid and keyboard shortcut labels legitimately render character glyphs.
   "apps/mac/ui/features/channel/views/EmojiPicker.tsx": ["glyph-icon-substitute"],
   "apps/mac/ui/infra/base/shortcuts.ts": ["glyph-icon-substitute"],

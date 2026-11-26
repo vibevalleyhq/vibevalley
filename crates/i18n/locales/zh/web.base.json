@@ -239,7 +239,11 @@
     "zoomOut": "缩小",
     "zoomReset": "重置缩放"
   },
-  "updateReady": "{next} 已下好，去「关于」重启",
+  "updateInstall": "立即更新",
+  "updateInstalling": "重启中…",
+  "updateReadyOneClick": "{next} 已就绪，点击一键重启更新",
+  "updateReadyTitle": "更新到 {next}",
+  "updateNotesTitle": "本次更新内容",
   "intent": {
     "timedOut": "等了太久没回音，可以重试",
     "offline": "没连上 VibeValley，这一下没发出去"

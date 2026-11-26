@@ -1,14 +1,8 @@
 use std::collections::{HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
-use serde::Serialize;
+pub use vibevalley_protocol::HostPhoneCallLog as CallLog;
 use vibevalley_protocol::InboxItem;
-
-#[derive(Debug, Clone, Serialize)]
-pub struct CallLog {
-    pub call: InboxItem,
-    pub answered: bool,
-}
 
 #[derive(Debug, Default)]
 pub struct Phone {

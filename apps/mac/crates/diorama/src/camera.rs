@@ -224,8 +224,21 @@ impl CameraRig {
         }
     }
 
+    pub fn settle(&mut self) {
+        self.cur = self.to;
+        self.blend_t = 1.0;
+        self.pan_offset = self.target_pan;
+        self.zoom_scale = self.target_zoom;
+    }
+
+    pub fn is_moving(&self) -> bool {
+        self.blend_t < 1.0 || self.target_pan.sub(self.pan_offset).len_sq() > 1e-6 || (self.target_zoom - self.zoom_scale).abs() > 1e-4
+    }
+
     pub fn update(&mut self, dt: f32) -> bool {
-        let mut moved = false;
+        if !self.is_moving() {
+            return false;
+        }
         if self.blend_t < 1.0 {
             let dur = self.blend_duration.max(0.1);
             self.blend_t = (self.blend_t + dt / dur).min(1.0);
@@ -237,19 +250,11 @@ impl CameraRig {
                 yaw_deg: self.from.yaw_deg + (self.to.yaw_deg - self.from.yaw_deg) * e,
                 fov_deg: self.from.fov_deg + (self.to.fov_deg - self.from.fov_deg) * e,
             };
-            moved = true;
         }
-        // Smooth exponential inertia damping for pan & zoom
         let k = (1.0 - (-dt * 14.0).exp()).clamp(0.0, 1.0);
-        if self.target_pan.sub(self.pan_offset).len_sq() > 1e-6 {
-            self.pan_offset = self.pan_offset.lerp(self.target_pan, k);
-            moved = true;
-        }
-        if (self.target_zoom - self.zoom_scale).abs() > 1e-4 {
-            self.zoom_scale += (self.target_zoom - self.zoom_scale) * k;
-            moved = true;
-        }
-        moved
+        self.pan_offset = self.pan_offset.lerp(self.target_pan, k);
+        self.zoom_scale += (self.target_zoom - self.zoom_scale) * k;
+        true
     }
 
     pub fn view_params(&self, aspect: f32) -> CameraMatrices {

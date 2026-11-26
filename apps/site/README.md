@@ -25,7 +25,7 @@ vp run site:deploy                                    # 构建，再发到 Cloud
 
 不另存原图：场景、立体纸艺切片、角色肖像和引擎徽章来自 `assets/{site,avatars,engines,icons}/`，截图来自 `docs/images/`，时辰与萤火虫数据在 `src/base/scene.ts`。
 
-- `scripts/images.ts` 读取 `scene.ts` 的时辰清单，用 Sharp 生成 `assets/site/hero-*.webp` 与多尺寸截图；缺图、尺寸或清单就失败。
+- `scripts/images.ts` 检查每个时段的三档横图与两档竖图，将素材仓已编码的 WebP 原样写入站点。首屏的预加载和 `<picture>` 使用同一组媒体条件与候选尺寸，后续时段在滚动接近时加载。减弱动效时，场景和诗句在选定时段直接切换。页面截图由 Sharp 从 PNG 分档编码。
 - 转换后的图写到 `public/gen/images/`，路径和尺寸由同一步写入 `src/base/images.generated.json`；不要手改生成清单。
 - `scripts/prepare.ts` 复制 Papertrails 图标，并调用 `scripts/card.ts` 以 `assets/site/postcard.png` 为底绘制分享图。输出都在 `public/gen/`，不进 git。
 - 分享图每种语言一张，1200×630。改了 `hero` 文案，构建会重新生成。

@@ -1,7 +1,8 @@
-export { ArtifactCard, artifactHref, artifactIcon, artifactSuffix, artifactTypeIcon, artifactTypeLabel, kindLabel, useArtifacts } from "./ArtifactCard";
+export { ArtifactCard, artifactHref, artifactIcon, artifactTypeIcon, artifactTypeLabel, kindLabel, useArtifacts } from "./ArtifactCard";
 export { ArtifactCanvas } from "./ArtifactCanvas";
 export { ArtifactsPage } from "./ArtifactsPage";
 export { buildOutlineFromMarkdown, inferArtifactFromName } from "./html";
+export { InstallAppletModal, useInstalledApplets } from "./InstallAppletModal";
 export { IssueArtifacts } from "./IssueArtifacts";
 export { PresenterPage } from "./PresenterPage";
 export { StandaloneArtifactPage } from "./StandaloneArtifactPage";

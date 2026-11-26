@@ -239,7 +239,11 @@
     "zoomOut": "Zoom out",
     "zoomReset": "Reset zoom"
   },
-  "updateReady": "{next} is ready: restart from About",
+  "updateInstall": "Update",
+  "updateInstalling": "Restarting…",
+  "updateReadyOneClick": "{next} is ready — click to update & restart",
+  "updateReadyTitle": "Update to {next}",
+  "updateNotesTitle": "What's new",
   "intent": {
     "timedOut": "No answer in time; try again",
     "offline": "Not connected to the farm, so this was not sent"

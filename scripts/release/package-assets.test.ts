@@ -32,7 +32,7 @@ test("shouldPackageAsset excludes website-only site assets and keeps app assets"
     "engines/vibevalley.png",
     "diorama/manifest.json",
     "diorama/meshes.bin",
-    "diorama/print/materials_2k.vvtex",
+    "diorama/print/materials.vvtex",
   ];
   for (const path of included) {
     expect(shouldPackageAsset(path), `expected included: ${path}`).toBe(true);

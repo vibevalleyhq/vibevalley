@@ -14,6 +14,7 @@ import { motionClass } from "../../design/motion";
 import { Tag } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
+import { reasonOf } from "../../infra/api";
 import { currentHost } from "../../infra/host";
 import { defineQuery, ready, useQuery, useQueryClient } from "../../infra/query";
 import { artifactIcon, kindLabel } from "./ArtifactCard";
@@ -26,12 +27,14 @@ const appletsQuery = defineQuery({
   },
 });
 
-function useInstalledApplet(artifactId: () => string) {
+export function useInstalledApplets() {
   const list = useQuery(() => appletsQuery(), { enabled: () => currentHost().applet !== undefined });
-  return computed((): ArtifactAppletInfo | undefined => {
-    const items = ready(list, []);
-    return items.find((item) => item.artifactId === artifactId() && item.installed);
-  });
+  return computed((): readonly ArtifactAppletInfo[] => ready(list, []));
+}
+
+function useInstalledApplet(artifactId: () => string) {
+  const list = useInstalledApplets();
+  return computed((): ArtifactAppletInfo | undefined => list().find((item) => item.artifactId === artifactId() && item.installed));
 }
 
 interface InstallAppletModalProps {
@@ -41,7 +44,7 @@ interface InstallAppletModalProps {
 }
 
 /** Modal to install, update, launch, or uninstall a local macOS artifact applet. */
-function InstallAppletModal(props: InstallAppletModalProps) {
+export function InstallAppletModal(props: InstallAppletModalProps) {
   return (
     <Dialog open={props.open} onClose={props.onClose} title={t("web.artifact.applet.modalTitle")} testid="install-applet-modal">
       <If when={props.open}>
@@ -225,10 +228,31 @@ export function InstallAppletButton(props: { artifact: Artifact; testID?: string
     props.onOpenChange?.(next);
   };
   const label = () => (installed() ? t("web.artifact.applet.buttonInstalled") : t("web.artifact.applet.button"));
+  const openInstalled = () => {
+    const applet = currentHost().applet;
+    const info = installed();
+    if (!applet || !info) return;
+    void applet.open(props.artifact.id).then(
+      () => toast(t("web.artifact.applet.openedToast", { name: info.appName })),
+      (e: unknown) => toast(reasonOf(e), "bad"),
+    );
+  };
 
   return (
     <If when={currentHost().applet !== undefined}>
-      <>
+      <View class="shrink-0 flex-row items-center gap-1">
+        <If when={installed()}>
+          <View
+            role="button"
+            testID="artifact-open-applet"
+            accessibilityLabel={t("web.artifact.applet.openApp")}
+            tooltip={<Bubble text={t("web.artifact.applet.openApp")} />}
+            onPress={openInstalled}
+            class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 hover:border-faint hover:bg-hover ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+          >
+            <Icon name="open" size={12} tone="ok-ink" />
+          </View>
+        </If>
         <View
           role="button"
           testID={props.testID ?? "artifact-install-applet"}
@@ -248,7 +272,7 @@ export function InstallAppletButton(props: { artifact: Artifact; testID?: string
           </If>
         </View>
         <InstallAppletModal open={modalOpen()} artifact={props.artifact} onClose={() => setOpen(false)} />
-      </>
+      </View>
     </If>
   );
 }

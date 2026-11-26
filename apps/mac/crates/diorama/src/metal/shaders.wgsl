@@ -518,9 +518,7 @@ fn triplanar_dominant_uv(lp: vec3<f32>, ln: vec3<f32>) -> vec2<f32> {
     return lp.xy;
 }
 
-// Seam-free, bleed-free 4x2 atlas (2048x1024, 512x512 cells) triplanar sampler:
-// gradients are computed from continuous pre-fract localPos derivatives and clamped inside cell bounds
-// so wrapped seams never trigger coarse mips and neighboring atlas cells never bleed!
+// Differentiate the continuous surface coordinates before wrapping within a material.
 fn sample_material_tile(
     col: f32,
     row: f32,
@@ -529,15 +527,11 @@ fn sample_material_tile(
     dTriY: vec2<f32>,
     freq: f32
 ) -> vec3<f32> {
-    let fuv = fract(triUv * freq);
-    let padX = 1.5 / 2048.0;
-    let padY = 1.5 / 1024.0;
-    let inner = vec2<f32>(0.25 - 2.0 * padX, 0.50 - 2.0 * padY);
-    let cellUv = vec2<f32>(
-        col * 0.25 + padX + fuv.x * inner.x,
-        row * 0.50 + padY + fuv.y * inner.y
-    );
-    let maxGrad = vec2<f32>(0.028, 0.035);
+    let cell = vec2<f32>(1.0 / 3.0, 0.5);
+    let pad = cell * (1.5 / 1024.0);
+    let inner = cell - 2.0 * pad;
+    let cellUv = vec2<f32>(col, row) * cell + pad + fract(triUv * freq) * inner;
+    let maxGrad = cell * 0.07;
     let dCellX = clamp(dTriX * (freq * inner), -maxGrad, maxGrad);
     let dCellY = clamp(dTriY * (freq * inner), -maxGrad, maxGrad);
     return textureSampleGrad(materialsTex, artSmp, cellUv, dCellX, dCellY).rgb;
@@ -678,7 +672,6 @@ fn scene_fs(in: SceneOut, @builtin(front_facing) isFront: bool) -> SceneFragOut 
         let toneSeed = (in.aoTint.a - 0.5) * 0.055;
         var surfMod = 1.0 + tooth * 0.64 + cloud * 0.12 + toneSeed;
 
-        // 2K Hand-Painted Pen-and-Ink + Matte Gouache Material Atlas (`materials_2k.vvtex`, 4x2 of 512x512)
         // Each tile is normalized to mean linear luminance 0.50 so multiplying preserves scene color balance!
         let srgbLuma = dot(srgbPigment, vec3<f32>(0.299, 0.587, 0.114));
         let maxC = max(srgbPigment.r, max(srgbPigment.g, srgbPigment.b));
@@ -713,9 +706,8 @@ fn scene_fs(in: SceneOut, @builtin(front_facing) isFront: bool) -> SceneFragOut 
             * (1.0 - smoothstep(0.10, 0.17, sat))
             * (1.0 - wPlaster) * (1.0 - wRoof);
 
-        // Select dominant atlas cell (single seam-free 4x anisotropic textureSampleGrad per fragment!)
         var matCol = 2.0;
-        var matRow = 1.0; // neutral slot
+        var matRow = 1.0;
         var matFreq = 0.85;
         var matStrength = 0.0;
         var bestW = 0.18;
@@ -730,13 +722,13 @@ fn scene_fs(in: SceneOut, @builtin(front_facing) isFront: bool) -> SceneFragOut 
             bestW = wTimber; matCol = 2.0; matRow = 0.0; matFreq = 0.96; matStrength = 0.78 * wTimber;
         }
         if (wStone > bestW) {
-            bestW = wStone; matCol = 3.0; matRow = 0.0; matFreq = 0.80; matStrength = 0.82 * wStone;
+            bestW = wStone; matCol = 0.0; matRow = 1.0; matFreq = 0.80; matStrength = 0.82 * wStone;
         }
         if (wFoliage > bestW) {
-            bestW = wFoliage; matCol = 0.0; matRow = 1.0; matFreq = 1.08; matStrength = 0.80 * wFoliage;
+            bestW = wFoliage; matCol = 1.0; matRow = 1.0; matFreq = 1.08; matStrength = 0.80 * wFoliage;
         }
         if (wBamboo > bestW) {
-            bestW = wBamboo; matCol = 1.0; matRow = 1.0; matFreq = 1.12; matStrength = 0.78 * wBamboo;
+            bestW = wBamboo; matCol = 2.0; matRow = 1.0; matFreq = 1.12; matStrength = 0.78 * wBamboo;
         }
 
         if (matStrength > 0.01) {
@@ -1166,7 +1158,8 @@ fn composite_fs(in: QuadOut) -> @location(0) vec4<f32> {
     let isInteractive = frame.quality_pad.x > 0.5;
 
     var col = sharp.rgb;
-    if (coc > 0.015 && maxBlur > 0.01) {
+    let blurPixels = coc * maxBlur;
+    if (coc > 0.015 && maxBlur > 0.01 && (!isInteractive || blurPixels > 0.5)) {
         var taps = 36;
         var radNormScale = 1.0;
         if (isInteractive) {
@@ -1183,7 +1176,7 @@ fn composite_fs(in: QuadOut) -> @location(0) vec4<f32> {
         }
         var blurAcc = sharp.rgb * 0.60;
         var wAcc = 0.60;
-        let rPx = coc * maxBlur * radNormScale;
+        let rPx = blurPixels * radNormScale;
         let jAng = bnVal * (6.2831853 * 0.28);
         let jc = cos(jAng);
         let js = sin(jAng);
@@ -1206,7 +1199,8 @@ fn composite_fs(in: QuadOut) -> @location(0) vec4<f32> {
             wAcc += w;
         }
         let blurred = blurAcc / max(wAcc, 1e-4);
-        col = mix(col, blurred, smoothstep(0.015, 0.34, coc));
+        let subpixel = select(1.0, smoothstep(0.5, 1.0, blurPixels), isInteractive);
+        col = mix(col, blurred, smoothstep(0.015, 0.34, coc) * subpixel);
     }
 
     if (isInteractive && coc <= 0.10) {
@@ -1215,20 +1209,12 @@ fn composite_fs(in: QuadOut) -> @location(0) vec4<f32> {
         let cS  = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>( 0.0,  texel.y), 0.0).rgb;
         let cW  = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>(-texel.x,  0.0), 0.0).rgb;
         let cE  = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>( texel.x,  0.0), 0.0).rgb;
-        let cNW = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>(-texel.x, -texel.y), 0.0).rgb;
-        let cNE = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>( texel.x, -texel.y), 0.0).rgb;
-        let cSW = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>(-texel.x,  texel.y), 0.0).rgb;
-        let cSE = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>( texel.x,  texel.y), 0.0).rgb;
 
         let lM  = fxaa_luma(col);
         let lN  = fxaa_luma(cN);
         let lS  = fxaa_luma(cS);
         let lW  = fxaa_luma(cW);
         let lE  = fxaa_luma(cE);
-        let lNW = fxaa_luma(cNW);
-        let lNE = fxaa_luma(cNE);
-        let lSW = fxaa_luma(cSW);
-        let lSE = fxaa_luma(cSE);
 
         let lumaMin = min(lM, min(min(lN, lS), min(lW, lE)));
         let lumaMax = max(lM, max(max(lN, lS), max(lW, lE)));
@@ -1236,6 +1222,14 @@ fn composite_fs(in: QuadOut) -> @location(0) vec4<f32> {
 
         var aaCol = col;
         if (lumaRange >= max(0.065, lumaMax * 0.18)) {
+            let cNW = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>(-texel.x, -texel.y), 0.0).rgb;
+            let cNE = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>( texel.x, -texel.y), 0.0).rgb;
+            let cSW = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>(-texel.x,  texel.y), 0.0).rgb;
+            let cSE = textureSampleLevel(compSceneTex, compSmp, in.uv + vec2<f32>( texel.x,  texel.y), 0.0).rgb;
+            let lNW = fxaa_luma(cNW);
+            let lNE = fxaa_luma(cNE);
+            let lSW = fxaa_luma(cSW);
+            let lSE = fxaa_luma(cSE);
             let dirX = -((lNW + lNE) - (lSW + lSE));
             let dirY =  ((lNW + lSW) - (lNE + lSE));
             let dirReduce = max((lNW + lNE + lSW + lSE) * 0.03125, 0.0078125);
@@ -1370,5 +1364,6 @@ fn composite_fs(in: QuadOut) -> @location(0) vec4<f32> {
     let grainAmt = mix(0.008, 0.004, coc);
     col += (bnVal - 0.5) * grainAmt;
 
-    return vec4<f32>(clamp(col, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
+    let output = select(col, col.bgr, frame.quality_pad.y > 0.5);
+    return vec4<f32>(clamp(output, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
 }

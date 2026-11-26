@@ -250,3 +250,41 @@ import Testing
     #expect(shiftA == MappedKeystroke(key: "a", keyChar: "A", clearFunctionModifier: false))
   }
 }
+
+@Suite struct AppletStorageTests {
+  @Test func sanitizesIdentifiersAndBuildsAutosaveNames() {
+    #expect(AppletStorage.sanitizeIdentifier("../../etc/passwd") == "etc_passwd")
+    #expect(AppletStorage.sanitizeIdentifier("..__.") == "default")
+    #expect(AppletStorage.sanitizeIdentifier("art_focus-01") == "art_focus-01")
+    #expect(AppletStorage.windowAutosaveName(forArtifactId: "../art:1") == "VibeValleyApplet.art_1")
+  }
+
+  @Test func persistsSetRemoveAndClearAcrossReloadsAndEnforcesCaps() throws {
+    let tmp = FileManager.default.temporaryDirectory
+      .appendingPathComponent("vv-applet-store-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: tmp) }
+    let file = tmp.appendingPathComponent("store.json")
+
+    let first = AppletStorage(fileURL: file)
+    #expect(first.set(key: "theme", value: "dark") == true)
+    #expect(first.set(key: "note", value: "hello </script>") == true)
+    #expect(first.set(key: "", value: "ignored") == false)
+    #expect(first.set(key: "huge", value: String(repeating: "x", count: AppletStorage.maxBytes + 1)) == false)
+
+    let reloaded = AppletStorage(fileURL: file)
+    #expect(reloaded.snapshot() == ["theme": "dark", "note": "hello </script>"])
+
+    let script = reloaded.bootstrapScript()
+    #expect(!script.contains("</script>"))
+    #expect(script.contains(#"\u003C\/script\u003E"#))
+    #expect(script.contains("window.vvStore"))
+
+    reloaded.remove(key: "theme")
+    let afterRemove = AppletStorage(fileURL: file)
+    #expect(afterRemove.snapshot() == ["note": "hello </script>"])
+
+    afterRemove.clear()
+    let afterClear = AppletStorage(fileURL: file)
+    #expect(afterClear.snapshot().isEmpty)
+  }
+}

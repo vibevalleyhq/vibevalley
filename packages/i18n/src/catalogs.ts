@@ -257,7 +257,66 @@ export const catalogs = {
         rail: "这篇的旁注",
         railShow: "打开旁注",
         railHide: "收起旁注",
+        backToLibrary: "返回内容库",
+        previewTab: "预览",
+        filesTab: "文件",
+        filesTabCount: "文件 ({n})",
+        viewMode: "视图模式",
+        liveVersion: "实时",
+        directory: "目录",
+        newFileLabel: "新文件路径",
+        discard: "放弃更改",
+        unsaved: "未保存",
+        deleteFileAsk: "删除文件「{path}」？",
+        snapshotNote: "手动快照",
       },
+      docs: { split: "分栏", edit: "编辑", read: "阅读", chars: "{n} 字" },
+      outline: {
+        progress: "{done}/{total} 已完成",
+        hideDone: "隐藏已完成",
+        showDone: "显示已完成",
+        quickAdd: "输入内容后按回车快速添加…",
+        kindHeading: "标题",
+        kindBullet: "要点",
+        kindTodo: "待办",
+        cycleKind: "切换类型 ({kind})",
+        indent: "缩进",
+        outdent: "取消缩进",
+        addChild: "添加子项",
+        untitled: "新条目",
+      },
+      sheet: { filterPlaceholder: "筛选行…", addRow: "新增一行", empty: "暂无工作表", rowsCount: "{n} 行" },
+      diagram: { visual: "图谱视图", structure: "节点与连线", nodes: "节点", edges: "连线" },
+      motion: {
+        timeline: "时间线片段",
+        layers: "{n} 个图层",
+        play: "播放",
+        stop: "暂停",
+        restart: "回到开头",
+        loop: "循环播放",
+        prevStep: "后退 0.5 秒",
+        nextStep: "前进 0.5 秒",
+        chapters: "章节",
+      },
+      storyboard: {
+        gridMode: "分镜卡片",
+        animaticMode: "动态预演",
+        totalDuration: "总时长 {sec} 秒",
+        shotOf: "第 {n} / {total} 镜",
+        sfx: "音效",
+        transition: "转场",
+      },
+      prototype: {
+        viewportLabel: "视口尺寸",
+        viewportFull: "铺满",
+        viewportTablet: "平板",
+        viewportMobile: "手机",
+        reload: "重新载入",
+        iterateAi: "让助手修改",
+        installApp: "安装为应用",
+        openApp: "打开应用",
+      },
+      files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
       issue: { title: "作品" },
       blocks: { saved: "都存好了", user: "你", start: "从这里开始写……" },
       canvas: { label: "打开的作品", close: "关掉", openPage: "在作品页打开" },
@@ -350,11 +409,42 @@ export const catalogs = {
         styleSolid: "实线",
         styleDashed: "虚线",
       },
-      design: { noProps: "当前画板未声明可调属性（data-props）" },
-      designSystem: { components: "组件预览" },
+      design: {
+        themeLight: "浅色",
+        themeDark: "深色",
+        propsTitle: "属性控制杆",
+        enabled: "开启",
+        disabled: "关闭",
+        emptyCanvas: "暂无画板元素，可在工作区中添加组件",
+      },
+      designSystem: {
+        components: "组件预览",
+        colors: "色彩令牌",
+        typography: "字体排印",
+        spacing: "间距尺度",
+        radius: "圆角尺度",
+        guidelinesDo: "推荐",
+        guidelinesDont: "避免",
+        previewTheme: "预览主题",
+        specimen: "Aa Bb 永和九年 0123456789",
+      },
       slidesStore: { addSlide: "加一页" },
       edit: { save: "存成新的一稿", saved: "存成了第 {version} 稿" },
-      slides: { previous: "上一页", next: "下一页", present: "全屏放映", presenter: "演讲者视图" },
+      slides: {
+        previous: "上一页",
+        next: "下一页",
+        present: "全屏放映",
+        presenter: "演讲者视图",
+        editSlide: "编辑本页",
+        doneEdit: "完成编辑",
+        slideTitleLabel: "标题",
+        slideSubtitleLabel: "副标题",
+        slideLayoutLabel: "版式",
+        layoutCover: "封面",
+        layoutContent: "正文",
+        slideBulletsLabel: "要点（每行一条）",
+        slideNotesLabel: "演讲备注",
+      },
       presenter: {
         missing: "没说要讲哪一份幻灯片：从作品的「演讲者视图」打开。",
         current: "这一页",
@@ -388,6 +478,8 @@ export const catalogs = {
         reinstall: "更新并重装",
         installing: "正在安装…",
         open: "打开应用",
+        openApp: "打开独立应用",
+        manageApp: "管理应用",
         uninstall: "卸载",
         installedToast: "已安装「{name}.app」",
         uninstalledToast: "已卸载「{name}.app」",
@@ -635,7 +727,11 @@ export const catalogs = {
         zoomOut: "缩小",
         zoomReset: "重置缩放",
       },
-      updateReady: "{next} 已下好，去「关于」重启",
+      updateInstall: "立即更新",
+      updateInstalling: "重启中…",
+      updateReadyOneClick: "{next} 已就绪，点击一键重启更新",
+      updateReadyTitle: "更新到 {next}",
+      updateNotesTitle: "本次更新内容",
       intent: { timedOut: "等了太久没回音，可以重试", offline: "没连上 VibeValley，这一下没发出去" },
       pickTooLarge: "{name} 没加上：超过 512 MiB 了",
       openTerminal: "在这里打开终端",
@@ -1551,6 +1647,10 @@ export const catalogs = {
         sidebarToggle: "展开或收起内容导航",
         recent: "全部最近",
         pinned: "置顶收藏",
+        pinnedEmpty: "还没有置顶内容。悬停任意作品或素材并点击图钉即可置顶到这里。",
+        resetFilter: "重置筛选",
+        installedApps: "已安装应用",
+        installedAppsEmpty: "还没有安装独立应用。在任意作品卡片或详情右上角点击「安装为应用」，即可把它装成独立的 macOS 桌面应用并在此集中启动与管理。",
         pin: "置顶",
         unpin: "取消置顶",
         pinnedToast: "已置顶收藏",
@@ -1575,27 +1675,79 @@ export const catalogs = {
         templates: {
           title: "新建内容",
           search: "搜索模板…",
+          searchCount: "找到 {n} 个模板",
           empty: "没有匹配的模板",
-          cat: { recommended: "推荐", note: "大纲笔记", whiteboard: "白板与图表", deliverable: "交付作品", ai: "AI 生成" },
+          cat: {
+            recommended: "推荐",
+            apps: "独立应用",
+            engineering: "研发工程",
+            note: "大纲笔记",
+            whiteboard: "白板与图表",
+            deliverable: "交付作品",
+            ai: "AI 生成",
+          },
           items: {
             noteBlank: { name: "空白大纲笔记", desc: "轻量单栏大纲，支持缩进、待办与双链" },
             noteTech: { name: "技术方案大纲", desc: "背景目标、核心设计与拆解清单" },
             noteMeeting: { name: "会议纪要", desc: "讨论焦点、关键结论与后续待办" },
             noteDaily: { name: "每日工作记录", desc: "今日主线、阻塞点与交接摘要" },
+            notePrReview: { name: "代码评审清单", desc: "正确性、边界条件、并发安全与回归测试核对" },
+            noteDebug: { name: "故障排查记录", desc: "复现路径、假设验证、日志线索与根因定位" },
+            noteRelease: { name: "发版核对清单", desc: "预检门禁、灰度放量、监控观察与回滚预案" },
+            noteOncall: { name: "值班交接单", desc: "活跃告警、待跟进事项、变更窗口与联系人" },
+            noteOnboarding: { name: "代码库导读", desc: "目录拓扑、关键入口、本地运行与常见坑点" },
+            noteSprintRetro: { name: "迭代复盘大纲", desc: "交付亮点、摩擦瓶颈、工程债与改进行动" },
             wbBlank: { name: "空白白板", desc: "自由无限画布，点阵网格与原生连线" },
             wbArch: { name: "系统架构图", desc: "分层节点与数据流箭头连线" },
             wbTimeline: { name: "产品发布时间线", desc: "里程碑节点与交付阶段节奏" },
             wbJourney: { name: "用户旅程图", desc: "关键触点、痛点观察与改进机会" },
             wbWorkshop: { name: "启动工作坊", desc: "目标拆解、发散便签与收口结论" },
+            wbEventStorming: { name: "事件风暴画布 (DDD)", desc: "领域命令、聚合、领域事件与读模型推演" },
+            wbC4: { name: "C4 容器架构画布", desc: "边界网关、应用服务、异步队列与存储拓扑" },
+            wbIncidentMap: { name: "故障根因推理图", desc: "症状现象、候选假设、验证结果与止血动作" },
+            wbTradeoff: { name: "技术选型对比板", desc: "候选方案、约束权重、风险评估与最终决策" },
             artDocs: { name: "协作文档", desc: "长文规范、评审报告或技术说明" },
+            docRfc: { name: "RFC 技术设计文档", desc: "问题背景、方案对比、接口契约与灰度回滚" },
+            docAdr: { name: "架构决策记录 (ADR)", desc: "决策上下文、候选权衡、最终结论与影响面" },
+            docPostmortem: { name: "故障复盘报告", desc: "影响面、时间线、五问根因分析与防再发项" },
+            docApiSpec: { name: "接口契约规范", desc: "端点路由、鉴权、请求响应结构与错误码定义" },
+            docRunbook: { name: "运维处置手册", desc: "告警阈值、排查命令、降级开关与回滚步骤" },
+            docSecurity: { name: "安全威胁建模", desc: "信任边界、STRIDE 威胁面、缓解措施与审计" },
+            docMigration: { name: "数据与结构迁移方案", desc: "双写兼容、分批回填、校验脚本与回滚演练" },
+            docPerf: { name: "性能压测与调优报告", desc: "压测基线、瓶颈剖析、优化前后对比与容量结论" },
             artSlides: { name: "演示幻灯片", desc: "宽屏多页演示文稿与分页备注" },
+            slidesArchReview: { name: "架构评审演示稿", desc: "目标约束、核心拓扑、关键权衡与风险缓释" },
+            slidesReleaseDemo: { name: "技术分享与发版宣讲", desc: "版本亮点、实现剖析、性能收益与后续规划" },
             artDashboard: { name: "数据看板", desc: "指标卡片、趋势核验与明细表" },
+            dashSlo: { name: "服务 SLO 与稳定性看板", desc: "可用性、P99 延迟、错误预算消耗与告警明细" },
+            dashDora: { name: "研发效能看板 (DORA)", desc: "部署频次、变更前置时间、故障率与恢复时长" },
             artDesign: { name: "界面画板", desc: "多画板界面探索与组件属性调节" },
             artDesignSystem: { name: "设计体系", desc: "色彩令牌、字阶规范与对比度核验" },
             artMotion: { name: "动态短片", desc: "可交互动效预览与视频导出" },
             artHtml: { name: "单页网页", desc: "独立可交互网页与版本迭代" },
+            protoApiPlayground: { name: "接口报文与 Schema 沙盒", desc: "离线 JSON 校验格式化、请求构造与 cURL 生成" },
+            protoComponentLab: { name: "交互组件状态实验台", desc: "多态预览（正常/加载/空/报错）、明暗主题与视口切换" },
+            protoFocusStudio: { name: "专注番茄钟与白噪音工坊", desc: "环形倒计时、WebAudio 雨声/暖噪合成与本地任务队列，适合装成桌面独立应用" },
+            protoSynthPad: { name: "便携合成器与 16 步鼓机", desc: "零外链 WebAudio 鼓机步进音序器、实时波形示波器与键盘演奏台" },
+            protoParticleLab: { name: "生成式流体粒子实验室", desc: "60fps Canvas 旋度场粒子物理模拟、鼠标引力扰动与多色板切换" },
+            protoTokenCalculator: { name: "AI Token 成本与缓存估算器", desc: "实时滑动估算 DAU、命中率、多档模型月度成本并导出预算摘要" },
+            protoCssGlassStudio: { name: "流体网格与毛玻璃参数工坊", desc: "动态渐变光球叠加模糊透明度实时调节，一键复制 CSS" },
+            protoDeskKanban: { name: "极简桌面看板与便签栏", desc: "三列桌面微型进度看板，带优先级标签、完成度统计与本地记忆" },
+            designWorkspaceUi: { name: "多端工作台界面画板", desc: "含桌面/移动端画板、实时属性控制杆与响应式卡片节点树" },
+            dsPapertrails: { name: "Papertrails 设计体系规范", desc: "完整明暗色彩令牌、字阶圆角尺度与实时组件变体规范" },
+            motionLaunchReel: { name: "产品发布动效短片", desc: "3 章节纯时间确定性多图层动画序列，支持时间轴播放预览" },
+            storyboardProductFilm: { name: "产品宣讲分镜脚本文案", desc: "含景别构图、运镜节奏、对白旁白与动态预演的多镜头分镜板" },
             artSheet: { name: "电子表格", desc: "多工作表结构化表格与 CSV 导出" },
+            sheetBenchmark: { name: "性能基准测试表", desc: "QPS、P50/P95/P99 延迟、内存占用与对比结论" },
+            sheetTechMatrix: { name: "技术方案评估矩阵", desc: "分维度加权打分、改造成本与运维复杂度对比" },
+            sheetTestMatrix: { name: "测试与回归矩阵", desc: "核心用例、环境覆盖、预期结果与最近通过状态" },
+            sheetApiInventory: { name: "接口与依赖台账", desc: "端点清单、鉴权方式、限流策略与负责人记录" },
             artDiagram: { name: "结构图表", desc: "节点、连线与架构流程表达" },
+            diagMicroservices: { name: "微服务拓扑图", desc: "边缘网关、业务服务、事件总线与存储依赖" },
+            diagSequence: { name: "调用时序图", desc: "客户端、认证、核心服务与持久化请求链路" },
+            diagErd: { name: "数据实体关系图 (ER)", desc: "核心实体表、外键关联与索引归属关系" },
+            diagCicd: { name: "CI/CD 交付流水线", desc: "静态检查、单测集成、制品构建与灰度发布" },
+            diagStateMachine: { name: "状态机流转图", desc: "生命周期状态节点、合法跃迁条件与终态收敛" },
             artStoryboard: { name: "分镜脚本", desc: "镜头清单、景别、色调与对白脚本" },
             aiImage: { name: "AI 生成图片", desc: "根据描述生成概念插画、图标或配图" },
             aiSpeech: { name: "AI 单人语音", desc: "将文案合成为自然人声音频文件" },
@@ -1605,6 +1757,18 @@ export const catalogs = {
             noteTech: "## 背景与目标\n- 说明要解决的核心问题与收益边界\n## 核心设计\n- 梳理模块边界与数据流\n## 实施拆解\n- [ ] 拆分任务步骤并补全验收测试",
             noteMeeting: "## 讨论焦点\n- 记录本次沟通的核心议题\n## 关键结论\n- 写下已达成一致的决定\n## 后续待办\n- [ ] 跟进确认后的行动项",
             noteDaily: "## 今日主线\n- [ ] 列出今天优先推进的事项\n## 阻塞与风险\n- 记录需要协作解开的卡点\n## 交接摘要\n- 今日完成的结果与后续衔接点",
+            notePrReview:
+              "## 变更范围与意图\n- 确认改动是否聚焦单一职责、无无关夹带\n## 正确性与边界\n- [ ] 空值、并发竞态与错误传播是否显式处理\n- [ ] 外部输入是否在边界完成解码与校验\n## 质量与测试\n- [ ] 新增行为与回归边界是否均有自动化测试覆盖\n- [ ] 无重复逻辑、临时兜底或静默吞错",
+            noteDebug:
+              "## 问题现象\n- 报错信息、复现环境与影响范围\n## 假设与排查记录\n- [ ] 核对最近提交与配置变更\n- [ ] 采集链路观测日志与关键指标快照\n- [ ] 在最小复现用例中锁定触发条件\n## 根因与修复\n- 写明根本原因、修复方案与补充回归测试",
+            noteRelease:
+              "## 发布前门禁\n- [ ] 全部 CI 检查、构建与契约校验绿灯通过\n- [ ] 数据库结构迁移脚本与向后兼容已验证\n## 灰度与监控\n- [ ] 先发布 5% 灰度并观察错误率与 P99 延迟 15 分钟\n- [ ] 确认核心业务指标与告警面板无异常\n## 回滚预案\n- 记录一键回滚命令、开关名称与值班负责人",
+            noteOncall:
+              "## 值班周期与交接人\n- 交接时段、主备值班人及升级联系人\n## 活跃告警与处理中事项\n- [ ] 列出尚未关闭的告警与当前处置进展\n## 本周期重点观察\n- 近期上线变更、定时任务窗口与容量水位\n## 常用工具入口\n- 监控面板、链路观测平台与快速止血开关",
+            noteOnboarding:
+              "## 仓库定位与目录结构\n- 核心入口目录、共享契约包与构建产物位置\n## 本地开发与校验命令\n- [ ] 安装依赖并启动本地服务与热更新\n- [ ] 跑通单测、静态检查与格式化命令\n## 核心请求主线\n- 从边界入口、领域层到持久化存储的完整路径\n## 常见注意事项\n- 环境变量、本地状态目录与高频踩坑提示",
+            noteSprintRetro:
+              "## 本轮交付亮点\n- 顺利上线的核心特性与超预期成果\n## 过程中的摩擦点\n- 返工原因、等待阻塞、工具链或需求不清之处\n## 工程债与质量盘点\n- 本轮新增或暴露出的技术债清单\n## 下轮改进行动\n- [ ] 明确责任人、落地方式与验收时间点",
             wbBlankTitle: "中心主题",
             wbBlankBody: "从工具栏添加卡片、便签与连线",
             wbArchN1Title: "接入层 · UI",
@@ -1639,9 +1803,352 @@ export const catalogs = {
             wbWorkW3Body: "收敛第一阶段优先落地的改动",
             wbWorkE1: "发散",
             wbWorkE2: "收敛",
+            wbEsCmdTitle: "Command · 提交变更",
+            wbEsCmdBody: "校验输入权限与幂等键",
+            wbEsAggTitle: "Aggregate · 领域聚合",
+            wbEsAggBody: "维护状态不变量与业务规则",
+            wbEsEvtTitle: "Event · 变更已持久化",
+            wbEsEvtBody: "同事务写入 Outbox 事件表",
+            wbEsReadTitle: "Read Model · 切片投影",
+            wbEsReadBody: "增量更新视图并广播客户端",
+            wbEsE1: "校验并执行",
+            wbEsE2: "发布事件",
+            wbEsE3: "异步投影",
+            wbC4EdgeTitle: "API 网关 · HTTP/WS",
+            wbC4EdgeBody: "鉴权、限流与契约边界解码",
+            wbC4AppTitle: "核心服务 · Rust",
+            wbC4AppBody: "核心状态机、事务与协同内核",
+            wbC4QueueTitle: "Async Queue · 异步队列",
+            wbC4QueueBody: "执行耗时媒体与外部投递任务",
+            wbC4DbTitle: "主库 · SQLite / PostgreSQL",
+            wbC4DbBody: "单一持久化真源与版本快照",
+            wbC4E1: "RPC 调用",
+            wbC4E2: "入队",
+            wbC4E3: "事务落库",
+            wbIncSymTitle: "现象 · P99 延迟突增",
+            wbIncSymBody: "核心接口超时率升至 3.2%",
+            wbIncHyp1Title: "假设 A · 慢查询锁表",
+            wbIncHyp1Body: "检查连接池等待与索引失效",
+            wbIncHyp2Title: "假设 B · 上游限流重试",
+            wbIncHyp2Body: "核对重试放大与超时配置",
+            wbIncFixTitle: "止血 · 降级与限流",
+            wbIncFixBody: "开启熔断保护并回滚可疑发布",
+            wbIncE1: "排查",
+            wbIncE2: "验证",
+            wbIncE3: "处置",
+            wbToReqTitle: "约束 · 一致性与延迟",
+            wbToReqBody: "跨节点协作需强收敛且低开销",
+            wbToOptATitle: "方案 A · CRDT 本地优先",
+            wbToOptABody: "离线可用，冲突自动无锁合并",
+            wbToOptBTitle: "方案 B · OT 中心协调",
+            wbToOptBBody: "服务端定序，实现复杂度集中在锁",
+            wbToDecTitle: "结论 · 采纳方案 A",
+            wbToDecBody: "复用已有协同内核并控住复杂度",
+            wbToE1: "评估",
+            wbToE2: "对比",
+            wbToE3: "定案",
+            docRfcBody:
+              "# {title}\n\n- **状态**：Draft / Review / Accepted\n- **负责人**：\n- **关联任务**：\n\n## 1. 背景与动机\n\n描述当前系统痛点、触发契机与本次要解决的核心问题。\n\n## 2. 目标与非目标\n\n### 目标\n- 明确可量化的工程收益与功能边界。\n\n### 非目标\n- 显式列出本次故意不做的部分，防止范围蔓延。\n\n## 3. 备选方案对比\n\n| 维度 | 方案 A（推荐） | 方案 B |\n|---|---|---|\n| 复杂度 | 低，复用现有模块 | 高，需新增独立状态 |\n| 性能与可靠性 | 满足 SLA | 存在额外网络跳数 |\n| 回滚成本 | 可通过开关秒级回退 | 涉及不可逆数据结构改动 |\n\n## 4. 详细设计\n\n### 4.1 模块边界与接口契约\n```ts\n// 在此贴入核心类型、接口签名或状态机定义\n```\n\n### 4.2 数据模型与存储变更\n- 说明新增/变更的表结构、索引与迁移策略。\n\n### 4.3 失败模式与并发安全\n- 梳理超时、重试幂等、部分失败与降级路径。\n\n## 5. 测试、灰度与回滚计划\n- [ ] 单元测试与集成测试\n- [ ] 指标监控与告警阈值\n- [ ] 灰度放量节奏与一键回滚步骤\n",
+            docAdrBody:
+              "# {title}\n\n- **状态**：Proposed / Accepted / Superseded\n- **日期**：\n- **决策人**：\n\n## 1. 上下文与问题陈述\n\n描述促使我们做出架构决策的技术背景、约束条件与业务诉求。\n\n## 2. 决策驱动因素\n- 性能与延迟预算\n- 开发维护成本与团队熟悉度\n- 长期演进与可替换性\n\n## 3. 候选方案\n1. **方案一**：\n2. **方案二**：\n3. **维持现状**：\n\n## 4. 决策结果\n\n**选定方案**：写明最终拍板的方案与核心理由。\n\n### 正面影响\n- 带来的收益与简化。\n\n### 负面影响与风险缓释\n- 需要承担的代价及对应的防护措施。\n\n## 5. 校验与后续复核\n- 说明如何在代码审查、静态门禁或压测中长期守住该决策。\n",
+            docPostmortemBody:
+              "# {title}\n\n- **严重级别**：SEV-1 / SEV-2 / SEV-3\n- **持续时长**：\n- **影响面**：受影响接口、功能或用户比例\n\n## 1. 事件摘要\n\n用两三句话客观概括故障表现、触发原因与最终恢复手段（对事不对人）。\n\n## 2. 关键时间线（UTC+8）\n| 时间 | 事件 / 动作 |\n|---|---|\n| 00:00 | 变更发布 / 触发条件出现 |\n| 00:05 | 告警触发并开始排查 |\n| 00:12 | 定位直接原因并执行止血/回滚 |\n| 00:18 | 指标恢复正常，事件降级关闭 |\n\n## 3. 根因分析（5 Whys）\n1. 为什么发生表层异常？\n2. 为什么防线未能拦截？\n3. 为什么监控没有更早预警？\n4. 根本系统性诱因是什么？\n\n## 4. 做得好的地方与待改进项\n- **有效止血**：\n- **暴露短板**：\n\n## 5. 整改行动项（Action Items）\n| 类型 | 行动项 | 负责人 | 截止日期 | 状态 |\n|---|---|---|---|---|\n| 预防 | 补充回归测试与静态检查 | | | 待办 |\n| 探测 | 完善告警阈值与观测面板 | | | 待办 |\n",
+            docApiSpecBody:
+              '# {title}\n\n- **协议版本**：v1\n- **鉴权方式**：Bearer Token / HMAC\n- **幂等键**：`Idempotency-Key`\n\n## 1. 端点总览\n\n| 方法 | 路径 | 说明 | 限流 |\n|---|---|---|---|\n| GET | `/api/v1/resources` | 分页查询列表 | 120 req/min |\n| POST | `/api/v1/resources` | 创建资源 | 30 req/min |\n| PUT | `/api/v1/resources/:id` | 全量更新资源 | 60 req/min |\n\n## 2. 请求与响应契约\n\n### 请求载荷\n```json\n{\n  "id": "res_01",\n  "name": "example",\n  "options": {}\n}\n```\n\n### 成功响应（`200 OK`）\n```json\n{\n  "bizCode": 0,\n  "message": "ok",\n  "data": {}\n}\n```\n\n## 3. 业务错误码\n\n| HTTP 状态 | `bizCode` | 含义 | 客户端处理建议 |\n|---|---|---|---|\n| 400 | 400001 | 参数校验失败 | 高亮字段提示用户 |\n| 409 | 409001 | 版本冲突 / 乐观锁失败 | 拉取最新快照后重试 |\n\n## 4. 兼容性与变更记录\n- 遵循向后兼容扩展原则，禁止无版本变更破坏已有字段。\n',
+            docRunbookBody:
+              "# {title}\n\n- **服务名称**：\n- **所属团队 / 值班频道**：\n- **监控面板链接**：\n\n## 1. 服务依赖与架构简图\n- 列出上下游强依赖、弱依赖及降级后预期行为。\n\n## 2. 常见告警与排查步骤\n\n### 告警 A：错误率 > 1% 或 P99 延迟超阈值\n1. 检查最近 30 分钟发布与配置变更记录。\n2. 执行诊断命令确认进程存活、连接池与磁盘水位：\n```bash\ncurl -fsS http://127.0.0.1:8787/healthz\n```\n3. 查看错误聚合日志，确认是上游超时、数据库锁等待还是参数异常。\n\n## 3. 紧急止血开关与降级操作\n- **限流 / 降级开关**：写明配置键、生效方式与副作用。\n- **流量切换**：说明多实例或备份节点切换步骤。\n\n## 4. 回滚流程\n```bash\n# 确认上一稳定版本标识并执行回滚\n```\n\n## 5. 升级路径\n- 若 15 分钟内未能定位或止血，立即升级至对应模块负责人。\n",
+            docSecurityBody:
+              "# {title}\n\n- **评审范围**：\n- **数据密级**：公开 / 内部 / 敏感凭据\n\n## 1. 资产与信任边界\n- 列出核心敏感资产（密钥、令牌、用户代码库、数据库）。\n- 标注不可信输入入口（外部 HTTP、第三方回调、本地用户输入、模型工具调用）。\n\n## 2. STRIDE 威胁分析\n\n| 威胁类别 | 攻击面与场景 | 现有防线 | 剩余风险与待补措施 |\n|---|---|---|---|\n| 身份伪造 (Spoofing) | 伪造请求来源或越权令牌 | 边界鉴权校验 | 补充签名过期校验 |\n| 数据篡改 (Tampering) | 路径穿越或载荷注入 | 规范化路径校验与参数化查询 | 增加静态检查拦截 |\n| 信息泄露 (Info Disclosure) | 日志或报错打印密钥 | `Secret` 脱敏包装 | 审查日志输出链路 |\n| 拒绝服务 (DoS) | 超大附件或恶意高频请求 | 请求体上限与限流 | 补充超时与并发上限 |\n| 权限提升 (Elevation) | 未授权访问管理端点 | 基于角色的能力校验 | 添加回归权限单测 |\n\n## 3. 安全上线核对\n- [ ] 密钥不进仓库与日志\n- [ ] 高危输入全部在入口完成白名单/结构解码\n",
+            docMigrationBody:
+              "# {title}\n\n- **涉及存储**：SQLite / PostgreSQL / 对象目录\n- **是否可在线无停机执行**：是 / 否\n\n## 1. 变更前后对比\n- 列出新增表、字段变更、约束调整或文件目录结构变动。\n\n## 2. 分阶段迁移步骤（Expand & Contract）\n1. **阶段 1（兼容扩展）**：新增结构并保持旧读路径可用，启用双写。\n2. **阶段 2（离线/分批回填）**：按主键游标分批回填历史数据并限速，避免锁表。\n3. **阶段 3（校验切换）**：运行一致性比对脚本确认 0 误差后切换读路径。\n4. **阶段 4（安全清理）**：观察一个稳定周期后再移除旧字段或兜底逻辑。\n\n## 3. 一致性校验脚本\n```sql\n-- 在此写明核对行数、校验和与抽样比对查询\n```\n\n## 4. 回滚与恢复预案\n- 写明每一步如果失败如何止损、是否需要从快照恢复及预计恢复时间（RTO）。\n",
+            docPerfBody:
+              "# {title}\n\n- **测试环境**：硬件规格、数据集规模、并发模型\n- **压测工具**：\n\n## 1. 性能目标与基线\n\n| 指标 | 优化前基线 | 目标阈值 | 优化后实测 | 提升幅度 |\n|---|---|---|---|---|\n| QPS / 吞吐 | | | | |\n| P50 延迟 | | | | |\n| P99 延迟 | | | | |\n| 峰值内存 / CPU | | | | |\n\n## 2. 瓶颈定位与火焰图剖析\n- 记录锁竞争、频繁分配、序列化开销或 N+1 查询等关键瓶颈。\n\n## 3. 实施的优化措施\n1. **优化项一**：说明改动原理与局部权衡。\n2. **优化项二**：说明缓存策略或批处理改造。\n\n## 4. 容量评估与结论\n- 给出单机推荐并发上限、安全水位线与后续监控建议。\n",
+            diagMsNodeGateway: "边缘网关 (Gateway)",
+            diagMsNodeAuth: "鉴权服务 (Auth)",
+            diagMsNodeCore: "核心业务 (Core)",
+            diagMsNodeQueue: "异步队列 (Queue)",
+            diagMsNodeMedia: "媒体计算 (Media)",
+            diagMsNodeDb: "主数据库 (Primary DB)",
+            diagMsEdgeAuth: "令牌校验",
+            diagMsEdgeRpc: "内部 RPC",
+            diagMsEdgeEmit: "投递任务",
+            diagMsEdgeRead: "事务读写",
+            diagMsEdgeStore: "状态落库",
+            diagSeqClient: "客户端 App",
+            diagSeqApi: "API 入口层",
+            diagSeqGuard: "权限与校验",
+            diagSeqDomain: "领域服务",
+            diagSeqOutbox: "数据库 + Outbox",
+            diagSeqBus: "实时事件流",
+            diagSeqE1: "1. 请求",
+            diagSeqE2: "2. 校验",
+            diagSeqE3: "3. 执行",
+            diagSeqE4: "4. 同事务落库",
+            diagSeqE5: "5. 推送切片",
+            diagErdUser: "用户 / 角色 (agent)",
+            diagErdRepo: "代码仓库 (repo)",
+            diagErdIssue: "任务单 (issue)",
+            diagErdSession: "执行会话 (session)",
+            diagErdArtifact: "协作作品",
+            diagErdVersion: "版本快照 (version)",
+            diagErdE1: "绑定仓库",
+            diagErdE2: "派发会话",
+            diagErdE3: "归属角色",
+            diagErdE4: "生成作品",
+            diagErdE5: "1:N 快照",
+            diagCiLint: "静态检查与格式",
+            diagCiUnit: "单测与契约校验",
+            diagCiBuild: "产物构建打包",
+            diagCiCanary: "灰度环境发布",
+            diagCiSmoke: "冒烟与观测检查",
+            diagCiProd: "全量上线",
+            diagCiE1: "通过",
+            diagCiE2: "归档",
+            diagCiE3: "部署",
+            diagCiE4: "绿灯",
+            diagCiE5: "放量",
+            diagSmDraft: "草稿 (Draft)",
+            diagSmQueued: "待执行 (Queued)",
+            diagSmRunning: "运行中 (Running)",
+            diagSmReview: "待验收 (In Review)",
+            diagSmDone: "已完成 (Done)",
+            diagSmCanceled: "已取消 (Canceled)",
+            diagSmE1: "派发",
+            diagSmE2: "开始运行",
+            diagSmE3: "提交改动",
+            diagSmE4: "打回修改",
+            diagSmE5: "验收通过",
+            diagSmE6: "关闭取消",
+            sheetBenchTab1: "基准对比",
+            sheetBenchTab2: "环境参数",
+            sheetBenchColCase: "测试场景",
+            sheetBenchColBaseline: "基线 QPS",
+            sheetBenchColCurrent: "优化后 QPS",
+            sheetBenchColP99: "P99 延迟 (ms)",
+            sheetBenchColMem: "内存 (MB)",
+            sheetBenchColStatus: "结论",
+            sheetBenchR1Case: "列表分页查询 (1000 条)",
+            sheetBenchR1Status: "达成 (+68%)",
+            sheetBenchR2Case: "并发写入事务 (64 并发)",
+            sheetBenchR2Status: "达成 (+52%)",
+            sheetBenchR3Case: "大文档增量同步 (10k 节点)",
+            sheetBenchR3Status: "达成 (-41% 延迟)",
+            sheetBenchR4Case: "冷启动全量投影",
+            sheetBenchR4Status: "观察中",
+            sheetBenchEnvKey: "参数项",
+            sheetBenchEnvVal: "配置值",
+            sheetBenchEnvR1: "并发连接数",
+            sheetBenchEnvR2: "数据集规模",
+            sheetBenchEnvR3: "预热轮次",
+            sheetTechTab: "评分矩阵",
+            sheetTechColDim: "评估维度",
+            sheetTechColWeight: "权重",
+            sheetTechColOptA: "方案 A（原生集成）",
+            sheetTechColOptB: "方案 B（外置服务）",
+            sheetTechColNote: "评分依据",
+            sheetTechR1Dim: "端到端延迟",
+            sheetTechR1Note: "零进程间序列化往返",
+            sheetTechR2Dim: "部署与运维成本",
+            sheetTechR2Note: "单二进制交付，零额外守护进程",
+            sheetTechR3Dim: "故障隔离能力",
+            sheetTechR3Note: "外置进程崩溃不影响主宿主",
+            sheetTechR4Dim: "开发交付周期",
+            sheetTechR4Note: "复用现有契约与存储底座",
+            sheetTechR5Dim: "长期扩展弹性",
+            sheetTechR5Note: "支持后期按网关端口拆分",
+            sheetTestTab: "回归用例",
+            sheetTestColId: "编号",
+            sheetTestColArea: "模块",
+            sheetTestColCase: "用例描述",
+            sheetTestColEnv: "测试层",
+            sheetTestColOwner: "负责人",
+            sheetTestColResult: "状态",
+            sheetTestR1Area: "鉴权边界",
+            sheetTestR1Case: "非法令牌拒绝并返回 401",
+            sheetTestR1Env: "集成测试",
+            sheetTestR1Owner: "服务端",
+            sheetTestR1Res: "通过",
+            sheetTestR2Area: "状态机",
+            sheetTestR2Case: "并发冲突写入触发乐观锁保护",
+            sheetTestR2Env: "单元测试",
+            sheetTestR2Owner: "核心域",
+            sheetTestR2Res: "通过",
+            sheetTestR3Area: "桌面端界面",
+            sheetTestR3Case: "明暗主题切换与快捷键响应正常",
+            sheetTestR3Env: "端到端UI",
+            sheetTestR3Owner: "前端",
+            sheetTestR3Res: "通过",
+            sheetTestR4Area: "数据库迁移",
+            sheetTestR4Case: "旧库平滑对齐并校验无漂移",
+            sheetTestR4Env: "冒烟测试",
+            sheetTestR4Owner: "存储层",
+            sheetTestR4Res: "待复核",
+            sheetApiTab: "接口台账",
+            sheetApiColMethod: "方法",
+            sheetApiColPath: "路径",
+            sheetApiColAuth: "鉴权",
+            sheetApiColRate: "限流",
+            sheetApiColOwner: "归属模块",
+            sheetApiColStability: "稳定性",
+            sheetApiR1Auth: "回环 / Bearer",
+            sheetApiR1Rate: "无限制 (本地)",
+            sheetApiR1Owner: "任务域",
+            sheetApiR1Stab: "稳定 v1",
+            sheetApiR2Auth: "令牌鉴权 (Bearer)",
+            sheetApiR2Rate: "60 次/分钟",
+            sheetApiR2Owner: "作品域",
+            sheetApiR2Stab: "稳定 v1",
+            sheetApiR3Auth: "Bearer + 角色",
+            sheetApiR3Rate: "30 次/分钟",
+            sheetApiR3Owner: "会话域",
+            sheetApiR3Stab: "灰度中",
+            sheetApiR4Auth: "配对签名",
+            sheetApiR4Rate: "10 次/分钟",
+            sheetApiR4Owner: "远程门",
+            sheetApiR4Stab: "稳定 v1",
+            dashSloP1: "核心可用性 (%)",
+            dashSloP2: "P99 延迟 (ms)",
+            dashSloP3: "错误预算剩余 (%)",
+            dashSloP4: "近 7 天告警次数",
+            dashSloServiceCol: "服务名",
+            dashSloAvailCol: "可用率",
+            dashSloP99Col: "P99 延迟",
+            dashSloBudgetCol: "预算剩余",
+            dashSloAlertsCol: "告警",
+            dashSloR1: "接入网关 (Gateway)",
+            dashSloR2: "核心状态引擎 (Core)",
+            dashSloR3: "协同与存储 (Storage)",
+            dashSloR4: "实时订阅流 (SSE)",
+            dashDoraP1: "周部署次数",
+            dashDoraP2: "变更前置时间 (h)",
+            dashDoraP3: "变更失败率 (%)",
+            dashDoraP4: "平均恢复时长 (min)",
+            dashDoraWeekCol: "周期",
+            dashDoraDeployCol: "部署数",
+            dashDoraLeadCol: "前置时间(h)",
+            dashDoraCfrCol: "失败率(%)",
+            dashDoraMttrCol: "恢复耗时 (分)",
+            slidesArchS1Sub: "背景目标、系统边界与核心权衡",
+            slidesArchS1Notes: "开场 2 分钟先对齐本次评审要解决的核心约束与非目标。",
+            slidesArchS2Title: "背景与核心约束",
+            slidesArchS2Sub: "为什么现有方案不足以支撑下一步演进",
+            slidesArchS2B1: "延迟与一致性指标要求",
+            slidesArchS2B2: "存量数据兼容性与迁移窗口",
+            slidesArchS2B3: "单机与远程多端同步边界",
+            slidesArchS2Notes: "明确哪些指标是硬约束，哪些可以分阶段演进。",
+            slidesArchS3Title: "目标架构与模块分层",
+            slidesArchS3Sub: "单向依赖有向无环图与进门一次解码",
+            slidesArchS3B1: "边界层只做解码与鉴权转发",
+            slidesArchS3B2: "核心领域规则保持纯函数可测",
+            slidesArchS3B3: "持久化统一收口于单一服务层",
+            slidesArchS3Notes: "结合结构图讲解请求主线与异常恢复路径。",
+            slidesArchS4Title: "关键技术权衡",
+            slidesArchS4Sub: "方案对比与风险控制",
+            slidesArchS4B1: "已选方案的长期收益与代价",
+            slidesArchS4B2: "降级开关与灰度回滚策略",
+            slidesArchS4B3: "性能压测与容量水位验证",
+            slidesArchS4Notes: "重点回应评审人最关心的回滚与并发安全性问题。",
+            slidesArchS5Title: "交付里程碑与行动项",
+            slidesArchS5Sub: "分阶段落地排期与验收标准",
+            slidesArchS5B1: "阶段一：核心骨架与契约落定",
+            slidesArchS5B2: "阶段二：集成联调与压测验收",
+            slidesArchS5B3: "阶段三：灰度放量与全量上线",
+            slidesArchS5Notes: "确认评审结论、阻塞依赖与各阶段责任人。",
+            slidesRelS1Sub: "新能力总览、核心收益与现场演示",
+            slidesRelS1Notes: "控制在 15 分钟内，重点讲清楚解决了什么痛点。",
+            slidesRelS2Title: "为什么做这次升级",
+            slidesRelS2Sub: "从用户与研发高频痛点出发",
+            slidesRelS2B1: "上线前人工核对耗时且易漏项",
+            slidesRelS2B2: "跨模块排查链路长、缺乏统一视图",
+            slidesRelS2B3: "关键指标与回归基线缺少自动化门禁",
+            slidesRelS2Notes: "用 1-2 个真实故障或卡点案例开场最有共鸣。",
+            slidesRelS3Title: "核心功能与架构亮点",
+            slidesRelS3Sub: "做对了哪些关键设计",
+            slidesRelS3B1: "声明式模板与结构化目录落盘",
+            slidesRelS3B2: "零额外网络往返的本地沙盒预览",
+            slidesRelS3B3: "双端词典与自动化契约测试守门",
+            slidesRelS3Notes: "展示核心流程图或现场操作录屏。",
+            slidesRelS4Title: "线上效果与性能数据",
+            slidesRelS4Sub: "实测收益对比",
+            slidesRelS4B1: "核心操作响应耗时降低 45%",
+            slidesRelS4B2: "自动化回归覆盖率提升至 95%+",
+            slidesRelS4B3: "零破坏性变更平滑升级",
+            slidesRelS4Notes: "用真实对比数据收口价值。",
+            slidesRelS5Title: "下一步计划与 Q&A",
+            slidesRelS5Sub: "后续演进路线与反馈收集",
+            slidesRelS5B1: "补齐更多团队自定义模板能力",
+            slidesRelS5B2: "打通任务流转一键沉淀到内容库",
+            slidesRelS5B3: "欢迎在团队频道留下使用反馈",
+            slidesRelS5Notes: "预留 5 分钟问答并记录反馈问题。",
+            protoApiTitle: "接口报文与 Schema 沙盒",
+            protoApiSub: "离线格式化 JSON、检查字段类型并一键生成 cURL 请求",
+            protoApiBtnPretty: "格式化 JSON",
+            protoApiBtnMinify: "压缩",
+            protoApiBtnCopy: "生成 cURL",
+            protoApiPayloadLabel: "请求 JSON 载荷",
+            protoApiCurlLabel: "生成命令",
+            protoApiValid: "JSON 语法合法",
+            protoApiInvalid: "JSON 解析错误：",
+            protoCompTitle: "交互组件状态实验台",
+            protoCompSub: "快速核验组件在正常、加载、空态、报错及不同视口与明暗主题下的表现",
+            protoCompStateLabel: "组件状态",
+            protoCompThemeLabel: "外观主题",
+            protoCompWidthLabel: "预览宽度",
+            protoCompStateDefault: "正常",
+            protoCompStateLoading: "加载中",
+            protoCompStateEmpty: "空数据",
+            protoCompStateError: "报错态",
+            protoCompThemeLight: "浅色",
+            protoCompThemeDark: "深色",
+            protoCompCardTitle: "服务部署状态卡",
+            protoCompCardBody: "当前版本 v2.4.0 已在 3 个可用区健康运行，P99 延迟 18ms。",
+            protoCompLoadingText: "正在拉取最新健康状态与指标…",
+            protoCompEmptyText: "暂无符合条件的运行实例，可调整筛选条件或新建部署。",
+            protoCompErrorText: "连接超时 (504)：上游状态聚合接口未在 3000ms 内响应，请重试。",
+            designDesktopName: "桌面端工作台",
+            designMobileName: "移动端伴侣",
+            designPropDensity: "视图密度",
+            designPropBanner: "展示公告横幅",
+            designPropCta: "主按钮文案",
+            designPropCtaDefault: "安装为桌面应用",
+            designHeroSub: "全原生双端实时协同，一处修改多画板同步响应。",
+            designMetricsTitle: "核心指标契约",
+            designActionTitle: "桌面打包配置",
+            dsButtonTitle: "按钮 Button",
+            dsButtonSummary: "用于触发明确动作；同一操作栏仅保留 1 个 primary 主操作。",
+            dsButtonDo: "动词开头写明结果，例如「保存并发布」",
+            dsButtonDont: "避免在同一操作栏并列两个主按钮",
+            dsBadgeTitle: "徽章 Badge",
+            dsBadgeSummary: "轻量状态与分类标签，保持简短可读。",
+            dsBadgeDo: "控制在 2–4 个字或短单词内",
+            motionCh1: "开场引子",
+            motionCh2: "核心特性揭幕",
+            motionCh3: "行动收尾",
+            motionSc2Headline: "离线零依赖，直接装成独立桌面应用",
+            motionSc2CardTitle: "纯时间确定性渲染",
+            motionSc2CardBody: "任意时刻 t 始终对应一致的关键帧进度与缓动轨迹",
+            motionSc3Headline: "立即在工作台探索并导出",
+            sbTone: "暖纸胶片 · 克制沉稳",
+            sbS1Scene: "开场 · 工作台全景",
+            sbS1Visual: "清晨光线洒在桌面工作台，卡片与时间线逐层展开。",
+            sbS1Dialogue: "把每一次对话里的灵感，直接沉淀为可运行的作品。",
+            sbS2Scene: "演示 · 一键独立安装",
+            sbS2Visual: "点击右上角安装按钮，交互应用以透明沉浸标题栏窗口弹出。",
+            sbS2Dialogue: "无需浏览器标签页，它本身就是一个趁手的 Mac 桌面工具。",
+            sbS3Scene: "收尾 · 本地持久运行",
+            sbS3Visual: "特写聚焦番茄钟与波形示波器在独立窗口里稳定跳动。",
+            sbS3Dialogue: "离线可用，随时唤醒，专为专注与创作而生。",
           },
         },
-        search: { title: "搜索内容", placeholder: "搜索笔记、作品和素材…", empty: "未找到匹配的笔记、作品或素材", typeMedia: "素材" },
+        search: {
+          title: "搜索内容",
+          placeholder: "搜索笔记、作品和素材…",
+          empty: "未找到匹配的笔记、作品或素材",
+          typeMedia: "素材",
+          scopeAll: "全部",
+          scopeArtifacts: "作品",
+          scopeMedia: "素材",
+        },
       },
     },
     "web.media": {
@@ -2571,6 +3078,20 @@ export const catalogs = {
         toolFailed: "失败",
         toolPending: "等待输出…",
         toolNoOutput: "无输出",
+        activityThinking: "思考 {n} 次",
+        activityRead: "读取 {n} 个文件",
+        activitySearch: "搜索 {n} 次",
+        activityEdit: "编辑 {n} 个文件",
+        activityCommand: "运行 {n} 条命令",
+        activityOther: "调用 {n} 个工具",
+        activitySteps: "{n} 步",
+        activityRunning: "执行中",
+        activityFailed: "{n} 项失败",
+        toolInput: "输入",
+        toolOutput: "输出",
+        toolLines: "{n} 行",
+        copy: "复制",
+        copied: "已复制",
         interactionBadge: "需要你确认 · 不会自动批准",
         interactionAnswered: "已回复",
         interactionDeclined: "已拒绝",
@@ -2968,7 +3489,66 @@ export const catalogs = {
         rail: "Beside this artifact",
         railShow: "Show the side panel",
         railHide: "Hide the side panel",
+        backToLibrary: "Back to content",
+        previewTab: "Preview",
+        filesTab: "Files",
+        filesTabCount: "Files ({n})",
+        viewMode: "View mode",
+        liveVersion: "Live",
+        directory: "Directory",
+        newFileLabel: "New file path",
+        discard: "Discard",
+        unsaved: "Unsaved",
+        deleteFileAsk: "Delete file “{path}”?",
+        snapshotNote: "Snapshot",
       },
+      docs: { split: "Split", edit: "Edit", read: "Read", chars: "{n} chars" },
+      outline: {
+        progress: "{done}/{total} done",
+        hideDone: "Hide done",
+        showDone: "Show done",
+        quickAdd: "Type and press Enter to add…",
+        kindHeading: "Heading",
+        kindBullet: "Bullet",
+        kindTodo: "Todo",
+        cycleKind: "Switch type ({kind})",
+        indent: "Indent",
+        outdent: "Outdent",
+        addChild: "Add child",
+        untitled: "New item",
+      },
+      sheet: { filterPlaceholder: "Filter rows…", addRow: "Add row", empty: "No sheets", rowsCount: "{n} rows" },
+      diagram: { visual: "Diagram", structure: "Nodes & edges", nodes: "Nodes", edges: "Edges" },
+      motion: {
+        timeline: "Timeline scenes",
+        layers: "{n} layers",
+        play: "Play",
+        stop: "Stop",
+        restart: "Restart",
+        loop: "Loop",
+        prevStep: "Step back 0.5s",
+        nextStep: "Step forward 0.5s",
+        chapters: "Chapters",
+      },
+      storyboard: {
+        gridMode: "Grid",
+        animaticMode: "Animatic",
+        totalDuration: "{sec}s total",
+        shotOf: "Shot {n} of {total}",
+        sfx: "SFX",
+        transition: "Transition",
+      },
+      prototype: {
+        viewportLabel: "Viewport",
+        viewportFull: "Full",
+        viewportTablet: "Tablet",
+        viewportMobile: "Mobile",
+        reload: "Reload",
+        iterateAi: "Iterate with AI",
+        installApp: "Install as App",
+        openApp: "Open App",
+      },
+      files: { codeMode: "Code", htmlPreviewMode: "Preview" },
       issue: { title: "Artifacts" },
       blocks: { saved: "All saved", user: "You", start: "Start writing here…" },
       canvas: { label: "Open artifact", close: "Close", openPage: "Open its page" },
@@ -3061,11 +3641,42 @@ export const catalogs = {
         styleSolid: "Solid",
         styleDashed: "Dashed",
       },
-      design: { noProps: "This artboard declares no adjustable props (data-props)" },
-      designSystem: { components: "Components" },
+      design: {
+        themeLight: "Light",
+        themeDark: "Dark",
+        propsTitle: "Props Inspector",
+        enabled: "Enabled",
+        disabled: "Disabled",
+        emptyCanvas: "No layers in this artboard yet",
+      },
+      designSystem: {
+        components: "Components",
+        colors: "Color Tokens",
+        typography: "Typography",
+        spacing: "Spacing",
+        radius: "Radius",
+        guidelinesDo: "Do",
+        guidelinesDont: "Don't",
+        previewTheme: "Preview Theme",
+        specimen: "The quick brown fox jumps · 0123456789",
+      },
       slidesStore: { addSlide: "Add slide" },
       edit: { save: "Save as a new version", saved: "Saved as version {version}" },
-      slides: { previous: "Previous slide", next: "Next slide", present: "Present full screen", presenter: "Presenter view" },
+      slides: {
+        previous: "Previous slide",
+        next: "Next slide",
+        present: "Present full screen",
+        presenter: "Presenter view",
+        editSlide: "Edit slide",
+        doneEdit: "Done",
+        slideTitleLabel: "Title",
+        slideSubtitleLabel: "Subtitle",
+        slideLayoutLabel: "Layout",
+        layoutCover: "Cover",
+        layoutContent: "Content",
+        slideBulletsLabel: "Bullets (one per line)",
+        slideNotesLabel: "Speaker notes",
+      },
       presenter: {
         missing: "No deck named: open the presenter view from an artifact's controls.",
         current: "This slide",
@@ -3099,6 +3710,8 @@ export const catalogs = {
         reinstall: "Update & Reinstall",
         installing: "Installing…",
         open: "Open App",
+        openApp: "Open Standalone App",
+        manageApp: "Manage App",
         uninstall: "Uninstall",
         installedToast: "Installed “{name}.app”",
         uninstalledToast: "Uninstalled “{name}.app”",
@@ -3362,7 +3975,11 @@ export const catalogs = {
         zoomOut: "Zoom out",
         zoomReset: "Reset zoom",
       },
-      updateReady: "{next} is ready: restart from About",
+      updateInstall: "Update",
+      updateInstalling: "Restarting…",
+      updateReadyOneClick: "{next} is ready — click to update & restart",
+      updateReadyTitle: "Update to {next}",
+      updateNotesTitle: "What's new",
       intent: { timedOut: "No answer in time; try again", offline: "Not connected to the farm, so this was not sent" },
       pickTooLarge: "{name} was not added: it is over 512 MiB",
       openTerminal: "Open a terminal here",
@@ -4337,6 +4954,11 @@ export const catalogs = {
         sidebarToggle: "Toggle content sidebar",
         recent: "All recent",
         pinned: "Pinned",
+        pinnedEmpty: "Nothing pinned yet. Hover any artifact or media item and click the pin icon to keep it handy here.",
+        resetFilter: "Reset filter",
+        installedApps: "Installed Apps",
+        installedAppsEmpty:
+          "No standalone apps installed yet. Click “Install as App” on any artifact card or toolbar to install it as an independent macOS app and manage it here.",
         pin: "Pin",
         unpin: "Unpin",
         pinnedToast: "Pinned",
@@ -4361,27 +4983,100 @@ export const catalogs = {
         templates: {
           title: "New content",
           search: "Search templates…",
+          searchCount: "{n} matching templates",
           empty: "No matching templates",
-          cat: { recommended: "Recommended", note: "Outline notes", whiteboard: "Whiteboards", deliverable: "Deliverables", ai: "AI media" },
+          cat: {
+            recommended: "Recommended",
+            apps: "Mini Apps",
+            engineering: "Engineering",
+            note: "Outline notes",
+            whiteboard: "Whiteboards",
+            deliverable: "Deliverables",
+            ai: "AI media",
+          },
           items: {
             noteBlank: { name: "Blank outline note", desc: "Single-column outline with nesting, todos, and wikilinks" },
             noteTech: { name: "Tech spec outline", desc: "Context, goals, architecture, and implementation checklist" },
             noteMeeting: { name: "Meeting notes", desc: "Key discussion points, decisions, and follow-up todos" },
             noteDaily: { name: "Daily log", desc: "Today's focus, blockers, and handoff summary" },
+            notePrReview: { name: "Code Review Checklist", desc: "Correctness, edge cases, concurrency safety, and regression checks" },
+            noteDebug: { name: "Debugging Log", desc: "Reproduction path, hypotheses, telemetry clues, and root cause" },
+            noteRelease: { name: "Release Checklist", desc: "Preflight gates, canary rollout, monitoring, and rollback plan" },
+            noteOncall: { name: "On-Call Handoff", desc: "Active alerts, pending follow-ups, deploy windows, and contacts" },
+            noteOnboarding: { name: "Codebase Onboarding", desc: "Directory layout, entry points, local dev setup, and gotchas" },
+            noteSprintRetro: { name: "Sprint Retrospective", desc: "Shipped highlights, friction bottlenecks, tech debt, and action items" },
             wbBlank: { name: "Blank whiteboard", desc: "Infinite canvas with dot grid and native connectors" },
             wbArch: { name: "System architecture", desc: "Layered service nodes with directional data-flow arrows" },
             wbTimeline: { name: "Launch timeline", desc: "Milestone cards and delivery stages" },
             wbJourney: { name: "User journey", desc: "Touchpoints, friction points, and improvement opportunities" },
             wbWorkshop: { name: "Kickoff workshop", desc: "Goal framing, brainstorming stickies, and convergence" },
+            wbEventStorming: { name: "Event Storming (DDD)", desc: "Domain commands, aggregates, domain events, and read projections" },
+            wbC4: { name: "C4 Container Canvas", desc: "Edge gateway, core service, async queue, and storage topology" },
+            wbIncidentMap: { name: "Incident Root-Cause Map", desc: "Symptoms, candidate hypotheses, verification, and mitigation" },
+            wbTradeoff: { name: "Tech Trade-off Board", desc: "Options comparison, weighted constraints, risks, and final call" },
             artDocs: { name: "Collaborative doc", desc: "Long-form specs, review reports, and technical guides" },
+            docRfc: { name: "Engineering RFC", desc: "Context, alternatives comparison, contracts, and rollout plan" },
+            docAdr: { name: "Architecture Decision Record (ADR)", desc: "Decision context, evaluated trade-offs, outcome, and impact" },
+            docPostmortem: { name: "Incident Postmortem", desc: "Impact, timeline, five-whys root cause, and prevention actions" },
+            docApiSpec: { name: "API & Contract Spec", desc: "Endpoints, auth, request/response schemas, and error codes" },
+            docRunbook: { name: "Service Runbook", desc: "Alert thresholds, triage commands, kill switches, and rollback" },
+            docSecurity: { name: "Security & Threat Model", desc: "Trust boundaries, STRIDE threat matrix, mitigations, and audit" },
+            docMigration: { name: "Data & Schema Migration Plan", desc: "Dual-write compatibility, batch backfill, verification, and rollback" },
+            docPerf: { name: "Performance & Benchmark Report", desc: "Baseline load profile, bottlenecks, before/after comparison, capacity" },
             artSlides: { name: "Slide deck", desc: "Widescreen multi-slide deck with speaker notes" },
+            slidesArchReview: { name: "Architecture Review Deck", desc: "Goals, core topology, key trade-offs, and risk mitigation" },
+            slidesReleaseDemo: { name: "Tech Talk & Release Demo", desc: "Highlights, implementation deep dive, benchmarks, and roadmap" },
             artDashboard: { name: "Data dashboard", desc: "KPI cards, trend charts, and verified tables" },
+            dashSlo: { name: "Service SLO & Reliability", desc: "Availability, P99 latency, error budget burn, and alert breakdown" },
+            dashDora: { name: "Engineering DORA Metrics", desc: "Deploy frequency, lead time, change failure rate, and MTTR" },
             artDesign: { name: "Design canvas", desc: "Multi-artboard UI explorations with live prop controls" },
             artDesignSystem: { name: "Design system", desc: "Color tokens, typography scale, and contrast checks" },
             artMotion: { name: "Motion clip", desc: "Interactive animated canvas with video export" },
             artHtml: { name: "Web page", desc: "Standalone interactive HTML page with version history" },
+            protoApiPlayground: { name: "API & JSON Payload Sandbox", desc: "Offline JSON format/validate, request builder, and cURL generator" },
+            protoComponentLab: { name: "Interactive UI State Sandbox", desc: "State matrix (default/loading/empty/error), theme, and width switcher" },
+            protoFocusStudio: {
+              name: "Focus Studio & Ambient Timer",
+              desc: "Animated SVG ring timer, WebAudio rain & brown-noise mixer, and task queue built for standalone desktop use",
+            },
+            protoSynthPad: {
+              name: "Pocket Synth & 16-Step Drum Machine",
+              desc: "Offline WebAudio drum step sequencer, live Canvas oscilloscope, and playable synth keys",
+            },
+            protoParticleLab: {
+              name: "Generative Flow Field Studio",
+              desc: "60fps Canvas curl-noise particle simulation with pointer gravity and live palette controls",
+            },
+            protoTokenCalculator: {
+              name: "AI Token & Cost Simulator",
+              desc: "Interactive DAU, prompt cache, and model tier monthly cost breakdown with Markdown export",
+            },
+            protoCssGlassStudio: {
+              name: "Mesh & Frosted Glass Studio",
+              desc: "Animated mesh orbs with real-time blur, fill alpha, radius sliders, and 1-click CSS copy",
+            },
+            protoDeskKanban: { name: "Mini Desk Kanban Board", desc: "Lightweight 3-column desktop task board with priority pills and completion meter" },
+            designWorkspaceUi: { name: "Multi-Viewport Workspace UI", desc: "Desktop & mobile artboards with live interactive props and token-bound UI tree" },
+            dsPapertrails: {
+              name: "Papertrails Design System",
+              desc: "Light/dark color tokens, type hierarchy, spacing/radius scales, and live component specs",
+            },
+            motionLaunchReel: { name: "Product Launch Motion Reel", desc: "3-chapter deterministic motion sequence ready for live playback scrubbing" },
+            storyboardProductFilm: {
+              name: "Product Film Storyboard",
+              desc: "Multi-shot visual script with framing, camera moves, dialogue, and animatic preview",
+            },
             artSheet: { name: "Workbook sheet", desc: "Multi-sheet structured tables and CSV export" },
+            sheetBenchmark: { name: "Benchmark Matrix", desc: "QPS, P50/P95/P99 latency, memory footprint, and comparison verdict" },
+            sheetTechMatrix: { name: "Tech Evaluation Matrix", desc: "Weighted criteria scoring, effort, and operational complexity" },
+            sheetTestMatrix: { name: "QA & Regression Matrix", desc: "Core test cases, layer coverage, expected behavior, and status" },
+            sheetApiInventory: { name: "API & Dependency Inventory", desc: "Endpoint registry, auth mode, rate limits, and owning module" },
             artDiagram: { name: "Architecture diagram", desc: "Nodes, edges, and architecture flows" },
+            diagMicroservices: { name: "Microservices Topology", desc: "Edge gateway, domain services, event bus, and storage links" },
+            diagSequence: { name: "Request Sequence Flow", desc: "Client, auth guard, core service, outbox, and live stream flow" },
+            diagErd: { name: "Database ER Model", desc: "Core entity tables, foreign-key relations, and ownership links" },
+            diagCicd: { name: "CI/CD Release Pipeline", desc: "Lint & format, unit/contract checks, bundle build, and canary" },
+            diagStateMachine: { name: "State Machine Flow", desc: "Lifecycle states, valid transitions, and terminal convergence" },
             artStoryboard: { name: "Storyboard shots", desc: "Shot list, framing, palette, and dialogue" },
             aiImage: { name: "AI image", desc: "Generate concept art, icons, or illustrations from text" },
             aiSpeech: { name: "AI speech", desc: "Synthesize natural voiceover audio from text" },
@@ -4394,6 +5089,18 @@ export const catalogs = {
               "## Discussion Focus\n- Key agenda topics for this session\n## Key Decisions\n- Record agreed conclusions and trade-offs\n## Follow-ups\n- [ ] Track confirmed action items",
             noteDaily:
               "## Today's Focus\n- [ ] List today's top priorities\n## Blockers & Risks\n- Note items awaiting collaboration\n## Handoff Summary\n- Outcomes shipped and next steps",
+            notePrReview:
+              "## Scope & Intent\n- Confirm the change has a single clear responsibility with no unrelated edits\n## Correctness & Edge Cases\n- [ ] Null values, concurrency races, and error propagation are handled explicitly\n- [ ] External inputs are decoded and validated at the boundary\n## Quality & Tests\n- [ ] Automated tests cover new behavior and regression boundaries\n- [ ] No duplicated logic, temporary fallbacks, or swallowed errors",
+            noteDebug:
+              "## Symptom & Impact\n- Error output, reproduction environment, and blast radius\n## Hypotheses & Checks\n- [ ] Inspect recent commits and config changes\n- [ ] Capture telemetry logs and metric snapshots\n- [ ] Isolate trigger conditions in a minimal repro\n## Root Cause & Fix\n- Document root cause, fix design, and regression test added",
+            noteRelease:
+              "## Preflight Gates\n- [ ] All CI checks, builds, and contract parity checks are green\n- [ ] Schema migrations and backward compatibility verified\n## Canary & Monitoring\n- [ ] Roll out 5% canary and watch error rate and P99 latency for 15 min\n- [ ] Confirm core KPIs and alert panels remain clean\n## Rollback Plan\n- Record one-command rollback steps, kill switches, and on-call lead",
+            noteOncall:
+              "## Shift & Contacts\n- Handoff window, primary/secondary engineers, and escalation contacts\n## Active Alerts & Open Items\n- [ ] List unresolved alerts and current mitigation status\n## Watchlist This Shift\n- Recent deploys, scheduled cron windows, and capacity headroom\n## Quick Links\n- Dashboards, telemetry viewer, and emergency feature flags",
+            noteOnboarding:
+              "## Repository Purpose & Layout\n- Core entry directories, shared contract packages, and build outputs\n## Local Dev & Verification\n- [ ] Install dependencies and start local server / UI\n- [ ] Run unit tests, linter, and formatter\n## Primary Request Path\n- End-to-end flow from boundary handler through domain rules to storage\n## Common Gotchas\n- Environment variables, local state directories, and frequent pitfalls",
+            noteSprintRetro:
+              "## Highlights Shipped\n- Key features delivered and outcomes exceeding expectations\n## Friction & Bottlenecks\n- Rework causes, blockers, tooling gaps, or unclear specs\n## Tech Debt Inventory\n- Engineering debt introduced or uncovered this sprint\n## Next Sprint Actions\n- [ ] Assign lead, concrete change, and target verification date",
             wbBlankTitle: "Central Topic",
             wbBlankBody: "Add cards, stickies, and arrows from the toolbar",
             wbArchN1Title: "Client / UI",
@@ -4428,6 +5135,341 @@ export const catalogs = {
             wbWorkW3Body: "Pick top priorities for first milestone",
             wbWorkE1: "explore",
             wbWorkE2: "decide",
+            wbEsCmdTitle: "Command · Submit Change",
+            wbEsCmdBody: "Validate permissions and idempotency key",
+            wbEsAggTitle: "Aggregate · Domain Core",
+            wbEsAggBody: "Enforce state invariants and rules",
+            wbEsEvtTitle: "Event · Change Persisted",
+            wbEsEvtBody: "Write Outbox event in same transaction",
+            wbEsReadTitle: "Read Model · Slice Projection",
+            wbEsReadBody: "Fold incremental slice and push to clients",
+            wbEsE1: "validate",
+            wbEsE2: "emit",
+            wbEsE3: "project",
+            wbC4EdgeTitle: "API Gateway · HTTP/WS",
+            wbC4EdgeBody: "Auth, rate limits, and boundary decoding",
+            wbC4AppTitle: "Core Service · Rust",
+            wbC4AppBody: "State machine, transactions, and collab",
+            wbC4QueueTitle: "Async Queue",
+            wbC4QueueBody: "Execute media and outbound deliveries",
+            wbC4DbTitle: "SQLite / PostgreSQL",
+            wbC4DbBody: "Single source of truth and snapshots",
+            wbC4E1: "RPC",
+            wbC4E2: "enqueue",
+            wbC4E3: "commit",
+            wbIncSymTitle: "Symptom · P99 Latency Spike",
+            wbIncSymBody: "Core endpoint timeout rate reached 3.2%",
+            wbIncHyp1Title: "Hypothesis A · Lock Contention",
+            wbIncHyp1Body: "Inspect pool wait time and query plan",
+            wbIncHyp2Title: "Hypothesis B · Upstream Retries",
+            wbIncHyp2Body: "Check retry amplification and timeouts",
+            wbIncFixTitle: "Mitigation · Shed & Rollback",
+            wbIncFixBody: "Enable circuit breaker and revert deploy",
+            wbIncE1: "triage",
+            wbIncE2: "verify",
+            wbIncE3: "mitigate",
+            wbToReqTitle: "Constraint · Consistency & Speed",
+            wbToReqBody: "Multi-peer convergence with low overhead",
+            wbToOptATitle: "Option A · Local-First CRDT",
+            wbToOptABody: "Offline-ready, lock-free merge semantics",
+            wbToOptBTitle: "Option B · Central OT Server",
+            wbToOptBBody: "Server sequencing, higher lock complexity",
+            wbToDecTitle: "Decision · Adopt Option A",
+            wbToDecBody: "Reuse existing collab core with low risk",
+            wbToE1: "evaluate",
+            wbToE2: "compare",
+            wbToE3: "decide",
+            docRfcBody:
+              "# {title}\n\n- **Status**: Draft / Review / Accepted\n- **Lead**:\n- **Related Ticket**:\n\n## 1. Context & Motivation\n\nDescribe the current bottleneck, trigger, and core problem this RFC solves.\n\n## 2. Goals & Non-Goals\n\n### Goals\n- Define measurable engineering outcomes and scope boundaries.\n\n### Non-Goals\n- Explicitly state what is out of scope to prevent drift.\n\n## 3. Alternatives Comparison\n\n| Dimension | Option A (Recommended) | Option B |\n|---|---|---|\n| Complexity | Low, reuses existing modules | High, introduces parallel state |\n| Performance & Reliability | Meets SLA | Extra network hops |\n| Rollback Cost | Feature flag toggle in seconds | Irreversible schema changes |\n\n## 4. Detailed Design\n\n### 4.1 Module Boundaries & Contracts\n```ts\n// Paste core types, API signatures, or state machine definitions\n```\n\n### 4.2 Data Model & Storage\n- Describe new or updated tables, indexes, and migration strategy.\n\n### 4.3 Failure Modes & Concurrency\n- Cover timeouts, idempotency, partial failures, and fallbacks.\n\n## 5. Testing, Rollout & Rollback\n- [ ] Unit and integration tests\n- [ ] Metrics and alert thresholds\n- [ ] Canary schedule and one-command rollback\n",
+            docAdrBody:
+              "# {title}\n\n- **Status**: Proposed / Accepted / Superseded\n- **Date**:\n- **Deciders**:\n\n## 1. Context & Problem Statement\n\nDescribe the technical forces, constraints, and product requirements driving this decision.\n\n## 2. Decision Drivers\n- Performance and latency budget\n- Maintenance cost and team familiarity\n- Long-term evolution and replaceability\n\n## 3. Considered Options\n1. **Option 1**:\n2. **Option 2**:\n3. **Status quo**:\n\n## 4. Decision Outcome\n\n**Chosen option**: State the selected option and core rationale.\n\n### Positive Consequences\n- Expected benefits and simplifications.\n\n### Negative Consequences & Mitigations\n- Trade-offs accepted and guardrails put in place.\n\n## 5. Verification & Review\n- Explain how code review, static audits, or benchmarks enforce this decision.\n",
+            docPostmortemBody:
+              "# {title}\n\n- **Severity**: SEV-1 / SEV-2 / SEV-3\n- **Duration**:\n- **Impact**: Affected endpoints, features, or percentage of traffic\n\n## 1. Executive Summary\n\nSummarize the failure symptoms, root cause, and resolution in 2-3 blameless sentences.\n\n## 2. Timeline (UTC)\n| Time | Event / Action |\n|---|---|\n| 00:00 | Deploy or trigger condition occurred |\n| 00:05 | Alert fired and investigation began |\n| 00:12 | Direct cause isolated; mitigation/rollback started |\n| 00:18 | Metrics recovered and incident mitigated |\n\n## 3. Root Cause Analysis (5 Whys)\n1. Why did the user-facing error occur?\n2. Why did existing safeguards not catch it?\n3. Why did monitoring not alert earlier?\n4. What was the underlying systemic cause?\n\n## 4. What Went Well & What Needs Work\n- **Effective mitigation**:\n- **Gaps uncovered**:\n\n## 5. Action Items\n| Category | Action | Lead | Due Date | Status |\n|---|---|---|---|---|\n| Prevention | Add regression test and static gate | | | Todo |\n| Detection | Tune alert threshold and dashboard | | | Todo |\n",
+            docApiSpecBody:
+              '# {title}\n\n- **Version**: v1\n- **Auth**: Bearer Token / HMAC\n- **Idempotency**: `Idempotency-Key`\n\n## 1. Endpoints Overview\n\n| Method | Path | Description | Rate Limit |\n|---|---|---|---|\n| GET | `/api/v1/resources` | Paginated list | 120 req/min |\n| POST | `/api/v1/resources` | Create resource | 30 req/min |\n| PUT | `/api/v1/resources/:id` | Replace resource | 60 req/min |\n\n## 2. Request & Response Contract\n\n### Request Payload\n```json\n{\n  "id": "res_01",\n  "name": "example",\n  "options": {}\n}\n```\n\n### Success Response (`200 OK`)\n```json\n{\n  "bizCode": 0,\n  "message": "ok",\n  "data": {}\n}\n```\n\n## 3. Business Error Codes\n\n| HTTP Status | `bizCode` | Meaning | Client Handling |\n|---|---|---|---|\n| 400 | 400001 | Validation failed | Highlight invalid field |\n| 409 | 409001 | Version conflict | Reload snapshot and retry |\n\n## 4. Compatibility Policy\n- Follow additive evolution; never break existing fields without a version bump.\n',
+            docRunbookBody:
+              "# {title}\n\n- **Service**:\n- **Owning Team / Channel**:\n- **Dashboard Link**:\n\n## 1. Dependencies & Degraded Modes\n- List hard and soft dependencies along with expected fallback behavior.\n\n## 2. Common Alerts & Triage\n\n### Alert A: Error Rate > 1% or P99 Latency Breach\n1. Check deploys and config changes in the last 30 minutes.\n2. Verify health, connection pool saturation, and disk headroom:\n```bash\ncurl -fsS http://127.0.0.1:8787/healthz\n```\n3. Inspect aggregated error logs to distinguish upstream timeouts, DB locks, or bad payloads.\n\n## 3. Emergency Kill Switches\n- **Load shedding / feature flags**: Document config keys, reload mechanism, and side effects.\n- **Traffic failover**: Document steps to shift traffic to healthy instances.\n\n## 4. Rollback Procedure\n```bash\n# Identify last known good artifact and trigger rollback\n```\n\n## 5. Escalation\n- Escalate to the module lead if not mitigated within 15 minutes.\n",
+            docSecurityBody:
+              "# {title}\n\n- **Scope**:\n- **Data Classification**: Public / Internal / Sensitive Credentials\n\n## 1. Assets & Trust Boundaries\n- List sensitive assets (keys, tokens, repositories, databases).\n- Mark untrusted inputs (external HTTP, webhooks, user uploads, model tool calls).\n\n## 2. STRIDE Threat Matrix\n\n| Category | Threat Scenario | Existing Control | Residual Risk & Follow-up |\n|---|---|---|---|\n| Spoofing | Forged origin or stolen token | Boundary auth check | Add token expiry enforcement |\n| Tampering | Path traversal or payload injection | Path canonicalization & parameterized SQL | Add static audit check |\n| Info Disclosure | Secrets leaked in logs or errors | `Secret` redaction wrapper | Audit error formatting paths |\n| Denial of Service | Oversized payloads or request floods | Size caps and rate limits | Enforce per-route timeouts |\n| Elevation | Unauthorized admin endpoint access | Role capability gates | Add negative auth tests |\n\n## 3. Security Release Sign-off\n- [ ] No secrets committed or logged\n- [ ] Untrusted inputs decoded strictly at boundaries\n",
+            docMigrationBody:
+              "# {title}\n\n- **Target Storage**: SQLite / PostgreSQL / Directory Store\n- **Zero-Downtime**: Yes / No\n\n## 1. Schema Comparison\n- Summarize new tables, column updates, constraints, or directory layout changes.\n\n## 2. Expand & Contract Rollout\n1. **Phase 1 (Expand)**: Add new structures while keeping old readers working; enable dual-write.\n2. **Phase 2 (Backfill)**: Backfill historical records in throttled keyset batches to avoid locks.\n3. **Phase 3 (Verify & Cutover)**: Run parity verification to confirm zero mismatch, then switch reads.\n4. **Phase 4 (Contract)**: Remove deprecated columns or fallback code after one stable cycle.\n\n## 3. Parity Verification Query\n```sql\n-- Record row-count, checksum, and sample verification queries\n```\n\n## 4. Rollback & Recovery\n- Document stop-the-bleeding steps per phase, snapshot restore path, and expected RTO.\n",
+            docPerfBody:
+              "# {title}\n\n- **Environment**: Hardware specs, dataset size, concurrency profile\n- **Load Tool**:\n\n## 1. Targets & Benchmark Comparison\n\n| Metric | Baseline | Target | After Optimization | Delta |\n|---|---|---|---|---|\n| Throughput (QPS) | | | | |\n| P50 Latency | | | | |\n| P99 Latency | | | | |\n| Peak Memory / CPU | | | | |\n\n## 2. Bottlenecks & Flamegraph Findings\n- Summarize lock contention, hot allocations, serialization overhead, or N+1 queries.\n\n## 3. Applied Optimizations\n1. **Change 1**: Explain mechanism and local trade-offs.\n2. **Change 2**: Explain caching, indexing, or batching improvements.\n\n## 4. Capacity Verdict\n- State recommended per-node concurrency limit, safety margin, and ongoing alerts.\n",
+            diagMsNodeGateway: "Edge Gateway",
+            diagMsNodeAuth: "Auth Service",
+            diagMsNodeCore: "Core Domain",
+            diagMsNodeQueue: "Async Queue",
+            diagMsNodeMedia: "Media Engine",
+            diagMsNodeDb: "Primary DB",
+            diagMsEdgeAuth: "verify token",
+            diagMsEdgeRpc: "internal RPC",
+            diagMsEdgeEmit: "dispatch",
+            diagMsEdgeRead: "tx read/write",
+            diagMsEdgeStore: "persist state",
+            diagSeqClient: "Client App",
+            diagSeqApi: "API Boundary",
+            diagSeqGuard: "Auth & Decode",
+            diagSeqDomain: "Domain Service",
+            diagSeqOutbox: "DB + Outbox",
+            diagSeqBus: "Live SSE Feed",
+            diagSeqE1: "1. request",
+            diagSeqE2: "2. validate",
+            diagSeqE3: "3. execute",
+            diagSeqE4: "4. tx commit",
+            diagSeqE5: "5. push slice",
+            diagErdUser: "Agent (agent)",
+            diagErdRepo: "Repository (repo)",
+            diagErdIssue: "Ticket (issue)",
+            diagErdSession: "Session (session)",
+            diagErdArtifact: "Artifact (artifact)",
+            diagErdVersion: "Snapshot (version)",
+            diagErdE1: "scoped to",
+            diagErdE2: "launches",
+            diagErdE3: "uses profile",
+            diagErdE4: "produces",
+            diagErdE5: "1:N snapshots",
+            diagCiLint: "Lint & Format",
+            diagCiUnit: "Unit & Contract",
+            diagCiBuild: "Build & Package",
+            diagCiCanary: "Canary Deploy",
+            diagCiSmoke: "Smoke & Metrics",
+            diagCiProd: "Full Rollout",
+            diagCiE1: "pass",
+            diagCiE2: "archive",
+            diagCiE3: "deploy",
+            diagCiE4: "green",
+            diagCiE5: "promote",
+            diagSmDraft: "Draft",
+            diagSmQueued: "Queued",
+            diagSmRunning: "Running",
+            diagSmReview: "In Review",
+            diagSmDone: "Done",
+            diagSmCanceled: "Canceled",
+            diagSmE1: "dispatch",
+            diagSmE2: "start",
+            diagSmE3: "submit",
+            diagSmE4: "send back",
+            diagSmE5: "complete",
+            diagSmE6: "cancel",
+            sheetBenchTab1: "Benchmarks",
+            sheetBenchTab2: "Environment",
+            sheetBenchColCase: "Scenario",
+            sheetBenchColBaseline: "Baseline QPS",
+            sheetBenchColCurrent: "Current QPS",
+            sheetBenchColP99: "P99 (ms)",
+            sheetBenchColMem: "Memory (MB)",
+            sheetBenchColStatus: "Verdict",
+            sheetBenchR1Case: "Paginated list query (1000 rows)",
+            sheetBenchR1Status: "Pass (+68%)",
+            sheetBenchR2Case: "Concurrent write tx (64 clients)",
+            sheetBenchR2Status: "Pass (+52%)",
+            sheetBenchR3Case: "Incremental doc sync (10k nodes)",
+            sheetBenchR3Status: "Pass (-41% lat)",
+            sheetBenchR4Case: "Cold-boot slice projection",
+            sheetBenchR4Status: "Watch",
+            sheetBenchEnvKey: "Parameter",
+            sheetBenchEnvVal: "Value",
+            sheetBenchEnvR1: "Concurrency",
+            sheetBenchEnvR2: "Dataset Size",
+            sheetBenchEnvR3: "Warmup Rounds",
+            sheetTechTab: "Scoring Matrix",
+            sheetTechColDim: "Criterion",
+            sheetTechColWeight: "Weight",
+            sheetTechColOptA: "Option A (Embedded)",
+            sheetTechColOptB: "Option B (Sidecar)",
+            sheetTechColNote: "Rationale",
+            sheetTechR1Dim: "End-to-End Latency",
+            sheetTechR1Note: "Zero IPC serialization roundtrip",
+            sheetTechR2Dim: "Ops & Deployment Cost",
+            sheetTechR2Note: "Single binary with no extra daemon",
+            sheetTechR3Dim: "Fault Isolation",
+            sheetTechR3Note: "External crash stays isolated",
+            sheetTechR4Dim: "Delivery Lead Time",
+            sheetTechR4Note: "Reuses shared contracts and store",
+            sheetTechR5Dim: "Long-Term Scaling",
+            sheetTechR5Note: "Can split behind gateway later",
+            sheetTestTab: "Regression Cases",
+            sheetTestColId: "ID",
+            sheetTestColArea: "Area",
+            sheetTestColCase: "Scenario",
+            sheetTestColEnv: "Layer",
+            sheetTestColOwner: "Lead",
+            sheetTestColResult: "Status",
+            sheetTestR1Area: "Auth Boundary",
+            sheetTestR1Case: "Invalid token rejected with 401",
+            sheetTestR1Env: "Integration",
+            sheetTestR1Owner: "Server",
+            sheetTestR1Res: "Pass",
+            sheetTestR2Area: "State Machine",
+            sheetTestR2Case: "Concurrent writes enforce optimistic lock",
+            sheetTestR2Env: "Unit",
+            sheetTestR2Owner: "Core",
+            sheetTestR2Res: "Pass",
+            sheetTestR3Area: "Desktop UI",
+            sheetTestR3Case: "Theme switch and shortcuts respond cleanly",
+            sheetTestR3Env: "E2E UI",
+            sheetTestR3Owner: "Frontend",
+            sheetTestR3Res: "Pass",
+            sheetTestR4Area: "DB Migration",
+            sheetTestR4Case: "Legacy DB reconciles with zero drift",
+            sheetTestR4Env: "Smoke",
+            sheetTestR4Owner: "Storage",
+            sheetTestR4Res: "Review",
+            sheetApiTab: "API Registry",
+            sheetApiColMethod: "Method",
+            sheetApiColPath: "Path",
+            sheetApiColAuth: "Auth",
+            sheetApiColRate: "Rate Limit",
+            sheetApiColOwner: "Domain",
+            sheetApiColStability: "Stability",
+            sheetApiR1Auth: "Loopback / Bearer",
+            sheetApiR1Rate: "Unlimited (local)",
+            sheetApiR1Owner: "Issue",
+            sheetApiR1Stab: "Stable v1",
+            sheetApiR2Auth: "Bearer",
+            sheetApiR2Rate: "60 req/min",
+            sheetApiR2Owner: "Artifact",
+            sheetApiR2Stab: "Stable v1",
+            sheetApiR3Auth: "Bearer + Role",
+            sheetApiR3Rate: "30 req/min",
+            sheetApiR3Owner: "Session",
+            sheetApiR3Stab: "Canary",
+            sheetApiR4Auth: "Pair Signature",
+            sheetApiR4Rate: "10 req/min",
+            sheetApiR4Owner: "Remote",
+            sheetApiR4Stab: "Stable v1",
+            dashSloP1: "Availability (%)",
+            dashSloP2: "P99 Latency (ms)",
+            dashSloP3: "Error Budget Left (%)",
+            dashSloP4: "7d Alerts",
+            dashSloServiceCol: "Service",
+            dashSloAvailCol: "Availability",
+            dashSloP99Col: "P99",
+            dashSloBudgetCol: "Budget Left",
+            dashSloAlertsCol: "Alerts",
+            dashSloR1: "Edge Gateway",
+            dashSloR2: "Core State Engine",
+            dashSloR3: "Collab & Storage",
+            dashSloR4: "Live SSE Stream",
+            dashDoraP1: "Deploys / Week",
+            dashDoraP2: "Lead Time (h)",
+            dashDoraP3: "Failure Rate (%)",
+            dashDoraP4: "MTTR (min)",
+            dashDoraWeekCol: "Week",
+            dashDoraDeployCol: "Deploys",
+            dashDoraLeadCol: "Lead Time (h)",
+            dashDoraCfrCol: "CFR (%)",
+            dashDoraMttrCol: "MTTR (m)",
+            slidesArchS1Sub: "Context, boundaries, and key trade-offs",
+            slidesArchS1Notes: "Spend 2 minutes aligning on constraints and explicit non-goals.",
+            slidesArchS2Title: "Context & Constraints",
+            slidesArchS2Sub: "Why the current design cannot carry the next milestone",
+            slidesArchS2B1: "Latency and consistency targets",
+            slidesArchS2B2: "Legacy data compatibility and migration window",
+            slidesArchS2B3: "Local-first and remote sync boundary",
+            slidesArchS2Notes: "Clarify hard constraints versus staged improvements.",
+            slidesArchS3Title: "Target Architecture",
+            slidesArchS3Sub: "Acyclic module layering and boundary decoding",
+            slidesArchS3B1: "Gateway handles auth and edge validation only",
+            slidesArchS3B2: "Core domain rules stay pure and deterministic",
+            slidesArchS3B3: "Persistence consolidated behind one service",
+            slidesArchS3Notes: "Walk through the primary request path and recovery flow.",
+            slidesArchS4Title: "Key Trade-offs",
+            slidesArchS4Sub: "Options evaluated and risk mitigations",
+            slidesArchS4B1: "Long-term maintenance gains vs near-term cost",
+            slidesArchS4B2: "Kill switches and canary rollback strategy",
+            slidesArchS4B3: "Benchmarking and capacity headroom checks",
+            slidesArchS4Notes: "Address concurrency safety and rollback questions directly.",
+            slidesArchS5Title: "Milestones & Next Steps",
+            slidesArchS5Sub: "Phased rollout schedule and acceptance criteria",
+            slidesArchS5B1: "Phase 1: Core contracts and storage schema",
+            slidesArchS5B2: "Phase 2: Integration and load verification",
+            slidesArchS5B3: "Phase 3: Canary rollout and general availability",
+            slidesArchS5Notes: "Confirm review sign-off, blockers, and leads.",
+            slidesRelS1Sub: "Feature overview, engineering wins, and live demo",
+            slidesRelS1Notes: "Keep under 15 minutes; highlight the core problem solved.",
+            slidesRelS2Title: "Why We Built This",
+            slidesRelS2Sub: "Addressing high-frequency engineering friction",
+            slidesRelS2B1: "Manual preflight checklists were slow and error-prone",
+            slidesRelS2B2: "Cross-module debugging lacked a unified view",
+            slidesRelS2B3: "Metrics and regression baselines lacked automated gates",
+            slidesRelS2Notes: "Open with 1-2 real incidents or bottlenecks.",
+            slidesRelS3Title: "Core Capabilities & Design",
+            slidesRelS3Sub: "Key architectural decisions that paid off",
+            slidesRelS3B1: "Declarative templates with structured directory storage",
+            slidesRelS3B2: "Zero-network offline sandbox previews",
+            slidesRelS3B3: "Bilingual catalogs and automated contract parity checks",
+            slidesRelS3Notes: "Walk through the live workflow or diagram.",
+            slidesRelS4Title: "Measured Impact",
+            slidesRelS4Sub: "Before vs after verification results",
+            slidesRelS4B1: "45% faster core workflow turnaround",
+            slidesRelS4B2: "95%+ automated regression coverage",
+            slidesRelS4B3: "Zero-downtime upgrade with zero schema drift",
+            slidesRelS4Notes: "Anchor the value proposition with concrete numbers.",
+            slidesRelS5Title: "Roadmap & Q&A",
+            slidesRelS5Sub: "Upcoming improvements and feedback loop",
+            slidesRelS5B1: "Support team-authored custom template packs",
+            slidesRelS5B2: "One-click ticket handoff from content artifacts",
+            slidesRelS5B3: "Share feedback in the engineering channel",
+            slidesRelS5Notes: "Leave 5 minutes for open Q&A.",
+            protoApiTitle: "API & JSON Payload Sandbox",
+            protoApiSub: "Format JSON offline, inspect payload shape, and generate cURL commands",
+            protoApiBtnPretty: "Format JSON",
+            protoApiBtnMinify: "Minify",
+            protoApiBtnCopy: "Generate cURL",
+            protoApiPayloadLabel: "Request JSON Payload",
+            protoApiCurlLabel: "Generated Command",
+            protoApiValid: "Valid JSON payload",
+            protoApiInvalid: "JSON parse error: ",
+            protoCompTitle: "Interactive UI State Sandbox",
+            protoCompSub: "Preview default, loading, empty, and error states across themes and viewport widths",
+            protoCompStateLabel: "Component State",
+            protoCompThemeLabel: "Theme",
+            protoCompWidthLabel: "Viewport Width",
+            protoCompStateDefault: "Default",
+            protoCompStateLoading: "Loading",
+            protoCompStateEmpty: "Empty",
+            protoCompStateError: "Error",
+            protoCompThemeLight: "Light",
+            protoCompThemeDark: "Dark",
+            protoCompCardTitle: "Service Deployment Status",
+            protoCompCardBody: "Release v2.4.0 is healthy across 3 zones with 18ms P99 latency.",
+            protoCompLoadingText: "Fetching latest health checks and metrics…",
+            protoCompEmptyText: "No matching active instances. Adjust filters or create a deployment.",
+            protoCompErrorText: "Gateway timeout (504): upstream health aggregator missed the 3000ms deadline.",
+            designDesktopName: "Desktop Workspace",
+            designMobileName: "Mobile Companion",
+            designPropDensity: "Density",
+            designPropBanner: "Show Release Banner",
+            designPropCta: "Primary CTA",
+            designPropCtaDefault: "Install as Desktop App",
+            designHeroSub: "Native real-time collaboration across artboards with shared tokens.",
+            designMetricsTitle: "Service Contracts",
+            designActionTitle: "Desktop Bundle Setup",
+            dsButtonTitle: "Button",
+            dsButtonSummary: "Triggers a primary user action; keep one primary button per toolbar.",
+            dsButtonDo: 'Start with an action verb (e.g. "Save & Publish")',
+            dsButtonDont: "Avoid placing two primary buttons side-by-side",
+            dsBadgeTitle: "Badge",
+            dsBadgeSummary: "Compact status and category indicator.",
+            dsBadgeDo: "Keep labels concise (1–2 short words)",
+            motionCh1: "Opening Hook",
+            motionCh2: "Feature Reveal",
+            motionCh3: "Closing CTA",
+            motionSc2Headline: "Zero external dependencies — installable as a native app",
+            motionSc2CardTitle: "Pure-Time Deterministic Engine",
+            motionSc2CardBody: "Every timestamp t maps deterministically to easing curves and layer transforms",
+            motionSc3Headline: "Preview & Ship Directly from Content Hub",
+            sbTone: "Warm Editorial · Crisp Contrast",
+            sbS1Scene: "Opening · Studio Overview",
+            sbS1Visual: "Morning light illuminates the desktop workbench as cards and timelines fan out cleanly.",
+            sbS1Dialogue: "Turn every conversation idea directly into a runnable artifact.",
+            sbS2Scene: "Demo · One-Click Install as App",
+            sbS2Visual: "User clicks Install as App; an interactive mini-app opens in a unified immersive titlebar window.",
+            sbS2Dialogue: "No browser chrome — just a focused Mac utility ready from Spotlight or your Dock.",
+            sbS3Scene: "Closing · Built for Flow",
+            sbS3Visual: "Close-up of the ring timer and oscilloscope pulsing smoothly inside the standalone applet.",
+            sbS3Dialogue: "Offline-safe, instant launch, crafted for daily focus and exploration.",
           },
         },
         search: {
@@ -4435,6 +5477,9 @@ export const catalogs = {
           placeholder: "Search notes, artifacts, and media…",
           empty: "No matching notes, artifacts, or media",
           typeMedia: "Media",
+          scopeAll: "All",
+          scopeArtifacts: "Artifacts",
+          scopeMedia: "Media",
         },
       },
     },
@@ -5406,6 +6451,20 @@ export const catalogs = {
         toolFailed: "Failed",
         toolPending: "Waiting for output…",
         toolNoOutput: "No output",
+        activityThinking: "{n} thoughts",
+        activityRead: "Read {n}",
+        activitySearch: "Searched {n}",
+        activityEdit: "Edited {n}",
+        activityCommand: "Ran {n} cmds",
+        activityOther: "{n} tools",
+        activitySteps: "{n} steps",
+        activityRunning: "Running",
+        activityFailed: "{n} failed",
+        toolInput: "Input",
+        toolOutput: "Output",
+        toolLines: "{n} lines",
+        copy: "Copy",
+        copied: "Copied",
         interactionBadge: "Needs your confirmation · never auto-approved",
         interactionAnswered: "Answered",
         interactionDeclined: "Declined",
@@ -5807,9 +6866,11 @@ export interface Messages {
   "web.artifact.applet.install": undefined;
   "web.artifact.applet.installedToast": { readonly name: string | number };
   "web.artifact.applet.installing": undefined;
+  "web.artifact.applet.manageApp": undefined;
   "web.artifact.applet.modalTitle": undefined;
   "web.artifact.applet.nameRequired": undefined;
   "web.artifact.applet.open": undefined;
+  "web.artifact.applet.openApp": undefined;
   "web.artifact.applet.openedToast": { readonly name: string | number };
   "web.artifact.applet.reinstall": undefined;
   "web.artifact.applet.statusInstalled": undefined;
@@ -5827,23 +6888,79 @@ export interface Messages {
   "web.artifact.card.open": { readonly title: string | number };
   "web.artifact.card.version": { readonly version: string | number };
   "web.artifact.dashboard.exportCsv": undefined;
-  "web.artifact.design.noProps": undefined;
+  "web.artifact.design.disabled": undefined;
+  "web.artifact.design.emptyCanvas": undefined;
+  "web.artifact.design.enabled": undefined;
+  "web.artifact.design.propsTitle": undefined;
+  "web.artifact.design.themeDark": undefined;
+  "web.artifact.design.themeLight": undefined;
+  "web.artifact.designSystem.colors": undefined;
   "web.artifact.designSystem.components": undefined;
+  "web.artifact.designSystem.guidelinesDo": undefined;
+  "web.artifact.designSystem.guidelinesDont": undefined;
+  "web.artifact.designSystem.previewTheme": undefined;
+  "web.artifact.designSystem.radius": undefined;
+  "web.artifact.designSystem.spacing": undefined;
+  "web.artifact.designSystem.specimen": undefined;
+  "web.artifact.designSystem.typography": undefined;
+  "web.artifact.diagram.edges": undefined;
+  "web.artifact.diagram.nodes": undefined;
+  "web.artifact.diagram.structure": undefined;
+  "web.artifact.diagram.visual": undefined;
+  "web.artifact.docs.chars": { readonly n: string | number };
+  "web.artifact.docs.edit": undefined;
+  "web.artifact.docs.read": undefined;
+  "web.artifact.docs.split": undefined;
   "web.artifact.edit.save": undefined;
   "web.artifact.edit.saved": { readonly version: string | number };
+  "web.artifact.files.codeMode": undefined;
+  "web.artifact.files.htmlPreviewMode": undefined;
   "web.artifact.issue.title": undefined;
+  "web.artifact.motion.chapters": undefined;
+  "web.artifact.motion.layers": { readonly n: string | number };
+  "web.artifact.motion.loop": undefined;
+  "web.artifact.motion.nextStep": undefined;
+  "web.artifact.motion.play": undefined;
+  "web.artifact.motion.prevStep": undefined;
+  "web.artifact.motion.restart": undefined;
+  "web.artifact.motion.stop": undefined;
+  "web.artifact.motion.timeline": undefined;
+  "web.artifact.outline.addChild": undefined;
+  "web.artifact.outline.cycleKind": { readonly kind: string | number };
+  "web.artifact.outline.hideDone": undefined;
+  "web.artifact.outline.indent": undefined;
+  "web.artifact.outline.kindBullet": undefined;
+  "web.artifact.outline.kindHeading": undefined;
+  "web.artifact.outline.kindTodo": undefined;
+  "web.artifact.outline.outdent": undefined;
+  "web.artifact.outline.progress": { readonly done: string | number; readonly total: string | number };
+  "web.artifact.outline.quickAdd": undefined;
+  "web.artifact.outline.showDone": undefined;
+  "web.artifact.outline.untitled": undefined;
   "web.artifact.page.all": undefined;
+  "web.artifact.page.backToLibrary": undefined;
   "web.artifact.page.delete": undefined;
   "web.artifact.page.deleteAsk": { readonly title: string | number };
+  "web.artifact.page.deleteFileAsk": { readonly path: string | number };
   "web.artifact.page.deleted": { readonly title: string | number };
+  "web.artifact.page.directory": undefined;
+  "web.artifact.page.discard": undefined;
+  "web.artifact.page.filesTab": undefined;
+  "web.artifact.page.filesTabCount": { readonly n: string | number };
   "web.artifact.page.gone": undefined;
+  "web.artifact.page.liveVersion": undefined;
   "web.artifact.page.more": undefined;
   "web.artifact.page.new": undefined;
+  "web.artifact.page.newFileLabel": undefined;
   "web.artifact.page.none": undefined;
+  "web.artifact.page.previewTab": undefined;
   "web.artifact.page.rail": undefined;
   "web.artifact.page.railHide": undefined;
   "web.artifact.page.railShow": undefined;
+  "web.artifact.page.snapshotNote": undefined;
   "web.artifact.page.title": undefined;
+  "web.artifact.page.unsaved": undefined;
+  "web.artifact.page.viewMode": undefined;
   "web.artifact.presenter.aside": undefined;
   "web.artifact.presenter.clock": undefined;
   "web.artifact.presenter.current": undefined;
@@ -5856,14 +6973,41 @@ export interface Messages {
   "web.artifact.presenter.notes": undefined;
   "web.artifact.presenter.restart": undefined;
   "web.artifact.presenter.waiting": undefined;
+  "web.artifact.prototype.installApp": undefined;
+  "web.artifact.prototype.iterateAi": undefined;
+  "web.artifact.prototype.openApp": undefined;
+  "web.artifact.prototype.reload": undefined;
+  "web.artifact.prototype.viewportFull": undefined;
+  "web.artifact.prototype.viewportLabel": undefined;
+  "web.artifact.prototype.viewportMobile": undefined;
+  "web.artifact.prototype.viewportTablet": undefined;
+  "web.artifact.sheet.addRow": undefined;
+  "web.artifact.sheet.empty": undefined;
+  "web.artifact.sheet.filterPlaceholder": undefined;
+  "web.artifact.sheet.rowsCount": { readonly n: string | number };
+  "web.artifact.slides.doneEdit": undefined;
+  "web.artifact.slides.editSlide": undefined;
+  "web.artifact.slides.layoutContent": undefined;
+  "web.artifact.slides.layoutCover": undefined;
   "web.artifact.slides.next": undefined;
   "web.artifact.slides.present": undefined;
   "web.artifact.slides.presenter": undefined;
   "web.artifact.slides.previous": undefined;
+  "web.artifact.slides.slideBulletsLabel": undefined;
+  "web.artifact.slides.slideLayoutLabel": undefined;
+  "web.artifact.slides.slideNotesLabel": undefined;
+  "web.artifact.slides.slideSubtitleLabel": undefined;
+  "web.artifact.slides.slideTitleLabel": undefined;
   "web.artifact.slidesStore.addSlide": undefined;
   "web.artifact.standalone.live": undefined;
   "web.artifact.standalone.missing": undefined;
   "web.artifact.standalone.version": { readonly version: string | number };
+  "web.artifact.storyboard.animaticMode": undefined;
+  "web.artifact.storyboard.gridMode": undefined;
+  "web.artifact.storyboard.sfx": undefined;
+  "web.artifact.storyboard.shotOf": { readonly n: string | number; readonly total: string | number };
+  "web.artifact.storyboard.totalDuration": { readonly sec: string | number };
+  "web.artifact.storyboard.transition": undefined;
   "web.artifact.suggestions.accept": undefined;
   "web.artifact.suggestions.by": { readonly name: string | number };
   "web.artifact.suggestions.delete": undefined;
@@ -6217,7 +7361,11 @@ export interface Messages {
   "web.base.toasts": undefined;
   "web.base.unreachable": undefined;
   "web.base.update": undefined;
-  "web.base.updateReady": { readonly next: string | number };
+  "web.base.updateInstall": undefined;
+  "web.base.updateInstalling": undefined;
+  "web.base.updateNotesTitle": undefined;
+  "web.base.updateReadyOneClick": { readonly next: string | number };
+  "web.base.updateReadyTitle": { readonly next: string | number };
   "web.base.user": undefined;
   "web.base.working": { readonly n: string | number };
   "web.base.write": undefined;
@@ -7115,16 +8263,23 @@ export interface Messages {
   "web.library.content.inspector.reveal": undefined;
   "web.library.content.inspector.saveAs": undefined;
   "web.library.content.inspector.stopAudio": undefined;
+  "web.library.content.installedApps": undefined;
+  "web.library.content.installedAppsEmpty": undefined;
   "web.library.content.issueCreated": undefined;
   "web.library.content.media": undefined;
   "web.library.content.new": undefined;
   "web.library.content.newNote": undefined;
   "web.library.content.pin": undefined;
   "web.library.content.pinned": undefined;
+  "web.library.content.pinnedEmpty": undefined;
   "web.library.content.pinnedToast": undefined;
   "web.library.content.recent": undefined;
+  "web.library.content.resetFilter": undefined;
   "web.library.content.search.empty": undefined;
   "web.library.content.search.placeholder": undefined;
+  "web.library.content.search.scopeAll": undefined;
+  "web.library.content.search.scopeArtifacts": undefined;
+  "web.library.content.search.scopeMedia": undefined;
   "web.library.content.search.title": undefined;
   "web.library.content.search.typeMedia": undefined;
   "web.library.content.searchAll": undefined;
@@ -7134,7 +8289,9 @@ export interface Messages {
   "web.library.content.source.all": undefined;
   "web.library.content.source.user": undefined;
   "web.library.content.templates.cat.ai": undefined;
+  "web.library.content.templates.cat.apps": undefined;
   "web.library.content.templates.cat.deliverable": undefined;
+  "web.library.content.templates.cat.engineering": undefined;
   "web.library.content.templates.cat.note": undefined;
   "web.library.content.templates.cat.recommended": undefined;
   "web.library.content.templates.cat.whiteboard": undefined;
@@ -7165,28 +8322,404 @@ export interface Messages {
   "web.library.content.templates.items.artSlides.name": undefined;
   "web.library.content.templates.items.artStoryboard.desc": undefined;
   "web.library.content.templates.items.artStoryboard.name": undefined;
+  "web.library.content.templates.items.dashDora.desc": undefined;
+  "web.library.content.templates.items.dashDora.name": undefined;
+  "web.library.content.templates.items.dashSlo.desc": undefined;
+  "web.library.content.templates.items.dashSlo.name": undefined;
+  "web.library.content.templates.items.designWorkspaceUi.desc": undefined;
+  "web.library.content.templates.items.designWorkspaceUi.name": undefined;
+  "web.library.content.templates.items.diagCicd.desc": undefined;
+  "web.library.content.templates.items.diagCicd.name": undefined;
+  "web.library.content.templates.items.diagErd.desc": undefined;
+  "web.library.content.templates.items.diagErd.name": undefined;
+  "web.library.content.templates.items.diagMicroservices.desc": undefined;
+  "web.library.content.templates.items.diagMicroservices.name": undefined;
+  "web.library.content.templates.items.diagSequence.desc": undefined;
+  "web.library.content.templates.items.diagSequence.name": undefined;
+  "web.library.content.templates.items.diagStateMachine.desc": undefined;
+  "web.library.content.templates.items.diagStateMachine.name": undefined;
+  "web.library.content.templates.items.docAdr.desc": undefined;
+  "web.library.content.templates.items.docAdr.name": undefined;
+  "web.library.content.templates.items.docApiSpec.desc": undefined;
+  "web.library.content.templates.items.docApiSpec.name": undefined;
+  "web.library.content.templates.items.docMigration.desc": undefined;
+  "web.library.content.templates.items.docMigration.name": undefined;
+  "web.library.content.templates.items.docPerf.desc": undefined;
+  "web.library.content.templates.items.docPerf.name": undefined;
+  "web.library.content.templates.items.docPostmortem.desc": undefined;
+  "web.library.content.templates.items.docPostmortem.name": undefined;
+  "web.library.content.templates.items.docRfc.desc": undefined;
+  "web.library.content.templates.items.docRfc.name": undefined;
+  "web.library.content.templates.items.docRunbook.desc": undefined;
+  "web.library.content.templates.items.docRunbook.name": undefined;
+  "web.library.content.templates.items.docSecurity.desc": undefined;
+  "web.library.content.templates.items.docSecurity.name": undefined;
+  "web.library.content.templates.items.dsPapertrails.desc": undefined;
+  "web.library.content.templates.items.dsPapertrails.name": undefined;
+  "web.library.content.templates.items.motionLaunchReel.desc": undefined;
+  "web.library.content.templates.items.motionLaunchReel.name": undefined;
   "web.library.content.templates.items.noteBlank.desc": undefined;
   "web.library.content.templates.items.noteBlank.name": undefined;
   "web.library.content.templates.items.noteDaily.desc": undefined;
   "web.library.content.templates.items.noteDaily.name": undefined;
+  "web.library.content.templates.items.noteDebug.desc": undefined;
+  "web.library.content.templates.items.noteDebug.name": undefined;
   "web.library.content.templates.items.noteMeeting.desc": undefined;
   "web.library.content.templates.items.noteMeeting.name": undefined;
+  "web.library.content.templates.items.noteOnboarding.desc": undefined;
+  "web.library.content.templates.items.noteOnboarding.name": undefined;
+  "web.library.content.templates.items.noteOncall.desc": undefined;
+  "web.library.content.templates.items.noteOncall.name": undefined;
+  "web.library.content.templates.items.notePrReview.desc": undefined;
+  "web.library.content.templates.items.notePrReview.name": undefined;
+  "web.library.content.templates.items.noteRelease.desc": undefined;
+  "web.library.content.templates.items.noteRelease.name": undefined;
+  "web.library.content.templates.items.noteSprintRetro.desc": undefined;
+  "web.library.content.templates.items.noteSprintRetro.name": undefined;
   "web.library.content.templates.items.noteTech.desc": undefined;
   "web.library.content.templates.items.noteTech.name": undefined;
+  "web.library.content.templates.items.protoApiPlayground.desc": undefined;
+  "web.library.content.templates.items.protoApiPlayground.name": undefined;
+  "web.library.content.templates.items.protoComponentLab.desc": undefined;
+  "web.library.content.templates.items.protoComponentLab.name": undefined;
+  "web.library.content.templates.items.protoCssGlassStudio.desc": undefined;
+  "web.library.content.templates.items.protoCssGlassStudio.name": undefined;
+  "web.library.content.templates.items.protoDeskKanban.desc": undefined;
+  "web.library.content.templates.items.protoDeskKanban.name": undefined;
+  "web.library.content.templates.items.protoFocusStudio.desc": undefined;
+  "web.library.content.templates.items.protoFocusStudio.name": undefined;
+  "web.library.content.templates.items.protoParticleLab.desc": undefined;
+  "web.library.content.templates.items.protoParticleLab.name": undefined;
+  "web.library.content.templates.items.protoSynthPad.desc": undefined;
+  "web.library.content.templates.items.protoSynthPad.name": undefined;
+  "web.library.content.templates.items.protoTokenCalculator.desc": undefined;
+  "web.library.content.templates.items.protoTokenCalculator.name": undefined;
+  "web.library.content.templates.items.sheetApiInventory.desc": undefined;
+  "web.library.content.templates.items.sheetApiInventory.name": undefined;
+  "web.library.content.templates.items.sheetBenchmark.desc": undefined;
+  "web.library.content.templates.items.sheetBenchmark.name": undefined;
+  "web.library.content.templates.items.sheetTechMatrix.desc": undefined;
+  "web.library.content.templates.items.sheetTechMatrix.name": undefined;
+  "web.library.content.templates.items.sheetTestMatrix.desc": undefined;
+  "web.library.content.templates.items.sheetTestMatrix.name": undefined;
+  "web.library.content.templates.items.slidesArchReview.desc": undefined;
+  "web.library.content.templates.items.slidesArchReview.name": undefined;
+  "web.library.content.templates.items.slidesReleaseDemo.desc": undefined;
+  "web.library.content.templates.items.slidesReleaseDemo.name": undefined;
+  "web.library.content.templates.items.storyboardProductFilm.desc": undefined;
+  "web.library.content.templates.items.storyboardProductFilm.name": undefined;
   "web.library.content.templates.items.wbArch.desc": undefined;
   "web.library.content.templates.items.wbArch.name": undefined;
   "web.library.content.templates.items.wbBlank.desc": undefined;
   "web.library.content.templates.items.wbBlank.name": undefined;
+  "web.library.content.templates.items.wbC4.desc": undefined;
+  "web.library.content.templates.items.wbC4.name": undefined;
+  "web.library.content.templates.items.wbEventStorming.desc": undefined;
+  "web.library.content.templates.items.wbEventStorming.name": undefined;
+  "web.library.content.templates.items.wbIncidentMap.desc": undefined;
+  "web.library.content.templates.items.wbIncidentMap.name": undefined;
   "web.library.content.templates.items.wbJourney.desc": undefined;
   "web.library.content.templates.items.wbJourney.name": undefined;
   "web.library.content.templates.items.wbTimeline.desc": undefined;
   "web.library.content.templates.items.wbTimeline.name": undefined;
+  "web.library.content.templates.items.wbTradeoff.desc": undefined;
+  "web.library.content.templates.items.wbTradeoff.name": undefined;
   "web.library.content.templates.items.wbWorkshop.desc": undefined;
   "web.library.content.templates.items.wbWorkshop.name": undefined;
   "web.library.content.templates.search": undefined;
+  "web.library.content.templates.searchCount": { readonly n: string | number };
+  "web.library.content.templates.seed.dashDoraCfrCol": undefined;
+  "web.library.content.templates.seed.dashDoraDeployCol": undefined;
+  "web.library.content.templates.seed.dashDoraLeadCol": undefined;
+  "web.library.content.templates.seed.dashDoraMttrCol": undefined;
+  "web.library.content.templates.seed.dashDoraP1": undefined;
+  "web.library.content.templates.seed.dashDoraP2": undefined;
+  "web.library.content.templates.seed.dashDoraP3": undefined;
+  "web.library.content.templates.seed.dashDoraP4": undefined;
+  "web.library.content.templates.seed.dashDoraWeekCol": undefined;
+  "web.library.content.templates.seed.dashSloAlertsCol": undefined;
+  "web.library.content.templates.seed.dashSloAvailCol": undefined;
+  "web.library.content.templates.seed.dashSloBudgetCol": undefined;
+  "web.library.content.templates.seed.dashSloP1": undefined;
+  "web.library.content.templates.seed.dashSloP2": undefined;
+  "web.library.content.templates.seed.dashSloP3": undefined;
+  "web.library.content.templates.seed.dashSloP4": undefined;
+  "web.library.content.templates.seed.dashSloP99Col": undefined;
+  "web.library.content.templates.seed.dashSloR1": undefined;
+  "web.library.content.templates.seed.dashSloR2": undefined;
+  "web.library.content.templates.seed.dashSloR3": undefined;
+  "web.library.content.templates.seed.dashSloR4": undefined;
+  "web.library.content.templates.seed.dashSloServiceCol": undefined;
+  "web.library.content.templates.seed.designActionTitle": undefined;
+  "web.library.content.templates.seed.designDesktopName": undefined;
+  "web.library.content.templates.seed.designHeroSub": undefined;
+  "web.library.content.templates.seed.designMetricsTitle": undefined;
+  "web.library.content.templates.seed.designMobileName": undefined;
+  "web.library.content.templates.seed.designPropBanner": undefined;
+  "web.library.content.templates.seed.designPropCta": undefined;
+  "web.library.content.templates.seed.designPropCtaDefault": undefined;
+  "web.library.content.templates.seed.designPropDensity": undefined;
+  "web.library.content.templates.seed.diagCiBuild": undefined;
+  "web.library.content.templates.seed.diagCiCanary": undefined;
+  "web.library.content.templates.seed.diagCiE1": undefined;
+  "web.library.content.templates.seed.diagCiE2": undefined;
+  "web.library.content.templates.seed.diagCiE3": undefined;
+  "web.library.content.templates.seed.diagCiE4": undefined;
+  "web.library.content.templates.seed.diagCiE5": undefined;
+  "web.library.content.templates.seed.diagCiLint": undefined;
+  "web.library.content.templates.seed.diagCiProd": undefined;
+  "web.library.content.templates.seed.diagCiSmoke": undefined;
+  "web.library.content.templates.seed.diagCiUnit": undefined;
+  "web.library.content.templates.seed.diagErdArtifact": undefined;
+  "web.library.content.templates.seed.diagErdE1": undefined;
+  "web.library.content.templates.seed.diagErdE2": undefined;
+  "web.library.content.templates.seed.diagErdE3": undefined;
+  "web.library.content.templates.seed.diagErdE4": undefined;
+  "web.library.content.templates.seed.diagErdE5": undefined;
+  "web.library.content.templates.seed.diagErdIssue": undefined;
+  "web.library.content.templates.seed.diagErdRepo": undefined;
+  "web.library.content.templates.seed.diagErdSession": undefined;
+  "web.library.content.templates.seed.diagErdUser": undefined;
+  "web.library.content.templates.seed.diagErdVersion": undefined;
+  "web.library.content.templates.seed.diagMsEdgeAuth": undefined;
+  "web.library.content.templates.seed.diagMsEdgeEmit": undefined;
+  "web.library.content.templates.seed.diagMsEdgeRead": undefined;
+  "web.library.content.templates.seed.diagMsEdgeRpc": undefined;
+  "web.library.content.templates.seed.diagMsEdgeStore": undefined;
+  "web.library.content.templates.seed.diagMsNodeAuth": undefined;
+  "web.library.content.templates.seed.diagMsNodeCore": undefined;
+  "web.library.content.templates.seed.diagMsNodeDb": undefined;
+  "web.library.content.templates.seed.diagMsNodeGateway": undefined;
+  "web.library.content.templates.seed.diagMsNodeMedia": undefined;
+  "web.library.content.templates.seed.diagMsNodeQueue": undefined;
+  "web.library.content.templates.seed.diagSeqApi": undefined;
+  "web.library.content.templates.seed.diagSeqBus": undefined;
+  "web.library.content.templates.seed.diagSeqClient": undefined;
+  "web.library.content.templates.seed.diagSeqDomain": undefined;
+  "web.library.content.templates.seed.diagSeqE1": undefined;
+  "web.library.content.templates.seed.diagSeqE2": undefined;
+  "web.library.content.templates.seed.diagSeqE3": undefined;
+  "web.library.content.templates.seed.diagSeqE4": undefined;
+  "web.library.content.templates.seed.diagSeqE5": undefined;
+  "web.library.content.templates.seed.diagSeqGuard": undefined;
+  "web.library.content.templates.seed.diagSeqOutbox": undefined;
+  "web.library.content.templates.seed.diagSmCanceled": undefined;
+  "web.library.content.templates.seed.diagSmDone": undefined;
+  "web.library.content.templates.seed.diagSmDraft": undefined;
+  "web.library.content.templates.seed.diagSmE1": undefined;
+  "web.library.content.templates.seed.diagSmE2": undefined;
+  "web.library.content.templates.seed.diagSmE3": undefined;
+  "web.library.content.templates.seed.diagSmE4": undefined;
+  "web.library.content.templates.seed.diagSmE5": undefined;
+  "web.library.content.templates.seed.diagSmE6": undefined;
+  "web.library.content.templates.seed.diagSmQueued": undefined;
+  "web.library.content.templates.seed.diagSmReview": undefined;
+  "web.library.content.templates.seed.diagSmRunning": undefined;
+  "web.library.content.templates.seed.docAdrBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docApiSpecBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docMigrationBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docPerfBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docPostmortemBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docRfcBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docRunbookBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docSecurityBody": { readonly title: string | number };
+  "web.library.content.templates.seed.dsBadgeDo": undefined;
+  "web.library.content.templates.seed.dsBadgeSummary": undefined;
+  "web.library.content.templates.seed.dsBadgeTitle": undefined;
+  "web.library.content.templates.seed.dsButtonDo": undefined;
+  "web.library.content.templates.seed.dsButtonDont": undefined;
+  "web.library.content.templates.seed.dsButtonSummary": undefined;
+  "web.library.content.templates.seed.dsButtonTitle": undefined;
+  "web.library.content.templates.seed.motionCh1": undefined;
+  "web.library.content.templates.seed.motionCh2": undefined;
+  "web.library.content.templates.seed.motionCh3": undefined;
+  "web.library.content.templates.seed.motionSc2CardBody": undefined;
+  "web.library.content.templates.seed.motionSc2CardTitle": undefined;
+  "web.library.content.templates.seed.motionSc2Headline": undefined;
+  "web.library.content.templates.seed.motionSc3Headline": undefined;
   "web.library.content.templates.seed.noteDaily": undefined;
+  "web.library.content.templates.seed.noteDebug": undefined;
   "web.library.content.templates.seed.noteMeeting": undefined;
+  "web.library.content.templates.seed.noteOnboarding": undefined;
+  "web.library.content.templates.seed.noteOncall": undefined;
+  "web.library.content.templates.seed.notePrReview": undefined;
+  "web.library.content.templates.seed.noteRelease": undefined;
+  "web.library.content.templates.seed.noteSprintRetro": undefined;
   "web.library.content.templates.seed.noteTech": undefined;
+  "web.library.content.templates.seed.protoApiBtnCopy": undefined;
+  "web.library.content.templates.seed.protoApiBtnMinify": undefined;
+  "web.library.content.templates.seed.protoApiBtnPretty": undefined;
+  "web.library.content.templates.seed.protoApiCurlLabel": undefined;
+  "web.library.content.templates.seed.protoApiInvalid": undefined;
+  "web.library.content.templates.seed.protoApiPayloadLabel": undefined;
+  "web.library.content.templates.seed.protoApiSub": undefined;
+  "web.library.content.templates.seed.protoApiTitle": undefined;
+  "web.library.content.templates.seed.protoApiValid": undefined;
+  "web.library.content.templates.seed.protoCompCardBody": undefined;
+  "web.library.content.templates.seed.protoCompCardTitle": undefined;
+  "web.library.content.templates.seed.protoCompEmptyText": undefined;
+  "web.library.content.templates.seed.protoCompErrorText": undefined;
+  "web.library.content.templates.seed.protoCompLoadingText": undefined;
+  "web.library.content.templates.seed.protoCompStateDefault": undefined;
+  "web.library.content.templates.seed.protoCompStateEmpty": undefined;
+  "web.library.content.templates.seed.protoCompStateError": undefined;
+  "web.library.content.templates.seed.protoCompStateLabel": undefined;
+  "web.library.content.templates.seed.protoCompStateLoading": undefined;
+  "web.library.content.templates.seed.protoCompSub": undefined;
+  "web.library.content.templates.seed.protoCompThemeDark": undefined;
+  "web.library.content.templates.seed.protoCompThemeLabel": undefined;
+  "web.library.content.templates.seed.protoCompThemeLight": undefined;
+  "web.library.content.templates.seed.protoCompTitle": undefined;
+  "web.library.content.templates.seed.protoCompWidthLabel": undefined;
+  "web.library.content.templates.seed.sbS1Dialogue": undefined;
+  "web.library.content.templates.seed.sbS1Scene": undefined;
+  "web.library.content.templates.seed.sbS1Visual": undefined;
+  "web.library.content.templates.seed.sbS2Dialogue": undefined;
+  "web.library.content.templates.seed.sbS2Scene": undefined;
+  "web.library.content.templates.seed.sbS2Visual": undefined;
+  "web.library.content.templates.seed.sbS3Dialogue": undefined;
+  "web.library.content.templates.seed.sbS3Scene": undefined;
+  "web.library.content.templates.seed.sbS3Visual": undefined;
+  "web.library.content.templates.seed.sbTone": undefined;
+  "web.library.content.templates.seed.sheetApiColAuth": undefined;
+  "web.library.content.templates.seed.sheetApiColMethod": undefined;
+  "web.library.content.templates.seed.sheetApiColOwner": undefined;
+  "web.library.content.templates.seed.sheetApiColPath": undefined;
+  "web.library.content.templates.seed.sheetApiColRate": undefined;
+  "web.library.content.templates.seed.sheetApiColStability": undefined;
+  "web.library.content.templates.seed.sheetApiR1Auth": undefined;
+  "web.library.content.templates.seed.sheetApiR1Owner": undefined;
+  "web.library.content.templates.seed.sheetApiR1Rate": undefined;
+  "web.library.content.templates.seed.sheetApiR1Stab": undefined;
+  "web.library.content.templates.seed.sheetApiR2Auth": undefined;
+  "web.library.content.templates.seed.sheetApiR2Owner": undefined;
+  "web.library.content.templates.seed.sheetApiR2Rate": undefined;
+  "web.library.content.templates.seed.sheetApiR2Stab": undefined;
+  "web.library.content.templates.seed.sheetApiR3Auth": undefined;
+  "web.library.content.templates.seed.sheetApiR3Owner": undefined;
+  "web.library.content.templates.seed.sheetApiR3Rate": undefined;
+  "web.library.content.templates.seed.sheetApiR3Stab": undefined;
+  "web.library.content.templates.seed.sheetApiR4Auth": undefined;
+  "web.library.content.templates.seed.sheetApiR4Owner": undefined;
+  "web.library.content.templates.seed.sheetApiR4Rate": undefined;
+  "web.library.content.templates.seed.sheetApiR4Stab": undefined;
+  "web.library.content.templates.seed.sheetApiTab": undefined;
+  "web.library.content.templates.seed.sheetBenchColBaseline": undefined;
+  "web.library.content.templates.seed.sheetBenchColCase": undefined;
+  "web.library.content.templates.seed.sheetBenchColCurrent": undefined;
+  "web.library.content.templates.seed.sheetBenchColMem": undefined;
+  "web.library.content.templates.seed.sheetBenchColP99": undefined;
+  "web.library.content.templates.seed.sheetBenchColStatus": undefined;
+  "web.library.content.templates.seed.sheetBenchEnvKey": undefined;
+  "web.library.content.templates.seed.sheetBenchEnvR1": undefined;
+  "web.library.content.templates.seed.sheetBenchEnvR2": undefined;
+  "web.library.content.templates.seed.sheetBenchEnvR3": undefined;
+  "web.library.content.templates.seed.sheetBenchEnvVal": undefined;
+  "web.library.content.templates.seed.sheetBenchR1Case": undefined;
+  "web.library.content.templates.seed.sheetBenchR1Status": undefined;
+  "web.library.content.templates.seed.sheetBenchR2Case": undefined;
+  "web.library.content.templates.seed.sheetBenchR2Status": undefined;
+  "web.library.content.templates.seed.sheetBenchR3Case": undefined;
+  "web.library.content.templates.seed.sheetBenchR3Status": undefined;
+  "web.library.content.templates.seed.sheetBenchR4Case": undefined;
+  "web.library.content.templates.seed.sheetBenchR4Status": undefined;
+  "web.library.content.templates.seed.sheetBenchTab1": undefined;
+  "web.library.content.templates.seed.sheetBenchTab2": undefined;
+  "web.library.content.templates.seed.sheetTechColDim": undefined;
+  "web.library.content.templates.seed.sheetTechColNote": undefined;
+  "web.library.content.templates.seed.sheetTechColOptA": undefined;
+  "web.library.content.templates.seed.sheetTechColOptB": undefined;
+  "web.library.content.templates.seed.sheetTechColWeight": undefined;
+  "web.library.content.templates.seed.sheetTechR1Dim": undefined;
+  "web.library.content.templates.seed.sheetTechR1Note": undefined;
+  "web.library.content.templates.seed.sheetTechR2Dim": undefined;
+  "web.library.content.templates.seed.sheetTechR2Note": undefined;
+  "web.library.content.templates.seed.sheetTechR3Dim": undefined;
+  "web.library.content.templates.seed.sheetTechR3Note": undefined;
+  "web.library.content.templates.seed.sheetTechR4Dim": undefined;
+  "web.library.content.templates.seed.sheetTechR4Note": undefined;
+  "web.library.content.templates.seed.sheetTechR5Dim": undefined;
+  "web.library.content.templates.seed.sheetTechR5Note": undefined;
+  "web.library.content.templates.seed.sheetTechTab": undefined;
+  "web.library.content.templates.seed.sheetTestColArea": undefined;
+  "web.library.content.templates.seed.sheetTestColCase": undefined;
+  "web.library.content.templates.seed.sheetTestColEnv": undefined;
+  "web.library.content.templates.seed.sheetTestColId": undefined;
+  "web.library.content.templates.seed.sheetTestColOwner": undefined;
+  "web.library.content.templates.seed.sheetTestColResult": undefined;
+  "web.library.content.templates.seed.sheetTestR1Area": undefined;
+  "web.library.content.templates.seed.sheetTestR1Case": undefined;
+  "web.library.content.templates.seed.sheetTestR1Env": undefined;
+  "web.library.content.templates.seed.sheetTestR1Owner": undefined;
+  "web.library.content.templates.seed.sheetTestR1Res": undefined;
+  "web.library.content.templates.seed.sheetTestR2Area": undefined;
+  "web.library.content.templates.seed.sheetTestR2Case": undefined;
+  "web.library.content.templates.seed.sheetTestR2Env": undefined;
+  "web.library.content.templates.seed.sheetTestR2Owner": undefined;
+  "web.library.content.templates.seed.sheetTestR2Res": undefined;
+  "web.library.content.templates.seed.sheetTestR3Area": undefined;
+  "web.library.content.templates.seed.sheetTestR3Case": undefined;
+  "web.library.content.templates.seed.sheetTestR3Env": undefined;
+  "web.library.content.templates.seed.sheetTestR3Owner": undefined;
+  "web.library.content.templates.seed.sheetTestR3Res": undefined;
+  "web.library.content.templates.seed.sheetTestR4Area": undefined;
+  "web.library.content.templates.seed.sheetTestR4Case": undefined;
+  "web.library.content.templates.seed.sheetTestR4Env": undefined;
+  "web.library.content.templates.seed.sheetTestR4Owner": undefined;
+  "web.library.content.templates.seed.sheetTestR4Res": undefined;
+  "web.library.content.templates.seed.sheetTestTab": undefined;
+  "web.library.content.templates.seed.slidesArchS1Notes": undefined;
+  "web.library.content.templates.seed.slidesArchS1Sub": undefined;
+  "web.library.content.templates.seed.slidesArchS2B1": undefined;
+  "web.library.content.templates.seed.slidesArchS2B2": undefined;
+  "web.library.content.templates.seed.slidesArchS2B3": undefined;
+  "web.library.content.templates.seed.slidesArchS2Notes": undefined;
+  "web.library.content.templates.seed.slidesArchS2Sub": undefined;
+  "web.library.content.templates.seed.slidesArchS2Title": undefined;
+  "web.library.content.templates.seed.slidesArchS3B1": undefined;
+  "web.library.content.templates.seed.slidesArchS3B2": undefined;
+  "web.library.content.templates.seed.slidesArchS3B3": undefined;
+  "web.library.content.templates.seed.slidesArchS3Notes": undefined;
+  "web.library.content.templates.seed.slidesArchS3Sub": undefined;
+  "web.library.content.templates.seed.slidesArchS3Title": undefined;
+  "web.library.content.templates.seed.slidesArchS4B1": undefined;
+  "web.library.content.templates.seed.slidesArchS4B2": undefined;
+  "web.library.content.templates.seed.slidesArchS4B3": undefined;
+  "web.library.content.templates.seed.slidesArchS4Notes": undefined;
+  "web.library.content.templates.seed.slidesArchS4Sub": undefined;
+  "web.library.content.templates.seed.slidesArchS4Title": undefined;
+  "web.library.content.templates.seed.slidesArchS5B1": undefined;
+  "web.library.content.templates.seed.slidesArchS5B2": undefined;
+  "web.library.content.templates.seed.slidesArchS5B3": undefined;
+  "web.library.content.templates.seed.slidesArchS5Notes": undefined;
+  "web.library.content.templates.seed.slidesArchS5Sub": undefined;
+  "web.library.content.templates.seed.slidesArchS5Title": undefined;
+  "web.library.content.templates.seed.slidesRelS1Notes": undefined;
+  "web.library.content.templates.seed.slidesRelS1Sub": undefined;
+  "web.library.content.templates.seed.slidesRelS2B1": undefined;
+  "web.library.content.templates.seed.slidesRelS2B2": undefined;
+  "web.library.content.templates.seed.slidesRelS2B3": undefined;
+  "web.library.content.templates.seed.slidesRelS2Notes": undefined;
+  "web.library.content.templates.seed.slidesRelS2Sub": undefined;
+  "web.library.content.templates.seed.slidesRelS2Title": undefined;
+  "web.library.content.templates.seed.slidesRelS3B1": undefined;
+  "web.library.content.templates.seed.slidesRelS3B2": undefined;
+  "web.library.content.templates.seed.slidesRelS3B3": undefined;
+  "web.library.content.templates.seed.slidesRelS3Notes": undefined;
+  "web.library.content.templates.seed.slidesRelS3Sub": undefined;
+  "web.library.content.templates.seed.slidesRelS3Title": undefined;
+  "web.library.content.templates.seed.slidesRelS4B1": undefined;
+  "web.library.content.templates.seed.slidesRelS4B2": undefined;
+  "web.library.content.templates.seed.slidesRelS4B3": undefined;
+  "web.library.content.templates.seed.slidesRelS4Notes": undefined;
+  "web.library.content.templates.seed.slidesRelS4Sub": undefined;
+  "web.library.content.templates.seed.slidesRelS4Title": undefined;
+  "web.library.content.templates.seed.slidesRelS5B1": undefined;
+  "web.library.content.templates.seed.slidesRelS5B2": undefined;
+  "web.library.content.templates.seed.slidesRelS5B3": undefined;
+  "web.library.content.templates.seed.slidesRelS5Notes": undefined;
+  "web.library.content.templates.seed.slidesRelS5Sub": undefined;
+  "web.library.content.templates.seed.slidesRelS5Title": undefined;
   "web.library.content.templates.seed.wbArchE1": undefined;
   "web.library.content.templates.seed.wbArchE2": undefined;
   "web.library.content.templates.seed.wbArchN1Body": undefined;
@@ -7197,6 +8730,39 @@ export interface Messages {
   "web.library.content.templates.seed.wbArchN3Title": undefined;
   "web.library.content.templates.seed.wbBlankBody": undefined;
   "web.library.content.templates.seed.wbBlankTitle": undefined;
+  "web.library.content.templates.seed.wbC4AppBody": undefined;
+  "web.library.content.templates.seed.wbC4AppTitle": undefined;
+  "web.library.content.templates.seed.wbC4DbBody": undefined;
+  "web.library.content.templates.seed.wbC4DbTitle": undefined;
+  "web.library.content.templates.seed.wbC4E1": undefined;
+  "web.library.content.templates.seed.wbC4E2": undefined;
+  "web.library.content.templates.seed.wbC4E3": undefined;
+  "web.library.content.templates.seed.wbC4EdgeBody": undefined;
+  "web.library.content.templates.seed.wbC4EdgeTitle": undefined;
+  "web.library.content.templates.seed.wbC4QueueBody": undefined;
+  "web.library.content.templates.seed.wbC4QueueTitle": undefined;
+  "web.library.content.templates.seed.wbEsAggBody": undefined;
+  "web.library.content.templates.seed.wbEsAggTitle": undefined;
+  "web.library.content.templates.seed.wbEsCmdBody": undefined;
+  "web.library.content.templates.seed.wbEsCmdTitle": undefined;
+  "web.library.content.templates.seed.wbEsE1": undefined;
+  "web.library.content.templates.seed.wbEsE2": undefined;
+  "web.library.content.templates.seed.wbEsE3": undefined;
+  "web.library.content.templates.seed.wbEsEvtBody": undefined;
+  "web.library.content.templates.seed.wbEsEvtTitle": undefined;
+  "web.library.content.templates.seed.wbEsReadBody": undefined;
+  "web.library.content.templates.seed.wbEsReadTitle": undefined;
+  "web.library.content.templates.seed.wbIncE1": undefined;
+  "web.library.content.templates.seed.wbIncE2": undefined;
+  "web.library.content.templates.seed.wbIncE3": undefined;
+  "web.library.content.templates.seed.wbIncFixBody": undefined;
+  "web.library.content.templates.seed.wbIncFixTitle": undefined;
+  "web.library.content.templates.seed.wbIncHyp1Body": undefined;
+  "web.library.content.templates.seed.wbIncHyp1Title": undefined;
+  "web.library.content.templates.seed.wbIncHyp2Body": undefined;
+  "web.library.content.templates.seed.wbIncHyp2Title": undefined;
+  "web.library.content.templates.seed.wbIncSymBody": undefined;
+  "web.library.content.templates.seed.wbIncSymTitle": undefined;
   "web.library.content.templates.seed.wbJourneyE1": undefined;
   "web.library.content.templates.seed.wbJourneyE2": undefined;
   "web.library.content.templates.seed.wbJourneyJ1Body": undefined;
@@ -7213,6 +8779,17 @@ export interface Messages {
   "web.library.content.templates.seed.wbTlP2Title": undefined;
   "web.library.content.templates.seed.wbTlP3Body": undefined;
   "web.library.content.templates.seed.wbTlP3Title": undefined;
+  "web.library.content.templates.seed.wbToDecBody": undefined;
+  "web.library.content.templates.seed.wbToDecTitle": undefined;
+  "web.library.content.templates.seed.wbToE1": undefined;
+  "web.library.content.templates.seed.wbToE2": undefined;
+  "web.library.content.templates.seed.wbToE3": undefined;
+  "web.library.content.templates.seed.wbToOptABody": undefined;
+  "web.library.content.templates.seed.wbToOptATitle": undefined;
+  "web.library.content.templates.seed.wbToOptBBody": undefined;
+  "web.library.content.templates.seed.wbToOptBTitle": undefined;
+  "web.library.content.templates.seed.wbToReqBody": undefined;
+  "web.library.content.templates.seed.wbToReqTitle": undefined;
   "web.library.content.templates.seed.wbWorkE1": undefined;
   "web.library.content.templates.seed.wbWorkE2": undefined;
   "web.library.content.templates.seed.wbWorkW1Body": undefined;
@@ -8071,10 +9648,21 @@ export interface Messages {
   "web.setting.words.remote": undefined;
   "web.setting.words.skills": undefined;
   "web.setting.words.voice": undefined;
+  "web.shell.chat.activityCommand": { readonly n: string | number };
+  "web.shell.chat.activityEdit": { readonly n: string | number };
+  "web.shell.chat.activityFailed": { readonly n: string | number };
+  "web.shell.chat.activityOther": { readonly n: string | number };
+  "web.shell.chat.activityRead": { readonly n: string | number };
+  "web.shell.chat.activityRunning": undefined;
+  "web.shell.chat.activitySearch": { readonly n: string | number };
+  "web.shell.chat.activitySteps": { readonly n: string | number };
+  "web.shell.chat.activityThinking": { readonly n: string | number };
   "web.shell.chat.attachFile": undefined;
   "web.shell.chat.chooseModel": undefined;
   "web.shell.chat.composerPlaceholder": { readonly runtime: string | number };
   "web.shell.chat.configFailed": { readonly why: string | number };
+  "web.shell.chat.copied": undefined;
+  "web.shell.chat.copy": undefined;
   "web.shell.chat.emptyHint": undefined;
   "web.shell.chat.emptyTitle": undefined;
   "web.shell.chat.interactionAnswered": undefined;
@@ -8122,10 +9710,13 @@ export interface Messages {
   "web.shell.chat.thoughtMedium": undefined;
   "web.shell.chat.title": undefined;
   "web.shell.chat.toolFailed": undefined;
+  "web.shell.chat.toolInput": undefined;
+  "web.shell.chat.toolLines": { readonly n: string | number };
   "web.shell.chat.toolNoOutput": undefined;
   "web.shell.chat.toolOk": undefined;
   "web.shell.chat.toolOpenDiff": undefined;
   "web.shell.chat.toolOpenFile": undefined;
+  "web.shell.chat.toolOutput": undefined;
   "web.shell.chat.toolPending": undefined;
   "web.shell.chat.toolRunning": undefined;
   "web.shell.chat.you": undefined;

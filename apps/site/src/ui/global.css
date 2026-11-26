@@ -498,6 +498,9 @@
 
   /* Keep each loop's current phase; entrance styles apply only when reduced motion is not requested. */
   @media (prefers-reduced-motion: reduce) {
+    :root:not([data-scene="morning"]) [data-hero-intro] {
+      visibility: hidden;
+    }
     html {
       scroll-behavior: auto;
     }

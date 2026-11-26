@@ -25,3 +25,13 @@ test("buildPrototypeDocument inlines local CSS/JS and enforces strict CSP with c
   expect(doc).toContain(`<style>\nbody { color: #1c1917; }\n</style>`);
   expect(doc).toContain(`<script type="module">\nexport const ok = "<\\/script>";\n</script>`);
 });
+
+test("buildPrototypeDocument falls back to alternate html entry and inlines local svg images", () => {
+  const files = new Map<string, string>([
+    ["structure/preview.html", '<!doctype html><html><head></head><body><img alt="icon" src="../asset/logo.svg"></body></html>'],
+    ["asset/logo.svg", '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg>'],
+  ]);
+  const doc = buildPrototypeDocument(files);
+  expect(doc).toContain("data:image/svg+xml;charset=utf-8,");
+  expect(doc).toContain(`connect-src 'none'`);
+});

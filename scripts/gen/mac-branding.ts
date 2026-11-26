@@ -8,7 +8,6 @@ const ROOT = resolve(import.meta.dirname, "../..");
 const ASSETS_REPO = process.env.VIBEVALLEY_ASSETS_REPO ? resolve(process.env.VIBEVALLEY_ASSETS_REPO) : resolve(ROOT, "..", "vibevalley-assets");
 const DEFAULT_RAW_DIR = join(ASSETS_REPO, "dist", "brand");
 const DEFAULT_OUT_DIR = join(ROOT, "apps", "mac", "resources");
-const DEFAULT_ICONS_DIR = join(ROOT, "assets", "icons");
 
 const FAVICON_SIZES: readonly number[] = [32, 64, 256];
 
@@ -1000,12 +999,7 @@ function buildFavicons(fallbackPng: string, iconsDir: string): void {
   }
 }
 
-export function generateMacBranding(
-  rawDir = DEFAULT_RAW_DIR,
-  outDir = DEFAULT_OUT_DIR,
-  dmgOnly = false,
-  iconsOutDir = outDir === DEFAULT_OUT_DIR ? DEFAULT_ICONS_DIR : undefined,
-): number {
+export function generateMacBranding(rawDir = DEFAULT_RAW_DIR, outDir = DEFAULT_OUT_DIR, dmgOnly = false, iconsOutDir?: string): number {
   const rawIcon = join(rawDir, "app-icon.png");
   if (!dmgOnly && !existsSync(rawIcon)) {
     console.error(`Missing raw asset: ${rawIcon}. Run vibevalley-assets/scripts/pack_all.sh or ./design/sync-assets.sh --build first.`);
@@ -1082,6 +1076,5 @@ if (import.meta.main) {
     },
   });
   const outDir = values["out-dir"] ?? DEFAULT_OUT_DIR;
-  const iconsDir = values["icons-dir"] ?? (outDir === DEFAULT_OUT_DIR ? DEFAULT_ICONS_DIR : undefined);
-  process.exitCode = generateMacBranding(values["raw-dir"] ?? DEFAULT_RAW_DIR, outDir, values["dmg-only"], iconsDir);
+  process.exitCode = generateMacBranding(values["raw-dir"] ?? DEFAULT_RAW_DIR, outDir, values["dmg-only"], values["icons-dir"]);
 }

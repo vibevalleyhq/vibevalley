@@ -57,6 +57,35 @@ const test = base.extend<object, { website: string }>({
   },
 });
 
+test("regression: preload and displayed hero use one Retina image for the viewport", async ({ browser, viewport, website }) => {
+  const context = await browser.newContext({ ...(viewport ? { viewport } : {}), deviceScaleFactor: 2, reducedMotion: "reduce" });
+  try {
+    const page = await context.newPage();
+    const images: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/gen/images/hero-")) images.push(request.url());
+    });
+    await page.goto(website);
+    const hero = page.locator('#top img[data-scene="morning"]');
+    const src = await hero.evaluate(async (img: HTMLImageElement) => {
+      await img.decode();
+      return img.currentSrc;
+    });
+    const portrait = await page.evaluate(() => matchMedia("(orientation: portrait)").matches);
+    expect(src).toMatch(portrait ? /hero-morning-portrait-1080-/u : /hero-morning-3200-/u);
+    expect(images).toEqual([src]);
+    await page.getByTestId("hero-hour-night").click();
+    await expect(page.locator("html")).toHaveAttribute("data-scene", "night");
+    const nightImage = page.locator('#top img[data-scene="night"]');
+    await expect(nightImage).toHaveCSS("opacity", "1");
+    await expect(page.locator("#top h1")).toBeHidden();
+    const night = await nightImage.evaluate((img: HTMLImageElement) => img.currentSrc);
+    expect(night).toMatch(portrait ? /hero-night-portrait-1080-/u : /hero-night-3200-/u);
+  } finally {
+    await context.close();
+  }
+});
+
 for (const path of ["/", "/en/", "/404.html"]) {
   test(`production static HTML and initial CSS without JavaScript: ${path}`, async ({ browser, viewport, website }) => {
     const context = await browser.newContext({ javaScriptEnabled: false, ...(viewport ? { viewport } : {}) });
@@ -190,6 +219,7 @@ test("regression: selected hour controls retain hover styling and offscreen anim
     await page.getByTestId(`hero-hour-${hour}`).click();
     await expect(page.locator("html")).toHaveAttribute("data-scene", hour);
     await expect(page.getByTestId(`hero-hour-${hour}`)).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(`#top img[data-scene="${hour}"]`)).toHaveCSS("opacity", "1");
     await expect(page.getByTestId(`hero-hour-${hour}`)).toHaveCSS("background-color", hoverColor);
   }
   await page.locator("#features").scrollIntoViewIfNeeded();

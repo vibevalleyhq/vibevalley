@@ -72,6 +72,10 @@
     "sidebarToggle": "展开或收起内容导航",
     "recent": "全部最近",
     "pinned": "置顶收藏",
+    "pinnedEmpty": "还没有置顶内容。悬停任意作品或素材并点击图钉即可置顶到这里。",
+    "resetFilter": "重置筛选",
+    "installedApps": "已安装应用",
+    "installedAppsEmpty": "还没有安装独立应用。在任意作品卡片或详情右上角点击「安装为应用」，即可把它装成独立的 macOS 桌面应用并在此集中启动与管理。",
     "pin": "置顶",
     "unpin": "取消置顶",
     "pinnedToast": "已置顶收藏",
@@ -102,9 +106,12 @@
     "templates": {
       "title": "新建内容",
       "search": "搜索模板…",
+      "searchCount": "找到 {n} 个模板",
       "empty": "没有匹配的模板",
       "cat": {
         "recommended": "推荐",
+        "apps": "独立应用",
+        "engineering": "研发工程",
         "note": "大纲笔记",
         "whiteboard": "白板与图表",
         "deliverable": "交付作品",
@@ -127,6 +134,30 @@
           "name": "每日工作记录",
           "desc": "今日主线、阻塞点与交接摘要"
         },
+        "notePrReview": {
+          "name": "代码评审清单",
+          "desc": "正确性、边界条件、并发安全与回归测试核对"
+        },
+        "noteDebug": {
+          "name": "故障排查记录",
+          "desc": "复现路径、假设验证、日志线索与根因定位"
+        },
+        "noteRelease": {
+          "name": "发版核对清单",
+          "desc": "预检门禁、灰度放量、监控观察与回滚预案"
+        },
+        "noteOncall": {
+          "name": "值班交接单",
+          "desc": "活跃告警、待跟进事项、变更窗口与联系人"
+        },
+        "noteOnboarding": {
+          "name": "代码库导读",
+          "desc": "目录拓扑、关键入口、本地运行与常见坑点"
+        },
+        "noteSprintRetro": {
+          "name": "迭代复盘大纲",
+          "desc": "交付亮点、摩擦瓶颈、工程债与改进行动"
+        },
         "wbBlank": {
           "name": "空白白板",
           "desc": "自由无限画布，点阵网格与原生连线"
@@ -147,17 +178,81 @@
           "name": "启动工作坊",
           "desc": "目标拆解、发散便签与收口结论"
         },
+        "wbEventStorming": {
+          "name": "事件风暴画布 (DDD)",
+          "desc": "领域命令、聚合、领域事件与读模型推演"
+        },
+        "wbC4": {
+          "name": "C4 容器架构画布",
+          "desc": "边界网关、应用服务、异步队列与存储拓扑"
+        },
+        "wbIncidentMap": {
+          "name": "故障根因推理图",
+          "desc": "症状现象、候选假设、验证结果与止血动作"
+        },
+        "wbTradeoff": {
+          "name": "技术选型对比板",
+          "desc": "候选方案、约束权重、风险评估与最终决策"
+        },
         "artDocs": {
           "name": "协作文档",
           "desc": "长文规范、评审报告或技术说明"
+        },
+        "docRfc": {
+          "name": "RFC 技术设计文档",
+          "desc": "问题背景、方案对比、接口契约与灰度回滚"
+        },
+        "docAdr": {
+          "name": "架构决策记录 (ADR)",
+          "desc": "决策上下文、候选权衡、最终结论与影响面"
+        },
+        "docPostmortem": {
+          "name": "故障复盘报告",
+          "desc": "影响面、时间线、五问根因分析与防再发项"
+        },
+        "docApiSpec": {
+          "name": "接口契约规范",
+          "desc": "端点路由、鉴权、请求响应结构与错误码定义"
+        },
+        "docRunbook": {
+          "name": "运维处置手册",
+          "desc": "告警阈值、排查命令、降级开关与回滚步骤"
+        },
+        "docSecurity": {
+          "name": "安全威胁建模",
+          "desc": "信任边界、STRIDE 威胁面、缓解措施与审计"
+        },
+        "docMigration": {
+          "name": "数据与结构迁移方案",
+          "desc": "双写兼容、分批回填、校验脚本与回滚演练"
+        },
+        "docPerf": {
+          "name": "性能压测与调优报告",
+          "desc": "压测基线、瓶颈剖析、优化前后对比与容量结论"
         },
         "artSlides": {
           "name": "演示幻灯片",
           "desc": "宽屏多页演示文稿与分页备注"
         },
+        "slidesArchReview": {
+          "name": "架构评审演示稿",
+          "desc": "目标约束、核心拓扑、关键权衡与风险缓释"
+        },
+        "slidesReleaseDemo": {
+          "name": "技术分享与发版宣讲",
+          "desc": "版本亮点、实现剖析、性能收益与后续规划"
+        },
         "artDashboard": {
           "name": "数据看板",
           "desc": "指标卡片、趋势核验与明细表"
+        },
+        "dashSlo": {
+          "name": "服务 SLO 与稳定性看板",
+          "desc": "可用性、P99 延迟、错误预算消耗与告警明细"
+        },
+        "dashDora": {
+          "name": "研发效能看板 (DORA)",
+          "desc": "部署频次、变更前置时间、故障率与恢复时长"
         },
         "artDesign": {
           "name": "界面画板",
@@ -175,13 +270,97 @@
           "name": "单页网页",
           "desc": "独立可交互网页与版本迭代"
         },
+        "protoApiPlayground": {
+          "name": "接口报文与 Schema 沙盒",
+          "desc": "离线 JSON 校验格式化、请求构造与 cURL 生成"
+        },
+        "protoComponentLab": {
+          "name": "交互组件状态实验台",
+          "desc": "多态预览（正常/加载/空/报错）、明暗主题与视口切换"
+        },
+        "protoFocusStudio": {
+          "name": "专注番茄钟与白噪音工坊",
+          "desc": "环形倒计时、WebAudio 雨声/暖噪合成与本地任务队列，适合装成桌面独立应用"
+        },
+        "protoSynthPad": {
+          "name": "便携合成器与 16 步鼓机",
+          "desc": "零外链 WebAudio 鼓机步进音序器、实时波形示波器与键盘演奏台"
+        },
+        "protoParticleLab": {
+          "name": "生成式流体粒子实验室",
+          "desc": "60fps Canvas 旋度场粒子物理模拟、鼠标引力扰动与多色板切换"
+        },
+        "protoTokenCalculator": {
+          "name": "AI Token 成本与缓存估算器",
+          "desc": "实时滑动估算 DAU、命中率、多档模型月度成本并导出预算摘要"
+        },
+        "protoCssGlassStudio": {
+          "name": "流体网格与毛玻璃参数工坊",
+          "desc": "动态渐变光球叠加模糊透明度实时调节，一键复制 CSS"
+        },
+        "protoDeskKanban": {
+          "name": "极简桌面看板与便签栏",
+          "desc": "三列桌面微型进度看板，带优先级标签、完成度统计与本地记忆"
+        },
+        "designWorkspaceUi": {
+          "name": "多端工作台界面画板",
+          "desc": "含桌面/移动端画板、实时属性控制杆与响应式卡片节点树"
+        },
+        "dsPapertrails": {
+          "name": "Papertrails 设计体系规范",
+          "desc": "完整明暗色彩令牌、字阶圆角尺度与实时组件变体规范"
+        },
+        "motionLaunchReel": {
+          "name": "产品发布动效短片",
+          "desc": "3 章节纯时间确定性多图层动画序列，支持时间轴播放预览"
+        },
+        "storyboardProductFilm": {
+          "name": "产品宣讲分镜脚本文案",
+          "desc": "含景别构图、运镜节奏、对白旁白与动态预演的多镜头分镜板"
+        },
         "artSheet": {
           "name": "电子表格",
           "desc": "多工作表结构化表格与 CSV 导出"
         },
+        "sheetBenchmark": {
+          "name": "性能基准测试表",
+          "desc": "QPS、P50/P95/P99 延迟、内存占用与对比结论"
+        },
+        "sheetTechMatrix": {
+          "name": "技术方案评估矩阵",
+          "desc": "分维度加权打分、改造成本与运维复杂度对比"
+        },
+        "sheetTestMatrix": {
+          "name": "测试与回归矩阵",
+          "desc": "核心用例、环境覆盖、预期结果与最近通过状态"
+        },
+        "sheetApiInventory": {
+          "name": "接口与依赖台账",
+          "desc": "端点清单、鉴权方式、限流策略与负责人记录"
+        },
         "artDiagram": {
           "name": "结构图表",
           "desc": "节点、连线与架构流程表达"
+        },
+        "diagMicroservices": {
+          "name": "微服务拓扑图",
+          "desc": "边缘网关、业务服务、事件总线与存储依赖"
+        },
+        "diagSequence": {
+          "name": "调用时序图",
+          "desc": "客户端、认证、核心服务与持久化请求链路"
+        },
+        "diagErd": {
+          "name": "数据实体关系图 (ER)",
+          "desc": "核心实体表、外键关联与索引归属关系"
+        },
+        "diagCicd": {
+          "name": "CI/CD 交付流水线",
+          "desc": "静态检查、单测集成、制品构建与灰度发布"
+        },
+        "diagStateMachine": {
+          "name": "状态机流转图",
+          "desc": "生命周期状态节点、合法跃迁条件与终态收敛"
         },
         "artStoryboard": {
           "name": "分镜脚本",
@@ -204,6 +383,12 @@
         "noteTech": "## 背景与目标\n- 说明要解决的核心问题与收益边界\n## 核心设计\n- 梳理模块边界与数据流\n## 实施拆解\n- [ ] 拆分任务步骤并补全验收测试",
         "noteMeeting": "## 讨论焦点\n- 记录本次沟通的核心议题\n## 关键结论\n- 写下已达成一致的决定\n## 后续待办\n- [ ] 跟进确认后的行动项",
         "noteDaily": "## 今日主线\n- [ ] 列出今天优先推进的事项\n## 阻塞与风险\n- 记录需要协作解开的卡点\n## 交接摘要\n- 今日完成的结果与后续衔接点",
+        "notePrReview": "## 变更范围与意图\n- 确认改动是否聚焦单一职责、无无关夹带\n## 正确性与边界\n- [ ] 空值、并发竞态与错误传播是否显式处理\n- [ ] 外部输入是否在边界完成解码与校验\n## 质量与测试\n- [ ] 新增行为与回归边界是否均有自动化测试覆盖\n- [ ] 无重复逻辑、临时兜底或静默吞错",
+        "noteDebug": "## 问题现象\n- 报错信息、复现环境与影响范围\n## 假设与排查记录\n- [ ] 核对最近提交与配置变更\n- [ ] 采集链路观测日志与关键指标快照\n- [ ] 在最小复现用例中锁定触发条件\n## 根因与修复\n- 写明根本原因、修复方案与补充回归测试",
+        "noteRelease": "## 发布前门禁\n- [ ] 全部 CI 检查、构建与契约校验绿灯通过\n- [ ] 数据库结构迁移脚本与向后兼容已验证\n## 灰度与监控\n- [ ] 先发布 5% 灰度并观察错误率与 P99 延迟 15 分钟\n- [ ] 确认核心业务指标与告警面板无异常\n## 回滚预案\n- 记录一键回滚命令、开关名称与值班负责人",
+        "noteOncall": "## 值班周期与交接人\n- 交接时段、主备值班人及升级联系人\n## 活跃告警与处理中事项\n- [ ] 列出尚未关闭的告警与当前处置进展\n## 本周期重点观察\n- 近期上线变更、定时任务窗口与容量水位\n## 常用工具入口\n- 监控面板、链路观测平台与快速止血开关",
+        "noteOnboarding": "## 仓库定位与目录结构\n- 核心入口目录、共享契约包与构建产物位置\n## 本地开发与校验命令\n- [ ] 安装依赖并启动本地服务与热更新\n- [ ] 跑通单测、静态检查与格式化命令\n## 核心请求主线\n- 从边界入口、领域层到持久化存储的完整路径\n## 常见注意事项\n- 环境变量、本地状态目录与高频踩坑提示",
+        "noteSprintRetro": "## 本轮交付亮点\n- 顺利上线的核心特性与超预期成果\n## 过程中的摩擦点\n- 返工原因、等待阻塞、工具链或需求不清之处\n## 工程债与质量盘点\n- 本轮新增或暴露出的技术债清单\n## 下轮改进行动\n- [ ] 明确责任人、落地方式与验收时间点",
         "wbBlankTitle": "中心主题",
         "wbBlankBody": "从工具栏添加卡片、便签与连线",
         "wbArchN1Title": "接入层 · UI",
@@ -237,14 +422,344 @@
         "wbWorkW3Title": "方案收口",
         "wbWorkW3Body": "收敛第一阶段优先落地的改动",
         "wbWorkE1": "发散",
-        "wbWorkE2": "收敛"
+        "wbWorkE2": "收敛",
+        "wbEsCmdTitle": "Command · 提交变更",
+        "wbEsCmdBody": "校验输入权限与幂等键",
+        "wbEsAggTitle": "Aggregate · 领域聚合",
+        "wbEsAggBody": "维护状态不变量与业务规则",
+        "wbEsEvtTitle": "Event · 变更已持久化",
+        "wbEsEvtBody": "同事务写入 Outbox 事件表",
+        "wbEsReadTitle": "Read Model · 切片投影",
+        "wbEsReadBody": "增量更新视图并广播客户端",
+        "wbEsE1": "校验并执行",
+        "wbEsE2": "发布事件",
+        "wbEsE3": "异步投影",
+        "wbC4EdgeTitle": "API 网关 · HTTP/WS",
+        "wbC4EdgeBody": "鉴权、限流与契约边界解码",
+        "wbC4AppTitle": "核心服务 · Rust",
+        "wbC4AppBody": "核心状态机、事务与协同内核",
+        "wbC4QueueTitle": "Async Queue · 异步队列",
+        "wbC4QueueBody": "执行耗时媒体与外部投递任务",
+        "wbC4DbTitle": "主库 · SQLite / PostgreSQL",
+        "wbC4DbBody": "单一持久化真源与版本快照",
+        "wbC4E1": "RPC 调用",
+        "wbC4E2": "入队",
+        "wbC4E3": "事务落库",
+        "wbIncSymTitle": "现象 · P99 延迟突增",
+        "wbIncSymBody": "核心接口超时率升至 3.2%",
+        "wbIncHyp1Title": "假设 A · 慢查询锁表",
+        "wbIncHyp1Body": "检查连接池等待与索引失效",
+        "wbIncHyp2Title": "假设 B · 上游限流重试",
+        "wbIncHyp2Body": "核对重试放大与超时配置",
+        "wbIncFixTitle": "止血 · 降级与限流",
+        "wbIncFixBody": "开启熔断保护并回滚可疑发布",
+        "wbIncE1": "排查",
+        "wbIncE2": "验证",
+        "wbIncE3": "处置",
+        "wbToReqTitle": "约束 · 一致性与延迟",
+        "wbToReqBody": "跨节点协作需强收敛且低开销",
+        "wbToOptATitle": "方案 A · CRDT 本地优先",
+        "wbToOptABody": "离线可用，冲突自动无锁合并",
+        "wbToOptBTitle": "方案 B · OT 中心协调",
+        "wbToOptBBody": "服务端定序，实现复杂度集中在锁",
+        "wbToDecTitle": "结论 · 采纳方案 A",
+        "wbToDecBody": "复用已有协同内核并控住复杂度",
+        "wbToE1": "评估",
+        "wbToE2": "对比",
+        "wbToE3": "定案",
+        "docRfcBody": "# {title}\n\n- **状态**：Draft / Review / Accepted\n- **负责人**：\n- **关联任务**：\n\n## 1. 背景与动机\n\n描述当前系统痛点、触发契机与本次要解决的核心问题。\n\n## 2. 目标与非目标\n\n### 目标\n- 明确可量化的工程收益与功能边界。\n\n### 非目标\n- 显式列出本次故意不做的部分，防止范围蔓延。\n\n## 3. 备选方案对比\n\n| 维度 | 方案 A（推荐） | 方案 B |\n|---|---|---|\n| 复杂度 | 低，复用现有模块 | 高，需新增独立状态 |\n| 性能与可靠性 | 满足 SLA | 存在额外网络跳数 |\n| 回滚成本 | 可通过开关秒级回退 | 涉及不可逆数据结构改动 |\n\n## 4. 详细设计\n\n### 4.1 模块边界与接口契约\n```ts\n// 在此贴入核心类型、接口签名或状态机定义\n```\n\n### 4.2 数据模型与存储变更\n- 说明新增/变更的表结构、索引与迁移策略。\n\n### 4.3 失败模式与并发安全\n- 梳理超时、重试幂等、部分失败与降级路径。\n\n## 5. 测试、灰度与回滚计划\n- [ ] 单元测试与集成测试\n- [ ] 指标监控与告警阈值\n- [ ] 灰度放量节奏与一键回滚步骤\n",
+        "docAdrBody": "# {title}\n\n- **状态**：Proposed / Accepted / Superseded\n- **日期**：\n- **决策人**：\n\n## 1. 上下文与问题陈述\n\n描述促使我们做出架构决策的技术背景、约束条件与业务诉求。\n\n## 2. 决策驱动因素\n- 性能与延迟预算\n- 开发维护成本与团队熟悉度\n- 长期演进与可替换性\n\n## 3. 候选方案\n1. **方案一**：\n2. **方案二**：\n3. **维持现状**：\n\n## 4. 决策结果\n\n**选定方案**：写明最终拍板的方案与核心理由。\n\n### 正面影响\n- 带来的收益与简化。\n\n### 负面影响与风险缓释\n- 需要承担的代价及对应的防护措施。\n\n## 5. 校验与后续复核\n- 说明如何在代码审查、静态门禁或压测中长期守住该决策。\n",
+        "docPostmortemBody": "# {title}\n\n- **严重级别**：SEV-1 / SEV-2 / SEV-3\n- **持续时长**：\n- **影响面**：受影响接口、功能或用户比例\n\n## 1. 事件摘要\n\n用两三句话客观概括故障表现、触发原因与最终恢复手段（对事不对人）。\n\n## 2. 关键时间线（UTC+8）\n| 时间 | 事件 / 动作 |\n|---|---|\n| 00:00 | 变更发布 / 触发条件出现 |\n| 00:05 | 告警触发并开始排查 |\n| 00:12 | 定位直接原因并执行止血/回滚 |\n| 00:18 | 指标恢复正常，事件降级关闭 |\n\n## 3. 根因分析（5 Whys）\n1. 为什么发生表层异常？\n2. 为什么防线未能拦截？\n3. 为什么监控没有更早预警？\n4. 根本系统性诱因是什么？\n\n## 4. 做得好的地方与待改进项\n- **有效止血**：\n- **暴露短板**：\n\n## 5. 整改行动项（Action Items）\n| 类型 | 行动项 | 负责人 | 截止日期 | 状态 |\n|---|---|---|---|---|\n| 预防 | 补充回归测试与静态检查 | | | 待办 |\n| 探测 | 完善告警阈值与观测面板 | | | 待办 |\n",
+        "docApiSpecBody": "# {title}\n\n- **协议版本**：v1\n- **鉴权方式**：Bearer Token / HMAC\n- **幂等键**：`Idempotency-Key`\n\n## 1. 端点总览\n\n| 方法 | 路径 | 说明 | 限流 |\n|---|---|---|---|\n| GET | `/api/v1/resources` | 分页查询列表 | 120 req/min |\n| POST | `/api/v1/resources` | 创建资源 | 30 req/min |\n| PUT | `/api/v1/resources/:id` | 全量更新资源 | 60 req/min |\n\n## 2. 请求与响应契约\n\n### 请求载荷\n```json\n{\n  \"id\": \"res_01\",\n  \"name\": \"example\",\n  \"options\": {}\n}\n```\n\n### 成功响应（`200 OK`）\n```json\n{\n  \"bizCode\": 0,\n  \"message\": \"ok\",\n  \"data\": {}\n}\n```\n\n## 3. 业务错误码\n\n| HTTP 状态 | `bizCode` | 含义 | 客户端处理建议 |\n|---|---|---|---|\n| 400 | 400001 | 参数校验失败 | 高亮字段提示用户 |\n| 409 | 409001 | 版本冲突 / 乐观锁失败 | 拉取最新快照后重试 |\n\n## 4. 兼容性与变更记录\n- 遵循向后兼容扩展原则，禁止无版本变更破坏已有字段。\n",
+        "docRunbookBody": "# {title}\n\n- **服务名称**：\n- **所属团队 / 值班频道**：\n- **监控面板链接**：\n\n## 1. 服务依赖与架构简图\n- 列出上下游强依赖、弱依赖及降级后预期行为。\n\n## 2. 常见告警与排查步骤\n\n### 告警 A：错误率 > 1% 或 P99 延迟超阈值\n1. 检查最近 30 分钟发布与配置变更记录。\n2. 执行诊断命令确认进程存活、连接池与磁盘水位：\n```bash\ncurl -fsS http://127.0.0.1:8787/healthz\n```\n3. 查看错误聚合日志，确认是上游超时、数据库锁等待还是参数异常。\n\n## 3. 紧急止血开关与降级操作\n- **限流 / 降级开关**：写明配置键、生效方式与副作用。\n- **流量切换**：说明多实例或备份节点切换步骤。\n\n## 4. 回滚流程\n```bash\n# 确认上一稳定版本标识并执行回滚\n```\n\n## 5. 升级路径\n- 若 15 分钟内未能定位或止血，立即升级至对应模块负责人。\n",
+        "docSecurityBody": "# {title}\n\n- **评审范围**：\n- **数据密级**：公开 / 内部 / 敏感凭据\n\n## 1. 资产与信任边界\n- 列出核心敏感资产（密钥、令牌、用户代码库、数据库）。\n- 标注不可信输入入口（外部 HTTP、第三方回调、本地用户输入、模型工具调用）。\n\n## 2. STRIDE 威胁分析\n\n| 威胁类别 | 攻击面与场景 | 现有防线 | 剩余风险与待补措施 |\n|---|---|---|---|\n| 身份伪造 (Spoofing) | 伪造请求来源或越权令牌 | 边界鉴权校验 | 补充签名过期校验 |\n| 数据篡改 (Tampering) | 路径穿越或载荷注入 | 规范化路径校验与参数化查询 | 增加静态检查拦截 |\n| 信息泄露 (Info Disclosure) | 日志或报错打印密钥 | `Secret` 脱敏包装 | 审查日志输出链路 |\n| 拒绝服务 (DoS) | 超大附件或恶意高频请求 | 请求体上限与限流 | 补充超时与并发上限 |\n| 权限提升 (Elevation) | 未授权访问管理端点 | 基于角色的能力校验 | 添加回归权限单测 |\n\n## 3. 安全上线核对\n- [ ] 密钥不进仓库与日志\n- [ ] 高危输入全部在入口完成白名单/结构解码\n",
+        "docMigrationBody": "# {title}\n\n- **涉及存储**：SQLite / PostgreSQL / 对象目录\n- **是否可在线无停机执行**：是 / 否\n\n## 1. 变更前后对比\n- 列出新增表、字段变更、约束调整或文件目录结构变动。\n\n## 2. 分阶段迁移步骤（Expand & Contract）\n1. **阶段 1（兼容扩展）**：新增结构并保持旧读路径可用，启用双写。\n2. **阶段 2（离线/分批回填）**：按主键游标分批回填历史数据并限速，避免锁表。\n3. **阶段 3（校验切换）**：运行一致性比对脚本确认 0 误差后切换读路径。\n4. **阶段 4（安全清理）**：观察一个稳定周期后再移除旧字段或兜底逻辑。\n\n## 3. 一致性校验脚本\n```sql\n-- 在此写明核对行数、校验和与抽样比对查询\n```\n\n## 4. 回滚与恢复预案\n- 写明每一步如果失败如何止损、是否需要从快照恢复及预计恢复时间（RTO）。\n",
+        "docPerfBody": "# {title}\n\n- **测试环境**：硬件规格、数据集规模、并发模型\n- **压测工具**：\n\n## 1. 性能目标与基线\n\n| 指标 | 优化前基线 | 目标阈值 | 优化后实测 | 提升幅度 |\n|---|---|---|---|---|\n| QPS / 吞吐 | | | | |\n| P50 延迟 | | | | |\n| P99 延迟 | | | | |\n| 峰值内存 / CPU | | | | |\n\n## 2. 瓶颈定位与火焰图剖析\n- 记录锁竞争、频繁分配、序列化开销或 N+1 查询等关键瓶颈。\n\n## 3. 实施的优化措施\n1. **优化项一**：说明改动原理与局部权衡。\n2. **优化项二**：说明缓存策略或批处理改造。\n\n## 4. 容量评估与结论\n- 给出单机推荐并发上限、安全水位线与后续监控建议。\n",
+        "diagMsNodeGateway": "边缘网关 (Gateway)",
+        "diagMsNodeAuth": "鉴权服务 (Auth)",
+        "diagMsNodeCore": "核心业务 (Core)",
+        "diagMsNodeQueue": "异步队列 (Queue)",
+        "diagMsNodeMedia": "媒体计算 (Media)",
+        "diagMsNodeDb": "主数据库 (Primary DB)",
+        "diagMsEdgeAuth": "令牌校验",
+        "diagMsEdgeRpc": "内部 RPC",
+        "diagMsEdgeEmit": "投递任务",
+        "diagMsEdgeRead": "事务读写",
+        "diagMsEdgeStore": "状态落库",
+        "diagSeqClient": "客户端 App",
+        "diagSeqApi": "API 入口层",
+        "diagSeqGuard": "权限与校验",
+        "diagSeqDomain": "领域服务",
+        "diagSeqOutbox": "数据库 + Outbox",
+        "diagSeqBus": "实时事件流",
+        "diagSeqE1": "1. 请求",
+        "diagSeqE2": "2. 校验",
+        "diagSeqE3": "3. 执行",
+        "diagSeqE4": "4. 同事务落库",
+        "diagSeqE5": "5. 推送切片",
+        "diagErdUser": "用户 / 角色 (agent)",
+        "diagErdRepo": "代码仓库 (repo)",
+        "diagErdIssue": "任务单 (issue)",
+        "diagErdSession": "执行会话 (session)",
+        "diagErdArtifact": "协作作品",
+        "diagErdVersion": "版本快照 (version)",
+        "diagErdE1": "绑定仓库",
+        "diagErdE2": "派发会话",
+        "diagErdE3": "归属角色",
+        "diagErdE4": "生成作品",
+        "diagErdE5": "1:N 快照",
+        "diagCiLint": "静态检查与格式",
+        "diagCiUnit": "单测与契约校验",
+        "diagCiBuild": "产物构建打包",
+        "diagCiCanary": "灰度环境发布",
+        "diagCiSmoke": "冒烟与观测检查",
+        "diagCiProd": "全量上线",
+        "diagCiE1": "通过",
+        "diagCiE2": "归档",
+        "diagCiE3": "部署",
+        "diagCiE4": "绿灯",
+        "diagCiE5": "放量",
+        "diagSmDraft": "草稿 (Draft)",
+        "diagSmQueued": "待执行 (Queued)",
+        "diagSmRunning": "运行中 (Running)",
+        "diagSmReview": "待验收 (In Review)",
+        "diagSmDone": "已完成 (Done)",
+        "diagSmCanceled": "已取消 (Canceled)",
+        "diagSmE1": "派发",
+        "diagSmE2": "开始运行",
+        "diagSmE3": "提交改动",
+        "diagSmE4": "打回修改",
+        "diagSmE5": "验收通过",
+        "diagSmE6": "关闭取消",
+        "sheetBenchTab1": "基准对比",
+        "sheetBenchTab2": "环境参数",
+        "sheetBenchColCase": "测试场景",
+        "sheetBenchColBaseline": "基线 QPS",
+        "sheetBenchColCurrent": "优化后 QPS",
+        "sheetBenchColP99": "P99 延迟 (ms)",
+        "sheetBenchColMem": "内存 (MB)",
+        "sheetBenchColStatus": "结论",
+        "sheetBenchR1Case": "列表分页查询 (1000 条)",
+        "sheetBenchR1Status": "达成 (+68%)",
+        "sheetBenchR2Case": "并发写入事务 (64 并发)",
+        "sheetBenchR2Status": "达成 (+52%)",
+        "sheetBenchR3Case": "大文档增量同步 (10k 节点)",
+        "sheetBenchR3Status": "达成 (-41% 延迟)",
+        "sheetBenchR4Case": "冷启动全量投影",
+        "sheetBenchR4Status": "观察中",
+        "sheetBenchEnvKey": "参数项",
+        "sheetBenchEnvVal": "配置值",
+        "sheetBenchEnvR1": "并发连接数",
+        "sheetBenchEnvR2": "数据集规模",
+        "sheetBenchEnvR3": "预热轮次",
+        "sheetTechTab": "评分矩阵",
+        "sheetTechColDim": "评估维度",
+        "sheetTechColWeight": "权重",
+        "sheetTechColOptA": "方案 A（原生集成）",
+        "sheetTechColOptB": "方案 B（外置服务）",
+        "sheetTechColNote": "评分依据",
+        "sheetTechR1Dim": "端到端延迟",
+        "sheetTechR1Note": "零进程间序列化往返",
+        "sheetTechR2Dim": "部署与运维成本",
+        "sheetTechR2Note": "单二进制交付，零额外守护进程",
+        "sheetTechR3Dim": "故障隔离能力",
+        "sheetTechR3Note": "外置进程崩溃不影响主宿主",
+        "sheetTechR4Dim": "开发交付周期",
+        "sheetTechR4Note": "复用现有契约与存储底座",
+        "sheetTechR5Dim": "长期扩展弹性",
+        "sheetTechR5Note": "支持后期按网关端口拆分",
+        "sheetTestTab": "回归用例",
+        "sheetTestColId": "编号",
+        "sheetTestColArea": "模块",
+        "sheetTestColCase": "用例描述",
+        "sheetTestColEnv": "测试层",
+        "sheetTestColOwner": "负责人",
+        "sheetTestColResult": "状态",
+        "sheetTestR1Area": "鉴权边界",
+        "sheetTestR1Case": "非法令牌拒绝并返回 401",
+        "sheetTestR1Env": "集成测试",
+        "sheetTestR1Owner": "服务端",
+        "sheetTestR1Res": "通过",
+        "sheetTestR2Area": "状态机",
+        "sheetTestR2Case": "并发冲突写入触发乐观锁保护",
+        "sheetTestR2Env": "单元测试",
+        "sheetTestR2Owner": "核心域",
+        "sheetTestR2Res": "通过",
+        "sheetTestR3Area": "桌面端界面",
+        "sheetTestR3Case": "明暗主题切换与快捷键响应正常",
+        "sheetTestR3Env": "端到端UI",
+        "sheetTestR3Owner": "前端",
+        "sheetTestR3Res": "通过",
+        "sheetTestR4Area": "数据库迁移",
+        "sheetTestR4Case": "旧库平滑对齐并校验无漂移",
+        "sheetTestR4Env": "冒烟测试",
+        "sheetTestR4Owner": "存储层",
+        "sheetTestR4Res": "待复核",
+        "sheetApiTab": "接口台账",
+        "sheetApiColMethod": "方法",
+        "sheetApiColPath": "路径",
+        "sheetApiColAuth": "鉴权",
+        "sheetApiColRate": "限流",
+        "sheetApiColOwner": "归属模块",
+        "sheetApiColStability": "稳定性",
+        "sheetApiR1Auth": "回环 / Bearer",
+        "sheetApiR1Rate": "无限制 (本地)",
+        "sheetApiR1Owner": "任务域",
+        "sheetApiR1Stab": "稳定 v1",
+        "sheetApiR2Auth": "令牌鉴权 (Bearer)",
+        "sheetApiR2Rate": "60 次/分钟",
+        "sheetApiR2Owner": "作品域",
+        "sheetApiR2Stab": "稳定 v1",
+        "sheetApiR3Auth": "Bearer + 角色",
+        "sheetApiR3Rate": "30 次/分钟",
+        "sheetApiR3Owner": "会话域",
+        "sheetApiR3Stab": "灰度中",
+        "sheetApiR4Auth": "配对签名",
+        "sheetApiR4Rate": "10 次/分钟",
+        "sheetApiR4Owner": "远程门",
+        "sheetApiR4Stab": "稳定 v1",
+        "dashSloP1": "核心可用性 (%)",
+        "dashSloP2": "P99 延迟 (ms)",
+        "dashSloP3": "错误预算剩余 (%)",
+        "dashSloP4": "近 7 天告警次数",
+        "dashSloServiceCol": "服务名",
+        "dashSloAvailCol": "可用率",
+        "dashSloP99Col": "P99 延迟",
+        "dashSloBudgetCol": "预算剩余",
+        "dashSloAlertsCol": "告警",
+        "dashSloR1": "接入网关 (Gateway)",
+        "dashSloR2": "核心状态引擎 (Core)",
+        "dashSloR3": "协同与存储 (Storage)",
+        "dashSloR4": "实时订阅流 (SSE)",
+        "dashDoraP1": "周部署次数",
+        "dashDoraP2": "变更前置时间 (h)",
+        "dashDoraP3": "变更失败率 (%)",
+        "dashDoraP4": "平均恢复时长 (min)",
+        "dashDoraWeekCol": "周期",
+        "dashDoraDeployCol": "部署数",
+        "dashDoraLeadCol": "前置时间(h)",
+        "dashDoraCfrCol": "失败率(%)",
+        "dashDoraMttrCol": "恢复耗时 (分)",
+        "slidesArchS1Sub": "背景目标、系统边界与核心权衡",
+        "slidesArchS1Notes": "开场 2 分钟先对齐本次评审要解决的核心约束与非目标。",
+        "slidesArchS2Title": "背景与核心约束",
+        "slidesArchS2Sub": "为什么现有方案不足以支撑下一步演进",
+        "slidesArchS2B1": "延迟与一致性指标要求",
+        "slidesArchS2B2": "存量数据兼容性与迁移窗口",
+        "slidesArchS2B3": "单机与远程多端同步边界",
+        "slidesArchS2Notes": "明确哪些指标是硬约束，哪些可以分阶段演进。",
+        "slidesArchS3Title": "目标架构与模块分层",
+        "slidesArchS3Sub": "单向依赖有向无环图与进门一次解码",
+        "slidesArchS3B1": "边界层只做解码与鉴权转发",
+        "slidesArchS3B2": "核心领域规则保持纯函数可测",
+        "slidesArchS3B3": "持久化统一收口于单一服务层",
+        "slidesArchS3Notes": "结合结构图讲解请求主线与异常恢复路径。",
+        "slidesArchS4Title": "关键技术权衡",
+        "slidesArchS4Sub": "方案对比与风险控制",
+        "slidesArchS4B1": "已选方案的长期收益与代价",
+        "slidesArchS4B2": "降级开关与灰度回滚策略",
+        "slidesArchS4B3": "性能压测与容量水位验证",
+        "slidesArchS4Notes": "重点回应评审人最关心的回滚与并发安全性问题。",
+        "slidesArchS5Title": "交付里程碑与行动项",
+        "slidesArchS5Sub": "分阶段落地排期与验收标准",
+        "slidesArchS5B1": "阶段一：核心骨架与契约落定",
+        "slidesArchS5B2": "阶段二：集成联调与压测验收",
+        "slidesArchS5B3": "阶段三：灰度放量与全量上线",
+        "slidesArchS5Notes": "确认评审结论、阻塞依赖与各阶段责任人。",
+        "slidesRelS1Sub": "新能力总览、核心收益与现场演示",
+        "slidesRelS1Notes": "控制在 15 分钟内，重点讲清楚解决了什么痛点。",
+        "slidesRelS2Title": "为什么做这次升级",
+        "slidesRelS2Sub": "从用户与研发高频痛点出发",
+        "slidesRelS2B1": "上线前人工核对耗时且易漏项",
+        "slidesRelS2B2": "跨模块排查链路长、缺乏统一视图",
+        "slidesRelS2B3": "关键指标与回归基线缺少自动化门禁",
+        "slidesRelS2Notes": "用 1-2 个真实故障或卡点案例开场最有共鸣。",
+        "slidesRelS3Title": "核心功能与架构亮点",
+        "slidesRelS3Sub": "做对了哪些关键设计",
+        "slidesRelS3B1": "声明式模板与结构化目录落盘",
+        "slidesRelS3B2": "零额外网络往返的本地沙盒预览",
+        "slidesRelS3B3": "双端词典与自动化契约测试守门",
+        "slidesRelS3Notes": "展示核心流程图或现场操作录屏。",
+        "slidesRelS4Title": "线上效果与性能数据",
+        "slidesRelS4Sub": "实测收益对比",
+        "slidesRelS4B1": "核心操作响应耗时降低 45%",
+        "slidesRelS4B2": "自动化回归覆盖率提升至 95%+",
+        "slidesRelS4B3": "零破坏性变更平滑升级",
+        "slidesRelS4Notes": "用真实对比数据收口价值。",
+        "slidesRelS5Title": "下一步计划与 Q&A",
+        "slidesRelS5Sub": "后续演进路线与反馈收集",
+        "slidesRelS5B1": "补齐更多团队自定义模板能力",
+        "slidesRelS5B2": "打通任务流转一键沉淀到内容库",
+        "slidesRelS5B3": "欢迎在团队频道留下使用反馈",
+        "slidesRelS5Notes": "预留 5 分钟问答并记录反馈问题。",
+        "protoApiTitle": "接口报文与 Schema 沙盒",
+        "protoApiSub": "离线格式化 JSON、检查字段类型并一键生成 cURL 请求",
+        "protoApiBtnPretty": "格式化 JSON",
+        "protoApiBtnMinify": "压缩",
+        "protoApiBtnCopy": "生成 cURL",
+        "protoApiPayloadLabel": "请求 JSON 载荷",
+        "protoApiCurlLabel": "生成命令",
+        "protoApiValid": "JSON 语法合法",
+        "protoApiInvalid": "JSON 解析错误：",
+        "protoCompTitle": "交互组件状态实验台",
+        "protoCompSub": "快速核验组件在正常、加载、空态、报错及不同视口与明暗主题下的表现",
+        "protoCompStateLabel": "组件状态",
+        "protoCompThemeLabel": "外观主题",
+        "protoCompWidthLabel": "预览宽度",
+        "protoCompStateDefault": "正常",
+        "protoCompStateLoading": "加载中",
+        "protoCompStateEmpty": "空数据",
+        "protoCompStateError": "报错态",
+        "protoCompThemeLight": "浅色",
+        "protoCompThemeDark": "深色",
+        "protoCompCardTitle": "服务部署状态卡",
+        "protoCompCardBody": "当前版本 v2.4.0 已在 3 个可用区健康运行，P99 延迟 18ms。",
+        "protoCompLoadingText": "正在拉取最新健康状态与指标…",
+        "protoCompEmptyText": "暂无符合条件的运行实例，可调整筛选条件或新建部署。",
+        "protoCompErrorText": "连接超时 (504)：上游状态聚合接口未在 3000ms 内响应，请重试。",
+        "designDesktopName": "桌面端工作台",
+        "designMobileName": "移动端伴侣",
+        "designPropDensity": "视图密度",
+        "designPropBanner": "展示公告横幅",
+        "designPropCta": "主按钮文案",
+        "designPropCtaDefault": "安装为桌面应用",
+        "designHeroSub": "全原生双端实时协同，一处修改多画板同步响应。",
+        "designMetricsTitle": "核心指标契约",
+        "designActionTitle": "桌面打包配置",
+        "dsButtonTitle": "按钮 Button",
+        "dsButtonSummary": "用于触发明确动作；同一操作栏仅保留 1 个 primary 主操作。",
+        "dsButtonDo": "动词开头写明结果，例如「保存并发布」",
+        "dsButtonDont": "避免在同一操作栏并列两个主按钮",
+        "dsBadgeTitle": "徽章 Badge",
+        "dsBadgeSummary": "轻量状态与分类标签，保持简短可读。",
+        "dsBadgeDo": "控制在 2–4 个字或短单词内",
+        "motionCh1": "开场引子",
+        "motionCh2": "核心特性揭幕",
+        "motionCh3": "行动收尾",
+        "motionSc2Headline": "离线零依赖，直接装成独立桌面应用",
+        "motionSc2CardTitle": "纯时间确定性渲染",
+        "motionSc2CardBody": "任意时刻 t 始终对应一致的关键帧进度与缓动轨迹",
+        "motionSc3Headline": "立即在工作台探索并导出",
+        "sbTone": "暖纸胶片 · 克制沉稳",
+        "sbS1Scene": "开场 · 工作台全景",
+        "sbS1Visual": "清晨光线洒在桌面工作台，卡片与时间线逐层展开。",
+        "sbS1Dialogue": "把每一次对话里的灵感，直接沉淀为可运行的作品。",
+        "sbS2Scene": "演示 · 一键独立安装",
+        "sbS2Visual": "点击右上角安装按钮，交互应用以透明沉浸标题栏窗口弹出。",
+        "sbS2Dialogue": "无需浏览器标签页，它本身就是一个趁手的 Mac 桌面工具。",
+        "sbS3Scene": "收尾 · 本地持久运行",
+        "sbS3Visual": "特写聚焦番茄钟与波形示波器在独立窗口里稳定跳动。",
+        "sbS3Dialogue": "离线可用，随时唤醒，专为专注与创作而生。"
       }
     },
     "search": {
       "title": "搜索内容",
       "placeholder": "搜索笔记、作品和素材…",
       "empty": "未找到匹配的笔记、作品或素材",
-      "typeMedia": "素材"
+      "typeMedia": "素材",
+      "scopeAll": "全部",
+      "scopeArtifacts": "作品",
+      "scopeMedia": "素材"
     }
   }
 }

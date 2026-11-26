@@ -2,6 +2,7 @@ import type { JSX } from "@solidjs/web";
 import { springValue, type MotionValue } from "motion";
 import { createSignal, onCleanup } from "solid-js";
 
+import { heroWideSizes, heroPortraitSizes, type HeroArt } from "../base/images";
 import { SCENES, firefliesOf, type Scene } from "../base/scene";
 import type { Copy } from "../i18n/zh";
 import { Icon } from "../ui/icons";
@@ -42,13 +43,20 @@ const SAYS: Record<Exclude<Scene, "morning">, [number, number, number, number]> 
 const POINTS: Record<Scene, number> = { morning: 0, day: 0.37, evening: 0.64, night: 1 };
 const flies = { evening: firefliesOf("evening"), night: firefliesOf("night") };
 
-const picturesOf = (root: ParentNode, scene: Scene) => [
-  ...root.querySelectorAll<HTMLImageElement>(`[data-scene="${scene}"][data-src], [data-scene="${scene}"] [data-src]`),
-];
+function loadScene(root: ParentNode, hour: Scene) {
+  const image = root.querySelector<HTMLImageElement>(`img[data-scene="${hour}"]`);
+  if (image && !image.hasAttribute("src") && image.dataset.src && image.dataset.srcset) {
+    const portrait = image.parentElement?.querySelector("source");
+    if (portrait?.dataset.srcset) portrait.srcset = portrait.dataset.srcset;
+    image.srcset = image.dataset.srcset;
+    image.src = image.dataset.src;
+  }
+  return image;
+}
 
 interface Props {
   copy: Copy["hero"];
-  backgrounds: Record<Scene, string>;
+  backgrounds: Record<Scene, HeroArt>;
   github: string;
 }
 
@@ -70,7 +78,6 @@ export default function Hero(props: Props) {
     { keyframes: { opacity: [1, 1, 0, 0] }, times: [0, 0.12, 0.22, 1] },
   ]);
   const hint = createScrollAnimation<HTMLAnchorElement>(root, HOLDING, () => [{ keyframes: { opacity: [1, 0, 0] }, times: [0, 0.08, 1] }]);
-  let ahead = false;
   observeVisibility(root);
   /** How far through the holding screen the page is, 0 to 1. */
   const held = (y: number) => {
@@ -79,17 +86,14 @@ export default function Hero(props: Props) {
     return Math.min(1, Math.max(0, y / Math.max(1, span)));
   };
   createScrollPosition((y) => {
-    // Load later time-of-day renders as soon as the visitor begins scrolling.
-    const element = root.get();
-    if (!ahead && y > 0 && element) {
-      ahead = true;
-      for (const s of SCENES) for (const img of picturesOf(element, s)) if (!img.getAttribute("src")) img.src = img.dataset.src ?? "";
-    }
     const q = held(y);
     const turn = TURNS.findLast(([from]) => q >= from);
     if (!turn) throw new RangeError(`No hero scene for scroll progress ${q}`);
     const hour = turn[1];
     if (hour !== wanted) void relight(hour);
+    const element = root.get();
+    const upcoming = TURNS.find(([from]) => from > q && from - q <= 0.1);
+    if (element && upcoming) loadScene(element, upcoming[1]);
   });
   function go(s: Scene) {
     const hero = root.get();
@@ -100,17 +104,14 @@ export default function Hero(props: Props) {
     wanted = next;
     setScene(next);
     const element = root.get();
-    const pictures = element ? picturesOf(element, next) : [];
-    await Promise.all(
-      pictures.map(async (img) => {
-        if (!img.getAttribute("src")) img.src = img.dataset.src ?? "";
-        try {
-          await img.decode();
-        } catch (error) {
-          console.warn(`Failed to decode hero image ${img.currentSrc || img.src}`, error);
-        }
-      }),
-    );
+    const image = element && loadScene(element, next);
+    if (image) {
+      try {
+        await image.decode();
+      } catch (error) {
+        console.warn(`Failed to decode hero image ${image.currentSrc || image.src}`, error);
+      }
+    }
     if (wanted === next && !disposed) document.documentElement.dataset.scene = next;
   }
   function point(
@@ -133,23 +134,13 @@ export default function Hero(props: Props) {
     <section ref={root.set} id="top" aria-label={props.copy.name} class="relative h-[200svh] min-h-280">
       <div onPointerMove={point} onPointerLeave={leave} class="@container-[size] sticky top-0 isolate h-svh min-h-140 overflow-hidden bg-(--color-dusk)">
         {/* Full-bleed 16:9 Papertrails Metal diorama with gentle camera drift and time-of-day crossfade. */}
-        <div aria-hidden="true" class="@container-[size] absolute top-1/2 left-1/2 aspect-[16/9] w-[max(106cqw,188cqh)] -translate-1/2">
+        <div aria-hidden="true" class="@container-[size] absolute top-1/2 left-1/2 h-[106cqh] w-[106cqw] -translate-1/2">
           <Layer lag={0.42} zoom={1.06} origin="62% 56%" point={18} hero={root} px={px} py={py}>
             <div class="absolute inset-0 [transform-origin:58%_54%] [animation-name:title-pan] [animation-duration:64000ms] [animation-timing-function:ease-in-out] [animation-iteration-count:infinite] [animation-direction:alternate]">
-              <img
-                data-scene="morning"
-                data-src={props.backgrounds.morning}
-                src={props.backgrounds.morning}
-                alt=""
-                draggable={false}
-                class="absolute inset-0 w-full h-full max-w-none object-cover select-none"
-              />
-              <Comes hour="day" src={props.backgrounds.day} hero={root} />
-              <Comes hour="evening" src={props.backgrounds.evening} hero={root} />
-              <Comes hour="night" src={props.backgrounds.night} hero={root} />
-              <noscript>
-                <img src={props.backgrounds.morning} alt="" class="absolute inset-0 w-full h-full max-w-none object-cover" />
-              </noscript>
+              <HeroPicture hour="morning" art={props.backgrounds.morning} />
+              <Comes hour="day" art={props.backgrounds.day} hero={root} />
+              <Comes hour="evening" art={props.backgrounds.evening} hero={root} />
+              <Comes hour="night" art={props.backgrounds.night} hero={root} />
               {(["evening", "night"] as const).map((at) => (
                 <div class={["absolute inset-0 transition-[opacity] ease-out duration-900", hourVisibility[at]]}>
                   {flies[at].map((f, i) => (
@@ -175,6 +166,7 @@ export default function Hero(props: Props) {
         <div aria-hidden="true" class="pointer-events-none absolute inset-0 z-2 bg-[image:var(--scene-hero-shade)]" />
         <div
           ref={words.set}
+          data-hero-intro=""
           class="pointer-events-none absolute inset-0 z-2 flex flex-col justify-end md:justify-center gap-4 px-[clamp(16px,6vw,96px)] pt-24 pb-24 md:pb-30 text-paper-core"
         >
           <div class="pointer-events-auto motion-safe:[animation-name:title-float] motion-safe:[animation-duration:5500ms] motion-safe:[animation-timing-function:ease-in-out] motion-safe:[animation-iteration-count:infinite]">
@@ -235,7 +227,7 @@ export default function Hero(props: Props) {
         </div>
 
         {(["day", "evening", "night"] as const).map((h) => (
-          <Line verse={props.copy.verses[h]} at={SAYS[h]} stays={h === "night"} hero={root} />
+          <Line hour={h} verse={props.copy.verses[h]} hero={root} />
         ))}
 
         <div
@@ -272,36 +264,48 @@ export default function Hero(props: Props) {
   );
 }
 
-/** Later scenes layer over the morning diorama render. */
-function Comes(props: { hour: Exclude<Scene, "morning">; src: string; hero: ElementRef<HTMLElement> }) {
-  const [from, to] = COMES[props.hour];
-  const ref = createScrollAnimation<HTMLImageElement>(props.hero, HOLDING, () => [{ keyframes: { opacity: [0, 0, 1, 1] }, times: [0, from, to, 1] }], {
-    still: true,
-  });
+function HeroPicture(props: { hour: Scene; art: HeroArt; imageRef?: (el: HTMLImageElement) => void }) {
+  const first = props.hour === "morning";
   return (
-    <img
-      ref={ref.set}
-      data-scene={props.hour}
-      data-src={props.src}
-      alt=""
-      draggable={false}
-      class="absolute inset-0 w-full h-full max-w-none object-cover opacity-0 select-none"
-    />
+    <picture>
+      <source
+        media="(orientation: portrait)"
+        sizes={heroPortraitSizes}
+        srcset={first ? props.art.portraitSrcset : undefined}
+        data-srcset={first ? undefined : props.art.portraitSrcset}
+      />
+      <img
+        ref={props.imageRef}
+        data-scene={props.hour}
+        sizes={heroWideSizes}
+        srcset={first ? props.art.srcset : undefined}
+        src={first ? props.art.src : undefined}
+        data-srcset={first ? undefined : props.art.srcset}
+        data-src={first ? undefined : props.art.src}
+        alt=""
+        draggable={false}
+        class={["absolute inset-0 w-full h-full max-w-none object-cover select-none", !first && hourVisibility[props.hour]]}
+      />
+    </picture>
   );
 }
 
-function Line(props: { verse: string[]; at: [number, number, number, number]; stays: boolean; hero: ElementRef<HTMLElement> }) {
-  const [a, b, c, d] = props.at;
-  const seen = createScrollAnimation<HTMLDivElement>(
-    props.hero,
-    HOLDING,
-    () => [
-      props.stays ? { keyframes: { opacity: [0, 0, 1, 1] }, times: [0, a, b, 1] } : { keyframes: { opacity: [0, 0, 1, 1, 0, 0] }, times: [0, a, b, c, d, 1] },
-    ],
-    { still: true },
-  );
-  const rise = createScrollAnimation<HTMLParagraphElement>(props.hero, HOLDING, () => [
-    props.stays
+/** Later scenes layer over the morning diorama render. */
+function Comes(props: { hour: Exclude<Scene, "morning">; art: HeroArt; hero: ElementRef<HTMLElement> }) {
+  const [from, to] = COMES[props.hour];
+  const ref = createScrollAnimation<HTMLImageElement>(props.hero, HOLDING, () => [{ keyframes: { opacity: [0, 0, 1, 1] }, times: [0, from, to, 1] }]);
+  return <HeroPicture hour={props.hour} art={props.art} imageRef={ref.set} />;
+}
+
+function Line(props: { hour: Exclude<Scene, "morning">; verse: string[]; hero: ElementRef<HTMLElement> }) {
+  const [a, b, c, d] = SAYS[props.hour];
+  const seen = createScrollAnimation<HTMLDivElement>(props.hero, HOLDING, () => [
+    props.hour === "night"
+      ? { keyframes: { opacity: [0, 0, 1, 1] }, times: [0, a, b, 1] }
+      : { keyframes: { opacity: [0, 0, 1, 1, 0, 0] }, times: [0, a, b, c, d, 1] },
+  ]);
+  const rise = createScrollAnimation<HTMLDivElement>(props.hero, HOLDING, () => [
+    props.hour === "night"
       ? { keyframes: { transform: ["translateY(24px)", "translateY(24px)", "translateY(0px)", "translateY(0px)"] }, times: [0, a, b, 1] }
       : {
           keyframes: { transform: ["translateY(24px)", "translateY(24px)", "translateY(0px)", "translateY(0px)", "translateY(-24px)", "translateY(-24px)"] },
@@ -311,7 +315,10 @@ function Line(props: { verse: string[]; at: [number, number, number, number]; st
   return (
     <div
       ref={seen.set}
-      class="pointer-events-none absolute inset-0 z-2 flex flex-col justify-end md:justify-center px-[clamp(16px,6vw,96px)] pt-24 pb-28 md:pb-30 text-paper-core opacity-0"
+      class={[
+        "pointer-events-none absolute inset-0 z-2 flex flex-col justify-end md:justify-center px-[clamp(16px,6vw,96px)] pt-24 pb-28 md:pb-30 text-paper-core",
+        hourVisibility[props.hour],
+      ]}
     >
       <p ref={rise.set} class="font-display text-[length:clamp(32px,4.8vw,64px)] font-bold leading-[1.28] [text-shadow:var(--text-shadow-title)]">
         {props.verse.map((half) => (

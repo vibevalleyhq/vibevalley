@@ -26,12 +26,12 @@ for arg in "$@"; do
 done
 
 dist="$assets_repo/dist/diorama"
-if [ "$build" -eq 1 ] || [ ! -f "$dist/manifest.json" ] || [ ! -f "$dist/meshes.bin" ]; then
+if [ "$build" -eq 1 ] || [ ! -f "$dist/manifest.json" ] || [ ! -f "$dist/meshes.bin" ] || [ ! -f "$dist/print/materials.vvtex" ]; then
   echo "Compiling diorama assets in $assets_repo..."
   (cd "$assets_repo" && cargo run --release -p diorama-compiler)
 fi
 
-for req in manifest.json meshes.bin lights.json foley.json; do
+for req in manifest.json meshes.bin lights.json foley.json print/materials.vvtex; do
   if [ ! -f "$dist/$req" ]; then
     echo "Missing compiled diorama file: $dist/$req" >&2
     exit 1

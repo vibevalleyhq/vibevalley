@@ -1,7 +1,7 @@
 import { effect, keymap, View, type JSX } from "nsh";
 
 import { useLocation } from "../../infra/router";
-import { contentPresenting, contentSidebarOpen, openTemplatePicker, recordContentPath } from "../../infra/state/contentNav";
+import { contentPresenting, contentSidebarOpen, openContentSearch, openTemplatePicker, recordContentPath } from "../../infra/state/contentNav";
 import { ContentSearchModal } from "./ContentSearchModal";
 import { ContentSidebar } from "./ContentSidebar";
 import { TemplateModal } from "./TemplateModal";
@@ -16,6 +16,7 @@ export function ContentShell(props: { children: JSX.Element }) {
 
   keymap.bind("mod+\\", () => contentSidebarOpen.update((open) => !open), { when: "always" });
   keymap.bind("mod+n", () => openTemplatePicker(), { when: "notEditing" });
+  keymap.bind("mod+f", () => openContentSearch(), { when: "notEditing" });
 
   return (
     <View testID="content-shell" class="h-full min-h-0 min-w-0 flex-1 flex-row overflow-hidden">

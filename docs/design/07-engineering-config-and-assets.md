@@ -27,12 +27,13 @@
 
 ## 7.3 Papertrails 资产同步管线
 
-全部原始素材、3D 纸雕编译脚本与生成管线存放在同级独立仓库 `vibevalley-assets` 中，经 `design/sync-assets.sh`（及 `design/diorama.sh`）仅同步轻量成品至根目录 `assets/` 与 `apps/mac/resources/`：
+全部原始素材、3D 纸雕编译脚本与生成管线存放在同级独立仓库 `vibevalley-assets` 中，制作规范在该仓的 `docs/PAPERCRAFT_QUALITY.md`。`bash design/sync-assets.sh --all` 编译材质、渲染横竖母图、裁切角色与场景，再同步成品至本仓。
 
 | 资产门类 | 源目录与同步脚本 | 成品输出位置与消费方式 |
 | --- | --- | --- |
-| **3D 纸雕场景（`diorama`）** | `vibevalley-assets` + `design/diorama.sh` | 同步 `manifest.json`、`meshes.bin`、`lights.json`、`foley.json` 与 `print/`、`stock/` 贴图到 `assets/diorama/`，由 `vibevalley-diorama` 直接渲染 |
+| **3D 纸雕场景（`diorama`）** | `vibevalley-assets` + `design/diorama.sh` | 同步 `manifest.json`、`meshes.bin`、`lights.json`、`foley.json` 与 `print/`、`stock/` 贴图到 `assets/diorama/`。六张 1024 px 材质使用一张 3072 × 2048 BC1 图集，完整农场包预算 16 MiB |
 | **品牌、通道图标与开场画** | `vibevalley-assets` 仓（`render_brand.swift`）+ `scripts/gen/mac-branding.ts` + `design/sync-assets.sh` | 产出 `apps/mac/resources/{appicon-*.png,icon*.icns,dmg-background.png}`、`assets/icons/app-{32,64,256}.png` 与 `assets/brand/{opening-*.webp,tray-*.png}` |
+| **官网首图与场景切片** | 素材仓的 `render_shots --mode publication`、`build_tile_kit.py` 与 `pack_all.sh` | 四个时段各有独立横竖构图。浏览器按屏幕方向与像素密度取档，产物见 [官网素材](apps/site/README.md) |
 | **角色头像与引擎徽标** | `vibevalley-assets` 仓（`build_avatars.py` / `build_engines.py`）+ `design/sync-assets.sh` | 同步至 `assets/avatars/`（14 角色、8 物种、6 主助手、用户与 1x/2x 导航肖像）及 `assets/engines/`（10 引擎 + 3 连接器）；工作台经 `apps/mac/ui/design/art.ts` 调 `host.assetsDir` 拼接 `file://` URL |
 | **工作台线条图标** | `crates/rich/src/icon.rs`、`apps/mac/ui/design/icons.ts`、`scripts/gen/icons.ts` | 97 枚 `reicon` SVG 路径静态下沉至原生 `crates/rich/src/icon.rs`（`VvIcon`，无锁 `OnceLock<Vec<Path>>` 缓存）；TS 侧 `icons.ts` 仅保留纯类型 `IconName` 与 `actionIcon` 映射供 `<Icon name>` 调用，移动端与非 GPUI 载体经 `iconPaths.gen.ts` 矢量回退 |
 | **多端设计令牌生成与护栏** | `design/tokens.json`、`scripts/gen/tokens.ts`、`scripts/audit/ui-tokens.ts` | 从单源 `tokens.json` 生成并校验 `theme.json`、`nsh.json`、`theme_tokens.rs` 及 `global.css` 缓动曲线；`ui-tokens.ts` 对工作台与工作区外壳 `apps/mac/ui/{app,features,design,workspace}` 做 AST 扫描拦截硬编码色值、任意 Tailwind 类与裸控件 |

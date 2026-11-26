@@ -1,9 +1,25 @@
 {
   "backgrounds": {
-    "morning": "/gen/images/hero-morning-9ffcf08acc40.webp",
-    "day": "/gen/images/hero-day-93bbf2586d5d.webp",
-    "evening": "/gen/images/hero-evening-9e4beb2cabe3.webp",
-    "night": "/gen/images/hero-night-12ea85715eea.webp"
+    "morning": {
+      "src": "/gen/images/hero-morning-63301427345f.webp",
+      "srcset": "/gen/images/hero-morning-960-5ef82c49c49e.webp 960w, /gen/images/hero-morning-63301427345f.webp 1600w, /gen/images/hero-morning-3200-bffe89b90d2a.webp 3200w",
+      "portraitSrcset": "/gen/images/hero-morning-portrait-720-c9c2a1452516.webp 720w, /gen/images/hero-morning-portrait-1080-a735a86cc6c7.webp 1080w"
+    },
+    "day": {
+      "src": "/gen/images/hero-day-686d2ad75e37.webp",
+      "srcset": "/gen/images/hero-day-960-5e26d77b3392.webp 960w, /gen/images/hero-day-686d2ad75e37.webp 1600w, /gen/images/hero-day-3200-83e38555b7e3.webp 3200w",
+      "portraitSrcset": "/gen/images/hero-day-portrait-720-49ee570c4c25.webp 720w, /gen/images/hero-day-portrait-1080-9bfe9ce7d7da.webp 1080w"
+    },
+    "evening": {
+      "src": "/gen/images/hero-evening-60babdded766.webp",
+      "srcset": "/gen/images/hero-evening-960-75e3222b7a11.webp 960w, /gen/images/hero-evening-60babdded766.webp 1600w, /gen/images/hero-evening-3200-f377f8da1be9.webp 3200w",
+      "portraitSrcset": "/gen/images/hero-evening-portrait-720-7ca0c317d203.webp 720w, /gen/images/hero-evening-portrait-1080-2160a4a029ea.webp 1080w"
+    },
+    "night": {
+      "src": "/gen/images/hero-night-3f55fded2f88.webp",
+      "srcset": "/gen/images/hero-night-960-37ec7299692c.webp 960w, /gen/images/hero-night-3f55fded2f88.webp 1600w, /gen/images/hero-night-3200-116db0245373.webp 3200w",
+      "portraitSrcset": "/gen/images/hero-night-portrait-720-88a81fd29173.webp 720w, /gen/images/hero-night-portrait-1080-fd507ee85460.webp 1080w"
+    }
   },
   "shots": {
     "native-farm": {
