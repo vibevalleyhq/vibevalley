@@ -408,5 +408,9 @@
     "uploadFailed": "附件上传失败：{why}",
     "uploading": "正在上传 {name}…",
     "remove": "移除附件 {name}"
+  },
+  "error": {
+    "missingApiKey": "未配置模型 API Key，请先在设置中配置后再重试。",
+    "goSettings": "去设置"
   }
 }

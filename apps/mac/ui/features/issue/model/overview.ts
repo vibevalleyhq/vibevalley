@@ -1,11 +1,12 @@
 import { t } from "@vibevalley/i18n";
 import type { BoardSummary, DoingView, Issue, IssuePromptKind, IssueStage, IssueStageKind, Session, SessionEvent, SessionView } from "@vibevalley/protocol";
-import { sessionProfile, sessionRepo, sessionWorktree, shortTitle } from "@vibevalley/protocol/rules";
+import { sessionProfile, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
 import { sessionId } from "@vibevalley/protocol/schema";
 
 import { spanText, tookText } from "../../../infra/base/format";
 import type { Tone } from "./cards";
 import { endedAt, issueTitle, needsWorktreeCheck } from "./issue";
+import { localizeIssueError } from "./issueError";
 /** An action's words as a sentence starts them (English capitalizes; Chinese has no case). */
 const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -24,6 +25,7 @@ export const stageTone: Record<IssueStageKind, Tone> = {
 interface UserQuestion {
   head: string;
   line?: string;
+  settingsHref?: string;
   tone: Tone;
 }
 
@@ -81,16 +83,18 @@ function fallbackPromptOf(stage: IssueStage, issue: Issue): IssuePromptKind | un
 /** Every prompt kind has copy: add one when a prompt kind is added. */
 function userQuestionFromPrompt(prompt: IssuePromptKind, issue: Issue, head: Session): UserQuestion {
   const who = head.name;
-  const said = head.lastRun?.summary;
+  const rawSaid = head.lastRun?.summary;
+  const localizedSaid = rawSaid ? localizeIssueError(rawSaid) : undefined;
+  const saidFields = localizedSaid ? { line: localizedSaid.text, ...(localizedSaid.settingsHref ? { settingsHref: localizedSaid.settingsHref } : {}) } : {};
   switch (prompt) {
     case "asking":
       return { head: t("web.issue.issue.asking", { who, n: issue.questions.length }), line: t("web.issue.issue.askingLine"), tone: "wheat" };
     case "review_after_failed_check":
-      return { head: t("web.issue.issue.reviewAfterFailedCheck"), ...(said ? { line: said } : {}), tone: "wheat" };
+      return { head: t("web.issue.issue.reviewAfterFailedCheck"), ...saidFields, tone: "wheat" };
     case "reviewed":
-      return { head: t("web.issue.issue.reviewed"), ...(said ? { line: said } : {}), tone: "leaf" };
+      return { head: t("web.issue.issue.reviewed"), ...saidFields, tone: "leaf" };
     case "handed_back":
-      return { head: t("web.issue.issue.handedBack", { who }), ...(said ? { line: said } : {}), tone: "wheat" };
+      return { head: t("web.issue.issue.handedBack", { who }), ...saidFields, tone: "wheat" };
     case "stuck_conflict":
       return {
         head: t("web.issue.issue.conflict", { base: issue.conflict?.base ?? t("web.issue.issue.main") }),
@@ -98,9 +102,9 @@ function userQuestionFromPrompt(prompt: IssuePromptKind, issue: Issue, head: Ses
         tone: "berry",
       };
     case "stuck_failed":
-      return { head: t("web.issue.issue.failed"), ...(said ? { line: said } : {}), tone: "berry" };
+      return { head: t("web.issue.issue.failed"), ...saidFields, tone: "berry" };
     case "stuck_interrupted":
-      return { head: t("web.issue.issue.interrupted"), ...(said ? { line: said } : {}), tone: "wheat" };
+      return { head: t("web.issue.issue.interrupted"), ...saidFields, tone: "wheat" };
     case "stuck_quiet":
       return { head: t("web.issue.issue.quiet", { who }), line: t("web.issue.issue.quietLine"), tone: "berry" };
     case "stuck_unknown":
@@ -142,8 +146,7 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
   // Each helper once, the first time it worked the issue.
   const crew = sessions.filter((s, i) => !sessions.slice(0, i).some((x) => (sessionProfile(x) ?? x.id) === (sessionProfile(s) ?? s.id)));
   const hand = sessionWorktree(head) !== undefined ? session : undefined;
-  const fullTitle = issueTitle(issue, issues);
-  const title = shortTitle(fullTitle);
+  const title = issueTitle(issue, issues);
 
   /** The status summary, one part each: the stage, how long, who, the rounds, the time used, the money. cny is all the issue's runs when known. */
   const statusParts = (now: number, cny?: number): string[] => {
@@ -170,8 +173,7 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     inFamily: issue.parent !== undefined,
     open: stage.state !== "done" && stage.state !== "canceled",
     title,
-    /** The whole of a title too long for the page's first line goes with the description. */
-    description: [title !== fullTitle ? fullTitle : "", issue.description || (title === head.brief ? "" : head.brief)].filter(Boolean).join("\n\n"),
+    description: issue.description || (title === head.brief ? "" : head.brief),
     repo: issue.repo ?? sessionRepo(head),
     parentText: parent?.title ?? issue.parent ?? "",
     ask: userQuestion(stage, issue, head, boardSummary),

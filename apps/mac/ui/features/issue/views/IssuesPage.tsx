@@ -389,6 +389,7 @@ function Toolbar(props: {
   const repoOptions = createMemo(() => repos().map((p) => ({ value: p, label: p })));
   const agentOptions = createMemo(() => agents().map((a) => ({ value: a, label: nameOf()(a) })));
   const isFiltered = createMemo(() => filterAny(props.filter));
+  const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "");
   return (
     <View desktop={{ windowDrag: true }} class="flex-row flex-wrap items-center gap-2 px-3.5 py-2">
       <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
@@ -401,29 +402,39 @@ function Toolbar(props: {
           label={t("web.issue.page.findLabel")}
           class="w-60"
         />
-        <Icon name="filter" size={14} label={t("web.issue.page.filter")} tone="muted" />
-        <Select
-          size="control"
-          class="max-w-48"
-          label={t("web.issue.page.byRepo")}
-          testid="filter-repo"
-          filter
-          value={props.filter.repo}
-          placeholder={t("web.issue.page.allRepos")}
-          options={repoOptions()}
-          onChange={(repo) => props.onFilter({ ...props.filter, repo })}
-        />
-        <Select
-          size="control"
-          class="max-w-48"
-          label={t("web.issue.page.byHelper")}
-          testid="filter-agent"
-          filter
-          value={props.filter.agent}
-          placeholder={t("web.issue.page.allHelpers")}
-          options={agentOptions()}
-          onChange={(agent) => props.onFilter({ ...props.filter, agent })}
-        />
+        <View
+          testID="issue-filter-bar"
+          accessibilityLabel={t("web.issue.page.filter")}
+          class="flex-row items-center rounded-md border border-line bg-side pl-2"
+        >
+          <Icon name="filter" size={14} tone={hasFacetFilter() ? "accent" : "faint"} />
+          <View class="mx-1.5 h-3.5 w-px bg-line" />
+          <Select
+            quiet
+            size="control"
+            class="max-w-44"
+            label={t("web.issue.page.byRepo")}
+            testid="filter-repo"
+            filter
+            value={props.filter.repo}
+            placeholder={t("web.issue.page.allRepos")}
+            options={repoOptions()}
+            onChange={(repo) => props.onFilter({ ...props.filter, repo })}
+          />
+          <View class="h-3.5 w-px bg-line" />
+          <Select
+            quiet
+            size="control"
+            class="max-w-44"
+            label={t("web.issue.page.byHelper")}
+            testid="filter-agent"
+            filter
+            value={props.filter.agent}
+            placeholder={t("web.issue.page.allHelpers")}
+            options={agentOptions()}
+            onChange={(agent) => props.onFilter({ ...props.filter, agent })}
+          />
+        </View>
         <If when={isFiltered()}>
           <Text class="text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
             {t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}

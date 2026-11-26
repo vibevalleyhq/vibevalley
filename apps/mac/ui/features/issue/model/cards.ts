@@ -11,13 +11,14 @@ import type {
   Session,
   SessionView,
 } from "@vibevalley/protocol";
-import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, stageWantsUser } from "@vibevalley/protocol/rules";
 import { IssueLane as IssueLaneSchema } from "@vibevalley/protocol/schema";
 
 import { ago, tookText } from "../../../infra/base/format";
 import { matches } from "../../../infra/base/search";
 import { describeSubagents } from "../../session";
 import { endedAt, assignedOnDuty, issueSession, issueTag, needsWorktreeCheck, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
+import { localizeIssueError } from "./issueError";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
 
@@ -263,7 +264,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
     case "todo": {
       const item = c.issue;
       if (item.refining) flags.push({ text: t("web.issue.card.refining", { name: item.refining.name }), tone: "water" });
-      else if (item.status === "backlog") flags.push({ text: t("web.issue.card.draft"), tone: "wheat" });
+      else if (item.status === "backlog") flags.push({ text: t("web.issue.card.draft"), tone: "faint" });
       if (item.queuedAt !== undefined) flags.push({ text: t("web.issue.card.queued"), tone: "water" });
       if (item.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       const agent = assignedAgentOf(item);
@@ -280,7 +281,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       const { issue, sessions, tag, session } = c;
       const head = sessions.at(-1);
       if (!head) {
-        return { number: numberOf(issue), title: shortTitle(issueTitle(issue, issues)), status: issue.status, priority: issue.priority, flags, detail: "" };
+        return { number: numberOf(issue), title: issueTitle(issue, issues), status: issue.status, priority: issue.priority, flags, detail: "" };
       }
       const first = sessions[0] ?? head;
       const phase = session?.phase;
@@ -316,7 +317,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
         ].join(" · "),
       );
       const said = now0.lastRun?.summary;
-      if (tag === "waiting" && said) lines.push(said);
+      if (tag === "waiting" && said) lines.push(localizeIssueError(said).text);
       const subagents = session?.subagents;
       const wait =
         subagents && subagents.waits.length > 0
@@ -328,7 +329,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       if (!tagOpen(tag)) lines.push(`${tagText(issue)} · ${ago(issue.closedAt ?? endedAt(head) ?? head.hiredAt, now)}`);
       return omitUndefined({
         number: numberOf(issue),
-        title: shortTitle(issueTitle(issue, issues)),
+        title: issueTitle(issue, issues),
         status: issue.status,
         wait,
         statusTone: issue.canceled === "lost" ? ("berry" as const) : undefined,

@@ -294,7 +294,7 @@ function LaneView(props: {
       accessibilityLabel={laneLabel[props.lane]}
       testID={`lane-${props.lane}`}
       accessibilityState={{ selected: over() }}
-      class={`max-h-full min-w-55 flex-1 self-start rounded-lg border px-2 pt-1.5 pb-2 ${over() ? "border-leaf" : "border-transparent bg-side"}`}
+      class={`max-h-full min-w-55 flex-1 rounded-lg border px-2 pt-1.5 pb-2 ${over() ? "border-leaf" : "border-transparent bg-side"}`}
       style={over() ? { backgroundColor: mix("leaf", 0.15) } : undefined}
     >
       <View class="h-7 shrink-0 flex-row items-center gap-1.5 px-1">
@@ -316,7 +316,7 @@ function LaneView(props: {
           <Hint text={emptyText[props.lane]} />
         </View>
       </View>
-      <Scroll class="mt-2 min-h-0 shrink" contentClass="gap-1.5 pb-0.5">
+      <Scroll class="mt-2 min-h-0 shrink" contentClass="gap-2 pb-0.5">
         <If
           when={p().loading}
           else={
@@ -344,7 +344,10 @@ function LaneView(props: {
                 </>
               }
             >
-              <View testID="lane-empty" class={`rounded-md border border-dashed px-3 py-4 ${over() ? "border-leaf" : "border-line bg-page"}`}>
+              <View
+                testID="lane-empty"
+                class={`min-h-28 justify-center rounded-md border border-dashed px-3.5 py-5 ${over() ? "border-leaf" : "border-line bg-page"}`}
+              >
                 <View testID={`lane-empty-${props.lane}`} class="items-center gap-1.5">
                   <Icon name={guide().icon} size={15} tone="muted" />
                   <If
@@ -430,7 +433,9 @@ function CardView(props: {
     return pr === "urgent" || pr === "high" ? pr : undefined;
   });
   const showsStatus = computed(() => ownStatus(props.card.lane, look().status));
-  const unassignedTodo = computed(() => props.card.kind === "todo" && props.card.lane === "todo" && !cardAgent(props.card));
+  const unassignedTodo = computed(
+    () => props.card.kind === "todo" && props.card.lane === "todo" && props.card.issue.status !== "backlog" && !cardAgent(props.card),
+  );
   const attachmentCount = computed(() => props.card.issue.attachments?.length ?? 0);
   const marks = computed(
     () =>
@@ -490,7 +495,7 @@ function CardView(props: {
         accessibilityState={{ selected: props.selected, busy: props.card.move?.state === "moving" }}
         tooltip={<If when={look().detail}>{(d) => <Bubble text={d()} />}</If>}
         class={[
-          "relative overflow-hidden rounded-lg border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus",
+          "relative overflow-hidden rounded-lg border px-3 py-2.5 focus-visible:outline-2 focus-visible:outline-focus",
           props.selected ? "border-accent bg-selected" : "border-line bg-elevated hover:border-faint hover:shadow-raise",
           props.card.move?.state === "moving" ? "opacity-70" : props.drag.dragging()?.id === props.card.id ? "opacity-40" : "",
         ].join(" ")}

@@ -118,9 +118,10 @@ pub fn session_ids_of(issue: &Issue) -> Vec<&SessionId> {
         .collect()
 }
 
-const TITLE_MAX: usize = 40;
+const TITLE_MAX: usize = 120;
 
-/// `shortTitle`: one short line for a title.
+/// `shortTitle`: one line for a title; preserves normal titles up to `TITLE_MAX`
+/// characters and breaks overly long lines cleanly at punctuation or word boundaries.
 pub fn short_title(text: &str) -> String {
     let line = text.split('\n').find(|l| !l.trim().is_empty()).unwrap_or("").trim();
     let chars: Vec<char> = line.chars().collect();
@@ -146,6 +147,11 @@ pub fn short_title(text: &str) -> String {
     }
     if pause >= 4 {
         return slice(&head, 0, Some(pause as usize)).trim().to_string();
+    }
+    if let Some(space) = chars[..TITLE_MAX].iter().rposition(|c| c.is_whitespace())
+        && space >= TITLE_MAX / 2
+    {
+        return chars[..space].iter().collect::<String>().trim_end().to_string() + "…";
     }
     chars[..TITLE_MAX - 1].iter().collect::<String>() + "…"
 }
@@ -425,9 +431,16 @@ mod tests {
     #[test]
     fn short_titles() {
         assert_eq!(short_title("\n  fix it \nmore"), "fix it");
-        // Both answers are what VibeValley's shortTitle gives.
-        let forty = "这是一个很长的标题，里面有很多很多的字，一直写下去一直写下去一直写下去一直写下去";
-        assert_eq!(short_title(forty), forty);
-        assert_eq!(short_title(&format!("{forty}再写一点")), "这是一个很长的标题，里面有很多很多的字");
+        let english = "Polish mobile responsive layout for remote worktree session view";
+        assert_eq!(short_title(english), english);
+        let chinese = "这是一个很长的标题，里面有很多很多的字，一直写下去一直写下去一直写下去一直写下去再写一点";
+        assert_eq!(short_title(chinese), chinese);
+        let over_cap = format!("{chinese}，{}", "继续补充更多背景说明内容".repeat(8));
+        assert_eq!(short_title(&over_cap), chinese);
+        let long_english = "Implement full end-to-end streaming transport synchronization across desktop workbench and mobile remote clients without truncating mid word anywhere";
+        let cut_english = short_title(long_english);
+        assert!(cut_english.ends_with('…'));
+        assert!(cut_english.chars().count() <= TITLE_MAX);
+        assert!(!cut_english.ends_with("tru…"));
     }
 }
