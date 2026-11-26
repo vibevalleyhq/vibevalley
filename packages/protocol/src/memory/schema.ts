@@ -27,19 +27,27 @@ const memoryFields = {
   recalledAt: z.exactOptional(z.number()),
   fading: z.boolean(),
   source: z.exactOptional(z.string()),
+  title: z.exactOptional(z.string()),
+  importance: z.exactOptional(z.number()),
+  replacedBy: z.exactOptional(z.string()),
 };
 
-export const Memory = z.object(memoryFields) satisfies Codec<T.Memory>;
+export const Memory = z.object({ ...memoryFields, scope: z.exactOptional(z.string()) }) satisfies Codec<T.Memory>;
 
 export const MemoryRequest = z.object({
   text: z.string(),
   repo: z.exactOptional(z.string()),
   requestKey: z.exactOptional(z.string()),
+  kind: z.exactOptional(MemoryKind),
+  scope: z.exactOptional(z.string()),
+  title: z.exactOptional(z.string()),
+  importance: z.exactOptional(z.number()),
 }) satisfies Codec<T.MemoryRequest>;
 
 const MemoryScope = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("global") }),
   z.object({ kind: z.literal("repo"), repo: z.string() }),
+  z.object({ kind: z.literal("farm") }),
   z.object({ kind: z.literal("unknown") }),
 ]) satisfies Codec<T.MemoryScope>;
 

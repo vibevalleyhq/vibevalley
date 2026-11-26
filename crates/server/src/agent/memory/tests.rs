@@ -220,6 +220,92 @@ async fn verify_memory_dual_db(service: Arc<Service>, home: &std::path::Path, ex
     let search = memories.search_async("backend", "farm", "cargo test", 10).await;
     assert!(search.found.iter().any(|f| f.id == user_note.id));
 
+    // Farm-wide profile memories: ordered by descending importance in prompts & recall.
+    let low_profile = memories.write_profile_async(Some("日志偏好"), "尽量精简日志输出", 10, By::User).await.unwrap();
+    let high_profile = memories
+        .write_profile_async(Some("安全红线"), "绝不跳过权限校验与边界检查", 100, By::User)
+        .await
+        .unwrap();
+    let mid_profile = memories
+        .write_profile_async(Some("提交规范"), "提交标题用英文祈使句", 50, By::Orchestrator)
+        .await
+        .unwrap();
+    let farm_profiles = memories.list_farm_profiles_async().await.unwrap();
+    let profile_ids: Vec<&str> = farm_profiles.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(profile_ids, vec![high_profile.id.as_str(), mid_profile.id.as_str(), low_profile.id.as_str()]);
+
+    let port = memories.port_async("backend", By::Orchestrator).await;
+    let prompt_text = port.prompt();
+    let hi_pos = prompt_text.find("绝不跳过权限校验").expect("high profile in prompt");
+    let mid_pos = prompt_text.find("提交标题用英文祈使句").expect("mid profile in prompt");
+    let lo_pos = prompt_text.find("尽量精简日志输出").expect("low profile in prompt");
+    assert!(hi_pos < mid_pos && mid_pos < lo_pos, "profiles must be ordered by importance: {prompt_text}");
+
+    let recall_with_profiles = memories.recall_async("backend", Some("sess-2"), "farm", "无关查询", true).await;
+    let recalled_profile_ids: Vec<&str> = recall_with_profiles.iter().take(3).map(|(id, _)| id.as_str()).collect();
+    assert_eq!(
+        recalled_profile_ids,
+        vec![high_profile.id.as_str(), mid_profile.id.as_str(), low_profile.id.as_str()]
+    );
+
+    // Episode memory: retrieval-only via gse search, never auto-injected into prompt or recall.
+    let episode = memories
+        .record_episode_async(
+            "backend",
+            Some("#51 迁移验证"),
+            "扩展 memory 表支持 profile 与 episode 并完成双库测试",
+            Some("farm"),
+            Some("sess-ep"),
+            vibevalley_protocol::ActorKind::System,
+        )
+        .await
+        .unwrap()
+        .expect("episode written");
+    assert_eq!(episode.kind, vibevalley_protocol::MemoryKind::Episode);
+    let port_after_ep = memories.port_async("backend", By::Orchestrator).await;
+    assert!(!port_after_ep.prompt().contains("扩展 memory 表"));
+    let recall_after_ep = memories.recall_async("backend", Some("sess-3"), "farm", "双库测试 迁移验证", false).await;
+    assert!(recall_after_ep.iter().all(|(id, _)| id != &episode.id));
+    let ep_search = memories.search_async("backend", "farm", "迁移验证 双库测试", 10).await;
+    assert!(
+        ep_search
+            .found
+            .iter()
+            .any(|f| f.id == episode.id && f.kind == vibevalley_protocol::MemoryKind::Episode),
+        "episode must be searchable via gse"
+    );
+
+    // Transactional superseding: >= 0.8 similarity marks old active entry replaced_by = Some(new_id).
+    let old_pref = memories
+        .write_async(&Note {
+            agent: "backend".into(),
+            text: "用户喜欢简短回答，不要长篇大论".into(),
+            repo: "farm".into(),
+            by: By::User,
+        })
+        .await
+        .unwrap();
+    let new_pref = memories
+        .write_async(&Note {
+            agent: "backend".into(),
+            text: "用户喜欢简短的回答，不要长篇大论".into(),
+            repo: "farm".into(),
+            by: By::User,
+        })
+        .await
+        .unwrap();
+    let old_stored = ctx.service.memory.get(&old_pref.id).await.unwrap().expect("old row retained in DB");
+    assert_eq!(old_stored.replaced_by.as_deref(), Some(new_pref.id.as_str()));
+    let active_backend = memories.list_async("backend").await.unwrap();
+    assert!(!active_backend.iter().any(|m| m.id == old_pref.id));
+    assert!(active_backend.iter().any(|m| m.id == new_pref.id));
+    let all_backend = memories.list_all_async("backend").await.unwrap();
+    assert!(
+        all_backend
+            .iter()
+            .any(|m| m.id == old_pref.id && m.replaced_by.as_deref() == Some(new_pref.id.as_str()))
+    );
+
     let preview = memories.preview_forget_async("backend", &user_note.id).await.unwrap();
     assert!(!preview.does.is_empty());
     memories.forget_async("backend", &user_note.id).await.unwrap();

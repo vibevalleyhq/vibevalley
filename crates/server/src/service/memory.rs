@@ -16,10 +16,13 @@ pub(crate) struct NewMemory {
     pub(crate) id: String,
     pub(crate) agent: String,
     pub(crate) kind: MemoryKind,
+    pub(crate) scope: String,
+    pub(crate) title: Option<String>,
     pub(crate) body: String,
     pub(crate) repo: Option<String>,
     pub(crate) session: Option<String>,
     pub(crate) author: ActorKind,
+    pub(crate) importance: i64,
     pub(crate) created_at: i64,
 }
 
@@ -37,16 +40,62 @@ fn read_memory(row: memory::Model) -> Memory {
         recalled_at: row.recalled_at,
         fading: false,
         source: None,
+        scope: (!row.scope.is_empty()).then_some(row.scope),
+        title: row.title,
+        importance: Some(row.importance),
+        replaced_by: row.replaced_by,
     }
 }
 
-async fn list_impl<C: ConnectionTrait>(db: &C, agent: &str) -> DbResult<Vec<Memory>> {
+async fn get_impl<C: ConnectionTrait>(db: &C, id: &str) -> DbResult<Option<Memory>> {
+    Ok(memory::Entity::find_by_id(id.to_owned()).one(db).await?.map(read_memory))
+}
+
+async fn list_impl<C: ConnectionTrait>(db: &C, agent: &str, active_only: bool) -> DbResult<Vec<Memory>> {
+    let mut query = memory::Entity::find().filter(memory::Column::Agent.eq(agent));
+    if active_only {
+        query = query.filter(memory::Column::ReplacedBy.is_null());
+    }
+    let rows = query.order_by_desc(memory::Column::CreatedAt).order_by_desc(memory::Column::Id).all(db).await?;
+    Ok(rows.into_iter().map(read_memory).collect())
+}
+
+async fn list_all_active_impl<C: ConnectionTrait>(db: &C) -> DbResult<Vec<Memory>> {
     let rows = memory::Entity::find()
-        .filter(memory::Column::Agent.eq(agent))
+        .filter(memory::Column::ReplacedBy.is_null())
         .order_by_desc(memory::Column::CreatedAt)
         .order_by_desc(memory::Column::Id)
         .all(db)
         .await?;
+    Ok(rows.into_iter().map(read_memory).collect())
+}
+
+async fn list_farm_profiles_impl<C: ConnectionTrait>(db: &C) -> DbResult<Vec<Memory>> {
+    let rows = memory::Entity::find()
+        .filter(memory::Column::Kind.eq(db_word(&MemoryKind::Profile)?))
+        .filter(memory::Column::Scope.eq("farm"))
+        .filter(memory::Column::ReplacedBy.is_null())
+        .order_by_desc(memory::Column::Importance)
+        .order_by_desc(memory::Column::UpdatedAt)
+        .order_by_desc(memory::Column::Id)
+        .all(db)
+        .await?;
+    Ok(rows.into_iter().map(read_memory).collect())
+}
+
+async fn list_active_scope_impl<C: ConnectionTrait>(db: &C, agent: &str, kind: MemoryKind, scope: &str, repo: Option<&str>) -> DbResult<Vec<Memory>> {
+    let mut query = memory::Entity::find()
+        .filter(memory::Column::Kind.eq(db_word(&kind)?))
+        .filter(memory::Column::Scope.eq(scope))
+        .filter(memory::Column::ReplacedBy.is_null());
+    if scope != "farm" {
+        query = query.filter(memory::Column::Agent.eq(agent));
+    }
+    query = match repo {
+        Some(r) => query.filter(memory::Column::Repo.eq(r)),
+        None => query.filter(memory::Column::Repo.is_null()),
+    };
+    let rows = query.order_by_desc(memory::Column::CreatedAt).order_by_desc(memory::Column::Id).all(db).await?;
     Ok(rows.into_iter().map(read_memory).collect())
 }
 
@@ -55,10 +104,14 @@ async fn insert_impl<C: ConnectionTrait>(db: &C, entry: &NewMemory) -> DbResult<
         id: Set(entry.id.clone()),
         agent: Set(entry.agent.clone()),
         kind: Set(db_word(&entry.kind)?),
+        scope: Set(entry.scope.clone()),
+        title: Set(entry.title.clone()),
         body: Set(entry.body.clone()),
         repo: Set(entry.repo.clone()),
         session: Set(entry.session.clone()),
         author: Set(db_word(&entry.author)?),
+        importance: Set(entry.importance),
+        replaced_by: Set(None),
         created_at: Set(entry.created_at),
         updated_at: Set(entry.created_at),
         recalled: Set(0),
@@ -67,6 +120,19 @@ async fn insert_impl<C: ConnectionTrait>(db: &C, entry: &NewMemory) -> DbResult<
     .insert(db)
     .await?;
     Ok(())
+}
+
+async fn mark_replaced_by_impl<C: ConnectionTrait>(db: &C, ids: &[String], replaced_by: &str, at: i64) -> DbResult<u64> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let res = memory::Entity::update_many()
+        .col_expr(memory::Column::ReplacedBy, Expr::value(Some(replaced_by.to_owned())))
+        .col_expr(memory::Column::UpdatedAt, Expr::value(at))
+        .filter(memory::Column::Id.is_in(ids.iter().cloned()))
+        .exec(db)
+        .await?;
+    Ok(res.rows_affected)
 }
 
 async fn delete_agent_notes_impl<C: ConnectionTrait>(db: &C, agent: &str) -> DbResult<u64> {
@@ -105,10 +171,14 @@ async fn upsert_issue_memory_impl<C: ConnectionTrait>(db: &C, entry: &NewMemory)
         id: Set(entry.id.clone()),
         agent: Set(entry.agent.clone()),
         kind: Set(db_word(&MemoryKind::Issue)?),
+        scope: Set(entry.scope.clone()),
+        title: Set(entry.title.clone()),
         body: Set(entry.body.clone()),
         repo: Set(entry.repo.clone()),
         session: Set(entry.session.clone()),
         author: Set(db_word(&entry.author)?),
+        importance: Set(entry.importance),
+        replaced_by: Set(None),
         created_at: Set(entry.created_at),
         updated_at: Set(entry.created_at),
         recalled: Set(0),
@@ -116,7 +186,16 @@ async fn upsert_issue_memory_impl<C: ConnectionTrait>(db: &C, entry: &NewMemory)
     };
     let on_conflict = OnConflict::columns([memory::Column::Agent, memory::Column::Session])
         .target_and_where(Expr::col(memory::Column::Kind).eq(Expr::cust("'issue'")))
-        .update_columns([memory::Column::Body, memory::Column::Repo, memory::Column::CreatedAt, memory::Column::UpdatedAt])
+        .update_columns([
+            memory::Column::Scope,
+            memory::Column::Title,
+            memory::Column::Body,
+            memory::Column::Repo,
+            memory::Column::Importance,
+            memory::Column::ReplacedBy,
+            memory::Column::CreatedAt,
+            memory::Column::UpdatedAt,
+        ])
         .to_owned();
     memory::Entity::insert(model).on_conflict(on_conflict).exec(db).await?;
     Ok(())
@@ -132,16 +211,43 @@ impl MemoryService {
         Self { db }
     }
 
+    pub(crate) async fn get(&self, id: &str) -> DbResult<Option<Memory>> {
+        get_impl(self.db.read_conn(), id).await
+    }
+
     pub(crate) async fn list(&self, agent: &str) -> DbResult<Vec<Memory>> {
-        list_impl(self.db.read_conn(), agent).await
+        list_impl(self.db.read_conn(), agent, true).await
+    }
+
+    pub(crate) async fn list_all(&self, agent: &str) -> DbResult<Vec<Memory>> {
+        list_impl(self.db.read_conn(), agent, false).await
+    }
+
+    pub(crate) async fn list_all_active(&self) -> DbResult<Vec<Memory>> {
+        list_all_active_impl(self.db.read_conn()).await
+    }
+
+    pub(crate) async fn list_farm_profiles(&self) -> DbResult<Vec<Memory>> {
+        list_farm_profiles_impl(self.db.read_conn()).await
     }
 
     pub(crate) async fn list_in_tx(&self, tx: &Tx, agent: &str) -> DbResult<Vec<Memory>> {
-        list_impl(tx, agent).await
+        list_impl(tx, agent, true).await
     }
 
-    pub(crate) async fn insert(&self, entry: &NewMemory) -> DbResult<()> {
-        insert_impl(self.db.write_conn(), entry).await
+    /// Atomically inserts `entry` and marks any overlapping active memory in the same scope
+    /// with `replaced_by = Some(entry.id)` inside a single write transaction.
+    pub(crate) async fn insert_superseding(&self, entry: &NewMemory, overlaps: impl Fn(&Memory) -> bool + Send) -> DbResult<Vec<String>> {
+        with_write_tx(&self.db, async |tx| {
+            let candidates = list_active_scope_impl(tx, &entry.agent, entry.kind, &entry.scope, entry.repo.as_deref()).await?;
+            let superseded_ids: Vec<String> = candidates.iter().filter(|m| overlaps(m)).map(|m| m.id.clone()).collect();
+            insert_impl(tx, entry).await?;
+            if !superseded_ids.is_empty() {
+                mark_replaced_by_impl(tx, &superseded_ids, &entry.id, entry.created_at).await?;
+            }
+            Ok(superseded_ids)
+        })
+        .await
     }
 
     /// Atomically replaces all non-user notes for `agent` with `notes`.

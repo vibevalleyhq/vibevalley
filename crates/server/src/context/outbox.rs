@@ -28,6 +28,7 @@ const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(5);
 
 pub const OUTBOX_SESSION_REPORTED: &str = "work.session.reported";
 pub const OUTBOX_SESSION_REMEMBER: &str = "memory.session_remember";
+pub const OUTBOX_ISSUE_EPISODE: &str = "memory.issue_episode";
 pub const OUTBOX_CONNECTOR_NOTIFY: &str = "connector.notify";
 
 /// Durable report payload persisted via `Outbox` when a session round finishes.
@@ -62,6 +63,14 @@ pub enum OutboxEvent {
     SessionReported(OutboxSessionReported),
     #[serde(rename = "memory.session_remember")]
     SessionRemember { agent: String, text: String, repo: Option<String> },
+    #[serde(rename = "memory.issue_episode")]
+    IssueEpisode {
+        agent: String,
+        title: Option<String>,
+        text: String,
+        repo: Option<String>,
+        session: Option<String>,
+    },
     #[serde(rename = "connector.notify")]
     ConnectorNotify(OutboxConnectorNotify),
 }
@@ -71,6 +80,7 @@ impl OutboxEvent {
         match self {
             Self::SessionReported(_) => OUTBOX_SESSION_REPORTED,
             Self::SessionRemember { .. } => OUTBOX_SESSION_REMEMBER,
+            Self::IssueEpisode { .. } => OUTBOX_ISSUE_EPISODE,
             Self::ConnectorNotify(_) => OUTBOX_CONNECTOR_NOTIFY,
         }
     }
@@ -79,6 +89,19 @@ impl OutboxEvent {
         let res = match self {
             Self::SessionReported(report) => serde_json::to_string(report),
             Self::SessionRemember { agent, text, repo } => serde_json::to_string(&RememberPayload { agent, text, repo }),
+            Self::IssueEpisode {
+                agent,
+                title,
+                text,
+                repo,
+                session,
+            } => serde_json::to_string(&IssueEpisodePayload {
+                agent,
+                title,
+                text,
+                repo,
+                session,
+            }),
             Self::ConnectorNotify(notify) => serde_json::to_string(notify),
         };
         res.map_err(|e| ApiError::new(BizCode::InternalError, format!("outbox payload serialize failed: {e}")))
@@ -90,6 +113,15 @@ struct RememberPayload<'a> {
     agent: &'a str,
     text: &'a str,
     repo: &'a Option<String>,
+}
+
+#[derive(Serialize)]
+struct IssueEpisodePayload<'a> {
+    agent: &'a str,
+    title: &'a Option<String>,
+    text: &'a str,
+    repo: &'a Option<String>,
+    session: &'a Option<String>,
 }
 
 /// Configuration governing outbox batch size, retry budget, and backoff timings.
@@ -146,6 +178,24 @@ impl OutboxDelivery {
                     agent: p.agent,
                     text: p.text,
                     repo: p.repo,
+                })
+            }
+            OUTBOX_ISSUE_EPISODE => {
+                #[derive(Deserialize)]
+                struct OwnedEpisode {
+                    agent: String,
+                    title: Option<String>,
+                    text: String,
+                    repo: Option<String>,
+                    session: Option<String>,
+                }
+                let p: OwnedEpisode = serde_json::from_str(&self.payload_json)?;
+                Ok(OutboxEvent::IssueEpisode {
+                    agent: p.agent,
+                    title: p.title,
+                    text: p.text,
+                    repo: p.repo,
+                    session: p.session,
                 })
             }
             OUTBOX_CONNECTOR_NOTIFY => Ok(OutboxEvent::ConnectorNotify(serde_json::from_str(&self.payload_json)?)),

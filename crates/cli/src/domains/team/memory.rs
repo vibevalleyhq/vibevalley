@@ -99,6 +99,7 @@ pub async fn run(client: &Client, cmd: MemoryCmd) -> Done {
                 text: words.join(" "),
                 repo,
                 request_key: key,
+                ..Default::default()
             };
             client.mutate::<ops::MemoryCreate>("memory create", &request, memory_line).await
         }

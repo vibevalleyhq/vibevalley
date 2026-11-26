@@ -11,6 +11,7 @@ pub mod m20261125_100002_add_issue_attachments;
 pub mod m20261126_100001_add_issue_tags_and_dates;
 pub mod m20261127_100001_add_issue_status;
 pub mod m20261127_100002_add_issue_owner;
+pub mod m20261127_100003_extend_memory_profile_episode;
 
 use sea_orm_migration::prelude::*;
 
@@ -31,6 +32,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261126_100001_add_issue_tags_and_dates::Migration),
             Box::new(m20261127_100001_add_issue_status::Migration),
             Box::new(m20261127_100002_add_issue_owner::Migration),
+            Box::new(m20261127_100003_extend_memory_profile_episode::Migration),
         ]
     }
 }

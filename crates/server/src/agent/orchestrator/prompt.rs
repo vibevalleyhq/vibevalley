@@ -17,7 +17,7 @@ use crate::agent::tool::{Route, held};
 const QUOTA_LOW: f64 = 15.0;
 
 impl Orchestrator {
-    pub(crate) async fn system_prompt_snapshot_async(&self, id: &str) -> String {
+    pub async fn system_prompt_snapshot_async(&self, id: &str) -> String {
         let home = self.home.join("agent").join(id);
         let memory = self.memory.port_async(id, By::Orchestrator).await;
         self.system_prompt(id, &home, memory.as_ref())

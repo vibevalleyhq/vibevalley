@@ -45,6 +45,27 @@ impl OrchestratorHost for Orchestrator {
     fn brain_at_async<'a>(&'a self, id: &'a str, route: &'a Arc<Mutex<Route>>, model: &'a str) -> BoxFuture<'a, Brain> {
         Box::pin(Orchestrator::brain_at_async(self, id, route, model))
     }
+
+    fn record_worker_compaction_episode(&self, session_id: &str, level: &str, summary: &str) {
+        if summary.trim().is_empty() {
+            return;
+        }
+        let Some(orch) = self.me.upgrade() else { return };
+        let session_id = session_id.to_owned();
+        let level = level.to_owned();
+        let summary = summary.to_owned();
+        self.ctx.spawn("memory.compaction_episode", async move {
+            let session = orch.runtime.session_async(&session_id).await;
+            let agent = session
+                .as_ref()
+                .and_then(|s| s.profile.clone())
+                .unwrap_or_else(|| vibevalley_protocol::DEFAULT_ORCHESTRATOR.to_string());
+            let repo = session.as_ref().and_then(|s| s.repo_name()).map(str::to_string);
+            orch.memory
+                .record_compaction_episode_async(&agent, &session_id, &level, &summary, repo.as_deref())
+                .await;
+        });
+    }
 }
 
 impl ChatIntake for Orchestrator {

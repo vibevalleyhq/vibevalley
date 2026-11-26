@@ -32,6 +32,7 @@ pub(super) trait OrchestratorHost: Send + Sync {
     fn issue(&self) -> &Board;
     fn artifact(&self) -> &ArtifactManager;
     fn brain_at_async<'a>(&'a self, id: &'a str, route: &'a Arc<Mutex<Route>>, model: &'a str) -> BoxFuture<'a, Brain>;
+    fn record_worker_compaction_episode(&self, session_id: &str, level: &str, summary: &str);
 }
 
 pub(super) trait RunSink: Send + Sync {
@@ -77,6 +78,12 @@ impl BrainProvider for Bound {
     }
 
     fn observe(&self, conv: &str, _task: &str, event: AgentEvent) {
+        if let Some(session_id) = conv.strip_prefix("worker:")
+            && let AgentEvent::Compacted { level, summary } = &event
+            && let Some(o) = self.orchestrator.get().and_then(Weak::upgrade)
+        {
+            o.record_worker_compaction_episode(session_id, level, summary);
+        }
         if let Some(s) = self.listeners.lock().get(conv) {
             let _ = s.send(event);
         }

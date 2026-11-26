@@ -484,6 +484,14 @@ pub fn memory_found_text(result: &vibevalley_protocol::MemorySearch, agent: &str
         let mut line = match f.kind {
             MemoryKind::Issue => format!("- 做过（{where_words}）：{}", f.text),
             MemoryKind::Note => format!("- （{where_words}）{}", f.text),
+            MemoryKind::Profile => match f.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+                Some(title) => format!("- [全局] {title}：{}", f.text),
+                None => format!("- [全局] {}", f.text),
+            },
+            MemoryKind::Episode => match f.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+                Some(title) => format!("- 经历（{where_words}）{title}：{}", f.text),
+                None => format!("- 经历（{where_words}）：{}", f.text),
+            },
         };
         if agent.is_empty() && !f.agent.is_empty() {
             line = format!("- {}：{}", f.agent, line.trim_start_matches("- "));

@@ -166,27 +166,71 @@ impl IssueState {
     /// Applies `change` to issue `id` and returns the derived issue after commit.
     pub async fn change_async(&self, id: &str, change: IssueChange) -> Result<Issue> {
         let dirty = change.dirty_mask();
-        let issue_id = {
+        let record_episode = matches!(change, IssueChange::Delivered(..) | IssueChange::MergedIntoParent { .. });
+        let (issue_id, enqueued_episode) = {
             let _write = self.write.lock().await;
             let raw = self.raw_issues_async().await?;
             let mut issue = find_issue(&raw, id).cloned().ok_or_else(|| RuntimeError::NoIssue(id.into()))?;
+            let session = if record_episode && let Some(sid) = issue.latest_session_id() {
+                match self.ctx.service.session.get(sid).await.ok().flatten() {
+                    Some(s) => Some(s),
+                    None => self.past_session_async(sid).await,
+                }
+            } else {
+                None
+            };
             let at = now();
             change.fold(&mut issue, at);
+            let episode = record_episode.then(|| {
+                let agent = issue
+                    .assigned_agent()
+                    .map(str::to_string)
+                    .or_else(|| session.as_ref().and_then(|s| s.profile.clone()))
+                    .unwrap_or_else(|| vibevalley_protocol::DEFAULT_ORCHESTRATOR.to_string());
+                let title_text = vibevalley_core::text::clip(&issue.title, 120);
+                let title = format!("#{} {title_text}", issue.number);
+                let summary = session
+                    .as_ref()
+                    .and_then(|s| s.last_run.as_ref())
+                    .map(|r| r.summary.as_str())
+                    .filter(|s| !s.trim().is_empty())
+                    .or_else(|| issue.answer.as_ref().map(|a| a.conclusion.as_str()).filter(|s| !s.trim().is_empty()))
+                    .or_else(|| (!issue.description.trim().is_empty()).then_some(issue.description.as_str()));
+                let text = match summary {
+                    Some(s) => format!("{title}：{}", vibevalley_core::text::clip(s, 600)),
+                    None => title.clone(),
+                };
+                crate::context::OutboxEvent::IssueEpisode {
+                    agent,
+                    title: Some(title),
+                    text,
+                    repo: issue.repo.clone(),
+                    session: issue.latest_session_id().cloned(),
+                }
+            });
             let issue_id = issue.id.clone();
             let issue_svc = self.ctx.service.issue.clone();
+            let outbox = self.ctx.outbox.clone();
+            let has_episode = episode.is_some();
             let (_, written_dirty) = self
                 .ctx
                 .service
                 .write_dirty_with(RuntimeError::Store, |tx| {
                     Box::pin(async move {
                         issue_svc.put_in_tx(tx, &issue).await?;
+                        if let Some(ev) = episode {
+                            outbox.enqueue_event_in_tx(tx, &ev).await.map_err(RuntimeError::Api)?;
+                        }
                         Ok(((), dirty))
                     })
                 })
                 .await?;
             self.ctx.mark_dirty(written_dirty);
-            issue_id
+            (issue_id, has_episode)
         };
+        if enqueued_episode {
+            self.ctx.outbox.wake();
+        }
         self.issue_async(&issue_id).await?.ok_or(RuntimeError::NoIssue(issue_id))
     }
 

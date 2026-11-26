@@ -24,6 +24,8 @@ const RECALL_MATCH_MOST: f64 = 5.0;
 const RECALL_MATCH_WEIGHT: f64 = 0.3;
 const RECALL_SHARED_WEIGHT: f64 = 0.5;
 pub const NOTE_MAX_CHARS: usize = 300;
+pub const PROFILE_MAX_CHARS: usize = 800;
+pub const EPISODE_MAX_CHARS: usize = 1000;
 pub const SEARCH_LIMIT: usize = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,6 +33,8 @@ pub const SEARCH_LIMIT: usize = 10;
 pub enum MemoryKind {
     Note,
     Issue,
+    Profile,
+    Episode,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,6 +66,14 @@ pub struct Memory {
     pub fading: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub importance: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replaced_by: Option<String>,
 }
 
 fn stopwords() -> &'static HashSet<String> {
@@ -115,21 +127,24 @@ fn in_common(a: &HashSet<String>, b: &HashSet<String>) -> usize {
     a.iter().filter(|t| b.contains(*t)).count()
 }
 
-#[cfg(test)]
 pub fn likeness(a: &HashSet<String>, b: &HashSet<String>) -> f64 {
     let shared = in_common(a, b);
     let all = a.len() + b.len() - shared;
     if all == 0 { 0.0 } else { shared as f64 / all as f64 }
 }
 
+/// True when `a` and `b` match identically or share at least 0.8 term Jaccard similarity.
+pub fn is_similar(a: &str, b: &str) -> bool {
+    a.trim() == b.trim() || likeness(&terms_of(a), &terms_of(b)) >= 0.8
+}
+
 /// Whether `text` is worth a new note: no note in the same scope says the
 /// same thing (equal, or ≥ 0.8 likeness).
 #[cfg(test)]
 pub fn is_new_note(memories: &[Memory], text: &str, repo: Option<&str>) -> bool {
-    let terms = terms_of(text);
     !memories
         .iter()
-        .any(|m| m.kind == MemoryKind::Note && m.repo.as_deref() == repo && (m.text == text || likeness(&terms_of(&m.text), &terms) >= 0.8))
+        .any(|m| m.kind == MemoryKind::Note && m.repo.as_deref() == repo && is_similar(&m.text, text))
 }
 
 fn utf16_len(s: &str) -> usize {
@@ -167,6 +182,20 @@ pub fn line_of(m: &Memory, repo: &str) -> String {
     match m.kind {
         MemoryKind::Issue => format!("- 做过（{w}）：{}", m.text),
         MemoryKind::Note => format!("- （{w}）{}", m.text),
+        MemoryKind::Profile => format!("- {}", profile_prompt_line(m)),
+        MemoryKind::Episode => match m.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+            Some(title) => format!("- 经历（{w}）{title}：{}", m.text),
+            None => format!("- 经历（{w}）：{}", m.text),
+        },
+    }
+}
+
+/// Formats a farm-wide profile memory line for prompt injection without trailing bullet.
+pub fn profile_prompt_line(m: &Memory) -> String {
+    let prefix = if m.author == ActorKind::User { FROM_USER } else { "" };
+    match m.title.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+        Some(title) => format!("[全局] {prefix}{title}：{}", m.text),
+        None => format!("[全局] {prefix}{}", m.text),
     }
 }
 
@@ -203,7 +232,7 @@ pub struct Cue<'a> {
 }
 
 fn relevance(m: &Memory, cue: &Cue, terms: &HashSet<String>) -> Option<f64> {
-    if cue.skip.contains(&m.id) || (m.session.is_some() && m.session.as_deref() == cue.session) {
+    if m.replaced_by.is_some() || cue.skip.contains(&m.id) || (m.session.is_some() && m.session.as_deref() == cue.session) {
         return None;
     }
     let shared = in_common(&terms_of(&m.text), terms);
@@ -212,6 +241,7 @@ fn relevance(m: &Memory, cue: &Cue, terms: &HashSet<String>) -> Option<f64> {
     match m.kind {
         MemoryKind::Issue if !here => return None,
         MemoryKind::Note if !here && !everywhere && shared < RECALL_ELSEWHERE => return None,
+        MemoryKind::Profile | MemoryKind::Episode => return None,
         _ => {}
     }
     let used = m.recalled_at.unwrap_or(m.at);
@@ -255,11 +285,12 @@ pub fn pick(memories: &[Memory], cue: &Cue) -> Vec<Memory> {
 
 /// Ids to evict before `coming` new memories: the longest unused first.
 pub fn next_forgotten(memories: &[Memory], coming: usize) -> Vec<String> {
-    let over = (memories.len() + coming).saturating_sub(MEMORY_KEEP);
+    let eligible: Vec<&Memory> = memories.iter().filter(|m| m.replaced_by.is_none() && m.kind != MemoryKind::Profile).collect();
+    let over = (eligible.len() + coming).saturating_sub(MEMORY_KEEP);
     if over == 0 {
         return vec![];
     }
-    let mut sorted: Vec<&Memory> = memories.iter().collect();
+    let mut sorted = eligible;
     sorted.sort_by_key(|m| m.recalled_at.unwrap_or(m.at));
     sorted.into_iter().take(over).map(|m| m.id.clone()).collect()
 }
@@ -279,12 +310,20 @@ pub fn search(
     let whole = text.to_lowercase().trim().to_string();
     let mut out: Vec<(Memory, f64)> = vec![];
     for m in memories {
-        let in_repo = repo.is_empty() || m.repo.is_none() || m.repo.as_deref() == Some(repo);
+        if m.replaced_by.is_some() {
+            continue;
+        }
+        let is_farm = m.scope.as_deref() == Some("farm");
+        let in_repo = repo.is_empty() || is_farm || m.repo.is_none() || m.repo.as_deref() == Some(repo);
         if kind.is_some_and(|k| k != m.kind) || !in_repo {
             continue;
         }
-        let mut score = matches.get(&m.id).copied().unwrap_or(0.0) + in_common(&terms_of(&m.text), &terms) as f64 * RECALL_SHARED_WEIGHT;
-        if !whole.is_empty() && m.text.to_lowercase().contains(&whole) {
+        let mut doc_terms = terms_of(&m.text);
+        if let Some(title) = &m.title {
+            doc_terms.extend(terms_of(title));
+        }
+        let mut score = matches.get(&m.id).copied().unwrap_or(0.0) + in_common(&doc_terms, &terms) as f64 * RECALL_SHARED_WEIGHT;
+        if !whole.is_empty() && (m.text.to_lowercase().contains(&whole) || m.title.as_ref().is_some_and(|t| t.to_lowercase().contains(&whole))) {
             score += 2.0;
         }
         if !whole.is_empty() && score == 0.0 {

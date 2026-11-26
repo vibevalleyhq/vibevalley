@@ -77,6 +77,10 @@ fn eviction_and_search() {
         recalled_at: if i == 0 { Some(1_000) } else { None },
         fading: false,
         source: None,
+        scope: None,
+        title: None,
+        importance: None,
+        replaced_by: None,
     };
     let all: Vec<Memory> = (0..MEMORY_KEEP as i64).map(mk).collect();
     assert!(next_forgotten(&all[..10], 1).is_empty());
@@ -109,4 +113,66 @@ fn sources_take_turns_and_drop_near_duplicates() {
     let skip: HashSet<String> = ["1".to_string(), "nowledge:7".into(), "everos:9".into()].into();
     assert_eq!(skip_for(LOCAL, &skip), ["1".to_string()].into());
     assert_eq!(skip_for("nowledge", &skip), ["7".to_string()].into());
+}
+
+#[test]
+fn profile_and_episode_recall_search_eviction_and_superseding_rules() {
+    let mk = |id: &str, kind: MemoryKind, title: Option<&str>, text: &str, importance: Option<i64>, replaced_by: Option<&str>| Memory {
+        id: id.into(),
+        agent: "backend".into(),
+        kind,
+        text: text.into(),
+        author: ActorKind::System,
+        repo: Some("farm".into()),
+        session: None,
+        at: 100,
+        recalled: 0,
+        recalled_at: None,
+        fading: false,
+        source: None,
+        scope: Some(if kind == MemoryKind::Profile { "farm" } else { "repo" }.into()),
+        title: title.map(str::to_string),
+        importance,
+        replaced_by: replaced_by.map(str::to_string),
+    };
+
+    let profile = mk("p1", MemoryKind::Profile, Some("代码规范"), "禁止跳过静态检查", Some(90), None);
+    let episode = mk("e1", MemoryKind::Episode, Some("#51 记忆迁移"), "完成记忆表扩展并验证压缩摘要", None, None);
+    let superseded_note = mk("n_old", MemoryKind::Note, None, "用 cargo test 跑测试", None, Some("n_new"));
+    let active_note = mk("n_new", MemoryKind::Note, None, "用 RUSTC_WRAPPER=\"\" cargo test 跑测试", None, None);
+
+    let all = vec![profile.clone(), episode.clone(), superseded_note, active_note.clone()];
+    let cue = Cue {
+        session: None,
+        repo: "farm",
+        text: "记忆迁移 静态检查 cargo test",
+        skip: HashSet::new(),
+        now: 200,
+        matches: HashMap::new(),
+    };
+    let picked: Vec<String> = pick(&all, &cue).into_iter().map(|m| m.id).collect();
+    assert_eq!(
+        picked,
+        vec!["n_new".to_string()],
+        "episode, profile, and superseded rows must not be auto-picked"
+    );
+
+    // Search retrieves episode by gse terms across title + body and skips superseded rows.
+    let found = search(&all, "farm", "记忆迁移", None, 10, &HashMap::new());
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].0.id, "e1");
+    assert!(line_of(&episode, "farm").contains("经历"));
+    assert!(line_of(&profile, "farm").contains("[全局] 代码规范：禁止跳过静态检查"));
+
+    // Profile memories are never evicted by next_forgotten even when count exceeds MEMORY_KEEP.
+    let mut overflow: Vec<Memory> = (0..MEMORY_KEEP as i64)
+        .map(|i| mk(&format!("n{i}"), MemoryKind::Note, None, &format!("第{i}条记录"), None, None))
+        .collect();
+    overflow.insert(0, profile);
+    let evicted = next_forgotten(&overflow, 1);
+    assert_eq!(evicted.len(), 1);
+    assert_ne!(evicted[0], "p1");
+
+    assert!(is_similar("用户喜欢简短回答", "用户喜欢简短的回答"));
+    assert!(!is_similar("用户喜欢简短回答", "使用 PostgreSQL 作为生产数据库"));
 }
