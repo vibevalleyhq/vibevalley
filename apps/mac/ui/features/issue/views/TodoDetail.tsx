@@ -11,6 +11,7 @@ import { ConfirmButton } from "../../../design/ConfirmButton";
 import { TextArea, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { toast } from "../../../design/toasts";
+import { mix } from "../../../design/tone";
 import { useWorkAgents } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { ago, shortMomentText } from "../../../infra/base/format";
@@ -24,6 +25,7 @@ import { issueMove, issueMoveOf, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
 import { IssueThread } from "./IssueThread";
+import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
 import { Fold, IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 
 interface Draft {
@@ -194,12 +196,26 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const criteria = computed(() => criteriaList(d().criteria));
   const heading = (
     <View>
-      <View class="mb-1.5 flex-row flex-wrap items-center gap-1.5">
+      <View class="mb-2 flex-row flex-wrap items-center gap-1.5">
+        <If when={d().repo}>
+          {(repo) => (
+            <>
+              <View class="flex-row items-center gap-1 rounded-md bg-side px-1.5 py-0.5">
+                <Icon name="folder" size={12} tone="muted" />
+                <Text class="text-xs font-medium text-muted">{repo()}</Text>
+              </View>
+              <Icon name="next" size={12} tone="faint" />
+            </>
+          )}
+        </If>
         <If when={props.item.parent}>
           {(parent) => (
-            <View role="button" testID="parent-issue" class="-mx-1 rounded-sm px-1 py-0.5 hover:bg-hover" onPress={() => props.onDone(parent())}>
-              <Text class="text-xs text-water">{t("web.issue.family.parent")}</Text>
-            </View>
+            <>
+              <View role="button" testID="parent-issue" class="rounded-md px-1.5 py-0.5 hover:bg-hover" onPress={() => props.onDone(parent())}>
+                <Text class="text-xs text-water">{t("web.issue.family.parent")}</Text>
+              </View>
+              <Icon name="next" size={12} tone="faint" />
+            </>
           )}
         </If>
         <IssueNumberPill number={props.item.number} />
@@ -215,7 +231,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         onChange={(e) => edit({ title: e.value })}
         placeholder={t("web.issue.todo.titleHint")}
         accessibilityLabel={t("web.issue.todo.title")}
-        class={`${bare} -mx-2 px-2 py-1 text-xl font-semibold`}
+        class={`${bare} -mx-2 px-2 py-1 text-2xl leading-snug font-semibold`}
       />
     </View>
   );
@@ -225,18 +241,25 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const own = signal(false);
   const written = computed(() => refined() || d().description.trim() !== "" || criteria().length > 0);
   const fields = computed(() => written() || own() || !backlog());
+  const talkTone = computed<"water" | "wheat">(() => (drafting() ? "water" : "wheat"));
   const talk = () => (
     <If when={backlog()}>
-      <SheetLabel>{t("web.issue.todo.talk")}</SheetLabel>
-      <Note tone={drafting() ? "water" : "wheat"}>
-        <Text class="text-base font-semibold text-ink">{said()[0]}</Text>
-        <Text class="mt-1 text-sm text-ink">{said()[1]}</Text>
+      <View
+        accessibilityLabel={t("web.issue.todo.talk")}
+        class="mt-5 rounded-xl border px-4 py-3.5"
+        style={{ borderColor: mix(talkTone(), 0.35), backgroundColor: mix(talkTone(), 0.08) }}
+      >
+        <View class="flex-row items-center gap-2">
+          <Icon name={drafting() ? "bolt" : "idea"} size={15} tone={talkTone()} />
+          <Text class="min-w-0 flex-1 text-sm font-semibold text-ink">{said()[0]}</Text>
+        </View>
+        <Text class="mt-1.5 text-sm leading-relaxed text-muted">{said()[1]}</Text>
         <Each of={questions()} key={(a) => a.question}>
           {(a) => (
-            <View class="mt-1.5">
+            <View class="mt-2">
               <Text class="text-sm text-ink">{`· ${a().question}`}</Text>
               <If when={a().options.length}>
-                <View class="mt-1 flex-row flex-wrap gap-1.5 pl-3" accessibilityLabel={t("web.issue.todo.answerTo", { question: a().question })}>
+                <View class="mt-1.5 flex-row flex-wrap gap-1.5 pl-3" accessibilityLabel={t("web.issue.todo.answerTo", { question: a().question })}>
                   <Each of={a().options} key={(o) => o}>
                     {(o) => (
                       <Button disabled={busy()} onPress={() => word.set(o())}>
@@ -249,31 +272,31 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             </View>
           )}
         </Each>
-      </Note>
-      <TextArea
-        testID="issue-talk"
-        class="mt-2.5"
-        rows={2}
-        value={word()}
-        onInput={(v) => word.set(v)}
-        submit
-        onSubmit={() => canRefine() && void draft()}
-        placeholder={questions().length > 0 ? t("web.issue.todo.answerHint") : refined() ? t("web.issue.todo.againHint") : t("web.issue.todo.whatHint")}
-        accessibilityLabel={t("web.issue.todo.whatLabel")}
-      />
-      <View class="mt-2.5 flex-row flex-wrap gap-2">
-        <Button
-          tone={written() ? "primary" : "plain"}
-          testID="issue-start"
-          disabled={!startable()}
-          accessibilityLabel={d().agent ? undefined : t("web.issue.todo.pickHelper")}
-          onPress={() => void start()}
-        >
-          {t("web.issue.todo.start")}
-        </Button>
-        <Button testID="issue-draft" tone={written() ? "plain" : "primary"} disabled={!canRefine()} onPress={() => void draft()}>
-          {refined() ? t("web.issue.todo.redraft") : t("web.issue.todo.draft")}
-        </Button>
+        <TextArea
+          testID="issue-talk"
+          class="mt-3"
+          rows={2}
+          value={word()}
+          onInput={(v) => word.set(v)}
+          submit
+          onSubmit={() => canRefine() && void draft()}
+          placeholder={questions().length > 0 ? t("web.issue.todo.answerHint") : refined() ? t("web.issue.todo.againHint") : t("web.issue.todo.whatHint")}
+          accessibilityLabel={t("web.issue.todo.whatLabel")}
+        />
+        <View class="mt-3.5 flex-row flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: mix(talkTone(), 0.18) }}>
+          <Button
+            tone={written() ? "primary" : "plain"}
+            testID="issue-start"
+            disabled={!startable()}
+            accessibilityLabel={d().agent ? undefined : t("web.issue.todo.pickHelper")}
+            onPress={() => void start()}
+          >
+            {t("web.issue.todo.start")}
+          </Button>
+          <Button testID="issue-draft" tone={written() ? "plain" : "primary"} disabled={!canRefine()} onPress={() => void draft()}>
+            {refined() ? t("web.issue.todo.redraft") : t("web.issue.todo.draft")}
+          </Button>
+        </View>
       </View>
     </If>
   );
@@ -300,8 +323,9 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           class={`${bare} -mx-2 px-2 py-1.5 text-base`}
           style={{ minHeight: 6 * 22 + 12 }}
         />
-        <View class="mt-3 border-t border-line">
+        <View class="mt-4 overflow-hidden rounded-lg border border-line bg-page px-3.5">
           <Fold
+            bordered={false}
             label={t("web.issue.todo.criteria")}
             summary={
               criteria().length === 0
@@ -323,24 +347,32 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       </If>
       <IssueAttachments files={d().attachments} editable={!closed()} busy={busy()} onAdd={addAttachment} onRemove={removeAttachment} />
       <IssueThread issue={props.item.id} />
-      <IssueArtifacts issue={props.item.id} heading={<SheetLabel>{t("web.artifact.issue.title")}</SheetLabel>} />
+      <IssueArtifacts
+        issue={props.item.id}
+        heading={
+          <View class="mt-7 border-t border-line pt-5">
+            <SheetLabel first>{t("web.artifact.issue.title")}</SheetLabel>
+          </View>
+        }
+      />
     </>
   );
 
   const side = (
     <>
       <SheetLabel first>{t("web.issue.detail.properties")}</SheetLabel>
-      <Property label={t("web.issue.todo.status")}>
-        <View class="flex-row items-center gap-2">
-          <View
-            class={`h-2 w-2 rounded-full ${props.item.status === "done" ? "bg-leaf" : props.item.status === "canceled" ? "bg-faint" : backlog() ? "bg-wheat" : "bg-water"}`}
-          />
-          <Text class="text-sm text-ink">
-            {closed() ? t(`shared.status.${props.item.status}`) : backlog() ? t("web.issue.todo.draftStatus") : t("web.issue.todo.todoStatus")}
-          </Text>
-        </View>
+      <Property label={t("web.issue.todo.status")} icon={<StatusMark status={props.item.status} size={13} />}>
+        {closed() ? t(`shared.status.${props.item.status}`) : backlog() ? t("web.issue.todo.draftStatus") : t("web.issue.todo.todoStatus")}
       </Property>
-      <Property label={t("web.issue.detail.helper")}>
+      <Property
+        label={t("web.issue.detail.helper")}
+        icon={
+          <If when={d().agent} else={<Icon name="agents" size={13} tone="muted" />}>
+            {(agent) => <AgentFaceOf agent={agent()} size={16} />}
+          </If>
+        }
+        inset
+      >
         <Pick
           label={t("web.issue.detail.helper")}
           testid="issue-helper"
@@ -350,7 +382,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           options={agentOptions()}
         />
       </Property>
-      <Property align="start" label={t("web.issue.task.repo")}>
+      <Property align="start" label={t("web.issue.task.repo")} icon={<Icon name="folder" size={13} tone="muted" />} inset>
         <View class="gap-1">
           <Pick
             label={t("web.issue.task.repo")}
@@ -372,7 +404,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
                 role="button"
                 testID="new-repo"
                 onPress={() => newRepo.set(true)}
-                class="-ml-1 flex-row items-center gap-1 self-start rounded-sm px-1 py-0.5 hover:bg-hover"
+                class="flex-row items-center gap-1 self-start rounded-sm px-2 py-0.5 hover:bg-hover"
               >
                 <Icon name="add" size={12} tone="water" />
                 <Text class="text-xs text-water">{repos().length === 0 && !d().repo ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}</Text>
@@ -391,7 +423,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           </Popover>
         </View>
       </Property>
-      <Property label={t("web.issue.todo.priority")}>
+      <Property label={t("web.issue.todo.priority")} icon={<PriorityMark priority={d().priority} size={13} />} inset>
         <Pick
           label={t("web.issue.todo.priority")}
           testid="issue-priority"
@@ -400,7 +432,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           options={priorityOptions()}
         />
       </Property>
-      <Property label={t("web.issue.detail.deliver")}>
+      <Property label={t("web.issue.detail.deliver")} icon={<Icon name={d().deliver === "answer" ? "chat" : "diff"} size={13} tone="muted" />} inset>
         <Pick
           label={t("web.issue.detail.deliver")}
           testid="issue-deliver"
@@ -427,7 +459,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       <View class="mt-4">
         <ActLines issue={props.item.id} />
       </View>
-      <View class="mt-2 gap-2 border-t border-line pt-3">
+      <View class="mt-2 gap-2 border-t border-line pt-4">
         <If when={edited()}>
           <View class="flex-row items-center gap-2">
             <View class="h-1.5 w-1.5 shrink-0 rounded-full bg-wheat" />

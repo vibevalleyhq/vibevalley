@@ -345,7 +345,7 @@ function IssueView(props: { onBack: () => void; backLabel: string; blocked: () =
   return (
     <IssueChromeContext.Provider value={chrome}>
       <View testID="issue" class="min-h-0 flex-1">
-        <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3.5">
+        <View desktop={{ windowDrag: true }} class="h-10 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4">
           <View
             role="button"
             testID="issue-close"
@@ -391,7 +391,7 @@ function Toolbar(props: {
   const isFiltered = createMemo(() => filterAny(props.filter));
   const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "");
   return (
-    <View desktop={{ windowDrag: true }} class="flex-row flex-wrap items-center gap-2 px-3.5 py-2">
+    <View desktop={{ windowDrag: true }} class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2 border-b border-line bg-page px-4 py-1.5">
       <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
         <SearchField
           testid="issue-search"
@@ -400,7 +400,7 @@ function Toolbar(props: {
           onInput={(query) => props.onFilter({ ...props.filter, query })}
           placeholder={t("web.issue.page.find")}
           label={t("web.issue.page.findLabel")}
-          class="w-60"
+          class="w-56"
         />
         <View
           testID="issue-filter-bar"

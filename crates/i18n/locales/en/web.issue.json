@@ -399,7 +399,8 @@
   "conversation": {
     "title": "Discussion and delivery",
     "older": "Load earlier messages",
-    "empty": "Requirements, execution feedback and deliveries stay here"
+    "empty": "Requirements, execution feedback and deliveries stay here",
+    "placeholder": "Write a comment, note, or feedback…"
   },
   "attachments": {
     "title": "Attachments",

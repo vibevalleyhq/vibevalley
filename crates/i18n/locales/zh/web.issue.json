@@ -29,7 +29,7 @@
       "filtered": "当前筛选条件下此列没有工单。"
     },
     "whichLane": "看哪一列",
-    "spots": "{taken} / {of} 个并发上限",
+    "spots": "{taken} / {of} 并发",
     "moveFailed": "没挪过去",
     "retryMove": "再挪一次",
     "putBack": "放回原处"
@@ -399,7 +399,8 @@
   "conversation": {
     "title": "讨论与交付记录",
     "older": "加载更早的消息",
-    "empty": "需求讨论、执行反馈与交付会保留在这里"
+    "empty": "需求讨论、执行反馈与交付会保留在这里",
+    "placeholder": "写一条评论、补充说明或反馈…"
   },
   "attachments": {
     "title": "附件",
