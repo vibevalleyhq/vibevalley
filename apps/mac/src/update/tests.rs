@@ -73,6 +73,13 @@ fn regression_a_failed_replacement_restores_the_previous_bundle() {
     assert_eq!(lines[0], "0.2.0");
     assert!(lines[1].contains("could not move updated app into place"), "{marker}");
     assert_eq!(lines[2], "https://example.test/v0.2.0");
+    assert!(
+        std::fs::read_dir(&updates_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .all(|entry| !entry.file_name().to_string_lossy().contains(".tmp.")),
+        "atomic swap-failed marker left a temp file behind"
+    );
 }
 
 #[test]
@@ -317,7 +324,7 @@ async fn an_app_outside_a_bundle_starts_disabled_never_asks_and_has_nothing_to_s
     assert!(!updater.begin_check());
     updater.check().await;
     assert_eq!(updater.state()["_tag"], "disabled");
-    assert!(!updater.swap(true).await);
+    assert_eq!(updater.swap(true).await.unwrap_err(), "no update is ready");
     assert!(writable(dir.path()).await);
     assert!(!writable(&dir.path().join("missing")).await);
 }
@@ -451,7 +458,8 @@ async fn swap_emits_installing_and_transitions_to_failed_install_if_staging_fail
     });
     tokio::task::yield_now().await;
 
-    assert!(!updater.swap(true).await);
+    let swap_err = updater.swap(true).await.unwrap_err();
+    assert!(swap_err.contains("cannot stage beside"), "{swap_err}");
     let seen = watcher.await.unwrap();
     assert!(seen.contains(&"installing".to_string()), "expected installing transition, saw {seen:?}");
     assert!(seen.contains(&"failed".to_string()), "expected failed transition, saw {seen:?}");

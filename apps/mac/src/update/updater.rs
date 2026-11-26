@@ -192,7 +192,10 @@ fail() {
   reason="$1"
   printf 'swap failed (%s): %s\n' "${target_version:-unknown}" "$reason" >&2
   if [ -n "$fail_file" ]; then
-    printf '%s\n%s\n%s\n' "$target_version" "$reason" "$page" >"$fail_file" 2>/dev/null || true
+    tmp_fail="$fail_file.tmp.$$"
+    if printf '%s\n%s\n%s\n' "$target_version" "$reason" "$page" >"$tmp_fail" 2>/dev/null; then
+      /bin/mv -f "$tmp_fail" "$fail_file" 2>/dev/null || /bin/rm -f "$tmp_fail" 2>/dev/null || true
+    fi
   fi
   exit 1
 }
@@ -495,17 +498,19 @@ impl Updater {
     }
 
     /// Hands the staged app to the swap script, which waits for this process to go.
-    pub(super) async fn swap(&self, reopen: bool) -> bool {
-        let Some(staged) = self.staged.lock().take() else { return false };
-        let fail = |staged: Staged, kind: FailureKind, why: String| -> bool {
+    pub(super) async fn swap(&self, reopen: bool) -> Result<(), String> {
+        let Some(staged) = self.staged.lock().take() else {
+            return Err("no update is ready".into());
+        };
+        let fail = |staged: Staged, kind: FailureKind, why: String| -> Result<(), String> {
             eprintln!("update: {why}");
             if reopen {
                 let page = (!staged.page.is_empty()).then_some(staged.page);
-                self.set(State::Failed { kind, why, page });
+                self.set(State::Failed { kind, why: why.clone(), page });
             } else {
                 *self.staged.lock() = Some(staged);
             }
-            false
+            Err(why)
         };
         let Some(parent) = staged.bundle.parent().map(Path::to_path_buf) else {
             return fail(staged, FailureKind::Install, "installed bundle has no parent directory".into());
@@ -576,7 +581,7 @@ impl Updater {
             .process_group(0)
             .spawn();
         match spawned {
-            Ok(_) => true,
+            Ok(_) => Ok(()),
             Err(e) => {
                 let _ = tokio::fs::remove_dir_all(&next).await;
                 fail(staged, FailureKind::Install, format!("swap: {e}"))
@@ -630,7 +635,7 @@ pub fn install(cx: &mut App) {
         }
         let updater = updater.clone();
         let handle = vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
-            updater.swap(false).await;
+            let _ = updater.swap(false).await;
         });
         async move {
             let _ = handle.await;
@@ -668,13 +673,13 @@ pub fn host_call(op: UpdateOp, reply: crate::hosted::Replier, cx: &mut App) {
         // Restarts into the new version.
         UpdateOp::Install => {
             let handle = vibevalley_runtime::rt::current_or_global_handle().spawn(async move { updater.swap(true).await });
-            cx.spawn(async move |cx| {
-                if handle.await.unwrap_or(false) {
+            cx.spawn(async move |cx| match handle.await {
+                Ok(Ok(())) => {
                     reply.send(Envelope::ok(Value::Null));
                     cx.update(|cx| cx.quit());
-                } else {
-                    reply.send(refusal(BizCode::Refused, "no update is ready"));
                 }
+                Ok(Err(why)) => reply.send(refusal(BizCode::Refused, why)),
+                Err(_) => reply.send(refusal(BizCode::Refused, "update install task failed")),
             })
             .detach();
         }
