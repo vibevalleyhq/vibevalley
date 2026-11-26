@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
+pub mod history;
 mod input;
 mod links;
 mod pty;
@@ -428,11 +429,21 @@ impl TermSession {
         self.post(Msg::Kill);
     }
 
+    /// Initiates graceful session shutdown without waiting for exit.
+    pub fn begin_shutdown(&self) {
+        self.post(Msg::Shutdown);
+    }
+
+    /// Waits up to `timeout` for a previously initiated shutdown to finish.
+    pub fn wait_shutdown(&self, timeout: std::time::Duration) -> bool {
+        self.inner.done.recv_timeout(timeout).is_ok()
+    }
+
     /// Stops the session thread, reaps its PTY child, and waits up to `timeout`
     /// for teardown to finish.
     pub fn shutdown_and_wait(&self, timeout: std::time::Duration) {
-        self.post(Msg::Shutdown);
-        let _ = self.inner.done.recv_timeout(timeout);
+        self.begin_shutdown();
+        let _ = self.wait_shutdown(timeout);
     }
 }
 

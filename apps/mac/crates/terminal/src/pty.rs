@@ -146,9 +146,7 @@ fn command(opts: &SpawnOptions) -> CommandBuilder {
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "VibeValley");
-    for (key, value) in &opts.env {
-        cmd.env(key, value);
-    }
+    crate::history::apply_pty_env(&mut cmd, &opts.env);
     cmd
 }
 

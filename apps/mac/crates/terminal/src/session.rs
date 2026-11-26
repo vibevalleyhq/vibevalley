@@ -37,7 +37,10 @@ const MAX_HOLD: Duration = Duration::from_secs(1);
 /// background job can keep the slave side open indefinitely).
 const EXIT_DRAIN: Duration = Duration::from_millis(300);
 const EXIT_DRAIN_MAX: Duration = Duration::from_secs(3);
-const KILL_GRACE: Duration = Duration::from_millis(500);
+const SIGINT_GRACE: Duration = Duration::from_millis(1500);
+const SIGHUP_GRACE: Duration = Duration::from_millis(1000);
+const FG_POLL_INTERVAL: Duration = Duration::from_millis(20);
+const REAP_GRACE: Duration = Duration::from_millis(200);
 const MAX_BLOCKS: usize = 64;
 
 pub(crate) enum Msg {
@@ -139,6 +142,20 @@ enum Anchor {
     },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ShutdownStage {
+    None,
+    /// Stage 1: `SIGINT` sent to foreground process group; waiting for it to exit or return to shell.
+    Sigint {
+        fg_pgid: i32,
+        deadline: Instant,
+    },
+    /// Stage 2: `SIGHUP` sent to shell/group for history flush; waiting before `SIGKILL`.
+    Sighup {
+        deadline: Instant,
+    },
+}
+
 struct Session {
     term: Terminal<'static, 'static>,
     builder: Builder,
@@ -166,7 +183,7 @@ struct Session {
     child_exit: Option<Option<i32>>,
     exited_at: Option<Instant>,
     exit_deadline: Option<Instant>,
-    kill_deadline: Option<Instant>,
+    shutdown_stage: ShutdownStage,
     finished: bool,
 }
 
@@ -358,7 +375,7 @@ impl Session {
             child_exit: None,
             exited_at: None,
             exit_deadline: None,
-            kill_deadline: None,
+            shutdown_stage: ShutdownStage::None,
             finished: false,
         })
     }
@@ -781,13 +798,64 @@ impl Session {
         }
     }
 
+    fn start_graceful_kill(&mut self, now: Instant) {
+        if self.child_exit.is_some() || self.shutdown_stage != ShutdownStage::None {
+            return;
+        }
+        let Some(pid) = self.pty.pid else {
+            return;
+        };
+        if let Some(pgid) = self.pty.foreground_pgid()
+            && pgid != pid
+        {
+            pty::signal(-pgid, libc::SIGINT);
+            self.shutdown_stage = ShutdownStage::Sigint {
+                fg_pgid: pgid,
+                deadline: now + SIGINT_GRACE,
+            };
+        } else {
+            self.hangup();
+            self.shutdown_stage = ShutdownStage::Sighup { deadline: now + SIGHUP_GRACE };
+        }
+    }
+
+    fn advance_shutdown(&mut self, now: Instant) {
+        if self.child_exit.is_some() {
+            self.shutdown_stage = ShutdownStage::None;
+            return;
+        }
+        match self.shutdown_stage {
+            ShutdownStage::None => {}
+            ShutdownStage::Sigint { fg_pgid, deadline } => {
+                if self.pty.foreground_pgid() != Some(fg_pgid) || now >= deadline {
+                    self.hangup();
+                    self.shutdown_stage = ShutdownStage::Sighup { deadline: now + SIGHUP_GRACE };
+                }
+            }
+            ShutdownStage::Sighup { deadline } => {
+                if now >= deadline {
+                    self.force_kill();
+                    self.shutdown_stage = ShutdownStage::None;
+                }
+            }
+        }
+    }
+
+    fn shutdown_step_deadline(&self, now: Instant) -> Option<Instant> {
+        match self.shutdown_stage {
+            ShutdownStage::None => None,
+            ShutdownStage::Sigint { deadline, .. } => Some((now + FG_POLL_INTERVAL).min(deadline)),
+            ShutdownStage::Sighup { deadline } => Some(deadline),
+        }
+    }
+
     fn finish(&mut self) {
         if self.finished {
             return;
         }
         self.finished = true;
         self.exit_deadline = None;
-        self.kill_deadline = None;
+        self.shutdown_stage = ShutdownStage::None;
         self.shared.alive.store(false, Ordering::Release);
         *self.shared.master_fd.lock().unwrap() = None;
         self.pty.shutdown();
@@ -798,10 +866,7 @@ impl Session {
     }
 
     fn on_timers(&mut self, now: Instant) {
-        if self.kill_deadline.is_some_and(|at| now >= at) {
-            self.kill_deadline = None;
-            self.force_kill();
-        }
+        self.advance_shutdown(now);
         if self.exit_deadline.is_some_and(|at| now >= at) && self.child_exit.is_some() {
             self.finish();
         }
@@ -815,7 +880,7 @@ impl Session {
                 _ => at,
             }
         });
-        [frame, self.exit_deadline, self.kill_deadline].into_iter().flatten().min()
+        [frame, self.exit_deadline, self.shutdown_step_deadline(now)].into_iter().flatten().min()
     }
 
     /// Returns false when the session thread should stop.
@@ -890,12 +955,7 @@ impl Session {
                 let _ = reply.send(self.command_output(id));
             }
             Msg::OptionAsAlt(value) => self.input.option_as_alt = value,
-            Msg::Kill => {
-                if self.child_exit.is_none() {
-                    self.hangup();
-                    self.kill_deadline = Some(Instant::now() + KILL_GRACE);
-                }
-            }
+            Msg::Kill => self.start_graceful_kill(Instant::now()),
             Msg::Shutdown => return false,
         }
         true
@@ -929,13 +989,18 @@ impl Session {
         }
     }
 
-    /// Last handle dropped: hang up, give the child a moment, then make sure
-    /// it is gone so the waiter thread can finish.
+    /// Last handle dropped: run two-stage graceful shutdown (`SIGINT` to
+    /// foreground job -> `SIGHUP` to shell -> `SIGKILL` fallback) so jobs and
+    /// shells can flush state/history before teardown.
     fn shutdown(&mut self, rx: &flume::Receiver<Msg>) {
         if self.child_exit.is_none() {
-            self.hangup();
-            let deadline = Instant::now() + KILL_GRACE;
-            loop {
+            self.start_graceful_kill(Instant::now());
+            while self.child_exit.is_none() && self.shutdown_stage != ShutdownStage::None {
+                let now = Instant::now();
+                self.advance_shutdown(now);
+                let Some(deadline) = self.shutdown_step_deadline(now) else {
+                    break;
+                };
                 match rx.recv_deadline(deadline) {
                     Ok(Msg::ChildExited(code)) => {
                         self.child_exit = Some(code);
@@ -943,10 +1008,25 @@ impl Session {
                     }
                     Ok(Msg::Pty(data)) => self.pty.budget.release(data.len()),
                     Ok(_) => {}
-                    Err(_) => break,
+                    Err(flume::RecvTimeoutError::Timeout) => {}
+                    Err(flume::RecvTimeoutError::Disconnected) => break,
                 }
             }
-            self.force_kill();
+            if self.child_exit.is_none() {
+                self.force_kill();
+                let reap_deadline = Instant::now() + REAP_GRACE;
+                loop {
+                    match rx.recv_deadline(reap_deadline) {
+                        Ok(Msg::ChildExited(code)) => {
+                            self.child_exit = Some(code);
+                            break;
+                        }
+                        Ok(Msg::Pty(data)) => self.pty.budget.release(data.len()),
+                        Ok(_) => {}
+                        Err(_) => break,
+                    }
+                }
+            }
         }
         self.shared.alive.store(false, Ordering::Release);
         *self.shared.master_fd.lock().unwrap() = None;
@@ -991,4 +1071,158 @@ pub(crate) fn run_with_history(
     let _ = ready.send(Ok(()));
     session.run(&rx);
     session.shutdown(&rx);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use crate::{Rgb, SpawnOptions, TermEvent, TermSession, TermSize, Theme};
+
+    fn test_theme() -> Theme {
+        Theme {
+            foreground: Rgb(220, 220, 220),
+            background: Rgb(20, 20, 20),
+            cursor: Rgb(255, 255, 255),
+            selection: Rgb(60, 80, 120),
+            ansi: [Rgb(0, 0, 0); 16],
+        }
+    }
+
+    fn spawn_opts(program: &str, args: &[&str]) -> SpawnOptions {
+        SpawnOptions {
+            cwd: std::env::temp_dir(),
+            program: Some(program.into()),
+            args: args.iter().map(|s| (*s).into()).collect(),
+            env: Vec::new(),
+            size: TermSize {
+                cols: 100,
+                rows: 24,
+                cell_width_px: 8,
+                cell_height_px: 16,
+            },
+            scrollback_lines: 200,
+            theme: test_theme(),
+        }
+    }
+
+    fn screen_text(session: &TermSession) -> String {
+        let snap = session.snapshot();
+        snap.rows
+            .iter()
+            .map(|row| {
+                let mut line = String::new();
+                let mut col = 0;
+                for run in &row.runs {
+                    while col < run.start_col {
+                        line.push(' ');
+                        col += 1;
+                    }
+                    line.push_str(&run.text);
+                    col += run.cols;
+                }
+                line
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    fn wait_for_screen(session: &TermSession, events: &flume::Receiver<TermEvent>, needle: &str) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            let text = screen_text(session);
+            if text.contains(needle) {
+                return;
+            }
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() || events.recv_timeout(remaining).is_err() {
+                panic!("timed out waiting for {needle:?}; screen:\n{}", screen_text(session));
+            }
+        }
+    }
+
+    #[test]
+    fn graceful_shutdown_sends_sigint_to_foreground_job_then_sighup_to_shell() {
+        let dir = tempfile::tempdir().unwrap();
+        let fg_marker = dir.path().join("fg_sigint");
+        let shell_marker = dir.path().join("shell_sighup");
+        let (tx, rx) = flume::unbounded();
+        let session = TermSession::spawn(spawn_opts("/bin/zsh", &["-f", "-i"]), move |ev| {
+            let _ = tx.send(ev);
+        })
+        .unwrap();
+
+        wait_for_screen(&session, &rx, "%");
+        session.send_text(&format!(
+            "trap 'touch {}; exit 0' HUP; /bin/sh -c 'trap \"touch {}; exit 0\" INT; echo FG_READY; sleep 30'\n",
+            shell_marker.display(),
+            fg_marker.display()
+        ));
+        wait_for_screen(&session, &rx, "FG_READY");
+        assert!(session.has_foreground_process(), "foreground child must own tty pgid");
+
+        let start = Instant::now();
+        session.shutdown_and_wait(Duration::from_secs(3));
+        let elapsed = start.elapsed();
+
+        assert!(!session.is_alive());
+        assert!(fg_marker.exists(), "foreground job did not receive SIGINT");
+        assert!(shell_marker.exists(), "shell did not receive SIGHUP");
+        assert!(
+            elapsed < Duration::from_millis(1200),
+            "expected fast two-stage exit once fg returned, took {elapsed:?}"
+        );
+    }
+
+    #[test]
+    fn graceful_shutdown_falls_back_to_sigkill_when_foreground_ignores_sigint_and_sighup() {
+        let (tx, rx) = flume::unbounded();
+        let session = TermSession::spawn(spawn_opts("/bin/sh", &["-c", "trap '' INT HUP; echo STUCK_READY; sleep 30"]), move |ev| {
+            let _ = tx.send(ev);
+        })
+        .unwrap();
+        wait_for_screen(&session, &rx, "STUCK_READY");
+
+        let start = Instant::now();
+        session.shutdown_and_wait(Duration::from_secs(4));
+        let elapsed = start.elapsed();
+
+        assert!(!session.is_alive());
+        assert!(
+            elapsed >= Duration::from_millis(900),
+            "should wait for SIGHUP grace before SIGKILL: {elapsed:?}"
+        );
+        assert!(elapsed < Duration::from_secs(3), "SIGKILL fallback took too long: {elapsed:?}");
+    }
+
+    #[test]
+    fn graceful_shutdown_waits_sigint_grace_then_sighups_stubborn_foreground_job() {
+        let dir = tempfile::tempdir().unwrap();
+        let shell_marker = dir.path().join("shell_sighup");
+        let (tx, rx) = flume::unbounded();
+        let session = TermSession::spawn(spawn_opts("/bin/zsh", &["-f", "-i"]), move |ev| {
+            let _ = tx.send(ev);
+        })
+        .unwrap();
+        wait_for_screen(&session, &rx, "%");
+
+        session.send_text(&format!(
+            "trap 'touch {}; exit 0' HUP; /bin/sh -c 'trap \"\" INT; echo FG_NOINT; sleep 30'\n",
+            shell_marker.display()
+        ));
+        wait_for_screen(&session, &rx, "FG_NOINT");
+        assert!(session.has_foreground_process(), "foreground child must own tty pgid");
+
+        let start = Instant::now();
+        session.shutdown_and_wait(Duration::from_secs(4));
+        let elapsed = start.elapsed();
+
+        assert!(!session.is_alive());
+        assert!(shell_marker.exists(), "shell did not receive SIGHUP after SIGINT grace");
+        assert!(
+            elapsed >= Duration::from_millis(1400),
+            "expected SIGINT grace before SIGHUP when fg ignores SIGINT: {elapsed:?}"
+        );
+        assert!(elapsed < Duration::from_secs(3), "expected SIGHUP exit well under 3s: {elapsed:?}");
+    }
 }

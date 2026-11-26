@@ -709,6 +709,7 @@ impl Shell {
         let Some(closed) = project.close_tab(tab) else { return };
         if let PaneKind::Terminal { terminal_id, .. } = &closed {
             self.workspace.terminals.remove(terminal_id);
+            vibevalley_terminal::history::remove_history_file(&terminal_history_path(terminal_id));
         }
         if let Some(session_id) = closed_chat_session_id(Some(&closed))
             && let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>()
@@ -802,6 +803,8 @@ impl Shell {
         if spec.project_root.is_none() {
             spec.project_root = self.workspace.ws.active().map(|p| p.root().to_path_buf());
         }
+        let history_dir = terminal_history_dir();
+        vibevalley_terminal::history::configure_env(&mut spec.env, &history_dir.join("zdotdir"), &terminal_history_path_in(&history_dir, id));
         let cwd = spec.cwd.clone();
         let initial_title = spec.title.clone();
         let view = cx.new(|cx| TerminalView::new(spec, cx));
@@ -1214,6 +1217,20 @@ pub(crate) fn non_terminal_tab_busy_label(kind: &PaneKind, chat_status: Option<&
     }
 }
 
+fn terminal_history_dir() -> PathBuf {
+    let db = crate::host::Storage::configured().database;
+    let data_dir = db.parent().unwrap_or_else(|| Path::new("."));
+    vibevalley_terminal::history::history_dir_for(data_dir)
+}
+
+fn terminal_history_path_in(history_dir: &Path, id: &str) -> PathBuf {
+    vibevalley_terminal::history::history_file_for(history_dir, id)
+}
+
+pub(crate) fn terminal_history_path(id: &str) -> PathBuf {
+    terminal_history_path_in(&terminal_history_dir(), id)
+}
+
 #[cfg(test)]
 mod url_tests {
     #[test]
@@ -1394,5 +1411,21 @@ mod url_tests {
         };
         assert_eq!(super::non_terminal_tab_busy_label(&file, Some(&working)), None);
         assert_eq!(super::non_terminal_tab_busy_label(&diff, Some(&working)), None);
+    }
+
+    #[test]
+    fn terminal_history_path_in_uses_per_tab_file_and_cleanup_removes_only_target_tab() {
+        let dir = tempfile::tempdir().unwrap();
+        let hist_dir = vibevalley_terminal::history::history_dir_for(dir.path());
+        std::fs::create_dir_all(&hist_dir).unwrap();
+
+        let tab_a = super::terminal_history_path_in(&hist_dir, "tab-a");
+        let tab_b = super::terminal_history_path_in(&hist_dir, "tab-b");
+        std::fs::write(&tab_a, ": 1:0;ls\n").unwrap();
+        std::fs::write(&tab_b, ": 2:0;pwd\n").unwrap();
+
+        vibevalley_terminal::history::remove_history_file(&tab_a);
+        assert!(!tab_a.exists());
+        assert!(tab_b.exists());
     }
 }

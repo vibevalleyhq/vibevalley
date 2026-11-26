@@ -12,6 +12,9 @@ use crate::layout::{Layout, PaneKind};
 use crate::persist::Persistence;
 use crate::util::new_id;
 
+/// Total budget for shutting down all live terminal sessions concurrently on quit.
+pub const SHUTDOWN_BUDGET: std::time::Duration = std::time::Duration::from_secs(3);
+
 /// What the registry needs from a live terminal. Implemented for
 /// `vibevalley_terminal::TermSession`.
 pub trait TerminalHandle: Clone + Send + 'static {
@@ -20,8 +23,16 @@ pub trait TerminalHandle: Clone + Send + 'static {
     fn scrollback_text(&self, max_lines: usize) -> String;
     fn is_alive(&self) -> bool;
     fn kill(&self);
+    /// Initiates graceful shutdown without blocking.
+    fn begin_shutdown(&self) {
+        self.kill();
+    }
     fn shutdown_and_wait(&self) {
         self.kill();
+    }
+    fn shutdown_and_wait_with_timeout(&self, timeout: std::time::Duration) {
+        let _ = timeout;
+        self.shutdown_and_wait();
     }
 }
 
@@ -38,8 +49,14 @@ impl TerminalHandle for vibevalley_terminal::TermSession {
     fn kill(&self) {
         vibevalley_terminal::TermSession::kill(self)
     }
+    fn begin_shutdown(&self) {
+        vibevalley_terminal::TermSession::begin_shutdown(self)
+    }
     fn shutdown_and_wait(&self) {
-        vibevalley_terminal::TermSession::shutdown_and_wait(self, std::time::Duration::from_secs(2))
+        vibevalley_terminal::TermSession::shutdown_and_wait(self, SHUTDOWN_BUDGET)
+    }
+    fn shutdown_and_wait_with_timeout(&self, timeout: std::time::Duration) {
+        let _ = vibevalley_terminal::TermSession::wait_shutdown(self, timeout);
     }
 }
 
@@ -376,8 +393,29 @@ impl<T: TerminalHandle> Workspace<T> {
             .iter_mut()
             .flat_map(|project| std::mem::take(&mut project.terminals).into_values().map(|entry| entry.handle))
             .collect();
+        if handles.is_empty() {
+            return;
+        }
+        for handle in &handles {
+            handle.begin_shutdown();
+        }
+        let deadline = std::time::Instant::now() + SHUTDOWN_BUDGET;
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let total = handles.len();
         for handle in handles {
-            handle.shutdown_and_wait();
+            let tx = done_tx.clone();
+            std::thread::spawn(move || {
+                let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                handle.shutdown_and_wait_with_timeout(remaining);
+                let _ = tx.send(());
+            });
+        }
+        drop(done_tx);
+        for _ in 0..total {
+            let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+            if remaining.is_zero() || done_rx.recv_timeout(remaining).is_err() {
+                break;
+            }
         }
     }
 }
@@ -427,7 +465,7 @@ mod tests {
         ws.open(load_project(store, Path::new(path)).unwrap())
     }
 
-    fn first_terminal(ws: &Workspace<FakeTerm>, id: ProjectId) -> String {
+    fn first_terminal<T: TerminalHandle>(ws: &Workspace<T>, id: ProjectId) -> String {
         ws.project(id).unwrap().layout.terminal_ids()[0].clone()
     }
 
@@ -640,5 +678,145 @@ mod tests {
         assert_eq!(stored[0].path, live_dir);
 
         let _ = std::fs::remove_dir_all(live_dir);
+    }
+
+    #[derive(Clone)]
+    struct BarrierFakeTerm {
+        gate: std::sync::Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>,
+        barrier: Option<std::sync::Arc<std::sync::Barrier>>,
+        wait_limit: std::time::Duration,
+        begun: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        finished: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl TerminalHandle for BarrierFakeTerm {
+        fn cwd(&self) -> Option<PathBuf> {
+            None
+        }
+        fn scrollback_text(&self, _max_lines: usize) -> String {
+            String::new()
+        }
+        fn is_alive(&self) -> bool {
+            true
+        }
+        fn kill(&self) {}
+        fn begin_shutdown(&self) {
+            self.begun.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+        fn shutdown_and_wait(&self) {
+            if let Some(barrier) = &self.barrier {
+                barrier.wait();
+            }
+            if !self.wait_limit.is_zero() {
+                let (lock, cv) = &*self.gate;
+                let guard = lock.lock().unwrap();
+                let _ = cv.wait_timeout_while(guard, self.wait_limit, |released| !*released).unwrap();
+            }
+            self.finished.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    #[test]
+    fn shutdown_all_and_wait_fans_out_concurrently_within_budget() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::{Arc, Barrier, Condvar, Mutex};
+        use std::time::{Duration, Instant};
+
+        let store = MemStore::default();
+        let mut ws: Workspace<BarrierFakeTerm> = Workspace::new();
+        let project_id = ws.open(load_project(&store, Path::new("/code/alpha")).unwrap());
+        let begun = Arc::new(AtomicUsize::new(0));
+        let finished = Arc::new(AtomicUsize::new(0));
+        let gate = Arc::new((Mutex::new(false), Condvar::new()));
+        // A sequential shutdown_all_and_wait would deadlock on this 5-party barrier.
+        let barrier = Arc::new(Barrier::new(5));
+
+        for i in 0..5 {
+            let id = if i == 0 {
+                first_terminal(&ws, project_id)
+            } else {
+                ws.project_mut(project_id).unwrap().new_terminal_tab().0
+            };
+            ws.project_mut(project_id).unwrap().attach_terminal(
+                &id,
+                BarrierFakeTerm {
+                    gate: gate.clone(),
+                    barrier: Some(barrier.clone()),
+                    wait_limit: Duration::from_millis(200),
+                    begun: begun.clone(),
+                    finished: finished.clone(),
+                },
+                "/code/alpha".into(),
+                None,
+            );
+        }
+
+        let start = Instant::now();
+        ws.shutdown_all_and_wait();
+        let elapsed = start.elapsed();
+
+        assert_eq!(begun.load(Ordering::SeqCst), 5);
+        assert_eq!(finished.load(Ordering::SeqCst), 5);
+        assert!(
+            elapsed < Duration::from_millis(1500),
+            "5 tabs must execute concurrently within budget (took {elapsed:?})"
+        );
+    }
+
+    #[test]
+    fn shutdown_all_and_wait_bounds_hung_terminals_to_budget() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::{Arc, Condvar, Mutex};
+        use std::time::{Duration, Instant};
+
+        let store = MemStore::default();
+        let mut ws: Workspace<BarrierFakeTerm> = Workspace::new();
+        let project_id = ws.open(load_project(&store, Path::new("/code/beta")).unwrap());
+        let begun = Arc::new(AtomicUsize::new(0));
+        let finished = Arc::new(AtomicUsize::new(0));
+        let fast_gate = Arc::new((Mutex::new(true), Condvar::new()));
+        let stuck_gate = Arc::new((Mutex::new(false), Condvar::new()));
+        let first = first_terminal(&ws, project_id);
+        let (second, _) = ws.project_mut(project_id).unwrap().new_terminal_tab();
+
+        ws.project_mut(project_id).unwrap().attach_terminal(
+            &first,
+            BarrierFakeTerm {
+                gate: fast_gate,
+                barrier: None,
+                wait_limit: Duration::ZERO,
+                begun: begun.clone(),
+                finished: finished.clone(),
+            },
+            "/code/beta".into(),
+            None,
+        );
+        ws.project_mut(project_id).unwrap().attach_terminal(
+            &second,
+            BarrierFakeTerm {
+                gate: stuck_gate.clone(),
+                barrier: None,
+                wait_limit: Duration::from_secs(10),
+                begun: begun.clone(),
+                finished: finished.clone(),
+            },
+            "/code/beta".into(),
+            None,
+        );
+
+        let start = Instant::now();
+        ws.shutdown_all_and_wait();
+        let elapsed = start.elapsed();
+
+        // Release the stuck waiter thread immediately after assertion.
+        *stuck_gate.0.lock().unwrap() = true;
+        stuck_gate.1.notify_all();
+
+        assert_eq!(begun.load(Ordering::SeqCst), 2);
+        assert_eq!(finished.load(Ordering::SeqCst), 1);
+        assert!(
+            elapsed < Duration::from_millis(3600),
+            "hung terminal must be bounded by SHUTDOWN_BUDGET (~3s), took {elapsed:?}"
+        );
     }
 }
