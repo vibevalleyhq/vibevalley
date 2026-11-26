@@ -17,10 +17,10 @@ use vibevalley_mcp::{
 use vibevalley_protocol::home::ReleaseChannel;
 use vibevalley_protocol::{
     AppliedIssue, Attachment, AttachmentUpload, Issue, IssueCommentCreateInput, IssueConversationGetInput, IssueFilter, IssueGetInput, IssueRequest,
-    IssueStatus, IssueStatusUpdateInput, IssueUpdate, IssueUpdateInput, Priority, SayRequest, VdpCaptureScreenshotParams, VdpCommand, VdpDispatchKeyParams,
-    VdpDispatchMouseParams, VdpInputResult, VdpMouseButton, VdpMouseEventKind, VdpScreenshotResult, VdpScreenshotTarget, VdpShellNavigateParams,
-    VdpShellResizeParams, VdpShellSetThemeParams, VdpTargetListResult, VdpTypeTextParams, VdpUiPressParams, VdpUiPressResult, VdpUiQueryParams,
-    VdpUiQueryResult, VdpVersionInfo, home, ops,
+    IssueStatus, IssueStatusUpdateInput, IssueUpdate, IssueUpdateInput, JsNumber, Priority, SayRequest, VdpCaptureScreenshotParams, VdpCommand,
+    VdpDispatchKeyParams, VdpDispatchMouseParams, VdpInputResult, VdpMouseButton, VdpMouseEventKind, VdpScreenshotResult, VdpScreenshotTarget,
+    VdpShellNavigateParams, VdpShellResizeParams, VdpShellSetThemeParams, VdpTargetListResult, VdpTypeTextParams, VdpUiPressParams, VdpUiPressResult,
+    VdpUiQueryParams, VdpUiQueryResult, VdpVersionInfo, home, ops,
 };
 
 use crate::auth::{self, Secret};
@@ -98,6 +98,27 @@ where
     }
 }
 
+/// Accepts an optional issue reference as a JSON string (`"12"`, `"#12"`, `"iss_..."`, `""`), integer (`12`), or null.
+fn deserialize_optional_issue_id<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OptStringOrInt {
+        Str(String),
+        Int(i64),
+        Uint(u64),
+    }
+
+    match Option::<OptStringOrInt>::deserialize(deserializer)? {
+        None => Ok(None),
+        Some(OptStringOrInt::Str(s)) => Ok(Some(s)),
+        Some(OptStringOrInt::Int(n)) => Ok(Some(n.to_string())),
+        Some(OptStringOrInt::Uint(n)) => Ok(Some(n.to_string())),
+    }
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct VdpOverrideArgs {
@@ -145,6 +166,14 @@ struct IssueCreateArgs {
     repo: Option<String>,
     #[serde(default)]
     agent: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_issue_id")]
+    parent: Option<String>,
+    #[serde(default)]
+    tags: Option<Vec<String>>,
+    #[serde(default)]
+    start_at: Option<JsNumber>,
+    #[serde(default)]
+    due_at: Option<JsNumber>,
     #[serde(default)]
     criteria: Option<Vec<String>>,
     #[serde(default)]
@@ -168,6 +197,14 @@ struct IssueUpdateArgs {
     repo: Option<String>,
     #[serde(default)]
     agent: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_issue_id")]
+    parent: Option<String>,
+    #[serde(default)]
+    tags: Option<Vec<String>>,
+    #[serde(default)]
+    start_at: Option<JsNumber>,
+    #[serde(default)]
+    due_at: Option<JsNumber>,
     #[serde(default)]
     criteria: Option<Vec<String>>,
     #[serde(default)]
@@ -424,6 +461,10 @@ fn tool_definitions() -> Vec<ToolDef> {
                     "status": { "type": "string", "enum": ["backlog", "todo", "in_progress", "in_review", "done", "canceled"], "description": "Optional target status after creation (server defaults to backlog)." },
                     "repo": { "type": "string", "description": "Optional repository name." },
                     "agent": { "type": "string", "description": "Optional assigned agent profile id." },
+                    "parent": { "type": "string", "description": "Optional parent issue number (e.g. '10' or '#10') or issue id." },
+                    "tags": { "type": "array", "items": { "type": "string" }, "description": "Optional issue tags (e.g. ['UX', 'MCP'])." },
+                    "startAt": { "type": "number", "description": "Optional planned start timestamp in Unix milliseconds." },
+                    "dueAt": { "type": "number", "description": "Optional target due timestamp in Unix milliseconds." },
                     "criteria": { "type": "array", "items": { "type": "string" }, "description": "Optional acceptance criteria list." },
                     "attachments": { "type": "array", "items": { "type": "string" }, "description": "Optional uploaded attachment ids." }
                 },
@@ -432,7 +473,7 @@ fn tool_definitions() -> Vec<ToolDef> {
         ),
         def(
             "vv_issue_update",
-            "Update an existing VibeValley issue's title, description, priority, repo, agent, criteria, attachments, or transition its status.",
+            "Update an existing VibeValley issue's title, description, priority, repo, agent, parent, tags, startAt, dueAt, criteria, attachments, or transition its status.",
             json!({
                 "type": "object",
                 "properties": {
@@ -443,6 +484,10 @@ fn tool_definitions() -> Vec<ToolDef> {
                     "priority": { "type": "string", "enum": ["urgent", "high", "medium", "low"], "description": "Updated priority." },
                     "repo": { "type": "string", "description": "Updated repository name." },
                     "agent": { "type": "string", "description": "Updated assigned agent profile id." },
+                    "parent": { "type": "string", "description": "Updated parent issue number/id, or empty string '' to clear parent." },
+                    "tags": { "type": "array", "items": { "type": "string" }, "description": "Replacement issue tags list." },
+                    "startAt": { "type": "number", "description": "Updated planned start timestamp in Unix milliseconds (0 clears it)." },
+                    "dueAt": { "type": "number", "description": "Updated target due timestamp in Unix milliseconds (0 clears it)." },
                     "criteria": { "type": "array", "items": { "type": "string" }, "description": "Replacement acceptance criteria list." },
                     "attachments": { "type": "array", "items": { "type": "string" }, "description": "Replacement uploaded attachment ids." },
                     "comment": { "type": "string", "description": "Optional comment attached to a status transition." }
@@ -812,6 +857,10 @@ impl McpServer {
             description: non_empty_trimmed(args.description),
             repo: non_empty_trimmed(args.repo),
             agent: non_empty_trimmed(args.agent),
+            parent: non_empty_trimmed(args.parent).map(|p| issue_ref(&p)),
+            tags: args.tags.filter(|t| !t.is_empty()),
+            start_at: args.start_at,
+            due_at: args.due_at,
             priority: args.priority,
             criteria: args.criteria.filter(|c| !c.is_empty()),
             attachments: args.attachments.filter(|a| !a.is_empty()),
@@ -871,13 +920,29 @@ impl McpServer {
         let description = args.description;
         let repo = non_empty_trimmed(args.repo);
         let agent = non_empty_trimmed(args.agent);
+        let parent = args.parent.map(|p| {
+            let trimmed = p.trim();
+            if trimmed.is_empty() { String::new() } else { issue_ref(trimmed) }
+        });
+        let tags = args.tags;
+        let start_at = args.start_at;
+        let due_at = args.due_at;
         let priority = args.priority;
         let criteria = args.criteria;
         let attachments = args.attachments;
         let comment = non_empty_trimmed(args.comment);
 
-        let has_field_edits =
-            title.is_some() || description.is_some() || repo.is_some() || agent.is_some() || priority.is_some() || criteria.is_some() || attachments.is_some();
+        let has_field_edits = title.is_some()
+            || description.is_some()
+            || repo.is_some()
+            || agent.is_some()
+            || parent.is_some()
+            || tags.is_some()
+            || start_at.is_some()
+            || due_at.is_some()
+            || priority.is_some()
+            || criteria.is_some()
+            || attachments.is_some();
 
         self.refresh_issue_client().await;
         let client = self.client.read().await;
@@ -887,6 +952,10 @@ impl McpServer {
                 description,
                 repo,
                 agent,
+                parent,
+                tags,
+                start_at,
+                due_at,
                 priority,
                 criteria,
                 attachments,
@@ -908,7 +977,7 @@ impl McpServer {
         } else {
             if !has_field_edits {
                 return ToolCallResult::error(
-                    "vv_issue_update requires at least one field to update (title, description, status, priority, repo, agent, criteria, or attachments)",
+                    "vv_issue_update requires at least one field to update (title, description, status, priority, repo, agent, parent, tags, startAt, dueAt, criteria, or attachments)",
                 );
             }
             let req = IssueUpdateInput {
@@ -917,6 +986,10 @@ impl McpServer {
                 description,
                 repo,
                 agent,
+                parent,
+                tags,
+                start_at,
+                due_at,
                 priority,
                 criteria,
                 attachments,
@@ -1562,6 +1635,45 @@ mod tests {
         };
         assert!(!text.contains("vdp-super-secret-xyz"));
         assert!(text.contains("[redacted]"));
+    }
+
+    #[test]
+    fn issue_mcp_tools_expose_and_decode_tags_parent_and_schedule_dates() {
+        let defs = tool_definitions();
+        for tool_name in ["vv_issue_create", "vv_issue_update"] {
+            let def = defs.iter().find(|d| d.name == tool_name).expect(tool_name);
+            let props = def.input_schema["properties"].as_object().expect("properties object");
+            for field in ["parent", "tags", "startAt", "dueAt"] {
+                assert!(props.contains_key(field), "{tool_name} missing schema property {field}");
+            }
+        }
+
+        let created: IssueCreateArgs = serde_json::from_value(json!({
+            "title": "Sub task",
+            "parent": 10,
+            "tags": ["UX", "MCP"],
+            "startAt": 1760000000000_i64,
+            "dueAt": 1760864000000_i64
+        }))
+        .unwrap();
+        assert_eq!(created.parent.as_deref(), Some("10"));
+        assert_eq!(created.tags, Some(vec!["UX".into(), "MCP".into()]));
+        assert_eq!(created.start_at, Some(JsNumber::from(1_760_000_000_000_i64)));
+        assert_eq!(created.due_at, Some(JsNumber::from(1_760_864_000_000_i64)));
+
+        let updated: IssueUpdateArgs = serde_json::from_value(json!({
+            "id": "#12",
+            "parent": "",
+            "tags": ["Bug"],
+            "startAt": 0,
+            "dueAt": 1760900000000_i64
+        }))
+        .unwrap();
+        assert_eq!(updated.id, "#12");
+        assert_eq!(updated.parent.as_deref(), Some(""));
+        assert_eq!(updated.tags, Some(vec!["Bug".into()]));
+        assert_eq!(updated.start_at, Some(JsNumber::from(0_i64)));
+        assert_eq!(updated.due_at, Some(JsNumber::from(1_760_900_000_000_i64)));
     }
 
     #[tokio::test]

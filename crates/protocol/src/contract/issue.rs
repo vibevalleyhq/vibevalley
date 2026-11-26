@@ -8,6 +8,7 @@ use serde_with::skip_serializing_none;
 use ts_rs::TS;
 
 use super::*;
+use crate::JsNumber;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -771,6 +772,13 @@ pub struct Issue {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<Attachment>>", optional))]
     pub attachments: Vec<Attachment>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<String>>", optional))]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub start_at: Option<JsNumber>,
+    #[serde(default)]
+    pub due_at: Option<JsNumber>,
 }
 
 /// Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
@@ -822,6 +830,13 @@ pub struct AppliedIssue {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<Attachment>>", optional))]
     pub attachments: Vec<Attachment>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "ts-gen", ts(as = "Option<Vec<String>>", optional))]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub start_at: Option<JsNumber>,
+    #[serde(default)]
+    pub due_at: Option<JsNumber>,
     pub seq: i64,
 }
 
@@ -863,6 +878,9 @@ impl AppliedIssue {
             answer: issue.answer,
             stage: issue.stage,
             attachments: issue.attachments,
+            tags: issue.tags,
+            start_at: issue.start_at,
+            due_at: issue.due_at,
             seq,
         }
     }
@@ -887,6 +905,17 @@ pub struct IssueUpdate {
     pub before: Option<String>,
     #[serde(default)]
     pub attachments: Option<Vec<String>>,
+    /// Parent issue id or number; "" clears the parent.
+    #[serde(default)]
+    pub parent: Option<String>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+    /// Start date timestamp (ms); 0 or negative clears it.
+    #[serde(default)]
+    pub start_at: Option<JsNumber>,
+    /// Target due timestamp (ms); 0 or negative clears it.
+    #[serde(default)]
+    pub due_at: Option<JsNumber>,
 }
 
 #[skip_serializing_none]
@@ -935,6 +964,12 @@ pub struct IssueRequest {
     pub criteria: Option<Vec<String>>,
     #[serde(default)]
     pub attachments: Option<Vec<String>>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub start_at: Option<JsNumber>,
+    #[serde(default)]
+    pub due_at: Option<JsNumber>,
     /// Idempotency key deduplicating retries after a lost response.
     pub request_key: Option<String>,
 }
@@ -1203,6 +1238,17 @@ pub struct IssueUpdateInput {
     pub before: Option<String>,
     #[serde(default)]
     pub attachments: Option<Vec<String>>,
+    /// Parent issue id or number; "" clears the parent.
+    #[serde(default)]
+    pub parent: Option<String>,
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
+    /// Start date timestamp (ms); 0 or negative clears it.
+    #[serde(default)]
+    pub start_at: Option<JsNumber>,
+    /// Target due timestamp (ms); 0 or negative clears it.
+    #[serde(default)]
+    pub due_at: Option<JsNumber>,
 }
 
 #[skip_serializing_none]

@@ -69,7 +69,7 @@ fn an_issue_goes_through_the_endpoints_from_create_to_done() {
     assert_eq!(missing["bizCode"], 300001);
     assert_eq!(missing["error"]["next"][0]["run"], json!(["issue", "list"]));
 
-    let refused = call(router, "issue.status.update", json!({ "id": id, "status": "done" }));
+    let refused = call(router, "issue.status.update", json!({ "id": id, "status": "in_review" }));
     assert_eq!(refused["bizCode"], 300002, "{refused}");
     assert!(refused["error"]["next"].as_array().is_some_and(|n| !n.is_empty()), "{refused}");
     let preview = call(router, "issue.status.previewUpdate", json!({ "id": id, "status": "todo" }));

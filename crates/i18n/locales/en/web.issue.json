@@ -1,7 +1,39 @@
 {
   "family": {
     "children": "Child issues",
-    "parent": "Parent issue"
+    "parent": "Parent issue",
+    "noParent": "No parent",
+    "clearParent": "Clear parent",
+    "subProgress": "{done} / {total} done"
+  },
+  "tags": {
+    "label": "Tags",
+    "placeholder": "Add custom tag and press Enter…",
+    "add": "Add tag",
+    "remove": "Remove tag {tag}",
+    "empty": "No tags",
+    "byTag": "By tag",
+    "allTags": "All tags",
+    "preset": {
+      "arch": "Architecture",
+      "storage": "Storage",
+      "voice": "Voice",
+      "whiteboard": "Whiteboard"
+    }
+  },
+  "dates": {
+    "startAt": "Start date",
+    "dueAt": "Due date",
+    "datePlaceholder": "YYYY-MM-DD",
+    "notSet": "Not set",
+    "clearDate": "Clear date"
+  },
+  "scope": {
+    "label": "Scope",
+    "all": "All",
+    "active": "Active",
+    "backlog": "Backlog",
+    "canceled": "Canceled"
   },
   "reading": "Reading…",
   "never": "Never mind",
@@ -268,7 +300,11 @@
     "doneEditing": "Done",
     "addDescription": "Add description…",
     "addCriteria": "Add acceptance criteria",
-    "polish": "Refine with helper"
+    "polish": "Refine with helper",
+    "markReady": "Mark as Todo",
+    "markDone": "Mark as Done",
+    "markCanceled": "Discard",
+    "revive": "Restore to Backlog"
   },
   "peek": {
     "expand": "Open full screen",

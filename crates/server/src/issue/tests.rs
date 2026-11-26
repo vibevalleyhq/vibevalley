@@ -230,3 +230,156 @@ async fn issue_attachments_create_update_closed_rejection_and_brief_paths() {
     board.close_async().await;
     let _ = ctx.shutdown(Duration::from_secs(1)).await;
 }
+
+#[tokio::test]
+async fn issue_tags_dates_cycle_safe_parent_and_manual_done_roundtrip() {
+    use vibevalley_protocol::{IssueStatus, JsNumber};
+
+    let dir = tempfile::tempdir().unwrap();
+    let service = Service::open(dir.path()).await.unwrap();
+    let outbox = Arc::new(Outbox::new(service.clone()));
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let ctx = Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        outbox,
+        Arc::new(StateFeed::new()),
+        vibevalley_core::system_clock(),
+        http.clone(),
+        http,
+    ));
+    let board = Board::open_standalone_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+
+    // Create parent with tags and start/due dates.
+    let parent = board
+        .create_from_request_async(&IssueRequest {
+            title: "Parent epic".into(),
+            tags: Some(vec![" UX ".into(), "架构".into(), "UX".into(), "".into()]),
+            start_at: Some(JsNumber::from(1_760_000_000_000_i64)),
+            due_at: Some(JsNumber::from(1_760_864_000_000_i64)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(parent.tags, vec!["UX".to_string(), "架构".to_string()]);
+    assert_eq!(parent.start_at, Some(JsNumber::from(1_760_000_000_000_i64)));
+    assert_eq!(parent.due_at, Some(JsNumber::from(1_760_864_000_000_i64)));
+
+    // Create child & grandchild, then update parent dynamically and verify cycle protection.
+    let child = board
+        .create_from_request_async(&IssueRequest {
+            title: "Child task".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let grandchild = board
+        .create_from_request_async(&IssueRequest {
+            title: "Grandchild task".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let child = board
+        .update_from_input_async(IssueUpdateInput {
+            id: child.id.clone(),
+            parent: Some(format!("#{}", parent.number)),
+            tags: Some(vec!["MCP".into(), "Bug".into()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(child.parent.as_deref(), Some(parent.id.as_str()));
+    assert_eq!(child.tags, vec!["MCP".to_string(), "Bug".to_string()]);
+
+    let grandchild = board
+        .update_from_input_async(IssueUpdateInput {
+            id: grandchild.id.clone(),
+            parent: Some(child.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(grandchild.parent.as_deref(), Some(child.id.as_str()));
+
+    // Self-parenting and ancestor cycle are both refused.
+    let self_err = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            parent: Some(parent.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(self_err.biz_code, BizCode::IssueRefused);
+
+    let cycle_err = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            parent: Some(grandchild.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(cycle_err.biz_code, BizCode::IssueRefused);
+
+    // Clearing parent via "" and clearing dates via 0 persists cleanly.
+    let cleared = board
+        .update_from_input_async(IssueUpdateInput {
+            id: grandchild.id.clone(),
+            parent: Some(String::new()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(cleared.parent, None);
+
+    let cleared_dates = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            start_at: Some(JsNumber::from(0_i64)),
+            due_at: Some(JsNumber::from(0_i64)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(cleared_dates.start_at, None);
+    assert_eq!(cleared_dates.due_at, None);
+
+    // Direct backlog -> done (manual completion without agent session) and revive -> backlog.
+    assert_eq!(
+        board.move_to_async(&cleared.id, IssueStatus::Done, None).await.unwrap(),
+        vibevalley_core::Move::Complete
+    );
+    let done = board.get_async(&cleared.id).await.unwrap();
+    assert_eq!(done.status, IssueStatus::Done);
+    assert_eq!(done.delivered, Some(Landing::None));
+    assert!(done.closed_at.is_some());
+
+    assert_eq!(
+        board.move_to_async(&cleared.id, IssueStatus::Backlog, None).await.unwrap(),
+        vibevalley_core::Move::Revive
+    );
+    let revived = board.get_async(&cleared.id).await.unwrap();
+    assert_eq!(revived.status, IssueStatus::Backlog);
+    assert_eq!(revived.delivered, None);
+    assert_eq!(revived.closed_at, None);
+
+    // Direct backlog -> canceled.
+    assert_eq!(
+        board.move_to_async(&cleared.id, IssueStatus::Canceled, None).await.unwrap(),
+        vibevalley_core::Move::Drop
+    );
+    assert_eq!(board.get_async(&cleared.id).await.unwrap().status, IssueStatus::Canceled);
+
+    // Effective concurrency limits are unbounded by default (no 6-slot blocking).
+    let default_cfg = BoardConfig::under(dir.path());
+    assert_eq!(board::effective_limits(&default_cfg), (0, 0));
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}

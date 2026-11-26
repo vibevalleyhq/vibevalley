@@ -1337,7 +1337,19 @@ export const catalogs = {
     },
     "web.inbox": { tray: { working: "{n} 个执行会话在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "频道 {n} 条没读" } },
     "web.issue": {
-      family: { children: "子工单", parent: "父工单" },
+      family: { children: "子工单", parent: "父工单", noParent: "无父工单", clearParent: "清除父工单", subProgress: "{done} / {total} 已完成" },
+      tags: {
+        label: "标签",
+        placeholder: "输入自定义标签并回车…",
+        add: "添加标签",
+        remove: "移除标签 {tag}",
+        empty: "无标签",
+        byTag: "按标签看",
+        allTags: "全部标签",
+        preset: { arch: "架构", storage: "存储", voice: "语音", whiteboard: "白板" },
+      },
+      dates: { startAt: "计划开始", dueAt: "目标截止", datePlaceholder: "如 2026-12-01", notSet: "未设置", clearDate: "清除日期" },
+      scope: { label: "工单范围", all: "全部", active: "活跃", backlog: "需求池", canceled: "已废弃" },
       reading: "在读……",
       never: "算了",
       later: "先放着",
@@ -1586,6 +1598,10 @@ export const catalogs = {
         addDescription: "添加说明…",
         addCriteria: "添加验收标准",
         polish: "让角色再润色",
+        markReady: "标为待开发",
+        markDone: "标为已完成",
+        markCanceled: "废弃",
+        revive: "恢复到需求池",
       },
       peek: { expand: "展开全屏", close: "关闭预览", compareBadge: "对比" },
       boardLabels: {
@@ -4777,7 +4793,19 @@ export const catalogs = {
       },
     },
     "web.issue": {
-      family: { children: "Child issues", parent: "Parent issue" },
+      family: { children: "Child issues", parent: "Parent issue", noParent: "No parent", clearParent: "Clear parent", subProgress: "{done} / {total} done" },
+      tags: {
+        label: "Tags",
+        placeholder: "Add custom tag and press Enter…",
+        add: "Add tag",
+        remove: "Remove tag {tag}",
+        empty: "No tags",
+        byTag: "By tag",
+        allTags: "All tags",
+        preset: { arch: "Architecture", storage: "Storage", voice: "Voice", whiteboard: "Whiteboard" },
+      },
+      dates: { startAt: "Start date", dueAt: "Due date", datePlaceholder: "YYYY-MM-DD", notSet: "Not set", clearDate: "Clear date" },
+      scope: { label: "Scope", all: "All", active: "Active", backlog: "Backlog", canceled: "Canceled" },
       reading: "Reading…",
       never: "Never mind",
       later: "Leave it for now",
@@ -5028,6 +5056,10 @@ export const catalogs = {
         addDescription: "Add description…",
         addCriteria: "Add acceptance criteria",
         polish: "Refine with helper",
+        markReady: "Mark as Todo",
+        markDone: "Mark as Done",
+        markCanceled: "Discard",
+        revive: "Restore to Backlog",
       },
       peek: { expand: "Open full screen", close: "Close preview", compareBadge: "Compare" },
       boardLabels: {
@@ -8380,6 +8412,11 @@ export interface Messages {
   "web.issue.conversation.older": undefined;
   "web.issue.conversation.placeholder": undefined;
   "web.issue.conversation.title": undefined;
+  "web.issue.dates.clearDate": undefined;
+  "web.issue.dates.datePlaceholder": undefined;
+  "web.issue.dates.dueAt": undefined;
+  "web.issue.dates.notSet": undefined;
+  "web.issue.dates.startAt": undefined;
   "web.issue.detail.answer": undefined;
   "web.issue.detail.answerTo": { readonly question: string | number };
   "web.issue.detail.answered": undefined;
@@ -8469,7 +8506,10 @@ export interface Messages {
   "web.issue.error.goSettings": undefined;
   "web.issue.error.missingApiKey": undefined;
   "web.issue.family.children": undefined;
+  "web.issue.family.clearParent": undefined;
+  "web.issue.family.noParent": undefined;
   "web.issue.family.parent": undefined;
+  "web.issue.family.subProgress": { readonly done: string | number; readonly total: string | number };
   "web.issue.issue.and": undefined;
   "web.issue.issue.asking": { readonly n: number; readonly who: string | number };
   "web.issue.issue.askingLine": undefined;
@@ -8574,10 +8614,26 @@ export interface Messages {
   "web.issue.run.heard": { readonly n: number };
   "web.issue.run.reconcile": undefined;
   "web.issue.run.working": undefined;
+  "web.issue.scope.active": undefined;
+  "web.issue.scope.all": undefined;
+  "web.issue.scope.backlog": undefined;
+  "web.issue.scope.canceled": undefined;
+  "web.issue.scope.label": undefined;
   "web.issue.sheet.at": { readonly stage: string | number };
   "web.issue.sheet.less": undefined;
   "web.issue.sheet.more": undefined;
   "web.issue.sheet.stageDone": { readonly stage: string | number };
+  "web.issue.tags.add": undefined;
+  "web.issue.tags.allTags": undefined;
+  "web.issue.tags.byTag": undefined;
+  "web.issue.tags.empty": undefined;
+  "web.issue.tags.label": undefined;
+  "web.issue.tags.placeholder": undefined;
+  "web.issue.tags.preset.arch": undefined;
+  "web.issue.tags.preset.storage": undefined;
+  "web.issue.tags.preset.voice": undefined;
+  "web.issue.tags.preset.whiteboard": undefined;
+  "web.issue.tags.remove": { readonly tag: string | number };
   "web.issue.task.repo": undefined;
   "web.issue.task.written": undefined;
   "web.issue.todo.addCriteria": undefined;
@@ -8598,6 +8654,9 @@ export interface Messages {
   "web.issue.todo.edit": undefined;
   "web.issue.todo.firstRepo": undefined;
   "web.issue.todo.inQueue": { readonly ago: string | number };
+  "web.issue.todo.markCanceled": undefined;
+  "web.issue.todo.markDone": undefined;
+  "web.issue.todo.markReady": undefined;
   "web.issue.todo.newRepo": undefined;
   "web.issue.todo.newRepoLink": undefined;
   "web.issue.todo.pickForMe": undefined;
@@ -8613,6 +8672,7 @@ export interface Messages {
   "web.issue.todo.remove": undefined;
   "web.issue.todo.repoHint": undefined;
   "web.issue.todo.repoName": undefined;
+  "web.issue.todo.revive": undefined;
   "web.issue.todo.save": undefined;
   "web.issue.todo.start": undefined;
   "web.issue.todo.status": undefined;

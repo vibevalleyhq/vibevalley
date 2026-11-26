@@ -511,9 +511,12 @@ mod tests {
             .map(|c| c.name.as_str())
             .collect();
         assert!(issue_cols.contains("attachments"), "issue table must include attachments column");
+        assert!(issue_cols.contains("tags_json"), "issue table must include tags_json column");
+        assert!(issue_cols.contains("start_at"), "issue table must include start_at column");
+        assert!(issue_cols.contains("due_at"), "issue table must include due_at column");
 
         let migrations = list_applied_migrations(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
-        assert_eq!(migrations.len(), 4);
+        assert_eq!(migrations.len(), 5);
         db.close().await;
     }
 

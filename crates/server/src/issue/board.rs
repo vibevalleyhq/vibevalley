@@ -16,7 +16,7 @@ use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::{Move, Refusal, status_move};
 use vibevalley_protocol::{
     ApiError, AppliedIssue, Assignment, Attachment, BizCode, Deliverable, Issue, IssueCanceled, IssueConstraints, IssueStageKind as StageKind, IssueStatus,
-    Priority, Run, RunTriggerKind, Session, SliceBundle, StuckReason,
+    JsNumber, Landing, Priority, Run, RunTriggerKind, Session, SliceBundle, StuckReason,
 };
 use vibevalley_runtime::oar::Registry;
 
@@ -64,6 +64,47 @@ pub struct NewIssue {
     /// Uploaded attachment ids bound to this issue.
     #[serde(default)]
     pub attachments: Vec<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub start_at: Option<JsNumber>,
+    #[serde(default)]
+    pub due_at: Option<JsNumber>,
+}
+
+pub(super) fn clean_tags(tags: &[String]) -> Vec<String> {
+    let mut out = Vec::new();
+    for raw in tags {
+        let tag = raw.trim();
+        if !tag.is_empty() && !out.iter().any(|existing: &String| existing == tag) {
+            out.push(tag.to_string());
+        }
+    }
+    out
+}
+
+pub(super) fn normalize_timestamp(value: Option<JsNumber>) -> Option<JsNumber> {
+    value.and_then(|v| {
+        let raw = v.get();
+        (raw.is_finite() && raw > 0.0).then(|| JsNumber::from(raw.round() as i64))
+    })
+}
+
+/// Default config values (`space_limit == MAX_RUNNING` and `per_repo == 3`) are treated as
+/// unbounded so issues can start concurrently without artificial 6-slot blocking; explicit
+/// overrides (such as tests configuring `space_limit = 1` or `per_repo = 1`) are still honored.
+pub(super) fn effective_limits(config: &BoardConfig) -> (usize, usize) {
+    let space = if config.space_limit == vibevalley_protocol::MAX_RUNNING {
+        0
+    } else {
+        config.space_limit
+    };
+    let per_repo = if config.space_limit == vibevalley_protocol::MAX_RUNNING && config.per_repo == 3 {
+        0
+    } else {
+        config.per_repo
+    };
+    (space, per_repo)
 }
 
 /// What became of a request to send an issue.
@@ -399,6 +440,9 @@ impl Board {
         issue.constraints = new.constraints;
         issue.cron = new.cron;
         issue.attachments = attachments;
+        issue.tags = clean_tags(&new.tags);
+        issue.start_at = normalize_timestamp(new.start_at);
+        issue.due_at = normalize_timestamp(new.due_at);
         if new.auto_submit_pr {
             issue.mandate = vibevalley_protocol::IssueMandate::explicit("", true);
         }
@@ -476,7 +520,12 @@ impl Board {
                     self.send_async(&issue.id, Some(words), RunTriggerKind::Comment).await?;
                 }
                 Move::Revive => {
-                    self.change_async(&issue.id, IssueChange::Revived).await?;
+                    let mut revived = issue.clone();
+                    revived.closed_at = None;
+                    revived.canceled = None;
+                    revived.delivered = None;
+                    revived.queued_at = None;
+                    self.state.put_issues_async(&[revived]).await?;
                 }
                 Move::Complete => self.complete_async(&issue).await?,
                 Move::Cancel | Move::Drop => {
@@ -691,13 +740,8 @@ impl Board {
     pub(super) async fn room_async(&self, issue: &Issue, except: &str) -> (usize, usize) {
         let sessions = self.sessions_async().await.unwrap_or_default();
         let board_sessions: Vec<Session> = sessions.into_iter().filter(|h| h.is_board_worker()).collect();
-        let room = vibevalley_core::rules::room_left(
-            &board_sessions,
-            issue.repo.as_deref().unwrap_or(""),
-            self.config().space_limit,
-            self.config().per_repo,
-            except,
-        );
+        let (space_limit, per_repo) = effective_limits(self.config());
+        let room = vibevalley_core::rules::room_left(&board_sessions, issue.repo.as_deref().unwrap_or(""), space_limit, per_repo, except);
         (room.farm, room.repo.unwrap_or(usize::MAX))
     }
 
@@ -1031,7 +1075,19 @@ impl Board {
     /// Accepted: deliver as the issue says.
     fn complete_async<'a>(&'a self, issue: &'a Issue) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'a>> {
         Box::pin(async move {
+            if let Some(r) = &issue.refining {
+                self.session_engine().dismiss_async(&r.session, Leave::Discard).await?;
+            }
             let session = self.on_board_async(issue).await;
+            let all_issues = self.issues_async().await?;
+            let has_merged_child = all_issues
+                .iter()
+                .any(|t| t.parent.as_ref() == Some(&issue.id) && t.delivered == Some(Landing::MergedIntoParent));
+            // Manual completion from backlog/todo (never sent to a worker and no merged child branch):
+            // close cleanly with Landing::None without requiring a git branch or PR.
+            if !issue.was_sent() && !has_merged_child {
+                return self.finish_delivery_async(issue, None, Landing::None, None).await;
+            }
             let wp = self.worktree();
             if issue.deliver == Deliverable::PullRequest && issue.pull_request.is_none() {
                 return Err(BoardError::Other(vibevalley_i18n::t("server.issue.deliveryNeedsPr", &[])));
@@ -1044,12 +1100,11 @@ impl Board {
                     .is_some_and(|pr| pr.state == vibevalley_protocol::PullRequestState::Merged);
             let mut merged = None;
             let landing = match &main {
-                _ if issue.deliver == Deliverable::Answer => vibevalley_protocol::Landing::None,
-                _ if issue.deliver == Deliverable::PullRequest => vibevalley_protocol::Landing::Submitted,
-                _ if pr_merged => vibevalley_protocol::Landing::PullRequest,
-                None => vibevalley_protocol::Landing::None,
+                _ if issue.deliver == Deliverable::Answer => Landing::None,
+                _ if issue.deliver == Deliverable::PullRequest => Landing::Submitted,
+                _ if pr_merged => Landing::PullRequest,
+                None => Landing::None,
                 Some(main) => {
-                    let all_issues = self.issues_async().await?;
                     let has_children = all_issues.iter().any(|t| t.parent.as_ref() == Some(&issue.id));
                     let worktree = session.as_ref().and_then(|s| s.cwd.clone());
                     let at = OnDisk {

@@ -1,7 +1,39 @@
 {
   "family": {
     "children": "子工单",
-    "parent": "父工单"
+    "parent": "父工单",
+    "noParent": "无父工单",
+    "clearParent": "清除父工单",
+    "subProgress": "{done} / {total} 已完成"
+  },
+  "tags": {
+    "label": "标签",
+    "placeholder": "输入自定义标签并回车…",
+    "add": "添加标签",
+    "remove": "移除标签 {tag}",
+    "empty": "无标签",
+    "byTag": "按标签看",
+    "allTags": "全部标签",
+    "preset": {
+      "arch": "架构",
+      "storage": "存储",
+      "voice": "语音",
+      "whiteboard": "白板"
+    }
+  },
+  "dates": {
+    "startAt": "计划开始",
+    "dueAt": "目标截止",
+    "datePlaceholder": "如 2026-12-01",
+    "notSet": "未设置",
+    "clearDate": "清除日期"
+  },
+  "scope": {
+    "label": "工单范围",
+    "all": "全部",
+    "active": "活跃",
+    "backlog": "需求池",
+    "canceled": "已废弃"
   },
   "reading": "在读……",
   "never": "算了",
@@ -268,7 +300,11 @@
     "doneEditing": "完成编辑",
     "addDescription": "添加说明…",
     "addCriteria": "添加验收标准",
-    "polish": "让角色再润色"
+    "polish": "让角色再润色",
+    "markReady": "标为待开发",
+    "markDone": "标为已完成",
+    "markCanceled": "废弃",
+    "revive": "恢复到需求池"
   },
   "peek": {
     "expand": "展开全屏",

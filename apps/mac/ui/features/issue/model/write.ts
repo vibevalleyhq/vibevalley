@@ -1,5 +1,6 @@
 import { type Applied, type AppliedIssue, type Issue, type IssueUpdate, VibeValleyApiError } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
+import { issueId } from "@vibevalley/protocol/schema";
 
 import { api, newSendKey } from "../../../infra/api";
 import { bySeq, defineIntent, type Intent, type Intents, sendReplacing } from "../../../infra/state/intent";
@@ -24,6 +25,7 @@ export async function writeIssue(
   requestKey: string,
   machineId = "",
   attachments?: readonly string[],
+  tags?: readonly string[],
 ): Promise<{ issue: Issue; refused: string }> {
   const words = text.trim();
   const made = await api.issue.create(
@@ -33,6 +35,7 @@ export async function writeIssue(
       agent: agent || undefined,
       machineId: machineId || undefined,
       attachments: attachments && attachments.length > 0 ? [...attachments] : undefined,
+      tags: tags && tags.length > 0 ? [...tags] : undefined,
       requestKey,
     }),
   );
@@ -50,10 +53,10 @@ export function updateIssueAttachments(id: string, attachments: readonly string[
   return api.issue.update({ id, attachments: [...attachments] });
 }
 
-// An issue's labels set by the user on its page (title, priority, what it delivers): an intent (state/intent.ts) on issue.update,
-// settled by the frame whose seq is the reply's. The server takes them while the issue is open, sent or not.
+// An issue's labels set by the user on its page (title, priority, what it delivers, parent, tags, schedule): an intent
+// (state/intent.ts) on issue.update, settled by the frame whose seq is the reply's. The server takes them while the issue is open.
 
-export type IssueLabels = Pick<IssueUpdate, "title" | "priority" | "deliver">;
+export type IssueLabels = Pick<IssueUpdate, "title" | "priority" | "deliver" | "parent" | "tags" | "startAt" | "dueAt">;
 export type IssueLabel = keyof IssueLabels;
 
 export type IssueSet = { readonly id: string } & IssueLabels;
@@ -69,7 +72,8 @@ export const issueSet = defineIntent<IssueSet, AppliedIssue, "board">({
 
 type LabelSets = readonly Intent<IssueSet, AppliedIssue>[];
 
-const labelsOf = (p: IssueSet) => (["title", "priority", "deliver"] as const).filter((k) => p[k] !== undefined);
+const allLabelKeys = ["title", "priority", "deliver", "parent", "tags", "startAt", "dueAt"] as const;
+const labelsOf = (p: IssueSet) => allLabelKeys.filter((k) => p[k] !== undefined);
 const newestSet = (sets: LabelSets, id: string, label: IssueLabel) => sets.findLast((p) => p.input.id === id && p.input[label] !== undefined);
 
 /** A newer set of the same label of the same issue replaces the one still on its way. */
@@ -85,8 +89,31 @@ const labeled = (issue: Issue, sets: LabelSets) => {
     const p = newestSet(sets, issue.id, label);
     return p === undefined ? undefined : p.phase === "failed" ? ("failed" as const) : ("pending" as const);
   };
-  const labels = omitUndefined({ title: kept("title")?.title, priority: kept("priority")?.priority, deliver: kept("deliver")?.deliver });
-  return { issue: { ...issue, ...labels }, state };
+  const next: Issue = {
+    ...issue,
+    ...omitUndefined({
+      title: kept("title")?.title,
+      priority: kept("priority")?.priority,
+      deliver: kept("deliver")?.deliver,
+      tags: kept("tags")?.tags,
+    }),
+  };
+  const nextParent = kept("parent")?.parent;
+  if (nextParent !== undefined) {
+    if (nextParent === "") delete next.parent;
+    else next.parent = issueId(nextParent);
+  }
+  const nextStart = kept("startAt")?.startAt;
+  if (nextStart !== undefined) {
+    if (nextStart <= 0) delete next.startAt;
+    else next.startAt = nextStart;
+  }
+  const nextDue = kept("dueAt")?.dueAt;
+  if (nextDue !== undefined) {
+    if (nextDue <= 0) delete next.dueAt;
+    else next.dueAt = nextDue;
+  }
+  return { issue: next, state };
 };
 
 /**

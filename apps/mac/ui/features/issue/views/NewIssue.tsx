@@ -17,16 +17,18 @@ import { useRouter } from "../../../infra/router";
 import { prefsNow } from "../../../infra/state/prefs";
 import { canSubmitDraft, type DraftSubmitEvent, type DraftSubmitState, draftSubmitTransition, initialDraftSubmit } from "../model/draftSubmit";
 import { createAttachmentUploader, IssueAttachmentStrip } from "./IssueAttachments";
+import { TagEditor } from "./IssueMetaControls";
 
 const isRuntimeReady = (runtime: RuntimeInfo) => runtime.installation.status === "available" && runtime.settings.enabled;
 
-/** The repo, helper, optional execution machine, starter template text, or attachment ids for a new issue. */
+/** The repo, helper, optional execution machine, starter template text, tags, or attachment ids for a new issue. */
 export interface NewIssueAt {
   readonly repo?: string;
   readonly agent?: string;
   readonly machineId?: string;
   readonly text?: string;
   readonly attachments?: readonly string[];
+  readonly tags?: readonly string[];
 }
 
 export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where: NewIssueAt, requestKey: string) => Promise<boolean>; onClose: () => void }) {
@@ -41,6 +43,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     }),
   );
   const machineId = signal(props.at.machineId ?? "");
+  const tags = signal<string[]>([...(props.at.tags ?? [])]);
   const dispatch = (event: DraftSubmitEvent): DraftSubmitState => {
     const next = draftSubmitTransition(untracked(flow), event, newSendKey);
     flow.set(next);
@@ -78,6 +81,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     if (started.kind !== "submitting") return;
     const { submitted, requestKey } = started;
     const pickedMachine = untracked(machineId);
+    const pickedTags = untracked(tags);
     let kept = false;
     try {
       kept = await props.onKeep(
@@ -87,6 +91,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           ...(submitted.agent ? { agent: submitted.agent } : {}),
           ...(pickedMachine ? { machineId: pickedMachine } : {}),
           ...(submitted.attachments.length > 0 ? { attachments: submitted.attachments.map((file) => file.id) } : {}),
+          ...(pickedTags.length > 0 ? { tags: pickedTags } : {}),
         },
         requestKey,
       );
@@ -174,6 +179,10 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
               </If>
             </View>
           </If>
+          <View class="gap-1">
+            <Text class="text-xs font-medium text-muted">{t("web.issue.tags.label")}</Text>
+            <TagEditor compact tags={tags()} onChange={(next) => tags.set(next)} testid="issue-new-tags" />
+          </View>
           <If when={noRepos() || noReadyRuntimes()}>
             <View class="gap-2">
               <If when={noRepos()}>
