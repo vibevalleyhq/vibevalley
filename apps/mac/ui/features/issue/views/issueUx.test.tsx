@@ -379,11 +379,18 @@ test("Board renders tags, parent badges, scope toggle, and TodoDetail supports t
   });
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 3);
 
-  // Tags and parent badge render on cards, and scope/tag filter controls exist.
+  // Tags, parent badge, refresh button, and scope/tag filter controls exist.
   expect(app.count("id:issue-scope")).toBe(1);
   expect(app.count("id:filter-tag")).toBe(1);
+  expect(app.count("id:issue-refresh")).toBe(1);
   expect(app.count("id:card-parent-badge")).toBe(1);
   expect(app.count("id:issue-tag-pill")).toBeGreaterThanOrEqual(3);
+
+  // Clicking manual refresh triggers syncing feedback and invalidates issue queries.
+  const historyCallsBefore = fake.calls.filter((c) => c.op === "issue.history.list").length;
+  await app.press("id:issue-refresh");
+  expect(app.count("id:issue-syncing")).toBe(1);
+  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.history.list").length > historyCallsBefore);
 
   // Scope toggle filters to Backlog (2) and Canceled (1).
   await app.press("id:issue-scope-backlog");
@@ -393,9 +400,10 @@ test("Board renders tags, parent badges, scope toggle, and TodoDetail supports t
   await app.press("id:issue-scope-all");
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 3);
 
-  // Open child draft directly to verify TodoDetail inspector controls and one-click triage actions.
+  // Open child draft directly to verify TodoDetail inspector controls, interactive status picker, and one-click triage actions.
   await app.host.send("route", `/issues/${childIssue.id}`);
   await fake.pumpUntil(app, () => app.count("id:todo-triage-actions") === 1);
+  expect(app.count("id:todo-status")).toBe(1);
   expect(app.count("id:issue-parent-picker")).toBe(1);
   expect(app.count("id:issue-tag-editor")).toBe(1);
   expect(app.count("id:issue-start-at")).toBe(1);
@@ -404,7 +412,15 @@ test("Board renders tags, parent badges, scope toggle, and TodoDetail supports t
   expect(app.count("id:todo-mark-done")).toBe(1);
   expect(app.count("id:todo-mark-canceled")).toBe(1);
 
+  // Even when a draft field is edited locally, marking done optimistically updates status to done (closed) immediately.
+  await app.press("id:issue-title-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-title-input") === 1);
+  await app.type("id:issue-title-input", " draft edit");
+  await app.keyboard.press("enter");
+  await fake.pumpUntil(app, () => app.count("id:issue-save") === 1);
+
   await app.press("id:todo-mark-done");
+  await fake.pumpUntil(app, () => app.count("id:todo-revive") === 1);
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.status.update"));
   const statusCall = fake.calls.find((c) => c.op === "issue.status.update");
   expect((statusCall?.payload as { status?: string } | undefined)?.status).toBe("done");

@@ -130,6 +130,7 @@
 | `useInboxSlice` | `frame.ts` |  |
 | `useOpsSlice` | `frame.ts` |  |
 | `useLink` | `frame.ts` |  |
+| `useRefreshSlice` | `frame.ts` |  |
 | `useSessionsMap` | `frame.ts` |  |
 | `useSession` | `frame.ts` |  |
 | `useIssue` | `frame.ts` |  |

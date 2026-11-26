@@ -71,6 +71,9 @@ function createMockSlicesSource(initial: SliceBundle) {
         sliceListeners[kind].delete(listener);
       };
     },
+    refresh: (kind: SliceKind) => {
+      for (const listener of [...sliceListeners[kind]]) listener();
+    },
     link: () => link,
     subscribeLink: (listener) => {
       linkListeners.add(listener);

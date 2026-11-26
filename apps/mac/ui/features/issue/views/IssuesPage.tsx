@@ -1,4 +1,4 @@
-import { keymap, Scroll, signal, Text, View, type JSX } from "nsh";
+import { cleanup, keymap, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
@@ -9,14 +9,15 @@ import { Button } from "../../../design/Button";
 import { SearchField, Select } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
-import { motionClass } from "../../../design/motion";
+import { motionClass, motionDuration } from "../../../design/motion";
 import { Segmented } from "../../../design/Segmented";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { useOrchestrators } from "../../../infra/agents";
 import { api, reasonOf } from "../../../infra/api";
 import { variant } from "../../../infra/base/dom";
-import { useBoardSlice, useSessionsSlice } from "../../../infra/frame";
+import { useBoardSlice, useRefreshSlice, useSessionsSlice } from "../../../infra/frame";
+import { useQueryClient } from "../../../infra/query";
 import { useRouter, useSearchValues } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
@@ -58,7 +59,38 @@ type Closing = { issue: Issue; session: Session | undefined; review: boolean; la
 export function IssuesPage(props: { rest: string }) {
   const router = useRouter();
   const board = useBoardSlice();
+  const refreshBoard = useRefreshSlice("board");
+  const queries = useQueryClient();
   const sessions = useSessionsSlice();
+  const refreshing = signal(false);
+  let refreshToken = 0;
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  cleanup(() => {
+    if (refreshTimer !== undefined) clearTimeout(refreshTimer);
+  });
+  const refreshIssues = () => {
+    const token = ++refreshToken;
+    if (refreshTimer !== undefined) {
+      clearTimeout(refreshTimer);
+      refreshTimer = undefined;
+    }
+    refreshing.set(true);
+    refreshBoard();
+    const minWait = new Promise<void>((resolve) => {
+      const ms = motionDuration(360);
+      if (ms <= 0) {
+        resolve();
+        return;
+      }
+      refreshTimer = setTimeout(() => {
+        refreshTimer = undefined;
+        resolve();
+      }, ms);
+    });
+    void Promise.allSettled([queries.invalidate({ prefix: ["issues"] }), minWait]).finally(() => {
+      if (refreshToken === token) refreshing.set(false);
+    });
+  };
   const id = () => (props.rest && props.rest !== "new" ? props.rest : undefined);
   // The repo and the helper are in the address, so a reload or a link keeps the board as filtered; the words typed
   // are not, being half a thought.
@@ -154,6 +186,10 @@ export function IssuesPage(props: { rest: string }) {
       }
       const done = await sendMove(moves, { id: c.id, status: "todo", lane: to }).done;
       if (done?.replied) notice(done.replied.reply);
+    } else if (move === "close" && c.kind === "todo") {
+      await sendMove(moves, { id: c.id, status: c.issue.moves.includes("done") ? "done" : "canceled", lane: to }).done;
+    } else if (move === "revive" && (c.kind === "todo" || c.kind === "family")) {
+      await sendMove(moves, { id: c.id, status: "backlog", lane: to }).done;
     } else if (move === "close" && c.kind === "issue" && c.session) closing.set({ issue: c.issue, session: c.session, review: false, lane: to });
     else if (move === "close" && c.kind === "family") closing.set({ issue: c.issue, session: undefined, review: false, lane: to });
     else if (move === "reopen" && (c.kind === "issue" || c.kind === "family")) reopening.set({ issue: c.issue, lane: to });
@@ -210,7 +246,17 @@ export function IssuesPage(props: { rest: string }) {
                 {reasonOf(history.error())}
               </Text>
             </If>
-            <Toolbar filter={filter()} cards={all()} shown={shown().length} onFilter={setFilter} look={look()} onLook={setLook} onNew={() => startNew({})} />
+            <Toolbar
+              filter={filter()}
+              cards={all()}
+              shown={shown().length}
+              onFilter={setFilter}
+              look={look()}
+              onLook={setLook}
+              refreshing={refreshing()}
+              onRefresh={refreshIssues}
+              onNew={() => startNew({})}
+            />
             <If
               when={look().view === "board"}
               else={
@@ -439,6 +485,8 @@ function Toolbar(props: {
   onFilter: (f: BoardFilter) => void;
   look: BoardLook;
   onLook: (l: BoardLook) => void;
+  refreshing: boolean;
+  onRefresh: () => void;
   onNew: () => void;
 }) {
   const nameOf = useNameOf();
@@ -549,6 +597,26 @@ function Toolbar(props: {
           options={boardViews.map((v) => ({ value: v, label: viewLabel[v] }))}
         />
         <DisplayMenu look={props.look} onChange={props.onLook} />
+        <View
+          role="button"
+          testID="issue-refresh"
+          accessibilityLabel={props.refreshing ? t("web.issue.page.refreshing") : t("web.issue.page.refresh")}
+          accessibilityState={{ busy: props.refreshing }}
+          tooltip={<Bubble text={props.refreshing ? t("web.issue.page.refreshing") : t("web.issue.page.refresh")} />}
+          onPress={() => props.onRefresh()}
+          class={`h-7 shrink-0 flex-row items-center justify-center gap-1 rounded-md ${
+            props.refreshing ? "bg-selected px-2" : "w-7 hover:bg-hover"
+          } ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+        >
+          <View class={props.refreshing ? motionClass("animate-spin") : ""}>
+            <Icon name="refresh" size={14} tone={props.refreshing ? "water" : "muted"} />
+          </View>
+          <If when={props.refreshing}>
+            <Text testID="issue-syncing" class="text-xs font-medium text-water">
+              {t("web.issue.page.refreshing")}
+            </Text>
+          </If>
+        </View>
         <View tooltip={<Bubble text={`${t("web.issue.new.title")} (C)`} />}>
           <Button tone="primary" icon="add" testID="issue-toolbar-new" onPress={props.onNew}>
             {t("web.issue.new.card")}
