@@ -31,7 +31,7 @@ use crate::router::{AppCore, Router};
 use crate::runtime::{Runtime, RuntimeConfig, SessionDriver};
 use crate::service::Service;
 use crate::setting::{Setting, SettingConfig};
-use crate::storage::Storage;
+use crate::storage::{Storage, StorageConfig};
 use crate::voice::{Parts as VoiceParts, Voice};
 
 /// White-box test view over [`App`] internals for `crates/server/tests/*`.
@@ -126,17 +126,23 @@ impl App {
     }
 }
 
-/// Opens and starts the full server asynchronously.
+/// Opens and starts the full server asynchronously, reading optional
+/// `VIBEVALLEY_STORAGE_URL` (defaulting to local filesystem at `config.home`).
 pub async fn create_app(config: Config) -> Result<App, StartError> {
-    Box::pin(create_app_inner(config)).await
+    let storage_config = StorageConfig::from_env(&config.home).map_err(|e| failed("the storage")(&e))?;
+    Box::pin(create_app_inner(config, storage_config)).await
 }
 
-async fn create_app_inner(config: Config) -> Result<App, StartError> {
+/// Opens and starts the full server asynchronously with an explicit [`StorageConfig`].
+pub async fn create_app_with_storage(config: Config, storage_config: StorageConfig) -> Result<App, StartError> {
+    Box::pin(create_app_inner(config, storage_config)).await
+}
+
+async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Result<App, StartError> {
     let boot_started = std::time::Instant::now();
     install_tls();
     tokio::fs::create_dir_all(&config.home).await.map_err(|e| failed("the home")(&e))?;
-    tokio::fs::create_dir_all(&config.work_root).await.map_err(|e| failed("the work root")(&e))?;
-    for dir in [config.work_root.join("repos"), config.work_root.join("worktrees")] {
+    for dir in [config.work_root.clone(), config.work_root.join("repos"), config.work_root.join("worktrees")] {
         tokio::fs::create_dir_all(&dir).await.map_err(|e| failed("the work root")(&e))?;
     }
 
@@ -151,12 +157,8 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
         None if config.offline_media => crate::fake::moss::network(),
         None => (Arc::new(Http), Arc::new(PublicDownload)),
     };
-    let (live, outbox, feed, clock) = (
-        Arc::new(LiveState::new()),
-        Arc::new(Outbox::new(service.clone())),
-        Arc::new(StateFeed::new()),
-        config.clock.clone(),
-    );
+    let (live, outbox, feed) = (Arc::new(LiveState::new()), Arc::new(Outbox::new(service.clone())), Arc::new(StateFeed::new()));
+    let clock = config.clock.clone();
     let ctx = Arc::new(Context::new(service, TaskGroup::new(), live, outbox, feed, clock, http, download));
     let active_subscriptions = Arc::new(AtomicUsize::new(0));
 
@@ -168,7 +170,7 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
     })
     .await;
     let provider = Arc::new(Provider::new(setting.clone(), ctx.http.clone()));
-    let storage = Storage::open_async(&config.home, ctx.clone())
+    let storage = Storage::open_with_config_async(&config.home, &storage_config, ctx.clone())
         .await
         .map_err(|e| failed("the storage")(&e.message))?;
 

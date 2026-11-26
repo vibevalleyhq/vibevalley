@@ -24,6 +24,7 @@ use vibevalley_protocol::{
     ArtifactType, BizCode,
 };
 
+use super::backend::{LocalFsBackend, StorageBackend, StorageKind};
 use crate::context::{Context, internal};
 
 const COVER_META_FILE: &str = ".cover.json";
@@ -229,10 +230,12 @@ async fn refresh_manifest_files_async(root: &Path, artifact_id: &str, artifact_t
     Ok(())
 }
 
-/// Manages `<home>/artifact/<id>/` directories and immutable `<home>/artifact_snapshot/<id>/<storage_id>/` copies.
+/// Manages `<home>/artifact/<id>/` directories and immutable `<home>/artifact_snapshot/<id>/<storage_id>/` copies,
+/// optionally mirroring objects to a pluggable [`StorageBackend`] when running with a non-local backend.
 pub struct ArtifactStorage {
     live_root: PathBuf,
     snapshot_root: PathBuf,
+    backend: Arc<dyn StorageBackend>,
     ctx: Arc<Context>,
     preview_cache: RwLock<HashMap<String, (i64, ArtifactPreview)>>,
     cover_cache: RwLock<HashMap<String, Option<ArtifactCover>>>,
@@ -243,13 +246,87 @@ pub type InitDirectoryResult = (Vec<ArtifactFileMeta>, BTreeMap<String, Vec<u8>>
 
 impl ArtifactStorage {
     pub fn open(home: &Path, ctx: Arc<Context>) -> Arc<Self> {
+        let backend: Arc<dyn StorageBackend> = Arc::new(LocalFsBackend::new(home));
+        Self::open_with_backend(home, backend, ctx)
+    }
+
+    pub fn open_with_backend(home: &Path, backend: Arc<dyn StorageBackend>, ctx: Arc<Context>) -> Arc<Self> {
         Arc::new(Self {
             live_root: home.join("artifact"),
             snapshot_root: home.join("artifact_snapshot"),
+            backend,
             ctx,
             preview_cache: RwLock::new(HashMap::new()),
             cover_cache: RwLock::new(HashMap::new()),
         })
+    }
+
+    pub fn backend(&self) -> &Arc<dyn StorageBackend> {
+        &self.backend
+    }
+
+    pub fn object_key(artifact_id: &str, rel_path: &str) -> String {
+        format!("artifact/{artifact_id}/{rel_path}")
+    }
+
+    pub fn snapshot_object_key(artifact_id: &str, storage_id: &str, rel_path: &str) -> String {
+        format!("artifact_snapshot/{artifact_id}/{storage_id}/{rel_path}")
+    }
+
+    pub fn signed_file_url(&self, artifact_id: &str, rel_path: &str, expires_secs: u64) -> Option<String> {
+        validate_artifact_path(rel_path).ok()?;
+        self.backend.signed_url(&Self::object_key(artifact_id, rel_path), expires_secs)
+    }
+
+    fn mirrors_to_remote(&self) -> bool {
+        self.backend.kind() != StorageKind::LocalFs
+    }
+
+    async fn mirror_live_file_async(&self, artifact_id: &str, rel_path: &str, bytes: &[u8]) -> Result<(), ApiError> {
+        if !self.mirrors_to_remote() {
+            return Ok(());
+        }
+        let key = Self::object_key(artifact_id, rel_path);
+        self.backend.put(&key, bytes.to_vec(), Some(infer_mime(rel_path))).await.map_err(internal)?;
+        Ok(())
+    }
+
+    async fn mirror_manifest_from_disk_async(&self, artifact_id: &str) -> Result<(), ApiError> {
+        if !self.mirrors_to_remote() {
+            return Ok(());
+        }
+        let manifest_abs = self.artifact_dir(artifact_id).join(MANIFEST_FILE);
+        if let Ok(bytes) = tokio::fs::read(&manifest_abs).await {
+            self.mirror_live_file_async(artifact_id, MANIFEST_FILE, &bytes).await?;
+        }
+        Ok(())
+    }
+
+    /// Hydrates a local artifact directory (or snapshot) from the configured remote/memory [`StorageBackend`].
+    /// Returns the number of files written to disk.
+    pub async fn restore_from_backend_async(&self, artifact_id: &str, storage_id: Option<&str>) -> Result<usize, ApiError> {
+        if !self.mirrors_to_remote() {
+            return Ok(0);
+        }
+        let (prefix, target_root) = match storage_id {
+            Some(sid) => (format!("artifact_snapshot/{artifact_id}/{sid}/"), self.snapshot_dir(artifact_id, sid)),
+            None => (format!("artifact/{artifact_id}/"), self.artifact_dir(artifact_id)),
+        };
+        let objects = self.backend.list(&prefix).await.map_err(internal)?;
+        let mut restored = 0usize;
+        for obj in objects {
+            let Some(rel) = obj.key.strip_prefix(&prefix) else {
+                continue;
+            };
+            if validate_artifact_path(rel).is_err() {
+                continue;
+            }
+            if let Some(bytes) = self.backend.get(&obj.key).await.map_err(internal)? {
+                write_atomic_async(&target_root.join(rel), &bytes).await.map_err(internal)?;
+                restored += 1;
+            }
+        }
+        Ok(restored)
     }
 
     pub fn artifact_dir(&self, id: &str) -> PathBuf {
@@ -315,7 +392,9 @@ impl ArtifactStorage {
         }
         let mut raw = BTreeMap::new();
         for m in &metas {
-            raw.insert(m.path.clone(), tokio::fs::read(root.join(&m.path)).await.map_err(internal)?);
+            let bytes = tokio::fs::read(root.join(&m.path)).await.map_err(internal)?;
+            self.mirror_live_file_async(id, &m.path, &bytes).await?;
+            raw.insert(m.path.clone(), bytes);
         }
         Ok((metas, raw))
     }
@@ -452,6 +531,7 @@ impl ArtifactStorage {
             }
             let abs = root.join(&rel);
             write_atomic_async(&abs, &bytes).await.map_err(internal)?;
+            self.mirror_live_file_async(artifact_id, &rel, &bytes).await?;
             let meta = tokio::fs::metadata(&abs).await.map_err(internal)?;
             changed.push(ArtifactFileMeta {
                 mime: infer_mime(&rel).to_owned(),
@@ -463,6 +543,7 @@ impl ArtifactStorage {
         }
         if !wrote_manifest {
             refresh_manifest_files_async(&root, artifact_id, artifact_type, title).await?;
+            self.mirror_manifest_from_disk_async(artifact_id).await?;
         }
         Ok(changed)
     }
@@ -476,7 +557,11 @@ impl ArtifactStorage {
             return Err(missing_artifact_or_file(title, path));
         }
         tokio::fs::remove_file(&abs).await.map_err(internal)?;
+        if self.mirrors_to_remote() {
+            let _ = self.backend.delete(&Self::object_key(artifact_id, path)).await.map_err(internal)?;
+        }
         refresh_manifest_files_async(&root, artifact_id, artifact_type, title).await?;
+        self.mirror_manifest_from_disk_async(artifact_id).await?;
         Ok(())
     }
 
@@ -485,6 +570,7 @@ impl ArtifactStorage {
         let root = self.artifact_dir(artifact_id);
         if tokio::fs::try_exists(&root).await.map_err(internal)? {
             refresh_manifest_files_async(&root, artifact_id, artifact_type, title).await?;
+            self.mirror_manifest_from_disk_async(artifact_id).await?;
         }
         Ok(())
     }
@@ -507,6 +593,9 @@ impl ArtifactStorage {
         for old_rel in current.keys() {
             if old_rel != MANIFEST_FILE && !files.contains_key(old_rel) {
                 let _ = tokio::fs::remove_file(root.join(old_rel)).await;
+                if self.mirrors_to_remote() {
+                    let _ = self.backend.delete(&Self::object_key(artifact_id, old_rel)).await;
+                }
                 deleted.push(old_rel.clone());
             }
         }
@@ -514,6 +603,7 @@ impl ArtifactStorage {
         for (rel, bytes) in files {
             let abs = root.join(rel);
             write_atomic_async(&abs, bytes).await.map_err(internal)?;
+            self.mirror_live_file_async(artifact_id, rel, bytes).await?;
             let meta = tokio::fs::metadata(&abs).await.map_err(internal)?;
             updated_metas.push(ArtifactFileMeta {
                 path: rel.clone(),
@@ -525,6 +615,7 @@ impl ArtifactStorage {
         }
         if !files.contains_key(MANIFEST_FILE) {
             refresh_manifest_files_async(&root, artifact_id, artifact_type, title).await?;
+            self.mirror_manifest_from_disk_async(artifact_id).await?;
         }
         Ok((updated_metas, deleted))
     }
@@ -543,6 +634,10 @@ impl ArtifactStorage {
             let bytes = tokio::fs::read(&abs).await.map_err(internal)?;
             total_bytes += bytes.len() as i64;
             write_atomic_async(&dst_root.join(&rel), &bytes).await.map_err(internal)?;
+            if self.mirrors_to_remote() {
+                let key = Self::snapshot_object_key(artifact_id, &storage_id, &rel);
+                self.backend.put(&key, bytes, Some(infer_mime(&rel))).await.map_err(internal)?;
+            }
         }
         Ok((storage_id, total_bytes))
     }
@@ -558,6 +653,15 @@ impl ArtifactStorage {
         }
         if tokio::fs::try_exists(&snap).await.map_err(internal)? {
             tokio::fs::remove_dir_all(&snap).await.map_err(internal)?;
+        }
+        if self.mirrors_to_remote() {
+            for prefix in [format!("artifact/{artifact_id}/"), format!("artifact_snapshot/{artifact_id}/")] {
+                if let Ok(objs) = self.backend.list(&prefix).await {
+                    for obj in objs {
+                        let _ = self.backend.delete(&obj.key).await;
+                    }
+                }
+            }
         }
         Ok(())
     }

@@ -1,8 +1,10 @@
-//! Core file and staged media input storage (`Storage`), combining content-addressed
-//! attachments ([`AttachmentStorage`]) and temporary staged uploads ([`MediaInputStorage`]).
+//! Core file and staged media input storage (`Storage`), combining a pluggable
+//! [`StorageBackend`] with content-addressed attachments ([`AttachmentStorage`]),
+//! temporary staged uploads ([`MediaInputStorage`]), and artifact directories ([`ArtifactStorage`]).
 
 pub mod artifact;
 pub mod attachment;
+pub mod backend;
 pub mod media_input;
 pub mod validate;
 
@@ -14,31 +16,57 @@ use vibevalley_protocol::{ApiError, Attachment, AttachmentFile, AttachmentImport
 
 pub use artifact::ArtifactStorage;
 pub use attachment::{ATTACHMENT_MAX, AttachmentStorage};
+pub use backend::{LocalFsBackend, MemoryBackend, ObjectMeta, S3Backend, S3Config, StorageBackend, StorageConfig, StorageError, StorageKind, build_backend};
 pub use media_input::MediaInputStorage;
 pub use validate::{AudioFacts, audio_facts};
 
-use crate::context::Context;
+use crate::context::{Context, internal};
 use crate::service::Tx;
 
-/// Unified server file storage: content-addressed attachments, staged media inputs, and artifact directories.
+/// Unified server file storage: pluggable object backend, content-addressed attachments,
+/// staged media inputs, and artifact directories.
 pub struct Storage {
+    pub backend: Arc<dyn StorageBackend>,
     pub attachment: Arc<AttachmentStorage>,
     pub media_input: Arc<MediaInputStorage>,
     pub artifact: Arc<ArtifactStorage>,
 }
 
 impl Storage {
-    /// Opens attachment CAS, staged media input storage, and artifact directory storage under `home`, awaiting the
-    /// initial staged-input recovery sweep and starting the periodic sweeper on `ctx.task`.
+    /// Opens attachment CAS, staged media input storage, and artifact directory storage under `home`
+    /// using the default [`LocalFsBackend`], awaiting the initial staged-input recovery sweep and
+    /// starting the periodic sweeper on `ctx.task`.
     pub async fn open_async(home: &Path, ctx: Arc<Context>) -> Result<Arc<Self>, ApiError> {
-        let attachment = AttachmentStorage::open(home, ctx.clone());
+        let backend: Arc<dyn StorageBackend> = Arc::new(LocalFsBackend::new(home));
+        Self::open_with_backend_async(home, backend, ctx).await
+    }
+
+    /// Opens [`Storage`] using a validated [`StorageConfig`] (`LocalFs`, `S3`, or `Memory`).
+    pub async fn open_with_config_async(home: &Path, config: &StorageConfig, ctx: Arc<Context>) -> Result<Arc<Self>, ApiError> {
+        let backend = build_backend(config).map_err(internal)?;
+        Self::open_with_backend_async(home, backend, ctx).await
+    }
+
+    /// Opens [`Storage`] with an explicit pluggable [`StorageBackend`] instance.
+    pub async fn open_with_backend_async(home: &Path, backend: Arc<dyn StorageBackend>, ctx: Arc<Context>) -> Result<Arc<Self>, ApiError> {
+        let attachment = AttachmentStorage::open_with_backend(home, backend.clone(), ctx.clone());
         let media_input = MediaInputStorage::open_async(home, ctx.clone(), attachment.clone()).await?;
-        let artifact = ArtifactStorage::open(home, ctx);
+        let artifact = ArtifactStorage::open_with_backend(home, backend.clone(), ctx);
         Ok(Arc::new(Self {
+            backend,
             attachment,
             media_input,
             artifact,
         }))
+    }
+
+    pub fn backend_kind(&self) -> StorageKind {
+        self.backend.kind()
+    }
+
+    /// Returns a time-limited presigned GET URL for attachment `id` when supported by the backend.
+    pub fn signed_attachment_url(&self, id: &str, expires_secs: u64) -> Option<String> {
+        self.attachment.signed_url(id, expires_secs)
     }
 
     /// Stops the staged media input sweeper cleanly.
