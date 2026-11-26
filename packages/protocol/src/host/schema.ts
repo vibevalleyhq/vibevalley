@@ -346,17 +346,10 @@ export const HostAppletIdPayload = z.object({
   artifactId: z.string(),
 }) satisfies Codec<T.HostAppletIdPayload>;
 
-export const HostCaptureWebViewPayload = z.object({
+const HostCaptureWebViewPayload = z.object({
   width: z.exactOptional(z.number()),
   height: z.exactOptional(z.number()),
 }) satisfies Codec<T.HostCaptureWebViewPayload>;
-
-export const HostCapturedImage = z.object({
-  mime: z.string(),
-  data: z.string(),
-  width: z.number(),
-  height: z.number(),
-}) satisfies Codec<T.HostCapturedImage>;
 
 export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.info") }),
