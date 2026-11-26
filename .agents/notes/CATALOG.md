@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（31 篇）
+## proposed（33 篇）
 
 ### feature
 
@@ -18,6 +18,8 @@
 
 ### architecture
 
+- 2026-11-27 [多维结构化数据表 Base 与 Agent 批量执行列架构（#32）](.agents/notes/proposed/architecture/2026-11-27-multidimensional-base-table.md)
+- 2026-11-27 [作品类型收敛与 Block Rich Doc 统一内容模型（#31）](.agents/notes/proposed/architecture/2026-11-27-artifact-block-doc-convergence.md)
 - 2026-11-26 [独立协议包 `vibevalley-mcp`（Stateless Streamable HTTP + SEP-2640 Skills）](.agents/notes/proposed/architecture/2026-11-26-vibevalley-mcp-crate.md)
 - 2026-11-26 [VDP 远程实时调试协议（VibeValley DevTools Protocol）](.agents/notes/proposed/architecture/2026-11-26-vdp-remote-debugging.md)
 - 2026-11-26 [服务端插件化存储后端（StorageBackend）](.agents/notes/proposed/architecture/2026-11-26-pluggable-storage-backend.md)
