@@ -12,8 +12,5 @@ export const userId = "user";
 /** Who the everyone mention is. */
 export const everyone = "everyone";
 
-/** Sessions working at once; also the beds on the farm. */
-export const maxRunning = 6;
-
 /** Times are Unix milliseconds. */
 export const dayMs = 86400000;

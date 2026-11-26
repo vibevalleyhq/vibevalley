@@ -10,7 +10,6 @@ export {
   type KeyStatus,
   type Locale,
   LocaleValues,
-  maxRunning,
   type MessageId,
   orchestratorRuntime,
   type Outcome,

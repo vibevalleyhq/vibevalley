@@ -60,7 +60,7 @@ describe("vdp-review", () => {
 
   it("builds the full screen matrix across requested themes with seeded routes", () => {
     const entries = buildScreenMatrix(sampleIds, ["light", "dark"]);
-    expect(entries).toHaveLength(28);
+    expect(entries).toHaveLength(30);
 
     const lightRoutes = entries.filter((e) => e.theme === "light").map((e) => [e.id, e.route, e.fileName]);
     expect(lightRoutes).toEqual([
@@ -69,6 +69,7 @@ describe("vdp-review", () => {
       ["chat", "/chat", "chat-light.png"],
       ["runs", "/runs", "runs-light.png"],
       ["agents", "/agents", "agents-light.png"],
+      ["runtimes", "/runtimes", "runtimes-light.png"],
       ["library", "/library", "library-light.png"],
       ["artifact-outline", "/artifacts/art_outline", "artifact-outline-light.png"],
       ["artifact-dashboard", "/artifacts/art_dash", "artifact-dashboard-light.png"],
@@ -80,7 +81,7 @@ describe("vdp-review", () => {
       ["farm", "/farm", "farm-light.png"],
     ]);
 
-    expect(buildScreenMatrix(sampleIds, ["light"])).toHaveLength(14);
+    expect(buildScreenMatrix(sampleIds, ["light"])).toHaveLength(15);
   });
 
   it("counts nested UI tree nodes and extracts shell/view errors", () => {

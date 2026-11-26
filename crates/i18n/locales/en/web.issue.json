@@ -12,24 +12,23 @@
     "earlier": "{n} earlier",
     "recent": "Recent only",
     "empty": {
-      "todo": "Write down what you want done here; drag it to In progress to start someone on it, up and down to order it.",
-      "working": "Nothing being worked on.",
-      "waiting": "What is done or failed waits here for you; drag it to Closed to complete or cancel it.",
-      "closed": "Completed and canceled tickets; drag one back to In progress to reopen it."
+      "todo": "Write down what you want done here; drag it to In Progress to start someone on it, up and down to order it.",
+      "working": "Nothing in progress.",
+      "waiting": "Completed rounds or questions wait here in review; drag to Done to complete or cancel.",
+      "closed": "Completed and canceled tickets; drag one back to In Progress to reopen it."
     },
     "emptyGuide": {
       "todoTitle": "No to-dos yet",
       "todoBody": "Jot down a ticket, pick a repo and helper, and dispatch it.",
       "workingTitle": "Nothing in progress",
-      "workingBody": "Assign a helper and dispatch a To do ticket, or drag it here to start a worktree session.",
-      "waitingTitle": "Nothing waiting for review",
+      "workingBody": "Assign a helper and dispatch a Todo ticket, or drag it here to start a worktree session.",
+      "waitingTitle": "Nothing in review",
       "waitingBody": "Completed rounds and helper questions appear here so you can inspect changes and merge.",
-      "closedTitle": "No closed tickets yet",
-      "closedBody": "Completed and canceled tickets stay here; drag one back to In progress to reopen.",
+      "closedTitle": "No done tickets yet",
+      "closedBody": "Completed and canceled tickets stay here; drag one back to In Progress to reopen.",
       "filtered": "No matching tickets in this column."
     },
     "whichLane": "Which column",
-    "spots": "{taken} / {of} spots",
     "moveFailed": "Not moved",
     "retryMove": "Move it again",
     "putBack": "Put it back"
@@ -237,8 +236,6 @@
     "descriptionHint": "Description: why, what to do, what not to do, which files it may touch (drafting writes it)",
     "description": "Description",
     "criteria": "Acceptance criteria",
-    "noCriteria": "Not written yet",
-    "criteriaSummary": "{n} · {first}",
     "criteriaHint": "One per line: the points you check when you review",
     "talk": "Talk it through with the helper",
     "answerTo": "Answer: {question}",
@@ -266,7 +263,17 @@
     "repoHint": "The repo's name, which is also its folder under the work folder",
     "repoName": "Repo name",
     "create": "Create",
-    "writeOwn": "Write it yourself"
+    "writeOwn": "Write it yourself",
+    "edit": "Edit",
+    "doneEditing": "Done",
+    "addDescription": "Add description…",
+    "addCriteria": "Add acceptance criteria",
+    "polish": "Refine with helper"
+  },
+  "peek": {
+    "expand": "Open full screen",
+    "close": "Close preview",
+    "compareBadge": "Compare"
   },
   "boardLabels": {
     "view": {
@@ -286,10 +293,10 @@
       "created": "Created"
     },
     "lane": {
-      "todo": "To do",
-      "working": "In progress",
-      "waiting": "For you to see",
-      "closed": "Closed"
+      "todo": "Todo",
+      "working": "In Progress",
+      "waiting": "In Review",
+      "closed": "Done"
     },
     "stage": {
       "talk": "Talk it through",

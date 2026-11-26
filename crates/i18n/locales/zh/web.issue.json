@@ -12,24 +12,23 @@
     "earlier": "更早的 {n} 张",
     "recent": "只看最近的",
     "empty": {
-      "todo": "想到要做的先写在这里，拖到「处理中」就派人开工；上下拖排先后。",
-      "working": "没有在干的活。",
-      "waiting": "做完的、没做成的在这里等你看；拖到「已关」完成或取消。",
-      "closed": "已完成、已取消的工单；拖回「处理中」重开。"
+      "todo": "想到要做的先写在这里，拖到「进行中」就派人开工；上下拖排先后。",
+      "working": "暂无进行中的工单。",
+      "waiting": "做完的、没做成的在这里待验收；拖到「已完成」完成或取消。",
+      "closed": "已完成、已取消的工单；拖回「进行中」重开。"
     },
     "emptyGuide": {
       "todoTitle": "待办还是空的",
       "todoBody": "记下要做的工单，选好仓库和角色就能派发开工。",
-      "workingTitle": "暂无处理中工单",
+      "workingTitle": "暂无进行中工单",
       "workingBody": "给待办工单选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
       "waitingTitle": "暂无待验收改动",
       "waitingBody": "执行会话跑完一轮或有疑问时会停在这里，方便看改动、回复或完成交付。",
-      "closedTitle": "还没有已关工单",
-      "closedBody": "已完成或取消的工单会留在这里，拖回「处理中」即可随时重开。",
+      "closedTitle": "还没有已完成工单",
+      "closedBody": "已完成或取消的工单会留在这里，拖回「进行中」即可随时重开。",
       "filtered": "当前筛选条件下此列没有工单。"
     },
     "whichLane": "看哪一列",
-    "spots": "{taken} / {of} 并发",
     "moveFailed": "没挪过去",
     "retryMove": "再挪一次",
     "putBack": "放回原处"
@@ -237,8 +236,6 @@
     "descriptionHint": "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
     "description": "说明",
     "criteria": "验收标准",
-    "noCriteria": "还没写",
-    "criteriaSummary": "{n} 条 · {first}",
     "criteriaHint": "一行一条：你验收时照着看的点",
     "talk": "和执行会话聊清楚",
     "answerTo": "回答：{question}",
@@ -266,7 +263,17 @@
     "repoHint": "仓库名，也是工作区下的文件夹名",
     "repoName": "仓库名",
     "create": "新建",
-    "writeOwn": "自己写说明"
+    "writeOwn": "自己写说明",
+    "edit": "编辑",
+    "doneEditing": "完成编辑",
+    "addDescription": "添加说明…",
+    "addCriteria": "添加验收标准",
+    "polish": "让角色再润色"
+  },
+  "peek": {
+    "expand": "展开全屏",
+    "close": "关闭预览",
+    "compareBadge": "对比"
   },
   "boardLabels": {
     "view": {
@@ -287,9 +294,9 @@
     },
     "lane": {
       "todo": "待办",
-      "working": "处理中",
-      "waiting": "等你看",
-      "closed": "已关"
+      "working": "进行中",
+      "waiting": "待验收",
+      "closed": "已完成"
     },
     "stage": {
       "talk": "聊清楚",

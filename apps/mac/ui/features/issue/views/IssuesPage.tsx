@@ -34,6 +34,7 @@ import { DisplayMenu } from "./DisplayMenu";
 import { FamilyDetail } from "./FamilyDetail";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
+import { IssuePeekModal } from "./IssuePeekModal";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { createIssueChrome, IssueChromeContext } from "./Sheet";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
@@ -75,7 +76,9 @@ export function IssuesPage(props: { rest: string }) {
     if (path === "/farm" || path?.startsWith("/farm/") === true) return t("web.base.farm");
   };
   const returnTo = signal<string>();
+  const peeking = signal<string>();
   const open = (to: string | undefined) => {
+    if (to !== undefined) peeking.set(undefined);
     if (!to && fromScene()) {
       router.history.back();
       return;
@@ -83,6 +86,15 @@ export function IssuesPage(props: { rest: string }) {
     if (to && !id()) returnTo.set(to);
     if (!to && !returnTo()) returnTo.set(card()?.id ?? id());
     router.navigate((to === undefined ? "/issues" : `/issues/${encodeURIComponent(to)}`) + kept());
+  };
+  const peek = (to: string) => {
+    returnTo.set(to);
+    peeking.set(to);
+  };
+  const closePeek = () => peeking.set(undefined);
+  const expandPeek = (to: string) => {
+    peeking.set(undefined);
+    open(to);
   };
   const notice = dispatchedNotice(open);
 
@@ -94,6 +106,10 @@ export function IssuesPage(props: { rest: string }) {
   const shown = createMemo(() => all().filter((c) => filterShows(filter(), c)));
   const card = createMemo(() => {
     const at = id();
+    return at === undefined ? undefined : all().find((c) => c.id === at || (c.kind === "issue" && issueIs(c.issue, at)));
+  });
+  const peekCard = createMemo(() => {
+    const at = id() === undefined ? peeking() : undefined;
     return at === undefined ? undefined : all().find((c) => c.id === at || (c.kind === "issue" && issueIs(c.issue, at)));
   });
 
@@ -133,7 +149,8 @@ export function IssuesPage(props: { rest: string }) {
     newAt.set({ ...(repo ? { repo } : {}), ...(agent ? { agent } : {}), ...(text ? { text } : {}), ...(machineId ? { machineId } : {}) });
   };
   const addInList: ListAdd = (where) => startNew(where);
-  const dialogUp = () => draftAt() !== undefined || closing() !== undefined || reopening() !== undefined;
+  const overlayDialogUp = () => draftAt() !== undefined || closing() !== undefined || reopening() !== undefined;
+  const dialogUp = () => overlayDialogUp() || peekCard() !== undefined;
   // C, unless a field has focus, a dialog is up or an issue is open.
   keymap.bind(
     "c",
@@ -181,7 +198,7 @@ export function IssuesPage(props: { rest: string }) {
                   grouping={look().grouping}
                   ordering={look().ordering}
                   onOlder={() => older.set(!older())}
-                  onOpen={open}
+                  onOpen={peek}
                   onAdd={addInList}
                   onClearFilter={() => setFilter(noFilter)}
                 />
@@ -196,7 +213,7 @@ export function IssuesPage(props: { rest: string }) {
                 older={older()}
                 ordering={look().ordering}
                 onOlder={() => older.set(!older())}
-                onOpen={open}
+                onOpen={peek}
                 onDrop={(c, to) => void drop(c, to)}
                 onRetry={(c) => void retry(c)}
                 onPutBack={(c) => c.move && moves.drop(c.move.key)}
@@ -228,6 +245,23 @@ export function IssuesPage(props: { rest: string }) {
             </IssueView>
           )}
         </Each>
+      </If>
+      <If when={peekCard()}>
+        {(c) => (
+          <IssuePeekModal card={c()} blocked={overlayDialogUp} onExpand={expandPeek} onClose={closePeek}>
+            <Each of={[c().id]} key={(cur) => cur}>
+              {(at) => (
+                <Detail
+                  id={at()}
+                  cards={all}
+                  known={!history.loading() && history.rows() !== undefined}
+                  open={(to) => (to === undefined ? closePeek() : peeking.set(to))}
+                  onClose={(issue, session, review) => closing.set({ issue, session, review })}
+                />
+              )}
+            </Each>
+          </IssuePeekModal>
+        )}
       </If>
       <If when={draftAt()}>{(at) => <NewIssue at={at()} onKeep={keepNew} onClose={closeDraft} />}</If>
       <If when={closing()}>

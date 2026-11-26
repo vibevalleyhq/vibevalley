@@ -347,13 +347,13 @@ test("dense scenario stresses 65 issues (OlderLink fold), 80 messages, 10 crons,
     durationMs: 0,
   };
 
-  // Board shows folded closed column (< total 65 since 17 closed > closedShown 15), and reconciles wide/narrow working count (17) + running slots (6 / 6).
+  // Board shows folded closed column (< total 65 since 17 closed > closedShown 15), reconciles wide/narrow working count (17), and omits legacy concurrency slots badge.
   const denseBoard = fixture.state.board.boardSummary;
   expect(denseBoard?.laneCounts.working).toBe(17);
   expect(denseBoard?.runningSlots).toBe(6);
   expect(denseBoard?.maxRunning).toBe(6);
   expect(app.shows("id:lane-working >> text:17")).toBe(true);
-  expect(app.texts().some((s) => s.includes("6 / 6"))).toBe(true);
+  expect(app.count("id:lane-working-slots")).toBe(0);
   const foldedCards = app.count("id:issue-card");
   expect(foldedCards).toBeGreaterThan(20);
   expect(foldedCards).toBeLessThan(fixture.state.board.issues.length);
@@ -473,7 +473,7 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
   expect(app.shows("id:lane-working >> text:8")).toBe(true);
   expect(app.shows("id:lane-waiting >> text:4")).toBe(true);
   expect(app.shows("id:lane-closed >> text:9")).toBe(true);
-  expect(app.texts().some((s) => s.includes("2 / 6"))).toBe(true);
+  expect(app.count("id:lane-working-slots")).toBe(0);
 
   await app.setViewport(560, 800);
   row.viewports.push("560x800");
@@ -626,12 +626,12 @@ test("english locale renders issues, chat, and settings cleanly with zero crashe
 
   expect(app.count("id:issues-page")).toBe(1);
   const issueTexts = app.texts();
-  expect(issueTexts).toContain("To do");
-  expect(issueTexts).toContain("In progress");
-  expect(issueTexts).toContain("For you to see");
-  expect(issueTexts).toContain("Closed");
+  expect(issueTexts).toContain("Todo");
+  expect(issueTexts).toContain("In Progress");
+  expect(issueTexts).toContain("In Review");
+  expect(issueTexts).toContain("Done");
   expect(issueTexts).toContain("New issue");
-  expect(issueTexts.some((s) => s.includes("spots"))).toBe(true);
+  expect(app.count("id:lane-working-slots")).toBe(0);
 
   await app.host.send("route", "/chat");
   await fake.pump(app);

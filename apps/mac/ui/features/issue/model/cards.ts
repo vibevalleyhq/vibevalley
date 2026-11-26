@@ -14,6 +14,7 @@ import type {
 import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, stageWantsUser } from "@vibevalley/protocol/rules";
 import { IssueLane as IssueLaneSchema } from "@vibevalley/protocol/schema";
 
+import { splitMarkdownCompareBlocks } from "../../../design/compareModel";
 import { ago, tookText } from "../../../infra/base/format";
 import { matches } from "../../../infra/base/search";
 import { describeSubagents } from "../../session";
@@ -191,18 +192,27 @@ export function laneCountOf(lane: Lane, cards: readonly BoardCard[], summary: Bo
   return cards.filter((c) => c.lane === lane).length;
 }
 
-/** Active worker slot usage (`runningSlots / maxRunning`) for the working lane header. */
-export function runningSlotsOf(
-  cards: readonly BoardCard[],
-  summary: BoardSummary | undefined,
-  filtered: boolean,
-  fallbackMax: number,
-): { taken: number; of: number } {
-  if (summary !== undefined && !filtered) {
-    return { taken: summary.runningSlots, of: summary.maxRunning };
+export interface CardPreview {
+  readonly attachmentId?: string;
+  readonly url?: string;
+  readonly isCompare: boolean;
+}
+
+/** First previewable image for a board card: prefers a valid ```compare block image, then the first image attachment. */
+export function cardPreviewOf(card: BoardCard): CardPreview | undefined {
+  const description = card.issue.description;
+  if (description.includes("compare")) {
+    for (const seg of splitMarkdownCompareBlocks(description)) {
+      if (seg.kind !== "compare") continue;
+      const picked = seg.spec.after ?? seg.spec.before ?? seg.spec.image;
+      if (!picked) continue;
+      if (picked.attachment) return { attachmentId: picked.attachment, isCompare: true };
+      if (picked.url) return { url: picked.url, isCompare: true };
+    }
   }
-  const taken = cards.filter((c) => c.lane === "working" && c.kind === "issue" && c.session?.phase._tag === "working").length;
-  return { taken, of: summary?.maxRunning ?? fallbackMax };
+  const imageAttachment = card.issue.attachments?.find((att) => att.type.startsWith("image/"));
+  if (imageAttachment) return { attachmentId: imageAttachment.id, isCompare: false };
+  return undefined;
 }
 
 function cardWords(c: BoardCard): (string | undefined)[] {

@@ -279,15 +279,21 @@ test("regression: todo add button renders in lane header above cards and draggin
   expect(newBtnBox).toBeDefined();
   expect(newBtnBox!.y + newBtnBox!.height).toBeLessThanOrEqual(firstCardBox!.y);
 
-  // Dragging a card (even across lanes) must not open its detail page.
+  // Dragging a card (even across lanes) must not open Quick-Peek or full detail.
   const secondBox = app.layout("id:issue-card >> nth=1")!;
   const workingBox = app.layout("id:lane-working")!;
   await app.drag("id:issue-card >> nth=1", { x: workingBox.x + workingBox.width / 2 - (secondBox.x + secondBox.width / 2), y: 0 });
   await fake.pump(app);
+  expect(app.count("id:issue-peek-modal")).toBe(0);
   expect(app.count("id:issue")).toBe(0);
 
-  // Advance virtual clock past the post-drag click suppression window, then verify a plain click opens detail.
+  // Advance virtual clock past the post-drag click suppression window: plain click opens Quick-Peek, then Expand opens full screen.
   await app.wait(350);
   await app.press("id:issue-card >> nth=1");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  expect(app.count("id:issue")).toBe(0);
+
+  await app.press("id:issue-peek-expand");
   await fake.pumpUntil(app, () => app.count("id:issue") === 1);
+  expect(app.count("id:issue-peek-modal")).toBe(0);
 });
