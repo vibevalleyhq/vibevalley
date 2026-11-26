@@ -6,4 +6,4 @@ mod service;
 #[cfg(test)]
 mod tests;
 
-pub use service::{DEFAULT_CHANNEL, Scheduler};
+pub use service::{DEFAULT_CHANNEL, DigestCronRequest, DigestDeliveryPort, Scheduler};

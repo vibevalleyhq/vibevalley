@@ -349,6 +349,52 @@ impl ConnectorService {
         }
     }
 
+    /// Enqueues outgoing pieces only if `(connector, message_id)` has no non-dropped row yet.
+    pub(crate) async fn add_outgoing_once(&self, id: ConnectorID, message: &str, pieces: &[String], at: i64) -> DbResult<bool> {
+        if pieces.is_empty() {
+            return Ok(false);
+        }
+        let tx = begin_write_tx(self.db.write_conn()).await?;
+        let outcome: DbResult<bool> = async {
+            let existing = connector_outbox::Entity::find()
+                .filter(connector_outbox::Column::Connector.eq(id.as_str()))
+                .filter(connector_outbox::Column::MessageId.eq(message))
+                .filter(connector_outbox::Column::State.ne("dropped"))
+                .count(&tx)
+                .await?;
+            if existing > 0 {
+                return Ok(false);
+            }
+            for piece in pieces {
+                connector_outbox::ActiveModel {
+                    connector: Set(id.as_str().to_owned()),
+                    message_id: Set(message.to_owned()),
+                    body: Set(piece.clone()),
+                    state: Set("pending".to_owned()),
+                    ext_id: Set(None),
+                    error: Set(None),
+                    created_at: Set(at),
+                    sent_at: Set(None),
+                    ..Default::default()
+                }
+                .insert(&tx)
+                .await?;
+            }
+            Ok(true)
+        }
+        .await;
+        match outcome {
+            Ok(inserted) => {
+                commit_tx(tx).await?;
+                Ok(inserted)
+            }
+            Err(err) => {
+                let _ = rollback_tx(tx).await;
+                Err(err)
+            }
+        }
+    }
+
     pub(crate) async fn pending_outgoing(&self, id: ConnectorID) -> DbResult<Vec<ConnectorOutgoingRow>> {
         let rows = connector_outbox::Entity::find()
             .filter(connector_outbox::Column::Connector.eq(id.as_str()))

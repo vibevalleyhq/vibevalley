@@ -8,9 +8,11 @@ use parking_lot::Mutex;
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::SliceMask;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, IssueStatus, NoticeLevel, Preview};
+use vibevalley_protocol::{ActorKind, ApiError, BizCode, Cron, CronRequest, CronWhen, IssueStatus, NoticeLevel, Preview, Run};
 
 use crate::channel::{Chat, Noticing};
+use crate::connector::Connector;
+use crate::connector::digest::{DigestSpec, DigestTargets, build_progress_digest, format_digest_directive, format_progress_digest, parse_digest_directive};
 use crate::context::Context;
 use crate::context::error::{LookIn, missing};
 use crate::context::port::{CronAgentPort, CronOrchestratorPort};
@@ -20,6 +22,29 @@ use crate::service::internal_db;
 
 pub const DEFAULT_CHANNEL: &str = "general";
 const TICK: Duration = Duration::from_secs(20);
+const DEFAULT_DIGEST_WINDOW_MS: i64 = 24 * 60 * 60_000;
+
+/// Delivers formatted scheduled progress digests to external connectors.
+pub trait DigestDeliveryPort: Send + Sync {
+    fn deliver_digest_async<'a>(&'a self, cron_id: &'a str, at: i64, targets: DigestTargets, text: &'a str) -> crate::BoxFuture<'a, Result<usize, ApiError>>;
+}
+
+impl DigestDeliveryPort for Connector {
+    fn deliver_digest_async<'a>(&'a self, cron_id: &'a str, at: i64, targets: DigestTargets, text: &'a str) -> crate::BoxFuture<'a, Result<usize, ApiError>> {
+        Box::pin(async move { Connector::deliver_digest_async(self, cron_id, at, targets, text).await })
+    }
+}
+
+/// Request payload for scheduling a progress digest cron job.
+#[derive(Debug, Clone)]
+pub struct DigestCronRequest {
+    pub name: String,
+    pub note: String,
+    pub channel: Option<String>,
+    pub when: CronWhen,
+    pub tz: Option<String>,
+    pub spec: DigestSpec,
+}
 
 fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::CronRefused, text)
@@ -67,6 +92,7 @@ pub struct Scheduler {
     lock: AsyncMutex<()>,
     chat: Option<Arc<Chat>>,
     orchestrator: Option<Arc<dyn CronOrchestratorPort>>,
+    digest_delivery: Mutex<Option<Arc<dyn DigestDeliveryPort>>>,
     closed: AtomicBool,
     ticker: Mutex<Option<Ticker>>,
 }
@@ -115,9 +141,15 @@ impl Scheduler {
             lock: AsyncMutex::new(()),
             chat,
             orchestrator,
+            digest_delivery: Mutex::new(None),
             closed: AtomicBool::new(false),
             ticker: Mutex::new(None),
         }))
+    }
+
+    /// Binds the connector delivery target used by `[digest]` scheduled crons.
+    pub fn set_digest_delivery(&self, target: Arc<dyn DigestDeliveryPort>) {
+        *self.digest_delivery.lock() = Some(target);
     }
 
     /// Stops the ticker.
@@ -190,6 +222,25 @@ impl Scheduler {
             .into_iter()
             .find(|c| c.id == id)
             .ok_or_else(|| missing(t("server.cron.noCron", &[("id", id.into())]), LookIn::Cron))
+    }
+
+    /// Schedules a progress digest cron job that summarizes recent Issues and Runs
+    /// and delivers to the configured connector targets.
+    pub async fn add_digest_async(&self, req: DigestCronRequest, by: ActorKind) -> Result<Cron, ApiError> {
+        let text = format_digest_directive(&req.spec, &req.note);
+        self.add_async(
+            CronRequest {
+                name: req.name,
+                text,
+                channel: req.channel,
+                agent: None,
+                repo: None,
+                when: req.when,
+                tz: req.tz,
+            },
+            by,
+        )
+        .await
     }
 
     /// `add_async`: `by` is who asks, and on whose word (`needsOK`).
@@ -319,13 +370,14 @@ impl Scheduler {
             let due_runs: Vec<_> = vibevalley_core::cron::due_crons(&rules, at)
                 .into_iter()
                 .map(|due| {
+                    let prev_last_run = due.last_run;
                     let missed = vibevalley_core::cron::is_missed(due, at);
                     let after = vibevalley_core::cron_from_rules(vibevalley_core::cron::after_run(due, at));
                     let words = vibevalley_core::cron::due_text(due, missed);
-                    (after, words)
+                    (after, words, prev_last_run)
                 })
                 .collect();
-            for (after, words) in due_runs {
+            for (after, words, prev_last_run) in due_runs {
                 if let Err(e) = self.put_async(after.clone()).await {
                     // Not kept: due again at the next tick.
                     self.ctx
@@ -333,13 +385,64 @@ impl Scheduler {
                         .publish_notice(self.ctx.now(), NoticeLevel::Warn, format!("cron {}: {}", after.id, e.message));
                     continue;
                 }
-                if let Err(e) = self.scheduled_async(&after, &words).await {
+                if let Err(e) = self.scheduled_at_async(&after, &words, prev_last_run, at).await {
                     self.ctx
                         .live
                         .publish_notice(self.ctx.now(), NoticeLevel::Warn, format!("{}: {}", after.name, e.message));
                 }
             }
         })
+    }
+
+    async fn collect_recent_runs_async(&self, issues: &[vibevalley_protocol::Issue], window_start: i64) -> Vec<Run> {
+        let mut runs = Vec::new();
+        for issue in issues {
+            if !issue.was_sent() {
+                continue;
+            }
+            if issue.status.is_closed() && issue.closed_at.is_none_or(|c| c < window_start) {
+                continue;
+            }
+            if let Ok(found) = self.board.runs_async(&issue.id).await {
+                runs.extend(found);
+            }
+        }
+        runs
+    }
+
+    async fn deliver_digest_async(&self, cron: &Cron, spec: &DigestSpec, prev_last_run: Option<i64>, at: i64) -> Result<(), ApiError> {
+        let fail = |e: BoardError| match e {
+            BoardError::Api(e) => e,
+            e => ApiError::new(BizCode::IssueRefused, e.to_string()),
+        };
+        let window_start = prev_last_run.unwrap_or_else(|| at.saturating_sub(DEFAULT_DIGEST_WINDOW_MS));
+        let issues = self.board.issues_async().await.map_err(fail)?;
+        let sessions = self.board.sessions_async().await.map_err(fail)?;
+        let runs = self.collect_recent_runs_async(&issues, window_start).await;
+        let digest = build_progress_digest(&cron.name, &issues, &sessions, &runs, window_start, at);
+        if spec.skip_if_empty && digest.is_empty() {
+            return Ok(());
+        }
+        let text = format_progress_digest(&digest);
+        if let Some(chat) = self.chat.as_ref() {
+            let channel = if chat.place(&cron.channel).is_some() {
+                cron.channel.clone()
+            } else {
+                chat.default_channel()
+            };
+            chat.notice_async(Noticing {
+                channel,
+                text: text.clone(),
+                code: "cron.digest".into(),
+                ..Default::default()
+            })
+            .await;
+        }
+        let delivery = self.digest_delivery.lock().clone();
+        if let Some(delivery) = delivery {
+            delivery.deliver_digest_async(&cron.id, at, spec.targets.clone(), &text).await?;
+        }
+        Ok(())
     }
 
     /// A cron for no profile: its words said in its channel and handed to
@@ -373,15 +476,24 @@ impl Scheduler {
         }
     }
 
-    /// `scheduled_async`: the issue the cron owns, started, reopened or told;
-    /// else a new one linked back to `cron.issue_id`.
-    fn scheduled_async<'a>(&'a self, cron: &'a Cron, words: &'a str) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ApiError>> + Send + 'a>> {
+    /// `scheduled_at_async`: runs a digest push if `cron` carries a digest directive;
+    /// otherwise starts, reopens, or tells the cron's linked issue, or notifies the orchestrator.
+    fn scheduled_at_async<'a>(
+        &'a self,
+        cron: &'a Cron,
+        words: &'a str,
+        prev_last_run: Option<i64>,
+        at: i64,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ApiError>> + Send + 'a>> {
         Box::pin(async move {
             let fail = |e: BoardError| match e {
                 BoardError::Api(e) => e,
                 e => ApiError::new(BizCode::IssueRefused, e.to_string()),
             };
             let Some(agent) = &cron.agent else {
+                if let Some(spec) = parse_digest_directive(&cron.text) {
+                    return self.deliver_digest_async(cron, &spec, prev_last_run, at).await;
+                }
                 return self.to_orchestrator_async(cron, words).await;
             };
             let found = match self.issue_of(&cron.id) {

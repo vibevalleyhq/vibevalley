@@ -7,7 +7,7 @@ use std::sync::{Arc, OnceLock};
 use crate::agent::{Agent, AgentDriver, Mcp, Memory, Orchestrator, OrchestratorParts, PendingExecution, Profile, Resource, ToolRegistry};
 use crate::artifact::Manager as ArtifactManager;
 use crate::boot::{
-    LazyCronOrchestrator, build_runtimes, register_session_reported_outbox, seat_orchestrators_and_watch, seed_starter_issues_on_boot,
+    LazyCronOrchestrator, build_context, build_runtimes, register_session_reported_outbox, seat_orchestrators_and_watch, seed_starter_issues_on_boot,
     spawn_chat_artifact_bridge, spawn_skin_event_bridge,
 };
 use crate::channel::Chat;
@@ -15,7 +15,7 @@ use crate::config::failed;
 pub use crate::config::{Config, StartError, StartErrorKind};
 use crate::connector::Connector;
 use crate::context::port::{CronOrchestratorPort, MemoryRecallPort};
-use crate::context::{Context, Fetch, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup, install_tls};
+use crate::context::{Context, install_tls};
 use crate::cron::Scheduler as CronScheduler;
 use crate::debug::DebugKit;
 use crate::debug_sources::build_debug_kit;
@@ -152,14 +152,7 @@ async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Resu
             .await
             .map_err(|e| StartError::from_db_error(e, Some(config.home.join("server.db"))))?,
     };
-    let (http, download): (Arc<dyn Fetch>, Arc<dyn Fetch>) = match &config.media_network {
-        Some(network) => network.clone(),
-        None if config.offline_media => crate::fake::moss::network(),
-        None => (Arc::new(Http), Arc::new(PublicDownload)),
-    };
-    let (live, outbox, feed) = (Arc::new(LiveState::new()), Arc::new(Outbox::new(service.clone())), Arc::new(StateFeed::new()));
-    let clock = config.clock.clone();
-    let ctx = Arc::new(Context::new(service, TaskGroup::new(), live, outbox, feed, clock, http, download));
+    let ctx = build_context(service, &config);
     let active_subscriptions = Arc::new(AtomicUsize::new(0));
 
     let setting = Setting::open_async(SettingConfig {
@@ -319,7 +312,7 @@ async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Resu
     let game = Game::open_async(&config.home, ctx.clone(), repo.clone()).await;
     game.count_commits(config.git_emails.clone());
     spawn_skin_event_bridge(&ctx, &game, &runtime, &channel).await;
-    register_session_reported_outbox(&ctx, &issue_chat, &session_chat, &agent, &game, &runtime);
+    register_session_reported_outbox(&ctx, &issue_chat, &session_chat, &agent, &game, &runtime, &connector, &cron);
 
     let debug = build_debug_kit(
         &ctx,

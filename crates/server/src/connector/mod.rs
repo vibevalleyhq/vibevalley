@@ -10,10 +10,12 @@
 
 pub mod adapter;
 mod bridge;
-mod digest;
+pub mod digest;
 mod feishu;
+pub mod notify;
 mod qq;
 mod service;
 mod weixin;
 
+pub use notify::{NotifyDecision, NotifyOptions, QuietHours, SuppressReason};
 pub use service::{Connector, Options, Vendors, app_of};

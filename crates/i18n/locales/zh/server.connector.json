@@ -61,5 +61,34 @@
     "incomplete": "微信确认了，但没给齐登录信息，请重试。",
     "tooLong": "等太久没扫，二维码过期了。"
   },
-  "digest": "你不在的时候有 {n} 条消息：\n{lines}\n\n完整的在默认频道里。"
+  "digest": "你不在的时候有 {n} 条消息：\n{lines}\n\n完整的在默认频道里。",
+  "push": {
+    "asking": "【需要回复 · {target}】\n{question}\n\n直接回复此消息即可继续。",
+    "askingMore": "【需要回复 · {target}】\n{question}（共 {n} 个问题）\n\n直接回复此消息即可继续。",
+    "reviewing": "【待你验收 · {target}】\n{summary}\n\n请在工作台验收或回复意见。",
+    "conflict": "【合并冲突 · {target}】\n与 {base} 冲突（{n} 个文件：{files}）\n\n请在工作台处理冲突后重试。",
+    "conflictWhy": "【合并冲突 · {target}】\n{why}\n\n请在工作台处理冲突后重试。",
+    "interrupted": "【运行中断 · {target}】\n{summary}\n\n可在工作台恢复或回复继续。",
+    "failed": "【执行失败 · {target}】\n{summary}\n\n可在工作台查看详情或回复重试。",
+    "runCompleted": "【一轮完成 · {name}】\n{summary}",
+    "runCompletedTokens": "【一轮完成 · {name}】\n{summary}\n（消耗 {tokens} tokens）",
+    "runFailed": "【一轮失败 · {name}】\n{summary}"
+  },
+  "cronDigest": {
+    "title": "【进展简报 · {title}】",
+    "counts": "工单：待回复 {asking} · 待验收 {reviewing} · 阻塞 {stuck} · 进行中 {working} · 近期完成 {done}",
+    "runs": "运行：完成 {completed} · 失败 {failed} · 中断 {interrupted}",
+    "attentionHeader": "需要你处理：",
+    "completedHeader": "近期完成：",
+    "workingHeader": "进行中：",
+    "itemAsk": "· [待回复] #{number} {title}：{detail}",
+    "itemReview": "· [待验收] #{number} {title}：{detail}",
+    "itemConflict": "· [冲突] #{number} {title}：{detail}",
+    "itemInterrupted": "· [中断] #{number} {title}：{detail}",
+    "itemFailed": "· [失败] #{number} {title}：{detail}",
+    "itemWorking": "· [进行中] #{number} {title}",
+    "itemDone": "· #{number} {title}",
+    "more": "……还有 {n} 项",
+    "quiet": "近期暂无新增进度，当前没有待处理工单。"
+  }
 }

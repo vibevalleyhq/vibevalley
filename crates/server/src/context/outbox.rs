@@ -13,7 +13,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
 use vibevalley_core::{SharedClock, system_clock};
-use vibevalley_protocol::{ApiError, BizCode, Millis, Outcome, Spent};
+use vibevalley_protocol::{ApiError, BizCode, ConnectorID, Millis, Outcome, Spent};
 
 use super::api::BoxFuture;
 use super::task::TaskGroup;
@@ -28,6 +28,7 @@ const DEFAULT_POLL_INTERVAL: Duration = Duration::from_secs(5);
 
 pub const OUTBOX_SESSION_REPORTED: &str = "work.session.reported";
 pub const OUTBOX_SESSION_REMEMBER: &str = "memory.session_remember";
+pub const OUTBOX_CONNECTOR_NOTIFY: &str = "connector.notify";
 
 /// Durable report payload persisted via `Outbox` when a session round finishes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -40,6 +41,19 @@ pub struct OutboxSessionReported {
     pub run: Option<String>,
 }
 
+/// Durable connector push/digest notification persisted via `Outbox`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutboxConnectorNotify {
+    pub connector: Option<ConnectorID>,
+    pub dedupe_key: String,
+    pub message_id: String,
+    pub issue_id: Option<String>,
+    pub channel_id: Option<String>,
+    pub body: String,
+    pub created_at: Millis,
+    pub urgent: bool,
+}
+
 /// Closed typed event catalog carried by the durable [`Outbox`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "topic", content = "payload")]
@@ -48,6 +62,8 @@ pub enum OutboxEvent {
     SessionReported(OutboxSessionReported),
     #[serde(rename = "memory.session_remember")]
     SessionRemember { agent: String, text: String, repo: Option<String> },
+    #[serde(rename = "connector.notify")]
+    ConnectorNotify(OutboxConnectorNotify),
 }
 
 impl OutboxEvent {
@@ -55,6 +71,7 @@ impl OutboxEvent {
         match self {
             Self::SessionReported(_) => OUTBOX_SESSION_REPORTED,
             Self::SessionRemember { .. } => OUTBOX_SESSION_REMEMBER,
+            Self::ConnectorNotify(_) => OUTBOX_CONNECTOR_NOTIFY,
         }
     }
 
@@ -62,6 +79,7 @@ impl OutboxEvent {
         let res = match self {
             Self::SessionReported(report) => serde_json::to_string(report),
             Self::SessionRemember { agent, text, repo } => serde_json::to_string(&RememberPayload { agent, text, repo }),
+            Self::ConnectorNotify(notify) => serde_json::to_string(notify),
         };
         res.map_err(|e| ApiError::new(BizCode::InternalError, format!("outbox payload serialize failed: {e}")))
     }
@@ -130,6 +148,7 @@ impl OutboxDelivery {
                     repo: p.repo,
                 })
             }
+            OUTBOX_CONNECTOR_NOTIFY => Ok(OutboxEvent::ConnectorNotify(serde_json::from_str(&self.payload_json)?)),
             _ => Err(serde::de::Error::custom(format!("unknown outbox topic `{}`", self.topic))),
         }
     }
@@ -173,6 +192,15 @@ impl Outbox {
     pub async fn enqueue_event(&self, event: &OutboxEvent) -> Result<i64, ApiError> {
         let payload_json = event.serialize_payload_json()?;
         self.service.outbox.enqueue(event.topic(), &payload_json, self.clock.now_ms()).await
+    }
+
+    /// Enqueues a typed [`OutboxEvent`] standalone scheduled for `available_at` (ms).
+    pub async fn enqueue_event_at(&self, event: &OutboxEvent, available_at: i64) -> Result<i64, ApiError> {
+        let payload_json = event.serialize_payload_json()?;
+        self.service
+            .outbox
+            .enqueue_at(event.topic(), &payload_json, self.clock.now_ms(), available_at)
+            .await
     }
 
     /// Enqueues a typed [`OutboxEvent`] inside an open write transaction using the configured clock.
