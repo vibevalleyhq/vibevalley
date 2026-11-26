@@ -1184,7 +1184,19 @@ export const catalogs = {
           "这里是田头，你、助手和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每张工单下面挂着它的工单串。",
         send: "发送",
       },
-      hud: { workbench: "工作台" },
+      hud: {
+        workbench: "工作台",
+        dawn: "晨",
+        noon: "昼",
+        dusk: "暮",
+        night: "夜",
+        liftRoof: "掀顶",
+        closeRoof: "合顶",
+        resetCamera: "回正",
+        phone: "手机",
+        enter: "进入",
+        backToYard: "返回庭院",
+      },
       sow: {
         homeless: "这座农场不是哪个仓库的",
         toMap: "种地要先进一个仓库的农场：去「仓库」里挑一个仓库。",
@@ -4522,7 +4534,19 @@ export const catalogs = {
           'This is the farm chat, where you, the assistant and the helpers talk. Tell me something to do, such as "have the tester run the tests".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.',
         send: "Send",
       },
-      hud: { workbench: "Workbench" },
+      hud: {
+        workbench: "Workbench",
+        dawn: "Dawn",
+        noon: "Noon",
+        dusk: "Dusk",
+        night: "Night",
+        liftRoof: "Lift roof",
+        closeRoof: "Close roof",
+        resetCamera: "Reset",
+        phone: "Phone",
+        enter: "Enter",
+        backToYard: "Back to yard",
+      },
       sow: {
         homeless: "This farm belongs to no repo",
         toMap: "To plant, enter a repo's farm first: open Repos and pick a repository.",
@@ -7963,6 +7987,16 @@ export interface Messages {
   "web.farm.harvest.repo": { readonly repo: string | number };
   "web.farm.harvest.resolve": undefined;
   "web.farm.harvest.take": { readonly base: string | number };
+  "web.farm.hud.backToYard": undefined;
+  "web.farm.hud.closeRoof": undefined;
+  "web.farm.hud.dawn": undefined;
+  "web.farm.hud.dusk": undefined;
+  "web.farm.hud.enter": undefined;
+  "web.farm.hud.liftRoof": undefined;
+  "web.farm.hud.night": undefined;
+  "web.farm.hud.noon": undefined;
+  "web.farm.hud.phone": undefined;
+  "web.farm.hud.resetCamera": undefined;
   "web.farm.hud.workbench": undefined;
   "web.farm.menu.issues": undefined;
   "web.farm.menu.repos": undefined;
