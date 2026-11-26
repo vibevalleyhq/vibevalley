@@ -794,3 +794,82 @@ fn artifact_preview_and_derived_cover_without_crdt_or_version_pollution() {
     drop(listener);
     started.close_blocking();
 }
+
+#[cfg(unix)]
+#[test]
+fn regression_symlinked_home_canonicalizes_cover_and_frame_paths() {
+    let real_parent = tempfile::tempdir().unwrap();
+    let real_home = real_parent.path().join("real-home");
+    let link_home = real_parent.path().join("link-home");
+    std::fs::create_dir_all(&real_home).unwrap();
+    std::os::unix::fs::symlink(&real_home, &link_home).unwrap();
+
+    let canonical_home = std::fs::canonicalize(&real_home).unwrap();
+    let png_b64 = BASE64.encode(minimal_png_bytes(640, 400));
+
+    let started = start(&link_home);
+    let hub = started.router().clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let sb = ok(call(
+        "artifact.create",
+        json!({
+            "title": "Symlink Storyboard",
+            "artifactType": "storyboard",
+            "announce": false,
+            "files": [
+                {
+                    "path": "structure/shots.json",
+                    "content": serde_json::to_string(&json!({
+                        "title": "Symlink Storyboard",
+                        "shots": [{ "id": "sh01", "scene": "Open", "durationSec": 2.0, "frameAsset": "asset/frames/sh01.png" }]
+                    })).unwrap()
+                },
+                { "path": "asset/frames/sh01.png", "encoding": "base64", "content": png_b64 }
+            ]
+        }),
+    ));
+    let frame_path = sb["preview"]["framePath"].as_str().expect("framePath");
+    assert!(
+        std::path::Path::new(frame_path).starts_with(&canonical_home),
+        "expected canonical framePath under {}, got {frame_path}",
+        canonical_home.display()
+    );
+
+    let proto = ok(call(
+        "artifact.create",
+        json!({ "title": "Symlink Prototype", "artifactType": "prototype", "announce": false }),
+    ));
+    let proto_id = proto["id"].as_str().unwrap().to_string();
+    let cover = ok(call(
+        "artifact.cover.set",
+        json!({ "id": proto_id, "seq": 1, "mime": "image/png", "data": png_b64, "width": 640, "height": 400 }),
+    ));
+    let cover_path = cover["path"].as_str().expect("cover.path");
+    assert!(
+        std::path::Path::new(cover_path).starts_with(&canonical_home),
+        "expected canonical cover.path under {}, got {cover_path}",
+        canonical_home.display()
+    );
+
+    // Reload from disk in a fresh server instance to verify `read_cover_from_disk_async` and `.preview.json` cache path too.
+    started.close_blocking();
+    let restarted = start(&link_home);
+    let hub2 = restarted.router().clone();
+    let reloaded_proto = ok(hub2.call_as(Caller::User, "artifact.get", json!({ "id": proto_id })));
+    let reloaded_cover_path = reloaded_proto["cover"]["path"].as_str().expect("reloaded cover.path");
+    assert!(
+        std::path::Path::new(reloaded_cover_path).starts_with(&canonical_home),
+        "expected canonical reloaded cover.path under {}, got {reloaded_cover_path}",
+        canonical_home.display()
+    );
+    let reloaded_sb = ok(hub2.call_as(Caller::User, "artifact.get", json!({ "id": sb["id"].as_str().unwrap() })));
+    let reloaded_frame_path = reloaded_sb["preview"]["framePath"].as_str().expect("reloaded framePath");
+    assert!(
+        std::path::Path::new(reloaded_frame_path).starts_with(&canonical_home),
+        "expected canonical reloaded framePath under {}, got {reloaded_frame_path}",
+        canonical_home.display()
+    );
+
+    restarted.close_blocking();
+}
