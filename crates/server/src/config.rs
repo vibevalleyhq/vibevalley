@@ -198,3 +198,20 @@ pub(crate) fn failed(what: &str) -> impl Fn(&dyn std::fmt::Display) -> StartErro
     };
     move |e| StartError::new(kind, format!("{what}: {e}"))
 }
+
+impl Config {
+    pub(crate) async fn open_service(&self) -> Result<std::sync::Arc<crate::service::Service>, StartError> {
+        tokio::fs::create_dir_all(&self.home).await.map_err(|e| failed("the home")(&e))?;
+        for dir in [self.work_root.clone(), self.work_root.join("repos"), self.work_root.join("worktrees")] {
+            tokio::fs::create_dir_all(&dir).await.map_err(|e| failed("the work root")(&e))?;
+        }
+        match self.database_url.as_deref() {
+            Some(url) => Box::pin(crate::service::Service::open_url(url))
+                .await
+                .map_err(|e| StartError::from_db_error(e, None)),
+            None => Box::pin(crate::service::Service::open(&self.home))
+                .await
+                .map_err(|e| StartError::from_db_error(e, Some(self.home.join("server.db")))),
+        }
+    }
+}
