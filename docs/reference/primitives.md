@@ -141,6 +141,8 @@
 | `followArtifact` | `gateway.ts` | An artifact directory's file changes after this seq, then each committed batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `followArtifactPresence` | `gateway.ts` | An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. |
+| `clampUpdatePercent` | `host.ts` | Clamps an update download percentage to a whole number between 0 and 100. |
+| `formatUpdateTransfer` | `host.ts` | Formats downloaded/total bytes and transfer speed for the update progress UI. |
 | `currentHost` | `host.ts` |  |
 | `farmCallsSchema` | `hostParams.ts` |  |
 | `readHostParams` | `hostParams.ts` |  |
