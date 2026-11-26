@@ -8,9 +8,9 @@ Status: proposed
 
 | 缺口 | 源码位置 | 现状与限制 |
 |---|---|---|
-| 仅支持启动前静态脚本与轮询转储 | [debug.rs](apps/mac/src/debug.rs#L130-L200) | 必须在启动前配置 `VIBEVALLEY_DEBUG_SCRIPT` 逐行静态执行（固定 `400 ms` 步进与手写 `wait:<ms>` 盲等）和 `VIBEVALLEY_DEBUG_DUMP` 每 `1000 ms` 整份覆盖写 JSON 文件，无法对运行中实例热挂载，也不支持实时事件流 |
-| 无法按语义检视与触发 `nsh` 界面 | [debug.rs](apps/mac/src/debug.rs#L205-L302) | 只能向窗口注入裸坐标 `mouse:click,x,y` 与盲发快捷键 `key:...`，无法按 `testID`、文本或 `role` 查询节点树和边界框，也无法做语义点击或条件等待，验收脚本极易因布局微调失效 |
-| 调试通道与状态分散在三处 | [debug.rs](apps/mac/src/debug.rs)、[hosted/debug.rs](apps/mac/src/hosted/debug.rs)、[shell/devtools.rs](apps/mac/src/shell/devtools.rs)、[DevToolsApp.tsx](apps/mac/ui/features/devtools/DevToolsApp.tsx) | `debug.rs` 独立维护非类型化文本脚本解析、键鼠注入、Metal 截屏与壳状态转储；`ShellDebugHandle` 独立向服务端 `HostDebugBridge` 汇报路由、缓存与帧耗时；`devtools.rs` 与 `DevToolsApp.tsx` 仅支持进程内 `VIBEVALLEY_DEBUG=1` 自我观察，无法跨进程调试另一个 VibeValley 实例 |
+| 仅支持启动前静态脚本与轮询转储 | 原 `apps/mac/src/debug.rs`（现拆分至 [script.rs](apps/mac/src/debug/script.rs)） | 必须在启动前配置 `VIBEVALLEY_DEBUG_SCRIPT` 逐行静态执行（固定 `400 ms` 步进与手写 `wait:<ms>` 盲等）和 `VIBEVALLEY_DEBUG_DUMP` 每 `1000 ms` 整份覆盖写 JSON 文件，无法对运行中实例热挂载，也不支持实时事件流 |
+| 无法按语义检视与触发 `nsh` 界面 | 原 `apps/mac/src/debug.rs`（现拆分至 [executor.rs](apps/mac/src/debug/executor.rs)） | 只能向窗口注入裸坐标 `mouse:click,x,y` 与盲发快捷键 `key:...`，无法按 `testID`、文本或 `role` 查询节点树和边界框，也无法做语义点击或条件等待，验收脚本极易因布局微调失效 |
+| 调试通道与状态分散在三处 | [debug/mod.rs](apps/mac/src/debug/mod.rs)、[hosted/debug.rs](apps/mac/src/hosted/debug.rs)、[shell/devtools.rs](apps/mac/src/shell/devtools.rs)、[DevToolsApp.tsx](apps/mac/ui/features/devtools/DevToolsApp.tsx) | 原 `debug.rs` 独立维护非类型化文本脚本解析、键鼠注入、Metal 截屏与壳状态转储；`ShellDebugHandle` 独立向服务端 `HostDebugBridge` 汇报路由、缓存与帧耗时；`devtools.rs` 与 `DevToolsApp.tsx` 仅支持进程内 `VIBEVALLEY_DEBUG=1` 自我观察，无法跨进程调试另一个 VibeValley 实例 |
 
 既有提案 [VibeValley DevTools V2](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md) 规划了进程内画布 `Inspector`、Trajectory 联动与 Loro 状态检视，并提出以强类型命令替代旧文本脚本。本提案在此基础上定义跨进程热挂载的 VDP（VibeValley DevTools Protocol）协议、统一宿主执行器与三类客户端架构。
 
@@ -74,7 +74,7 @@ flowchart LR
 
 ### 3. 统一宿主调试架构与可选 `UI.*` 探针
 
-- **重构 `apps/mac/src/debug/` 模块**：将 437 行的单体 [debug.rs](apps/mac/src/debug.rs) 拆分为四个职责清晰的子文件，消除脚本与远程调试的重复解析：
+- **重构 `apps/mac/src/debug/` 模块**：将 437 行的单体 `apps/mac/src/debug.rs` 拆分为四个职责清晰的子文件，消除脚本与远程调试的重复解析：
   - `apps/mac/src/debug/mod.rs`：解析 `--remote-debugging-port` / `VIBEVALLEY_DEBUG_PORT`，装配脚本适配与 VDP 监听门生命周期，应用退出时经 `on_app_quit` 清理 `debug.json`。
   - `apps/mac/src/debug/executor.rs`：唯一命令执行器，接收已解码的 `VdpCommand` 并在 GPUI 主线程执行壳状态快照、导航、分栏、终端读写、键鼠派发、`BridgeHub` 服务端调用及截屏；`Page.captureScreenshot` 对 `target: "webview"` 直接复用 [capture.rs](apps/mac/src/capture.rs) 的原生 `WKWebView` 截屏，对 `target: "shell"` 在编译启用 `--features shot` 时从 Metal 纹理内存编码 PNG，未启用时返回明确的 `UNAVAILABLE` 错误。
   - `apps/mac/src/debug/script.rs`：保留对既有 `VIBEVALLEY_DEBUG_SCRIPT` 与 `VIBEVALLEY_DEBUG_DUMP` 的向后兼容适配，将脚本行转换为 `VdpCommand` 委托给 `executor.rs`，不保留第二套执行逻辑。
@@ -104,7 +104,7 @@ flowchart LR
 
 - **默认关闭零开销**：不传 `--remote-debugging-port` 且未设 `VIBEVALLEY_DEBUG_PORT` 时，不绑定 VDP 端口、不创建 `$VIBEVALLEY_HOME/debug.json`、`host.params` 不含 `vdpEnabled`。
 - **回环鉴权与发现文件不变量**：启用 `VIBEVALLEY_DEBUG_PORT=0` 时，`$VIBEVALLEY_HOME/debug.json` 以 Unix `0600` 权限原子写入且包含有效非零端口；未携带令牌或令牌错误访问 `/json/version`、`/json/list`、`/devtools` 均返回 `401`；任何 HTTP 响应体不含 `token`；应用正常退出后删除 `debug.json`，陈旧死进程文件由 `read_debug_endpoint` 忽略。
-- **宿主执行器统一**：[debug.rs](apps/mac/src/debug.rs) 拆分为 `apps/mac/src/debug/{mod.rs,executor.rs,script.rs,vdp.rs}`，VDP WebSocket 与 `VIBEVALLEY_DEBUG_SCRIPT` 共用 `executor.rs`，既有脚本命令保持兼容。
+- **宿主执行器统一**：原 `apps/mac/src/debug.rs` 拆分为 [mod.rs](apps/mac/src/debug/mod.rs)、[executor.rs](apps/mac/src/debug/executor.rs)、[script.rs](apps/mac/src/debug/script.rs) 与 [vdp.rs](apps/mac/src/debug/vdp.rs)，VDP WebSocket 与 `VIBEVALLEY_DEBUG_SCRIPT` 共用 `executor.rs`，既有脚本命令保持兼容。
 - **双进程实机验收**：以隔离 `VIBEVALLEY_HOME`、`VIBEVALLEY_STORE` 与 `VIBEVALLEY_DEBUG_PORT=0` 启动 `vibevalley-mac --features shot`，通过 `vibevalley debug` 实测 `discover`、`targets`、`state`、`navigate /library`、`ui-query`、`screenshot`（写出非空有效 PNG）与 `server-slice board` 全部成功；另一实例的 [DevToolsApp.tsx](apps/mac/ui/features/devtools/DevToolsApp.tsx) 可经 `host.vdpDiscover` / `host.vdpCall` 发现、挂载、执行远端命令并预览实时截屏。
 - **静态、契约与测试门禁全绿**：`cargo xtask protocol`、`cargo xtask audit`、`cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test -p vibevalley-protocol -p vibevalley-cli -p vibevalley-mac`、`vp run packages:check`、`vp run mac:check`、`vp run deadcode`、`vpx scripts/audit/ui-tokens.ts`、`vpx scripts/gen/i18n.ts check` 与 `vp run docs:verify` 全部通过。
 - **沉淀文档**：功能合入主线后，将长期成立的协议、发现文件约定与宿主架构沉淀至 [客户端](docs/subsystems/app.md) 与 [核心状态](docs/subsystems/core.md)，并删除本 Note。

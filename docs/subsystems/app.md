@@ -27,7 +27,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | `apps/mac/crates/` | 桌面端独占支撑 crate：`diorama`、`terminal`、`workspace`（项目、布局含 `PaneKind::Chat` 与 `PaneKind::Diorama`、终端与宿主 `state.db` 持久化） |
 | `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版、相对图片解析缓存与供纯 GPUI 窗格直连的 `native_markdown_root`、`VvIcon`（[icon.rs](crates/rich/src/icon.rs)，承载 97 枚工作台 reicon 线性图标并以无锁 `OnceLock<Vec<Path>>` 零拷贝共享解析路径；前端 [icons.ts](apps/mac/ui/design/icons.ts) 只保留纯类型 `IconName`，[icons.ts](scripts/gen/icons.ts) 另单源生成 `iconPaths.gen.ts` 供无原生 `VvIcon` 时经 `<Canvas>` + `Path2D` 矢量回退）、`VvI18n`（`"vibevalley/rich"` 导出 `.translate(...)`，由 `installNativeI18n()` 接管 `@vibevalley/i18n`，使生产 UI 包不含 `packages/i18n` JS 词典）、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`（四者经 `run_offloaded` 将大尺寸未缓存渲染移出 UI 线程并用 `LruCache::get_by` 零拷贝查缓存）、`VvGenUi`（按 `(doc_gen, state_rev)` 缓存解析树）、`VvWhiteboard`（含 Loro Phase A 实时在场光标/占位框/一键跟随视口与 `onCursorMove`/`onViewportChange` 回调）、`VvPinyin`）与内部渲染引擎 `engine/` |
 | `apps/mac/src/theme.rs`、`apps/mac/src/theme_tokens.rs` | 外壳的主题、动画幅度（`Settings.motion`）与字号设置；令牌从 `design/tokens.json` 同步生成 |
-| `apps/mac/src/debug.rs` | 不看屏幕检查应用的两个入口：状态转储和脚本（[验收](.agents/skills/vv-acceptance/references/app.md)） |
+| `apps/mac/src/debug/` | 不看屏幕检查与远程调试应用的入口：VDP 回环调试门（`vdp.rs`）、统一命令执行器（`executor.rs`）及脚本/状态转储适配（`script.rs`，[验收](.agents/skills/vv-acceptance/references/app.md)） |
 | `apps/mac/ui/App.tsx`、`ShellApp.tsx`、`workspace/` | 双入口 TSX 包：`App.tsx` 供全量工作台（`vv` / `vibevalley`）与农场视图（`farm-form` / `farm-phone`），`ShellApp.tsx` 专供轻量工作区壳窗格（`devtools`、`sidebar`、`palette`、`workspace-chat`、`probe`；Markdown 预览已下沉为纯 GPUI `MarkdownView`），两份入口启动时均调 `installNativeI18n()` 走原生 `VvI18n` 并挂载 `DesignHostProvider`，按 `host.params.view` 挑视图 |
 | `apps/mac/ui/{app,features,design,infra}/` | 工作台共 6 个顶级目录：入口外壳 `app/`（路由表 `Workbench.tsx`、`WorkbenchDesignHost`、6 项一级导航 `places.ts`、外框 `Shell.tsx`）、领域切片 `features/<概念>/`（含二元统一内容中心壳 `content/`、5 栏设置页、Artifact 引擎含右侧 `HistoryPanel.tsx` 历史面板、`outline` 大纲笔记与 `OutlineImportModal.tsx` `.md` 导入、素材库）、共享原语与表面 `design/`（经 `DesignHostContext`（[host.tsx](apps/mac/ui/design/host.tsx)）与 `infra/` 解耦，含动效出口 `motion.ts`、防闪烁骨架原语 `Skeleton.tsx` 与 `Markdown.tsx` / `code/GenUi.tsx` 的 `onGenUiAction` 闭环）、底层运行时与状态 `infra/`（`bridge.ts`、`attachmentFile.ts`、`solid.ts`、`polyfill.ts`、`state/`），另加 `workspace/` 与 `farm/` |
 | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)），与 `apps/mobile` 令牌一同由 [tokens.ts](scripts/gen/tokens.ts) 从 [tokens.json](design/tokens.json) 生成 |
@@ -162,7 +162,7 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 
 - 真实音频验收、Developer ID 签名公证与签名包发布主线验收，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)。
 - 移动端真机分发签名与后台提醒机制，见[移动远程控制](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)。
-- DevTools V2（画布 `Inspector` `testID` 点选与源码跳转、Loro 前沿视图、强类型 `DebugCommand` 替换 `apps/mac/src/debug.rs`），见[VibeValley DevTools V2](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)。
+- DevTools V2（画布 `Inspector` `testID` 点选与源码跳转、Loro 前沿视图、强类型 `DebugCommand` 替换 `apps/mac/src/debug/script.rs` 旧文本脚本），见[VibeValley DevTools V2](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)。
 - 宽屏对话次级标签收敛与素材组织方式，见[对话页次级标签收敛与素材组织方式](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)。
 - 看板覆层/拖拽显式状态机与会话轨迹摘要下沉评估，见[工作台剩余交互 FSM 与会话轨迹投影收口](.agents/notes/proposed/architecture/2026-11-21-ui-state-machine-consolidation.md)。
 
