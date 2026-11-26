@@ -113,6 +113,18 @@ impl ShellDebugHandle {
         self.inner.read().loopback_url.as_deref().and_then(parse_loopback_port)
     }
 
+    pub fn loopback_url(&self) -> Option<String> {
+        self.inner.read().loopback_url.clone()
+    }
+
+    pub fn last_frame_ms(&self) -> Option<f64> {
+        self.inner.read().last_frame_ms
+    }
+
+    pub fn set_last_frame_ms(&self, ms: f64) {
+        self.inner.write().last_frame_ms = Some(ms);
+    }
+
     pub fn record_frame(&self, duration_us: u64, summary: &str) -> DebugFrameRecord {
         let mut guard = self.inner.write();
         guard.next_frame_seq += 1;

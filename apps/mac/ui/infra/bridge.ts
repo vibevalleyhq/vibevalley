@@ -305,6 +305,33 @@ const PickFileSchema = z.object({ path: z.string(), name: z.string(), type: z.st
 const ReadFileSchema = z.object({ data: z.string(), type: z.string(), name: z.string() });
 const AppletListSchema = z.array(ArtifactAppletInfo);
 
+const VdpEndpointInfoSchema = z.object({
+  protocolVersion: z.string(),
+  pid: z.number(),
+  channel: z.string(),
+  appVersion: z.string(),
+  home: z.string(),
+  port: z.number(),
+  httpUrl: z.string(),
+  wsUrl: z.string(),
+  token: z.string(),
+  startedAt: z.number(),
+});
+
+export type VdpEndpointInfo = z.infer<typeof VdpEndpointInfoSchema>;
+
+const VdpEndpointInfoListSchema = z.array(VdpEndpointInfoSchema);
+
+export interface VdpCallInput {
+  readonly wsUrl?: string | undefined;
+  readonly port?: number | undefined;
+  readonly token?: string | undefined;
+  readonly method: string;
+  readonly params?: unknown;
+  readonly sessionId?: string | undefined;
+  readonly timeoutMs?: number | undefined;
+}
+
 /** The host's capabilities (packages/protocol's Host, desktop flavour) and the terminal. */
 export const hostApi = {
   connectionState: () => callDecoded("host.connectionState", {}, DesktopConnectionSnapshotSchema),
@@ -345,6 +372,9 @@ export const hostApi = {
   appletOpen: (artifactId: string) => callDecoded("host.appletOpen", { artifactId }, AppletOpenResult),
   captureWebView: (options?: { width?: number; height?: number }) =>
     callDecoded("host.captureWebView", options ?? {}, HostCapturedImage.nullable(), { timeoutMs: 8_000 }),
+  vdpDiscover: (extraHomes?: readonly string[]) =>
+    callDecoded("host.vdpDiscover", extraHomes && extraHomes.length > 0 ? { extraHomes } : {}, VdpEndpointInfoListSchema, { timeoutMs: 5_000 }),
+  vdpCall: (input: VdpCallInput) => call("host.vdpCall", input, { timeoutMs: (input.timeoutMs ?? 8_000) + 2_000 }),
   stopAudio: () => call("host.stopAudio", {}),
 };
 

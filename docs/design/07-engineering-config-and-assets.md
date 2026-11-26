@@ -49,8 +49,8 @@
    - 包含无头交互、主题令牌与外壳测试（`interactions.test.tsx`、`components.test.tsx`、`scenarios.test.tsx`、`theme.test.tsx`、`workspace/workspace.test.tsx`）。
    - `scripts/audit/mac-tests.ts` 并发驱动 `.tools/bin/nsh test` 执行工作台测试套件，解析每套用例通过/失败计数与耗时并生成结构化报告 JSON。
    - 真实 GPUI 窗口截图验收通过 `vp run ui:gallery` 统一驱动（`scripts/audit/ui-gallery.ts`），输出固定页面、工作区与农场的 Light/Dark/窄窗截图并校验 `dump.json` 零报错。
-3. **纸雕场景单测与状态转储（`apps/mac/src/diorama/` & `apps/mac/src/debug.rs`）**：
+3. **纸雕场景单测与状态转储（`apps/mac/src/diorama/` & `apps/mac/src/debug/executor.rs`）**：
    - Rust 单元测试验证切片到地块阶段的映射、开场 WebP 缓存回收与 `vibevalley-diorama` 逻辑。
-   - `debug.rs` 对外提供运行中窗口完整树与纸雕画布指标转储（`diorama` 字段含渲染器类型、时段、聚焦建筑、地块/偶人数与 GPU/回读遥测）。
+   - `debug/executor.rs` 对外提供运行中窗口完整树与纸雕画布指标转储（`diorama` 字段含渲染器类型、时段、聚焦建筑、地块/偶人数与 GPU/回读遥测）。
 4. **综合质量看板（`scripts/audit/ui-report.ts`）**：
    - 汇总 `mac-tests.ts` 结果、6+1（含英文 `en`）种情景密级枚举覆盖表、壳组件就绪与错误统计及各端截图对比画廊，输出单一离线 HTML 验收报告（默认目录 `/tmp/vv-ui-report`）。

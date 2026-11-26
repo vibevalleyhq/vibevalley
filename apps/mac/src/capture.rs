@@ -178,6 +178,49 @@ fn start_webview_capture(window: &gpui::Window, width: Option<u32>, height: Opti
     Ok(PendingCapture { rx, dst_w, dst_h })
 }
 
+/// Asynchronously captures the active visible `WKWebView` in `window` and resolves
+/// the returned oneshot with the encoded cover image (or an error reason).
+pub fn capture_webview_cover(
+    window: &gpui::Window,
+    width: Option<u32>,
+    height: Option<u32>,
+    cx: &mut gpui::App,
+) -> tokio::sync::oneshot::Receiver<Result<HostCapturedImage, String>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let PendingCapture { rx: snap_rx, dst_w, dst_h } = match start_webview_capture(window, width, height) {
+        Ok(started) => started,
+        Err(reason) => {
+            let _ = tx.send(Err(reason));
+            return rx;
+        }
+    };
+
+    cx.spawn(async move |cx| {
+        let timer = cx.background_executor().timer(SNAPSHOT_TIMEOUT);
+        let raw = match select(Box::pin(snap_rx.recv_async()), Box::pin(timer)).await {
+            Either::Left((Ok(Ok(raw)), _)) => raw,
+            Either::Left((Ok(Err(reason)), _)) => {
+                let _ = tx.send(Err(reason));
+                return;
+            }
+            Either::Left((Err(_), _)) => {
+                let _ = tx.send(Err("webview capture channel closed".into()));
+                return;
+            }
+            Either::Right((_, _)) => {
+                let _ = tx.send(Err("webview capture timed out".into()));
+                return;
+            }
+        };
+
+        let encoded = cx.background_executor().spawn(async move { encode_cover(raw, dst_w, dst_h) }).await;
+        let _ = tx.send(encoded);
+    })
+    .detach();
+
+    rx
+}
+
 /// Asynchronously captures the active visible `WKWebView` in `window` and sends
 /// `Envelope::ok(HostCapturedImage)` (or `Envelope::ok(null)` on graceful no-op).
 pub fn capture_webview_for_reply(

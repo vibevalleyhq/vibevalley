@@ -2,12 +2,16 @@
 //! where it is, `server.json` (where the server using it listens; the
 //! command line finds the server through it) and the saved language.
 
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::vdp::VdpEndpointInfo;
+
 pub const SERVER_FILE: &str = "server.json";
+pub const DEBUG_FILE: &str = "debug.json";
 pub const SETTINGS_FILE: &str = "settings.json";
 
 /// Canonical non-standard environment variables recognized across VibeValley crates and scripts.
@@ -27,6 +31,7 @@ pub const CANONICAL_ENV_VARS: &[&str] = &[
     "VIBEVALLEY_CONTROL_PLANE_URL",
     "VIBEVALLEY_DEBUG",
     "VIBEVALLEY_DEBUG_DUMP",
+    "VIBEVALLEY_DEBUG_PORT",
     "VIBEVALLEY_DEBUG_SCRIPT",
     "VIBEVALLEY_DIORAMA_DIST",
     "VIBEVALLEY_EMBED_UI",
@@ -242,18 +247,112 @@ impl Drop for Announced {
     }
 }
 
+/// Returns whether `pid` refers to a live process owned by this user on Unix (`kill -0`).
+pub fn is_pid_alive(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    std::process::Command::new("kill")
+        .args(["-0", &pid.to_string()])
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
 /// Where the server using `home` listens, while that server is running.
 pub fn announced(home: &Path) -> Option<String> {
     let said: ServerAnnouncement = serde_json::from_str(&std::fs::read_to_string(home.join(SERVER_FILE)).ok()?).ok()?;
-    let alive = std::process::Command::new("kill")
-        .args(["-0", &said.pid.to_string()])
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success());
-    if !alive {
+    let pid = u32::try_from(said.pid).ok()?;
+    if !is_pid_alive(pid) {
         return None;
     }
     Some(said.url)
+}
+
+/// Path to `$VIBEVALLEY_HOME/debug.json` for `home`.
+pub fn debug_json_path(home: &Path) -> PathBuf {
+    home.join(DEBUG_FILE)
+}
+
+/// Guard returned by [`write_debug_endpoint`]; removes `debug.json` on drop only if its `pid` still matches ours.
+pub struct DebugEndpointGuard {
+    path: PathBuf,
+    pid: u32,
+}
+
+impl DebugEndpointGuard {
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for DebugEndpointGuard {
+    fn drop(&mut self) {
+        let ours = std::fs::read_to_string(&self.path)
+            .ok()
+            .and_then(|t| serde_json::from_str::<VdpEndpointInfo>(&t).ok())
+            .is_some_and(|v| v.pid == self.pid);
+        if ours {
+            let _ = std::fs::remove_file(&self.path);
+        }
+    }
+}
+
+/// Atomically writes `info` to `<home>/debug.json` with `0600` permissions on Unix and removes it on drop.
+pub fn write_debug_endpoint(home: &Path, info: &VdpEndpointInfo) -> std::io::Result<DebugEndpointGuard> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    std::fs::create_dir_all(home)?;
+    let path = debug_json_path(home);
+    let tmp = home.join(format!(".{DEBUG_FILE}.{}.tmp", info.pid));
+    let body = serde_json::to_string_pretty(info).map_err(std::io::Error::other)?;
+    {
+        let mut f = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&tmp)?;
+        writeln!(f, "{body}")?;
+        f.sync_all()?;
+    }
+    std::fs::rename(&tmp, &path)?;
+    Ok(DebugEndpointGuard { path, pid: info.pid })
+}
+
+/// Reads `<home>/debug.json` and returns it only while its recorded PID is still alive.
+pub fn read_debug_endpoint(home: &Path) -> Option<VdpEndpointInfo> {
+    let text = std::fs::read_to_string(debug_json_path(home)).ok()?;
+    let info: VdpEndpointInfo = serde_json::from_str(&text).ok()?;
+    if !is_pid_alive(info.pid) {
+        return None;
+    }
+    Some(info)
+}
+
+/// Scans an explicit list of candidate homes for live `debug.json` endpoints, deduplicated by canonical path.
+pub fn discover_debug_endpoints_in(homes: &[PathBuf]) -> Vec<VdpEndpointInfo> {
+    let mut seen = BTreeSet::new();
+    let mut found = Vec::new();
+    for home in homes {
+        let key = std::fs::canonicalize(home).unwrap_or_else(|_| home.clone());
+        if !seen.insert(key) {
+            continue;
+        }
+        if let Some(info) = read_debug_endpoint(home) {
+            found.push(info);
+        }
+    }
+    found
+}
+
+/// Discovers live local VDP endpoints across `extra_homes`, `VIBEVALLEY_HOME`, and the 4 default channel homes.
+pub fn discover_local_debug_endpoints(extra_homes: &[PathBuf]) -> Vec<VdpEndpointInfo> {
+    let mut candidates = Vec::with_capacity(extra_homes.len() + 5);
+    candidates.extend(extra_homes.iter().cloned());
+    if let Some(env_home) = std::env::var_os("VIBEVALLEY_HOME").filter(|h| !h.is_empty()) {
+        candidates.push(PathBuf::from(env_home));
+    }
+    for channel in [ReleaseChannel::Dev, ReleaseChannel::Alpha, ReleaseChannel::Beta, ReleaseChannel::Release] {
+        candidates.push(home_for(channel));
+    }
+    discover_debug_endpoints_in(&candidates)
 }
 
 /// The language `settings.json` keeps: `en`, else `zh`.
@@ -447,5 +546,88 @@ mod tests {
             assert!(name.contains('_'));
             assert!(seen.insert(name), "duplicate canonical env var: {name}");
         }
+    }
+
+    #[test]
+    fn debug_endpoint_write_read_permissions_and_cleanup() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let pid = std::process::id();
+        let info = VdpEndpointInfo {
+            protocol_version: crate::vdp::VDP_PROTOCOL_VERSION.into(),
+            pid,
+            channel: "dev".into(),
+            app_version: "0.1.0-alpha.4".into(),
+            home: dir.path().display().to_string(),
+            port: 9222,
+            http_url: "http://127.0.0.1:9222".into(),
+            ws_url: "ws://127.0.0.1:9222/devtools".into(),
+            token: "tok-abc".into(),
+            started_at: 1_700_000_000_000,
+        };
+
+        let guard = write_debug_endpoint(dir.path(), &info).unwrap();
+        assert_eq!(guard.path(), debug_json_path(dir.path()));
+        let mode = std::fs::metadata(guard.path()).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        assert_eq!(read_debug_endpoint(dir.path()).as_ref(), Some(&info));
+
+        drop(guard);
+        assert!(!debug_json_path(dir.path()).exists());
+        assert_eq!(read_debug_endpoint(dir.path()), None);
+
+        // Guard must not remove a debug.json overwritten by another process.
+        let guard2 = write_debug_endpoint(dir.path(), &info).unwrap();
+        let other = VdpEndpointInfo { pid: 1, ..info.clone() };
+        std::fs::write(debug_json_path(dir.path()), serde_json::to_string(&other).unwrap()).unwrap();
+        drop(guard2);
+        assert!(debug_json_path(dir.path()).exists());
+
+        // Stale PIDs are filtered out by read_debug_endpoint.
+        let dead = VdpEndpointInfo { pid: 1 << 22, ..info };
+        std::fs::write(debug_json_path(dir.path()), serde_json::to_string(&dead).unwrap()).unwrap();
+        assert_eq!(read_debug_endpoint(dir.path()), None);
+        assert!(!is_pid_alive(0));
+    }
+
+    #[test]
+    fn discover_debug_endpoints_deduplicates_canonical_paths_and_skips_stale() {
+        let live_dir = tempfile::tempdir().unwrap();
+        let stale_dir = tempfile::tempdir().unwrap();
+        let empty_dir = tempfile::tempdir().unwrap();
+        let symlink_parent = tempfile::tempdir().unwrap();
+        let symlink_dir = symlink_parent.path().join("alias");
+        std::os::unix::fs::symlink(live_dir.path(), &symlink_dir).unwrap();
+
+        let live_info = VdpEndpointInfo {
+            protocol_version: crate::vdp::VDP_PROTOCOL_VERSION.into(),
+            pid: std::process::id(),
+            channel: "dev".into(),
+            app_version: "0.1.0-alpha.4".into(),
+            home: live_dir.path().display().to_string(),
+            port: 9333,
+            http_url: "http://127.0.0.1:9333".into(),
+            ws_url: "ws://127.0.0.1:9333/devtools".into(),
+            token: "tok-live".into(),
+            started_at: 100,
+        };
+        let _guard = write_debug_endpoint(live_dir.path(), &live_info).unwrap();
+
+        let stale_info = VdpEndpointInfo {
+            pid: 1 << 22,
+            home: stale_dir.path().display().to_string(),
+            port: 9334,
+            ..live_info.clone()
+        };
+        std::fs::write(debug_json_path(stale_dir.path()), serde_json::to_string(&stale_info).unwrap()).unwrap();
+
+        let found = discover_debug_endpoints_in(&[
+            live_dir.path().to_path_buf(),
+            symlink_dir,
+            stale_dir.path().to_path_buf(),
+            empty_dir.path().to_path_buf(),
+        ]);
+        assert_eq!(found, vec![live_info]);
     }
 }
