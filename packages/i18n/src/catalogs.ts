@@ -721,6 +721,38 @@ export const catalogs = {
         zoomOut: "缩小",
         zoomReset: "重置缩放",
       },
+      compare: {
+        title: "对比图",
+        before: "改前",
+        after: "改后",
+        sideBySide: "并排",
+        slider: "滑块",
+        modeLabel: "对比视图模式",
+        annotations: "标注",
+        sliderPosition: "滑块位置",
+        zoom: "放大查看 {label}",
+        addAction: "添加对比图",
+        dialogTitle: "插入对比图",
+        titleLabel: "标题（可选）",
+        titlePlaceholder: "例如：按钮对齐修复对比",
+        pickHint: "点击选择或拖入图片",
+        uploading: "上传中…",
+        replace: "替换图片",
+        clear: "移除图片",
+        addAnnotation: "添加标注",
+        annotationNote: "标注说明",
+        annotationNotePlaceholder: "输入需要说明的改动或问题",
+        removeAnnotation: "删除标注",
+        sideLabel: "位置",
+        sideBoth: "双侧",
+        toneLabel: "类型",
+        toneIssue: "问题",
+        toneFixed: "已修复",
+        toneNote: "说明",
+        submit: "插入对比图",
+        cancel: "取消",
+        uploadFailed: "图片上传失败：{why}",
+      },
       updateInstall: "立即更新",
       updateInstalling: "安装中",
       updateVerifying: "校验中",
@@ -4048,6 +4080,38 @@ export const catalogs = {
         zoomIn: "Zoom in",
         zoomOut: "Zoom out",
         zoomReset: "Reset zoom",
+      },
+      compare: {
+        title: "Compare",
+        before: "Before",
+        after: "After",
+        sideBySide: "Side by side",
+        slider: "Slider",
+        modeLabel: "Compare view mode",
+        annotations: "Annotations",
+        sliderPosition: "Slider position",
+        zoom: "Zoom {label}",
+        addAction: "Add compare",
+        dialogTitle: "Insert comparison",
+        titleLabel: "Title (optional)",
+        titlePlaceholder: "e.g. Button alignment fix",
+        pickHint: "Click to pick or drop an image",
+        uploading: "Uploading…",
+        replace: "Replace image",
+        clear: "Remove image",
+        addAnnotation: "Add annotation",
+        annotationNote: "Annotation note",
+        annotationNotePlaceholder: "Describe the issue or fix",
+        removeAnnotation: "Remove annotation",
+        sideLabel: "Side",
+        sideBoth: "Both",
+        toneLabel: "Tone",
+        toneIssue: "Issue",
+        toneFixed: "Fixed",
+        toneNote: "Note",
+        submit: "Insert compare",
+        cancel: "Cancel",
+        uploadFailed: "Image upload failed: {why}",
       },
       updateInstall: "Update",
       updateInstalling: "Installing",
@@ -7377,6 +7441,36 @@ export interface Messages {
   "web.base.chips.value": undefined;
   "web.base.chips.valueHint": undefined;
   "web.base.chips.valueOf": { readonly k: string | number };
+  "web.base.compare.addAction": undefined;
+  "web.base.compare.addAnnotation": undefined;
+  "web.base.compare.after": undefined;
+  "web.base.compare.annotationNote": undefined;
+  "web.base.compare.annotationNotePlaceholder": undefined;
+  "web.base.compare.annotations": undefined;
+  "web.base.compare.before": undefined;
+  "web.base.compare.cancel": undefined;
+  "web.base.compare.clear": undefined;
+  "web.base.compare.dialogTitle": undefined;
+  "web.base.compare.modeLabel": undefined;
+  "web.base.compare.pickHint": undefined;
+  "web.base.compare.removeAnnotation": undefined;
+  "web.base.compare.replace": undefined;
+  "web.base.compare.sideBoth": undefined;
+  "web.base.compare.sideBySide": undefined;
+  "web.base.compare.sideLabel": undefined;
+  "web.base.compare.slider": undefined;
+  "web.base.compare.sliderPosition": undefined;
+  "web.base.compare.submit": undefined;
+  "web.base.compare.title": undefined;
+  "web.base.compare.titleLabel": undefined;
+  "web.base.compare.titlePlaceholder": undefined;
+  "web.base.compare.toneFixed": undefined;
+  "web.base.compare.toneIssue": undefined;
+  "web.base.compare.toneLabel": undefined;
+  "web.base.compare.toneNote": undefined;
+  "web.base.compare.uploadFailed": { readonly why: string | number };
+  "web.base.compare.uploading": undefined;
+  "web.base.compare.zoom": { readonly label: string | number };
   "web.base.farm": undefined;
   "web.base.farmShort": undefined;
   "web.base.file.pdf": undefined;
