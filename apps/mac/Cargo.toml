@@ -79,6 +79,7 @@ unicode-width = "0.2.3"
 uuid = { workspace = true }
 zip = { version = "9.7.1", default-features = false }
 
+axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio", "ws"] }
 backon = { workspace = true }
 parking_lot = { workspace = true }
 rustls = { workspace = true }
@@ -98,5 +99,4 @@ nsh-dev = ["nsh-platform-gpui/dev"]
 shot = ["gpui/test-support", "gpui-platform/test-support"]
 
 [dev-dependencies]
-axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
 tempfile = { workspace = true }

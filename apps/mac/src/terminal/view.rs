@@ -291,8 +291,12 @@ impl TerminalView {
         }
     }
 
+    pub fn send_text(&mut self, text: &str) {
+        self.input(Input::Text(text.to_owned()));
+    }
+
     pub fn send_line(&mut self, line: &str) {
-        self.input(Input::Text(line.to_owned()));
+        self.send_text(line);
         self.input(Input::Key(vibevalley_terminal::KeyInput {
             key: vibevalley_terminal::Key::Enter,
             mods: Mods::default(),

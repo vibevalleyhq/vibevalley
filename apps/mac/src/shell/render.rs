@@ -9,7 +9,8 @@ use super::{Shell, should_mount_inspector};
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let frame_start = self.overlays.devtools.state.enabled.then(std::time::Instant::now);
+        let vdp_on = crate::debug::vdp_enabled();
+        let frame_start = (self.overlays.devtools.state.enabled || vdp_on).then(std::time::Instant::now);
         self.ensure_panes(window, cx);
         self.sync_inspector(window, cx);
         self.ensure_devtools_overlay(window, cx);
@@ -277,10 +278,16 @@ impl Render for Shell {
             let duration_us = started.elapsed().as_micros() as u64;
             let ms = duration_us as f64 / 1000.0;
             self.overlays.devtools.state.record_frame_ms(ms);
-            if self.overlays.devtools.state.should_record_frame(duration_us)
-                && let Some(handle) = cx.try_global::<crate::hosted::ShellDebugHandle>()
-            {
-                handle.record_frame(duration_us, "Shell::render");
+            if let Some(handle) = cx.try_global::<crate::hosted::ShellDebugHandle>() {
+                if self.overlays.devtools.state.should_record_frame(duration_us) {
+                    handle.record_frame(duration_us, "Shell::render");
+                } else if vdp_on {
+                    handle.set_last_frame_ms(ms);
+                }
+            }
+            if vdp_on && crate::debug::is_vdp_log_active() {
+                let vp = window.viewport_size();
+                crate::debug::emit_page_frame(ms, f32::from(vp.width), f32::from(vp.height));
             }
         }
         root

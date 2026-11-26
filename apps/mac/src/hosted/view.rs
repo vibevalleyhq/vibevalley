@@ -84,6 +84,9 @@ impl HostedView {
             params.entry("motion").or_insert_with(|| json!(motion.as_str()));
             params.entry("connectionMode").or_insert_with(|| json!(active_connection.as_str()));
             params.entry("randomSeed").or_insert_with(|| json!(crate::host::random_seed_hex()));
+            if crate::debug::vdp_enabled() {
+                params.entry("vdpEnabled").or_insert_with(|| json!(true));
+            }
             let assets_dir = crate::assets::assets_dir();
             let has_assets_dir = assets_dir.is_dir();
             if has_assets_dir {
@@ -94,10 +97,22 @@ impl HostedView {
             let bridge = hub.map(|hub| Arc::new(hub.attach(identity, Arc::new(ChannelOutlet(host.clone())))));
             client = bridge.clone();
             let reply_host = host.clone();
-            // Runs on the engine thread. Server traffic and stateless host ops
-            // answer directly here; decoded shell host ops go to the GPUI thread.
+            let vdp_view_name = name.clone();
+            // Runs on the engine thread. Server traffic, VDP UI probe replies, and
+            // stateless host ops answer directly here; decoded shell host ops go to the GPUI thread.
             host.handle("action", move |call| {
                 let v = call.data();
+                match v["type"].as_str() {
+                    Some("vdp_ui_res") => {
+                        crate::debug::resolve_ui_response(v);
+                        return;
+                    }
+                    Some("vdp_ui_log") => {
+                        crate::debug::emit_ui_console(&vdp_view_name, v);
+                        return;
+                    }
+                    _ => {}
+                }
                 if v["type"].as_str() == Some("call")
                     && let Some(op) = v["op"].as_str()
                     && op.starts_with("host.")
@@ -161,6 +176,7 @@ impl HostedView {
             let label = name.clone();
             app.on_error(move |message| {
                 eprintln!("hosted view {label}: {message}");
+                crate::debug::emit_ui_error(&label, message);
                 let _ = err_tx.send(message.to_string());
             });
             load(&app, &name, cx);
@@ -211,6 +227,9 @@ impl HostedView {
                     self.ready = true;
                     self.outbox.reset();
                     self.applied.clear();
+                    if crate::debug::is_vdp_log_active() {
+                        self.set_vdp_log_enabled(true, cx);
+                    }
                     cx.emit(HostedEvent::Ready);
                 }
                 Ok(Action::Call { id, op, payload }) => {
@@ -231,6 +250,32 @@ impl HostedView {
 
     pub fn is_ready(&self) -> bool {
         self.ready
+    }
+
+    pub fn view_name(&self) -> &str {
+        &self.view
+    }
+
+    pub fn send_vdp_ui_req(&self, req_id: &str, method: &str, params: Value, cx: &App) {
+        let _ = self.app.read(cx).host().send(
+            "vdp_ui_req",
+            json!({
+                "type": "vdp_ui_req",
+                "reqId": req_id,
+                "method": method,
+                "params": params,
+            }),
+        );
+    }
+
+    pub fn set_vdp_log_enabled(&self, enabled: bool, cx: &App) {
+        let _ = self.app.read(cx).host().send(
+            "vdp_ui_config",
+            json!({
+                "type": "vdp_ui_config",
+                "logEnabled": enabled,
+            }),
+        );
     }
 
     /// Sends `data` as the frame of `topic` unless the view already has it.

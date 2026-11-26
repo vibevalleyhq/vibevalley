@@ -18,7 +18,7 @@ use super::projects::SidebarTopics;
 use super::{DioramaSlot, PaneSlot, Shell, TerminalSlot};
 
 impl Shell {
-    pub(super) fn navigate_workbench(&mut self, route: &str, cx: &mut Context<Self>) {
+    pub(crate) fn navigate_workbench(&mut self, route: &str, cx: &mut Context<Self>) {
         self.chrome.native_workspace = false;
         self.chrome.native_diorama = None;
         self.chrome.explicit_route = true;
@@ -29,7 +29,7 @@ impl Shell {
         cx.notify();
     }
 
-    pub(super) fn show_workspace(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn show_workspace(&mut self, cx: &mut Context<Self>) {
         if self.chrome.native_workspace && self.chrome.native_diorama.is_none() && self.chrome.last_route.as_deref() == Some("/workspace") {
             return;
         }
@@ -42,7 +42,7 @@ impl Shell {
         cx.notify();
     }
 
-    pub(super) fn show_diorama(&mut self, scene: &str, mut props: Value, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn show_diorama(&mut self, scene: &str, mut props: Value, window: &mut Window, cx: &mut Context<Self>) {
         if props.get("cwd").is_none() {
             props["cwd"] = json!(self.workspace.ws.active().map(|p| p.root().to_path_buf()));
         }

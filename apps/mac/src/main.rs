@@ -69,6 +69,7 @@ where
 
 fn main() {
     log::init();
+    debug::configure_from_env_and_args();
     host::disable_default_font_smoothing();
     update::enter_bundle();
     vibevalley_i18n::set_locale(vibevalley_server::home::saved_locale(&hosted::server_home()));
@@ -93,6 +94,7 @@ fn main() {
             cx.activate(true);
         }
         cx.on_app_quit(|cx| {
+            debug::shutdown(cx);
             applet::AppletHost::shutdown(cx);
             let running = serving::RunningServer::take_for_shutdown(cx);
             let background = cx.background_executor().clone();

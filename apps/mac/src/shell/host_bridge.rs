@@ -647,6 +647,24 @@ impl Shell {
                 crate::capture::capture_webview_for_reply(window, req.width, req.height, reply, cx);
                 return;
             }
+            HostOp::VdpDiscover(req) => {
+                let extra: Vec<PathBuf> = req.extra_homes.unwrap_or_default().into_iter().map(PathBuf::from).collect();
+                Self::bg(
+                    cx,
+                    move || vibevalley_protocol::home::discover_local_debug_endpoints(&extra),
+                    move |_, endpoints, _| {
+                        reply.send(Envelope::ok(json!(endpoints)));
+                    },
+                );
+                return;
+            }
+            HostOp::VdpCall(req) => {
+                vibevalley_runtime::rt::current_or_global_handle().spawn(async move {
+                    let envelope = crate::debug::call_remote_vdp(req).await;
+                    reply.send(envelope);
+                });
+                return;
+            }
             stateless @ (HostOp::Sha256(_) | HostOp::RandomBytes(_) | HostOp::Qr(_)) => {
                 crate::host::handle_stateless_op(&stateless).expect("stateless HostOp handled")
             }
@@ -724,7 +742,7 @@ fn host_info_payload(settings: &crate::theme::Settings, fonts: &[String]) -> Val
         "uiFontSize": settings.ui_font_size,
         "theme": settings.theme.as_str(),
         "motion": settings.effective_motion().as_str(),
-        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "assetsDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet", "captureWebView"],
+        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "assetsDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet", "captureWebView", "vdp"],
     })
 }
 

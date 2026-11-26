@@ -141,7 +141,7 @@ impl Shell {
         cx.notify();
     }
 
-    fn for_each_hosted_view(&self, cx: &mut Context<Self>, mut f: impl FnMut(&mut HostedView, &mut Context<HostedView>)) {
+    pub(crate) fn for_each_hosted_view(&self, cx: &mut Context<Self>, mut f: impl FnMut(&mut HostedView, &mut Context<HostedView>)) {
         self.chrome.sidebar.update(cx, &mut f);
         if let Some(slot) = &self.chrome.inspector {
             slot.view.update(cx, &mut f);

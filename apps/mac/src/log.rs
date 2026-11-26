@@ -145,6 +145,17 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for LogBufferLayer {
         let meta = event.metadata();
         let mut visitor = LineVisitor::new();
         event.record(&mut visitor);
+        if crate::debug::is_vdp_log_active() {
+            let level = match *meta.level() {
+                tracing::Level::TRACE => vibevalley_protocol::VdpLogLevel::Trace,
+                tracing::Level::DEBUG => vibevalley_protocol::VdpLogLevel::Debug,
+                tracing::Level::INFO => vibevalley_protocol::VdpLogLevel::Info,
+                tracing::Level::WARN => vibevalley_protocol::VdpLogLevel::Warn,
+                tracing::Level::ERROR => vibevalley_protocol::VdpLogLevel::Error,
+            };
+            let fields = (!visitor.fields.is_empty()).then(|| serde_json::json!({ "raw": visitor.fields }));
+            crate::debug::emit_log_entry(level, meta.target(), visitor.message.clone(), fields);
+        }
         let line = visitor.format_line(meta.level(), meta.target());
         log_ring().lock().push_line(line);
     }
