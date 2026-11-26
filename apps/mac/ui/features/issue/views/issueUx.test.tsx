@@ -109,9 +109,78 @@ test("IssueDetail shows full unclamped title, omits empty repo crumb, localizes 
   expect(texts.join("\n")).not.toContain("no API key is set");
   expect(texts).toContain(t("web.issue.error.missingApiKey"));
   expect(app.count("id:issue-error-settings")).toBe(1);
+  // Active ask action card is elevated above the issue description, and criteria render a progress bar.
+  const askBox = app.layout("id:issue-ask");
+  const reqBox = app.layout("id:issue-requirement");
+  expect(askBox).toBeDefined();
+  expect(reqBox).toBeDefined();
+  expect(askBox!.y + askBox!.height).toBeLessThanOrEqual(reqBox!.y);
+  expect(app.count("id:issue-progress-bar")).toBe(1);
+  // Without a thread channel in collab slice, inline comment composer is gracefully omitted.
+  expect(app.count("id:issue-comment-composer")).toBe(0);
 
   await app.press("id:issue-error-settings");
   await fake.pumpUntil(app, () => app.count("id:settings-models") === 1);
+});
+
+test("IssueDetail renders inline comment composer when an issue thread channel exists", async () => {
+  setLocale("zh");
+  const session = makeFailedSession("s-thread", "waiting for review");
+  const issue = makeIssueFixture({
+    id: "i-thread-1",
+    number: 18,
+    title: "Add inline comment box to issue discussion",
+    assignments: [
+      {
+        id: "assign-thread",
+        issue: "i-thread-1" as IssueId,
+        agent: "laozhou",
+        assignedAt: SCENARIO_NOW - 300_000,
+        executions: [{ kind: "worker", session: session.id, startedAt: SCENARIO_NOW - 300_000 }],
+      },
+    ],
+  });
+  const threadChannel = {
+    id: "ch-issue-18",
+    name: "#18",
+    title: issue.title,
+    description: "",
+    category: "issues",
+    type: "thread" as const,
+    default: false,
+    notify: "all" as const,
+    replies: 0,
+    at: SCENARIO_NOW - 300_000,
+    subjectKind: "issue" as const,
+    subjectId: issue.id,
+    members: [],
+  };
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 12, issues: [issue] },
+    collab: {
+      ...scenarios.empty.state.collab,
+      chat: {
+        channels: [threadChannel],
+        userMentions: [],
+      },
+    },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${issue.id}`, locale: "zh" });
+  fake.respond("issue.history.list", [{ issue, sessions: [session], missingSessions: [] }]);
+  fake.respond("issue.conversation.get", threadChannel.id);
+  fake.respond("channel.message.list", []);
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1200,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-comment-composer") === 1);
+  expect(app.count("id:issue-comment-composer >> id:composer-input")).toBe(1);
 });
 
 test("Board integrates filter bar, preserves long card titles, and suppresses unassigned badge on backlog drafts", async () => {

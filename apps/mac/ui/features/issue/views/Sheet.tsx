@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { Select } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
+import { Dot } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
@@ -90,13 +91,13 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
   return (
     <View onLayout={box.onLayout} class="relative min-h-0 flex-1 flex-row">
       <Scroll testID="issue-scroll" class="min-h-0 min-w-0 flex-1">
-        <View class={`w-full max-w-200 self-center ${wide() ? "px-6 pt-5 pb-12" : "px-4 pt-4 pb-10"}`}>
+        <View class={`w-full max-w-[780px] self-center ${wide() ? "px-8 pt-6 pb-14" : "px-4 pt-4 pb-10"}`}>
           {props.heading}
-          <View class="mt-5">{props.main}</View>
+          <View class="mt-6">{props.main}</View>
         </View>
       </Scroll>
       <If when={wide() && desktopOpen()}>
-        <View testID="issue-inspector" class="min-h-0 w-72 shrink-0 border-l border-line bg-side">
+        <View testID="issue-inspector" class="min-h-0 w-76 shrink-0 border-l border-line bg-side">
           <Scroll class="min-h-0 flex-1">
             <View class="px-4 pt-4 pb-8">{props.side}</View>
           </Scroll>
@@ -104,8 +105,8 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
       </If>
       <If when={!wide() && drawerOpen()}>
         <View testID="issue-inspector-backdrop" class="absolute inset-0 z-20 bg-scrim" onPress={() => chrome?.closeDrawer()} />
-        <View testID="issue-inspector" class="absolute top-0 right-0 bottom-0 z-30 w-72 max-w-full border-l border-line bg-side shadow-float">
-          <View class="h-9 shrink-0 flex-row items-center justify-between border-b border-line px-3.5">
+        <View testID="issue-inspector" class="absolute top-0 right-0 bottom-0 z-30 w-76 max-w-full border-l border-line bg-side shadow-float">
+          <View class="h-10 shrink-0 flex-row items-center justify-between border-b border-line px-4">
             <Text class="text-xs font-semibold text-muted">{t("web.issue.detail.properties")}</Text>
             <IconButton icon="close" size={14} label={t("web.issue.sheet.less")} onClick={() => chrome?.closeDrawer()} />
           </View>
@@ -119,13 +120,18 @@ export function IssueSheet(props: { heading: JSX.Element; main: JSX.Element; sid
 }
 
 /** A label and its value, the label in a narrow muted column. */
-export function Property(props: { label: string; align?: "center" | "start"; children: JSX.Element }) {
+export function Property(props: { label: string; icon?: JSX.Element; align?: "center" | "start"; inset?: boolean; children: JSX.Element }) {
   const start = () => props.align === "start";
   return (
-    <View class={`min-h-7.5 flex-row gap-2.5 py-0.5 ${start() ? "items-start" : "items-center"}`}>
-      <Text class={`w-16 shrink-0 text-xs text-muted ${start() ? "pt-1" : ""}`}>{props.label}</Text>
-      <View class="min-w-0 flex-1">
-        <Say>{props.children}</Say>
+    <View class={`min-h-8 flex-row gap-2 py-0.5 ${start() ? "items-start" : "items-center"}`}>
+      <Text class={`w-16 shrink-0 text-xs text-muted ${start() ? "pt-1.5" : ""}`}>{props.label}</Text>
+      <View class={`min-w-0 flex-1 flex-row gap-1 ${start() ? "items-start" : "items-center"}`}>
+        <If when={props.icon}>
+          <View class={`w-4 shrink-0 items-center justify-center ${start() ? "pt-1.5" : ""}`}>{props.icon}</View>
+        </If>
+        <View class={`min-w-0 flex-1 ${props.inset === true ? "" : "px-2"}`}>
+          <Say>{props.children}</Say>
+        </View>
       </View>
     </View>
   );
@@ -137,6 +143,7 @@ export function Fold(props: {
   summary?: string | undefined;
   open?: boolean;
   defaultOpen?: boolean;
+  bordered?: boolean;
   leading?: JSX.Element;
   aside?: JSX.Element;
   testID?: string;
@@ -151,7 +158,7 @@ export function Fold(props: {
     props.onToggle?.(next);
   };
   return (
-    <View class="border-b border-line">
+    <View class={props.bordered === false ? "" : "border-b border-line"}>
       <View class="flex-row items-center gap-2">
         <View
           role="button"
@@ -205,13 +212,37 @@ export function SheetLabel(props: { first?: boolean; divider?: boolean; children
   const chrome = IssueChromeContext();
   // Narrow drawer already renders a sticky Properties header above `side`; suppress the duplicate leading Properties label there.
   const duplicateDrawerHeading = () => props.first === true && chrome !== undefined && !chrome.wide() && props.children === t("web.issue.detail.properties");
-  const spacing = () => (props.first === true ? "mt-0 mb-2" : props.divider === true ? "mt-4 mb-2 border-t border-line pt-4" : "mt-6 mb-2");
+  const spacing = () => (props.first === true ? "mt-0 mb-2.5" : props.divider === true ? "mt-4 mb-2.5 border-t border-line pt-4" : "mt-6 mb-2.5");
   return (
     <If when={!duplicateDrawerHeading()}>
       <View class={`${spacing()} flex-row items-baseline`}>
         <Say class="text-xs font-semibold text-muted">{props.children}</Say>
       </View>
     </If>
+  );
+}
+
+const stagePillStyles: Record<Tone, { bgClass: string; bgStyle?: () => string; textClass: string }> = {
+  leaf: { bgClass: "bg-ok-soft", textClass: "text-ok-ink" },
+  berry: { bgClass: "bg-bad-soft", textClass: "text-berry" },
+  wheat: { bgClass: "bg-warn-soft", textClass: "text-warn-ink" },
+  water: { bgClass: "", bgStyle: () => mix("water", 0.14), textClass: "text-water" },
+  muted: { bgClass: "bg-hover", textClass: "text-muted" },
+  faint: { bgClass: "bg-hover", textClass: "text-muted" },
+};
+
+/** Semantic stage badge: colored dot + stage label inside a soft rounded pill. */
+export function StagePill(props: { tone: Tone; label: string }) {
+  const look = () => stagePillStyles[props.tone];
+  const bgStyle = () => {
+    const bg = look().bgStyle;
+    return bg ? { backgroundColor: bg() } : undefined;
+  };
+  return (
+    <View class={`shrink-0 flex-row items-center gap-1.5 rounded-full px-2.5 py-0.5 ${look().bgClass}`} style={bgStyle()}>
+      <Dot tone={props.tone} size={7} ring={false} />
+      <Text class={`text-xs font-semibold ${look().textClass}`}>{props.label}</Text>
+    </View>
   );
 }
 
@@ -269,7 +300,6 @@ export function Pick<V extends string>(props: {
         <Select
           quiet
           size="control"
-          class="-ml-2"
           label={props.label}
           value={props.value}
           options={props.options}
@@ -280,7 +310,7 @@ export function Pick<V extends string>(props: {
         />
       }
     >
-      <View testID={props.testid} accessibilityLabel={props.label} class="min-h-7 flex-row items-center">
+      <View testID={props.testid} accessibilityLabel={props.label} class="min-h-7 flex-row items-center px-2">
         <Text class={`min-w-0 truncate text-sm ${props.value === "" ? "text-faint" : "text-ink"}`}>{shown()}</Text>
       </View>
     </If>
@@ -313,7 +343,7 @@ export function IssueNumberPill(props: { number: number }) {
       accessibilityLabel={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
       tooltip={<Bubble text={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
       onPress={copy}
-      class="-mx-1 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus"
+      class="shrink-0 flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:border-line-strong hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus"
     >
       <Text class={`font-mono text-xs tabular-nums ${copied() ? "text-leaf" : "text-muted"}`}>{`#${props.number}`}</Text>
       <Icon name={copied() ? "check" : "copy"} size={12} tone={copied() ? "leaf" : "muted"} />

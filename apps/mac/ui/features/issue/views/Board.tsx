@@ -5,9 +5,10 @@ import { type BoardSummary, maxRunning } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
+import { IconButton } from "../../../design/IconButton";
 import type { IconName } from "../../../design/icons";
 import { motionClass, motionDuration, motionOff } from "../../../design/motion";
-import { Bubble, Hint } from "../../../design/Tip";
+import { Bubble } from "../../../design/Tip";
 import { mix, tone } from "../../../design/tone";
 import {
   type BoardCard,
@@ -206,9 +207,9 @@ export function IssueBoard(props: BoardProps) {
   }));
   const workingSlots = computed(() => runningSlotsOf(props.cards, props.summary, props.filtered === true, maxRunning));
   return (
-    <View ref={drag.setRoot} class="min-h-0 flex-1 px-3 pb-3">
+    <View ref={drag.setRoot} class="min-h-0 flex-1 px-4 py-3">
       <If when={narrow()}>
-        <View accessibilityLabel={t("web.issue.board.whichLane")} class="mb-2 flex-row gap-0.5 rounded-md border border-line bg-side p-0.5">
+        <View accessibilityLabel={t("web.issue.board.whichLane")} class="mb-2.5 flex-row gap-0.5 rounded-md border border-line bg-side p-0.5">
           <Each of={lanes} key={(l) => l}>
             {(l) => (
               <View
@@ -231,7 +232,7 @@ export function IssueBoard(props: BoardProps) {
           </Each>
         </View>
       </If>
-      <View class="min-h-0 flex-1 flex-row gap-2.5">
+      <View class="min-h-0 flex-1 flex-row gap-3">
         <Each of={lanes} key={(l) => l}>
           {(l) => (
             <If when={!narrow() || l() === lane()}>
@@ -287,36 +288,44 @@ function LaneView(props: {
   const shown = computed(() => (folded() ? ordered().slice(0, closedShown) : ordered()));
   const hidden = computed(() => (folded() ? ordered().length - closedShown : 0));
   const guide = () => emptyLaneGuide[props.lane];
-  const showBottomNew = computed(() => props.lane === "todo" && (props.board.loading || props.cards.length > 0));
+  const showHeaderNew = computed(() => props.lane === "todo" && (props.board.loading || props.cards.length > 0));
   return (
     <View
       ref={(r) => props.drag.lane(props.lane, r)}
       accessibilityLabel={laneLabel[props.lane]}
       testID={`lane-${props.lane}`}
       accessibilityState={{ selected: over() }}
-      class={`max-h-full min-w-55 flex-1 rounded-lg border px-2 pt-1.5 pb-2 ${over() ? "border-leaf" : "border-transparent bg-side"}`}
-      style={over() ? { backgroundColor: mix("leaf", 0.15) } : undefined}
+      class={`max-h-full min-w-55 flex-1 rounded-xl border px-2.5 pt-2.5 pb-2.5 ${over() ? "border-leaf" : "border-transparent bg-side"}`}
+      style={over() ? { backgroundColor: mix("leaf", 0.14) } : undefined}
     >
-      <View class="h-7 shrink-0 flex-row items-center gap-1.5 px-1">
-        <StatusMark status={laneStatus[props.lane]} />
-        <Text role="header" class="shrink-0 text-sm font-semibold text-ink">
-          {laneLabel[props.lane]}
-        </Text>
-        <Text testID={`lane-count-${props.lane}`} class="shrink-0 text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
-          {String(props.count)}
-        </Text>
+      <View class="mb-1.5 h-7 shrink-0 flex-row items-center gap-1.5 px-1">
+        <View class="min-w-0 flex-row items-center gap-1.5" tooltip={<Bubble text={emptyText[props.lane]} />}>
+          <StatusMark status={laneStatus[props.lane]} size={14} />
+          <Text role="header" class="shrink-0 text-xs font-semibold text-ink">
+            {laneLabel[props.lane]}
+          </Text>
+        </View>
+        <View class="shrink-0 rounded-full bg-hover px-1.5 py-0.5">
+          <Text testID={`lane-count-${props.lane}`} class="text-2xs font-medium text-muted tabular-nums">
+            {String(props.count)}
+          </Text>
+        </View>
         <If when={props.slots}>
           {(slots) => (
-            <Text testID="lane-working-slots" class="min-w-0 shrink truncate text-2xs text-faint" style={{ fontVariant: ["tabular-nums"], numberOfLines: 1 }}>
-              {`· ${t("web.issue.board.spots", slots())}`}
-            </Text>
+            <View class="ml-auto shrink-0" tooltip={<Bubble text={t("web.issue.board.spots", slots())} />}>
+              <Text testID="lane-working-slots" class="text-2xs text-faint tabular-nums">
+                {t("web.issue.board.spots", slots())}
+              </Text>
+            </View>
           )}
         </If>
-        <View class="ml-auto shrink-0">
-          <Hint text={emptyText[props.lane]} />
-        </View>
+        <If when={showHeaderNew()}>
+          <View class="ml-auto shrink-0">
+            <IconButton testid="issue-new" icon="add" size={14} label={t("web.issue.new.title")} onClick={() => p().onNew()} />
+          </View>
+        </If>
       </View>
-      <Scroll class="mt-2 min-h-0 shrink" contentClass="gap-2 pb-0.5">
+      <Scroll class="min-h-0 shrink" contentClass="gap-2 pb-0.5">
         <If
           when={p().loading}
           else={
@@ -344,22 +353,21 @@ function LaneView(props: {
                 </>
               }
             >
-              <View
-                testID="lane-empty"
-                class={`min-h-28 justify-center rounded-md border border-dashed px-3.5 py-5 ${over() ? "border-leaf" : "border-line bg-page"}`}
-              >
-                <View testID={`lane-empty-${props.lane}`} class="items-center gap-1.5">
-                  <Icon name={guide().icon} size={15} tone="muted" />
+              <View testID="lane-empty" class={`justify-center rounded-lg border px-3 py-8 ${over() ? "border-dashed border-leaf" : "border-transparent"}`}>
+                <View testID={`lane-empty-${props.lane}`} class="items-center gap-2">
+                  <View class="size-8 items-center justify-center rounded-full bg-hover">
+                    <Icon name={guide().icon} size={14} tone="faint" />
+                  </View>
                   <If
                     when={p().filtered === true}
                     else={
                       <>
-                        <Text class="text-center text-xs font-medium text-ink">{t(guide().titleKey)}</Text>
-                        <Text class="text-center text-2xs leading-snug text-muted">{t(guide().bodyKey)}</Text>
+                        <Text class="text-center text-xs font-medium text-muted">{t(guide().titleKey)}</Text>
+                        <Text class="text-center text-2xs leading-relaxed text-faint">{t(guide().bodyKey)}</Text>
                       </>
                     }
                   >
-                    <Text class="text-center text-2xs leading-snug text-muted">{t("web.issue.board.emptyGuide.filtered")}</Text>
+                    <Text class="text-center text-2xs leading-relaxed text-faint">{t("web.issue.board.emptyGuide.filtered")}</Text>
                   </If>
                   <If when={props.lane === "todo" || props.showClear}>
                     <View class="flex-row flex-wrap items-center justify-center gap-1.5 pt-1">
@@ -383,18 +391,6 @@ function LaneView(props: {
           <Text class="px-1 text-xs text-faint">{t("web.issue.reading")}</Text>
         </If>
       </Scroll>
-      <If when={showBottomNew()}>
-        <View
-          onPress={() => p().onNew()}
-          role="button"
-          testID="issue-new"
-          accessibilityLabel={t("web.issue.new.title")}
-          class={`group mt-2 h-9 w-full shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-dashed border-line ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:bg-page active:translate-y-px`}
-        >
-          <Icon name="add" size={14} tone="muted" />
-          <Text class="text-sm font-medium text-muted group-hover:text-ink">{t("web.issue.new.card")}</Text>
-        </View>
-      </If>
     </View>
   );
 }
@@ -427,27 +423,18 @@ function CardView(props: {
   const issues = useIssues();
   const look = computed(() => cardLook(props.card, nameOf(), issues(), Date.now()));
   const repo = computed(() => cardRepo(props.card));
-  const hasMeta = computed(() => Boolean(look().number || repo()));
   const loud = computed(() => {
     const pr = look().priority;
     return pr === "urgent" || pr === "high" ? pr : undefined;
   });
+  const hasFace = computed(() => Boolean(cardAgent(props.card)) || props.card.kind === "orchestrator");
+  const hasTopRow = computed(() => Boolean(look().number || repo() || loud() || hasFace()));
   const showsStatus = computed(() => ownStatus(props.card.lane, look().status));
   const unassignedTodo = computed(
     () => props.card.kind === "todo" && props.card.lane === "todo" && props.card.issue.status !== "backlog" && !cardAgent(props.card),
   );
   const attachmentCount = computed(() => props.card.issue.attachments?.length ?? 0);
-  const marks = computed(
-    () =>
-      showsStatus() ||
-      !!loud() ||
-      !!cardAgent(props.card) ||
-      unassignedTodo() ||
-      props.card.kind === "orchestrator" ||
-      !!look().progress ||
-      attachmentCount() > 0 ||
-      look().flags.length > 0,
-  );
+  const marks = computed(() => showsStatus() || unassignedTodo() || !!look().progress || attachmentCount() > 0 || look().flags.length > 0);
   const draggable = computed(() => props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving");
   // Dragging sends a synthetic press on mouse-up; suppress opening the card right after a drag ends.
   let suppressPressUntil = 0;
@@ -496,38 +483,38 @@ function CardView(props: {
         tooltip={<If when={look().detail}>{(d) => <Bubble text={d()} />}</If>}
         class={[
           "relative overflow-hidden rounded-lg border px-3 py-2.5 focus-visible:outline-2 focus-visible:outline-focus",
-          props.selected ? "border-accent bg-selected" : "border-line bg-elevated hover:border-faint hover:shadow-raise",
+          props.selected ? "border-accent bg-selected" : "border-line bg-elevated hover:border-line-strong hover:shadow-raise",
           props.card.move?.state === "moving" ? "opacity-70" : props.drag.dragging()?.id === props.card.id ? "opacity-40" : "",
         ].join(" ")}
         style={cardStyle()}
       >
         <If when={urgency()}>{(u) => <View class="pointer-events-none absolute inset-y-0 left-0 w-0.75" style={{ backgroundColor: tone(u()) }} />}</If>
-        <If when={hasMeta()}>
-          <View class="flex-row items-center gap-1">
-            <If when={look().number}>
-              {(num) => (
-                <Text class="shrink-0 font-mono text-2xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
-                  {num()}
-                </Text>
-              )}
+        <If when={hasTopRow()}>
+          <View class="flex-row items-center justify-between gap-2">
+            <View class="min-w-0 flex-1 flex-row items-center gap-1">
+              <If when={look().number}>{(num) => <Text class="shrink-0 font-mono text-2xs font-medium text-faint tabular-nums">{num()}</Text>}</If>
+              <If when={look().number && repo()}>
+                <Text class="shrink-0 text-2xs text-faint">·</Text>
+              </If>
+              <If when={repo()}>{(r) => <Text class="min-w-0 flex-1 truncate text-2xs text-faint">{r()}</Text>}</If>
+            </View>
+            <If when={loud() || hasFace()}>
+              <View class="shrink-0 flex-row items-center gap-1.5">
+                <If when={loud()}>{(pr) => <PriorityMark priority={pr()} size={12} />}</If>
+                <If when={hasFace()}>
+                  <CardFace card={props.card} size={18} />
+                </If>
+              </View>
             </If>
-            <If when={look().number && repo()}>
-              <Text class="shrink-0 text-2xs text-faint">·</Text>
-            </If>
-            <If when={repo()}>{(r) => <Text class="min-w-0 flex-1 truncate text-2xs text-muted">{r()}</Text>}</If>
           </View>
         </If>
-        <Text class={`${hasMeta() ? "mt-1 " : ""}line-clamp-2 text-sm leading-snug font-medium text-ink`}>{look().title}</Text>
-        <If when={look().wait}>{(wait) => <Text class="mt-1 line-clamp-2 text-xs leading-snug text-water">{wait()}</Text>}</If>
-        {/* Only what differs from the lane's default: its own status, a high priority, who works it, how far, its flags. */}
+        <Text class={`${hasTopRow() ? "mt-1.5 " : ""}line-clamp-2 text-sm leading-[19px] font-medium text-ink`}>{look().title}</Text>
+        <If when={look().wait}>{(wait) => <Text class="mt-1 line-clamp-1 text-xs text-water">{wait()}</Text>}</If>
+        {/* Only what differs from the lane's default: its own status, unassigned todo, progress, attachments, flags. */}
         <If when={marks()}>
           <View testID="card-marks" class="mt-2 flex-row flex-wrap items-center gap-1.5">
             <If when={showsStatus()}>
               <StatusMark status={look().status} tone={look().statusTone} size={13} />
-            </If>
-            <If when={loud()}>{(pr) => <PriorityMark priority={pr()} size={13} />}</If>
-            <If when={cardAgent(props.card) || props.card.kind === "orchestrator"}>
-              <CardFace card={props.card} size={18} />
             </If>
             <If when={unassignedTodo()}>
               <View

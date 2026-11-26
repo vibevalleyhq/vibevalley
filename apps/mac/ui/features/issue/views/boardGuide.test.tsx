@@ -253,7 +253,7 @@ test("IssueList empty-filter CTA resets search and IssueDetail copies issue refe
   expect(app.texts()).toContain(t("web.base.rich.copied"));
 });
 
-test("regression: todo add button renders below cards and dragging a card does not open it", async () => {
+test("regression: todo add button renders in lane header above cards and dragging a card does not open it", async () => {
   setLocale("zh");
   const first = makeTodoIssue("i-drag-1", "第一张工单", "laozhou");
   const second = makeTodoIssue("i-drag-2", "第二张工单");
@@ -273,11 +273,11 @@ test("regression: todo add button renders below cards and dragging a card does n
   );
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 2 && app.count("id:issue-new") === 1);
 
-  const cardBox = app.layout("id:issue-card >> nth=1");
+  const firstCardBox = app.layout("id:issue-card >> nth=0");
   const newBtnBox = app.layout("id:issue-new");
-  expect(cardBox).toBeDefined();
+  expect(firstCardBox).toBeDefined();
   expect(newBtnBox).toBeDefined();
-  expect(newBtnBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height);
+  expect(newBtnBox!.y + newBtnBox!.height).toBeLessThanOrEqual(firstCardBox!.y);
 
   // Dragging a card (even across lanes) must not open its detail page.
   const secondBox = app.layout("id:issue-card >> nth=1")!;

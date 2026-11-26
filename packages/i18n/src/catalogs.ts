@@ -1332,7 +1332,7 @@ export const catalogs = {
           filtered: "当前筛选条件下此列没有工单。",
         },
         whichLane: "看哪一列",
-        spots: "{taken} / {of} 个并发上限",
+        spots: "{taken} / {of} 并发",
         moveFailed: "没挪过去",
         retryMove: "再挪一次",
         putBack: "放回原处",
@@ -1641,7 +1641,12 @@ export const catalogs = {
         missingRuntime: "尚未启用可用引擎，配置好编码引擎后就能自动起草和开工。",
         goRuntimes: "去配置引擎",
       },
-      conversation: { title: "讨论与交付记录", older: "加载更早的消息", empty: "需求讨论、执行反馈与交付会保留在这里" },
+      conversation: {
+        title: "讨论与交付记录",
+        older: "加载更早的消息",
+        empty: "需求讨论、执行反馈与交付会保留在这里",
+        placeholder: "写一条评论、补充说明或反馈…",
+      },
       attachments: {
         title: "附件",
         attachFile: "添加附件",
@@ -5036,7 +5041,12 @@ export const catalogs = {
         missingRuntime: "No ready engine configured yet. Set up an engine to draft and run tickets.",
         goRuntimes: "Configure engines",
       },
-      conversation: { title: "Discussion and delivery", older: "Load earlier messages", empty: "Requirements, execution feedback and deliveries stay here" },
+      conversation: {
+        title: "Discussion and delivery",
+        older: "Load earlier messages",
+        empty: "Requirements, execution feedback and deliveries stay here",
+        placeholder: "Write a comment, note, or feedback…",
+      },
       attachments: {
         title: "Attachments",
         attachFile: "Attach file",
@@ -8245,6 +8255,7 @@ export interface Messages {
   "web.issue.close.working": { readonly who: string | number };
   "web.issue.conversation.empty": undefined;
   "web.issue.conversation.older": undefined;
+  "web.issue.conversation.placeholder": undefined;
   "web.issue.conversation.title": undefined;
   "web.issue.detail.answer": undefined;
   "web.issue.detail.answerTo": { readonly question: string | number };
