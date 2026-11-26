@@ -478,8 +478,8 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
       id,
       type: "shape",
       shape: "card",
-      x: 108,
-      y: 108,
+      x: 120,
+      y: 120,
       w: 196,
       h: 120,
       title: t("web.artifact.whiteboard.card"),
@@ -524,7 +524,7 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
 
   return (
     <View testID="whiteboard-view" class="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg border border-line bg-side">
-      <View class="min-h-9 shrink-0 flex-row items-center gap-1 border-b border-line bg-page px-2.5 py-0.5">
+      <View class="min-h-10 shrink-0 flex-row items-center gap-1.5 border-b border-line bg-page px-3 py-1">
         <Button icon="add" testID="wb-add-node" disabled={act.busy()} onPress={addNode}>
           {t("web.artifact.whiteboard.sticky")}
         </Button>
@@ -535,9 +535,9 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
           disabled={undoStack().length === 0 || act.busy()}
           onClick={runUndo}
         />
-        <View class="ml-auto flex-row items-center gap-1">
+        <View class="ml-auto flex-row items-center gap-1.5">
           <If when={props.presences().length > 0}>
-            <View testID="wb-presence-peers" class="flex-row items-center gap-1 pr-1">
+            <View testID="wb-presence-peers" class="flex-row items-center gap-1">
               <Each of={props.presences()} key={(p) => p.id}>
                 {(peer) => (
                   <View testID="wb-presence-peer" class="h-5 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5">
@@ -548,9 +548,10 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
               </Each>
             </View>
           </If>
-          <Text testID="wb-count" class="pr-1 font-mono text-xs text-muted tabular-nums">
+          <Text testID="wb-count" class="font-mono text-xs text-muted tabular-nums">
             {t("web.artifact.whiteboard.elements", { n: elements().length })}
           </Text>
+          <View class="h-4 w-px bg-line" />
           <IconButton
             icon="download"
             label={`${t("web.library.content.exportArtifact")} SVG`}

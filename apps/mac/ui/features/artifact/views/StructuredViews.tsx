@@ -1,5 +1,6 @@
 import { computed, Scroll, signal, Text, untracked, View } from "nsh";
 import { Input } from "nsh/base";
+import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
@@ -19,6 +20,29 @@ import {
   diagramToMermaid,
 } from "./previewModel";
 
+const ChartSpecObjectSchema = z.object({}).loose();
+
+/** Turns a raw dataset filename such as `sample.json` or `slo_metrics.json` into a clean display label. */
+export function formatDatasetLabel(name: string): string {
+  const base = name.replace(/\.(?:json|csv|tsv)$/iu, "").trim();
+  if (!base) return name;
+  const words = base.replace(/[_-]+/gu, " ").split(/\s+/u).filter(Boolean);
+  if (words.length === 0) return name;
+  return words.map((word) => (word === word.toUpperCase() ? word : word.charAt(0).toUpperCase() + word.slice(1))).join(" ");
+}
+
+function sizeChartSpec(spec: string | undefined, width: number): string | undefined {
+  if (spec === undefined) return undefined;
+  try {
+    const parsed = ChartSpecObjectSchema.safeParse(JSON.parse(spec));
+    if (!parsed.success) return spec;
+    return JSON.stringify({ ...parsed.data, width });
+  } catch (e) {
+    if (e instanceof SyntaxError) return spec;
+    throw e;
+  }
+}
+
 export function DashboardView(props: {
   readonly panels: readonly Record<string, unknown>[];
   readonly datasets: readonly DashboardDataset[];
@@ -26,9 +50,25 @@ export function DashboardView(props: {
   readonly onExportCsv: (name: string, rows: readonly Record<string, unknown>[]) => void;
 }) {
   const datasetsByPath = computed(() => new Map(props.datasets.map((d) => [d.path, d])));
+  const viewportWidth = signal<number | undefined>(undefined);
+  // Quantize to 16px steps so resizing does not thrash the native SVG chart cache.
+  const chartWidth = computed(() => {
+    const raw = viewportWidth();
+    if (raw === undefined || raw <= 0) return 680;
+    const inner = Math.max(360, Math.min(1280, raw - 40));
+    return Math.floor(inner / 16) * 16;
+  });
 
   return (
-    <Scroll testID="artifact-dashboard-view" class="min-h-0 flex-1" contentClass="gap-4 p-5">
+    <Scroll
+      testID="artifact-dashboard-view"
+      onLayout={(e) => {
+        const w = Math.floor(e.bounds.size.width);
+        if (w > 0 && w !== untracked(viewportWidth)) viewportWidth.set(w);
+      }}
+      class="min-h-0 flex-1"
+      contentClass="gap-4 p-5"
+    >
       <View class="flex-row flex-wrap gap-3">
         <Each of={props.panels} key={(p) => asString(p.id, "panel")}>
           {(panel) => {
@@ -57,19 +97,22 @@ export function DashboardView(props: {
                 .schema.filter((s) => s.type === "number")
                 .map((s) => s.name),
             );
-          const chartSpec = () => buildDashboardChartSpec(ds());
+          const datasetLabel = () => formatDatasetLabel(ds().name);
+          const chartSpec = () => sizeChartSpec(buildDashboardChartSpec(ds()), chartWidth());
           return (
             <View class="gap-3">
               <If when={chartSpec()}>
                 {(spec) => (
-                  <View testID={`dashboard-chart-${ds().name}`} class="overflow-hidden rounded-lg border border-line bg-side p-3">
-                    <Chart spec={spec()} title={ds().name} />
+                  <View testID={`dashboard-chart-${ds().name}`} class="w-full">
+                    <Chart spec={spec()} title={datasetLabel()} class="my-0" />
                   </View>
                 )}
               </If>
               <View class="overflow-hidden rounded-lg border border-line bg-page">
                 <View class="flex-row items-center justify-between gap-2 border-b border-line bg-side px-3 py-2">
-                  <Text class="font-mono text-xs font-semibold text-ink">{ds().name}</Text>
+                  <Text testID={`dashboard-dataset-label-${ds().name}`} class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">
+                    {datasetLabel()}
+                  </Text>
                   <IconButton
                     icon="download"
                     size={14}

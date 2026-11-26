@@ -1718,9 +1718,10 @@ export const catalogs = {
         unpin: "取消置顶",
         pinnedToast: "已置顶收藏",
         unpinnedToast: "已取消置顶",
-        newNote: "新建大纲笔记",
         artifacts: "作品",
         media: "素材",
+        moreTypes: "更多类型 ({n})",
+        fewerTypes: "收起空类型",
         sendArtifact: "发到频道",
         exportArtifact: "导出",
         turnIntoIssue: "转为工单",
@@ -5110,9 +5111,10 @@ export const catalogs = {
         unpin: "Unpin",
         pinnedToast: "Pinned",
         unpinnedToast: "Unpinned",
-        newNote: "New outline note",
         artifacts: "Artifacts",
         media: "Media",
+        moreTypes: "More types ({n})",
+        fewerTypes: "Hide empty types",
         sendArtifact: "Send to channel",
         exportArtifact: "Export",
         turnIntoIssue: "Turn into ticket",
@@ -8488,6 +8490,7 @@ export interface Messages {
   "web.library.content.artifactType.all": undefined;
   "web.library.content.artifacts": undefined;
   "web.library.content.exportArtifact": undefined;
+  "web.library.content.fewerTypes": undefined;
   "web.library.content.inspector.copiedPath": undefined;
   "web.library.content.inspector.copyPath": undefined;
   "web.library.content.inspector.openExternal": undefined;
@@ -8498,8 +8501,8 @@ export interface Messages {
   "web.library.content.installedAppsEmpty": undefined;
   "web.library.content.issueCreated": undefined;
   "web.library.content.media": undefined;
+  "web.library.content.moreTypes": { readonly n: string | number };
   "web.library.content.new": undefined;
-  "web.library.content.newNote": undefined;
   "web.library.content.pin": undefined;
   "web.library.content.pinned": undefined;
   "web.library.content.pinnedEmpty": undefined;

@@ -482,6 +482,7 @@ export function LibraryPage() {
           <If when={isMediaMakeSupported(bucket())}>
             <Button
               size="compact"
+              tone="quiet"
               testID="library-make-btn"
               icon="generate"
               onPress={() => setSearch({ make: bucketFileKind(bucket()) === "audio" ? "audio" : "image" })}
@@ -489,9 +490,11 @@ export function LibraryPage() {
               {t("web.library.make")}
             </Button>
           </If>
-          <Button size="compact" testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
-            {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
-          </Button>
+          <If when={!appsOnly() && !pinnedOnly()}>
+            <Button size="compact" tone="quiet" testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
+              {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
+            </Button>
+          </If>
         </View>
 
         <Scroll

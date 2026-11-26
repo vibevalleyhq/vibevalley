@@ -725,19 +725,6 @@ function uniqueNoteTitle(base: string, existingTitles: readonly string[]): strin
   return `${base} ${Date.now()}`;
 }
 
-export async function createQuickBlankNote(deps: {
-  readonly queries: QueryClient;
-  readonly router: RouterController;
-  readonly existingNoteTitles: readonly string[];
-}): Promise<void> {
-  const baseTitle = t("web.library.content.templates.items.noteBlank.name");
-  const title = uniqueNoteTitle(baseTitle, deps.existingNoteTitles);
-  const outlineJson = `${JSON.stringify(buildOutlineFromMarkdown(title, noteStarterMarkdown("blank")), null, 2)}\n`;
-  const made = await createTypedArtifact("outline", title, { content: outlineJson });
-  await deps.queries.invalidate({ prefix: ["artifacts"] });
-  deps.router.navigate(artifactHref(made.id));
-}
-
 export async function createFromTemplate(
   tpl: ContentTemplate,
   deps: {
