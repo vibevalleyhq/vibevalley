@@ -10,7 +10,7 @@ import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { ActiveBar, Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
-import { Dot, type DotTone } from "../../design/Tag";
+import { CountPill, Dot, type DotTone } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { mix } from "../../design/tone";
@@ -258,9 +258,21 @@ export function RunsPage(props: { approvals?: RunApprovals }) {
     <View
       testID="runs-list-pane"
       accessibilityLabel={t("web.session.hub.list")}
-      class={`min-h-0 flex-col bg-side ${wide() ? "w-80 shrink-0 border-r border-line" : "flex-1"}`}
+      class={`min-h-0 flex-col bg-side ${wide() ? "w-76 shrink-0 border-r border-line" : "flex-1"}`}
     >
-      <View class="shrink-0 gap-2 border-b border-line p-3">
+      <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3">
+        <View class="min-w-0 flex-row items-center gap-2">
+          <Text class="truncate text-sm font-semibold text-ink">{t("web.session.hub.list")}</Text>
+          <CountPill count={visibleEntries().length} />
+        </View>
+        <If when={activeCount() > 0}>
+          <View class="h-5 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5" style={{ backgroundColor: mix("water", 0.14) }}>
+            <Dot tone="water" size={6} ring={false} />
+            <Text class="font-mono text-2xs font-medium text-water tabular-nums">{String(activeCount())}</Text>
+          </View>
+        </If>
+      </View>
+      <View class="shrink-0 gap-1.5 border-b border-line bg-side px-2.5 py-2">
         <SearchField
           testid="runs-search"
           clearTestid="runs-search-clear"
@@ -309,7 +321,7 @@ export function RunsPage(props: { approvals?: RunApprovals }) {
           </View>
         </If>
       </View>
-      <Scroll class="min-h-0 flex-1" contentClass="gap-1 p-2">
+      <Scroll class="min-h-0 flex-1" contentClass="gap-0.5 p-1.5">
         <If
           when={visibleEntries().length > 0}
           else={
@@ -399,7 +411,7 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
       accessibilityLabel={entryName(props.entry)}
       accessibilityState={{ selected: props.selected }}
       onPress={props.onSelect}
-      class={`relative flex-row items-start gap-2.5 rounded-md border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus ${
+      class={`relative flex-row items-start gap-2 rounded-md border px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${
         props.selected ? "border-line bg-selected" : "border-transparent hover:bg-hover"
       }`}
     >
@@ -411,11 +423,11 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
           when={props.entry.kind === "orchestrator"}
           else={
             <If when={props.entry.kind === "worker" ? props.entry : undefined}>
-              {(w) => <AgentFace agentId={sessionProfile(w().session) ?? ""} name={w().session.name} look={props.look} size={30} />}
+              {(w) => <AgentFace agentId={sessionProfile(w().session) ?? ""} name={w().session.name} look={props.look} size={28} />}
             </If>
           }
         >
-          <OrchestratorFace size={30} agent={props.entry.id} />
+          <OrchestratorFace size={28} agent={props.entry.id} />
         </If>
       </View>
       <View class="min-w-0 flex-1 gap-0.5">
@@ -441,7 +453,7 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
         <If when={entrySubtitle(props.entry)}>
           <Text class="truncate text-xs text-muted">{entrySubtitle(props.entry)}</Text>
         </If>
-        <View class="flex-row items-center gap-1.5 pt-0.5">
+        <View class="flex-row items-center gap-1.5">
           <Dot tone={status().dot} size={6} ring={false} />
           <Text class={`shrink-0 text-2xs font-medium ${status().textClass}`}>{status().label}</Text>
           <If when={repo()}>
@@ -501,79 +513,72 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
 
   return (
     <View class="h-full min-h-0 flex-1 bg-page">
-      <View testID="run-detail-header" class="shrink-0 border-b border-line px-5 py-3">
-        <View class="w-full max-w-5xl gap-2">
-          <If when={props.showBack}>
-            <View
-              role="button"
-              testID="runs-back"
-              onPress={props.onBack}
-              class="-ml-1.5 flex-row items-center gap-1 self-start rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
-            >
-              <Icon name="back" size={12} tone="muted" />
-              <Text class="text-xs font-medium text-muted">{t("web.session.hub.back")}</Text>
-            </View>
-          </If>
-          <View class="flex-row flex-wrap items-center gap-3">
-            <View class="shrink-0">
-              <If
-                when={props.entry.kind === "orchestrator"}
-                else={
-                  <If when={props.entry.kind === "worker" ? props.entry : undefined}>
-                    {(w) => (
-                      <AgentFace
-                        agentId={sessionProfile(w().session) ?? ""}
-                        name={w().session.name}
-                        runtime={w().session.runtime}
-                        look={props.look}
-                        size={36}
-                      />
-                    )}
-                  </If>
-                }
-              >
-                <OrchestratorFace size={36} agent={props.entry.id} />
-              </If>
-            </View>
-            <View class="min-w-0 flex-1 gap-0.5">
-              <View class="flex-row flex-wrap items-center gap-2">
-                <Text role="header" class="min-w-0 shrink truncate text-base font-semibold text-ink">
-                  {entryName(props.entry)}
-                </Text>
-                <View class={`h-5 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 ${status().pillClass}`} style={pillStyle()}>
-                  <Dot tone={status().dot} size={6} ring={false} />
-                  <Text class={`text-2xs font-medium ${status().textClass}`}>{status().label}</Text>
-                </View>
-              </View>
-              <If when={subLine()}>
-                <Text class="truncate text-xs text-muted">{subLine()}</Text>
-              </If>
-            </View>
-            <View class="shrink-0 flex-row flex-wrap items-center gap-2">
-              <Button
-                testID="run-copy-id"
-                icon={copiedId() ? "check" : "copy"}
-                tooltip={<Bubble text={copiedId() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
-                onPress={copyRunId}
-              >
-                {copiedId() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
-              </Button>
-              <If when={workerIssueId()}>
-                {(issueId) => (
-                  <ButtonLink href={`/issues/${encodeURIComponent(issueId())}`} icon="issues" testID="run-open-issue">
-                    {workerIssueNumber() !== undefined ? `#${workerIssueNumber()} ${t("web.session.hub.openIssue")}` : t("web.session.hub.openIssue")}
-                  </ButtonLink>
+      <View
+        desktop={{ windowDrag: true }}
+        testID="run-detail-header"
+        class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2.5 border-b border-line bg-page px-4 py-1.5"
+      >
+        <If when={props.showBack}>
+          <View
+            role="button"
+            testID="runs-back"
+            onPress={props.onBack}
+            class="-ml-1 flex-row items-center gap-1 rounded-md px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+          >
+            <Icon name="back" size={12} tone="muted" />
+            <Text class="text-xs font-medium text-muted">{t("web.session.hub.back")}</Text>
+          </View>
+        </If>
+        <View class="shrink-0">
+          <If
+            when={props.entry.kind === "orchestrator"}
+            else={
+              <If when={props.entry.kind === "worker" ? props.entry : undefined}>
+                {(w) => (
+                  <AgentFace agentId={sessionProfile(w().session) ?? ""} name={w().session.name} runtime={w().session.runtime} look={props.look} size={24} />
                 )}
               </If>
-              <ButtonLink href={`/agents/${encodeURIComponent(profileId())}`} icon="agents" testID="run-open-profile">
-                {t("web.session.hub.openProfile")}
-              </ButtonLink>
-            </View>
+            }
+          >
+            <OrchestratorFace size={24} agent={props.entry.id} />
+          </If>
+        </View>
+        <View class="min-w-0 flex-1 flex-row items-center gap-2">
+          <Text role="header" class="shrink-0 truncate text-sm font-semibold text-ink">
+            {entryName(props.entry)}
+          </Text>
+          <View class={`h-5 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 ${status().pillClass}`} style={pillStyle()}>
+            <Dot tone={status().dot} size={6} ring={false} />
+            <Text class={`text-2xs font-medium ${status().textClass}`}>{status().label}</Text>
           </View>
+          <If when={subLine()}>
+            <Text class="min-w-0 flex-1 truncate text-xs text-muted">{subLine()}</Text>
+          </If>
+        </View>
+        <View class="shrink-0 flex-row items-center gap-1.5">
+          <Button
+            size="compact"
+            testID="run-copy-id"
+            icon={copiedId() ? "check" : "copy"}
+            tooltip={<Bubble text={copiedId() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
+            onPress={copyRunId}
+          >
+            {copiedId() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
+          </Button>
+          <If when={workerIssueId()}>
+            {(issueId) => (
+              <ButtonLink size="compact" href={`/issues/${encodeURIComponent(issueId())}`} icon="issues" testID="run-open-issue">
+                {workerIssueNumber() !== undefined ? `#${workerIssueNumber()} ${t("web.session.hub.openIssue")}` : t("web.session.hub.openIssue")}
+              </ButtonLink>
+            )}
+          </If>
+          <ButtonLink size="compact" href={`/agents/${encodeURIComponent(profileId())}`} icon="agents" testID="run-open-profile">
+            {t("web.session.hub.openProfile")}
+          </ButtonLink>
         </View>
       </View>
-      <View class="min-h-0 flex-1 px-5 pt-3 pb-4">
-        <View class="min-h-0 w-full max-w-5xl flex-1 gap-3">
+      <View class="min-h-0 flex-1 px-4 pt-2.5 pb-3">
+        <View class="min-h-0 w-full max-w-6xl flex-1 gap-2.5">
           <If when={props.entry.kind === "orchestrator" ? props.approvals : undefined}>
             {(Approvals) => {
               const ViewApprovals = Approvals();

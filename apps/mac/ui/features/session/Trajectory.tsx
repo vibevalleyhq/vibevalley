@@ -5,7 +5,7 @@ import type { OrchestratorEval, Session, SessionEvent } from "@vibevalley/protoc
 import { oneLine } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
-import { Button } from "../../design/Button";
+import { Button, ButtonLink } from "../../design/Button";
 import { SearchField, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Quiet } from "../../design/layout";
@@ -34,6 +34,7 @@ import {
   secondsText,
   shownEvents,
   spanTone,
+  stepDurationsOf,
   summaryOf,
   tagOf,
   tokensText,
@@ -145,6 +146,14 @@ function stepTextOf(step: SessionEvent): string {
   return "";
 }
 
+function compactTokenBadge(step: SessionEvent): string | undefined {
+  if (!step.tokens) return undefined;
+  const totalIn = Math.round(step.tokens.input + step.tokens.cacheRead);
+  const totalOut = Math.round(step.tokens.output);
+  if (totalIn + totalOut <= 0) return undefined;
+  return `${tokensText(totalIn)}/${tokensText(totalOut)}`;
+}
+
 const haystack = (step: SessionEvent, tag: string) => [tag, stepTextOf(step), step.tool ?? "", step.input ?? "", step.output ?? ""].join("\n").toLowerCase();
 
 function summaryText(s: TrajectorySummary) {
@@ -207,10 +216,11 @@ export function TrajectoryLog(props: {
 }
 
 interface RowSpec {
-  step: SessionEvent;
-  tag: string;
-  when: string;
-  markable: boolean;
+  readonly step: SessionEvent;
+  readonly tag: string;
+  readonly when: string;
+  readonly durationMs: number | undefined;
+  readonly markable: boolean;
 }
 
 interface RunGroup {
@@ -255,6 +265,7 @@ export function Trajectory(props: {
     return props.working === true && props.now > last ? props.now : last;
   });
   const bySeq = createMemo(() => new Map(shown().map((s) => [s.seq, s])));
+  const durations = createMemo(() => stepDurationsOf(props.steps, end()));
   const summary = createMemo(() => summaryText(summaryOf(props.steps, end())));
 
   const groups = createMemo((): readonly RunGroup[] => {
@@ -262,6 +273,7 @@ export function Trajectory(props: {
     const filter = stepFilter();
     const q = query().trim().toLowerCase();
     const views = runsOf(shown());
+    const durationMap = durations();
     const out: RunGroup[] = [];
     let n = 0;
     views.forEach((view, idx) => {
@@ -276,6 +288,7 @@ export function Trajectory(props: {
           step,
           tag,
           when: ago(step.time, props.now),
+          durationMs: durationMap.get(step.seq),
           markable: !!props.onMarkWrong && step.type === "user/message" && step.under === undefined,
         });
       }
@@ -309,12 +322,32 @@ export function Trajectory(props: {
     return out;
   });
 
+  const visibleSeqs = createMemo(() => groups().flatMap((g) => g.rows.map((r) => r.step.seq)));
+  const allExpanded = createMemo(() => {
+    const seqs = visibleSeqs();
+    if (seqs.length === 0) return false;
+    const closed = collapsedRuns();
+    const opened = open();
+    return groups().every((g) => hasActiveFilter() || !closed.has(g.key)) && seqs.every((seq) => opened.has(seq));
+  });
+
+  const toggleAll = () => {
+    if (allExpanded()) {
+      open.set(new Set());
+      return;
+    }
+    collapsedRuns.set(new Set());
+    open.set(new Set(visibleSeqs()));
+  };
+
   const show = (seq: number) => {
     clearFilters();
     const targetGroup = groups().find((g) => g.rows.some((r) => r.step.seq === seq));
     if (targetGroup && collapsedRuns().has(targetGroup.key)) {
       collapsedRuns.set(new Set([...collapsedRuns()].filter((k) => k !== targetGroup.key)));
     }
+    const o = open();
+    if (!o.has(seq)) open.set(new Set([...o, seq]));
     marked.set(seq);
     requestAnimationFrame(() => rowRefs.get(seq)?.reveal({ vertical: "nearest" }));
   };
@@ -333,7 +366,7 @@ export function Trajectory(props: {
     <View testID="trajectory" class="min-h-0 flex-1">
       <View class="flex-row flex-wrap items-center gap-2 pb-2">
         <View class="min-w-0 flex-1">{props.head}</View>
-        <View testID="trajectory-filters" class="flex-row items-center gap-1 rounded-md border border-line bg-side p-0.5">
+        <View testID="trajectory-filters" class="flex-row items-center gap-0.5 rounded-md border border-line bg-side p-0.5">
           <Each of={stepFilters} key={(f) => f}>
             {(f) => {
               const active = () => stepFilter() === f();
@@ -359,6 +392,11 @@ export function Trajectory(props: {
             }}
           </Each>
         </View>
+        <If when={visibleSeqs().length > 0}>
+          <Button size="compact" testID="trajectory-toggle-all" icon={allExpanded() ? "collapseAll" : "expandAll"} onPress={toggleAll}>
+            {allExpanded() ? t("web.session.trajectory.collapseAll") : t("web.session.trajectory.expandAll")}
+          </Button>
+        </If>
         <SearchField
           testid="trajectory-search"
           clearTestid="trajectory-search-clear"
@@ -367,23 +405,29 @@ export function Trajectory(props: {
           onInput={(v) => query.set(v)}
           placeholder={t("web.session.trajectory.searchHint")}
           label={t("web.session.trajectory.search")}
-          class="w-56"
+          class="w-48"
         />
       </View>
       <WaterfallView
         steps={props.steps}
         end={end()}
+        selectedSeq={marked()}
         colorOf={(seq) => {
           const s = bySeq().get(seq);
           return s ? tone(spanTone(s)) : tone("bark-400");
         }}
+        summaryOf={(seq) => {
+          const s = bySeq().get(seq);
+          if (!s) return "";
+          return collapsedStepSummary(s, stepTextOf(s));
+        }}
         onPick={show}
       />
-      <Scroll class="mt-2 min-h-0 flex-1 border-y border-line" contentClass="py-1.5">
+      <Scroll class="mt-2 min-h-0 flex-1" contentClass="pb-2">
         <If
           when={groups().length > 0}
           else={
-            <View class="items-start gap-2 px-2 py-4">
+            <View class="items-start gap-2 rounded-lg border border-line bg-elevated px-3.5 py-4">
               <Text testID="steps-empty" class="text-sm text-muted">
                 {t("web.session.trajectory.noMatch")}
               </Text>
@@ -396,7 +440,7 @@ export function Trajectory(props: {
           }
         >
           <Each of={groups()} key={(g) => g.key}>
-            {(group, groupIdx) => {
+            {(group) => {
               const isRunOpen = () => hasActiveFilter() || !collapsedRuns().has(group().key);
               const metaParts = () => {
                 const g = group();
@@ -408,13 +452,16 @@ export function Trajectory(props: {
                 ];
               };
               return (
-                <View class={groupIdx() > 0 ? "mt-1.5 border-t border-line pt-1.5" : ""}>
+                <View testID={`run-group-${group().key}`} class="mb-2.5 overflow-hidden rounded-lg border border-line bg-elevated">
                   <View
                     role="button"
+                    testID={`run-header-${group().key}`}
                     accessibilityState={{ expanded: isRunOpen() }}
                     accessibilityLabel={isRunOpen() ? t("web.session.log.fold") : t("web.session.log.unfold")}
                     onPress={() => toggleRun(group().key)}
-                    class="mb-0.5 flex-row items-center gap-2 rounded-md px-2 py-1 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+                    class={`h-8 flex-row items-center gap-2 bg-side px-3 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover ${
+                      isRunOpen() ? "border-b border-line" : "border-b-0"
+                    }`}
                   >
                     <View
                       class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
@@ -434,38 +481,45 @@ export function Trajectory(props: {
                         <Dot tone="water" size={7} ring={false} />
                       </If>
                     </View>
-                    <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{group().label}</Text>
-                    <View class="shrink-0 flex-row items-center gap-2">
-                      <Text class={`text-2xs tabular-nums ${group().live ? "font-medium text-water" : group().hasError ? "text-berry" : "text-muted"}`}>
-                        {metaParts().join(" · ")}
-                      </Text>
-                      <If when={group().when}>
-                        <Text class="text-right text-2xs text-faint tabular-nums">{group().when}</Text>
-                      </If>
-                    </View>
+                    <Text class="shrink-0 text-xs font-semibold text-ink">{group().label}</Text>
+                    <Text
+                      class={`min-w-0 flex-1 truncate text-2xs tabular-nums ${group().live ? "font-medium text-water" : group().hasError ? "text-berry" : "text-muted"}`}
+                    >
+                      {metaParts().join(" · ")}
+                    </Text>
+                    <If when={group().when}>
+                      <Text class="shrink-0 text-right text-2xs text-faint tabular-nums">{group().when}</Text>
+                    </If>
                   </View>
                   <If when={isRunOpen()}>
-                    <View class="gap-0.5">
+                    <View>
                       <Each of={group().rows} key={(r) => r.step.seq}>
-                        {(r) => {
-                          const seq = r().step.seq;
+                        {(r, rowIdx) => {
+                          const hasDivider = () => rowIdx() < group().rows.length - 1;
                           const row = () => (
                             <Row
                               spec={r()}
-                              open={open().has(seq)}
-                              marked={marked() === seq}
-                              refTo={(el) => rowRefs.set(seq, el)}
-                              onToggle={() => toggle(seq)}
+                              open={open().has(r().step.seq)}
+                              marked={marked() === r().step.seq}
+                              refTo={(el) => rowRefs.set(r().step.seq, el)}
+                              onToggle={() => toggle(r().step.seq)}
                             />
                           );
                           return (
-                            <If when={r().markable ? props.onMarkWrong : undefined} else={row()}>
-                              {(send) => (
-                                <Markable step={seq} send={send()} file={wrong().get(seq)} onMarked={(file) => wrong.set(new Map([...wrong(), [seq, file]]))}>
-                                  {row()}
-                                </Markable>
-                              )}
-                            </If>
+                            <View class={hasDivider() ? "border-b" : ""} style={hasDivider() ? { borderColor: mix("line", 0.45) } : undefined}>
+                              <If when={r().markable ? props.onMarkWrong : undefined} else={row()}>
+                                {(send) => (
+                                  <Markable
+                                    step={r().step.seq}
+                                    send={send()}
+                                    file={wrong().get(r().step.seq)}
+                                    onMarked={(file) => wrong.set(new Map([...wrong(), [r().step.seq, file]]))}
+                                  >
+                                    {row()}
+                                  </Markable>
+                                )}
+                              </If>
+                            </View>
                           );
                         }}
                       </Each>
@@ -477,9 +531,11 @@ export function Trajectory(props: {
           </Each>
         </If>
       </Scroll>
-      <Text testID="trajectory-summary" class="pt-2 text-xs text-muted tabular-nums">
-        {summary()}
-      </Text>
+      <View class="shrink-0 border-t border-line pt-2">
+        <Text testID="trajectory-summary" class="text-xs text-muted tabular-nums">
+          {summary()}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -493,29 +549,32 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
   const sub = () => step().under !== undefined;
   const bodyText = createMemo(() => stepTextOf(step()));
   const summaryLine = createMemo(() => collapsedStepSummary(step(), bodyText()));
+  const durationLabel = () => {
+    const ms = props.spec.durationMs;
+    return ms !== undefined && ms >= 100 ? secondsText(ms) : undefined;
+  };
+  const tokenLabel = () => (step().type === "llm/usage" ? compactTokenBadge(step()) : undefined);
   return (
-    <View
-      ref={(el) => props.refTo(el)}
-      testID="step"
-      class={`rounded-md ${props.marked ? "" : props.open ? "bg-hover" : "hover:bg-hover"}`}
-      style={props.marked ? { backgroundColor: mix("wheat", 0.25) } : undefined}
-    >
+    <View ref={(el) => props.refTo(el)} testID="step">
       <View
         role="button"
         testID={`step-toggle-${String(step().seq)}`}
         accessibilityLabel={`${props.spec.tag} ${summaryLine()}`}
         accessibilityState={{ expanded: props.open }}
         onPress={() => props.onToggle()}
-        class="w-full flex-row items-start gap-2 px-2 py-1"
+        class={`group w-full flex-row items-center gap-2 px-3 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${
+          props.marked ? "" : props.open ? "bg-selected" : "hover:bg-hover"
+        }`}
+        style={props.marked ? { backgroundColor: mix("wheat", 0.25) } : undefined}
       >
         <View
-          class={`mt-1 h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
+          class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
           style={{ transform: [{ rotate: props.open ? "90deg" : "0deg" }] }}
         >
-          <Icon name="expand" size={10} tone="muted" />
+          <Icon name="expand" size={10} tone={props.open ? "ink" : "muted"} />
         </View>
         <View
-          class={`mt-px shrink-0 rounded-sm px-1.5 py-px ${sub() ? "ml-2.5 w-19.5 border-l-2" : "w-22"} ${tagTone().bgClass}`}
+          class={`shrink-0 rounded-sm px-1.5 py-px ${sub() ? "ml-2 w-14 border-l-2" : "w-16"} ${tagTone().bgClass}`}
           style={(() => {
             const bg = tagTone().bgStyle;
             const border = sub() ? { borderColor: mix("leaf", 0.65) } : undefined;
@@ -524,7 +583,24 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
         >
           <Text class={`truncate text-center text-2xs font-medium ${tagTone().text}`}>{props.spec.tag}</Text>
         </View>
-        <View class="mt-1 h-3.5 w-3.5 shrink-0 items-center justify-center">
+        <View class="min-w-0 flex-1">
+          <If
+            when={tool()}
+            else={
+              <Text class={`truncate text-sm ${failed() ? "text-berry" : step().type === "llm/usage" ? "text-muted tabular-nums" : "text-ink"}`}>
+                {summaryLine()}
+              </Text>
+            }
+          >
+            <ToolLine step={step()} failed={failed()} />
+          </If>
+        </View>
+        <View class="shrink-0 flex-row items-center gap-1.5">
+          <Text class={`text-2xs text-faint ${props.open ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+            {props.open ? t("web.session.trajectory.hideDetail") : t("web.session.trajectory.inspect")}
+          </Text>
+          <If when={durationLabel()}>{(dur) => <Text class="font-mono text-2xs text-faint tabular-nums">{dur()}</Text>}</If>
+          <If when={tokenLabel()}>{(tok) => <Text class="font-mono text-2xs text-faint tabular-nums">{tok()}</Text>}</If>
           <If when={failed()}>
             <Icon name="cross" size={12} />
           </If>
@@ -538,38 +614,28 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
             <Icon name="warn" size={12} />
           </If>
         </View>
-        <View class="min-w-0 flex-1">
-          <If
-            when={tool()}
-            else={
-              <If
-                when={props.open}
-                else={
-                  <Text class={`truncate text-sm ${failed() ? "text-berry" : step().type === "llm/usage" ? "text-muted tabular-nums" : "text-ink"}`}>
-                    {summaryLine()}
-                  </Text>
-                }
-              >
-                <If
-                  when={step().type === "assistant/message"}
-                  else={
-                    <Text class={`text-sm ${failed() ? "text-berry" : step().type === "llm/usage" ? "text-muted tabular-nums" : "text-ink"}`}>
-                      {bodyText()}
-                    </Text>
-                  }
-                >
-                  <Markdown size="sm" text={bodyText()} />
-                </If>
-              </If>
-            }
-          >
-            <ToolLine step={step()} failed={failed()} />
-          </If>
-        </View>
-        <Text class="shrink-0 pt-0.5 pl-1 text-right text-2xs text-faint tabular-nums">{props.spec.when}</Text>
+        <Text class="w-12 shrink-0 text-right text-2xs text-faint tabular-nums">{props.spec.when}</Text>
       </View>
-      <If when={props.open && tool()}>
-        <ToolDetail step={step()} />
+      <If when={props.open}>
+        <StepDrawer step={step()} tag={props.spec.tag} body={bodyText()} durationMs={props.spec.durationMs} />
+      </If>
+    </View>
+  );
+}
+
+/** Structured inline inspection drawer opened underneath any trajectory step row. */
+function StepDrawer(props: { step: SessionEvent; tag: string; body: string; durationMs: number | undefined }) {
+  return (
+    <View testID={`step-drawer-${String(props.step.seq)}`} class="border-t border-line py-2.5 pr-3.5 pl-8" style={{ backgroundColor: mix("side", 0.7) }}>
+      <If
+        when={props.step.type === "tool/call"}
+        else={
+          <If when={props.step.type === "run/error"} else={<BodyDetail step={props.step} tag={props.tag} body={props.body} durationMs={props.durationMs} />}>
+            <ErrorDetail step={props.step} />
+          </If>
+        }
+      >
+        <ToolDetail step={props.step} durationMs={props.durationMs} />
       </If>
     </View>
   );
@@ -595,25 +661,24 @@ function ToolLine(props: { step: SessionEvent; failed: boolean }) {
   );
 }
 
-function CopyStepButton(props: { testID: string; copied: boolean; onCopy: () => void }) {
+function CopyStepButton(props: { testID: string; copied: boolean; label?: string | undefined; onCopy: () => void }) {
+  const text = () => (props.copied ? t("web.base.rich.copied") : (props.label ?? t("web.base.rich.copy")));
   return (
     <View
       role="button"
       testID={props.testID}
-      accessibilityLabel={props.copied ? t("web.base.rich.copied") : t("web.base.rich.copy")}
-      tooltip={<Bubble text={props.copied ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
+      accessibilityLabel={text()}
+      tooltip={<Bubble text={text()} />}
       onPress={props.onCopy}
       class="flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
     >
-      <Icon name={props.copied ? "check" : "copy"} size={11} tone={props.copied ? "leaf" : "muted"} />
-      <Text class={`text-2xs ${props.copied ? "font-medium text-ok-ink" : "text-muted"}`}>
-        {props.copied ? t("web.base.rich.copied") : t("web.base.rich.copy")}
-      </Text>
+      <Icon name={props.copied ? "check" : "copy"} size={12} tone={props.copied ? "leaf" : "muted"} />
+      <Text class={`text-2xs ${props.copied ? "font-medium text-ok-ink" : "text-muted"}`}>{text()}</Text>
     </View>
   );
 }
 
-function ToolDetail(props: { step: SessionEvent }) {
+function ToolDetail(props: { step: SessionEvent; durationMs: number | undefined }) {
   const copiedSlot = signal<"input" | "output" | undefined>(undefined);
   const resetCopy = useTimeout();
   createEffect(
@@ -638,19 +703,31 @@ function ToolDetail(props: { step: SessionEvent }) {
     running() ? t("web.session.trajectory.running") : props.step.ok === true ? t("web.session.trajectory.ok") : t("web.session.trajectory.failed");
   const badgeClass = () => (running() ? "" : failed() ? "bg-bad-soft" : "bg-ok-soft");
   const badgeText = () => (running() ? "text-water" : failed() ? "text-berry" : "text-ok-ink");
+  const durationLabel = () => (props.durationMs !== undefined ? secondsText(props.durationMs) : undefined);
   return (
-    <View class="mt-1 mr-2 mb-1.5 ml-7.5 gap-1.5 rounded-md border border-line bg-side p-2.5">
+    <View class="gap-2">
       <View class="flex-row items-center gap-2">
         <If when={props.step.tool}>
-          <Text class="font-mono text-xs text-muted">{t("web.session.trajectory.tool", { name: props.step.tool ?? "" })}</Text>
+          <Text class="font-mono text-xs font-medium text-ink">{t("web.session.trajectory.tool", { name: props.step.tool ?? "" })}</Text>
         </If>
-        <View class={`rounded-sm px-1.5 py-px ${badgeClass()}`} style={running() ? { backgroundColor: mix("water", 0.14) } : undefined}>
+        <View
+          testID="tool-status-badge"
+          class={`rounded-sm px-1.5 py-px ${badgeClass()}`}
+          style={running() ? { backgroundColor: mix("water", 0.14) } : undefined}
+        >
           <Text class={`text-2xs font-medium ${badgeText()}`}>{stateLabel()}</Text>
         </View>
+        <If when={durationLabel()}>
+          {(dur) => (
+            <Text testID="tool-duration" class="font-mono text-2xs text-muted tabular-nums">
+              {dur()}
+            </Text>
+          )}
+        </If>
       </View>
       <If when={input()}>
         {(text) => (
-          <>
+          <View class="gap-1">
             <View class="flex-row items-center justify-between gap-2">
               <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.input")}</Text>
               <CopyStepButton testID="tool-copy-input" copied={copiedSlot() === "input"} onCopy={() => copyPayload("input", text())} />
@@ -658,32 +735,137 @@ function ToolDetail(props: { step: SessionEvent }) {
             <Scroll class="max-h-40 rounded-md border border-line bg-code-bg px-2.5 py-2">
               <Text class="select-text font-mono text-xs text-code-ink">{text()}</Text>
             </Scroll>
-          </>
+          </View>
         )}
       </If>
-      <View class="flex-row items-center justify-between gap-2">
-        <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.output")}</Text>
-        <If when={props.step.output}>
-          {(out) => <CopyStepButton testID="tool-copy-output" copied={copiedSlot() === "output"} onCopy={() => copyPayload("output", out())} />}
+      <View class="gap-1">
+        <View class="flex-row items-center justify-between gap-2">
+          <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.output")}</Text>
+          <If when={props.step.output}>
+            {(out) => <CopyStepButton testID="tool-copy-output" copied={copiedSlot() === "output"} onCopy={() => copyPayload("output", out())} />}
+          </If>
+        </View>
+        <If
+          when={props.step.output}
+          else={<Text class="text-xs text-faint">{running() ? t("web.session.trajectory.pending") : t("web.session.trajectory.noOutput")}</Text>}
+        >
+          <Scroll
+            class={`max-h-56 rounded-md border px-2.5 py-2 ${failed() ? "bg-bad-soft" : "border-line bg-page"}`}
+            style={failed() ? { borderColor: mix("berry", 0.3) } : undefined}
+          >
+            <Text class={`select-text font-mono text-xs ${failed() ? "text-berry" : "text-ink"}`}>{props.step.output ?? ""}</Text>
+          </Scroll>
         </If>
       </View>
-      <If
-        when={props.step.output}
-        else={<Text class="text-xs text-faint">{running() ? t("web.session.trajectory.pending") : t("web.session.trajectory.noOutput")}</Text>}
-      >
-        <Scroll
-          class={`max-h-56 rounded-md border px-2.5 py-2 ${failed() ? "bg-bad-soft" : "border-line bg-page"}`}
-          style={failed() ? { borderColor: mix("berry", 0.3) } : undefined}
+    </View>
+  );
+}
+
+function ErrorDetail(props: { step: SessionEvent }) {
+  const copied = signal(false);
+  const resetCopy = useTimeout();
+  createEffect(
+    () => props.step.seq,
+    () => copied.set(false),
+    { defer: true },
+  );
+  const localized = createMemo(() => localizeRuntimeError(props.step.text));
+  const copyRaw = () => {
+    void Clipboard.writeText(props.step.text).then(
+      () => {
+        copied.set(true);
+        resetCopy(() => copied.set(false), 1500);
+        toast(t("web.base.rich.copied"));
+      },
+      () => undefined,
+    );
+  };
+  return (
+    <View testID="error-callout" class="gap-2 rounded-md border bg-bad-soft px-3 py-2.5" style={{ borderColor: mix("berry", 0.3) }}>
+      <View class="flex-row items-start gap-2">
+        <View class="mt-0.5 shrink-0">
+          <Icon name="cross" size={12} />
+        </View>
+        <Text class="min-w-0 flex-1 select-text text-sm text-berry">{localized().text}</Text>
+      </View>
+      <View class="flex-row items-center justify-end gap-2">
+        <If when={localized().settingsHref}>
+          {(href) => (
+            <ButtonLink size="compact" href={href()} icon="settings" testID="error-open-settings">
+              {t("web.session.trajectory.openSettings")}
+            </ButtonLink>
+          )}
+        </If>
+        <CopyStepButton testID="error-copy-raw" copied={copied()} label={t("web.session.trajectory.copyRawError")} onCopy={copyRaw} />
+      </View>
+    </View>
+  );
+}
+
+function BodyDetail(props: { step: SessionEvent; tag: string; body: string; durationMs: number | undefined }) {
+  const copied = signal(false);
+  const resetCopy = useTimeout();
+  createEffect(
+    () => props.step.seq,
+    () => copied.set(false),
+    { defer: true },
+  );
+  const copyBody = () => {
+    if (!props.body) return;
+    void Clipboard.writeText(props.body).then(
+      () => {
+        copied.set(true);
+        resetCopy(() => copied.set(false), 1500);
+        toast(t("web.base.rich.copied"));
+      },
+      () => undefined,
+    );
+  };
+  const durationLabel = () => (props.durationMs !== undefined && props.durationMs >= 100 ? secondsText(props.durationMs) : undefined);
+  return (
+    <View class="gap-1.5">
+      <View class="flex-row items-center justify-between gap-2">
+        <View class="flex-row items-center gap-2">
+          <Text class="text-2xs font-medium text-muted">{props.tag}</Text>
+          <If when={durationLabel()}>{(dur) => <Text class="font-mono text-2xs text-faint tabular-nums">{dur()}</Text>}</If>
+        </View>
+        <If when={props.body.length > 0}>
+          <CopyStepButton testID="step-copy-body" copied={copied()} onCopy={copyBody} />
+        </If>
+      </View>
+      <View class="rounded-md border border-line bg-page px-3 py-2">
+        <If
+          when={props.step.type === "assistant/message"}
+          else={
+            <Text
+              class={`select-text ${
+                props.step.type === "llm/usage"
+                  ? "font-mono text-xs text-muted tabular-nums"
+                  : props.step.type === "assistant/thinking"
+                    ? "text-sm text-muted"
+                    : "text-sm text-ink"
+              }`}
+            >
+              {props.body}
+            </Text>
+          }
         >
-          <Text class={`select-text font-mono text-xs ${failed() ? "text-berry" : "text-ink"}`}>{props.step.output ?? ""}</Text>
-        </Scroll>
-      </If>
+          <Markdown size="sm" text={props.body} />
+        </If>
+      </View>
     </View>
   );
 }
 
 /** Runs side by side by how long each took; the idle time between them is a fixed gap. */
-function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (seq: number) => string; onPick: (seq: number) => void }) {
+function WaterfallView(props: {
+  steps: SessionEvent[];
+  end: number;
+  selectedSeq?: number | undefined;
+  colorOf: (seq: number) => string;
+  summaryOf: (seq: number) => string;
+  onPick: (seq: number) => void;
+}) {
   const width = signal(0);
   const lane = 12;
   const gap = 3;
@@ -717,18 +899,20 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
       const rawLeft = at(r, span.start);
       const barWidth = Math.max(minTickWidth, at(r, span.end) - rawLeft - 1);
       const left = Math.min(rawLeft, Math.max(0, width() - barWidth));
+      const preview = props.summaryOf(span.seq);
+      const head = `${laneNames[span.lane]} · ${secondsText(span.end - span.start)}`;
       return {
         seq: span.seq,
         left,
         width: barWidth,
         top: lanes.indexOf(span.lane) * (lane + gap),
-        label: `${laneNames[span.lane]} · ${secondsText(span.end - span.start)}`,
+        label: preview ? `${head}\n${preview}` : head,
         color: span.lane === "asked" ? tone("wheat") : span.lane === "model" ? tone("leaf") : props.colorOf(span.seq),
       };
     });
   });
   return (
-    <View testID="waterfall" class="flex-row items-center rounded-md border border-line bg-side px-2 py-2">
+    <View testID="waterfall" class="flex-row items-center rounded-lg border border-line bg-side px-3 py-2">
       <View class="w-12 shrink-0 justify-between" style={{ height: lane * 3 + gap * 2 }}>
         <Each of={lanes} key={(l) => l}>
           {(l) => (
@@ -743,18 +927,21 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
           {(i) => <View class="absolute inset-x-0 h-3 rounded-xs bg-hover" style={{ top: i() * (lane + gap) }} />}
         </Each>
         <Each of={bars()} key="index">
-          {(b) => (
-            <View
-              role="button"
-              testID={`waterfall-bar-${String(b().seq)}`}
-              accessibilityLabel={b().label}
-              tooltip={<Bubble text={b().label} />}
-              onPress={() => props.onPick(b().seq)}
-              class="absolute h-3 min-w-1.5 rounded-full"
-              style={{ left: b().left, width: b().width, top: b().top, backgroundColor: b().color }}
-              hoverStyle={{ backgroundColor: tone("ink") }}
-            />
-          )}
+          {(b) => {
+            const active = () => props.selectedSeq === b().seq;
+            return (
+              <View
+                role="button"
+                testID={`waterfall-bar-${String(b().seq)}`}
+                accessibilityLabel={b().label}
+                tooltip={<Bubble text={b().label} />}
+                onPress={() => props.onPick(b().seq)}
+                class="absolute h-3 min-w-1.5 rounded-full focus-visible:outline-2 focus-visible:outline-focus"
+                style={{ left: b().left, width: b().width, top: b().top, backgroundColor: active() ? tone("ink") : b().color }}
+                hoverStyle={{ backgroundColor: tone("ink") }}
+              />
+            );
+          }}
         </Each>
       </View>
     </View>
@@ -788,7 +975,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
           testID="mark-wrong"
           tooltip={<Bubble text={t("web.session.trajectory.wrong")} />}
           onPress={() => writing.set(true)}
-          class={`absolute top-0.5 right-1 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 shadow-raise ${motionClass("transition-transform duration-120 ease-out")} focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover active:translate-y-px`}
+          class={`absolute top-1 right-2 flex-row items-center gap-1 rounded-md border border-line bg-page px-2 py-0.5 shadow-raise ${motionClass("transition-transform duration-120 ease-out")} focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover active:translate-y-px`}
           style={{ opacity: over() ? 1 : 0 }}
           focusStyle={{ opacity: 1 }}
         >
@@ -800,7 +987,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
         <View
           testID="marked"
           tooltip={<Bubble text={props.file ?? ""} />}
-          class="my-1 mr-2 ml-7.5 flex-row items-center gap-1.5 rounded-md border px-2.5 py-1.5"
+          class="mx-3 my-1.5 ml-8 flex-row items-center gap-1.5 rounded-md border px-2.5 py-1.5"
           style={{ backgroundColor: mix("bad-soft", 0.85), borderColor: mix("berry", 0.25) }}
         >
           <Icon name="bug" size={12} tone="berry" />
@@ -808,7 +995,7 @@ function Markable(props: { step: number; send: MarkWrong; file?: string | undefi
         </View>
       </If>
       <If when={writing()}>
-        <View class="my-1.5 mr-2 ml-7.5 flex-row items-center gap-1.5">
+        <View class="mx-3 my-1.5 ml-8 flex-row items-center gap-1.5">
           <TextInput
             autoFocus
             testID="mark-want"

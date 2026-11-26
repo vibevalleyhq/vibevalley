@@ -2840,6 +2840,12 @@ export const catalogs = {
         hired: "{ago}接活",
         hiredAndLeft: "{hired}接活 · {left}走的",
         contextUpdate: "状态上下文更新",
+        expandAll: "全部展开",
+        collapseAll: "全部收起",
+        inspect: "查看详情",
+        hideDetail: "收起详情",
+        copyRawError: "复制原始错误",
+        openSettings: "前往设置",
       },
       hub: {
         search: "搜索运行与轨迹",
@@ -6338,6 +6344,12 @@ export const catalogs = {
         hired: "took the ticket {ago}",
         hiredAndLeft: "took the ticket {hired} · left {left}",
         contextUpdate: "Context snapshot",
+        expandAll: "Expand all",
+        collapseAll: "Collapse all",
+        inspect: "Inspect",
+        hideDetail: "Collapse",
+        copyRawError: "Copy raw error",
+        openSettings: "Open settings",
       },
       hub: {
         search: "Search runs and trajectories",
@@ -9824,12 +9836,17 @@ export interface Messages {
   "web.session.subagents.steps.title": undefined;
   "web.session.subagents.wait": { readonly targets: string | number; readonly who: string | number };
   "web.session.trajectory.cacheHit": { readonly pct: string | number };
+  "web.session.trajectory.collapseAll": undefined;
   "web.session.trajectory.contextUpdate": undefined;
+  "web.session.trajectory.copyRawError": undefined;
   "web.session.trajectory.earlier": undefined;
+  "web.session.trajectory.expandAll": undefined;
   "web.session.trajectory.failed": undefined;
+  "web.session.trajectory.hideDetail": undefined;
   "web.session.trajectory.hired": { readonly ago: string | number };
   "web.session.trajectory.hiredAndLeft": { readonly hired: string | number; readonly left: string | number };
   "web.session.trajectory.input": undefined;
+  "web.session.trajectory.inspect": undefined;
   "web.session.trajectory.lane.asked": undefined;
   "web.session.trajectory.lane.model": undefined;
   "web.session.trajectory.lane.tool": undefined;
@@ -9838,6 +9855,7 @@ export interface Messages {
   "web.session.trajectory.noMatch": undefined;
   "web.session.trajectory.noOutput": undefined;
   "web.session.trajectory.ok": undefined;
+  "web.session.trajectory.openSettings": undefined;
   "web.session.trajectory.output": undefined;
   "web.session.trajectory.pending": undefined;
   "web.session.trajectory.quiet": undefined;

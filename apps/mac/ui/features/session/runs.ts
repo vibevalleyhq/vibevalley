@@ -86,6 +86,51 @@ export function spansOf(r: RunView, end: number): Span[] {
   return all.map((s, i) => ({ step: s, ms: Math.max(0, (all[i + 1]?.time ?? end) - s.time) }));
 }
 
+/** Per-step duration in ms: pairs `tool/call` with its `tool/result` (or `end` while running), and measures other steps until the next event in their run. */
+export function stepDurationsOf(log: readonly SessionEvent[], end: number): Map<number, number> {
+  const durations = new Map<number, number>();
+  const shown = shownEvents([...log]);
+  const views = runsOf(shown);
+
+  views.forEach((view, idx) => {
+    const all = allOf(view);
+    const runEnd = idx === views.length - 1 ? Math.max(end, all.at(-1)?.time ?? end) : (all.at(-1)?.time ?? end);
+    for (let i = 0; i < all.length; i++) {
+      const step = all.at(i);
+      if (step === undefined || step.type === "llm/usage" || step.type === "run/error") continue;
+      if (step.type === "tool/call") continue;
+      const next = all.at(i + 1);
+      const until = next !== undefined ? next.time : runEnd;
+      durations.set(step.seq, Math.max(0, until - step.time));
+    }
+  });
+
+  // Pair every tool/call with its matching tool/result (works for concurrent calls and subagents).
+  const openCalls = new Map<number, { time: number; run: string | undefined }>();
+  const runEnds = new Map<string | undefined, number>();
+  for (const e of log) {
+    if (e.type === "run/start" || e.type === "run/end") continue;
+    const prev = runEnds.get(e.run) ?? 0;
+    if (e.time > prev) runEnds.set(e.run, e.time);
+    if (e.type === "tool/call") {
+      openCalls.set(e.seq, { time: e.time, run: e.run });
+    } else if (e.type === "tool/result" && e.call !== undefined) {
+      const call = openCalls.get(e.call);
+      if (call) {
+        durations.set(e.call, Math.max(0, e.time - call.time));
+        openCalls.delete(e.call);
+      }
+    }
+  }
+  const lastRun = views.at(-1)?.run;
+  for (const [seq, call] of openCalls) {
+    const fallbackEnd = call.run === lastRun ? Math.max(end, runEnds.get(call.run) ?? call.time) : (runEnds.get(call.run) ?? call.time);
+    durations.set(seq, Math.max(0, fallbackEnd - call.time));
+  }
+
+  return durations;
+}
+
 export function runMs(r: RunView, end: number) {
   const first = allOf(r).at(0);
   return first ? Math.max(0, end - first.time) : 0;

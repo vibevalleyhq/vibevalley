@@ -5,7 +5,7 @@ import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 import type { SessionEvent } from "@vibevalley/protocol";
 
-import { collapsedStepSummary, waterfallWidths } from "./runs";
+import { collapsedStepSummary, stepDurationsOf, waterfallWidths } from "./runs";
 
 const sumOf = (xs: readonly number[]) => xs.reduce((total, x) => total + x, 0);
 
@@ -115,4 +115,25 @@ test("collapsedStepSummary strips internal orchestrator prompt scaffolding while
     "[target=#general:1 msg=4 from=w1 Ada #4] no API key is set for the model",
   ].join("\n");
   expect(collapsedStepSummary(userStep(apiKeyReport), apiKeyReport)).toBe(`#general:1 · w1 Ada #4: ${t("web.issue.error.missingApiKey")}`);
+});
+
+test("stepDurationsOf pairs tool calls with results and computes step durations per run", () => {
+  const events: SessionEvent[] = [
+    { seq: 1, run: "r1", type: "user/message", text: "Check tests", time: 1_000, revision: 1 },
+    { seq: 2, run: "r1", type: "assistant/thinking", text: "Checking files", time: 1_500, revision: 1 },
+    { seq: 3, run: "r1", type: "tool/call", tool: "read_file", action: "read_file", text: "Read a.ts", input: "a.ts", time: 2_000, revision: 1 },
+    { seq: 4, run: "r1", type: "tool/call", tool: "run_command", action: "run_command", text: "Run test", input: "vp test", time: 2_200, revision: 1 },
+    { seq: 5, run: "r1", type: "tool/result", call: 3, ok: true, output: "ok", text: "", time: 2_800, revision: 1 },
+    { seq: 6, run: "r1", type: "tool/result", call: 4, ok: true, output: "pass", text: "", time: 3_700, revision: 1 },
+    { seq: 7, run: "r1", type: "assistant/message", text: "All good", time: 4_000, revision: 1 },
+    { seq: 8, run: "r2", type: "tool/call", tool: "run_command", action: "run_command", text: "Still running", input: "build", time: 5_000, revision: 1 },
+  ];
+
+  const durations = stepDurationsOf(events, 7_500);
+  expect(durations.get(1)).toBe(500);
+  expect(durations.get(2)).toBe(500);
+  expect(durations.get(3)).toBe(800);
+  expect(durations.get(4)).toBe(1_500);
+  expect(durations.get(7)).toBe(0);
+  expect(durations.get(8)).toBe(2_500);
 });

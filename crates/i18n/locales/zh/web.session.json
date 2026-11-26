@@ -91,7 +91,13 @@
     "wantHint": "它应该怎样：比如「先问我是哪个仓库，别直接派活」",
     "hired": "{ago}接活",
     "hiredAndLeft": "{hired}接活 · {left}走的",
-    "contextUpdate": "状态上下文更新"
+    "contextUpdate": "状态上下文更新",
+    "expandAll": "全部展开",
+    "collapseAll": "全部收起",
+    "inspect": "查看详情",
+    "hideDetail": "收起详情",
+    "copyRawError": "复制原始错误",
+    "openSettings": "前往设置"
   },
   "hub": {
     "search": "搜索运行与轨迹",
