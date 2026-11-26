@@ -11,10 +11,14 @@ import {
   defaultThoughtLevelFor,
   extractToolTarget,
   fetchWorkspaceRuntimes,
+  formatDurationMs,
   formatTokens,
+  formatToolDetails,
+  groupChatSteps,
   mergeChatSteps,
   parseBoardTokens,
   preferredModelFor,
+  thinkingPreview,
   toWorkspaceRuntime,
   visibleChatSteps,
 } from "./chatSession";
@@ -314,4 +318,85 @@ test("fetchWorkspaceRuntimes returns server preset labels without hardcoded fall
   } finally {
     setTransport(prev);
   }
+});
+
+test("groupChatSteps keeps single intermediate steps bare and aggregates consecutive steps", () => {
+  const events: SessionEvent[] = [
+    step(1, "user/message", { text: "Check ACP" }),
+    step(2, "assistant/thinking", { text: "Inspecting mod.rs" }),
+    step(3, "assistant/message", { text: "One step done." }),
+    step(4, "user/message", { text: "Fix it and test" }),
+    step(5, "assistant/thinking", { text: "Planning edits" }),
+    step(6, "tool/call", { action: "read_file", input: JSON.stringify({ path: "src/a.rs", start_line: 10 }), ok: true }),
+    step(7, "tool/call", { action: "search", input: JSON.stringify({ query: "Handshake", path: "src" }), ok: true }),
+    step(8, "tool/call", { action: "edit_file", tool: "replace_file_content", input: JSON.stringify({ path: "src/a.rs", StartLine: 15 }), ok: true }),
+    step(9, "tool/call", { action: "edit_file", tool: "replace_file_content", input: JSON.stringify({ path: "src/a.rs", StartLine: 42 }), ok: true }),
+    step(10, "tool/call", { action: "run_command", input: JSON.stringify({ command: "cargo test" }), ok: false }),
+  ];
+
+  const items = groupChatSteps(events);
+  expect(items.map((item) => item.kind)).toEqual(["step", "step", "step", "step", "activity"]);
+  expect(items[1]).toMatchObject({ kind: "step", key: "s:2", durationMs: 1_000 });
+
+  const cluster = items[4];
+  expect(cluster?.kind).toBe("activity");
+  if (cluster?.kind === "activity") {
+    expect(cluster.key).toBe("g:5");
+    expect(cluster.trailing).toBe(true);
+    expect(cluster.summary).toEqual({
+      totalSteps: 6,
+      thinkingCount: 1,
+      readCount: 1,
+      searchCount: 1,
+      editCount: 2,
+      commandCount: 1,
+      otherToolCount: 0,
+      totalTools: 5,
+      runningCount: 0,
+      failedCount: 1,
+      durationMs: 5_000,
+      editedFiles: [{ path: "src/a.rs", line: 42, canDiff: true }],
+    });
+  }
+});
+
+test("formatToolDetails, formatDurationMs, and thinkingPreview extract scannable summaries", () => {
+  expect(formatDurationMs(420)).toBe("420ms");
+  expect(formatDurationMs(4_240)).toBe("4.2s");
+  expect(formatDurationMs(72_000)).toBe("1m 12s");
+  expect(formatDurationMs(undefined)).toBeUndefined();
+
+  expect(thinkingPreview("  Line one\n\n  Line two  ")).toBe("Line one Line two");
+  expect(thinkingPreview("a".repeat(20), 10)).toBe("aaaaaaaaa…");
+
+  const cmd = formatToolDetails(
+    step(1, "tool/call", {
+      action: "run_command",
+      input: JSON.stringify({ command: "cargo test -p vibevalley-mac", cwd: "/work/vibevalley" }),
+      output: "running 1 test\nok",
+    }),
+  );
+  expect(cmd).toEqual({
+    headline: "$ cargo test -p vibevalley-mac",
+    formattedInput: "$ cargo test -p vibevalley-mac\ncwd: /work/vibevalley",
+    outputLines: 2,
+  });
+
+  const search = formatToolDetails(
+    step(2, "tool/call", {
+      action: "search",
+      input: JSON.stringify({ query: "groupChatSteps", path: "apps/mac/ui" }),
+    }),
+  );
+  expect(search.headline).toBe("groupChatSteps in apps/mac/ui");
+
+  const edit = formatToolDetails(
+    step(3, "tool/call", {
+      action: "edit_file",
+      input: JSON.stringify({ path: "src/lib.rs", StartLine: 12, EndLine: 28 }),
+    }),
+  );
+  expect(edit.headline).toBe("src/lib.rs:12-28");
+  expect(edit.formattedInput).toBe('{\n  "path": "src/lib.rs",\n  "StartLine": 12,\n  "EndLine": 28\n}');
+  expect(edit.outputLines).toBe(0);
 });

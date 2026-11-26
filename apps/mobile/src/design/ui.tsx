@@ -1,10 +1,21 @@
-import { computed, openUrl, safeArea, Text, untracked, View, type JSX } from "nsh";
+import { cleanup, computed, openUrl, safeArea, Text, untracked, View, type JSX } from "nsh";
 import { Input, TextView, type TextViewClasses } from "nsh/base";
+
+import { t } from "@vibevalley/i18n";
 
 import type { IconName } from "../../design/icons";
 import { Icon } from "./Icon";
 import type { MobileLayout } from "./layout";
 import { mix } from "./tone";
+
+export function useTimeout(): (fn: () => void, ms: number) => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  cleanup(() => clearTimeout(timer));
+  return (fn, ms) => {
+    clearTimeout(timer);
+    timer = setTimeout(fn, ms);
+  };
+}
 
 export type ButtonTone = "primary" | "plain" | "ok" | "danger" | "quiet";
 export type TagTone = "ok" | "bad" | "wait" | "info" | "neutral";
@@ -228,13 +239,64 @@ export function StatusTag(props: {
   );
 }
 
-export function EmptyPanel(props: { readonly icon: IconName; readonly message: string; readonly testID?: string }) {
+export function EmptyPanel(props: {
+  readonly icon: IconName;
+  readonly message: string;
+  readonly actionLabel?: string;
+  readonly actionIcon?: IconName;
+  readonly actionTestID?: string;
+  readonly onAction?: () => void;
+  readonly testID?: string;
+}) {
   return (
     <View testID={props.testID} class="flex-1 items-center justify-center gap-3 px-6 py-12">
       <View class="size-12 items-center justify-center rounded-full border border-line bg-side">
         <Icon name={props.icon} size={20} tone="muted" />
       </View>
       <Text class="text-center text-sm text-muted">{props.message}</Text>
+      <If when={props.actionLabel !== undefined && props.actionLabel !== "" && props.onAction !== undefined ? props.actionLabel : undefined}>
+        {(label) => (
+          <PillButton testID={props.actionTestID} tone="plain" size="sm" icon={props.actionIcon} label={label()} onPress={() => props.onAction?.()} />
+        )}
+      </If>
+    </View>
+  );
+}
+
+export function SearchInput(props: {
+  readonly value: string;
+  readonly placeholder?: string;
+  readonly onInput: (value: string) => void;
+  readonly testID?: string;
+  readonly clearTestID?: string;
+  readonly clearLabel?: string;
+  readonly accessibilityLabel?: string;
+  readonly class?: string;
+}) {
+  return (
+    <View class={`h-9 flex-row items-center gap-2 rounded-lg border border-line bg-page px-2.5 focus-within:border-focus ${props.class ?? ""}`}>
+      <Icon name="search" size={14} tone="faint" />
+      <Input
+        testID={props.testID}
+        accessibilityLabel={props.accessibilityLabel ?? props.placeholder}
+        value={props.value}
+        placeholder={props.placeholder}
+        onChange={(e) => {
+          if (e.value !== untracked(() => props.value)) props.onInput(e.value);
+        }}
+        class="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint"
+      />
+      <If when={props.value.length > 0}>
+        <View
+          role="button"
+          testID={props.clearTestID}
+          accessibilityLabel={props.clearLabel ?? t("web.session.hub.clear")}
+          onPress={() => props.onInput("")}
+          class="size-6 shrink-0 items-center justify-center rounded-full active:bg-hover"
+        >
+          <Icon name="close" size={12} tone="muted" />
+        </View>
+      </If>
     </View>
   );
 }

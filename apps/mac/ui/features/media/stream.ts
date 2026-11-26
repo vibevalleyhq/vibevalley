@@ -1,8 +1,10 @@
 import { z } from "zod";
 
+import { HostSpeechAudioPhaseValues } from "@vibevalley/protocol";
+
 import { transport } from "../../infra/transport";
 
-const Playback = z.object({ phase: z.enum(["idle", "playing", "draining", "stopping"]), problem: z.string().nullable() });
+const Playback = z.object({ phase: z.enum(HostSpeechAudioPhaseValues), problem: z.string().nullable() });
 const POLL_MS = 250;
 
 export function playSpeech(id: string, changed: (state: "playing" | "done" | "finished") => void, failed: (error: string) => void) {

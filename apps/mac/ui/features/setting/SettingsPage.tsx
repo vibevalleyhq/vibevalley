@@ -1,6 +1,7 @@
 import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
+import { FeatureValues } from "@vibevalley/protocol";
 
 import { Readiness } from "../../design/domain/Readiness";
 import { SettingsPage as Page, SettingsSearch } from "../../design/domain/settings";
@@ -77,7 +78,7 @@ function legacyRedirect(rest: string): string | undefined {
 function VoiceSettings() {
   return (
     <Page title={t("web.setting.nav.voice")} hint={t("web.voice.moss.intro")}>
-      <Readiness features={["live", "vision", "call"]} />
+      <Readiness features={FeatureValues.filter((f) => f === "live" || f === "vision" || f === "call")} />
       <VoiceForm part="line" />
     </Page>
   );

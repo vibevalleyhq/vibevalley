@@ -687,11 +687,46 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   expect(app.count("id:chat-permission-mode")).toBe(0);
   expect(app.count("id:chat-cwd-chip")).toBe(0);
 
+  // Completed thinking + edit cluster starts folded with an edited-file shortcut strip, then expands on demand.
+  expect(app.count("id:chat-activity-g:2")).toBe(1);
+  expect(app.count("id:chat-tool-3")).toBe(0);
   host.clearActs();
   await app.press(`label:${t("web.shell.chat.toolOpenFile")}`);
   await app.press(`label:${t("web.shell.chat.toolOpenDiff")}`);
   expect(host.acts).toContainEqual({ type: "open_file_adjacent", path: "crates/runtime/src/oar/acp/mod.rs", line: 136 });
   expect(host.acts).toContainEqual({ type: "open_diff_adjacent", path: "crates/runtime/src/oar/acp/mod.rs", staged: false });
+
+  await app.press("id:chat-activity-toggle-g:2");
+  await host.pump(app);
+  expect(app.count("id:chat-thinking")).toBe(1);
+  expect(app.count("id:chat-tool-3")).toBe(1);
+  await app.press("id:chat-tool-toggle-3");
+  await host.pump(app);
+  expect(app.texts()).toContain(t("web.shell.chat.toolInput"));
+  expect(app.texts()).toContain(t("web.shell.chat.toolOutput"));
+
+  // Failed tool calls auto-expand their input/output details immediately.
+  await host.emitSub(app, "session.watch", {
+    kind: "event",
+    session: "sess-ws-1",
+    event: {
+      seq: 6,
+      revision: 1,
+      time: 1_700_000_006_000,
+      type: "tool/call",
+      action: "run_command",
+      actionText: "Run",
+      tool: "run_command",
+      text: "cargo test",
+      input: JSON.stringify({ command: "cargo test -p vibevalley-runtime" }),
+      output: "error: test failed",
+      ok: false,
+    },
+  });
+  await host.pump(app);
+  expect(app.count("id:chat-tool-6")).toBe(1);
+  expect(app.texts()).toContain("$ cargo test -p vibevalley-runtime");
+  expect(app.texts()).toContain("error: test failed");
 
   expect(app.count("id:chat-permission-perm-1")).toBe(1);
   expect(app.count("id:chat-interaction-interaction_01")).toBe(1);

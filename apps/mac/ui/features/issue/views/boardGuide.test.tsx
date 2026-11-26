@@ -132,10 +132,15 @@ test("empty lanes render actionable contextual guidance and unassigned Todo card
   expect(min.app.count("id:issue-new-dialog")).toBe(1);
   await min.app.press("id:issue-new-dialog-never");
 
-  // Filter with no matches switches empty lanes to the filtered hint.
+  // Filter with no matches switches empty lanes to the filtered hint and offers one-click reset.
   await min.app.type("id:issue-search", "no-matching-issue-xyz");
   expect(min.app.count("id:lane-empty-working")).toBe(1);
   expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.filtered"));
+  expect(min.app.count("id:board-clear-filter")).toBe(1);
+  expect(min.app.count("id:issue-search-clear")).toBe(1);
+  await min.app.press("id:board-clear-filter");
+  await min.fake.pumpUntil(min.app, () => min.app.count("id:issue-card") === 1);
+  expect(min.app.value("id:issue-search")).toBe("");
 
   // Custom board with 1 unassigned todo + 1 assigned todo: working/waiting/closed empty, unassigned hint appears once.
   const unassigned = makeTodoIssue("i-unassigned", "需要认领的待办");
@@ -224,4 +229,26 @@ test("english locale, dark theme, and narrow viewport render empty board cleanly
   expect(emptyEn.app.count("id:issues-empty-onboarding")).toBe(0);
   expect(emptyEn.app.count("id:workflow-guide")).toBe(0);
   expect(emptyEn.app.texts()).toContain("No to-dos yet");
+});
+
+test("IssueList empty-filter CTA resets search and IssueDetail copies issue reference", async () => {
+  setLocale("zh");
+  const { app, fake } = await mountBoard("typical");
+
+  await fake.pumpUntil(app, () => app.count("id:issue-card") > 0);
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
+  await app.type("id:issue-search", "no-matching-list-xyz");
+  await fake.pumpUntil(app, () => app.count("id:issue-list-clear-filter") === 1);
+  await app.press("id:issue-list-clear-filter");
+  await fake.pumpUntil(app, () => app.count("id:issue-list-clear-filter") === 0);
+  expect(app.value("id:issue-search")).toBe("");
+
+  const workingIssue = scenarios.typical.state.board.issues.find((i) => i.status === "in_progress" || i.status === "in_review" || i.status === "done");
+  if (!workingIssue) throw new Error("typical scenario must include an active or closed issue");
+  await app.host.send("route", `/issues/${workingIssue.id}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-copy-id") === 1);
+  await app.press("id:issue-copy-id");
+  await fake.pumpUntil(app, () => app.clipboard() === `#${workingIssue.number}`);
+  expect(app.texts()).toContain(t("web.base.rich.copied"));
 });

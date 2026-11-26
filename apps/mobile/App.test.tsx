@@ -1142,3 +1142,151 @@ test("recycling List views and TextView markdown render across Inbox, Channels, 
   await app.waitFor("id:issue-detail-description");
   expect(app.texts().join(" ")).toContain("recycling lists");
 });
+
+test("IssuesTab and SessionsTab support search filtering, empty-filter recovery CTA, and tap-to-copy ID feedback", async () => {
+  const twoSessionsSlice = {
+    ...sampleSessionsSlice,
+    sessions: [
+      sampleSessionsSlice.sessions[0],
+      {
+        ...sampleSessionsSlice.sessions[0],
+        id: "sess-2",
+        name: "Verifier Owl",
+        runtime: "claude",
+        brief: "Verify mobile search",
+      },
+    ],
+  };
+
+  const app = await open("./App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    clock: { time: NOW },
+    storage: harnessCredentialsStorage("iPhone"),
+    network: createFullNetwork({
+      [`GET ${BASE}/api/v1/slice/sessions`]: sseResponse([{ id: "3", data: twoSessionsSlice }]),
+    }),
+  });
+
+  await app.waitFor("id:mobile-home");
+
+  // 1. IssuesTab search + clear + empty-filter recovery CTA + copy issue ref
+  await app.press("id:tab-issues");
+  await app.waitFor("id:issue-row-issue-1");
+
+  await app.type("id:issue-search-input", "Tailscale");
+  expect(app.shows("id:issue-row-issue-2")).toBe(true);
+  expect(app.shows("id:issue-row-issue-1")).toBe(false);
+
+  await app.clear("id:issue-search-input");
+  await app.type("id:issue-search-input", "no-such-ticket");
+  await app.waitFor("id:issues-empty");
+  expect(app.shows("id:issues-clear-filters")).toBe(true);
+
+  await app.press("id:issues-clear-filters");
+  await app.waitFor("id:issue-row-issue-1");
+  expect(app.value("id:issue-search-input")).toBe("");
+  expect(app.shows("id:issue-row-issue-2")).toBe(true);
+  expect(app.shows("id:issue-row-issue-3")).toBe(true);
+
+  await app.press("id:issue-row-issue-1");
+  await app.waitFor("id:issue-copy-id");
+  await app.press("id:issue-copy-id");
+  await app.waitUntil(() => app.clipboard() === "#101");
+  expect(app.texts()).toContain("Copied");
+  const clock = app.clock;
+  if (!clock) throw new Error("expected manual virtual clock");
+  await clock.fastForward(1_600);
+  await app.waitUntil(() => !app.texts().includes("Copied"));
+
+  // 2. SessionsTab search + clear + empty-filter recovery CTA + copy session ID
+  await app.press("id:tab-sessions");
+  await app.waitFor("id:session-row-sess-1");
+  await app.waitFor("id:session-row-sess-2");
+
+  await app.type("id:session-search-input", "Verifier");
+  expect(app.shows("id:session-row-sess-2")).toBe(true);
+  expect(app.shows("id:session-row-sess-1")).toBe(false);
+
+  await app.press("id:session-search-clear");
+  await app.waitFor("id:session-row-sess-1");
+  expect(app.value("id:session-search-input")).toBe("");
+
+  await app.type("id:session-search-input", "missing-helper");
+  await app.waitFor("id:sessions-empty");
+  expect(app.shows("id:sessions-clear-filters")).toBe(true);
+
+  await app.press("id:sessions-clear-filters");
+  await app.waitFor("id:session-row-sess-1");
+
+  await app.press("id:session-row-sess-1");
+  await app.waitFor("id:session-copy-id");
+  await app.press("id:session-copy-id");
+  await app.waitUntil(() => app.clipboard() === "sess-1");
+  expect(app.texts()).toContain("Copied");
+  await clock.fastForward(1_600);
+  await app.waitUntil(() => !app.texts().includes("Copied"));
+});
+
+test("MobileApp manual refresh triggers immediate resync and connection recovery banner handles reconnecting and unauthorized", async () => {
+  let inboxCalls = 0;
+
+  const app = await open("./App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: harnessCredentialsStorage("iPhone"),
+    network: createFullNetwork({
+      [`GET ${BASE}/api/v1/slice/inbox`]: () => {
+        inboxCalls++;
+        if (inboxCalls === 1) {
+          return {
+            status: 503,
+            headers: { "content-type": "text/plain" },
+            body: "temporarily unavailable",
+          };
+        }
+        return sseResponse([{ id: "1", data: sampleInboxSlice }]);
+      },
+    }),
+  });
+
+  await app.waitFor("id:mobile-home");
+  await app.waitFor("id:connection-banner");
+  await app.waitFor("id:connection-retry-button");
+  expect(app.texts()).toContain("Connection lost, reconnecting…");
+
+  await app.press("id:connection-retry-button");
+  await app.waitFor("id:inbox-item-inbox-review-1");
+  await app.waitUntil(() => app.texts().includes("Connected"));
+  expect(app.count("id:connection-banner")).toBe(0);
+
+  const callsBeforeRefresh = inboxCalls;
+  await app.press("id:mobile-refresh-button");
+  await app.waitUntil(() => inboxCalls > callsBeforeRefresh);
+  const inboxReqs = app.requests().filter((r) => r.url === `${BASE}/api/v1/slice/inbox`);
+  expect(inboxReqs.at(-1)?.headers["last-event-id"]).toBe("1");
+
+  const revokedApp = await open("./App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: harnessCredentialsStorage("iPhone"),
+    network: {
+      [`GET ${BASE}/api/v1/slice/*`]: {
+        status: 401,
+        headers: { "content-type": "application/json" },
+        body: { bizCode: BizCode.Unauthorized, message: "revoked" },
+      },
+    },
+  });
+
+  await revokedApp.waitFor("id:connection-banner");
+  await revokedApp.waitFor("id:connection-repair-button");
+  await revokedApp.press("id:connection-repair-button");
+  await revokedApp.waitFor("id:pair-screen");
+});

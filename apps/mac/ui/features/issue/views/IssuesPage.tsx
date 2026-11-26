@@ -184,6 +184,7 @@ export function IssuesPage(props: { rest: string }) {
                   onOlder={() => older.set(!older())}
                   onOpen={open}
                   onAdd={addInList}
+                  onClearFilter={() => setFilter(noFilter)}
                 />
               }
             >
@@ -202,6 +203,7 @@ export function IssuesPage(props: { rest: string }) {
                 onPutBack={(c) => c.move && moves.drop(c.move.key)}
                 onPlace={(c, before) => void place(c, before)}
                 onNew={() => startNew({})}
+                onClearFilter={() => setFilter(noFilter)}
               />
             </If>
           </>
@@ -393,6 +395,7 @@ function Toolbar(props: {
       <View class="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
         <SearchField
           testid="issue-search"
+          clearTestid="issue-search-clear"
           value={props.filter.query}
           onInput={(query) => props.onFilter({ ...props.filter, query })}
           placeholder={t("web.issue.page.find")}

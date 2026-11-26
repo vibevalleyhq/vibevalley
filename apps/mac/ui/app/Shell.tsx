@@ -1,22 +1,28 @@
-import { colorScheme, effect, host, keymap, Scroll, Text, View, windowSize, type JSX } from "nsh";
+import { colorScheme, effect, host, keymap, Scroll, signal, Text, untracked, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession } from "@vibevalley/protocol/rules";
 
 import { useAssetsDir } from "../design/art";
+import { Button } from "../design/Button";
+import { Dialog } from "../design/Dialog";
 import { OrchestratorFace } from "../design/domain/Face";
 import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
 import { motionClass } from "../design/motion";
 import { ShortcutSheet } from "../design/ShortcutSheet";
 import { Bubble } from "../design/Tip";
+import { toast } from "../design/toasts";
 import { mix } from "../design/tone";
 import { QuickSwitcher, switcher } from "../features/channel";
 import { waitingOnUser } from "../features/inbox";
+import { reasonOf } from "../infra/api";
 import { Keyed, variant } from "../infra/base/dom";
+import { hostApi } from "../infra/bridge";
 import { useInboxSlice, useLink, useSessionsSlice } from "../infra/frame";
+import { currentHost } from "../infra/host";
 import { readHostParams } from "../infra/hostParams";
-import { NavLink, useLocation, useMatches } from "../infra/router";
+import { NavLink, useLocation, useMatches, useRouter } from "../infra/router";
 import { useUpdates } from "../infra/settings";
 import { safeLastContentPath } from "../infra/state/contentNav";
 import { type Place, places, runsPlace, settingsPlace } from "./places";
@@ -84,16 +90,174 @@ const railIcon = (name: IconName, current: () => boolean) => () => <Icon name={n
 
 const railGroups = ["work", "setup"] as const;
 
+function RailUpdateControl(props: { small: boolean; working: number }) {
+  const updates = useUpdates();
+  const router = useRouter();
+  const installing = signal(false);
+  const confirmOpen = signal(false);
+
+  const readyState = () => {
+    const s = updates();
+    return s ? variant(s, "_tag", "ready") : undefined;
+  };
+  const downloadingState = () => {
+    const s = updates();
+    return s ? variant(s, "_tag", "downloading") : undefined;
+  };
+  const manualState = () => {
+    const s = updates();
+    return s ? variant(s, "_tag", "manual") : undefined;
+  };
+
+  const doInstall = () => {
+    if (untracked(installing)) return;
+    const update = currentHost().update;
+    if (!update) return;
+    installing.set(true);
+    void update.install().catch((e: unknown) => {
+      installing.set(false);
+      toast(reasonOf(e), "bad");
+    });
+  };
+
+  const handleReadyPress = () => {
+    const r = readyState();
+    if (!r || untracked(installing)) return;
+    if (props.working > 0 || r.newFarm) {
+      confirmOpen.set(true);
+      return;
+    }
+    doInstall();
+  };
+
+  return (
+    <>
+      <If when={readyState()}>
+        {(r) => (
+          <>
+            <View
+              role="button"
+              testID="rail-update-btn"
+              accessibilityLabel={t("web.base.updateReadyOneClick", { next: r().next })}
+              accessibilityState={{ busy: installing(), disabled: installing() }}
+              tooltip={
+                <Bubble
+                  text={
+                    props.working > 0
+                      ? `${t("web.base.updateReadyOneClick", { next: r().next })} · ${t("web.base.working", { n: props.working })}`
+                      : t("web.base.updateReadyOneClick", { next: r().next })
+                  }
+                  placement="right"
+                />
+              }
+              onPress={handleReadyPress}
+              class={`${props.small ? "size-10" : "w-15 px-1.5 py-1.5"} shrink-0 items-center justify-center gap-0.5 rounded-lg border ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+              style={{ backgroundColor: mix("accent", 0.16), borderColor: mix("accent", 0.45) }}
+            >
+              <Icon name={installing() ? "wait" : "update"} size={18} tone="accent" />
+              <If when={!props.small}>
+                <Text class="w-full truncate text-center font-sans text-2xs leading-tight font-semibold text-accent">
+                  {installing() ? t("web.base.updateInstalling") : t("web.base.updateInstall")}
+                </Text>
+              </If>
+            </View>
+            <Dialog
+              open={confirmOpen()}
+              onClose={() => confirmOpen.set(false)}
+              title={t("web.base.updateReadyTitle", { next: r().next })}
+              testid="rail-update-confirm-dialog"
+            >
+              <View class="gap-3.5">
+                <Text class="text-sm text-ink">
+                  {r().newFarm
+                    ? t("web.setting.about.newFarmQuestion")
+                    : props.working > 0
+                      ? t("web.setting.about.workingQuestion", { n: props.working })
+                      : t("web.setting.about.restartQuestion")}
+                </Text>
+                <If when={r().notes.length > 0}>
+                  <View class="gap-1.5 rounded-md border border-line bg-side p-3">
+                    <Text class="text-xs font-semibold text-muted">{t("web.base.updateNotesTitle")}</Text>
+                    <Each of={r().notes} key={(_, i) => String(i)}>
+                      {(note) => (
+                        <View class="flex-row items-start gap-2">
+                          <View class="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" />
+                          <Text class="min-w-0 flex-1 text-xs leading-relaxed text-ink">{note()}</Text>
+                        </View>
+                      )}
+                    </Each>
+                  </View>
+                </If>
+                <View class="flex-row items-center justify-end gap-2">
+                  <Button tone="quiet" testID="rail-update-confirm-cancel" onPress={() => confirmOpen.set(false)}>
+                    {t("web.base.form.never")}
+                  </Button>
+                  <Button
+                    tone="primary"
+                    icon="update"
+                    testID="rail-update-confirm-sure"
+                    disabled={installing()}
+                    onPress={() => {
+                      confirmOpen.set(false);
+                      doInstall();
+                    }}
+                  >
+                    {installing() ? t("web.base.updateInstalling") : t("web.setting.about.restart")}
+                  </Button>
+                </View>
+              </View>
+            </Dialog>
+          </>
+        )}
+      </If>
+
+      <If when={downloadingState()}>
+        {(d) => (
+          <View
+            testID="rail-update-downloading"
+            accessibilityLabel={t("web.setting.about.downloading", { next: d().next, percent: d().percent })}
+            tooltip={<Bubble text={t("web.setting.about.downloading", { next: d().next, percent: d().percent })} placement="right" />}
+            class={`${props.small ? "size-9" : "w-15 px-1.5 py-1"} shrink-0 items-center justify-center gap-0.5 rounded-lg border border-line bg-side`}
+          >
+            <Icon name="update" size={16} tone="accent" />
+            <If when={!props.small}>
+              <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{`${d().percent}%`}</Text>
+            </If>
+          </View>
+        )}
+      </If>
+
+      <If when={manualState()}>
+        {(m) => (
+          <View
+            role="button"
+            testID="rail-update-manual"
+            accessibilityLabel={t(`web.setting.about.manual.${m().why}`, { next: m().next })}
+            tooltip={<Bubble text={t(`web.setting.about.manual.${m().why}`, { next: m().next })} placement="right" />}
+            onPress={() => {
+              const page = m().page.trim();
+              if (page) void hostApi.openUrl(page);
+              else router.navigate("/settings/about");
+            }}
+            class={`${props.small ? "size-9" : "w-15 px-1.5 py-1"} shrink-0 items-center justify-center gap-0.5 rounded-lg border ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+            style={{ backgroundColor: mix("wheat", 0.16), borderColor: mix("wheat", 0.45) }}
+          >
+            <Icon name="update" size={16} tone="wheat" />
+            <If when={!props.small}>
+              <Text class="w-full truncate text-center font-sans text-2xs leading-tight font-medium text-warn-ink">{t("web.base.update")}</Text>
+            </If>
+          </View>
+        )}
+      </If>
+    </>
+  );
+}
+
 function Rail(props: { here?: Place | undefined; farm: boolean }) {
   const assetsDir = useAssetsDir();
   const sessions = useSessionsSlice();
   const inbox = useInboxSlice();
   const link = useLink();
-  const updates = useUpdates();
-  const ready = () => {
-    const s = updates();
-    return s ? variant(s, "_tag", "ready") : undefined;
-  };
   const waiting = () => waitingOnUser(inbox()?.items ?? []);
   const working = () => sessions()?.sessions.filter((s) => !isFreeUserSession(s) && s.phase._tag === "working").length ?? 0;
   const onRuns = () => props.here === runsPlace;
@@ -180,17 +344,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
       </Scroll>
       <View class="shrink-0 items-center gap-1 pt-2 pb-3">
         <View class="mb-1 h-px w-8" style={{ backgroundColor: mix("on-rail", 0.1) }} />
-        <If when={ready()}>
-          {(r) => (
-            <Slot
-              to="/settings/about"
-              place="update"
-              label={t("web.base.updateReady", { next: r().next })}
-              name={t("web.base.update")}
-              icon={railIcon("update", () => false)}
-            />
-          )}
-        </If>
+        <RailUpdateControl small={small()} working={working()} />
         <NavLink
           href="/runs"
           testID="rail-runs-status"

@@ -96,6 +96,8 @@ export function TextArea(props: TextInputProps & { rows?: number; submit?: boole
 export function SearchField(props: {
   value: string;
   onInput: (value: string) => void;
+  onSubmit?: (() => void) | undefined;
+  autoFocus?: boolean | undefined;
   placeholder?: string | undefined;
   label: string;
   testid?: string | undefined;
@@ -113,8 +115,11 @@ export function SearchField(props: {
         testID={props.testid}
         accessibilityLabel={props.label}
         placeholder={props.placeholder}
+        autoFocus={props.autoFocus}
         value={props.value}
+        submitBehavior={props.onSubmit ? "submit" : undefined}
         onChange={(e) => props.onInput(e.value)}
+        onSubmit={() => props.onSubmit?.()}
         class="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint"
       />
       <If when={props.value.length > 0}>

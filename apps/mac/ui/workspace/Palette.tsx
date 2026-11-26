@@ -3,6 +3,7 @@ import { Command, type CommandItem } from "nsh/base";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
+import { HostPaletteMode as HostPaletteModeSchema } from "@vibevalley/protocol/schema";
 
 import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
@@ -10,7 +11,7 @@ import { SkeletonLines, useDelayedBusy } from "../design/Skeleton";
 import { act, frame } from "../infra/bridge";
 import { startEllipsis } from "./chrome";
 
-type PaletteMode = "commands" | "files" | "search";
+type PaletteMode = z.infer<typeof HostPaletteModeSchema>;
 type Item = CommandItem & { detail?: string };
 
 const paletteItemSchema: z.ZodType<Item> = z.object({
@@ -25,7 +26,7 @@ const paletteItemSchema: z.ZodType<Item> = z.object({
 });
 
 const paletteFrameSchema = z.object({
-  mode: z.enum(["commands", "files", "search"]),
+  mode: HostPaletteModeSchema,
   query: z.string(),
   items: z.array(paletteItemSchema),
   loading: z.boolean(),

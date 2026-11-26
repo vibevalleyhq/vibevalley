@@ -7,7 +7,7 @@ import { channelOf, defaultOf, isFreeUserSession, sessionChannelId, sessionProfi
 
 import { createAct } from "../../../design/act";
 import { Dialog } from "../../../design/Dialog";
-import { OrchestratorFace } from "../../../design/domain/Face";
+import { OrchestratorFace, UserFace } from "../../../design/domain/Face";
 import { Select, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { CountPill } from "../../../design/Tag";
@@ -48,14 +48,14 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
   };
   return (
     <Scroll testID="pins" accessibilityLabel={t("web.channel.pins.title")} contentClass="gap-1">
-      <View class="flex-row items-center justify-between px-2 py-1">
+      <View class="mb-1 flex-row items-center justify-between border-b border-line px-2 pt-1 pb-1.5">
         <Text class="text-xs font-semibold text-muted">{t("web.channel.pins.title")}</Text>
         <If when={pinned() !== undefined}>
           <CountPill count={pinned()?.length ?? 0} hoverBright />
         </If>
       </View>
       <If when={pinned()?.length === 0}>
-        <Text class="px-2 py-2 text-sm text-muted">{t("web.channel.pins.none")}</Text>
+        <Text class="px-3 py-4 text-center text-xs leading-relaxed text-muted">{t("web.channel.pins.none")}</Text>
       </If>
       <If when={failed()}>
         {(why) => (
@@ -69,7 +69,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
           <View
             role="button"
             testID={`pin-${m().id}`}
-            class="gap-0.5 rounded-md px-2 py-1.5 hover:bg-hover"
+            class="gap-1 rounded-md border border-transparent px-2.5 py-2 hover:border-line hover:bg-hover"
             onPress={() => {
               router.navigate(messagePath(channelOf(collab()?.chat, m().channel), m().number));
               untracked(() => props.onPick)();
@@ -77,7 +77,7 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
           >
             <View class="flex-row items-baseline justify-between gap-2">
               <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{m().from === userId ? t("web.channel.messages.user") : m().name}</Text>
-              <Text class="shrink-0 text-2xs text-faint">{workbenchClock(m().at)}</Text>
+              <Text class="shrink-0 text-2xs text-faint tabular-nums">{workbenchClock(m().at)}</Text>
             </View>
             <Text class="line-clamp-3 text-sm text-ink">{m().text}</Text>
           </View>
@@ -111,21 +111,19 @@ export function Members(props: { channel: Channel }) {
   const totalCount = () => 1 + inside().length + helpers().length;
   return (
     <Scroll accessibilityLabel={t("web.channel.members.title")} testID="members" class="w-60 shrink-0 border-l border-line bg-side" contentClass="gap-1 p-3">
-      <View class="flex-row items-center justify-between px-1.5 pb-1.5">
+      <View class="mb-1 flex-row items-center justify-between border-b border-line px-1.5 pb-2">
         <Text class="text-xs font-semibold text-muted">{t("web.channel.members.title")}</Text>
         <CountPill count={totalCount()} hoverBright />
       </View>
-      <View class="flex-row items-center gap-2 rounded-md px-1.5 py-1.5">
-        <View class="h-7 w-7 shrink-0 items-center justify-center rounded-full bg-selected">
-          <Text class="text-xs font-semibold text-muted">{t("web.channel.members.user").slice(0, 1)}</Text>
-        </View>
+      <View class="flex-row items-center gap-2 rounded-md px-2 py-1.5">
+        <UserFace size={28} />
         <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{t("web.channel.members.user")}</Text>
       </View>
       <Each of={inside()} key={(id) => id}>
         {(id) => {
           const mood = () => orchestratorMood(sessions()?.sessions, id());
           return (
-            <View testID={`member-orchestrator-${id()}`} class="flex-row items-center gap-2 rounded-md px-1.5 py-1.5">
+            <View testID={`member-orchestrator-${id()}`} class="flex-row items-center gap-2 rounded-md px-2 py-1.5">
               <View class="relative shrink-0">
                 <OrchestratorFace size={28} agent={id()} />
                 <View class="absolute -right-0.5 -bottom-0.5">
@@ -141,37 +139,41 @@ export function Members(props: { channel: Channel }) {
           );
         }}
       </Each>
-      <Each of={helpers()} key={(h) => h.id}>
-        {(h) => (
-          <View testID={`member-${h().id}`} class="flex-row items-center gap-2 rounded-md px-1.5 py-1.5 hover:bg-hover">
-            <View class="relative shrink-0">
-              <HelperFace agent={sessionProfile(h()) ?? ""} runtime={h().runtime} size={28} />
-              <View class="absolute -right-0.5 -bottom-0.5">
-                <Dot tone={phaseDot(h().phase)} size={6} />
+      <If when={props.channel.type !== "direct"}>
+        <View class="mt-1 gap-1 border-t border-line pt-1.5">
+          <Each of={helpers()} key={(h) => h.id}>
+            {(h) => (
+              <View testID={`member-${h().id}`} class="flex-row items-center gap-2 rounded-md px-2 py-1.5 hover:bg-hover">
+                <View class="relative shrink-0">
+                  <HelperFace agent={sessionProfile(h()) ?? ""} runtime={h().runtime} size={28} />
+                  <View class="absolute -right-0.5 -bottom-0.5">
+                    <Dot tone={phaseDot(h().phase)} size={6} />
+                  </View>
+                </View>
+                <View class="min-w-0 flex-1">
+                  <Text class="truncate text-sm font-medium text-ink">{h().name}</Text>
+                  <View class="flex-row items-center gap-1">
+                    <PhaseGlyph phase={h().phase} size={12} />
+                    <Text class="min-w-0 flex-1 truncate text-xs text-muted tabular-nums">{phaseText(h(), now())}</Text>
+                  </View>
+                </View>
+                <BarButton
+                  icon="thread"
+                  size={14}
+                  compact
+                  label={t("web.channel.direct.open", { name: h().name })}
+                  onPress={() => {
+                    const agent = sessionProfile(h());
+                    if (agent) void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
+                  }}
+                />
               </View>
-            </View>
-            <View class="min-w-0 flex-1">
-              <Text class="truncate text-sm font-medium text-ink">{h().name}</Text>
-              <View class="flex-row items-center gap-1">
-                <PhaseGlyph phase={h().phase} size={12} />
-                <Text class="min-w-0 flex-1 truncate text-xs text-muted">{phaseText(h(), now())}</Text>
-              </View>
-            </View>
-            <BarButton
-              icon="thread"
-              size={14}
-              compact
-              label={t("web.channel.direct.open", { name: h().name })}
-              onPress={() => {
-                const agent = sessionProfile(h());
-                if (agent) void act.run(async () => router.navigate(`/chat/${await api.channel.direct.create({ agent })}`));
-              }}
-            />
-          </View>
-        )}
-      </Each>
-      <If when={props.channel.type !== "direct" && helpers().length === 0}>
-        <Text class="px-1.5 pt-1 text-xs text-muted">{t("web.channel.members.none")}</Text>
+            )}
+          </Each>
+          <If when={helpers().length === 0}>
+            <Text class="px-2 py-1.5 text-xs text-muted">{t("web.channel.members.none")}</Text>
+          </If>
+        </View>
       </If>
     </Scroll>
   );
@@ -204,7 +206,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
           <Text class="max-w-44 shrink-0 truncate text-sm font-semibold text-ink">{threadTitle(props.thread, board()?.issues, sessions())}</Text>
           <View class="min-w-0 flex-1 flex-row items-center gap-1">
             <If when={session()}>{(s) => <PhaseGlyph phase={s().phase} size={12} />}</If>
-            <Text class="min-w-0 flex-1 truncate text-xs text-muted">{status()}</Text>
+            <Text class="min-w-0 flex-1 truncate text-xs text-muted tabular-nums">{status()}</Text>
           </View>
         </View>
         <Select
@@ -305,12 +307,12 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
   );
   return (
     <Scroll testID="thread-list" accessibilityLabel={t("web.channel.threadList.title")} contentClass="gap-0.5">
-      <View class="flex-row items-center justify-between px-2 py-1">
+      <View class="mb-1 flex-row items-center justify-between border-b border-line px-2 pt-1 pb-1.5">
         <Text class="text-xs font-semibold text-muted">{t("web.channel.threadList.title")}</Text>
         <CountPill count={live().length} hoverBright />
       </View>
       <If when={live().length === 0}>
-        <Text testID="threads-empty" class="px-2 py-2 text-sm text-muted">
+        <Text testID="threads-empty" class="px-3 py-4 text-center text-xs leading-relaxed text-muted">
           {t("web.channel.threadList.none")}
         </Text>
       </If>
@@ -318,23 +320,25 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
         {(c) => item(c)}
       </Each>
       <If when={archived().length > 0}>
-        <View
-          role="button"
-          testID="threads-archived"
-          accessibilityState={{ expanded: showArchived() }}
-          class="group mt-1 h-7 flex-row items-center gap-1.5 rounded-md px-1.5 hover:bg-hover"
-          onPress={() => showArchived.set(!showArchived())}
-        >
-          <View class="h-4 w-4 shrink-0 items-center justify-center">
-            <Icon name={showArchived() ? "choose" : "expand"} size={14} tone="muted" />
+        <View class="mt-1.5 gap-0.5 border-t border-line pt-1.5">
+          <View
+            role="button"
+            testID="threads-archived"
+            accessibilityState={{ expanded: showArchived() }}
+            class="group h-7 flex-row items-center gap-1.5 rounded-md px-1.5 hover:bg-hover"
+            onPress={() => showArchived.set(!showArchived())}
+          >
+            <View class="h-4 w-4 shrink-0 items-center justify-center">
+              <Icon name={showArchived() ? "choose" : "expand"} size={14} tone="muted" />
+            </View>
+            <Text class="text-xs font-medium text-muted group-hover:text-ink">{t("web.channel.threadList.archived", { n: archived().length })}</Text>
           </View>
-          <Text class="text-xs font-medium text-muted group-hover:text-ink">{t("web.channel.threadList.archived", { n: archived().length })}</Text>
+          <If when={showArchived()}>
+            <Each of={archived()} key={(c) => c.id}>
+              {(c) => item(c)}
+            </Each>
+          </If>
         </View>
-        <If when={showArchived()}>
-          <Each of={archived()} key={(c) => c.id}>
-            {(c) => item(c)}
-          </Each>
-        </If>
       </If>
     </Scroll>
   );
@@ -371,7 +375,7 @@ function ThreadItem(props: { thread: Channel; title: string; onOpen: () => void 
             <View class="flex-row items-center gap-1.5">
               <Icon name="thread" size={14} />
               <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{props.title}</Text>
-              <Text class="shrink-0 text-xs text-muted">{t("web.channel.replies", { n: props.thread.replies })}</Text>
+              <Text class="shrink-0 text-xs text-muted tabular-nums">{t("web.channel.replies", { n: props.thread.replies })}</Text>
             </View>
             <If when={props.thread.last}>
               {(m) => (
@@ -475,7 +479,9 @@ function FarmSearchBody(props: { onClose: () => void }) {
           wide={false}
         />
       </View>
-      <Text class="text-xs text-faint">{t("web.channel.farmSearch.filters")}</Text>
+      <View class="rounded-md bg-side px-2.5 py-1.5">
+        <Text class="font-mono text-xs text-muted">{t("web.channel.farmSearch.filters")}</Text>
+      </View>
       <If when={search()?.state === "waiting"}>
         <Text class="text-sm text-muted">{t("web.channel.farmSearch.searching")}</Text>
       </If>
@@ -487,16 +493,16 @@ function FarmSearchBody(props: { onClose: () => void }) {
         )}
       </If>
       <If when={hits()?.length === 0 && text().trim() !== ""}>
-        <Text class="text-sm text-muted">{t("web.channel.farmSearch.none")}</Text>
+        <Text class="py-4 text-center text-sm text-muted">{t("web.channel.farmSearch.none")}</Text>
       </If>
-      <View role="list" accessibilityLabel={t("web.channel.messages.label")} class="gap-0.5">
+      <View role="list" accessibilityLabel={t("web.channel.messages.label")} class="gap-1">
         <Each of={hits() ?? []} key={(h) => h.message.id}>
           {(h) => (
             <View
               role="button"
               testID={`search-hit-${h().message.id}`}
               tooltip={<Bubble text={h().address} />}
-              class="gap-0.5 rounded-md px-2 py-1.5 hover:bg-hover"
+              class="gap-1 rounded-md border border-transparent px-2.5 py-2 hover:border-line hover:bg-hover"
               onPress={() => {
                 router.navigate(messagePath(channelOf(collab()?.chat, h().message.channel), h().message.number));
                 untracked(() => props.onClose)();
@@ -505,7 +511,7 @@ function FarmSearchBody(props: { onClose: () => void }) {
               <View class="flex-row items-baseline gap-2">
                 <Text class="text-xs font-semibold text-accent">{h().address}</Text>
                 <Text class="text-xs font-semibold text-ink">{h().message.from === userId ? t("web.channel.messages.user") : h().message.name}</Text>
-                <Text class="text-xs text-muted">{workbenchClock(h().message.at)}</Text>
+                <Text class="text-xs text-muted tabular-nums">{workbenchClock(h().message.at)}</Text>
               </View>
               <Text class="line-clamp-2 text-sm text-ink">{h().message.text}</Text>
             </View>

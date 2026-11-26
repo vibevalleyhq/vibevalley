@@ -1,4 +1,4 @@
-import { computed, effect, lifecycle, platform, signal, UrlScheme, wakeCount, type Accessor } from "nsh";
+import { computed, effect, lifecycle, platform, signal, untracked, UrlScheme, wakeCount, type Accessor } from "nsh";
 import { Haptics, type HapticImpact, type HapticNotification } from "nsh/mobile";
 import { z } from "zod";
 
@@ -81,6 +81,7 @@ export interface RemoteSession {
   readonly sessionWatchState: (sessionId: string) => SessionWatchState;
   readonly ensureSessionWatch: (sessionId: string) => () => void;
   readonly pair: (rawUrl: string, code: string, deviceName: string) => Promise<boolean>;
+  readonly reconnect: () => void;
   readonly disconnect: () => Promise<void>;
   readonly call: (op: string, payload?: unknown, options?: { readonly signal?: AbortSignal }) => Promise<RemoteEnvelope>;
   readonly subscribe: (name: string, payload: unknown, on: (event: unknown) => void, ended: (why: RemoteEnvelope | null) => void) => () => void;
@@ -541,6 +542,19 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
     }
   };
 
+  const reconnect = () => {
+    if (disposed) return;
+    const creds = untracked(credentials);
+    if (!creds) return;
+    hapticImpact("light");
+    if (!transport || untracked(connectionState) === "unauthorized") {
+      connectWith(creds);
+      return;
+    }
+    transportSuspended = false;
+    transport.resume();
+  };
+
   const disconnect = async (): Promise<void> => {
     abortPendingPair();
     teardownTransport();
@@ -710,6 +724,7 @@ export function createRemoteSession(options?: RemoteSessionOptions): RemoteSessi
     sessionWatchState,
     ensureSessionWatch,
     pair,
+    reconnect,
     disconnect,
     call,
     subscribe,

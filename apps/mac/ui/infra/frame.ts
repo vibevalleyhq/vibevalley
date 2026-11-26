@@ -12,6 +12,7 @@ import {
   type SessionsSlice,
   type SessionView,
   type SliceKind,
+  SliceKindValues,
 } from "@vibevalley/protocol";
 import { isOrchestratorSession, sessionIssueId, sessionProfile } from "@vibevalley/protocol/rules";
 
@@ -20,7 +21,7 @@ import { onTransportChange, transport, type SliceMap } from "./transport";
 
 export type Link = "connecting" | "open" | "lost";
 
-const SLICE_KINDS: readonly SliceKind[] = ["board", "sessions", "collab", "inbox", "ops", "farm"];
+const SLICE_KINDS = SliceKindValues;
 
 export interface Slices {
   readonly slice: <K extends SliceKind>(kind: K) => Accessor<SliceMap[K] | undefined>;

@@ -24,6 +24,7 @@ export function showsArtifactsInBucket(bucket: ContentBucket): boolean {
   switch (bucket.kind) {
     case "recent":
     case "pinned":
+    case "apps":
     case "artifacts":
       return true;
     case "media":
@@ -37,6 +38,7 @@ export function showsMediaInBucket(bucket: ContentBucket): boolean {
     case "pinned":
     case "media":
       return true;
+    case "apps":
     case "artifacts":
       return false;
   }
@@ -52,6 +54,10 @@ export function bucketFileKind(bucket: ContentBucket): LibraryFileKind | undefin
 
 export function isPinnedBucket(bucket: ContentBucket): boolean {
   return bucket.kind === "pinned";
+}
+
+export function isAppsBucket(bucket: ContentBucket): boolean {
+  return bucket.kind === "apps";
 }
 
 export function selectBucketSelection(selection: LibrarySelection, bucket: ContentBucket): LibrarySelection {

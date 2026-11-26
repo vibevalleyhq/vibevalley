@@ -63,6 +63,11 @@ test("bucket helpers report visible content categories and clear incompatible me
   expect(showsMediaInBucket(pinned)).toBe(true);
   expect(isPinnedBucket(pinned)).toBe(true);
 
+  const apps: ContentBucket = { kind: "apps" };
+  expect(showsArtifactsInBucket(apps)).toBe(true);
+  expect(showsMediaInBucket(apps)).toBe(false);
+  expect(isPinnedBucket(apps)).toBe(false);
+
   const outline: ContentBucket = { kind: "artifacts", artifactType: "outline" };
   expect(showsArtifactsInBucket(outline)).toBe(true);
   expect(showsMediaInBucket(outline)).toBe(false);
@@ -245,11 +250,13 @@ test("regression: countContentHub sidebar badges match LibraryPage visible count
     makeMedia({ id: "m-bin", name: "data.bin", type: "application/octet-stream", origin: { kind: "uploaded" } }),
   ];
   const pinned = new Set(["artifact:a-wb", "media:m-img", "artifact:gone"]);
+  const installedArtifactIds = new Set(["a-wb", "a-proto"]);
 
-  const counts = countContentHub({ artifacts, media, pinned });
+  const counts = countContentHub({ artifacts, media, pinned, installedArtifactIds });
   const buckets: readonly ContentBucket[] = [
     { kind: "recent" },
     { kind: "pinned" },
+    { kind: "apps" },
     { kind: "artifacts" },
     ...ArtifactTypeValues.map((artifactType): ContentBucket => ({ kind: "artifacts", artifactType })),
     { kind: "media" },
@@ -263,10 +270,13 @@ test("regression: countContentHub sidebar badges match LibraryPage visible count
     const pinnedOnly = isPinnedBucket(bucket);
     const pageTotal =
       (showsArtifactsInBucket(bucket)
-        ? shownArtifacts(artifacts, { source: "all", artifactType: bucketArtifactType(bucket), sort: "recent", pinnedOnly, pinned }).length
+        ? shownArtifacts(artifacts, { source: "all", artifactType: bucketArtifactType(bucket), sort: "recent", pinnedOnly, pinned }).filter(
+            (a) => bucket.kind !== "apps" || installedArtifactIds.has(a.id),
+          ).length
         : 0) + (showsMediaInBucket(bucket) ? shownMedia(media, { source: "all", fileKind: bucketFileKind(bucket), pinnedOnly, pinned }).length : 0);
     expect(countForBucket(counts, bucket)).toBe(pageTotal);
   }
   expect(counts.total).toBe(artifacts.length + media.length);
   expect(counts.pinned).toBe(2);
+  expect(counts.installedApps).toBe(2);
 });

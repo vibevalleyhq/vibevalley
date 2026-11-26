@@ -11,10 +11,11 @@ export type ArtifactFacet = ArtifactType;
 export type ContentBucket =
   | { readonly kind: "recent" }
   | { readonly kind: "pinned" }
+  | { readonly kind: "apps" }
   | { readonly kind: "artifacts"; readonly artifactType?: ArtifactFacet | undefined }
   | { readonly kind: "media"; readonly fileKind?: LibraryFileKind | undefined };
 
-export type TemplateCategory = "recommended" | "note" | "whiteboard" | "deliverable" | "ai";
+export type TemplateCategory = "recommended" | "apps" | "engineering" | "note" | "whiteboard" | "deliverable" | "ai";
 
 export const contentSidebarOpen = defineStored("content.sidebar", z.boolean(), true);
 export const contentBrowseBucket = signal<ContentBucket>({ kind: "recent" });
@@ -107,6 +108,7 @@ export function mediaKindOf(mime: string): LibraryFileKind {
 export interface ContentHubCounts {
   readonly total: number;
   readonly pinned: number;
+  readonly installedApps: number;
   readonly artifacts: number;
   readonly artifactByFacet: ReadonlyMap<ArtifactFacet, number>;
   readonly media: number;
@@ -118,11 +120,14 @@ export function countContentHub(input: {
   readonly artifacts: readonly Pick<Artifact, "id" | "artifactType">[];
   readonly media: readonly { readonly attachment: Pick<LibraryItem["attachment"], "id" | "type"> }[];
   readonly pinned: ReadonlySet<string>;
+  readonly installedArtifactIds?: ReadonlySet<string> | undefined;
 }): ContentHubCounts {
   let pinned = 0;
+  let installedApps = 0;
   const artifactByFacet = new Map<ArtifactFacet, number>();
   for (const a of input.artifacts) {
     if (input.pinned.has(`artifact:${a.id}`)) pinned += 1;
+    if (input.installedArtifactIds?.has(a.id) === true) installedApps += 1;
     const facet = artifactFacetOf(a);
     artifactByFacet.set(facet, (artifactByFacet.get(facet) ?? 0) + 1);
   }
@@ -135,6 +140,7 @@ export function countContentHub(input: {
   return {
     total: input.artifacts.length + input.media.length,
     pinned,
+    installedApps,
     artifacts: input.artifacts.length,
     artifactByFacet,
     media: input.media.length,
@@ -148,6 +154,8 @@ export function countForBucket(counts: ContentHubCounts, bucket: ContentBucket):
       return counts.total;
     case "pinned":
       return counts.pinned;
+    case "apps":
+      return counts.installedApps;
     case "artifacts":
       return bucket.artifactType === undefined ? counts.artifacts : (counts.artifactByFacet.get(bucket.artifactType) ?? 0);
     case "media":

@@ -25,7 +25,7 @@ import { issueMove, issueMoveOf, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
 import { IssueThread } from "./IssueThread";
-import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
+import { Fold, IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 
 interface Draft {
   title: string;
@@ -195,13 +195,16 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const criteria = computed(() => criteriaList(d().criteria));
   const heading = (
     <View>
-      <If when={props.item.parent}>
-        {(parent) => (
-          <View role="button" testID="parent-issue" class="-mx-1 mb-2 self-start rounded-sm px-1 py-0.5 hover:bg-hover" onPress={() => props.onDone(parent())}>
-            <Text class="text-xs text-water">{t("web.issue.family.parent")}</Text>
-          </View>
-        )}
-      </If>
+      <View class="mb-1.5 flex-row flex-wrap items-center gap-1.5">
+        <If when={props.item.parent}>
+          {(parent) => (
+            <View role="button" testID="parent-issue" class="-mx-1 rounded-sm px-1 py-0.5 hover:bg-hover" onPress={() => props.onDone(parent())}>
+              <Text class="text-xs text-water">{t("web.issue.family.parent")}</Text>
+            </View>
+          )}
+        </If>
+        <IssueNumberPill number={props.item.number} />
+      </View>
       <If when={backlog()}>
         <View class="mb-4">
           <Stages at="talk" />

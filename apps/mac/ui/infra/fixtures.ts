@@ -1,9 +1,20 @@
 // `responses` are read as crates/server/src/transport/bridge/fake.rs reads them: change them there and here together.
-import type { BoardSlice, CollabSlice, FarmFrame, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceBundle, SliceKind } from "@vibevalley/protocol";
+import {
+  type BoardSlice,
+  type CollabSlice,
+  type FarmFrame,
+  type InboxSlice,
+  type LiveEvent,
+  type OpsSlice,
+  type SessionsSlice,
+  type SliceBundle,
+  type SliceKind,
+  SliceKindValues,
+} from "@vibevalley/protocol";
 
 import type { Envelope, SliceMap, Transport } from "./transport";
 
-const SLICE_KINDS: readonly SliceKind[] = ["board", "sessions", "collab", "inbox", "ops", "farm"];
+const SLICE_KINDS = SliceKindValues;
 
 function isEnvelope(value: unknown): value is Envelope {
   return typeof value === "object" && value !== null && "bizCode" in value && typeof value.bizCode === "number";

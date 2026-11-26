@@ -107,6 +107,7 @@ export interface BoardProps {
   onPlace: (card: BoardCard, before: string | undefined) => void;
   /** The todo lane's placeholder card. */
   onNew: () => void;
+  onClearFilter?: (() => void) | undefined;
 }
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -240,6 +241,9 @@ export function IssueBoard(props: BoardProps) {
                 cards={cardsByLane()[l()]}
                 count={laneCounts()[l()]}
                 slots={l() === "working" ? workingSlots() : undefined}
+                showClear={
+                  props.filtered === true && props.cards.length === 0 && props.onClearFilter !== undefined && (narrow() ? l() === lane() : l() === "todo")
+                }
                 drag={drag}
               />
             </If>
@@ -267,7 +271,15 @@ export function IssueBoard(props: BoardProps) {
   );
 }
 
-function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; count: number; slots?: { taken: number; of: number } | undefined; drag: Drag }) {
+function LaneView(props: {
+  board: BoardProps;
+  lane: Lane;
+  cards: BoardCard[];
+  count: number;
+  slots?: { taken: number; of: number } | undefined;
+  showClear: boolean;
+  drag: Drag;
+}) {
   const p = () => props.board;
   const over = computed(() => props.drag.over() === props.lane);
   const folded = computed(() => props.lane === "closed" && !props.board.older && props.cards.length > closedShown);
@@ -358,11 +370,18 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
                   >
                     <Text class="text-center text-2xs leading-snug text-muted">{t("web.issue.board.emptyGuide.filtered")}</Text>
                   </If>
-                  <If when={props.lane === "todo"}>
-                    <View class="pt-1">
-                      <Button size="compact" icon="add" testID="issue-new" onPress={() => p().onNew()}>
-                        {t("web.issue.new.card")}
-                      </Button>
+                  <If when={props.lane === "todo" || props.showClear}>
+                    <View class="flex-row flex-wrap items-center justify-center gap-1.5 pt-1">
+                      <If when={props.lane === "todo"}>
+                        <Button size="compact" icon="add" testID="issue-new" onPress={() => p().onNew()}>
+                          {t("web.issue.new.card")}
+                        </Button>
+                      </If>
+                      <If when={props.showClear}>
+                        <Button size="compact" tone="plain" icon="close" testID="board-clear-filter" onPress={() => p().onClearFilter?.()}>
+                          {t("web.issue.page.clear")}
+                        </Button>
+                      </If>
                     </View>
                   </If>
                 </View>

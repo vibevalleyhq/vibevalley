@@ -1,6 +1,8 @@
 // Papertrails static asset URLs rooted at the host's `assets/` directory (`host.assetsDir`).
 import { z } from "zod";
 
+import { ConnectorIDValues, SpeciesValues } from "@vibevalley/protocol";
+
 import { readHostParams } from "../infra/hostParams";
 import { defineQuery, ready, useQuery } from "../infra/query";
 import { transport } from "../infra/transport";
@@ -38,7 +40,7 @@ export const ROLE_AVATARS = [
 
 const ROLE_AVATAR_SET = new Set<string>(ROLE_AVATARS);
 
-const SPECIES_PORTRAITS = new Set(["bear", "fox", "owl", "shiba", "cat", "rabbit", "hedgehog", "raccoon"]);
+const SPECIES_PORTRAITS: ReadonlySet<string> = new Set<string>([...SpeciesValues, "shiba"]);
 
 const ORCHESTRATOR_PORTRAIT_KEY: Readonly<Record<string, string>> = {
   farmer: "default",
@@ -52,7 +54,7 @@ const ORCHESTRATOR_PORTRAIT_KEY: Readonly<Record<string, string>> = {
 
 const ENGINE_LOGOS = new Set(["antigravity", "claude", "codex", "cursor", "dsh", "grok", "kimi", "opencode", "pi", "vibevalley"]);
 
-const CONNECTOR_EMBLEMS = new Set(["weixin", "feishu", "qq"]);
+const CONNECTOR_EMBLEMS: ReadonlySet<string> = new Set<string>(ConnectorIDValues);
 
 /** Root `assets/` folder on disk, undefined until the host answers (or when unavailable). */
 export function useAssetsDir(): () => string | undefined {

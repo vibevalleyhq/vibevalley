@@ -1,13 +1,15 @@
 import { z } from "zod";
 
-import type { EventTokens, SessionEvent } from "@vibevalley/protocol";
+import { type EventTokens, type SessionEvent, SessionEventTypeValues } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { jsonString } from "@vibevalley/protocol/schema";
 
 /** The steps kept for one session's log in the page. */
 export const stepLimit = 240;
 
-const defaultHiddenEventTypes: ReadonlySet<SessionEvent["type"]> = new Set(["tool/result", "run/start", "run/end"]);
+const defaultHiddenEventTypes: ReadonlySet<SessionEvent["type"]> = new Set(
+  SessionEventTypeValues.filter((t) => t === "tool/result" || t === "run/start" || t === "run/end"),
+);
 const JsonObjectInput = jsonString(z.record(z.string(), z.unknown()));
 const toolInputPathKeys = ["path", "file_path", "filePath", "TargetFile", "AbsolutePath", "file"] as const;
 const toolInputLineKeys = ["line", "start_line", "StartLine", "lineNumber", "offset"] as const;

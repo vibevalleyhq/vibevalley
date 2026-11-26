@@ -9,17 +9,18 @@ import { Dialog } from "../../design/Dialog";
 import { Select } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
-import { Empty, Quiet } from "../../design/layout";
+import { Empty } from "../../design/layout";
 import { Lightbox, type Picture } from "../../design/Lightbox";
 import { readFiles } from "../../design/picked";
 import { Segmented } from "../../design/Segmented";
 import { CountPill } from "../../design/Tag";
 import { toast } from "../../design/toasts";
-import { api } from "../../infra/api";
+import { api, reasonOf } from "../../infra/api";
 import { attachmentData, decodeBase64Utf8 } from "../../infra/attachment";
 import { fileUrl, importLocalAttachment, localPathFromUri, useAttachmentFile } from "../../infra/attachmentFile";
 import { hostApi } from "../../infra/bridge";
 import { useCollabSlice, useOpsSlice } from "../../infra/frame";
+import { currentHost } from "../../infra/host";
 import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
 import { useRouter, useSearchParams } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
@@ -35,7 +36,7 @@ import {
   togglePinned,
 } from "../../infra/state/contentNav";
 import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
-import { artifactTypeLabel, buildOutlineFromMarkdown, inferArtifactFromName, useArtifacts } from "../artifact";
+import { artifactTypeLabel, buildOutlineFromMarkdown, inferArtifactFromName, InstallAppletModal, useArtifacts, useInstalledApplets } from "../artifact";
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
 import { Inspector } from "./Inspector";
@@ -62,6 +63,7 @@ import {
   closeLightbox,
   focusFile,
   initialLibrarySelection,
+  isAppsBucket,
   isAskingRemove,
   isPinnedBucket,
   type LibrarySelection,
@@ -117,6 +119,8 @@ function titleOfBucket(bucket: ContentBucket): string {
       return t("web.library.content.recent");
     case "pinned":
       return t("web.library.content.pinned");
+    case "apps":
+      return t("web.library.content.installedApps");
     case "artifacts":
       return artifactTypeTitle(bucket.artifactType);
     case "media":
@@ -135,15 +139,31 @@ export function LibraryPage() {
   const source = signal<SourceFilter>("all");
   const items = useQuery(() => libraryQuery({ text: "", sort: sort() }), { interval: () => 10_000, keepPrevious: true });
   const artifactsQuery = useArtifacts(() => ({}));
+  const installedApplets = useInstalledApplets();
   const selection = signal<LibrarySelection>(initialLibrarySelection);
   const dragging = signal(false);
   const seen = signal<ReadonlyMap<string, Seen>>(new Map());
+  const appletTarget = signal<Artifact | undefined>(undefined);
+  const deletingArtifact = signal<Artifact | undefined>(undefined);
   const act = createAct();
 
   const bucket = () => contentBrowseBucket();
   const tile = () => Math.min(tileMax, Math.max(tileMin, prefsNow().libraryTile));
+  const effectiveSort = createMemo((): LibrarySort => (!showsMediaInBucket(bucket()) && sort() === "size" ? "recent" : sort()));
+  const sortOptions = createMemo(() => {
+    const allowed = showsMediaInBucket(bucket()) ? LibrarySortValues : LibrarySortValues.filter((v) => v !== "size");
+    return allowed.map((value) => ({ value, label: t(`web.library.sort.${value}`) }));
+  });
   const allMedia = createMemo((): readonly LibraryItem[] => ready(items, undefined) ?? []);
   const allArtifacts = createMemo((): readonly Artifact[] => ready(artifactsQuery, undefined) ?? []);
+  const installedMap = createMemo(
+    () =>
+      new Map(
+        installedApplets()
+          .filter((item) => item.installed)
+          .map((item) => [item.artifactId, item]),
+      ),
+  );
   const jobs = (): readonly MediaJob[] => ops()?.media ?? [];
   const mediaSummary = () => ops()?.mediaSummary;
   const working = createMemo(() => making(jobs(), mediaSummary()));
@@ -151,18 +171,19 @@ export function LibraryPage() {
 
   const pinnedSet = createMemo(() => new Set(pinnedKeys()));
   const pinnedOnly = () => isPinnedBucket(bucket());
+  const appsOnly = () => isAppsBucket(bucket());
 
-  const visibleArtifacts = createMemo(() =>
-    showsArtifactsInBucket(bucket())
-      ? shownArtifacts(allArtifacts(), {
-          source: source(),
-          artifactType: bucketArtifactType(bucket()),
-          sort: sort(),
-          pinnedOnly: pinnedOnly(),
-          pinned: pinnedSet(),
-        })
-      : [],
-  );
+  const visibleArtifacts = createMemo(() => {
+    if (!showsArtifactsInBucket(bucket())) return [];
+    const base = shownArtifacts(allArtifacts(), {
+      source: source(),
+      artifactType: bucketArtifactType(bucket()),
+      sort: effectiveSort(),
+      pinnedOnly: pinnedOnly(),
+      pinned: pinnedSet(),
+    });
+    return appsOnly() ? base.filter((a) => installedMap().has(a.id)) : base;
+  });
   const visibleMedia = createMemo(() =>
     showsMediaInBucket(bucket())
       ? shownMedia(allMedia(), {
@@ -466,9 +487,9 @@ export function LibraryPage() {
             testid="library-sort"
             size="control"
             quiet
-            value={sort()}
+            value={effectiveSort()}
             onChange={(v) => sort.set(v)}
-            options={LibrarySortValues.map((value) => ({ value, label: t(`web.library.sort.${value}`) }))}
+            options={sortOptions()}
           />
           <If when={showsMediaInBucket(bucket())}>
             <Segmented
@@ -483,6 +504,14 @@ export function LibraryPage() {
               ]}
             />
           </If>
+          <Button
+            size="compact"
+            testID="library-make-btn"
+            icon="generate"
+            onPress={() => setSearch({ make: bucketFileKind(bucket()) === "audio" ? "audio" : "image" })}
+          >
+            {t("web.library.make")}
+          </Button>
           <Button size="compact" testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
             {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
           </Button>
@@ -519,7 +548,54 @@ export function LibraryPage() {
             <If when={showsMediaInBucket(bucket()) && !pinnedOnly() && activeMediaCount() > 0 && working().length > 0}>
               <MakingTiles jobs={working()} width={inner()} height={tile()} label={(job) => t(`web.library.job.${job.kind}`)} />
             </If>
-            <If when={!nothingShown()} else={<Quiet>{t("web.library.nothingShown")}</Quiet>}>
+            <If
+              when={!nothingShown()}
+              else={
+                <Empty
+                  icon={
+                    appsOnly() ? "devices" : pinnedOnly() ? "pin" : showsArtifactsInBucket(bucket()) && !showsMediaInBucket(bucket()) ? "artifacts" : "media"
+                  }
+                  testid={appsOnly() ? "library-apps-empty" : "library-nothing-shown"}
+                  action={
+                    <View class="flex-row flex-wrap items-center justify-center gap-2">
+                      <If when={source() !== "all"}>
+                        <Button testID="library-reset-filter" icon="refresh" onPress={() => source.set("all")}>
+                          {t("web.library.content.resetFilter")}
+                        </Button>
+                      </If>
+                      <If when={bucket().kind === "artifacts"}>
+                        <Button
+                          tone="primary"
+                          icon="add"
+                          onPress={() => {
+                            const type = bucketArtifactType(bucket());
+                            openTemplatePicker(type === "outline" ? "note" : type === "whiteboard" ? "whiteboard" : "deliverable");
+                          }}
+                        >
+                          {t("web.library.content.new")}
+                        </Button>
+                      </If>
+                      <If when={bucket().kind === "media"}>
+                        <>
+                          <Button icon="upload" onPress={() => void pickFiles()}>
+                            {t("web.library.upload")}
+                          </Button>
+                          <Button tone="primary" icon="generate" onPress={() => setSearch({ make: bucketFileKind(bucket()) === "audio" ? "audio" : "image" })}>
+                            {t("web.library.make")}
+                          </Button>
+                        </>
+                      </If>
+                    </View>
+                  }
+                >
+                  {appsOnly()
+                    ? t("web.library.content.installedAppsEmpty")
+                    : pinnedOnly()
+                      ? t("web.library.content.pinnedEmpty")
+                      : t("web.library.nothingShown")}
+                </Empty>
+              }
+            >
               <If when={visibleArtifacts().length > 0}>
                 <View class="gap-2.5">
                   <If when={sectionCount() > 1}>
@@ -530,9 +606,22 @@ export function LibraryPage() {
                   </If>
                   <ArtifactTiles
                     artifacts={visibleArtifacts()}
+                    width={inner()}
                     onOpen={(id) => openArtifact(id)}
                     isPinned={(id) => isPinned(`artifact:${id}`)}
                     onTogglePin={(id) => handleTogglePin(`artifact:${id}`)}
+                    onDelete={(a) => deletingArtifact.set(a)}
+                    installedApplets={installedMap()}
+                    canInstallApplet={currentHost().applet !== undefined}
+                    onInstallApplet={(a) => appletTarget.set(a)}
+                    onOpenApplet={(id) =>
+                      void currentHost()
+                        .applet?.open(id)
+                        .then(
+                          () => toast(t("web.artifact.applet.openedToast", { name: installedMap().get(id)?.appName ?? id })),
+                          (e: unknown) => toast(reasonOf(e), "bad"),
+                        )
+                    }
                   />
                 </View>
               </If>
@@ -550,6 +639,7 @@ export function LibraryPage() {
                     picked={picked()}
                     active={active()}
                     isPinned={(id) => isPinned(`media:${id}`)}
+                    onTogglePin={(id) => handleTogglePin(`media:${id}`)}
                     seen={(id) => seen().get(id)}
                     onSeen={(id, s) => {
                       const was = seen();
@@ -636,6 +726,40 @@ export function LibraryPage() {
             testid="library-understand-dialog"
           >
             <UnderstandingPanel file={file()} />
+          </Dialog>
+        )}
+      </If>
+
+      <If when={appletTarget()}>{(a) => <InstallAppletModal open artifact={a()} onClose={() => appletTarget.set(undefined)} />}</If>
+
+      <If when={deletingArtifact()}>
+        {(target) => (
+          <Dialog open onClose={() => deletingArtifact.set(undefined)} title={t("web.artifact.page.delete")} testid="library-artifact-delete-dialog">
+            <View class="gap-4">
+              <Text class="text-sm text-ink">{t("web.artifact.page.deleteAsk", { title: target().title })}</Text>
+              <View class="flex-row items-center justify-end gap-2">
+                <Button tone="quiet" onPress={() => deletingArtifact.set(undefined)}>
+                  {t("web.base.form.never")}
+                </Button>
+                <Button
+                  tone="danger"
+                  icon="delete"
+                  testID="library-artifact-delete-confirm"
+                  disabled={act.busy()}
+                  onPress={() => {
+                    const art = target();
+                    deletingArtifact.set(undefined);
+                    void act.run(async () => {
+                      await api.artifact.delete({ id: art.id });
+                      toast(t("web.artifact.page.deleted", { title: art.title }));
+                      void queries.invalidate({ prefix: ["artifacts"] });
+                    });
+                  }}
+                >
+                  {t("web.artifact.page.delete")}
+                </Button>
+              </View>
+            </View>
           </Dialog>
         )}
       </If>

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession, isOrchestratorSession, sessionBranch, sessionIssueId, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
+import { HostRailRunningState as HostRailRunningStateSchema } from "@vibevalley/protocol/schema";
 
 import { engineLogoUrl } from "../design/art";
 import { Icon } from "../design/Icon";
@@ -20,7 +21,7 @@ import { FileTree, filesFrameSchema } from "./FileTree";
 import { GitPanel, gitFrameSchema, type GitTab } from "./GitPanel";
 import { RepoDetailPanel, type RepoDetailTarget } from "./RepoDetailPanel";
 
-type RailRunningState = "working" | "ready" | "idle";
+type RailRunningState = z.infer<typeof HostRailRunningStateSchema>;
 
 type RailTab = {
   id: number;
@@ -72,7 +73,7 @@ const railTabSchema: z.ZodType<RailTab> = z.object({
   active: z.boolean(),
   kind: z.string(),
   running: z.exactOptional(z.boolean()),
-  runningState: z.exactOptional(z.enum(["working", "ready", "idle"])),
+  runningState: z.exactOptional(HostRailRunningStateSchema),
   runningAgent: z.exactOptional(z.string().nullable()),
   runningLabel: z.exactOptional(z.string().nullable()),
   attention: z.exactOptional(z.boolean()),

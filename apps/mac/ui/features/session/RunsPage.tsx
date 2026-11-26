@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
+import { Clipboard, computed, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Look, OrchestratorEval } from "@vibevalley/protocol";
@@ -11,15 +11,18 @@ import { Icon } from "../../design/Icon";
 import { ActiveBar, Quiet } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { Dot, type DotTone } from "../../design/Tag";
+import { Bubble } from "../../design/Tip";
+import { toast } from "../../design/toasts";
 import { mix } from "../../design/tone";
 import { useOrchestrators } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { Keyed, useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
+import { useTimeout } from "../../infra/base/timer";
 import { useBoardSlice, useSessionsSlice } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useAgents, useQuery } from "../../infra/query";
 import { useRouter, useSearch } from "../../infra/router";
-import { createMemo } from "../../infra/solid";
+import { createEffect, createMemo } from "../../infra/solid";
 import {
   buildRunEntries,
   filterRunEntries,
@@ -455,6 +458,24 @@ function RunListRow(props: { entry: RunEntry; look?: Look | undefined; selected:
 }
 
 function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: number; showBack: boolean; onBack: () => void; approvals?: RunApprovals }) {
+  const copiedId = signal(false);
+  const resetCopy = useTimeout();
+  createEffect(
+    () => props.entry.id,
+    () => copiedId.set(false),
+    { defer: true },
+  );
+  const copyRunId = () => {
+    const id = props.entry.id;
+    void Clipboard.writeText(id).then(
+      () => {
+        copiedId.set(true);
+        resetCopy(() => copiedId.set(false), 1500);
+        toast(t("web.base.rich.copied"));
+      },
+      () => undefined,
+    );
+  };
   const status = computed(() => statusMeta(runStatusOf(props.entry)));
   const pillStyle = () => {
     const bg = status().pillBg;
@@ -528,6 +549,14 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
               </If>
             </View>
             <View class="shrink-0 flex-row flex-wrap items-center gap-2">
+              <Button
+                testID="run-copy-id"
+                icon={copiedId() ? "check" : "copy"}
+                tooltip={<Bubble text={copiedId() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
+                onPress={copyRunId}
+              >
+                {copiedId() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
+              </Button>
               <If when={workerIssueId()}>
                 {(issueId) => (
                   <ButtonLink href={`/issues/${encodeURIComponent(issueId())}`} icon="issues" testID="run-open-issue">

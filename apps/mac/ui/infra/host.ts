@@ -24,48 +24,79 @@ const unwrap = async <T>(pending: Promise<Envelope<T>>): Promise<T> => {
   return e.data;
 };
 
-const desktop: Host = {
-  name: "desktop",
-  commandLine: {
-    state: () => commandLineState(hostApi.cliState()),
-    install: () => commandLineState(hostApi.cliInstall()),
-    remove: () => commandLineState(hostApi.cliRemove()),
-  },
-  applet: {
-    list: () => unwrap(hostApi.appletList()),
-    install: (input) => unwrap(hostApi.appletInstall(input)),
-    uninstall: (artifactId) => unwrap(hostApi.appletUninstall(artifactId)),
-    open: (artifactId) => unwrap(hostApi.appletOpen(artifactId)),
-  },
-  notify: (notice) => done(hostApi.notify(notice)),
-  tray: (summary) => done(hostApi.tray(summary)),
-  locale: (locale) => void hostApi.locale(locale),
-  reveal: (path) => void hostApi.reveal(path),
-  theme: (theme) => void hostApi.theme(theme),
-  motion: (choice) => void hostApi.motion(choice),
-  opening: (opening) => done(hostApi.opening(opening)),
-  update: {
-    watch: (listener) => {
-      let stopped = false;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const poll = async () => {
-        const response = await hostApi.updateState();
-        if (stopped) return;
-        const decoded = UpdateState.safeParse(response.data);
-        if (response.bizCode === 0 && decoded.success) listener(decoded.data);
-        else listener({ _tag: "failed", version: "", why: response.bizCode !== 0 ? response.message : (decoded.error?.message ?? "Invalid update state") });
-        timer = setTimeout(() => void poll(), 1_000);
-      };
-      void poll();
-      return () => {
-        stopped = true;
-        if (timer !== undefined) clearTimeout(timer);
-      };
+const desktop: Host = (() => {
+  const updateRefreshers = new Set<() => Promise<void>>();
+  return {
+    name: "desktop",
+    commandLine: {
+      state: () => commandLineState(hostApi.cliState()),
+      install: () => commandLineState(hostApi.cliInstall()),
+      remove: () => commandLineState(hostApi.cliRemove()),
     },
-    check: () => done(hostApi.updateCheck()),
-    install: () => done(hostApi.updateInstall()),
-  },
-};
+    applet: {
+      list: () => unwrap(hostApi.appletList()),
+      install: (input) => unwrap(hostApi.appletInstall(input)),
+      uninstall: (artifactId) => unwrap(hostApi.appletUninstall(artifactId)),
+      open: (artifactId) => unwrap(hostApi.appletOpen(artifactId)),
+    },
+    notify: (notice) => done(hostApi.notify(notice)),
+    tray: (summary) => done(hostApi.tray(summary)),
+    locale: (locale) => void hostApi.locale(locale),
+    reveal: (path) => void hostApi.reveal(path),
+    theme: (theme) => void hostApi.theme(theme),
+    motion: (choice) => void hostApi.motion(choice),
+    opening: (opening) => done(hostApi.opening(opening)),
+    update: {
+      watch: (listener) => {
+        let stopped = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let inFlight: Promise<void> | undefined;
+        let nextDelayMs = 10_000;
+        const poll = async () => {
+          if (stopped) return;
+          if (timer !== undefined) {
+            clearTimeout(timer);
+            timer = undefined;
+          }
+          if (inFlight) return inFlight;
+          inFlight = (async () => {
+            try {
+              const response = await hostApi.updateState();
+              if (stopped) return;
+              const decoded = UpdateState.safeParse(response.data);
+              if (response.bizCode === 0 && decoded.success) {
+                nextDelayMs = decoded.data._tag === "checking" || decoded.data._tag === "downloading" ? 1_000 : 10_000;
+                listener(decoded.data);
+              } else {
+                nextDelayMs = 10_000;
+                listener({ _tag: "failed", version: "", why: response.bizCode !== 0 ? response.message : (decoded.error?.message ?? "Invalid update state") });
+              }
+            } finally {
+              inFlight = undefined;
+              if (!stopped) timer = setTimeout(() => void poll(), nextDelayMs);
+            }
+          })();
+          return inFlight;
+        };
+        updateRefreshers.add(poll);
+        void poll();
+        return () => {
+          stopped = true;
+          updateRefreshers.delete(poll);
+          if (timer !== undefined) clearTimeout(timer);
+        };
+      },
+      check: async () => {
+        try {
+          await done(hostApi.updateCheck());
+        } finally {
+          await Promise.all([...updateRefreshers].map((refresh) => refresh()));
+        }
+      },
+      install: () => done(hostApi.updateInstall()),
+    },
+  };
+})();
 
 const browser: Host = { name: "browser" };
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { t, setLocale } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
+import { InboxSlice } from "@vibevalley/protocol/schema";
 
 import { OrchestratorFace } from "../design/domain/Face";
 import { TextArea } from "../design/Field";
@@ -20,8 +21,9 @@ import { GameIcon, GamePad, PhoneGame, type GameId } from "./PhoneGames";
 
 type Screen = "home" | "missed" | "log" | "orchestrator" | "games" | GameId;
 type Calls = FarmCalls;
+const activeCallPhases = InboxSlice.shape.call.exclude(["ending", "error"]);
 const voiceSchema = z.object({
-  phase: z.enum(["idle", "connecting", "live", "stopping"]),
+  phase: z.enum([...activeCallPhases.options, "stopping"]),
   problem: z.string().nullable(),
   heard: z.string(),
   said: z.string(),

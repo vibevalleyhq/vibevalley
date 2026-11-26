@@ -3,6 +3,7 @@ import { computed, Scroll, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { IssueStatus } from "@vibevalley/protocol";
 
+import { Button } from "../../../design/Button";
 import { OrchestratorFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
@@ -35,6 +36,7 @@ export function IssueList(props: {
   onOlder: () => void;
   onOpen: (id: string) => void;
   onAdd: ListAdd;
+  onClearFilter?: (() => void) | undefined;
 }) {
   const folded = signal<ReadonlySet<string>>(new Set());
   const nameOf = useNameOf();
@@ -61,8 +63,15 @@ export function IssueList(props: {
         <If
           when={props.cards.length > 0}
           else={
-            <View testID="issue-list-empty" class="px-5 py-6">
+            <View testID="issue-list-empty" class="items-start gap-2 px-5 py-6">
               <Text class="text-xs text-muted">{props.filtered === true ? t("web.issue.list.emptyFiltered") : t("web.issue.list.empty")}</Text>
+              <If when={props.filtered === true ? props.onClearFilter : undefined}>
+                {(clear) => (
+                  <Button size="compact" tone="plain" icon="close" testID="issue-list-clear-filter" onPress={() => clear()()}>
+                    {t("web.issue.page.clear")}
+                  </Button>
+                )}
+              </If>
             </View>
           }
         >
