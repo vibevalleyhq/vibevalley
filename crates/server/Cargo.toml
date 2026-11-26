@@ -57,6 +57,7 @@ uuid = { workspace = true }
 vibevalley-core = { version = "0.1.0", path = "../core", features = ["collab"] }
 vibevalley-git = { version = "0.1.0", path = "../git" }
 vibevalley-i18n = { version = "0.1.0", path = "../i18n" }
+vibevalley-mcp = { workspace = true }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
 vibevalley-runtime = { version = "0.1.0", path = "../runtime" }
 

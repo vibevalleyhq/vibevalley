@@ -12456,6 +12456,7 @@ dependencies = [
  "uuid",
  "vibevalley-core",
  "vibevalley-git",
+ "vibevalley-mcp",
  "vibevalley-protocol",
  "vibevalley-runtime",
  "vibevalley-server",
@@ -12571,6 +12572,16 @@ dependencies = [
  "vibevalley-terminal",
  "vibevalley-workspace",
  "zip",
+]
+
+[[package]]
+name = "vibevalley-mcp"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]
@@ -12708,6 +12719,7 @@ dependencies = [
  "vibevalley-core",
  "vibevalley-git",
  "vibevalley-i18n",
+ "vibevalley-mcp",
  "vibevalley-protocol",
  "vibevalley-runtime",
 ]

@@ -2,7 +2,7 @@
 
 由 [scripts/docs/agent-notes.ts](scripts/docs/agent-notes.ts) 从每篇 Note 的路径和标题写成，不手改：加、挪、删 Note 或改了标题以后跑 `vp run notes:catalog`，过期了 `vp run notes:verify` 会报错。Note 放在哪、怎么写见 [README](.agents/notes/README.md)。
 
-## proposed（29 篇）
+## proposed（30 篇）
 
 ### feature
 
@@ -18,6 +18,7 @@
 
 ### architecture
 
+- 2026-11-26 [独立协议包 `vibevalley-mcp`（Stateless Streamable HTTP + SEP-2640 Skills）](.agents/notes/proposed/architecture/2026-11-26-vibevalley-mcp-crate.md)
 - 2026-11-26 [VDP 远程实时调试协议（VibeValley DevTools Protocol）](.agents/notes/proposed/architecture/2026-11-26-vdp-remote-debugging.md)
 - 2026-11-25 [跨端 SSOT、纯 Rust git 与全仓 Tokio 收敛](.agents/notes/proposed/architecture/2026-11-25-ssot-git-tokio-convergence.md)
 - 2026-11-25 [Artifact 安装为本地轻应用（macOS 跨进程 App Shim）](.agents/notes/proposed/architecture/2026-11-25-artifact-local-app-shim.md)

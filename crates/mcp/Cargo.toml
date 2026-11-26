@@ -1,0 +1,15 @@
+[package]
+name = "vibevalley-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pure MCP protocol implementation: SEP-2575 stateless core, SEP-2243 routable Streamable HTTP headers, SEP-2640 Skills over MCP, stdio transport, and config spec types"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "sync"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }

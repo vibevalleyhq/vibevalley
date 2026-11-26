@@ -4,15 +4,16 @@
 //! Stdout is reserved strictly for newline-delimited JSON-RPC 2.0 responses;
 //! all diagnostics go to stderr.
 
-use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 
 use base64::Engine;
 use clap::{Args, ValueEnum};
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer};
 use serde_json::{Value, json};
-#[cfg(test)]
-use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
+use vibevalley_mcp::{
+    BoxFuture, ContentBlock, McpHandler, RequestContext, RpcError, ServerCapabilities, ServerInfo, SkillCatalog, ToolCallResult, ToolDef, scrub_tool_result,
+    serve_stdio,
+};
 use vibevalley_protocol::home::ReleaseChannel;
 use vibevalley_protocol::{
     AppliedIssue, Attachment, AttachmentUpload, Issue, IssueCommentCreateInput, IssueConversationGetInput, IssueFilter, IssueGetInput, IssueRequest,
@@ -27,14 +28,8 @@ use crate::client::{Client, Done, Failure, ServerSource, exit};
 use crate::domains::debug::{self, DEFAULT_RPC_TIMEOUT, DebugTargetArgs, ResolvedEndpoint, VdpWsClient};
 use crate::output::{guess_mime, issue_ref};
 
-const DEFAULT_PROTOCOL_VERSION: &str = "2025-03-26";
 const SERVER_NAME: &str = "vibevalley";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-const JSONRPC_PARSE_ERROR: i64 = -32700;
-const JSONRPC_INVALID_REQUEST: i64 = -32600;
-const JSONRPC_METHOD_NOT_FOUND: i64 = -32601;
-const JSONRPC_INVALID_PARAMS: i64 = -32602;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ChannelArg {
@@ -77,134 +72,10 @@ pub struct McpCmd {
     pub vdp_url: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct JsonRpcRequest {
-    #[serde(default)]
-    jsonrpc: Option<String>,
-    #[serde(default)]
-    id: Option<Value>,
-    #[serde(default)]
-    method: Option<String>,
-    #[serde(default)]
-    params: Value,
-}
-
-#[derive(Debug, Serialize)]
-struct JsonRpcResponse {
-    jsonrpc: &'static str,
-    id: Value,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    result: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<JsonRpcError>,
-}
-
-#[derive(Debug, Serialize)]
-struct JsonRpcError {
-    code: i64,
-    message: String,
-}
-
-impl JsonRpcResponse {
-    fn ok(id: Value, result: Value) -> Self {
-        Self {
-            jsonrpc: "2.0",
-            id,
-            result: Some(result),
-            error: None,
-        }
-    }
-
-    fn err(id: Value, code: i64, message: impl Into<String>) -> Self {
-        Self {
-            jsonrpc: "2.0",
-            id,
-            result: None,
-            error: Some(JsonRpcError { code, message: message.into() }),
-        }
-    }
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct InitializeParams {
-    #[serde(default)]
-    protocol_version: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ToolCallParams {
-    name: String,
-    #[serde(default)]
-    arguments: Value,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-enum McpContent {
-    Text {
-        text: String,
-    },
-    #[serde(rename_all = "camelCase")]
-    Image {
-        data: String,
-        mime_type: String,
-    },
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct McpToolResult {
-    content: Vec<McpContent>,
-    #[serde(skip_serializing_if = "is_false")]
-    is_error: bool,
-}
-
-fn is_false(b: &bool) -> bool {
-    !*b
-}
-
-impl McpToolResult {
-    fn text(text: impl Into<String>) -> Self {
-        Self {
-            content: vec![McpContent::Text { text: text.into() }],
-            is_error: false,
-        }
-    }
-
-    fn json<T: Serialize>(value: &T) -> Self {
-        match serde_json::to_string_pretty(value) {
-            Ok(text) => Self::text(text),
-            Err(err) => Self::error(format!("failed to serialize tool result: {err}")),
-        }
-    }
-
-    fn error(message: impl Into<String>) -> Self {
-        Self {
-            content: vec![McpContent::Text { text: message.into() }],
-            is_error: true,
-        }
-    }
-
-    fn redact(mut self, secrets: &[&Secret]) -> Self {
-        for block in &mut self.content {
-            if let McpContent::Text { text } = block {
-                *text = redact_text(text, secrets);
-            }
-        }
-        self
-    }
-}
-
-fn redact_text(input: &str, secrets: &[&Secret]) -> String {
-    let mut out = input.to_string();
-    for secret in secrets {
-        let raw = secret.expose().trim();
-        if !raw.is_empty() && out.contains(raw) {
-            out = out.replace(raw, "[redacted]");
-        }
-    }
-    out
+fn redact_result(mut result: ToolCallResult, secrets: &[&Secret]) -> ToolCallResult {
+    let raw: Vec<&str> = secrets.iter().map(|s| s.expose()).collect();
+    scrub_tool_result(&mut result, &raw);
+    result
 }
 
 /// Accepts an issue reference as either a JSON string (`"12"`, `"#12"`, `"iss_..."`) or integer (`12`).
@@ -493,7 +364,7 @@ impl McpTool {
     }
 }
 
-fn tool_definitions() -> Vec<Value> {
+fn tool_definitions() -> Vec<ToolDef> {
     let vdp_target_props = || {
         json!({
             "home": { "type": "string", "description": "Optional VibeValley home directory override containing debug.json." },
@@ -508,11 +379,17 @@ fn tool_definitions() -> Vec<Value> {
         Value::Object(props)
     };
 
+    let def = |name: &str, description: &str, input_schema: Value| ToolDef {
+        name: name.to_owned(),
+        description: description.to_owned(),
+        input_schema,
+    };
+
     vec![
-        json!({
-            "name": "vv_issue_list",
-            "description": "List issues on the target VibeValley board with optional status, repo, or assigned agent filters.",
-            "inputSchema": {
+        def(
+            "vv_issue_list",
+            "List issues on the target VibeValley board with optional status, repo, or assigned agent filters.",
+            json!({
                 "type": "object",
                 "properties": {
                     "status": { "type": "string", "enum": ["backlog", "todo", "in_progress", "in_review", "done", "canceled"], "description": "Filter by issue status." },
@@ -522,23 +399,23 @@ fn tool_definitions() -> Vec<Value> {
                     "closed": { "type": "boolean", "description": "Include closed (done/canceled) issues." },
                     "limit": { "type": "integer", "minimum": 1, "maximum": 200, "description": "Maximum number of issues to return (default 50)." }
                 }
-            }
-        }),
-        json!({
-            "name": "vv_issue_get",
-            "description": "Read full details of a VibeValley issue, including description, acceptance criteria, questions, findings, and stage.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_issue_get",
+            "Read full details of a VibeValley issue, including description, acceptance criteria, questions, findings, and stage.",
+            json!({
                 "type": "object",
                 "properties": {
                     "id": { "type": "string", "description": "Issue number (e.g. '12' or '#12') or issue id." }
                 },
                 "required": ["id"]
-            }
-        }),
-        json!({
-            "name": "vv_issue_create",
-            "description": "Create a new issue directly on the VibeValley board.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_issue_create",
+            "Create a new issue directly on the VibeValley board.",
+            json!({
                 "type": "object",
                 "properties": {
                     "title": { "type": "string", "description": "Concise issue title." },
@@ -551,12 +428,12 @@ fn tool_definitions() -> Vec<Value> {
                     "attachments": { "type": "array", "items": { "type": "string" }, "description": "Optional uploaded attachment ids." }
                 },
                 "required": ["title"]
-            }
-        }),
-        json!({
-            "name": "vv_issue_update",
-            "description": "Update an existing VibeValley issue's title, description, priority, repo, agent, criteria, attachments, or transition its status.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_issue_update",
+            "Update an existing VibeValley issue's title, description, priority, repo, agent, criteria, attachments, or transition its status.",
+            json!({
                 "type": "object",
                 "properties": {
                     "id": { "type": "string", "description": "Issue number (e.g. '12' or '#12') or issue id." },
@@ -571,12 +448,12 @@ fn tool_definitions() -> Vec<Value> {
                     "comment": { "type": "string", "description": "Optional comment attached to a status transition." }
                 },
                 "required": ["id"]
-            }
-        }),
-        json!({
-            "name": "vv_issue_comment",
-            "description": "Post a comment (optionally with uploaded attachment ids or ```compare markdown blocks) to a VibeValley issue thread.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_issue_comment",
+            "Post a comment (optionally with uploaded attachment ids or ```compare markdown blocks) to a VibeValley issue thread.",
+            json!({
                 "type": "object",
                 "properties": {
                     "issueId": { "type": "string", "description": "Issue number (e.g. '12' or '#12') or issue id (alias: 'id')." },
@@ -584,12 +461,12 @@ fn tool_definitions() -> Vec<Value> {
                     "attachments": { "type": "array", "items": { "type": "string" }, "description": "Optional uploaded attachment ids to attach to the comment." }
                 },
                 "required": ["issueId", "text"]
-            }
-        }),
-        json!({
-            "name": "vv_attachment_upload",
-            "description": "Read a local file (e.g. before/after PNG screenshot) from disk and upload it via attachment.create, returning { id, name, type, size }.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_attachment_upload",
+            "Read a local file (e.g. before/after PNG screenshot) from disk and upload it via attachment.create, returning { id, name, type, size }.",
+            json!({
                 "type": "object",
                 "properties": {
                     "path": { "type": "string", "description": "Local file path to read and upload." },
@@ -597,12 +474,12 @@ fn tool_definitions() -> Vec<Value> {
                     "mime": { "type": "string", "description": "Optional MIME type override (inferred from extension when omitted)." }
                 },
                 "required": ["path"]
-            }
-        }),
-        json!({
-            "name": "vv_vdp_discover",
-            "description": "Discover running local debuggable VibeValley instances (never returns auth tokens).",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_discover",
+            "Discover running local debuggable VibeValley instances (never returns auth tokens).",
+            json!({
                 "type": "object",
                 "properties": {
                     "extraHomes": {
@@ -611,62 +488,62 @@ fn tool_definitions() -> Vec<Value> {
                         "description": "Optional extra VibeValley home directories to scan for debug.json."
                     }
                 }
-            }
-        }),
-        json!({
-            "name": "vv_vdp_targets",
-            "description": "List live inspectable VDP targets (shell, view:*, diorama, webview, server) on a running VibeValley app.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_targets",
+            "List live inspectable VDP targets (shell, view:*, diorama, webview, server) on a running VibeValley app.",
+            json!({
                 "type": "object",
                 "properties": vdp_target_props()
-            }
-        }),
-        json!({
-            "name": "vv_vdp_state",
-            "description": "Get live Shell.getState snapshot (active route, theme, window bounds, panes) from a running VibeValley app.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_state",
+            "Get live Shell.getState snapshot (active route, theme, window bounds, panes) from a running VibeValley app.",
+            json!({
                 "type": "object",
                 "properties": vdp_target_props()
-            }
-        }),
-        json!({
-            "name": "vv_vdp_navigate",
-            "description": "Navigate the live VibeValley desktop app to a route (e.g. /issues, /library, /farm, /chat, /settings).",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_navigate",
+            "Navigate the live VibeValley desktop app to a route (e.g. /issues, /library, /farm, /chat, /settings).",
+            json!({
                 "type": "object",
                 "properties": merge_vdp_props(serde_json::from_value(json!({
                     "route": { "type": "string", "description": "Target route path (e.g. /issues, /library, /farm)." }
                 })).expect("static schema")),
                 "required": ["route"]
-            }
-        }),
-        json!({
-            "name": "vv_vdp_resize",
-            "description": "Resize the live VibeValley desktop window in logical pixels.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_resize",
+            "Resize the live VibeValley desktop window in logical pixels.",
+            json!({
                 "type": "object",
                 "properties": merge_vdp_props(serde_json::from_value(json!({
                     "width": { "type": "number", "exclusiveMinimum": 0, "description": "Target window width in logical pixels." },
                     "height": { "type": "number", "exclusiveMinimum": 0, "description": "Target window height in logical pixels." }
                 })).expect("static schema")),
                 "required": ["width", "height"]
-            }
-        }),
-        json!({
-            "name": "vv_vdp_theme",
-            "description": "Switch or toggle the live VibeValley desktop theme.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_theme",
+            "Switch or toggle the live VibeValley desktop theme.",
+            json!({
                 "type": "object",
                 "properties": merge_vdp_props(serde_json::from_value(json!({
                     "mode": { "type": "string", "enum": ["light", "dark", "toggle"], "description": "Target theme mode." }
                 })).expect("static schema")),
                 "required": ["mode"]
-            }
-        }),
-        json!({
-            "name": "vv_vdp_ui_query",
-            "description": "Query mounted UI nodes and measured layout bounds by testId, text substring, or semantic role.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_ui_query",
+            "Query mounted UI nodes and measured layout bounds by testId, text substring, or semantic role.",
+            json!({
                 "type": "object",
                 "properties": merge_vdp_props(serde_json::from_value(json!({
                     "testId": { "type": "string", "description": "Exact or matching testID." },
@@ -674,24 +551,24 @@ fn tool_definitions() -> Vec<Value> {
                     "role": { "type": "string", "description": "Semantic/accessibility role." },
                     "view": { "type": "string", "description": "Optional view id (e.g. workbench)." }
                 })).expect("static schema"))
-            }
-        }),
-        json!({
-            "name": "vv_vdp_ui_press",
-            "description": "Press a mounted UI element in the live app by its testID without needing pixel coordinates.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_ui_press",
+            "Press a mounted UI element in the live app by its testID without needing pixel coordinates.",
+            json!({
                 "type": "object",
                 "properties": merge_vdp_props(serde_json::from_value(json!({
                     "testId": { "type": "string", "description": "Element testID to press." },
                     "view": { "type": "string", "description": "Optional view id (e.g. workbench)." }
                 })).expect("static schema")),
                 "required": ["testId"]
-            }
-        }),
-        json!({
-            "name": "vv_vdp_screenshot",
-            "description": "Capture a live PNG screenshot via Page.captureScreenshot, optionally save to outPath and/or upload as a VibeValley attachment, and return both an inline image block and a text summary.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_screenshot",
+            "Capture a live PNG screenshot via Page.captureScreenshot, optionally save to outPath and/or upload as a VibeValley attachment, and return both an inline image block and a text summary.",
+            json!({
                 "type": "object",
                 "properties": merge_vdp_props(serde_json::from_value(json!({
                     "target": { "type": "string", "enum": ["shell", "webview"], "description": "Capture target surface (default shell)." },
@@ -701,12 +578,12 @@ fn tool_definitions() -> Vec<Value> {
                     "uploadAttachment": { "type": "boolean", "description": "When true, upload the captured PNG via attachment.create and include attachmentId in the summary." },
                     "attachmentName": { "type": "string", "description": "Optional filename when uploadAttachment is true (default screenshot.png)." }
                 })).expect("static schema"))
-            }
-        }),
-        json!({
-            "name": "vv_vdp_input",
-            "description": "Inject keyboard or mouse input into the live VibeValley window.",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_input",
+            "Inject keyboard or mouse input into the live VibeValley window.",
+            json!({
                 "type": "object",
                 "properties": merge_vdp_props(serde_json::from_value(json!({
                     "kind": { "type": "string", "enum": ["key", "type", "click"], "description": "Input event kind." },
@@ -717,12 +594,12 @@ fn tool_definitions() -> Vec<Value> {
                     "right": { "type": "boolean", "description": "Use right mouse button instead of left when kind is 'click'." }
                 })).expect("static schema")),
                 "required": ["kind"]
-            }
-        }),
-        json!({
-            "name": "vv_vdp_call",
-            "description": "Send a raw VDP JSON-RPC 2.0 command (escape hatch for any VDP method).",
-            "inputSchema": {
+            }),
+        ),
+        def(
+            "vv_vdp_call",
+            "Send a raw VDP JSON-RPC 2.0 command (escape hatch for any VDP method).",
+            json!({
                 "type": "object",
                 "properties": merge_vdp_props(serde_json::from_value(json!({
                     "method": { "type": "string", "description": "VDP JSON-RPC method name (e.g. Page.getMetrics, UI.getTree, Server.slice)." },
@@ -730,8 +607,8 @@ fn tool_definitions() -> Vec<Value> {
                     "sessionId": { "type": "string", "description": "Optional attached VDP target session id." }
                 })).expect("static schema")),
                 "required": ["method"]
-            }
-        }),
+            }),
+        ),
     ]
 }
 
@@ -751,9 +628,10 @@ fn format_failure(failure: &Failure) -> String {
 }
 
 struct McpServer {
-    client: Client,
+    client: tokio::sync::RwLock<Client>,
     channel: Option<ReleaseChannel>,
     defaults: DebugTargetArgs,
+    skills: SkillCatalog,
 }
 
 impl McpServer {
@@ -762,25 +640,38 @@ impl McpServer {
         let explicit_home = cmd.home.or_else(|| channel.map(home::home_for));
         let effective_home = explicit_home.clone().unwrap_or_else(|| base.home.clone());
         let client = build_client_for_home(base, &effective_home, channel);
+        let skills = SkillCatalog::from_directory("local", &effective_home.join("skills")).unwrap_or_default();
         let defaults = DebugTargetArgs {
             home: explicit_home,
             port: cmd.vdp_port,
             url: non_empty_trimmed(cmd.vdp_url),
         };
-        Self { client, channel, defaults }
+        Self {
+            client: tokio::sync::RwLock::new(client),
+            channel,
+            defaults,
+            skills,
+        }
     }
 
     /// Re-checks `server.json` on the active home when no explicit `--server`/`VIBEVALLEY_SERVER`/`auth.json`
     /// is pinned, so long-lived MCP processes seamlessly follow restarted local VibeValley servers.
-    fn refresh_issue_client(&mut self) {
-        if matches!(self.client.server_source, ServerSource::Flag | ServerSource::Env | ServerSource::AuthFile) {
-            return;
-        }
-        if let Some(announced) = home::announced(&self.client.home) {
-            let normalized = auth::normalize_server_url_lossy(&announced);
-            if normalized != self.client.server {
-                self.client = build_client_for_home(&self.client, &self.client.home, self.channel);
+    async fn refresh_issue_client(&self) {
+        let needs_refresh = {
+            let client = self.client.read().await;
+            if matches!(client.server_source, ServerSource::Flag | ServerSource::Env | ServerSource::AuthFile) {
+                false
+            } else if let Some(announced) = home::announced(&client.home) {
+                let normalized = auth::normalize_server_url_lossy(&announced);
+                normalized != client.server
+            } else {
+                false
             }
+        };
+        if needs_refresh {
+            let mut client = self.client.write().await;
+            let rebuilt = build_client_for_home(&client, &client.home, self.channel);
+            *client = rebuilt;
         }
     }
 
@@ -803,15 +694,15 @@ impl McpServer {
         }
     }
 
-    fn known_secrets<'a>(&'a self, endpoint: Option<&'a ResolvedEndpoint>) -> Vec<&'a Secret> {
+    fn known_secrets<'a>(client: &'a Client, endpoint: Option<&'a ResolvedEndpoint>) -> Vec<&'a Secret> {
         let mut out = Vec::new();
-        if let Some(tok) = self.client.token() {
+        if let Some(tok) = client.token() {
             out.push(tok);
         }
-        if let Some(tok) = self.client.flag_token() {
+        if let Some(tok) = client.flag_token() {
             out.push(tok);
         }
-        if let Some(tok) = self.client.env_token() {
+        if let Some(tok) = client.env_token() {
             out.push(tok);
         }
         if let Some(ep) = endpoint
@@ -822,83 +713,9 @@ impl McpServer {
         out
     }
 
-    async fn handle_line(&mut self, line: &str) -> Option<JsonRpcResponse> {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-
-        let req: JsonRpcRequest = match serde_json::from_str(trimmed) {
-            Ok(req) => req,
-            Err(err) => {
-                return Some(JsonRpcResponse::err(Value::Null, JSONRPC_PARSE_ERROR, format!("parse error: {err}")));
-            }
-        };
-
-        let is_notification = req.id.is_none();
-        let id = req.id.unwrap_or(Value::Null);
-
-        if let Some(version) = req.jsonrpc.as_deref()
-            && version != "2.0"
-        {
-            return (!is_notification).then(|| JsonRpcResponse::err(id, JSONRPC_INVALID_REQUEST, format!("unsupported jsonrpc version: {version}")));
-        }
-
-        let Some(method) = req.method.as_deref().map(str::trim).filter(|m| !m.is_empty()) else {
-            return (!is_notification).then(|| JsonRpcResponse::err(id, JSONRPC_INVALID_REQUEST, "missing JSON-RPC method"));
-        };
-
-        // Notifications must never produce a JSON-RPC response on stdout.
-        if is_notification {
-            if !method.starts_with("notifications/") {
-                eprintln!("vibevalley mcp: ignoring notification for method {method}");
-            }
-            return None;
-        }
-
-        let response = match method {
-            "initialize" => {
-                let init: InitializeParams = serde_json::from_value(req.params).unwrap_or_default();
-                let protocol_version = init
-                    .protocol_version
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|v| !v.is_empty())
-                    .unwrap_or(DEFAULT_PROTOCOL_VERSION);
-                JsonRpcResponse::ok(
-                    id,
-                    json!({
-                        "protocolVersion": protocol_version,
-                        "capabilities": { "tools": {} },
-                        "serverInfo": {
-                            "name": SERVER_NAME,
-                            "version": SERVER_VERSION,
-                        }
-                    }),
-                )
-            }
-            "notifications/initialized" | "ping" => JsonRpcResponse::ok(id, json!({})),
-            "tools/list" => JsonRpcResponse::ok(id, json!({ "tools": tool_definitions() })),
-            "tools/call" => match serde_json::from_value::<ToolCallParams>(req.params) {
-                Ok(call) if !call.name.trim().is_empty() => {
-                    let result = self.call_tool(call.name.trim(), call.arguments).await;
-                    match serde_json::to_value(result) {
-                        Ok(val) => JsonRpcResponse::ok(id, val),
-                        Err(err) => JsonRpcResponse::err(id, -32603, format!("failed to encode tool response: {err}")),
-                    }
-                }
-                Ok(_) => JsonRpcResponse::err(id, JSONRPC_INVALID_PARAMS, "tools/call requires a non-empty tool name"),
-                Err(err) => JsonRpcResponse::err(id, JSONRPC_INVALID_PARAMS, format!("invalid tools/call params: {err}")),
-            },
-            other => JsonRpcResponse::err(id, JSONRPC_METHOD_NOT_FOUND, format!("method not found: {other}")),
-        };
-
-        Some(response)
-    }
-
-    async fn call_tool(&mut self, name: &str, raw_args: Value) -> McpToolResult {
+    async fn call_tool_inner(&self, name: &str, raw_args: Value) -> ToolCallResult {
         let Some(tool) = McpTool::from_name(name) else {
-            return McpToolResult::error(format!("unknown tool: {name}"));
+            return ToolCallResult::error(format!("unknown tool: {name}"));
         };
         let args = if raw_args.is_null() { json!({}) } else { raw_args };
 
@@ -909,7 +726,7 @@ impl McpServer {
             McpTool::IssueUpdate => self.tool_issue_update(args).await,
             McpTool::IssueComment => self.tool_issue_comment(args).await,
             McpTool::AttachmentUpload => self.tool_attachment_upload(args).await,
-            McpTool::VdpDiscover => self.tool_vdp_discover(args),
+            McpTool::VdpDiscover => self.tool_vdp_discover(args).await,
             McpTool::VdpTargets => self.tool_vdp_targets(args).await,
             McpTool::VdpState => self.tool_vdp_state(args).await,
             McpTool::VdpNavigate => self.tool_vdp_navigate(args).await,
@@ -923,16 +740,16 @@ impl McpServer {
         }
     }
 
-    fn decode_args<T: serde::de::DeserializeOwned>(tool_name: &str, args: Value) -> Result<T, McpToolResult> {
-        serde_json::from_value(args).map_err(|err| McpToolResult::error(format!("invalid arguments for {tool_name}: {err}")))
+    fn decode_args<T: serde::de::DeserializeOwned>(tool_name: &str, args: Value) -> Result<T, ToolCallResult> {
+        serde_json::from_value(args).map_err(|err| ToolCallResult::error(format!("invalid arguments for {tool_name}: {err}")))
     }
 
-    async fn tool_issue_list(&mut self, raw_args: Value) -> McpToolResult {
+    async fn tool_issue_list(&self, raw_args: Value) -> ToolCallResult {
         let args: IssueListArgs = match Self::decode_args("vv_issue_list", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
-        self.refresh_issue_client();
+        self.refresh_issue_client().await;
         let limit = args.limit.unwrap_or(50).clamp(1, 200);
         let agent_filter = non_empty_trimmed(args.agent);
         let filter = IssueFilter {
@@ -945,49 +762,51 @@ impl McpServer {
             wants_user: None,
         };
 
-        let result = match self.client.ask::<ops::IssueList>(&filter).await {
+        let client = self.client.read().await;
+        let result = match client.ask::<ops::IssueList>(&filter).await {
             Ok(mut issues) => {
                 if let Some(agent) = agent_filter.as_deref() {
                     issues.retain(|issue| matches_agent(issue, agent));
                 }
                 issues.truncate(limit as usize);
-                McpToolResult::json(&json!({
+                ToolCallResult::json(&json!({
                     "count": issues.len(),
                     "issues": issues,
                 }))
             }
-            Err(failure) => McpToolResult::error(format_failure(&failure)),
+            Err(failure) => ToolCallResult::error(format_failure(&failure)),
         };
-        result.redact(&self.known_secrets(None))
+        redact_result(result, &Self::known_secrets(&client, None))
     }
 
-    async fn tool_issue_get(&mut self, raw_args: Value) -> McpToolResult {
+    async fn tool_issue_get(&self, raw_args: Value) -> ToolCallResult {
         let args: IssueGetArgs = match Self::decode_args("vv_issue_get", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
         let id = issue_ref(args.id.trim());
         if id.is_empty() {
-            return McpToolResult::error("vv_issue_get requires a non-empty id");
+            return ToolCallResult::error("vv_issue_get requires a non-empty id");
         }
-        self.refresh_issue_client();
-        let result = match self.client.ask::<ops::IssueGet>(&IssueGetInput { id }).await {
-            Ok(issue) => McpToolResult::json(&issue),
-            Err(failure) => McpToolResult::error(format_failure(&failure)),
+        self.refresh_issue_client().await;
+        let client = self.client.read().await;
+        let result = match client.ask::<ops::IssueGet>(&IssueGetInput { id }).await {
+            Ok(issue) => ToolCallResult::json(&issue),
+            Err(failure) => ToolCallResult::error(format_failure(&failure)),
         };
-        result.redact(&self.known_secrets(None))
+        redact_result(result, &Self::known_secrets(&client, None))
     }
 
-    async fn tool_issue_create(&mut self, raw_args: Value) -> McpToolResult {
+    async fn tool_issue_create(&self, raw_args: Value) -> ToolCallResult {
         let args: IssueCreateArgs = match Self::decode_args("vv_issue_create", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
         let title = args.title.trim().to_string();
         if title.is_empty() {
-            return McpToolResult::error("vv_issue_create requires a non-empty title");
+            return ToolCallResult::error("vv_issue_create requires a non-empty title");
         }
-        self.refresh_issue_client();
+        self.refresh_issue_client().await;
         let request = IssueRequest {
             title,
             description: non_empty_trimmed(args.description),
@@ -999,9 +818,10 @@ impl McpServer {
             ..Default::default()
         };
 
-        let created: AppliedIssue = match self.client.ask::<ops::IssueCreate>(&request).await {
+        let client = self.client.read().await;
+        let created: AppliedIssue = match client.ask::<ops::IssueCreate>(&request).await {
             Ok(issue) => issue,
-            Err(failure) => return McpToolResult::error(format_failure(&failure)).redact(&self.known_secrets(None)),
+            Err(failure) => return redact_result(ToolCallResult::error(format_failure(&failure)), &Self::known_secrets(&client, None)),
         };
 
         let final_issue = if let Some(target_status) = args.status
@@ -1016,34 +836,36 @@ impl McpServer {
                 edit: None,
                 request_key: None,
             };
-            match self.client.ask::<ops::IssueStatusUpdate>(&status_req).await {
+            match client.ask::<ops::IssueStatusUpdate>(&status_req).await {
                 Ok(updated) => updated,
                 Err(failure) => {
-                    return McpToolResult::error(format!(
-                        "created issue #{} ({}), but failed to set status to {}: {}",
-                        created.number,
-                        created.id,
-                        target_status.as_str(),
-                        format_failure(&failure)
-                    ))
-                    .redact(&self.known_secrets(None));
+                    return redact_result(
+                        ToolCallResult::error(format!(
+                            "created issue #{} ({}), but failed to set status to {}: {}",
+                            created.number,
+                            created.id,
+                            target_status.as_str(),
+                            format_failure(&failure)
+                        )),
+                        &Self::known_secrets(&client, None),
+                    );
                 }
             }
         } else {
             created
         };
 
-        McpToolResult::json(&final_issue).redact(&self.known_secrets(None))
+        redact_result(ToolCallResult::json(&final_issue), &Self::known_secrets(&client, None))
     }
 
-    async fn tool_issue_update(&mut self, raw_args: Value) -> McpToolResult {
+    async fn tool_issue_update(&self, raw_args: Value) -> ToolCallResult {
         let args: IssueUpdateArgs = match Self::decode_args("vv_issue_update", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
         let id = issue_ref(args.id.trim());
         if id.is_empty() {
-            return McpToolResult::error("vv_issue_update requires a non-empty id");
+            return ToolCallResult::error("vv_issue_update requires a non-empty id");
         }
         let title = non_empty_trimmed(args.title);
         let description = args.description;
@@ -1057,7 +879,8 @@ impl McpServer {
         let has_field_edits =
             title.is_some() || description.is_some() || repo.is_some() || agent.is_some() || priority.is_some() || criteria.is_some() || attachments.is_some();
 
-        self.refresh_issue_client();
+        self.refresh_issue_client().await;
+        let client = self.client.read().await;
         let result = if let Some(target_status) = args.status {
             let edit = has_field_edits.then(|| IssueUpdate {
                 title,
@@ -1078,13 +901,13 @@ impl McpServer {
                 edit,
                 request_key: None,
             };
-            match self.client.ask::<ops::IssueStatusUpdate>(&req).await {
-                Ok(updated) => McpToolResult::json(&updated),
-                Err(failure) => McpToolResult::error(format_failure(&failure)),
+            match client.ask::<ops::IssueStatusUpdate>(&req).await {
+                Ok(updated) => ToolCallResult::json(&updated),
+                Err(failure) => ToolCallResult::error(format_failure(&failure)),
             }
         } else {
             if !has_field_edits {
-                return McpToolResult::error(
+                return ToolCallResult::error(
                     "vv_issue_update requires at least one field to update (title, description, status, priority, repo, agent, criteria, or attachments)",
                 );
             }
@@ -1099,16 +922,16 @@ impl McpServer {
                 attachments,
                 ..Default::default()
             };
-            match self.client.ask::<ops::IssueUpdate>(&req).await {
-                Ok(updated) => McpToolResult::json(&updated),
-                Err(failure) => McpToolResult::error(format_failure(&failure)),
+            match client.ask::<ops::IssueUpdate>(&req).await {
+                Ok(updated) => ToolCallResult::json(&updated),
+                Err(failure) => ToolCallResult::error(format_failure(&failure)),
             }
         };
 
-        result.redact(&self.known_secrets(None))
+        redact_result(result, &Self::known_secrets(&client, None))
     }
 
-    async fn tool_issue_comment(&mut self, raw_args: Value) -> McpToolResult {
+    async fn tool_issue_comment(&self, raw_args: Value) -> ToolCallResult {
         let args: IssueCommentArgs = match Self::decode_args("vv_issue_comment", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
@@ -1116,31 +939,28 @@ impl McpServer {
         let id = issue_ref(args.issue_id.trim());
         let text = args.text.trim().to_string();
         if id.is_empty() || text.is_empty() {
-            return McpToolResult::error("vv_issue_comment requires non-empty issueId and text");
+            return ToolCallResult::error("vv_issue_comment requires non-empty issueId and text");
         }
         let attachments: Vec<String> = args.attachments.into_iter().map(|a| a.trim().to_string()).filter(|a| !a.is_empty()).collect();
 
-        self.refresh_issue_client();
+        self.refresh_issue_client().await;
+        let client = self.client.read().await;
         let result = if attachments.is_empty() {
             let req = IssueCommentCreateInput {
                 id: id.clone(),
                 text,
                 ..Default::default()
             };
-            match self.client.ask::<ops::IssueCommentCreate>(&req).await {
-                Ok(applied) => McpToolResult::json(&json!({
+            match client.ask::<ops::IssueCommentCreate>(&req).await {
+                Ok(applied) => ToolCallResult::json(&json!({
                     "ok": true,
                     "issueId": id,
                     "seq": applied.seq,
                 })),
-                Err(failure) => McpToolResult::error(format_failure(&failure)),
+                Err(failure) => ToolCallResult::error(format_failure(&failure)),
             }
         } else {
-            match self
-                .client
-                .ask::<ops::IssueConversationGet>(&IssueConversationGetInput { id: id.clone() })
-                .await
-            {
+            match client.ask::<ops::IssueConversationGet>(&IssueConversationGetInput { id: id.clone() }).await {
                 Ok(Some(channel_id)) => {
                     let say = SayRequest {
                         id: channel_id.clone(),
@@ -1148,14 +968,14 @@ impl McpServer {
                         attachments: Some(attachments.clone()),
                         ..Default::default()
                     };
-                    match self.client.ask::<ops::ChannelMessageSend>(&say).await {
-                        Ok(()) => McpToolResult::json(&json!({
+                    match client.ask::<ops::ChannelMessageSend>(&say).await {
+                        Ok(()) => ToolCallResult::json(&json!({
                             "ok": true,
                             "issueId": id,
                             "channelId": channel_id,
                             "attachments": attachments,
                         })),
-                        Err(failure) => McpToolResult::error(format_failure(&failure)),
+                        Err(failure) => ToolCallResult::error(format_failure(&failure)),
                     }
                 }
                 Ok(None) => {
@@ -1166,17 +986,16 @@ impl McpServer {
                         text,
                         ..Default::default()
                     };
-                    match self.client.ask::<ops::IssueCommentCreate>(&req).await {
+                    match client.ask::<ops::IssueCommentCreate>(&req).await {
                         Ok(applied) => {
-                            if let Ok(issue) = self.client.ask::<ops::IssueGet>(&IssueGetInput { id: id.clone() }).await {
+                            if let Ok(issue) = client.ask::<ops::IssueGet>(&IssueGetInput { id: id.clone() }).await {
                                 let mut merged: Vec<String> = issue.attachments.into_iter().map(|a| a.id).collect();
                                 for att_id in &attachments {
                                     if !merged.contains(att_id) {
                                         merged.push(att_id.clone());
                                     }
                                 }
-                                let _ = self
-                                    .client
+                                let _ = client
                                     .ask::<ops::IssueUpdate>(&IssueUpdateInput {
                                         id: issue.id,
                                         attachments: Some(merged),
@@ -1184,35 +1003,35 @@ impl McpServer {
                                     })
                                     .await;
                             }
-                            McpToolResult::json(&json!({
+                            ToolCallResult::json(&json!({
                                 "ok": true,
                                 "issueId": id,
                                 "seq": applied.seq,
                                 "attachments": attachments,
                             }))
                         }
-                        Err(failure) => McpToolResult::error(format_failure(&failure)),
+                        Err(failure) => ToolCallResult::error(format_failure(&failure)),
                     }
                 }
-                Err(failure) => McpToolResult::error(format_failure(&failure)),
+                Err(failure) => ToolCallResult::error(format_failure(&failure)),
             }
         };
-        result.redact(&self.known_secrets(None))
+        redact_result(result, &Self::known_secrets(&client, None))
     }
 
-    async fn tool_attachment_upload(&mut self, raw_args: Value) -> McpToolResult {
+    async fn tool_attachment_upload(&self, raw_args: Value) -> ToolCallResult {
         let args: AttachmentUploadArgs = match Self::decode_args("vv_attachment_upload", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
         let path_str = args.path.trim();
         if path_str.is_empty() {
-            return McpToolResult::error("vv_attachment_upload requires a non-empty path");
+            return ToolCallResult::error("vv_attachment_upload requires a non-empty path");
         }
         let file = PathBuf::from(path_str);
         let bytes = match std::fs::read(&file) {
             Ok(b) => b,
-            Err(err) => return McpToolResult::error(format!("File: failed to read {}: {err}", file.display())),
+            Err(err) => return ToolCallResult::error(format!("File: failed to read {}: {err}", file.display())),
         };
         let name = non_empty_trimmed(args.name)
             .or_else(|| file.file_name().and_then(|n| n.to_str()).map(ToString::to_string))
@@ -1223,19 +1042,21 @@ impl McpServer {
             r#type: mime,
             data: base64::engine::general_purpose::STANDARD.encode(&bytes),
         };
-        self.refresh_issue_client();
-        let result = match self.client.ask::<ops::AttachmentCreate>(&request).await {
-            Ok(att) => McpToolResult::json(&att),
-            Err(failure) => McpToolResult::error(format_failure(&failure)),
+        self.refresh_issue_client().await;
+        let client = self.client.read().await;
+        let result = match client.ask::<ops::AttachmentCreate>(&request).await {
+            Ok(att) => ToolCallResult::json(&att),
+            Err(failure) => ToolCallResult::error(format_failure(&failure)),
         };
-        result.redact(&self.known_secrets(None))
+        redact_result(result, &Self::known_secrets(&client, None))
     }
 
-    fn tool_vdp_discover(&self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_discover(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpDiscoverArgs = match Self::decode_args("vv_vdp_discover", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
+        let client = self.client.read().await;
         let mut extra: Vec<PathBuf> = args
             .extra_homes
             .into_iter()
@@ -1247,37 +1068,40 @@ impl McpServer {
         if let Some(default_home) = &self.defaults.home {
             extra.push(default_home.clone());
         }
-        extra.push(self.client.home.clone());
+        extra.push(client.home.clone());
 
         let discovered = home::discover_local_debug_endpoints(&extra);
         let tokens: Vec<Secret> = discovered.iter().map(|ep| Secret::new(ep.token.clone())).collect();
         // `VdpEndpointInfo::version_info()` structurally omits `token`.
         let instances: Vec<VdpVersionInfo> = discovered.into_iter().map(|ep| ep.version_info()).collect();
-        let mut secrets = self.known_secrets(None);
+        let mut secrets = Self::known_secrets(&client, None);
         for tok in &tokens {
             secrets.push(tok);
         }
-        McpToolResult::json(&json!({
-            "count": instances.len(),
-            "instances": instances,
-        }))
-        .redact(&secrets)
+        redact_result(
+            ToolCallResult::json(&json!({
+                "count": instances.len(),
+                "instances": instances,
+            })),
+            &secrets,
+        )
     }
 
-    async fn with_vdp_ws<F, Fut>(&self, override_args: &VdpOverrideArgs, f: F) -> McpToolResult
+    async fn with_vdp_ws<F, Fut>(&self, override_args: &VdpOverrideArgs, f: F) -> ToolCallResult
     where
         F: FnOnce(VdpWsClient) -> Fut,
-        Fut: std::future::Future<Output = Result<(McpToolResult, VdpWsClient), (Failure, VdpWsClient)>>,
+        Fut: std::future::Future<Output = Result<(ToolCallResult, VdpWsClient), (Failure, VdpWsClient)>>,
     {
         let target = self.resolve_vdp_target(override_args);
-        let endpoint = match debug::resolve_endpoint(&self.client, &target) {
+        let client = self.client.read().await;
+        let endpoint = match debug::resolve_endpoint(&client, &target) {
             Ok(ep) => ep,
-            Err(failure) => return McpToolResult::error(format_failure(&failure)).redact(&self.known_secrets(None)),
+            Err(failure) => return redact_result(ToolCallResult::error(format_failure(&failure)), &Self::known_secrets(&client, None)),
         };
-        let secrets = self.known_secrets(Some(&endpoint));
+        let secrets = Self::known_secrets(&client, Some(&endpoint));
         let ws = match VdpWsClient::connect(&endpoint).await {
             Ok(ws) => ws,
-            Err(failure) => return McpToolResult::error(format_failure(&failure)).redact(&secrets),
+            Err(failure) => return redact_result(ToolCallResult::error(format_failure(&failure)), &secrets),
         };
         let result = match f(ws).await {
             Ok((res, ws)) => {
@@ -1286,66 +1110,66 @@ impl McpServer {
             }
             Err((failure, ws)) => {
                 ws.close().await;
-                McpToolResult::error(format_failure(&failure))
+                ToolCallResult::error(format_failure(&failure))
             }
         };
-        result.redact(&secrets)
+        redact_result(result, &secrets)
     }
 
-    async fn tool_vdp_targets(&self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_targets(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpOverrideArgs = match Self::decode_args("vv_vdp_targets", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
         self.with_vdp_ws(&args, |mut ws| async move {
             match ws.call_typed::<VdpTargetListResult>(&VdpCommand::TargetList, DEFAULT_RPC_TIMEOUT).await {
-                Ok(res) => Ok((McpToolResult::json(&res), ws)),
+                Ok(res) => Ok((ToolCallResult::json(&res), ws)),
                 Err(err) => Err((err, ws)),
             }
         })
         .await
     }
 
-    async fn tool_vdp_state(&self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_state(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpOverrideArgs = match Self::decode_args("vv_vdp_state", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
         self.with_vdp_ws(&args, |mut ws| async move {
             match ws.call_command(&VdpCommand::ShellGetState, DEFAULT_RPC_TIMEOUT).await {
-                Ok(val) => Ok((McpToolResult::json(&val), ws)),
+                Ok(val) => Ok((ToolCallResult::json(&val), ws)),
                 Err(err) => Err((err, ws)),
             }
         })
         .await
     }
 
-    async fn tool_vdp_navigate(&self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_navigate(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpNavigateArgs = match Self::decode_args("vv_vdp_navigate", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
         let route = args.route.trim().to_string();
         if route.is_empty() {
-            return McpToolResult::error("vv_vdp_navigate requires a non-empty route");
+            return ToolCallResult::error("vv_vdp_navigate requires a non-empty route");
         }
         self.with_vdp_ws(&args.target, |mut ws| async move {
             let cmd = VdpCommand::ShellNavigate(VdpShellNavigateParams { route });
             match ws.call_command(&cmd, DEFAULT_RPC_TIMEOUT).await {
-                Ok(val) => Ok((McpToolResult::json(&val), ws)),
+                Ok(val) => Ok((ToolCallResult::json(&val), ws)),
                 Err(err) => Err((err, ws)),
             }
         })
         .await
     }
 
-    async fn tool_vdp_resize(&self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_resize(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpResizeArgs = match Self::decode_args("vv_vdp_resize", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
         if !args.width.is_finite() || !args.height.is_finite() || args.width <= 0.0 || args.height <= 0.0 {
-            return McpToolResult::error("vv_vdp_resize requires positive finite width and height");
+            return ToolCallResult::error("vv_vdp_resize requires positive finite width and height");
         }
         self.with_vdp_ws(&args.target, |mut ws| async move {
             let cmd = VdpCommand::ShellResize(VdpShellResizeParams {
@@ -1353,14 +1177,14 @@ impl McpServer {
                 height: args.height,
             });
             match ws.call_command(&cmd, DEFAULT_RPC_TIMEOUT).await {
-                Ok(val) => Ok((McpToolResult::json(&val), ws)),
+                Ok(val) => Ok((ToolCallResult::json(&val), ws)),
                 Err(err) => Err((err, ws)),
             }
         })
         .await
     }
 
-    async fn tool_vdp_theme(&self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_theme(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpThemeArgs = match Self::decode_args("vv_vdp_theme", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
@@ -1373,14 +1197,14 @@ impl McpServer {
         self.with_vdp_ws(&args.target, |mut ws| async move {
             let cmd = VdpCommand::ShellSetTheme(VdpShellSetThemeParams { dark });
             match ws.call_command(&cmd, DEFAULT_RPC_TIMEOUT).await {
-                Ok(val) => Ok((McpToolResult::json(&val), ws)),
+                Ok(val) => Ok((ToolCallResult::json(&val), ws)),
                 Err(err) => Err((err, ws)),
             }
         })
         .await
     }
 
-    async fn tool_vdp_ui_query(&self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_ui_query(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpUiQueryArgs = match Self::decode_args("vv_vdp_ui_query", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
@@ -1393,21 +1217,21 @@ impl McpServer {
                 view: non_empty_trimmed(args.view),
             });
             match ws.call_typed::<VdpUiQueryResult>(&cmd, DEFAULT_RPC_TIMEOUT).await {
-                Ok(res) => Ok((McpToolResult::json(&res), ws)),
+                Ok(res) => Ok((ToolCallResult::json(&res), ws)),
                 Err(err) => Err((err, ws)),
             }
         })
         .await
     }
 
-    async fn tool_vdp_ui_press(&self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_ui_press(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpUiPressArgs = match Self::decode_args("vv_vdp_ui_press", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
         let test_id = args.test_id.trim().to_string();
         if test_id.is_empty() {
-            return McpToolResult::error("vv_vdp_ui_press requires a non-empty testId");
+            return ToolCallResult::error("vv_vdp_ui_press requires a non-empty testId");
         }
         self.with_vdp_ws(&args.target, |mut ws| async move {
             let cmd = VdpCommand::UiPress(VdpUiPressParams {
@@ -1415,14 +1239,14 @@ impl McpServer {
                 view: non_empty_trimmed(args.view),
             });
             match ws.call_typed::<VdpUiPressResult>(&cmd, DEFAULT_RPC_TIMEOUT).await {
-                Ok(res) => Ok((McpToolResult::json(&res), ws)),
+                Ok(res) => Ok((ToolCallResult::json(&res), ws)),
                 Err(err) => Err((err, ws)),
             }
         })
         .await
     }
 
-    async fn tool_vdp_screenshot(&mut self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_screenshot(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpScreenshotArgs = match Self::decode_args("vv_vdp_screenshot", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
@@ -1434,18 +1258,19 @@ impl McpServer {
             .unwrap_or_else(|| "screenshot.png".into());
 
         if upload_attachment {
-            self.refresh_issue_client();
+            self.refresh_issue_client().await;
         }
 
         let target = self.resolve_vdp_target(&args.vdp);
-        let endpoint = match debug::resolve_endpoint(&self.client, &target) {
+        let client = self.client.read().await;
+        let endpoint = match debug::resolve_endpoint(&client, &target) {
             Ok(ep) => ep,
-            Err(failure) => return McpToolResult::error(format_failure(&failure)).redact(&self.known_secrets(None)),
+            Err(failure) => return redact_result(ToolCallResult::error(format_failure(&failure)), &Self::known_secrets(&client, None)),
         };
-        let secrets = self.known_secrets(Some(&endpoint));
+        let secrets = Self::known_secrets(&client, Some(&endpoint));
         let mut ws = match VdpWsClient::connect(&endpoint).await {
             Ok(ws) => ws,
-            Err(failure) => return McpToolResult::error(format_failure(&failure)).redact(&secrets),
+            Err(failure) => return redact_result(ToolCallResult::error(format_failure(&failure)), &secrets),
         };
 
         let cmd = VdpCommand::PageCaptureScreenshot(VdpCaptureScreenshotParams {
@@ -1458,14 +1283,14 @@ impl McpServer {
 
         let shot = match shot_res {
             Ok(s) => s,
-            Err(failure) => return McpToolResult::error(format_failure(&failure)).redact(&secrets),
+            Err(failure) => return redact_result(ToolCallResult::error(format_failure(&failure)), &secrets),
         };
 
         let raw_b64 = shot.data.trim().to_string();
         let bytes = match base64::engine::general_purpose::STANDARD.decode(&raw_b64) {
             Ok(b) => b,
             Err(err) => {
-                return McpToolResult::error(format!("Decode: invalid screenshot base64 payload: {err}")).redact(&secrets);
+                return redact_result(ToolCallResult::error(format!("Decode: invalid screenshot base64 payload: {err}")), &secrets);
             }
         };
 
@@ -1473,10 +1298,13 @@ impl McpServer {
             if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty())
                 && let Err(err) = std::fs::create_dir_all(parent)
             {
-                return McpToolResult::error(format!("File: failed to create directory {}: {err}", parent.display())).redact(&secrets);
+                return redact_result(
+                    ToolCallResult::error(format!("File: failed to create directory {}: {err}", parent.display())),
+                    &secrets,
+                );
             }
             if let Err(err) = std::fs::write(path, &bytes) {
-                return McpToolResult::error(format!("File: failed to write {}: {err}", path.display())).redact(&secrets);
+                return redact_result(ToolCallResult::error(format!("File: failed to write {}: {err}", path.display())), &secrets);
             }
         }
 
@@ -1488,9 +1316,9 @@ impl McpServer {
                 r#type: mime.clone(),
                 data: raw_b64.clone(),
             };
-            match self.client.ask::<ops::AttachmentCreate>(&req).await {
+            match client.ask::<ops::AttachmentCreate>(&req).await {
                 Ok(att) => Some(att),
-                Err(failure) => return McpToolResult::error(format_failure(&failure)).redact(&secrets),
+                Err(failure) => return redact_result(ToolCallResult::error(format_failure(&failure)), &secrets),
             }
         } else {
             None
@@ -1504,20 +1332,22 @@ impl McpServer {
             summary.push_str(&format!(" attachmentId={}", att.id));
         }
 
-        McpToolResult {
-            content: vec![
-                McpContent::Image {
-                    data: raw_b64,
-                    mime_type: mime,
-                },
-                McpContent::Text { text: summary },
-            ],
-            is_error: false,
-        }
-        .redact(&secrets)
+        redact_result(
+            ToolCallResult {
+                content: vec![
+                    ContentBlock::Image {
+                        data: raw_b64,
+                        mime_type: mime,
+                    },
+                    ContentBlock::Text { text: summary },
+                ],
+                is_error: false,
+            },
+            &secrets,
+        )
     }
 
-    async fn tool_vdp_input(&self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_input(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpInputArgs = match Self::decode_args("vv_vdp_input", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
@@ -1525,22 +1355,22 @@ impl McpServer {
         let cmd = match args.kind {
             InputKind::Key => {
                 let Some(keys) = non_empty_trimmed(args.keys) else {
-                    return McpToolResult::error("vv_vdp_input with kind='key' requires non-empty 'keys'");
+                    return ToolCallResult::error("vv_vdp_input with kind='key' requires non-empty 'keys'");
                 };
                 VdpCommand::InputDispatchKey(VdpDispatchKeyParams { keys })
             }
             InputKind::Type => {
                 let Some(text) = args.text else {
-                    return McpToolResult::error("vv_vdp_input with kind='type' requires 'text'");
+                    return ToolCallResult::error("vv_vdp_input with kind='type' requires 'text'");
                 };
                 VdpCommand::InputTypeText(VdpTypeTextParams { text })
             }
             InputKind::Click => {
                 let (Some(x), Some(y)) = (args.x, args.y) else {
-                    return McpToolResult::error("vv_vdp_input with kind='click' requires numeric 'x' and 'y'");
+                    return ToolCallResult::error("vv_vdp_input with kind='click' requires numeric 'x' and 'y'");
                 };
                 if !x.is_finite() || !y.is_finite() {
-                    return McpToolResult::error("vv_vdp_input click coordinates must be finite numbers");
+                    return ToolCallResult::error("vv_vdp_input click coordinates must be finite numbers");
                 }
                 VdpCommand::InputDispatchMouse(VdpDispatchMouseParams {
                     kind: VdpMouseEventKind::Click,
@@ -1555,31 +1385,57 @@ impl McpServer {
 
         self.with_vdp_ws(&args.target, |mut ws| async move {
             match ws.call_typed::<VdpInputResult>(&cmd, DEFAULT_RPC_TIMEOUT).await {
-                Ok(res) => Ok((McpToolResult::json(&res), ws)),
+                Ok(res) => Ok((ToolCallResult::json(&res), ws)),
                 Err(err) => Err((err, ws)),
             }
         })
         .await
     }
 
-    async fn tool_vdp_call(&self, raw_args: Value) -> McpToolResult {
+    async fn tool_vdp_call(&self, raw_args: Value) -> ToolCallResult {
         let args: VdpCallArgs = match Self::decode_args("vv_vdp_call", raw_args) {
             Ok(a) => a,
             Err(res) => return res,
         };
         let method = args.method.trim().to_string();
         if method.is_empty() {
-            return McpToolResult::error("vv_vdp_call requires a non-empty method");
+            return ToolCallResult::error("vv_vdp_call requires a non-empty method");
         }
         let params = args.params.filter(|v| !v.is_null()).unwrap_or_else(|| json!({}));
         let session_id = non_empty_trimmed(args.session_id);
         self.with_vdp_ws(&args.target, |mut ws| async move {
             match ws.call_raw(&method, params, session_id, DEFAULT_RPC_TIMEOUT).await {
-                Ok(val) => Ok((McpToolResult::json(&val), ws)),
+                Ok(val) => Ok((ToolCallResult::json(&val), ws)),
                 Err(err) => Err((err, ws)),
             }
         })
         .await
+    }
+}
+
+impl McpHandler for McpServer {
+    fn server_info(&self) -> ServerInfo {
+        ServerInfo::new(SERVER_NAME, SERVER_VERSION)
+    }
+
+    fn capabilities(&self) -> ServerCapabilities {
+        let mut caps = ServerCapabilities::default().with_tools();
+        if !self.skills.is_empty() {
+            caps = caps.with_resources().with_skills_extension(true);
+        }
+        caps
+    }
+
+    fn skills(&self) -> Option<&SkillCatalog> {
+        Some(&self.skills)
+    }
+
+    fn list_tools<'a>(&'a self, _ctx: &'a RequestContext) -> BoxFuture<'a, Result<Vec<ToolDef>, RpcError>> {
+        Box::pin(async { Ok(tool_definitions()) })
+    }
+
+    fn call_tool<'a>(&'a self, _ctx: &'a RequestContext, name: &'a str, arguments: Value) -> BoxFuture<'a, Result<ToolCallResult, RpcError>> {
+        Box::pin(async move { Ok(self.call_tool_inner(name, arguments).await) })
     }
 }
 
@@ -1613,91 +1469,17 @@ fn build_client_for_home(base: &Client, target_home: &Path, channel: Option<Rele
     )
 }
 
-#[cfg(test)]
-async fn serve_io<R, W>(server: &mut McpServer, reader: R, mut writer: W) -> Done
-where
-    R: AsyncBufRead + Unpin,
-    W: AsyncWrite + Unpin,
-{
-    let mut reader = reader;
-    let mut line = String::new();
-    loop {
-        line.clear();
-        let bytes = reader
-            .read_line(&mut line)
-            .await
-            .map_err(|err| Failure::new(exit::OTHER, "Io", format!("failed to read MCP stdin: {err}")))?;
-        if bytes == 0 {
-            return Ok(());
-        }
-        if let Some(response) = server.handle_line(&line).await {
-            let encoded =
-                serde_json::to_string(&response).map_err(|err| Failure::new(exit::OTHER, "Encode", format!("failed to encode MCP response: {err}")))?;
-            let write_res: std::io::Result<()> = async {
-                writer.write_all(encoded.as_bytes()).await?;
-                writer.write_all(b"\n").await?;
-                writer.flush().await
-            }
-            .await;
-            if let Err(err) = write_res {
-                if err.kind() == std::io::ErrorKind::BrokenPipe {
-                    return Ok(());
-                }
-                return Err(Failure::new(exit::OTHER, "Io", format!("failed to write MCP stdout: {err}")));
-            }
-        }
-    }
-}
-
 pub async fn run(client: &Client, cmd: McpCmd) -> Done {
-    let mut server = McpServer::new(client, cmd);
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<std::io::Result<String>>(32);
-
-    // Read blocking stdin lines on a dedicated OS thread so the Tokio runtime stays responsive.
-    std::thread::Builder::new()
-        .name("vibevalley-mcp-stdin".into())
-        .spawn(move || {
-            let stdin = std::io::stdin();
-            let mut reader = std::io::BufReader::new(stdin.lock());
-            let mut line = String::new();
-            loop {
-                line.clear();
-                match reader.read_line(&mut line) {
-                    Ok(0) => break,
-                    Ok(_) => {
-                        if tx.blocking_send(Ok(std::mem::take(&mut line))).is_err() {
-                            break;
-                        }
-                    }
-                    Err(err) => {
-                        let _ = tx.blocking_send(Err(err));
-                        break;
-                    }
-                }
-            }
-        })
-        .map_err(|err| Failure::new(exit::OTHER, "Io", format!("failed to spawn MCP stdin reader: {err}")))?;
-
-    while let Some(next_line) = rx.recv().await {
-        let line = next_line.map_err(|err| Failure::new(exit::OTHER, "Io", format!("failed to read MCP stdin: {err}")))?;
-        if let Some(response) = server.handle_line(&line).await {
-            let encoded =
-                serde_json::to_string(&response).map_err(|err| Failure::new(exit::OTHER, "Encode", format!("failed to encode MCP response: {err}")))?;
-            let mut stdout = std::io::stdout().lock();
-            if let Err(err) = writeln!(stdout, "{encoded}").and_then(|()| stdout.flush()) {
-                if err.kind() == std::io::ErrorKind::BrokenPipe {
-                    return Ok(());
-                }
-                return Err(Failure::new(exit::OTHER, "Io", format!("failed to write MCP stdout: {err}")));
-            }
-        }
-    }
-    Ok(())
+    let server = McpServer::new(client, cmd);
+    serve_stdio(&server)
+        .await
+        .map_err(|err| Failure::new(exit::OTHER, "Io", format!("MCP stdio error: {err}")))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vibevalley_mcp::{error_code, serve_io};
 
     fn test_client(home_dir: &Path) -> Client {
         Client::from_parts(
@@ -1726,13 +1508,14 @@ mod tests {
             },
         );
         let expected_home = home::home_for(ReleaseChannel::Alpha);
-        assert_eq!(server.client.home, expected_home);
+        let client = server.client.try_read().unwrap();
+        assert_eq!(client.home, expected_home);
         assert_eq!(server.defaults.home, Some(expected_home));
-        assert!(server.client.home.ends_with(".vibevalley-alpha"));
+        assert!(client.home.ends_with(".vibevalley-alpha"));
         assert_eq!(server.channel, Some(ReleaseChannel::Alpha));
         // Unless ~/.vibevalley-alpha has a live server.json or auth.json pointing elsewhere, fallback port is 8789.
-        if auth::load(&server.client.home).ok().flatten().is_none() && home::announced(&server.client.home).is_none() {
-            assert_eq!(server.client.server, "http://127.0.0.1:8789");
+        if auth::load(&client.home).ok().flatten().is_none() && home::announced(&client.home).is_none() {
+            assert_eq!(client.server, "http://127.0.0.1:8789");
         }
     }
 
@@ -1773,8 +1556,8 @@ mod tests {
     #[test]
     fn redact_secrets_scrubs_tokens_from_tool_results() {
         let tok = Secret::new("vdp-super-secret-xyz");
-        let res = McpToolResult::error("failed connecting with token vdp-super-secret-xyz").redact(&[&tok]);
-        let McpContent::Text { text } = &res.content[0] else {
+        let res = redact_result(ToolCallResult::error("failed connecting with token vdp-super-secret-xyz"), &[&tok]);
+        let ContentBlock::Text { text } = &res.content[0] else {
             panic!("expected text block");
         };
         assert!(!text.contains("vdp-super-secret-xyz"));
@@ -1782,38 +1565,56 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stdio_loop_handles_initialize_notifications_ping_and_errors_without_crashing() {
-        let client = test_client(Path::new("/tmp/mcp-unit-test"));
-        let mut server = McpServer::new(&client, McpCmd::default());
+    async fn stdio_loop_handles_initialize_discover_skills_notifications_ping_and_errors() {
+        let home_dir = tempfile::tempdir().unwrap();
+        let skill_dir = home_dir.path().join("skills").join("triage");
+        std::fs::create_dir_all(&skill_dir).unwrap();
+        std::fs::write(skill_dir.join("SKILL.md"), "# triage: Issue triage workflow\nCheck priority.\n").unwrap();
+
+        let client = test_client(home_dir.path());
+        let server = McpServer::new(&client, McpCmd::default());
 
         let input = concat!(
-            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-03-26\"}}\n",
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"server/discover\",\"params\":{}}\n",
+            "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-03-26\"}}\n",
             "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n",
             "not valid json\n",
-            "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}\n",
-            "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"vv_unknown\",\"arguments\":{}}}\n",
-            "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"unknown/method\"}\n",
+            "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"ping\"}\n",
+            "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"skills/list\",\"params\":{}}\n",
+            "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"skills/get\",\"params\":{\"name\":\"triage\"}}\n",
+            "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"vv_unknown\",\"arguments\":{}}}\n",
+            "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"unknown/method\"}\n",
         );
 
         let mut output = Vec::new();
-        serve_io(&mut server, tokio::io::BufReader::new(input.as_bytes()), &mut output).await.unwrap();
+        serve_io(&server, tokio::io::BufReader::new(input.as_bytes()), &mut output).await.unwrap();
 
         let lines: Vec<Value> = String::from_utf8(output).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
-        // 5 responses (notifications/initialized produces none).
-        assert_eq!(lines.len(), 5, "{lines:?}");
+        // 8 responses (notifications/initialized produces none).
+        assert_eq!(lines.len(), 8, "{lines:?}");
         assert_eq!(lines[0]["id"], 1);
-        assert_eq!(lines[0]["result"]["protocolVersion"], "2025-03-26");
+        assert_eq!(lines[0]["result"]["stateless"], true);
         assert_eq!(lines[0]["result"]["serverInfo"]["name"], "vibevalley");
 
-        assert_eq!(lines[1]["error"]["code"], JSONRPC_PARSE_ERROR);
+        assert_eq!(lines[1]["id"], 2);
+        assert_eq!(lines[1]["result"]["protocolVersion"], "2025-03-26");
+        assert_eq!(lines[1]["result"]["serverInfo"]["name"], "vibevalley");
 
-        assert_eq!(lines[2]["id"], 2);
-        assert_eq!(lines[2]["result"], json!({}));
+        assert_eq!(lines[2]["error"]["code"], error_code::PARSE_ERROR);
 
         assert_eq!(lines[3]["id"], 3);
-        assert_eq!(lines[3]["result"]["isError"], true);
+        assert_eq!(lines[3]["result"], json!({}));
 
         assert_eq!(lines[4]["id"], 4);
-        assert_eq!(lines[4]["error"]["code"], JSONRPC_METHOD_NOT_FOUND);
+        assert_eq!(lines[4]["result"]["skills"][0]["uri"], "skill://local/triage");
+
+        assert_eq!(lines[5]["id"], 5);
+        assert!(lines[5]["result"]["content"].as_str().unwrap().contains("Check priority"));
+
+        assert_eq!(lines[6]["id"], 6);
+        assert_eq!(lines[6]["result"]["isError"], true);
+
+        assert_eq!(lines[7]["id"], 7);
+        assert_eq!(lines[7]["error"]["code"], error_code::METHOD_NOT_FOUND);
     }
 }
