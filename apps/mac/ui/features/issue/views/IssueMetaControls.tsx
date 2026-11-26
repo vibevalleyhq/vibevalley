@@ -194,6 +194,7 @@ export function DatePropertyEditor(props: {
   minMs?: number | undefined;
   maxMs?: number | undefined;
   quiet?: boolean | undefined;
+  showIcon?: boolean | undefined;
   onCommit: (ms: number) => void;
 }) {
   return (
@@ -205,6 +206,7 @@ export function DatePropertyEditor(props: {
       placeholder={props.placeholder}
       size="control"
       quiet={props.quiet ?? true}
+      showIcon={props.showIcon ?? props.quiet === false}
       minMs={props.minMs}
       maxMs={props.maxMs}
       onChange={(ms) => {

@@ -1,13 +1,14 @@
 import { computed, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
+import type { Attachment } from "@vibevalley/protocol";
 import { channelOf } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
 import { Banner } from "../../../design/layout";
-import { Markdown } from "../../../design/Markdown";
+import { extractInlineAttachmentIds, Markdown } from "../../../design/Markdown";
 import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { api } from "../../../infra/api";
@@ -22,6 +23,14 @@ const conversationQuery = defineQuery({
   fetch: (id, context) => api.issue.conversation.get({ id }, context),
   ...retryRead,
 });
+
+function remainingMessageAttachments(message: { text: string; attachments: readonly Attachment[] }): readonly Attachment[] | undefined {
+  if (message.attachments.length === 0) return undefined;
+  const inlineIds = extractInlineAttachmentIds(message.text);
+  if (inlineIds.size === 0) return message.attachments;
+  const rest = message.attachments.filter((file) => !inlineIds.has(file.id));
+  return rest.length > 0 ? rest : undefined;
+}
 
 export function IssueThread(props: { issue: string }) {
   const collab = useCollabSlice();
@@ -79,7 +88,7 @@ export function IssueThread(props: { issue: string }) {
                     <Markdown size="sm" text={message().text} />
                   </View>
                 </If>
-                <If when={message().attachments.length > 0 ? message().attachments : undefined}>{(files) => <Attachments files={files()} />}</If>
+                <If when={remainingMessageAttachments(message())}>{(files) => <Attachments files={files()} />}</If>
               </View>
             )}
           </Each>

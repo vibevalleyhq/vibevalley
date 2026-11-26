@@ -367,13 +367,13 @@ export function IssueTrail(props: {
   onOpenParent?: ((id: string) => void) | undefined;
 }) {
   return (
-    <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-2.5 flex-row flex-wrap items-center gap-1.5">
+    <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-2.5 min-w-0 flex-row flex-wrap items-center gap-1.5">
       <If when={props.repo}>
         {(repo) => (
           <>
-            <View class="flex-row items-center gap-1 rounded-md bg-side px-1.5 py-0.5">
+            <View class="min-w-0 max-w-48 shrink flex-row items-center gap-1 overflow-hidden rounded-md bg-side px-1.5 py-0.5">
               <Icon name="folder" size={12} tone="muted" />
-              <Text class="text-xs font-medium text-muted">{repo()}</Text>
+              <Text class="min-w-0 truncate text-xs font-medium text-muted">{repo()}</Text>
             </View>
             <Icon name="next" size={12} tone="faint" />
           </>
@@ -386,9 +386,11 @@ export function IssueTrail(props: {
               role="button"
               testID="parent-issue"
               onPress={() => props.onOpenParent?.(parentId())}
-              class="max-w-64 flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:border-line-strong hover:bg-hover"
+              class="min-w-0 max-w-64 shrink flex-row items-center gap-1 overflow-hidden rounded-md border border-line bg-side px-1.5 py-0.5 hover:border-line-strong hover:bg-hover"
             >
-              <Text class="truncate text-xs text-water">{props.parent ? `#${props.parent.number} ${props.parent.title}` : t("web.issue.family.parent")}</Text>
+              <Text class="min-w-0 truncate text-xs text-water">
+                {props.parent ? `#${props.parent.number} ${props.parent.title}` : t("web.issue.family.parent")}
+              </Text>
             </View>
             <Icon name="next" size={12} tone="faint" />
           </>

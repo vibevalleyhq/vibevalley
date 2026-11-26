@@ -258,3 +258,59 @@ test("TodoDetail inspector scrolls smoothly at 900x720 so bottom delete button i
   expect(removeBox!.clipped).toBe(false);
   expect(removeBox!.y + removeBox!.height).toBeLessThanOrEqual(720);
 });
+
+test("TodoDetail truncates long parent trail pill without colliding with #N and omits duplicate calendar icon in DatePropertyEditor", async () => {
+  const baseTodo =
+    scenarios.typical.state.board.issues.find((i) => i.status === "backlog") ?? scenarios.typical.state.board.issues.find((i) => i.status === "todo");
+  if (!baseTodo) throw new Error("typical scenario must include a backlog or todo issue");
+
+  const longParent = {
+    ...baseTodo,
+    id: "i-long-parent" as typeof baseTodo.id,
+    number: 42,
+    title: "Extremely long parent issue title designed to overflow breadcrumb pills if min-w-0 and max-w-64 are missing from IssueTrail",
+    parent: undefined,
+  };
+  const childTodo = {
+    ...baseTodo,
+    id: "i-long-child" as typeof baseTodo.id,
+    number: 63,
+    title: "Child draft verifying trail layout and date icons",
+    parent: longParent.id,
+    status: "backlog" as const,
+    stage: { state: "draft" as const, acts: [] },
+  };
+  const state = {
+    ...scenarios.typical.state,
+    board: {
+      ...scenarios.typical.state.board,
+      issues: [longParent, childTodo, ...scenarios.typical.state.board.issues.filter((i) => i.id !== longParent.id && i.id !== childTodo.id)],
+    },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${childTodo.id}` });
+  const app = await open("../../../app/main.tsx", {
+    width: 1200,
+    height: 800,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:parent-issue") === 1 && app.count("id:issue-copy-id") === 1);
+
+  const parentBox = app.layout("id:parent-issue");
+  const copyBox = app.layout("id:issue-copy-id");
+  expect(parentBox).toBeDefined();
+  expect(copyBox).toBeDefined();
+  expect(parentBox!.width).toBeLessThanOrEqual(256);
+  const sameRow = Math.abs(parentBox!.y - copyBox!.y) < Math.min(parentBox!.height, copyBox!.height);
+  if (sameRow) {
+    expect(parentBox!.x + parentBox!.width).toBeLessThanOrEqual(copyBox!.x);
+  }
+
+  // Property rows provide the single leading calendar icon; EpochDatePicker omits its own duplicate icon.
+  expect(app.count("id:issue-start-at")).toBe(1);
+  expect(app.count("id:issue-due-at")).toBe(1);
+  expect(app.count("id:issue-start-at-icon")).toBe(0);
+  expect(app.count("id:issue-due-at-icon")).toBe(0);
+});

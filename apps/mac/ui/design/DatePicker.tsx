@@ -251,6 +251,7 @@ export interface DatePickerProps {
   readonly testid?: string | undefined;
   readonly size?: "control" | "field" | undefined;
   readonly quiet?: boolean | undefined;
+  readonly showIcon?: boolean | undefined;
   readonly placement?: Placement | undefined;
   readonly align?: Align | undefined;
   readonly class?: string | undefined;
@@ -331,7 +332,14 @@ export function DatePicker(props: DatePickerProps) {
             disabled() ? "opacity-50" : "aria-expanded:border-focus focus-visible:outline-2 focus-visible:outline-focus",
           ].join(" ")}
         >
-          <Icon name="calendar" size={12} tone={disabled() || !display().hasValue ? "faint" : "muted"} />
+          <If when={props.showIcon !== false}>
+            <Icon
+              name="calendar"
+              size={12}
+              tone={disabled() || !display().hasValue ? "faint" : "muted"}
+              testID={props.testid ? `${props.testid}-icon` : undefined}
+            />
+          </If>
           <Text class={`min-w-0 flex-1 truncate ${textSizeClass()} ${display().hasValue ? "font-mono text-ink tabular-nums" : "text-faint"}`}>
             {display().text}
           </Text>
@@ -385,6 +393,7 @@ export function EpochDatePicker(props: EpochDatePickerProps) {
       testid={props.testid}
       size={props.size}
       quiet={props.quiet}
+      showIcon={props.showIcon}
       placement={props.placement}
       align={props.align}
       class={props.class}

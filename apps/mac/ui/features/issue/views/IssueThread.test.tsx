@@ -163,3 +163,51 @@ test("IssueThread omits Markdown box on attachment-only comments", async () => {
   expect(app.count("id:issue-message >> id:issue-message-body")).toBe(0);
   expect(app.count("id:issue-message >> id:attachment-only-image.png")).toBe(1);
 });
+
+test("IssueThread renders inline Markdown attachment image URLs as clickable thumbnails opening Lightbox and ignores code blocks", async () => {
+  const comments: ChatMessage[] = [
+    makeComment({
+      id: "m-inline-md-img",
+      channel: "ch-issue-86",
+      number: 1,
+      text: [
+        "Verified fix:",
+        "",
+        "![Relative screenshot](/api/v1/attachment/att-rel-1)",
+        "![Remote screenshot](http://127.0.0.1:8790/api/v1/attachment/att-http-2)",
+        "",
+        "Example `![inline-code](/api/v1/attachment/att-code-inline)` should remain code.",
+        "",
+        "```markdown",
+        "![fenced-code](/api/v1/attachment/att-code-fenced)",
+        "```",
+      ].join("\n"),
+      attachments: [{ id: "att-rel-1", name: "rel.png", type: "image/png", size: 2048 }],
+    }),
+  ];
+
+  const { app, fake } = await mountIssueThread(comments);
+  await fake.pumpUntil(app, () => app.count("id:markdown-image-att-rel-1") === 1 && app.count("id:markdown-image-att-http-2") === 1);
+  await fake.pump(app);
+
+  // Both relative and HTTP attachment URLs render inline clickable thumbnails inside Markdown.
+  expect(app.count("id:issue-message-body >> id:markdown-image-thumb")).toBe(2);
+  // Deduplicates attachment already rendered inline via Markdown, avoiding double thumbnail.
+  expect(app.count("id:attachment-rel.png")).toBe(0);
+  // Code blocks and inline code are never rewritten into thumbnails.
+  expect(app.count("id:markdown-image-att-code-inline")).toBe(0);
+  expect(app.count("id:markdown-image-att-code-fenced")).toBe(0);
+  expect(app.texts().join("\n")).not.toContain("/api/v1/attachment/att-rel-1");
+
+  // Clicking first thumbnail opens Lightbox with both inline images navigable via Next.
+  expect(app.count("id:lightbox")).toBe(0);
+  await app.press("id:markdown-image-att-rel-1");
+  expect(app.count("id:lightbox")).toBe(1);
+  expect(app.shows("id:lightbox >> text:Relative screenshot")).toBe(true);
+
+  await app.press("id:lightbox-next");
+  expect(app.shows("id:lightbox >> text:Remote screenshot")).toBe(true);
+
+  await app.press("id:lightbox-close");
+  expect(app.count("id:lightbox")).toBe(0);
+});

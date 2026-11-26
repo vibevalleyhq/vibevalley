@@ -424,6 +424,20 @@ test("Board renders tags, parent badges, scope toggle, and TodoDetail supports t
   expect(app.count("id:todo-stage-pill")).toBe(0);
   expect(app.count("id:todo-review-banner")).toBe(0);
 
+  // EpochDatePicker in inspector omits duplicate leading calendar icon (Property row already renders one).
+  expect(app.count("id:issue-start-at-icon")).toBe(0);
+  expect(app.count("id:issue-due-at-icon")).toBe(0);
+
+  // Parent trail pill is constrained to max-w-64 and never overlaps #N pill.
+  const parentTrailBox = app.layout("id:parent-issue");
+  const copyIdBox = app.layout("id:issue-copy-id");
+  expect(parentTrailBox).toBeDefined();
+  expect(copyIdBox).toBeDefined();
+  expect(parentTrailBox!.width).toBeLessThanOrEqual(256);
+  if (Math.abs(parentTrailBox!.y - copyIdBox!.y) < Math.min(parentTrailBox!.height, copyIdBox!.height)) {
+    expect(parentTrailBox!.x + parentTrailBox!.width).toBeLessThanOrEqual(copyIdBox!.x);
+  }
+
   // EpochDatePicker in inspector picks a date preset (+3d) and commits via Save.
   await app.press("id:issue-start-at-trigger");
   await fake.pumpUntil(app, () => app.count("text:+3d") === 1);
@@ -532,8 +546,10 @@ test("Issue DB-backed pickers (NewIssue repo/helper and ParentPicker) filter via
   expect(app.texts()).not.toContain("老周");
   await app.keyboard.press("escape");
 
-  // NewIssue searchable ParentPicker & EpochDatePicker wire parent + startAt into issue.create.
+  // NewIssue searchable ParentPicker & EpochDatePicker wire parent + startAt into issue.create (standalone pickers retain leading icon).
   await fake.pumpUntil(app, () => app.count("id:issue-new-parent-trigger") === 1 && app.count("id:issue-new-start-at-trigger") === 1);
+  expect(app.count("id:issue-new-start-at-icon")).toBe(1);
+  expect(app.count("id:issue-new-due-at-icon")).toBe(1);
   await app.press("id:issue-new-parent-trigger");
   await fake.pumpUntil(app, () => app.count("id:issue-new-parent-search") === 1);
   await app.type("id:issue-new-parent-search", "Beta");
