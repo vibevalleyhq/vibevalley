@@ -1607,7 +1607,7 @@ export const catalogs = {
       },
       peek: { expand: "展开全屏", close: "关闭预览", compareBadge: "对比" },
       boardLabels: {
-        view: { board: "看板", list: "列表" },
+        view: { board: "看板", list: "列表", timeline: "甘特图", calendar: "日历" },
         grouping: { status: "状态", repo: "仓库", agent: "角色", none: "不分组" },
         ordering: { manual: "默认", priority: "优先级", updated: "最近更新", created: "创建时间" },
         lane: { todo: "待办", working: "进行中", waiting: "待验收", closed: "已完成" },
@@ -1709,6 +1709,33 @@ export const catalogs = {
         remove: "移除附件 {name}",
       },
       error: { missingApiKey: "未配置模型 API Key，请先在设置中配置后再重试。", goSettings: "去设置" },
+      timeline: {
+        today: "今天",
+        unscheduled: "未排期 {n}",
+        scheduledCount: "已排期 {n}",
+        rolledUp: "由子工单汇总",
+        overdue: "已逾期",
+        shiftPrev: "提前 1 天",
+        shiftNext: "延后 1 天",
+        editDates: "调整排期",
+        scheduleToday: "排到今天",
+        emptyScheduled: "当前没有带起止日期的工单",
+        emptyScheduledHint: "在下方未排期工单中点「排到今天」，或在工单属性里设置计划开始 / 目标截止日期。",
+        issuesColumn: "工单",
+        unscheduledTitle: "未排期工单",
+        scale: { label: "时间刻度", week: "周", month: "月", quarter: "季" },
+        weekday: { mon: "周一", tue: "周二", wed: "周三", thu: "周四", fri: "周五", sat: "周六", sun: "周日" },
+      },
+      calendar: {
+        monthTitle: "{year} 年 {month} 月",
+        prevMonth: "上一月",
+        nextMonth: "下一月",
+        newOnDate: "在 {date} 新建工单",
+        moreItems: "还有 {n} 项",
+        collapseDay: "收起",
+        scheduledBadge: "排期 {date}",
+        clearScheduledDate: "清除预填日期",
+      },
     },
     "web.library": {
       upload: "上传",
@@ -5071,7 +5098,7 @@ export const catalogs = {
       },
       peek: { expand: "Open full screen", close: "Close preview", compareBadge: "Compare" },
       boardLabels: {
-        view: { board: "Board", list: "List" },
+        view: { board: "Board", list: "List", timeline: "Timeline", calendar: "Calendar" },
         grouping: { status: "Status", repo: "Repo", agent: "Helper", none: "No grouping" },
         ordering: { manual: "Default", priority: "Priority", updated: "Last updated", created: "Created" },
         lane: { todo: "Todo", working: "In Progress", waiting: "In Review", closed: "Done" },
@@ -5178,6 +5205,33 @@ export const catalogs = {
         remove: "Remove attachment {name}",
       },
       error: { missingApiKey: "No model API key is configured. Set it up in Settings and try again.", goSettings: "Settings" },
+      timeline: {
+        today: "Today",
+        unscheduled: "Unscheduled ({n})",
+        scheduledCount: "{n} scheduled",
+        rolledUp: "Rolled up from sub-tickets",
+        overdue: "Overdue",
+        shiftPrev: "Shift 1 day earlier",
+        shiftNext: "Shift 1 day later",
+        editDates: "Edit dates",
+        scheduleToday: "Schedule today",
+        emptyScheduled: "No scheduled tickets yet",
+        emptyScheduledHint: "Schedule an unscheduled ticket below, or set start and due dates in ticket properties.",
+        issuesColumn: "Tickets",
+        unscheduledTitle: "Unscheduled tickets",
+        scale: { label: "Time scale", week: "Week", month: "Month", quarter: "Quarter" },
+        weekday: { mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun" },
+      },
+      calendar: {
+        monthTitle: "{year} / {month}",
+        prevMonth: "Previous month",
+        nextMonth: "Next month",
+        newOnDate: "New ticket on {date}",
+        moreItems: "{n} more",
+        collapseDay: "Less",
+        scheduledBadge: "Scheduled {date}",
+        clearScheduledDate: "Clear prefilled date",
+      },
     },
     "web.library": {
       upload: "Upload",
@@ -8370,7 +8424,17 @@ export interface Messages {
   "web.issue.boardLabels.stage.talk": undefined;
   "web.issue.boardLabels.stage.work": undefined;
   "web.issue.boardLabels.view.board": undefined;
+  "web.issue.boardLabels.view.calendar": undefined;
   "web.issue.boardLabels.view.list": undefined;
+  "web.issue.boardLabels.view.timeline": undefined;
+  "web.issue.calendar.clearScheduledDate": undefined;
+  "web.issue.calendar.collapseDay": undefined;
+  "web.issue.calendar.monthTitle": { readonly month: string | number; readonly year: string | number };
+  "web.issue.calendar.moreItems": { readonly n: string | number };
+  "web.issue.calendar.newOnDate": { readonly date: string | number };
+  "web.issue.calendar.nextMonth": undefined;
+  "web.issue.calendar.prevMonth": undefined;
+  "web.issue.calendar.scheduledBadge": { readonly date: string | number };
   "web.issue.card.assignHelper": undefined;
   "web.issue.card.cron": undefined;
   "web.issue.card.draft": undefined;
@@ -8650,6 +8714,30 @@ export interface Messages {
   "web.issue.tags.remove": { readonly tag: string | number };
   "web.issue.task.repo": undefined;
   "web.issue.task.written": undefined;
+  "web.issue.timeline.editDates": undefined;
+  "web.issue.timeline.emptyScheduled": undefined;
+  "web.issue.timeline.emptyScheduledHint": undefined;
+  "web.issue.timeline.issuesColumn": undefined;
+  "web.issue.timeline.overdue": undefined;
+  "web.issue.timeline.rolledUp": undefined;
+  "web.issue.timeline.scale.label": undefined;
+  "web.issue.timeline.scale.month": undefined;
+  "web.issue.timeline.scale.quarter": undefined;
+  "web.issue.timeline.scale.week": undefined;
+  "web.issue.timeline.scheduleToday": undefined;
+  "web.issue.timeline.scheduledCount": { readonly n: string | number };
+  "web.issue.timeline.shiftNext": undefined;
+  "web.issue.timeline.shiftPrev": undefined;
+  "web.issue.timeline.today": undefined;
+  "web.issue.timeline.unscheduled": { readonly n: string | number };
+  "web.issue.timeline.unscheduledTitle": undefined;
+  "web.issue.timeline.weekday.fri": undefined;
+  "web.issue.timeline.weekday.mon": undefined;
+  "web.issue.timeline.weekday.sat": undefined;
+  "web.issue.timeline.weekday.sun": undefined;
+  "web.issue.timeline.weekday.thu": undefined;
+  "web.issue.timeline.weekday.tue": undefined;
+  "web.issue.timeline.weekday.wed": undefined;
   "web.issue.todo.addCriteria": undefined;
   "web.issue.todo.addDescription": undefined;
   "web.issue.todo.againHint": undefined;

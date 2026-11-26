@@ -316,7 +316,9 @@
   "boardLabels": {
     "view": {
       "board": "Board",
-      "list": "List"
+      "list": "List",
+      "timeline": "Timeline",
+      "calendar": "Calendar"
     },
     "grouping": {
       "status": "Status",
@@ -458,5 +460,45 @@
   "error": {
     "missingApiKey": "No model API key is configured. Set it up in Settings and try again.",
     "goSettings": "Settings"
+  },
+  "timeline": {
+    "today": "Today",
+    "unscheduled": "Unscheduled ({n})",
+    "scheduledCount": "{n} scheduled",
+    "rolledUp": "Rolled up from sub-tickets",
+    "overdue": "Overdue",
+    "shiftPrev": "Shift 1 day earlier",
+    "shiftNext": "Shift 1 day later",
+    "editDates": "Edit dates",
+    "scheduleToday": "Schedule today",
+    "emptyScheduled": "No scheduled tickets yet",
+    "emptyScheduledHint": "Schedule an unscheduled ticket below, or set start and due dates in ticket properties.",
+    "issuesColumn": "Tickets",
+    "unscheduledTitle": "Unscheduled tickets",
+    "scale": {
+      "label": "Time scale",
+      "week": "Week",
+      "month": "Month",
+      "quarter": "Quarter"
+    },
+    "weekday": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    }
+  },
+  "calendar": {
+    "monthTitle": "{year} / {month}",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "newOnDate": "New ticket on {date}",
+    "moreItems": "{n} more",
+    "collapseDay": "Less",
+    "scheduledBadge": "Scheduled {date}",
+    "clearScheduledDate": "Clear prefilled date"
   }
 }

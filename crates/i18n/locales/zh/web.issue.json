@@ -316,7 +316,9 @@
   "boardLabels": {
     "view": {
       "board": "看板",
-      "list": "列表"
+      "list": "列表",
+      "timeline": "甘特图",
+      "calendar": "日历"
     },
     "grouping": {
       "status": "状态",
@@ -458,5 +460,45 @@
   "error": {
     "missingApiKey": "未配置模型 API Key，请先在设置中配置后再重试。",
     "goSettings": "去设置"
+  },
+  "timeline": {
+    "today": "今天",
+    "unscheduled": "未排期 {n}",
+    "scheduledCount": "已排期 {n}",
+    "rolledUp": "由子工单汇总",
+    "overdue": "已逾期",
+    "shiftPrev": "提前 1 天",
+    "shiftNext": "延后 1 天",
+    "editDates": "调整排期",
+    "scheduleToday": "排到今天",
+    "emptyScheduled": "当前没有带起止日期的工单",
+    "emptyScheduledHint": "在下方未排期工单中点「排到今天」，或在工单属性里设置计划开始 / 目标截止日期。",
+    "issuesColumn": "工单",
+    "unscheduledTitle": "未排期工单",
+    "scale": {
+      "label": "时间刻度",
+      "week": "周",
+      "month": "月",
+      "quarter": "季"
+    },
+    "weekday": {
+      "mon": "周一",
+      "tue": "周二",
+      "wed": "周三",
+      "thu": "周四",
+      "fri": "周五",
+      "sat": "周六",
+      "sun": "周日"
+    }
+  },
+  "calendar": {
+    "monthTitle": "{year} 年 {month} 月",
+    "prevMonth": "上一月",
+    "nextMonth": "下一月",
+    "newOnDate": "在 {date} 新建工单",
+    "moreItems": "还有 {n} 项",
+    "collapseDay": "收起",
+    "scheduledBadge": "排期 {date}",
+    "clearScheduledDate": "清除预填日期"
   }
 }

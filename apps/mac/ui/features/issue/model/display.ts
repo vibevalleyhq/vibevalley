@@ -9,9 +9,14 @@ import { defineStored, orFallback } from "../../../infra/state/stored";
 import { type BoardCard, type Lane, lanes } from "./cards";
 import { endedAt } from "./issue";
 
-type BoardView = "board" | "list";
-export const boardViews = ["board", "list"] as const satisfies readonly BoardView[];
-export const viewLabel: Record<BoardView, string> = { board: t("web.issue.boardLabels.view.board"), list: t("web.issue.boardLabels.view.list") };
+export type BoardView = "board" | "list" | "timeline" | "calendar";
+export const boardViews = ["board", "list", "timeline", "calendar"] as const satisfies readonly BoardView[];
+export const viewLabel: Record<BoardView, string> = {
+  board: t("web.issue.boardLabels.view.board"),
+  list: t("web.issue.boardLabels.view.list"),
+  timeline: t("web.issue.boardLabels.view.timeline"),
+  calendar: t("web.issue.boardLabels.view.calendar"),
+};
 
 /** Groups of the list view. The board keeps its status lanes whatever this is: a drag between lanes moves status. */
 export type Grouping = "status" | "repo" | "agent" | "none";

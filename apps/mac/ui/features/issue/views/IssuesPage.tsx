@@ -41,14 +41,16 @@ import { issueIs } from "../model/issue";
 import { type IssueScope, issueScopes, issueTagPresets } from "../model/meta";
 import { issueMove, movedCards, sendMove } from "../model/moves";
 import { issueSearch } from "../model/navigation";
-import { writeIssue } from "../model/write";
+import { issueSet, labeledIssue, sendLabel, writeIssue } from "../model/write";
 import { IssueBoard } from "./Board";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { DisplayMenu } from "./DisplayMenu";
 import { FamilyDetail } from "./FamilyDetail";
+import { IssueCalendar } from "./IssueCalendar";
 import { IssueDetail, OrchestratorIssueDetail } from "./IssueDetail";
 import { IssueList, type ListAdd } from "./IssueList";
 import { IssuePeekModal } from "./IssuePeekModal";
+import { IssueTimeline } from "./IssueTimeline";
 import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { createIssueChrome, IssueChromeContext } from "./Sheet";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
@@ -158,8 +160,15 @@ export function IssuesPage(props: { rest: string }) {
   const orchestrators = useOrchestrators();
   const orchestratorIds = createMemo(() => new Set(orchestrators().map((a) => a.id)));
   const moves = useIntents(issueMove);
+  const labelSets = useIntents(issueSet);
   const act = createAct();
-  const all = createMemo(() => movedCards(buildCards(history.rows() ?? [], board(), sessions()?.sessions, orchestratorIds()), moves.list()));
+  const all = createMemo(() => {
+    const cards = movedCards(buildCards(history.rows() ?? [], board(), sessions()?.sessions, orchestratorIds()), moves.list());
+    const pendingLabels = labelSets.list();
+    if (pendingLabels.length === 0) return cards;
+    return cards.map((c) => ({ ...c, issue: labeledIssue(c.issue, pendingLabels).issue }));
+  });
+  const allIssues = createMemo(() => all().map((c) => c.issue));
   const shown = createMemo(() => all().filter((c) => filterShows(filter(), c)));
   const card = createMemo(() => {
     const at = id();
@@ -207,7 +216,17 @@ export function IssuesPage(props: { rest: string }) {
     const agent = where.agent || f.agent;
     const text = where.text;
     const machineId = where.machineId;
-    newAt.set({ ...(repo ? { repo } : {}), ...(agent ? { agent } : {}), ...(text ? { text } : {}), ...(machineId ? { machineId } : {}) });
+    newAt.set({
+      ...(repo ? { repo } : {}),
+      ...(agent ? { agent } : {}),
+      ...(text ? { text } : {}),
+      ...(machineId ? { machineId } : {}),
+      ...(where.startAt !== undefined ? { startAt: where.startAt } : {}),
+      ...(where.dueAt !== undefined ? { dueAt: where.dueAt } : {}),
+    });
+  };
+  const updateScheduleDates = async (issueId: string, dates: { startAt?: number; dueAt?: number }) => {
+    await sendLabel(labelSets, omitUndefined({ id: issueId, startAt: dates.startAt, dueAt: dates.dueAt })).done;
   };
   const addInList: ListAdd = (where) => startNew(where);
   const overlayDialogUp = () => draftAt() !== undefined || closing() !== undefined || reopening() !== undefined;
@@ -224,6 +243,17 @@ export function IssuesPage(props: { rest: string }) {
   const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
     const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? "", where.attachments, where.tags));
     if (!made) return false;
+    if (where.startAt !== undefined || where.dueAt !== undefined) {
+      await act.run(() =>
+        api.issue.update(
+          omitUndefined({
+            id: made.issue.id,
+            startAt: where.startAt,
+            dueAt: where.dueAt,
+          }),
+        ),
+      );
+    }
     rememberPick(where.agent ?? "", where.repo ?? "");
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
     return true;
@@ -260,19 +290,52 @@ export function IssuesPage(props: { rest: string }) {
             <If
               when={look().view === "board"}
               else={
-                <IssueList
-                  cards={shown()}
-                  filtered={filterAny(filter())}
-                  loading={history.loading()}
-                  selected={returnTo()}
-                  older={older()}
-                  grouping={look().grouping}
-                  ordering={look().ordering}
-                  onOlder={() => older.set(!older())}
-                  onOpen={peek}
-                  onAdd={addInList}
-                  onClearFilter={() => setFilter(noFilter)}
-                />
+                <If
+                  when={look().view === "list"}
+                  else={
+                    <If
+                      when={look().view === "timeline"}
+                      else={
+                        <IssueCalendar
+                          cards={shown()}
+                          allIssues={allIssues()}
+                          filtered={filterAny(filter())}
+                          loading={history.loading()}
+                          selected={returnTo()}
+                          onOpen={peek}
+                          onNew={startNew}
+                          onClearFilter={() => setFilter(noFilter)}
+                        />
+                      }
+                    >
+                      <IssueTimeline
+                        cards={shown()}
+                        allIssues={allIssues()}
+                        filtered={filterAny(filter())}
+                        loading={history.loading()}
+                        selected={returnTo()}
+                        onOpen={peek}
+                        onUpdateDates={updateScheduleDates}
+                        onNew={startNew}
+                        onClearFilter={() => setFilter(noFilter)}
+                      />
+                    </If>
+                  }
+                >
+                  <IssueList
+                    cards={shown()}
+                    filtered={filterAny(filter())}
+                    loading={history.loading()}
+                    selected={returnTo()}
+                    older={older()}
+                    grouping={look().grouping}
+                    ordering={look().ordering}
+                    onOlder={() => older.set(!older())}
+                    onOpen={peek}
+                    onAdd={addInList}
+                    onClearFilter={() => setFilter(noFilter)}
+                  />
+                </If>
               }
             >
               <IssueBoard
