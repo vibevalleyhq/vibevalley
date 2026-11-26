@@ -21,5 +21,7 @@ mod turn_state;
 pub(crate) use self::projector::Projector;
 pub use self::runtime::AcpRuntime;
 #[cfg(test)]
-pub(crate) use self::spec::models_of;
+pub(crate) use self::session::{agent_supports_http_mcp, encode_acp_mcp_server_configs};
 pub use self::spec::{AcpAgentSpec, builtin_agents};
+#[cfg(test)]
+pub(crate) use self::spec::{AcpFlavor, models_of};

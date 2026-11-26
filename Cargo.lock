@@ -12676,6 +12676,7 @@ dependencies = [
  "tokio-util",
  "uuid",
  "vibevalley-git",
+ "vibevalley-mcp",
  "vibevalley-protocol",
 ]
 
