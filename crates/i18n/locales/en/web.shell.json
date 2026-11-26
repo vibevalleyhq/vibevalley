@@ -124,7 +124,7 @@
   },
   "palette": {
     "placeholder": {
-      "commands": "Type a command or jump to any page…",
+      "commands": "Type a command, #issue, artifact, or run…",
       "files": "Jump to a file…",
       "search": "Search text in project…"
     },
@@ -132,6 +132,11 @@
       "commands": "Commands",
       "files": "Files",
       "search": "Search"
+    },
+    "groups": {
+      "issues": "Issues",
+      "artifacts": "Artifacts",
+      "runs": "Trajectory Runs"
     },
     "a11y": {
       "commands": "Commands",

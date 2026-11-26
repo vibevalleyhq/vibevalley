@@ -700,6 +700,165 @@ test("workspace Palette handles commands filter/select/close and remote search/f
   expect(host.acts).toContainEqual({ type: "search", query: "TODO" });
 });
 
+test("workspace Palette searches global commands, issues (#N/title), artifacts (title/type), and trajectory runs (session/agent)", async () => {
+  const host = workspaceHost(
+    { view: "palette" },
+    {
+      "artifact.list": [
+        {
+          id: "art-deck-1",
+          title: "Q4 Architecture Deck",
+          artifactType: "slides",
+          isDefault: false,
+          by: "user",
+          byName: "Lucas",
+          version: 1,
+          seq: 2,
+          versions: [],
+          at: 1_700_000_000_000,
+          updated: 1_700_000_050_000,
+        },
+        {
+          id: "art-doc-2",
+          title: "Palette Spec",
+          artifactType: "docs",
+          isDefault: false,
+          by: "coder",
+          byName: "Coder",
+          version: 0,
+          seq: 1,
+          versions: [],
+          at: 1_700_000_000_000,
+          updated: 1_700_000_010_000,
+        },
+      ],
+      "session.list": [
+        {
+          id: "sess-run-9",
+          controller: "issueBoard",
+          role: "worker",
+          name: "Review Bot",
+          profile: "reviewer",
+          runtime: "codex",
+          brief: "Inspect OAuth callback edge cases",
+          policy: { kind: "managedWorktree", repo: "vibevalley" },
+          bindings: [{ kind: "issue", id: "iss-77" }],
+          hiredAt: 1_700_000_000_000,
+          runs: 2,
+          lastRun: { outcome: "completed", summary: "Checks passed", at: 1_700_000_040_000 },
+          phase: { _tag: "done" },
+        },
+      ],
+    },
+  );
+  const app = await open("../ShellApp.story.tsx", { width: 640, height: 420, colorScheme: "light", platform: "macos", host: host.options });
+  await host.pump(app);
+
+  await host.pushFrame(app, "slice:board", {
+    seq: 1,
+    issues: [
+      {
+        id: "iss-77",
+        number: 77,
+        title: "Expand Cmd+K Palette",
+        description: "",
+        mandate: { strength: "explicit", maxBotReviewRounds: 1, autoSubmitPr: false },
+        repo: "vibevalley",
+        assignments: [],
+        priority: "high",
+        createdAt: 1_700_000_000_000,
+        blockedBy: [],
+        status: "in_review",
+        moves: [],
+        deliver: "change",
+        findings: [],
+        questions: [],
+        criteria: [],
+        checks: [],
+        stage: { state: "reviewing", acts: [] },
+      },
+      {
+        id: "iss-88",
+        number: 88,
+        title: "OAuth login flow",
+        description: "",
+        mandate: { strength: "explicit", maxBotReviewRounds: 1, autoSubmitPr: false },
+        repo: "vibevalley",
+        assignments: [],
+        priority: "medium",
+        createdAt: 1_700_000_001_000,
+        blockedBy: [],
+        status: "in_progress",
+        moves: [],
+        deliver: "change",
+        findings: [],
+        questions: [],
+        criteria: [],
+        checks: [],
+        stage: { state: "working", acts: [] },
+      },
+    ],
+  });
+  await host.pushFrame(app, "slice:sessions", { seq: 1, sessions: [], machines: [] });
+  await host.pushFrame(app, "palette", {
+    mode: "commands",
+    query: "",
+    loading: false,
+    note: null,
+    items: [
+      { id: "nav.dashboard", label: "前往总览仪表盘", detail: "/dashboard", group: "导航" },
+      { id: "nav.dashboard.runs", label: "前往运行轨迹", detail: "/dashboard/runs", group: "导航" },
+      { id: "nav.dashboard.retro", label: "前往复盘统计", detail: "/dashboard/retro", group: "导航" },
+      { id: "issue.new", label: "新建工单…", detail: "/issues/new", group: "工单" },
+      { id: "issue.next_reviewable", label: "跳转到下一条待审工单", detail: "reviewable", group: "工单" },
+    ],
+  });
+
+  // Empty query lists commands without cluttering with entities.
+  expect(app.texts()).toContain("前往总览仪表盘");
+  expect(app.texts()).not.toContain("#77 Expand Cmd+K Palette");
+
+  // Global command matching by route/keyword works and dispatches palette_select.
+  await app.type("id:palette-root", "/dashboard/retro");
+  expect(app.texts()).toContain("前往复盘统计");
+  expect(app.texts()).not.toContain("新建工单…");
+  await app.press("text:前往复盘统计");
+  expect(host.acts).toContainEqual({ type: "palette_select", id: "nav.dashboard.retro" });
+
+  // Issue search by #N jumps directly to /issues/<id> and closes palette cleanly.
+  host.clearActs();
+  await app.clear("id:palette-root");
+  await app.type("id:palette-root", "#77");
+  expect(app.texts()).toContain("#77 Expand Cmd+K Palette");
+  await app.press("text:#77 Expand Cmd+K Palette");
+  expect(host.acts).toEqual([{ type: "open_route", path: "/issues/iss-77" }, { type: "palette_close" }]);
+
+  // Issue search by title jumps directly to /issues/<id>.
+  host.clearActs();
+  await app.clear("id:palette-root");
+  await app.type("id:palette-root", "OAuth login");
+  expect(app.texts()).toContain("#88 OAuth login flow");
+  await app.press("text:#88 OAuth login flow");
+  expect(host.acts).toEqual([{ type: "open_route", path: "/issues/iss-88" }, { type: "palette_close" }]);
+
+  // Artifact search by type ("slides") and title jumps to /artifacts/<id>.
+  host.clearActs();
+  await app.clear("id:palette-root");
+  await app.type("id:palette-root", "slides");
+  expect(app.texts()).toContain("Q4 Architecture Deck");
+  expect(app.texts()).not.toContain("Palette Spec");
+  await app.press("text:Q4 Architecture Deck");
+  expect(host.acts).toEqual([{ type: "open_route", path: "/artifacts/art-deck-1" }, { type: "palette_close" }]);
+
+  // Trajectory run search by agent profile / session id jumps to /dashboard/runs?session=<id>.
+  host.clearActs();
+  await app.clear("id:palette-root");
+  await app.type("id:palette-root", "reviewer");
+  expect(app.texts()).toContain("Review Bot");
+  await app.press("text:Review Bot");
+  expect(host.acts).toEqual([{ type: "open_route", path: "/dashboard/runs?session=sess-run-9" }, { type: "palette_close" }]);
+});
+
 test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open, interaction_*, mid-turn steer, and telemetry", async () => {
   const baseSession = {
     id: "sess-ws-1",

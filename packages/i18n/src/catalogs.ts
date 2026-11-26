@@ -3469,8 +3469,9 @@ export const catalogs = {
       },
       section: { collapse: "折叠 {title}", expand: "展开 {title}" },
       palette: {
-        placeholder: { commands: "输入命令或跳转到任意页面…", files: "跳转到文件…", search: "在项目中搜索文本…" },
+        placeholder: { commands: "输入命令，或搜索 #工单、作品、运行轨迹…", files: "跳转到文件…", search: "在项目中搜索文本…" },
         mode: { commands: "命令", files: "文件", search: "搜索" },
+        groups: { issues: "工单", artifacts: "作品", runs: "运行轨迹" },
         a11y: { commands: "命令", files: "文件", search: "搜索结果" },
         searching: "搜索中…",
         empty: { commands: "没有匹配的命令。", files: "没有匹配的文件。", search: "没有匹配结果。" },
@@ -7293,8 +7294,9 @@ export const catalogs = {
       },
       section: { collapse: "Collapse {title}", expand: "Expand {title}" },
       palette: {
-        placeholder: { commands: "Type a command or jump to any page…", files: "Jump to a file…", search: "Search text in project…" },
+        placeholder: { commands: "Type a command, #issue, artifact, or run…", files: "Jump to a file…", search: "Search text in project…" },
         mode: { commands: "Commands", files: "Files", search: "Search" },
+        groups: { issues: "Issues", artifacts: "Artifacts", runs: "Trajectory Runs" },
         a11y: { commands: "Commands", files: "Files", search: "Search results" },
         searching: "Searching…",
         empty: { commands: "No matching commands.", files: "No matching files.", search: "No matching results." },
@@ -11115,6 +11117,9 @@ export interface Messages {
   "web.shell.palette.footer.close": undefined;
   "web.shell.palette.footer.run": undefined;
   "web.shell.palette.footer.select": undefined;
+  "web.shell.palette.groups.artifacts": undefined;
+  "web.shell.palette.groups.issues": undefined;
+  "web.shell.palette.groups.runs": undefined;
   "web.shell.palette.mode.commands": undefined;
   "web.shell.palette.mode.files": undefined;
   "web.shell.palette.mode.search": undefined;
