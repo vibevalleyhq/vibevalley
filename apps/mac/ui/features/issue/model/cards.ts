@@ -11,13 +11,16 @@ import type {
   Session,
   SessionView,
 } from "@vibevalley/protocol";
-import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
+import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, stageWantsUser } from "@vibevalley/protocol/rules";
 import { IssueLane as IssueLaneSchema } from "@vibevalley/protocol/schema";
 
+import { splitMarkdownCompareBlocks } from "../../../design/compareModel";
 import { ago, tookText } from "../../../infra/base/format";
 import { matches } from "../../../infra/base/search";
 import { describeSubagents } from "../../session";
 import { endedAt, assignedOnDuty, issueSession, issueTag, needsWorktreeCheck, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
+import { localizeIssueError } from "./issueError";
+import { type IssueScope, scopeMatches } from "./meta";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
 
@@ -26,33 +29,43 @@ export type Lane = IssueLane;
 export const lanes: Lane[] = [...IssueLaneSchema.options];
 
 export const laneLabel: Record<Lane, string> = {
+  backlog: t("web.issue.boardLabels.lane.backlog"),
   todo: t("web.issue.boardLabels.lane.todo"),
-  working: t("web.issue.boardLabels.lane.working"),
-  waiting: t("web.issue.boardLabels.lane.waiting"),
-  closed: t("web.issue.boardLabels.lane.closed"),
+  in_progress: t("web.issue.boardLabels.lane.in_progress"),
+  in_review: t("web.issue.boardLabels.lane.in_review"),
+  done: t("web.issue.boardLabels.lane.done"),
+  canceled: t("web.issue.boardLabels.lane.canceled"),
 };
 
-/** The status a lane's header is drawn with: the one its cards mostly have. */
-export const laneStatus: Record<Lane, IssueStatus> = { todo: "todo", working: "in_progress", waiting: "in_review", closed: "done" };
+/** The status a lane's header is drawn with: each lane matches its own status. */
+export const laneStatus: Record<Lane, IssueStatus> = {
+  backlog: "backlog",
+  todo: "todo",
+  in_progress: "in_progress",
+  in_review: "in_review",
+  done: "done",
+  canceled: "canceled",
+};
 
-/** A card says its own status only where its lane does not: a draft in todo says so by its draft flag instead. */
-export const ownStatus = (lane: Lane, status: IssueStatus) => status !== laneStatus[lane] && !(lane === "todo" && status === "backlog");
+/** A card says its own status only where its lane does not. */
+export const ownStatus = (lane: Lane, status: IssueStatus) => status !== laneStatus[lane];
 
 function laneOf(s: IssueStatus): Lane {
-  if (s === "backlog" || s === "todo") return "todo";
-  if (s === "in_progress") return "working";
-  if (s === "in_review") return "waiting";
-  return "closed";
+  return s;
 }
 
-export type Move = "start" | "close" | "reopen";
+export type Move = "start" | "track" | "close" | "reopen" | "revive";
 
-/** A drop between lanes, if the server lets the issue go there (`Issue.moves`). A task's issue has no moves. */
-function moveOf(from: Lane, to: Lane, moves: IssueStatus[]): Move | undefined {
-  if (from === "todo" && to === "working" && moves.includes("todo")) return "start";
-  if ((from === "working" || from === "waiting") && to === "closed" && (moves.includes("done") || moves.includes("canceled"))) return "close";
-  if (from === "closed" && to === "working" && moves.includes("todo")) return "reopen";
-  return undefined;
+/** A drop between any two distinct lanes, when the server allows the target status (`Issue.moves`). */
+function moveOf(from: Lane, to: Lane, moves: IssueStatus[], canTrack: boolean): Move | undefined {
+  if (from === to || !moves.includes(to)) return undefined;
+  if (to === "todo") {
+    if (from === "backlog") return "start";
+    return canTrack ? "track" : "reopen";
+  }
+  if (to === "done" || to === "canceled") return "close";
+  if (to === "backlog" && (from === "done" || from === "canceled")) return "revive";
+  return "track";
 }
 
 export const closedShown = 15;
@@ -83,13 +96,10 @@ export function boardRows(
   return [...live, ...history.filter((r) => !kept.has(r.issue.id))];
 }
 
-/** What the history adds to the board changes only when an issue gets a session or one leaves the farm. */
+/** Tracks board sequence, every issue's status + sessions, and active farm sessions so non-session transitions invalidate issue history too. */
 export const historyKey = (board: BoardSlice | undefined, sessions: readonly SessionView[] | undefined): string =>
   board
-    ? `${board.issues
-        .filter((i) => sessionIdsOf(i).length > 0)
-        .map((i) => `${i.id}:${sessionIdsOf(i).join(",")}`)
-        .join(";")}|${(sessions ?? []).map((s) => s.id).join(",")}`
+    ? `${board.seq}|${board.issues.map((i) => `${i.id}:${i.status}:${sessionIdsOf(i).join(",")}`).join(";")}|${(sessions ?? []).map((s) => s.id).join(",")}`
     : "";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */
@@ -108,6 +118,7 @@ export type BoardCard = (
 
 export const cardRepo = (c: BoardCard) => c.issue.repo;
 export const cardAgent = (c: BoardCard) => assignedAgentOf(c.issue);
+export const cardTags = (c: BoardCard) => c.issue.tags ?? [];
 
 export function buildCards(
   rows: IssueHistory[],
@@ -177,45 +188,56 @@ function usesSummaryLaneCounts(summary: BoardSummary | undefined, cards: readonl
 export function laneCountOf(lane: Lane, cards: readonly BoardCard[], summary: BoardSummary | undefined, filtered: boolean, older: boolean): number {
   if (usesSummaryLaneCounts(summary, cards, filtered, older)) {
     switch (lane) {
+      case "in_progress":
+        return summary.laneCounts.inProgress;
+      case "in_review":
+        return summary.laneCounts.inReview;
+      case "backlog":
       case "todo":
-        return summary.laneCounts.todo;
-      case "working":
-        return summary.laneCounts.working;
-      case "waiting":
-        return summary.laneCounts.waiting;
-      case "closed":
-        return summary.laneCounts.closed;
+      case "done":
+      case "canceled":
+        return summary.laneCounts[lane];
     }
   }
   return cards.filter((c) => c.lane === lane).length;
 }
 
-/** Active worker slot usage (`runningSlots / maxRunning`) for the working lane header. */
-export function runningSlotsOf(
-  cards: readonly BoardCard[],
-  summary: BoardSummary | undefined,
-  filtered: boolean,
-  fallbackMax: number,
-): { taken: number; of: number } {
-  if (summary !== undefined && !filtered) {
-    return { taken: summary.runningSlots, of: summary.maxRunning };
+export interface CardPreview {
+  readonly attachmentId?: string;
+  readonly url?: string;
+  readonly isCompare: boolean;
+}
+
+/** First previewable image for a board card: prefers a valid ```compare block image, then the first image attachment. */
+export function cardPreviewOf(card: BoardCard): CardPreview | undefined {
+  const description = card.issue.description;
+  if (description.includes("compare")) {
+    for (const seg of splitMarkdownCompareBlocks(description)) {
+      if (seg.kind !== "compare") continue;
+      const picked = seg.spec.after ?? seg.spec.before ?? seg.spec.image;
+      if (!picked) continue;
+      if (picked.attachment) return { attachmentId: picked.attachment, isCompare: true };
+      if (picked.url) return { url: picked.url, isCompare: true };
+    }
   }
-  const taken = cards.filter((c) => c.lane === "working" && c.kind === "issue" && c.session?.phase._tag === "working").length;
-  return { taken, of: summary?.maxRunning ?? fallbackMax };
+  const imageAttachment = card.issue.attachments?.find((att) => att.type.startsWith("image/"));
+  if (imageAttachment) return { attachmentId: imageAttachment.id, isCompare: false };
+  return undefined;
 }
 
 function cardWords(c: BoardCard): (string | undefined)[] {
+  const tags = c.issue.tags ?? [];
   switch (c.kind) {
     case "family":
     case "todo":
     case "missing":
-      return [c.issue.title, c.issue.description, c.issue.repo];
+      return [c.issue.title, c.issue.description, c.issue.repo, ...tags];
     case "issue": {
       const head = c.sessions.at(-1);
-      return [c.issue.title, c.issue.description, head?.name, c.issue.repo, c.issue.id, head?.lastRun?.summary];
+      return [c.issue.title, c.issue.description, head?.name, c.issue.repo, c.issue.id, head?.lastRun?.summary, ...tags];
     }
     case "orchestrator":
-      return [c.issue.title, c.issue.description, c.issue.repo, c.issue.id, t("web.issue.card.orchestrator")];
+      return [c.issue.title, c.issue.description, c.issue.repo, c.issue.id, t("web.issue.card.orchestrator"), ...tags];
   }
 }
 
@@ -223,12 +245,18 @@ export interface BoardFilter {
   query: string;
   repo: string;
   agent: string;
+  tag: string;
+  scope: IssueScope;
 }
 
-export const noFilter: BoardFilter = { query: "", repo: "", agent: "" };
-export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.repo !== "" || f.agent !== "";
+export const noFilter: BoardFilter = { query: "", repo: "", agent: "", tag: "", scope: "all" };
+export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.repo !== "" || f.agent !== "" || f.tag !== "" || f.scope !== "all";
 export const filterShows = (f: BoardFilter, c: BoardCard) =>
-  (f.repo === "" || cardRepo(c) === f.repo) && (f.agent === "" || cardAgent(c) === f.agent) && matches(f.query, cardWords(c));
+  scopeMatches(f.scope, c.issue) &&
+  (f.repo === "" || cardRepo(c) === f.repo) &&
+  (f.agent === "" || cardAgent(c) === f.agent) &&
+  (f.tag === "" || cardTags(c).includes(f.tag)) &&
+  matches(f.query, cardWords(c));
 
 /** What a card and a list row both show. `detail` is everything else: it is the hover tip. */
 interface CardLook {
@@ -263,7 +291,8 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
     case "todo": {
       const item = c.issue;
       if (item.refining) flags.push({ text: t("web.issue.card.refining", { name: item.refining.name }), tone: "water" });
-      else if (item.status === "backlog") flags.push({ text: t("web.issue.card.draft"), tone: "wheat" });
+      else if (item.status === "backlog") flags.push({ text: t("web.issue.card.draft"), tone: "faint" });
+      else if (item.status === "in_review") flags.push({ text: t("shared.stage.reviewing"), tone: "wheat" });
       if (item.queuedAt !== undefined) flags.push({ text: t("web.issue.card.queued"), tone: "water" });
       if (item.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       const agent = assignedAgentOf(item);
@@ -280,7 +309,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       const { issue, sessions, tag, session } = c;
       const head = sessions.at(-1);
       if (!head) {
-        return { number: numberOf(issue), title: shortTitle(issueTitle(issue, issues)), status: issue.status, priority: issue.priority, flags, detail: "" };
+        return { number: numberOf(issue), title: issueTitle(issue, issues), status: issue.status, priority: issue.priority, flags, detail: "" };
       }
       const first = sessions[0] ?? head;
       const phase = session?.phase;
@@ -316,7 +345,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
         ].join(" · "),
       );
       const said = now0.lastRun?.summary;
-      if (tag === "waiting" && said) lines.push(said);
+      if (tag === "waiting" && said) lines.push(localizeIssueError(said).text);
       const subagents = session?.subagents;
       const wait =
         subagents && subagents.waits.length > 0
@@ -328,7 +357,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       if (!tagOpen(tag)) lines.push(`${tagText(issue)} · ${ago(issue.closedAt ?? endedAt(head) ?? head.hiredAt, now)}`);
       return omitUndefined({
         number: numberOf(issue),
-        title: shortTitle(issueTitle(issue, issues)),
+        title: issueTitle(issue, issues),
         status: issue.status,
         wait,
         statusTone: issue.canceled === "lost" ? ("berry" as const) : undefined,
@@ -382,12 +411,15 @@ export function cardUrgencyTone(card: BoardCard): "wheat" | "berry" | undefined 
     case "missing":
       return stageUrgencyTone(card.issue.stage.state) ?? "berry";
     case "todo":
+      return card.issue.status === "in_review" ? "wheat" : undefined;
     case "orchestrator":
       return undefined;
   }
 }
 
 export function cardMove(c: BoardCard, to: Lane): Move | undefined {
-  if (c.kind === "todo" || c.kind === "issue" || c.kind === "family") return moveOf(c.lane, to, c.issue.moves);
+  if (c.kind === "todo" || c.kind === "issue" || c.kind === "family") {
+    return moveOf(c.lane, to, c.issue.moves, c.kind === "todo");
+  }
   return undefined;
 }

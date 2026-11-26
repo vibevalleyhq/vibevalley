@@ -41,14 +41,14 @@ impl From<outbox_item::Model> for OutboxItem {
     }
 }
 
-async fn insert_impl<C: ConnectionTrait>(conn: &C, topic: &str, payload_json: &str, now_ms: i64) -> Result<i64, ApiError> {
+async fn insert_impl<C: ConnectionTrait>(conn: &C, topic: &str, payload_json: &str, created_at: i64, available_at: i64) -> Result<i64, ApiError> {
     let saved = outbox_item::ActiveModel {
         topic: Set(topic.to_owned()),
         payload_json: Set(payload_json.to_owned()),
         status: Set(OUTBOX_STATUS_PENDING.to_owned()),
         attempts: Set(0),
-        available_at: Set(now_ms),
-        created_at: Set(now_ms),
+        available_at: Set(available_at),
+        created_at: Set(created_at),
         last_error: Set(None),
         ..Default::default()
     }
@@ -70,12 +70,17 @@ impl OutboxService {
 
     /// Enqueues an outbox item standalone on the write pool.
     pub(crate) async fn enqueue(&self, topic: &str, payload_json: &str, now_ms: i64) -> Result<i64, ApiError> {
-        insert_impl(self.db.write_conn(), topic, payload_json, now_ms).await
+        insert_impl(self.db.write_conn(), topic, payload_json, now_ms, now_ms).await
+    }
+
+    /// Enqueues an outbox item standalone scheduled for `available_at` (ms).
+    pub(crate) async fn enqueue_at(&self, topic: &str, payload_json: &str, created_at: i64, available_at: i64) -> Result<i64, ApiError> {
+        insert_impl(self.db.write_conn(), topic, payload_json, created_at, available_at).await
     }
 
     /// Enqueues an outbox item inside an open write transaction.
     pub(crate) async fn enqueue_in_tx(&self, tx: &Tx, topic: &str, payload_json: &str, now_ms: i64) -> Result<i64, ApiError> {
-        insert_impl(tx, topic, payload_json, now_ms).await
+        insert_impl(tx, topic, payload_json, now_ms, now_ms).await
     }
 
     /// Requeues any rows left in `processing` from an unclean shutdown back to `pending`.

@@ -1,4 +1,4 @@
-import { cleanup, type JSX } from "nsh";
+import { cleanup, host, type JSX } from "nsh";
 
 import { createSlices, slices, SlicesContext } from "./frame";
 import { QueryProvider, refetchOnRelink, useQueryClient } from "./query";
@@ -24,5 +24,6 @@ export function Root(props: { history?: RouterHistory; children: JSX.Element }) 
 function Opened() {
   const queries = useQueryClient();
   cleanup(refetchOnRelink(slices, queries));
+  cleanup(host.on("repos-changed", () => void queries.invalidate({ prefix: ["repos"] })));
   return null;
 }

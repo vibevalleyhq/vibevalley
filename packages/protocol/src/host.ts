@@ -16,10 +16,23 @@ export interface TraySummary {
 const UpdateManualValues = ["diskImage", "translocated", "readOnly", "noBuild"] as const;
 export type UpdateManual = (typeof UpdateManualValues)[number];
 
+const UpdateFailureKindValues = ["network", "rateLimit", "integrity", "signature", "permission", "install", "unknown"] as const;
+export type UpdateFailureKind = (typeof UpdateFailureKindValues)[number];
+
 export type UpdateState =
-  | { readonly _tag: "idle"; readonly version: string }
+  | { readonly _tag: "disabled"; readonly version: string }
+  | { readonly _tag: "idle"; readonly version: string; readonly checkedAt?: number }
   | { readonly _tag: "checking"; readonly version: string }
-  | { readonly _tag: "downloading"; readonly version: string; readonly next: string; readonly percent: number }
+  | {
+      readonly _tag: "downloading";
+      readonly version: string;
+      readonly next: string;
+      readonly percent: number;
+      readonly downloadedBytes?: number;
+      readonly totalBytes?: number;
+      readonly speedBps?: number;
+    }
+  | { readonly _tag: "verifying"; readonly version: string; readonly next: string }
   | {
       readonly _tag: "ready";
       readonly version: string;
@@ -28,16 +41,40 @@ export type UpdateState =
       readonly newFarm: boolean;
       readonly page: string;
     }
+  | { readonly _tag: "installing"; readonly version: string; readonly next: string }
   | { readonly _tag: "manual"; readonly version: string; readonly next: string; readonly why: UpdateManual; readonly page: string }
-  | { readonly _tag: "failed"; readonly version: string; readonly why: string };
+  | {
+      readonly _tag: "failed";
+      readonly version: string;
+      readonly why: string;
+      readonly kind?: UpdateFailureKind;
+      readonly page?: string;
+    };
 
 export const UpdateState: Codec<UpdateState> = z.discriminatedUnion("_tag", [
-  z.object({ _tag: z.literal("idle"), version: z.string() }),
+  z.object({ _tag: z.literal("disabled"), version: z.string() }),
+  z.object({ _tag: z.literal("idle"), version: z.string(), checkedAt: z.exactOptional(z.number()) }),
   z.object({ _tag: z.literal("checking"), version: z.string() }),
-  z.object({ _tag: z.literal("downloading"), version: z.string(), next: z.string(), percent: z.number() }),
+  z.object({
+    _tag: z.literal("downloading"),
+    version: z.string(),
+    next: z.string(),
+    percent: z.number(),
+    downloadedBytes: z.exactOptional(z.number()),
+    totalBytes: z.exactOptional(z.number()),
+    speedBps: z.exactOptional(z.number()),
+  }),
+  z.object({ _tag: z.literal("verifying"), version: z.string(), next: z.string() }),
   z.object({ _tag: z.literal("ready"), version: z.string(), next: z.string(), notes: z.array(z.string()), newFarm: z.boolean(), page: z.string() }),
+  z.object({ _tag: z.literal("installing"), version: z.string(), next: z.string() }),
   z.object({ _tag: z.literal("manual"), version: z.string(), next: z.string(), why: z.enum(UpdateManualValues), page: z.string() }),
-  z.object({ _tag: z.literal("failed"), version: z.string(), why: z.string() }),
+  z.object({
+    _tag: z.literal("failed"),
+    version: z.string(),
+    why: z.string(),
+    kind: z.exactOptional(z.enum(UpdateFailureKindValues)),
+    page: z.exactOptional(z.string()),
+  }),
 ]) satisfies Codec<UpdateState>;
 
 export interface Updates {

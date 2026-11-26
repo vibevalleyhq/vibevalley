@@ -22,8 +22,17 @@ pub(super) fn capabilities_from(raw: &str) -> String {
         caps["fs"]["read"] = json!([]);
     }
     if let Some(read) = caps["fs"]["read"].as_array_mut() {
-        // nsh resolves roots to their real paths: only existing folders count.
-        read.extend(roots.iter().filter_map(|r| std::fs::canonicalize(r).ok()).map(|r| json!(r)));
+        // nsh checks local file:// media lexically against declared roots before canonicalizing,
+        // so include both the existing raw root (e.g. `/var/folders/...`, `/tmp/...` symlinks on
+        // macOS) and its canonical path (e.g. `/private/var/folders/...`).
+        for r in &roots {
+            if let Ok(canon) = std::fs::canonicalize(r) {
+                if r.is_absolute() && r != &canon {
+                    read.push(json!(r));
+                }
+                read.push(json!(canon));
+            }
+        }
     }
     caps.to_string()
 }

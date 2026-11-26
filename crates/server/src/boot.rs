@@ -14,14 +14,39 @@ use vibevalley_runtime::oar::Registry;
 
 use crate::agent::{Agent, Profile};
 use crate::channel::{ChannelMessageEvent, Chat};
-use crate::config::Config;
-use crate::context::Context;
+use crate::config::{Config, StartError};
+use crate::connector::Connector;
 use crate::context::api::BoxFuture;
 use crate::context::port::CronOrchestratorPort;
+use crate::context::{Context, Fetch, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
+use crate::cron::Scheduler as CronScheduler;
 use crate::game::Game;
 use crate::issue::{Board, IssueChat, SessionChat};
 use crate::runtime::{OUTBOX_SESSION_REPORTED, OutboxSessionReported, Runtime, SessionLifecycleEvent};
 use crate::setting::Setting;
+
+/// Opens the database service and assembles [`Context`].
+pub(crate) async fn open_context(config: &Config) -> Result<Arc<Context>, StartError> {
+    let service = config.open_service().await?;
+    let (http, download): (Arc<dyn Fetch>, Arc<dyn Fetch>) = match &config.media_network {
+        Some(network) => network.clone(),
+        None if config.offline_media => crate::fake::moss::network(),
+        None => (Arc::new(Http), Arc::new(PublicDownload)),
+    };
+    let live = Arc::new(LiveState::new());
+    let outbox = Arc::new(Outbox::new(service.clone()).with_clock(config.clock.clone()));
+    let feed = Arc::new(StateFeed::new());
+    Ok(Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        live,
+        outbox,
+        feed,
+        config.clock.clone(),
+        http,
+        download,
+    )))
+}
 
 /// Seeds the 3 starter guide issues once on a fresh real-server database.
 /// Skipped for test and scripted boots (`probe_runtimes == false` or injected fakes).
@@ -109,6 +134,7 @@ pub(crate) fn spawn_chat_artifact_bridge(ctx: &Context, channel: &Chat) -> broad
     chat_msg_rx
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn register_session_reported_outbox(
     ctx: &Context,
     issue_chat: &Arc<IssueChat>,
@@ -116,14 +142,18 @@ pub(crate) fn register_session_reported_outbox(
     agent: &Arc<Agent>,
     game: &Arc<Game>,
     runtime: &Arc<Runtime>,
+    connector: &Arc<Connector>,
+    cron: &Arc<CronScheduler>,
 ) {
+    cron.set_digest_delivery(connector.clone());
     let ic = Arc::downgrade(issue_chat);
     let sc = Arc::downgrade(session_chat);
     let ag = Arc::downgrade(agent);
     let g = Arc::downgrade(game);
     let rt = Arc::downgrade(runtime);
+    let conn = Arc::downgrade(connector);
     ctx.outbox.register(OUTBOX_SESSION_REPORTED, move |delivery| {
-        let (ic, sc, ag, g, rt) = (ic.clone(), sc.clone(), ag.clone(), g.clone(), rt.clone());
+        let (ic, sc, ag, g, rt, conn) = (ic.clone(), sc.clone(), ag.clone(), g.clone(), rt.clone(), conn.clone());
         async move {
             let report: OutboxSessionReported = delivery.decode().map_err(|e| format!("invalid {OUTBOX_SESSION_REPORTED} payload: {e}"))?;
             if let Some(ic) = ic.upgrade() {
@@ -144,6 +174,9 @@ pub(crate) fn register_session_reported_outbox(
                 if let Some(g) = g.upgrade() {
                     g.on_session_reported(&reported_session, report.outcome);
                 }
+            }
+            if let Some(conn) = conn.upgrade() {
+                conn.on_session_reported_async(&report).await;
             }
             Ok::<(), String>(())
         }

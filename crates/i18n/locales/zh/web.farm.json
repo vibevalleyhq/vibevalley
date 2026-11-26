@@ -20,7 +20,17 @@
     "send": "发送"
   },
   "hud": {
-    "workbench": "工作台"
+    "workbench": "工作台",
+    "dawn": "晨",
+    "noon": "昼",
+    "dusk": "暮",
+    "night": "夜",
+    "liftRoof": "掀顶",
+    "closeRoof": "合顶",
+    "resetCamera": "回正",
+    "phone": "手机",
+    "enter": "进入",
+    "backToYard": "返回庭院"
   },
   "sow": {
     "homeless": "这座农场不是哪个仓库的",

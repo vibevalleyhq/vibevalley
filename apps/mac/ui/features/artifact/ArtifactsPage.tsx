@@ -43,7 +43,7 @@ export type ArtifactChat = (props: {
 function ArtifactSkeleton() {
   return (
     <View testID="artifact-skeleton" accessibilityState={{ busy: true }} class="min-h-0 flex-1 bg-page">
-      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+      <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
         <If when={!contentSidebarOpen.get()}>
           <IconButton
             icon="sidebar"
@@ -71,7 +71,7 @@ function ArtifactSkeleton() {
 function CollapsedContentHeader() {
   return (
     <If when={!contentSidebarOpen.get()}>
-      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+      <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
         <IconButton
           icon="sidebar"
           size={16}
@@ -172,16 +172,16 @@ function Opened(props: { id: string; chat: ArtifactChat }) {
   );
 }
 
-/** The title, typed over in place: Return or leaving it renames, Escape puts it back. */
+/** Click-to-edit header title: displays full text with ellipsis at rest; Return or blur renames, Escape cancels. */
 function Title(props: { artifact: Artifact }) {
   const queries = useQueryClient();
   const text = signal(untracked(() => props.artifact.title));
-  const focused = signal(false);
+  const editing = signal(false);
   let field: InputRef | undefined;
   const act = createAct();
   effect(() => {
     const next = props.artifact.title;
-    if (!untracked(focused)) text.set(next);
+    if (!untracked(editing)) text.set(next);
   });
   const save = async () => {
     const title = text().trim();
@@ -198,35 +198,59 @@ function Title(props: { artifact: Artifact }) {
     );
     if (done !== true) text.set(props.artifact.title);
   };
+  const startEdit = () => {
+    text.set(props.artifact.title);
+    editing.set(true);
+  };
+  const commit = () => {
+    if (!untracked(editing)) return;
+    editing.set(false);
+    void save();
+  };
   effect(() => {
-    if (!focused()) return;
+    if (!editing()) return;
     return keymap.bind(
       "escape",
       () => {
         text.set(props.artifact.title);
+        editing.set(false);
         field?.blur();
       },
       { when: "always" },
     );
   });
   return (
-    <Input
-      ref={(el) => {
-        field = el;
-      }}
-      testID="artifact-title"
-      accessibilityLabel={t("web.artifact.page.title")}
-      value={text()}
-      maxLength={80}
-      submitBehavior="blurAndSubmit"
-      onChange={(e) => text.set(e.value)}
-      onFocus={() => focused.set(true)}
-      onBlur={() => {
-        focused.set(false);
-        void save();
-      }}
-      class="h-7 min-w-20 max-w-64 shrink rounded-md bg-transparent px-1.5 text-sm font-semibold text-ink hover:bg-hover focus:bg-hover"
-    />
+    <If
+      when={editing()}
+      else={
+        <View
+          role="button"
+          testID="artifact-title"
+          accessibilityLabel={t("web.artifact.page.title")}
+          accessibilityValue={{ text: props.artifact.title }}
+          onPress={startEdit}
+          class="h-7 min-w-0 max-w-lg shrink flex-row items-center rounded-md px-1.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          <Text class="min-w-0 truncate text-sm font-semibold text-ink">{props.artifact.title}</Text>
+        </View>
+      }
+    >
+      <Input
+        ref={(el) => {
+          field = el;
+        }}
+        autoFocus
+        testID="artifact-title"
+        accessibilityLabel={t("web.artifact.page.title")}
+        value={text()}
+        maxLength={80}
+        submitBehavior="blurAndSubmit"
+        onChange={(e) => text.set(e.value)}
+        onSubmit={commit}
+        onBlur={commit}
+        class="h-7 min-w-44 max-w-lg flex-1 rounded-md border border-focus bg-page px-1.5 text-sm font-semibold text-ink"
+      />
+    </If>
   );
 }
 
@@ -242,7 +266,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
   const appletModalOpen = signal(false);
   const historyPreview = signal<ArtifactHistoryPreviewResult | undefined>(undefined);
   const revisionKey = signal(0);
-  const railWidth = usePaneWidth("artifact-rail", 352, 280, 560);
+  const railWidth = usePaneWidth("artifact-rail", 384, 300, 560);
   const installedApplet = useInstalledApplet(() => props.artifact.id);
 
   const isWideCanvas = () => props.artifact.artifactType !== "docs" && props.artifact.artifactType !== "outline";
@@ -336,7 +360,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
     >
       <View class="min-h-0 min-w-0 flex-1">
         <If when={presenting()}>
-          <View testID="artifact-presenting" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-side px-3">
+          <View testID="artifact-presenting" desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-side px-3">
             <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{props.artifact.title}</Text>
             <Button size="compact" icon="close" testID="artifact-present-end" onPress={() => contentPresenting.set(false)}>
               {t("web.artifact.canvas.close")}
@@ -577,22 +601,24 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
         <View
           accessibilityLabel={rightPanel() === "history" ? t("web.artifact.timeline.title") : t("web.artifact.page.rail")}
           testID="artifact-rail"
-          class={`h-full min-h-0 border-l border-line bg-side ${lg() ? "relative shrink-0" : "absolute inset-0 z-20"}`}
+          class={`h-full min-h-0 overflow-hidden border-l border-line bg-side ${lg() ? "relative shrink-0" : "absolute inset-0 z-20"}`}
           style={lg() ? { width: railWidth() } : undefined}
         >
           <If when={lg()}>
-            <Splitter pane="artifact-rail" side="left" width={railWidth()} min={280} max={560} label={t("web.artifact.page.rail")} />
+            <Splitter pane="artifact-rail" side="left" width={railWidth()} min={300} max={560} label={t("web.artifact.page.rail")} />
           </If>
           <View class="min-h-0 min-w-0 flex-1">
             <If
               when={rightPanel() === "history"}
               else={
-                <Chat
-                  channel={said()?.channel ?? props.artifact.channel}
-                  issue={props.artifact.issue}
-                  point={said()?.number}
-                  onClose={() => setRightPanel("none")}
-                />
+                <View class="min-h-0 min-w-0 flex-1 pr-1.5">
+                  <Chat
+                    channel={said()?.channel ?? props.artifact.channel}
+                    issue={props.artifact.issue}
+                    point={said()?.number}
+                    onClose={() => setRightPanel("none")}
+                  />
+                </View>
               }
             >
               <HistoryPanel

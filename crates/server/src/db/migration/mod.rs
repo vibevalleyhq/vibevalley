@@ -8,6 +8,8 @@ pub mod m20261124_100001_create_server_tables;
 pub mod m20261124_100002_create_outbox_item;
 pub mod m20261125_100001_reconcile_legacy_baseline;
 pub mod m20261125_100002_add_issue_attachments;
+pub mod m20261126_100001_add_issue_tags_and_dates;
+pub mod m20261127_100001_add_issue_status;
 
 use sea_orm_migration::prelude::*;
 
@@ -25,6 +27,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261124_100002_create_outbox_item::Migration),
             Box::new(m20261125_100001_reconcile_legacy_baseline::Migration),
             Box::new(m20261125_100002_add_issue_attachments::Migration),
+            Box::new(m20261126_100001_add_issue_tags_and_dates::Migration),
+            Box::new(m20261127_100001_add_issue_status::Migration),
         ]
     }
 }

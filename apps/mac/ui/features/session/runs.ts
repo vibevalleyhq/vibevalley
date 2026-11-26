@@ -3,10 +3,11 @@ import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import type { LiveEvent, SessionEvent } from "@vibevalley/protocol";
-import { omitUndefined } from "@vibevalley/protocol/rules";
+import { omitUndefined, oneLine } from "@vibevalley/protocol/rules";
 import { jsonString } from "@vibevalley/protocol/schema";
 
 import { big, tookText } from "../../infra/base/format";
+import { localizeRuntimeError } from "../../infra/runtimeError";
 import { mergeSteps, shownEvents, stepLimit } from "../../infra/sessionRuns";
 
 export { mergeSteps, shownEvents };
@@ -83,6 +84,51 @@ interface Span {
 export function spansOf(r: RunView, end: number): Span[] {
   const all = allOf(r);
   return all.map((s, i) => ({ step: s, ms: Math.max(0, (all[i + 1]?.time ?? end) - s.time) }));
+}
+
+/** Per-step duration in ms: pairs `tool/call` with its `tool/result` (or `end` while running), and measures other steps until the next event in their run. */
+export function stepDurationsOf(log: readonly SessionEvent[], end: number): Map<number, number> {
+  const durations = new Map<number, number>();
+  const shown = shownEvents([...log]);
+  const views = runsOf(shown);
+
+  views.forEach((view, idx) => {
+    const all = allOf(view);
+    const runEnd = idx === views.length - 1 ? Math.max(end, all.at(-1)?.time ?? end) : (all.at(-1)?.time ?? end);
+    for (let i = 0; i < all.length; i++) {
+      const step = all.at(i);
+      if (step === undefined || step.type === "llm/usage" || step.type === "run/error") continue;
+      if (step.type === "tool/call") continue;
+      const next = all.at(i + 1);
+      const until = next !== undefined ? next.time : runEnd;
+      durations.set(step.seq, Math.max(0, until - step.time));
+    }
+  });
+
+  // Pair every tool/call with its matching tool/result (works for concurrent calls and subagents).
+  const openCalls = new Map<number, { time: number; run: string | undefined }>();
+  const runEnds = new Map<string | undefined, number>();
+  for (const e of log) {
+    if (e.type === "run/start" || e.type === "run/end") continue;
+    const prev = runEnds.get(e.run) ?? 0;
+    if (e.time > prev) runEnds.set(e.run, e.time);
+    if (e.type === "tool/call") {
+      openCalls.set(e.seq, { time: e.time, run: e.run });
+    } else if (e.type === "tool/result" && e.call !== undefined) {
+      const call = openCalls.get(e.call);
+      if (call) {
+        durations.set(e.call, Math.max(0, e.time - call.time));
+        openCalls.delete(e.call);
+      }
+    }
+  }
+  const lastRun = views.at(-1)?.run;
+  for (const [seq, call] of openCalls) {
+    const fallbackEnd = call.run === lastRun ? Math.max(end, runEnds.get(call.run) ?? call.time) : (runEnds.get(call.run) ?? call.time);
+    durations.set(seq, Math.max(0, fallbackEnd - call.time));
+  }
+
+  return durations;
 }
 
 export function runMs(r: RunView, end: number) {
@@ -202,6 +248,96 @@ export function readableInput(step: SessionEvent) {
     return JSON.stringify(obj.data, null, 2);
   }
   return raw;
+}
+
+const PROMPT_SCAFFOLDING_RE = /(?:^|\n)(?:【现在】|【现状】|【现状变了】|【群聊】|【输入事件】|\[来源：|这期间群聊里的汇报)/u;
+const USER_SAY_RE = /用户说：/gu;
+const CHAT_BLOCK_RE = /【群聊】([^\n]*?)里有给你的话：\n([\s\S]*?)(?:\n\n你的回答会发在[^\n]*|$)/u;
+const EVENT_BLOCK_RE = /【输入事件】\n([\s\S]*?)(?:\n\n原始载荷用[^\n]*|$)/u;
+const NOW_LINE_RE = /^【现在】/u;
+const SCAFFOLD_BLOCK_START_RE = /^(?:【现状】|【现状变了】|这期间群聊里的汇报)/u;
+const SOURCE_HEAD_RE = /^\[来源：([^\]）]+)\]/u;
+const IMPLICIT_SOURCE_RE = /^(?:用户|群聊)$/u;
+const SITUATION_LINE_RE = /^(?:用户的语言：|仓库（工作目录|可以派的帮工：|各频道里在场的帮工：|你正在回话的地方：|- |\+ |− |\[target=|│)/u;
+const PARENTHETICAL_HINT_RE = /^（(?:用户在对话框里选定了|用户选定了仓库：|这句话是用户用语音说的)/u;
+
+function cleanEnvelopeLine(line: string): string {
+  const msg = /^\[(?:target=[^\]]+|input=[^\]]+)\s+from=([^\]]+)\](?:（改过）)?\s*(.*)$/u.exec(line.trim());
+  if (msg) {
+    const from = (msg[1] ?? "").trim();
+    const text = (msg[2] ?? "").trim();
+    return from && text ? `${from}: ${text}` : text || from;
+  }
+  return line.trim();
+}
+
+function firstPayloadLine(block: string): string {
+  const found = block
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 0 && !l.startsWith("│"));
+  return found ? cleanEnvelopeLine(found) : "";
+}
+
+/** Strips internal orchestrator prompt-injection scaffolding for collapsed trajectory rows; expanded views keep the full raw text. */
+export function collapsedStepSummary(step: SessionEvent, body: string): string {
+  return localizeRuntimeError(collapsedStepSummaryRaw(step, body)).text;
+}
+
+function collapsedStepSummaryRaw(step: SessionEvent, body: string): string {
+  if (step.type !== "user/message" || !PROMPT_SCAFFOLDING_RE.test(body)) {
+    return oneLine(body).trim();
+  }
+  let lastUserSayEnd = -1;
+  for (const match of body.matchAll(USER_SAY_RE)) {
+    lastUserSayEnd = match.index + match[0].length;
+  }
+  if (lastUserSayEnd >= 0) {
+    const said = oneLine(body.slice(lastUserSayEnd)).trim();
+    if (said) return said;
+  }
+  const chatMatch = CHAT_BLOCK_RE.exec(body);
+  if (chatMatch) {
+    const target = (chatMatch[1] ?? "").trim();
+    const first = firstPayloadLine(chatMatch[2] ?? "");
+    if (first) return target ? `${target} · ${oneLine(first).trim()}` : oneLine(first).trim();
+  }
+  const eventMatch = EVENT_BLOCK_RE.exec(body);
+  if (eventMatch) {
+    const first = firstPayloadLine(eventMatch[1] ?? "");
+    if (first) return oneLine(first).trim();
+  }
+  let sourceLabel = "";
+  const kept: string[] = [];
+  let skippingBlock = false;
+  for (const rawLine of body.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      if (skippingBlock) skippingBlock = false;
+      continue;
+    }
+    if (NOW_LINE_RE.test(line)) continue;
+    if (SCAFFOLD_BLOCK_START_RE.test(line)) {
+      skippingBlock = true;
+      continue;
+    }
+    const src = SOURCE_HEAD_RE.exec(line);
+    if (src) {
+      skippingBlock = false;
+      const kind = (src[1] ?? "").trim();
+      if (kind && !IMPLICIT_SOURCE_RE.test(kind)) sourceLabel = kind;
+      continue;
+    }
+    if (skippingBlock) {
+      if (SITUATION_LINE_RE.test(line) || rawLine.startsWith("  ")) continue;
+      skippingBlock = false;
+    }
+    if (PARENTHETICAL_HINT_RE.test(line)) continue;
+    kept.push(cleanEnvelopeLine(line));
+  }
+  const summary = oneLine(kept.join(" ")).trim();
+  if (summary) return sourceLabel ? `${sourceLabel} · ${summary}` : summary;
+  return sourceLabel || t("web.session.trajectory.contextUpdate");
 }
 
 /** What started a run, as its fold says it: the first word is the issue, later ones are words carried to it. */

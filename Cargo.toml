@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
   "crates/protocol",
+  "crates/mcp",
   "crates/i18n",
   "crates/core",
   "crates/git",
@@ -71,6 +72,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 url = "2.5.8"
 uuid = { version = "1.29.2", features = ["v4", "v7"] }
+vibevalley-mcp = { path = "crates/mcp" }
 wgpu = "29.0.4"
 
 [profile.dev]

@@ -21,10 +21,12 @@ const IssueCardKind = z.enum(T.IssueCardKindValues) satisfies Codec<T.IssueCardK
 export const IssuePromptKind = z.enum(T.IssuePromptKindValues) satisfies Codec<T.IssuePromptKind>;
 
 export const BoardLaneCounts = z.object({
+  backlog: z.number(),
   todo: z.number(),
-  working: z.number(),
-  waiting: z.number(),
-  closed: z.number(),
+  inProgress: z.number(),
+  inReview: z.number(),
+  done: z.number(),
+  canceled: z.number(),
 }) satisfies Codec<T.BoardLaneCounts>;
 
 export const BoardIssueSummary = z.object({
@@ -201,6 +203,9 @@ const issueFields = {
   answer: z.exactOptional(IssueAnswer),
   stage: IssueStage,
   attachments: z.exactOptional(z.array(Attachment)),
+  tags: z.exactOptional(z.array(z.string())),
+  startAt: z.exactOptional(z.number()),
+  dueAt: z.exactOptional(z.number()),
 };
 
 export const Issue = z.object(issueFields) satisfies Codec<T.Issue>;
@@ -218,6 +223,10 @@ export const IssueUpdate = z.object({
   deliver: z.exactOptional(Deliverable),
   before: z.exactOptional(z.string()),
   attachments: z.exactOptional(z.array(z.string())),
+  parent: z.exactOptional(z.string()),
+  tags: z.exactOptional(z.array(z.string())),
+  startAt: z.exactOptional(z.number()),
+  dueAt: z.exactOptional(z.number()),
 }) satisfies Codec<T.IssueUpdate>;
 
 export const IssueHistory = z.object({
@@ -245,6 +254,9 @@ export const IssueRequest = z.object({
   autoSubmitPr: z.exactOptional(z.boolean()),
   criteria: z.exactOptional(z.array(z.string())),
   attachments: z.exactOptional(z.array(z.string())),
+  tags: z.exactOptional(z.array(z.string())),
+  startAt: z.exactOptional(z.number()),
+  dueAt: z.exactOptional(z.number()),
   requestKey: z.exactOptional(z.string()),
 }) satisfies Codec<T.IssueRequest>;
 

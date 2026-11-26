@@ -19,6 +19,7 @@ import { useNow } from "../../../infra/base/dom";
 import { tookText, spentText } from "../../../infra/base/format";
 import { useCollabSlice, useIssue, useSession, useSessionsMap, useSessionsSlice, useThreadOwner } from "../../../infra/frame";
 import { useRouter, Link as A } from "../../../infra/router";
+import { localizeRuntimeError } from "../../../infra/runtimeError";
 import { createEffect } from "../../../infra/solid";
 import { useLatest } from "../../../infra/state/atom";
 import { useIntents } from "../../../infra/state/intent";
@@ -288,7 +289,7 @@ function FeedRow(props: {
         }
       >
         <Text testID="message-notice" class="px-6 py-2 text-center text-xs leading-relaxed text-muted">
-          {m().text}
+          {localizeRuntimeError(m().text).text}
         </Text>
       </If>
     </View>
@@ -624,7 +625,7 @@ function ThreadPreview(props: { thread: Channel }) {
         {(m) => (
           <View class="w-full flex-row items-center gap-2">
             <Text class="shrink-0 text-sm font-medium text-ink">{m().from === userId ? t("web.channel.messages.user") : m().name}</Text>
-            <Text class="min-w-0 flex-1 truncate text-sm text-muted">{plainText(m().text)}</Text>
+            <Text class="min-w-0 flex-1 truncate text-sm text-muted">{localizeRuntimeError(plainText(m().text)).text}</Text>
             <Text class="shrink-0 text-xs text-muted">{workbenchClock(m().at)}</Text>
           </View>
         )}

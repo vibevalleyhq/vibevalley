@@ -1062,6 +1062,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             };
 
             let mut row = floating_pill()
+                .test_id("wb-top-left-hud")
                 .child(
                     text(count_txt)
                         .test_id("wb-count")
@@ -1124,7 +1125,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             let snap = ui_snap.get();
             let l = loc_str();
             let is_en = l.starts_with("en");
-            let mut row = floating_pill();
+            let mut row = floating_pill().test_id("wb-top-right-hud");
 
             // Live collaborator presence pills (deduplicated, capped at 3 for narrow viewports).
             if !snap.presences.is_empty() {
@@ -1394,7 +1395,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             }
             let l = loc_str();
             let is_en = l.starts_with("en");
-            let mut row = floating_pill().flex_wrap();
+            let mut row = floating_pill().test_id("wb-style-bar").flex_wrap();
 
             // 8 warm editorial fills.
             for (fill, hex_light, tid, label_key) in [
@@ -1565,14 +1566,27 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     },
                 ));
 
+            let minimap_reserve = if minimap_open.get() { 172.0 } else { 0.0 };
             view()
                 .absolute()
                 .bottom(px(56.0))
                 .left(px(12.0))
                 .right(px(12.0))
+                .flex_row()
                 .items_center()
+                .gap(px(8.0))
                 .pointer_events(PointerEvents::BoxNone)
-                .child(row)
+                .child(view().flex_1().min_w(px(0.0)).pointer_events(PointerEvents::BoxNone))
+                .child(
+                    view()
+                        .flex_shrink(1.0)
+                        .min_w(px(0.0))
+                        .flex_row()
+                        .justify_center()
+                        .pointer_events(PointerEvents::BoxNone)
+                        .child(row),
+                )
+                .child(view().flex_1().min_w(px(minimap_reserve)).pointer_events(PointerEvents::BoxNone))
                 .into_element()
         })
     };
@@ -1588,6 +1602,9 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             let is_en = l.starts_with("en");
 
             let mut dock = floating_pill()
+                .test_id("wb-bottom-dock")
+                .max_w(relative(1.0))
+                .min_w(px(0.0))
                 .gap(px(2.0))
                 .px(px(6.0))
                 .py(px(4.0))
@@ -1780,15 +1797,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     ),
             );
 
-            view()
-                .absolute()
-                .bottom(px(12.0))
-                .left(px(12.0))
-                .right(px(12.0))
-                .items_center()
-                .pointer_events(PointerEvents::BoxNone)
-                .child(dock)
-                .into_element()
+            dock.into_element()
         })
     };
 
@@ -1868,7 +1877,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         })
     };
 
-    // Top-right Zoom pill + toggleable Minimap (stacked cleanly below top_right_hud so bottom_dock never collides).
+    // Bottom-right Zoom pill + toggleable Minimap (opens upward above the zoom pill).
     let minimap_and_zoom = {
         let controller = Rc::clone(&controller);
         let run_action = run_action.clone();
@@ -1920,7 +1929,13 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                     dispatch_effects(effs, false, false);
                 }
             });
-            floating_card().p(px(2.0)).rounded(px(8.0)).child(minimap_view).into_element()
+            floating_card()
+                .test_id("wb-minimap-card")
+                .mb(px(6.0))
+                .p(px(2.0))
+                .rounded(px(8.0))
+                .child(minimap_view)
+                .into_element()
         });
 
         let zoom_bar = dynamic(move || {
@@ -1928,6 +1943,8 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
             let l = loc_str();
             let is_en = l.starts_with("en");
             floating_pill()
+                .test_id("wb-zoom-bar")
+                .flex_shrink_0()
                 .child(
                     pill_text_btn("wb-zoom-out", "-", false, false, {
                         let run = run_action.clone();
@@ -1969,16 +1986,47 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         });
 
         view()
-            .absolute()
-            .top(px(54.0))
-            .right(px(12.0))
+            .test_id("wb-zoom-hud")
             .flex_col()
             .items_end()
-            .gap(px(6.0))
+            .flex_shrink_0()
             .pointer_events(PointerEvents::BoxNone)
-            .child(zoom_bar)
             .child(minimap_panel)
+            .child(zoom_bar)
     };
+
+    // Unified bottom HUD row: centers the drawing dock when space allows while keeping the
+    // zoom + minimap cluster pinned to bottom-right without ever colliding with the dock.
+    let bottom_hud = view()
+        .test_id("wb-bottom-hud")
+        .absolute()
+        .bottom(px(12.0))
+        .left(px(12.0))
+        .right(px(12.0))
+        .flex_row()
+        .items_end()
+        .gap(px(8.0))
+        .pointer_events(PointerEvents::BoxNone)
+        .child(view().flex_1().min_w(px(0.0)).pointer_events(PointerEvents::BoxNone))
+        .child(
+            view()
+                .flex_shrink(1.0)
+                .min_w(px(0.0))
+                .flex_row()
+                .justify_center()
+                .pointer_events(PointerEvents::BoxNone)
+                .child(bottom_dock),
+        )
+        .child(
+            view()
+                .flex_1()
+                .min_w(px(236.0))
+                .flex_row()
+                .justify_end()
+                .items_end()
+                .pointer_events(PointerEvents::BoxNone)
+                .child(minimap_and_zoom),
+        );
 
     // Borderless in-place inline text editor projected directly over the edited element.
     let inline_editor_overlay = {
@@ -2520,7 +2568,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         },
                     )),
             );
-        view().absolute().top(px(50.0)).right(px(12.0)).child(panel).into_element()
+        view().absolute().top(px(54.0)).right(px(12.0)).child(panel).into_element()
     });
 
     let export_popover = {
@@ -2558,7 +2606,7 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
                         .child(text(label).text_size(px(12.0)).text_color(AdaptiveUi::INK)),
                 );
             }
-            view().absolute().top(px(50.0)).right(px(12.0)).child(panel).into_element()
+            view().absolute().top(px(54.0)).right(px(12.0)).child(panel).into_element()
         })
     };
 
@@ -2572,13 +2620,12 @@ pub fn VvWhiteboard(props: VvWhiteboardProps, cx: Scope<VvWhiteboardEvent>) -> i
         .child(top_left_hud)
         .child(follow_banner)
         .child(top_right_hud)
-        .child(minimap_and_zoom)
         .child(timer_popover)
         .child(export_popover)
         .child(template_popover)
+        .child(bottom_hud)
         .child(style_bar)
         .child(sticker_popover)
-        .child(bottom_dock)
         .child(inline_editor_overlay)
         .child(context_menu_overlay)
         .child(

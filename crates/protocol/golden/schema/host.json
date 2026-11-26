@@ -287,6 +287,10 @@
    "line": 12
   },
   {
+   "type": "global_modal",
+   "active": true
+  },
+  {
    "type": "toggle_devtools"
   },
   {
@@ -538,6 +542,9 @@
   },
   {
    "op": "host.pickFile"
+  },
+  {
+   "op": "host.pickFolder"
   },
   {
    "op": "host.saveFile",

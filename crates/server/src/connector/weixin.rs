@@ -100,9 +100,43 @@ struct SendAnswer {
     message_id: Option<VendorId>,
 }
 
+#[derive(Deserialize)]
+struct ErrorAnswer {
+    ret: Option<i64>,
+    errcode: Option<i64>,
+    errmsg: Option<String>,
+}
+
 /// WeChat's code of a refusal, when the answer carries one.
 fn refusal(ret: Option<i64>, errcode: Option<i64>) -> Option<i64> {
     ret.filter(|r| *r != 0).or(errcode.filter(|e| *e != 0))
+}
+
+fn failure_of(label: &str, code: i64, errmsg: Option<String>) -> AppFailed {
+    let kind = match code {
+        STALE_TOKEN => FailedKind::Stale,
+        RESTRICTED => FailedKind::Restricted,
+        _ => FailedKind::Failed,
+    };
+    let why = errmsg.filter(|m| !m.is_empty()).unwrap_or_else(|| code.to_string());
+    if kind == FailedKind::Stale {
+        AppFailed::new(kind, t("server.connector.staleLogin", &[]))
+    } else {
+        AppFailed::new(kind, format!("{label}: {why}"))
+    }
+}
+
+fn http_failure(label: &str, status: u16, bytes: &[u8]) -> AppFailed {
+    if let Ok(err) = serde_json::from_slice::<ErrorAnswer>(bytes)
+        && let Some(code) = refusal(err.ret, err.errcode)
+    {
+        return failure_of(label, code, err.errmsg);
+    }
+    match status {
+        401 => AppFailed::new(FailedKind::Stale, t("server.connector.staleLogin", &[])),
+        429 => AppFailed::new(FailedKind::Restricted, format!("{label}: 429")),
+        _ => AppFailed::failed(format!("{label}: {status}")),
+    }
 }
 
 fn text_of(m: &Message) -> String {
@@ -198,10 +232,11 @@ impl Weixin {
             }
         }
         let answer = call.send().await.map_err(|e| why(&e))?;
-        if !answer.status().is_success() {
-            return Err(why(&answer.status().as_u16()));
-        }
+        let status = answer.status();
         let bytes = answer.bytes().await.map_err(|e| why(&e))?;
+        if !status.is_success() {
+            return Err(http_failure(label, status.as_u16(), &bytes));
+        }
         serde_json::from_slice(&bytes).map_err(|e| why(&e))
     }
 
@@ -400,13 +435,7 @@ impl Adapter for Weixin {
         )
         .await?;
         if let Some(code) = refusal(body.ret, body.errcode) {
-            let kind = match code {
-                STALE_TOKEN => FailedKind::Stale,
-                RESTRICTED => FailedKind::Restricted,
-                _ => FailedKind::Failed,
-            };
-            let why = body.errmsg.filter(|m| !m.is_empty()).unwrap_or_else(|| code.to_string());
-            return Err(AppFailed::new(kind, format!("sendmessage: {why}")));
+            return Err(failure_of("sendmessage", code, body.errmsg));
         }
         Ok(body.message_id.unwrap_or_default().0)
     }
@@ -447,5 +476,110 @@ mod tests {
         assert!(serde_json::from_str::<SendAnswer>(r#"{"ret":0,"message_id":{"id":1}}"#).is_err());
         let sent: SendAnswer = serde_json::from_str(r#"{"ret":0,"message_id":7445566778899001122}"#).unwrap();
         assert_eq!(sent.message_id.unwrap().0, "7445566778899001122");
+    }
+
+    #[test]
+    fn http_and_ilink_failures_classify_stale_and_restricted_without_leaking_secrets() {
+        vibevalley_i18n::set_locale("zh");
+        let stale_http = http_failure("sendmessage", 401, b"");
+        assert_eq!(stale_http.kind, FailedKind::Stale);
+
+        let rate_limited_http = http_failure("sendmessage", 429, b"");
+        assert_eq!(rate_limited_http.kind, FailedKind::Restricted);
+
+        let json_restricted = http_failure("sendmessage", 400, br#"{"ret":-2,"errmsg":"reply window closed"}"#);
+        assert_eq!(json_restricted.kind, FailedKind::Restricted);
+        assert!(json_restricted.message.contains("reply window closed"));
+
+        let json_stale = http_failure("getupdates", 403, br#"{"errcode":-14,"errmsg":"session expired"}"#);
+        assert_eq!(json_stale.kind, FailedKind::Stale);
+
+        let keys = Keys {
+            token: Secret::new("super-secret-bot-token-xyz"),
+            bot_id: "bot@im.bot".into(),
+            base_url: "http://127.0.0.1:9".into(),
+        };
+        let serialized = serde_json::to_string(&keys).unwrap();
+        assert!(serialized.contains("super-secret-bot-token-xyz"));
+        assert!(!format!("{:?}", keys.token).contains("super-secret-bot-token-xyz"));
+    }
+
+    #[tokio::test]
+    async fn send_over_mock_http_handles_context_token_restricted_stale_and_64bit_id() {
+        use std::sync::{Arc, Mutex};
+
+        use axum::Router;
+        use axum::body::Bytes;
+        use axum::http::{HeaderMap, StatusCode};
+        use serde_json::Value;
+        use tokio_util::sync::CancellationToken;
+
+        #[derive(Default)]
+        struct StubState {
+            mode: &'static str,
+            captured: Vec<(Option<String>, Value)>,
+        }
+        let state = Arc::new(Mutex::new(StubState {
+            mode: "ok",
+            captured: Vec::new(),
+        }));
+        let st = state.clone();
+        let app = Router::new().route(
+            "/ilink/bot/sendmessage",
+            axum::routing::post(move |headers: HeaderMap, body: Bytes| {
+                let st = st.clone();
+                async move {
+                    let auth = headers.get("authorization").and_then(|v| v.to_str().ok()).map(str::to_owned);
+                    let json: Value = serde_json::from_slice(&body).unwrap();
+                    let mut guard = st.lock().unwrap();
+                    guard.captured.push((auth, json));
+                    match guard.mode {
+                        "restricted" => (StatusCode::TOO_MANY_REQUESTS, json!({ "ret": -2, "errmsg": "window closed" }).to_string()),
+                        "stale" => (StatusCode::OK, json!({ "ret": -14, "errmsg": "expired" }).to_string()),
+                        _ => (StatusCode::OK, json!({ "ret": 0, "message_id": 7445566778899001234u64 }).to_string()),
+                    }
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let cancel = CancellationToken::new();
+        let guard = cancel.clone().drop_guard();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, app).with_graceful_shutdown(cancel.cancelled_owned()).await;
+        });
+
+        let wx = Weixin::new(base.clone());
+        let keys = Keys {
+            token: Secret::new("wx-secret-token"),
+            bot_id: "bot@im.bot".into(),
+            base_url: base,
+        };
+
+        // Proactive push without context_token omits context_token and returns 64-bit id.
+        let id = wx.send(&keys, "u@im.wechat", "【需要回复】请确认", "").await.unwrap();
+        assert_eq!(id, "7445566778899001234");
+        {
+            let guard = state.lock().unwrap();
+            assert_eq!(guard.captured[0].0.as_deref(), Some("Bearer wx-secret-token"));
+            assert!(guard.captured[0].1["msg"].get("context_token").is_none());
+            assert_eq!(guard.captured[0].1["msg"]["to_user_id"], "u@im.wechat");
+        }
+
+        // With reply context_token, context_token is sent.
+        wx.send(&keys, "u@im.wechat", "带上下文", "ctx-99").await.unwrap();
+        assert_eq!(state.lock().unwrap().captured[1].1["msg"]["context_token"], "ctx-99");
+
+        // HTTP 429 / ret -2 maps to Restricted; ret -14 maps to Stale without leaking token.
+        state.lock().unwrap().mode = "restricted";
+        let err = wx.send(&keys, "u@im.wechat", "hello", "").await.unwrap_err();
+        assert_eq!(err.kind, FailedKind::Restricted);
+
+        state.lock().unwrap().mode = "stale";
+        let err = wx.send(&keys, "u@im.wechat", "hello", "").await.unwrap_err();
+        assert_eq!(err.kind, FailedKind::Stale);
+        assert!(!err.message.contains("wx-secret-token"));
+
+        drop(guard);
     }
 }

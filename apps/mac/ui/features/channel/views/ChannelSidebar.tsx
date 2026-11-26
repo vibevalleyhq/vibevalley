@@ -21,6 +21,7 @@ import { orchestratorMood, type OrchestratorMood, useCollabSlice, useSessionsSli
 import { ready, settingsQuery, useAgents, useQuery } from "../../../infra/query";
 import { fixOf } from "../../../infra/readiness";
 import { useRouter } from "../../../infra/router";
+import { localizeRuntimeError } from "../../../infra/runtimeError";
 import { runsHref } from "../../session";
 import { useMarkedChat } from "../model/marks";
 import { archivedOf, type ChatFilter, channelName, channelTime, chatPath, directPeerOf, sidebarChannelsOf, unreadTotal, unreadUnder } from "../model/places";
@@ -152,7 +153,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
   };
   return (
     <View accessibilityLabel={t("web.channel.side")} testID="channels-side" class="w-full flex-1 border-r border-line bg-side">
-      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-1.5 border-b border-line px-3.5">
+      <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-1.5 border-b border-line px-3.5">
         <Text role="header" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
           {t("web.channel.tab.chat")}
         </Text>
@@ -273,10 +274,10 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
       </Scroll>
       <If when={lacks()}>
         {(fix) => (
-          <View testID="channel-readiness-alert" class="flex-row items-center gap-2 border-t border-line px-3 py-2">
+          <View testID="channel-readiness-alert" class="flex-row items-center gap-2 border-t border-line bg-bad-soft px-3 py-2">
             <Icon name="warn" size={14} tone="berry" />
-            <Text class="min-w-0 flex-1 truncate text-xs text-berry">{t("web.channel.lacks", { why: fix().words })}</Text>
-            <TextLink href={fix().href} testid="orchestrator-fix">
+            <Text class="min-w-0 flex-1 truncate text-xs font-medium text-berry">{t("web.channel.lacks", { why: fix().words })}</Text>
+            <TextLink href={fix().href} testid="orchestrator-fix" danger>
               {t("web.channel.lacksFix")}
             </TextLink>
           </View>
@@ -364,7 +365,6 @@ function ChannelRow(props: {
   const timeText = () => channelTime(props.channel.last?.at ?? props.channel.at, now());
   const preview = computed((): PreviewLine => {
     if (props.channel.type === "direct" && isOrc()) {
-      if (props.lacks) return { text: t("web.channel.lacks", { why: props.lacks.words }), tone: "berry" };
       if (mood() === "thinking" || mood() === "speaking") return { text: orchestratorMoodLabels[mood()], tone: "accent" };
     }
     const active = workerSession();
@@ -373,7 +373,7 @@ function ChannelRow(props: {
     }
     const last = props.channel.last;
     if (last) {
-      const body = last.text.replace(/\s+/gu, " ").trim();
+      const body = localizeRuntimeError(last.text.replace(/\s+/gu, " ").trim()).text;
       if (body) {
         const who = last.from === userId ? t("web.channel.messages.user") : last.name;
         const formatted = props.channel.type === "channel" ? (who ? `${who}: ${body}` : body) : last.from === userId ? `${who}: ${body}` : body;

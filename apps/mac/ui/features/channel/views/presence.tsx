@@ -9,6 +9,7 @@ import { actionIcon, type IconName } from "../../../design/icons";
 import { useAgent } from "../../../infra/agents";
 import { useNow } from "../../../infra/base/dom";
 import { useSession } from "../../../infra/frame";
+import { localizeRuntimeError } from "../../../infra/runtimeError";
 
 const span = spanText;
 
@@ -16,7 +17,7 @@ export { Dot } from "../../../design/Tag";
 
 /** The server's words for what the session is doing, how long it has been quiet filled in by the clock. */
 export function phaseText(h: SessionView, now: number) {
-  const words = h.phaseText;
+  const words = localizeRuntimeError(h.phaseText).text;
   return h.phase._tag === "working" && h.phase.quietSince !== undefined ? words.replaceAll("{span}", span(now - h.phase.quietSince)) : words;
 }
 

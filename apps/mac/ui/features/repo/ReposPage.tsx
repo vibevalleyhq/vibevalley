@@ -3,7 +3,9 @@ import { Clipboard, Scroll, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { RepoActivity, RepoLanguages, RepoSummary } from "@vibevalley/protocol";
 
+import { createAct } from "../../design/act";
 import { Button, ButtonLink } from "../../design/Button";
+import { ConfirmButton } from "../../design/ConfirmButton";
 import { Dialog } from "../../design/Dialog";
 import { OpenTerminal } from "../../design/domain/OpenTerminal";
 import { Icon } from "../../design/Icon";
@@ -14,8 +16,9 @@ import { toast } from "../../design/toasts";
 import { mix } from "../../design/tone";
 import { api } from "../../infra/api";
 import { Keyed, useNow } from "../../infra/base/dom";
+import { act as hostAct } from "../../infra/bridge";
 import { readHostParams } from "../../infra/hostParams";
-import { defineQuery, ready, retryRead, useQuery, useRepos } from "../../infra/query";
+import { defineQuery, ready, retryRead, useQuery, useQueryClient, useRepos } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { createMemo, untrack } from "../../infra/solid";
 import { dateText, type Recency, recencyOf, recencyText, since } from "./calendar";
@@ -76,6 +79,11 @@ export function ReposPage(props: { rest: string }) {
   const sorted = createMemo(() => sortRepos(ready(list, [])));
   const selected = createMemo(() => sorted().find((p) => p.name === (props.rest && decodeURIComponent(props.rest))));
   const creating = signal(false);
+  const createMode = signal<"local" | "new" | "github">("github");
+  const openAdd = (mode: "local" | "new" | "github") => {
+    createMode.set(mode);
+    creating.set(true);
+  };
   return (
     // The list is the page's side column, against the rail as the chat's and the notes' are (ui/layout.tsx Split edge).
     <View testID="repos-page" class="h-full min-h-0 flex-1 md:flex-row">
@@ -86,18 +94,21 @@ export function ReposPage(props: { rest: string }) {
           label={t("web.repo.list")}
           testid="repos"
           action={
-            <View class="flex-row items-center gap-1.5">
-              <If when={readHostParams().globalShell}>
-                <ButtonLink href="/workspace" icon="terminal" size="compact" testID="open-workspace">
-                  {t("web.repo.openWorkspace")}
-                </ButtonLink>
-              </If>
-              <Button icon="add" testID="new-repo" onPress={() => creating.set(true)}>
-                {t("web.repo.add")}
-              </Button>
-            </View>
+            <If when={readHostParams().globalShell}>
+              <ButtonLink href="/workspace" icon="terminal" size="compact" testID="open-workspace">
+                {t("web.repo.openWorkspace")}
+              </ButtonLink>
+            </If>
           }
         >
+          <View class="flex-row items-center gap-1.5 px-2 pt-0.5 pb-1.5">
+            <Button icon="folder" size="compact" class="flex-1 justify-center" testID="mount-local-repo" onPress={() => openAdd("local")}>
+              {t("web.repo.mountLocal")}
+            </Button>
+            <Button icon="add" size="compact" class="flex-1 justify-center" testID="new-repo" onPress={() => openAdd("github")}>
+              {t("web.repo.add")}
+            </Button>
+          </View>
           <View class="flex-row items-center justify-between px-2 pt-1 pb-1.5">
             <Text class="text-xs text-muted">{t("web.repo.repos")}</Text>
             <If when={sorted().length > 0}>
@@ -114,7 +125,8 @@ export function ReposPage(props: { rest: string }) {
                   const recency = () => recencyText(recencyOf(p().last, now()));
                   const line = () => {
                     const last = p().last;
-                    return !p().git ? t("web.repo.notGit") : last !== undefined ? `${recency()} · ${since(last, now())}` : recency();
+                    const base = !p().git ? t("web.repo.notGit") : last !== undefined ? `${recency()} · ${since(last, now())}` : recency();
+                    return p().external ? `${t("web.repo.badgeLocal")} · ${base}` : base;
                   };
                   return (
                     <ListRow
@@ -134,12 +146,21 @@ export function ReposPage(props: { rest: string }) {
       </Scroll>
       <Scroll class="min-h-120 min-w-0 flex-1 bg-page md:min-h-0" contentClass="p-4">
         {/* Keyed by the name, a plain value: the panel's queries ask about this one repo for its life. */}
-        <If when={selected()?.name} else={<ReposOverviewEmpty />}>
+        <If when={selected()?.name} else={<ReposOverviewEmpty onMountLocal={() => openAdd("local")} />}>
           {(name) => <Keyed key={name()}>{() => <RepoPanel name={untrack(name)} repos={sorted} now={now()} />}</Keyed>}
         </If>
       </Scroll>
-      <Dialog open={creating()} onClose={() => creating.set(false)} title={t("web.repo.add")} size="sm" height="fixed" scroll={false} testid="new-repo-dialog">
+      <Dialog
+        open={creating()}
+        onClose={() => creating.set(false)}
+        title={createMode() === "local" ? t("web.repo.mountLocal") : t("web.repo.add")}
+        size="sm"
+        height="fixed"
+        scroll={false}
+        testid="new-repo-dialog"
+      >
         <NewRepoForm
+          initialMode={createMode()}
           onDone={(made) => {
             creating.set(false);
             if (made) router.navigate(`/repos/${encodeURIComponent(made.name)}`);
@@ -150,9 +171,17 @@ export function ReposPage(props: { rest: string }) {
   );
 }
 
-function ReposOverviewEmpty() {
+function ReposOverviewEmpty(props: { onMountLocal: () => void }) {
   return (
-    <Empty icon="repos" testid="repos-empty">
+    <Empty
+      icon="repos"
+      testid="repos-empty"
+      action={
+        <Button icon="folder" testID="repos-empty-mount" onPress={props.onMountLocal}>
+          {t("web.repo.mountLocal")}
+        </Button>
+      }
+    >
       {t("web.repo.allLine")}
     </Empty>
   );
@@ -191,6 +220,21 @@ async function copyPath(path: string) {
 }
 
 function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; activity: Asked<RepoActivity>; now: number }) {
+  const router = useRouter();
+  const client = useQueryClient();
+  const unmountAct = createAct();
+  const unmountRepo = async () => {
+    const repoName = props.repo.name;
+    const ok = await unmountAct.run(async () => {
+      await api.repo.unmount({ id: repoName });
+      await client.invalidate({ prefix: ["repos"] });
+      return true;
+    });
+    if (ok === true) {
+      toast(t("web.repo.unmounted", { name: repoName }));
+      router.navigate("/repos");
+    }
+  };
   const recency = createMemo(() => recencyOf(props.repo.last, props.now));
   const counted = () => ready(props.languages, undefined);
   const worked = () => ready(props.activity, undefined);
@@ -240,6 +284,11 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
           <Text role="header" class="truncate text-xl font-semibold text-ink">
             {props.repo.name}
           </Text>
+          <View testID="repo-origin-badge" class={`rounded-sm px-1.5 py-0.5 ${props.repo.external ? "bg-selected" : "bg-hover"}`}>
+            <Text class={`text-xs font-medium ${props.repo.external ? "text-water" : "text-muted"}`}>
+              {props.repo.external ? t("web.repo.badgeLocal") : t("web.repo.badgeManaged")}
+            </Text>
+          </View>
           <View class={`rounded-sm px-1.5 py-0.5 ${badge().box}`}>
             <Text class={`text-xs font-medium ${badge().ink}`}>{recencyText(recency())}</Text>
           </View>
@@ -250,25 +299,43 @@ function Overview(props: { repo: RepoSummary; languages: Asked<RepoLanguages>; a
           <Stat label={t("web.repo.code")} value={codeLines()} />
           <Stat label={t("web.repo.languages")} value={languageTotal()} />
         </View>
-        <View class="flex-row items-center gap-1.5">
+        <View class="flex-row flex-wrap items-center gap-1.5">
           <Icon name="folder" size={14} tone="muted" />
           <View class="min-w-0 shrink" tooltip={<Bubble text={props.repo.path} />}>
             <Text class="truncate font-mono text-xs text-muted">{props.repo.path}</Text>
           </View>
           <IconButton icon="copy" size={14} testid="repo-copy" label={t("web.repo.copyPath")} onClick={() => void copyPath(props.repo.path)} />
           <OpenTerminal cwd={props.repo.path} title={props.repo.name} testid="repo-terminal" />
+          <If when={readHostParams().globalShell}>
+            <Button size="compact" icon="terminal" testID="repo-open-workspace" onPress={() => hostAct({ type: "activate_path", path: props.repo.path })}>
+              {t("web.repo.openWorkspace")}
+            </Button>
+          </If>
         </View>
       </View>
-      <View class="items-end gap-1">
-        <IconButton
-          icon="refresh"
-          testid="repo-recount"
-          label={busy() ? t("web.repo.counting") : t("web.repo.recount")}
-          disabled={busy()}
-          onClick={() => {
-            void Promise.allSettled([props.languages.refetch(), props.activity.refetch()]);
-          }}
-        />
+      <View class="items-end gap-1.5">
+        <View class="flex-row items-center gap-1.5">
+          <If when={props.repo.external}>
+            <ConfirmButton
+              testid="repo-unmount"
+              icon="close"
+              tone="danger"
+              label={unmountAct.busy() ? t("web.repo.unmounting") : t("web.repo.unmount")}
+              title={t("web.repo.unmountTip")}
+              disabled={unmountAct.busy()}
+              onConfirm={unmountRepo}
+            />
+          </If>
+          <IconButton
+            icon="refresh"
+            testid="repo-recount"
+            label={busy() ? t("web.repo.counting") : t("web.repo.recount")}
+            disabled={busy()}
+            onClick={() => {
+              void Promise.allSettled([props.languages.refetch(), props.activity.refetch()]);
+            }}
+          />
+        </View>
         <If when={counted()}>{(c) => <Text class="text-xs tabular-nums text-faint">{t("web.repo.countedAgo", { ago: since(c().at, props.now) })}</Text>}</If>
       </View>
     </View>

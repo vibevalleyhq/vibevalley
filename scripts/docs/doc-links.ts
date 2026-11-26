@@ -38,11 +38,10 @@ for (const file of files) {
     if (line.startsWith("```")) fenced = !fenced;
     if (fenced) {
       // A command block is copied and run as it is: a script it names that moved fails whoever runs it.
-      if (!file.startsWith(".agents/notes/"))
-        for (const match of line.matchAll(RUN_PATH)) {
-          const path = match[1] ?? "";
-          if (!inRepo(path)) broken.push(`${file}:${i + 1}: \`vpx ${path}\` runs a script that is not in the repository`);
-        }
+      for (const match of line.matchAll(RUN_PATH)) {
+        const path = match[1] ?? "";
+        if (!inRepo(path)) broken.push(`${file}:${i + 1}: \`vpx ${path}\` runs a script that is not in the repository`);
+      }
       continue;
     }
     // Links inside `inline code` are examples, not links.
@@ -61,8 +60,8 @@ for (const file of files) {
       // macOS and Windows find a file whatever the case; Linux and git do not. agents.md is not AGENTS.md.
       else if (realpathSync.native(full) !== realpathSync(full)) broken.push(`${file}:${i + 1}: ${target} (the file is ${realpathSync.native(full)})`);
     }
-    // Notes name historical files; artifact type guides describe virtual per-artifact directory paths (`structure/*.json`).
-    if (file.startsWith(".agents/notes/") || file.startsWith("crates/server/assets/artifact/types/")) continue;
+    // Artifact type guides describe virtual per-artifact directory paths (`structure/*.json`).
+    if (file.startsWith("crates/server/assets/artifact/types/")) continue;
     for (const match of line.matchAll(CODE_PATH)) {
       const path = match[1] ?? "";
       if (!inRepo(path.replace(/^(\.\.?\/)+/u, "")) && !existsSync(resolve(dirname(resolve(root, file)), path)))

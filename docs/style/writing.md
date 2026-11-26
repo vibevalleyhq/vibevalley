@@ -1,6 +1,6 @@
 # 写作
 
-文档、Note、README、skill、提交说明、PR 描述、代码注释、界面上的帮助文字和给用户的回复，都照这一篇写。第一部分管写什么、删什么，第二部分管词和格式怎么写。文档放在哪、写什么，见 [docs/AGENTS.md](docs/AGENTS.md)；代码注释写什么，见 [code.md](docs/style/code.md)。官网的宣传文案和首页的诗句不用它，那些靠节奏和修辞。
+文档、Issue、README、skill、提交说明、PR 描述、代码注释、界面上的帮助文字和给用户的回复，都照这一篇写。第一部分管写什么、删什么，第二部分管词和格式怎么写。文档放在哪、写什么，见 [docs/AGENTS.md](docs/AGENTS.md)；代码注释写什么，见 [code.md](docs/style/code.md)。官网的宣传文案和首页的诗句不用它，那些靠节奏和修辞。
 
 ## 写什么，删什么
 
@@ -27,7 +27,7 @@
 - 重复的免责声明和谨慎的表态。
 - 每条证据都包成一个小论证：背景、材料、含义、限制、意义。让事实和机制直接进文章。
 - 教程式的举例，以及用假设的例子证明一条本来就好懂的规则。例子用实际的东西：这个仓库里的文件、命令、真实的输出。
-- 同一件事在第二处展开：一件事只写在它的家里，别处链接过去。Note 不复制文档里的清单；skill 不复制 `AGENTS.md`。
+- 同一件事在第二处展开：一件事只写在它的家里，别处链接过去。Issue 不复制文档里的清单；skill 不复制 `AGENTS.md`。
 
 **删除测试**：删掉一段，读者对事实、数字、机制、因果、适用条件和结论的理解完全不变，就删掉。以「这说明」「值得注意的是」「因此」「不过」「需要强调的是」开头的段落要重点查：有的承载必要的推论，多数只是复述。
 
@@ -35,7 +35,7 @@
 
 ## 词和格式
 
-给 agent 读的文字（`AGENTS.md`、规矩、skill、Note）读错的代价比啰嗦大，下面几条是硬规则。规则来自 [hai-simplified-technical](https://github.com/hylarucoder/hai-stack/blob/main/skills/hai-simplified-technical/SKILL.zh_CN.md)（ASD-STE100）。
+给 agent 读的文字（`AGENTS.md`、规矩、skill、Issue）读错的代价比啰嗦大，下面几条是硬规则。规则来自 [hai-simplified-technical](https://github.com/hylarucoder/hai-stack/blob/main/skills/hai-simplified-technical/SKILL.zh_CN.md)（ASD-STE100）。
 
 - **词**：一词一义，一义一词，用[用语表](docs/README.md#用语)里的词，同一个东西不换说法。不用「适当」「有关的」「较为」「基本上」「若干」「显著」「大幅」这类程度词，不用「处理」「操作」「优化」这类空动词，不用「开箱即用」「无缝」「赋能」这类套话。
 - **要求**：只用「应」「不应」「宜」「不宜」「可」「不必」，强弱按这个顺序。用主动句，写明谁做。

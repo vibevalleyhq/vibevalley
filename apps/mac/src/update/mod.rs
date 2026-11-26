@@ -7,4 +7,4 @@ mod tests;
 mod updater;
 
 pub use bundle::{bundle_version, enter_bundle};
-pub use updater::{UpdateOp, host_call, install, ready, version};
+pub use updater::{UpdateOp, host_call, install, ready, state, subscribe, version};

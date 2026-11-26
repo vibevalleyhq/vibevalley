@@ -1,7 +1,7 @@
 import "../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
-import { t } from "@vibevalley/i18n";
+import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 import type { RuntimeInfo } from "@vibevalley/protocol";
 
@@ -227,6 +227,100 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   expect(app.texts()).not.toContain("README.md");
   await app.press(`label:${t("web.shell.sidebar.expandCurrent")}`);
   expect(app.texts()).toContain("README.md");
+});
+
+test("workspace sidebar header toggles sidebar collapse and repo/worktree chevrons transition expand/collapse state", async () => {
+  const host = workspaceHost(
+    { view: "sidebar" },
+    {
+      "repo.list": [{ name: "vibevalley", path: "/work/vibevalley", git: true }],
+    },
+  );
+  const app = await open("../ShellApp.story.tsx", { width: 280, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  await host.pump(app);
+
+  await host.pushFrame(app, "slice:board", { seq: 1, issues: [] });
+  await host.pushFrame(app, "slice:sessions", { seq: 1, sessions: [], machines: [] });
+  await host.pushFrame(app, "rail", {
+    panel: "files",
+    projects: [
+      {
+        id: 1,
+        name: "vibevalley",
+        path: "/work/vibevalley",
+        initials: "VV",
+        active: true,
+        attention: false,
+        terminals: 2,
+        branch: "main",
+        worktrees: [
+          { path: "/work/vibevalley", branch: "main", main: true },
+          { path: "/work/vibevalley-ui", branch: "feat/ui", main: false },
+        ],
+        tabs: [{ id: 201, title: "main-zsh", active: true, kind: "terminal", running: true, runningState: "working" }],
+      },
+      {
+        id: 3,
+        name: "vibevalley-ui",
+        path: "/work/vibevalley-ui",
+        mainRoot: "/work/vibevalley",
+        initials: "VU",
+        active: false,
+        attention: false,
+        terminals: 1,
+        branch: "feat/ui",
+        tabs: [{ id: 202, title: "ui-term", active: false, kind: "terminal" }],
+      },
+      {
+        id: 2,
+        name: "notes",
+        path: "/tmp/notes",
+        initials: "NO",
+        active: false,
+        attention: false,
+        terminals: 0,
+        tabs: [],
+      },
+    ],
+  });
+
+  // Header sidebar toggle posts the supported palette_select sidebar.toggle host action.
+  expect(app.count("id:sidebar-toggle")).toBe(1);
+  expect(app.count("id:sidebar-fold-all")).toBe(1);
+  host.clearActs();
+  await app.press("id:sidebar-toggle");
+  expect(host.acts).toContainEqual({ type: "palette_select", id: "sidebar.toggle" });
+
+  // Row fold chevrons are removed; expandable repo & worktrees start expanded and toggle by pressing the row directly.
+  expect(app.count("id:sidebar-repo-toggle-notes")).toBe(0);
+  expect(app.count("id:sidebar-repo-toggle-vibevalley")).toBe(0);
+  expect(app.count("id:sidebar-wt-toggle-feat/ui")).toBe(0);
+  expect(app.count("id:sidebar-repo-summary-vibevalley")).toBe(0);
+  expect(app.texts()).toContain("main-zsh");
+  expect(app.texts()).toContain("ui-term");
+
+  // Pressing an expandable worktree row collapses it and displays its summary pill.
+  await app.press("id:sidebar-wt-row-feat/ui");
+  expect(app.count("id:sidebar-wt-summary-feat/ui")).toBe(1);
+  expect(app.texts()).not.toContain("ui-term");
+  expect(app.texts()).toContain("main-zsh");
+
+  // Pressing the worktree row again re-expands its child tab row.
+  await app.press("id:sidebar-wt-row-feat/ui");
+  expect(app.count("id:sidebar-wt-summary-feat/ui")).toBe(0);
+  expect(app.texts()).toContain("ui-term");
+
+  // Pressing the repo row collapses worktrees/tabs and renders the collapsed summary pill.
+  await app.press("id:sidebar-repo-row-vibevalley");
+  expect(app.count("id:sidebar-repo-summary-vibevalley")).toBe(1);
+  expect(app.texts()).not.toContain("main-zsh");
+  expect(app.texts()).not.toContain("ui-term");
+
+  // Pressing the repo row again restores its child rows.
+  await app.press("id:sidebar-repo-row-vibevalley");
+  expect(app.count("id:sidebar-repo-summary-vibevalley")).toBe(0);
+  expect(app.texts()).toContain("main-zsh");
+  expect(app.texts()).toContain("ui-term");
 });
 
 test("regression: sidebar and GitPanel parse detached-HEAD worktrees with omitted branch/upstream fields and display shortened home path", async () => {
@@ -1620,4 +1714,54 @@ test("workspace ChatPane shows collapsed activity latest command, ticks elapsed 
   await host.pump(app);
   expect(app.texts()).not.toContain(t("web.shell.chat.toolInput"));
   expect(app.texts()).toContain("Simplify Content Hub");
+});
+
+test("Sidebar distinguishes mounted external repos from managed repos and refreshes on repos-changed", async () => {
+  setLocale("zh");
+  let repos: { name: string; path: string; git: boolean; external: boolean; maxSessions: number; pullRequest: { available: boolean; reason: string } }[] = [
+    {
+      name: "managed-app",
+      path: "/work/repos/managed-app",
+      git: true,
+      external: false,
+      maxSessions: 2,
+      pullRequest: { available: false, reason: "" },
+    },
+  ];
+  const host = workspaceHost({ view: "sidebar" }, { "repo.list": () => repos });
+  const app = await open("../ShellApp.story.tsx", {
+    width: 320,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    host: host.options,
+  });
+  await host.pump(app);
+  await host.pushFrame(app, "slice:board", { seq: 1, issues: [] });
+  await host.pushFrame(app, "slice:sessions", { seq: 1, sessions: [], machines: [] });
+  await host.pushFrame(app, "rail", { projects: [], panel: "files" });
+  expect(app.texts()).toContain("managed-app");
+
+  // Server finishes auto-mounting an open Workspace git repo and emits repos-changed.
+  repos = [
+    ...repos,
+    {
+      name: "ext-repo",
+      path: "/Users/dev/ext-repo",
+      git: true,
+      external: true,
+      maxSessions: 3,
+      pullRequest: { available: true, reason: "" },
+    },
+  ];
+  await app.host.send("repos-changed", null);
+  await host.pump(app);
+  expect(app.texts()).toContain("ext-repo");
+
+  // RepoDetailPanel shows the mounted external repo badge instead of managed repo badge.
+  await app.rightClick("text:ext-repo");
+  await app.press("id:sidebar-repo-menu-details-ext-repo");
+  await host.pump(app);
+  expect(app.count("id:workspace-repo-detail")).toBe(1);
+  expect(app.texts()).toContain(t("web.shell.repoDetail.badgeMounted"));
 });

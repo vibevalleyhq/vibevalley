@@ -21,7 +21,7 @@
         "canceled": "lost",
         "blockedBy": [],
         "status": "canceled",
-        "moves": ["backlog"],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "done"],
         "pullRequest": {
           "url": "https://github.com/vibevalley/vibevalley/pull/4199",
           "number": 4199,
@@ -63,7 +63,7 @@
         "delivered": "none",
         "blockedBy": [],
         "status": "done",
-        "moves": ["backlog"],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "canceled"],
         "deliver": "answer",
         "findings": [],
         "questions": [],
@@ -100,7 +100,7 @@
         "delivered": "kept",
         "blockedBy": [],
         "status": "done",
-        "moves": ["backlog"],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -137,7 +137,7 @@
         "delivered": "submitted",
         "blockedBy": [],
         "status": "done",
-        "moves": ["backlog"],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "canceled"],
         "deliver": "branch",
         "findings": [],
         "questions": [],
@@ -174,7 +174,7 @@
         "delivered": "pull_request",
         "blockedBy": [],
         "status": "done",
-        "moves": ["backlog"],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "canceled"],
         "pullRequest": {
           "url": "https://github.com/vibevalley/vibevalley/pull/4201",
           "number": 4201,
@@ -216,7 +216,7 @@
         "delivered": "merged",
         "blockedBy": [],
         "status": "done",
-        "moves": ["backlog"],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -251,7 +251,7 @@
         "createdAt": 1795172843624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["canceled"],
+        "moves": ["backlog", "todo", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -351,7 +351,7 @@
         "parent": "i-edge-family",
         "blockedBy": ["i-edge-fam-2"],
         "status": "canceled",
-        "moves": ["backlog"],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "done"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -389,7 +389,7 @@
         "parent": "i-edge-family",
         "blockedBy": ["i-edge-fam-4"],
         "status": "todo",
-        "moves": ["backlog", "canceled"],
+        "moves": ["backlog", "in_progress", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -425,7 +425,7 @@
         "parent": "i-edge-family",
         "blockedBy": ["i-edge-fam-4", "i-edge-fam-5"],
         "status": "backlog",
-        "moves": ["todo", "canceled"],
+        "moves": ["todo", "in_progress", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -466,7 +466,7 @@
         "createdAt": 1795194263624,
         "blockedBy": [],
         "status": "backlog",
-        "moves": ["todo", "canceled"],
+        "moves": ["todo", "in_progress", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -521,7 +521,7 @@
         "createdAt": 1795192643624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["canceled"],
+        "moves": ["backlog", "todo", "in_review", "done", "canceled"],
         "deliver": "answer",
         "findings": [],
         "questions": [],
@@ -574,7 +574,7 @@
         "queuedAt": 1795192163624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["todo", "canceled"],
+        "moves": ["backlog", "todo", "in_review", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -635,7 +635,7 @@
         "queuedAt": 1795192043624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["canceled"],
+        "moves": ["backlog", "todo", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -695,7 +695,7 @@
         "queuedAt": 1795191743624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["todo", "canceled"],
+        "moves": ["backlog", "todo", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [
@@ -755,7 +755,7 @@
         "queuedAt": 1795191443624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["todo", "done", "canceled"],
+        "moves": ["backlog", "todo", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -823,7 +823,7 @@
         "queuedAt": 1795191143624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["todo", "canceled"],
+        "moves": ["backlog", "todo", "in_review", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -889,7 +889,7 @@
         "queuedAt": 1795190843624,
         "blockedBy": [],
         "status": "in_review",
-        "moves": ["todo", "done", "canceled"],
+        "moves": ["backlog", "todo", "in_progress", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -951,7 +951,7 @@
         "queuedAt": 1795190243624,
         "blockedBy": [],
         "status": "in_review",
-        "moves": ["todo", "done", "canceled"],
+        "moves": ["backlog", "todo", "in_progress", "done", "canceled"],
         "deliver": "answer",
         "findings": [],
         "questions": [],
@@ -1024,7 +1024,7 @@
         "queuedAt": 1795189043624,
         "blockedBy": [],
         "status": "in_review",
-        "moves": ["todo", "done", "canceled"],
+        "moves": ["backlog", "todo", "in_progress", "done", "canceled"],
         "deliver": "branch",
         "reviewedAt": 1795193963624,
         "findings": [],
@@ -1086,7 +1086,7 @@
         "queuedAt": 1795183643624,
         "blockedBy": [],
         "status": "in_review",
-        "moves": ["todo", "done", "canceled"],
+        "moves": ["backlog", "todo", "in_progress", "done", "canceled"],
         "pullRequest": {
           "url": "https://github.com/vibevalley/vibevalley/pull/4242/commits/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
           "number": 4242,
@@ -1172,7 +1172,7 @@
         "parent": "i-edge-family",
         "blockedBy": ["i-edge-fam-2", "i-edge-fam-3"],
         "status": "in_progress",
-        "moves": ["canceled"],
+        "moves": ["backlog", "todo", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -1202,16 +1202,18 @@
     ],
     "boardSummary": {
       "laneCounts": {
-        "todo": 3,
-        "working": 8,
-        "waiting": 4,
-        "closed": 9
+        "backlog": 2,
+        "todo": 1,
+        "inProgress": 8,
+        "inReview": 4,
+        "done": 7,
+        "canceled": 2
       },
       "runningSlots": 2,
       "maxRunning": 6,
       "byIssue": {
         "i-edge-ask": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1219,7 +1221,7 @@
           "prompt": "asking"
         },
         "i-edge-canceled": {
-          "lane": "closed",
+          "lane": "canceled",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1227,7 +1229,7 @@
           "prompt": "canceled_reopenable"
         },
         "i-edge-conflict": {
-          "lane": "waiting",
+          "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1235,14 +1237,14 @@
           "prompt": "stuck_conflict"
         },
         "i-edge-draft": {
-          "lane": "todo",
+          "lane": "backlog",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i-edge-failed": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1250,21 +1252,21 @@
           "prompt": "stuck_failed"
         },
         "i-edge-fam-1": {
-          "lane": "closed",
+          "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i-edge-fam-2": {
-          "lane": "closed",
+          "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i-edge-fam-3": {
-          "lane": "closed",
+          "lane": "canceled",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1272,7 +1274,7 @@
           "prompt": "canceled_reopenable"
         },
         "i-edge-fam-4": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1286,21 +1288,21 @@
           "needsWorktreeCheck": false
         },
         "i-edge-fam-6": {
-          "lane": "todo",
+          "lane": "backlog",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i-edge-family": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "family",
           "familyDone": 3,
           "familyTotal": 6,
           "needsWorktreeCheck": false
         },
         "i-edge-handed": {
-          "lane": "waiting",
+          "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1308,7 +1310,7 @@
           "prompt": "handed_back"
         },
         "i-edge-interrupted": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1316,49 +1318,49 @@
           "prompt": "stuck_interrupted"
         },
         "i-edge-land-kept": {
-          "lane": "closed",
+          "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i-edge-land-merged": {
-          "lane": "closed",
+          "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i-edge-land-none": {
-          "lane": "closed",
+          "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i-edge-land-pr": {
-          "lane": "closed",
+          "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i-edge-land-submitted": {
-          "lane": "closed",
+          "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i-edge-orch": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "orchestrator",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i-edge-pr-open": {
-          "lane": "waiting",
+          "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1366,7 +1368,7 @@
           "prompt": "review_after_failed_check"
         },
         "i-edge-quiet": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1374,7 +1376,7 @@
           "prompt": "stuck_quiet"
         },
         "i-edge-reviewed": {
-          "lane": "waiting",
+          "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -1382,7 +1384,7 @@
           "prompt": "reviewed"
         },
         "i-edge-stuck-unknown": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,

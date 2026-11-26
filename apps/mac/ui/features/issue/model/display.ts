@@ -9,9 +9,14 @@ import { defineStored, orFallback } from "../../../infra/state/stored";
 import { type BoardCard, type Lane, lanes } from "./cards";
 import { endedAt } from "./issue";
 
-type BoardView = "board" | "list";
-export const boardViews = ["board", "list"] as const satisfies readonly BoardView[];
-export const viewLabel: Record<BoardView, string> = { board: t("web.issue.boardLabels.view.board"), list: t("web.issue.boardLabels.view.list") };
+export type BoardView = "board" | "list" | "timeline" | "calendar";
+export const boardViews = ["board", "list", "timeline", "calendar"] as const satisfies readonly BoardView[];
+export const viewLabel: Record<BoardView, string> = {
+  board: t("web.issue.boardLabels.view.board"),
+  list: t("web.issue.boardLabels.view.list"),
+  timeline: t("web.issue.boardLabels.view.timeline"),
+  calendar: t("web.issue.boardLabels.view.calendar"),
+};
 
 /** Groups of the list view. The board keeps its status lanes whatever this is: a drag between lanes moves status. */
 export type Grouping = "status" | "repo" | "agent" | "none";
@@ -148,8 +153,8 @@ function closedAt(c: BoardCard) {
   }
 }
 
-/** A lane's cards in the order the user picked; the closed lane by default newest closed first. */
+/** A lane's cards in the order the user picked; done and canceled by default newest closed first. */
 export function laneOrder(lane: Lane, cards: BoardCard[], ordering: Ordering) {
-  if (lane === "closed" && ordering === "manual") return [...cards].toSorted((a, b) => closedAt(b) - closedAt(a));
+  if ((lane === "done" || lane === "canceled") && ordering === "manual") return [...cards].toSorted((a, b) => closedAt(b) - closedAt(a));
   return orderRows(cards, ordering, rowKeys);
 }

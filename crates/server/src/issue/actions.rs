@@ -102,6 +102,7 @@ pub fn next_steps(item: &Issue) -> Vec<Next> {
 /// A move settled before anything changes (`settledMove`).
 struct Settled {
     mv: Move,
+    to: IssueStatus,
     said: String,
 }
 
@@ -114,10 +115,10 @@ fn settle(item: &Issue, to: IssueStatus, text: &str) -> Result<Settled, ApiError
     if mv == Move::Round && said.is_empty() && item.stage.stuck == Some(StuckReason::Quiet) {
         return Err(refused("server.issue.roundNeedsWords", &[]));
     }
-    if mv == Move::Complete && item.deliver == vibevalley_protocol::Deliverable::PullRequest && item.pull_request.is_none() {
+    if mv == Move::Complete && item.was_sent() && item.deliver == vibevalley_protocol::Deliverable::PullRequest && item.pull_request.is_none() {
         return Err(refused("server.issue.deliveryNeedsPr", &[]));
     }
-    Ok(Settled { mv, said })
+    Ok(Settled { mv, to, said })
 }
 
 async fn helper_name_async(board: &Board, item: &Issue) -> String {
@@ -214,7 +215,14 @@ async fn move_lines_async(board: &Board, item: &Issue, s: &Settled, name: Option
             out
         }
         Move::Revive => vec![t("server.issue.does.revive", &[("n", n.into())])],
+        Move::Track => vec![t(
+            "server.issue.move.moveTo",
+            &[("status", t(&format!("shared.status.{}", s.to.as_str()), &[]).into())],
+        )],
         Move::Complete => {
+            if !item.was_sent() && board.on_board_async(item).await.is_none() {
+                return vec![t("server.issue.does.completeNone", &[("n", n.into())])];
+            }
             let changes = match item.repo.as_ref() {
                 Some(_) => board.changes_async(&item.id).await.ok(),
                 None => None,
@@ -352,6 +360,19 @@ fn apply_preview_edit(item: &mut Issue, edit: &IssueUpdate) {
             })
             .collect();
     }
+    if let Some(p) = &edit.parent {
+        let trimmed = p.trim();
+        item.parent = (!trimmed.is_empty()).then(|| trimmed.to_string());
+    }
+    if let Some(tags) = &edit.tags {
+        item.tags = super::board::clean_tags(tags);
+    }
+    if let Some(start_at) = edit.start_at {
+        item.start_at = super::board::normalize_timestamp(Some(start_at));
+    }
+    if let Some(due_at) = edit.due_at {
+        item.due_at = super::board::normalize_timestamp(Some(due_at));
+    }
 }
 
 impl Board {
@@ -399,6 +420,9 @@ impl Board {
             cron: None,
             auto_submit_pr: req.auto_submit_pr == Some(true),
             attachments: req.attachments.clone().unwrap_or_default(),
+            tags: req.tags.clone().unwrap_or_default(),
+            start_at: req.start_at,
+            due_at: req.due_at,
         };
         self.create_async(new).await.map_err(api)
     }
@@ -416,6 +440,10 @@ impl Board {
             deliver: input.deliver,
             before: input.before,
             attachments: input.attachments,
+            parent: input.parent,
+            tags: input.tags,
+            start_at: input.start_at,
+            due_at: input.due_at,
         };
         let id = self.get_async(&input.id).await?.id;
         self.edit_async(&id, &upd).await.map_err(api)
@@ -681,6 +709,7 @@ impl Board {
                 if item.status == IssueStatus::Todo {
                     let settled = Settled {
                         mv: Move::Start,
+                        to: IssueStatus::Todo,
                         said: input.text.as_deref().unwrap_or("").trim().to_string(),
                     };
                     return Ok(Preview {

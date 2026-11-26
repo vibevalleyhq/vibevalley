@@ -40,7 +40,7 @@ function makeArtifact(over: {
   };
 }
 
-async function mountLibrary(artifacts: readonly Artifact[], configure?: (fake: FakeHost) => void) {
+async function mountLibrary(artifacts: readonly Artifact[], configure?: (fake: FakeHost) => void, opts?: { readonly colorScheme?: "light" | "dark" }) {
   const fake = fakeHost(scenarios.typical, { route: "/library", locale: "en" });
   for (const [op, answer] of Object.entries(artifactResponses)) {
     fake.respond(op, answer);
@@ -50,7 +50,7 @@ async function mountLibrary(artifacts: readonly Artifact[], configure?: (fake: F
   const app = await open("../../app/main.tsx", {
     width: 1280,
     height: 800,
-    colorScheme: "light",
+    colorScheme: opts?.colorScheme ?? "light",
     platform: "macos",
     clock: { time: SCENARIO_NOW },
     host: fake.options,
@@ -251,4 +251,57 @@ test("ArtifactTiles renders all 12 structured previews, covers, and clean instal
   expect(third!.y).toBe(first!.y);
   expect(second!.x).toBeGreaterThan(first!.x);
   expect(third!.x).toBeGreaterThan(second!.x);
+  // Regression: DesignSystemPreview frames each color swatch individually and light mode omits dark-only cover scrim.
+  expect(app.count("id:design-system-swatch")).toBe(3);
+  expect(app.count("id:library-artifact-cover-p-proto-covered-scrim")).toBe(0);
+});
+
+test("Library sidebar folds 0-count types behind collapsible toggle and dark mode adds prototype cover scrim", async () => {
+  setLocale("en");
+  const subset: readonly Artifact[] = [
+    makeArtifact({
+      id: "p-docs",
+      title: "Architecture RFC",
+      artifactType: "docs",
+      preview: { _tag: "docs", heading: "Goals", excerpt: "Concise spec." },
+    }),
+    makeArtifact({
+      id: "p-proto-covered",
+      title: "Synth Pad",
+      artifactType: "prototype",
+      cover: {
+        path: "/tmp/demo-cover-1.png",
+        url: "/api/v1/artifact/p-proto-covered/cover?seq=1",
+        mime: "image/png",
+        seq: 1,
+        width: 640,
+        height: 400,
+        updatedAt: SCENARIO_NOW,
+      },
+    }),
+  ];
+
+  const { app, fake } = await mountLibrary(subset, undefined, { colorScheme: "dark" });
+
+  // Dark mode applies subtle scrim + inner border over captured covers.
+  expect(app.count("id:library-artifact-cover-p-proto-covered-scrim")).toBe(1);
+
+  // Populated artifact types are shown immediately; 0-count types are folded behind the quiet toggle.
+  expect(app.count("id:content-nav-artifact-docs")).toBe(1);
+  expect(app.count("id:content-nav-artifact-prototype")).toBe(1);
+  expect(app.count("id:content-nav-artifact-sheet")).toBe(0);
+  expect(app.count("id:content-nav-artifact-diagram")).toBe(0);
+  expect(app.count("id:content-nav-artifacts-more")).toBe(1);
+  expect(app.count("id:content-new-note-btn")).toBe(0);
+
+  // Expanding the toggle reveals the remaining 0-count types.
+  await app.press("id:content-nav-artifacts-more");
+  await fake.pump(app);
+  expect(app.count("id:content-nav-artifact-sheet")).toBe(1);
+  expect(app.count("id:content-nav-artifact-diagram")).toBe(1);
+
+  // Collapsing hides 0-count types again.
+  await app.press("id:content-nav-artifacts-more");
+  await fake.pump(app);
+  expect(app.count("id:content-nav-artifact-sheet")).toBe(0);
 });

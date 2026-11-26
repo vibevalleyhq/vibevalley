@@ -1868,6 +1868,7 @@ mod tests {
             work_root: dir.path().to_path_buf(),
             version: "0.1.0-test".into(),
             deepseek_api_key: String::new(),
+            ..Default::default()
         })
         .await;
         let storage = Storage::open_async(dir.path(), ctx.clone()).await.unwrap();

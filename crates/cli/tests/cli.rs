@@ -200,6 +200,7 @@ const COMMANDS: &[&str] = &[
     "library list",
     "machine list",
     "machine up",
+    "mcp",
     "media input delete",
     "media input list",
     "media input upload",
@@ -308,7 +309,11 @@ fn issue_crud_text_and_json_output_and_errors() {
     assert_eq!((missing.code, missing.tag()), (4, "Missing"));
     assert_eq!(missing.failure.as_ref().unwrap()["error"]["next"][0]["run"], json!(["issue", "list"]));
 
-    let refused = srv.run(&["issue", "status", "1", "done"]);
+    // Direct transitions across all 6 statuses work (#22/#34); repeating the same status is refused with next actions.
+    assert!(srv.run(&["issue", "status", "2", "done"]).out.starts_with("#2  done"));
+    assert!(srv.run(&["issue", "status", "1", "in_review"]).out.starts_with("#1  in_review"));
+
+    let refused = srv.run(&["issue", "status", "1", "in_review"]);
     assert_eq!((refused.code, refused.tag()), (3, "Refused"));
     let next = refused.failure.as_ref().unwrap()["error"]["next"].as_array().cloned().unwrap_or_default();
     let cancel = next

@@ -27,7 +27,8 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 | `apps/mac/crates/` | 桌面端独占支撑 crate：`diorama`、`terminal`、`workspace`（项目、布局含 `PaneKind::Chat` 与 `PaneKind::Diorama`、终端与宿主 `state.db` 持久化） |
 | `crates/rich/` | 原生富内容组件集（`VvMarkdown` 含 `Doc` 排版、相对图片解析缓存与供纯 GPUI 窗格直连的 `native_markdown_root`、`VvIcon`（[icon.rs](crates/rich/src/icon.rs)，承载 97 枚工作台 reicon 线性图标并以无锁 `OnceLock<Vec<Path>>` 零拷贝共享解析路径；前端 [icons.ts](apps/mac/ui/design/icons.ts) 只保留纯类型 `IconName`，[icons.ts](scripts/gen/icons.ts) 另单源生成 `iconPaths.gen.ts` 供无原生 `VvIcon` 时经 `<Canvas>` + `Path2D` 矢量回退）、`VvI18n`（`"vibevalley/rich"` 导出 `.translate(...)`，由 `installNativeI18n()` 接管 `@vibevalley/i18n`，使生产 UI 包不含 `packages/i18n` JS 词典）、`VvCodeBlock`、`VvDiagram`、`VvCanvas`、`VvChart`（四者经 `run_offloaded` 将大尺寸未缓存渲染移出 UI 线程并用 `LruCache::get_by` 零拷贝查缓存）、`VvGenUi`（按 `(doc_gen, state_rev)` 缓存解析树）、`VvWhiteboard`（含 Loro Phase A 实时在场光标/占位框/一键跟随视口与 `onCursorMove`/`onViewportChange` 回调）、`VvPinyin`）与内部渲染引擎 `engine/` |
 | `apps/mac/src/theme.rs`、`apps/mac/src/theme_tokens.rs` | 外壳的主题、动画幅度（`Settings.motion`）与字号设置；令牌从 `design/tokens.json` 同步生成 |
-| `apps/mac/src/debug/` | 不看屏幕检查与远程调试应用的入口：VDP 回环调试门（`vdp.rs`）、统一命令执行器（`executor.rs`）及脚本/状态转储适配（`script.rs`，[验收](.agents/skills/vv-acceptance/references/app.md)） |
+| `apps/mac/src/debug/` | 不看屏幕检查与远程调试应用的入口：VDP 回环调试门（`vdp.rs`）、统一 26 项 `VdpCommand` / 6 项 `VdpNotification` 执行器（`executor.rs`，协议见 [vdp.rs](crates/protocol/src/vdp.rs)）、脚本兼容适配（`script.rs`）、可选 UI 探针 [vdpProbe.ts](apps/mac/ui/infra/vdpProbe.ts) 与远端面板 [RemoteVdpPanel.tsx](apps/mac/ui/features/devtools/RemoteVdpPanel.tsx)（[验收](.agents/skills/vv-acceptance/references/app.md)） |
+| `apps/mac/src/applet/`、`apps/shim/` | 作品本地轻应用：`AppletHost` 经 `$VIBEVALLEY_HOME/applet.sock` NDJSON 驱动极薄 Swift AppKit Shim（`apps/shim/`）；11 类原生作品走 Plan B2 `CAContext` / `CALayerHost` 跨进程合成，`prototype` 走独立沙箱 `WKWebView`（`connect-src 'none'`），负责 `~/Applications/VibeValley Apps/<作品名>.app` 安装与卸载 |
 | `apps/mac/ui/App.tsx`、`ShellApp.tsx`、`workspace/` | 双入口 TSX 包：`App.tsx` 供全量工作台（`vv` / `vibevalley`）与农场视图（`farm-form` / `farm-phone`），`ShellApp.tsx` 专供轻量工作区壳窗格（`devtools`、`sidebar`、`palette`、`workspace-chat`、`probe`；Markdown 预览已下沉为纯 GPUI `MarkdownView`），两份入口启动时均调 `installNativeI18n()` 走原生 `VvI18n` 并挂载 `DesignHostProvider`，按 `host.params.view` 挑视图 |
 | `apps/mac/ui/{app,features,design,infra}/` | 工作台共 6 个顶级目录：入口外壳 `app/`（路由表 `Workbench.tsx`、`WorkbenchDesignHost`、6 项一级导航 `places.ts`、外框 `Shell.tsx`）、领域切片 `features/<概念>/`（含二元统一内容中心壳 `content/`、5 栏设置页、Artifact 引擎含右侧 `HistoryPanel.tsx` 历史面板、`outline` 大纲笔记与 `OutlineImportModal.tsx` `.md` 导入、素材库）、共享原语与表面 `design/`（经 `DesignHostContext`（[host.tsx](apps/mac/ui/design/host.tsx)）与 `infra/` 解耦，含动效出口 `motion.ts`、防闪烁骨架原语 `Skeleton.tsx` 与 `Markdown.tsx` / `code/GenUi.tsx` 的 `onGenUiAction` 闭环）、底层运行时与状态 `infra/`（`bridge.ts`、`attachmentFile.ts`、`solid.ts`、`polyfill.ts`、`state/`），另加 `workspace/` 与 `farm/` |
 | `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json` | 工作台的令牌：颜色（浅色、深色各一套）、字号、圆角、缓动、阴影（[哲学与令牌](docs/design/01-philosophy-and-tokens.md)），与 `apps/mobile` 令牌一同由 [tokens.ts](scripts/gen/tokens.ts) 从 [tokens.json](design/tokens.json) 生成 |
@@ -142,9 +143,17 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 
 `scripts/release/package.ts` 与 [package-platform.ts](scripts/release/package-platform.ts) 将应用（`vibevalley-mac`）、命令行（`vibevalley`）和灵动岛放进 `.app/Contents/MacOS`，按发布通道设置独立包标识（`dev.vibevalley.app{,.alpha,.beta,.dev}`），将静态素材（`assets`，经 `scripts/release/package-assets.ts` 的 `shouldPackageAsset` 过滤仅官网使用的 `assets/site/`）、通道图标与经 `xcrun actool` 从全出血通道 PNG（`appicon-{release,alpha,beta,dev}.png`）编译出的 Tahoe `Assets.car` 放进 `Contents/Resources`（两份 `--release` 字节码已直接嵌入 `vibevalley-mac` 二进制，不再向 `Contents/Resources/ui` 复制开发页面包），并产出带 Retina 背景的 DMG 与 ZIP 安装包。应用从自身包定位资源，不依赖构建仓库的位置；`release.json` 记录版本、架构、ZIP 文件名、字节数和 SHA-512。
 
-`apps/mac/src/update` 只在打包版本上按通道包名启动更新检查，启动时和每 30 分钟各检查一次（[fetch.rs](apps/mac/src/update/fetch.rs) 使用带 `tokio::time::sleep` 的异步重试循环，[releases.rs](apps/mac/src/update/releases.rs) 匹配通道包名与归档）。稳定版读最新正式版，alpha、beta 各读同阶段最新版本；仓库运行和 `0.0.0` 不自动检查。`VIBEVALLEY_UPDATE_FEED=off` 关闭检查，指定清单 URL 可验证本地更新；新版本下载就绪后会在主导航左下角显示一键重启更新入口（有运行中会话时先弹出确认）。
+`apps/mac/src/update` 只在打包版本上按通道包名启动更新检查，启动时和每 30 分钟各检查一次（[fetch.rs](apps/mac/src/update/fetch.rs) 匹配通道包名与归档）。稳定版读最新正式版，alpha、beta 各读同阶段最新版本；仓库运行和 `0.0.0`（`Feed::Off`）初始化为 `disabled` 态，不误报「已是最新版本」。`VIBEVALLEY_UPDATE_FEED=off` 关闭检查，指定清单 URL 可验证本地更新：
 
-更新包的大小、哈希、归档路径、版本和签名全部通过后才进入 ready；Developer ID 应用只接受同一团队签名。DMG、系统转移位置或不可写目录要求手工安装。更新先复制到应用旁边，退出后由独立进程替换；移动新包失败时恢复原包。页面的立即安装会重启，普通退出只替换；原包保留在同目录的 `.VibeValley-previous-<pid>.app`。更新不移动或迁移用户数据。
+- **非阻塞检查与推送优先**：`UpdateOp::Check` 在后台任务启动检查并立即返回（`apps/mac/src/update/updater.rs`）；`Updater` 经 `tokio::sync::watch` 持有最新状态，变化时通过 `HostedView` 推送 `update_state` 事件，页面边界经 `UpdateState.safeParse` 解码，仅保留 `60 秒` 低频兜底拉取。
+- **9 态显式状态机与 7 类失败分类**：[host.ts](packages/protocol/src/host.ts) 定义 9 个 `UpdateState` 分支（`disabled`、`idle`、`checking`、`downloading`、`verifying`、`ready`、`installing`、`manual`、`failed`）与 7 种 `FailureKind`（`network`、`rateLimit`、`integrity`、`signature`、`permission`、`install`、`unknown`）；[UpdateRow.tsx](apps/mac/ui/features/setting/UpdateRow.tsx) 穷尽渲染全部分支，[Shell.tsx](apps/mac/ui/app/Shell.tsx) 点击 `rail-update-btn` 始终打开克制的更新预览弹窗（含版本变更、活跃会话提醒、「下次退出时更新」与「立即重启更新」），不静默退出。
+- **可续传下载与 ETag 缓存**：下载写入 `$VIBEVALLEY_HOME/updates/<version>/update.zip.part`，支持 HTTP `Range` 断点续传（`206` 追加、`200` 截断重写、`416` 重置）、`backon` 指数退避重试、约 `200 ms` 节流字节速率遥测与 `EtagCache`（`If-None-Match` / `304` 复用，避免 GitHub API 限流）；进入 `ready` 后清理旧版本暂存与残留临时目录。
+- **原子替换与下次启动恢复**：更新包的大小、SHA-512、归档路径、通道包名和同团队 Developer ID 签名全部通过后进入 `ready`；DMG、系统转移位置或不可写目录进入 `manual`。`swap(true)` 先推 `installing` 再复制 `.app` 并拉起独立 `swap.sh`；`swap.sh` 将日志写入 `$VIBEVALLEY_HOME/updates/swap.log`，失败回滚时原子写出 `swap-failed.txt`，下次 `Updater::from_env()` 启动核对版本后呈现 `failed(kind = "install")`（已升级成功则静默清除）。普通退出仍由 `on_app_quit` 静默替换，原包保留在 `.VibeValley-previous-<pid>.app`，不迁移用户数据。
+
+### 本地轻应用与 VDP 远程调试
+
+- **Artifact 安装为本地轻应用（Stage 0–2）**：[installer.rs](apps/mac/src/applet/installer.rs) 将作品安装至 `~/Applications/VibeValley Apps/<作品名>.app`（`CFBundleIdentifier: dev.vibevalley.applet.<artifact_id>`、`.icns` 图标、ad-hoc `codesign` 与 `lsregister -f`），运行期零修改包内文件以保签名不失效；极薄 Swift AppKit Shim（`apps/shim/`）经 `$VIBEVALLEY_HOME/applet.sock` NDJSON 协议与宿主 [host.rs](apps/mac/src/applet/host.rs) 通信（宿主未运行时静默拉起）。11 类原生作品通过方案 B2 `CAContext` / `CALayerHost`（[remote_layer.rs](apps/mac/src/applet/remote_layer.rs)）由 WindowServer 跨进程 GPU 合成，`prototype` 由 Shim 内置沙箱 `WKWebView`（`connect-src 'none'`）直接渲染；Stage 3 增强能力（菜单栏常驻、作品 KV、全局快捷键与便携导出）暂延后。
+- **VDP 远程实时调试（`apps/mac/src/debug/`、`crates/protocol/src/vdp.rs`）**：默认完全关闭（零端口、无 `debug.json`、无探针开销）；仅传入 `--remote-debugging-port=<port>` 或 `VIBEVALLEY_DEBUG_PORT=<port>` 时在 `127.0.0.1` 启动回环 HTTP/WS 门（[vdp.rs](apps/mac/src/debug/vdp.rs)），以 Unix `0600` 权限原子写出 `$VIBEVALLEY_HOME/debug.json` 与 32 字节随机十六进制令牌（退出或 `Drop` 核对 PID 清理，[home.rs](crates/protocol/src/home.rs) 经 `kill -0` 过滤陈旧进程）。`/json/version`、`/json/list` 与 WS `/devtools` 均强制校验令牌（失败返回 `401`，HTTP 响应体与 `Debug` 输出绝不泄漏 `token`）。[vdp.rs](crates/protocol/src/vdp.rs) 单源定义 26 个封闭 `VdpCommand`（`Target.*`、`Shell.*`、`Page.*`、`Input.*`、`UI.*`、`Server.*`、`Log.*`）与 6 类 `VdpNotification`，在边界一次解码后统一交 [executor.rs](apps/mac/src/debug/executor.rs) 执行（[script.rs](apps/mac/src/debug/script.rs) 薄适配旧环境变量脚本），配合可选 [vdpProbe.ts](apps/mac/ui/infra/vdpProbe.ts)（`vdp_ui_req` / `vdp_ui_res` / `vdp_ui_log`）服务三类客户端：另一实例的 `DevToolsApp.tsx`（[RemoteVdpPanel.tsx](apps/mac/ui/features/devtools/RemoteVdpPanel.tsx)，经 `HostOp::VdpDiscover` / `VdpCall`）、`vibevalley debug` 命令行（[debug.rs](crates/cli/src/domains/debug.rs)）与验收脚本。
 
 ## 和谁打交道
 
@@ -157,14 +166,18 @@ VibeValley 的主客户端是原生 macOS 应用 `apps/mac`（二进制 `vibeval
 - **工作台用 TSX，3D 纸雕场景用 Rust**：工作台是表单、列表和文字，沿用页面的写法和契约的 TS 类型最省；3D 纸雕农场需要离屏 `wgpu` 渲染、阴影/景深与射线拾取，直接留在 Rust 侧。
 - **状态中间层收在 `state/`，意图按帧 `seq` 结算**：消除「请求返回先弹回旧状态、下一帧再跳过去」的闪烁。
 - **Mac 是唯一服务端宿主，远程访问收口在 Tailscale + 原生移动壳**：不引入公网中继和 WebView 壳，主回环门保持无认证极简路径；远程监听默认关闭，仅在用户需要时对私有 Tailscale 网络或本地调试回环开放，由独立 4 标签 `apps/mobile` 聚焦离开桌面后的高频分拣与回复。
+- **自动更新留纯 Rust 管线，不接 Sparkle / 强弹窗 / 高频轮询**：放弃 Sparkle（避免 ObjC/Swift FFI 与 Appcast XML 割裂现有通道与 `HostOp`）、放弃 `ready` 强弹全屏模态（避免打断阅读与执行心流）、放弃高频前端轮询（改由 `tokio::sync::watch` 实时推送 `update_state`）。
+- **轻应用采用极薄 AppKit Shim + Plan B2（`CAContext`/`CALayerHost`）**：放弃方案 A（仅 URL 唤醒主进程，无独立 Dock / `Cmd+Tab` 身份）、方案 C（`clonefile` 多份 GPUI/服务端进程内存叠加）、方案 B1（`IOSurface` 需深改上游 GPUI）与 Pake/Tauri 离线打包（失去 11 类原生渲染与 Loro 实时协同）；`prototype` 直接由 Shim 内置沙箱 `WKWebView` 承载。
+- **VDP 借鉴传输习惯而非强套浏览器 CDP**：原生工作台是 GPUI + `nsh` + `wgpu` 而非 Chromium DOM/V8，故只复用 `/json/*` 与 WebSocket JSON-RPC 2.0，放弃浏览器 CDP 域、纯 HTTP 轮询与纯 UDS 传输（脱离标准回环工具链）。
 
 ## 还没做的
 
-- 真实音频验收、Developer ID 签名公证与签名包发布主线验收，见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)。
-- 移动端真机分发签名与后台提醒机制，见[移动远程控制](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)。
-- DevTools V2（画布 `Inspector` `testID` 点选与源码跳转、Loro 前沿视图、强类型 `DebugCommand` 替换 `apps/mac/src/debug/script.rs` 旧文本脚本），见[VibeValley DevTools V2](.agents/notes/proposed/architecture/2026-11-22-devtools-and-protocol-boundaries.md)。
-- 宽屏对话次级标签收敛与素材组织方式，见[对话页次级标签收敛与素材组织方式](.agents/notes/proposed/architecture/2026-11-22-workbench-ux-polish-and-outline-as-artifact.md)。
-- 看板覆层/拖拽显式状态机与会话轨迹摘要下沉评估，见[工作台剩余交互 FSM 与会话轨迹投影收口](.agents/notes/proposed/architecture/2026-11-21-ui-state-machine-consolidation.md)。
+- 真实音频验收、Developer ID 签名公证与签名包发布主线验收：`#54`。
+- 移动端真机分发签名与后台提醒机制：`#60`。
+- DevTools V2 画布 `Inspector` 与 Loro 前沿视图：`#57`。
+- 宽屏对话次级标签收敛与素材组织方式：`#59`。
+- 看板覆层/拖拽显式状态机：`#56`（会话轨迹摘要下沉已并入 `#37`）。
+- 桌面轻应用 Stage 3 增强能力（菜单栏常驻、作品 KV、全局快捷键与便携导出）。
 
 ## 怎么验证
 

@@ -60,14 +60,16 @@ test("empty scenario keeps every major route stable across themes and narrow wid
   expect(app.count("id:issues-page")).toBe(1);
   expect(app.count("id:issue-card")).toBe(0);
   expect(app.count("id:desk-status")).toBe(0);
-  expect(app.count("id:rail-runs-status")).toBe(1);
-  expect(app.shows("id:rail-runs-status >> text:未启动")).toBe(false);
+  expect(app.count("id:place-dashboard")).toBe(1);
+  expect(app.count("id:place-farm")).toBe(1);
+  expect(app.count("id:link")).toBe(1);
+  expect(app.count("id:rail-runs-status")).toBe(0);
   row.stepsPassed++;
 
   await fake.setSlice(app, "inbox", { ...fixture.state.inbox, call: "live" });
-  expect(app.count("id:rail-runs-status")).toBe(1);
+  expect(app.count("id:place-dashboard")).toBe(1);
   await fake.setState(app, fixture.state);
-  expect(app.shows("id:rail-runs-status >> text:未启动")).toBe(false);
+  expect(app.count("id:link")).toBe(1);
 
   await visit(app, fake, "/chat", row, () => {
     expect(app.count("id:chat-page")).toBe(1);
@@ -347,13 +349,13 @@ test("dense scenario stresses 65 issues (OlderLink fold), 80 messages, 10 crons,
     durationMs: 0,
   };
 
-  // Board shows folded closed column (< total 65 since 17 closed > closedShown 15), and reconciles wide/narrow working count (17) + running slots (6 / 6).
+  // Board shows folded done column (< total 65 since 16 done > closedShown 15), reconciles wide/narrow in_progress count (17), and omits legacy concurrency slots badge.
   const denseBoard = fixture.state.board.boardSummary;
-  expect(denseBoard?.laneCounts.working).toBe(17);
+  expect(denseBoard?.laneCounts.inProgress).toBe(17);
   expect(denseBoard?.runningSlots).toBe(6);
   expect(denseBoard?.maxRunning).toBe(6);
-  expect(app.shows("id:lane-working >> text:17")).toBe(true);
-  expect(app.texts().some((s) => s.includes("6 / 6"))).toBe(true);
+  expect(app.shows("id:lane-in_progress >> text:17")).toBe(true);
+  expect(app.count("id:lane-working-slots")).toBe(0);
   const foldedCards = app.count("id:issue-card");
   expect(foldedCards).toBeGreaterThan(20);
   expect(foldedCards).toBeLessThan(fixture.state.board.issues.length);
@@ -369,7 +371,7 @@ test("dense scenario stresses 65 issues (OlderLink fold), 80 messages, 10 crons,
   await app.setColorScheme("dark");
   row.themes.push("dark");
   expect(app.count("id:issues-page")).toBe(1);
-  expect(app.shows("id:board-lane-tab-working >> text:17")).toBe(true);
+  expect(app.shows("id:board-lane-tab-in_progress >> text:17")).toBe(true);
   row.stepsPassed++;
 
   await app.setViewport(1280, 820);
@@ -465,22 +467,26 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
 
   const boardSummary = fixture.state.board.boardSummary;
   expect(boardSummary).toBeDefined();
-  expect(boardSummary?.laneCounts).toEqual({ todo: 3, working: 8, waiting: 4, closed: 9 });
+  expect(boardSummary?.laneCounts).toEqual({ backlog: 2, todo: 1, inProgress: 8, inReview: 4, done: 7, canceled: 2 });
   expect(boardSummary?.runningSlots).toBe(2);
   expect(boardSummary?.maxRunning).toBe(6);
   expect(app.count("id:issue-card")).toBe(fixture.state.board.issues.length);
-  expect(app.shows("id:lane-todo >> text:3")).toBe(true);
-  expect(app.shows("id:lane-working >> text:8")).toBe(true);
-  expect(app.shows("id:lane-waiting >> text:4")).toBe(true);
-  expect(app.shows("id:lane-closed >> text:9")).toBe(true);
-  expect(app.texts().some((s) => s.includes("2 / 6"))).toBe(true);
+  expect(app.shows("id:lane-backlog >> text:2")).toBe(true);
+  expect(app.shows("id:lane-todo >> text:1")).toBe(true);
+  expect(app.shows("id:lane-in_progress >> text:8")).toBe(true);
+  expect(app.shows("id:lane-in_review >> text:4")).toBe(true);
+  expect(app.shows("id:lane-done >> text:7")).toBe(true);
+  expect(app.shows("id:lane-canceled >> text:2")).toBe(true);
+  expect(app.count("id:lane-working-slots")).toBe(0);
 
   await app.setViewport(560, 800);
   row.viewports.push("560x800");
-  expect(app.shows("id:board-lane-tab-todo >> text:3")).toBe(true);
-  expect(app.shows("id:board-lane-tab-working >> text:8")).toBe(true);
-  expect(app.shows("id:board-lane-tab-waiting >> text:4")).toBe(true);
-  expect(app.shows("id:board-lane-tab-closed >> text:9")).toBe(true);
+  expect(app.shows("id:board-lane-tab-backlog >> text:2")).toBe(true);
+  expect(app.shows("id:board-lane-tab-todo >> text:1")).toBe(true);
+  expect(app.shows("id:board-lane-tab-in_progress >> text:8")).toBe(true);
+  expect(app.shows("id:board-lane-tab-in_review >> text:4")).toBe(true);
+  expect(app.shows("id:board-lane-tab-done >> text:7")).toBe(true);
+  expect(app.shows("id:board-lane-tab-canceled >> text:2")).toBe(true);
   await app.setViewport(1280, 820);
   row.stepsPassed++;
 
@@ -535,10 +541,10 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
   });
 
   await visit(app, fake, "/runs", row, () => {
+    expect(app.count("id:dashboard-page")).toBe(1);
     expect(app.count("id:runs-page")).toBe(1);
     expect(app.count("id:run-row-orchestrator")).toBe(1);
     expect(app.count("id:run-row-w-edge-fam4")).toBe(1);
-    expect(app.shows("id:rail-runs-status >> text:3")).toBe(true);
   });
 
   const seenConnectorStates = new Set<ConnectorState>();
@@ -626,12 +632,12 @@ test("english locale renders issues, chat, and settings cleanly with zero crashe
 
   expect(app.count("id:issues-page")).toBe(1);
   const issueTexts = app.texts();
-  expect(issueTexts).toContain("To do");
-  expect(issueTexts).toContain("In progress");
-  expect(issueTexts).toContain("For you to see");
-  expect(issueTexts).toContain("Closed");
+  expect(issueTexts).toContain("Todo");
+  expect(issueTexts).toContain("In Progress");
+  expect(issueTexts).toContain("In Review");
+  expect(issueTexts).toContain("Done");
   expect(issueTexts).toContain("New issue");
-  expect(issueTexts.some((s) => s.includes("spots"))).toBe(true);
+  expect(app.count("id:lane-working-slots")).toBe(0);
 
   await app.host.send("route", "/chat");
   await fake.pump(app);
@@ -647,15 +653,18 @@ test("english locale renders issues, chat, and settings cleanly with zero crashe
   await fake.pump(app);
   expect(app.count("id:settings-nav")).toBe(1);
   const settingsTexts = app.texts();
-  expect(settingsTexts).toContain("General & Appearance");
+  expect(settingsTexts).toContain("General");
+  expect(settingsTexts).toContain("Appearance");
   expect(settingsTexts).toContain("Page language");
 
   await app.host.send("route", "/runs");
   await fake.pump(app);
   await fake.pump(app);
+  expect(app.count("id:dashboard-page")).toBe(1);
   expect(app.count("id:runs-page")).toBe(1);
   const runsTexts = app.texts();
-  expect(runsTexts).toContain("Runs & trajectories");
+  expect(runsTexts).toContain("Dashboard");
+  expect(runsTexts).toContain("Runs");
   expect(runsTexts).toContain("Active");
 
   await app.host.send("route", "/agents");

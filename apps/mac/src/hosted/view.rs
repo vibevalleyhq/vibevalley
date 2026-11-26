@@ -59,6 +59,7 @@ impl HostedView {
             appearance: Appearance::System,
             data_dir: Some(crate::host::Storage::configured().views),
             inline_root: true,
+            transparent: true,
             ..Default::default()
         };
         let name = view.to_string();
@@ -289,6 +290,10 @@ impl HostedView {
         let _ = self.app.read(cx).host().send("farm-sound", json!(name));
     }
 
+    pub fn notify_repos_changed(&self, cx: &App) {
+        let _ = self.app.read(cx).host().send("repos-changed", json!(null));
+    }
+
     pub fn navigate(&self, route: &str, cx: &App) {
         let _ = self.app.read(cx).host().send("route", json!(route));
     }
@@ -304,6 +309,10 @@ impl HostedView {
 
     pub fn set_motion(&self, motion: crate::theme::MotionChoice, cx: &App) {
         let _ = self.app.read(cx).host().send("motion", json!(motion.as_str()));
+    }
+
+    pub fn push_update_state(&self, state: Value, cx: &App) {
+        let _ = self.app.read(cx).host().send("update_state", state);
     }
 
     pub fn set_ui_font_size(&self, size: f32, cx: &mut App) {

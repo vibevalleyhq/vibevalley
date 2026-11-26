@@ -171,7 +171,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
     [props.channel?.description, props.channel?.repo ? t("web.channel.defaultRepo", { repo: props.channel.repo }) : ""].filter(Boolean).join(" · ");
   return (
     <View accessibilityLabel={channelLabel(props.channel)} testID="channel-main" class="min-w-0 flex-1">
-      <View testID="channel-head" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
+      <View testID="channel-head" desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
         <If when={!md()}>
           <BarButton icon="chat" size={16} label={t("web.channel.channels")} testid="channels-drawer" onPress={() => props.onDrawer()} />
         </If>

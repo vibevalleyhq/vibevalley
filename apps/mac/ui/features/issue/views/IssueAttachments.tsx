@@ -4,6 +4,8 @@ import { Progress } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import type { Attachment } from "@vibevalley/protocol";
 
+import { Button } from "../../../design/Button";
+import { CompareUploadDialog, type CompareUploadResult } from "../../../design/Compare";
 import { AttachmentTile, fileKind, kindIcon, sizeText } from "../../../design/domain/AttachmentTile";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
@@ -13,9 +15,10 @@ import { readFiles } from "../../../design/picked";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
-import { api, reasonOf } from "../../../infra/api";
+import { api, newSendKey, reasonOf } from "../../../infra/api";
 import { attachmentData } from "../../../infra/attachment";
 import { fileUrl, openAttachment, useAttachmentFile } from "../../../infra/attachmentFile";
+import { appHistory } from "../../../infra/router";
 import { createEffect } from "../../../infra/solid";
 
 export interface PendingUpload {
@@ -108,9 +111,11 @@ export function IssueAttachments(props: {
   busy?: boolean | undefined;
   first?: boolean | undefined;
   onAdd?: ((file: Attachment) => unknown) | undefined;
+  onAddCompare?: ((result: CompareUploadResult) => unknown) | undefined;
   onRemove?: ((id: string) => unknown) | undefined;
 }) {
   const uploader = createAttachmentUploader((file) => props.onAdd?.(file));
+  const compareOpen = signal(false);
   const known = signal<ReadonlyMap<string, string>>(new Map());
   const pictures = computed(() =>
     props.files.flatMap((f) => {
@@ -123,38 +128,76 @@ export function IssueAttachments(props: {
   const visible = computed(() => props.editable === true || hasItems());
   const disabled = computed(() => props.busy === true);
 
+  const handleAddCompare = async (result: CompareUploadResult) => {
+    if (props.onAddCompare) {
+      await props.onAddCompare(result);
+      compareOpen.set(false);
+      return;
+    }
+    for (const file of result.attachments) {
+      await props.onAdd?.(file);
+    }
+    const routeIssueId = /^\/issues\/([^/?#]+)$/u.exec(appHistory.read().pathname)?.[1];
+    if (routeIssueId) {
+      if (result.attachments.length > 1) {
+        const merged = [...new Set([...props.files.map((f) => f.id), ...result.attachments.map((f) => f.id)])];
+        await api.issue.update({ id: routeIssueId, attachments: merged });
+      }
+      await api.issue.comment.create({ id: routeIssueId, text: result.block, sendKey: newSendKey() });
+    }
+    compareOpen.set(false);
+  };
+
   return (
     <If when={visible()}>
       <View testID="issue-attachments" accessibilityLabel={t("web.issue.attachments.title")}>
         <Lightbox pictures={pictures()} at={lightboxAt()} onAt={(at) => lightboxAt.set(at)} />
-        <View class={`${props.first === true ? "mt-0" : "mt-6"} mb-2 flex-row items-center justify-between gap-2`}>
-          <View class="flex-row items-baseline gap-2">
-            <Text class="text-xs font-semibold text-muted">{t("web.issue.attachments.title")}</Text>
-            <If when={props.files.length > 0}>
-              <Text testID="issue-attachments-count" class="text-xs text-muted tabular-nums">
-                {String(props.files.length)}
-              </Text>
+        <If when={props.editable === true}>
+          <CompareUploadDialog open={compareOpen()} onClose={() => compareOpen.set(false)} onSubmit={handleAddCompare} />
+        </If>
+        <If
+          when={hasItems()}
+          else={
+            <View class={`${props.first === true ? "mt-0" : "mt-4"} flex-row items-center gap-2`}>
+              <Button size="compact" tone="quiet" icon="attach" testID="issue-attach-file" disabled={disabled()} onPress={() => void uploader.pick()}>
+                {t("web.issue.attachments.attachFile")}
+              </Button>
+              <Button size="compact" tone="quiet" icon="diff" testID="issue-add-compare" disabled={disabled()} onPress={() => compareOpen.set(true)}>
+                {t("web.base.compare.addAction")}
+              </Button>
+            </View>
+          }
+        >
+          <View class={`${props.first === true ? "mt-0" : "mt-6"} mb-2 flex-row items-center justify-between gap-2`}>
+            <View class="flex-row items-baseline gap-2">
+              <Text class="text-xs font-semibold text-muted">{t("web.issue.attachments.title")}</Text>
+              <If when={props.files.length > 0}>
+                <Text testID="issue-attachments-count" class="text-xs text-muted tabular-nums">
+                  {String(props.files.length)}
+                </Text>
+              </If>
+            </View>
+            <If when={props.editable === true}>
+              <View class="flex-row items-center gap-1">
+                <IconButton
+                  icon="diff"
+                  size={14}
+                  label={t("web.base.compare.addAction")}
+                  disabled={disabled()}
+                  onClick={() => compareOpen.set(true)}
+                  testid="issue-add-compare"
+                />
+                <IconButton
+                  icon="attach"
+                  size={14}
+                  label={t("web.issue.attachments.attachFile")}
+                  disabled={disabled()}
+                  onClick={() => void uploader.pick()}
+                  testid="issue-attach-file"
+                />
+              </View>
             </If>
           </View>
-          <If when={props.editable === true}>
-            <IconButton
-              icon="attach"
-              size={14}
-              label={t("web.issue.attachments.attachFile")}
-              disabled={disabled()}
-              onClick={() => void uploader.pick()}
-              testid="issue-attach-file"
-            />
-          </If>
-        </View>
-        <If when={uploader.error()}>
-          {(err) => (
-            <Text role="alert" testID="issue-attach-error" class="mb-2 text-xs text-berry">
-              {t("web.issue.attachments.uploadFailed", { why: err() })}
-            </Text>
-          )}
-        </If>
-        <If when={hasItems()}>
           <View class="flex-row flex-wrap items-start gap-2">
             <Each of={props.files} key={(f) => f.id}>
               {(f) => (
@@ -175,6 +218,13 @@ export function IssueAttachments(props: {
               {(u) => <UploadingChip name={u().name} />}
             </Each>
           </View>
+        </If>
+        <If when={uploader.error()}>
+          {(err) => (
+            <Text role="alert" testID="issue-attach-error" class="mt-2 text-xs text-berry">
+              {t("web.issue.attachments.uploadFailed", { why: err() })}
+            </Text>
+          )}
         </If>
       </View>
     </If>

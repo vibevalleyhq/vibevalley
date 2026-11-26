@@ -3,6 +3,7 @@ import { Dialog } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
+import { useModalOverlay } from "./Dialog";
 import { useDesignHost } from "./host";
 import { IconButton } from "./IconButton";
 import { fadeAnimation } from "./motion";
@@ -16,6 +17,7 @@ export interface Picture {
 }
 
 export function Lightbox(props: { pictures: readonly Picture[]; at: number | undefined; onAt: (at: number | undefined) => void }) {
+  useModalOverlay(() => props.at !== undefined);
   const designHost = useDesignHost();
   const count = () => props.pictures.length;
   const go = (step: number) => {

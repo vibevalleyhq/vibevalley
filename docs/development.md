@@ -53,7 +53,7 @@ vp run build:release -- --bump   # 先 bump release，默认先跑 make verify�
 - `vp run packages:check`：打出各包的声明、`vp check`、各包的测试。
 - `vp run scripts:test`：`scripts/` 自己的测试。
 - `vp run site:check`、`vp run site:build`：官网的素材和静态生成测试、构建。
-- `vp run docs:verify`：校验 Note、skill、文档链接、旧名字、用语表、词典与生成的参考表。
+- `vp run docs:verify`：校验 skill、文档链接、旧名字、用语表、词典与生成的参考表。
 - 帮工交付前，服务端运行工单 worktree 的 `.vibevalley/check`。脚本清除 `VIBEVALLEY_*` 和模型钥匙等环境变量，安装锁定版本的依赖，运行 `vp check --deny-warnings`。它按改动和新增文件选择 Rust、契约、SQL、页面和软件包的检查，最后运行 `docs:verify`。新 worktree 的 `.vibevalley/setup` 安装依赖并构建软件包声明。[仓库检查](.vibevalley/check)
 
 测试不连接真实模型：服务端的测试在 `crates/server/tests`，助手用替身模型，帮工用 oar 的 scripted 农机（`crates/server/src/fake/runtime.rs`）。页面的测试用 `nsh/test` 写在 `apps/mac/ui`，喂样例的 `Transport`；3D 纸雕农场与开场的测试在 `apps/mac/src/diorama/` 与 `apps/mac/crates/diorama/`。

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gpui::{
-    AnyElement, App, AppContext as _, Bounds, Context, DevicePixels, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement as _, IntoElement,
+    AnyElement, App, AppContext as _, Bounds, Context, DevicePixels, Entity, EventEmitter, FocusHandle, Focusable, Hsla, InteractiveElement as _, IntoElement,
     KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, ParentElement as _, Pixels, Point, Render, ScrollEvent, Styled as _, Subscription, Window,
     canvas, div, point, px, size,
 };
@@ -514,30 +514,27 @@ impl DioramaView {
         let toast_text = d.active_toast().map(str::to_string);
         let has_missed = d.phone.ringing.is_some() || d.phone.missed(&d.frame.inbox).next().is_some();
 
-        let paper = gpui::rgba(0xfbf7eee8);
-        let border = gpui::rgb(0xdfd4be);
-        let ink = gpui::rgb(0x2f2318);
-        let muted = gpui::rgb(0x786958);
-        let active_bg = gpui::rgb(0x3f6a34);
-        let active_fg = gpui::rgb(0xfbf7ee);
+        let ui_dark = cx.try_global::<crate::theme::Ui>().is_some_and(|ui| ui.colors.dark);
+        let palette = HudPalette::for_scene(ui_dark, active_tod);
+        let hover_bg = palette.hover;
 
         let tod_buttons = [
-            (vibevalley_diorama::TimeOfDay::Dawn, "晨"),
-            (vibevalley_diorama::TimeOfDay::Noon, "昼"),
-            (vibevalley_diorama::TimeOfDay::Dusk, "暮"),
-            (vibevalley_diorama::TimeOfDay::Night, "夜"),
+            vibevalley_diorama::TimeOfDay::Dawn,
+            vibevalley_diorama::TimeOfDay::Noon,
+            vibevalley_diorama::TimeOfDay::Dusk,
+            vibevalley_diorama::TimeOfDay::Night,
         ]
         .into_iter()
-        .map(|(tod, label)| {
+        .map(|tod| {
             let selected = active_tod == tod;
-            div()
+            let button = div()
                 .px(px(7.0))
                 .py(px(3.0))
                 .rounded(px(6.0))
                 .cursor_pointer()
                 .text_size(px(11.5))
-                .bg(if selected { active_bg } else { gpui::rgba(0x00000000) })
-                .text_color(if selected { active_fg } else { ink })
+                .bg(if selected { palette.active_bg } else { gpui::rgba(0x00000000).into() })
+                .text_color(if selected { palette.active_fg } else { palette.ink })
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_down(
                     MouseButton::Left,
@@ -549,8 +546,32 @@ impl DioramaView {
                         }
                     }),
                 )
-                .child(label)
+                .child(t(hud_tod_label_key(tod), &[]));
+            if selected { button } else { button.hover(move |s| s.bg(hover_bg)) }
         });
+
+        let cutaway_button = {
+            let button = div()
+                .px(px(7.0))
+                .py(px(3.0))
+                .rounded(px(6.0))
+                .cursor_pointer()
+                .text_size(px(11.5))
+                .bg(if cutaway { palette.active_bg } else { gpui::rgba(0x00000000).into() })
+                .text_color(if cutaway { palette.active_fg } else { palette.ink })
+                .on_mouse_down(
+                    MouseButton::Left,
+                    cx.listener(|v, _, _, cx| {
+                        cx.stop_propagation();
+                        if let SceneState::Ready(d) = &mut v.scene {
+                            d.toggle_cutaway();
+                            cx.notify();
+                        }
+                    }),
+                )
+                .child(t(hud_cutaway_label_key(cutaway), &[]));
+            if cutaway { button } else { button.hover(move |s| s.bg(hover_bg)) }
+        };
 
         let toolbar = div()
             .flex()
@@ -559,13 +580,14 @@ impl DioramaView {
             .px(px(8.0))
             .py(px(4.0))
             .rounded(px(10.0))
-            .bg(paper)
+            .bg(palette.surface)
             .border_1()
-            .border_color(border)
+            .border_color(palette.border)
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .children(tod_buttons)
-            .child(div().w(px(1.0)).h(px(12.0)).bg(border))
+            .child(hud_divider(&palette))
+            .child(cutaway_button)
             .child(
                 div()
                     .px(px(7.0))
@@ -573,28 +595,8 @@ impl DioramaView {
                     .rounded(px(6.0))
                     .cursor_pointer()
                     .text_size(px(11.5))
-                    .bg(if cutaway { active_bg } else { gpui::rgba(0x00000000) })
-                    .text_color(if cutaway { active_fg } else { ink })
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(|v, _, _, cx| {
-                            cx.stop_propagation();
-                            if let SceneState::Ready(d) = &mut v.scene {
-                                d.toggle_cutaway();
-                                cx.notify();
-                            }
-                        }),
-                    )
-                    .child("掀顶"),
-            )
-            .child(
-                div()
-                    .px(px(7.0))
-                    .py(px(3.0))
-                    .rounded(px(6.0))
-                    .cursor_pointer()
-                    .text_size(px(11.5))
-                    .text_color(ink)
+                    .text_color(palette.ink)
+                    .hover(move |s| s.bg(hover_bg))
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|v, _, _, cx| {
@@ -605,8 +607,9 @@ impl DioramaView {
                             }
                         }),
                     )
-                    .child("回正"),
+                    .child(t("web.farm.hud.resetCamera", &[])),
             )
+            .child(hud_divider(&palette))
             .child(
                 div()
                     .px(px(7.0))
@@ -614,7 +617,8 @@ impl DioramaView {
                     .rounded(px(6.0))
                     .cursor_pointer()
                     .text_size(px(11.5))
-                    .text_color(ink)
+                    .text_color(palette.ink)
+                    .hover(move |s| s.bg(hover_bg))
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|_, _, _, cx| {
@@ -622,19 +626,20 @@ impl DioramaView {
                             cx.emit(DioramaEvent::Route("/repos".into()));
                         }),
                     )
-                    .child("仓库"),
+                    .child(t("web.farm.menu.repos", &[])),
             )
             .child(
                 div()
                     .flex()
                     .items_center()
-                    .gap(px(4.0))
+                    .gap(px(5.0))
                     .px(px(7.0))
                     .py(px(3.0))
                     .rounded(px(6.0))
                     .cursor_pointer()
                     .text_size(px(11.5))
-                    .text_color(ink)
+                    .text_color(palette.ink)
+                    .hover(move |s| s.bg(hover_bg))
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|v, _, _, cx| {
@@ -649,16 +654,12 @@ impl DioramaView {
                             }
                         }),
                     )
-                    .children(has_missed.then(|| div().w(px(6.0)).h(px(6.0)).rounded_full().bg(gpui::rgb(0xc84b31))))
-                    .child("手机"),
+                    .children(has_missed.then(|| phone_notification_dot(&palette)))
+                    .child(t("web.farm.hud.phone", &[])),
             );
 
         let anchor_pills = anchors.into_iter().map(|anchor| {
-            let dot = match anchor.tone.as_str() {
-                "vermilion" => gpui::rgb(0xc84b31),
-                "ochre" => gpui::rgb(0xb8860b),
-                _ => gpui::rgb(0x3f5e8a),
-            };
+            let dot = palette.anchor_dot(&anchor.tone);
             let left_px = (anchor.x * vw - 56.0).clamp(10.0, (vw - 140.0).max(10.0));
             let top_px = (anchor.y * vh - 14.0).clamp(48.0, (vh - 64.0).max(48.0));
             let clicked = anchor.clone();
@@ -672,9 +673,9 @@ impl DioramaView {
                 .px(px(8.0))
                 .py(px(3.0))
                 .rounded(px(8.0))
-                .bg(paper)
+                .bg(palette.surface)
                 .border_1()
-                .border_color(border)
+                .border_color(palette.border)
                 .cursor_pointer()
                 .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_down(
@@ -689,11 +690,11 @@ impl DioramaView {
                     }),
                 )
                 .child(div().w(px(6.0)).h(px(6.0)).rounded_full().bg(dot))
-                .child(div().text_size(px(11.0)).text_color(ink).child(anchor.badge))
+                .child(div().text_size(px(11.0)).text_color(palette.ink).child(anchor.badge))
                 .child(
                     div()
                         .text_size(px(11.0))
-                        .text_color(muted)
+                        .text_color(palette.muted)
                         .max_w(px(110.0))
                         .overflow_hidden()
                         .child(anchor.label),
@@ -715,11 +716,11 @@ impl DioramaView {
                     .px(px(10.0))
                     .py(px(5.0))
                     .rounded(px(8.0))
-                    .bg(paper)
+                    .bg(palette.surface)
                     .border_1()
-                    .border_color(border)
+                    .border_color(palette.border)
                     .text_size(px(12.0))
-                    .text_color(ink)
+                    .text_color(palette.ink)
                     .child(msg),
             );
         }
@@ -733,11 +734,11 @@ impl DioramaView {
                     .px(px(9.0))
                     .py(px(4.0))
                     .rounded(px(8.0))
-                    .bg(paper)
+                    .bg(palette.surface)
                     .border_1()
-                    .border_color(border)
+                    .border_color(palette.border)
                     .text_size(px(11.5))
-                    .text_color(ink)
+                    .text_color(palette.ink)
                     .child(label),
             );
         }
@@ -754,20 +755,20 @@ impl DioramaView {
                     .px(px(10.0))
                     .py(px(5.0))
                     .rounded(px(10.0))
-                    .bg(paper)
+                    .bg(palette.surface)
                     .border_1()
-                    .border_color(border)
+                    .border_color(palette.border)
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(div().text_size(px(12.0)).text_color(ink).child(label))
+                    .child(div().text_size(px(12.0)).text_color(palette.ink).child(label))
                     .child(
                         div()
                             .px(px(8.0))
                             .py(px(3.0))
                             .rounded(px(6.0))
                             .cursor_pointer()
-                            .bg(active_bg)
-                            .text_color(active_fg)
+                            .bg(palette.active_bg)
+                            .text_color(palette.active_fg)
                             .text_size(px(11.5))
                             .on_mouse_down(
                                 MouseButton::Left,
@@ -779,7 +780,7 @@ impl DioramaView {
                                     }
                                 }),
                             )
-                            .child("进入"),
+                            .child(t("web.farm.hud.enter", &[])),
                     )
                     .child(
                         div()
@@ -787,7 +788,8 @@ impl DioramaView {
                             .py(px(3.0))
                             .rounded(px(6.0))
                             .cursor_pointer()
-                            .text_color(muted)
+                            .text_color(palette.muted)
+                            .hover(move |s| s.bg(hover_bg))
                             .text_size(px(11.5))
                             .on_mouse_down(
                                 MouseButton::Left,
@@ -799,13 +801,118 @@ impl DioramaView {
                                     }
                                 }),
                             )
-                            .child("返回庭院"),
+                            .child(t("web.farm.hud.backToYard", &[])),
                     ),
             );
         }
 
         Some(overlay.into_any_element())
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct HudPalette {
+    dark: bool,
+    surface: Hsla,
+    border: Hsla,
+    divider: Hsla,
+    ink: Hsla,
+    muted: Hsla,
+    hover: Hsla,
+    active_bg: Hsla,
+    active_fg: Hsla,
+    badge_dot: Hsla,
+    badge_halo: Hsla,
+    dot_vermilion: Hsla,
+    dot_ochre: Hsla,
+    dot_water: Hsla,
+}
+
+impl HudPalette {
+    /// Selects a Papertrails warm-paper HUD surface for daytime light mode, and a
+    /// deep translucent warm-charcoal surface whenever dark theme or night lighting is active.
+    fn for_scene(ui_dark: bool, tod: vibevalley_diorama::TimeOfDay) -> Self {
+        if ui_dark || matches!(tod, vibevalley_diorama::TimeOfDay::Night) {
+            Self::dark(&crate::theme::Palette::dark())
+        } else {
+            Self::light(&crate::theme::Palette::light())
+        }
+    }
+
+    fn light(theme: &crate::theme::Palette) -> Self {
+        Self {
+            dark: false,
+            surface: gpui::rgba(0xfbf7eeeb).into(),
+            border: gpui::rgb(0xdfd4be).into(),
+            divider: gpui::rgba(0x7c64473d).into(),
+            ink: gpui::rgb(0x2f2318).into(),
+            muted: gpui::rgb(0x6e5f4f).into(),
+            hover: theme.hover,
+            active_bg: theme.accent,
+            active_fg: theme.on_accent,
+            badge_dot: theme.danger,
+            badge_halo: Hsla { a: 0.24, ..theme.danger },
+            dot_vermilion: theme.danger,
+            dot_ochre: theme.warning,
+            dot_water: theme.info,
+        }
+    }
+
+    fn dark(theme: &crate::theme::Palette) -> Self {
+        Self {
+            dark: true,
+            surface: Hsla { a: 0.88, ..theme.elevated },
+            border: Hsla { a: 0.16, ..theme.text },
+            divider: Hsla { a: 0.16, ..theme.text },
+            ink: theme.text,
+            muted: theme.muted,
+            hover: theme.hover,
+            active_bg: theme.accent,
+            active_fg: theme.on_accent,
+            badge_dot: theme.danger,
+            badge_halo: Hsla { a: 0.28, ..theme.danger },
+            dot_vermilion: theme.danger,
+            dot_ochre: theme.warning,
+            dot_water: theme.info,
+        }
+    }
+
+    fn anchor_dot(&self, tone: &str) -> Hsla {
+        match tone {
+            "vermilion" => self.dot_vermilion,
+            "ochre" => self.dot_ochre,
+            _ => self.dot_water,
+        }
+    }
+}
+
+const fn hud_tod_label_key(tod: vibevalley_diorama::TimeOfDay) -> &'static str {
+    match tod {
+        vibevalley_diorama::TimeOfDay::Dawn => "web.farm.hud.dawn",
+        vibevalley_diorama::TimeOfDay::Noon => "web.farm.hud.noon",
+        vibevalley_diorama::TimeOfDay::Dusk => "web.farm.hud.dusk",
+        vibevalley_diorama::TimeOfDay::Night => "web.farm.hud.night",
+    }
+}
+
+const fn hud_cutaway_label_key(cutaway: bool) -> &'static str {
+    if cutaway { "web.farm.hud.closeRoof" } else { "web.farm.hud.liftRoof" }
+}
+
+fn hud_divider(palette: &HudPalette) -> gpui::Div {
+    div().w(px(1.0)).h(px(12.0)).mx(px(2.0)).bg(palette.divider)
+}
+
+fn phone_notification_dot(palette: &HudPalette) -> gpui::Div {
+    div()
+        .w(px(8.0))
+        .h(px(8.0))
+        .rounded_full()
+        .flex()
+        .items_center()
+        .justify_center()
+        .bg(palette.badge_halo)
+        .child(div().w(px(5.0)).h(px(5.0)).rounded_full().bg(palette.badge_dot))
 }
 
 fn motion_enabled(cx: &App) -> bool {
@@ -1138,8 +1245,70 @@ fn phone_overlay_size(view_size: (f32, f32), phone: &super::phone::Phone) -> (f3
 
 #[cfg(test)]
 mod tests {
-    use super::phone_overlay_size;
+    use vibevalley_diorama::TimeOfDay;
+
+    use super::{HudPalette, hud_cutaway_label_key, hud_tod_label_key, phone_overlay_size};
     use crate::diorama::phone::Phone;
+
+    #[test]
+    fn hud_palette_adapts_to_ui_theme_and_night_diorama() {
+        for daytime in [TimeOfDay::Dawn, TimeOfDay::Noon, TimeOfDay::Dusk] {
+            let light = HudPalette::for_scene(false, daytime);
+            assert!(!light.dark, "daytime light mode ({daytime:?}) should use light HUD palette");
+            assert!(light.surface.l > 0.9, "light HUD surface should stay warm paper");
+            assert!(light.surface.a < 1.0 && light.surface.a > 0.8);
+            assert!(light.ink.l < 0.25, "light HUD ink should be dark for legibility");
+            assert!(light.divider.a > 0.1);
+            assert_ne!(light.anchor_dot("vermilion"), light.anchor_dot("ochre"));
+            assert_ne!(light.anchor_dot("ochre"), light.anchor_dot("water"));
+        }
+
+        let dark_night = HudPalette::for_scene(true, TimeOfDay::Night);
+        assert!(dark_night.dark);
+        assert!(dark_night.surface.l < 0.2, "dark HUD surface should stay deep warm charcoal");
+        assert!(dark_night.surface.a < 1.0 && dark_night.surface.a > 0.8);
+        assert!(dark_night.ink.l > 0.85, "dark HUD ink should be light cream");
+        assert!(dark_night.active_fg.l < 0.2, "dark active pill label should keep high contrast on leaf accent");
+        assert!(dark_night.badge_dot.l > 0.5, "dark notification dot should remain crisp and bright");
+
+        for tod in [TimeOfDay::Dawn, TimeOfDay::Noon, TimeOfDay::Dusk, TimeOfDay::Night] {
+            let dark = HudPalette::for_scene(true, tod);
+            assert_eq!(dark, dark_night, "dark theme must use dark HUD palette at {tod:?}");
+        }
+
+        // Night lighting also switches to dark HUD in light mode so no glaring cream pill floats over the night scene.
+        assert_eq!(HudPalette::for_scene(false, TimeOfDay::Night), dark_night);
+    }
+
+    #[test]
+    fn hud_i18n_keys_resolve_in_zh_and_en() {
+        let keys = [
+            hud_tod_label_key(TimeOfDay::Dawn),
+            hud_tod_label_key(TimeOfDay::Noon),
+            hud_tod_label_key(TimeOfDay::Dusk),
+            hud_tod_label_key(TimeOfDay::Night),
+            hud_cutaway_label_key(false),
+            hud_cutaway_label_key(true),
+            "web.farm.hud.resetCamera",
+            "web.farm.menu.repos",
+            "web.farm.hud.phone",
+            "web.farm.hud.enter",
+            "web.farm.hud.backToYard",
+        ];
+
+        for key in keys {
+            let zh = vibevalley_i18n::t_in("zh", key, &[]);
+            let en = vibevalley_i18n::t_in("en", key, &[]);
+            assert!(!zh.is_empty() && zh != key, "zh missing translation for {key}: {zh:?}");
+            assert!(!en.is_empty() && en != key, "en missing translation for {key}: {en:?}");
+            assert_ne!(zh, en, "zh and en translations should differ for {key}");
+        }
+
+        assert_eq!(vibevalley_i18n::t_in("zh", hud_cutaway_label_key(false), &[]), "掀顶");
+        assert_eq!(vibevalley_i18n::t_in("zh", hud_cutaway_label_key(true), &[]), "合顶");
+        assert_eq!(vibevalley_i18n::t_in("en", hud_cutaway_label_key(false), &[]), "Lift roof");
+        assert_eq!(vibevalley_i18n::t_in("en", hud_cutaway_label_key(true), &[]), "Close roof");
+    }
 
     #[test]
     fn regression_folded_phone_fits_3x2_icon_grid_and_unfolded_fits_handset_plus_chat() {

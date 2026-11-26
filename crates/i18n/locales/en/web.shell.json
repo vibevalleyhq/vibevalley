@@ -1,6 +1,8 @@
 {
   "sidebar": {
-    "title": "Repos & terminals",
+    "title": "Workspace",
+    "toggleSidebar": "Hide sidebar",
+    "toggleSidebarTooltip": "Hide sidebar (⌘B)",
     "addRepo": "Add repository",
     "addRepoTooltip": "Add a local repository or folder",
     "newMenu": "New in {name}",
@@ -22,7 +24,9 @@
     "mainWorktree": "{label} · main",
     "mainLabel": "main",
     "collapseAll": "Collapse all",
+    "collapseAllTooltip": "Collapse all repositories and worktrees",
     "expandCurrent": "Expand current",
+    "expandCurrentTooltip": "Expand active repositories and worktrees",
     "collapseItem": "Collapse {name}",
     "expandItem": "Expand {name}",
     "newTerminalHere": "New terminal here",
@@ -251,6 +255,7 @@
   },
   "repoDetail": {
     "badgeManaged": "VibeValley repo",
+    "badgeMounted": "Local mount",
     "badgeFolder": "Local folder",
     "openFullPage": "Open full repository page",
     "copied": "Path copied",

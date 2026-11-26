@@ -1,7 +1,7 @@
-//! `repo list|create` and `repo pr submit`.
+//! `repo list|create|mount|unmount` and `repo pr submit`.
 
 use clap::{Args, Subcommand};
-use vibevalley_protocol::{NewRepo, RepoSummary, SubmitBranch, ops};
+use vibevalley_protocol::{MountRepo, NewRepo, RepoSummary, RepoUnmountInput, SubmitBranch, ops};
 
 use crate::client::{Client, Done};
 use crate::output::line;
@@ -26,6 +26,24 @@ pub enum RepoAction {
         /// Optional GitHub repository URL to clone
         #[arg(long)]
         github: Option<String>,
+    },
+    /// Mount an existing local repository folder into the workspace
+    #[command(after_help = "Examples:\n  vibevalley repo mount /path/to/project\n  vibevalley repo mount /path/to/folder --name demo --init-git")]
+    Mount {
+        /// Local directory path
+        path: String,
+        /// Optional repository name override
+        #[arg(long)]
+        name: Option<String>,
+        /// Initialize a Git repository if the folder is not one yet
+        #[arg(long)]
+        init_git: bool,
+    },
+    /// Unmount an external local repository without deleting files on disk
+    #[command(after_help = "Examples:\n  vibevalley repo unmount demo")]
+    Unmount {
+        /// Repository name to unmount
+        id: String,
     },
     /// Pull request publishing commands
     Pr(RepoPrCmd),
@@ -85,6 +103,18 @@ pub async fn run(client: &Client, cmd: RepoCmd) -> Done {
         RepoAction::Create { name, github } => {
             let request = NewRepo { name, github };
             client.mutate::<ops::RepoCreate>("repo create", &request, repo_line).await
+        }
+        RepoAction::Mount { path, name, init_git } => {
+            let request = MountRepo {
+                path,
+                name,
+                init_git: init_git.then_some(true),
+            };
+            client.mutate::<ops::RepoMount>("repo mount", &request, repo_line).await
+        }
+        RepoAction::Unmount { id } => {
+            let request = RepoUnmountInput { id: id.clone() };
+            client.mutate::<ops::RepoUnmount>("repo unmount", &request, |_| format!("unmounted {id}")).await
         }
         RepoAction::Pr(pr) => match pr.action {
             RepoPrAction::Submit {

@@ -99,10 +99,12 @@ test("empty board always renders the unified toolbar, kanban columns, and calm e
   expect(app.count("id:issues-empty-onboarding")).toBe(0);
   expect(app.count("id:issue-toolbar-new")).toBe(1);
   expect(app.count("id:workflow-guide")).toBe(0);
+  expect(app.count("id:lane-backlog")).toBe(1);
   expect(app.count("id:lane-todo")).toBe(1);
-  expect(app.count("id:lane-working")).toBe(1);
-  expect(app.count("id:lane-waiting")).toBe(1);
-  expect(app.count("id:lane-closed")).toBe(1);
+  expect(app.count("id:lane-in_progress")).toBe(1);
+  expect(app.count("id:lane-in_review")).toBe(1);
+  expect(app.count("id:lane-done")).toBe(1);
+  expect(app.count("id:lane-canceled")).toBe(1);
 
   // Switch to list view: shows a calm 1-line empty hint.
   await app.press("id:issue-view-list");
@@ -117,15 +119,19 @@ test("empty board always renders the unified toolbar, kanban columns, and calm e
 test("empty lanes render actionable contextual guidance and unassigned Todo cards show assign hint", async () => {
   setLocale("zh");
 
-  // minimal has 1 working issue: todo, waiting, and closed lanes are empty.
+  // minimal has 1 in_progress issue: backlog, todo, in_review, done, and canceled lanes are empty.
   const min = await mountBoard("minimal");
+  expect(min.app.count("id:lane-empty-backlog")).toBe(1);
   expect(min.app.count("id:lane-empty-todo")).toBe(1);
-  expect(min.app.count("id:lane-empty-working")).toBe(0);
-  expect(min.app.count("id:lane-empty-waiting")).toBe(1);
-  expect(min.app.count("id:lane-empty-closed")).toBe(1);
+  expect(min.app.count("id:lane-empty-in_progress")).toBe(0);
+  expect(min.app.count("id:lane-empty-in_review")).toBe(1);
+  expect(min.app.count("id:lane-empty-done")).toBe(1);
+  expect(min.app.count("id:lane-empty-canceled")).toBe(1);
+  expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.backlogTitle"));
   expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.todoTitle"));
-  expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.waitingTitle"));
-  expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.closedTitle"));
+  expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.in_reviewTitle"));
+  expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.doneTitle"));
+  expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.canceledTitle"));
 
   // Quick "+ New issue" inside empty todo lane opens NewIssue.
   await min.app.press("id:lane-empty-todo >> id:issue-new");
@@ -134,7 +140,7 @@ test("empty lanes render actionable contextual guidance and unassigned Todo card
 
   // Filter with no matches switches empty lanes to the filtered hint and offers one-click reset.
   await min.app.type("id:issue-search", "no-matching-issue-xyz");
-  expect(min.app.count("id:lane-empty-working")).toBe(1);
+  expect(min.app.count("id:lane-empty-in_progress")).toBe(1);
   expect(min.app.texts()).toContain(t("web.issue.board.emptyGuide.filtered"));
   expect(min.app.count("id:board-clear-filter")).toBe(1);
   expect(min.app.count("id:issue-search-clear")).toBe(1);
@@ -142,7 +148,7 @@ test("empty lanes render actionable contextual guidance and unassigned Todo card
   await min.fake.pumpUntil(min.app, () => min.app.count("id:issue-card") === 1);
   expect(min.app.value("id:issue-search")).toBe("");
 
-  // Custom board with 1 unassigned todo + 1 assigned todo: working/waiting/closed empty, unassigned hint appears once.
+  // Custom board with 1 unassigned todo + 1 assigned todo: in_progress/in_review/done/canceled empty, unassigned hint appears once.
   const unassigned = makeTodoIssue("i-unassigned", "需要认领的待办");
   const assigned = makeTodoIssue("i-assigned", "已指派角色的待办", "laozhou");
   const customState: SliceBundle = {
@@ -163,8 +169,8 @@ test("empty lanes render actionable contextual guidance and unassigned Todo card
     { state: customState },
   );
   await todoBoard.fake.pumpUntil(todoBoard.app, () => todoBoard.app.count("id:issue-card") === 2);
-  expect(todoBoard.app.count("id:lane-empty-working")).toBe(1);
-  expect(todoBoard.app.texts()).toContain(t("web.issue.board.emptyGuide.workingTitle"));
+  expect(todoBoard.app.count("id:lane-empty-in_progress")).toBe(1);
+  expect(todoBoard.app.texts()).toContain(t("web.issue.board.emptyGuide.in_progressTitle"));
   expect(todoBoard.app.count("id:card-unassigned")).toBe(1);
   expect(todoBoard.app.texts()).toContain(t("web.issue.card.assignHelper"));
 });
@@ -225,9 +231,12 @@ test("english locale, dark theme, and narrow viewport render empty board cleanly
   setLocale("en");
   const emptyEn = await mountBoard("empty", undefined, { locale: "en", width: 560, height: 800 });
   await emptyEn.app.setColorScheme("dark");
-  await emptyEn.fake.pumpUntil(emptyEn.app, () => emptyEn.app.count("id:lane-empty-todo") === 1);
+  await emptyEn.fake.pumpUntil(emptyEn.app, () => emptyEn.app.count("id:lane-empty-backlog") === 1);
   expect(emptyEn.app.count("id:issues-empty-onboarding")).toBe(0);
   expect(emptyEn.app.count("id:workflow-guide")).toBe(0);
+  expect(emptyEn.app.texts()).toContain("Backlog is empty");
+  await emptyEn.app.press("id:board-lane-tab-todo");
+  await emptyEn.fake.pumpUntil(emptyEn.app, () => emptyEn.app.count("id:lane-empty-todo") === 1);
   expect(emptyEn.app.texts()).toContain("No to-dos yet");
 });
 
@@ -253,7 +262,7 @@ test("IssueList empty-filter CTA resets search and IssueDetail copies issue refe
   expect(app.texts()).toContain(t("web.base.rich.copied"));
 });
 
-test("regression: todo add button renders below cards and dragging a card does not open it", async () => {
+test("regression: todo add button renders in lane header above cards and dragging a card does not open it", async () => {
   setLocale("zh");
   const first = makeTodoIssue("i-drag-1", "第一张工单", "laozhou");
   const second = makeTodoIssue("i-drag-2", "第二张工单");
@@ -273,21 +282,53 @@ test("regression: todo add button renders below cards and dragging a card does n
   );
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 2 && app.count("id:issue-new") === 1);
 
-  const cardBox = app.layout("id:issue-card >> nth=1");
+  const firstCardBox = app.layout("id:issue-card >> nth=0");
   const newBtnBox = app.layout("id:issue-new");
-  expect(cardBox).toBeDefined();
+  expect(firstCardBox).toBeDefined();
   expect(newBtnBox).toBeDefined();
-  expect(newBtnBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height);
+  expect(newBtnBox!.y + newBtnBox!.height).toBeLessThanOrEqual(firstCardBox!.y);
 
-  // Dragging a card (even across lanes) must not open its detail page.
+  // Dragging a card (even across lanes) must not open Quick-Peek or full detail.
   const secondBox = app.layout("id:issue-card >> nth=1")!;
-  const workingBox = app.layout("id:lane-working")!;
+  const workingBox = app.layout("id:lane-in_progress")!;
   await app.drag("id:issue-card >> nth=1", { x: workingBox.x + workingBox.width / 2 - (secondBox.x + secondBox.width / 2), y: 0 });
   await fake.pump(app);
+  expect(app.count("id:issue-peek-modal")).toBe(0);
   expect(app.count("id:issue")).toBe(0);
 
-  // Advance virtual clock past the post-drag click suppression window, then verify a plain click opens detail.
+  // Advance virtual clock past the post-drag click suppression window: plain click opens Quick-Peek, then Expand opens full screen.
   await app.wait(350);
   await app.press("id:issue-card >> nth=1");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  expect(app.count("id:issue")).toBe(0);
+
+  await app.press("id:issue-peek-expand");
   await fake.pumpUntil(app, () => app.count("id:issue") === 1);
+  expect(app.count("id:issue-peek-modal")).toBe(0);
+});
+
+test("NewIssue unified AgentSelect surfaces agent.validate readiness diagnostics", async () => {
+  setLocale("zh");
+  const { app, fake } = await mountBoard("typical", (f) => {
+    f.respond("agent.validate", [{ id: "xiaolin", problems: [{ field: "runtime", level: "error", text: "Codex 未配置密钥" }] }]);
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-new") === 1);
+  await app.press("id:issue-new");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper") === 1);
+
+  // Choose an enabled helper whose validation has an error problem -> inline diagnostic displays error text.
+  await app.press("id:issue-new-helper");
+  await fake.pump(app);
+  expect(app.texts()).toContain("小林");
+  expect(app.texts()).toContain("Codex 未配置密钥");
+  await app.press("text:小林");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper-status") === 1);
+  expect(app.texts()).toContain("Codex 未配置密钥");
+
+  // Choose a ready agent -> shows ready status instead of problem text.
+  await app.press("id:issue-new-helper");
+  await fake.pump(app);
+  await app.press("text:老周");
+  await fake.pump(app);
+  expect(app.texts()).toContain("就绪");
 });

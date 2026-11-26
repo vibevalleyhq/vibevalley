@@ -10,7 +10,6 @@ export {
   type KeyStatus,
   type Locale,
   LocaleValues,
-  maxRunning,
   type MessageId,
   orchestratorRuntime,
   type Outcome,
@@ -59,6 +58,14 @@ export {
 } from "./agent/shapes";
 export {
   type InventoryEntry,
+  type McpHostId,
+  type McpHostInfo,
+  type McpInstallInput,
+  type McpInstallStatus,
+  type McpListInput,
+  type McpListResult,
+  type McpTransportKind,
+  type McpUninstallInput,
   quotaLow,
   type RuntimeCapability,
   RuntimeCapabilityValues,
@@ -80,6 +87,7 @@ export type {
   Changes,
   GitHubStatus,
   LanguageCount,
+  MountRepo,
   NewRepo,
   RepoActivity,
   RepoLanguages,
@@ -283,6 +291,7 @@ export {
   type Readiness,
   type SettingsStatus,
   type SettingsUpdate,
+  type UserProfile,
 } from "./setting/shapes.gen";
 export type {
   ProviderConnectionUpdate,

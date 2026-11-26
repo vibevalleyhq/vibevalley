@@ -10,11 +10,13 @@ import { OpenTerminal } from "../../../design/domain/OpenTerminal";
 import { TextArea, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
+import type { IconName } from "../../../design/icons";
 import { Markdown } from "../../../design/Markdown";
 import { motionClass } from "../../../design/motion";
-import { Dot } from "../../../design/Tag";
+import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
+import { mix } from "../../../design/tone";
 import { useAgent } from "../../../infra/agents";
 import { useNow } from "../../../infra/base/dom";
 import { shortMomentText } from "../../../infra/base/format";
@@ -27,6 +29,7 @@ import { useIntents } from "../../../infra/state/intent";
 import { IssueArtifacts } from "../../artifact";
 import { createSessionEvents, runsHref, SubagentProgress } from "../../session";
 import { createIssueActs } from "../model/acts";
+import type { Tone } from "../model/cards";
 import { changesLine } from "../model/changes";
 import { useIssueChanges, useIssues, useIssueTimeline } from "../model/history";
 import { issueMove, movedIssue } from "../model/moves";
@@ -35,11 +38,22 @@ import { issueSet, labeledIssue, sendLabel, updateIssueAttachments } from "../mo
 import { ActLines } from "./ActLines";
 import { ChangesBody, ChangesHead, ConflictFiles } from "./CloseDialog";
 import { IssueAttachments } from "./IssueAttachments";
+import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
 import { IssueThread } from "./IssueThread";
-import { Fold, IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
+import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
+import { Fold, IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, StagePill } from "./Sheet";
 
 export { OrchestratorIssueDetail };
+
+const askIcon: Record<Tone, IconName> = {
+  leaf: "check",
+  berry: "warn",
+  wheat: "warn",
+  water: "info",
+  muted: "info",
+  faint: "info",
+};
 
 /** The workbench's issue page, answering the user top to bottom. the side holds the facts. */
 export function IssueDetail(props: {
@@ -47,6 +61,7 @@ export function IssueDetail(props: {
   sessions: Session[];
   session?: SessionView | undefined;
   onClose: (session: Session, review: boolean) => void;
+  onOpen?: ((id: string) => void) | undefined;
   onParent?: (() => void) | undefined;
 }) {
   const board = useBoardSlice();
@@ -107,42 +122,57 @@ export function IssueDetail(props: {
     toast(t("web.base.rich.copied"));
   };
 
-  const parent = createMemo(() => issues().find((item) => item.id === props.issue.parent));
+  const openIssue = (id: string) => {
+    if (props.onOpen) props.onOpen(id);
+    else props.onParent?.();
+  };
+  const parent = createMemo(() => (live().parent ? issues().find((item) => item.id === live().parent) : undefined));
   const tone = computed(() => stageTone[s().stage.state]);
+  const statusParts = computed(() => s().statusParts(now(), timeline()?.spent?.cny));
+  const stageMeta = computed(() => statusParts().slice(1).filter(Boolean));
   const heading = (
     <View>
-      <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-1.5 flex-row flex-wrap items-center gap-1">
-        <Text class="text-xs text-muted">{s().repo || t("web.issue.detail.noRepo")}</Text>
-        <If when={s().inFamily ? props.onParent : undefined}>
-          {(onParent) => (
+      <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-2 flex-row flex-wrap items-center gap-1.5">
+        <If when={s().repo}>
+          {(repo) => (
             <>
-              <Icon name="next" size={12} tone="muted" />
-              <View role="button" testID="parent-issue" onPress={() => onParent()()} class="-mx-1 rounded-sm px-1 py-0.5 hover:bg-hover">
-                <Text class="text-xs text-water">{parent()?.title ?? t("web.issue.family.parent")}</Text>
+              <View class="flex-row items-center gap-1 rounded-md bg-side px-1.5 py-0.5">
+                <Icon name="folder" size={12} tone="muted" />
+                <Text class="text-xs font-medium text-muted">{repo()}</Text>
               </View>
+              <Icon name="next" size={12} tone="faint" />
             </>
           )}
         </If>
-        <Icon name="next" size={12} tone="muted" />
+        <If when={live().parent}>
+          {(parentId) => (
+            <>
+              <View
+                role="button"
+                testID="parent-issue"
+                onPress={() => openIssue(parentId())}
+                class="flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:bg-hover"
+              >
+                <Text class="text-xs text-water">{parent() ? `#${parent()!.number} ${parent()!.title}` : t("web.issue.family.parent")}</Text>
+              </View>
+              <Icon name="next" size={12} tone="faint" />
+            </>
+          )}
+        </If>
         <IssueNumberPill number={props.issue.number} />
       </View>
       <View class="flex-row flex-wrap items-baseline gap-x-2">
         <IssueTitle shown={s().title} full={live().title} editable={s().open} state={labeled().state("title")} onSave={(title) => setLabel({ title })} />
       </View>
-      <View class="mt-2 flex-row items-start gap-2" accessibilityLabel={t("web.issue.detail.now")} testID="issue-now">
-        <View class="mt-1.5">
-          <Dot tone={tone()} size={8} ring={false} />
-        </View>
-        {/* Each part whole: a narrow screen wraps between them, not inside "第 1 轮". */}
-        <View class="min-w-0 flex-1 flex-row flex-wrap">
-          <Each of={s().statusParts(now(), timeline()?.spent?.cny)} key="index">
-            {(part, i) => (
-              <Text class={`text-sm tabular-nums ${tone() === "berry" ? "text-berry" : "text-ink"}`} style={tone() === "berry" ? undefined : { opacity: 0.8 }}>
-                {`${i() > 0 ? " · " : ""}${part()}`}
-              </Text>
-            )}
-          </Each>
-        </View>
+      <View class="mt-2.5 flex-row flex-wrap items-center gap-2" accessibilityLabel={t("web.issue.detail.now")} testID="issue-now">
+        <StagePill tone={tone()} label={statusParts()[0] ?? t(`shared.stage.${s().stage.state}`)} />
+        <If when={stageMeta().length > 0}>
+          <View class="min-w-0 flex-1 flex-row flex-wrap items-center">
+            <Each of={stageMeta()} key="index">
+              {(part, i) => <Text class="text-xs text-muted tabular-nums">{`${i() > 0 ? " · " : ""}${part()}`}</Text>}
+            </Each>
+          </View>
+        </If>
       </View>
     </View>
   );
@@ -182,14 +212,78 @@ export function IssueDetail(props: {
     return attachAct.run(() => updateIssueAttachments(props.issue.id, next));
   };
   const otherActs = createMemo(() => s().others.filter((a) => a !== "close" && a !== "stop"));
+  const hasAboveProgress = computed(() => Boolean(s().ask) || Boolean(failedCheck()) || s().description !== "" || hasAttachmentsSection());
+  const progressBarPx = computed(() => (s().criteria.length === 0 ? 0 : Math.round((s().met / s().criteria.length) * 96)));
   const main = (
     <>
+      <If when={s().ask}>
+        {(ask) => (
+          <View
+            accessibilityLabel={t("web.issue.detail.yours")}
+            testID="issue-ask"
+            class="mb-6 rounded-xl border px-4 py-3.5"
+            style={{ borderColor: mix(ask().tone, 0.35), backgroundColor: mix(ask().tone, 0.08) }}
+          >
+            <View class="flex-row items-center gap-2">
+              <Icon name={askIcon[ask().tone]} size={15} tone={ask().tone === "faint" ? "muted" : ask().tone} />
+              <Text class="min-w-0 flex-1 text-sm font-semibold text-ink">{ask().head}</Text>
+            </View>
+            <If
+              when={live().conflict}
+              else={<If when={ask().line}>{(line) => <Text class="mt-1.5 line-clamp-4 text-sm leading-relaxed text-ink">{plainText(line())}</Text>}</If>}
+            >
+              {(conflict) => <ConflictFiles files={conflict().files} worktree={sessionWorktree(head())} />}
+            </If>
+            <If when={ask().settingsHref}>
+              {(href) => (
+                <View class="mt-2">
+                  <TextLink href={href()} testid="issue-error-settings">
+                    {t("web.issue.error.goSettings")}
+                  </TextLink>
+                </View>
+              )}
+            </If>
+            <If when={s().stage.state === "asking"}>
+              <Each of={props.issue.questions} key={(a) => a.question}>
+                {(a) => <Question ask={a()} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
+              </Each>
+            </If>
+            <If when={s().stage.state === "asking" || s().stage.state === "canceled" || box()}>
+              <TextArea
+                testID="issue-words"
+                class="mt-3"
+                rows={box() === "reject" ? 3 : 2}
+                value={text()}
+                disabled={busy()}
+                onInput={setText}
+                // Return says it (Shift+Return breaks the line), but not the findings of a reject or a reopen's words.
+                submit={box() !== "reject" && s().stage.state !== "canceled"}
+                onSubmit={() => sayAct(box() === "tell" ? "tell" : "answer")}
+                placeholder={placeholder()}
+                accessibilityLabel={boxLabel()}
+              />
+            </If>
+            <If when={s().lead !== undefined || otherActs().length > 0}>
+              <View class="mt-3.5 flex-row flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: mix(ask().tone, 0.18) }}>
+                {/* Keyed by the act, as VibeValley's keyed Show: another lead is another button. */}
+                <Each of={((l) => (l ? [l] : []))(s().lead)} key={(l) => l}>
+                  {(lead) => <ActButton act={lead()} lead />}
+                </Each>
+                <Each of={otherActs()} key={(a) => a}>
+                  {(a) => <ActButton act={a()} lead={false} />}
+                </Each>
+              </View>
+            </If>
+          </View>
+        )}
+      </If>
       <If when={failedCheck()}>
         {(check) => (
-          <Note tone="berry" class="mb-4">
+          <Note tone="berry" class="mb-5">
             <Fold
               testID="failed-project-check"
               defaultOpen
+              bordered={false}
               label={t("web.issue.changes.projectCheck")}
               summary={`${t("web.issue.changes.check.failed")} · ${check().candidateCommit.slice(0, 12)}`}
             >
@@ -205,72 +299,13 @@ export function IssueDetail(props: {
           </Note>
         )}
       </If>
-      <If when={s().description}>
-        <View testID="issue-requirement">
-          <SheetLabel first={!failedCheck()}>{t("web.issue.detail.full")}</SheetLabel>
-          <Markdown size="sm" text={s().description} />
-        </View>
-      </If>
-      <IssueAttachments
-        files={live().attachments ?? []}
-        editable={s().open}
-        busy={attachAct.busy()}
-        first={!failedCheck() && !s().description}
-        onAdd={addAttachment}
-        onRemove={removeAttachment}
-      />
       <If when={s().needsWorktreeCheck}>
         <ReconcileWorktree onChanges={changesAction()} />
       </If>
       <If when={head().subagents}>{(progress) => <SubagentProgress session={head().id} progress={progress()} now={now()} />}</If>
       <ActLines issue={props.issue.id} words={acts.words()} onSayAgain={acts.sayAgain} onTakeBack={acts.takeBack} />
-      <If when={s().ask}>
-        {(ask) => (
-          <View accessibilityLabel={t("web.issue.detail.yours")} testID="issue-ask" class="mb-5">
-            <SheetLabel first={!failedCheck() && !s().description && !hasAttachmentsSection()}>{t("web.issue.detail.yours")}</SheetLabel>
-            <Note tone={ask().tone}>
-              <Text class="text-sm font-semibold text-ink">{ask().head}</Text>
-              <If
-                when={live().conflict}
-                else={<If when={ask().line}>{(line) => <Text class="mt-1 line-clamp-4 text-sm text-ink">{plainText(line())}</Text>}</If>}
-              >
-                {(conflict) => <ConflictFiles files={conflict().files} worktree={sessionWorktree(head())} />}
-              </If>
-              <If when={s().stage.state === "asking"}>
-                <Each of={props.issue.questions} key={(a) => a.question}>
-                  {(a) => <Question ask={a()} busy={busy()} onPick={(o) => void doAct("answer", o).then((ok) => ok && setText(""))} />}
-                </Each>
-              </If>
-            </Note>
-            <If when={s().stage.state === "asking" || s().stage.state === "canceled" || box()}>
-              <TextArea
-                testID="issue-words"
-                class="mt-2.5"
-                rows={box() === "reject" ? 3 : 2}
-                value={text()}
-                disabled={busy()}
-                onInput={setText}
-                // Return says it (Shift+Return breaks the line), but not the findings of a reject or a reopen's words.
-                submit={box() !== "reject" && s().stage.state !== "canceled"}
-                onSubmit={() => sayAct(box() === "tell" ? "tell" : "answer")}
-                placeholder={placeholder()}
-                accessibilityLabel={boxLabel()}
-              />
-            </If>
-            <View class="mt-2.5 flex-row flex-wrap gap-2">
-              {/* Keyed by the act, as VibeValley's keyed Show: another lead is another button. */}
-              <Each of={((l) => (l ? [l] : []))(s().lead)} key={(l) => l}>
-                {(lead) => <ActButton act={lead()} lead />}
-              </Each>
-              <Each of={otherActs()} key={(a) => a}>
-                {(a) => <ActButton act={a()} lead={false} />}
-              </Each>
-            </View>
-          </View>
-        )}
-      </If>
       <If when={!s().ask && box() === "tell"}>
-        <View accessibilityLabel={t("web.issue.detail.tellSection")} class="mb-5">
+        <View accessibilityLabel={t("web.issue.detail.tellSection")} class="mb-5 rounded-xl border border-line bg-side p-3.5">
           <TextArea
             testID="issue-tell"
             rows={2}
@@ -283,7 +318,7 @@ export function IssueDetail(props: {
             accessibilityLabel={t("web.issue.detail.tell", { who: head().name })}
             autoFocus
           />
-          <View class="mt-2 flex-row gap-2">
+          <View class="mt-2.5 flex-row gap-2">
             <ActButton act="tell" lead />
             <Button disabled={busy()} onPress={() => setBox(undefined)}>
               {t("web.issue.never")}
@@ -291,19 +326,39 @@ export function IssueDetail(props: {
           </View>
         </View>
       </If>
+      <If when={s().description}>
+        <View testID="issue-requirement">
+          <SheetLabel first>{t("web.issue.detail.full")}</SheetLabel>
+          <Markdown size="sm" text={s().description} />
+        </View>
+      </If>
+      <IssueAttachments
+        files={live().attachments ?? []}
+        editable={s().open}
+        busy={attachAct.busy()}
+        first={!s().description}
+        onAdd={addAttachment}
+        onRemove={removeAttachment}
+      />
+      <SubIssuesSection issueId={props.issue.id} allIssues={issues()} onOpen={openIssue} />
 
-      <View accessibilityLabel={t("web.issue.detail.progress")} testID="issue-progress">
-        <View class={`${!failedCheck() && !s().description && !hasAttachmentsSection() && !s().ask ? "mt-0" : "mt-6"} mb-2 flex-row items-baseline gap-2`}>
+      <View accessibilityLabel={t("web.issue.detail.progress")} testID="issue-progress" class={hasAboveProgress() ? "mt-7 border-t border-line pt-5" : ""}>
+        <View class="mb-2.5 flex-row items-center justify-between gap-2">
           <Text class="text-xs font-semibold text-muted">{t("web.issue.detail.progress")}</Text>
           <If when={s().criteria.length > 0}>
-            <Text class="text-xs text-muted tabular-nums">{t("web.issue.detail.met", { met: s().met, of: s().criteria.length })}</Text>
+            <View class="flex-row items-center gap-2">
+              <Text class="text-xs text-muted tabular-nums">{t("web.issue.detail.met", { met: s().met, of: s().criteria.length })}</Text>
+              <View testID="issue-progress-bar" class="h-1.5 w-24 overflow-hidden rounded-full bg-line">
+                <View class="h-full rounded-full bg-leaf" style={{ width: progressBarPx() }} />
+              </View>
+            </View>
           </If>
         </View>
         <If when={s().doing}>
-          <Text class="mb-1.5 text-sm text-water">{s().doing}</Text>
+          <Text class="mb-2 text-sm text-water">{s().doing}</Text>
         </If>
         <If when={s().inFamily}>
-          <Text class="mb-1.5 text-xs text-muted">{s().parentText}</Text>
+          <Text class="mb-2 text-xs text-muted">{s().parentText}</Text>
         </If>
         <If
           when={s().criteria.length > 0}
@@ -312,10 +367,10 @@ export function IssueDetail(props: {
           <Criteria rows={s().criteria} checking={s().stage.state === "reviewing" && props.issue.reviewedAt === undefined} />
         </If>
         <If when={s().openFindings.length > 0}>
-          <View class="mt-2">
-            <Text class="text-xs text-muted">{t("web.issue.detail.rejected")}</Text>
+          <View class="mt-2.5 rounded-lg border border-line bg-bad-soft px-3.5 py-2.5">
+            <Text class="text-xs font-medium text-berry">{t("web.issue.detail.rejected")}</Text>
             <Each of={s().openFindings} key="index">
-              {(f) => <Text class="text-sm text-berry">{`· ${f().text}`}</Text>}
+              {(f) => <Text class="mt-0.5 text-sm text-berry">{`· ${f().text}`}</Text>}
             </Each>
           </View>
         </If>
@@ -324,41 +379,53 @@ export function IssueDetail(props: {
       <View
         accessibilityLabel={t("web.issue.detail.made")}
         testID="issue-made"
+        class="mt-7 border-t border-line pt-5"
         ref={(node) => {
           changesSection = node;
         }}
       >
-        <SheetLabel>{t("web.issue.detail.made")}</SheetLabel>
+        <SheetLabel first>{t("web.issue.detail.made")}</SheetLabel>
         <If
           when={live().deliver === "answer"}
           else={
             <If
               when={s().showsChanges ? changes() : undefined}
               else={
-                <If
-                  when={s().showsChanges}
-                  else={
-                    <Text class="text-sm text-muted">
-                      {s().stage.state === "done" ? t("shared.join.sentence", { text: closedText(props.issue) }) : t("web.issue.detail.nothingToSee")}
+                <View class="flex-row items-center gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5">
+                  <Icon name="diff" size={14} tone="faint" />
+                  <If
+                    when={s().showsChanges}
+                    else={
+                      <Text class="min-w-0 flex-1 text-xs text-muted">
+                        {s().stage.state === "done" ? t("shared.join.sentence", { text: closedText(props.issue) }) : t("web.issue.detail.nothingToSee")}
+                      </Text>
+                    }
+                  >
+                    <Text class="min-w-0 flex-1 text-xs text-muted">
+                      {changesQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.changesUnread")}
                     </Text>
-                  }
-                >
-                  <Text class="text-sm text-muted">{changesQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.changesUnread")}</Text>
-                </If>
+                  </If>
+                </View>
               }
             >
               {(c) => (
                 <If
                   when={c().commits.length > 0 || c().uncommitted.length > 0 || c().files.length > 0}
-                  else={<Text class="text-sm text-muted">{t("web.issue.detail.noChanges")}</Text>}
+                  else={
+                    <View class="flex-row items-center gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5">
+                      <Icon name="diff" size={14} tone="faint" />
+                      <Text class="min-w-0 flex-1 text-xs text-muted">{t("web.issue.detail.noChanges")}</Text>
+                    </View>
+                  }
                 >
-                  <View class="gap-2">
+                  <View class="gap-2 rounded-lg border border-line bg-page p-3.5">
                     <Text class="text-sm text-ink tabular-nums">{changesLine(c())}</Text>
                     <If when={c().conflicts.length > 0}>
                       <Text class="text-sm text-berry">{t("web.issue.detail.conflict", { base: c().base, files: list(c().conflicts) })}</Text>
                     </If>
                     <Fold
                       testID="changed-files"
+                      bordered={false}
                       open={filesOpen()}
                       onToggle={(v) => filesOpen.set(v)}
                       label={t("web.issue.detail.changedFiles")}
@@ -373,31 +440,55 @@ export function IssueDetail(props: {
             </If>
           }
         >
-          <If when={props.issue.answer} else={<Text class="text-sm text-muted">{t("web.issue.detail.noAnswer")}</Text>}>
-            {(a) => <AnswerView answer={a()} />}
+          <If
+            when={props.issue.answer}
+            else={
+              <View class="flex-row items-center gap-2 rounded-lg border border-line bg-side px-3.5 py-2.5">
+                <Icon name="chat" size={14} tone="faint" />
+                <Text class="min-w-0 flex-1 text-xs text-muted">{t("web.issue.detail.noAnswer")}</Text>
+              </View>
+            }
+          >
+            {(a) => (
+              <View class="rounded-lg border border-line bg-page p-3.5">
+                <AnswerView answer={a()} />
+              </View>
+            )}
           </If>
         </If>
         <If when={props.issue.pullRequest}>
           {(pr) => (
-            <View role="link" class="-mx-1 mt-1 self-start rounded-sm px-1 py-0.5 hover:bg-hover" onPress={() => void hostApi.openUrl(pr().url)}>
-              <Text class="text-sm text-water">{t("shared.join.aside", { text: `PR #${pr().number}`, aside: pr().state })}</Text>
+            <View
+              role="link"
+              class="mt-2 flex-row items-center gap-1.5 self-start rounded-md border border-line bg-page px-2.5 py-1 hover:bg-hover"
+              onPress={() => void hostApi.openUrl(pr().url)}
+            >
+              <Icon name="branch" size={12} tone="water" />
+              <Text class="text-xs font-medium text-water">{t("shared.join.aside", { text: `PR #${pr().number}`, aside: pr().state })}</Text>
             </View>
           )}
         </If>
       </View>
 
       <IssueThread issue={props.issue.id} />
-      <IssueArtifacts issue={props.issue.id} heading={<SheetLabel>{t("web.artifact.issue.title")}</SheetLabel>} />
+      <IssueArtifacts
+        issue={props.issue.id}
+        heading={
+          <View class="mt-7 border-t border-line pt-5">
+            <SheetLabel first>{t("web.artifact.issue.title")}</SheetLabel>
+          </View>
+        }
+      />
 
-      <View accessibilityLabel={t("web.issue.detail.story")} testID="issue-story">
-        <SheetLabel>{t("web.issue.detail.story")}</SheetLabel>
+      <View accessibilityLabel={t("web.issue.detail.story")} testID="issue-story" class="mt-7 border-t border-line pt-5">
+        <SheetLabel first>{t("web.issue.detail.story")}</SheetLabel>
         <If
           when={timeline()}
           else={<Text class="text-xs text-faint">{timelineQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.unread")}</Text>}
         >
           {(line) => <Story milestones={line().milestones} />}
         </If>
-        <View class="mt-3 border-t border-line">
+        <View class="mt-4 overflow-hidden rounded-lg border border-line bg-page px-3.5">
           <Fold
             testID="issue-steps-fold"
             label={t("web.issue.detail.steps")}
@@ -418,7 +509,7 @@ export function IssueDetail(props: {
               {(st) => <WorkLog steps={st()} />}
             </If>
           </Fold>
-          <Fold label={t("web.issue.detail.runs")} summary={s().historyLine} testID="issue-runs-fold">
+          <Fold bordered={false} label={t("web.issue.detail.runs")} summary={s().historyLine} testID="issue-runs-fold">
             <Runs
               issue={props.issue.id}
               version={`${props.issue.stage.state}:${props.session?.runs}:${props.session?.phase._tag}`}
@@ -457,7 +548,7 @@ export function IssueDetail(props: {
   const side = (
     <>
       <SheetLabel first>{t("web.issue.detail.properties")}</SheetLabel>
-      <Property label={t("web.issue.detail.status")}>
+      <Property label={t("web.issue.detail.status")} icon={<StatusMark status={live().status} size={13} />} inset>
         <Pick<IssueAct | "now">
           label={t("web.issue.detail.status")}
           testid="issue-status"
@@ -468,7 +559,7 @@ export function IssueDetail(props: {
           options={statusOptions()}
         />
       </Property>
-      <Property label={t("web.issue.detail.priority")}>
+      <Property label={t("web.issue.detail.priority")} icon={<PriorityMark priority={live().priority} size={13} />} inset>
         <Pick
           label={t("web.issue.detail.priority")}
           testid="issue-priority"
@@ -480,7 +571,7 @@ export function IssueDetail(props: {
         />
       </Property>
       <If when={!s().inFamily}>
-        <Property label={t("web.issue.detail.deliver")}>
+        <Property label={t("web.issue.detail.deliver")} icon={<Icon name={live().deliver === "answer" ? "chat" : "diff"} size={13} tone="muted" />} inset>
           <Pick
             label={t("web.issue.detail.deliver")}
             testid="issue-deliver"
@@ -492,20 +583,58 @@ export function IssueDetail(props: {
           />
         </Property>
       </If>
-      <Property label={t("web.issue.detail.repo")}>{s().repo || t("web.issue.detail.noRepo")}</Property>
-      <Property label={t("web.issue.detail.helper")}>{s().whoLine}</Property>
-      <If when={agent()?.model}>{(model) => <Property label={t("web.issue.detail.model")}>{model()}</Property>}</If>
-      <If when={sideActs().length > 0 || sessionWorktree(head())}>
-        <View class="mt-3 flex-row flex-wrap items-center gap-2">
-          <Each of={sideActs()} key={(a) => a}>
-            {(a) => <ActButton act={a()} lead={!s().ask && a() === s().lead} />}
-          </Each>
-          <If when={sessionWorktree(head())}>
-            {(worktree) => <OpenTerminal cwd={worktree()} title={`#${props.issue.number}`} testid="issue-open-workspace" />}
+      <Property label={t("web.issue.detail.repo")} icon={<Icon name="folder" size={13} tone="muted" />}>
+        {s().repo || t("web.issue.detail.noRepo")}
+      </Property>
+      <Property
+        label={t("web.issue.detail.helper")}
+        icon={
+          <If when={sessionProfile(head())} else={<Icon name="agents" size={13} tone="muted" />}>
+            {(profile) => <AgentFaceOf agent={profile()} runtime={head().runtime} size={16} />}
           </If>
-        </View>
+        }
+      >
+        {s().whoLine}
+      </Property>
+      <If when={agent()?.model}>
+        {(model) => (
+          <Property label={t("web.issue.detail.model")} icon={<Icon name="bolt" size={13} tone="muted" />}>
+            {model()}
+          </Property>
+        )}
       </If>
+      <Property label={t("web.issue.family.parent")} icon={<Icon name="indent" size={13} tone="muted" />} inset>
+        <ParentPicker
+          issueId={props.issue.id}
+          parentId={live().parent ?? ""}
+          allIssues={issues()}
+          disabled={busy() || !s().open}
+          state={labeled().state("parent")}
+          onChange={(parent) => setLabel({ parent })}
+        />
+      </Property>
+      <Property align="start" label={t("web.issue.tags.label")} icon={<Icon name="catalog" size={13} tone="muted" />} inset>
+        <TagEditor tags={live().tags ?? []} disabled={busy() || !s().open} onChange={(tags) => setLabel({ tags })} />
+      </Property>
       <SheetLabel divider>{t("web.issue.detail.time")}</SheetLabel>
+      <Property label={t("web.issue.dates.startAt")} icon={<Icon name="calendar" size={13} tone="muted" />} inset>
+        <DatePropertyEditor
+          label={t("web.issue.dates.startAt")}
+          value={live().startAt}
+          disabled={busy() || !s().open}
+          testid="issue-start-at"
+          onCommit={(startAt) => setLabel({ startAt })}
+        />
+      </Property>
+      <Property label={t("web.issue.dates.dueAt")} icon={<Icon name="calendar" size={13} tone="muted" />} inset>
+        <DatePropertyEditor
+          label={t("web.issue.dates.dueAt")}
+          value={live().dueAt}
+          disabled={busy() || !s().open}
+          testid="issue-due-at"
+          onCommit={(dueAt) => setLabel({ dueAt })}
+        />
+      </Property>
       <Property label={t("web.issue.detail.opened")}>
         <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.issue.createdAt, now())}</Text>
       </Property>
@@ -599,6 +728,16 @@ export function IssueDetail(props: {
           </Property>
         </If>
       </More>
+      <If when={sideActs().length > 0 || sessionWorktree(head())}>
+        <View testID="issue-side-actions" class="mt-4 flex-row flex-wrap items-center gap-2 border-t border-line pt-4">
+          <Each of={sideActs()} key={(a) => a}>
+            {(a) => <ActButton act={a()} lead={!s().ask && a() === s().lead} />}
+          </Each>
+          <If when={sessionWorktree(head())}>
+            {(worktree) => <OpenTerminal cwd={worktree()} title={`#${props.issue.number}`} testid="issue-open-workspace" />}
+          </If>
+        </View>
+      </If>
     </>
   );
   return <IssueSheet heading={heading} main={main} side={side} />;
@@ -622,7 +761,7 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
           <If
             when={props.editable}
             else={
-              <Text role="header" testID="issue-title" class="line-clamp-2 text-lg font-semibold text-ink">
+              <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
                 {props.shown}
               </Text>
             }
@@ -635,9 +774,9 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
                 typed = props.full;
                 editing.set(true);
               }}
-              class="-mx-1 self-start rounded-sm px-1 hover:bg-hover"
+              class="-mx-1 max-w-full self-start rounded-sm px-1 hover:bg-hover"
             >
-              <Text role="header" testID="issue-title" class="line-clamp-2 text-lg font-semibold text-ink">
+              <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
                 {props.shown}
               </Text>
             </View>

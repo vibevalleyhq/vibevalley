@@ -207,7 +207,7 @@ export function HistoryPanel(props: HistoryPanelProps) {
 
   return (
     <View testID="artifact-history-panel" class="min-h-0 min-w-0 flex-1 bg-side">
-      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center justify-between gap-1.5 border-b border-line px-3">
+      <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center justify-between gap-1.5 border-b border-line px-3">
         <View class="min-w-0 flex-1 flex-row items-center gap-1.5">
           <Icon name="clock" size={14} tone="muted" />
           <Text role="header" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">

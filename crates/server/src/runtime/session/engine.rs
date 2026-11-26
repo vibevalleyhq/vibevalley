@@ -312,6 +312,10 @@ impl SessionEngine {
         }
     }
 
+    pub fn mcp_url(&self) -> Option<String> {
+        self.0.door.lock().url.clone()
+    }
+
     /// The helper a bearer token names.
     pub fn who(&self, token: &str) -> Option<String> {
         if token.is_empty() {

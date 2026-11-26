@@ -20,7 +20,17 @@
     "send": "Send"
   },
   "hud": {
-    "workbench": "Workbench"
+    "workbench": "Workbench",
+    "dawn": "Dawn",
+    "noon": "Noon",
+    "dusk": "Dusk",
+    "night": "Night",
+    "liftRoof": "Lift roof",
+    "closeRoof": "Close roof",
+    "resetCamera": "Reset",
+    "phone": "Phone",
+    "enter": "Enter",
+    "backToYard": "Back to yard"
   },
   "sow": {
     "homeless": "This farm belongs to no repo",

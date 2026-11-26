@@ -828,7 +828,7 @@ mod tests {
         let dense = preset(Density::Dense);
         let board = dense.board.board_summary.as_ref().expect("board_summary");
         let working_issues = dense.board.issues.iter().filter(|i| i.status == IssueStatus::InProgress).count() as i64;
-        assert_eq!(board.lane_counts.working, working_issues);
+        assert_eq!(board.lane_counts.in_progress, working_issues);
         assert_eq!(board.running_slots, 6);
         assert_eq!(board.max_running, MAX_RUNNING as i64);
     }

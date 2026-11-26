@@ -2,7 +2,7 @@
 
 **先明确业务语义与不变量，再决定架构和模块边界；模块内部设计与测试策略共同落地，测试结果反过来检验设计。** 测试是模块的使用者，不是实现完成后附加的一层脚本。
 
-本文规定设计和评审的方法。现行结构见 [架构](docs/architecture.md)，测试分层与预算见 [地基](docs/subsystems/foundation.md#测试金字塔)，具体改造留在 Agent Notes。
+本文规定设计和评审的方法。现行结构见 [架构](docs/architecture.md)，测试分层与预算见 [地基](docs/subsystems/foundation.md#测试金字塔)，具体改造追踪在 VibeValley Issues。
 
 ## 责任和边界
 

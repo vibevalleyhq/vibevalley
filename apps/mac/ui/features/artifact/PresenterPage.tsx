@@ -96,7 +96,7 @@ function Presenter(props: { id: string; version: number }) {
 
   return (
     <View testID="presenter" accessibilityValue={{ now: at(), max: pages() }} class="h-full min-h-0 flex-1 bg-side">
-      <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3.5">
+      <View class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3.5">
         <IconButton icon="back" label={t("web.artifact.page.all")} testid="presenter-back" onClick={goBack} />
         <View class="h-4 w-px bg-line" />
         <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{title()}</Text>

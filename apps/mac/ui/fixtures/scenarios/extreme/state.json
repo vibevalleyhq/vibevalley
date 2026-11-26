@@ -20,7 +20,7 @@
         "canceled": "dismissed",
         "blockedBy": [],
         "status": "canceled",
-        "moves": ["backlog"],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "done"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -58,7 +58,7 @@
         "delivered": "merged",
         "blockedBy": [],
         "status": "done",
-        "moves": ["backlog"],
+        "moves": ["backlog", "todo", "in_progress", "in_review", "canceled"],
         "deliver": "change",
         "reviewedAt": 1795176443624,
         "findings": [],
@@ -94,7 +94,7 @@
         "createdAt": 1795158443624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["canceled"],
+        "moves": ["backlog", "todo", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -162,7 +162,7 @@
         "parent": "i40",
         "blockedBy": ["i41"],
         "status": "todo",
-        "moves": ["backlog", "canceled"],
+        "moves": ["backlog", "in_progress", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -196,7 +196,7 @@
         "createdAt": 1795180043624,
         "blockedBy": [],
         "status": "backlog",
-        "moves": ["canceled"],
+        "moves": ["in_progress", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -237,7 +237,7 @@
         "queuedAt": 1795192943624,
         "blockedBy": [],
         "status": "todo",
-        "moves": ["backlog", "canceled"],
+        "moves": ["backlog", "in_progress", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -273,7 +273,7 @@
         "queuedAt": 1795194323624,
         "blockedBy": [],
         "status": "todo",
-        "moves": ["backlog", "canceled"],
+        "moves": ["backlog", "in_progress", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -327,7 +327,7 @@
         "queuedAt": 1795192643624,
         "blockedBy": [],
         "status": "in_review",
-        "moves": ["todo", "done", "canceled"],
+        "moves": ["backlog", "todo", "in_progress", "done", "canceled"],
         "deliver": "change",
         "deliveryEvidence": {
           "reviews": [],
@@ -409,7 +409,7 @@
         "queuedAt": 1795193243624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["canceled"],
+        "moves": ["backlog", "todo", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -467,7 +467,7 @@
         "queuedAt": 1795192043624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["todo", "canceled"],
+        "moves": ["backlog", "todo", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [
@@ -527,7 +527,7 @@
         "queuedAt": 1795187243624,
         "blockedBy": [],
         "status": "in_review",
-        "moves": ["todo", "done", "canceled"],
+        "moves": ["backlog", "todo", "in_progress", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -605,7 +605,7 @@
         "queuedAt": 1795189043624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["todo", "canceled"],
+        "moves": ["backlog", "todo", "in_review", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -639,16 +639,18 @@
     ],
     "boardSummary": {
       "laneCounts": {
-        "todo": 4,
-        "working": 4,
-        "waiting": 2,
-        "closed": 3
+        "backlog": 1,
+        "todo": 3,
+        "inProgress": 4,
+        "inReview": 2,
+        "done": 2,
+        "canceled": 1
       },
       "runningSlots": 2,
       "maxRunning": 6,
       "byIssue": {
         "i-ext-conflict": {
-          "lane": "waiting",
+          "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -663,7 +665,7 @@
           "needsWorktreeCheck": false
         },
         "i10": {
-          "lane": "closed",
+          "lane": "canceled",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
@@ -671,21 +673,21 @@
           "prompt": "canceled_reopenable"
         },
         "i12": {
-          "lane": "closed",
+          "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i18": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
           "needsWorktreeCheck": false
         },
         "i21": {
-          "lane": "todo",
+          "lane": "backlog",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,
@@ -699,7 +701,7 @@
           "needsWorktreeCheck": false
         },
         "i31": {
-          "lane": "waiting",
+          "lane": "in_review",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -707,7 +709,7 @@
           "prompt": "handed_back"
         },
         "i33": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -715,7 +717,7 @@
           "prompt": "asking"
         },
         "i34": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,
@@ -723,14 +725,14 @@
           "prompt": "stuck_failed"
         },
         "i40": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "family",
           "familyDone": 1,
           "familyTotal": 2,
           "needsWorktreeCheck": false
         },
         "i41": {
-          "lane": "closed",
+          "lane": "done",
           "cardKind": "todo",
           "familyDone": 0,
           "familyTotal": 0,

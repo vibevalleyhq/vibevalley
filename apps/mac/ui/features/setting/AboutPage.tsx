@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 import { SettingRow, SettingsGroup, SettingsPage } from "../../design/domain/settings";
 import { IconButton } from "../../design/IconButton";
 import { Quiet } from "../../design/layout";
+import { Tag } from "../../design/Tag";
 import { Tip } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { reasonOf } from "../../infra/api";
@@ -18,7 +19,7 @@ function PathRow(props: { label: string; hint: string; path: string; last?: bool
   return (
     <SettingRow label={props.label} hint={props.hint} last={props.last}>
       <Tip text={props.path}>
-        <View class="max-w-80 rounded-sm bg-page px-2 py-0.5">
+        <View class="max-w-72 rounded-md border border-line bg-side px-2 py-0.5">
           <Text class="truncate font-mono text-xs text-muted">{props.path}</Text>
         </View>
       </Tip>
@@ -37,26 +38,31 @@ function PathRow(props: { label: string; hint: string; path: string; last?: bool
   );
 }
 
-export function AboutPage() {
+function backendLabel(backend: string | undefined): string {
+  switch (backend) {
+    case "s3":
+      return t("web.setting.data.backendS3");
+    case "memory":
+      return t("web.setting.data.backendMemory");
+    default:
+      return t("web.setting.data.backendLocalFs");
+  }
+}
+
+export function DataSettingsPage() {
   const settings = useSettings();
-  const updates = useUpdates();
-  const cli = useCommandLine();
   return (
-    <SettingsPage title={t("web.setting.nav.about")}>
+    <SettingsPage title={t("web.setting.nav.data")} description={t("web.setting.data.intro")}>
       <If
         when={ready(settings, undefined)}
         else={<Quiet>{settings.error() ? t("web.base.form.unreachable", { why: reasonOf(settings.error()) }) : t("web.base.form.asking")}</Quiet>}
       >
         {(s) => (
           <>
-            <SettingsGroup>
-              <SettingRow label={t("web.setting.about.version")} hint={t("web.setting.about.versionHint")} last={!updates() && !cli.state()}>
-                <Text testID="about-version" class="font-mono text-sm tabular-nums text-ink">
-                  {s().version}
-                </Text>
+            <SettingsGroup title={t("web.setting.data.storageTitle")}>
+              <SettingRow label={t("web.setting.data.backend")} hint={t("web.setting.data.backendHint")} testid="data-storage-backend" last>
+                <Tag icon="folder" tone="neutral" label={backendLabel(s().storageBackend)} />
               </SettingRow>
-              <UpdateRow state={updates} last={!cli.state()} />
-              <CommandLineRow state={cli.state} onInstall={cli.install} onRemove={cli.remove} last />
             </SettingsGroup>
             <SettingsGroup title={t("web.setting.about.files")}>
               <Each
@@ -72,6 +78,34 @@ export function AboutPage() {
               </Each>
             </SettingsGroup>
           </>
+        )}
+      </If>
+    </SettingsPage>
+  );
+}
+
+export function AboutPage() {
+  const settings = useSettings();
+  const updates = useUpdates();
+  const cli = useCommandLine();
+  return (
+    <SettingsPage title={t("web.setting.nav.about")} description={t("web.setting.about.intro")}>
+      <If
+        when={ready(settings, undefined)}
+        else={<Quiet>{settings.error() ? t("web.base.form.unreachable", { why: reasonOf(settings.error()) }) : t("web.base.form.asking")}</Quiet>}
+      >
+        {(s) => (
+          <SettingsGroup>
+            <SettingRow label={t("web.setting.about.version")} hint={t("web.setting.about.versionHint")} last={!updates() && !cli.state()}>
+              <View class="rounded-md border border-line bg-side px-2 py-0.5">
+                <Text testID="about-version" class="font-mono text-xs font-medium tabular-nums text-ink">
+                  {s().version}
+                </Text>
+              </View>
+            </SettingRow>
+            <UpdateRow state={updates} last={!cli.state()} />
+            <CommandLineRow state={cli.state} onInstall={cli.install} onRemove={cli.remove} last />
+          </SettingsGroup>
         )}
       </If>
     </SettingsPage>

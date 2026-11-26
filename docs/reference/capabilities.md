@@ -285,6 +285,9 @@ MOSS Live 语音通话
 | `runtime.list` | 列出全部引擎 | `/api/v1/runtime/list` | ✓ | ✓ |   |   |
 | `runtime.refresh` | 重新探测一个引擎 | `/api/v1/runtime/refresh` | ✓ | ✓ |   |   |
 | `runtime.setting.update` | 改一个引擎的设置：开关、路径、默认模型、预算 | `/api/v1/runtime/setting/update` | ✓ |   |   |   |
+| `runtime.mcp.list` | cap.op.runtime.mcp.list | `/api/v1/runtime/mcp/list` | ✓ | ✓ |   |   |
+| `runtime.mcp.install` | cap.op.runtime.mcp.install | `/api/v1/runtime/mcp/install` | ✓ |   |   |   |
+| `runtime.mcp.uninstall` | cap.op.runtime.mcp.uninstall | `/api/v1/runtime/mcp/uninstall` | ✓ |   |   |   |
 
 ## repo
 
@@ -296,6 +299,8 @@ MOSS Live 语音通话
 | `repo.list` | 列出全部仓库 | `/api/v1/repo/list` | ✓ | ✓ | ✓ |   |
 | `repo.validate` | 新建仓库会被拒的第一处，不真建 | `/api/v1/repo/validate` | ✓ | ✓ |   |   |
 | `repo.create` | 新建一个仓库 | `/api/v1/repo/create` | ✓ | ✓ |   |   |
+| `repo.mount` | cap.op.repo.mount | `/api/v1/repo/mount` | ✓ | ✓ |   |   |
+| `repo.unmount` | cap.op.repo.unmount | `/api/v1/repo/unmount` | ✓ | ✓ |   |   |
 | `repo.language.list` | 仓库用了哪些语言 | `/api/v1/repo/language/list` | ✓ | ✓ |   |   |
 | `repo.template.list` | 仓库的任务模板，按它的栈填好 | `/api/v1/repo/template/list` | ✓ | ✓ |   |   |
 | `repo.activity.get` | 仓库的提交：每天几次、谁提交的 | `/api/v1/repo/activity/get` | ✓ | ✓ |   |   |

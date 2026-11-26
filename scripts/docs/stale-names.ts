@@ -25,7 +25,7 @@ const RULES: readonly Rule[] = [
   {
     name: "the name the native port had before it moved in",
     pattern: /epona|Epona|EPONA/u,
-    says: "it is VibeValley: crates are vibevalley-<concept>, the app is apps/mac, variables are VIBEVALLEY_* (.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)",
+    says: "it is VibeValley: crates are vibevalley-<concept>, the app is apps/mac, variables are VIBEVALLEY_* (docs/architecture.md)",
     dirs: DIRS,
   },
   {

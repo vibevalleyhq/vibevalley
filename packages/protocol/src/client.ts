@@ -600,6 +600,14 @@ export class VibeValleyApi {
       update: (a: { id: string } & T.RuntimeSettings, options?: { signal?: AbortSignal }): Promise<T.RuntimeInfo> =>
         this.call<T.RuntimeInfo>("runtime.setting.update", "/api/v1/runtime/setting/update", a, options),
     },
+    mcp: {
+      list: (a: T.McpListInput, options?: { signal?: AbortSignal }): Promise<T.McpListResult> =>
+        this.call<T.McpListResult>("runtime.mcp.list", "/api/v1/runtime/mcp/list", a, options),
+      install: (a: T.McpInstallInput, options?: { signal?: AbortSignal }): Promise<T.McpHostInfo> =>
+        this.call<T.McpHostInfo>("runtime.mcp.install", "/api/v1/runtime/mcp/install", a, options),
+      uninstall: (a: T.McpUninstallInput, options?: { signal?: AbortSignal }): Promise<T.McpHostInfo> =>
+        this.call<T.McpHostInfo>("runtime.mcp.uninstall", "/api/v1/runtime/mcp/uninstall", a, options),
+    },
   };
 
   readonly repo = {
@@ -609,6 +617,9 @@ export class VibeValleyApi {
       this.call<T.Validation>("repo.validate", "/api/v1/repo/validate", a, options),
     create: (a: T.NewRepo, options?: { signal?: AbortSignal }): Promise<T.RepoSummary> =>
       this.call<T.RepoSummary>("repo.create", "/api/v1/repo/create", a, options),
+    mount: (a: T.MountRepo, options?: { signal?: AbortSignal }): Promise<T.RepoSummary> =>
+      this.call<T.RepoSummary>("repo.mount", "/api/v1/repo/mount", a, options),
+    unmount: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("repo.unmount", "/api/v1/repo/unmount", a, options),
     pr: {
       submit: (a: T.SubmitBranch, options?: { signal?: AbortSignal }): Promise<T.BranchPublication> =>
         this.call<T.BranchPublication>("repo.pr.submit", "/api/v1/repo/pr/submit", a, options),

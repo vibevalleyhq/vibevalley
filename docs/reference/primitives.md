@@ -18,7 +18,6 @@
 | `executionsOf` | `issues.ts` | Every execution, in assignment and start order. |
 | `sessionIdsOf` | `issues.ts` | The external helper contexts that executed it, in order. |
 | `latestSessionIdOf` | `issues.ts` |  |
-| `shortTitle` | `issues.ts` | One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits. failing those, cut. |
 | `closedText` | `issues.ts` | What its close says: done with what it delivered, or canceled and why. |
 | `omitUndefined` | `omit.ts` |  |
 | `isOneOf` | `oneOf.ts` |  |
@@ -43,12 +42,14 @@
 | 名字 | 文件 | 说的是 |
 |---|---|---|
 | `Root` | `Root.tsx` |  |
+| `localizeAgentProblem` | `agents.ts` | Localizes raw English engine readiness errors and attaches the matching settings route when actionable. |
 | `useWorkAgents` | `agents.ts` | The profiles work is sent to, the helpers; enabled, only those not switched off. |
 | `sortRuntimes` | `agents.ts` |  |
 | `useOrchestrators` | `agents.ts` | The orchestrators' profiles, the default one first. |
 | `orchestratorLookOf` | `agents.ts` | An orchestrator's look (its sprites are manager-<look>); the plain farmer until the profiles are read. |
 | `useAgent` | `agents.ts` | A profile by its id, once the profiles are read; undefined for none or one gone. |
 | `useAgentProblems` | `agents.ts` |  |
+| `useWorkAgentReadiness` | `agents.ts` | Validated runtime & config readiness (from `agent.validate` + `runtime.list`) keyed by agent id. |
 | `ApiConnectionError` | `api.ts` | The server could not be reached at all. |
 | `api` | `api.ts` | Calls the in-process Rust server directly through the current bridge transport. |
 | `reasonOf` | `api.ts` | What a refusal says, for a toast or an inline line. |
@@ -131,6 +132,7 @@
 | `useInboxSlice` | `frame.ts` |  |
 | `useOpsSlice` | `frame.ts` |  |
 | `useLink` | `frame.ts` |  |
+| `useRefreshSlice` | `frame.ts` |  |
 | `useSessionsMap` | `frame.ts` |  |
 | `useSession` | `frame.ts` |  |
 | `useIssue` | `frame.ts` |  |
@@ -141,6 +143,8 @@
 | `followArtifact` | `gateway.ts` | An artifact directory's file changes after this seq, then each committed batch from now on. |
 | `followSuggestions` | `gateway.ts` | An artifact's suggestions as they now are, then the whole list after each change. |
 | `followArtifactPresence` | `gateway.ts` | An artifact's ephemeral live presence peers as a snapshot, then incremental upserts and removals. |
+| `clampUpdatePercent` | `host.ts` | Clamps an update download percentage to a whole number between 0 and 100. |
+| `formatUpdateTransfer` | `host.ts` | Formats downloaded/total bytes and transfer speed for the update progress UI. |
 | `currentHost` | `host.ts` |  |
 | `farmCallsSchema` | `hostParams.ts` |  |
 | `readHostParams` | `hostParams.ts` |  |
@@ -204,6 +208,7 @@
 | `attemptCodec` | `router/search.ts` | A decode or an encode, or undefined when it fails; a Schema that decodes asynchronously never admits a value. |
 | `searchParam` | `router/search.ts` | One value of a search key, read with `schema`: a key given twice does not decode. |
 | `search` | `router/search.ts` |  |
+| `localizeRuntimeError` | `runtimeError.ts` | Maps raw English runtime API-key errors (e.g. `no API key is set for the model`) into localized copy with a Settings link. |
 | `stepLimit` | `sessionRuns.ts` | The steps kept for one session's log in the page. |
 | `mergeSteps` | `sessionRuns.ts` | By seq and revision, independent of HTTP/live arrival order; capped to `limit` (default `stepLimit`, `null` for uncapped). |
 | `shownEvents` | `sessionRuns.ts` | A call with its result's output and ok; hidden step types (by default results and run bounds) left out. |

@@ -14,6 +14,7 @@ pub struct Model {
     pub repo: Option<String>,
     pub machine_id: Option<String>,
     pub priority: String,
+    pub status: String,
     pub rank: Option<i64>,
     pub deliver: String,
     pub parent: Option<String>,
@@ -53,6 +54,10 @@ pub struct Model {
     pub assignments: String,
     #[sea_orm(column_type = "Text")]
     pub attachments: String,
+    #[sea_orm(column_type = "Text")]
+    pub tags_json: String,
+    pub start_at: Option<i64>,
+    pub due_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

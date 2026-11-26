@@ -13,6 +13,7 @@ fn config(home: &Path) -> SettingConfig {
         work_root: home.join("work"),
         version: "test".into(),
         deepseek_api_key: "sk-from-config-0000".into(),
+        ..Default::default()
     }
 }
 
@@ -125,4 +126,78 @@ fn readiness_follows_moss_providers_and_hides_keys() {
         assert!(!ready.to_string().contains("test-private-key"));
         assert_eq!(setting.providers().revision, 1);
     });
+}
+
+#[test]
+fn user_profile_persists_merges_and_clears_fields() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = app(dir.path());
+    let before = call(&app, "setting.get", Value::Null)["data"].clone();
+    assert!(before.get("profile").is_none());
+    assert_eq!(before["storageBackend"], "local_fs");
+
+    let saved = call(
+        &app,
+        "setting.update",
+        json!({
+            "profile": {
+                "displayName": "  Lucas  ",
+                "avatarPreset": "avatar-orchestrator",
+                "tagline": "Building VibeValley"
+            }
+        }),
+    )["data"]
+        .clone();
+    assert_eq!(
+        saved["profile"],
+        json!({
+            "displayName": "Lucas",
+            "avatarPreset": "avatar-orchestrator",
+            "tagline": "Building VibeValley"
+        })
+    );
+
+    // Partial update keeps other fields and allows switching to custom attachment while clearing preset.
+    let updated = call(
+        &app,
+        "setting.update",
+        json!({
+            "profile": {
+                "avatarAttachmentId": "att-123",
+                "avatarPreset": ""
+            }
+        }),
+    )["data"]
+        .clone();
+    assert_eq!(
+        updated["profile"],
+        json!({
+            "displayName": "Lucas",
+            "avatarAttachmentId": "att-123",
+            "tagline": "Building VibeValley"
+        })
+    );
+
+    // Clearing all fields drops `profile` from settings.json cleanly.
+    let cleared = call(
+        &app,
+        "setting.update",
+        json!({
+            "profile": {
+                "displayName": "",
+                "avatarAttachmentId": "",
+                "tagline": ""
+            }
+        }),
+    )["data"]
+        .clone();
+    assert!(cleared.get("profile").is_none());
+    assert!(file(dir.path()).get("profile").is_none());
+
+    // Excessively long displayName is refused.
+    let too_long = "x".repeat(81);
+    let refused = call(&app, "setting.update", json!({ "profile": { "displayName": too_long } }));
+    assert_eq!(refused["bizCode"], 700007);
+
+    app.close_blocking();
 }

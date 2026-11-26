@@ -68,9 +68,9 @@
 
 ## 还没做的
 
-- 授权分档、跨轮同意与持续推进交付：[让获授权的工作持续推进并可信交付](.agents/notes/proposed/architecture/2026-11-07-authorized-work-and-prompt-design.md)。
-- 按档案配 `toolsets`、助手加载技能与 `/` 调用：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
-- 仓库健康度、早报、工单关系与分拣建议：[助手给用户报告](.agents/notes/proposed/feature/2026-10-21-the-orchestrator-reports.md)。
+- 授权分档、跨轮同意与持续推进交付：`#53`。
+- 按档案配 `toolsets`、助手加载技能与 `/` 调用：`#52`。
+- 仓库健康度、早报、工单关系与分拣建议：`#48`。
 
 ## 怎么验证
 

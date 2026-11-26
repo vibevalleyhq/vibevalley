@@ -258,3 +258,92 @@ fn sent_issue_hands_over_to_another_profile_and_split_renames_parent() {
     });
     app.close_blocking();
 }
+
+#[test]
+fn external_local_repo_mounts_runs_issue_in_worktree_and_unmounts_safely() {
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let ext_root = tempfile::tempdir().unwrap();
+    let ext_repo = ext_root.path().join("external-service");
+    std::fs::create_dir_all(&ext_repo).unwrap();
+    std::fs::write(ext_repo.join("Cargo.toml"), "[package]\nname = \"external-service\"\n").unwrap();
+    assert!(
+        std::process::Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(&ext_repo)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        std::process::Command::new("git")
+            .args(["-c", "user.name=tester", "-c", "user.email=tester@example.com", "add", "-A"])
+            .current_dir(&ext_repo)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        std::process::Command::new("git")
+            .args(["-c", "user.name=tester", "-c", "user.email=tester@example.com", "commit", "-q", "-m", "initial"])
+            .current_dir(&ext_repo)
+            .status()
+            .unwrap()
+            .success()
+    );
+
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        ..vibevalley_server::Config::under(dir.path())
+    })
+    .unwrap();
+    let router = app.router().clone();
+    let call = |op: &str, p| router.call_as(Caller::User, op, p);
+
+    let mounted = call("repo.mount", json!({ "path": ext_repo.display().to_string() }));
+    let summary = mounted.data.unwrap_or_else(|| panic!("{}", mounted.message));
+    assert_eq!(summary["name"], "external-service");
+    assert_eq!(summary["external"], true);
+    assert_eq!(summary["git"], true);
+
+    let listed = call("repo.list", json!(null)).data.unwrap();
+    assert!(
+        listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["name"] == "external-service" && r["external"] == true)
+    );
+
+    let activity = call("repo.activity.get", json!({ "id": "external-service" })).data.unwrap();
+    assert_eq!(activity["total"], 1);
+
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
+    helper.runtime = "scripted".into();
+    helper.name = "Helper".into();
+    let _helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
+
+    let created = call(
+        "issue.create",
+        json!({ "title": "ship external change", "repo": "external-service", "agent": "Helper" }),
+    );
+    let issue = created.data.unwrap_or_else(|| panic!("{}", created.message));
+    let id = issue["id"].as_str().unwrap().to_string();
+
+    let started = call("issue.status.update", json!({ "id": id, "status": "todo" }));
+    assert_eq!(started.biz_code, 0, "{}", started.message);
+
+    let finished = crate::support::wait_until_transition(app.ctx(), std::time::Duration::from_secs(10), "external issue InReview", || {
+        crate::support::board_issue(app.test_internals().board, &id).filter(|i| i.status == vibevalley_protocol::IssueStatus::InReview)
+    });
+    assert_eq!(finished.status, vibevalley_protocol::IssueStatus::InReview);
+
+    let unmounted = call("repo.unmount", json!({ "id": "external-service" }));
+    assert_eq!(unmounted.biz_code, 0, "{}", unmounted.message);
+    assert!(ext_repo.exists(), "unmounting must never delete user external folder");
+
+    app.close_blocking();
+}

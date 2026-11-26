@@ -667,7 +667,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
         <View
           testID={props.headerTestID ?? "artifact-directory-header"}
           desktop={props.headerWindowDrag === true ? { windowDrag: true } : undefined}
-          class={props.headerClass ?? "h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3"}
+          class={props.headerClass ?? "h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3"}
         >
           <View class="min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden">
             {props.headerLeft}

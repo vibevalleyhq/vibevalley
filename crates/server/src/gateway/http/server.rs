@@ -12,7 +12,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use futures_util::{Stream, StreamExt};
-use serde_json::{Value, json};
+use serde_json::Value;
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
@@ -210,8 +210,9 @@ async fn not_allowed() -> Response {
     refuse(BizCode::MethodNotAllowed, "use POST")
 }
 
-/// A helper's MCP messages (streamable HTTP, answered as plain JSON): one
-/// message or a batch. Notifications alone are answered 202.
+/// A helper's MCP messages (Streamable HTTP, SEP-2575 stateless + SEP-2243
+/// routable headers, answered as plain JSON): one message or a batch.
+/// Notifications alone are answered 202.
 async fn mcp(State(state): State<HttpState>, _local: LocalOnly, headers: HeaderMap, body: Bytes) -> Response {
     let token = bearer_token(&headers).unwrap_or("").to_string();
     if token.starts_with("vv_dev_") {
@@ -220,16 +221,78 @@ async fn mcp(State(state): State<HttpState>, _local: LocalOnly, headers: HeaderM
     let Some(door) = state.ports().mcp else {
         return refuse(BizCode::ServiceUnavailable, "no MCP here");
     };
+    let mcp_headers = vibevalley_mcp::HttpHeaders::from_pairs(headers.iter().filter_map(|(name, value)| value.to_str().ok().map(|val| (name.as_str(), val))));
     let Ok(message_json) = std::str::from_utf8(&body) else {
-        let error = json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
-        return (StatusCode::BAD_REQUEST, axum::Json(error)).into_response();
+        let error = vibevalley_mcp::RpcResponse::err(vibevalley_mcp::RpcId::Null, vibevalley_mcp::RpcError::parse_error("parse error"));
+        return (
+            StatusCode::BAD_REQUEST,
+            [
+                ("content-type", "application/json"),
+                (
+                    vibevalley_mcp::HEADER_PROTOCOL_VERSION,
+                    mcp_headers.protocol_version.as_deref().unwrap_or(vibevalley_mcp::PROTOCOL_STATELESS),
+                ),
+                ("cache-control", "no-store"),
+            ],
+            axum::Json(error),
+        )
+            .into_response();
+    };
+    let validated = match mcp_headers.validate_raw_json(message_json) {
+        Ok(v) => v,
+        Err(err) => {
+            let status = StatusCode::from_u16(err.status).unwrap_or(StatusCode::BAD_REQUEST);
+            let encoded = serde_json::to_string(&err.response)
+                .unwrap_or_else(|_| r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"internal error"}}"#.to_string());
+            return (
+                status,
+                [
+                    ("content-type", "application/json".to_string()),
+                    (vibevalley_mcp::HEADER_PROTOCOL_VERSION, err.headers.protocol_version),
+                    ("cache-control", err.headers.cache_control.to_string()),
+                ],
+                encoded,
+            )
+                .into_response();
+        }
     };
     match crate::gateway::api::dispatch_mcp_message_async(door, token, message_json.to_string()).await {
-        Ok(Some(answer_json)) => (StatusCode::OK, [("content-type", "application/json")], answer_json).into_response(),
-        Ok(None) => StatusCode::ACCEPTED.into_response(),
+        Ok(Some(answer_json)) => {
+            let resp_headers = vibevalley_mcp::build_response_headers(&validated, Some(&answer_json));
+            (
+                StatusCode::OK,
+                [
+                    ("content-type", "application/json".to_string()),
+                    (vibevalley_mcp::HEADER_PROTOCOL_VERSION, resp_headers.protocol_version),
+                    ("cache-control", resp_headers.cache_control.to_string()),
+                ],
+                answer_json,
+            )
+                .into_response()
+        }
+        Ok(None) => {
+            let resp_headers = vibevalley_mcp::build_response_headers(&validated, None);
+            (
+                StatusCode::ACCEPTED,
+                [
+                    (vibevalley_mcp::HEADER_PROTOCOL_VERSION, resp_headers.protocol_version),
+                    ("cache-control", resp_headers.cache_control.to_string()),
+                ],
+            )
+                .into_response()
+        }
         Err(_) => {
-            let error = json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "parse error" } });
-            (StatusCode::BAD_REQUEST, axum::Json(error)).into_response()
+            let error = vibevalley_mcp::RpcResponse::err(vibevalley_mcp::RpcId::Null, vibevalley_mcp::RpcError::parse_error("parse error"));
+            (
+                StatusCode::BAD_REQUEST,
+                [
+                    ("content-type", "application/json".to_string()),
+                    (vibevalley_mcp::HEADER_PROTOCOL_VERSION, validated.negotiated_protocol),
+                    ("cache-control", "no-store".to_string()),
+                ],
+                axum::Json(error),
+            )
+                .into_response()
         }
     }
 }

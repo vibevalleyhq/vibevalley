@@ -3,24 +3,28 @@
     {
       "name": "vibevalley",
       "path": "/Users/me/vibevalley",
+      "external": false,
       "maxSessions": 4,
       "last": 1794496400000
     },
     {
       "name": "pixel-art",
       "path": "/Users/me/pixel-art",
+      "external": false,
       "maxSessions": 3,
       "last": 1794240800000
     },
     {
       "name": "notes",
       "path": "/Users/me/notes",
+      "external": false,
       "maxSessions": 2,
       "last": 1791044000000
     },
     {
       "name": "site",
       "path": "/Users/me/site",
+      "external": false,
       "maxSessions": 2
     }
   ],

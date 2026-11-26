@@ -33,7 +33,7 @@
 - **瞬态只进 `LiveState`**：运行中会话的实时步骤流、心跳与像素农场突发特效只写 `LiveState`（`context/` 的 `live.rs`），不入库，避免高频瞬态触发数据库写入。
 - **单航班脏合并与 6 路切片**：`StateFeed`（`context/` 的 `feed.rs`）经无堆分配原子唤醒门 `SliceWakeGate`（含 `--features loom` 并发模型检验）合并连续脏信号；仅对 `SliceMask` 命中的切片查询当域视图并调用 `crates/core/src/projection.rs` 纯投影函数，产出预编码共享 `Arc<str>` JSON 快照写入 `tokio::sync::watch`（农场特效只发往 `SliceKind::Farm`）。未变脏的切片不查库、不序列化、不唤醒下游消费者。
 - **界面文案只在投影时填充；跨视图摘要保持纯结构化枚举**：6 个纯投影函数（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）按需在对应切片上填入 `phaseText`、`actionText`、`whenText`、任务 `stage` 与可执行动作；持久层不含界面文案。`BoardSummary`（`laneCounts`、`runningSlots`、`maxRunning`、`byIssue: BoardIssueSummary`）、`MediaSummary`（`activeCount`、`activeIds`）与 `ChannelSummary`（`unreadTotal`、`unreadUnder`）仅输出结构化枚举、计数与实体 id，绝不拼本地化自然语言句子。`SliceBundle` 仅用于离线夹具与 `export_scenarios` 导出，不对外提供聚合 HTTP 端点。
-- **薄入口门 `Router`、`trace_id`、`tracing::Span` 与零开销 `DebugKit`**：`Router`（`router.rs`）统一透传 `CallerContext`（`caller`、`principal: CallerPrincipal`、`client: Option<ClientIdentity>`、`trace_id: u64`）；当 `trace_id == 0` 时无条件分配单调非零值，并在异步与阻塞路径经 `log/` 的 `spawn_traced` / `spawn_blocking_traced` 传播请求 `tracing::Span`。`Router` 对 `ENDPOINTS` 与 `NATIVE_ENDPOINTS` 做编译期穷尽 `match` 分发并直委各域处理器，零运行时 handler `HashMap` 与 `attach_*` 晚绑定槽位。`crates/server/src/debug/` 提供 `DebugKit` 及 9 个仅限 `Caller::User` 的 `debug.*` 端点，仅在 `VIBEVALLEY_DEBUG=1` 时启用环形缓冲、`FaultGate` 与 `OarObserver`（未启用一律返回 `BizCode::Refused`）；`Router` 与 `FaultGate` 始终跳过 `debug.*` 前缀调用，全部输出与纯 Rust ZIP 诊断包（`debug-bundle.zip`）均经统一脱敏器。本机 `vibevalley` CLI 不提供 `debug` 子命令。
+- **薄入口门 `Router`、`trace_id`、`tracing::Span` 与零开销 `DebugKit`**：`Router`（`router.rs`）统一透传 `CallerContext`（`caller`、`principal: CallerPrincipal`、`client: Option<ClientIdentity>`、`trace_id: u64`）；当 `trace_id == 0` 时无条件分配单调非零值，并在异步与阻塞路径经 `log/` 的 `spawn_traced` / `spawn_blocking_traced` 传播请求 `tracing::Span`。`Router` 对 `ENDPOINTS` 与 `NATIVE_ENDPOINTS` 做编译期穷尽 `match` 分发并直委各域处理器，零运行时 handler `HashMap` 与 `attach_*` 晚绑定槽位。`crates/server/src/debug/` 提供 `DebugKit` 及 9 个仅限 `Caller::User` 的 `debug.*` 端点，仅在 `VIBEVALLEY_DEBUG=1` 时启用环形缓冲、`FaultGate` 与 `OarObserver`（未启用一律返回 `BizCode::Refused`）；`Router` 与 `FaultGate` 始终跳过 `debug.*` 前缀调用，全部输出与纯 Rust ZIP 诊断包（`debug-bundle.zip`）均经统一脱敏器。面向原生桌面应用远程实时调试时，`vibevalley debug`（`crates/cli/src/domains/debug.rs`）经由 VDP 回环协议（`--remote-debugging-port` / `VIBEVALLEY_DEBUG_PORT`、`debug.json` 与随机令牌，见[客户端](docs/subsystems/app.md#本地轻应用与-vdp-远程调试)）直连运行中的 `vibevalley-mac` 实例。
 
 ### 收件箱
 
@@ -127,9 +127,7 @@ SSE 以外的路由：
 
 ## 还没做的
 
-- `can` 只留 `user` 与 `remote`，agent 工具按角色配置：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
-- 服务端扁平化与单数架构代码迁移与门禁收尾：[服务端扁平化与单数架构重构](.agents/notes/proposed/architecture/2026-11-24-first-principles-server-spine.md)。
-- 作品目录化存储、统一实时协同引擎与 12 类产品技能直接切换：[作品目录化存储、统一实时协同引擎与 12 类产品技能体系](.agents/notes/proposed/architecture/2026-11-24-artifact-unified-collab.md)。
+- `can` 只留 `user` 与 `remote`，agent 工具按角色配置：`#52`。
 
 ## 怎么验证
 

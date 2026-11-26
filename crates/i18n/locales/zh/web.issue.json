@@ -1,7 +1,39 @@
 {
   "family": {
     "children": "子工单",
-    "parent": "父工单"
+    "parent": "父工单",
+    "noParent": "无父工单",
+    "clearParent": "清除父工单",
+    "subProgress": "{done} / {total} 已完成"
+  },
+  "tags": {
+    "label": "标签",
+    "placeholder": "输入自定义标签并回车…",
+    "add": "添加标签",
+    "remove": "移除标签 {tag}",
+    "empty": "无标签",
+    "byTag": "按标签看",
+    "allTags": "全部标签",
+    "preset": {
+      "arch": "架构",
+      "storage": "存储",
+      "voice": "语音",
+      "whiteboard": "白板"
+    }
+  },
+  "dates": {
+    "startAt": "计划开始",
+    "dueAt": "目标截止",
+    "datePlaceholder": "如 2026-12-01",
+    "notSet": "未设置",
+    "clearDate": "清除日期"
+  },
+  "scope": {
+    "label": "工单范围",
+    "all": "全部",
+    "active": "活跃",
+    "backlog": "需求池",
+    "canceled": "已废弃"
   },
   "reading": "在读……",
   "never": "算了",
@@ -12,24 +44,29 @@
     "earlier": "更早的 {n} 张",
     "recent": "只看最近的",
     "empty": {
-      "todo": "想到要做的先写在这里，拖到「处理中」就派人开工；上下拖排先后。",
-      "working": "没有在干的活。",
-      "waiting": "做完的、没做成的在这里等你看；拖到「已关」完成或取消。",
-      "closed": "已完成、已取消的工单；拖回「处理中」重开。"
+      "backlog": "需求池里的工单：先理清需求，再拖到「待办」派发开工；上下拖排先后。",
+      "todo": "待办工单：选好仓库和角色即可开工，拖到「进行中」直接跟踪进度。",
+      "in_progress": "进行中的工单（自动执行或手动跟踪）。",
+      "in_review": "待验收的工单：确认改动与标准后一键验收通过或完成。",
+      "done": "已完成的工单；可随时拖回其他列重开或继续。",
+      "canceled": "已废弃的工单；需要时可拖回恢复。"
     },
     "emptyGuide": {
+      "backlogTitle": "需求池还是空的",
+      "backlogBody": "先把想法记入需求池，慢慢完善说明和验收标准。",
       "todoTitle": "待办还是空的",
-      "todoBody": "记下要做的工单，选好仓库和角色就能派发开工。",
-      "workingTitle": "暂无处理中工单",
-      "workingBody": "给待办工单选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
-      "waitingTitle": "暂无待验收改动",
-      "waitingBody": "执行会话跑完一轮或有疑问时会停在这里，方便看改动、回复或完成交付。",
-      "closedTitle": "还没有已关工单",
-      "closedBody": "已完成或取消的工单会留在这里，拖回「处理中」即可随时重开。",
+      "todoBody": "选好仓库和角色就能派发，或由外部 Agent 认领推进。",
+      "in_progressTitle": "暂无进行中工单",
+      "in_progressBody": "把工单拖到这里开始跟踪或派发独立 worktree 会话。",
+      "in_reviewTitle": "暂无待验收改动",
+      "in_reviewBody": "执行会话跑完或外部推进到这里，方便看改动、勾选标准与验收通过。",
+      "doneTitle": "还没有已完成工单",
+      "doneBody": "已完成的工单会留在这里，也可随时拖回其他状态。",
+      "canceledTitle": "没有已废弃工单",
+      "canceledBody": "暂不推进或取消的工单会归档在这里，拖回即可恢复。",
       "filtered": "当前筛选条件下此列没有工单。"
     },
     "whichLane": "看哪一列",
-    "spots": "{taken} / {of} 个并发上限",
     "moveFailed": "没挪过去",
     "retryMove": "再挪一次",
     "putBack": "放回原处"
@@ -69,7 +106,9 @@
     "clear": "清掉筛选",
     "view": "看法",
     "missing": "这一轮的记录缺失：{what}。对它的操作暂不可用。",
-    "backToBoard": "工单"
+    "backToBoard": "工单",
+    "refresh": "刷新工单",
+    "refreshing": "正在同步…"
   },
   "marks": {
     "priority": "优先级：{word}"
@@ -237,8 +276,6 @@
     "descriptionHint": "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
     "description": "说明",
     "criteria": "验收标准",
-    "noCriteria": "还没写",
-    "criteriaSummary": "{n} 条 · {first}",
     "criteriaHint": "一行一条：你验收时照着看的点",
     "talk": "和执行会话聊清楚",
     "answerTo": "回答：{question}",
@@ -255,6 +292,7 @@
     "whichRepo": "在哪个仓库里做",
     "firstRepo": "还没有仓库：新建一个",
     "newRepoLink": "新建仓库",
+    "mountLocalLink": "关联本地仓库",
     "priority": "优先级",
     "inQueue": "排队中：{ago}排上的，有并发上限就按看板上的先后自动开工。",
     "unqueue": "不排了",
@@ -266,12 +304,30 @@
     "repoHint": "仓库名，也是工作区下的文件夹名",
     "repoName": "仓库名",
     "create": "新建",
-    "writeOwn": "自己写说明"
+    "writeOwn": "自己写说明",
+    "edit": "编辑",
+    "doneEditing": "完成编辑",
+    "addDescription": "添加说明…",
+    "addCriteria": "添加验收标准",
+    "polish": "让角色再润色",
+    "markReady": "标为待开发",
+    "markDone": "标为已完成",
+    "accept": "验收通过",
+    "markCanceled": "废弃",
+    "revive": "恢复到需求池",
+    "criterionToggle": "切换验收标准「{criterion}」"
+  },
+  "peek": {
+    "expand": "展开全屏",
+    "close": "关闭预览",
+    "compareBadge": "对比"
   },
   "boardLabels": {
     "view": {
       "board": "看板",
-      "list": "列表"
+      "list": "列表",
+      "timeline": "甘特图",
+      "calendar": "日历"
     },
     "grouping": {
       "status": "状态",
@@ -286,10 +342,12 @@
       "created": "创建时间"
     },
     "lane": {
+      "backlog": "需求池",
       "todo": "待办",
-      "working": "处理中",
-      "waiting": "等你看",
-      "closed": "已关"
+      "in_progress": "进行中",
+      "in_review": "待验收",
+      "done": "已完成",
+      "canceled": "已废弃"
     },
     "stage": {
       "talk": "聊清楚",
@@ -399,7 +457,8 @@
   "conversation": {
     "title": "讨论与交付记录",
     "older": "加载更早的消息",
-    "empty": "需求讨论、执行反馈与交付会保留在这里"
+    "empty": "需求讨论、执行反馈与交付会保留在这里",
+    "placeholder": "写一条评论、补充说明或反馈…"
   },
   "attachments": {
     "title": "附件",
@@ -408,5 +467,49 @@
     "uploadFailed": "附件上传失败：{why}",
     "uploading": "正在上传 {name}…",
     "remove": "移除附件 {name}"
+  },
+  "error": {
+    "missingApiKey": "未配置模型 API Key，请先在设置中配置后再重试。",
+    "goSettings": "去设置"
+  },
+  "timeline": {
+    "today": "今天",
+    "unscheduled": "未排期 {n}",
+    "scheduledCount": "已排期 {n}",
+    "rolledUp": "由子工单汇总",
+    "overdue": "已逾期",
+    "shiftPrev": "提前 1 天",
+    "shiftNext": "延后 1 天",
+    "editDates": "调整排期",
+    "scheduleToday": "排到今天",
+    "emptyScheduled": "当前没有带起止日期的工单",
+    "emptyScheduledHint": "在下方未排期工单中点「排到今天」，或在工单属性里设置计划开始 / 目标截止日期。",
+    "issuesColumn": "工单",
+    "unscheduledTitle": "未排期工单",
+    "scale": {
+      "label": "时间刻度",
+      "week": "周",
+      "month": "月",
+      "quarter": "季"
+    },
+    "weekday": {
+      "mon": "周一",
+      "tue": "周二",
+      "wed": "周三",
+      "thu": "周四",
+      "fri": "周五",
+      "sat": "周六",
+      "sun": "周日"
+    }
+  },
+  "calendar": {
+    "monthTitle": "{year} 年 {month} 月",
+    "prevMonth": "上一月",
+    "nextMonth": "下一月",
+    "newOnDate": "在 {date} 新建工单",
+    "moreItems": "还有 {n} 项",
+    "collapseDay": "收起",
+    "scheduledBadge": "排期 {date}",
+    "clearScheduledDate": "清除预填日期"
   }
 }

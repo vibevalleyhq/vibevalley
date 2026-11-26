@@ -8,7 +8,7 @@
     "mcpServers": "MCP list",
     "tools": "Tool list"
   },
-  "available": "available",
+  "available": "Ready",
   "disabled": "disabled",
   "unsupported": "unsupported",
   "notFound": "not found",
@@ -151,5 +151,7 @@
   "remoteSummary": "Hosted on {machine} and dispatched remotely.",
   "sessions": "Related sessions",
   "noSessions": "No active or recent sessions.",
-  "quickActions": "Quick actions"
+  "quickActions": "Quick actions",
+  "installation": "Installation",
+  "source": "Install source"
 }

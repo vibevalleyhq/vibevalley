@@ -66,3 +66,46 @@ test("SettingsPage search finds 技能 and 记忆 in Chinese locale", async () =
   expect(memoryApp.app.count("id:settings-section-memory")).toBe(1);
   expect(memoryApp.app.count("id:settings-section-skills")).toBe(0);
 });
+
+test("SettingsPage general and appearance render separate sections with split IA groups (zh & en)", async () => {
+  const zh = await mountSettings("/settings/general", "zh");
+  const zhTexts = zh.app.texts();
+  expect(zhTexts).toContain("个人与工作区");
+  expect(zhTexts).toContain("连接与集成");
+  expect(zhTexts).toContain("数据与关于");
+  expect(zhTexts).toContain("调整界面语言与启动默认页面。");
+  expect(zhTexts).toContain("语言");
+  expect(zhTexts).toContain("对整个 VibeValley");
+  expect(zhTexts).toContain("启动");
+  expect(zhTexts).toContain("只对这台设备");
+  expect(zh.app.count("id:settings-section-profile")).toBe(1);
+  expect(zh.app.count("id:settings-section-appearance")).toBe(1);
+  expect(zh.app.count("id:settings-section-mcp")).toBe(1);
+  expect(zh.app.count("id:settings-section-data")).toBe(1);
+  expect(zh.app.count("id:settings-section-about")).toBe(1);
+  expect(zh.app.count("id:theme-dark")).toBe(0);
+
+  await zh.app.press("id:settings-section-data");
+  await zh.fake.pumpUntil(zh.app, () => zh.app.count("id:data-storage-backend") === 1);
+  expect(zh.app.count("id:about-version")).toBe(0);
+
+  await zh.app.press("id:settings-section-about");
+  await zh.fake.pumpUntil(zh.app, () => zh.app.count("id:about-version") === 1);
+  expect(zh.app.count("id:data-storage-backend")).toBe(0);
+
+  const en = await mountSettings("/settings/general", "en");
+  const enTexts = en.app.texts();
+  expect(enTexts).toContain("Profile & Workspace");
+  expect(enTexts).toContain("Connections & Integrations");
+  expect(enTexts).toContain("Data & About");
+  expect(enTexts).toContain("Configure interface language and startup behavior.");
+  expect(enTexts).toContain("Language");
+  expect(enTexts).toContain("For all of VibeValley");
+  expect(enTexts).toContain("Startup");
+  expect(enTexts).toContain("This device only");
+  expect(enTexts).toContain("Appearance");
+
+  await en.app.press("id:settings-section-appearance");
+  await en.fake.pumpUntil(en.app, () => en.app.count("id:theme-dark") === 1);
+  expect(en.app.count("id:motion-off")).toBe(1);
+});

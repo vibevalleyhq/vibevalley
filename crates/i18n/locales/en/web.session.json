@@ -90,7 +90,14 @@
     "want": "What this round should have done",
     "wantHint": "What it should do: such as \"ask me which repo first, do not send work right away\"",
     "hired": "took the ticket {ago}",
-    "hiredAndLeft": "took the ticket {hired} · left {left}"
+    "hiredAndLeft": "took the ticket {hired} · left {left}",
+    "contextUpdate": "Context snapshot",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "inspect": "Inspect",
+    "hideDetail": "Collapse",
+    "copyRawError": "Copy raw error",
+    "openSettings": "Open settings"
   },
   "hub": {
     "search": "Search runs and trajectories",

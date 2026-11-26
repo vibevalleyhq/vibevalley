@@ -187,6 +187,33 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("RuntimeInfo"),
     },
     Endpoint {
+        op: "runtime.mcp.list",
+        module: "runtime",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("McpListInput"),
+        result: Some("McpListResult"),
+    },
+    Endpoint {
+        op: "runtime.mcp.install",
+        module: "runtime",
+        about: &["host"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("McpInstallInput"),
+        result: Some("McpHostInfo"),
+    },
+    Endpoint {
+        op: "runtime.mcp.uninstall",
+        module: "runtime",
+        about: &["host"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("McpUninstallInput"),
+        result: Some("McpHostInfo"),
+    },
+    Endpoint {
         op: "memory.list",
         module: "memory",
         about: &["agent"],
@@ -293,6 +320,24 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: Some("NewRepo"),
         result: Some("RepoSummary"),
+    },
+    Endpoint {
+        op: "repo.mount",
+        module: "repo",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("MountRepo"),
+        result: Some("RepoSummary"),
+    },
+    Endpoint {
+        op: "repo.unmount",
+        module: "repo",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("RepoUnmountInput"),
+        result: None,
     },
     Endpoint {
         op: "repo.language.list",
@@ -1899,6 +1944,24 @@ pub mod ops {
         type Input = t::RuntimeSettingUpdateInput;
         type Result = t::RuntimeInfo;
     }
+    pub struct RuntimeMcpList;
+    impl Op for RuntimeMcpList {
+        const NAME: &'static str = "runtime.mcp.list";
+        type Input = t::McpListInput;
+        type Result = t::McpListResult;
+    }
+    pub struct RuntimeMcpInstall;
+    impl Op for RuntimeMcpInstall {
+        const NAME: &'static str = "runtime.mcp.install";
+        type Input = t::McpInstallInput;
+        type Result = t::McpHostInfo;
+    }
+    pub struct RuntimeMcpUninstall;
+    impl Op for RuntimeMcpUninstall {
+        const NAME: &'static str = "runtime.mcp.uninstall";
+        type Input = t::McpUninstallInput;
+        type Result = t::McpHostInfo;
+    }
     /// An agent's memories from the database and its configured sources.
     pub struct MemoryList;
     impl Op for MemoryList {
@@ -1975,6 +2038,18 @@ pub mod ops {
         const NAME: &'static str = "repo.create";
         type Input = t::NewRepo;
         type Result = t::RepoSummary;
+    }
+    pub struct RepoMount;
+    impl Op for RepoMount {
+        const NAME: &'static str = "repo.mount";
+        type Input = t::MountRepo;
+        type Result = t::RepoSummary;
+    }
+    pub struct RepoUnmount;
+    impl Op for RepoUnmount {
+        const NAME: &'static str = "repo.unmount";
+        type Input = t::RepoUnmountInput;
+        type Result = ();
     }
     pub struct RepoLanguageList;
     impl Op for RepoLanguageList {
@@ -3201,6 +3276,9 @@ endpoint_ids! {
     RuntimeList => "runtime.list",
     RuntimeRefresh => "runtime.refresh",
     RuntimeSettingUpdate => "runtime.setting.update",
+    RuntimeMcpList => "runtime.mcp.list",
+    RuntimeMcpInstall => "runtime.mcp.install",
+    RuntimeMcpUninstall => "runtime.mcp.uninstall",
     // memory
     MemoryList => "memory.list",
     MemoryRecall => "memory.recall",
@@ -3215,6 +3293,8 @@ endpoint_ids! {
     RepoList => "repo.list",
     RepoValidate => "repo.validate",
     RepoCreate => "repo.create",
+    RepoMount => "repo.mount",
+    RepoUnmount => "repo.unmount",
     RepoLanguageList => "repo.language.list",
     RepoTemplateList => "repo.template.list",
     RepoActivityGet => "repo.activity.get",

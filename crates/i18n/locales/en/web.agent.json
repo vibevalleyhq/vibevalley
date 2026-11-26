@@ -22,6 +22,7 @@
   "fine": "The configuration is fine: it can be sent work.",
   "problems": "Why it cannot be sent",
   "cannot": "Cannot be sent: ",
+  "missingApiKey": "No model API key set yet",
   "random": "A random one",
   "avatar": "Role avatar",
   "avatarHint": "Shown in lists and chat; when unset, the farm animal face is shown.",
@@ -121,13 +122,13 @@
   "templates": {
     "title": "Templates",
     "intro": "Each template is a recipe for an agent: its role, duty, persona, the machine it is written for and its look. Installing one adds a profile, and one template can be installed many times; change what is installed as you like, and when the template has a new version the profile says so.",
-    "open": "Install from a template",
+    "open": "Templates",
     "openLine": "Recipes for assistants and helpers, to pick from",
     "folder": "Template folder",
     "folderHint": "The path of a template folder on this machine (with agent.json in it)",
     "add": "Add it",
     "added": "The template \"{name}\" is added, not installed yet",
-    "onServer": "Runs on VibeValley's own agent",
+    "onServer": "Uses built-in",
     "notHere": "Written for {runtime}, which this machine lacks: once installed, pick another machine in the profile",
     "noPersona": "No persona.",
     "addedHere": " · added on this machine",
@@ -195,5 +196,12 @@
   "targetMachineTip": "Pin this profile to a specific execution machine, or leave on Auto to route to the local or best online machine.",
   "targetMachineAuto": "Auto (local or online)",
   "targetMachineOffline": "{name} (offline)",
-  "targetMachineDraining": "{name} (draining)"
+  "targetMachineDraining": "{name} (draining)",
+  "selector": {
+    "ready": "Ready",
+    "warn": "Warning",
+    "error": "Unavailable",
+    "checking": "Checking…",
+    "fix": "Fix"
+  }
 }

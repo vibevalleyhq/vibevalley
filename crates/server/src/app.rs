@@ -7,7 +7,7 @@ use std::sync::{Arc, OnceLock};
 use crate::agent::{Agent, AgentDriver, Mcp, Memory, Orchestrator, OrchestratorParts, PendingExecution, Profile, Resource, ToolRegistry};
 use crate::artifact::Manager as ArtifactManager;
 use crate::boot::{
-    LazyCronOrchestrator, build_runtimes, register_session_reported_outbox, seat_orchestrators_and_watch, seed_starter_issues_on_boot,
+    LazyCronOrchestrator, build_runtimes, open_context, register_session_reported_outbox, seat_orchestrators_and_watch, seed_starter_issues_on_boot,
     spawn_chat_artifact_bridge, spawn_skin_event_bridge,
 };
 use crate::channel::Chat;
@@ -15,7 +15,7 @@ use crate::config::failed;
 pub use crate::config::{Config, StartError, StartErrorKind};
 use crate::connector::Connector;
 use crate::context::port::{CronOrchestratorPort, MemoryRecallPort};
-use crate::context::{Context, Fetch, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup, install_tls};
+use crate::context::{Context, install_tls};
 use crate::cron::Scheduler as CronScheduler;
 use crate::debug::DebugKit;
 use crate::debug_sources::build_debug_kit;
@@ -31,7 +31,7 @@ use crate::router::{AppCore, Router};
 use crate::runtime::{Runtime, RuntimeConfig, SessionDriver};
 use crate::service::Service;
 use crate::setting::{Setting, SettingConfig};
-use crate::storage::Storage;
+use crate::storage::{Storage, StorageConfig};
 use crate::voice::{Parts as VoiceParts, Voice};
 
 /// White-box test view over [`App`] internals for `crates/server/tests/*`.
@@ -126,38 +126,22 @@ impl App {
     }
 }
 
-/// Opens and starts the full server asynchronously.
+/// Opens and starts the full server asynchronously, reading optional
+/// `VIBEVALLEY_STORAGE_URL` (defaulting to local filesystem at `config.home`).
 pub async fn create_app(config: Config) -> Result<App, StartError> {
-    Box::pin(create_app_inner(config)).await
+    let storage_config = StorageConfig::from_env(&config.home).map_err(|e| failed("the storage")(&e))?;
+    Box::pin(create_app_inner(config, storage_config)).await
 }
 
-async fn create_app_inner(config: Config) -> Result<App, StartError> {
+/// Opens and starts the full server asynchronously with an explicit [`StorageConfig`].
+pub async fn create_app_with_storage(config: Config, storage_config: StorageConfig) -> Result<App, StartError> {
+    Box::pin(create_app_inner(config, storage_config)).await
+}
+
+async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Result<App, StartError> {
     let boot_started = std::time::Instant::now();
     install_tls();
-    tokio::fs::create_dir_all(&config.home).await.map_err(|e| failed("the home")(&e))?;
-    tokio::fs::create_dir_all(&config.work_root).await.map_err(|e| failed("the work root")(&e))?;
-    for dir in [config.work_root.join("repos"), config.work_root.join("worktrees")] {
-        tokio::fs::create_dir_all(&dir).await.map_err(|e| failed("the work root")(&e))?;
-    }
-
-    let service = match config.database_url.as_deref() {
-        Some(url) => Box::pin(Service::open_url(url)).await.map_err(|e| StartError::from_db_error(e, None))?,
-        None => Box::pin(Service::open(&config.home))
-            .await
-            .map_err(|e| StartError::from_db_error(e, Some(config.home.join("server.db"))))?,
-    };
-    let (http, download): (Arc<dyn Fetch>, Arc<dyn Fetch>) = match &config.media_network {
-        Some(network) => network.clone(),
-        None if config.offline_media => crate::fake::moss::network(),
-        None => (Arc::new(Http), Arc::new(PublicDownload)),
-    };
-    let (live, outbox, feed, clock) = (
-        Arc::new(LiveState::new()),
-        Arc::new(Outbox::new(service.clone())),
-        Arc::new(StateFeed::new()),
-        config.clock.clone(),
-    );
-    let ctx = Arc::new(Context::new(service, TaskGroup::new(), live, outbox, feed, clock, http, download));
+    let ctx = open_context(&config).await?;
     let active_subscriptions = Arc::new(AtomicUsize::new(0));
 
     let setting = Setting::open_async(SettingConfig {
@@ -165,10 +149,11 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
         work_root: config.work_root.clone(),
         version: config.version.clone(),
         deepseek_api_key: config.deepseek_api_key.clone(),
+        storage_backend: Some(storage_config.kind().to_string()),
     })
     .await;
     let provider = Arc::new(Provider::new(setting.clone(), ctx.http.clone()));
-    let storage = Storage::open_async(&config.home, ctx.clone())
+    let storage = Storage::open_with_config_async(&config.home, &storage_config, ctx.clone())
         .await
         .map_err(|e| failed("the storage")(&e.message))?;
 
@@ -213,18 +198,19 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
     .await
     .map_err(|e| failed("artifacts")(&e.message))?;
 
-    let board_config = RuntimeConfig {
-        worktrees_dir: config.work_root.join("worktrees"),
-        data_dir: config.home.join("issues"),
-        repos_dir: Some(config.work_root.join("repos")),
-        ..RuntimeConfig::under(&config.home)
-    };
-    let repo = Box::pin(Repo::open_async(&config.work_root, board_config.per_repo))
+    let repo = Box::pin(Repo::open_async(&config.work_root, RuntimeConfig::under(&config.home).per_repo))
         .await
         .map_err(|e| failed("the repos")(&e))?;
     if config.probe_runtimes {
         repo.probe_in_context(&ctx);
     }
+    let board_config = RuntimeConfig {
+        worktrees_dir: config.work_root.join("worktrees"),
+        data_dir: config.home.join("issues"),
+        repos_dir: Some(config.work_root.join("repos")),
+        repo: Some(repo.clone()),
+        ..RuntimeConfig::under(&config.home)
+    };
 
     let drivers: Arc<dyn SessionDriver> = Arc::new(AgentDriver::new(profile.clone(), Some(memory.clone() as Arc<dyn MemoryRecallPort>)));
     let (runtime, opened) = Box::pin(Runtime::open_async(ctx.clone(), drivers, board_config))
@@ -317,7 +303,7 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
     let game = Game::open_async(&config.home, ctx.clone(), repo.clone()).await;
     game.count_commits(config.git_emails.clone());
     spawn_skin_event_bridge(&ctx, &game, &runtime, &channel).await;
-    register_session_reported_outbox(&ctx, &issue_chat, &session_chat, &agent, &game, &runtime);
+    register_session_reported_outbox(&ctx, &issue_chat, &session_chat, &agent, &game, &runtime, &connector, &cron);
 
     let debug = build_debug_kit(
         &ctx,

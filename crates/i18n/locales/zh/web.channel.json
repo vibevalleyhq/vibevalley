@@ -1,6 +1,6 @@
 {
   "tab": {
-    "chat": "聊天",
+    "chat": "对话",
     "issues": "工单",
     "crons": "定时任务"
   },
@@ -18,7 +18,7 @@
   "channelsTitle": "频道",
   "directsTitle": "私聊",
   "newChannel": "创建频道",
-  "newChat": "发起聊天",
+  "newChat": "发起对话",
   "filter": {
     "label": "筛选会话",
     "all": "全部",

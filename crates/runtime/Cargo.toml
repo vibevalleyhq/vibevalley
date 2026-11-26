@@ -43,6 +43,7 @@ tokio = { workspace = true, features = ["process", "io-util"] }
 tokio-util = { workspace = true }
 uuid = { workspace = true }
 vibevalley-git = { version = "0.1.0", path = "../git" }
+vibevalley-mcp = { path = "../mcp" }
 vibevalley-protocol = { version = "0.1.0", path = "../protocol" }
 
 [dev-dependencies]

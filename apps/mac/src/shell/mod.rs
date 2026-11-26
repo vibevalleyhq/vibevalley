@@ -73,6 +73,7 @@ pub struct HostChrome {
     pub workbench: Entity<HostedView>,
     pub native_workspace: bool,
     pub native_diorama: Option<DioramaSlot>,
+    pub modal_overlay: bool,
     pub global_rail_width: f32,
     pub panel: Panel,
     pub inspector_open: bool,
@@ -114,4 +115,8 @@ pub struct Shell {
 
 pub(super) fn should_mount_inspector(native_workspace: bool, inspector_open: bool, viewport_width: f32) -> bool {
     native_workspace && inspector_open && viewport_width >= INSPECTOR_MIN_VIEWPORT_WIDTH
+}
+
+pub(super) fn should_raise_workbench_overlay(modal_overlay: bool, native_workspace: bool, has_diorama: bool) -> bool {
+    modal_overlay && (native_workspace || has_diorama)
 }

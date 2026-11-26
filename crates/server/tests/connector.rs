@@ -582,6 +582,7 @@ fn start(dir: &std::path::Path, world: &World) -> App {
             reconnect: Duration::from_millis(50),
             moment: Duration::from_millis(1500),
             poll_floor: Duration::from_millis(30),
+            ..Options::default()
         },
         ..Config::under(dir)
     })
@@ -1059,4 +1060,314 @@ fn the_feishu_bot_is_made_by_a_scan_and_takes_only_the_users_direct_words() {
     let out = call(&s, "connector.logout", json!({ "id": "feishu" }));
     assert_eq!(out["state"], "off");
     s.close_blocking();
+}
+
+fn start_with_clock_and_notify(
+    dir: &std::path::Path,
+    world: &World,
+    clock: vibevalley_core::SharedClock,
+    notify: vibevalley_server::connector::NotifyOptions,
+) -> App {
+    use crate::support::{HookRuntime, quick};
+    use vibevalley_runtime::oar::StopReason;
+    use vibevalley_runtime::oar::scripted::{Script, Step};
+
+    vibevalley_i18n::set_locale("zh");
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    registry.register(HookRuntime::new("ask", quick(), |turn| {
+        if turn.index == 0 {
+            turn.report(r#"{"status":"blocked","summary":"need answer","questions":[{"question":"是否启用安静时段？","options":[]}]}"#);
+        } else {
+            turn.done("已实现初版");
+        }
+    }));
+    registry.register(HookRuntime::new(
+        "fail",
+        Script::new().turn(vec![Step::text("oops"), Step::finish(StopReason::Error)]),
+        |_| {},
+    ));
+    registry.register(HookRuntime::new("done", quick(), |turn| {
+        turn.commit("fix.txt", "ok\n");
+        turn.done("all checks green");
+    }));
+    create_app_blocking(Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        tick_crons: false,
+        link_previews: false,
+        orchestrator_listens: false,
+        clock,
+        connector: Options {
+            vendors: Vendors {
+                weixin: world.http.clone(),
+                qq_api: world.http.clone(),
+                qq_token: format!("{}/app/getAppAccessToken", world.http),
+                feishu_accounts: world.http.clone(),
+                lark_accounts: world.http.clone(),
+                feishu_open: world.http.clone(),
+                lark_open: world.http.clone(),
+            },
+            retry_first: Duration::from_millis(80),
+            retry_most: Duration::from_millis(200),
+            reconnect: Duration::from_millis(50),
+            moment: Duration::from_millis(1500),
+            poll_floor: Duration::from_millis(30),
+            notify,
+        },
+        ..Config::under(dir)
+    })
+    .unwrap()
+}
+
+#[test]
+fn weixin_personal_event_pushes_cover_stages_dedupe_withdrawal_and_secret_hygiene() {
+    use crate::support::{inspect_db, repo, wait_stage};
+    use vibevalley_core::{Clock, ManualClock, SystemClock};
+    use vibevalley_protocol::{Conflict, ExecutionPolicy, IssueStageKind as StageKind, IssueStatus, Outcome, Session, SessionController};
+    use vibevalley_server::connector::NotifyOptions;
+    use vibevalley_server::context::{OUTBOX_SESSION_REPORTED, OutboxEvent, OutboxSessionReported};
+    use vibevalley_server::issue::NewIssue;
+    use vibevalley_server::runtime::IssueChange;
+
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new();
+    let main_repo = repo(dir.path(), "app");
+    let clock = Arc::new(ManualClock::new(SystemClock.now_ms()));
+    let s = start_with_clock_and_notify(
+        dir.path(),
+        &world,
+        clock.clone(),
+        NotifyOptions {
+            issue_cooldown: Duration::ZERO,
+            rate_limit_max: 20,
+            ..Default::default()
+        },
+    );
+    weixin_connected(&s, &world);
+    call(&s, "channel.create", json!({ "name": "#ops-bridge" }));
+    call(&s, "connector.channel.set", json!({ "id": "weixin", "channel": "#ops-bridge" }));
+
+    let board = s.test_internals().board.clone();
+    let issue = vibevalley_runtime::rt::block_on(board.create_async(NewIssue {
+        title: "微信个人推送".into(),
+        description: "测试各阶段通知".into(),
+        repo: Some(main_repo.clone()),
+        agent: "ask".into(),
+        ..Default::default()
+    }))
+    .unwrap();
+
+    // 1. Asking pushes immediately and deduplicates identical board refreshes.
+    vibevalley_runtime::rt::block_on(board.move_to_async(&issue.id, IssueStatus::Todo, None)).unwrap();
+    wait_stage(&board, &issue.id, StageKind::Asking);
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+
+    let ask_msg = nth(&world, "weixin", 0);
+    assert!(ask_msg.text.contains("【需要回复 · #1 微信个人推送】"), "{}", ask_msg.text);
+    assert!(ask_msg.text.contains("是否启用安静时段？"), "{}", ask_msg.text);
+
+    // Re-marking BOARD dirty without changing stage must not push a duplicate.
+    s.ctx().mark_dirty(vibevalley_core::SliceMask::BOARD);
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+
+    // 2. Answering moves the round to Reviewing -> pushes review notification.
+    vibevalley_runtime::rt::block_on(board.tell_async(&issue.id, "启用安静时段")).unwrap();
+    wait_stage(&board, &issue.id, StageKind::Reviewing);
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+    let review_msg = nth(&world, "weixin", 1);
+    assert!(review_msg.text.contains("【待你验收 · #1 微信个人推送】"), "{}", review_msg.text);
+    assert!(review_msg.text.contains("已实现初版"), "{}", review_msg.text);
+
+    // 3. Conflict transitions to Stuck(Conflict) -> pushes conflict notification.
+    vibevalley_runtime::rt::block_on(async {
+        board
+            .state()
+            .change_async(
+                &issue.id,
+                IssueChange::Conflicted(Conflict {
+                    base: "main".into(),
+                    files: vec!["src/weixin.rs".into()],
+                }),
+            )
+            .await
+            .unwrap();
+        s.ctx().feed.flush().await;
+    });
+    wait_stage(&board, &issue.id, StageKind::Stuck);
+    let conflict_msg = nth(&world, "weixin", 2);
+    assert!(conflict_msg.text.contains("【合并冲突 · #1 微信个人推送】"), "{}", conflict_msg.text);
+    assert!(conflict_msg.text.contains("src/weixin.rs"), "{}", conflict_msg.text);
+
+    // 4. Restricted delivery holds a push in connector_outbox, and closing the issue in workbench withdraws it!
+    *world.opened.lock().unwrap() = "ctx-open".into();
+    world.restricted.store(true, Ordering::SeqCst);
+    let i2 = vibevalley_runtime::rt::block_on(board.create_async(NewIssue {
+        title: "待撤回推送".into(),
+        description: "在工作台先解决".into(),
+        repo: Some(main_repo.clone()),
+        agent: "fail".into(),
+        ..Default::default()
+    }))
+    .unwrap();
+    vibevalley_runtime::rt::block_on(board.move_to_async(&i2.id, IssueStatus::Todo, None)).unwrap();
+    wait_stage(&board, &i2.id, StageKind::Stuck);
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+    status_is(&s, "weixin", "restricted push pending in connector_outbox", |st| {
+        st["pending"].as_i64().unwrap_or(0) >= 1
+    });
+    assert_eq!(world.by("weixin").len(), 3);
+
+    // Close i2 in workbench -> pending push for i2 is withdrawn cleanly!
+    vibevalley_runtime::rt::block_on(board.move_to_async(&i2.id, IssueStatus::Canceled, None)).unwrap();
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+    status_is(&s, "weixin", "withdrawn after workbench close", |st| st["pending"] == 0);
+    world.restricted.store(false, Ordering::SeqCst);
+
+    // 5. Outbox SessionReported for standalone workspace session pushes RunFailed cleanly.
+    let ws = Session::new(
+        "s-ws-1",
+        SessionController::User,
+        "主工作区会话",
+        "scripted",
+        ExecutionPolicy::SandboxDir,
+        clock.now_ms(),
+    );
+    vibevalley_runtime::rt::block_on(async {
+        s.test_internals().runtime.upsert_orchestrator_async(&ws).await.unwrap();
+        let report = OutboxSessionReported {
+            id: "s-ws-1".into(),
+            at: clock.now_ms() + 1_000,
+            outcome: Outcome::Failed,
+            summary: "编译失败：missing symbol".into(),
+            spent: None,
+            run: Some("run-ws-1".into()),
+        };
+        s.ctx().outbox.enqueue_event(&OutboxEvent::SessionReported(report)).await.unwrap();
+        s.ctx().outbox.wake();
+    });
+    let ws_msg = nth(&world, "weixin", 3);
+    assert!(ws_msg.text.contains("【一轮失败 · 主工作区会话】"), "{}", ws_msg.text);
+    assert!(ws_msg.text.contains("编译失败：missing symbol"), "{}", ws_msg.text);
+
+    // 6. Secret hygiene: bot_token ("tok") never leaks into DB outbox tables or ConnectorStatus.
+    let mut db = inspect_db(&dir.path().join("server.db"));
+    let leaked_outbox: i64 = vibevalley_runtime::rt::block_on(
+        sqlx::query_scalar("select count(*) from connector_outbox where body like '%tok%' or coalesce(error, '') like '%tok%'").fetch_one(&mut db),
+    )
+    .unwrap();
+    let leaked_ctx_outbox: i64 = vibevalley_runtime::rt::block_on(
+        sqlx::query_scalar("select count(*) from outbox_item where topic = ? and payload_json like '%bot_token%'")
+            .bind(OUTBOX_SESSION_REPORTED)
+            .fetch_one(&mut db),
+    )
+    .unwrap();
+    assert_eq!((leaked_outbox, leaked_ctx_outbox), (0, 0));
+    assert!(!status(&s, "weixin").to_string().contains("\"tok\""));
+
+    s.close_blocking();
+}
+
+#[test]
+fn scheduled_cron_digest_summarizes_issues_and_runs_over_weixin_and_survives_restart() {
+    use crate::support::{repo, wait_stage};
+    use vibevalley_core::{Clock, ManualClock, SystemClock};
+    use vibevalley_protocol::{ActorKind, ConnectorID, CronWhen, CronWhenEvery, IssueStageKind as StageKind, IssueStatus};
+    use vibevalley_server::connector::NotifyOptions;
+    use vibevalley_server::connector::digest::{DigestSpec, DigestTargets};
+    use vibevalley_server::cron::DigestCronRequest;
+    use vibevalley_server::issue::NewIssue;
+
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new();
+    let main_repo = repo(dir.path(), "app");
+    let clock = Arc::new(ManualClock::new(SystemClock.now_ms()));
+
+    let digest_notify = || NotifyOptions {
+        push_targets: vec![],
+        ..Default::default()
+    };
+
+    {
+        let s = start_with_clock_and_notify(dir.path(), &world, clock.clone(), digest_notify());
+        weixin_connected(&s, &world);
+        call(&s, "channel.create", json!({ "name": "#digest-bridge" }));
+        call(&s, "connector.channel.set", json!({ "id": "weixin", "channel": "#digest-bridge" }));
+        let board = s.test_internals().board.clone();
+
+        // Run a real issue through completion to produce both a Done issue and a Completed Run.
+        let done_issue = vibevalley_runtime::rt::block_on(board.create_async(NewIssue {
+            title: "完成夜间编译修复".into(),
+            description: "修好 clippy".into(),
+            repo: Some(main_repo.clone()),
+            agent: "done".into(),
+            ..Default::default()
+        }))
+        .unwrap();
+        vibevalley_runtime::rt::block_on(board.move_to_async(&done_issue.id, IssueStatus::Todo, None)).unwrap();
+        wait_stage(&board, &done_issue.id, StageKind::Reviewing);
+        vibevalley_runtime::rt::block_on(board.move_to_async(&done_issue.id, IssueStatus::Done, None)).unwrap();
+
+        vibevalley_runtime::rt::block_on(async {
+            // Schedule a 15-minute digest targeting WeChat.
+            s.test_internals()
+                .cron
+                .add_digest_async(
+                    DigestCronRequest {
+                        name: "研发日报".into(),
+                        note: "自动汇报".into(),
+                        channel: None,
+                        when: CronWhen::Every(CronWhenEvery { minutes: 15 }),
+                        tz: Some("UTC".into()),
+                        spec: DigestSpec {
+                            targets: DigestTargets::Connectors(vec![ConnectorID::Weixin]),
+                            skip_if_empty: false,
+                        },
+                    },
+                    ActorKind::User,
+                )
+                .await
+                .unwrap();
+        });
+
+        // Before 15 minutes pass, ticking does not push a digest.
+        vibevalley_runtime::rt::block_on(s.test_internals().cron.tick_async());
+        assert!(world.by("weixin").is_empty());
+
+        // Advance ManualClock past 15m -> digest pushes to WeChat!
+        clock.advance(Duration::from_secs(15 * 60));
+        vibevalley_runtime::rt::block_on(s.test_internals().cron.tick_async());
+        let first_digest = nth(&world, "weixin", 0);
+        assert!(first_digest.text.contains("【进展简报 · 研发日报】"), "{}", first_digest.text);
+        assert!(first_digest.text.contains("近期完成 1"), "{}", first_digest.text);
+        assert!(first_digest.text.contains("#1 完成夜间编译修复"), "{}", first_digest.text);
+        assert!(first_digest.text.contains("完成 1"), "{}", first_digest.text);
+
+        s.close_blocking();
+    }
+
+    // Reopen server on same DB & clock -> scheduled digest cron persists and fires on next interval!
+    {
+        let clock2 = Arc::new(ManualClock::new(clock.now_ms()));
+        let s = start_with_clock_and_notify(dir.path(), &world, clock2.clone(), digest_notify());
+        reaches(&s, "weixin", "connected");
+        // Schedule via `cron.create` RPC using `[简报:weixin]` directive as well.
+        let created = call(
+            &s,
+            "cron.create",
+            json!({
+                "name": "小时简报",
+                "text": "[简报:weixin] 检查进度",
+                "when": { "kind": "every", "minutes": 5 },
+                "tz": "UTC"
+            }),
+        );
+        assert_eq!(created["enabled"], true);
+
+        clock2.advance(Duration::from_secs(5 * 60));
+        vibevalley_runtime::rt::block_on(s.test_internals().cron.tick_async());
+        let second_digest = nth(&world, "weixin", 1);
+        assert!(second_digest.text.contains("【进展简报 · 小时简报】"), "{}", second_digest.text);
+        s.close_blocking();
+    }
 }

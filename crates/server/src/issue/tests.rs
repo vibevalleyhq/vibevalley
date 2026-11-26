@@ -230,3 +230,325 @@ async fn issue_attachments_create_update_closed_rejection_and_brief_paths() {
     board.close_async().await;
     let _ = ctx.shutdown(Duration::from_secs(1)).await;
 }
+
+#[tokio::test]
+async fn issue_tags_dates_cycle_safe_parent_and_manual_done_roundtrip() {
+    use vibevalley_protocol::{IssueStatus, JsNumber};
+
+    let dir = tempfile::tempdir().unwrap();
+    let service = Service::open(dir.path()).await.unwrap();
+    let outbox = Arc::new(Outbox::new(service.clone()));
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let ctx = Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        outbox,
+        Arc::new(StateFeed::new()),
+        vibevalley_core::system_clock(),
+        http.clone(),
+        http,
+    ));
+    let board = Board::open_standalone_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+
+    // Create parent with tags and start/due dates.
+    let parent = board
+        .create_from_request_async(&IssueRequest {
+            title: "Parent epic".into(),
+            tags: Some(vec![" UX ".into(), "架构".into(), "UX".into(), "".into()]),
+            start_at: Some(JsNumber::from(1_760_000_000_000_i64)),
+            due_at: Some(JsNumber::from(1_760_864_000_000_i64)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(parent.tags, vec!["UX".to_string(), "架构".to_string()]);
+    assert_eq!(parent.start_at, Some(JsNumber::from(1_760_000_000_000_i64)));
+    assert_eq!(parent.due_at, Some(JsNumber::from(1_760_864_000_000_i64)));
+
+    // Create child & grandchild, then update parent dynamically and verify cycle protection.
+    let child = board
+        .create_from_request_async(&IssueRequest {
+            title: "Child task".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let grandchild = board
+        .create_from_request_async(&IssueRequest {
+            title: "Grandchild task".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let child = board
+        .update_from_input_async(IssueUpdateInput {
+            id: child.id.clone(),
+            parent: Some(format!("#{}", parent.number)),
+            tags: Some(vec!["MCP".into(), "Bug".into()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(child.parent.as_deref(), Some(parent.id.as_str()));
+    assert_eq!(child.tags, vec!["MCP".to_string(), "Bug".to_string()]);
+
+    let grandchild = board
+        .update_from_input_async(IssueUpdateInput {
+            id: grandchild.id.clone(),
+            parent: Some(child.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(grandchild.parent.as_deref(), Some(child.id.as_str()));
+
+    // Self-parenting and ancestor cycle are both refused.
+    let self_err = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            parent: Some(parent.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(self_err.biz_code, BizCode::IssueRefused);
+
+    let cycle_err = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            parent: Some(grandchild.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(cycle_err.biz_code, BizCode::IssueRefused);
+
+    // Clearing parent via "" and clearing dates via 0 persists cleanly.
+    let cleared = board
+        .update_from_input_async(IssueUpdateInput {
+            id: grandchild.id.clone(),
+            parent: Some(String::new()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(cleared.parent, None);
+
+    let cleared_dates = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            start_at: Some(JsNumber::from(0_i64)),
+            due_at: Some(JsNumber::from(0_i64)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(cleared_dates.start_at, None);
+    assert_eq!(cleared_dates.due_at, None);
+
+    // Direct backlog -> done (manual completion without agent session) and revive -> backlog.
+    assert_eq!(
+        board.move_to_async(&cleared.id, IssueStatus::Done, None).await.unwrap(),
+        vibevalley_core::Move::Complete
+    );
+    let done = board.get_async(&cleared.id).await.unwrap();
+    assert_eq!(done.status, IssueStatus::Done);
+    assert_eq!(done.delivered, Some(Landing::None));
+    assert!(done.closed_at.is_some());
+
+    assert_eq!(
+        board.move_to_async(&cleared.id, IssueStatus::Backlog, None).await.unwrap(),
+        vibevalley_core::Move::Revive
+    );
+    let revived = board.get_async(&cleared.id).await.unwrap();
+    assert_eq!(revived.status, IssueStatus::Backlog);
+    assert_eq!(revived.delivered, None);
+    assert_eq!(revived.closed_at, None);
+
+    // Direct backlog -> canceled.
+    assert_eq!(
+        board.move_to_async(&cleared.id, IssueStatus::Canceled, None).await.unwrap(),
+        vibevalley_core::Move::Drop
+    );
+    assert_eq!(board.get_async(&cleared.id).await.unwrap().status, IssueStatus::Canceled);
+
+    // Effective concurrency limits are unbounded by default (no 6-slot blocking).
+    let default_cfg = BoardConfig::under(dir.path());
+    assert_eq!(board::effective_limits(&default_cfg), (0, 0));
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}
+
+#[tokio::test]
+async fn unsent_issue_workflow_tracks_in_progress_in_review_and_criteria_persisting_across_reopen() {
+    use vibevalley_protocol::{IssueAct, IssueAction, IssueStageKind, IssueStatus, IssueStatusUpdateInput};
+
+    let dir = tempfile::tempdir().unwrap();
+    let open_board = || async {
+        let service = Service::open(dir.path()).await.unwrap();
+        let outbox = Arc::new(Outbox::new(service.clone()));
+        let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+        let ctx = Arc::new(Context::new(
+            service,
+            TaskGroup::new(),
+            Arc::new(LiveState::new()),
+            outbox,
+            Arc::new(StateFeed::new()),
+            vibevalley_core::system_clock(),
+            http.clone(),
+            http,
+        ));
+        let board = Board::open_standalone_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+            .await
+            .unwrap();
+        (ctx, board)
+    };
+
+    let (ctx, board) = open_board().await;
+    let created = board
+        .create_from_request_async(&IssueRequest {
+            title: "External MCP workflow".into(),
+            criteria: Some(vec!["First check".into(), "Second check".into()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(created.status, IssueStatus::Backlog);
+    assert!(created.moves.contains(&IssueStatus::InProgress));
+    assert!(created.moves.contains(&IssueStatus::InReview));
+
+    // Move backlog -> in_progress (persisted across DB reopen).
+    let in_prog = board
+        .status_from_input_async(&IssueStatusUpdateInput {
+            revision: None,
+            id: created.id.clone(),
+            status: IssueStatus::InProgress,
+            text: None,
+            agent: None,
+            edit: None,
+            request_key: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(in_prog.status, IssueStatus::InProgress);
+    assert_eq!(in_prog.stage.state, IssueStageKind::Working);
+    assert_eq!(in_prog.queued_at, None);
+
+    // Toggle criteria checkbox while in_progress.
+    let checked = board
+        .update_from_input_async(IssueUpdateInput {
+            id: created.id.clone(),
+            criteria: Some(vec!["[x] First check".into(), "Second check".into()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(checked.criteria, vec!["[x] First check", "Second check"]);
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+
+    // Reopen DB & Board: verify `in_progress` and criteria persisted cleanly.
+    let (ctx2, board2) = open_board().await;
+    let reloaded = board2.get_async(&created.id).await.unwrap();
+    assert_eq!(reloaded.status, IssueStatus::InProgress);
+    assert_eq!(reloaded.criteria, vec!["[x] First check", "Second check"]);
+
+    // Move in_progress -> in_review: shows Reviewing stage with one-click Complete & Close acts, and appears in wants_user list.
+    let in_rev = board2
+        .status_from_input_async(&IssueStatusUpdateInput {
+            revision: None,
+            id: created.id.clone(),
+            status: IssueStatus::InReview,
+            text: None,
+            agent: None,
+            edit: None,
+            request_key: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(in_rev.status, IssueStatus::InReview);
+    assert_eq!(in_rev.stage.state, IssueStageKind::Reviewing);
+    assert_eq!(in_rev.stage.lead, Some(IssueAct::Complete));
+    assert!(in_rev.reviewed_at.is_some());
+    assert!(matches!(
+        in_rev.stage.acts.first(),
+        Some(IssueAction::Move {
+            act: IssueAct::Complete,
+            status: IssueStatus::Done,
+            ..
+        })
+    ));
+    let patrol = board2
+        .list_async(&IssueFilter {
+            wants_user: Some(true),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(patrol.len(), 1);
+    assert_eq!(patrol[0].id, created.id);
+
+    board2.close_async().await;
+    let _ = ctx2.shutdown(Duration::from_secs(1)).await;
+
+    // Reopen again and verify `in_review` persisted, then accept to `done`, then track back to `in_progress` and `backlog`.
+    let (ctx3, board3) = open_board().await;
+    let reloaded_review = board3.get_async(&created.id).await.unwrap();
+    assert_eq!(reloaded_review.status, IssueStatus::InReview);
+    assert_eq!(reloaded_review.stage.state, IssueStageKind::Reviewing);
+
+    let done = board3
+        .status_from_input_async(&IssueStatusUpdateInput {
+            revision: None,
+            id: created.id.clone(),
+            status: IssueStatus::Done,
+            text: None,
+            agent: None,
+            edit: None,
+            request_key: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(done.status, IssueStatus::Done);
+    assert_eq!(done.delivered, Some(Landing::None));
+
+    let reopened_progress = board3
+        .status_from_input_async(&IssueStatusUpdateInput {
+            revision: None,
+            id: created.id.clone(),
+            status: IssueStatus::InProgress,
+            text: None,
+            agent: None,
+            edit: None,
+            request_key: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(reopened_progress.status, IssueStatus::InProgress);
+    assert_eq!(reopened_progress.closed_at, None);
+    assert_eq!(reopened_progress.delivered, None);
+
+    let back = board3
+        .status_from_input_async(&IssueStatusUpdateInput {
+            revision: None,
+            id: created.id.clone(),
+            status: IssueStatus::Backlog,
+            text: None,
+            agent: None,
+            edit: None,
+            request_key: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(back.status, IssueStatus::Backlog);
+    assert_eq!(back.reviewed_at, None);
+
+    board3.close_async().await;
+    let _ = ctx3.shutdown(Duration::from_secs(1)).await;
+}

@@ -38,6 +38,8 @@ export interface FakeHost {
   setSlice<K extends SliceKind>(app: App, kind: K, slice: SliceMap[K]): Promise<void>;
   /** Push a server LiveEvent on `frame:live`. */
   pushLive(app: App, event: unknown): Promise<void>;
+  /** Push a host `update_state` event directly to the view. */
+  pushUpdateState(app: App, state: unknown): Promise<void>;
   /** The subscriptions asked for and not stopped: name and payload by id. */
   readonly subscriptions: Map<string, { name: string; payload: unknown }>;
   /** An event to every open subscription of `name` (whose payload `matches`, when given). */
@@ -212,6 +214,11 @@ export function fakeHost(fixture: { state: SliceBundle; responses: Record<string
     pushLive: async (app, event) => {
       sync(app);
       queue.push(["frame:live", { rev: ++liveRev.value, data: event }]);
+      await pump(app);
+    },
+    pushUpdateState: async (app, next) => {
+      sync(app);
+      queue.push(["update_state", next]);
       await pump(app);
     },
     get subscriptions() {

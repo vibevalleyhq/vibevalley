@@ -1,6 +1,8 @@
 {
   "sidebar": {
-    "title": "仓库与终端",
+    "title": "工作区",
+    "toggleSidebar": "收起侧边栏",
+    "toggleSidebarTooltip": "收起侧边栏 (⌘B)",
     "addRepo": "添加仓库",
     "addRepoTooltip": "添加本地仓库或文件夹",
     "newMenu": "新建：{name}",
@@ -22,7 +24,9 @@
     "mainWorktree": "{label} · 主目录",
     "mainLabel": "主目录",
     "collapseAll": "折叠全部",
+    "collapseAllTooltip": "折叠全部仓库与工作树",
     "expandCurrent": "展开当前",
+    "expandCurrentTooltip": "展开当前仓库与活动工作树",
     "collapseItem": "折叠 {name}",
     "expandItem": "展开 {name}",
     "newTerminalHere": "在此新建终端",
@@ -251,6 +255,7 @@
   },
   "repoDetail": {
     "badgeManaged": "VibeValley 仓库",
+    "badgeMounted": "本地关联仓库",
     "badgeFolder": "本地目录",
     "openFullPage": "打开完整仓库页",
     "copied": "已复制路径",

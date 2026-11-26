@@ -6,6 +6,7 @@ import { githubRepository } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
+import { Checkbox } from "../../design/Checkbox";
 import { AgentFace } from "../../design/domain/Face";
 import { Field, TextInput } from "../../design/Field";
 import { Card, Quiet } from "../../design/layout";
@@ -14,8 +15,9 @@ import { Bubble } from "../../design/Tip";
 import { mix } from "../../design/tone";
 import { useWorkAgents } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
+import { hostApi } from "../../infra/bridge";
 import { type QueryResult, ready, useQueryClient } from "../../infra/query";
-import { createMemo } from "../../infra/solid";
+import { createMemo, untrack } from "../../infra/solid";
 import { calendarOf, type CalendarDay, dayText, streaksOf } from "./calendar";
 import { languageShares, number, percent } from "./repos";
 
@@ -283,24 +285,49 @@ export function Hands(props: { activity?: RepoActivity | undefined }) {
   );
 }
 
-/** The name follows the repository's until it is typed by hand; what would be refused is the server's answer. */
-export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
+/** Creates a managed repo (empty or GitHub clone) or mounts an existing local directory. */
+export function NewRepoForm(props: { initialMode?: "local" | "new" | "github" | undefined; onDone: (made?: RepoSummary) => void }) {
   const client = useQueryClient();
-  const importing = signal<"new" | "github">("github");
+  const importing = signal<"local" | "new" | "github">(untrack(() => props.initialMode ?? "github"));
   const github = signal("");
+  const localPath = signal("");
+  const initGit = signal(false);
   const name = signal("");
   const named = signal(false);
   const error = signal<string | undefined>(undefined);
   // A refusal shows in the form, beside what was typed.
   const act = createAct((reason) => error.set(reason));
   const busy = act.busy;
-  const canSubmit = createMemo(() => !busy() && name().trim() !== "" && (importing() === "new" || github().trim() !== ""));
+  const canSubmit = createMemo(() => {
+    if (busy()) return false;
+    if (importing() === "local") return localPath().trim() !== "";
+    return name().trim() !== "" && (importing() === "new" || github().trim() !== "");
+  });
+  const pickLocalFolder = async () => {
+    error.set(undefined);
+    const got = await hostApi.pickFolder();
+    if (got.bizCode !== 0 || !got.data) return;
+    localPath.set(got.data.path);
+    initGit.set(!got.data.git);
+    if (!named() && got.data.name) name.set(got.data.name);
+  };
   const submit = async () => {
     if (!canSubmit()) return;
-    const request = { name: name().trim(), ...(importing() === "github" ? { github: github().trim() } : {}) };
     const done = props.onDone;
     error.set(undefined);
     await act.run(async () => {
+      if (importing() === "local") {
+        const trimmedName = name().trim();
+        const made = await api.repo.mount({
+          path: localPath().trim(),
+          ...(trimmedName ? { name: trimmedName } : {}),
+          ...(initGit() ? { initGit: true } : {}),
+        });
+        await client.invalidate({ prefix: ["repos"] });
+        done(made);
+        return;
+      }
+      const request = { name: name().trim(), ...(importing() === "github" ? { github: github().trim() } : {}) };
       const problem = (await api.repo.validate(request)).problem;
       if (problem) {
         error.set(problem);
@@ -319,6 +346,7 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
           testid="repo-how"
           value={importing()}
           options={[
+            { value: "local", label: t("web.repo.local"), disabled: busy() },
             { value: "new", label: t("web.repo.fresh"), disabled: busy() },
             { value: "github", label: t("web.repo.github"), disabled: busy() },
           ]}
@@ -327,6 +355,41 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
             error.set(undefined);
           }}
         />
+        <If when={importing() === "local"}>
+          <Field label={t("web.repo.localPath")} hint={t("web.repo.localPathHint")}>
+            <View class="flex-row items-center gap-2">
+              <TextInput
+                autoFocus
+                wide={false}
+                class="min-w-0 flex-1"
+                testID="repo-local-path"
+                accessibilityLabel={t("web.repo.localPath")}
+                disabled={busy()}
+                placeholder={t("web.repo.localPathPlaceholder")}
+                value={localPath()}
+                onInput={(typed) => {
+                  localPath.set(typed);
+                  if (!named()) {
+                    const base = typed.replace(/\/+$/u, "").split("/").pop() ?? "";
+                    name.set(base);
+                  }
+                  error.set(undefined);
+                }}
+                onSubmit={() => void submit()}
+              />
+              <Button icon="folder" testID="repo-pick-folder" disabled={busy()} onPress={() => void pickLocalFolder()}>
+                {t("web.repo.pickFolder")}
+              </Button>
+            </View>
+          </Field>
+          <View class="flex-row items-start gap-2">
+            <Checkbox checked={initGit()} onChange={(v) => initGit.set(v)} label={t("web.repo.initGit")} disabled={busy()} testid="repo-init-git" />
+            <View class="min-w-0 flex-1 gap-0.5">
+              <Text class="text-sm text-ink">{t("web.repo.initGit")}</Text>
+              <Text class="text-xs text-muted">{t("web.repo.initGitHint")}</Text>
+            </View>
+          </View>
+        </If>
         <If when={importing() === "github"}>
           <Field label={t("web.repo.githubAddress")} hint={t("web.repo.githubHint")}>
             <TextInput
@@ -345,7 +408,7 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
             />
           </Field>
         </If>
-        <Field label={t("web.repo.name")} hint={t("web.repo.nameHint")}>
+        <Field label={t("web.repo.name")} hint={importing() === "local" ? t("web.repo.nameOptionalHint") : t("web.repo.nameHint")}>
           <TextInput
             testID="repo-name"
             accessibilityLabel={t("web.repo.name")}
@@ -366,7 +429,9 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
           </Text>
         </If>
         <If when={busy()}>
-          <Text class="text-sm text-muted">{importing() === "github" ? t("web.repo.downloading") : t("web.repo.making")}</Text>
+          <Text class="text-sm text-muted">
+            {importing() === "github" ? t("web.repo.downloading") : importing() === "local" ? t("web.repo.mounting") : t("web.repo.making")}
+          </Text>
         </If>
       </Scroll>
       <View class="shrink-0 flex-row justify-end gap-2 border-t border-line px-5 py-3">
@@ -374,7 +439,13 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
           {t("web.repo.cancel")}
         </Button>
         <Button tone="primary" testID="submit" disabled={!canSubmit()} onPress={() => void submit()}>
-          {busy() ? t("web.repo.busy") : importing() === "github" ? t("web.repo.download") : t("web.repo.create")}
+          {busy()
+            ? t("web.repo.busy")
+            : importing() === "github"
+              ? t("web.repo.download")
+              : importing() === "local"
+                ? t("web.repo.mount")
+                : t("web.repo.create")}
         </Button>
       </View>
     </View>

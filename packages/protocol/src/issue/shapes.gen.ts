@@ -17,7 +17,7 @@ export type Priority = (typeof PriorityValues)[number];
 export const IssueStatusValues = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
 export type IssueStatus = (typeof IssueStatusValues)[number];
 
-export const IssueLaneValues = ["todo", "working", "waiting", "closed"] as const;
+export const IssueLaneValues = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
 export type IssueLane = (typeof IssueLaneValues)[number];
 
 export const IssueCardKindValues = ["todo", "issue", "family", "orchestrator"] as const;
@@ -26,7 +26,7 @@ export type IssueCardKind = (typeof IssueCardKindValues)[number];
 export const IssuePromptKindValues = ["asking", "review_after_failed_check", "reviewed", "handed_back", "stuck_conflict", "stuck_failed", "stuck_interrupted", "stuck_quiet", "stuck_unknown", "canceled_reopenable"] as const;
 export type IssuePromptKind = (typeof IssuePromptKindValues)[number];
 
-export type BoardLaneCounts = { todo: number, working: number, waiting: number, closed: number, };
+export type BoardLaneCounts = { backlog: number, todo: number, inProgress: number, inReview: number, done: number, canceled: number, };
 
 export type BoardIssueSummary = { lane: IssueLane, cardKind: IssueCardKind, familyDone: number, familyTotal: number, needsWorktreeCheck: boolean, prompt?: IssuePromptKind, };
 
@@ -129,7 +129,7 @@ machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: n
 /**
  * Tracks runs executed without a worker session (e.g. in-process orchestrator); active while `endedAt` is absent.
  */
-lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, };
+lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, };
 
 /**
  * Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
@@ -138,13 +138,25 @@ export type AppliedIssue = { constraints?: IssueConstraints, id: IssueId, number
 /**
  * Target execution host id when pinned to a specific machine; omitted lets the control plane route.
  */
-machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, seq: number, };
+machineId?: string, assignments: Array<Assignment>, priority: Priority, rank?: number, createdAt: number, queuedAt?: number, closedAt?: number, delivered?: Landing, canceled?: IssueCanceled, parent?: IssueId, blockedBy: Array<IssueId>, cron?: string, status: IssueStatus, moves: Array<IssueStatus>, pullRequest?: PullRequest, deliver: Deliverable, reviewedAt?: number, deliveryEvidence?: DeliveryEvidence, findings: Array<Finding>, questions: Array<Question>, criteria: Array<string>, checks: Array<CriterionCheck>, refining?: IssueRefining, lastRun?: IssueLastRun, answer?: IssueAnswer, stage: IssueStage, attachments?: Array<Attachment>, tags?: Array<string>, startAt?: number, dueAt?: number, seq: number, };
 
 export type IssueUpdate = { title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable,
 /**
  * Board placement before this issue id; "" places it last. Valid only before dispatch.
  */
-before?: string, attachments?: Array<string>, };
+before?: string, attachments?: Array<string>,
+/**
+ * Parent issue id or number; "" clears the parent.
+ */
+parent?: string, tags?: Array<string>,
+/**
+ * Start date timestamp (ms); 0 or negative clears it.
+ */
+startAt?: number,
+/**
+ * Target due timestamp (ms); 0 or negative clears it.
+ */
+dueAt?: number, };
 
 export type IssueHistory = { issue: Issue, sessions: Array<Session>, missingSessions: Array<SessionId>, };
 
@@ -154,7 +166,7 @@ export type IssueRefineRequest = { text?: string,
  */
 edit?: IssueUpdate, };
 
-export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>, attachments?: Array<string>,
+export type IssueRequest = { constraints?: IssueConstraints, title: string, parent?: IssueId, blockedBy?: Array<IssueId>, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, deliver?: Deliverable, autoSubmitPr?: boolean, criteria?: Array<string>, attachments?: Array<string>, tags?: Array<string>, startAt?: number, dueAt?: number,
 /**
  * Idempotency key deduplicating retries after a lost response.
  */
@@ -224,7 +236,19 @@ export type IssueRunListInput = { id: string, };
 
 export type IssueTimelineGetInput = { id: string, };
 
-export type IssueUpdateInput = { id: string, title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable, before?: string, attachments?: Array<string>, };
+export type IssueUpdateInput = { id: string, title?: string, description?: string, repo?: string, agent?: string, machineId?: string, priority?: Priority, criteria?: Array<string>, deliver?: Deliverable, before?: string, attachments?: Array<string>,
+/**
+ * Parent issue id or number; "" clears the parent.
+ */
+parent?: string, tags?: Array<string>,
+/**
+ * Start date timestamp (ms); 0 or negative clears it.
+ */
+startAt?: number,
+/**
+ * Target due timestamp (ms); 0 or negative clears it.
+ */
+dueAt?: number, };
 
 export type IssueDeleteInput = { id: string, };
 

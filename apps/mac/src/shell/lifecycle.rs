@@ -36,9 +36,20 @@ impl Shell {
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => {
                 this.workspace.workbench_ready = true;
+                this.chrome.workbench.read(cx).push_update_state(crate::update::state(), cx);
                 this.finish_opening(true, cx);
             }
         });
+        let mut update_rx = crate::update::subscribe();
+        cx.spawn(async move |this, cx| {
+            while update_rx.changed().await.is_ok() {
+                let state = update_rx.borrow_and_update().clone();
+                if this.update(cx, |shell, cx| shell.notify_update_state(state, cx)).is_err() {
+                    break;
+                }
+            }
+        })
+        .detach();
         let (fs_tx, fs_rx) = flume::unbounded::<(ProjectId, Vec<FsChange>)>();
         cx.spawn(async move |this, cx| {
             while let Ok(first) = fs_rx.recv_async().await {
@@ -138,6 +149,7 @@ impl Shell {
                 workbench,
                 native_workspace: false,
                 native_diorama: None,
+                modal_overlay: false,
                 global_rail_width: 76.0,
                 panel: Panel::Files,
                 inspector_open: ui_settings.inspector_open,
@@ -192,6 +204,9 @@ impl Shell {
                             shell.workspace.server_ready = true;
                             shell.overlays.startup.slow = false;
                             shell.sync_chat_watches(cx);
+                            if shell.workspace.loaded {
+                                shell.sync_all_project_mounts(cx);
+                            }
                             shell.finish_opening(true, cx);
                         }
                         Err(failure) => {
@@ -369,6 +384,9 @@ impl Shell {
                     }
                     this.refresh_summaries(cx);
                     this.sync_chat_watches(cx);
+                    if this.workspace.server_ready {
+                        this.sync_all_project_mounts(cx);
+                    }
                     this.push_sidebar(cx);
                     this.finish_opening(true, cx);
                     cx.notify();

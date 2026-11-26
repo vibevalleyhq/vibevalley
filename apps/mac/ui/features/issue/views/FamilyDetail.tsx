@@ -1,4 +1,4 @@
-import { Text, View } from "nsh";
+import { computed, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Issue } from "@vibevalley/protocol";
@@ -8,15 +8,27 @@ import { Button } from "../../../design/Button";
 import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { Markdown } from "../../../design/Markdown";
-import { Dot } from "../../../design/Tag";
 import { toast } from "../../../design/toasts";
 import { shortMomentText } from "../../../infra/base/format";
+import { createMemo } from "../../../infra/solid";
+import { useIntents } from "../../../infra/state/intent";
 import { createIssueActs } from "../model/acts";
+import { useIssues } from "../model/history";
 import { stageTone } from "../model/overview";
+import { issueSet, labeledIssue, sendLabel } from "../model/write";
 import { ActLines } from "./ActLines";
-import { IssueNumberPill, IssueSheet, Property, SheetLabel } from "./Sheet";
+import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
+import { StatusMark } from "./Marks";
+import { IssueNumberPill, IssueSheet, Property, SheetLabel, StagePill } from "./Sheet";
 
 export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (id: string) => void; onClose: (review: boolean) => void }) {
+  const allIssues = useIssues();
+  const sets = useIntents(issueSet);
+  const labeled = createMemo(() => labeledIssue(allIssues().find((item) => item.id === props.issue.id) ?? props.issue, sets.list()));
+  const live = () => labeled().issue;
+  const open = computed(() => live().status !== "done" && live().status !== "canceled");
+  const setLabel = (label: Omit<Parameters<typeof sendLabel>[1], "id">) => void sendLabel(sets, { id: props.issue.id, ...label });
+  const parent = createMemo(() => (live().parent ? allIssues().find((item) => item.id === live().parent) : undefined));
   const acts = createIssueActs(() => props.issue, {
     act: createAct(),
     complete: () => props.onClose(true),
@@ -29,17 +41,40 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
 
   const heading = (
     <View>
-      <View class="mb-1.5 flex-row flex-wrap items-center gap-1">
-        <Text class="text-xs text-muted">{props.issue.repo || t("web.issue.detail.noRepo")}</Text>
-        <Icon name="next" size={12} tone="muted" />
-        <IssueNumberPill number={props.issue.number} />
+      <View class="mb-2 flex-row flex-wrap items-center gap-1.5">
+        <If when={live().repo}>
+          {(repo) => (
+            <>
+              <View class="flex-row items-center gap-1 rounded-md bg-side px-1.5 py-0.5">
+                <Icon name="folder" size={12} tone="muted" />
+                <Text class="text-xs font-medium text-muted">{repo()}</Text>
+              </View>
+              <Icon name="next" size={12} tone="faint" />
+            </>
+          )}
+        </If>
+        <If when={live().parent}>
+          {(parentId) => (
+            <>
+              <View
+                role="button"
+                testID="parent-issue"
+                onPress={() => props.onOpen(parentId())}
+                class="flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:bg-hover"
+              >
+                <Text class="text-xs text-water">{parent() ? `#${parent()!.number} ${parent()!.title}` : t("web.issue.family.parent")}</Text>
+              </View>
+              <Icon name="next" size={12} tone="faint" />
+            </>
+          )}
+        </If>
+        <IssueNumberPill number={live().number} />
       </View>
-      <Text role="header" class="text-lg font-semibold text-ink">
-        {props.issue.title}
+      <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
+        {live().title}
       </Text>
-      <View class="mt-2 flex-row items-center gap-2">
-        <Dot tone={tone()} size={8} ring={false} />
-        <Text class="text-sm text-muted">{t(`shared.stage.${props.issue.stage.state}`)}</Text>
+      <View class="mt-2.5 flex-row flex-wrap items-center gap-2">
+        <StagePill tone={tone()} label={t(`shared.stage.${props.issue.stage.state}`)} />
       </View>
     </View>
   );
@@ -48,52 +83,85 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
     <>
       <ActLines issue={props.issue.id} />
       <If when={needsBox()}>
-        <View class="mb-4">
+        <View class="mb-5">
           <TextArea accessibilityLabel={t("shared.act.tell")} value={acts.text()} onInput={acts.setText} />
         </View>
       </If>
-      <If when={props.issue.description}>
+      <If when={live().description}>
         <View>
           <SheetLabel first>{t("web.issue.detail.full")}</SheetLabel>
-          <Markdown size="sm" text={props.issue.description} />
+          <Markdown size="sm" text={live().description} />
         </View>
       </If>
-      <SheetLabel first={!props.issue.description}>{t("web.issue.family.children")}</SheetLabel>
-      <View class="overflow-hidden rounded-lg border border-line bg-page">
-        <Each of={props.children} key={(child) => child.id}>
-          {(child, i) => (
-            <View
-              role="button"
-              testID="child-issue"
-              accessibilityLabel={child().title}
-              class={`w-full flex-row items-center gap-3 px-3.5 py-2.5 hover:bg-hover ${i() < props.children.length - 1 ? "border-b border-line" : ""}`}
-              onPress={() => props.onOpen(child().id)}
-            >
-              <Text class="w-10 shrink-0 font-mono text-xs text-muted tabular-nums">{`#${child().number}`}</Text>
-              <Text class="min-w-0 flex-1 truncate text-sm font-medium text-ink">{child().title}</Text>
-              <Text class="shrink-0 text-xs text-muted">{t(`shared.status.${child().status}`)}</Text>
-            </View>
-          )}
-        </Each>
-      </View>
+      <SubIssuesSection
+        issueId={live().id}
+        allIssues={allIssues().length > 0 ? allIssues() : props.children}
+        onOpen={props.onOpen}
+        bordered={Boolean(live().description)}
+      />
     </>
   );
 
   const side = (
     <>
       <SheetLabel first>{t("web.issue.detail.properties")}</SheetLabel>
-      <Property label={t("web.issue.detail.status")}>
-        <View class="flex-row items-center gap-2">
-          <Dot tone={tone()} size={8} ring={false} />
-          <Text class="text-sm text-ink">{t(`shared.stage.${props.issue.stage.state}`)}</Text>
-        </View>
+      <Property label={t("web.issue.detail.status")} icon={<StatusMark status={live().status} size={13} />}>
+        {t(`shared.stage.${props.issue.stage.state}`)}
       </Property>
-      <If when={props.issue.repo}>{(repo) => <Property label={t("web.issue.detail.repo")}>{repo()}</Property>}</If>
-      <Property label={t("web.issue.family.children")}>
+      <If when={live().repo}>
+        {(repo) => (
+          <Property label={t("web.issue.detail.repo")} icon={<Icon name="folder" size={13} tone="muted" />}>
+            {repo()}
+          </Property>
+        )}
+      </If>
+      <Property label={t("web.issue.family.children")} icon={<Icon name="issues" size={13} tone="muted" />}>
         <Text class="text-sm text-ink tabular-nums">{String(props.children.length)}</Text>
       </Property>
+      <Property label={t("web.issue.family.parent")} icon={<Icon name="indent" size={13} tone="muted" />} inset>
+        <ParentPicker
+          issueId={live().id}
+          parentId={live().parent ?? ""}
+          allIssues={allIssues()}
+          disabled={!open()}
+          state={labeled().state("parent")}
+          onChange={(parent) => setLabel({ parent })}
+        />
+      </Property>
+      <Property align="start" label={t("web.issue.tags.label")} icon={<Icon name="catalog" size={13} tone="muted" />} inset>
+        <TagEditor tags={live().tags ?? []} disabled={!open()} onChange={(tags) => setLabel({ tags })} />
+      </Property>
+      <SheetLabel divider>{t("web.issue.detail.time")}</SheetLabel>
+      <Property label={t("web.issue.dates.startAt")} icon={<Icon name="calendar" size={13} tone="muted" />} inset>
+        <DatePropertyEditor
+          label={t("web.issue.dates.startAt")}
+          value={live().startAt}
+          disabled={!open()}
+          testid="issue-start-at"
+          onCommit={(startAt) => setLabel({ startAt })}
+        />
+      </Property>
+      <Property label={t("web.issue.dates.dueAt")} icon={<Icon name="calendar" size={13} tone="muted" />} inset>
+        <DatePropertyEditor
+          label={t("web.issue.dates.dueAt")}
+          value={live().dueAt}
+          disabled={!open()}
+          testid="issue-due-at"
+          onCommit={(dueAt) => setLabel({ dueAt })}
+        />
+      </Property>
+      <Property label={t("web.issue.detail.opened")}>
+        <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.issue.createdAt)}</Text>
+      </Property>
+      <If when={props.issue.closedAt}>
+        {(at) => (
+          <Property label={t("web.issue.detail.closedAt")}>
+            <Text class="text-sm text-ink tabular-nums">{shortMomentText(at())}</Text>
+          </Property>
+        )}
+      </If>
       <If when={props.issue.stage.acts.length > 0}>
-        <View class="mt-3 flex-row flex-wrap gap-2">
+        <View class="mt-4 flex-row flex-wrap gap-2 border-t border-line pt-4">
           <Each of={props.issue.stage.acts} key={(action) => action.act}>
             {(action) => (
               <Button
@@ -107,17 +175,6 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
             )}
           </Each>
         </View>
-      </If>
-      <SheetLabel divider>{t("web.issue.detail.time")}</SheetLabel>
-      <Property label={t("web.issue.detail.opened")}>
-        <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.issue.createdAt)}</Text>
-      </Property>
-      <If when={props.issue.closedAt}>
-        {(at) => (
-          <Property label={t("web.issue.detail.closedAt")}>
-            <Text class="text-sm text-ink tabular-nums">{shortMomentText(at())}</Text>
-          </Property>
-        )}
       </If>
     </>
   );

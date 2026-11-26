@@ -176,6 +176,10 @@ impl Shell {
         self.for_each_hosted_view(cx, |v, cx| v.set_locale(locale, cx));
     }
 
+    pub(super) fn notify_update_state(&mut self, state: serde_json::Value, cx: &mut Context<Self>) {
+        self.for_each_hosted_view(cx, |v, cx| v.push_update_state(state.clone(), cx));
+    }
+
     /// Tells every open terminal, native markdown pane, and hosted view about the new theme.
     pub(super) fn theme_changed(&mut self, cx: &mut Context<Self>) {
         let dark = Ui::get(cx).colors.dark;

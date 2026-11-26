@@ -118,9 +118,10 @@ pub fn session_ids_of(issue: &Issue) -> Vec<&SessionId> {
         .collect()
 }
 
-const TITLE_MAX: usize = 40;
+const TITLE_MAX: usize = 120;
 
-/// `shortTitle`: one short line for a title.
+/// `shortTitle`: one line for a title; preserves normal titles up to `TITLE_MAX`
+/// characters and breaks overly long lines cleanly at punctuation or word boundaries.
 pub fn short_title(text: &str) -> String {
     let line = text.split('\n').find(|l| !l.trim().is_empty()).unwrap_or("").trim();
     let chars: Vec<char> = line.chars().collect();
@@ -146,6 +147,11 @@ pub fn short_title(text: &str) -> String {
     }
     if pause >= 4 {
         return slice(&head, 0, Some(pause as usize)).trim().to_string();
+    }
+    if let Some(space) = chars[..TITLE_MAX].iter().rposition(|c| c.is_whitespace())
+        && space >= TITLE_MAX / 2
+    {
+        return chars[..space].iter().collect::<String>().trim_end().to_string() + "…";
     }
     chars[..TITLE_MAX - 1].iter().collect::<String>() + "…"
 }
@@ -188,7 +194,7 @@ pub fn room_left(sessions: &[Session], repo: &str, space: usize, per_repo: usize
     let busy: Vec<&Session> = sessions.iter().filter(|h| h.is_board_worker() && is_busy(h) && h.id != except).collect();
     let in_repo = busy.iter().filter(|h| h.repo_name() == Some(repo)).count();
     Room {
-        farm: space.saturating_sub(busy.len()),
+        farm: if space == 0 { usize::MAX } else { space.saturating_sub(busy.len()) },
         repo: (per_repo > 0).then(|| per_repo.saturating_sub(in_repo)),
         busy: busy.len(),
         in_repo,
@@ -425,9 +431,42 @@ mod tests {
     #[test]
     fn short_titles() {
         assert_eq!(short_title("\n  fix it \nmore"), "fix it");
-        // Both answers are what VibeValley's shortTitle gives.
-        let forty = "这是一个很长的标题，里面有很多很多的字，一直写下去一直写下去一直写下去一直写下去";
-        assert_eq!(short_title(forty), forty);
-        assert_eq!(short_title(&format!("{forty}再写一点")), "这是一个很长的标题，里面有很多很多的字");
+        let english = "Polish mobile responsive layout for remote worktree session view";
+        assert_eq!(short_title(english), english);
+        let chinese = "这是一个很长的标题，里面有很多很多的字，一直写下去一直写下去一直写下去一直写下去再写一点";
+        assert_eq!(short_title(chinese), chinese);
+        let over_cap = format!("{chinese}，{}", "继续补充更多背景说明内容".repeat(8));
+        assert_eq!(short_title(&over_cap), chinese);
+        let long_english = "Implement full end-to-end streaming transport synchronization across desktop workbench and mobile remote clients without truncating mid word anywhere";
+        let cut_english = short_title(long_english);
+        assert!(cut_english.ends_with('…'));
+        assert!(cut_english.chars().count() <= TITLE_MAX);
+        assert!(!cut_english.ends_with("tru…"));
+    }
+
+    #[test]
+    fn room_left_unbounded_when_space_and_per_repo_are_zero() {
+        let sessions: Vec<Session> = (1..=10)
+            .map(|i| {
+                let mut s = Session::new(
+                    format!("s{i}"),
+                    SessionController::IssueBoard,
+                    format!("worker-{i}"),
+                    "claude",
+                    ExecutionPolicy::ManagedWorktree {
+                        repo: "app".into(),
+                        branch: None,
+                    },
+                    100,
+                );
+                s.phase = Phase::working(100, SessionAction::EditFile, "edit");
+                s
+            })
+            .collect();
+        let room = room_left(&sessions, "app", 0, 0, "");
+        assert_eq!(room.farm, usize::MAX);
+        assert_eq!(room.repo, None);
+        assert_eq!(room.busy, 10);
+        assert_eq!(room.in_repo, 10);
     }
 }

@@ -27,7 +27,7 @@ use crate::auth::Secret;
 use crate::client::{Client, Done, Failure, decode_failure, exit, no_dry_run};
 use crate::output::{line, out, read_json_input};
 
-const DEFAULT_RPC_TIMEOUT: Duration = Duration::from_secs(15);
+pub(crate) const DEFAULT_RPC_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Args)]
 #[command(arg_required_else_help = true, subcommand_required = true)]
@@ -259,10 +259,10 @@ pub enum DebugAction {
 
 /// Resolved VDP target coordinates and optional bearer token.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ResolvedEndpoint {
-    http_url: String,
-    ws_url: String,
-    token: Option<Secret>,
+pub(crate) struct ResolvedEndpoint {
+    pub(crate) http_url: String,
+    pub(crate) ws_url: String,
+    pub(crate) token: Option<Secret>,
 }
 
 #[derive(Debug, Serialize)]
@@ -439,7 +439,7 @@ where
     }
 }
 
-fn resolve_endpoint(client: &Client, target: &DebugTargetArgs) -> Result<ResolvedEndpoint, Failure> {
+pub(crate) fn resolve_endpoint(client: &Client, target: &DebugTargetArgs) -> Result<ResolvedEndpoint, Failure> {
     resolve_endpoint_with(
         target,
         client.flag_token().cloned(),
@@ -500,14 +500,14 @@ fn http_status_failure(status: u16, body: &str) -> Failure {
     failure
 }
 
-struct VdpWsClient {
+pub(crate) struct VdpWsClient {
     ws: WebSocketStream<MaybeTlsStream<TcpStream>>,
     next_id: u64,
     buffered_events: Vec<VdpEvent>,
 }
 
 impl VdpWsClient {
-    async fn connect(endpoint: &ResolvedEndpoint) -> Result<Self, Failure> {
+    pub(crate) async fn connect(endpoint: &ResolvedEndpoint) -> Result<Self, Failure> {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let mut request = endpoint
             .ws_url
@@ -547,7 +547,7 @@ impl VdpWsClient {
         })
     }
 
-    async fn call_raw(&mut self, method: &str, params: Value, session_id: Option<String>, timeout: Duration) -> Result<Value, Failure> {
+    pub(crate) async fn call_raw(&mut self, method: &str, params: Value, session_id: Option<String>, timeout: Duration) -> Result<Value, Failure> {
         let id = self.next_id;
         self.next_id = self.next_id.saturating_add(1);
         let req = VdpRequest::new(id, method, params, session_id);
@@ -591,11 +591,11 @@ impl VdpWsClient {
         .map_err(|_| Failure::new(exit::OTHER, "Timeout", format!("VDP call {method} timed out after {}ms", timeout.as_millis())))?
     }
 
-    async fn call_command(&mut self, cmd: &VdpCommand, timeout: Duration) -> Result<Value, Failure> {
+    pub(crate) async fn call_command(&mut self, cmd: &VdpCommand, timeout: Duration) -> Result<Value, Failure> {
         self.call_raw(cmd.method(), cmd.to_params(), None, timeout).await
     }
 
-    async fn call_typed<T: DeserializeOwned>(&mut self, cmd: &VdpCommand, timeout: Duration) -> Result<T, Failure> {
+    pub(crate) async fn call_typed<T: DeserializeOwned>(&mut self, cmd: &VdpCommand, timeout: Duration) -> Result<T, Failure> {
         let value = self.call_command(cmd, timeout).await?;
         serde_json::from_value(value).map_err(decode_failure)
     }
@@ -626,7 +626,7 @@ impl VdpWsClient {
         }
     }
 
-    async fn close(mut self) {
+    pub(crate) async fn close(mut self) {
         let _ = self.ws.close(None).await;
     }
 }

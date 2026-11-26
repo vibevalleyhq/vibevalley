@@ -12456,6 +12456,7 @@ dependencies = [
  "uuid",
  "vibevalley-core",
  "vibevalley-git",
+ "vibevalley-mcp",
  "vibevalley-protocol",
  "vibevalley-runtime",
  "vibevalley-server",
@@ -12574,6 +12575,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vibevalley-mcp"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "vibevalley-onig"
 version = "0.1.0"
 
@@ -12665,6 +12676,7 @@ dependencies = [
  "tokio-util",
  "uuid",
  "vibevalley-git",
+ "vibevalley-mcp",
  "vibevalley-protocol",
 ]
 
@@ -12708,6 +12720,7 @@ dependencies = [
  "vibevalley-core",
  "vibevalley-git",
  "vibevalley-i18n",
+ "vibevalley-mcp",
  "vibevalley-protocol",
  "vibevalley-runtime",
 ]

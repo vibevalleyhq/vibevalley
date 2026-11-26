@@ -31,7 +31,9 @@ pub use http::{
     Fetch, FetchError, Http, PublicBytes, PublicDownload, PublicDownloadError, ReadError, Request, Response, install_tls, read_max, read_max_until,
 };
 pub use live::{FarmEffect, FarmEffectEntry, LiveSessionSnapshot, LiveState, Sink, bridge_live_receiver};
-pub use outbox::{OUTBOX_SESSION_REPORTED, Outbox, OutboxConfig, OutboxDelivery, OutboxEvent, OutboxSessionReported};
+pub use outbox::{
+    OUTBOX_CONNECTOR_NOTIFY, OUTBOX_SESSION_REPORTED, Outbox, OutboxConfig, OutboxConnectorNotify, OutboxDelivery, OutboxEvent, OutboxSessionReported,
+};
 pub use task::{TaskGroup, Ticker};
 
 use crate::service::Service;

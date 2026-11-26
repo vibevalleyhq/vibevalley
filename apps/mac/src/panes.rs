@@ -467,9 +467,10 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
     let mut tabs_row = div()
         .id(("tabbar", group_id as usize))
         .h_full()
-        .flex_1()
         .min_w_0()
-        .px(px(6.0))
+        .flex_shrink(1.0)
+        .pl(px(6.0))
+        .pr(px(2.0))
         .flex()
         .flex_row()
         .items_center()
@@ -609,8 +610,6 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
     let new_btn = div()
         .id(("new-tab", group_id as usize))
         .size(px(26.0))
-        .ml(px(4.0))
-        .mr(px(if is_last_group { 2.0 } else { 6.0 }))
         .flex_none()
         .flex()
         .items_center()
@@ -643,75 +642,10 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
             .child(gpui_icon("add", 13.0, colors.muted))
     };
 
-    let mut bar = div()
-        .h(px(36.0))
-        .flex_none()
-        .flex()
-        .flex_row()
-        .items_center()
-        .bg(colors.surface)
-        .border_b_1()
-        .border_color(colors.border)
-        .child(tabs_row)
-        .child(new_btn);
-
-    if is_last_group {
-        let inspector_btn = div()
-            .id("toggle-inspector")
-            .size(px(26.0))
-            .ml(px(4.0))
-            .mr(px(6.0))
-            .flex_none()
-            .flex()
-            .items_center()
-            .justify_center()
-            .rounded(px(6.0))
-            .border_1()
-            .cursor_pointer()
-            .tooltip(gpui_tooltip("Toggle inspector", &colors))
-            .tooltip_show_delay(TOOLTIP_SHOW_DELAY)
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(|s, _, _, cx| {
-                    cx.stop_propagation();
-                    s.toggle_inspector(cx);
-                }),
-            );
-        let inspector_btn = if inspector_open {
-            inspector_btn
-                .bg(colors.elevated)
-                .border_color(colors.border)
-                .child(gpui_icon("sidebarRight", 14.0, colors.text))
-        } else {
-            inspector_btn
-                .bg(transparent())
-                .border_color(transparent())
-                .hover(move |s| s.bg(hover_bg))
-                .child(gpui_icon("sidebarRight", 14.0, colors.muted))
-        };
-        bar = bar.child(inspector_btn);
-    }
-    let content: AnyElement = match g.active_tab() {
-        Some(Tab {
-            kind: PaneKind::Terminal { terminal_id, .. },
-            ..
-        }) => match shell.workspace.terminals.get(terminal_id) {
-            Some(t) => t.view.clone().into_any_element(),
-            None => div().into_any_element(),
-        },
-        Some(tab) => match shell.workspace.panes.get(&(pid, tab.id)) {
-            Some(p) => p.entity.element(),
-            None => div().into_any_element(),
-        },
-        None => div().into_any_element(),
-    };
     let chat_menu = menu_open.then(|| {
         let choices = [("antigravity", "Antigravity"), ("claude", "Claude Code"), ("codex", "Codex")];
         let mut panel = div()
             .id(("chat-runtime-menu", group_id as usize))
-            .absolute()
-            .top(px(38.0))
-            .right(px(if is_last_group { 38.0 } else { 8.0 }))
             .w(px(216.0))
             .p(px(4.0))
             .rounded(px(8.0))
@@ -816,8 +750,95 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                     })),
             );
         }
-        panel
+        gpui::deferred(
+            gpui::anchored()
+                .anchor(gpui::Anchor::TopLeft)
+                .offset(gpui::point(px(0.0), px(30.0)))
+                .snap_to_window_with_margin(gpui::Edges::all(px(8.0)))
+                .child(panel),
+        )
+        .with_priority(1)
     });
+
+    let new_btn_slot = div()
+        .relative()
+        .ml(px(2.0))
+        .mr(px(if is_last_group { 2.0 } else { 6.0 }))
+        .flex_none()
+        .child(new_btn)
+        .children(chat_menu);
+
+    let tabs_wrap = div()
+        .h_full()
+        .flex_1()
+        .min_w_0()
+        .flex()
+        .flex_row()
+        .items_center()
+        .child(tabs_row)
+        .child(new_btn_slot);
+
+    let mut bar = div()
+        .h(px(36.0))
+        .flex_none()
+        .flex()
+        .flex_row()
+        .items_center()
+        .bg(colors.surface)
+        .border_b_1()
+        .border_color(colors.border)
+        .child(tabs_wrap);
+
+    if is_last_group {
+        let inspector_btn = div()
+            .id("toggle-inspector")
+            .size(px(26.0))
+            .ml(px(4.0))
+            .mr(px(6.0))
+            .flex_none()
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(6.0))
+            .border_1()
+            .cursor_pointer()
+            .tooltip(gpui_tooltip("Toggle inspector", &colors))
+            .tooltip_show_delay(TOOLTIP_SHOW_DELAY)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|s, _, _, cx| {
+                    cx.stop_propagation();
+                    s.toggle_inspector(cx);
+                }),
+            );
+        let inspector_btn = if inspector_open {
+            inspector_btn
+                .bg(colors.elevated)
+                .border_color(colors.border)
+                .child(gpui_icon("sidebarRight", 14.0, colors.text))
+        } else {
+            inspector_btn
+                .bg(transparent())
+                .border_color(transparent())
+                .hover(move |s| s.bg(hover_bg))
+                .child(gpui_icon("sidebarRight", 14.0, colors.muted))
+        };
+        bar = bar.child(inspector_btn);
+    }
+    let content: AnyElement = match g.active_tab() {
+        Some(Tab {
+            kind: PaneKind::Terminal { terminal_id, .. },
+            ..
+        }) => match shell.workspace.terminals.get(terminal_id) {
+            Some(t) => t.view.clone().into_any_element(),
+            None => div().into_any_element(),
+        },
+        Some(tab) => match shell.workspace.panes.get(&(pid, tab.id)) {
+            Some(p) => p.entity.element(),
+            None => div().into_any_element(),
+        },
+        None => div().into_any_element(),
+    };
 
     div()
         .id(("group", group_id as usize))
@@ -842,7 +863,6 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
         )
         .child(bar)
         .child(div().flex_1().min_h_0().child(content))
-        .children(chat_menu)
         .into_any_element()
 }
 

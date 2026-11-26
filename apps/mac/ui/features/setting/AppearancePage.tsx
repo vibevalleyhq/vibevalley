@@ -107,6 +107,7 @@ export function AppearanceGroups() {
         <Select
           label={t("web.setting.appearance.monoFont")}
           testid="mono-font"
+          class="w-56"
           value={monoFont()}
           options={availableFonts().map((f) => ({ value: f, label: f }))}
           onChange={(next) => {

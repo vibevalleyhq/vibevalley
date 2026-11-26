@@ -719,6 +719,7 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
         .call_as(Caller::User, "debug.trajectory.get", json!({ "id": "does-not-exist" }));
     assert_eq!(missing.biz_code, BizCode::SessionNotFound.code());
 
+    let base_board_watchers = started.router().slice_watcher_counts().get("board").copied().unwrap_or(0);
     let _board_watch = started.ctx().feed.subscribe(SliceKind::Board);
     let graph: DebugGraph = serde_json::from_value(started.router().call_as(Caller::User, "debug.graph", json!({})).data.unwrap()).unwrap();
     let g_issue = graph.sessions.iter().find(|s| s.session_id == "sess-issue-1").unwrap();
@@ -728,13 +729,13 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
 
     let snap: DebugSnapshot = serde_json::from_value(started.router().call_as(Caller::User, "debug.snapshot", json!({})).data.unwrap()).unwrap();
     assert_eq!(snap.state_cache.slice_seqs.len(), 6);
-    assert_eq!(snap.state_cache.slice_watchers.get("board"), Some(&1));
+    assert_eq!(snap.state_cache.slice_watchers.get("board"), Some(&(base_board_watchers + 1)));
     assert_eq!(snap.state_cache.counts.issues, 1);
     assert!(snap.state_cache.counts.sessions >= 2);
     assert_eq!(snap.overview.active_sessions, 1);
     assert!(snap.overview.latest_seq > 0);
     assert!(started.router().slice_seqs().len() == 6);
-    assert_eq!(started.router().slice_watcher_counts().get("board"), Some(&1));
+    assert_eq!(started.router().slice_watcher_counts().get("board"), Some(&(base_board_watchers + 1)));
 
     started.close_blocking();
 }

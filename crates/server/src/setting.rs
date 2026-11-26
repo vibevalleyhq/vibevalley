@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, BizCode, Feature, KeySource, KeyStatus, LitFalse, LitTrue, Locale, MemorySource, MemorySourceKind, Missing, ProviderBinding, ProviderConnection,
-    ProviderConnectionAdapter, ProviderStatus, Readiness, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, SpacePaths, Validation, VoiceSettings,
+    ProviderConnectionAdapter, ProviderStatus, Readiness, SettingsStatus, SettingsUpdate, SettingsUpdateVoice, SpacePaths, UserProfile, Validation,
+    VoiceSettings,
 };
 
 pub const MOSS: &str = "https://api.mosi.cn/v1";
@@ -282,6 +283,7 @@ pub struct SettingConfig {
     pub work_root: PathBuf,
     pub version: String,
     pub deepseek_api_key: String,
+    pub storage_backend: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -323,6 +325,8 @@ struct Stored {
     voice: Option<SettingsUpdateVoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
     providers: Option<Providers>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    profile: Option<UserProfile>,
 }
 
 pub struct Setting {
@@ -363,6 +367,17 @@ fn voice_problem(v: &SettingsUpdateVoice) -> String {
     String::new()
 }
 
+/// What is wrong with a profile update, or "".
+fn profile_problem(p: &UserProfile) -> String {
+    if p.display_name.as_deref().is_some_and(|n| n.trim().chars().count() > 80) {
+        return t("server.setting.profile.displayNameLong", &[]);
+    }
+    if p.tagline.as_deref().is_some_and(|s| s.trim().chars().count() > 160) {
+        return t("server.setting.profile.taglineLong", &[]);
+    }
+    String::new()
+}
+
 /// Validates a settings update; empty strings clear and are always fine.
 pub fn settings_problem(u: &SettingsUpdate) -> String {
     let trimmed = |k: &Option<String>| k.as_deref().unwrap_or("").trim().to_string();
@@ -385,6 +400,12 @@ pub fn settings_problem(u: &SettingsUpdate) -> String {
         }
         if m.key.as_deref().is_some_and(|k| has_space(k.trim())) {
             return t("server.setting.memory.keySpace", &[]);
+        }
+    }
+    if let Some(p) = &u.profile {
+        let problem = profile_problem(p);
+        if !problem.is_empty() {
+            return problem;
         }
     }
     u.voice.as_ref().map(voice_problem).unwrap_or_default()
@@ -556,6 +577,8 @@ impl Setting {
             voice_defaults: self.voice_defaults(),
             readiness,
             memory_sources,
+            profile: st.profile,
+            storage_backend: c.storage_backend.clone(),
         }
     }
 
@@ -602,6 +625,26 @@ impl Setting {
             if let Some(v) = &u.voice {
                 let overrides = voice_overrides(voice_over(defaults.clone(), v), &defaults);
                 next.voice = (overrides != SettingsUpdateVoice::default()).then_some(overrides);
+            }
+            if let Some(p) = &u.profile {
+                let mut merged = next.profile.take().unwrap_or_default();
+                let clean = |v: &str| {
+                    let t = v.trim();
+                    (!t.is_empty()).then(|| t.to_owned())
+                };
+                if let Some(v) = &p.display_name {
+                    merged.display_name = clean(v);
+                }
+                if let Some(v) = &p.avatar_attachment_id {
+                    merged.avatar_attachment_id = clean(v);
+                }
+                if let Some(v) = &p.avatar_preset {
+                    merged.avatar_preset = clean(v);
+                }
+                if let Some(v) = &p.tagline {
+                    merged.tagline = clean(v);
+                }
+                next.profile = (merged != UserProfile::default()).then_some(merged);
             }
             next
         };

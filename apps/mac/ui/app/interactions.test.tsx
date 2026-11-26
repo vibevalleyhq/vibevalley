@@ -310,8 +310,16 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
   expect(app.count("id:desk")).toBe(0);
   expect(app.count("id:content-sidebar")).toBe(1);
   expect(app.count("id:content-nav-artifact-outline")).toBe(1);
-  expect(app.count("id:content-nav-artifact-sheet")).toBe(1);
   expect(app.count("id:content-nav-artifact-prototype")).toBe(1);
+  expect(app.count("id:content-nav-artifact-sheet")).toBe(0);
+  expect(app.count("id:content-nav-artifact-diagram")).toBe(0);
+  expect(app.count("id:content-nav-artifact-storyboard")).toBe(0);
+  expect(app.count("id:content-nav-artifacts-more")).toBe(1);
+  expect(app.count("id:content-new-note-btn")).toBe(0);
+
+  await app.press("id:content-nav-artifacts-more");
+  await fake.pump(app);
+  expect(app.count("id:content-nav-artifact-sheet")).toBe(1);
   expect(app.count("id:content-nav-artifact-diagram")).toBe(1);
   expect(app.count("id:content-nav-artifact-storyboard")).toBe(1);
 
@@ -340,11 +348,12 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
   await fake.pumpUntil(app, () => app.count("id:artifacts") === 1 && app.count("id:artifact-directory-view") === 1);
   const createCall = fake.calls.find((c) => c.op === "artifact.create");
   expect(createCall?.payload).toMatchObject({ artifactType: "outline" });
-
-  fake.clearCalls();
-  await app.press("id:content-new-note-btn");
-  await fake.pumpUntil(app, () => created.length === 2 && app.value("id:artifact-title") === created[1]?.title);
-  expect(fake.calls.find((c) => c.op === "artifact.create")?.payload).toMatchObject({ artifactType: "outline" });
+  expect(app.texts()).toContain(created[0]?.title);
+  await app.press("id:artifact-title");
+  await fake.pump(app);
+  expect(app.value("id:artifact-title")).toBe(created[0]?.title);
+  await app.keyboard.press("escape");
+  await fake.pump(app);
 
   await app.press("id:content-nav-artifacts-all");
   await fake.pump(app);
@@ -632,10 +641,6 @@ test("settings: general settings route renders controls and persists updates", a
   expect(app.count("id:start-workbench")).toBe(1);
   expect(app.count("id:language-zh")).toBe(1);
   expect(app.count("id:language-en")).toBe(1);
-  expect(app.count("id:theme-dark")).toBe(1);
-
-  await app.press("id:theme-dark");
-  expect(fake.calls.find((c) => c.op === "host.theme")?.payload).toBe("dark");
 
   await app.press("id:start-farm");
 
@@ -644,11 +649,16 @@ test("settings: general settings route renders controls and persists updates", a
   await fake.pump(app);
   expect(fake.calls.find((c) => c.op === "setting.update")?.payload).toMatchObject({ locale: "en" });
   expect(fake.calls.find((c) => c.op === "host.locale")?.payload).toBe("en");
+
+  await app.press("id:settings-section-appearance");
+  await fake.pumpUntil(app, () => app.count("id:theme-dark") === 1);
+  await app.press("id:theme-dark");
+  expect(fake.calls.find((c) => c.op === "host.theme")?.payload).toBe("dark");
 });
 
 test("settings: appearance motion control dispatches host.motion, syncs host events, and applies off mode", async () => {
   const { app, fake } = await mountApp(
-    "/settings/general",
+    "/settings/appearance",
     (f) => {
       f.respond("host.info", { capabilities: ["theme", "motion"], motion: "on" });
       f.respond("host.motion", null);
@@ -692,7 +702,7 @@ test("settings: appearance motion control dispatches host.motion, syncs host eve
   expect(app.count("id:issue-new-dialog")).toBe(0);
 
   const bootOff = await mountApp(
-    "/settings/general",
+    "/settings/appearance",
     (f) => {
       f.respond("host.info", { capabilities: ["theme", "motion"], motion: "off" });
     },
@@ -835,9 +845,11 @@ test("regression: defineStored preferences persist through nsh Storage and survi
     f.respond("host.font", { monoFont: "Menlo", terminalFontSize: 14, uiFontSize: 14 });
   });
 
+  await first.app.press("id:start-farm");
+  await first.app.press("id:settings-section-appearance");
+  await first.fake.pumpUntil(first.app, () => first.app.count("id:theme-dark") === 1);
   await first.app.press("id:theme-dark");
   await first.app.press("id:scale-110");
-  await first.app.press("id:start-farm");
   await first.app.waitUntil(() => {
     const raw = first.app.storage()["vibevalley.prefs"];
     if (!raw) return false;
@@ -853,29 +865,30 @@ test("regression: defineStored preferences persist through nsh Storage and survi
   });
 
   const reloaded = await mountApp("/settings/general", undefined, { storage: persisted });
+  await reloaded.app.waitUntil(() => reloaded.app.viewStyle("id:start-farm")?.backgroundColor !== undefined);
+  expect(reloaded.app.viewStyle("id:start-workbench")?.backgroundColor).toBeUndefined();
+
+  await reloaded.app.press("id:settings-section-appearance");
+  await reloaded.fake.pumpUntil(reloaded.app, () => reloaded.app.count("id:theme-dark") === 1);
   await reloaded.app.waitUntil(
-    () =>
-      reloaded.app.viewStyle("id:theme-dark")?.backgroundColor !== undefined &&
-      reloaded.app.viewStyle("id:scale-110")?.backgroundColor !== undefined &&
-      reloaded.app.viewStyle("id:start-farm")?.backgroundColor !== undefined,
+    () => reloaded.app.viewStyle("id:theme-dark")?.backgroundColor !== undefined && reloaded.app.viewStyle("id:scale-110")?.backgroundColor !== undefined,
   );
   expect(reloaded.app.viewStyle("id:theme-system")?.backgroundColor).toBeUndefined();
-  expect(reloaded.app.viewStyle("id:start-workbench")?.backgroundColor).toBeUndefined();
 
   const rootReload = await mountApp("/", undefined, { storage: persisted });
   await rootReload.fake.pumpUntil(rootReload.app, () => rootReload.fake.acts.some((a) => a.type === "openFarm"));
   expect(rootReload.fake.acts.some((a) => a.type === "openFarm")).toBe(true);
 });
 
-test("bottom-left update control: one-click install when idle, downloading pill, and confirm dialog when sessions are working", async () => {
+test("bottom-left update control: always shows release-notes dialog before restart, downloading/verifying/installing pills, and active-session warning", async () => {
   const readyApp = await mountApp("/issues", (f) => {
     f.respond("host.updateState", {
       _tag: "ready",
       version: "0.4.0",
       next: "0.4.1",
-      notes: ["Faster content views"],
+      notes: ["Faster content views", "Resumable auto-update"],
       newFarm: false,
-      page: "",
+      page: "https://github.com/vibevalleyhq/vibevalley/releases/tag/v0.4.1",
     });
     f.respond("host.updateInstall", null);
   });
@@ -887,8 +900,21 @@ test("bottom-left update control: one-click install when idle, downloading pill,
   await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.app.count("id:rail-update-btn") === 1);
   readyApp.fake.clearCalls();
   await readyApp.app.press("id:rail-update-btn");
+  await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.app.count("id:rail-update-confirm-dialog") === 1);
+  expect(readyApp.fake.calls.some((c) => c.op === "host.updateInstall")).toBe(false);
+  expect(readyApp.app.count("id:rail-update-warning")).toBe(0);
+  expect(readyApp.app.count("id:rail-update-notes")).toBe(1);
+  expect(readyApp.app.texts()).toContain("v0.4.0 → v0.4.1");
+  expect(readyApp.app.texts()).toContain("Faster content views");
+  expect(readyApp.app.texts()).toContain("Resumable auto-update");
+  await readyApp.app.press("id:rail-update-confirm-cancel");
+  await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.app.count("id:rail-update-confirm-dialog") === 0);
+  expect(readyApp.fake.calls.some((c) => c.op === "host.updateInstall")).toBe(false);
+
+  await readyApp.app.press("id:rail-update-btn");
+  await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.app.count("id:rail-update-confirm-dialog") === 1);
+  await readyApp.app.press("id:rail-update-confirm-sure");
   await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.fake.calls.some((c) => c.op === "host.updateInstall"));
-  expect(readyApp.app.count("id:rail-update-confirm-dialog")).toBe(0);
 
   const downloadingApp = await mountApp("/issues", (f) => {
     f.respond("host.updateState", {
@@ -896,10 +922,28 @@ test("bottom-left update control: one-click install when idle, downloading pill,
       version: "0.4.0",
       next: "0.4.1",
       percent: 42,
+      downloadedBytes: Math.round(42.1 * 1024 * 1024),
+      totalBytes: Math.round(86.4 * 1024 * 1024),
+      speedBps: Math.round(3.2 * 1024 * 1024),
     });
   });
   await downloadingApp.fake.pumpUntil(downloadingApp.app, () => downloadingApp.app.count("id:rail-update-downloading") === 1);
+  expect(downloadingApp.app.count("id:rail-update-progress")).toBe(1);
   expect(downloadingApp.app.texts()).toContain("42%");
+
+  await downloadingApp.fake.pushUpdateState(downloadingApp.app, {
+    _tag: "verifying",
+    version: "0.4.0",
+    next: "0.4.1",
+  });
+  await downloadingApp.fake.pumpUntil(downloadingApp.app, () => downloadingApp.app.count("id:rail-update-verifying") === 1);
+
+  await downloadingApp.fake.pushUpdateState(downloadingApp.app, {
+    _tag: "installing",
+    version: "0.4.0",
+    next: "0.4.1",
+  });
+  await downloadingApp.fake.pumpUntil(downloadingApp.app, () => downloadingApp.app.count("id:rail-update-installing") === 1);
 
   const busyApp = await mountApp("/issues", (f) => {
     f.respond("host.updateState", {
@@ -916,6 +960,7 @@ test("bottom-left update control: one-click install when idle, downloading pill,
   busyApp.fake.clearCalls();
   await busyApp.app.press("id:rail-update-btn");
   await busyApp.fake.pumpUntil(busyApp.app, () => busyApp.app.count("id:rail-update-confirm-dialog") === 1);
+  expect(busyApp.app.count("id:rail-update-warning")).toBe(1);
   expect(busyApp.fake.calls.some((c) => c.op === "host.updateInstall")).toBe(false);
   await busyApp.app.press("id:rail-update-confirm-sure");
   await busyApp.fake.pumpUntil(busyApp.app, () => busyApp.fake.calls.some((c) => c.op === "host.updateInstall"));

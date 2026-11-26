@@ -95,8 +95,8 @@
 
 ## 还没做的
 
-- `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证（计费、配额、插话、取消与跨版本恢复）：[持久执行与驱动验收](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
-- 档案配置 `toolsets`，技能库改用 Agent Skills 文件夹按需加载：[agent 带什么：工具集和技能](.agents/notes/proposed/architecture/2026-10-28-toolsets-and-skills.md)。
+- `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证（计费、配额、插话、取消与跨版本恢复）：`#55`。
+- 档案配置 `toolsets`，技能库改用 Agent Skills 文件夹按需加载：`#52`。
 
 ## 怎么验证
 

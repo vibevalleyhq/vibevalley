@@ -14,6 +14,7 @@ import { mix, tone } from "../../design/tone";
 import { useNow } from "../../infra/base/dom";
 import { ago, tookText } from "../../infra/base/format";
 import { useTimeout } from "../../infra/base/timer";
+import { localizeRuntimeError } from "../../infra/runtimeError";
 import { createEffect } from "../../infra/solid";
 import { createRunEvents } from "./events";
 import {
@@ -107,12 +108,7 @@ export function WorkLog(props: { steps: SessionEvent[]; now: number; asked?: str
   const runs = computed(() => runsOf(shown()));
   const firstAsked = computed(() => shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq);
   return (
-    <Scroll
-      testID="work-log"
-      class={`rounded-md border border-line bg-page ${props.class ?? ""}`}
-      style={{ maxHeight: props.height ?? 352 }}
-      accessibilityLabel={t("web.session.log.process")}
-    >
+    <Scroll testID="work-log" class={props.class ?? ""} style={{ maxHeight: props.height ?? 352 }} accessibilityLabel={t("web.session.log.process")}>
       <Each of={runs()} key={(r) => r.run ?? (r.asked ?? r.steps[0])?.seq ?? -1}>
         {(r, i) => (
           <RunFold
@@ -137,15 +133,18 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
     const answer = answerOf(props.run);
     return open() ? props.run.steps : answer ? [answer] : [];
   });
+  const hasBody = computed(() => props.run.asked !== undefined || props.run.steps.length > 0);
   return (
-    <View testID="run" class={`gap-1.5 px-2.5 pt-2 pb-2.5 ${props.last ? "" : "border-b border-line"}`}>
+    <View testID="run" class={`overflow-hidden rounded-lg border border-line bg-elevated ${props.last ? "" : "mb-2.5"}`}>
       <View
         role="button"
         testID="run-fold"
         onPress={() => toggled.set(!open())}
         accessibilityLabel={open() ? t("web.session.log.fold") : t("web.session.log.unfold")}
         accessibilityState={{ expanded: open() }}
-        class="flex-row items-center gap-2 rounded-md px-1.5 py-1 hover:bg-hover"
+        class={`h-8 flex-row items-center gap-2 bg-side px-3 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover ${
+          hasBody() ? "border-b border-line" : "border-b-0"
+        }`}
       >
         <View
           class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
@@ -165,37 +164,49 @@ function RunFold(props: { run: RunView; last: boolean; live: boolean; now: numbe
             <Dot tone="water" size={7} ring={false} />
           </If>
         </View>
-        <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{props.label}</Text>
-        <View class="shrink-0 flex-row items-center gap-2">
-          <Text class={`text-xs tabular-nums ${props.live ? "font-medium text-water" : hasError() ? "text-berry" : "text-muted"}`}>
-            {`${t("web.session.log.steps", { n: props.run.steps.length, took: tookText(runMs(props.run, end())) })}${props.live ? t("web.session.log.live") : ""}`}
-          </Text>
-          <If when={props.run.asked}>{(asked) => <When at={asked().time} now={props.now} />}</If>
-        </View>
+        <Text class="shrink-0 text-xs font-semibold text-ink">{props.label}</Text>
+        <Text class={`min-w-0 flex-1 truncate text-2xs tabular-nums ${props.live ? "font-medium text-water" : hasError() ? "text-berry" : "text-muted"}`}>
+          {`${t("web.session.log.steps", { n: props.run.steps.length, took: tookText(runMs(props.run, end())) })}${props.live ? t("web.session.log.live") : ""}`}
+        </Text>
+        <If when={props.run.asked}>{(asked) => <When at={asked().time} now={props.now} />}</If>
       </View>
       <If when={props.run.asked}>
         {(asked) => (
-          <View class="rounded-md border-l-2 px-3 py-2" style={{ backgroundColor: mix("wheat", 0.14), borderColor: mix("wheat", 0.65) }}>
-            <Folded text={asked().text} lines={4} />
+          <View class="border-b px-3 py-1.5" style={{ backgroundColor: mix("wheat", 0.12), borderColor: mix("line", 0.45) }}>
+            <Folded text={localizeRuntimeError(asked().text).text} lines={4} />
           </View>
         )}
       </If>
       <If when={props.run.steps.length > 0}>
-        <TimeBar run={props.run} end={end()} />
+        <View class="border-b px-3 py-1.5" style={{ borderColor: mix("line", 0.45) }}>
+          <TimeBar run={props.run} end={end()} />
+        </View>
       </If>
       <Each of={shown()} key={(s) => s.seq}>
-        {(s) => (
-          <View class={s().under !== undefined ? "ml-5 border-l-2 pl-2.5" : ""} style={s().under !== undefined ? { borderColor: mix("leaf", 0.5) } : undefined}>
-            <WorkLogStep step={s()} now={props.now} />
-          </View>
-        )}
+        {(s, idx) => {
+          const hasDivider = () => idx() < shown().length - 1 || (!open() && props.run.steps.length > shown().length);
+          return (
+            <View
+              class={`${hasDivider() ? "border-b" : ""} ${s().under !== undefined ? "ml-4 border-l-2" : ""}`}
+              style={
+                s().under !== undefined
+                  ? { borderColor: mix("leaf", 0.5), ...(hasDivider() ? { borderBottomColor: mix("line", 0.45) } : {}) }
+                  : hasDivider()
+                    ? { borderColor: mix("line", 0.45) }
+                    : undefined
+              }
+            >
+              <WorkLogStep step={s()} now={props.now} />
+            </View>
+          );
+        }}
       </Each>
       <If when={!open() && props.run.steps.length > shown().length}>
         <View
           role="button"
           testID="run-see"
           onPress={() => toggled.set(true)}
-          class="flex-row items-center gap-1.5 self-start rounded-md px-2 py-1 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+          class="flex-row items-center gap-1.5 bg-side px-3 py-1.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
         >
           <Icon name="expand" size={10} tone="water" />
           <Text class="text-xs font-medium text-water tabular-nums">{t("web.session.log.see", { n: props.run.steps.length })}</Text>
@@ -213,7 +224,7 @@ function TimeBar(props: { run: RunView; end: number }) {
     return total <= 0 ? 1 : total / 80;
   });
   return (
-    <View testID="time-bar" class="h-2 flex-row gap-px overflow-hidden rounded-sm bg-hover">
+    <View testID="time-bar" class="h-1.5 flex-row gap-px overflow-hidden rounded-sm bg-hover">
       <Each of={spans()} key={(s) => s.step.seq}>
         {(s) => (
           <View
@@ -227,7 +238,7 @@ function TimeBar(props: { run: RunView; end: number }) {
 }
 
 function When(props: { at: number; now: number }) {
-  return <Text class="shrink-0 text-right text-2xs text-faint tabular-nums">{ago(props.at, props.now)}</Text>;
+  return <Text class="w-12 shrink-0 text-right text-2xs text-faint tabular-nums">{ago(props.at, props.now)}</Text>;
 }
 
 function Folded(props: { text: string; lines: number; markdown?: boolean; muted?: boolean }) {
@@ -256,13 +267,9 @@ function Folded(props: { text: string; lines: number; markdown?: boolean; muted?
 
 function Box(props: { tint?: string; dashed?: boolean; label: string; step: SessionEvent; now: number; children: JSX.Element }) {
   return (
-    <View
-      testID="step"
-      class={`rounded-md px-3 py-2 ${props.dashed === true ? "border border-dashed border-line bg-page" : ""}`}
-      style={props.tint ? { backgroundColor: props.tint } : undefined}
-    >
-      <View class="mb-1 flex-row items-center gap-2">
-        <Text class={`min-w-0 flex-1 truncate text-xs font-semibold text-muted ${props.dashed === true ? "italic" : ""}`}>{props.label}</Text>
+    <View testID="step" class={`px-3 py-1.5 ${props.dashed === true ? "bg-page" : ""}`} style={props.tint ? { backgroundColor: props.tint } : undefined}>
+      <View class="mb-0.5 flex-row items-center gap-2">
+        <Text class={`min-w-0 flex-1 truncate text-2xs font-semibold text-muted ${props.dashed === true ? "italic" : ""}`}>{props.label}</Text>
         <When at={props.step.time} now={props.now} />
       </View>
       {props.children}
@@ -273,11 +280,11 @@ function Box(props: { tint?: string; dashed?: boolean; label: string; step: Sess
 function Line(props: { mark: IconName; step: SessionEvent; now: number; kind: LineKind; text?: string }) {
   const style = () => lineKinds[props.kind];
   return (
-    <View testID="step" class={`flex-row items-start gap-2 rounded-md px-2.5 py-1.5 ${style().bgClass}`}>
-      <View class="mt-0.5 h-3.5 w-3.5 shrink-0 items-center justify-center">
+    <View testID="step" class={`flex-row items-center gap-2 px-3 py-1.5 ${style().bgClass}`}>
+      <View class="h-3.5 w-3.5 shrink-0 items-center justify-center">
         <Icon name={props.mark} size={12} tone={style().iconTone} />
       </View>
-      <Text class={`min-w-0 flex-1 text-xs tabular-nums ${style().text}`}>{props.text ?? props.step.text}</Text>
+      <Text class={`min-w-0 flex-1 text-xs tabular-nums ${style().text}`}>{props.text ?? localizeRuntimeError(props.step.text).text}</Text>
       <When at={props.step.time} now={props.now} />
     </View>
   );
@@ -290,12 +297,12 @@ export function WorkLogStep(props: { step: SessionEvent; now: number }) {
   return (
     <>
       <If when={type() === "user/message"}>
-        <Box tint={mix("wheat", 0.14)} label={sub() ? t("web.session.log.subagentGot") : t("web.session.log.told")} step={props.step} now={props.now}>
-          <Folded text={props.step.text} lines={4} />
+        <Box tint={mix("wheat", 0.12)} label={sub() ? t("web.session.log.subagentGot") : t("web.session.log.told")} step={props.step} now={props.now}>
+          <Folded text={localizeRuntimeError(props.step.text).text} lines={4} />
         </Box>
       </If>
       <If when={type() === "memory/recalled"}>
-        <Box tint={mix("leaf", 0.15)} label={t("web.session.log.recalled")} step={props.step} now={props.now}>
+        <Box tint={mix("leaf", 0.12)} label={t("web.session.log.recalled")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={3} />
         </Box>
       </If>
@@ -305,7 +312,7 @@ export function WorkLogStep(props: { step: SessionEvent; now: number }) {
         </Box>
       </If>
       <If when={type() === "assistant/message"}>
-        <Box tint={mix("hover", 1)} label={sub() ? t("web.session.log.subagentSaid") : t("web.session.log.said")} step={props.step} now={props.now}>
+        <Box tint={mix("hover", 0.6)} label={sub() ? t("web.session.log.subagentSaid") : t("web.session.log.said")} step={props.step} now={props.now}>
           <Folded text={props.step.text} lines={8} markdown />
         </Box>
       </If>
@@ -335,7 +342,7 @@ function WorkLogCopyButton(props: { testID: string; copied: boolean; onCopy: () 
       onPress={props.onCopy}
       class="flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
     >
-      <Icon name={props.copied ? "check" : "copy"} size={11} tone={props.copied ? "leaf" : "muted"} />
+      <Icon name={props.copied ? "check" : "copy"} size={12} tone={props.copied ? "leaf" : "muted"} />
       <Text class={`text-2xs ${props.copied ? "font-medium text-ok-ink" : "text-muted"}`}>
         {props.copied ? t("web.base.rich.copied") : t("web.base.rich.copy")}
       </Text>
@@ -380,8 +387,8 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
         testID="tool-step"
         onPress={() => open.set(!open())}
         accessibilityState={{ expanded: open() }}
-        class={`w-full flex-row items-center gap-2 rounded-md px-2 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${
-          failed() ? "hover:bg-hover" : open() ? "bg-hover" : "hover:bg-hover"
+        class={`group w-full flex-row items-center gap-2 px-3 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${
+          failed() ? "hover:bg-hover" : open() ? "bg-selected" : "hover:bg-hover"
         }`}
         style={failed() ? { backgroundColor: open() ? mix("bad-soft", 0.85) : mix("bad-soft", 0.45) } : undefined}
       >
@@ -389,12 +396,12 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
           class={`h-3.5 w-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
           style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
         >
-          <Icon name="expand" size={10} tone="muted" />
+          <Icon name="expand" size={10} tone={open() ? "ink" : "muted"} />
         </View>
-        <View class="h-4 w-4 shrink-0 items-center justify-center">
+        <View class="h-3.5 w-3.5 shrink-0 items-center justify-center">
           <Icon name={actionIcon[props.step.action ?? "other"]} size={14} tone={failed() ? "berry" : running() ? "water" : "muted"} />
         </View>
-        <Text class={`w-14 shrink-0 truncate text-xs font-medium ${failed() ? "text-berry" : "text-ink"}`}>{kind()}</Text>
+        <Text class={`w-16 shrink-0 truncate text-xs font-medium ${failed() ? "text-berry" : "text-ink"}`}>{kind()}</Text>
         <Text class={`min-w-0 flex-1 truncate font-mono text-xs ${failed() ? "text-berry" : "text-muted"}`}>{farm() ?? props.step.text}</Text>
         <View accessibilityLabel={state()} tooltip={<Bubble text={state()} />} class="h-4 w-4 shrink-0 items-center justify-center">
           <If when={!running()} else={<Dot tone="water" size={6} ring={false} />}>
@@ -404,10 +411,10 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
         <When at={props.step.time} now={props.now} />
       </View>
       <If when={open()}>
-        <View class="gap-1.5 pt-1.5 pr-2 pb-2 pl-7.5">
+        <View class="gap-2 border-t border-line py-2.5 pr-3.5 pl-8" style={{ backgroundColor: mix("side", 0.7) }}>
           <View class="flex-row items-center gap-2">
             <If when={props.step.tool}>
-              <Text class="font-mono text-xs text-muted">{t("web.session.log.tool", { name: props.step.tool ?? "" })}</Text>
+              <Text class="font-mono text-xs font-medium text-ink">{t("web.session.log.tool", { name: props.step.tool ?? "" })}</Text>
             </If>
             <View class={`rounded-sm px-1.5 py-px ${badgeClass()}`} style={running() ? { backgroundColor: mix("water", 0.14) } : undefined}>
               <Text class={`text-2xs font-medium ${badgeText()}`}>{state()}</Text>
@@ -421,30 +428,32 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
                   <WorkLogCopyButton testID="worklog-copy-input" copied={copiedSlot() === "input"} onCopy={() => copyPayload("input", text())} />
                 </View>
                 <Scroll class="max-h-40 rounded-md border border-line bg-code-bg px-2.5 py-2">
-                  <Text class="font-mono text-xs text-code-ink select-text">{text()}</Text>
+                  <Text class="select-text font-mono text-xs text-code-ink">{text()}</Text>
                 </Scroll>
               </View>
             )}
           </If>
-          <View class="flex-row items-center justify-between gap-2">
-            <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.output")}</Text>
-            <If when={props.step.output}>
-              {(out) => <WorkLogCopyButton testID="worklog-copy-output" copied={copiedSlot() === "output"} onCopy={() => copyPayload("output", out())} />}
+          <View class="gap-1">
+            <View class="flex-row items-center justify-between gap-2">
+              <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.output")}</Text>
+              <If when={props.step.output}>
+                {(out) => <WorkLogCopyButton testID="worklog-copy-output" copied={copiedSlot() === "output"} onCopy={() => copyPayload("output", out())} />}
+              </If>
+            </View>
+            <If
+              when={props.step.output}
+              else={<Text class="text-xs text-faint">{running() ? t("web.session.log.pending") : t("web.session.log.noOutput")}</Text>}
+            >
+              {(out) => (
+                <Scroll
+                  class={`rounded-md border px-2.5 py-2 ${failed() ? "bg-bad-soft" : "border-line bg-page"}`}
+                  style={failed() ? { maxHeight: 224, borderColor: mix("berry", 0.3) } : { maxHeight: 224 }}
+                >
+                  <Text class={`select-text font-mono text-xs ${failed() ? "text-berry" : "text-ink"}`}>{out()}</Text>
+                </Scroll>
+              )}
             </If>
           </View>
-          <If
-            when={props.step.output}
-            else={<Text class="text-xs text-faint">{running() ? t("web.session.log.pending") : t("web.session.log.noOutput")}</Text>}
-          >
-            {(out) => (
-              <Scroll
-                class={`rounded-md border px-2.5 py-2 ${failed() ? "bg-bad-soft" : "border-line bg-side"}`}
-                style={failed() ? { maxHeight: 224, borderColor: mix("berry", 0.3) } : { maxHeight: 224 }}
-              >
-                <Text class={`font-mono text-xs select-text ${failed() ? "text-berry" : "text-ink"}`}>{out()}</Text>
-              </Scroll>
-            )}
-          </If>
         </View>
       </If>
     </View>

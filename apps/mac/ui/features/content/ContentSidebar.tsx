@@ -1,10 +1,9 @@
-import { Scroll, Text, View, type JSX } from "nsh";
+import { Scroll, signal, Text, View, type JSX } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { ARTIFACT_TYPES, type LibraryFileKind, LibraryFileKindValues } from "@vibevalley/protocol";
 
-import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
@@ -12,7 +11,7 @@ import type { IconName } from "../../design/icons";
 import { ActiveBar, Kbd } from "../../design/layout";
 import { Bubble } from "../../design/Tip";
 import { currentHost } from "../../infra/host";
-import { ready, useQuery, useQueryClient } from "../../infra/query";
+import { ready, useQuery } from "../../infra/query";
 import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import {
@@ -30,7 +29,6 @@ import {
 import { defineStored } from "../../infra/state/stored";
 import { artifactTypeIcon, artifactTypeLabel, useArtifacts, useInstalledApplets } from "../artifact";
 import { libraryQuery } from "../media";
-import { createQuickBlankNote } from "./templates";
 
 const artifactsSectionOpen = defineStored("content.sidebar.artifacts", z.boolean(), true);
 const mediaSectionOpen = defineStored("content.sidebar.media", z.boolean(), true);
@@ -60,8 +58,8 @@ const rowClass = (active: boolean, indent = false) =>
 export function ContentSidebar() {
   const router = useRouter();
   const location = useLocation();
-  const queries = useQueryClient();
-  const act = createAct();
+  const showEmptyArtifacts = signal(false);
+  const showEmptyMedia = signal(false);
 
   const artifacts = useArtifacts(() => ({}));
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
@@ -98,22 +96,47 @@ export function ContentSidebar() {
     }),
   );
 
+  const activeArtifactFilter = createMemo(() => {
+    const b = bucket();
+    return inBrowse() && b.kind === "artifacts" ? b.artifactType : undefined;
+  });
+  const activeMediaFilter = createMemo(() => {
+    const b = bucket();
+    return inBrowse() && b.kind === "media" ? b.fileKind : undefined;
+  });
+
+  const visibleArtifactFacets = createMemo(() => {
+    const c = counts();
+    const activeType = activeArtifactFilter();
+    const expanded = showEmptyArtifacts();
+    return artifactFacets.filter((facet) => expanded || facet.type === activeType || countForBucket(c, { kind: "artifacts", artifactType: facet.type }) > 0);
+  });
+  const emptyArtifactFacetCount = createMemo(() => {
+    const c = counts();
+    const activeType = activeArtifactFilter();
+    return artifactFacets.filter((facet) => facet.type !== activeType && countForBucket(c, { kind: "artifacts", artifactType: facet.type }) === 0).length;
+  });
+
+  const visibleMediaKinds = createMemo(() => {
+    const c = counts();
+    const activeKind = activeMediaFilter();
+    const expanded = showEmptyMedia();
+    return mediaKinds.filter((kind) => expanded || kind === activeKind || countForBucket(c, { kind: "media", fileKind: kind }) > 0);
+  });
+  const emptyMediaKindCount = createMemo(() => {
+    const c = counts();
+    const activeKind = activeMediaFilter();
+    return mediaKinds.filter((kind) => kind !== activeKind && countForBucket(c, { kind: "media", fileKind: kind }) === 0).length;
+  });
+
   const selectBucket = (next: ContentBucket) => {
     contentBrowseBucket.set(next);
     if (!inBrowse()) router.navigate("/library");
   };
 
-  const newBlankNote = () => {
-    if (act.busy()) return;
-    const existingNoteTitles = allArtifacts()
-      .filter((a) => a.artifactType === "outline")
-      .map((a) => a.title);
-    void act.run(() => createQuickBlankNote({ queries, router, existingNoteTitles }));
-  };
-
   return (
     <View testID="content-sidebar" accessibilityLabel={t("web.library.content.title")} class="h-full w-58 shrink-0 border-r border-line bg-side">
-      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-1.5 border-b border-line px-2.5">
+      <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-1.5 border-b border-line px-2.5">
         <IconButton
           icon="sidebar"
           size={16}
@@ -190,23 +213,10 @@ export function ContentSidebar() {
           open={artifactsSectionOpen.get()}
           onSelect={() => selectBucket({ kind: "artifacts" })}
           onToggle={() => artifactsSectionOpen.update((on) => !on)}
-          action={
-            <IconButton
-              icon="add"
-              size={12}
-              label={t("web.library.content.newNote")}
-              testid="content-new-note-btn"
-              disabled={act.busy()}
-              onClick={newBlankNote}
-            />
-          }
         >
-          <Each of={artifactFacets} key={(facet) => facet.type}>
+          <Each of={visibleArtifactFacets()} key={(facet) => facet.type}>
             {(facet) => {
-              const active = () => {
-                const b = bucket();
-                return inBrowse() && b.kind === "artifacts" && b.artifactType === facet().type;
-              };
+              const active = () => activeArtifactFilter() === facet().type;
               return (
                 <NavRow
                   testID={`content-nav-artifact-${facet().type}`}
@@ -220,6 +230,14 @@ export function ContentSidebar() {
               );
             }}
           </Each>
+          <If when={emptyArtifactFacetCount() > 0}>
+            <FoldEmptyToggle
+              testID="content-nav-artifacts-more"
+              expanded={showEmptyArtifacts()}
+              hiddenCount={emptyArtifactFacetCount()}
+              onToggle={() => showEmptyArtifacts.set(!showEmptyArtifacts())}
+            />
+          </If>
         </NavSection>
 
         <NavSection
@@ -233,12 +251,9 @@ export function ContentSidebar() {
           onSelect={() => selectBucket({ kind: "media" })}
           onToggle={() => mediaSectionOpen.update((on) => !on)}
         >
-          <Each of={mediaKinds} key={(kind) => kind}>
+          <Each of={visibleMediaKinds()} key={(kind) => kind}>
             {(kind) => {
-              const active = () => {
-                const b = bucket();
-                return inBrowse() && b.kind === "media" && b.fileKind === kind();
-              };
+              const active = () => activeMediaFilter() === kind();
               return (
                 <NavRow
                   testID={`content-nav-media-${kind()}`}
@@ -252,8 +267,33 @@ export function ContentSidebar() {
               );
             }}
           </Each>
+          <If when={emptyMediaKindCount() > 0}>
+            <FoldEmptyToggle
+              testID="content-nav-media-more"
+              expanded={showEmptyMedia()}
+              hiddenCount={emptyMediaKindCount()}
+              onToggle={() => showEmptyMedia.set(!showEmptyMedia())}
+            />
+          </If>
         </NavSection>
       </Scroll>
+    </View>
+  );
+}
+
+function FoldEmptyToggle(props: { testID: string; expanded: boolean; hiddenCount: number; onToggle: () => void }) {
+  const label = () => (props.expanded ? t("web.library.content.fewerTypes") : t("web.library.content.moreTypes", { n: props.hiddenCount }));
+  return (
+    <View
+      role="button"
+      testID={props.testID}
+      accessibilityLabel={label()}
+      accessibilityState={{ expanded: props.expanded }}
+      onPress={() => props.onToggle()}
+      class="h-7 flex-row items-center gap-2 rounded-md pr-2 pl-6 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+    >
+      <Icon name={props.expanded ? "choose" : "expand"} size={12} tone="faint" />
+      <Text class="min-w-0 flex-1 truncate text-xs text-faint">{label()}</Text>
     </View>
   );
 }

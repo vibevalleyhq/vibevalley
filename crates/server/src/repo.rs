@@ -5,13 +5,13 @@
 //! `git` is the system binary (as everywhere in VibeValley); the calls here
 //! (`init`, `clone`, `log --all`) are ones `vibevalley-git` does not offer.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
@@ -20,7 +20,7 @@ use tracing::Instrument;
 use tracing::instrument::WithSubscriber;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Author, BizCode, DayCount, GitHubStatus, Issue, IssueTemplate, JsNumber, LanguageCount, MAX_RUNNING, NewRepo, PullRequestCapability,
+    ApiError, Author, BizCode, DayCount, GitHubStatus, Issue, IssueTemplate, JsNumber, LanguageCount, MAX_RUNNING, MountRepo, NewRepo, PullRequestCapability,
     RepoActivity, RepoLanguages, RepoStack, RepoSummary, RepoTemplates, TemplateBlank, TemplateKind, Validation,
 };
 
@@ -297,39 +297,118 @@ pub async fn probe_github_async() -> GitHubStatus {
     parse_github_probe(version, Some(auth))
 }
 
-/// A folder under the repos root.
+const MOUNTS_FILE: &str = ".mounts.json";
+
+/// Persisted external repository mount record under `<work_root>/repos/.mounts.json`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MountedRepo {
+    name: String,
+    path: PathBuf,
+}
+
+/// A managed folder under the repos root or a mounted external repository.
 #[derive(Debug, Clone)]
 pub struct RepoFolder {
     pub name: String,
     pub path: PathBuf,
     pub git: bool,
+    pub external: bool,
 }
 
-/// Repository manager rooted at `<work_root>/repos`.
+/// Repository manager rooted at `<work_root>/repos` plus persisted external mounts.
+#[derive(Debug)]
 pub struct Repo {
     root: PathBuf,
+    canon_root: PathBuf,
     per_repo: usize,
     tokei: String,
     github: Mutex<Option<GitHubStatus>>,
     capabilities: Mutex<HashMap<String, PullRequestCapability>>,
     /// One change at a time per repo name; names being created are hidden from listings.
-    pending: Mutex<std::collections::HashSet<String>>,
+    pending: Mutex<HashSet<String>>,
+    /// Mounted external git repositories stored in `<work_root>/repos/.mounts.json`.
+    mounts: Mutex<Vec<MountedRepo>>,
+    mount_lock: tokio::sync::Mutex<()>,
     cancel: CancellationToken,
     probe: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
+async fn read_mounts_async(file: &Path) -> Vec<MountedRepo> {
+    let Ok(body) = tokio::fs::read_to_string(file).await else {
+        return Vec::new();
+    };
+    let mut parsed = serde_json::from_str::<Vec<MountedRepo>>(&body).unwrap_or_default();
+    for m in &mut parsed {
+        if let Ok(canon) = tokio::fs::canonicalize(&m.path).await {
+            m.path = canon;
+        }
+    }
+    parsed
+}
+
+async fn write_mounts_async(file: &Path, mounts: &[MountedRepo]) -> Result<(), ApiError> {
+    if let Some(dir) = file.parent() {
+        tokio::fs::create_dir_all(dir).await.map_err(|e| refused(e.to_string()))?;
+    }
+    let text = serde_json::to_string_pretty(mounts).unwrap_or_else(|_| "[]".to_string()) + "\n";
+    let tmp = file.with_extension("json.tmp");
+    tokio::fs::write(&tmp, text.as_bytes()).await.map_err(|e| refused(e.to_string()))?;
+    tokio::fs::rename(&tmp, file).await.map_err(|e| refused(e.to_string()))
+}
+
+fn sanitize_repo_name(raw: &str) -> String {
+    let mut cleaned: String = raw
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-') { c } else { '-' })
+        .collect();
+    while cleaned.starts_with(|c: char| !c.is_ascii_alphanumeric()) {
+        cleaned.remove(0);
+    }
+    if cleaned.is_empty() {
+        return "repo".to_string();
+    }
+    if cleaned.len() > 64 {
+        cleaned.truncate(64);
+    }
+    cleaned
+}
+
+fn derive_repo_name(dir: &Path, taken: &HashSet<String>) -> String {
+    let raw = dir.file_name().and_then(|n| n.to_str()).unwrap_or("repo");
+    let base = sanitize_repo_name(raw);
+    if !taken.contains(&base) {
+        return base;
+    }
+    for n in 2usize.. {
+        let suffix = format!("-{n}");
+        let max_base = 64usize.saturating_sub(suffix.len()).max(1);
+        let prefix = &base[..base.len().min(max_base)];
+        let candidate = format!("{prefix}{suffix}");
+        if good_name(&candidate) && !taken.contains(&candidate) {
+            return candidate;
+        }
+    }
+    unreachable!()
+}
+
 impl Repo {
-    /// Opens `<work_root>/repos` (creating it when missing).
+    /// Opens `<work_root>/repos` (creating it when missing) and loads mounted external repos.
     pub async fn open_async(work_root: &Path, per_repo: usize) -> std::io::Result<Arc<Repo>> {
         let root = work_root.join("repos");
         tokio::fs::create_dir_all(&root).await?;
+        let canon_root = tokio::fs::canonicalize(&root).await.unwrap_or_else(|_| root.clone());
+        let mounts = read_mounts_async(&root.join(MOUNTS_FILE)).await;
         Ok(Arc::new(Repo {
             root,
+            canon_root,
             per_repo,
             tokei: "tokei".into(),
             github: Mutex::default(),
             capabilities: Mutex::default(),
             pending: Mutex::default(),
+            mounts: Mutex::new(mounts),
+            mount_lock: tokio::sync::Mutex::new(()),
             cancel: CancellationToken::new(),
             probe: Mutex::default(),
         }))
@@ -370,10 +449,51 @@ impl Repo {
         (if n == 0 || n > MAX_RUNNING { MAX_RUNNING } else { n }) as i64
     }
 
-    /// Lists folders under the root; symlinks are ignored.
+    /// Returns the mounted external path for `name` when registered in `.mounts.json`.
+    pub fn mounted_path(&self, name: &str) -> Option<PathBuf> {
+        self.mounts.lock().iter().find(|m| m.name == name).map(|m| m.path.clone())
+    }
+
+    /// Synchronously resolves the registered repo name for `top` when known via mounts or `repos_dir`.
+    pub fn name_for_path_sync(&self, top: &Path) -> Option<String> {
+        if let Some(m) = self.mounts.lock().iter().find(|m| m.path == top) {
+            return Some(m.name.clone());
+        }
+        if top.parent() == Some(self.root.as_path()) || top.parent() == Some(self.canon_root.as_path()) {
+            return top.file_name().map(|n| n.to_string_lossy().into_owned());
+        }
+        None
+    }
+
+    /// Resolves the registered repo name (managed, symlinked, or mounted) matching `top`.
+    pub async fn name_for_path_async(&self, top: &Path) -> Option<String> {
+        let canon_top = tokio::fs::canonicalize(top).await.unwrap_or_else(|_| top.to_path_buf());
+        self.list_async().await.into_iter().find(|p| p.path == canon_top).map(|p| p.name)
+    }
+
+    /// Lists managed folders (including symlinks to real directories) and mounted external repos.
     pub async fn list_async(&self) -> Vec<RepoFolder> {
         let pending = self.pending.lock().clone();
-        list_folders_async(&self.root, &pending).await
+        let mut out = list_folders_async(&self.root, &pending).await;
+        let mounts = self.mounts.lock().clone();
+        for m in mounts {
+            if pending.contains(&m.name) {
+                continue;
+            }
+            let path = tokio::fs::canonicalize(&m.path).await.unwrap_or_else(|_| m.path.clone());
+            if out.iter().any(|p| p.name == m.name || p.path == path) {
+                continue;
+            }
+            let git = tokio::fs::try_exists(path.join(".git")).await.unwrap_or(false);
+            out.push(RepoFolder {
+                name: m.name,
+                path,
+                git,
+                external: true,
+            });
+        }
+        out.sort_by(|a, b| a.name.cmp(&b.name));
+        out
     }
 
     pub async fn find_async(&self, name: &str) -> Option<RepoFolder> {
@@ -406,6 +526,7 @@ impl Repo {
                 name: String::new(),
                 path: String::new(),
                 git: false,
+                external: false,
                 last: None,
                 max_sessions,
                 pull_request: PullRequestCapability {
@@ -465,6 +586,9 @@ impl Repo {
         if !problem.is_empty() {
             return Err(refused(problem));
         }
+        if self.mounts.lock().iter().any(|m| m.name == req.name) {
+            return Err(refused(t("server.repo.exists", &[("name", req.name.clone().into())])));
+        }
         let path = self.root.join(&req.name);
         tokio::fs::create_dir(&path).await.map_err(|e| {
             refused(if e.kind() == std::io::ErrorKind::AlreadyExists {
@@ -521,6 +645,7 @@ impl Repo {
                     name: req.name.clone(),
                     path: canonical,
                     git: true,
+                    external: false,
                 })
             }
             Err(e) => {
@@ -597,12 +722,6 @@ impl Repo {
 
     /// Re-probes `gh` and refreshes each repo's pull request capability with bounded fan-out.
     pub async fn refresh_github_async(&self) -> GitHubStatus {
-        #[derive(Deserialize)]
-        struct ViewerPermission {
-            #[serde(rename = "viewerPermission")]
-            viewer_permission: Option<String>,
-        }
-
         let probed = tokio::select! {
             biased;
             _ = self.cancel.cancelled() => return self.github_status(),
@@ -645,47 +764,7 @@ impl Repo {
                         if cancel.is_cancelled() {
                             return None;
                         }
-                        let origin = if p.git {
-                            vibevalley_git::read::remote_url(&p.path, "origin")
-                                .ok()
-                                .flatten()
-                                .map(|u| github_origin(&u))
-                                .unwrap_or_default()
-                        } else {
-                            String::new()
-                        };
-                        let c = if !p.git || origin.is_empty() {
-                            PullRequestCapability {
-                                available: false,
-                                reason: t("server.repo.github.notGithub", &[]),
-                            }
-                        } else {
-                            let view_args = ["repo", "view", &origin, "--json", "viewerPermission"];
-                            let view = tokio::select! {
-                                biased;
-                                _ = cancel.cancelled() => return None,
-                                view = gh_async(&view_args) => view,
-                            };
-                            let permission = if view.ok {
-                                serde_json::from_str::<ViewerPermission>(&view.out).ok().and_then(|v| v.viewer_permission)
-                            } else {
-                                None
-                            };
-                            match permission.as_deref() {
-                                None => PullRequestCapability {
-                                    available: false,
-                                    reason: t("server.repo.github.noPermission", &[]),
-                                },
-                                Some("ADMIN" | "MAINTAIN" | "WRITE") => PullRequestCapability {
-                                    available: true,
-                                    reason: String::new(),
-                                },
-                                Some(_) => PullRequestCapability {
-                                    available: false,
-                                    reason: t("server.repo.github.readOnly", &[]),
-                                },
-                            }
-                        };
+                        let c = probe_single_capability_async(&p.path, p.git, &cancel).await?;
                         Some((p.name, c))
                     }
                     .in_current_span()
@@ -705,9 +784,15 @@ impl Repo {
         probed
     }
 
-    /// The user's commits per repository under the root.
+    /// The user's commits per repository under the root and mounted external repositories.
     pub async fn contributions_async(&self, extra: Vec<String>) -> Vec<vibevalley_protocol::Repo> {
-        contributions_of_async(self.root().to_path_buf(), extra).await
+        let mut dirs = repo_dirs_async(self.root(), 3).await;
+        for folder in self.list_async().await {
+            if folder.git {
+                dirs.push(folder.path);
+            }
+        }
+        contributions_for_dirs_async(dirs, extra).await
     }
 
     pub async fn list_summaries_async(&self) -> Vec<RepoSummary> {
@@ -721,6 +806,108 @@ impl Repo {
     pub async fn create_repo_async(&self, req: &NewRepo) -> Result<RepoSummary, ApiError> {
         let p = self.create_async(req).await?;
         Ok(self.summary_async(p).await)
+    }
+
+    /// Validates and mounts an existing local directory (optionally initializing Git), persisting it across restarts.
+    pub async fn mount_repo_async(&self, req: &MountRepo) -> Result<RepoSummary, ApiError> {
+        let raw_path = req.path.trim();
+        if raw_path.is_empty() {
+            return Err(refused(t("server.repo.mount.emptyPath", &[])));
+        }
+        let path = PathBuf::from(raw_path);
+        let meta = match tokio::fs::metadata(&path).await {
+            Ok(meta) => meta,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Err(refused(t("server.repo.mount.notFound", &[("path", raw_path.into())])));
+            }
+            Err(e) => return Err(refused(e.to_string())),
+        };
+        if !meta.is_dir() {
+            return Err(refused(t("server.repo.mount.notDir", &[("path", raw_path.into())])));
+        }
+        let canon = tokio::fs::canonicalize(&path).await.map_err(|e| refused(e.to_string()))?;
+
+        let _guard = self.mount_lock.lock().await;
+        let existing = self.list_async().await;
+        if let Some(found) = existing.iter().find(|p| p.path == canon).cloned() {
+            if found.git || req.init_git != Some(true) {
+                if !found.git {
+                    return Err(refused(t("server.repo.mount.notGit", &[("path", canon.display().to_string().into())])));
+                }
+                return Ok(self.summary_async(found).await);
+            }
+            init_external_git_async(&canon).await?;
+            let updated = RepoFolder { git: true, ..found };
+            if self.github_status().logged_in
+                && let Some(cap) = probe_single_capability_async(&updated.path, true, &self.cancel).await
+            {
+                self.capabilities.lock().insert(updated.name.clone(), cap);
+            }
+            return Ok(self.summary_async(updated).await);
+        }
+
+        let has_git = tokio::fs::try_exists(canon.join(".git")).await.unwrap_or(false);
+        if !has_git {
+            if req.init_git == Some(true) {
+                init_external_git_async(&canon).await?;
+            } else {
+                return Err(refused(t("server.repo.mount.notGit", &[("path", canon.display().to_string().into())])));
+            }
+        }
+
+        let mut taken: HashSet<String> = existing.into_iter().map(|p| p.name).collect();
+        taken.extend(self.pending.lock().iter().cloned());
+        let name = if let Some(explicit) = req.name.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            if !good_name(explicit) {
+                return Err(refused(t("server.repo.notRepoName", &[("name", explicit.into())])));
+            }
+            if taken.contains(explicit) {
+                return Err(refused(t("server.repo.exists", &[("name", explicit.into())])));
+            }
+            explicit.to_string()
+        } else {
+            derive_repo_name(&canon, &taken)
+        };
+
+        let mut next = self.mounts.lock().clone();
+        next.push(MountedRepo {
+            name: name.clone(),
+            path: canon.clone(),
+        });
+        write_mounts_async(&self.root.join(MOUNTS_FILE), &next).await?;
+        *self.mounts.lock() = next;
+
+        if self.github_status().logged_in
+            && let Some(cap) = probe_single_capability_async(&canon, true, &self.cancel).await
+        {
+            self.capabilities.lock().insert(name.clone(), cap);
+        }
+
+        Ok(self
+            .summary_async(RepoFolder {
+                name,
+                path: canon,
+                git: true,
+                external: true,
+            })
+            .await)
+    }
+
+    /// Removes a mounted external repository from the registry without deleting its folder on disk.
+    pub async fn unmount_repo_async(&self, id: &str) -> Result<(), ApiError> {
+        let _guard = self.mount_lock.lock().await;
+        let current = self.mounts.lock().clone();
+        if current.iter().any(|m| m.name == id) {
+            let next: Vec<MountedRepo> = current.into_iter().filter(|m| m.name != id).collect();
+            write_mounts_async(&self.root.join(MOUNTS_FILE), &next).await?;
+            *self.mounts.lock() = next;
+            self.capabilities.lock().remove(id);
+            return Ok(());
+        }
+        if self.find_async(id).await.is_some() {
+            return Err(refused(t("server.repo.mount.unmountManaged", &[("name", id.into())])));
+        }
+        Err(repo_ref(id))
     }
 
     pub async fn languages_endpoint_async(&self, id: &str) -> Result<RepoLanguages, ApiError> {
@@ -793,11 +980,83 @@ impl Repo {
     }
 }
 
+async fn probe_single_capability_async(path: &Path, git: bool, cancel: &CancellationToken) -> Option<PullRequestCapability> {
+    #[derive(Deserialize)]
+    struct ViewerPermission {
+        #[serde(rename = "viewerPermission")]
+        viewer_permission: Option<String>,
+    }
+
+    let origin = if git {
+        vibevalley_git::read::remote_url(path, "origin")
+            .ok()
+            .flatten()
+            .map(|u| github_origin(&u))
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    if !git || origin.is_empty() {
+        return Some(PullRequestCapability {
+            available: false,
+            reason: t("server.repo.github.notGithub", &[]),
+        });
+    }
+    let view_args = ["repo", "view", &origin, "--json", "viewerPermission"];
+    let view = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return None,
+        view = gh_async(&view_args) => view,
+    };
+    let permission = if view.ok {
+        serde_json::from_str::<ViewerPermission>(&view.out).ok().and_then(|v| v.viewer_permission)
+    } else {
+        None
+    };
+    Some(match permission.as_deref() {
+        None => PullRequestCapability {
+            available: false,
+            reason: t("server.repo.github.noPermission", &[]),
+        },
+        Some("ADMIN" | "MAINTAIN" | "WRITE") => PullRequestCapability {
+            available: true,
+            reason: String::new(),
+        },
+        Some(_) => PullRequestCapability {
+            available: false,
+            reason: t("server.repo.github.readOnly", &[]),
+        },
+    })
+}
+
+async fn init_external_git_async(canon: &Path) -> Result<(), ApiError> {
+    let p_git = canon.to_path_buf();
+    let initial_short = t("server.repo.commit.initialShort", &[]);
+    crate::log::spawn_blocking_traced(move || {
+        vibevalley_git::init(&p_git, Some("main")).map_err(|e| refused(reason(&e.to_string())))?;
+        if vibevalley_git::read::head(&p_git).ok().flatten().is_none() {
+            let _ = git_raw(&p_git, &["add", "-A"]);
+            commit(&p_git, &initial_short)?;
+        }
+        Ok::<_, ApiError>(())
+    })
+    .await
+    .map_err(|e| refused(e.to_string()))?
+}
+
+async fn is_dir_or_dir_symlink_async(entry: &tokio::fs::DirEntry) -> bool {
+    let Ok(ft) = entry.file_type().await else { return false };
+    if ft.is_dir() {
+        return true;
+    }
+    ft.is_symlink() && tokio::fs::metadata(entry.path()).await.is_ok_and(|m| m.is_dir())
+}
+
 async fn list_folders_async(root: &Path, pending: &std::collections::HashSet<String>) -> Vec<RepoFolder> {
     let Ok(mut entries) = tokio::fs::read_dir(root).await else { return vec![] };
     let mut out = Vec::new();
     while let Ok(Some(e)) = entries.next_entry().await {
-        if !e.file_type().await.is_ok_and(|t| t.is_dir()) {
+        if !is_dir_or_dir_symlink_async(&e).await {
             continue;
         }
         let Ok(name) = e.file_name().into_string() else { continue };
@@ -806,7 +1065,12 @@ async fn list_folders_async(root: &Path, pending: &std::collections::HashSet<Str
         }
         let Ok(path) = tokio::fs::canonicalize(e.path()).await else { continue };
         let git = tokio::fs::try_exists(path.join(".git")).await.unwrap_or(false);
-        out.push(RepoFolder { name, path, git });
+        out.push(RepoFolder {
+            name,
+            path,
+            git,
+            external: false,
+        });
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     out
@@ -822,6 +1086,7 @@ fn summary_of(p: RepoFolder, max_sessions: i64, pull_request: PullRequestCapabil
         name: p.name,
         path: p.path.to_string_lossy().into_owned(),
         git: p.git,
+        external: p.external,
         last: (last > 0).then_some(last),
         max_sessions,
         pull_request,
@@ -904,8 +1169,13 @@ const SKIP_DIRS: [&str; 8] = ["node_modules", ".git", ".venv", "vendor", "dist",
 /// Finds git repositories under `dir` up to `depth` folders deep without descending into a repo.
 async fn repo_dirs_async(root: &Path, max_depth: usize) -> Vec<PathBuf> {
     let mut out = Vec::new();
+    let mut visited = HashSet::new();
     let mut stack = vec![(root.to_path_buf(), max_depth)];
     while let Some((dir, depth)) = stack.pop() {
+        let canon = tokio::fs::canonicalize(&dir).await.unwrap_or_else(|_| dir.clone());
+        if !visited.insert(canon) {
+            continue;
+        }
         let Ok(mut rd) = tokio::fs::read_dir(&dir).await else { continue };
         let mut entries = Vec::new();
         while let Ok(Some(e)) = rd.next_entry().await {
@@ -920,7 +1190,7 @@ async fn repo_dirs_async(root: &Path, max_depth: usize) -> Vec<PathBuf> {
         }
         for e in entries {
             let name = e.file_name();
-            if e.file_type().await.is_ok_and(|t| t.is_dir()) && !SKIP_DIRS.iter().any(|s| name == *s) {
+            if is_dir_or_dir_symlink_async(&e).await && !SKIP_DIRS.iter().any(|s| name == *s) {
                 stack.push((e.path(), depth - 1));
             }
         }
@@ -941,6 +1211,10 @@ fn global_email() -> String {
 /// (matching global `user.email`, repo `user.email`, and `extra`).
 pub async fn contributions_of_async(root: PathBuf, extra: Vec<String>) -> Vec<vibevalley_protocol::Repo> {
     let dirs = repo_dirs_async(&root, 3).await;
+    contributions_for_dirs_async(dirs, extra).await
+}
+
+async fn contributions_for_dirs_async(dirs: Vec<PathBuf>, extra: Vec<String>) -> Vec<vibevalley_protocol::Repo> {
     if dirs.is_empty() {
         return vec![];
     }
@@ -1265,5 +1539,155 @@ mod tests {
         assert_eq!(contribs.len(), 2);
 
         repo.close_async().await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn mounts_external_local_repo_persists_handles_collisions_and_unmounts_safely() {
+        let work = tempfile::tempdir().unwrap();
+        let ext_root = tempfile::tempdir().unwrap();
+
+        // 1. Create an external git repository with an initial commit and Cargo.toml.
+        let ext_one = ext_root.path().join("demo-app");
+        std::fs::create_dir_all(&ext_one).unwrap();
+        std::fs::write(ext_one.join("Cargo.toml"), "[package]\nname = \"demo-app\"\n").unwrap();
+        assert!(
+            std::process::Command::new("git")
+                .args(["init", "-q"])
+                .current_dir(&ext_one)
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(
+            std::process::Command::new("git")
+                .args(["-c", "user.name=tester", "-c", "user.email=tester@example.com", "add", "-A"])
+                .current_dir(&ext_one)
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(
+            std::process::Command::new("git")
+                .args(["-c", "user.name=tester", "-c", "user.email=tester@example.com", "commit", "-q", "-m", "init"])
+                .current_dir(&ext_one)
+                .status()
+                .unwrap()
+                .success()
+        );
+
+        // 2. Create a second external folder with the same basename without git.
+        let ext_two_parent = ext_root.path().join("other");
+        let ext_two = ext_two_parent.join("demo-app");
+        std::fs::create_dir_all(&ext_two).unwrap();
+        std::fs::write(ext_two.join("package.json"), "{\"scripts\":{\"test\":\"vitest\"}}\n").unwrap();
+
+        // 3. Create a symlink under `<work>/repos` pointing to another external git repo.
+        let linked_target = ext_root.path().join("linked-repo");
+        std::fs::create_dir_all(&linked_target).unwrap();
+        assert!(
+            std::process::Command::new("git")
+                .args(["init", "-q"])
+                .current_dir(&linked_target)
+                .status()
+                .unwrap()
+                .success()
+        );
+        #[cfg(unix)]
+        {
+            std::fs::create_dir_all(work.path().join("repos")).unwrap();
+            std::os::unix::fs::symlink(&linked_target, work.path().join("repos/linked-repo")).unwrap();
+        }
+
+        let repo = Repo::open_async(work.path(), 3).await.unwrap();
+
+        // Mount external git repo -> succeeds, external = true, canonical path.
+        let mounted = repo
+            .mount_repo_async(&MountRepo {
+                path: ext_one.display().to_string(),
+                name: None,
+                init_git: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(mounted.name, "demo-app");
+        assert!(mounted.external);
+        assert!(mounted.git);
+        let canon_one = std::fs::canonicalize(&ext_one).unwrap();
+        assert_eq!(mounted.path, canon_one.to_string_lossy());
+
+        // Idempotent re-mount returns the existing entry without duplicating.
+        let mounted_again = repo
+            .mount_repo_async(&MountRepo {
+                path: ext_one.display().to_string(),
+                name: None,
+                init_git: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(mounted_again.name, "demo-app");
+        assert_eq!(repo.name_for_path_async(&ext_one).await.as_deref(), Some("demo-app"));
+
+        // Non-git folder is refused unless init_git = Some(true).
+        let refused_non_git = repo
+            .mount_repo_async(&MountRepo {
+                path: ext_two.display().to_string(),
+                name: None,
+                init_git: None,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(refused_non_git.biz_code, BizCode::RepoRefused);
+
+        // Mounting with init_git = Some(true) initializes git and avoids name collision -> demo-app-2.
+        let mounted_two = repo
+            .mount_repo_async(&MountRepo {
+                path: ext_two.display().to_string(),
+                name: None,
+                init_git: Some(true),
+            })
+            .await
+            .unwrap();
+        assert_eq!(mounted_two.name, "demo-app-2");
+        assert!(mounted_two.external);
+        assert!(mounted_two.git);
+        assert!(ext_two.join(".git").exists());
+
+        // Activity, stack, summaries, and contributions work on mounted repos and symlinks.
+        let summaries = repo.list_summaries_async().await;
+        assert!(summaries.iter().any(|s| s.name == "demo-app" && s.external));
+        assert!(summaries.iter().any(|s| s.name == "demo-app-2" && s.external));
+        #[cfg(unix)]
+        assert!(summaries.iter().any(|s| s.name == "linked-repo" && !s.external && s.git));
+
+        let activity = repo.activity_endpoint_async("demo-app").await.unwrap();
+        assert_eq!(activity.total, 1);
+        let stack = repo.stack_async("demo-app").await.unwrap();
+        assert_eq!(stack.name, "rust");
+        let contribs = repo.contributions_async(vec!["tester@example.com".into()]).await;
+        assert!(contribs.iter().any(|c| c.path == canon_one.to_string_lossy() && c.commits == 1));
+        repo.close_async().await;
+
+        // Re-opening persists mounts from .mounts.json.
+        let reopened = Repo::open_async(work.path(), 3).await.unwrap();
+        assert_eq!(reopened.mounted_path("demo-app").as_deref(), Some(canon_one.as_path()));
+        assert!(reopened.find_async("demo-app-2").await.is_some());
+
+        // Unmounting removes from registry without deleting user's folder.
+        reopened.unmount_repo_async("demo-app").await.unwrap();
+        assert!(canon_one.exists());
+        assert!(reopened.find_async("demo-app").await.is_none());
+
+        // Refuses unmounting a managed repo.
+        let managed = reopened
+            .create_repo_async(&NewRepo {
+                name: "managed".into(),
+                github: None,
+            })
+            .await
+            .unwrap();
+        assert!(!managed.external);
+        let err = reopened.unmount_repo_async("managed").await.unwrap_err();
+        assert_eq!(err.biz_code, BizCode::RepoRefused);
+        reopened.close_async().await;
     }
 }

@@ -59,3 +59,24 @@ machineId?: string, preset: RuntimePreset, support: RuntimeSupport, installation
 export type RuntimeRefreshInput = { id: string, };
 
 export type RuntimeSettingUpdateInput = { id: string, enabled: boolean, binPath: string, defaultModel: string, defaultEffort: string, env: { [key in string]: string }, dailyBudget?: number, maxWorking?: number, };
+
+export const McpHostIdValues = ["antigravity", "claude", "codex", "cursor"] as const;
+export type McpHostId = (typeof McpHostIdValues)[number];
+
+export const McpTransportKindValues = ["stdio", "streamableHttp"] as const;
+export type McpTransportKind = (typeof McpTransportKindValues)[number];
+
+/**
+ * Told apart by `kind`.
+ */
+export type McpInstallStatus = { "kind": "notInstalled" } | { "kind": "installed", transport: McpTransportKind, } | { "kind": "outdated", current: McpTransportKind, reason: string, } | { "kind": "unsupported", reason: string, };
+
+export type McpHostInfo = { id: McpHostId, label: string, installed: boolean, configPath?: string, status: McpInstallStatus, supportsStdio: boolean, supportsHttp: boolean, stdioSnippet: string, httpSnippet?: string, };
+
+export type McpListInput = { transport?: McpTransportKind, };
+
+export type McpListResult = { serverName: string, stdioCommand: string, stdioArgs: Array<string>, httpUrl?: string, hosts: Array<McpHostInfo>, };
+
+export type McpInstallInput = { host: McpHostId, transport?: McpTransportKind, };
+
+export type McpUninstallInput = { host: McpHostId, };

@@ -41,7 +41,7 @@ export function StandaloneArtifactPage(props: { id: string }) {
         <View
           testID="standalone-artifact-header"
           desktop={{ windowDrag: true }}
-          class="h-9.5 shrink-0 flex-row items-center gap-2 border-b border-line bg-page pr-3 pl-20"
+          class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page pr-3 pl-20"
         >
           <If when={showSkeleton()}>
             <View class="min-w-0 flex-1 flex-row items-center gap-2">
@@ -81,7 +81,7 @@ export function StandaloneArtifactPage(props: { id: string }) {
             artifact={a()}
             version={askedVersion()}
             headerTestID="standalone-artifact-header"
-            headerClass="h-9.5 shrink-0 flex-row items-center gap-2 border-b border-line bg-page pr-3 pl-20"
+            headerClass="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page pr-3 pl-20"
             headerWindowDrag
             menuTestID="standalone-artifact-more"
             headerLeft={

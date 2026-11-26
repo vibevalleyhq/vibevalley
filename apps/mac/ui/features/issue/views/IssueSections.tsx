@@ -11,6 +11,7 @@ import { Icon } from "../../../design/Icon";
 import type { IconName } from "../../../design/icons";
 import { Markdown } from "../../../design/Markdown";
 import { Dot } from "../../../design/Tag";
+import { TextLink } from "../../../design/TextLink";
 import { mix } from "../../../design/tone";
 import { useNow } from "../../../infra/base/dom";
 import { shortMomentText, tookText, wallClockText } from "../../../infra/base/format";
@@ -20,12 +21,14 @@ import { SubagentProgress } from "../../session";
 import { perform } from "../model/acts";
 import { useIssueRuns } from "../model/history";
 import { issueTag, runText, tagOpen, tagText } from "../model/issue";
+import { localizeIssueError } from "../model/issueError";
 import { issueMove, issueMoveOf, sendMove } from "../model/moves";
 import { type CriterionRow, stageTone } from "../model/overview";
 import { updateIssueAttachments } from "../model/write";
 import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
-import { IssueNumberPill, IssueSheet, Note, Property, SheetLabel } from "./Sheet";
+import { StatusMark } from "./Marks";
+import { IssueNumberPill, IssueSheet, Note, Property, SheetLabel, StagePill } from "./Sheet";
 
 /** A question of the helper's: its options are replies as they are, one click each. */
 export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (words: string) => void }) {
@@ -64,10 +67,14 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
     ticked.set(n);
   };
   return (
-    <View>
+    <View class="overflow-hidden rounded-lg border border-line bg-page">
       <Each of={props.rows} key={(r) => r.text}>
         {(r, i) => (
-          <View testID="criterion" class="flex-row items-start gap-2.5 rounded-md px-1.5 py-1">
+          <View
+            testID="criterion"
+            class={`flex-row items-start gap-2.5 px-3.5 py-2.5 ${i() < props.rows.length - 1 ? "border-b" : ""}`}
+            style={i() < props.rows.length - 1 ? { borderColor: mix("line", 0.55) } : undefined}
+          >
             <If when={props.checking}>
               <Checkbox
                 testid="criterion-tick"
@@ -79,7 +86,13 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
             </If>
             <If
               when={r().result}
-              else={<View accessibilityLabel={t("web.issue.detail.unsaid")} class="mt-1 h-3 w-3 shrink-0 rounded-full border border-line" />}
+              else={
+                <View
+                  testID="criterion-unsaid"
+                  accessibilityLabel={t("web.issue.detail.unsaid")}
+                  class="mt-1 h-3 w-3 shrink-0 rounded-full border border-idle"
+                />
+              }
             >
               {(res) => (
                 <View class="mt-0.5 shrink-0">
@@ -88,9 +101,9 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
               )}
             </If>
             <View class="min-w-0 flex-1">
-              <Text class={`text-sm ${ticked().has(i()) ? "text-muted" : "text-ink"}`}>{r().text}</Text>
+              <Text class={`text-sm leading-snug ${ticked().has(i()) ? "text-muted" : "text-ink"}`}>{r().text}</Text>
               <If when={r().proof}>
-                <Text class="text-xs text-muted">{r().proof}</Text>
+                <Text class="mt-0.5 text-xs text-muted">{r().proof}</Text>
               </If>
             </View>
           </View>
@@ -100,27 +113,42 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
   );
 }
 
-/** The milestones, newest first: when, who, what. */
+const milestoneTone = (kind: Milestone["kind"]) =>
+  kind === "failed" || kind === "rejected" ? "berry" : kind === "asked" ? "wheat" : kind === "closed" || kind === "accepted" ? "leaf" : "muted";
+
+/** The milestones, newest first: vertical dot-and-rail timeline. */
 export function Story(props: { milestones: Milestone[] }) {
   const now = useNow();
   return (
     <View>
       <Each of={props.milestones} key={(m) => `${m.at}:${m.kind}:${m.text}`}>
-        {(m) => (
-          <View testID="milestone" class="flex-row items-baseline gap-3 py-1">
-            <Text class="w-24 shrink-0 text-xs text-muted tabular-nums">{shortMomentText(m().at, now())}</Text>
-            <Text
-              class={[
-                "min-w-0 flex-1 text-sm",
-                m().kind === "failed" || m().kind === "rejected" ? "text-berry" : "text-ink",
-                m().kind === "asked" ? "font-semibold" : "",
-              ].join(" ")}
-            >
-              <If when={m().who}>
-                <Text class="text-muted">{`${m().who} · `}</Text>
+        {(m, i) => (
+          <View testID="milestone" class="flex-row items-stretch gap-3">
+            <View class="w-3 shrink-0 items-center">
+              <View class="mt-1.5">
+                <Dot tone={milestoneTone(m().kind)} size={6} ring={false} />
+              </View>
+              <If when={i() < props.milestones.length - 1}>
+                <View class="mt-1 w-px flex-1 bg-line" />
               </If>
-              {plainText(m().text)}
-            </Text>
+            </View>
+            <View class={`min-w-0 flex-1 ${i() < props.milestones.length - 1 ? "pb-3" : "pb-0.5"}`}>
+              <View class="flex-row items-baseline gap-2">
+                <Text class="shrink-0 text-xs text-faint tabular-nums">{shortMomentText(m().at, now())}</Text>
+                <If when={m().who}>
+                  <Text class="min-w-0 truncate text-xs font-medium text-muted">{m().who}</Text>
+                </If>
+              </View>
+              <Text
+                class={[
+                  "mt-0.5 text-sm leading-snug",
+                  m().kind === "failed" || m().kind === "rejected" ? "text-berry" : "text-ink",
+                  m().kind === "asked" ? "font-semibold" : "",
+                ].join(" ")}
+              >
+                {localizeIssueError(plainText(m().text)).text}
+              </Text>
+            </View>
           </View>
         )}
       </Each>
@@ -163,7 +191,18 @@ export function Runs(props: { issue: string; version: string; onChanges?: (() =>
               <View class="min-w-0 flex-1">
                 <Text class="text-sm text-ink">{runText(r(), now(), tookText)}</Text>
                 <If when={r().summary}>
-                  <Text class="mt-0.5 line-clamp-2 text-xs text-muted">{r().summary}</Text>
+                  {(summary) => (
+                    <View class="mt-0.5 gap-1">
+                      <Text class="line-clamp-2 text-xs text-muted">{localizeIssueError(summary()).text}</Text>
+                      <If when={localizeIssueError(summary()).settingsHref}>
+                        {(href) => (
+                          <TextLink href={href()} testid="run-error-settings">
+                            {t("web.issue.error.goSettings")}
+                          </TextLink>
+                        )}
+                      </If>
+                    </View>
+                  )}
                 </If>
                 <If when={r().needsReconciliation}>
                   <ReconcileWorktree onChanges={props.onChanges} />
@@ -207,7 +246,9 @@ export function WorkLog(props: { steps: SessionEvent[] }) {
             <Text class={`w-12 shrink-0 font-mono text-xs ${e().type === "run/error" ? "text-berry" : e().type === "tool/call" ? "text-water" : "text-muted"}`}>
               {stepWord[e().type] ?? ""}
             </Text>
-            <Text class="line-clamp-3 min-w-0 flex-1 text-sm text-ink">{e().type === "tool/call" ? (e().actionText ?? e().text) : e().text}</Text>
+            <Text class="line-clamp-3 min-w-0 flex-1 text-sm text-ink">
+              {e().type === "tool/call" ? (e().actionText ?? e().text) : e().type === "run/error" ? localizeIssueError(e().text).text : e().text}
+            </Text>
           </View>
         )}
       </Each>
@@ -245,26 +286,29 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
 
   const heading = (
     <View>
-      <View class="mb-1.5 flex-row flex-wrap items-center gap-1">
-        <Text class="text-xs text-muted">{t("web.issue.orchestrator")}</Text>
-        <Icon name="next" size={12} tone="muted" />
+      <View class="mb-2 flex-row flex-wrap items-center gap-1.5">
+        <View class="flex-row items-center gap-1 rounded-md bg-side px-1.5 py-0.5">
+          <Icon name="agents" size={12} tone="muted" />
+          <Text class="text-xs font-medium text-muted">{t("web.issue.orchestrator")}</Text>
+        </View>
+        <Icon name="next" size={12} tone="faint" />
         <IssueNumberPill number={props.issue.number} />
       </View>
-      <Text role="header" class="text-lg font-semibold text-ink">
+      <Text role="header" class="text-2xl leading-snug font-semibold text-ink">
         {props.issue.title}
       </Text>
-      <View class="mt-2 flex-row items-center gap-2">
-        <Dot tone={tone()} size={8} ring={false} />
-        <Text class="text-sm text-muted">{tagText(props.issue)}</Text>
+      <View class="mt-2.5 flex-row flex-wrap items-center gap-2">
+        <StagePill tone={tone()} label={tagText(props.issue)} />
       </View>
     </View>
   );
 
+  const hasAboveRuns = computed(() => Boolean(props.issue.description || props.issue.stage.state === "stuck" || hasAttachmentsSection()));
   const main = (
     <>
       <ActLines issue={props.issue.id} />
       <If when={props.issue.stage.state === "stuck"}>
-        <Note tone="berry" class="mb-4">
+        <Note tone="berry" class="mb-5">
           <Text class="text-sm text-ink">{t("web.issue.detail.orchestratorStuck")}</Text>
         </Note>
       </If>
@@ -282,10 +326,8 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
         onAdd={addAttachment}
         onRemove={removeAttachment}
       />
-      <View>
-        <SheetLabel first={!props.issue.description && props.issue.stage.state !== "stuck" && !hasAttachmentsSection()}>
-          {t("web.issue.detail.runs")}
-        </SheetLabel>
+      <View class={hasAboveRuns() ? "mt-7 border-t border-line pt-5" : ""}>
+        <SheetLabel first>{t("web.issue.detail.runs")}</SheetLabel>
         <Runs issue={props.issue.id} version={`${props.issue.status}:${props.issue.closedAt}:${tagOpen(tag())}`} />
       </View>
     </>
@@ -294,21 +336,33 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
   const side = (
     <>
       <SheetLabel first>{t("web.issue.detail.properties")}</SheetLabel>
-      <Property label={t("web.issue.detail.status")}>
-        <View class="flex-row items-center gap-2">
-          <Dot tone={tone()} size={8} ring={false} />
-          <Text class="text-sm text-ink">{tagText(props.issue)}</Text>
-        </View>
+      <Property label={t("web.issue.detail.status")} icon={<StatusMark status={props.issue.status} size={13} />}>
+        {tagText(props.issue)}
       </Property>
-      <Property label={t("web.issue.detail.who")}>{t("web.issue.orchestrator")}</Property>
+      <Property label={t("web.issue.detail.who")} icon={<Icon name="agents" size={13} tone="muted" />}>
+        {t("web.issue.orchestrator")}
+      </Property>
       <If when={props.issue.cron}>
-        <Property align="start" label={t("web.issue.detail.from")}>
+        <Property align="start" label={t("web.issue.detail.from")} icon={<Icon name="clock" size={13} tone="muted" />}>
           {t("web.issue.detail.fromCron")}
         </Property>
       </If>
-      <Property label={t("web.issue.detail.answer")}>{t("web.issue.detail.answered")}</Property>
+      <Property label={t("web.issue.detail.answer")} icon={<Icon name="chat" size={13} tone="muted" />}>
+        {t("web.issue.detail.answered")}
+      </Property>
+      <SheetLabel divider>{t("web.issue.detail.time")}</SheetLabel>
+      <Property label={t("web.issue.detail.opened")}>
+        <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.issue.createdAt, now())}</Text>
+      </Property>
+      <If when={props.issue.closedAt}>
+        {(at) => (
+          <Property label={t("web.issue.detail.closedAt")}>
+            <Text class="text-sm text-ink tabular-nums">{shortMomentText(at(), now())}</Text>
+          </Property>
+        )}
+      </If>
       <If when={props.issue.stage.acts.length > 0}>
-        <View class="mt-3 flex-row flex-wrap gap-2">
+        <View class="mt-4 flex-row flex-wrap gap-2 border-t border-line pt-4">
           <Each of={props.issue.stage.acts} key={(a) => a.act}>
             {(a) => (
               <Button
@@ -321,17 +375,6 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
             )}
           </Each>
         </View>
-      </If>
-      <SheetLabel divider>{t("web.issue.detail.time")}</SheetLabel>
-      <Property label={t("web.issue.detail.opened")}>
-        <Text class="text-sm text-ink tabular-nums">{shortMomentText(props.issue.createdAt, now())}</Text>
-      </Property>
-      <If when={props.issue.closedAt}>
-        {(at) => (
-          <Property label={t("web.issue.detail.closedAt")}>
-            <Text class="text-sm text-ink tabular-nums">{shortMomentText(at(), now())}</Text>
-          </Property>
-        )}
       </If>
     </>
   );

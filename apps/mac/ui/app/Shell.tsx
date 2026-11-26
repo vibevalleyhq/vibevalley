@@ -1,13 +1,13 @@
-import { colorScheme, effect, host, keymap, Scroll, signal, Text, untracked, View, windowSize, type JSX, type ViewRef } from "nsh";
+import { colorScheme, computed, effect, host, keymap, Scroll, signal, Text, untracked, View, windowSize, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession } from "@vibevalley/protocol/rules";
 
-import { useAssetsDir } from "../design/art";
 import { Button } from "../design/Button";
-import { Dialog } from "../design/Dialog";
-import { OrchestratorFace } from "../design/domain/Face";
+import { Dialog, hasOpenModal } from "../design/Dialog";
+import { UserAvatar } from "../design/domain/Face";
 import { Icon } from "../design/Icon";
+import { OutLink } from "../design/IconButton";
 import type { IconName } from "../design/icons";
 import { motionClass } from "../design/motion";
 import { ShortcutSheet } from "../design/ShortcutSheet";
@@ -20,13 +20,13 @@ import { reasonOf } from "../infra/api";
 import { Keyed, variant } from "../infra/base/dom";
 import { hostApi } from "../infra/bridge";
 import { useInboxSlice, useLink, useSessionsSlice } from "../infra/frame";
-import { currentHost } from "../infra/host";
+import { clampUpdatePercent, currentHost, formatUpdateTransfer } from "../infra/host";
 import { readHostParams } from "../infra/hostParams";
 import { NavLink, useLocation, useMatches, useRouter } from "../infra/router";
 import { useUpdates } from "../infra/settings";
 import { safeLastContentPath } from "../infra/state/contentNav";
 import { isVdpEnabled, useVdpNode } from "../infra/vdpProbe";
-import { type Place, places, runsPlace, settingsPlace } from "./places";
+import { dashboardPlace, type Place, places, settingsPlace } from "./places";
 
 const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;
 
@@ -109,24 +109,39 @@ const railIcon = (name: IconName, current: () => boolean) => () => <Icon name={n
 
 const railGroups = ["work", "setup"] as const;
 
+const stripVersionPrefix = (version: string) => version.replace(/^v/u, "");
+
 function RailUpdateControl(props: { small: boolean; working: number }) {
   const updates = useUpdates();
   const router = useRouter();
   const installing = signal(false);
-  const confirmOpen = signal(false);
+  const dialogOpen = signal(false);
 
-  const readyState = () => {
+  const readyState = computed(() => {
     const s = updates();
     return s ? variant(s, "_tag", "ready") : undefined;
-  };
-  const downloadingState = () => {
+  });
+  const downloadingState = computed(() => {
     const s = updates();
     return s ? variant(s, "_tag", "downloading") : undefined;
-  };
-  const manualState = () => {
+  });
+  const verifyingState = computed(() => {
+    const s = updates();
+    return s ? variant(s, "_tag", "verifying") : undefined;
+  });
+  const installingState = computed(() => {
+    const s = updates();
+    return s ? variant(s, "_tag", "installing") : undefined;
+  });
+  const manualState = computed(() => {
     const s = updates();
     return s ? variant(s, "_tag", "manual") : undefined;
-  };
+  });
+
+  effect(() => {
+    const tag = updates()?._tag;
+    if (tag !== "ready" && tag !== "installing") installing.set(false);
+  });
 
   const doInstall = () => {
     if (untracked(installing)) return;
@@ -140,13 +155,8 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
   };
 
   const handleReadyPress = () => {
-    const r = readyState();
-    if (!r || untracked(installing)) return;
-    if (props.working > 0 || r.newFarm) {
-      confirmOpen.set(true);
-      return;
-    }
-    doInstall();
+    if (!readyState() || untracked(installing)) return;
+    dialogOpen.set(true);
   };
 
   return (
@@ -157,14 +167,14 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
             <View
               role="button"
               testID="rail-update-btn"
-              accessibilityLabel={t("web.base.updateReadyOneClick", { next: r().next })}
+              accessibilityLabel={t("web.base.updateReadyOneClick", { next: stripVersionPrefix(r().next) })}
               accessibilityState={{ busy: installing(), disabled: installing() }}
               tooltip={
                 <Bubble
                   text={
                     props.working > 0
-                      ? `${t("web.base.updateReadyOneClick", { next: r().next })} · ${t("web.base.working", { n: props.working })}`
-                      : t("web.base.updateReadyOneClick", { next: r().next })
+                      ? `${t("web.base.updateReadyOneClick", { next: stripVersionPrefix(r().next) })} · ${t("web.base.working", { n: props.working })}`
+                      : t("web.base.updateReadyOneClick", { next: stripVersionPrefix(r().next) })
                   }
                   placement="right"
                 />
@@ -181,21 +191,32 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
               </If>
             </View>
             <Dialog
-              open={confirmOpen()}
-              onClose={() => confirmOpen.set(false)}
-              title={t("web.base.updateReadyTitle", { next: r().next })}
+              open={dialogOpen()}
+              onClose={() => dialogOpen.set(false)}
+              title={t("web.base.updateReadyTitle", { next: stripVersionPrefix(r().next) })}
               testid="rail-update-confirm-dialog"
             >
               <View class="gap-3.5">
-                <Text class="text-sm text-ink">
-                  {r().newFarm
-                    ? t("web.setting.about.newFarmQuestion")
-                    : props.working > 0
-                      ? t("web.setting.about.workingQuestion", { n: props.working })
-                      : t("web.setting.about.restartQuestion")}
-                </Text>
+                <View class="flex-row flex-wrap items-center justify-between gap-2">
+                  <View testID="rail-update-version-badge" class="rounded-sm border border-line bg-side px-2 py-0.5">
+                    <Text class="font-mono text-xs text-muted tabular-nums">{`v${stripVersionPrefix(r().version)} → v${stripVersionPrefix(r().next)}`}</Text>
+                  </View>
+                  <If when={r().page.trim()}>{(page) => <OutLink href={page()} label={t("web.base.updateReleasePage")} />}</If>
+                </View>
+                <If when={props.working > 0 || r().newFarm} else={<Text class="text-sm text-muted">{t("web.base.updateReadyHint")}</Text>}>
+                  <View
+                    testID="rail-update-warning"
+                    class="flex-row items-start gap-2 rounded-md border bg-warn-soft px-3 py-2"
+                    style={{ borderColor: mix("wheat", 0.4) }}
+                  >
+                    <Icon name="warn" size={14} tone="wheat" />
+                    <Text class="min-w-0 flex-1 text-xs leading-relaxed font-medium text-warn-ink">
+                      {r().newFarm ? t("web.setting.about.newFarmQuestion") : t("web.setting.about.workingQuestion", { n: props.working })}
+                    </Text>
+                  </View>
+                </If>
                 <If when={r().notes.length > 0}>
-                  <View class="gap-1.5 rounded-md border border-line bg-side p-3">
+                  <View testID="rail-update-notes" class="gap-1.5 rounded-md border border-line bg-side p-3">
                     <Text class="text-xs font-semibold text-muted">{t("web.base.updateNotesTitle")}</Text>
                     <Each of={r().notes} key={(_, i) => String(i)}>
                       {(note) => (
@@ -208,8 +229,8 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
                   </View>
                 </If>
                 <View class="flex-row items-center justify-end gap-2">
-                  <Button tone="quiet" testID="rail-update-confirm-cancel" onPress={() => confirmOpen.set(false)}>
-                    {t("web.base.form.never")}
+                  <Button tone="quiet" testID="rail-update-confirm-cancel" onPress={() => dialogOpen.set(false)}>
+                    {t("web.base.updateLaterOnQuit")}
                   </Button>
                   <Button
                     tone="primary"
@@ -217,7 +238,7 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
                     testID="rail-update-confirm-sure"
                     disabled={installing()}
                     onPress={() => {
-                      confirmOpen.set(false);
+                      dialogOpen.set(false);
                       doInstall();
                     }}
                   >
@@ -231,16 +252,63 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
       </If>
 
       <If when={downloadingState()}>
-        {(d) => (
+        {(d) => {
+          const percent = () => clampUpdatePercent(d().percent);
+          const tooltipText = () => {
+            const base = t("web.setting.about.downloading", { next: d().next, percent: percent() });
+            const transfer = formatUpdateTransfer(d());
+            return transfer ? `${base} · ${transfer}` : base;
+          };
+          return (
+            <View
+              testID="rail-update-downloading"
+              accessibilityLabel={tooltipText()}
+              tooltip={<Bubble text={tooltipText()} placement="right" />}
+              class={`${props.small ? "size-9 px-1" : "w-15 px-1.5 py-1.5"} shrink-0 items-center justify-center gap-1 rounded-lg border border-line bg-side`}
+            >
+              <View class="flex-row items-center justify-center gap-1">
+                <Icon name="update" size={14} tone="accent" />
+                <If when={!props.small}>
+                  <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{`${percent()}%`}</Text>
+                </If>
+              </View>
+              <View testID="rail-update-progress" class="h-1 w-full overflow-hidden rounded-full bg-hover">
+                <View class="h-full rounded-full bg-accent" style={{ width: `${percent()}%` }} />
+              </View>
+            </View>
+          );
+        }}
+      </If>
+
+      <If when={verifyingState()}>
+        {(v) => (
           <View
-            testID="rail-update-downloading"
-            accessibilityLabel={t("web.setting.about.downloading", { next: d().next, percent: d().percent })}
-            tooltip={<Bubble text={t("web.setting.about.downloading", { next: d().next, percent: d().percent })} placement="right" />}
+            testID="rail-update-verifying"
+            accessibilityLabel={t("web.setting.about.verifying", { next: v().next })}
+            tooltip={<Bubble text={t("web.setting.about.verifying", { next: v().next })} placement="right" />}
             class={`${props.small ? "size-9" : "w-15 px-1.5 py-1"} shrink-0 items-center justify-center gap-0.5 rounded-lg border border-line bg-side`}
           >
-            <Icon name="update" size={16} tone="accent" />
+            <Icon name="wait" size={16} tone="water" />
             <If when={!props.small}>
-              <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{`${d().percent}%`}</Text>
+              <Text class="w-full truncate text-center font-sans text-2xs leading-tight font-medium text-muted">{t("web.base.updateVerifying")}</Text>
+            </If>
+          </View>
+        )}
+      </If>
+
+      <If when={installingState()}>
+        {(inst) => (
+          <View
+            testID="rail-update-installing"
+            accessibilityLabel={t("web.setting.about.installing", { next: inst().next })}
+            accessibilityState={{ busy: true, disabled: true }}
+            tooltip={<Bubble text={t("web.setting.about.installing", { next: inst().next })} placement="right" />}
+            class={`${props.small ? "size-9" : "w-15 px-1.5 py-1"} shrink-0 items-center justify-center gap-0.5 rounded-lg border opacity-75`}
+            style={{ backgroundColor: mix("accent", 0.12), borderColor: mix("accent", 0.35) }}
+          >
+            <Icon name="wait" size={16} tone="accent" />
+            <If when={!props.small}>
+              <Text class="w-full truncate text-center font-sans text-2xs leading-tight font-medium text-accent">{t("web.base.updateInstalling")}</Text>
             </If>
           </View>
         )}
@@ -273,13 +341,12 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
 }
 
 function Rail(props: { here?: Place | undefined; farm: boolean }) {
-  const assetsDir = useAssetsDir();
   const sessions = useSessionsSlice();
   const inbox = useInboxSlice();
   const link = useLink();
   const waiting = () => waitingOnUser(inbox()?.items ?? []);
   const working = () => sessions()?.sessions.filter((s) => !isFreeUserSession(s) && s.phase._tag === "working").length ?? 0;
-  const onRuns = () => props.here === runsPlace;
+  const atDashboard = () => props.here === dashboardPlace;
   const settings = settingsPlace;
   const atSettings = () => props.here === settings;
   const location = useLocation();
@@ -300,25 +367,16 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
       </If>
       <View class={`shrink-0 items-center ${globalShell ? "pt-1 pb-2" : compactTall() ? "pt-1.5 pb-2" : "pt-2 pb-2"}`}>
         <Slot
-          to="/farm"
-          place="farm"
-          label={`${t("web.base.farm")} · ${linkWords[link()]}`}
-          name={t("web.base.farmShort")}
-          current={props.farm}
+          to={dashboardPlace.path}
+          place={dashboardPlace.id}
+          label={`${dashboardPlace.label} · ${linkWords[link()]}`}
+          name={dashboardPlace.label}
+          current={atDashboard()}
           hero
           icon={() => (
             <View class="relative">
               <View class="overflow-hidden rounded-md border border-line">
-                <If
-                  when={assetsDir()}
-                  else={
-                    <View class="h-9.5 w-9.5 items-center justify-center bg-page">
-                      <Icon name="farm" size={20} tone="leaf" />
-                    </View>
-                  }
-                >
-                  <OrchestratorFace size={38} />
-                </If>
+                <UserAvatar size={38} />
               </View>
               <View
                 testID="link"
@@ -342,7 +400,8 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
                 <Each of={places.filter((p) => p.group === group() && p.id !== "settings")}>
                   {(p) => {
                     const to = () => (p().id === "workspace" && globalShell ? "/workspace" : p().id === "content" ? safeLastContentPath() : p().path);
-                    const isCurrent = () => (p().id === "workspace" ? location().pathname === "/workspace" || p() === props.here : p() === props.here);
+                    const isCurrent = () =>
+                      p().id === "workspace" ? location().pathname === "/workspace" || p() === props.here : p().id === "farm" ? props.farm : p() === props.here;
                     return (
                       <Slot
                         to={to()}
@@ -364,30 +423,6 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
       <View class="shrink-0 items-center gap-1 pt-2 pb-3">
         <View class="mb-1 h-px w-8" style={{ backgroundColor: mix("on-rail", 0.1) }} />
         <RailUpdateControl small={small()} working={working()} />
-        <NavLink
-          href="/runs"
-          testID="rail-runs-status"
-          accessibilityLabel={working() > 0 ? t("web.base.working", { n: working() }) : t("web.base.runsHint")}
-          tooltip={
-            <Bubble
-              text={working() > 0 ? `${t("web.base.working", { n: working() })} · ${t("web.base.runsHint")}` : t("web.base.runsHint")}
-              placement="right"
-            />
-          }
-          class={`h-7 shrink-0 flex-row items-center justify-center gap-1.5 rounded-full border px-2 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus ${
-            working() > 0 ? "" : onRuns() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
-          }`}
-          style={working() > 0 ? { backgroundColor: mix("leaf", 0.14), borderColor: mix("leaf", 0.45) } : undefined}
-        >
-          <View class="size-3 shrink-0 items-center justify-center rounded-full" style={working() > 0 ? { backgroundColor: mix("leaf", 0.25) } : undefined}>
-            <View
-              class={`size-1.5 rounded-full ${working() > 0 ? `bg-leaf ${motionClass("animate-pulse")}` : inbox()?.call === "live" ? "bg-leaf" : "bg-faint"}`}
-            />
-          </View>
-          <If when={working() > 0}>
-            <Text class="font-mono text-2xs font-semibold text-leaf tabular-nums">{String(working())}</Text>
-          </If>
-        </NavLink>
         <Slot
           to={settings.path}
           place={settings.id}
@@ -403,7 +438,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
 
 function Desk(props: { place?: Place | undefined }) {
   return (
-    <View testID="desk" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center justify-between gap-3 border-b border-line px-3.5">
+    <View testID="desk" desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center justify-between gap-3 border-b border-line px-3.5">
       <If when={props.place} else={<View class="flex-1" />}>
         {(place) => (
           <View class="min-w-0 flex-1 flex-row items-center gap-2.5 overflow-hidden">
@@ -428,26 +463,30 @@ export function Shell(props: { children: JSX.Element }) {
   const meta = () => matches().at(-1)?.meta;
   const here = () => {
     const id = meta()?.place;
-    if (id === runsPlace.id) return runsPlace;
+    if (id === dashboardPlace.id || id === "runs") return dashboardPlace;
+    if (meta()?.skin === "farm") return places.find((place) => place.id === "farm");
     return places.find((place) => place.id === id);
   };
   const inFarm = () => meta()?.skin === "farm";
+  const transparentOverlay = () => readHostParams().globalShell && hasOpenModal() && (inFarm() || location().pathname === "/workspace");
   // Ctrl+J (⌘J on a Mac) opens the channel quick switcher without colliding with global ⌘K command palette.
   keymap.bind("mod+j", () => switcher.toggle(), { when: "always" });
   return (
-    <View class="flex-1 flex-row bg-page">
+    <View class={transparentOverlay() ? "flex-1 flex-row bg-transparent" : "flex-1 flex-row bg-page"}>
       <QuickSwitcher />
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <View class="min-w-0 flex-1">
-        {/* Issues, Chat, Content, and Runtimes draw their own top bars; native workspace fills its own pane. */}
+        {/* Dashboard, Issues, Chat, Content, Runtimes, and Team draw their own top bars; native workspace fills its own pane. */}
         <If
           when={
             !inFarm() &&
+            here()?.id !== "dashboard" &&
             here()?.id !== "issues" &&
             here()?.id !== "chat" &&
             here()?.id !== "content" &&
             here()?.id !== "runtimes" &&
+            here()?.id !== "team" &&
             location().pathname !== "/workspace"
           }
         >

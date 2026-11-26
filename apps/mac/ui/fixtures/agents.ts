@@ -312,16 +312,25 @@ const skills: Skill[] = [
 ];
 
 const repos: RepoSummary[] = [
-  { name: "vibevalley", path: "/Users/farmer/code/vibevalley", git: true, last: now - 3 * hour, maxSessions: 3, pullRequest: { available: true, reason: "" } },
+  {
+    name: "vibevalley",
+    path: "/Users/farmer/code/vibevalley",
+    git: true,
+    external: false,
+    last: now - 3 * hour,
+    maxSessions: 3,
+    pullRequest: { available: true, reason: "" },
+  },
   {
     name: "site",
     path: "/Users/farmer/code/site",
     git: true,
+    external: false,
     last: now - 5 * day,
     maxSessions: 2,
     pullRequest: { available: false, reason: "没有远端" },
   },
-  { name: "notes", path: "/Users/farmer/notes", git: false, maxSessions: 1, pullRequest: { available: false, reason: "不是 git 仓库" } },
+  { name: "notes", path: "/Users/farmer/notes", git: false, external: false, maxSessions: 1, pullRequest: { available: false, reason: "不是 git 仓库" } },
 ];
 
 const two = (n: number) => String(n).padStart(2, "0");

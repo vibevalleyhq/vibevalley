@@ -22,6 +22,7 @@
   "fine": "配置没问题，可以派活。",
   "problems": "派不出去的原因",
   "cannot": "派不出去：",
+  "missingApiKey": "还没填模型 API 密钥",
   "random": "随机一个",
   "avatar": "角色头像",
   "avatarHint": "在工作台与聊天里展示这个头像；留空时显示农场里的小动物。",
@@ -121,13 +122,13 @@
   "templates": {
     "title": "模板",
     "intro": "每个模板是一份 agent 的配方：角色、职责、人设、推荐的引擎和长相。装一份就多一份角色，同一个模板能装好几份；装好的随便改，模板出了新版本，角色页会提示更新。",
-    "open": "从模板装",
+    "open": "模板库",
     "openLine": "主助手与执行角色的配方，挑着装",
     "folder": "模板文件夹",
     "folderHint": "本机上一个模板文件夹的路径（里面有 agent.json）",
     "add": "加进来",
     "added": "模板「{name}」加进来了，还没装",
-    "onServer": "跑在 VibeValley 自己的 agent 上",
+    "onServer": "跑在内置引擎",
     "notHere": "写给 {runtime}，这台机器上没有：装上以后在角色里换一个引擎",
     "noPersona": "没写人设。",
     "addedHere": " · 本机加进来的",
@@ -195,5 +196,12 @@
   "targetMachineTip": "将此角色固定到某台执行机器，或保持「自动」由总控端优先调度本机或在线机器。",
   "targetMachineAuto": "自动（优先本机或在线）",
   "targetMachineOffline": "{name}（离线）",
-  "targetMachineDraining": "{name}（排空中）"
+  "targetMachineDraining": "{name}（排空中）",
+  "selector": {
+    "ready": "就绪",
+    "warn": "提醒",
+    "error": "不可用",
+    "checking": "检测中…",
+    "fix": "去设置"
+  }
 }

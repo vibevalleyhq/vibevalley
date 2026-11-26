@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use gpui::{AppContext as _, Context, Entity, PathPromptOptions, Subscription, Window};
+use gpui::{AppContext as _, Context, Entity, Focusable as _, PathPromptOptions, Subscription, Window};
 use serde_json::{Value, json};
 use vibevalley_workspace::PaneKind;
 
@@ -19,6 +19,15 @@ impl Shell {
                 let next = rail_width.clamp(56.0, 80.0);
                 if (self.chrome.global_rail_width - next).abs() > 0.01 {
                     self.chrome.global_rail_width = next;
+                    cx.notify();
+                }
+            }
+            Action::GlobalModal { active } => {
+                if self.chrome.modal_overlay != active {
+                    self.chrome.modal_overlay = active;
+                    if active {
+                        window.focus(&self.chrome.workbench.read(cx).focus_handle(cx), cx);
+                    }
                     cx.notify();
                 }
             }
@@ -459,6 +468,31 @@ impl Shell {
                 .detach();
                 return;
             }
+            HostOp::PickFolder => {
+                let chosen = cx.prompt_for_paths(PathPromptOptions {
+                    files: false,
+                    directories: true,
+                    multiple: false,
+                    prompt: None,
+                });
+                cx.spawn(async move |_, cx| {
+                    let result = match chosen.await {
+                        Ok(Ok(Some(paths))) => match paths.into_iter().next() {
+                            Some(path) => cx.background_spawn(async move { crate::host::folder_info(&path) }).await.map(Some),
+                            None => Ok(None),
+                        },
+                        Ok(Ok(None)) => Ok(None),
+                        Ok(Err(error)) => Err(error.to_string()),
+                        Err(error) => Err(error.to_string()),
+                    };
+                    reply.send(match result {
+                        Ok(folder) => Envelope::ok(json!(folder)),
+                        Err(error) => refusal(BizCode::Refused, error),
+                    });
+                })
+                .detach();
+                return;
+            }
             HostOp::SaveFile(req) => {
                 let source = PathBuf::from(req.path);
                 if !source.is_absolute() {
@@ -695,10 +729,10 @@ impl Shell {
     }
 
     pub(super) fn subscribe_hosted(&mut self, view: &Entity<HostedView>, window: &mut Window, cx: &mut Context<Self>) -> Subscription {
-        cx.subscribe_in(view, window, move |this, _, event: &HostedEvent, window, cx| match event {
+        cx.subscribe_in(view, window, move |this, view, event: &HostedEvent, window, cx| match event {
             HostedEvent::Action(a) => this.on_action(a.clone(), window, cx),
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
-            HostedEvent::Ready => {}
+            HostedEvent::Ready => view.read(cx).push_update_state(crate::update::state(), cx),
         })
     }
 
@@ -742,7 +776,7 @@ fn host_info_payload(settings: &crate::theme::Settings, fonts: &[String]) -> Val
         "uiFontSize": settings.ui_font_size,
         "theme": settings.theme.as_str(),
         "motion": settings.effective_motion().as_str(),
-        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "assetsDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet", "captureWebView", "vdp"],
+        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "assetsDir", "playAudio", "readFile", "commandLine", "pickFile", "pickFolder", "saveFile", "update", "mossVoice", "applet", "captureWebView", "vdp"],
     })
 }
 

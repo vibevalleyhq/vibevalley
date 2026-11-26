@@ -61,5 +61,34 @@
     "incomplete": "WeChat confirmed, but did not give the whole login: try again.",
     "tooLong": "Not scanned in time: the QR code expired."
   },
-  "digest": "{n} messages while you were away:\n{lines}\n\nThe whole of them is in the default channel."
+  "digest": "{n} messages while you were away:\n{lines}\n\nThe whole of them is in the default channel.",
+  "push": {
+    "asking": "[Question · {target}]\n{question}\n\nReply here to answer and continue.",
+    "askingMore": "[Question · {target}]\n{question} ({n} questions total)\n\nReply here to answer and continue.",
+    "reviewing": "[Ready for Review · {target}]\n{summary}\n\nReview in VibeValley or reply with feedback.",
+    "conflict": "[Merge Conflict · {target}]\nConflicts with {base} ({n} files: {files})\n\nResolve the conflict in VibeValley and retry.",
+    "conflictWhy": "[Merge Conflict · {target}]\n{why}\n\nResolve the conflict in VibeValley and retry.",
+    "interrupted": "[Interrupted · {target}]\n{summary}\n\nResume in VibeValley or reply to continue.",
+    "failed": "[Failed · {target}]\n{summary}\n\nInspect in VibeValley or reply to retry.",
+    "runCompleted": "[Round Completed · {name}]\n{summary}",
+    "runCompletedTokens": "[Round Completed · {name}]\n{summary}\n({tokens} tokens spent)",
+    "runFailed": "[Round Failed · {name}]\n{summary}"
+  },
+  "cronDigest": {
+    "title": "[Progress Digest · {title}]",
+    "counts": "Tickets: asking {asking} · reviewing {reviewing} · stuck {stuck} · working {working} · completed {done}",
+    "runs": "Runs: completed {completed} · failed {failed} · interrupted {interrupted}",
+    "attentionHeader": "Needs your attention:",
+    "completedHeader": "Recently completed:",
+    "workingHeader": "In progress:",
+    "itemAsk": "· [Asking] #{number} {title}: {detail}",
+    "itemReview": "· [Review] #{number} {title}: {detail}",
+    "itemConflict": "· [Conflict] #{number} {title}: {detail}",
+    "itemInterrupted": "· [Interrupted] #{number} {title}: {detail}",
+    "itemFailed": "· [Failed] #{number} {title}: {detail}",
+    "itemWorking": "· [Working] #{number} {title}",
+    "itemDone": "· #{number} {title}",
+    "more": "...and {n} more",
+    "quiet": "No new progress recently and nothing waiting on you."
+  }
 }
