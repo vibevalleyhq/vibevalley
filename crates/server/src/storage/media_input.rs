@@ -257,7 +257,7 @@ impl MediaInputStorage {
         for r in rows {
             if r.phase == MediaInputPhase::Ready {
                 let exists = match r.hash.as_ref() {
-                    Some(h) => tokio::fs::metadata(self.attachment.path_of(h)).await.is_ok_and(|m| m.is_file()),
+                    Some(h) => self.attachment.exists_blob_async(h).await,
                     None => false,
                 };
                 if !exists {
@@ -367,7 +367,7 @@ impl MediaInputStorage {
                 size: file.size,
             })
             .await?;
-        let source_path = self.attachment.path_of(id);
+        let source_path = self.attachment.materialize_local_async(id).await.map_err(|_| refused("inputInvalid"))?;
         let opened = tokio::fs::File::open(&source_path).await.map_err(storage)?.into_std().await;
         self.upload_async(&r.id, Box::new(opened)).await
     }
@@ -397,7 +397,7 @@ impl MediaInputStorage {
             return Err(refused("inputMissing"));
         }
         let hash = r.hash.clone().ok_or_else(|| refused("inputMissing"))?;
-        let path = self.attachment.path_of(&hash);
+        let path = self.attachment.materialize_local_async(&hash).await.map_err(|_| refused("inputMissing"))?;
         verify_content_async(&path, r.size as u64, &hash).await?;
         Ok(AttachmentFile {
             path: path.to_string_lossy().into_owned(),
@@ -421,7 +421,7 @@ impl MediaInputStorage {
                 .map_err(storage)?
                 .ok_or_else(|| refused("inputMissing"))?;
             let has_file = match r.hash.as_ref() {
-                Some(h) => tokio::fs::metadata(self.attachment.path_of(h)).await.is_ok_and(|m| m.is_file()),
+                Some(h) => self.attachment.exists_blob_async(h).await,
                 None => false,
             };
             if r.phase != MediaInputPhase::Ready || (r.can_delete && r.expires_at <= self.ctx.now()) || !has_file {

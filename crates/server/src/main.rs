@@ -1,17 +1,20 @@
 //! `vibevalley-server`: standalone binary entrypoint. `--ready-json` prints
-//! `{"url","pid"}` once listening, and `--database-url <URL>` overrides the
-//! database URL. Remaining configuration reads environment variables via
+//! `{"url","pid"}` once listening, `--database-url <URL>` overrides the
+//! database URL, and `--storage-url <URL>` overrides `VIBEVALLEY_STORAGE_URL`.
+//! Remaining configuration reads environment variables via
 //! [`vibevalley_server::Config::from_env`].
 
 struct Flags {
     ready_json: bool,
     database_url: Option<String>,
+    storage_url: Option<String>,
 }
 
 fn flags() -> Result<Flags, String> {
     let mut f = Flags {
         ready_json: false,
         database_url: None,
+        storage_url: None,
     };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -28,6 +31,17 @@ fn flags() -> Result<Flags, String> {
                 return Err("--database-url requires a non-empty URL".to_string());
             }
             f.database_url = Some(url.to_string());
+        } else if a == "--storage-url" {
+            let url = args
+                .next()
+                .filter(|v| !v.is_empty())
+                .ok_or_else(|| "--storage-url requires a URL".to_string())?;
+            f.storage_url = Some(url);
+        } else if let Some(url) = a.strip_prefix("--storage-url=") {
+            if url.is_empty() {
+                return Err("--storage-url requires a non-empty URL".to_string());
+            }
+            f.storage_url = Some(url.to_string());
         } else {
             return Err(format!("unknown flag {a}"));
         }
@@ -59,12 +73,16 @@ fn run() -> Result<(), String> {
     if let Some(database_url) = flags.database_url {
         config.database_url = Some(database_url);
     }
+    let storage_config =
+        vibevalley_server::storage::StorageConfig::from_url_override(flags.storage_url.as_deref(), &home).map_err(|e| format!("the storage: {e}"))?;
 
     vibevalley_runtime::rt::block_on(async {
-        let app = vibevalley_server::create_app(config).await.map_err(|e| match &e.detail {
-            Some(detail) => format!("{e}\n{detail}"),
-            None => e.to_string(),
-        })?;
+        let app = vibevalley_server::app::create_app_with_storage(config, storage_config)
+            .await
+            .map_err(|e| match &e.detail {
+                Some(detail) => format!("{e}\n{detail}"),
+                None => e.to_string(),
+            })?;
         let addr = format!("127.0.0.1:{port}").parse().map_err(|e| format!("{e}"))?;
         let listener = vibevalley_server::gateway::serve(app.server(), addr).map_err(|e| format!("listening on {addr}: {e}"))?;
         let url = listener.url();

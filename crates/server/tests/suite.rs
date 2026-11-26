@@ -29,5 +29,6 @@ mod session;
 mod setting;
 mod spine_and_gateway;
 mod start;
+mod storage_backend;
 mod voice;
 mod watch;
