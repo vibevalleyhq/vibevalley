@@ -393,17 +393,20 @@ fn machine_contract_types_runtime_ref_and_routing_fields_round_trip() {
         "id": "sbx-1",
     }));
 
-    // Routing fields on IssueRequest / IssueUpdate / IssueUpdateInput serialize cleanly.
+    // Routing and owner fields on IssueRequest / IssueUpdate / IssueUpdateInput serialize cleanly.
     round_value::<IssueRequest>(&serde_json::json!({
         "title": "Run on GPU",
         "machineId": "gpu-1",
+        "owner": { "kind": "user", "id": "self" },
     }));
     round_value::<IssueUpdate>(&serde_json::json!({
         "machineId": "gpu-1",
+        "owner": { "kind": "agent", "id": "arch" },
     }));
     round_value::<IssueUpdateInput>(&serde_json::json!({
         "id": "i1",
         "machineId": "gpu-1",
+        "owner": { "kind": "user", "id": "" },
     }));
 
     let ep = endpoint("machine.list").expect("machine.list endpoint");

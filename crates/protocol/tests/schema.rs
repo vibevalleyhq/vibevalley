@@ -52,6 +52,7 @@ pub fn round_trip(name: &str, value: serde_json::Value) -> Option<Result<serde_j
         "ActWords" => rt::<vibevalley_protocol::ActWords>(value),
         "Actor" => rt::<vibevalley_protocol::Actor>(value),
         "ActorKind" => rt::<vibevalley_protocol::ActorKind>(value),
+        "ActorRef" => rt::<vibevalley_protocol::ActorRef>(value),
         "Agent" => rt::<vibevalley_protocol::Agent>(value),
         "AgentDeleteInput" => rt::<vibevalley_protocol::AgentDeleteInput>(value),
         "AgentFrom" => rt::<vibevalley_protocol::AgentFrom>(value),

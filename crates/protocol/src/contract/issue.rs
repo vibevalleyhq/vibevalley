@@ -10,6 +10,19 @@ use ts_rs::TS;
 use super::*;
 use crate::JsNumber;
 
+/// Lightweight typed owner/actor reference on issues (`user` or `agent`).
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "kind")]
+pub enum ActorRef {
+    #[serde(rename = "user", rename_all = "camelCase")]
+    User { id: String },
+    #[serde(rename = "agent", rename_all = "camelCase")]
+    Agent { id: String },
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum Landing {
@@ -779,6 +792,8 @@ pub struct Issue {
     pub start_at: Option<JsNumber>,
     #[serde(default)]
     pub due_at: Option<JsNumber>,
+    #[serde(default)]
+    pub owner: Option<ActorRef>,
 }
 
 /// Includes the Core fold `seq` that applied the mutation so clients can await state convergence.
@@ -837,6 +852,8 @@ pub struct AppliedIssue {
     pub start_at: Option<JsNumber>,
     #[serde(default)]
     pub due_at: Option<JsNumber>,
+    #[serde(default)]
+    pub owner: Option<ActorRef>,
     pub seq: i64,
 }
 
@@ -881,6 +898,7 @@ impl AppliedIssue {
             tags: issue.tags,
             start_at: issue.start_at,
             due_at: issue.due_at,
+            owner: issue.owner,
             seq,
         }
     }
@@ -916,6 +934,9 @@ pub struct IssueUpdate {
     /// Target due timestamp (ms); 0 or negative clears it.
     #[serde(default)]
     pub due_at: Option<JsNumber>,
+    /// Final owner (`user` or `agent`); empty `id` clears it.
+    #[serde(default)]
+    pub owner: Option<ActorRef>,
 }
 
 #[skip_serializing_none]
@@ -970,6 +991,8 @@ pub struct IssueRequest {
     pub start_at: Option<JsNumber>,
     #[serde(default)]
     pub due_at: Option<JsNumber>,
+    #[serde(default)]
+    pub owner: Option<ActorRef>,
     /// Idempotency key deduplicating retries after a lost response.
     pub request_key: Option<String>,
 }
@@ -1249,6 +1272,9 @@ pub struct IssueUpdateInput {
     /// Target due timestamp (ms); 0 or negative clears it.
     #[serde(default)]
     pub due_at: Option<JsNumber>,
+    /// Final owner (`user` or `agent`); empty `id` clears it.
+    #[serde(default)]
+    pub owner: Option<ActorRef>,
 }
 
 #[skip_serializing_none]
@@ -1452,7 +1478,8 @@ pub struct BoardSummary {
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "issue";
-    types: [Landing,
+    types: [ActorRef,
+    Landing,
     IssueCanceled,
     Priority,
     IssueStatus,

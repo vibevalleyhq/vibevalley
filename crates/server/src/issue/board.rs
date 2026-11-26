@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
 use vibevalley_core::{Move, status_move};
 use vibevalley_protocol::{
-    ApiError, AppliedIssue, Assignment, Attachment, BizCode, Deliverable, Issue, IssueCanceled, IssueConstraints, IssueStageKind as StageKind, IssueStatus,
-    JsNumber, Landing, Priority, Run, RunTriggerKind, Session, SliceBundle, StuckReason,
+    ActorRef, ApiError, AppliedIssue, Assignment, Attachment, BizCode, Deliverable, Issue, IssueCanceled, IssueConstraints, IssueStageKind as StageKind,
+    IssueStatus, JsNumber, Landing, Priority, Run, RunTriggerKind, Session, SliceBundle, StuckReason,
 };
 use vibevalley_runtime::oar::Registry;
 
@@ -71,6 +71,8 @@ pub struct NewIssue {
     pub start_at: Option<JsNumber>,
     #[serde(default)]
     pub due_at: Option<JsNumber>,
+    #[serde(default)]
+    pub owner: Option<ActorRef>,
 }
 
 pub(super) fn clean_tags(tags: &[String]) -> Vec<String> {
@@ -88,6 +90,30 @@ pub(super) fn normalize_timestamp(value: Option<JsNumber>) -> Option<JsNumber> {
     value.and_then(|v| {
         let raw = v.get();
         (raw.is_finite() && raw > 0.0).then(|| JsNumber::from(raw.round() as i64))
+    })
+}
+
+pub(super) fn normalize_owner(owner: Option<ActorRef>) -> Option<ActorRef> {
+    owner.and_then(|o| match o {
+        ActorRef::User { id } => {
+            let trimmed = id.trim();
+            (!trimmed.is_empty()).then(|| ActorRef::User { id: trimmed.to_string() })
+        }
+        ActorRef::Agent { id } => {
+            let trimmed = id.trim();
+            (!trimmed.is_empty()).then(|| ActorRef::Agent { id: trimmed.to_string() })
+        }
+    })
+}
+
+pub(super) fn normalize_owner_with_driver(driver: &dyn crate::runtime::SessionDriver, owner: Option<ActorRef>) -> Option<ActorRef> {
+    normalize_owner(owner).and_then(|o| match o {
+        ActorRef::User { .. } => Some(o),
+        ActorRef::Agent { id } => {
+            let resolved = driver.resolve_agent_key(&id);
+            let trimmed = resolved.trim();
+            (!trimmed.is_empty()).then(|| ActorRef::Agent { id: trimmed.to_string() })
+        }
     })
 }
 
@@ -484,6 +510,7 @@ impl Board {
             issue.tags = clean_tags(&new.tags);
             issue.start_at = normalize_timestamp(new.start_at);
             issue.due_at = normalize_timestamp(new.due_at);
+            issue.owner = normalize_owner_with_driver(self.runtime.driver().as_ref(), new.owner).or_else(|| Some(ActorRef::self_user()));
             if new.auto_submit_pr {
                 issue.mandate = vibevalley_protocol::IssueMandate::explicit("", true);
             }

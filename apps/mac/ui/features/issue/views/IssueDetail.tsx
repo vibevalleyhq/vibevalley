@@ -38,7 +38,7 @@ import { issueSet, labeledIssue, sendLabel, updateIssueAttachments } from "../mo
 import { ActLines } from "./ActLines";
 import { ChangesBody, ChangesHead, ConflictFiles } from "./CloseDialog";
 import { IssueAttachments } from "./IssueAttachments";
-import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
+import { DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
 import { IssueThread } from "./IssueThread";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
@@ -567,6 +567,16 @@ export function IssueDetail(props: {
         }
       >
         {s().whoLine}
+      </Property>
+      <Property label={t("web.issue.owner.label")} icon={<OwnerMark owner={live().owner} size={15} />} inset>
+        <OwnerPicker
+          owner={live().owner}
+          allIssues={issues()}
+          disabled={busy() || !s().open}
+          state={labeled().state("owner")}
+          testid="issue-owner"
+          onChange={(owner) => setLabel({ owner: owner ?? { kind: "user", id: "" } })}
+        />
       </Property>
       <If when={agent()?.model}>
         {(model) => (

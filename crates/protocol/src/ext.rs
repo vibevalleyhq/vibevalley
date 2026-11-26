@@ -138,6 +138,19 @@ impl IssueStage {
     }
 }
 
+impl ActorRef {
+    /// The local interactive user (`self`).
+    pub fn self_user() -> Self {
+        Self::User { id: "self".into() }
+    }
+
+    pub fn id(&self) -> &str {
+        match self {
+            Self::User { id } | Self::Agent { id } => id,
+        }
+    }
+}
+
 impl Issue {
     /// A fresh issue in the backlog, asked for explicitly, delivering a change.
     pub fn new(id: impl Into<IssueId>, number: i64, title: impl Into<String>, created_at: Millis) -> Issue {
@@ -180,6 +193,7 @@ impl Issue {
             tags: vec![],
             start_at: None,
             due_at: None,
+            owner: None,
         }
     }
 }

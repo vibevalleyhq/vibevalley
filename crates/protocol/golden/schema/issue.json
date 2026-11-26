@@ -4,6 +4,16 @@
   "optional",
   "required"
  ],
+ "ActorRef": [
+  {
+   "id": "self",
+   "kind": "user"
+  },
+  {
+   "id": "laozhou",
+   "kind": "agent"
+  }
+ ],
  "AppliedIssue": [
   {
    "answer": {

@@ -599,3 +599,252 @@ test("Issue DB-backed pickers (NewIssue repo/helper and ParentPicker) filter via
   expect(app.texts()).toContain("#102 Beta Polish Pipeline");
   expect(app.texts()).not.toContain("#101 Alpha Core Architecture");
 });
+
+test("Searchable OwnerPicker sets owner on NewIssue, TodoDetail, and IssueDetail without touching assignments", async () => {
+  setLocale("zh");
+  const targetIssue = makeIssueFixture({
+    id: "i-owner-todo",
+    number: 201,
+    title: "Editable draft task for owner test",
+    status: "todo",
+    owner: { kind: "user", id: "self" },
+    stage: { state: "draft", acts: [] },
+  });
+  const runningSession = makeFailedSession("s-owner-run", "Working on issue");
+  const runningIssue = makeIssueFixture({
+    id: "i-owner-running",
+    number: 202,
+    title: "Running task for owner delegation",
+    status: "in_progress",
+    owner: { kind: "user", id: "alice" },
+    assignments: [
+      {
+        id: "a-run",
+        issue: "i-owner-running" as IssueId,
+        agent: "laozhou",
+        assignedAt: SCENARIO_NOW - 1000,
+        executions: [{ kind: "worker", session: runningSession.id, startedAt: SCENARIO_NOW - 1000 }],
+      },
+    ],
+    stage: { state: "stuck", stuck: "failed", acts: [] },
+  });
+  const base = scenarios.typical;
+  const state: SliceBundle = {
+    ...base.state,
+    board: { seq: 15, issues: [targetIssue, runningIssue] },
+  };
+  const fake = fakeHost({ state, responses: base.responses }, { route: "/issues", locale: "zh" });
+  fake.respond("issue.create", (payload: unknown) => {
+    const p = payload as { title?: string; owner?: Issue["owner"] };
+    return makeIssueFixture({
+      id: "i-owner-created",
+      number: 203,
+      title: p.title ?? "Owner test task",
+      status: "backlog",
+      ...(p.owner ? { owner: p.owner } : {}),
+      stage: { state: "draft", acts: [] },
+    });
+  });
+  fake.respond("issue.refine", (payload: unknown) => {
+    const p = payload as { id: string; text?: string };
+    return makeIssueFixture({
+      id: p.id,
+      number: 203,
+      title: p.text ?? "Owner test task",
+      status: "backlog",
+      stage: { state: "draft", acts: [] },
+    });
+  });
+  fake.respond("issue.update", (payload: unknown) => {
+    const p = payload as { id: string; owner?: Issue["owner"] };
+    const existing = p.id === runningIssue.id ? runningIssue : targetIssue;
+    return {
+      ...existing,
+      ...(p.owner ? { owner: p.owner } : {}),
+      seq: 21,
+    };
+  });
+  fake.respond("issue.history.list", [
+    { issue: targetIssue, sessions: [], missingSessions: [] },
+    { issue: runningIssue, sessions: [runningSession], missingSessions: [] },
+  ]);
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 2);
+
+  // 1. NewIssue: searchable OwnerPicker lists self, collaborators (alice/bob), and Expert agents (laozhou/xiaolin).
+  await app.press("id:issue-toolbar-new");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-trigger") === 1);
+  await app.press("id:issue-new-owner-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-search") === 1);
+  await app.type("id:issue-new-owner-search", "老周");
+  await fake.pumpUntil(app, () => app.count("text:老周") >= 1);
+  expect(app.texts()).not.toContain("alice");
+  await app.press("text:老周");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-owner-search") === 0);
+
+  await app.type("id:issue-new-text", "Owner test task");
+  await app.press("id:issue-new-keep");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-dialog") === 0);
+  const created = fake.calls.findLast((c) => c.op === "issue.create");
+  expect(created?.payload).toMatchObject({
+    title: "Owner test task",
+    owner: { kind: "agent", id: "laozhou" },
+  });
+
+  // 2. TodoDetail: OwnerPicker updates owner to collaborator alice cleanly.
+  await app.host.send("route", `/issues/${targetIssue.id}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-owner-trigger") === 1);
+  await app.press("id:issue-owner-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-owner-search") === 1);
+  await app.type("id:issue-owner-search", "alice");
+  await fake.pumpUntil(app, () => app.count("text:alice") >= 1);
+  await app.press("text:alice");
+  await fake.pumpUntil(app, () => app.count("id:issue-save") === 1);
+  await app.press("id:issue-save");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.update"));
+  const todoOwnerUpd = fake.calls.findLast((c) => c.op === "issue.update");
+  expect(todoOwnerUpd?.payload).toMatchObject({
+    id: targetIssue.id,
+    owner: { kind: "user", id: "alice" },
+  });
+
+  // 3. IssueDetail: OwnerPicker delegates running issue owner to Expert agent without changing execution assignments.
+  await app.host.send("route", `/issues/${runningIssue.id}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-owner-trigger") === 1);
+  await app.press("id:issue-owner-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-owner-search") === 1);
+  await app.type("id:issue-owner-search", "小林");
+  await fake.pumpUntil(app, () => app.count("text:小林") >= 1);
+  await app.press("text:小林");
+  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length >= 2);
+  const detailOwnerUpd = fake.calls.findLast((c) => c.op === "issue.update");
+  expect(detailOwnerUpd?.payload).toMatchObject({
+    id: runningIssue.id,
+    owner: { kind: "agent", id: "xiaolin" },
+  });
+});
+
+test("Group By renders collapsible groups across Kanban & List, and hierarchy modes fold children into clickable parent card rows", async () => {
+  setLocale("zh");
+  const parentOne = makeIssueFixture({
+    id: "i-hier-parent-1",
+    number: 301,
+    title: "Parent epic A",
+    status: "todo",
+    priority: "urgent",
+    owner: { kind: "user", id: "self" },
+    stage: { state: "draft", acts: [] },
+  });
+  const childOne = makeIssueFixture({
+    id: "i-hier-child-1",
+    number: 302,
+    title: "Child task A1",
+    parent: "i-hier-parent-1" as IssueId,
+    status: "in_progress",
+    priority: "high",
+    owner: { kind: "agent", id: "laozhou" },
+    stage: { state: "draft", acts: [] },
+  });
+  const childTwo = makeIssueFixture({
+    id: "i-hier-child-2",
+    number: 303,
+    title: "Child task A2",
+    parent: "i-hier-parent-1" as IssueId,
+    status: "done",
+    priority: "medium",
+    owner: { kind: "user", id: "alice" },
+    stage: { state: "done", acts: [] },
+  });
+  const standalone = makeIssueFixture({
+    id: "i-hier-solo",
+    number: 304,
+    title: "Standalone top-level task",
+    status: "backlog",
+    priority: "low",
+    owner: { kind: "user", id: "self" },
+    stage: { state: "draft", acts: [] },
+  });
+
+  const allIssues = [parentOne, childOne, childTwo, standalone];
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 20, issues: allIssues },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "zh" });
+  fake.respond(
+    "issue.history.list",
+    allIssues.map((issue) => ({ issue, sessions: [], missingSessions: [] })),
+  );
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 4);
+
+  // Switch Group By -> Owner in Kanban board: creates collapsible owner swimlane groups with counts.
+  await app.press("id:group-by-trigger");
+  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.groupBy.owner")}`) === 1);
+  await app.press(`text:${t("web.issue.groupBy.owner")}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-group-user:self") === 1);
+  expect(app.count("id:issue-group-user:alice")).toBe(1);
+  expect(app.count("id:issue-group-agent:laozhou")).toBe(1);
+  expect(app.count("id:issue-group-body")).toBe(3);
+
+  // Collapse the self owner group in Kanban.
+  await app.press("id:issue-group-user:self");
+  await fake.pumpUntil(app, () => app.count("id:issue-group-body") === 2);
+
+  // Switch to List view & Group By -> Priority; verify 4 priority groups and collapsible toggle.
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
+  await app.press("id:group-by-trigger");
+  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.groupBy.priority")}`) === 1);
+  await app.press(`text:${t("web.issue.groupBy.priority")}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-group-urgent") === 1);
+  expect(app.count("id:issue-group-high")).toBe(1);
+  expect(app.count("id:issue-group-medium")).toBe(1);
+  expect(app.count("id:issue-group-low")).toBe(1);
+
+  // Reset Group By -> None and switch back to Kanban for hierarchy verification.
+  await app.press("id:group-by-trigger");
+  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.groupBy.none")}`) === 1);
+  await app.press(`text:${t("web.issue.groupBy.none")}`);
+  await app.press("id:issue-view-board");
+  await fake.pumpUntil(app, () => app.count("id:issue-board") === 1);
+
+  // Switch Hierarchy -> top_level: child cards disappear from outer board, leaving parentOne + standalone (2 outer cards).
+  await app.press("id:hierarchy-mode-trigger");
+  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.hierarchy.top_level")}`) === 1);
+  await app.press(`text:${t("web.issue.hierarchy.top_level")}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 2);
+  expect(app.count("id:card-children")).toBe(1);
+  expect(app.count("id:card-child-i-hier-child-1")).toBe(1);
+  expect(app.count("id:card-child-i-hier-child-2")).toBe(1);
+  expect(app.texts()).toContain("1/2");
+
+  // Switch Hierarchy -> parents_only: only parentOne remains as outer card (1 outer card), with children still inside.
+  await app.press("id:hierarchy-mode-trigger");
+  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.hierarchy.parents_only")}`) === 1);
+  await app.press(`text:${t("web.issue.hierarchy.parents_only")}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 1);
+  expect(app.count("id:card-child-i-hier-child-1")).toBe(1);
+
+  // Clicking a compact child row directly opens that child's Quick-Peek modal (not the parent).
+  await app.press("id:card-child-i-hier-child-1");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  expect(app.texts()).toContain("#301 Parent epic A");
+  expect(app.texts()).toContain("Child task A1");
+});

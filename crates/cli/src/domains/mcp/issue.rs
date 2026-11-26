@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer};
 use serde_json::{Value, json};
 use vibevalley_mcp::{ToolCallResult, ToolDef};
 use vibevalley_protocol::{
-    AppliedIssue, AttachmentUpload, Issue, IssueCommentCreateInput, IssueConversationGetInput, IssueFilter, IssueGetInput, IssueRequest, IssueStatus,
+    ActorRef, AppliedIssue, AttachmentUpload, Issue, IssueCommentCreateInput, IssueConversationGetInput, IssueFilter, IssueGetInput, IssueRequest, IssueStatus,
     IssueStatusUpdateInput, IssueUpdate, IssueUpdateInput, JsNumber, Priority, SayRequest, ops,
 };
 
@@ -105,6 +105,8 @@ pub(super) struct IssueCreateArgs {
     pub(super) criteria: Option<Vec<String>>,
     #[serde(default)]
     pub(super) attachments: Option<Vec<String>>,
+    #[serde(default)]
+    pub(super) owner: Option<ActorRef>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -136,6 +138,8 @@ pub(super) struct IssueUpdateArgs {
     pub(super) criteria: Option<Vec<String>>,
     #[serde(default)]
     pub(super) attachments: Option<Vec<String>>,
+    #[serde(default)]
+    pub(super) owner: Option<ActorRef>,
     #[serde(default)]
     pub(super) comment: Option<String>,
 }
@@ -205,14 +209,24 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
                     "startAt": { "type": "number", "description": "Optional planned start timestamp in Unix milliseconds." },
                     "dueAt": { "type": "number", "description": "Optional target due timestamp in Unix milliseconds." },
                     "criteria": { "type": "array", "items": { "type": "string" }, "description": "Optional acceptance criteria list." },
-                    "attachments": { "type": "array", "items": { "type": "string" }, "description": "Optional uploaded attachment ids." }
+                    "attachments": { "type": "array", "items": { "type": "string" }, "description": "Optional uploaded attachment ids." },
+                    "owner": {
+                        "type": "object",
+                        "properties": {
+                            "kind": { "type": "string", "enum": ["user", "agent"] },
+                            "id": { "type": "string" }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false,
+                        "description": "Optional final owner reference ({ kind: 'user' | 'agent', id }); defaults to local user 'self'."
+                    }
                 },
                 "required": ["title"]
             }),
         ),
         tool_def(
             "vv_issue_update",
-            "Update an existing VibeValley issue's title, description, priority, repo, agent, parent, tags, startAt, dueAt, criteria, attachments, or transition its status.",
+            "Update an existing VibeValley issue's title, description, priority, repo, agent, owner, parent, tags, startAt, dueAt, criteria, attachments, or transition its status.",
             json!({
                 "type": "object",
                 "properties": {
@@ -223,6 +237,16 @@ pub(super) fn tool_definitions() -> Vec<ToolDef> {
                     "priority": { "type": "string", "enum": ["urgent", "high", "medium", "low"], "description": "Updated priority." },
                     "repo": { "type": "string", "description": "Updated repository name." },
                     "agent": { "type": "string", "description": "Updated assigned agent profile id." },
+                    "owner": {
+                        "type": "object",
+                        "properties": {
+                            "kind": { "type": "string", "enum": ["user", "agent"] },
+                            "id": { "type": "string" }
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false,
+                        "description": "Updated final owner reference ({ kind: 'user' | 'agent', id }), or empty id '' to clear owner."
+                    },
                     "parent": { "type": "string", "description": "Updated parent issue number/id, or empty string '' to clear parent." },
                     "tags": { "type": "array", "items": { "type": "string" }, "description": "Replacement issue tags list." },
                     "startAt": { "type": "number", "description": "Updated planned start timestamp in Unix milliseconds (0 clears it)." },
@@ -349,6 +373,7 @@ impl McpServer {
             priority: args.priority,
             criteria: args.criteria.filter(|c| !c.is_empty()),
             attachments: args.attachments.filter(|a| !a.is_empty()),
+            owner: args.owner,
             ..Default::default()
         };
 
@@ -415,12 +440,14 @@ impl McpServer {
         let priority = args.priority;
         let criteria = args.criteria;
         let attachments = args.attachments;
+        let owner = args.owner;
         let comment = non_empty_trimmed(args.comment);
 
         let has_field_edits = title.is_some()
             || description.is_some()
             || repo.is_some()
             || agent.is_some()
+            || owner.is_some()
             || parent.is_some()
             || tags.is_some()
             || start_at.is_some()
@@ -437,6 +464,7 @@ impl McpServer {
                 description,
                 repo,
                 agent,
+                owner,
                 parent,
                 tags,
                 start_at,
@@ -462,7 +490,7 @@ impl McpServer {
         } else {
             if !has_field_edits {
                 return ToolCallResult::error(
-                    "vv_issue_update requires at least one field to update (title, description, status, priority, repo, agent, parent, tags, startAt, dueAt, criteria, or attachments)",
+                    "vv_issue_update requires at least one field to update (title, description, status, priority, repo, agent, owner, parent, tags, startAt, dueAt, criteria, or attachments)",
                 );
             }
             let req = IssueUpdateInput {
@@ -471,6 +499,7 @@ impl McpServer {
                 description,
                 repo,
                 agent,
+                owner,
                 parent,
                 tags,
                 start_at,

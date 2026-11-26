@@ -6,7 +6,7 @@ import { issueId } from "@vibevalley/protocol/schema";
 
 import { Registry } from "../../../infra/state/atom";
 import { buildCards } from "./cards";
-import { boardLook } from "./display";
+import { boardLook, defaultLook } from "./display";
 import { addUtcDays, buildMonthGrid, buildScheduleForCards, computeSchedule, groupScheduledByDay, shiftIssueDates, shiftMonth, utcDayStart } from "./schedule";
 
 function issueStub(overrides: Partial<Omit<Issue, "id">> & { id: string; number: number }): Issue {
@@ -206,12 +206,21 @@ test("shiftIssueDates shifts explicit dates and falls back cleanly for unschedul
 
 test("boardLook preserves valid timeline/calendar views and falls back for unknown views", () => {
   const reg1 = new Registry();
-  boardLook.inRegistry(reg1).set({ view: "timeline", grouping: "status", ordering: "manual" });
+  boardLook.inRegistry(reg1).set({ ...defaultLook, view: "timeline", grouping: "status", ordering: "manual" });
   expect(boardLook.inRegistry(reg1).get().view).toBe("timeline");
-  boardLook.inRegistry(reg1).set({ view: "calendar", grouping: "status", ordering: "manual" });
+  boardLook.inRegistry(reg1).set({ ...defaultLook, view: "calendar", grouping: "status", ordering: "manual" });
   expect(boardLook.inRegistry(reg1).get().view).toBe("calendar");
 
-  localStorage.setItem("vibevalley.board.look", JSON.stringify({ view: "unknown_view", grouping: "status", ordering: "manual" }));
+  boardLook.inRegistry(reg1).set({ ...defaultLook, groupBy: "owner", hierarchy: "parents_only" });
+  expect(boardLook.inRegistry(reg1).get().groupBy).toBe("owner");
+  expect(boardLook.inRegistry(reg1).get().hierarchy).toBe("parents_only");
+
+  localStorage.setItem(
+    "vibevalley.board.look",
+    JSON.stringify({ view: "unknown_view", grouping: "status", ordering: "manual", groupBy: "bad", hierarchy: "bad" }),
+  );
   const reg2 = new Registry();
   expect(boardLook.inRegistry(reg2).get().view).toBe("board");
+  expect(boardLook.inRegistry(reg2).get().groupBy).toBe("none");
+  expect(boardLook.inRegistry(reg2).get().hierarchy).toBe("all");
 });

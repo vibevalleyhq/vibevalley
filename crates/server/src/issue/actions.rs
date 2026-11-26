@@ -373,6 +373,9 @@ fn apply_preview_edit(item: &mut Issue, edit: &IssueUpdate) {
     if let Some(due_at) = edit.due_at {
         item.due_at = super::board::normalize_timestamp(Some(due_at));
     }
+    if let Some(owner) = edit.owner.clone() {
+        item.owner = super::board::normalize_owner(Some(owner));
+    }
 }
 
 impl Board {
@@ -423,6 +426,7 @@ impl Board {
             tags: req.tags.clone().unwrap_or_default(),
             start_at: req.start_at,
             due_at: req.due_at,
+            owner: req.owner.clone(),
         };
         self.create_async(new).await.map_err(api)
     }
@@ -444,6 +448,7 @@ impl Board {
             tags: input.tags,
             start_at: input.start_at,
             due_at: input.due_at,
+            owner: input.owner,
         };
         let id = self.get_async(&input.id).await?.id;
         self.edit_async(&id, &upd).await.map_err(api)

@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use vibevalley_protocol::{Assignment, Deliverable, Issue, IssueConstraints, IssueStageKind as StageKind};
+use vibevalley_protocol::{ActorRef, Assignment, Deliverable, Issue, IssueConstraints, IssueStageKind as StageKind};
 
 use super::board::Board;
 use super::store::{BoardError, IssueChange, Result};
@@ -100,6 +100,7 @@ impl Board {
             child.repo = Some(repo.clone());
             child.parent = Some(parent.id.clone());
             child.priority = parent.priority;
+            child.owner = parent.owner.clone().or_else(|| Some(ActorRef::self_user()));
             child.deliver = Deliverable::Change;
             child.blocked_by = d.needs.iter().filter_map(|n| ids.get(n).cloned()).collect();
             child.constraints = Some(IssueConstraints {

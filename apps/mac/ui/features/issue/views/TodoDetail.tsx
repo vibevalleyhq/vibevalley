@@ -3,6 +3,7 @@ import { Input, Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import {
+  type ActorRef,
   type Attachment,
   type Deliverable,
   DeliverableValues,
@@ -38,7 +39,7 @@ import { isRefined, newIssueTitle } from "../model/issue";
 import { issueMove, issueMoveOf, movedIssue, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
-import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
+import { DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { IssueThread } from "./IssueThread";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
 import { IssueSheet, IssueTrail, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
@@ -50,6 +51,7 @@ interface Draft {
   criteria: string;
   repo: string;
   agent: string;
+  owner: ActorRef | undefined;
   priority: Priority;
   deliver: Deliverable;
   attachments: readonly Attachment[];
@@ -65,6 +67,7 @@ const draftOf = (i: Issue): Draft => ({
   criteria: i.criteria.join("\n"),
   repo: i.repo ?? "",
   agent: assignedAgentOf(i) ?? "",
+  owner: i.owner,
   priority: i.priority,
   deliver: i.deliver,
   attachments: i.attachments ?? [],
@@ -129,6 +132,8 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     }));
   };
 
+  const sameOwner = (a: ActorRef | undefined, b: ActorRef | undefined) => a?.kind === b?.kind && a?.id === b?.id;
+
   const update = (x: Draft): IssueUpdate => ({
     title: x.title,
     description: x.description,
@@ -142,6 +147,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     tags: [...x.tags],
     ...(x.startAt !== props.item.startAt ? { startAt: x.startAt ?? 0 } : {}),
     ...(x.dueAt !== props.item.dueAt ? { dueAt: x.dueAt ?? 0 } : {}),
+    ...(!sameOwner(x.owner, props.item.owner) ? { owner: x.owner ?? { kind: "user", id: "" } } : {}),
   });
 
   // Saving goes with the act (edit): the server saves the fields before it acts on them. Taken when asked, so a call
@@ -500,6 +506,9 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             <AgentReadinessNote agentId={d().agent} readiness={agentReadiness} testid="issue-helper-status" />
           </If>
         </View>
+      </Property>
+      <Property label={t("web.issue.owner.label")} icon={<OwnerMark owner={d().owner} size={15} />} inset>
+        <OwnerPicker owner={d().owner} allIssues={allIssues()} disabled={closed()} testid="issue-owner" onChange={(owner) => edit({ owner })} />
       </Property>
       <Property align="start" label={t("web.issue.task.repo")} icon={<Icon name="folder" size={13} tone="muted" />} inset>
         <View class="gap-1">

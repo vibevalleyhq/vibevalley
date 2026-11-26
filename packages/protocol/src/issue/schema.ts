@@ -7,6 +7,11 @@ import { Conflict, ReviewRevision } from "../repo/schema";
 import { IssueAnswer, Session } from "../session/schema";
 import * as T from "./shapes.gen";
 
+export const ActorRef = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("user"), id: z.string() }),
+  z.object({ kind: z.literal("agent"), id: z.string() }),
+]) satisfies Codec<T.ActorRef>;
+
 const Landing = z.enum(T.LandingValues) satisfies Codec<T.Landing>;
 const IssueCanceled = z.enum(T.IssueCanceledValues) satisfies Codec<T.IssueCanceled>;
 
@@ -206,6 +211,7 @@ const issueFields = {
   tags: z.exactOptional(z.array(z.string())),
   startAt: z.exactOptional(z.number()),
   dueAt: z.exactOptional(z.number()),
+  owner: z.exactOptional(ActorRef),
 };
 
 export const Issue = z.object(issueFields) satisfies Codec<T.Issue>;
@@ -227,6 +233,7 @@ export const IssueUpdate = z.object({
   tags: z.exactOptional(z.array(z.string())),
   startAt: z.exactOptional(z.number()),
   dueAt: z.exactOptional(z.number()),
+  owner: z.exactOptional(ActorRef),
 }) satisfies Codec<T.IssueUpdate>;
 
 export const IssueHistory = z.object({
@@ -257,6 +264,7 @@ export const IssueRequest = z.object({
   tags: z.exactOptional(z.array(z.string())),
   startAt: z.exactOptional(z.number()),
   dueAt: z.exactOptional(z.number()),
+  owner: z.exactOptional(ActorRef),
   requestKey: z.exactOptional(z.string()),
 }) satisfies Codec<T.IssueRequest>;
 

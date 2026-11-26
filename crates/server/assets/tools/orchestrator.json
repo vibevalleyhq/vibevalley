@@ -104,6 +104,15 @@
      "description": "紧急、高、普通、低；不填是普通",
      "type": "string"
     },
+    "owner": {
+     "description": "最终负责人（{ kind: 'user' | 'agent', id }）；不填默认当前用户",
+     "type": "object",
+     "properties": {
+      "kind": { "type": "string", "enum": ["user", "agent"] },
+      "id": { "type": "string" }
+     },
+     "required": ["kind", "id"]
+    },
     "repo": {
      "description": "仓库文件夹名；频道有默认仓库时可以不填；新仓库起一个简短的英文名，开工时会新建",
      "type": "string"
@@ -162,6 +171,15 @@
     "priority": {
      "description": "紧急、高、普通、低",
      "type": "string"
+    },
+    "owner": {
+     "description": "最终负责人（{ kind: 'user' | 'agent', id }）；id 传空字符串清除",
+     "type": "object",
+     "properties": {
+      "kind": { "type": "string", "enum": ["user", "agent"] },
+      "id": { "type": "string" }
+     },
+     "required": ["kind", "id"]
     },
     "repo": {
      "description": "仓库（派出去以前才能改）",

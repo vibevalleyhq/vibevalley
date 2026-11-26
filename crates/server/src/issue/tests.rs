@@ -267,6 +267,41 @@ async fn issue_tags_dates_cycle_safe_parent_and_manual_done_roundtrip() {
     assert_eq!(parent.tags, vec!["UX".to_string(), "架构".to_string()]);
     assert_eq!(parent.start_at, Some(JsNumber::from(1_760_000_000_000_i64)));
     assert_eq!(parent.due_at, Some(JsNumber::from(1_760_864_000_000_i64)));
+    assert_eq!(parent.owner, Some(vibevalley_protocol::ActorRef::User { id: "self".into() }));
+    assert!(parent.assignments.is_empty());
+
+    // Update owner to collaborator and then to agent, and clear via empty id.
+    let owned_collab = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            owner: Some(vibevalley_protocol::ActorRef::User { id: " alice ".into() }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(owned_collab.owner, Some(vibevalley_protocol::ActorRef::User { id: "alice".into() }));
+    assert!(owned_collab.assignments.is_empty());
+
+    let owned_agent = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            owner: Some(vibevalley_protocol::ActorRef::Agent { id: "expert-arch".into() }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(owned_agent.owner, Some(vibevalley_protocol::ActorRef::Agent { id: "expert-arch".into() }));
+    assert!(owned_agent.assignments.is_empty());
+
+    let cleared_owner = board
+        .update_from_input_async(IssueUpdateInput {
+            id: parent.id.clone(),
+            owner: Some(vibevalley_protocol::ActorRef::User { id: String::new() }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(cleared_owner.owner, None);
 
     // Create child & grandchild, then update parent dynamically and verify cycle protection.
     let child = board

@@ -1,7 +1,7 @@
 import { cleanup, computed, effect, keymap, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { Attachment, RuntimeInfo } from "@vibevalley/protocol";
+import type { ActorRef, Attachment, RuntimeInfo } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
@@ -19,14 +19,15 @@ import { prefsNow } from "../../../infra/state/prefs";
 import { canSubmitDraft, type DraftSubmitEvent, type DraftSubmitState, draftSubmitTransition, initialDraftSubmit } from "../model/draftSubmit";
 import { useIssues } from "../model/history";
 import { createAttachmentUploader, IssueAttachmentStrip } from "./IssueAttachments";
-import { DatePropertyEditor, ParentPicker, TagEditor } from "./IssueMetaControls";
+import { DatePropertyEditor, OwnerPicker, ParentPicker, TagEditor } from "./IssueMetaControls";
 
 const isRuntimeReady = (runtime: RuntimeInfo) => runtime.installation.status === "available" && runtime.settings.enabled;
 
-/** The repo, helper, optional execution machine, parent issue, starter template text, tags, attachment ids, or schedule dates for a new issue. */
+/** The repo, helper, owner, optional execution machine, parent issue, starter template text, tags, attachment ids, or schedule dates for a new issue. */
 export interface NewIssueAt {
   readonly repo?: string;
   readonly agent?: string;
+  readonly owner?: ActorRef | undefined;
   readonly machineId?: string;
   readonly parent?: string;
   readonly text?: string;
@@ -49,6 +50,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     }),
   );
   const machineId = signal(props.at.machineId ?? "");
+  const owner = signal<ActorRef | undefined>(props.at.owner ?? { kind: "user", id: "self" });
   const parent = signal(props.at.parent ?? "");
   const tags = signal<string[]>([...(props.at.tags ?? [])]);
   const startAt = signal<number | undefined>(props.at.startAt);
@@ -92,6 +94,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     if (started.kind !== "submitting") return;
     const { submitted, requestKey } = started;
     const pickedMachine = untracked(machineId);
+    const pickedOwner = untracked(owner);
     const pickedParent = untracked(parent);
     const pickedTags = untracked(tags);
     const pickedStartAt = untracked(startAt);
@@ -103,6 +106,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
         {
           ...(submitted.repo ? { repo: submitted.repo } : {}),
           ...(submitted.agent ? { agent: submitted.agent } : {}),
+          ...(pickedOwner ? { owner: pickedOwner } : {}),
           ...(pickedMachine ? { machineId: pickedMachine } : {}),
           ...(pickedParent ? { parent: pickedParent } : {}),
           ...(submitted.attachments.length > 0 ? { attachments: submitted.attachments.map((file) => file.id) } : {}),
@@ -156,50 +160,56 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
             onRemove={(id) => dispatch({ kind: "removeAttachment", id })}
             testid="issue-new-attachments"
           />
-          <If when={!noRepos() || !noReadyRuntimes() || hasMultipleMachines()}>
-            <View class="flex-row flex-wrap items-center gap-2">
-              <If when={!noRepos()}>
-                <Select
-                  quiet
-                  size="control"
-                  searchable
-                  searchPlaceholder={t("web.shell.palette.mode.search")}
-                  emptyText={t("web.base.table.empty")}
-                  label={t("web.issue.task.repo")}
-                  testid="issue-new-repo"
-                  value={draft().repo}
-                  placeholder={t("web.issue.todo.whichRepo")}
-                  onChange={(repo) => dispatch({ kind: "setRepo", repo })}
-                  options={repoOptions()}
-                />
-              </If>
-              <If when={!noReadyRuntimes()}>
-                <AgentSelect
-                  quiet
-                  size="control"
-                  label={t("web.issue.detail.helper")}
-                  testid="issue-new-helper"
-                  value={draft().agent}
-                  agents={agents()}
-                  readiness={agentReadiness}
-                  placeholder={t("web.issue.todo.pickForMe")}
-                  onChange={(agent) => dispatch({ kind: "setAgent", agent })}
-                />
-              </If>
-              <If when={hasMultipleMachines()}>
-                <Select
-                  quiet
-                  size="control"
-                  label={t("web.issue.new.machine")}
-                  testid="issue-new-machine"
-                  value={machineId()}
-                  placeholder={t("web.issue.new.machineAuto")}
-                  onChange={(id) => machineId.set(id)}
-                  options={machineOptions()}
-                />
-              </If>
-            </View>
-          </If>
+          <View class="flex-row flex-wrap items-center gap-2">
+            <If when={!noRepos()}>
+              <Select
+                quiet
+                size="control"
+                searchable
+                searchPlaceholder={t("web.shell.palette.mode.search")}
+                emptyText={t("web.base.table.empty")}
+                label={t("web.issue.task.repo")}
+                testid="issue-new-repo"
+                value={draft().repo}
+                placeholder={t("web.issue.todo.whichRepo")}
+                onChange={(repo) => dispatch({ kind: "setRepo", repo })}
+                options={repoOptions()}
+              />
+            </If>
+            <If when={!noReadyRuntimes()}>
+              <AgentSelect
+                quiet
+                size="control"
+                label={t("web.issue.detail.helper")}
+                testid="issue-new-helper"
+                value={draft().agent}
+                agents={agents()}
+                readiness={agentReadiness}
+                placeholder={t("web.issue.todo.pickForMe")}
+                onChange={(agent) => dispatch({ kind: "setAgent", agent })}
+              />
+            </If>
+            <OwnerPicker
+              owner={owner()}
+              allIssues={allIssues()}
+              testid="issue-new-owner"
+              clearable={false}
+              class="min-w-32 shrink-0"
+              onChange={(next) => owner.set(next)}
+            />
+            <If when={hasMultipleMachines()}>
+              <Select
+                quiet
+                size="control"
+                label={t("web.issue.new.machine")}
+                testid="issue-new-machine"
+                value={machineId()}
+                placeholder={t("web.issue.new.machineAuto")}
+                onChange={(id) => machineId.set(id)}
+                options={machineOptions()}
+              />
+            </If>
+          </View>
           <If when={!noReadyRuntimes() && draft().agent !== ""}>
             <AgentReadinessNote agentId={draft().agent} readiness={agentReadiness} testid="issue-new-helper-status" onNavigate={goTo} />
           </If>

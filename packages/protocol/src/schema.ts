@@ -169,6 +169,7 @@ export {
   ViewportRect,
 } from "./artifact/schema";
 export {
+  ActorRef,
   AppliedIssue,
   BoardIssueSummary,
   BoardLaneCounts,

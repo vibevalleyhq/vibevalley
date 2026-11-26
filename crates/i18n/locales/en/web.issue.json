@@ -4,7 +4,35 @@
     "parent": "Parent issue",
     "noParent": "No parent",
     "clearParent": "Clear parent",
-    "subProgress": "{done} / {total} done"
+    "subProgress": "{done} / {total} done",
+    "compactProgress": "{done}/{total}"
+  },
+  "owner": {
+    "label": "Assignee",
+    "pick": "Set assignee",
+    "search": "Search people or experts…",
+    "self": "Me (Self)",
+    "selfNamed": "{name} (Me)",
+    "unassigned": "Unassigned",
+    "clear": "Clear assignee",
+    "peopleGroup": "People",
+    "expertsGroup": "Experts"
+  },
+  "groupBy": {
+    "label": "Group by",
+    "none": "No grouping",
+    "repo": "Repo",
+    "owner": "Assignee",
+    "agent": "Helper",
+    "priority": "Priority",
+    "parent": "Parent",
+    "noParent": "No parent"
+  },
+  "hierarchy": {
+    "label": "Hierarchy",
+    "all": "All issues",
+    "top_level": "Top-level",
+    "parents_only": "Parents only"
   },
   "tags": {
     "label": "Tags",

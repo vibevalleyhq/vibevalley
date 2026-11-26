@@ -1442,7 +1442,27 @@ export const catalogs = {
     },
     "web.inbox": { tray: { working: "{n} 个执行会话在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "频道 {n} 条没读" } },
     "web.issue": {
-      family: { children: "子工单", parent: "父工单", noParent: "无父工单", clearParent: "清除父工单", subProgress: "{done} / {total} 已完成" },
+      family: {
+        children: "子工单",
+        parent: "父工单",
+        noParent: "无父工单",
+        clearParent: "清除父工单",
+        subProgress: "{done} / {total} 已完成",
+        compactProgress: "{done}/{total}",
+      },
+      owner: {
+        label: "负责人",
+        pick: "选择负责人",
+        search: "搜索人员或专家…",
+        self: "我（本人）",
+        selfNamed: "{name}（本人）",
+        unassigned: "未指定负责人",
+        clear: "清除负责人",
+        peopleGroup: "人员",
+        expertsGroup: "专家角色",
+      },
+      groupBy: { label: "分组", none: "不分组", repo: "仓库", owner: "负责人", agent: "角色", priority: "优先级", parent: "父工单", noParent: "无父工单" },
+      hierarchy: { label: "层级", all: "全部工单", top_level: "仅顶层", parents_only: "仅父工单" },
       tags: {
         label: "标签",
         placeholder: "输入自定义标签并回车…",
@@ -5164,7 +5184,36 @@ export const catalogs = {
       },
     },
     "web.issue": {
-      family: { children: "Child issues", parent: "Parent issue", noParent: "No parent", clearParent: "Clear parent", subProgress: "{done} / {total} done" },
+      family: {
+        children: "Child issues",
+        parent: "Parent issue",
+        noParent: "No parent",
+        clearParent: "Clear parent",
+        subProgress: "{done} / {total} done",
+        compactProgress: "{done}/{total}",
+      },
+      owner: {
+        label: "Assignee",
+        pick: "Set assignee",
+        search: "Search people or experts…",
+        self: "Me (Self)",
+        selfNamed: "{name} (Me)",
+        unassigned: "Unassigned",
+        clear: "Clear assignee",
+        peopleGroup: "People",
+        expertsGroup: "Experts",
+      },
+      groupBy: {
+        label: "Group by",
+        none: "No grouping",
+        repo: "Repo",
+        owner: "Assignee",
+        agent: "Helper",
+        priority: "Priority",
+        parent: "Parent",
+        noParent: "No parent",
+      },
+      hierarchy: { label: "Hierarchy", all: "All issues", top_level: "Top-level", parents_only: "Parents only" },
       tags: {
         label: "Tags",
         placeholder: "Add custom tag and press Enter…",
@@ -9162,9 +9211,22 @@ export interface Messages {
   "web.issue.error.missingApiKey": undefined;
   "web.issue.family.children": undefined;
   "web.issue.family.clearParent": undefined;
+  "web.issue.family.compactProgress": { readonly done: string | number; readonly total: string | number };
   "web.issue.family.noParent": undefined;
   "web.issue.family.parent": undefined;
   "web.issue.family.subProgress": { readonly done: string | number; readonly total: string | number };
+  "web.issue.groupBy.agent": undefined;
+  "web.issue.groupBy.label": undefined;
+  "web.issue.groupBy.noParent": undefined;
+  "web.issue.groupBy.none": undefined;
+  "web.issue.groupBy.owner": undefined;
+  "web.issue.groupBy.parent": undefined;
+  "web.issue.groupBy.priority": undefined;
+  "web.issue.groupBy.repo": undefined;
+  "web.issue.hierarchy.all": undefined;
+  "web.issue.hierarchy.label": undefined;
+  "web.issue.hierarchy.parents_only": undefined;
+  "web.issue.hierarchy.top_level": undefined;
   "web.issue.issue.and": undefined;
   "web.issue.issue.asking": { readonly n: number; readonly who: string | number };
   "web.issue.issue.askingLine": undefined;
@@ -9239,6 +9301,15 @@ export interface Messages {
   "web.issue.new.words": undefined;
   "web.issue.noHelper": undefined;
   "web.issue.orchestrator": undefined;
+  "web.issue.owner.clear": undefined;
+  "web.issue.owner.expertsGroup": undefined;
+  "web.issue.owner.label": undefined;
+  "web.issue.owner.peopleGroup": undefined;
+  "web.issue.owner.pick": undefined;
+  "web.issue.owner.search": undefined;
+  "web.issue.owner.self": undefined;
+  "web.issue.owner.selfNamed": { readonly name: string | number };
+  "web.issue.owner.unassigned": undefined;
   "web.issue.page.allHelpers": undefined;
   "web.issue.page.allRepos": undefined;
   "web.issue.page.backToBoard": undefined;

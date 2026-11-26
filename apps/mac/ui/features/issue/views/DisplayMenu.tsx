@@ -11,7 +11,11 @@ import { type BoardLook, defaultLook, groupingLabel, groupings, orderingLabel, o
 
 /** Display: a small panel under its button with how the list groups and how both views order. */
 export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) => void }) {
-  const changed = () => props.look.grouping !== defaultLook.grouping || props.look.ordering !== defaultLook.ordering;
+  const changed = () =>
+    props.look.grouping !== defaultLook.grouping ||
+    props.look.ordering !== defaultLook.ordering ||
+    (props.look.groupBy ?? "none") !== "none" ||
+    (props.look.hierarchy ?? "all") !== "all";
   const notes = () =>
     [
       props.look.view === "board" && t("web.issue.display.boardNote"),
@@ -78,7 +82,15 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
             role="button"
             testID="display-reset"
             class={`mt-2 self-start rounded-md px-2 py-1 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
-            onPress={() => props.onChange({ ...props.look, grouping: defaultLook.grouping, ordering: defaultLook.ordering })}
+            onPress={() =>
+              props.onChange({
+                ...props.look,
+                grouping: defaultLook.grouping,
+                ordering: defaultLook.ordering,
+                groupBy: defaultLook.groupBy,
+                hierarchy: defaultLook.hierarchy,
+              })
+            }
           >
             <Text class="text-xs font-medium text-water">{t("web.issue.display.reset")}</Text>
           </View>

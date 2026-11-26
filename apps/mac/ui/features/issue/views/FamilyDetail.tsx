@@ -17,7 +17,7 @@ import { useIssues } from "../model/history";
 import { stageTone } from "../model/overview";
 import { issueSet, labeledIssue, sendLabel } from "../model/write";
 import { ActLines } from "./ActLines";
-import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
+import { DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { StatusMark } from "./Marks";
 import { IssueSheet, IssueTrail, Property, SheetLabel, StagePill } from "./Sheet";
 
@@ -89,6 +89,16 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
       </If>
       <Property label={t("web.issue.family.children")} icon={<Icon name="issues" size={13} tone="muted" />}>
         <Text class="text-sm text-ink tabular-nums">{String(props.children.length)}</Text>
+      </Property>
+      <Property label={t("web.issue.owner.label")} icon={<OwnerMark owner={live().owner} size={15} />} inset>
+        <OwnerPicker
+          owner={live().owner}
+          allIssues={allIssues()}
+          disabled={!open()}
+          state={labeled().state("owner")}
+          testid="issue-owner"
+          onChange={(owner) => setLabel({ owner: owner ?? { kind: "user", id: "" } })}
+        />
       </Property>
       <Property label={t("web.issue.family.parent")} icon={<Icon name="indent" size={13} tone="muted" />} inset>
         <ParentPicker

@@ -367,19 +367,21 @@ mod tests {
         for tool_name in ["vv_issue_create", "vv_issue_update"] {
             let def = defs.iter().find(|d| d.name == tool_name).expect(tool_name);
             let props = def.input_schema["properties"].as_object().expect("properties object");
-            for field in ["parent", "tags", "startAt", "dueAt"] {
+            for field in ["owner", "parent", "tags", "startAt", "dueAt"] {
                 assert!(props.contains_key(field), "{tool_name} missing schema property {field}");
             }
         }
 
         let created: IssueCreateArgs = serde_json::from_value(json!({
             "title": "Sub task",
+            "owner": { "kind": "agent", "id": "arch" },
             "parent": 10,
             "tags": ["UX", "MCP"],
             "startAt": 1760000000000_i64,
             "dueAt": 1760864000000_i64
         }))
         .unwrap();
+        assert_eq!(created.owner, Some(vibevalley_protocol::ActorRef::Agent { id: "arch".into() }));
         assert_eq!(created.parent.as_deref(), Some("10"));
         assert_eq!(created.tags, Some(vec!["UX".into(), "MCP".into()]));
         assert_eq!(created.start_at, Some(JsNumber::from(1_760_000_000_000_i64)));
@@ -387,6 +389,7 @@ mod tests {
 
         let updated: IssueUpdateArgs = serde_json::from_value(json!({
             "id": "#12",
+            "owner": { "kind": "user", "id": "" },
             "parent": "",
             "tags": ["Bug"],
             "startAt": 0,
@@ -394,6 +397,7 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(updated.id, "#12");
+        assert_eq!(updated.owner, Some(vibevalley_protocol::ActorRef::User { id: String::new() }));
         assert_eq!(updated.parent.as_deref(), Some(""));
         assert_eq!(updated.tags, Some(vec!["Bug".into()]));
         assert_eq!(updated.start_at, Some(JsNumber::from(0_i64)));

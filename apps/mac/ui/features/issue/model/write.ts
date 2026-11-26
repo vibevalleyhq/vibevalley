@@ -1,4 +1,4 @@
-import { type Applied, type AppliedIssue, type Issue, type IssueUpdate, VibeValleyApiError } from "@vibevalley/protocol";
+import { type ActorRef, type Applied, type AppliedIssue, type Issue, type IssueUpdate, VibeValleyApiError } from "@vibevalley/protocol";
 import { omitUndefined } from "@vibevalley/protocol/rules";
 import { issueId } from "@vibevalley/protocol/schema";
 
@@ -26,7 +26,7 @@ export async function writeIssue(
   machineId = "",
   attachments?: readonly string[],
   tags?: readonly string[],
-  dates?: { startAt?: number | undefined; dueAt?: number | undefined; parent?: string | undefined },
+  dates?: { startAt?: number | undefined; dueAt?: number | undefined; parent?: string | undefined; owner?: ActorRef | undefined },
 ): Promise<{ issue: Issue; refused: string }> {
   const words = text.trim();
   const made = await api.issue.create(
@@ -40,6 +40,7 @@ export async function writeIssue(
       parent: dates?.parent ? issueId(dates.parent) : undefined,
       startAt: dates?.startAt,
       dueAt: dates?.dueAt,
+      owner: dates?.owner,
       requestKey,
     }),
   );
@@ -60,7 +61,7 @@ export function updateIssueAttachments(id: string, attachments: readonly string[
 // An issue's labels set by the user on its page (title, priority, what it delivers, parent, tags, schedule): an intent
 // (state/intent.ts) on issue.update, settled by the frame whose seq is the reply's. The server takes them while the issue is open.
 
-export type IssueLabels = Pick<IssueUpdate, "title" | "priority" | "deliver" | "parent" | "tags" | "startAt" | "dueAt">;
+export type IssueLabels = Pick<IssueUpdate, "title" | "priority" | "deliver" | "parent" | "tags" | "startAt" | "dueAt" | "owner">;
 export type IssueLabel = keyof IssueLabels;
 
 export type IssueSet = { readonly id: string } & IssueLabels;
@@ -76,7 +77,7 @@ export const issueSet = defineIntent<IssueSet, AppliedIssue, "board">({
 
 type LabelSets = readonly Intent<IssueSet, AppliedIssue>[];
 
-const allLabelKeys = ["title", "priority", "deliver", "parent", "tags", "startAt", "dueAt"] as const;
+const allLabelKeys = ["title", "priority", "deliver", "parent", "tags", "startAt", "dueAt", "owner"] as const;
 const labelsOf = (p: IssueSet) => allLabelKeys.filter((k) => p[k] !== undefined);
 const newestSet = (sets: LabelSets, id: string, label: IssueLabel) => sets.findLast((p) => p.input.id === id && p.input[label] !== undefined);
 
@@ -116,6 +117,11 @@ const labeled = (issue: Issue, sets: LabelSets) => {
   if (nextDue !== undefined) {
     if (nextDue <= 0) delete next.dueAt;
     else next.dueAt = nextDue;
+  }
+  const nextOwner = kept("owner")?.owner;
+  if (nextOwner !== undefined) {
+    if (nextOwner.id.trim() === "") delete next.owner;
+    else next.owner = nextOwner;
   }
   return { issue: next, state };
 };

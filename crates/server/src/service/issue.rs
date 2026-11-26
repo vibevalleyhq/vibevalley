@@ -77,6 +77,7 @@ fn read_issue(r: issue::Model) -> DbResult<Issue> {
     item.tags = read_db_json(r.tags_json)?;
     item.start_at = r.start_at.map(JsNumber::from);
     item.due_at = r.due_at.map(JsNumber::from);
+    item.owner = r.owner.map(read_db_json).transpose()?;
     item.constraints = r.constraints.map(read_db_json).transpose()?;
     item.conflict = r.conflict.map(read_db_json).transpose()?;
     item.last_run = r.last_run.map(read_db_json).transpose()?;
@@ -153,6 +154,7 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
         tags_json: Set(db_json(&t.tags)?),
         start_at: Set(t.start_at.map(|v| v.get().round() as i64)),
         due_at: Set(t.due_at.map(|v| v.get().round() as i64)),
+        owner: Set(t.owner.as_ref().map(db_json).transpose()?),
     };
     let on_conflict = OnConflict::column(issue::Column::Id)
         .update_columns([
@@ -188,6 +190,7 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
             issue::Column::TagsJson,
             issue::Column::StartAt,
             issue::Column::DueAt,
+            issue::Column::Owner,
         ])
         .to_owned();
     issue::Entity::insert(model).on_conflict(on_conflict).exec(db).await?;

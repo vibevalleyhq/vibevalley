@@ -130,6 +130,9 @@ impl Board {
             if let Some(due_at) = upd.due_at {
                 issue.due_at = super::board::normalize_timestamp(Some(due_at));
             }
+            if let Some(owner) = upd.owner.clone() {
+                issue.owner = super::board::normalize_owner_with_driver(self.runtime.driver().as_ref(), Some(owner));
+            }
             let mut edited = vec![issue];
             if let Some(before) = &upd.before {
                 for placed in self.placed_async(&was.id, before).await? {

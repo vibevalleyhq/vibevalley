@@ -215,6 +215,7 @@ export {
   type ViewportRect,
 } from "./artifact/shapes.gen";
 export {
+  type ActorRef,
   type AppliedIssue,
   type Assignment,
   type BoardSummary,

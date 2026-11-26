@@ -3,7 +3,7 @@
 use serde::Deserialize;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    CriterionCheck, Deliverable, Issue, IssueAnswer, IssueFilter, IssueRefineInput, IssueReportMemory, IssueRequest, IssueReviewInput, IssueStatus,
+    ActorRef, CriterionCheck, Deliverable, Issue, IssueAnswer, IssueFilter, IssueRefineInput, IssueReportMemory, IssueRequest, IssueReviewInput, IssueStatus,
     IssueStatusUpdateInput, IssueTimeline, IssueUpdateInput, MandateStrength, SubmitBranch,
 };
 
@@ -241,6 +241,7 @@ pub struct UpdateArgs {
     deliver: Option<Deliverable>,
     priority: Option<String>,
     agent: Option<String>,
+    owner: Option<ActorRef>,
     attachments: Option<Vec<String>>,
 }
 
@@ -257,6 +258,7 @@ pub async fn update(f: &ToolRegistry, _who: &Who, a: UpdateArgs) -> Result<Strin
         criteria: a.criteria,
         deliver: a.deliver,
         attachments: a.attachments,
+        owner: a.owner,
         ..Default::default()
     };
     if let Some(pr) = given(&a.priority) {
@@ -343,6 +345,7 @@ pub struct CreateArgs {
     draft: bool,
     #[serde(rename = "autoSubmitPr")]
     auto_submit_pr: Option<bool>,
+    owner: Option<ActorRef>,
     attachments: Option<Vec<String>>,
 }
 
@@ -369,6 +372,7 @@ pub async fn create(f: &ToolRegistry, who: &Who, a: CreateArgs) -> Result<String
         parent: a.parent,
         blocked_by: a.blocked_by,
         auto_submit_pr: a.auto_submit_pr,
+        owner: a.owner,
         attachments: a.attachments,
         ..Default::default()
     };

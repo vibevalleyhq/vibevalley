@@ -6,9 +6,9 @@ use std::time::Duration;
 use clap::{ArgGroup, Args, Subcommand, ValueEnum};
 use tokio_util::sync::CancellationToken;
 use vibevalley_protocol::{
-    ActWords, AppliedIssue, BoardSlice, Changes, Issue, IssueAction, IssueCommentCreateInput, IssueDeleteInput, IssueDiffGetInput, IssueFilter, IssueGetInput,
-    IssueRequest, IssueReviewInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimelineGetInput, IssueUpdateInput, IssueWatch, Priority,
-    ReviewRevision, ops,
+    ActWords, ActorRef, AppliedIssue, BoardSlice, Changes, Issue, IssueAction, IssueCommentCreateInput, IssueDeleteInput, IssueDiffGetInput, IssueFilter,
+    IssueGetInput, IssueRequest, IssueReviewInput, IssueStageKind, IssueStatus, IssueStatusUpdateInput, IssueTimelineGetInput, IssueUpdateInput, IssueWatch,
+    Priority, ReviewRevision, ops,
 };
 
 use crate::client::{Client, Done, Failure, decode_failure, exit};
@@ -125,6 +125,9 @@ pub enum IssueActionCmd {
         /// Assigned agent profile id
         #[arg(long)]
         agent: Option<String>,
+        /// Final owner ('self', 'user:<id>', or 'agent:<id>')
+        #[arg(long)]
+        owner: Option<String>,
         /// Priority level
         #[arg(long, value_enum)]
         priority: Option<PriorityArg>,
@@ -155,6 +158,9 @@ pub enum IssueActionCmd {
         /// New assigned agent profile id
         #[arg(long)]
         agent: Option<String>,
+        /// New final owner ('self', 'user:<id>', 'agent:<id>', or '' to clear)
+        #[arg(long)]
+        owner: Option<String>,
         /// New priority level
         #[arg(long, value_enum)]
         priority: Option<PriorityArg>,
@@ -272,9 +278,45 @@ fn doable(issue: &Issue) -> Vec<String> {
         .collect()
 }
 
+fn format_owner(owner: Option<&ActorRef>) -> String {
+    match owner {
+        Some(ActorRef::User { id }) => format!("user:{id}"),
+        Some(ActorRef::Agent { id }) => format!("agent:{id}"),
+        None => String::new(),
+    }
+}
+
+fn parse_actor_ref(raw: &str) -> Result<ActorRef, Failure> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(ActorRef::User { id: String::new() });
+    }
+    if trimmed == "self" {
+        return Ok(ActorRef::self_user());
+    }
+    if let Some((kind, id)) = trimmed.split_once(':') {
+        let id = id.trim().to_string();
+        return match kind.trim() {
+            "user" => Ok(ActorRef::User { id }),
+            "agent" => Ok(ActorRef::Agent { id }),
+            other => Err(Failure::new(
+                exit::OTHER,
+                "InvalidOwner",
+                format!("invalid owner kind '{other}': expected 'user:<id>', 'agent:<id>', or 'self'"),
+            )),
+        };
+    }
+    Err(Failure::new(
+        exit::OTHER,
+        "InvalidOwner",
+        format!("invalid owner '{trimmed}': expected 'user:<id>', 'agent:<id>', or 'self'"),
+    ))
+}
+
 fn issue_text(issue: &Issue) -> String {
     let agent = issue.assignments.last().map(|a| format!("@{}", a.agent)).unwrap_or_default();
     let repo = issue.repo.as_ref().map(|r| format!("[{r}]")).unwrap_or_default();
+    let owner = format_owner(issue.owner.as_ref());
     let stage = match &issue.stage.stuck {
         Some(stuck) => format!("{} ({})", issue.stage.state.as_str(), stuck.as_str()),
         None => issue.stage.state.as_str().to_string(),
@@ -284,6 +326,9 @@ fn issue_text(issue: &Issue) -> String {
         line(&[issue.status.as_str(), issue.priority.as_str(), &repo, &agent]),
         format!("stage: {stage}"),
     ];
+    if !owner.is_empty() {
+        lines.push(format!("owner: {owner}"));
+    }
     if !issue.description.trim().is_empty() {
         lines.extend([String::new(), issue.description.trim().to_string()]);
     }
@@ -389,16 +434,19 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
             description,
             repo,
             agent,
+            owner,
             priority,
             criterion,
             attach,
             key,
         } => {
+            let owner = owner.as_deref().map(parse_actor_ref).transpose()?;
             let request = IssueRequest {
                 title: title.join(" "),
                 description: load_description(description)?,
                 repo,
                 agent,
+                owner,
                 priority: priority.map(Into::into),
                 criteria: (!criterion.is_empty()).then_some(criterion),
                 attachments: (!attach.is_empty()).then_some(attach),
@@ -413,16 +461,19 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
             description,
             repo,
             agent,
+            owner,
             priority,
             criterion,
             attach,
         } => {
+            let owner = owner.as_deref().map(parse_actor_ref).transpose()?;
             let request = IssueUpdateInput {
                 id: issue_ref(&issue),
                 title,
                 description: load_description(description)?,
                 repo,
                 agent,
+                owner,
                 priority: priority.map(Into::into),
                 criteria: (!criterion.is_empty()).then_some(criterion),
                 attachments: (!attach.is_empty()).then_some(attach),
