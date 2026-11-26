@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, View } from "nsh";
+import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { Issue, Priority } from "@vibevalley/protocol";
@@ -55,6 +55,7 @@ export function IssueCalendar(props: {
   onClearFilter?: (() => void) | undefined;
 }) {
   const now = useNow(60_000);
+  const compactHeight = () => windowSize().height < 780;
   const initial = monthDateParts(now());
   const cursor = signal<{ year: number; month: number }>(initial);
   const expandedDays = signal<ReadonlySet<string>>(new Set());
@@ -122,11 +123,14 @@ export function IssueCalendar(props: {
         </View>
 
         {/* 7-column month grid */}
-        <Scroll class="min-h-0 flex-1" contentClass="min-h-full">
-          <View class="min-h-full flex-1">
+        <Scroll testID="calendar-grid-scroll" class="min-h-0 flex-1" contentClass="grow">
+          <View class="grow">
             <Each of={grid().weeks} key={(week) => week[0]?.dateKey ?? ""}>
               {(week, weekIdx) => (
-                <View class={`min-h-28 flex-1 flex-row ${weekIdx() < grid().weeks.length - 1 ? "border-b border-line" : ""}`}>
+                <View
+                  testID={`calendar-week-${weekIdx()}`}
+                  class={`${compactHeight() ? "min-h-20" : "min-h-28"} grow flex-row ${weekIdx() < grid().weeks.length - 1 ? "border-b border-line" : ""}`}
+                >
                   <Each of={week()} key={(cell) => cell.dateKey}>
                     {(cell, colIdx) => {
                       const items = computed(() => byDay().get(cell().dateKey) ?? []);

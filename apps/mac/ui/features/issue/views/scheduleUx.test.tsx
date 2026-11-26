@@ -363,3 +363,79 @@ test("IssueTimeline frame queue cancels pending requestAnimationFrame callbacks 
   await app.press("id:issue-view-calendar");
   await fake.pumpUntil(app, () => app.count("id:issue-calendar") === 1);
 });
+
+test("regression: IssueCalendar keeps all 6 week rows completely accessible without week 6 clipping at 900x720 and 1280x800", async () => {
+  setLocale("zh");
+  const todayMs = utcDayStart(SCENARIO_NOW); // 2026-11-20 (Nov 2026 spans 6 week rows: Oct 26 - Dec 6)
+  const scheduled = Array.from({ length: 8 }, (_, idx) =>
+    makeIssue({
+      id: `i-cal-density-${idx + 1}`,
+      number: 50 + idx,
+      title: `Calendar density item ${idx + 1}`,
+      status: "in_progress",
+      startAt: todayMs,
+      dueAt: addUtcDays(todayMs, 1),
+    }),
+  );
+  const week6Issue = makeIssue({
+    id: "i-cal-week6",
+    number: 60,
+    title: "Week 6 milestone",
+    status: "todo",
+    startAt: Date.UTC(2026, 11, 6),
+    dueAt: Date.UTC(2026, 11, 6),
+  });
+  const all = [...scheduled, week6Issue];
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 40, issues: all },
+  };
+
+  for (const vp of [
+    { width: 900, height: 720 },
+    { width: 1280, height: 800 },
+  ]) {
+    const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "zh" });
+    fake.respond(
+      "issue.history.list",
+      all.map((issue) => ({ issue, sessions: [], missingSessions: [] })),
+    );
+    const app = await open("../../../app/main.tsx", {
+      width: vp.width,
+      height: vp.height,
+      colorScheme: "light",
+      platform: "macos",
+      clock: { time: SCENARIO_NOW },
+      host: fake.options,
+    });
+    await fake.pumpUntil(app, () => app.count("id:issue-view-calendar") === 1);
+    await app.press("id:issue-view-calendar");
+    await fake.pumpUntil(app, () => app.count("id:issue-calendar") === 1);
+
+    for (let weekIdx = 0; weekIdx < 6; weekIdx++) {
+      expect(app.count(`id:calendar-week-${weekIdx}`)).toBe(1);
+    }
+
+    const scrollBox = app.layout("id:calendar-grid-scroll");
+    const week6 = app.layout("id:calendar-week-5");
+    const dec6 = app.layout("id:calendar-day-2026-12-06");
+    expect(scrollBox).not.toBeNull();
+    expect(week6).not.toBeNull();
+    expect(dec6).not.toBeNull();
+    expect(week6!.clipped).toBe(false);
+    expect(dec6!.clipped).toBe(false);
+    expect(week6!.y + week6!.height).toBeLessThanOrEqual(vp.height);
+    expect(dec6!.y + dec6!.height).toBeLessThanOrEqual(scrollBox!.y + scrollBox!.height + 1);
+
+    // Expanding a busy day cell grows the week row, and scrolling calendar-grid-scroll reaches week 6 cleanly.
+    await app.press("id:calendar-day-2026-11-20 >> id:calendar-day-more");
+    await fake.pumpUntil(app, () => app.count("id:calendar-day-2026-11-20 >> id:calendar-pill") === 8);
+    await app.scroll("id:calendar-grid-scroll", 400);
+    const week6AfterExpand = app.layout("id:calendar-week-5");
+    const dec6AfterExpand = app.layout("id:calendar-day-2026-12-06");
+    expect(week6AfterExpand).not.toBeNull();
+    expect(dec6AfterExpand).not.toBeNull();
+    expect(week6AfterExpand!.clipped).toBe(false);
+    expect(dec6AfterExpand!.clipped).toBe(false);
+  }
+});
