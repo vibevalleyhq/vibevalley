@@ -1116,6 +1116,8 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
                 activeEntry={prototypeEntry()}
                 reloadKey={prototypeReloadKey()}
                 covered={anyCovered()}
+                version={props.version}
+                seq={seq()}
               />
             </If>
 

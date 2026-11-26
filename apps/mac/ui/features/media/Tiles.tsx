@@ -2,18 +2,18 @@ import { computed, effect, Image, signal, Text, View } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import type { Artifact, ArtifactType, LibraryItem, MediaJob } from "@vibevalley/protocol";
+import { type Artifact, type LibraryItem, type MediaJob, userId } from "@vibevalley/protocol";
 import type { ArtifactAppletInfo } from "@vibevalley/protocol/host";
 
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
 import { Bubble } from "../../design/Tip";
-import { mix } from "../../design/tone";
 import { useAttachmentUrl } from "../../infra/attachmentFile";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { artifactIcon, kindLabel } from "../artifact";
+import { ArtifactPreview } from "./ArtifactPreview";
 import { durationText, extOf, justify, kindOf, type Placed } from "./items";
 
 export interface Seen {
@@ -48,7 +48,7 @@ export const ratioOf = ({ item, seen }: { readonly item: LibraryItem; readonly s
   }
 };
 
-function CardPinButton(props: { testid: string; pinned: boolean; onToggle: () => void }) {
+function CardPinButton(props: { testid: string; pinned: boolean; elevated?: boolean | undefined; onToggle: () => void }) {
   const label = () => (props.pinned ? t("web.library.content.unpin") : t("web.library.content.pin"));
   return (
     <View
@@ -61,7 +61,9 @@ function CardPinButton(props: { testid: string; pinned: boolean; onToggle: () =>
       class={`size-6 shrink-0 items-center justify-center rounded-sm border focus-visible:outline-2 focus-visible:outline-focus ${
         props.pinned
           ? "border-line bg-warn-soft opacity-100"
-          : "border-transparent bg-transparent opacity-0 group-hover:opacity-100 hover:bg-selected focus:opacity-100"
+          : props.elevated === true
+            ? "border-line bg-elevated opacity-0 shadow-raise group-hover:opacity-100 hover:bg-selected focus:opacity-100"
+            : "border-transparent bg-transparent opacity-0 group-hover:opacity-100 hover:bg-selected focus:opacity-100"
       }`}
     >
       <Icon name="pin" size={12} tone={props.pinned ? "warn-ink" : "muted"} />
@@ -248,20 +250,16 @@ function Tile(props: {
   );
 }
 
-const artifactTypeTint: Record<ArtifactType, string> = {
-  docs: "water",
-  outline: "water",
-  whiteboard: "wheat",
-  design: "wheat",
-  "design-system": "wheat",
-  slides: "berry",
-  motion: "berry",
-  storyboard: "berry",
-  dashboard: "leaf",
-  sheet: "leaf",
-  diagram: "leaf",
-  prototype: "accent",
-};
+const artifactCardMinWidth = 256;
+
+export function artifactMetaLine(artifact: Artifact, nowMs: number): string {
+  const parts: string[] = [kindLabel(artifact)];
+  if (artifact.isDefault) parts.push(t("web.artifact.types.defaultBadge"));
+  if (artifact.by !== userId && artifact.byName.trim() !== "") parts.push(artifact.byName);
+  if (artifact.version > 0) parts.push(t("web.library.inspector.versionBadge", { version: artifact.version }));
+  parts.push(ago(artifact.updated, nowMs));
+  return parts.join(" · ");
+}
 
 export function ArtifactTiles(props: {
   artifacts: readonly Artifact[];
@@ -278,17 +276,18 @@ export function ArtifactTiles(props: {
   const now = useNow();
   const cardWidth = computed(() => {
     const w = props.width;
-    if (w === undefined || w <= 0) return 224;
-    const cols = Math.max(1, Math.floor((w + tileGap) / (224 + tileGap)));
+    if (w === undefined || w <= 0) return artifactCardMinWidth;
+    const cols = Math.max(1, Math.floor((w + tileGap) / (artifactCardMinWidth + tileGap)));
     return Math.floor((w - tileGap * (cols - 1)) / cols);
   });
+  const stageWidth = computed(() => Math.max(0, cardWidth() - 2));
+  const stageHeight = computed(() => Math.round((stageWidth() * 10) / 16));
   return (
     <View testID="library-artifacts" class="flex-row flex-wrap gap-3">
       <Each of={props.artifacts} key={(a) => a.id}>
         {(a) => {
           const pinned = () => props.isPinned(a().id);
           const installed = () => props.installedApplets?.get(a().id);
-          const tint = () => artifactTypeTint[a().artifactType];
           return (
             <View
               role="button"
@@ -297,29 +296,11 @@ export function ArtifactTiles(props: {
               tooltip={<Bubble text={a().title} />}
               onPress={() => props.onOpen(a().id)}
               style={{ width: cardWidth() }}
-              class="group relative shrink-0 gap-2.5 rounded-lg border border-line bg-page p-3 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+              class="group relative shrink-0 overflow-hidden rounded-lg border border-line bg-page hover:border-faint focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <View class="flex-row items-start gap-2.5">
-                <View
-                  class={`size-8 shrink-0 items-center justify-center rounded-md ${installed() ? "bg-ok-soft" : ""}`}
-                  style={installed() ? undefined : { backgroundColor: mix(tint(), 0.14) }}
-                >
-                  <Icon name={artifactIcon(a())} size={16} tone={installed() ? "ok-ink" : tint()} />
-                </View>
-                <View class="min-w-0 flex-1 gap-0.5">
-                  <View class="flex-row flex-wrap items-center gap-1">
-                    <View class="h-5 items-center justify-center rounded-sm bg-side px-1.5">
-                      <Text class="text-2xs font-medium text-ink">{kindLabel(a())}</Text>
-                    </View>
-                    <If when={a().isDefault}>
-                      <View class="h-5 items-center justify-center rounded-sm bg-accent px-1.5">
-                        <Text class="text-2xs font-semibold text-page">{t("web.artifact.types.defaultBadge")}</Text>
-                      </View>
-                    </If>
-                  </View>
-                  <Text class="truncate text-2xs text-faint">{a().byName}</Text>
-                </View>
-                <View class="shrink-0 flex-row items-center gap-0.5">
+              <View class="relative overflow-hidden border-b border-line bg-side" style={{ width: stageWidth(), height: stageHeight() }}>
+                <ArtifactPreview artifact={a()} width={stageWidth()} height={stageHeight()} />
+                <View class="absolute top-2 right-2 flex-row items-center gap-1">
                   <If
                     when={installed()}
                     else={
@@ -330,7 +311,7 @@ export function ArtifactTiles(props: {
                           accessibilityLabel={t("web.artifact.applet.button")}
                           tooltip={<Bubble text={t("web.artifact.applet.button")} />}
                           onPress={() => props.onInstallApplet?.(a())}
-                          class="size-6 shrink-0 items-center justify-center rounded-sm border border-transparent bg-transparent opacity-0 group-hover:opacity-100 hover:bg-selected focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
+                          class="size-6 shrink-0 items-center justify-center rounded-sm border border-line bg-elevated opacity-0 shadow-raise group-hover:opacity-100 hover:bg-selected focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
                         >
                           <Icon name="devices" size={12} tone="muted" />
                         </View>
@@ -344,35 +325,36 @@ export function ArtifactTiles(props: {
                         accessibilityLabel={t("web.artifact.applet.manageApp")}
                         tooltip={<Bubble text={`${info().appName} · ${t("web.artifact.applet.manageApp")}`} />}
                         onPress={() => props.onInstallApplet?.(a())}
-                        class="h-6 shrink-0 flex-row items-center gap-1 rounded-sm border border-line bg-ok-soft px-1.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+                        class="size-6 shrink-0 items-center justify-center rounded-sm border border-line bg-elevated opacity-0 shadow-raise group-hover:opacity-100 hover:bg-selected focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
                       >
-                        <Icon name="devices" size={11} tone="ok-ink" />
-                        <Text class="text-2xs font-medium text-ok-ink">{t("web.artifact.applet.badgeInstalled")}</Text>
+                        <Icon name="devices" size={12} tone="ok-ink" />
                       </View>
                     )}
                   </If>
-                  <CardPinButton testid={`library-artifact-pin-${a().id}`} pinned={pinned()} onToggle={() => props.onTogglePin(a().id)} />
+                  <CardPinButton testid={`library-artifact-pin-${a().id}`} pinned={pinned()} elevated onToggle={() => props.onTogglePin(a().id)} />
                   <If when={props.onDelete}>{(onDel) => <DeleteArtifactButton artifact={a()} onDelete={onDel()} />}</If>
                 </View>
               </View>
-              <Text class="truncate text-sm font-semibold text-ink">{a().title}</Text>
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="min-w-0 flex-1 truncate text-xs text-muted">
-                  {[...(a().version > 0 ? [t("web.library.inspector.versionBadge", { version: a().version })] : []), ago(a().updated, now())].join(" · ")}
-                </Text>
-                <If when={installed()} else={<Icon name="open" size={12} tone="faint" />}>
-                  <View
-                    role="button"
-                    testID={`library-artifact-open-app-${a().id}`}
-                    accessibilityLabel={t("web.artifact.applet.openApp")}
-                    tooltip={<Bubble text={t("web.artifact.applet.openApp")} />}
-                    onPress={() => props.onOpenApplet?.(a().id)}
-                    class="h-5 shrink-0 flex-row items-center gap-1 rounded-sm border border-line bg-page px-1.5 hover:border-faint hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
-                  >
-                    <Icon name="open" size={11} tone="ok-ink" />
-                    <Text class="text-2xs font-medium text-ok-ink">{t("web.artifact.applet.openApp")}</Text>
-                  </View>
-                </If>
+              <View class="gap-1 px-3 py-2.5">
+                <View class="flex-row items-center gap-1.5">
+                  <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{a().title}</Text>
+                  <If when={installed()}>
+                    <View
+                      role="button"
+                      testID={`library-artifact-open-app-${a().id}`}
+                      accessibilityLabel={t("web.artifact.applet.openApp")}
+                      tooltip={<Bubble text={t("web.artifact.applet.openApp")} />}
+                      onPress={() => props.onOpenApplet?.(a().id)}
+                      class="size-6 shrink-0 items-center justify-center rounded-sm border border-line bg-ok-soft hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+                    >
+                      <Icon name="open" size={12} tone="ok-ink" />
+                    </View>
+                  </If>
+                </View>
+                <View class="flex-row items-center gap-1.5">
+                  <Icon name={artifactIcon(a())} size={12} tone="faint" />
+                  <Text class="min-w-0 flex-1 truncate text-xs text-muted tabular-nums">{artifactMetaLine(a(), now())}</Text>
+                </View>
               </View>
             </View>
           );
@@ -399,8 +381,8 @@ function DeleteArtifactButton(props: { artifact: Artifact; onDelete: (artifact: 
           accessibilityLabel={t("web.artifact.page.delete")}
           tooltip={<Bubble text={t("web.artifact.page.delete")} />}
           onPress={() => open.set(true)}
-          class={`size-6 shrink-0 items-center justify-center rounded-sm border border-transparent focus-visible:outline-2 focus-visible:outline-focus ${
-            open() ? "bg-bad-soft opacity-100" : "bg-transparent opacity-0 group-hover:opacity-100 hover:bg-bad-soft focus:opacity-100"
+          class={`size-6 shrink-0 items-center justify-center rounded-sm border border-line shadow-raise focus-visible:outline-2 focus-visible:outline-focus ${
+            open() ? "bg-bad-soft opacity-100" : "bg-elevated opacity-0 group-hover:opacity-100 hover:bg-bad-soft focus:opacity-100"
           }`}
         >
           <Icon name="delete" size={12} tone="berry" />

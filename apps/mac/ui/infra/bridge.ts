@@ -10,6 +10,7 @@ import {
   AppletRemoveResult,
   ArtifactAppletInfo,
   CommandLineState,
+  HostCapturedImage,
   MotionChoice,
   ThemeChoice,
 } from "@vibevalley/protocol/host";
@@ -342,6 +343,8 @@ export const hostApi = {
   appletInstall: (input: AppletInstallInput) => callDecoded("host.appletInstall", input, ArtifactAppletInfo),
   appletUninstall: (artifactId: string) => callDecoded("host.appletUninstall", { artifactId }, AppletRemoveResult),
   appletOpen: (artifactId: string) => callDecoded("host.appletOpen", { artifactId }, AppletOpenResult),
+  captureWebView: (options?: { width?: number; height?: number }) =>
+    callDecoded("host.captureWebView", options ?? {}, HostCapturedImage.nullable(), { timeoutMs: 8_000 }),
   stopAudio: () => call("host.stopAudio", {}),
 };
 

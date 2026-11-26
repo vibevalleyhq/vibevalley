@@ -84,6 +84,7 @@ export function fakeHost(fixture: { state: SliceBundle; responses: Record<string
       const { artifactId } = payload as { artifactId: string };
       return { opened: installedApplets.has(artifactId) };
     },
+    "host.captureWebView": () => null,
   };
   const answer = (op: string, payload: unknown): unknown => {
     if (op === "health") return { bizCode: 0, message: "ok", data: null };

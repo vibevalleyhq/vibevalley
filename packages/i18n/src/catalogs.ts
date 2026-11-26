@@ -244,6 +244,7 @@ export const catalogs = {
     },
     "web.artifact": {
       card: { version: "第 {version} 稿", open: "打开「{title}」" },
+      preview: { slides: "{n} 页", shots: "{n} 镜", scenes: "{n} 场", nodes: "{n} 节点", edges: "{n} 连线" },
       page: {
         delete: "删掉",
         deleteAsk: "删掉「{title}」？对话里的卡片还在。",
@@ -3465,6 +3466,7 @@ export const catalogs = {
     },
     "web.artifact": {
       card: { version: "Version {version}", open: 'Open "{title}"' },
+      preview: { slides: "{n} slides", shots: "{n} shots", scenes: "{n} scenes", nodes: "{n} nodes", edges: "{n} edges" },
       page: {
         delete: "Delete",
         deleteAsk: "Delete “{title}”? Its cards stay in the conversation.",
@@ -6949,6 +6951,11 @@ export interface Messages {
   "web.artifact.presenter.notes": undefined;
   "web.artifact.presenter.restart": undefined;
   "web.artifact.presenter.waiting": undefined;
+  "web.artifact.preview.edges": { readonly n: string | number };
+  "web.artifact.preview.nodes": { readonly n: string | number };
+  "web.artifact.preview.scenes": { readonly n: string | number };
+  "web.artifact.preview.shots": { readonly n: string | number };
+  "web.artifact.preview.slides": { readonly n: string | number };
   "web.artifact.prototype.reload": undefined;
   "web.artifact.prototype.viewportFull": undefined;
   "web.artifact.prototype.viewportLabel": undefined;

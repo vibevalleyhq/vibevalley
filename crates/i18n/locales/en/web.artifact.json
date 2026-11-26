@@ -3,6 +3,13 @@
     "version": "Version {version}",
     "open": "Open \"{title}\""
   },
+  "preview": {
+    "slides": "{n} slides",
+    "shots": "{n} shots",
+    "scenes": "{n} scenes",
+    "nodes": "{n} nodes",
+    "edges": "{n} edges"
+  },
   "page": {
     "delete": "Delete",
     "deleteAsk": "Delete “{title}”? Its cards stay in the conversation.",

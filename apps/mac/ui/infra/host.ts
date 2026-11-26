@@ -39,6 +39,10 @@ const desktop: Host = (() => {
       uninstall: (artifactId) => unwrap(hostApi.appletUninstall(artifactId)),
       open: (artifactId) => unwrap(hostApi.appletOpen(artifactId)),
     },
+    captureWebView: async (options) => {
+      const e = await hostApi.captureWebView(options);
+      return e.bizCode === 0 ? (e.data ?? null) : null;
+    },
     notify: (notice) => done(hostApi.notify(notice)),
     tray: (summary) => done(hostApi.tray(summary)),
     locale: (locale) => void hostApi.locale(locale),
