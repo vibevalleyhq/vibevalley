@@ -22,6 +22,7 @@
   "fine": "配置没问题，可以派活。",
   "problems": "派不出去的原因",
   "cannot": "派不出去：",
+  "missingApiKey": "还没填模型 API 密钥",
   "random": "随机一个",
   "avatar": "角色头像",
   "avatarHint": "在工作台与聊天里展示这个头像；留空时显示农场里的小动物。",

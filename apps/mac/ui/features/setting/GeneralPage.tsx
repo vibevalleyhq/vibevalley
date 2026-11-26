@@ -9,12 +9,12 @@ export function GeneralGroups() {
   const start = usePrefs((p) => p.start);
   return (
     <>
-      <SettingsGroup note={t("web.setting.scope.farm")}>
+      <SettingsGroup title={t("web.setting.language.title")} note={t("web.setting.scope.farm")}>
         <SettingRow label={t("web.setting.language.label")} hint={t("web.setting.general.languageHint")} last>
           <LanguageChoice />
         </SettingRow>
       </SettingsGroup>
-      <SettingsGroup note={t("web.setting.scope.device")}>
+      <SettingsGroup title={t("web.setting.general.startupTitle")} note={t("web.setting.scope.device")}>
         <SettingRow label={t("web.setting.general.start")} hint={t("web.setting.general.startHint")} last>
           <Segmented
             label={t("web.setting.general.start")}

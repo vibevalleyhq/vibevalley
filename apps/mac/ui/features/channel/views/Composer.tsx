@@ -287,16 +287,19 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       </If>
       <If when={activeArtifactViewContext()}>
         {(ctx) => (
-          <View testID="artifact-context-pill" class="mb-2 h-6 flex-row items-center gap-1.5 self-start rounded-full border border-line bg-side pr-1 pl-2.5">
+          <View
+            testID="artifact-context-pill"
+            class="mb-2 h-6 max-w-full min-w-0 flex-row items-center gap-1.5 self-start rounded-full border border-line bg-side pr-1 pl-2.5"
+          >
             <Icon name="artifacts" size={12} tone="muted" />
-            <Text class="max-w-72 truncate text-xs text-ink">{artifactContextLabel(ctx())}</Text>
+            <Text class="min-w-0 shrink truncate text-xs text-ink">{artifactContextLabel(ctx())}</Text>
             <BoxButton
               icon="close"
               iconSize={12}
               testid="artifact-context-clear"
               label={t("web.channel.composer.clearContext")}
               onPress={clearActiveArtifactViewContext}
-              class="h-5 w-5 rounded-full"
+              class="h-5 w-5 shrink-0 rounded-full"
             />
           </View>
         )}

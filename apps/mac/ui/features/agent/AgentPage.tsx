@@ -12,6 +12,7 @@ import { runtimeName } from "../../design/domain/RuntimeBadge";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { MoreMenu } from "../../design/MoreMenu";
+import { TextLink } from "../../design/TextLink";
 import { useAgentProblems } from "../../infra/agents";
 import { api, reasonOf } from "../../infra/api";
 import { agentsQuery, ready, useAgents, useQueryClient, useRuntimes } from "../../infra/query";
@@ -22,6 +23,7 @@ import { ConfigTabs, supportOf } from "./AgentConfig";
 import { LookPanel, Stage } from "./AgentLook";
 import { FromTemplate } from "./FromTemplate";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
+import { localizeAgentProblem } from "./readiness";
 
 function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agent {
   const info = catalog.find((r) => r.id === runtime);
@@ -142,7 +144,7 @@ function Creator(props: { saved?: Agent | undefined; start: Agent; all: readonly
     });
 
   const bar = () => (
-    <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
+    <View testID="profile-bar" desktop={{ windowDrag: true }} class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
       <A
         href="/agents"
         testID="back"
@@ -262,16 +264,26 @@ function Problems(props: { problems: AgentProblem[] }) {
     >
       <Scroll accessibilityLabel={t("web.agent.problems")} testID="agent-problems" class="max-h-40 border-t border-line" contentClass="gap-1 px-4 py-3">
         <Each of={props.problems} key={(p) => `${p.level}:${p.text}`}>
-          {(i) => (
-            <View class="flex-row items-start gap-1.5">
-              <View class="mt-1">
-                <Icon name={i().level === "error" ? "cross" : "warn"} size={12} />
+          {(i) => {
+            const localized = () => localizeAgentProblem(i().text);
+            return (
+              <View class="flex-row items-start gap-1.5">
+                <View class="mt-1">
+                  <Icon name={i().level === "error" ? "cross" : "warn"} size={12} />
+                </View>
+                <Text class={`min-w-0 flex-1 text-sm ${i().level === "error" ? "text-berry" : "text-warn-ink"}`}>
+                  {(i().level === "error" ? t("web.agent.cannot") : "") + localized().text}
+                </Text>
+                <If when={localized().fixHref}>
+                  {(href) => (
+                    <TextLink href={href()} testid="agent-problem-fix" danger={i().level === "error"}>
+                      {t("web.setting.readiness.fix")}
+                    </TextLink>
+                  )}
+                </If>
               </View>
-              <Text class={`min-w-0 flex-1 text-sm ${i().level === "error" ? "text-berry" : "text-warn-ink"}`}>
-                {(i().level === "error" ? t("web.agent.cannot") : "") + i().text}
-              </Text>
-            </View>
-          )}
+            );
+          }}
         </Each>
       </Scroll>
     </If>

@@ -91,6 +91,7 @@ export const catalogs = {
       fine: "配置没问题，可以派活。",
       problems: "派不出去的原因",
       cannot: "派不出去：",
+      missingApiKey: "还没填模型 API 密钥",
       random: "随机一个",
       avatar: "角色头像",
       avatarHint: "在工作台与聊天里展示这个头像；留空时显示农场里的小动物。",
@@ -736,7 +737,7 @@ export const catalogs = {
       stop: "停止",
     },
     "web.channel": {
-      tab: { chat: "聊天", issues: "工单", crons: "定时任务" },
+      tab: { chat: "对话", issues: "工单", crons: "定时任务" },
       defaultRepo: "默认仓库 {repo}",
       channels: "频道列表",
       defaultHint: "默认的频道：你、主助手和执行会话都在这儿",
@@ -751,7 +752,7 @@ export const catalogs = {
       channelsTitle: "频道",
       directsTitle: "私聊",
       newChannel: "创建频道",
-      newChat: "发起聊天",
+      newChat: "发起对话",
       filter: { label: "筛选会话", all: "全部", group: "频道", direct: "私聊" },
       emptyPreview: "暂无消息",
       emptyList: "这里还没有对话",
@@ -2801,6 +2802,7 @@ export const catalogs = {
         wantHint: "它应该怎样：比如「先问我是哪个仓库，别直接派活」",
         hired: "{ago}接活",
         hiredAndLeft: "{hired}接活 · {left}走的",
+        contextUpdate: "状态上下文更新",
       },
       hub: {
         search: "搜索运行与轨迹",
@@ -2913,6 +2915,7 @@ export const catalogs = {
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
       general: {
         languageHint: "界面、主助手和执行会话说的话都用它",
+        startupTitle: "启动",
         start: "启动时打开",
         startHint: "打开应用、或者打开首页时先进哪里",
         starts: { workbench: "工作台", farm: "农场" },
@@ -3395,6 +3398,7 @@ export const catalogs = {
       fine: "The configuration is fine: it can be sent work.",
       problems: "Why it cannot be sent",
       cannot: "Cannot be sent: ",
+      missingApiKey: "No model API key set yet",
       random: "A random one",
       avatar: "Role avatar",
       avatarHint: "Shown in lists and chat; when unset, the farm animal face is shown.",
@@ -6259,6 +6263,7 @@ export const catalogs = {
         wantHint: 'What it should do: such as "ask me which repo first, do not send work right away"',
         hired: "took the ticket {ago}",
         hiredAndLeft: "took the ticket {hired} · left {left}",
+        contextUpdate: "Context snapshot",
       },
       hub: {
         search: "Search runs and trajectories",
@@ -6371,6 +6376,7 @@ export const catalogs = {
       scope: { farm: "For all of VibeValley", device: "This device only" },
       general: {
         languageHint: "The page, the assistant and the helpers all speak it",
+        startupTitle: "Startup",
         start: "Open on start",
         startHint: "Where the app, or the home page, opens",
         starts: { workbench: "Workbench", farm: "Farm" },
@@ -6898,6 +6904,7 @@ export interface Messages {
   "web.agent.mcpKind": undefined;
   "web.agent.mcpName": undefined;
   "web.agent.mcpTarget": undefined;
+  "web.agent.missingApiKey": undefined;
   "web.agent.model": undefined;
   "web.agent.modelLevels": { readonly n: string | number; readonly name: string | number };
   "web.agent.name": undefined;
@@ -9712,6 +9719,7 @@ export interface Messages {
   "web.session.subagents.steps.title": undefined;
   "web.session.subagents.wait": { readonly targets: string | number; readonly who: string | number };
   "web.session.trajectory.cacheHit": { readonly pct: string | number };
+  "web.session.trajectory.contextUpdate": undefined;
   "web.session.trajectory.earlier": undefined;
   "web.session.trajectory.failed": undefined;
   "web.session.trajectory.hired": { readonly ago: string | number };
@@ -9824,6 +9832,7 @@ export interface Messages {
   "web.setting.general.startHint": undefined;
   "web.setting.general.starts.farm": undefined;
   "web.setting.general.starts.workbench": undefined;
+  "web.setting.general.startupTitle": undefined;
   "web.setting.github.cli": undefined;
   "web.setting.github.cliHint": undefined;
   "web.setting.github.login": undefined;

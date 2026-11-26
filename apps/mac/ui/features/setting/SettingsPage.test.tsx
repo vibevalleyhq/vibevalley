@@ -66,3 +66,21 @@ test("SettingsPage search finds 技能 and 记忆 in Chinese locale", async () =
   expect(memoryApp.app.count("id:settings-section-memory")).toBe(1);
   expect(memoryApp.app.count("id:settings-section-skills")).toBe(0);
 });
+
+test("SettingsPage general renders symmetric left section titles paired with scope notes (zh & en)", async () => {
+  const zh = await mountSettings("/settings/general", "zh");
+  const zhTexts = zh.app.texts();
+  expect(zhTexts).toContain("语言");
+  expect(zhTexts).toContain("对整个 VibeValley");
+  expect(zhTexts).toContain("启动");
+  expect(zhTexts).toContain("只对这台设备");
+  expect(zhTexts).toContain("外观");
+
+  const en = await mountSettings("/settings/general", "en");
+  const enTexts = en.app.texts();
+  expect(enTexts).toContain("Language");
+  expect(enTexts).toContain("For all of VibeValley");
+  expect(enTexts).toContain("Startup");
+  expect(enTexts).toContain("This device only");
+  expect(enTexts).toContain("Appearance");
+});

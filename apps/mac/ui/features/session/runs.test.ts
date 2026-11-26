@@ -1,7 +1,11 @@
 import "../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
-import { waterfallWidths } from "./runs";
+import { setLocale } from "@vibevalley/i18n";
+import "@vibevalley/i18n/catalogs";
+import type { SessionEvent } from "@vibevalley/protocol";
+
+import { collapsedStepSummary, waterfallWidths } from "./runs";
 
 const sumOf = (xs: readonly number[]) => xs.reduce((total, x) => total + x, 0);
 
@@ -49,4 +53,58 @@ test("waterfallWidths dampens 11s vs 7h36m extreme ratio while preserving order 
   const tight = waterfallWidths([1_000, 1_000_000], 60);
   expect(tight[0]).toBeGreaterThanOrEqual(30);
   expectClose(sumOf(tight), 60);
+});
+
+function userStep(text: string): SessionEvent {
+  return { seq: 1, type: "user/message", text, time: 1_000, revision: 1 };
+}
+
+test("collapsedStepSummary strips internal orchestrator prompt scaffolding while preserving trigger meaning", () => {
+  setLocale("zh");
+
+  const userPrompt = [
+    "【现在】2026-11-26 21:00",
+    "【现状】",
+    "用户的语言：zh（你说的话、写给用户和帮工的都用它）",
+    "仓库（工作目录 /var/folders/xx/work 下的文件夹）：app",
+    "可以派的帮工：",
+    "- 小林（id xiaolin，Claude Code）",
+    "各频道里在场的帮工：",
+    "  （没有帮工）",
+    "你正在回话的地方：#general",
+    "",
+    "[来源：用户]",
+    "用户说：帮我把登录超时修一下",
+  ].join("\n");
+  expect(collapsedStepSummary(userStep(userPrompt), userPrompt)).toBe("帮我把登录超时修一下");
+
+  const chatPrompt = [
+    "【现在】2026-11-26 21:05",
+    "【现状变了】",
+    "+ - 小林（在忙）",
+    "",
+    "[来源：群聊]（帮工写的是它的汇报）",
+    "【群聊】#general 里有给你的话：",
+    "[target=#general msg=12 from=小林] 所有单元测试都通过了",
+    "  │ [附件 log.txt：/tmp/log.txt]",
+    "",
+    "你的回答会发在 #general。",
+  ].join("\n");
+  expect(collapsedStepSummary(userStep(chatPrompt), chatPrompt)).toBe("#general · 小林: 所有单元测试都通过了");
+
+  const cronPrompt = [
+    "【现在】2026-11-26 09:00",
+    "【现状】",
+    "仓库（工作目录 /var/folders/xx/work 下的文件夹）：app",
+    "",
+    "[来源：定时]",
+    "每天九点跑一遍回归测试",
+  ].join("\n");
+  expect(collapsedStepSummary(userStep(cronPrompt), cronPrompt)).toBe("定时 · 每天九点跑一遍回归测试");
+
+  const scaffoldingOnly = "【现在】2026-11-26 09:00\n【现状】\n用户的语言：zh\n仓库（工作目录 /var/folders/xx 下的文件夹）：（还没有）";
+  expect(collapsedStepSummary(userStep(scaffoldingOnly), scaffoldingOnly)).toBe("状态上下文更新");
+
+  const plain = "Fix login timeout";
+  expect(collapsedStepSummary(userStep(plain), plain)).toBe("Fix login timeout");
 });

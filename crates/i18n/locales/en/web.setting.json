@@ -71,6 +71,7 @@
   },
   "general": {
     "languageHint": "The page, the assistant and the helpers all speak it",
+    "startupTitle": "Startup",
     "start": "Open on start",
     "startHint": "Where the app, or the home page, opens",
     "starts": {

@@ -71,6 +71,7 @@
   },
   "general": {
     "languageHint": "界面、主助手和执行会话说的话都用它",
+    "startupTitle": "启动",
     "start": "启动时打开",
     "startHint": "打开应用、或者打开首页时先进哪里",
     "starts": {

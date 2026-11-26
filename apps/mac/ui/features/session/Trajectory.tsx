@@ -22,6 +22,7 @@ import { createEffect, createMemo } from "../../infra/solid";
 import { createSessionEvents } from "./events";
 import {
   cacheHit,
+  collapsedStepSummary,
   farmToolText,
   type Lane,
   lanes,
@@ -490,6 +491,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
   const failed = () => (tool() && step().ok === false) || step().type === "run/error";
   const sub = () => step().under !== undefined;
   const bodyText = createMemo(() => stepTextOf(step()));
+  const summaryLine = createMemo(() => collapsedStepSummary(step(), bodyText()));
   return (
     <View
       ref={(el) => props.refTo(el)}
@@ -500,7 +502,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
       <View
         role="button"
         testID={`step-toggle-${String(step().seq)}`}
-        accessibilityLabel={`${props.spec.tag} ${oneLine(bodyText()).trim()}`}
+        accessibilityLabel={`${props.spec.tag} ${summaryLine()}`}
         accessibilityState={{ expanded: props.open }}
         onPress={() => props.onToggle()}
         class="w-full flex-row items-start gap-2 px-2 py-1"
@@ -543,7 +545,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
                 when={props.open}
                 else={
                   <Text class={`truncate text-sm ${failed() ? "text-berry" : step().type === "llm/usage" ? "text-muted tabular-nums" : "text-ink"}`}>
-                    {oneLine(bodyText()).trim()}
+                    {summaryLine()}
                   </Text>
                 }
               >
@@ -706,15 +708,18 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
       const runWidth = widths[r] ?? 0;
       return left + (runTook > 0 ? ((t - runStart) / runTook) * runWidth : 0);
     };
+    const minTickWidth = 6;
     let r = 0;
     return fall.spans.map((span) => {
       while (r + 1 < runs.length && span.start >= (runs[r + 1]?.[0] ?? 0)) r++;
       while (r > 0 && span.start < (runs[r]?.[0] ?? 0)) r--;
-      const left = at(r, span.start);
+      const rawLeft = at(r, span.start);
+      const barWidth = Math.max(minTickWidth, at(r, span.end) - rawLeft - 1);
+      const left = Math.min(rawLeft, Math.max(0, width() - barWidth));
       return {
         seq: span.seq,
         left,
-        width: Math.max(2, at(r, span.end) - left),
+        width: barWidth,
         top: lanes.indexOf(span.lane) * (lane + gap),
         label: `${laneNames[span.lane]} · ${secondsText(span.end - span.start)}`,
         color: span.lane === "asked" ? tone("wheat") : span.lane === "model" ? tone("leaf") : props.colorOf(span.seq),
@@ -740,11 +745,12 @@ function WaterfallView(props: { steps: SessionEvent[]; end: number; colorOf: (se
           {(b) => (
             <View
               role="button"
+              testID={`waterfall-bar-${String(b().seq)}`}
               accessibilityLabel={b().label}
               tooltip={<Bubble text={b().label} />}
               onPress={() => props.onPick(b().seq)}
-              class="absolute h-3 rounded-xs"
-              style={{ left: b().left, width: b().width - 1, top: b().top, backgroundColor: b().color }}
+              class="absolute h-3 min-w-1.5 rounded-full"
+              style={{ left: b().left, width: b().width, top: b().top, backgroundColor: b().color }}
               hoverStyle={{ backgroundColor: tone("ink") }}
             />
           )}

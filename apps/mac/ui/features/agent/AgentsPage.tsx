@@ -11,14 +11,17 @@ import { Icon } from "../../design/Icon";
 import { Empty, PageBody, Toggle } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { CountPill, Dot } from "../../design/Tag";
+import { TextLink } from "../../design/TextLink";
 import { Bubble, Hint } from "../../design/Tip";
 import { useAgentProblems, useOrchestrators, useWorkAgents } from "../../infra/agents";
 import { api } from "../../infra/api";
 import { ready, useAgentTemplates, useQueryClient, useRuntimes } from "../../infra/query";
 import { Link as A } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
+import { assignWorkerAvatars, withDefaultWorkerAvatar } from "./AgentLook";
 import { AgentPage } from "./AgentPage";
 import { orchestratorHref } from "./OrchestratorProfile";
+import { localizeAgentProblem, type LocalizedAgentProblem } from "./readiness";
 import { type CategoryFilter, categoryLabel, matchesTemplateQuery, TemplateCard, templateCategoryOf } from "./TemplateCard";
 import { TemplatesPage } from "./TemplatesPage";
 
@@ -101,14 +104,15 @@ function AgentsPage() {
     { value: "worker" as const, label: t("web.agent.list.helpers"), count: agents().length },
   ]);
   const workerErrorsById = createMemo(() => {
-    const map = new Map<string, string[]>();
+    const map = new Map<string, LocalizedAgentProblem[]>();
     const all = problems();
     for (const [id, list] of Object.entries(all)) {
-      const errs = list.filter((item) => item.level === "error").map((item) => item.text);
+      const errs = list.filter((item) => item.level === "error").map((item) => localizeAgentProblem(item.text));
       if (errs.length > 0) map.set(id, errs);
     }
     return map;
   });
+  const defaultWorkerAvatars = createMemo(() => assignWorkerAvatars(agents()));
 
   const clearFilters = () => {
     roleFilter.set("all");
@@ -117,133 +121,133 @@ function AgentsPage() {
   };
 
   return (
-    <Scroll testID="agents-page" onLayout={(e) => width.set(e.bounds.size.width)} class="h-full flex-1 bg-page" contentClass="px-3.5 pt-3 pb-8">
-      <PageBody width="manage">
-        <View testID="agents-toolbar" class="flex-row flex-wrap items-center justify-between gap-3">
-          <View class="flex-row flex-wrap items-center gap-2">
-            <Segmented
-              testid="agents-role-filter"
-              label={t("web.agent.list.filterLabel")}
-              value={roleFilter()}
-              onChange={(v) => roleFilter.set(v)}
-              options={roleOptions()}
-            />
-            <SearchField
-              testid="agents-search"
-              clearTestid="agents-search-clear"
-              clearLabel={t("web.agent.list.clearFilter")}
-              value={query()}
-              onInput={(v) => query.set(v)}
-              placeholder={t("web.agent.list.searchHint")}
-              label={t("web.agent.list.search")}
-              class="w-56"
-            />
-          </View>
-          <View class="flex-row flex-wrap items-center gap-1.5">
-            <ButtonLink
-              href="/agents/templates"
-              tone="quiet"
-              testID="open-templates"
-              icon="folder"
-              tooltip={<Bubble text={t("web.agent.templates.openLine")} />}
-            >
-              {t("web.agent.templates.open")}
-            </ButtonLink>
-            <ButtonLink href="/agents/new?role=orchestrator" tone="quiet" testID="new-orchestrator" icon="add">
-              {t("web.agent.list.makeOrchestrator")}
-            </ButtonLink>
-            <ButtonLink href="/agents/new" tone="primary" testID="new-agent" icon="add">
-              {t("web.agent.list.make")}
-            </ButtonLink>
-          </View>
+    <View testID="agents-page" onLayout={(e) => width.set(e.bounds.size.width)} class="h-full min-h-0 flex-1 bg-page">
+      <View
+        testID="agents-toolbar"
+        desktop={{ windowDrag: true }}
+        class="shrink-0 flex-row flex-wrap items-center justify-between gap-2 border-b border-line bg-page px-3.5 py-2"
+      >
+        <View class="flex-row flex-wrap items-center gap-2">
+          <Segmented
+            testid="agents-role-filter"
+            label={t("web.agent.list.filterLabel")}
+            value={roleFilter()}
+            onChange={(v) => roleFilter.set(v)}
+            options={roleOptions()}
+          />
+          <SearchField
+            testid="agents-search"
+            clearTestid="agents-search-clear"
+            clearLabel={t("web.agent.list.clearFilter")}
+            value={query()}
+            onInput={(v) => query.set(v)}
+            placeholder={t("web.agent.list.searchHint")}
+            label={t("web.agent.list.search")}
+            class="w-56"
+          />
         </View>
-
-        <If
-          when={!noMatches()}
-          else={
-            <Empty
-              compact
-              testid="agents-empty-search"
-              icon="search"
-              action={
-                <Button testID="agents-clear-filter" size="compact" onPress={clearFilters}>
-                  {t("web.agent.list.clearFilter")}
-                </Button>
-              }
-            >
-              {t("web.agent.list.emptySearch")}
-            </Empty>
-          }
-        >
-          <If when={showsOrchestrators(roleFilter()) && visibleOrchestrators().length > 0}>
-            <GroupSection title={t("web.agent.list.orchestrators")} count={visibleOrchestrators().length} testid="agents-group-orchestrators">
-              <View class="overflow-hidden rounded-lg border border-line bg-page">
-                <Each of={visibleOrchestrators()} key={(a) => a.id}>
-                  {(a, i) => <OrchestratorRow agent={a()} first={i() === 0} wide={wide()} />}
-                </Each>
-              </View>
-            </GroupSection>
-          </If>
-
-          <If when={showsWorkers(roleFilter()) && visibleWorkers().length > 0}>
-            <GroupSection title={t("web.agent.list.helpers")} count={visibleWorkers().length} testid="agents-group-workers">
-              <View class="overflow-hidden rounded-lg border border-line bg-page">
-                <Each of={visibleWorkers()} key={(a) => a.id}>
-                  {(a, i) => (
-                    <WorkerRow
-                      agent={a()}
-                      runtime={runtimeById().get(a().runtime)}
-                      errors={workerErrorsById().get(a().id) ?? []}
-                      first={i() === 0}
-                      wide={wide()}
-                    />
-                  )}
-                </Each>
-              </View>
-            </GroupSection>
-          </If>
-
-          <If when={ready(templates, []).length > 0}>
-            <View testID="agents-templates-gallery" class={hasProfileSection() ? "gap-3 border-t border-line pt-5" : "gap-3"}>
-              <View class="flex-row flex-wrap items-center justify-between gap-2">
-                <View class="flex-row items-center gap-2">
-                  <Text role="header" class="text-xs font-semibold text-muted">
-                    {t("web.agent.templates.galleryTitle")}
-                  </Text>
-                  <CountPill count={visibleTemplates().length} />
-                  <Hint text={t("web.agent.templates.galleryIntro")} />
+        <View class="flex-row flex-wrap items-center gap-1.5">
+          <ButtonLink href="/agents/templates" tone="quiet" testID="open-templates" icon="folder" tooltip={<Bubble text={t("web.agent.templates.openLine")} />}>
+            {t("web.agent.templates.open")}
+          </ButtonLink>
+          <ButtonLink href="/agents/new?role=orchestrator" tone="quiet" testID="new-orchestrator" icon="add">
+            {t("web.agent.list.makeOrchestrator")}
+          </ButtonLink>
+          <ButtonLink href="/agents/new" tone="primary" testID="new-agent" icon="add">
+            {t("web.agent.list.make")}
+          </ButtonLink>
+        </View>
+      </View>
+      <Scroll class="min-h-0 flex-1" contentClass="px-3.5 pt-4 pb-8">
+        <PageBody width="manage">
+          <If
+            when={!noMatches()}
+            else={
+              <Empty
+                compact
+                testid="agents-empty-search"
+                icon="search"
+                action={
+                  <Button testID="agents-clear-filter" size="compact" onPress={clearFilters}>
+                    {t("web.agent.list.clearFilter")}
+                  </Button>
+                }
+              >
+                {t("web.agent.list.emptySearch")}
+              </Empty>
+            }
+          >
+            <If when={showsOrchestrators(roleFilter()) && visibleOrchestrators().length > 0}>
+              <GroupSection title={t("web.agent.list.orchestrators")} count={visibleOrchestrators().length} testid="agents-group-orchestrators">
+                <View class="overflow-hidden rounded-lg border border-line bg-page">
+                  <Each of={visibleOrchestrators()} key={(a) => a.id}>
+                    {(a, i) => <OrchestratorRow agent={a()} first={i() === 0} wide={wide()} />}
+                  </Each>
                 </View>
-                <ButtonLink href="/agents/templates" tone="quiet" size="compact" testID="gallery-manage-templates">
-                  <>
-                    <Text class="text-xs text-ink">{t("web.agent.templates.manageLink")}</Text>
-                    <Icon name="next" size={12} tone="muted" />
-                  </>
-                </ButtonLink>
+              </GroupSection>
+            </If>
+
+            <If when={showsWorkers(roleFilter()) && visibleWorkers().length > 0}>
+              <GroupSection title={t("web.agent.list.helpers")} count={visibleWorkers().length} testid="agents-group-workers">
+                <View class="overflow-hidden rounded-lg border border-line bg-page">
+                  <Each of={visibleWorkers()} key={(a) => a.id}>
+                    {(a, i) => (
+                      <WorkerRow
+                        agent={a()}
+                        defaultAvatar={defaultWorkerAvatars().get(a().id)}
+                        runtime={runtimeById().get(a().runtime)}
+                        errors={workerErrorsById().get(a().id) ?? []}
+                        first={i() === 0}
+                        wide={wide()}
+                      />
+                    )}
+                  </Each>
+                </View>
+              </GroupSection>
+            </If>
+
+            <If when={ready(templates, []).length > 0}>
+              <View testID="agents-templates-gallery" class={hasProfileSection() ? "gap-3 border-t border-line pt-5" : "gap-3"}>
+                <View class="flex-row flex-wrap items-center justify-between gap-2">
+                  <View class="flex-row items-center gap-2">
+                    <Text role="header" class="text-xs font-semibold text-muted">
+                      {t("web.agent.templates.galleryTitle")}
+                    </Text>
+                    <CountPill count={visibleTemplates().length} />
+                    <Hint text={t("web.agent.templates.galleryIntro")} />
+                  </View>
+                  <ButtonLink href="/agents/templates" tone="quiet" size="compact" testID="gallery-manage-templates">
+                    <>
+                      <Text class="text-xs text-ink">{t("web.agent.templates.manageLink")}</Text>
+                      <Icon name="next" size={12} tone="muted" />
+                    </>
+                  </ButtonLink>
+                </View>
+                <Segmented
+                  testid="templates-category-filter"
+                  label={t("web.agent.templates.galleryTitle")}
+                  value={category()}
+                  onChange={(v) => category.set(v)}
+                  options={[
+                    { value: "all", label: categoryLabel("all"), count: roleMatchedTemplates().length },
+                    ...TemplateCategoryValues.map((cat) => ({
+                      value: cat,
+                      label: categoryLabel(cat),
+                      count: roleMatchedTemplates().filter((tpl) => templateCategoryOf(tpl) === cat).length,
+                    })),
+                  ]}
+                />
+                <View class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                  <Each of={visibleTemplates()} key={(tpl) => tpl.id}>
+                    {(tpl) => <TemplateCard template={tpl()} runtimes={ready(runtimes, [])} />}
+                  </Each>
+                </View>
               </View>
-              <Segmented
-                testid="templates-category-filter"
-                label={t("web.agent.templates.galleryTitle")}
-                value={category()}
-                onChange={(v) => category.set(v)}
-                options={[
-                  { value: "all", label: categoryLabel("all"), count: roleMatchedTemplates().length },
-                  ...TemplateCategoryValues.map((cat) => ({
-                    value: cat,
-                    label: categoryLabel(cat),
-                    count: roleMatchedTemplates().filter((tpl) => templateCategoryOf(tpl) === cat).length,
-                  })),
-                ]}
-              />
-              <View class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                <Each of={visibleTemplates()} key={(tpl) => tpl.id}>
-                  {(tpl) => <TemplateCard template={tpl()} runtimes={ready(runtimes, [])} />}
-                </Each>
-              </View>
-            </View>
+            </If>
           </If>
-        </If>
-      </PageBody>
-    </Scroll>
+        </PageBody>
+      </Scroll>
+    </View>
   );
 }
 
@@ -314,7 +318,14 @@ function OrchestratorRow(props: { agent: Agent; first: boolean; wide: boolean })
   );
 }
 
-function WorkerRow(props: { agent: Agent; runtime?: RuntimeInfo | undefined; errors: string[]; first: boolean; wide: boolean }) {
+function WorkerRow(props: {
+  agent: Agent;
+  defaultAvatar?: string | undefined;
+  runtime?: RuntimeInfo | undefined;
+  errors: readonly LocalizedAgentProblem[];
+  first: boolean;
+  wide: boolean;
+}) {
   const client = useQueryClient();
   const available = () => props.runtime?.installation.status === "available";
   const act = createAct();
@@ -332,6 +343,8 @@ function WorkerRow(props: { agent: Agent; runtime?: RuntimeInfo | undefined; err
   const toggleLabel = () => t("web.agent.list.toggle", { act: toggleAction(), name: props.agent.name });
   const healthy = createMemo(() => props.errors.length === 0);
   const shownTags = createMemo(() => (healthy() ? props.agent.tags.slice(0, 2) : []));
+  const fixHref = createMemo(() => props.errors.find((e) => e.fixHref !== undefined)?.fixHref);
+  const displayLook = createMemo(() => withDefaultWorkerAvatar(props.agent, props.defaultAvatar));
   return (
     <RowShell
       agent={props.agent}
@@ -339,27 +352,29 @@ function WorkerRow(props: { agent: Agent; runtime?: RuntimeInfo | undefined; err
       first={props.first}
       muted={!props.agent.enabled}
       trailing={
-        <View tooltip={<Bubble text={toggleLabel()} />}>
-          <Toggle
-            bare
-            checked={props.agent.enabled}
-            disabled={act.busy()}
-            ariaLabel={toggleLabel()}
-            testid={`toggle-${props.agent.enabled ? "on" : "off"}`}
-            onChange={() => void toggle()}
-          />
-        </View>
+        <>
+          <If when={fixHref()}>
+            {(href) => (
+              <TextLink href={href()} testid={`agent-card-fix-${props.agent.id}`} danger>
+                {t("web.setting.readiness.fix")}
+              </TextLink>
+            )}
+          </If>
+          <View tooltip={<Bubble text={toggleLabel()} />}>
+            <Toggle
+              bare
+              checked={props.agent.enabled}
+              disabled={act.busy()}
+              ariaLabel={toggleLabel()}
+              testid={`toggle-${props.agent.enabled ? "on" : "off"}`}
+              onChange={() => void toggle()}
+            />
+          </View>
+        </>
       }
     >
       <View class="h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-side">
-        <AgentFace
-          agentId={props.agent.id}
-          name={props.agent.name}
-          runtime={props.agent.runtime}
-          look={props.agent.look}
-          size={34}
-          muted={!props.agent.enabled}
-        />
+        <AgentFace agentId={props.agent.id} name={props.agent.name} runtime={props.agent.runtime} look={displayLook()} size={34} muted={!props.agent.enabled} />
       </View>
       <View class="min-w-0 flex-1 gap-0.5">
         <View class="flex-row items-center gap-1.5">
@@ -370,9 +385,9 @@ function WorkerRow(props: { agent: Agent; runtime?: RuntimeInfo | undefined; err
             </View>
           </If>
           <If when={props.errors.length > 0}>
-            <View tooltip={<Bubble text={props.errors.join("\n")} />} class="max-w-60 shrink rounded-sm bg-bad-soft px-1.5 py-px">
+            <View tooltip={<Bubble text={props.errors.map((e) => e.text).join("\n")} />} class="max-w-60 shrink rounded-sm bg-bad-soft px-1.5 py-px">
               <Text testID="agent-card-error" class="truncate text-2xs font-medium text-berry">
-                {t("web.agent.cannot") + (props.errors[0] ?? "")}
+                {t("web.agent.cannot") + (props.errors[0]?.text ?? "")}
               </Text>
             </View>
           </If>
@@ -386,7 +401,7 @@ function WorkerRow(props: { agent: Agent; runtime?: RuntimeInfo | undefined; err
             <Text class="min-w-0 flex-1 truncate text-xs text-muted">{runtimeSpec()}</Text>
           </View>
           <View class="w-28 flex-row items-center justify-end gap-1 overflow-hidden">
-            <Each of={shownTags()}>
+            <Each of={shownTags()} key={(tag) => tag}>
               {(tag) => (
                 <View class="max-w-full shrink rounded-sm bg-hover px-1.5 py-px">
                   <Text class="truncate text-2xs text-muted">{tag()}</Text>
