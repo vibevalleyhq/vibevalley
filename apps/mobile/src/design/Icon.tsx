@@ -1,24 +1,24 @@
 import { Canvas, colorScheme, Path2D } from "nsh";
 
-import { ICON_PATHS } from "../../design/iconPaths.gen";
+import { createIconPathCache, drawIconShapes, ICON_PATHS } from "../../design/iconPaths.gen";
 import type { IconName } from "../../design/icons";
 import { tone as toneOf } from "./tone";
 
-const fixedIconTone: Partial<Record<IconName, string>> = {
+const iconTone: Partial<Record<IconName, string>> = {
   check: "leaf",
   cross: "berry",
   warn: "wheat",
 };
 
-const pathCache = new Map<string, Path2D>();
+const cachedPath = createIconPathCache((d) => new Path2D(d));
 
-function cachedPath(d: string): Path2D {
-  let path = pathCache.get(d);
-  if (!path) {
-    path = new Path2D(d);
-    pathCache.set(d, path);
-  }
-  return path;
+/** Resolves an icon's hex color: explicit `color`, explicit `tone`, status fallback (`iconTone`), or `"ink"`. */
+export function resolveIconColor(props: { readonly name: IconName; readonly color?: string; readonly tone?: string }): string {
+  // Track colorScheme so light/dark switches redraw the canvas with the updated token hex.
+  colorScheme();
+  if (props.color !== undefined) return props.color;
+  if (props.tone !== undefined) return toneOf(props.tone);
+  return toneOf(iconTone[props.name] ?? "ink");
 }
 
 export function Icon(props: {
@@ -30,13 +30,7 @@ export function Icon(props: {
   readonly testID?: string;
 }) {
   const size = () => props.size ?? 16;
-  const color = () => {
-    // Track colorScheme so light/dark switches redraw the canvas with the updated token hex.
-    colorScheme();
-    const fixed = fixedIconTone[props.name];
-    if (fixed !== undefined) return toneOf(fixed);
-    return props.color ?? toneOf(props.tone ?? "ink");
-  };
+  const color = () => resolveIconColor(props);
 
   return (
     <Canvas
@@ -46,31 +40,7 @@ export function Icon(props: {
       accessibilityLabel={props.label}
       class="shrink-0"
       style={{ width: size(), height: size() }}
-      draw={(cx) => {
-        const s = size();
-        if (!Number.isFinite(s) || s <= 0) return;
-        const paint = color();
-        const shapes = ICON_PATHS[props.name];
-        cx.save();
-        cx.scale(s / 24, s / 24);
-        for (const shape of shapes) {
-          cx.globalAlpha = shape.opacity ?? 1;
-          const path = cachedPath(shape.d);
-          if (shape.fill) {
-            cx.fillStyle = paint;
-            if (shape.evenodd === true) cx.fill(path, "evenodd");
-            else cx.fill(path);
-          }
-          if (shape.stroke !== undefined && shape.stroke > 0) {
-            cx.strokeStyle = paint;
-            cx.lineWidth = shape.stroke;
-            cx.lineCap = shape.cap ?? "butt";
-            cx.lineJoin = shape.join ?? "miter";
-            cx.stroke(path);
-          }
-        }
-        cx.restore();
-      }}
+      draw={(cx) => drawIconShapes(cx, ICON_PATHS[props.name], size(), color(), cachedPath)}
     />
   );
 }
