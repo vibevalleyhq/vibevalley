@@ -52,11 +52,11 @@
 
 ## 为什么这样
 
-- **显式字段提交 + 纯函数分词召回，不调额外模型**：结构化提交省去回合后调模型总结的延迟；`gse` 分词毫秒级完成且可确定性回归。
+- **显式字段提交 + 纯函数分词召回，不调额外模型**：结构化提交省去回合后调模型总结的延迟；`gse` 分词毫秒级完成且可确定性回归。记忆浏览与编辑统一收敛在 `/settings/memory`，已放弃独立的 `/tree` 像素记忆树视图。
 
 ## 还没做的
 
-- 用户全局画像（`profile`）、完整对话提炼与记忆树真实数据接入：[记忆都存在库里](.agents/notes/proposed/architecture/2026-10-18-profile-and-episode-memories.md)、[记忆树](.agents/notes/proposed/feature/2026-10-22-memory-tree.md)。
+- 用户全局画像（`profile`）与完整对话提炼：`#51`。
 
 ## 怎么验证
 

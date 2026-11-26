@@ -1,6 +1,6 @@
 # VibeValley 文档
 
-VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸雕农场的皮（[概念](docs/concepts.md)）。这里写现在怎么用、怎么开发、东西怎么工作；为什么这样设计和还没做的提案在 [Agent Notes](.agents/notes/README.md)，文档放在哪见 [AGENTS.md](docs/AGENTS.md)。
+VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸雕农场的皮（[概念](docs/concepts.md)）。这里写现在怎么用、怎么开发、东西怎么工作；未上线的规划与待办见 VibeValley Issue 看板，已沉淀的设计与放弃的路在各篇子系统文档，文档放在哪见 [AGENTS.md](docs/AGENTS.md)。
 
 先读：
 
@@ -37,7 +37,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | [app.md](docs/subsystems/app.md) | 客户端：原生应用 `apps/mac`（GPUI 窗口、进程里的服务端、页面和服务端之间的桥、nsh TSX 的工作台、宿主能力） |
 | [farm.md](docs/subsystems/farm.md) | 农场的皮：Rust `wgpu` 3D 纸雕江南院落、地里长什么、偶人走位、开场与农场手机 |
 | [agent.md](docs/subsystems/agent.md) | 档案和农机：档案和它的角色、种子、农机的探测和清单、技能书 |
-| [process.md](docs/subsystems/process.md) | 工程流程：文档分层、Note 和子系统、检查、skill、写作规范、素材流水线 |
+| [process.md](docs/subsystems/process.md) | 工程流程：双层 SSOT（Issue 与子系统文档）、`xtask` 导航与 QA 门禁、检查、skill、写作规范、素材流水线 |
 | [site.md](docs/subsystems/site.md) | 官网：Vite + Solid 2 静态生成、图从游戏来 |
 
 查的东西（`reference/`）：
@@ -72,7 +72,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | [code.md](docs/style/code.md) | 代码：格式、叫法、注释写什么不写什么 |
 | [nsh-tsx.md](docs/style/nsh-tsx.md) | NSH TSX 编码与响应式规范：细粒度依赖、`<If>`/`<Each>`/`<List>`、禁止解构与提前求值、输入持久化解耦、乐观发送与静态检查 |
 | [naming.md](docs/style/naming.md) | 命名：名字站在领域的视角，不用的名字，文件、代码、接口、表、词典的键和测试标记的形状，改名 |
-| [writing.md](docs/style/writing.md) | 文字：写什么、删什么，词和格式怎么写；文档、Note、skill、提交说明、注释和回复都用 |
+| [writing.md](docs/style/writing.md) | 文字：写什么、删什么，词和格式怎么写；文档、Issue、skill、提交说明、注释和回复都用 |
 
 ## 用语
 

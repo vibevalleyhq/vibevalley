@@ -179,7 +179,7 @@ flowchart TD
 | **持久化读写** | 独立顶层 `crates/server/src/service/`（`Service`，挂载于 `ctx.service`） | `crates/server/src/db/entity/` 严格一表一文件（`<table_name>.rs`，共 35 表）；**`crates/server/src/{db,service}/` 之外零 `sea_orm::` 与 `db::entity` 导入** |
 | **入口分发** | `router.rs`（`Router` 编译期穷尽 `match`）+ `GatewayPorts` | 零运行时 handler `HashMap` 与 `attach_*` 晚绑定槽位；`gateway/` 不导入任何业务域 |
 | **状态广播与异步因果** | 同事务写 `Outbox` + `ctx.mark_dirty(SliceMask)` → `StateFeed` 单航班纯投影；瞬态流与农场特效进 `LiveState` | 零内存影子库、零启动重放水合、零 `EventBus` |
-| **作品目录与统一实时协同** | `storage/` 托管 `<storage>/artifact/<artifact_id>/{manifest.json,structure/,asset/}`，5 张作品表（`artifact`、`artifact_version`、`artifact_collab`、`artifact_change`、`artifact_suggestion`）覆盖全部 12 类 `ArtifactType` | 全类型不可妥协地支持多人 + 多 Agent 实时协同、在场、按 `origin` 历史与评审建议；彻底删除 `artifact_block`、`artifact_block_revision`、`artifact_entry`、`block.rs`、`entry.rs` 与旧 `Html` patcher（详见[作品统一协同方案](.agents/notes/proposed/architecture/2026-11-24-artifact-unified-collab.md)） |
+| **作品目录与统一实时协同** | `storage/` 托管 `<storage>/artifact/<artifact_id>/{manifest.json,structure/,asset/}`，5 张作品表（`artifact`、`artifact_version`、`artifact_collab`、`artifact_change`、`artifact_suggestion`）覆盖全部 12 类 `ArtifactType` | 全类型不可妥协地支持多人 + 多 Agent 实时协同、在场、按 `origin` 历史与评审建议；彻底删除 `artifact_block`、`artifact_block_revision`、`artifact_entry`、`block.rs`、`entry.rs` 与旧 `Html` patcher（详见 [Artifact](docs/subsystems/artifact.md)） |
 
 #### 3.2.2 静态防退化门禁
 
@@ -341,9 +341,9 @@ stateDiagram-v2
 
 ### 6.1 分阶段路线
 
-1. **第一刀 — 服务端扁平单数架构与作品目录化统一协同直接切换（PR `refactor/server-flat-architecture`）**
-   - 按[服务端扁平化与单数架构重构](.agents/notes/proposed/architecture/2026-11-24-first-principles-server-spine.md)落地 `main.rs` → `create_app(config) -> App`、薄 `router.rs`、统一 `log/`、严格一表一文件 `db/entity/<table_name>.rs`（35 表）、独立顶层 `service/`（`Service` 挂于 `Context::service`，`{db,service}/` 外零 `sea_orm::` 与 `db::entity` 导入）、`storage/` 与 `gateway/` 隔离。
-   - 按[作品目录化存储、统一实时协同引擎与 12 类产品技能体系](.agents/notes/proposed/architecture/2026-11-24-artifact-unified-collab.md)消除旧 `Blocks` / `Html` patcher / SQL-KV `artifact_entry` 三引擎割裂与 `ArtifactKind` × `ArtifactBody` 重叠，落地 `<storage>/artifact/<artifact_id>/{manifest.json,structure/,asset/}` 目录化存储 + 5 表统一多人/多 Agent 实时协同层 + 12 类 `ArtifactType` 渐进披露技能。
+1. **第一刀 — 服务端扁平单数架构与作品目录化统一协同直接切换（已落地）**
+   - 落地 `main.rs` → `create_app(config) -> App`、薄 `router.rs`、统一 `log/`、严格一表一文件 `db/entity/<table_name>.rs`（35 表）、独立顶层 `service/`（`Service` 挂于 `Context::service`，`{db,service}/` 外零 `sea_orm::` 与 `db::entity` 导入）、`storage/` 与 `gateway/` 隔离（[地基](docs/subsystems/foundation.md)、[架构](docs/architecture.md)）。
+   - 消除旧 `Blocks` / `Html` patcher / SQL-KV `artifact_entry` 三引擎割裂与 `ArtifactKind` × `ArtifactBody` 重叠，落地 `<storage>/artifact/<artifact_id>/{manifest.json,structure/,asset/}` 目录化存储 + 5 表统一多人/多 Agent 实时协同层 + 12 类 `ArtifactType` 渐进披露技能（[Artifact](docs/subsystems/artifact.md)）。
    - 启用 `cargo xtask audit`（[xtask/src/boundaries.rs](xtask/src/boundaries.rs) 与 [xtask/src/ratchets.rs](xtask/src/ratchets.rs)）守住扁平无环 DAG、`gateway/` 隔离与 `{db,service}/` 数据访问边界。
 2. **第二刀 — 统一 `Machine` + `Runtime` 执行层与无头部署**
    - 完善 `LocalMachine` 与 `RemoteMachine`（`vibevalley machine up`、本地 `127.0.0.1/mcp` 代理隧道、断线 `after_seq` 续读与 `input_id` 幂等）。

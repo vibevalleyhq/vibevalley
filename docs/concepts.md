@@ -21,7 +21,7 @@ Host（~/.vibevalley：密钥、引擎、全局角色模板）
 
 一个 Space 有若干个 **Repo**、若干个 **Issue** 和若干份 **Artifact**。Repo 是仓库本身；Issue 归 Space，用 `repo` 指向它要改的仓库，也可以不指（只调研、只写大纲或文档）；指了仓库且角色开了 worktree 时，才为它切出 **Worktree**。Agent、Session、Run 是在这个 Space 里运行与协同的实体。
 
-现在任务、频道这些状态还在 Host 的库里（`$VIBEVALLEY_HOME/server.db`），所以切换 Space 目前只切 `repos/` 和 `worktrees/`，看板还没跟着切；让整个 Space 自包含是 [Space 领域模型](.agents/notes/proposed/architecture/2026-11-06-space-domain-model.md) 还没做完的一步。
+现在任务、频道这些状态仍在 Host 的库里（`$VIBEVALLEY_HOME/server.db`），切换 Space 目前只切 `repos/` 和 `worktrees/`；原拟由每个 Space 单独持有本地 `server.db` 的方案已退役，后续按 `#36`（Hub/Machine 解耦与按空间隔离）推进。
 
 ## 一件活怎么走
 

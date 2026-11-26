@@ -85,14 +85,16 @@ Artifact（`Artifact`）是用户、主助手和执行会话共同创作与交�
 
 ## 为什么这样
 
-- **目录化文件存储 + 单一协同层取代三套割裂引擎**：删去 `artifact_block`、`artifact_block_revision`、SQL-KV `artifact_entry` 与旧 `Html` 字符串 patcher 后，12 种类型全部落到真实目录结构与同一套 CRDT/在场/建议/历史引擎上，既保留不可妥协的多人/多 Agent 实时协同，又大幅削减重复代码与表结构。
+- **目录化文件存储 + 单一协同层取代三套割裂引擎**：删去 `artifact_block`、`artifact_block_revision`、SQL-KV `artifact_entry` 与旧 `Html` 字符串 patcher 后，12 种类型全部落到真实目录结构与同一套 CRDT/在场/建议/历史引擎上，既保留不可妥协的多人/多 Agent 实时协同，又大幅削减重复代码与表结构（已否决保留 `artifact_entry` 承载协同或直接删掉实时协同的方案）。
+- **单作品写锁与原子物化落盘**：`crates/server/src/artifact/collab.rs` 通过每作品异步写锁 `artifact_lock` 串行化协同合并，并经 `storage/artifact.rs` 的 `materialize_directory_async` 先写临时文件再 `rename` 原子刷盘，服务重启时可从 `artifact_collab` CRDT 快照直接重建物化目录，防止半写脏文件。
+- **稳定大纲编辑器（`outlineEditor.ts` + `OutlineView.tsx`）**：[outlineEditor.ts](apps/mac/ui/features/artifact/views/outlineEditor.ts) 单源收拢几何网格（`OUTLINE_BASE_PADDING_PX = 8`、`OUTLINE_SLOT_PX = 20`、`OUTLINE_SLOT_GAP_PX = 4`、`OUTLINE_INDENT_STEP_PX = 24`、`OUTLINE_LINE_HEIGHT_PX = 24`）与纯键盘流状态机（`Enter`/`Escape`/`Tab`/`Shift+Tab`/`Backspace`/`ArrowUp|Down`/`Alt+ArrowUp|Down`）；[OutlineView.tsx](apps/mac/ui/features/artifact/views/OutlineView.tsx) 阅读态 `<View>` 与编辑态 `<Input multiline />` 共享完全同构的 `1px` `border-transparent` + `px-1.5` + `leading-6` 盒模型，并采用脱离文档流的 `outline-more-<id>` 无框 `<Menu>` 图标按钮，消除点击跳动 `4px` 与水平漂移（已否决 5 键带框悬浮胶囊与等宽类型标签、每行常驻 `<Input>`、WebView `contentEditable` 及固定 `28px` 单行输入框）。
 - **单一 `ArtifactType` 与独立渐进披露技能**：移除 `ArtifactKind` × `ArtifactBody` 正交冗余，12 种产品类型各自维护清晰的目录规范与工艺技能，按需加载不挤占常驻上下文。
 - **不可信脚本一律运行在无同源权限沙箱内**：`prototype`、`slides`、`dashboard`、`motion`、`design` 等可执行视图在 `sandbox`（无 `allow-same-origin`、`connect-src 'none'`）中渲染，彻底隔离宿主接口。
 
 ## 还没做的
 
-- 作品目录化存储、统一实时协同引擎与 12 类产品技能直接切换：[作品目录化存储、统一实时协同引擎与 12 类产品技能体系](.agents/notes/proposed/architecture/2026-11-24-artifact-unified-collab.md)。
-- Loro 远端浏览器 WASM/JS 双向同步与流式 token 微批事务合并等演进：[Loro 协作内容引擎：四平面边界、实时感知、块内共编与时间旅行](.agents/notes/proposed/architecture/2026-11-22-loro-collaborative-content-engine.md)。
+- 作品类型向高内聚原语（`3+1` / Block Rich Doc 与多维数据表 `Base`）及协同交互体验收敛：`#31`、`#32`、`#38`–`#40`。
+- Loro 远端浏览器 WASM/JS 双向同步与流式微批合并：`#58`。
 
 ## 怎么验证
 

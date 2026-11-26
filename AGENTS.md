@@ -1,6 +1,6 @@
 # AGENTS.md
 
-VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：任务派给角色（Agent），服务端为它派一个执行会话（Session，经 Rust 的 oar 驱动本机的编码引擎），按角色设置在仓库目录或任务的 worktree 里一轮一轮运行，用户看改动、合进主分支；用户、主助手（替用户派活的 agent）和执行会话在频道里说话。外面另有一层 Papertrails 纸雕农场皮肤：仓库是院，在做的任务是一块地，帮工在地上干活，默认频道画成田头（[概念](docs/concepts.md)）。它是全原生的，桌面宿主运行于 macOS：服务端和命令行是 Rust（`crates/`），桌面应用是 `apps/mac`（GPUI 窗口，里面带着服务端；工作台是 nsh 跑的 TSX 页面，3D 纸雕农场由 Rust `wgpu` 画），另提供独立原生移动端 `apps/mobile`（`nsh/mobile`，iOS 优先、Android 就绪，经默认关闭的 Tailscale / 回环受认证远程门接入 Mac，见[移动远程控制方案](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)）；契约、词典、工具说明和提示以 Rust 为源，TS 由它生成。还在做的部分见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)。改 `crates/`、`apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
+VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：任务派给角色（Agent），服务端为它派一个执行会话（Session，经 Rust 的 oar 驱动本机的编码引擎），按角色设置在仓库目录或任务的 worktree 里一轮一轮运行，用户看改动、合进主分支；用户、主助手（替用户派活的 agent）和执行会话在频道里说话。外面另有一层 Papertrails 纸雕农场皮肤：仓库是院，在做的任务是一块地，帮工在地上干活，默认频道画成田头（[概念](docs/concepts.md)）。它是全原生的，桌面宿主运行于 macOS：服务端和命令行是 Rust（`crates/`），桌面应用是 `apps/mac`（GPUI 窗口，里面带着服务端；工作台是 nsh 跑的 TSX 页面，3D 纸雕农场由 Rust `wgpu` 画），另提供独立原生移动端 `apps/mobile`（`nsh/mobile`，iOS 优先、Android 就绪，经默认关闭的 Tailscale / 回环受认证远程门接入 Mac，见[移动端与远程访问](docs/subsystems/app.md#移动端与远程访问)）；契约、词典、工具说明和提示以 Rust 为源，TS 由它生成。改 `crates/`、`apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；长期现状沉淀在 [docs/subsystems](docs/subsystems/README.md)，未上线规划与提案放在 VibeValley Issue 看板。
 
 ## 目录
 
@@ -30,9 +30,8 @@ packages/protocol/         页面用的契约：src/<概念>/shapes.gen.ts 和 e
 packages/i18n/             页面里 t("key")：src/catalogs.ts 由 i18n:gen 从 crates/i18n/locales 写出
 design/                    设计令牌（tokens.json）与素材同步脚本（sync-assets.sh、diorama.sh）；所有原始素材与生成脚本在同级仓库 vibevalley-assets
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
-.agents/notes/             Agent Notes：具体的计划，做完沉淀进 docs/subsystems
 .agents/skills/            仓库自己的 skill：验收（vv-acceptance）等；.claude/skills 链接到这里
-scripts/                   gen/（生成物写出）、audit/（lint 插件、死代码、注释审查）、docs/（Note、链接、术语与旧名检查）、release/（发版、回归与验收沙箱 verify-server.ts）、tsrs/（vp check 用的 TypeScript）
+scripts/                   gen/（生成物写出）、audit/（lint 插件、死代码、注释审查）、docs/（链接、术语与旧名检查）、release/（发版、回归与验收沙箱 verify-server.ts）、tsrs/（vp check 用的 TypeScript）
 ```
 
 每个包的约定在它的 README。
@@ -59,8 +58,7 @@ vp check                                                        # 改完 apps/ma
 vp run packages:check                                           # 改完 packages/：打出声明、vp check、各包的测试
 vp run scripts:test                                             # 改完 scripts/：它自己的测试
 vp run site:check && vp run site:build                          # 改完 apps/site/：素材和静态生成测试，再构建
-vp run docs:verify                                              # 改完文档、Note 或 skill：格式、目录、链接、旧名字、用语、词典和生成的参考表
-vp run notes:catalog                                            # 加、挪、删 Note 或改了标题：重写 .agents/notes/CATALOG.md
+vp run docs:verify                                              # 改完文档或 skill：格式、目录、链接、旧名字、用语、词典和生成的参考表
 vp run i18n:gen                                                 # 改了 crates/i18n/locales：重写 catalogs.ts；vpx scripts/gen/i18n.ts check|find <文字> 查问题、找键
 vp run capabilities                                             # 改了 <概念>/api.ts 的 can：重写 docs/reference/capabilities.md
 vp run api:client                                               # 改了 <概念>/api.ts 的接口：重写 packages/protocol/src/client.ts
@@ -87,7 +85,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 
 ## 规矩
 
-- **Rust 为准，速度优先**：服务端的行为以 Rust 为准；成本高、价值低的就砍掉或简化，记进[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)的「砍掉的」。
+- **Rust 为准，速度优先**：服务端的行为以 Rust 为准；只接 DeepSeek 不做多厂商路由、语音直连 MOSS Live 不接声网 SDK、不支持 `cursor`/`dsh` 驱动，成本高、价值低的路径直接裁剪并沉淀在对应子系统文档。
 - **先有概念，再有皮**：服务端按实际概念平铺单数模块（[概念](docs/concepts.md)）；农场只画它们，游戏规则只读事件算画面，业务不调它（[农场的皮](docs/subsystems/farm.md)）。
 - **单一持久化真源与切片投影**：持久化状态只经顶层 `crates/server/src/service/`（`Context::service`）落库，不维护内存影子库；外部投递同事务写入 `Outbox`，运行中流与农场特效留在 `LiveState`，前端 6 路切片由 `StateFeed` 按 `SliceMask` 调用 `vibevalley-core` 纯投影函数生成（[核心状态](docs/subsystems/core.md)）。
 - **数据库与持久化边界收口在 `db/` 与 `service/`**：`crates/server/src/db/entity/` 严格一表一文件（`<table_name>.rs`，共 35 表），全部业务视角 SeaORM 查询收拢在独立顶层 `crates/server/src/service/`（`Service` 挂载于 `Context::service`），`crates/server/src/{db,service}/` 之外禁止出现任何 `sea_orm::` 或 `db::entity` 导入。
@@ -112,7 +110,7 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **测试**：行为在能发现出错的最低层测；服务端的测试在 `crates/*/tests`，用 scripted 引擎与真 git 离线跑；页面的测试用 `nsh/test` 喂样例的 `Transport`，纸雕场景与开场逻辑在 `apps/mac/src/diorama/` 单元测试中核验；不写硬编码睡眠等待（TS 由 `no-test-sleep` 查）；修缺陷补 `regression` 测试。
 - **改完要验证**：先跑最窄的静态与单元检查；改了接口、服务、页面或纸雕场景，照 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 在真实程序上验收并附上证据。
 - **分支、提交和 PR**：同批改动默认合一个 PR，只经 squash 合入 `main`；分支 `<类>/<主题>`，提交与 PR 用英文写改完后的行为（标题不超过 100 字符、不带 agent 署名，commit-msg hook 与 CI 查），操作照 [vv-pr](.agents/skills/vv-pr/SKILL.md)（[分支、提交和 PR](docs/development.md)）。
-- **文档和 Note**：改行为同改对应文档（优先改 `docs/subsystems/`，见 [文档规矩](docs/AGENTS.md)）；非平凡改动先写 `proposed/` Note，上线后把长期成立的沉淀进子系统并删掉 Note（[什么时候写](.agents/notes/README.md#什么时候写)）。
+- **双层 SSOT（Issue + 子系统文档）**：改行为同改对应文档（优先改 `docs/subsystems/`，见 [文档规矩](docs/AGENTS.md)）；未上线的非平凡改动先在 VibeValley Issue 看板建单（标明 `Category`: `feature | bug-fix | architecture | simplification | process | testing`、`Domain Tags`、`priority`、`criteria`，`architecture` 类 Issue 须写清 `Alternatives considered`），上线后把长期成立的模型与取舍沉淀进子系统文档并关闭 Issue。
 
 ## 编辑本文
 

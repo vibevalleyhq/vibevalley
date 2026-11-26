@@ -17,7 +17,7 @@
 | 位置 | 职责 |
 |---|---|
 | `crates/server/src/repo.rs` | `repo.*`、`github.*`：`<工作目录>/repos` 下按名字新建或克隆、活跃度与语言（`tokei`）、`gh` 能不能开 PR |
-| `crates/git/src/read.rs`、`crates/git/src/repo.rs` | git 封装：纯 Rust 只读（根发现、引用、配置、worktree）与 Tokio 异步子进程（状态、diff、分支、worktree、冲突预检 `merge_check`、无检出合入 `merge_into`） |
+| `crates/git/src/read.rs`、`crates/git/src/cmd.rs`、`crates/git/src/repo.rs` | git 封装：`read.rs` 纯 Rust 无子进程只读（`discover_root`、`git_dir`、`git_common_dir`、`head`、`branch_exists`、`branches`、`commit_id_fast`、`remote_url`、`global_config_value`、`worktrees`）；`cmd.rs` 基于 `tokio::process::Command`（`.kill_on_drop(true)` + 异步 stdin）并施加 5 项环境安全保护；`repo.rs` 与 `verified_merge.rs` 负责状态、diff、分支、worktree、冲突预检与无检出合入 |
 | `crates/server/src/runtime/worktree/mod.rs`、`crates/server/src/runtime/worktree/check.rs` | `Workplace`：确保仓库在（`ensure_repo`）、工单的 worktree 与分支（`worktree`、`base`）、改动（`changes`）、交付（`land`）、子工单合进父分支（`join`）、帮工走时收拾 worktree 和分支（`release`）、异步 `.vibevalley/check`；不读工单板的状态 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`repo.*`、`github.*`、`issue.diff.get`）。
@@ -63,10 +63,12 @@
 - **用 git 底层树操作实现无检出预检与父分支合入**：`merge-tree` 和 `commit-tree` 不碰工作区文件，父工单无需维持常驻 worktree 即可接收子工单合入。
 - **GitHub 检测与克隆收紧边界**：克隆仅收标准 GitHub 主页地址并禁用终端交互弹窗，PR 权限统一走后台缓存，避免网络抖动阻塞看板操作。
 - **不让服务端代写提交**：自动生成的单行提交说明过不了仓库自己的提交门禁（`scripts/docs/commit-msg.ts`）；退回帮工自己提交，每个 commit 和 PR 才都符合仓库规范。
+- **纯 Rust 只读 + 系统 `git` 异步写（不引入 `gix`），并统一 5 项环境安全护栏**：引入 `gix`（gitoxide）会拉入数十个传递 crate 并产生与用户本地 git hooks、filter、GPG 签名的语义漂移；`read.rs` 用数百行纯 Rust 文件解析覆盖高频只读路径，复杂 revspec 与写操作统一走 `crates/git/src/cmd.rs`（剥离 8 个 `REPO_OVERRIDES` 环境变量、固定 `--no-pager -c core.quotepath=off -c color.ui=never` + `LC_ALL=C`、`GIT_TERMINAL_PROMPT=0`、只读设 `GIT_OPTIONAL_LOCKS=0`、统一 `GitError`），并由 `arch-audit` `NoRawGitCommand` 禁止在 `crates/git` 外直呼 `Command::new("git")`。
 
 ## 还没做的
 
-- 同一工单 worktree 内多帮工接力：[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
+- 同一工单 worktree 内多帮工接力：`#50`。
+- 两级仓库寻址（`<owner>/<repo>`）与空间解耦：`#10`、`#36`。
 
 ## 怎么验证
 

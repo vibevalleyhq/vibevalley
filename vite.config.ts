@@ -26,7 +26,6 @@ export default defineConfig({
     tasks: {
       "scripts:test": { command: "vp test run", cache: false },
       "docs:verify": [
-        "vpx scripts/docs/agent-notes.ts",
         "vpx scripts/docs/skills.ts",
         "vpx scripts/docs/doc-links.ts",
         "vpx scripts/docs/stale-names.ts",
@@ -37,7 +36,6 @@ export default defineConfig({
         "vpx scripts/gen/primitives.ts --check",
         "vpx scripts/gen/icons.ts --check",
       ],
-      "notes:verify": "vpx scripts/docs/agent-notes.ts",
       "site:check": { command: "vp run --filter @vibevalley/site check", cache: false },
       "site:build": { command: "vp run --filter @vibevalley/site build", cache: false },
       // The types each package gives the others (its pack block, dist/): what vp check reads a workspace package by, so
