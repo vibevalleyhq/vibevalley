@@ -94,21 +94,21 @@ export function ReposPage(props: { rest: string }) {
           label={t("web.repo.list")}
           testid="repos"
           action={
-            <View class="flex-row flex-wrap items-center gap-1.5">
-              <If when={readHostParams().globalShell}>
-                <ButtonLink href="/workspace" icon="terminal" size="compact" testID="open-workspace">
-                  {t("web.repo.openWorkspace")}
-                </ButtonLink>
-              </If>
-              <Button icon="folder" size="compact" testID="mount-local-repo" onPress={() => openAdd("local")}>
-                {t("web.repo.mountLocal")}
-              </Button>
-              <Button icon="add" size="compact" testID="new-repo" onPress={() => openAdd("github")}>
-                {t("web.repo.add")}
-              </Button>
-            </View>
+            <If when={readHostParams().globalShell}>
+              <ButtonLink href="/workspace" icon="terminal" size="compact" testID="open-workspace">
+                {t("web.repo.openWorkspace")}
+              </ButtonLink>
+            </If>
           }
         >
+          <View class="flex-row items-center gap-1.5 px-2 pt-0.5 pb-1.5">
+            <Button icon="folder" size="compact" class="flex-1 justify-center" testID="mount-local-repo" onPress={() => openAdd("local")}>
+              {t("web.repo.mountLocal")}
+            </Button>
+            <Button icon="add" size="compact" class="flex-1 justify-center" testID="new-repo" onPress={() => openAdd("github")}>
+              {t("web.repo.add")}
+            </Button>
+          </View>
           <View class="flex-row items-center justify-between px-2 pt-1 pb-1.5">
             <Text class="text-xs text-muted">{t("web.repo.repos")}</Text>
             <If when={sorted().length > 0}>
