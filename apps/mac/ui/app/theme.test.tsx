@@ -41,7 +41,7 @@ test("workbench surfaces and text inks resolve to theme.json tokens in both ligh
   expect(app.viewStyle("id:issue-card >> nth=0")?.backgroundColor).toBe(normHex(lightTokens.elevated));
   expect(app.count("id:desk")).toBe(0);
   expect(app.spanStyle("id:lane-todo >> text:待办").color).toBe(normHex(lightTokens.ink));
-  expect(app.spanStyle("id:lane-todo >> text:3").color).toBe(normHex(lightTokens.muted));
+  expect(app.spanStyle("id:lane-todo >> text:2 >> nth=0").color).toBe(normHex(lightTokens.muted));
 
   await app.host.send("route", "/issues/i18");
   await fake.pump(app);
@@ -61,7 +61,7 @@ test("workbench surfaces and text inks resolve to theme.json tokens in both ligh
   expect(app.viewStyle("id:lane-todo")?.backgroundColor).toBe(normHex(darkTokens.side));
   expect(app.viewStyle("id:issue-card >> nth=0")?.backgroundColor).toBe(normHex(darkTokens.elevated));
   expect(app.spanStyle("id:lane-todo >> text:待办").color).toBe(normHex(darkTokens.ink));
-  expect(app.spanStyle("id:lane-todo >> text:3").color).toBe(normHex(darkTokens.muted));
+  expect(app.spanStyle("id:lane-todo >> text:2 >> nth=0").color).toBe(normHex(darkTokens.muted));
 
   expect(normHex(lightTokens.page)).not.toBe(normHex(darkTokens.page));
   expect(normHex(lightTokens.side)).not.toBe(normHex(darkTokens.side));

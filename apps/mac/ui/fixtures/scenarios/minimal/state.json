@@ -34,7 +34,7 @@
         "queuedAt": 1795194263624,
         "blockedBy": [],
         "status": "in_progress",
-        "moves": ["canceled"],
+        "moves": ["backlog", "todo", "in_review", "done", "canceled"],
         "deliver": "change",
         "findings": [],
         "questions": [],
@@ -64,16 +64,18 @@
     ],
     "boardSummary": {
       "laneCounts": {
+        "backlog": 0,
         "todo": 0,
-        "working": 1,
-        "waiting": 0,
-        "closed": 0
+        "inProgress": 1,
+        "inReview": 0,
+        "done": 0,
+        "canceled": 0
       },
       "runningSlots": 1,
       "maxRunning": 6,
       "byIssue": {
         "i1": {
-          "lane": "working",
+          "lane": "in_progress",
           "cardKind": "issue",
           "familyDone": 0,
           "familyTotal": 0,

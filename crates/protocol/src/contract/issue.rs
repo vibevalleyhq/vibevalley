@@ -1289,26 +1289,39 @@ pub struct IssueRefineInput {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 pub enum IssueLane {
+    #[serde(rename = "backlog")]
+    Backlog,
     #[serde(rename = "todo")]
     Todo,
-    #[serde(rename = "working")]
-    Working,
-    #[serde(rename = "waiting")]
-    Waiting,
-    #[serde(rename = "closed")]
-    Closed,
+    #[serde(rename = "in_progress")]
+    InProgress,
+    #[serde(rename = "in_review")]
+    InReview,
+    #[serde(rename = "done")]
+    Done,
+    #[serde(rename = "canceled")]
+    Canceled,
 }
 
 impl IssueLane {
-    pub const ALL: [IssueLane; 4] = [IssueLane::Todo, IssueLane::Working, IssueLane::Waiting, IssueLane::Closed];
+    pub const ALL: [IssueLane; 6] = [
+        IssueLane::Backlog,
+        IssueLane::Todo,
+        IssueLane::InProgress,
+        IssueLane::InReview,
+        IssueLane::Done,
+        IssueLane::Canceled,
+    ];
 
     /// The string on the wire.
     pub fn as_str(self) -> &'static str {
         match self {
+            IssueLane::Backlog => "backlog",
             IssueLane::Todo => "todo",
-            IssueLane::Working => "working",
-            IssueLane::Waiting => "waiting",
-            IssueLane::Closed => "closed",
+            IssueLane::InProgress => "in_progress",
+            IssueLane::InReview => "in_review",
+            IssueLane::Done => "done",
+            IssueLane::Canceled => "canceled",
         }
     }
 }
@@ -1402,10 +1415,12 @@ impl IssuePromptKind {
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct BoardLaneCounts {
+    pub backlog: i64,
     pub todo: i64,
-    pub working: i64,
-    pub waiting: i64,
-    pub closed: i64,
+    pub in_progress: i64,
+    pub in_review: i64,
+    pub done: i64,
+    pub canceled: i64,
 }
 
 #[skip_serializing_none]

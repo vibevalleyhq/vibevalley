@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use vibevalley_i18n::t;
 use vibevalley_protocol::*;
 
-/// What a move does. `InProgress` and `InReview` are the session's to reach,
-/// never the user's.
+/// What a move does. For sent issues, `InProgress` and `InReview` belong to the
+/// session; unsent issues can also be tracked across them with `Track`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Move {
@@ -21,11 +21,13 @@ pub enum Move {
     Reopen,
     /// canceled before it was ever sent → backlog.
     Revive,
+    /// Unsent issue tracked across backlog, todo, in_progress, and in_review.
+    Track,
     /// → done: accepted and delivered as the issue says.
     Complete,
     /// in_progress, in_review → canceled: its session goes home.
     Cancel,
-    /// backlog, todo → canceled: never sent.
+    /// backlog, todo, in_progress, in_review → canceled: never sent.
     Drop,
 }
 
@@ -36,24 +38,12 @@ pub enum Refusal {
     /// A sub-issue merged into its parent goes with the parent.
     InGraph,
     Same,
-    /// Only a session moves an issue into these.
-    ByHelpers,
     /// A draft is being written by this session.
     Drafting {
         name: String,
     },
     /// This round failed: send it back with words, or close it.
     Failed,
-    /// It is being worked on.
-    Working,
-    /// Closed after being sent: reopen it into todo.
-    Reopen,
-    /// Closed before being sent: revive it into the backlog.
-    Revive,
-    Cannot {
-        from: IssueStatus,
-        to: IssueStatus,
-    },
 }
 
 impl Refusal {
@@ -62,19 +52,8 @@ impl Refusal {
         match self {
             Refusal::InGraph => t("server.issue.move.inGraph", &[]),
             Refusal::Same => t("server.issue.move.same", &[]),
-            Refusal::ByHelpers => t("server.issue.move.byHelpers", &[]),
             Refusal::Drafting { name } => t("server.issue.move.drafting", &[("name", name.clone().into())]),
             Refusal::Failed => t("server.issue.move.failed", &[]),
-            Refusal::Working => t("server.issue.move.working", &[]),
-            Refusal::Reopen => t("server.issue.move.reopen", &[]),
-            Refusal::Revive => t("server.issue.move.revive", &[]),
-            Refusal::Cannot { from, to } => t(
-                "server.issue.move.cannot",
-                &[
-                    ("from", t(&format!("shared.status.{}", from.as_str()), &[]).into()),
-                    ("to", t(&format!("shared.status.{}", to.as_str()), &[]).into()),
-                ],
-            ),
         }
     }
 }
@@ -94,64 +73,37 @@ pub fn status_move(issue: &Issue, to: IssueStatus) -> Result<Move, Refusal> {
     if from == to {
         return Err(Refusal::Same);
     }
-    if matches!(to, InProgress | InReview) {
-        return Err(Refusal::ByHelpers);
-    }
     let sent = issue.was_sent();
-    let stage = &issue.stage;
-    match from {
-        Backlog => match to {
-            Todo => match &issue.refining {
+    if !sent {
+        return Ok(match (from, to) {
+            (Backlog, Todo) => match &issue.refining {
                 Some(r) => return Err(Refusal::Drafting { name: r.name.clone() }),
-                None => return Ok(Move::Start),
+                None => Move::Start,
             },
-            Done => return Ok(Move::Complete),
-            Canceled => return Ok(Move::Drop),
-            _ => {}
-        },
-        Todo => match to {
-            Backlog => return Ok(Move::Unqueue),
-            Done => return Ok(Move::Complete),
-            Canceled => return Ok(Move::Drop),
-            _ => {}
-        },
-        InProgress => {
-            if to == Done && stage.stuck == Some(StuckReason::Failed) {
-                return Err(Refusal::Failed);
-            }
-            let recoverable = stage.state == IssueStageKind::Asking || (stage.state == IssueStageKind::Stuck && stage.stuck != Some(StuckReason::Quiet));
-            if to == Todo && recoverable {
-                return Ok(Move::Round);
-            }
-            if to == Done && stage.stuck == Some(StuckReason::Interrupted) {
-                return Ok(Move::Complete);
-            }
-            return if to == Canceled { Ok(Move::Cancel) } else { Err(Refusal::Working) };
-        }
-        InReview => match to {
-            Todo => return Ok(Move::Round),
-            // A round that failed is never done.
-            Done => {
-                return if stage.stuck == Some(StuckReason::Failed) {
-                    Err(Refusal::Failed)
-                } else {
-                    Ok(Move::Complete)
-                };
-            }
-            Canceled => return Ok(Move::Cancel),
-            _ => {}
-        },
-        Done | Canceled => {
-            if to == Todo && sent {
-                return Ok(Move::Reopen);
-            }
-            if to == Backlog && !sent {
-                return Ok(Move::Revive);
-            }
-            return Err(if sent { Refusal::Reopen } else { Refusal::Revive });
-        }
+            (Todo, Backlog) => Move::Unqueue,
+            (_, Done) => Move::Complete,
+            (_, Canceled) => Move::Drop,
+            (Done | Canceled, Backlog) => Move::Revive,
+            _ => Move::Track,
+        });
     }
-    Err(Refusal::Cannot { from, to })
+    let stage = &issue.stage;
+    if to == Done && matches!(from, InProgress | InReview) && stage.stuck == Some(StuckReason::Failed) {
+        return Err(Refusal::Failed);
+    }
+    Ok(match (from, to) {
+        (Backlog, Todo) => match &issue.refining {
+            Some(r) => return Err(Refusal::Drafting { name: r.name.clone() }),
+            None => Move::Start,
+        },
+        (Todo, Backlog) => Move::Unqueue,
+        (InProgress | InReview, Todo) => Move::Round,
+        (Done | Canceled, Todo) => Move::Reopen,
+        (_, Done) => Move::Complete,
+        (_, Canceled) => Move::Cancel,
+        (_, Backlog | InProgress | InReview) => Move::Track,
+        (Todo, Todo) => unreachable!(),
+    })
 }
 
 pub fn status_moves(issue: &Issue) -> Vec<IssueStatus> {
@@ -184,13 +136,57 @@ mod tests {
     #[test]
     fn running_and_failed_sessions_keep_completion_safety() {
         let mut issue = Issue::new("i2", 2, "Running issue", 100);
+        issue.last_run = Some(IssueLastRun {
+            started_at: 100,
+            ended_at: None,
+            outcome: None,
+        });
         issue.status = IssueStatus::InProgress;
         issue.stage.state = IssueStageKind::Working;
-        assert_eq!(status_move(&issue, IssueStatus::Done), Err(Refusal::Working));
+        assert_eq!(status_move(&issue, IssueStatus::InReview), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Done), Ok(Move::Complete));
         assert_eq!(status_move(&issue, IssueStatus::Canceled), Ok(Move::Cancel));
+        assert_eq!(status_move(&issue, IssueStatus::Backlog), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Todo), Ok(Move::Round));
 
         issue.stage.state = IssueStageKind::Stuck;
         issue.stage.stuck = Some(StuckReason::Failed);
         assert_eq!(status_move(&issue, IssueStatus::Done), Err(Refusal::Failed));
+    }
+
+    #[test]
+    fn unsent_issues_unlock_all_six_statuses_while_keeping_graph_protection() {
+        let mut issue = Issue::new("i3", 3, "External MCP tracked", 100);
+        assert_eq!(status_move(&issue, IssueStatus::InProgress), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::InReview), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Todo), Ok(Move::Start));
+        assert_eq!(status_move(&issue, IssueStatus::Done), Ok(Move::Complete));
+        assert_eq!(status_move(&issue, IssueStatus::Canceled), Ok(Move::Drop));
+
+        issue.status = IssueStatus::InProgress;
+        assert_eq!(status_move(&issue, IssueStatus::InProgress), Err(Refusal::Same));
+        assert_eq!(status_move(&issue, IssueStatus::InReview), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Todo), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Backlog), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Done), Ok(Move::Complete));
+        assert_eq!(status_move(&issue, IssueStatus::Canceled), Ok(Move::Drop));
+
+        issue.status = IssueStatus::InReview;
+        assert_eq!(status_move(&issue, IssueStatus::InProgress), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Todo), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Backlog), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Done), Ok(Move::Complete));
+        assert_eq!(status_move(&issue, IssueStatus::Canceled), Ok(Move::Drop));
+
+        issue.status = IssueStatus::Done;
+        issue.delivered = Some(Landing::None);
+        assert_eq!(status_move(&issue, IssueStatus::Backlog), Ok(Move::Revive));
+        assert_eq!(status_move(&issue, IssueStatus::InProgress), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::InReview), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Todo), Ok(Move::Track));
+        assert_eq!(status_move(&issue, IssueStatus::Canceled), Ok(Move::Drop));
+
+        issue.delivered = Some(Landing::MergedIntoParent);
+        assert_eq!(status_move(&issue, IssueStatus::InProgress), Err(Refusal::InGraph));
     }
 }

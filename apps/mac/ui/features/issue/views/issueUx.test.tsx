@@ -231,12 +231,13 @@ test("Board integrates filter bar, preserves long card titles, and suppresses un
   await app.press("id:issue-view-list");
   await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
 
-  // Todo group has 2 issues; working/waiting/closed are empty (0 rows) and render no group body.
-  expect(app.count("id:issue-group")).toBeGreaterThanOrEqual(3);
-  expect(app.count("id:issue-group-body")).toBe(1);
+  // Backlog and Todo each have 1 issue; in_progress/in_review/done/canceled are empty (0 rows) and render no group body.
+  expect(app.count("id:issue-group")).toBe(6);
+  expect(app.count("id:issue-group-body")).toBe(2);
+  expect(app.count("id:issue-group-backlog")).toBe(1);
   expect(app.count("id:issue-group-todo")).toBe(1);
-  expect(app.count("id:issue-group-working")).toBe(1);
-  expect(app.count("id:issue-group-waiting")).toBe(1);
+  expect(app.count("id:issue-group-in_progress")).toBe(1);
+  expect(app.count("id:issue-group-in_review")).toBe(1);
 });
 
 test("Board uses professional PM lane labels without concurrency badge, renders card thumbnails, and opens Quick-Peek modal", async () => {

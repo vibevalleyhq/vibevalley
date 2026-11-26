@@ -1710,7 +1710,12 @@ mod tests {
             let board = bundle.board.board_summary.as_ref().expect("board_summary populated");
             assert_eq!(board.max_running, MAX_RUNNING as i64);
             assert_eq!(
-                board.lane_counts.todo + board.lane_counts.working + board.lane_counts.waiting + board.lane_counts.closed,
+                board.lane_counts.backlog
+                    + board.lane_counts.todo
+                    + board.lane_counts.in_progress
+                    + board.lane_counts.in_review
+                    + board.lane_counts.done
+                    + board.lane_counts.canceled,
                 bundle.board.issues.len() as i64,
                 "lane_counts must equal issue count for {:?}",
                 density

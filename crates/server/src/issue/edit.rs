@@ -316,10 +316,7 @@ impl Board {
                     }
                 }
                 _ => {
-                    return Err(BoardError::Refused(vibevalley_core::Refusal::Cannot {
-                        from: issue.status,
-                        to: IssueStatus::Todo,
-                    }));
+                    return Err(refused("server.issue.handOverOnTodo", &[]));
                 }
             };
             if mv == vibevalley_core::Move::Round && issue.stage.state == vibevalley_protocol::IssueStageKind::Reviewing {

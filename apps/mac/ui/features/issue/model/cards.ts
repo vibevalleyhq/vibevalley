@@ -29,35 +29,43 @@ export type Lane = IssueLane;
 export const lanes: Lane[] = [...IssueLaneSchema.options];
 
 export const laneLabel: Record<Lane, string> = {
+  backlog: t("web.issue.boardLabels.lane.backlog"),
   todo: t("web.issue.boardLabels.lane.todo"),
-  working: t("web.issue.boardLabels.lane.working"),
-  waiting: t("web.issue.boardLabels.lane.waiting"),
-  closed: t("web.issue.boardLabels.lane.closed"),
+  in_progress: t("web.issue.boardLabels.lane.in_progress"),
+  in_review: t("web.issue.boardLabels.lane.in_review"),
+  done: t("web.issue.boardLabels.lane.done"),
+  canceled: t("web.issue.boardLabels.lane.canceled"),
 };
 
-/** The status a lane's header is drawn with: the one its cards mostly have. */
-export const laneStatus: Record<Lane, IssueStatus> = { todo: "todo", working: "in_progress", waiting: "in_review", closed: "done" };
+/** The status a lane's header is drawn with: each lane matches its own status. */
+export const laneStatus: Record<Lane, IssueStatus> = {
+  backlog: "backlog",
+  todo: "todo",
+  in_progress: "in_progress",
+  in_review: "in_review",
+  done: "done",
+  canceled: "canceled",
+};
 
-/** A card says its own status only where its lane does not: a draft in todo says so by its draft flag instead. */
-export const ownStatus = (lane: Lane, status: IssueStatus) => status !== laneStatus[lane] && !(lane === "todo" && status === "backlog");
+/** A card says its own status only where its lane does not. */
+export const ownStatus = (lane: Lane, status: IssueStatus) => status !== laneStatus[lane];
 
 function laneOf(s: IssueStatus): Lane {
-  if (s === "backlog" || s === "todo") return "todo";
-  if (s === "in_progress") return "working";
-  if (s === "in_review") return "waiting";
-  return "closed";
+  return s;
 }
 
-export type Move = "start" | "close" | "reopen" | "revive";
+export type Move = "start" | "track" | "close" | "reopen" | "revive";
 
-/** A drop between lanes, if the server lets the issue go there (`Issue.moves`). A task's issue has no moves. */
-function moveOf(from: Lane, to: Lane, moves: IssueStatus[]): Move | undefined {
-  if (from === "todo" && to === "working" && moves.includes("todo")) return "start";
-  if ((from === "todo" || from === "working" || from === "waiting") && to === "closed" && (moves.includes("done") || moves.includes("canceled")))
-    return "close";
-  if (from === "closed" && to === "working" && moves.includes("todo")) return "reopen";
-  if (from === "closed" && to === "todo" && moves.includes("backlog")) return "revive";
-  return undefined;
+/** A drop between any two distinct lanes, when the server allows the target status (`Issue.moves`). */
+function moveOf(from: Lane, to: Lane, moves: IssueStatus[], canTrack: boolean): Move | undefined {
+  if (from === to || !moves.includes(to)) return undefined;
+  if (to === "todo") {
+    if (from === "backlog") return "start";
+    return canTrack ? "track" : "reopen";
+  }
+  if (to === "done" || to === "canceled") return "close";
+  if (to === "backlog" && (from === "done" || from === "canceled")) return "revive";
+  return "track";
 }
 
 export const closedShown = 15;
@@ -180,14 +188,15 @@ function usesSummaryLaneCounts(summary: BoardSummary | undefined, cards: readonl
 export function laneCountOf(lane: Lane, cards: readonly BoardCard[], summary: BoardSummary | undefined, filtered: boolean, older: boolean): number {
   if (usesSummaryLaneCounts(summary, cards, filtered, older)) {
     switch (lane) {
+      case "in_progress":
+        return summary.laneCounts.inProgress;
+      case "in_review":
+        return summary.laneCounts.inReview;
+      case "backlog":
       case "todo":
-        return summary.laneCounts.todo;
-      case "working":
-        return summary.laneCounts.working;
-      case "waiting":
-        return summary.laneCounts.waiting;
-      case "closed":
-        return summary.laneCounts.closed;
+      case "done":
+      case "canceled":
+        return summary.laneCounts[lane];
     }
   }
   return cards.filter((c) => c.lane === lane).length;
@@ -283,6 +292,7 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       const item = c.issue;
       if (item.refining) flags.push({ text: t("web.issue.card.refining", { name: item.refining.name }), tone: "water" });
       else if (item.status === "backlog") flags.push({ text: t("web.issue.card.draft"), tone: "faint" });
+      else if (item.status === "in_review") flags.push({ text: t("shared.stage.reviewing"), tone: "wheat" });
       if (item.queuedAt !== undefined) flags.push({ text: t("web.issue.card.queued"), tone: "water" });
       if (item.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       const agent = assignedAgentOf(item);
@@ -401,12 +411,15 @@ export function cardUrgencyTone(card: BoardCard): "wheat" | "berry" | undefined 
     case "missing":
       return stageUrgencyTone(card.issue.stage.state) ?? "berry";
     case "todo":
+      return card.issue.status === "in_review" ? "wheat" : undefined;
     case "orchestrator":
       return undefined;
   }
 }
 
 export function cardMove(c: BoardCard, to: Lane): Move | undefined {
-  if (c.kind === "todo" || c.kind === "issue" || c.kind === "family") return moveOf(c.lane, to, c.issue.moves);
+  if (c.kind === "todo" || c.kind === "issue" || c.kind === "family") {
+    return moveOf(c.lane, to, c.issue.moves, c.kind === "todo");
+  }
   return undefined;
 }

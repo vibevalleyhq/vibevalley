@@ -5,10 +5,12 @@
     "issues": [],
     "boardSummary": {
       "laneCounts": {
+        "backlog": 0,
         "todo": 0,
-        "working": 0,
-        "waiting": 0,
-        "closed": 0
+        "inProgress": 0,
+        "inReview": 0,
+        "done": 0,
+        "canceled": 0
       },
       "runningSlots": 0,
       "maxRunning": 6,

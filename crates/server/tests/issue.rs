@@ -69,9 +69,16 @@ fn an_issue_goes_through_the_endpoints_from_create_to_done() {
     assert_eq!(missing["bizCode"], 300001);
     assert_eq!(missing["error"]["next"][0]["run"], json!(["issue", "list"]));
 
-    let refused = call(router, "issue.status.update", json!({ "id": id, "status": "in_review" }));
-    assert_eq!(refused["bizCode"], 300002, "{refused}");
-    assert!(refused["error"]["next"].as_array().is_some_and(|n| !n.is_empty()), "{refused}");
+    // Unsent issues can track freely across all statuses before dispatch.
+    let tracked = call(router, "issue.status.update", json!({ "id": id, "status": "in_review" }));
+    assert_eq!(tracked["bizCode"], 0, "{tracked}");
+    assert_eq!(tracked["data"]["status"], "in_review", "{tracked}");
+    let working = call(router, "issue.status.update", json!({ "id": id, "status": "in_progress" }));
+    assert_eq!(working["bizCode"], 0, "{working}");
+    assert_eq!(working["data"]["status"], "in_progress", "{working}");
+    let back = call(router, "issue.status.update", json!({ "id": id, "status": "backlog" }));
+    assert_eq!(back["bizCode"], 0, "{back}");
+    assert_eq!(back["data"]["status"], "backlog", "{back}");
     let preview = call(router, "issue.status.previewUpdate", json!({ "id": id, "status": "todo" }));
     assert_eq!(preview["bizCode"], 0, "{preview}");
     assert!(preview["data"]["does"][0].as_str().unwrap().contains("#1"), "{preview}");

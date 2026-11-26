@@ -44,20 +44,26 @@
     "earlier": "{n} earlier",
     "recent": "Recent only",
     "empty": {
-      "todo": "Write down what you want done here; drag it to In Progress to start someone on it, up and down to order it.",
-      "working": "Nothing in progress.",
-      "waiting": "Completed rounds or questions wait here in review; drag to Done to complete or cancel.",
-      "closed": "Completed and canceled tickets; drag one back to In Progress to reopen it."
+      "backlog": "Write ideas down here first; drag to Todo when ready to dispatch, or up and down to order.",
+      "todo": "Ready to start: pick a repo and helper to dispatch, or drag to In Progress.",
+      "in_progress": "Nothing in progress.",
+      "in_review": "Completed rounds or tracked reviews wait here; inspect and accept to Done.",
+      "done": "Completed tickets; drag back to any column anytime.",
+      "canceled": "Discarded tickets; drag back to restore."
     },
     "emptyGuide": {
+      "backlogTitle": "Backlog is empty",
+      "backlogBody": "Capture ideas here and refine descriptions and criteria before dispatching.",
       "todoTitle": "No to-dos yet",
       "todoBody": "Jot down a ticket, pick a repo and helper, and dispatch it.",
-      "workingTitle": "Nothing in progress",
-      "workingBody": "Assign a helper and dispatch a Todo ticket, or drag it here to start a worktree session.",
-      "waitingTitle": "Nothing in review",
-      "waitingBody": "Completed rounds and helper questions appear here so you can inspect changes and merge.",
-      "closedTitle": "No done tickets yet",
-      "closedBody": "Completed and canceled tickets stay here; drag one back to In Progress to reopen.",
+      "in_progressTitle": "Nothing in progress",
+      "in_progressBody": "Drag a ticket here to track work or dispatch a worktree session.",
+      "in_reviewTitle": "Nothing in review",
+      "in_reviewBody": "Completed work appears here so you can inspect changes, check criteria, and accept.",
+      "doneTitle": "No done tickets yet",
+      "doneBody": "Completed tickets stay here; drag one back anytime.",
+      "canceledTitle": "No canceled tickets",
+      "canceledBody": "Discarded tickets stay here; drag one back to restore.",
       "filtered": "No matching tickets in this column."
     },
     "whichLane": "Which column",
@@ -306,8 +312,10 @@
     "polish": "Refine with helper",
     "markReady": "Mark as Todo",
     "markDone": "Mark as Done",
+    "accept": "Accept",
     "markCanceled": "Discard",
-    "revive": "Restore to Backlog"
+    "revive": "Restore to Backlog",
+    "criterionToggle": "Toggle criterion \"{criterion}\""
   },
   "peek": {
     "expand": "Open full screen",
@@ -334,10 +342,12 @@
       "created": "Created"
     },
     "lane": {
+      "backlog": "Backlog",
       "todo": "Todo",
-      "working": "In Progress",
-      "waiting": "In Review",
-      "closed": "Done"
+      "in_progress": "In Progress",
+      "in_review": "In Review",
+      "done": "Done",
+      "canceled": "Canceled"
     },
     "stage": {
       "talk": "Talk it through",

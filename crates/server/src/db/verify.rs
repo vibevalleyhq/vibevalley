@@ -514,9 +514,10 @@ mod tests {
         assert!(issue_cols.contains("tags_json"), "issue table must include tags_json column");
         assert!(issue_cols.contains("start_at"), "issue table must include start_at column");
         assert!(issue_cols.contains("due_at"), "issue table must include due_at column");
+        assert!(issue_cols.contains("status"), "issue table must include status column");
 
         let migrations = list_applied_migrations(db.read_conn(), DatabaseBackend::Sqlite, &existing).await.unwrap();
-        assert_eq!(migrations.len(), 5);
+        assert_eq!(migrations.len(), 6);
         db.close().await;
     }
 

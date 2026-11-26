@@ -61,6 +61,7 @@ fn read_issue(r: issue::Model) -> DbResult<Issue> {
     item.closed_at = r.closed_at;
     item.reviewed_at = r.reviewed_at;
     item.priority = read_db_word(r.priority)?;
+    item.status = read_db_word(r.status)?;
     item.deliver = read_db_word(r.deliver)?;
     item.canceled = r.canceled.map(read_db_word).transpose()?;
     item.delivered = r.delivered.map(read_db_word).transpose()?;
@@ -124,6 +125,7 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
         repo: Set(t.repo.clone()),
         machine_id: Set(t.machine_id.clone()),
         priority: Set(db_word(&t.priority)?),
+        status: Set(db_word(&t.status)?),
         rank: Set(t.rank),
         deliver: Set(db_word(&t.deliver)?),
         parent: Set(t.parent.clone()),
@@ -159,6 +161,7 @@ async fn put_issue_impl<C: ConnectionTrait>(db: &C, t: &Issue) -> DbResult<()> {
             issue::Column::Repo,
             issue::Column::MachineId,
             issue::Column::Priority,
+            issue::Column::Status,
             issue::Column::Rank,
             issue::Column::Deliver,
             issue::Column::Parent,

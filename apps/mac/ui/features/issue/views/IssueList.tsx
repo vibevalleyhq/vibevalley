@@ -48,8 +48,9 @@ export function IssueList(props: {
   const wide = computed(() => box.width() === 0 || box.width() >= 640);
   const groups = computed(() => groupRows(props.cards, props.grouping, rowKeys));
 
-  // Only where a new todo belongs: the todo group, a repo's, a helper's (not the orchestrator's), or the one group.
-  const canAdd = (g: RowGroup<BoardCard>) => (props.grouping === "status" ? g.lane === "todo" : props.grouping === "agent" ? !isOrchestrator(g.key) : true);
+  // Only where a new todo belongs: the backlog/todo group, a repo's, a helper's (not the orchestrator's), or the one group.
+  const canAdd = (g: RowGroup<BoardCard>) =>
+    props.grouping === "status" ? g.lane === "backlog" || g.lane === "todo" : props.grouping === "agent" ? !isOrchestrator(g.key) : true;
   const add = (g: RowGroup<BoardCard>) => props.onAdd(props.grouping === "repo" ? { repo: g.key } : props.grouping === "agent" ? { agent: g.key } : {});
   const fold = (key: string) => {
     const n = new Set(folded());
@@ -84,11 +85,12 @@ export function IssueList(props: {
                   const l = groupLane();
                   return l ? laneOrder(l, g().rows, props.ordering) : orderRows(g().rows, props.ordering, rowKeys);
                 });
-                const folding = computed(() => groupLane() === "closed" && !props.older && ordered().length > closedShown);
+                const isClosed = computed(() => groupLane() === "done" || groupLane() === "canceled");
+                const folding = computed(() => isClosed() && !props.older && ordered().length > closedShown);
                 const rows = computed(() => (folding() ? ordered().slice(0, closedShown) : ordered()));
                 const hidden = computed(() => (folding() ? ordered().length - closedShown : 0));
                 const isFolded = computed(() => folded().has(g().key));
-                const showOlder = computed(() => hidden() > 0 || (groupLane() === "closed" && props.older && g().rows.length > closedShown));
+                const showOlder = computed(() => hidden() > 0 || (isClosed() && props.older && g().rows.length > closedShown));
                 const isEmpty = computed(() => rows().length === 0 && !showOlder());
                 const showBody = computed(() => !isFolded() && !isEmpty());
                 const label = computed(() => {

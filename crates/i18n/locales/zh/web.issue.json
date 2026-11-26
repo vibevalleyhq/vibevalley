@@ -44,20 +44,26 @@
     "earlier": "更早的 {n} 张",
     "recent": "只看最近的",
     "empty": {
-      "todo": "想到要做的先写在这里，拖到「进行中」就派人开工；上下拖排先后。",
-      "working": "暂无进行中的工单。",
-      "waiting": "做完的、没做成的在这里待验收；拖到「已完成」完成或取消。",
-      "closed": "已完成、已取消的工单；拖回「进行中」重开。"
+      "backlog": "需求池里的工单：先理清需求，再拖到「待办」派发开工；上下拖排先后。",
+      "todo": "待办工单：选好仓库和角色即可开工，拖到「进行中」直接跟踪进度。",
+      "in_progress": "进行中的工单（自动执行或手动跟踪）。",
+      "in_review": "待验收的工单：确认改动与标准后一键验收通过或完成。",
+      "done": "已完成的工单；可随时拖回其他列重开或继续。",
+      "canceled": "已废弃的工单；需要时可拖回恢复。"
     },
     "emptyGuide": {
+      "backlogTitle": "需求池还是空的",
+      "backlogBody": "先把想法记入需求池，慢慢完善说明和验收标准。",
       "todoTitle": "待办还是空的",
-      "todoBody": "记下要做的工单，选好仓库和角色就能派发开工。",
-      "workingTitle": "暂无进行中工单",
-      "workingBody": "给待办工单选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
-      "waitingTitle": "暂无待验收改动",
-      "waitingBody": "执行会话跑完一轮或有疑问时会停在这里，方便看改动、回复或完成交付。",
-      "closedTitle": "还没有已完成工单",
-      "closedBody": "已完成或取消的工单会留在这里，拖回「进行中」即可随时重开。",
+      "todoBody": "选好仓库和角色就能派发，或由外部 Agent 认领推进。",
+      "in_progressTitle": "暂无进行中工单",
+      "in_progressBody": "把工单拖到这里开始跟踪或派发独立 worktree 会话。",
+      "in_reviewTitle": "暂无待验收改动",
+      "in_reviewBody": "执行会话跑完或外部推进到这里，方便看改动、勾选标准与验收通过。",
+      "doneTitle": "还没有已完成工单",
+      "doneBody": "已完成的工单会留在这里，也可随时拖回其他状态。",
+      "canceledTitle": "没有已废弃工单",
+      "canceledBody": "暂不推进或取消的工单会归档在这里，拖回即可恢复。",
       "filtered": "当前筛选条件下此列没有工单。"
     },
     "whichLane": "看哪一列",
@@ -306,8 +312,10 @@
     "polish": "让角色再润色",
     "markReady": "标为待开发",
     "markDone": "标为已完成",
+    "accept": "验收通过",
     "markCanceled": "废弃",
-    "revive": "恢复到需求池"
+    "revive": "恢复到需求池",
+    "criterionToggle": "切换验收标准「{criterion}」"
   },
   "peek": {
     "expand": "展开全屏",
@@ -334,10 +342,12 @@
       "created": "创建时间"
     },
     "lane": {
+      "backlog": "需求池",
       "todo": "待办",
-      "working": "进行中",
-      "waiting": "待验收",
-      "closed": "已完成"
+      "in_progress": "进行中",
+      "in_review": "待验收",
+      "done": "已完成",
+      "canceled": "已废弃"
     },
     "stage": {
       "talk": "聊清楚",

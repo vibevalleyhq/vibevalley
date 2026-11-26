@@ -50,47 +50,66 @@ export function EmptyNote(props: { children: string }) {
   return <Text class="px-3 text-xs text-faint">{props.children}</Text>;
 }
 
+const isClosedLane = (lane: Lane) => lane === "done" || lane === "canceled";
+const isOrderLane = (lane: Lane) => lane === "backlog" || lane === "todo";
+
 const emptyText: Record<Lane, string> = {
+  backlog: t("web.issue.board.empty.backlog"),
   todo: t("web.issue.board.empty.todo"),
-  working: t("web.issue.board.empty.working"),
-  waiting: t("web.issue.board.empty.waiting"),
-  closed: t("web.issue.board.empty.closed"),
+  in_progress: t("web.issue.board.empty.in_progress"),
+  in_review: t("web.issue.board.empty.in_review"),
+  done: t("web.issue.board.empty.done"),
+  canceled: t("web.issue.board.empty.canceled"),
 };
 
 interface EmptyLaneGuide {
   readonly icon: IconName;
   readonly titleKey:
+    | "web.issue.board.emptyGuide.backlogTitle"
     | "web.issue.board.emptyGuide.todoTitle"
-    | "web.issue.board.emptyGuide.workingTitle"
-    | "web.issue.board.emptyGuide.waitingTitle"
-    | "web.issue.board.emptyGuide.closedTitle";
+    | "web.issue.board.emptyGuide.in_progressTitle"
+    | "web.issue.board.emptyGuide.in_reviewTitle"
+    | "web.issue.board.emptyGuide.doneTitle"
+    | "web.issue.board.emptyGuide.canceledTitle";
   readonly bodyKey:
+    | "web.issue.board.emptyGuide.backlogBody"
     | "web.issue.board.emptyGuide.todoBody"
-    | "web.issue.board.emptyGuide.workingBody"
-    | "web.issue.board.emptyGuide.waitingBody"
-    | "web.issue.board.emptyGuide.closedBody";
+    | "web.issue.board.emptyGuide.in_progressBody"
+    | "web.issue.board.emptyGuide.in_reviewBody"
+    | "web.issue.board.emptyGuide.doneBody"
+    | "web.issue.board.emptyGuide.canceledBody";
 }
 
 const emptyLaneGuide: Record<Lane, EmptyLaneGuide> = {
+  backlog: {
+    icon: "inbox",
+    titleKey: "web.issue.board.emptyGuide.backlogTitle",
+    bodyKey: "web.issue.board.emptyGuide.backlogBody",
+  },
   todo: {
     icon: "add",
     titleKey: "web.issue.board.emptyGuide.todoTitle",
     bodyKey: "web.issue.board.emptyGuide.todoBody",
   },
-  working: {
+  in_progress: {
     icon: "play",
-    titleKey: "web.issue.board.emptyGuide.workingTitle",
-    bodyKey: "web.issue.board.emptyGuide.workingBody",
+    titleKey: "web.issue.board.emptyGuide.in_progressTitle",
+    bodyKey: "web.issue.board.emptyGuide.in_progressBody",
   },
-  waiting: {
+  in_review: {
     icon: "diff",
-    titleKey: "web.issue.board.emptyGuide.waitingTitle",
-    bodyKey: "web.issue.board.emptyGuide.waitingBody",
+    titleKey: "web.issue.board.emptyGuide.in_reviewTitle",
+    bodyKey: "web.issue.board.emptyGuide.in_reviewBody",
   },
-  closed: {
+  done: {
     icon: "check",
-    titleKey: "web.issue.board.emptyGuide.closedTitle",
-    bodyKey: "web.issue.board.emptyGuide.closedBody",
+    titleKey: "web.issue.board.emptyGuide.doneTitle",
+    bodyKey: "web.issue.board.emptyGuide.doneBody",
+  },
+  canceled: {
+    icon: "close",
+    titleKey: "web.issue.board.emptyGuide.canceledTitle",
+    bodyKey: "web.issue.board.emptyGuide.canceledBody",
   },
 };
 
@@ -117,8 +136,9 @@ export interface BoardProps {
 type Rect = { x: number; y: number; w: number; h: number };
 const inside = (r: Rect, x: number, y: number) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 
-/** Whether a lane takes the card: a move the rules allow, or a todo dropped back on todo. */
-const accepts = (c: BoardCard | undefined, lane: Lane) => c !== undefined && (cardMove(c, lane) !== undefined || (lane === "todo" && c.kind === "todo"));
+/** Whether a lane takes the card: a move the rules allow, or a backlog/todo dropped back on its own ordered lane. */
+const accepts = (c: BoardCard | undefined, lane: Lane) =>
+  c !== undefined && (cardMove(c, lane) !== undefined || (isOrderLane(lane) && c.kind === "todo" && c.lane === lane));
 
 /** A card being dragged: what is under the pointer, and where everything was when it started. */
 function createDrag(board: () => BoardProps) {
@@ -194,19 +214,21 @@ type Drag = ReturnType<typeof createDrag>;
 
 /** Four lanes to drag between; narrower than 700, one lane at a time behind tabs. */
 export function IssueBoard(props: BoardProps) {
-  const lane = signal<Lane>(props.cards.find((card) => card.id === props.selected)?.lane ?? "todo");
+  const lane = signal<Lane>(props.cards.find((card) => card.id === props.selected)?.lane ?? "backlog");
   const narrow = computed(() => windowSize().width < 700);
   const drag = createDrag(() => props);
   const cardsByLane = computed<Record<Lane, BoardCard[]>>(() => {
-    const grouped: Record<Lane, BoardCard[]> = { todo: [], working: [], waiting: [], closed: [] };
+    const grouped: Record<Lane, BoardCard[]> = { backlog: [], todo: [], in_progress: [], in_review: [], done: [], canceled: [] };
     for (const c of props.cards) grouped[c.lane].push(c);
     return grouped;
   });
   const laneCounts = computed<Record<Lane, number>>(() => ({
+    backlog: laneCountOf("backlog", props.cards, props.summary, props.filtered === true, props.older),
     todo: laneCountOf("todo", props.cards, props.summary, props.filtered === true, props.older),
-    working: laneCountOf("working", props.cards, props.summary, props.filtered === true, props.older),
-    waiting: laneCountOf("waiting", props.cards, props.summary, props.filtered === true, props.older),
-    closed: laneCountOf("closed", props.cards, props.summary, props.filtered === true, props.older),
+    in_progress: laneCountOf("in_progress", props.cards, props.summary, props.filtered === true, props.older),
+    in_review: laneCountOf("in_review", props.cards, props.summary, props.filtered === true, props.older),
+    done: laneCountOf("done", props.cards, props.summary, props.filtered === true, props.older),
+    canceled: laneCountOf("canceled", props.cards, props.summary, props.filtered === true, props.older),
   }));
   return (
     <View ref={drag.setRoot} class="min-h-0 flex-1 px-4 py-3">
@@ -234,24 +256,44 @@ export function IssueBoard(props: BoardProps) {
           </Each>
         </View>
       </If>
-      <View class="min-h-0 flex-1 flex-row gap-3">
-        <Each of={lanes} key={(l) => l}>
-          {(l) => (
-            <If when={!narrow() || l() === lane()}>
-              <LaneView
-                board={props}
-                lane={l()}
-                cards={cardsByLane()[l()]}
-                count={laneCounts()[l()]}
-                showClear={
-                  props.filtered === true && props.cards.length === 0 && props.onClearFilter !== undefined && (narrow() ? l() === lane() : l() === "todo")
-                }
-                drag={drag}
-              />
-            </If>
-          )}
-        </Each>
-      </View>
+      <If
+        when={narrow()}
+        else={
+          <Scroll horizontal class="min-h-0 flex-1" contentClass="min-h-full flex-row gap-3">
+            <Each of={lanes} key={(l) => l}>
+              {(l) => (
+                <LaneView
+                  board={props}
+                  lane={l()}
+                  narrow={false}
+                  cards={cardsByLane()[l()]}
+                  count={laneCounts()[l()]}
+                  showClear={props.filtered === true && props.cards.length === 0 && props.onClearFilter !== undefined && l() === "backlog"}
+                  drag={drag}
+                />
+              )}
+            </Each>
+          </Scroll>
+        }
+      >
+        <View class="min-h-0 flex-1 flex-row gap-3">
+          <Each of={lanes} key={(l) => l}>
+            {(l) => (
+              <If when={l() === lane()}>
+                <LaneView
+                  board={props}
+                  lane={l()}
+                  narrow
+                  cards={cardsByLane()[l()]}
+                  count={laneCounts()[l()]}
+                  showClear={props.filtered === true && props.cards.length === 0 && props.onClearFilter !== undefined && l() === lane()}
+                  drag={drag}
+                />
+              </If>
+            )}
+          </Each>
+        </View>
+      </If>
       <If when={drag.ghost()}>
         {(g) => (
           <View
@@ -273,22 +315,24 @@ export function IssueBoard(props: BoardProps) {
   );
 }
 
-function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; count: number; showClear: boolean; drag: Drag }) {
+function LaneView(props: { board: BoardProps; lane: Lane; narrow: boolean; cards: BoardCard[]; count: number; showClear: boolean; drag: Drag }) {
   const p = () => props.board;
   const over = computed(() => props.drag.over() === props.lane);
-  const folded = computed(() => props.lane === "closed" && !props.board.older && props.cards.length > closedShown);
+  const closed = computed(() => isClosedLane(props.lane));
+  const folded = computed(() => closed() && !props.board.older && props.cards.length > closedShown);
   const ordered = computed(() => laneOrder(props.lane, props.cards, props.board.ordering));
   const shown = computed(() => (folded() ? ordered().slice(0, closedShown) : ordered()));
   const hidden = computed(() => (folded() ? ordered().length - closedShown : 0));
   const guide = () => emptyLaneGuide[props.lane];
-  const showHeaderNew = computed(() => props.lane === "todo" && (props.board.loading || props.cards.length > 0));
+  const showHeaderNew = computed(() => isOrderLane(props.lane) && (props.board.loading || props.cards.length > 0));
+  const newButtonTestId = computed(() => (props.lane === "todo" ? "issue-new" : `issue-new-${props.lane}`));
   return (
     <View
       ref={(r) => props.drag.lane(props.lane, r)}
       accessibilityLabel={laneLabel[props.lane]}
       testID={`lane-${props.lane}`}
       accessibilityState={{ selected: over() }}
-      class={`max-h-full min-w-55 flex-1 rounded-xl border px-2.5 pt-2.5 pb-2.5 ${over() ? "border-leaf" : "border-transparent bg-side"}`}
+      class={`max-h-full ${props.narrow ? "min-w-55 flex-1" : "w-72 shrink-0"} rounded-xl border px-2.5 pt-2.5 pb-2.5 ${over() ? "border-leaf" : "border-transparent bg-side"}`}
       style={over() ? { backgroundColor: mix("leaf", 0.14) } : undefined}
     >
       <View class="mb-1.5 h-7 shrink-0 flex-row items-center gap-1.5 px-1">
@@ -305,7 +349,7 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
         </View>
         <If when={showHeaderNew()}>
           <View class="ml-auto shrink-0">
-            <IconButton testid="issue-new" icon="add" size={14} label={t("web.issue.new.title")} onClick={() => p().onNew()} />
+            <IconButton testid={newButtonTestId()} icon="add" size={14} label={t("web.issue.new.title")} onClick={() => p().onNew()} />
           </View>
         </If>
       </View>
@@ -331,7 +375,7 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
                       />
                     )}
                   </Each>
-                  <If when={hidden() > 0 || (props.lane === "closed" && p().older && props.cards.length > closedShown)}>
+                  <If when={hidden() > 0 || (closed() && p().older && props.cards.length > closedShown)}>
                     <OlderLink hidden={hidden()} onClick={p().onOlder} />
                   </If>
                 </>
@@ -353,10 +397,10 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
                   >
                     <Text class="text-center text-2xs leading-relaxed text-faint">{t("web.issue.board.emptyGuide.filtered")}</Text>
                   </If>
-                  <If when={props.lane === "todo" || props.showClear}>
+                  <If when={isOrderLane(props.lane) || props.showClear}>
                     <View class="flex-row flex-wrap items-center justify-center gap-1.5 pt-1">
-                      <If when={props.lane === "todo"}>
-                        <Button size="compact" icon="add" testID="issue-new" onPress={() => p().onNew()}>
+                      <If when={isOrderLane(props.lane)}>
+                        <Button size="compact" icon="add" testID={newButtonTestId()} onPress={() => p().onNew()}>
                           {t("web.issue.new.card")}
                         </Button>
                       </If>

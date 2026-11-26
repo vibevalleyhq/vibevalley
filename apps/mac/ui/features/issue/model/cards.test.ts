@@ -51,7 +51,7 @@ test("cardUrgencyTone maps user-blocking stages to wheat/berry and non-blocking 
   const issueCard = (state: IssueStageKind): BoardCard => ({
     kind: "issue",
     id: state,
-    lane: state === "reviewing" ? "waiting" : "working",
+    lane: state === "reviewing" ? "in_review" : "in_progress",
     issue: makeIssue(state, state),
     sessions: [dummySession],
     tag: "working",
@@ -67,9 +67,9 @@ test("cardUrgencyTone maps user-blocking stages to wheat/berry and non-blocking 
   expect(cardUrgencyTone(issueCard("canceled"))).toBeUndefined();
 
   expect(cardUrgencyTone({ kind: "todo", id: "t1", lane: "todo", issue: makeIssue("t1", "asking") })).toBeUndefined();
-  expect(cardUrgencyTone({ kind: "orchestrator", id: "o1", lane: "working", issue: makeIssue("o1", "working") })).toBeUndefined();
-  expect(cardUrgencyTone({ kind: "missing", id: "m1", lane: "working", issue: makeIssue("m1", "working"), missing: ["s1"] })).toBe("berry");
-  expect(cardUrgencyTone({ kind: "family", id: "f1", lane: "waiting", issue: makeIssue("f1", "reviewing"), children: [] })).toBe("wheat");
+  expect(cardUrgencyTone({ kind: "orchestrator", id: "o1", lane: "in_progress", issue: makeIssue("o1", "working") })).toBeUndefined();
+  expect(cardUrgencyTone({ kind: "missing", id: "m1", lane: "in_progress", issue: makeIssue("m1", "working"), missing: ["s1"] })).toBe("berry");
+  expect(cardUrgencyTone({ kind: "family", id: "f1", lane: "in_review", issue: makeIssue("f1", "reviewing"), children: [] })).toBe("wheat");
 });
 
 test("cardLook and issueState preserve full titles over 40 chars and quiet draft flags", () => {
@@ -82,7 +82,7 @@ test("cardLook and issueState preserve full titles over 40 chars and quiet draft
   const card: BoardCard = {
     kind: "issue",
     id: activeIssue.id,
-    lane: "working",
+    lane: "in_progress",
     issue: activeIssue,
     sessions: [dummySession],
     tag: "working",
@@ -123,22 +123,26 @@ test("historyKey tracks board seq and non-session issue status changes", () => {
   expect(historyKey(undefined, [])).toBe("");
 });
 
-test("cardMove allows dragging todo to closed and closed to todo (revive)", () => {
-  const todoCard: BoardCard = {
+test("cardMove allows dragging across all 6 status lanes while keeping backlog->todo dispatch as start", () => {
+  const backlogCard: BoardCard = {
     kind: "todo",
     id: "i-todo",
-    lane: "todo",
-    issue: { ...makeIssue("i-todo", "draft"), status: "backlog", moves: ["todo", "done", "canceled"] },
+    lane: "backlog",
+    issue: { ...makeIssue("i-todo", "draft"), status: "backlog", moves: ["todo", "in_progress", "in_review", "done", "canceled"] },
   };
-  expect(cardMove(todoCard, "closed")).toBe("close");
-  expect(cardMove(todoCard, "working")).toBe("start");
+  expect(cardMove(backlogCard, "done")).toBe("close");
+  expect(cardMove(backlogCard, "canceled")).toBe("close");
+  expect(cardMove(backlogCard, "todo")).toBe("start");
+  expect(cardMove(backlogCard, "in_progress")).toBe("track");
+  expect(cardMove(backlogCard, "in_review")).toBe("track");
 
-  const closedCard: BoardCard = {
+  const doneCard: BoardCard = {
     kind: "todo",
     id: "i-closed",
-    lane: "closed",
-    issue: { ...makeIssue("i-closed", "done"), status: "done", moves: ["backlog"] },
+    lane: "done",
+    issue: { ...makeIssue("i-closed", "done"), status: "done", moves: ["backlog", "todo", "in_progress", "in_review", "canceled"] },
   };
-  expect(cardMove(closedCard, "todo")).toBe("revive");
-  expect(cardMove(closedCard, "working")).toBeUndefined();
+  expect(cardMove(doneCard, "backlog")).toBe("revive");
+  expect(cardMove(doneCard, "in_progress")).toBe("track");
+  expect(cardMove(doneCard, "in_review")).toBe("track");
 });

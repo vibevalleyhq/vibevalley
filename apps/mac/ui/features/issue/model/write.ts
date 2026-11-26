@@ -26,6 +26,7 @@ export async function writeIssue(
   machineId = "",
   attachments?: readonly string[],
   tags?: readonly string[],
+  dates?: { startAt?: number | undefined; dueAt?: number | undefined },
 ): Promise<{ issue: Issue; refused: string }> {
   const words = text.trim();
   const made = await api.issue.create(
@@ -36,6 +37,8 @@ export async function writeIssue(
       machineId: machineId || undefined,
       attachments: attachments && attachments.length > 0 ? [...attachments] : undefined,
       tags: tags && tags.length > 0 ? [...tags] : undefined,
+      startAt: dates?.startAt,
+      dueAt: dates?.dueAt,
       requestKey,
     }),
   );

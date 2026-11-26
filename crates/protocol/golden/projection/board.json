@@ -1142,6 +1142,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -1490,6 +1494,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -1548,6 +1556,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -1894,6 +1906,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -1952,6 +1968,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -2016,6 +2036,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 3,
@@ -2348,6 +2372,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -2406,6 +2434,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -2470,6 +2502,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 3,
@@ -2520,6 +2556,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 4,
@@ -2853,6 +2893,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -2911,6 +2955,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -2975,6 +3023,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 3,
@@ -3025,6 +3077,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 4,
@@ -3075,6 +3131,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -3426,6 +3486,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -3484,6 +3548,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -3548,6 +3616,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 3,
@@ -3598,6 +3670,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 4,
@@ -3648,6 +3724,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -3717,6 +3797,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 6,
@@ -4037,6 +4121,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -4098,6 +4184,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -4156,6 +4246,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -4220,6 +4314,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 3,
@@ -4270,6 +4368,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 4,
@@ -4320,6 +4422,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -4389,6 +4495,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 6,
@@ -4709,6 +4819,8 @@
       },
       "moves": [
        "backlog",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -4756,6 +4868,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -4817,6 +4931,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -4875,6 +4993,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -4939,6 +5061,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 3,
@@ -4989,6 +5115,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 4,
@@ -5039,6 +5169,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -5108,6 +5242,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 6,
@@ -5430,7 +5568,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
       ],
       "number": 9,
       "priority": "high",
@@ -5475,6 +5617,8 @@
       },
       "moves": [
        "backlog",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -5522,6 +5666,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -5583,6 +5729,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -5641,6 +5791,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -5705,6 +5859,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 3,
@@ -5755,6 +5913,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 4,
@@ -5805,6 +5967,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -5874,6 +6040,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 6,
@@ -6196,7 +6366,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 10,
       "priority": "medium",
@@ -6243,7 +6417,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
       ],
       "number": 9,
       "priority": "high",
@@ -6288,6 +6466,8 @@
       },
       "moves": [
        "backlog",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -6335,6 +6515,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -6396,6 +6578,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -6454,6 +6640,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -6518,6 +6708,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 3,
@@ -6568,6 +6762,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 4,
@@ -6618,6 +6816,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -6687,6 +6889,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 6,
@@ -7015,7 +7221,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -7070,7 +7278,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 10,
       "priority": "medium",
@@ -7117,7 +7329,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
       ],
       "number": 9,
       "priority": "high",
@@ -7162,6 +7378,8 @@
       },
       "moves": [
        "backlog",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -7209,6 +7427,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -7270,6 +7490,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -7328,6 +7552,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -7392,6 +7620,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 3,
@@ -7442,6 +7674,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 4,
@@ -7492,6 +7728,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -7561,6 +7801,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 6,
@@ -7864,7 +8108,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -7919,7 +8165,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 10,
       "priority": "medium",
@@ -7966,7 +8216,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
       ],
       "number": 9,
       "priority": "high",
@@ -8011,6 +8265,8 @@
       },
       "moves": [
        "backlog",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -8058,6 +8314,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -8119,6 +8377,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -8177,7 +8439,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -8247,6 +8512,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 3,
@@ -8297,6 +8566,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 4,
@@ -8347,6 +8620,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -8416,6 +8693,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 6,
@@ -8716,7 +8997,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -8771,7 +9054,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 10,
       "priority": "medium",
@@ -8818,7 +9105,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
       ],
       "number": 9,
       "priority": "high",
@@ -8863,6 +9154,8 @@
       },
       "moves": [
        "backlog",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -8910,6 +9203,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -8971,6 +9266,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -9029,7 +9328,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -9099,7 +9401,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -9163,6 +9467,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 4,
@@ -9213,6 +9521,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -9282,6 +9594,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 6,
@@ -9607,7 +9923,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -9662,7 +9980,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 10,
       "priority": "medium",
@@ -9709,7 +10031,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
       ],
       "number": 9,
       "priority": "high",
@@ -9754,6 +10080,8 @@
       },
       "moves": [
        "backlog",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -9801,6 +10129,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -9862,6 +10192,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -9920,7 +10254,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -9990,7 +10327,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -10054,7 +10393,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -10123,6 +10464,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -10192,6 +10537,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 6,
@@ -10521,7 +10870,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -10576,7 +10927,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 10,
       "priority": "medium",
@@ -10623,7 +10978,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "canceled"
       ],
       "number": 9,
       "priority": "high",
@@ -10668,6 +11027,8 @@
       },
       "moves": [
        "backlog",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -10715,6 +11076,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -10776,6 +11139,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 1,
@@ -10834,7 +11201,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 2,
@@ -10904,7 +11274,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -10968,7 +11340,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -11037,6 +11411,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 5,
@@ -11106,7 +11484,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_review",
        "canceled"
       ],
       "number": 6,
@@ -11561,7 +11941,9 @@
       "strength": "explicit"
      },
      "moves": [
+      "backlog",
       "todo",
+      "in_progress",
       "done",
       "canceled"
      ],
@@ -11616,7 +11998,11 @@
       "strength": "explicit"
      },
      "moves": [
-      "backlog"
+      "backlog",
+      "todo",
+      "in_progress",
+      "in_review",
+      "done"
      ],
      "number": 10,
      "priority": "medium",
@@ -11663,7 +12049,11 @@
       "strength": "explicit"
      },
      "moves": [
-      "backlog"
+      "backlog",
+      "todo",
+      "in_progress",
+      "in_review",
+      "canceled"
      ],
      "number": 9,
      "priority": "high",
@@ -11708,6 +12098,8 @@
      },
      "moves": [
       "backlog",
+      "in_progress",
+      "in_review",
       "done",
       "canceled"
      ],
@@ -11755,6 +12147,8 @@
      },
      "moves": [
       "todo",
+      "in_progress",
+      "in_review",
       "done",
       "canceled"
      ],
@@ -11816,6 +12210,10 @@
       "strength": "explicit"
      },
      "moves": [
+      "backlog",
+      "todo",
+      "in_review",
+      "done",
       "canceled"
      ],
      "number": 1,
@@ -11874,7 +12272,10 @@
       "strength": "explicit"
      },
      "moves": [
+      "backlog",
       "todo",
+      "in_review",
+      "done",
       "canceled"
      ],
      "number": 2,
@@ -11944,7 +12345,9 @@
       "strength": "explicit"
      },
      "moves": [
+      "backlog",
       "todo",
+      "in_progress",
       "done",
       "canceled"
      ],
@@ -12008,7 +12411,9 @@
       "strength": "explicit"
      },
      "moves": [
+      "backlog",
       "todo",
+      "in_progress",
       "done",
       "canceled"
      ],
@@ -12077,6 +12482,10 @@
       "strength": "explicit"
      },
      "moves": [
+      "backlog",
+      "todo",
+      "in_review",
+      "done",
       "canceled"
      ],
      "number": 5,
@@ -12146,7 +12555,9 @@
       "strength": "explicit"
      },
      "moves": [
+      "backlog",
       "todo",
+      "in_review",
       "canceled"
      ],
      "number": 6,
