@@ -71,7 +71,9 @@
        "strength": "explicit"
       },
       "moves": [
-       "todo",
+       "backlog",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -81,23 +83,16 @@
       "stage": {
        "acts": [
         {
-         "act": "start",
-         "does": "move",
-         "status": "todo",
-         "words": "none"
-        },
-        {
          "act": "close",
          "does": "move",
          "status": "canceled",
          "words": "none"
         }
        ],
-       "lead": "start",
        "since": 1794455600000,
-       "state": "draft"
+       "state": "queued"
       },
-      "status": "backlog",
+      "status": "todo",
       "title": "Issue 20"
      }
     ],
@@ -218,7 +213,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -335,6 +332,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -426,6 +425,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 20,
@@ -528,7 +531,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 22,
       "parent": "i20",
@@ -612,7 +619,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -741,7 +750,9 @@
        "strength": "explicit"
       },
       "moves": [
-       "todo",
+       "backlog",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -751,23 +762,16 @@
       "stage": {
        "acts": [
         {
-         "act": "start",
-         "does": "move",
-         "status": "todo",
-         "words": "none"
-        },
-        {
          "act": "close",
          "does": "move",
          "status": "canceled",
          "words": "none"
         }
        ],
-       "lead": "start",
        "since": 1794433400000,
-       "state": "draft"
+       "state": "queued"
       },
-      "status": "backlog",
+      "status": "todo",
       "title": "Issue 30"
      },
      {
@@ -796,7 +800,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 22,
       "parent": "i20",
@@ -880,7 +888,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -1043,7 +1053,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -1102,7 +1114,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 22,
       "parent": "i20",
@@ -1186,7 +1202,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -1309,6 +1327,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 40,
@@ -1398,7 +1420,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -1457,7 +1481,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 22,
       "parent": "i20",
@@ -1541,7 +1569,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -1666,7 +1696,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_review",
        "canceled"
       ],
       "number": 41,
@@ -1717,6 +1749,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 40,
@@ -1806,7 +1842,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -1865,7 +1903,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 22,
       "parent": "i20",
@@ -1949,7 +1991,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -2066,6 +2110,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -2124,7 +2170,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_review",
        "canceled"
       ],
       "number": 41,
@@ -2175,6 +2223,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 40,
@@ -2264,7 +2316,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -2323,7 +2377,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 22,
       "parent": "i20",
@@ -2407,7 +2465,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -2524,6 +2584,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -2582,7 +2644,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_review",
        "canceled"
       ],
       "number": 41,
@@ -2633,6 +2697,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 40,
@@ -2722,7 +2790,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -2781,7 +2851,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 22,
       "parent": "i20",
@@ -2865,7 +2939,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -2928,6 +3004,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -3033,6 +3111,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -3091,7 +3171,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_review",
        "canceled"
       ],
       "number": 41,
@@ -3142,6 +3224,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 40,
@@ -3231,7 +3317,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -3290,7 +3378,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 22,
       "parent": "i20",
@@ -3374,7 +3466,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -3436,6 +3530,8 @@
        "strength": "explicit"
       },
       "moves": [
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -3542,6 +3638,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -3599,6 +3697,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 40,
@@ -3688,7 +3790,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -3747,7 +3851,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 22,
       "parent": "i20",
@@ -3831,7 +3939,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -3893,6 +4003,8 @@
        "strength": "explicit"
       },
       "moves": [
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -3999,6 +4111,8 @@
       },
       "moves": [
        "todo",
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -4056,6 +4170,10 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
+       "todo",
+       "in_review",
+       "done",
        "canceled"
       ],
       "number": 40,
@@ -4145,7 +4263,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -4204,7 +4324,11 @@
        "strength": "explicit"
       },
       "moves": [
-       "backlog"
+       "backlog",
+       "todo",
+       "in_progress",
+       "in_review",
+       "done"
       ],
       "number": 22,
       "parent": "i20",
@@ -4288,7 +4412,9 @@
        "strength": "explicit"
       },
       "moves": [
+       "backlog",
        "todo",
+       "in_progress",
        "done",
        "canceled"
       ],
@@ -4350,6 +4476,8 @@
        "strength": "explicit"
       },
       "moves": [
+       "in_progress",
+       "in_review",
        "done",
        "canceled"
       ],
@@ -4494,6 +4622,8 @@
      },
      "moves": [
       "todo",
+      "in_progress",
+      "in_review",
       "done",
       "canceled"
      ],
@@ -4551,6 +4681,10 @@
       "strength": "explicit"
      },
      "moves": [
+      "backlog",
+      "todo",
+      "in_review",
+      "done",
       "canceled"
      ],
      "number": 40,
@@ -4640,7 +4774,9 @@
       "strength": "explicit"
      },
      "moves": [
+      "backlog",
       "todo",
+      "in_progress",
       "done",
       "canceled"
      ],
@@ -4699,7 +4835,11 @@
       "strength": "explicit"
      },
      "moves": [
-      "backlog"
+      "backlog",
+      "todo",
+      "in_progress",
+      "in_review",
+      "done"
      ],
      "number": 22,
      "parent": "i20",
@@ -4783,7 +4923,9 @@
       "strength": "explicit"
      },
      "moves": [
+      "backlog",
       "todo",
+      "in_progress",
       "done",
       "canceled"
      ],
@@ -4845,6 +4987,8 @@
       "strength": "explicit"
      },
      "moves": [
+      "in_progress",
+      "in_review",
       "done",
       "canceled"
      ],

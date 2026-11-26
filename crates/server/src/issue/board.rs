@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
-use vibevalley_core::{Move, Refusal, status_move};
+use vibevalley_core::{Move, status_move};
 use vibevalley_protocol::{
     ApiError, AppliedIssue, Assignment, Attachment, BizCode, Deliverable, Issue, IssueCanceled, IssueConstraints, IssueStageKind as StageKind, IssueStatus,
     JsNumber, Landing, Priority, Run, RunTriggerKind, Session, SliceBundle, StuckReason,
@@ -504,7 +504,16 @@ impl Board {
                     self.send_async(&issue.id, None, RunTriggerKind::Issue).await?;
                 }
                 Move::Unqueue => {
-                    self.change_async(&issue.id, IssueChange::Unqueued).await?;
+                    if issue.queued_at.is_some() {
+                        self.change_async(&issue.id, IssueChange::Unqueued).await?;
+                    }
+                    if issue.status != IssueStatus::Backlog {
+                        let mut unqueued = self.stored_async(&issue.id).await?;
+                        unqueued.status = IssueStatus::Backlog;
+                        unqueued.queued_at = None;
+                        unqueued.reviewed_at = None;
+                        self.state.put_issues_async(&[unqueued]).await?;
+                    }
                 }
                 Move::Round | Move::Reopen => {
                     // Sending back what was handed in takes the user's findings;
@@ -521,11 +530,26 @@ impl Board {
                 }
                 Move::Revive => {
                     let mut revived = issue.clone();
+                    revived.status = IssueStatus::Backlog;
                     revived.closed_at = None;
                     revived.canceled = None;
                     revived.delivered = None;
                     revived.queued_at = None;
+                    revived.reviewed_at = None;
                     self.state.put_issues_async(&[revived]).await?;
+                }
+                Move::Track => {
+                    if let Some(s) = self.on_board_async(&issue).await {
+                        self.session_engine().dismiss_async(&s.id, Leave::KeepBranch).await?;
+                    }
+                    let mut tracked = issue.clone();
+                    tracked.status = to;
+                    tracked.queued_at = None;
+                    tracked.closed_at = None;
+                    tracked.delivered = None;
+                    tracked.canceled = None;
+                    tracked.reviewed_at = (to == IssueStatus::InReview).then(now);
+                    self.state.put_issues_async(&[tracked]).await?;
                 }
                 Move::Complete => self.complete_async(&issue).await?,
                 Move::Cancel | Move::Drop => {
@@ -567,7 +591,10 @@ impl Board {
             let _work = self.work.lock().await;
             let issue = self.stored_async(reference).await?;
             if issue.status.is_closed() {
-                return Err(BoardError::Refused(if issue.was_sent() { Refusal::Reopen } else { Refusal::Revive }));
+                return Err(BoardError::Api(ApiError::new(
+                    BizCode::IssueRefused,
+                    vibevalley_i18n::t("server.issue.closedReopen", &[]),
+                )));
             }
             if let Some(session) = self.on_board_async(&issue).await
                 && let Some(steered) = self.session_engine().steer_async(&session, words).await
@@ -613,7 +640,7 @@ impl Board {
             return Ok(());
         }
         if issue.status.is_closed() {
-            let e = BoardError::Refused(if issue.was_sent() { Refusal::Reopen } else { Refusal::Revive });
+            let e = BoardError::Api(ApiError::new(BizCode::IssueRefused, vibevalley_i18n::t("server.issue.closedReopen", &[])));
             let _ = sessions.settle_mailbox_async(mail_entry.id, false, Some(&e.to_string())).await;
             sessions.settle_words_async(&sub.id, false, Some(&e.to_string())).await?;
             return Err(e);
@@ -1079,6 +1106,11 @@ impl Board {
                 self.session_engine().dismiss_async(&r.session, Leave::Discard).await?;
             }
             let session = self.on_board_async(issue).await;
+            if let Some(s) = &session
+                && s.phase.is_working()
+            {
+                let _ = self.session_engine().abort_turn_async(&s.id).await;
+            }
             let all_issues = self.issues_async().await?;
             let has_merged_child = all_issues
                 .iter()

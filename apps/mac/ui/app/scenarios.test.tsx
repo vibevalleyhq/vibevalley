@@ -347,12 +347,12 @@ test("dense scenario stresses 65 issues (OlderLink fold), 80 messages, 10 crons,
     durationMs: 0,
   };
 
-  // Board shows folded closed column (< total 65 since 17 closed > closedShown 15), reconciles wide/narrow working count (17), and omits legacy concurrency slots badge.
+  // Board shows folded done column (< total 65 since 16 done > closedShown 15), reconciles wide/narrow in_progress count (17), and omits legacy concurrency slots badge.
   const denseBoard = fixture.state.board.boardSummary;
-  expect(denseBoard?.laneCounts.working).toBe(17);
+  expect(denseBoard?.laneCounts.inProgress).toBe(17);
   expect(denseBoard?.runningSlots).toBe(6);
   expect(denseBoard?.maxRunning).toBe(6);
-  expect(app.shows("id:lane-working >> text:17")).toBe(true);
+  expect(app.shows("id:lane-in_progress >> text:17")).toBe(true);
   expect(app.count("id:lane-working-slots")).toBe(0);
   const foldedCards = app.count("id:issue-card");
   expect(foldedCards).toBeGreaterThan(20);
@@ -369,7 +369,7 @@ test("dense scenario stresses 65 issues (OlderLink fold), 80 messages, 10 crons,
   await app.setColorScheme("dark");
   row.themes.push("dark");
   expect(app.count("id:issues-page")).toBe(1);
-  expect(app.shows("id:board-lane-tab-working >> text:17")).toBe(true);
+  expect(app.shows("id:board-lane-tab-in_progress >> text:17")).toBe(true);
   row.stepsPassed++;
 
   await app.setViewport(1280, 820);
@@ -465,22 +465,26 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
 
   const boardSummary = fixture.state.board.boardSummary;
   expect(boardSummary).toBeDefined();
-  expect(boardSummary?.laneCounts).toEqual({ todo: 3, working: 8, waiting: 4, closed: 9 });
+  expect(boardSummary?.laneCounts).toEqual({ backlog: 2, todo: 1, inProgress: 8, inReview: 4, done: 7, canceled: 2 });
   expect(boardSummary?.runningSlots).toBe(2);
   expect(boardSummary?.maxRunning).toBe(6);
   expect(app.count("id:issue-card")).toBe(fixture.state.board.issues.length);
-  expect(app.shows("id:lane-todo >> text:3")).toBe(true);
-  expect(app.shows("id:lane-working >> text:8")).toBe(true);
-  expect(app.shows("id:lane-waiting >> text:4")).toBe(true);
-  expect(app.shows("id:lane-closed >> text:9")).toBe(true);
+  expect(app.shows("id:lane-backlog >> text:2")).toBe(true);
+  expect(app.shows("id:lane-todo >> text:1")).toBe(true);
+  expect(app.shows("id:lane-in_progress >> text:8")).toBe(true);
+  expect(app.shows("id:lane-in_review >> text:4")).toBe(true);
+  expect(app.shows("id:lane-done >> text:7")).toBe(true);
+  expect(app.shows("id:lane-canceled >> text:2")).toBe(true);
   expect(app.count("id:lane-working-slots")).toBe(0);
 
   await app.setViewport(560, 800);
   row.viewports.push("560x800");
-  expect(app.shows("id:board-lane-tab-todo >> text:3")).toBe(true);
-  expect(app.shows("id:board-lane-tab-working >> text:8")).toBe(true);
-  expect(app.shows("id:board-lane-tab-waiting >> text:4")).toBe(true);
-  expect(app.shows("id:board-lane-tab-closed >> text:9")).toBe(true);
+  expect(app.shows("id:board-lane-tab-backlog >> text:2")).toBe(true);
+  expect(app.shows("id:board-lane-tab-todo >> text:1")).toBe(true);
+  expect(app.shows("id:board-lane-tab-in_progress >> text:8")).toBe(true);
+  expect(app.shows("id:board-lane-tab-in_review >> text:4")).toBe(true);
+  expect(app.shows("id:board-lane-tab-done >> text:7")).toBe(true);
+  expect(app.shows("id:board-lane-tab-canceled >> text:2")).toBe(true);
   await app.setViewport(1280, 820);
   row.stepsPassed++;
 

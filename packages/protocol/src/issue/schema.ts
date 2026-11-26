@@ -21,10 +21,12 @@ const IssueCardKind = z.enum(T.IssueCardKindValues) satisfies Codec<T.IssueCardK
 export const IssuePromptKind = z.enum(T.IssuePromptKindValues) satisfies Codec<T.IssuePromptKind>;
 
 export const BoardLaneCounts = z.object({
+  backlog: z.number(),
   todo: z.number(),
-  working: z.number(),
-  waiting: z.number(),
-  closed: z.number(),
+  inProgress: z.number(),
+  inReview: z.number(),
+  done: z.number(),
+  canceled: z.number(),
 }) satisfies Codec<T.BoardLaneCounts>;
 
 export const BoardIssueSummary = z.object({

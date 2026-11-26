@@ -1,4 +1,4 @@
-import { computed, keymap, signal, Text, View } from "nsh";
+import { computed, signal, Text, View } from "nsh";
 import { Input, Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -17,17 +17,15 @@ import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { ConfirmButton } from "../../../design/ConfirmButton";
-import { TextArea, TextInput } from "../../../design/Field";
+import { TextArea } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { Markdown } from "../../../design/Markdown";
-import { CountPill } from "../../../design/Tag";
-import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
 import { useWorkAgents } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { ago, shortMomentText } from "../../../infra/base/format";
-import { ready, useQueryClient, useRepos } from "../../../infra/query";
+import { ready, useRepos } from "../../../infra/query";
 import { createEffect, createSignal, untrack } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { rememberPick } from "../../../infra/state/prefs";
@@ -40,7 +38,8 @@ import { IssueAttachments } from "./IssueAttachments";
 import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { IssueThread } from "./IssueThread";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
-import { IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
+import { IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, StagePill, Stages } from "./Sheet";
+import { criteriaList, NewRepoPopoverBody, TodoCriteriaSection, TodoTitle, toggleCriterionLine } from "./TodoSections";
 
 interface Draft {
   title: string;
@@ -72,12 +71,6 @@ const draftOf = (i: Issue): Draft => ({
   dueAt: i.dueAt,
 });
 
-const criteriaList = (text: string) =>
-  text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-
 /** Moved to todo: it is either worked already, or waits there for room. */
 export const dispatchedNotice = (open: (id: string | undefined) => void) => (got: Issue) => {
   if (got.status === "todo") toast(t("web.issue.todo.queued"));
@@ -97,7 +90,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const word = signal("");
   const newRepo = signal(false);
   const editingDesc = signal(false);
-  const editingCriteria = signal(false);
   const refineOpen = signal(false);
   const agents = useWorkAgents(true);
   const allIssues = useIssues();
@@ -163,8 +155,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
 
   const liveStatus = computed(() => movedIssue(props.item, moves.list()).status);
   const backlog = () => liveStatus() === "backlog";
+  const inProgress = () => liveStatus() === "in_progress";
+  const inReview = () => liveStatus() === "in_review";
   const closed = () => liveStatus() === "done" || liveStatus() === "canceled";
-  const todoStatuses: readonly IssueStatus[] = ["backlog", "todo", "done", "canceled"];
+  const todoStatuses: readonly IssueStatus[] = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"];
   const todoStatusLabel = (status: IssueStatus): string => {
     if (status === "backlog") return t("web.issue.todo.draftStatus");
     if (status === "todo") return t("web.issue.todo.todoStatus");
@@ -221,13 +215,13 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     const id = props.item.id;
     return sendMove(moves, { id, status: "backlog" }).done;
   };
-  const markStatus = (status: "done" | "canceled" | "backlog") => {
+  const markStatus = (status: IssueStatus) => {
     const id = props.item.id;
     const pendingEdit = status === "done" ? unsaved() : undefined;
     return sendMove(moves, {
       id,
       status,
-      lane: status === "backlog" ? "todo" : "closed",
+      lane: status,
       ...(pendingEdit ? { edit: pendingEdit } : {}),
     }).done.then((done) => {
       if (done?.replied && pendingEdit) saved(done.replied.reply);
@@ -235,7 +229,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   };
   const changeStatus = (next: IssueStatus) => {
     if (next === liveStatus()) return;
-    if (next === "todo") {
+    if (next === "todo" && liveStatus() === "backlog") {
       if (!d().agent || !d().repo) {
         toast(t("web.issue.page.pickFirst"));
         return;
@@ -243,8 +237,19 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       void start();
       return;
     }
-    if (next === "backlog" || next === "done" || next === "canceled") {
-      void markStatus(next);
+    void markStatus(next);
+  };
+  const toggleCriterion = async (index: number) => {
+    if (closed() || busy()) return;
+    const current = criteria();
+    if (index < 0 || index >= current.length) return;
+    const nextLines = current.map((line, idx) => (idx === index ? toggleCriterionLine(line) : line));
+    const prevRaw = form().draft.criteria;
+    const nextRaw = nextLines.join("\n");
+    setForm((cur) => ({ ...cur, draft: { ...cur.draft, criteria: nextRaw } }));
+    const ok = await act.run(() => api.issue.update({ id: props.item.id, criteria: nextLines }));
+    if (ok === undefined) {
+      setForm((cur) => (cur.draft.criteria === nextRaw ? { ...cur, draft: { ...cur.draft, criteria: prevRaw } } : cur));
     }
   };
   const remove = () => {
@@ -289,7 +294,25 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         </If>
         <IssueNumberPill number={props.item.number} />
       </View>
-      <If when={backlog()}>
+      <If
+        when={backlog()}
+        else={
+          <View testID="todo-stage-pill" class="mb-3 flex-row items-center gap-2">
+            <StagePill
+              tone={inReview() ? "wheat" : inProgress() ? "water" : liveStatus() === "done" ? "leaf" : "muted"}
+              label={
+                inReview()
+                  ? t("shared.stage.reviewing")
+                  : inProgress()
+                    ? t("shared.status.in_progress")
+                    : liveStatus() === "todo"
+                      ? t("web.issue.todo.todoStatus")
+                      : t(`shared.status.${liveStatus()}`)
+              }
+            />
+          </View>
+        }
+      >
         <View class="mb-4">
           <Stages at="talk" />
         </View>
@@ -406,6 +429,21 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         }
       >
         <View>
+          <If when={inReview()}>
+            <View
+              testID="todo-review-banner"
+              class="mb-5 flex-row flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3"
+              style={{ borderColor: mix("wheat", 0.35), backgroundColor: mix("wheat", 0.08) }}
+            >
+              <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                <Icon name="check" size={15} tone="wheat" />
+                <Text class="min-w-0 flex-1 text-sm font-semibold text-ink">{t("shared.stage.reviewing")}</Text>
+              </View>
+              <Button tone="primary" icon="check" testID="todo-accept" disabled={busy()} onPress={() => void markStatus("done")}>
+                {t("web.issue.todo.accept")}
+              </Button>
+            </View>
+          </If>
           <If
             when={editingDesc()}
             else={
@@ -452,67 +490,14 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           </If>
         </View>
 
-        <View class="mt-5">
-          <If
-            when={editingCriteria()}
-            else={
-              <If
-                when={criteria().length > 0}
-                else={
-                  <If when={!closed()}>
-                    <Button size="compact" tone="quiet" icon="add" testID="issue-edit-criteria" class="self-start" onPress={() => editingCriteria.set(true)}>
-                      {t("web.issue.todo.addCriteria")}
-                    </Button>
-                  </If>
-                }
-              >
-                <View testID="issue-criteria-preview">
-                  <View class="mb-2 flex-row items-center justify-between gap-2">
-                    <View class="flex-row items-center gap-1.5">
-                      <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.criteria")}</Text>
-                      <CountPill count={criteria().length} />
-                    </View>
-                    <If when={!closed()}>
-                      <Button size="compact" tone="quiet" icon="edit" testID="issue-edit-criteria" onPress={() => editingCriteria.set(true)}>
-                        {t("web.issue.todo.edit")}
-                      </Button>
-                    </If>
-                  </View>
-                  <View class="overflow-hidden rounded-lg border border-line bg-page">
-                    <Each of={criteria()} key="index">
-                      {(c, i) => (
-                        <View
-                          testID="todo-criterion"
-                          class={`flex-row items-start gap-2.5 px-3.5 py-2.5 ${i() < criteria().length - 1 ? "border-b" : ""}`}
-                          style={i() < criteria().length - 1 ? { borderColor: mix("line", 0.55) } : undefined}
-                        >
-                          <View class="mt-1 h-3 w-3 shrink-0 rounded-full border border-idle" />
-                          <Text class="min-w-0 flex-1 text-sm leading-snug text-ink">{c()}</Text>
-                        </View>
-                      )}
-                    </Each>
-                  </View>
-                </View>
-              </If>
-            }
-          >
-            <View class="mb-2 flex-row items-center justify-between gap-2">
-              <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.criteria")}</Text>
-              <Button size="compact" tone="quiet" icon="check" testID="issue-edit-criteria-done" onPress={() => editingCriteria.set(false)}>
-                {t("web.issue.todo.doneEditing")}
-              </Button>
-            </View>
-            <TextArea
-              testID="issue-criteria-input"
-              autoFocus
-              rows={3}
-              value={d().criteria}
-              onInput={(v) => edit({ criteria: v })}
-              placeholder={t("web.issue.todo.criteriaHint")}
-              accessibilityLabel={t("web.issue.todo.criteria")}
-            />
-          </If>
-        </View>
+        <TodoCriteriaSection
+          value={d().criteria}
+          criteria={criteria()}
+          editable={!closed()}
+          busy={busy()}
+          onInput={(v) => edit({ criteria: v })}
+          onToggle={(index) => void toggleCriterion(index)}
+        />
         {talk()}
       </If>
       <IssueAttachments files={d().attachments} editable={!closed()} busy={busy()} onAdd={addAttachment} onRemove={removeAttachment} />
@@ -705,9 +690,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
                 {t("web.issue.todo.markReady")}
               </Button>
             </If>
-            <Button size="compact" tone="plain" icon="check" testID="todo-mark-done" disabled={busy()} onPress={() => void markStatus("done")}>
-              {t("web.issue.todo.markDone")}
-            </Button>
+            <If
+              when={inReview()}
+              else={
+                <Button size="compact" tone="plain" icon="check" testID="todo-mark-done" disabled={busy()} onPress={() => void markStatus("done")}>
+                  {t("web.issue.todo.markDone")}
+                </Button>
+              }
+            >
+              <Button size="compact" tone="primary" icon="check" testID="todo-accept-side" disabled={busy()} onPress={() => void markStatus("done")}>
+                {t("web.issue.todo.accept")}
+              </Button>
+            </If>
             <Button size="compact" tone="danger" testID="todo-mark-canceled" disabled={busy()} onPress={() => void markStatus("canceled")}>
               {t("web.issue.todo.markCanceled")}
             </Button>
@@ -720,109 +714,4 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     </>
   );
   return <IssueSheet heading={heading} main={main} side={side} />;
-}
-
-/** Preview-first wrapping draft title: click toggles inline multiline input; Return/blur commits, Escape cancels. */
-function TodoTitle(props: { value: string; editable: boolean; onCommit: (title: string) => void }) {
-  const editing = signal(false);
-  let typed = "";
-  const finish = (keep: boolean) => {
-    if (!editing()) return;
-    editing.set(false);
-    const next = typed.replace(/[\r\n]+/gu, " ").trim();
-    if (keep && next !== "" && next !== props.value) props.onCommit(next);
-  };
-  return (
-    <If
-      when={editing()}
-      else={
-        <If
-          when={props.editable}
-          else={
-            <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
-              {props.value}
-            </Text>
-          }
-        >
-          <View
-            role="button"
-            testID="issue-title-trigger"
-            accessibilityLabel={t("web.issue.detail.rename")}
-            tooltip={<Bubble text={t("web.issue.detail.rename")} />}
-            onPress={() => {
-              typed = props.value;
-              editing.set(true);
-            }}
-            class="-mx-1 max-w-full self-start rounded-sm px-1 hover:bg-hover"
-          >
-            <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
-              {props.value || t("web.issue.todo.titleHint")}
-            </Text>
-          </View>
-        </If>
-      }
-    >
-      <TodoTitleInput initial={props.value} onInput={(v) => (typed = v)} onFinish={finish} />
-    </If>
-  );
-}
-
-function TodoTitleInput(props: { initial: string; onInput: (v: string) => void; onFinish: (keep: boolean) => void }) {
-  const draft = signal(untrack(() => props.initial));
-  keymap.bind("escape", () => props.onFinish(false), { when: "always" });
-  return (
-    <Input
-      multiline
-      submitBehavior="submit"
-      autoFocus
-      testID="issue-title-input"
-      value={draft()}
-      onChange={(e) => {
-        const clean = e.value.replace(/[\r\n]+/gu, " ");
-        draft.set(clean);
-        props.onInput(clean);
-      }}
-      onSubmit={() => props.onFinish(true)}
-      onBlur={() => props.onFinish(true)}
-      placeholder={t("web.issue.todo.titleHint")}
-      accessibilityLabel={t("web.issue.todo.title")}
-      class="-mx-2 w-full rounded-md border border-focus bg-page px-2 py-1 text-2xl leading-snug font-semibold text-ink placeholder:text-faint"
-    />
-  );
-}
-
-function NewRepoPopoverBody(props: { onClose: () => void; onMade: (name: string) => void }) {
-  const queries = useQueryClient();
-  const name = signal("");
-  const act = createAct();
-  const canCreate = computed(() => Boolean(name().trim()) && !act.busy());
-  const make = async () => {
-    const wanted = name().trim();
-    if (!wanted) return;
-    const made = await act.run(() => api.repo.create({ name: wanted }));
-    if (!made) return;
-    await queries.invalidate({ prefix: ["repos"] });
-    props.onMade(made.name);
-  };
-  return (
-    <View testID="new-repo-dialog" class="gap-2.5">
-      <Text class="text-xs font-semibold text-ink">{t("web.issue.todo.newRepo")}</Text>
-      <TextInput
-        autoFocus
-        value={name()}
-        onInput={(v) => name.set(v)}
-        onSubmit={() => void make()}
-        placeholder={t("web.issue.todo.repoHint")}
-        accessibilityLabel={t("web.issue.todo.repoName")}
-      />
-      <View class="flex-row justify-end gap-1.5">
-        <Button size="compact" tone="quiet" onPress={() => props.onClose()}>
-          {t("web.issue.never")}
-        </Button>
-        <Button size="compact" tone="primary" disabled={!canCreate()} onPress={() => void make()}>
-          {t("web.issue.todo.create")}
-        </Button>
-      </View>
-    </View>
-  );
 }

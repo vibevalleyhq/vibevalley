@@ -1359,20 +1359,26 @@ export const catalogs = {
         earlier: "更早的 {n} 张",
         recent: "只看最近的",
         empty: {
-          todo: "想到要做的先写在这里，拖到「进行中」就派人开工；上下拖排先后。",
-          working: "暂无进行中的工单。",
-          waiting: "做完的、没做成的在这里待验收；拖到「已完成」完成或取消。",
-          closed: "已完成、已取消的工单；拖回「进行中」重开。",
+          backlog: "需求池里的工单：先理清需求，再拖到「待办」派发开工；上下拖排先后。",
+          todo: "待办工单：选好仓库和角色即可开工，拖到「进行中」直接跟踪进度。",
+          in_progress: "进行中的工单（自动执行或手动跟踪）。",
+          in_review: "待验收的工单：确认改动与标准后一键验收通过或完成。",
+          done: "已完成的工单；可随时拖回其他列重开或继续。",
+          canceled: "已废弃的工单；需要时可拖回恢复。",
         },
         emptyGuide: {
+          backlogTitle: "需求池还是空的",
+          backlogBody: "先把想法记入需求池，慢慢完善说明和验收标准。",
           todoTitle: "待办还是空的",
-          todoBody: "记下要做的工单，选好仓库和角色就能派发开工。",
-          workingTitle: "暂无进行中工单",
-          workingBody: "给待办工单选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
-          waitingTitle: "暂无待验收改动",
-          waitingBody: "执行会话跑完一轮或有疑问时会停在这里，方便看改动、回复或完成交付。",
-          closedTitle: "还没有已完成工单",
-          closedBody: "已完成或取消的工单会留在这里，拖回「进行中」即可随时重开。",
+          todoBody: "选好仓库和角色就能派发，或由外部 Agent 认领推进。",
+          in_progressTitle: "暂无进行中工单",
+          in_progressBody: "把工单拖到这里开始跟踪或派发独立 worktree 会话。",
+          in_reviewTitle: "暂无待验收改动",
+          in_reviewBody: "执行会话跑完或外部推进到这里，方便看改动、勾选标准与验收通过。",
+          doneTitle: "还没有已完成工单",
+          doneBody: "已完成的工单会留在这里，也可随时拖回其他状态。",
+          canceledTitle: "没有已废弃工单",
+          canceledBody: "暂不推进或取消的工单会归档在这里，拖回即可恢复。",
           filtered: "当前筛选条件下此列没有工单。",
         },
         whichLane: "看哪一列",
@@ -1602,15 +1608,17 @@ export const catalogs = {
         polish: "让角色再润色",
         markReady: "标为待开发",
         markDone: "标为已完成",
+        accept: "验收通过",
         markCanceled: "废弃",
         revive: "恢复到需求池",
+        criterionToggle: "切换验收标准「{criterion}」",
       },
       peek: { expand: "展开全屏", close: "关闭预览", compareBadge: "对比" },
       boardLabels: {
         view: { board: "看板", list: "列表", timeline: "甘特图", calendar: "日历" },
         grouping: { status: "状态", repo: "仓库", agent: "角色", none: "不分组" },
         ordering: { manual: "默认", priority: "优先级", updated: "最近更新", created: "创建时间" },
-        lane: { todo: "待办", working: "进行中", waiting: "待验收", closed: "已完成" },
+        lane: { backlog: "需求池", todo: "待办", in_progress: "进行中", in_review: "待验收", done: "已完成", canceled: "已废弃" },
         stage: { talk: "聊清楚", work: "安排活", finish: "完成" },
         newIssue: "新工单",
       },
@@ -4848,20 +4856,26 @@ export const catalogs = {
         earlier: "{n} earlier",
         recent: "Recent only",
         empty: {
-          todo: "Write down what you want done here; drag it to In Progress to start someone on it, up and down to order it.",
-          working: "Nothing in progress.",
-          waiting: "Completed rounds or questions wait here in review; drag to Done to complete or cancel.",
-          closed: "Completed and canceled tickets; drag one back to In Progress to reopen it.",
+          backlog: "Write ideas down here first; drag to Todo when ready to dispatch, or up and down to order.",
+          todo: "Ready to start: pick a repo and helper to dispatch, or drag to In Progress.",
+          in_progress: "Nothing in progress.",
+          in_review: "Completed rounds or tracked reviews wait here; inspect and accept to Done.",
+          done: "Completed tickets; drag back to any column anytime.",
+          canceled: "Discarded tickets; drag back to restore.",
         },
         emptyGuide: {
+          backlogTitle: "Backlog is empty",
+          backlogBody: "Capture ideas here and refine descriptions and criteria before dispatching.",
           todoTitle: "No to-dos yet",
           todoBody: "Jot down a ticket, pick a repo and helper, and dispatch it.",
-          workingTitle: "Nothing in progress",
-          workingBody: "Assign a helper and dispatch a Todo ticket, or drag it here to start a worktree session.",
-          waitingTitle: "Nothing in review",
-          waitingBody: "Completed rounds and helper questions appear here so you can inspect changes and merge.",
-          closedTitle: "No done tickets yet",
-          closedBody: "Completed and canceled tickets stay here; drag one back to In Progress to reopen.",
+          in_progressTitle: "Nothing in progress",
+          in_progressBody: "Drag a ticket here to track work or dispatch a worktree session.",
+          in_reviewTitle: "Nothing in review",
+          in_reviewBody: "Completed work appears here so you can inspect changes, check criteria, and accept.",
+          doneTitle: "No done tickets yet",
+          doneBody: "Completed tickets stay here; drag one back anytime.",
+          canceledTitle: "No canceled tickets",
+          canceledBody: "Discarded tickets stay here; drag one back to restore.",
           filtered: "No matching tickets in this column.",
         },
         whichLane: "Which column",
@@ -5093,15 +5107,17 @@ export const catalogs = {
         polish: "Refine with helper",
         markReady: "Mark as Todo",
         markDone: "Mark as Done",
+        accept: "Accept",
         markCanceled: "Discard",
         revive: "Restore to Backlog",
+        criterionToggle: 'Toggle criterion "{criterion}"',
       },
       peek: { expand: "Open full screen", close: "Close preview", compareBadge: "Compare" },
       boardLabels: {
         view: { board: "Board", list: "List", timeline: "Timeline", calendar: "Calendar" },
         grouping: { status: "Status", repo: "Repo", agent: "Helper", none: "No grouping" },
         ordering: { manual: "Default", priority: "Priority", updated: "Last updated", created: "Created" },
-        lane: { todo: "Todo", working: "In Progress", waiting: "In Review", closed: "Done" },
+        lane: { backlog: "Backlog", todo: "Todo", in_progress: "In Progress", in_review: "In Review", done: "Done", canceled: "Canceled" },
         stage: { talk: "Talk it through", work: "Get it worked", finish: "Finish" },
         newIssue: "New ticket",
       },
@@ -8389,19 +8405,25 @@ export interface Messages {
   "web.issue.attachments.uploadFailed": { readonly why: string | number };
   "web.issue.attachments.uploading": { readonly name: string | number };
   "web.issue.board.earlier": { readonly n: string | number };
-  "web.issue.board.empty.closed": undefined;
+  "web.issue.board.empty.backlog": undefined;
+  "web.issue.board.empty.canceled": undefined;
+  "web.issue.board.empty.done": undefined;
+  "web.issue.board.empty.in_progress": undefined;
+  "web.issue.board.empty.in_review": undefined;
   "web.issue.board.empty.todo": undefined;
-  "web.issue.board.empty.waiting": undefined;
-  "web.issue.board.empty.working": undefined;
-  "web.issue.board.emptyGuide.closedBody": undefined;
-  "web.issue.board.emptyGuide.closedTitle": undefined;
+  "web.issue.board.emptyGuide.backlogBody": undefined;
+  "web.issue.board.emptyGuide.backlogTitle": undefined;
+  "web.issue.board.emptyGuide.canceledBody": undefined;
+  "web.issue.board.emptyGuide.canceledTitle": undefined;
+  "web.issue.board.emptyGuide.doneBody": undefined;
+  "web.issue.board.emptyGuide.doneTitle": undefined;
   "web.issue.board.emptyGuide.filtered": undefined;
+  "web.issue.board.emptyGuide.in_progressBody": undefined;
+  "web.issue.board.emptyGuide.in_progressTitle": undefined;
+  "web.issue.board.emptyGuide.in_reviewBody": undefined;
+  "web.issue.board.emptyGuide.in_reviewTitle": undefined;
   "web.issue.board.emptyGuide.todoBody": undefined;
   "web.issue.board.emptyGuide.todoTitle": undefined;
-  "web.issue.board.emptyGuide.waitingBody": undefined;
-  "web.issue.board.emptyGuide.waitingTitle": undefined;
-  "web.issue.board.emptyGuide.workingBody": undefined;
-  "web.issue.board.emptyGuide.workingTitle": undefined;
   "web.issue.board.moveFailed": undefined;
   "web.issue.board.putBack": undefined;
   "web.issue.board.recent": undefined;
@@ -8411,10 +8433,12 @@ export interface Messages {
   "web.issue.boardLabels.grouping.none": undefined;
   "web.issue.boardLabels.grouping.repo": undefined;
   "web.issue.boardLabels.grouping.status": undefined;
-  "web.issue.boardLabels.lane.closed": undefined;
+  "web.issue.boardLabels.lane.backlog": undefined;
+  "web.issue.boardLabels.lane.canceled": undefined;
+  "web.issue.boardLabels.lane.done": undefined;
+  "web.issue.boardLabels.lane.in_progress": undefined;
+  "web.issue.boardLabels.lane.in_review": undefined;
   "web.issue.boardLabels.lane.todo": undefined;
-  "web.issue.boardLabels.lane.waiting": undefined;
-  "web.issue.boardLabels.lane.working": undefined;
   "web.issue.boardLabels.newIssue": undefined;
   "web.issue.boardLabels.ordering.created": undefined;
   "web.issue.boardLabels.ordering.manual": undefined;
@@ -8738,6 +8762,7 @@ export interface Messages {
   "web.issue.timeline.weekday.thu": undefined;
   "web.issue.timeline.weekday.tue": undefined;
   "web.issue.timeline.weekday.wed": undefined;
+  "web.issue.todo.accept": undefined;
   "web.issue.todo.addCriteria": undefined;
   "web.issue.todo.addDescription": undefined;
   "web.issue.todo.againHint": undefined;
@@ -8746,6 +8771,7 @@ export interface Messages {
   "web.issue.todo.create": undefined;
   "web.issue.todo.criteria": undefined;
   "web.issue.todo.criteriaHint": undefined;
+  "web.issue.todo.criterionToggle": { readonly criterion: string | number };
   "web.issue.todo.description": undefined;
   "web.issue.todo.descriptionHint": undefined;
   "web.issue.todo.doneEditing": undefined;

@@ -67,15 +67,22 @@ export function IssuesPage(props: { rest: string }) {
   const refreshing = signal(false);
   let refreshToken = 0;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-  cleanup(() => {
-    if (refreshTimer !== undefined) clearTimeout(refreshTimer);
-  });
-  const refreshIssues = () => {
-    const token = ++refreshToken;
+  let resolveMinWait: (() => void) | undefined;
+  const finishMinWait = () => {
     if (refreshTimer !== undefined) {
       clearTimeout(refreshTimer);
       refreshTimer = undefined;
     }
+    if (resolveMinWait !== undefined) {
+      const done = resolveMinWait;
+      resolveMinWait = undefined;
+      done();
+    }
+  };
+  cleanup(finishMinWait);
+  const refreshIssues = () => {
+    const token = ++refreshToken;
+    finishMinWait();
     refreshing.set(true);
     refreshBoard();
     const minWait = new Promise<void>((resolve) => {
@@ -84,8 +91,10 @@ export function IssuesPage(props: { rest: string }) {
         resolve();
         return;
       }
+      resolveMinWait = resolve;
       refreshTimer = setTimeout(() => {
         refreshTimer = undefined;
+        resolveMinWait = undefined;
         resolve();
       }, ms);
     });
@@ -184,9 +193,9 @@ export function IssuesPage(props: { rest: string }) {
     await act.run(() => api.issue.update(omitUndefined({ id: c.id, before })));
   };
 
-  /** Asked about first where it cannot be undone. A todo dropped back on its own lane goes last. */
+  /** Asked about first where it cannot be undone. A backlog/todo dropped back on its own lane goes last. */
   const drop = async (c: BoardCard, to: Lane) => {
-    if (c.kind === "todo" && to === "todo") return place(c, undefined);
+    if (c.kind === "todo" && (c.lane === "backlog" || c.lane === "todo") && to === c.lane) return place(c, undefined);
     const move = cardMove(c, to);
     if (move === "start" && (c.kind === "todo" || c.kind === "family")) {
       if (!assignedAgentOf(c.issue) || !c.issue.repo) {
@@ -195,9 +204,11 @@ export function IssuesPage(props: { rest: string }) {
       }
       const done = await sendMove(moves, { id: c.id, status: "todo", lane: to }).done;
       if (done?.replied) notice(done.replied.reply);
+    } else if (move === "track") {
+      await sendMove(moves, { id: c.id, status: to, lane: to }).done;
     } else if (move === "close" && c.kind === "todo") {
-      await sendMove(moves, { id: c.id, status: c.issue.moves.includes("done") ? "done" : "canceled", lane: to }).done;
-    } else if (move === "revive" && (c.kind === "todo" || c.kind === "family")) {
+      await sendMove(moves, { id: c.id, status: to, lane: to }).done;
+    } else if (move === "revive") {
       await sendMove(moves, { id: c.id, status: "backlog", lane: to }).done;
     } else if (move === "close" && c.kind === "issue" && c.session) closing.set({ issue: c.issue, session: c.session, review: false, lane: to });
     else if (move === "close" && c.kind === "family") closing.set({ issue: c.issue, session: undefined, review: false, lane: to });
@@ -241,19 +252,13 @@ export function IssuesPage(props: { rest: string }) {
     { when: "notEditing" },
   );
   const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
-    const made = await act.run(() => writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? "", where.attachments, where.tags));
+    const made = await act.run(() =>
+      writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? "", where.attachments, where.tags, {
+        startAt: where.startAt,
+        dueAt: where.dueAt,
+      }),
+    );
     if (!made) return false;
-    if (where.startAt !== undefined || where.dueAt !== undefined) {
-      await act.run(() =>
-        api.issue.update(
-          omitUndefined({
-            id: made.issue.id,
-            startAt: where.startAt,
-            dueAt: where.dueAt,
-          }),
-        ),
-      );
-    }
     rememberPick(where.agent ?? "", where.repo ?? "");
     if (made.refused) toast(t("web.issue.page.notDrafted", { why: made.refused }));
     return true;

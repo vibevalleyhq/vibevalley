@@ -153,8 +153,8 @@ function closedAt(c: BoardCard) {
   }
 }
 
-/** A lane's cards in the order the user picked; the closed lane by default newest closed first. */
+/** A lane's cards in the order the user picked; done and canceled by default newest closed first. */
 export function laneOrder(lane: Lane, cards: BoardCard[], ordering: Ordering) {
-  if (lane === "closed" && ordering === "manual") return [...cards].toSorted((a, b) => closedAt(b) - closedAt(a));
+  if ((lane === "done" || lane === "canceled") && ordering === "manual") return [...cards].toSorted((a, b) => closedAt(b) - closedAt(a));
   return orderRows(cards, ordering, rowKeys);
 }

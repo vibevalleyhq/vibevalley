@@ -102,6 +102,7 @@ pub fn next_steps(item: &Issue) -> Vec<Next> {
 /// A move settled before anything changes (`settledMove`).
 struct Settled {
     mv: Move,
+    to: IssueStatus,
     said: String,
 }
 
@@ -117,7 +118,7 @@ fn settle(item: &Issue, to: IssueStatus, text: &str) -> Result<Settled, ApiError
     if mv == Move::Complete && item.was_sent() && item.deliver == vibevalley_protocol::Deliverable::PullRequest && item.pull_request.is_none() {
         return Err(refused("server.issue.deliveryNeedsPr", &[]));
     }
-    Ok(Settled { mv, said })
+    Ok(Settled { mv, to, said })
 }
 
 async fn helper_name_async(board: &Board, item: &Issue) -> String {
@@ -214,6 +215,10 @@ async fn move_lines_async(board: &Board, item: &Issue, s: &Settled, name: Option
             out
         }
         Move::Revive => vec![t("server.issue.does.revive", &[("n", n.into())])],
+        Move::Track => vec![t(
+            "server.issue.move.moveTo",
+            &[("status", t(&format!("shared.status.{}", s.to.as_str()), &[]).into())],
+        )],
         Move::Complete => {
             if !item.was_sent() && board.on_board_async(item).await.is_none() {
                 return vec![t("server.issue.does.completeNone", &[("n", n.into())])];
@@ -704,6 +709,7 @@ impl Board {
                 if item.status == IssueStatus::Todo {
                     let settled = Settled {
                         mv: Move::Start,
+                        to: IssueStatus::Todo,
                         said: input.text.as_deref().unwrap_or("").trim().to_string(),
                     };
                     return Ok(Preview {

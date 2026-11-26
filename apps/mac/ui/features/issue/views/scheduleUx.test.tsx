@@ -185,9 +185,9 @@ test("IssuesPage supports Timeline (Gantt) and Calendar views with scale switchi
   await app.type("id:issue-new-text", "Calendar scheduled issue");
   await app.press("id:issue-new-keep");
   await fake.pumpUntil(app, () => app.count("id:issue-new-dialog") === 0);
-  const dateUpdate = fake.calls.findLast((c) => c.op === "issue.update");
-  expect(dateUpdate?.payload).toMatchObject({
-    id: "i-created-cal",
+  const dateCreate = fake.calls.findLast((c) => c.op === "issue.create");
+  expect(dateCreate?.payload).toMatchObject({
+    title: "Calendar scheduled issue",
     startAt: Date.UTC(2026, 10, 26),
     dueAt: Date.UTC(2026, 10, 26),
   });

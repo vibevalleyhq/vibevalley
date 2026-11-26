@@ -84,7 +84,7 @@ fn stuck(reason: StuckReason, since: Option<i64>, lead: IssueAct, acts: Vec<Issu
 
 /// `issueStageOf`: `session` is the issue's newest one, `None` while none
 /// is on the farm.
-fn issue_stage_of(t: &Issue, session: Option<&Session>) -> IssueStage {
+fn issue_stage_of(t: &Issue, session: Option<&Session>, has_children: bool) -> IssueStage {
     use IssueAct as A;
     use IssueStageKind as K;
     let last = session.and_then(|s| s.last_run.as_ref());
@@ -138,7 +138,7 @@ fn issue_stage_of(t: &Issue, session: Option<&Session>) -> IssueStage {
             }
             let mut in_review = t.clone();
             in_review.status = IssueStatus::InReview;
-            issue_stage_of(&in_review, session)
+            issue_stage_of(&in_review, session, has_children)
         }
         IssueStatus::InReview => {
             if session.is_none()
@@ -163,6 +163,10 @@ fn issue_stage_of(t: &Issue, session: Option<&Session>) -> IssueStage {
             }
             if !t.questions.is_empty() {
                 return stage(K::Asking, since, Some(A::Answer), vec![say(A::Answer), close()]);
+            }
+            if !has_children && session.is_none() && t.last_run.is_none() {
+                let since = t.reviewed_at.or(Some(t.created_at));
+                return stage(K::Reviewing, since, Some(finish_act), vec![finish, close()]);
             }
             let unread = t.deliver == Deliverable::Answer && last.is_some_and(|l| l.outcome == Outcome::Completed && l.answer.is_none());
             if last.is_some_and(|l| l.outcome == Outcome::Failed) || unread {
@@ -243,8 +247,9 @@ fn status_with_lookup(t: &Issue, lookup: &Lookup) -> IssueStatus {
             return InProgress;
         }
     }
-    if let Some(latest) = latest {
-        let Some(h) = lookup.sessions.get(latest.as_str()) else { return Todo };
+    if let Some(latest) = latest
+        && let Some(h) = lookup.sessions.get(latest.as_str())
+    {
         let unfinished = !t.questions.is_empty()
             || h.last_run.as_ref().is_none_or(|r| r.outcome != Outcome::Completed)
             || (t.deliver == Deliverable::Answer && h.last_run.as_ref().is_none_or(|r| r.answer.is_none()));
@@ -257,12 +262,22 @@ fn status_with_lookup(t: &Issue, lookup: &Lookup) -> IssueStatus {
     if t.queued_at.is_some() {
         return Todo;
     }
+    if latest.is_some() {
+        return if matches!(t.status, Backlog | Todo | InProgress | InReview) {
+            t.status
+        } else {
+            Todo
+        };
+    }
     if let Some(lr) = &t.last_run {
         return if lr.ended_at.is_none() || lr.outcome != Some(Outcome::Completed) || !t.questions.is_empty() {
             InProgress
         } else {
             InReview
         };
+    }
+    if !t.was_sent() && matches!(t.status, Todo | InProgress | InReview) {
+        return t.status;
     }
     Backlog
 }
@@ -278,10 +293,11 @@ pub(crate) fn apply_issue_statuses(issues: &mut [Issue], sessions: &[Session]) -
         let status = status_with_lookup(t, &lookup);
         let drafting = lookup.refining.get(t.id.as_str()).cloned();
         let session = t.latest_session_id().and_then(|id| lookup.sessions.get(id.as_str()).copied());
+        let has_children = lookup.children.get(t.id.as_str()).is_some_and(|c| !c.is_empty());
         let mut next = t.clone();
         next.status = status;
         next.refining = drafting;
-        next.stage = issue_stage_of(&next, session);
+        next.stage = issue_stage_of(&next, session, has_children);
         next.moves = status_moves(&next);
         if next.status == t.status && next.refining == t.refining && next.stage == t.stage && next.moves == t.moves {
             continue;
@@ -383,13 +399,15 @@ fn assigned_on_duty(t: &Issue, on_duty: impl Fn(&str) -> bool) -> bool {
     on_duty(t.assigned_agent().unwrap_or(""))
 }
 
-/// Maps an issue's board status onto one of the four UI lanes.
+/// Maps an issue's board status onto its corresponding Kanban lane.
 fn issue_lane_of(status: IssueStatus) -> IssueLane {
     match status {
-        IssueStatus::Backlog | IssueStatus::Todo => IssueLane::Todo,
-        IssueStatus::InProgress => IssueLane::Working,
-        IssueStatus::InReview => IssueLane::Waiting,
-        IssueStatus::Done | IssueStatus::Canceled => IssueLane::Closed,
+        IssueStatus::Backlog => IssueLane::Backlog,
+        IssueStatus::Todo => IssueLane::Todo,
+        IssueStatus::InProgress => IssueLane::InProgress,
+        IssueStatus::InReview => IssueLane::InReview,
+        IssueStatus::Done => IssueLane::Done,
+        IssueStatus::Canceled => IssueLane::Canceled,
     }
 }
 
@@ -449,10 +467,12 @@ pub(crate) fn board_summary(issues: &[Issue], sessions: &[Session], channels: &[
     for issue in issues {
         let lane = issue_lane_of(issue.status);
         match lane {
+            IssueLane::Backlog => lane_counts.backlog += 1,
             IssueLane::Todo => lane_counts.todo += 1,
-            IssueLane::Working => lane_counts.working += 1,
-            IssueLane::Waiting => lane_counts.waiting += 1,
-            IssueLane::Closed => lane_counts.closed += 1,
+            IssueLane::InProgress => lane_counts.in_progress += 1,
+            IssueLane::InReview => lane_counts.in_review += 1,
+            IssueLane::Done => lane_counts.done += 1,
+            IssueLane::Canceled => lane_counts.canceled += 1,
         }
 
         let kids = lookup.children.get(issue.id.as_str()).map_or(&[][..], Vec::as_slice);
@@ -495,5 +515,47 @@ pub(crate) fn board_summary(issues: &[Issue], sessions: &[Session], channels: &[
         running_slots,
         max_running: MAX_RUNNING as i64,
         by_issue,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unsent_issues_preserve_tracked_in_progress_and_in_review_with_reviewing_stage() {
+        let mut tracked_work = Issue::new("i-work", 1, "External work", 100);
+        tracked_work.status = IssueStatus::InProgress;
+
+        let mut tracked_review = Issue::new("i-review", 2, "External review", 200);
+        tracked_review.status = IssueStatus::InReview;
+        tracked_review.reviewed_at = Some(350);
+
+        let mut issues = vec![tracked_work, tracked_review];
+        assert!(apply_issue_statuses(&mut issues, &[]));
+
+        assert_eq!(issues[0].status, IssueStatus::InProgress);
+        assert_eq!(issues[0].stage.state, IssueStageKind::Working);
+        assert_eq!(issues[0].stage.since, Some(100));
+
+        assert_eq!(issues[1].status, IssueStatus::InReview);
+        assert_eq!(issues[1].stage.state, IssueStageKind::Reviewing);
+        assert_eq!(issues[1].stage.since, Some(350));
+        assert_eq!(issues[1].stage.lead, Some(IssueAct::Complete));
+        assert_eq!(
+            issues[1].stage.acts,
+            vec![
+                IssueAction::Move {
+                    act: IssueAct::Complete,
+                    status: IssueStatus::Done,
+                    words: ActWords::None,
+                },
+                IssueAction::Move {
+                    act: IssueAct::Close,
+                    status: IssueStatus::Canceled,
+                    words: ActWords::None,
+                },
+            ]
+        );
     }
 }
