@@ -1,7 +1,7 @@
-import { cleanup, computed, PanResponder, Scroll, signal, Text, View, windowSize, type JSX, type ViewRef } from "nsh";
+import { cleanup, computed, Image, PanResponder, Scroll, signal, Text, View, windowSize, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type BoardSummary, maxRunning } from "@vibevalley/protocol";
+import type { BoardSummary } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
@@ -10,11 +10,14 @@ import type { IconName } from "../../../design/icons";
 import { motionClass, motionDuration, motionOff } from "../../../design/motion";
 import { Bubble } from "../../../design/Tip";
 import { mix, tone } from "../../../design/tone";
+import { fileUrl, useAttachmentFile } from "../../../infra/attachmentFile";
 import {
   type BoardCard,
   cardAgent,
   cardLook,
   cardMove,
+  type CardPreview,
+  cardPreviewOf,
   cardRepo,
   cardUrgencyTone,
   closedShown,
@@ -24,7 +27,6 @@ import {
   lanes,
   laneStatus,
   ownStatus,
-  runningSlotsOf,
 } from "../model/cards";
 import { laneOrder, type Ordering } from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
@@ -205,7 +207,6 @@ export function IssueBoard(props: BoardProps) {
     waiting: laneCountOf("waiting", props.cards, props.summary, props.filtered === true, props.older),
     closed: laneCountOf("closed", props.cards, props.summary, props.filtered === true, props.older),
   }));
-  const workingSlots = computed(() => runningSlotsOf(props.cards, props.summary, props.filtered === true, maxRunning));
   return (
     <View ref={drag.setRoot} class="min-h-0 flex-1 px-4 py-3">
       <If when={narrow()}>
@@ -241,7 +242,6 @@ export function IssueBoard(props: BoardProps) {
                 lane={l()}
                 cards={cardsByLane()[l()]}
                 count={laneCounts()[l()]}
-                slots={l() === "working" ? workingSlots() : undefined}
                 showClear={
                   props.filtered === true && props.cards.length === 0 && props.onClearFilter !== undefined && (narrow() ? l() === lane() : l() === "todo")
                 }
@@ -272,15 +272,7 @@ export function IssueBoard(props: BoardProps) {
   );
 }
 
-function LaneView(props: {
-  board: BoardProps;
-  lane: Lane;
-  cards: BoardCard[];
-  count: number;
-  slots?: { taken: number; of: number } | undefined;
-  showClear: boolean;
-  drag: Drag;
-}) {
+function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; count: number; showClear: boolean; drag: Drag }) {
   const p = () => props.board;
   const over = computed(() => props.drag.over() === props.lane);
   const folded = computed(() => props.lane === "closed" && !props.board.older && props.cards.length > closedShown);
@@ -310,15 +302,6 @@ function LaneView(props: {
             {String(props.count)}
           </Text>
         </View>
-        <If when={props.slots}>
-          {(slots) => (
-            <View class="ml-auto shrink-0" tooltip={<Bubble text={t("web.issue.board.spots", slots())} />}>
-              <Text testID="lane-working-slots" class="text-2xs text-faint tabular-nums">
-                {t("web.issue.board.spots", slots())}
-              </Text>
-            </View>
-          )}
-        </If>
         <If when={showHeaderNew()}>
           <View class="ml-auto shrink-0">
             <IconButton testid="issue-new" icon="add" size={14} label={t("web.issue.new.title")} onClick={() => p().onNew()} />
@@ -410,6 +393,34 @@ function SmallIconButton(props: { label: string; icon: IconName; onPress: () => 
   );
 }
 
+function CardThumbnail(props: { preview: CardPreview }) {
+  const file = useAttachmentFile(() => props.preview.attachmentId ?? "");
+  const src = computed(() => {
+    if (props.preview.url !== undefined && props.preview.url !== "") return props.preview.url;
+    const f = file();
+    return f ? fileUrl(f.path) : undefined;
+  });
+  return (
+    <If when={src()}>
+      {(url) => (
+        <View testID="card-preview" class="relative mt-2 h-24 w-full overflow-hidden rounded-md border border-line bg-side">
+          <Image testID="card-preview-image" src={url()} class="h-full w-full object-cover" />
+          <If when={props.preview.isCompare}>
+            <View
+              testID="card-preview-compare"
+              class="pointer-events-none absolute right-1.5 bottom-1.5 flex-row items-center gap-1 rounded-sm border border-line px-1.5 py-0.5"
+              style={{ backgroundColor: mix("elevated", 0.9) }}
+            >
+              <Icon name="diff" size={10} tone="ink" />
+              <Text class="text-2xs font-medium text-ink">{t("web.issue.peek.compareBadge")}</Text>
+            </View>
+          </If>
+        </View>
+      )}
+    </If>
+  );
+}
+
 function CardView(props: {
   card: BoardCard;
   selected: boolean;
@@ -423,6 +434,7 @@ function CardView(props: {
   const issues = useIssues();
   const look = computed(() => cardLook(props.card, nameOf(), issues(), Date.now()));
   const repo = computed(() => cardRepo(props.card));
+  const preview = computed(() => cardPreviewOf(props.card));
   const loud = computed(() => {
     const pr = look().priority;
     return pr === "urgent" || pr === "high" ? pr : undefined;
@@ -510,6 +522,7 @@ function CardView(props: {
         </If>
         <Text class={`${hasTopRow() ? "mt-1.5 " : ""}line-clamp-2 text-sm leading-[19px] font-medium text-ink`}>{look().title}</Text>
         <If when={look().wait}>{(wait) => <Text class="mt-1 line-clamp-1 text-xs text-water">{wait()}</Text>}</If>
+        <If when={preview()}>{(pv) => <CardThumbnail preview={pv()} />}</If>
         {/* Only what differs from the lane's default: its own status, unassigned todo, progress, attachments, flags. */}
         <If when={marks()}>
           <View testID="card-marks" class="mt-2 flex-row flex-wrap items-center gap-1.5">

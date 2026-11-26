@@ -6,14 +6,17 @@ import type { Attachment } from "@vibevalley/protocol";
 import { fakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../../fixtures/scenarios";
 
-async function mountTodoIssue(attachments?: Attachment[]) {
+async function mountTodoIssue(overrides?: { attachments?: Attachment[]; description?: string; criteria?: string[]; title?: string }) {
   const baseTodo =
     scenarios.typical.state.board.issues.find((i) => i.status === "backlog") ?? scenarios.typical.state.board.issues.find((i) => i.status === "todo");
   if (!baseTodo) throw new Error("typical scenario must include a backlog or todo issue");
   const { refining: _refining, queuedAt: _queuedAt, ...rest } = baseTodo;
   const draftTodo = {
     ...rest,
-    ...(attachments ? { attachments } : {}),
+    ...(overrides?.title !== undefined ? { title: overrides.title } : {}),
+    ...(overrides?.description !== undefined ? { description: overrides.description } : {}),
+    ...(overrides?.criteria !== undefined ? { criteria: overrides.criteria } : {}),
+    ...(overrides?.attachments ? { attachments: overrides.attachments } : {}),
     status: "backlog" as const,
     stage: { state: "draft" as const, acts: [] },
   };
@@ -33,6 +36,10 @@ async function mountTodoIssue(attachments?: Attachment[]) {
     const nextAttachments = ids ? (draftTodo.attachments ?? []).filter((a) => ids.includes(a.id)) : draftTodo.attachments;
     return { ...draftTodo, ...(nextAttachments ? { attachments: nextAttachments } : {}), seq: state.seq + 1 };
   });
+  fake.respond("attachment.file", (payload: unknown) => {
+    const id = (payload as { id?: string } | undefined)?.id ?? "";
+    return { path: `/tmp/${id}.png`, type: "image/png", name: `${id}.png` };
+  });
   const app = await open("../../../app/main.tsx", {
     width: 1200,
     height: 800,
@@ -41,7 +48,7 @@ async function mountTodoIssue(attachments?: Attachment[]) {
     clock: { time: SCENARIO_NOW },
     host: fake.options,
   });
-  await fake.pumpUntil(app, () => app.count("id:issue-talk") === 1);
+  await fake.pumpUntil(app, () => app.count("id:issue-title") === 1);
   return {
     app,
     fake,
@@ -54,6 +61,12 @@ async function mountTodoIssue(attachments?: Attachment[]) {
 
 test("TodoDetail clears draft word optimistically on submit and restores on error only if untouched", async () => {
   const { app, fake, setAllowRefine } = await mountTodoIssue();
+
+  // If the draft already has content, open the refine textarea via the quiet toggle; otherwise it is shown immediately.
+  if (app.count("id:issue-talk") === 0) {
+    await app.press("id:issue-draft-toggle");
+    await fake.pumpUntil(app, () => app.count("id:issue-talk") === 1);
+  }
 
   await app.type("id:issue-talk", "Clarify edge cases in parser");
   expect(app.enabled("id:issue-draft")).toBe(true);
@@ -87,7 +100,7 @@ test("TodoDetail renders issue attachments and persists removed attachments on S
     { id: "att-spec", name: "spec.pdf", type: "application/pdf", size: 2048 },
     { id: "att-log", name: "trace.txt", type: "text/plain", size: 512 },
   ];
-  const { app, fake } = await mountTodoIssue(files);
+  const { app, fake } = await mountTodoIssue({ attachments: files });
 
   expect(app.count("id:issue-attachments")).toBe(1);
   expect(app.count("id:issue-attachment-item")).toBe(2);
@@ -104,51 +117,73 @@ test("TodoDetail renders issue attachments and persists removed attachments on S
   expect((updateCall?.payload as { attachments?: string[] } | undefined)?.attachments).toEqual(["att-log"]);
 });
 
-test("TodoDetail wraps long draft titles without truncation and uses compact description min-height", async () => {
+test("TodoDetail defaults to preview-first Markdown, Compare, visual criteria checklist, and calm action bar with click-to-edit", async () => {
   const longTitle =
     "Investigate and redesign the multi-repository draft issue title input so titles over sixty characters wrap cleanly without horizontal clipping";
-  const baseTodo =
-    scenarios.typical.state.board.issues.find((i) => i.status === "backlog") ?? scenarios.typical.state.board.issues.find((i) => i.status === "todo");
-  if (!baseTodo) throw new Error("typical scenario must include a backlog or todo issue");
-  const { refining: _refining, queuedAt: _queuedAt, ...rest } = baseTodo;
-  const draftTodo = {
-    ...rest,
-    title: longTitle,
-    description: "Short draft summary.",
-    status: "backlog" as const,
-    stage: { state: "draft" as const, acts: [] },
-  };
-  const state = {
-    ...scenarios.typical.state,
-    board: {
-      ...scenarios.typical.state.board,
-      issues: scenarios.typical.state.board.issues.map((i) => (i.id === draftTodo.id ? draftTodo : i)),
-    },
-  };
-  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${draftTodo.id}` });
-  const app = await open("../../../app/main.tsx", {
-    width: 1200,
-    height: 800,
-    colorScheme: "light",
-    platform: "macos",
-    clock: { time: SCENARIO_NOW },
-    host: fake.options,
-  });
-  await fake.pumpUntil(app, () => app.count("id:issue-title") === 1 && app.count("id:issue-description") === 1);
+  const compareMarkdown = [
+    "## Summary",
+    "Render formatted **Markdown** and interactive Before/After visual comparisons directly on draft issues.",
+    "",
+    "```compare",
+    JSON.stringify({
+      title: "Draft Detail Visual Check",
+      before: { attachment: "att-before", label: "Before" },
+      after: { attachment: "att-after", label: "After" },
+    }),
+    "```",
+  ].join("\n");
 
-  expect(app.value("id:issue-title")).toBe(longTitle);
+  const { app, fake } = await mountTodoIssue({
+    title: longTitle,
+    description: compareMarkdown,
+    criteria: ["Markdown headings and Compare slider render by default", "Editing controls toggle inline cleanly"],
+  });
+
+  // Preview-first state: wrapping text title, Markdown + Compare preview, visual criteria rows, and calm action bar hiding issue-talk.
+  expect(app.texts()).toContain(longTitle);
+  expect(app.count("id:issue-title-input")).toBe(0);
+  expect(app.count("id:issue-description-preview")).toBe(1);
+  expect(app.count("id:compare-card")).toBe(1);
+  expect(app.count("id:issue-description")).toBe(0);
+  expect(app.count("id:issue-criteria-preview")).toBe(1);
+  expect(app.count("id:todo-criterion")).toBe(2);
+  expect(app.count("id:issue-criteria-input")).toBe(0);
+  expect(app.count("id:issue-talk")).toBe(0);
+  expect(app.count("id:issue-draft-toggle")).toBe(1);
+
   const titleBox = app.layout("id:issue-title");
   expect(titleBox).toBeDefined();
-  // Multiline title wraps across >= 2 lines (> single-line ~42px height).
-  expect(titleBox!.height).toBeGreaterThan(56);
+  expect(titleBox!.height).toBeGreaterThan(44);
 
-  // Typing into the multiline title field stays interactive and updates the draft value.
-  await app.type("id:issue-title", " updated");
-  expect(app.value("id:issue-title")).toContain("updated");
+  // Clicking title toggles inline multiline edit; typing and pressing Enter commits into preview title.
+  await app.press("id:issue-title-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-title-input") === 1);
+  await app.type("id:issue-title-input", " updated");
+  await app.keyboard.press("enter");
+  await fake.pumpUntil(app, () => app.count("id:issue-title-input") === 0);
+  expect(app.texts().join("\n")).toContain("updated");
 
-  // Short description box uses the tighter 88px minimum height rather than the old 144px gap.
-  const descBox = app.layout("id:issue-description");
-  expect(descBox).toBeDefined();
-  expect(descBox!.height).toBeGreaterThanOrEqual(88);
-  expect(descBox!.height).toBeLessThan(120);
+  // Re-opening title edit and pressing Escape discards unsaved edits.
+  await app.press("id:issue-title-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-title-input") === 1);
+  await app.type("id:issue-title-input", " discarded");
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => app.count("id:issue-title-input") === 0);
+  expect(app.texts().join("\n")).not.toContain("discarded");
+
+  // Clicking Edit on description switches to multiline textarea and Done returns to rendered preview.
+  await app.press("id:issue-edit-description");
+  await fake.pumpUntil(app, () => app.count("id:issue-description") === 1);
+  await app.press("id:issue-edit-description-done");
+  await fake.pumpUntil(app, () => app.count("id:issue-description-preview") === 1 && app.count("id:compare-card") === 1);
+
+  // Clicking Edit on criteria switches to textarea and Done returns to visual checklist.
+  await app.press("id:issue-edit-criteria");
+  await fake.pumpUntil(app, () => app.count("id:issue-criteria-input") === 1);
+  await app.press("id:issue-edit-criteria-done");
+  await fake.pumpUntil(app, () => app.count("id:issue-criteria-preview") === 1 && app.count("id:todo-criterion") === 2);
+
+  // Clicking the quiet refine toggle reveals the compact refine textarea.
+  await app.press("id:issue-draft-toggle");
+  await fake.pumpUntil(app, () => app.count("id:issue-talk") === 1);
 });

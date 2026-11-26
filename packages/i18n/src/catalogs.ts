@@ -1347,24 +1347,23 @@ export const catalogs = {
         earlier: "更早的 {n} 张",
         recent: "只看最近的",
         empty: {
-          todo: "想到要做的先写在这里，拖到「处理中」就派人开工；上下拖排先后。",
-          working: "没有在干的活。",
-          waiting: "做完的、没做成的在这里等你看；拖到「已关」完成或取消。",
-          closed: "已完成、已取消的工单；拖回「处理中」重开。",
+          todo: "想到要做的先写在这里，拖到「进行中」就派人开工；上下拖排先后。",
+          working: "暂无进行中的工单。",
+          waiting: "做完的、没做成的在这里待验收；拖到「已完成」完成或取消。",
+          closed: "已完成、已取消的工单；拖回「进行中」重开。",
         },
         emptyGuide: {
           todoTitle: "待办还是空的",
           todoBody: "记下要做的工单，选好仓库和角色就能派发开工。",
-          workingTitle: "暂无处理中工单",
+          workingTitle: "暂无进行中工单",
           workingBody: "给待办工单选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
           waitingTitle: "暂无待验收改动",
           waitingBody: "执行会话跑完一轮或有疑问时会停在这里，方便看改动、回复或完成交付。",
-          closedTitle: "还没有已关工单",
-          closedBody: "已完成或取消的工单会留在这里，拖回「处理中」即可随时重开。",
+          closedTitle: "还没有已完成工单",
+          closedBody: "已完成或取消的工单会留在这里，拖回「进行中」即可随时重开。",
           filtered: "当前筛选条件下此列没有工单。",
         },
         whichLane: "看哪一列",
-        spots: "{taken} / {of} 并发",
         moveFailed: "没挪过去",
         retryMove: "再挪一次",
         putBack: "放回原处",
@@ -1554,8 +1553,6 @@ export const catalogs = {
         descriptionHint: "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
         description: "说明",
         criteria: "验收标准",
-        noCriteria: "还没写",
-        criteriaSummary: "{n} 条 · {first}",
         criteriaHint: "一行一条：你验收时照着看的点",
         talk: "和执行会话聊清楚",
         answerTo: "回答：{question}",
@@ -1584,12 +1581,18 @@ export const catalogs = {
         repoName: "仓库名",
         create: "新建",
         writeOwn: "自己写说明",
+        edit: "编辑",
+        doneEditing: "完成编辑",
+        addDescription: "添加说明…",
+        addCriteria: "添加验收标准",
+        polish: "让角色再润色",
       },
+      peek: { expand: "展开全屏", close: "关闭预览", compareBadge: "对比" },
       boardLabels: {
         view: { board: "看板", list: "列表" },
         grouping: { status: "状态", repo: "仓库", agent: "角色", none: "不分组" },
         ordering: { manual: "默认", priority: "优先级", updated: "最近更新", created: "创建时间" },
-        lane: { todo: "待办", working: "处理中", waiting: "等你看", closed: "已关" },
+        lane: { todo: "待办", working: "进行中", waiting: "待验收", closed: "已完成" },
         stage: { talk: "聊清楚", work: "安排活", finish: "完成" },
         newIssue: "新工单",
       },
@@ -4784,24 +4787,23 @@ export const catalogs = {
         earlier: "{n} earlier",
         recent: "Recent only",
         empty: {
-          todo: "Write down what you want done here; drag it to In progress to start someone on it, up and down to order it.",
-          working: "Nothing being worked on.",
-          waiting: "What is done or failed waits here for you; drag it to Closed to complete or cancel it.",
-          closed: "Completed and canceled tickets; drag one back to In progress to reopen it.",
+          todo: "Write down what you want done here; drag it to In Progress to start someone on it, up and down to order it.",
+          working: "Nothing in progress.",
+          waiting: "Completed rounds or questions wait here in review; drag to Done to complete or cancel.",
+          closed: "Completed and canceled tickets; drag one back to In Progress to reopen it.",
         },
         emptyGuide: {
           todoTitle: "No to-dos yet",
           todoBody: "Jot down a ticket, pick a repo and helper, and dispatch it.",
           workingTitle: "Nothing in progress",
-          workingBody: "Assign a helper and dispatch a To do ticket, or drag it here to start a worktree session.",
-          waitingTitle: "Nothing waiting for review",
+          workingBody: "Assign a helper and dispatch a Todo ticket, or drag it here to start a worktree session.",
+          waitingTitle: "Nothing in review",
           waitingBody: "Completed rounds and helper questions appear here so you can inspect changes and merge.",
-          closedTitle: "No closed tickets yet",
-          closedBody: "Completed and canceled tickets stay here; drag one back to In progress to reopen.",
+          closedTitle: "No done tickets yet",
+          closedBody: "Completed and canceled tickets stay here; drag one back to In Progress to reopen.",
           filtered: "No matching tickets in this column.",
         },
         whichLane: "Which column",
-        spots: "{taken} / {of} spots",
         moveFailed: "Not moved",
         retryMove: "Move it again",
         putBack: "Put it back",
@@ -4993,8 +4995,6 @@ export const catalogs = {
         descriptionHint: "Description: why, what to do, what not to do, which files it may touch (drafting writes it)",
         description: "Description",
         criteria: "Acceptance criteria",
-        noCriteria: "Not written yet",
-        criteriaSummary: "{n} · {first}",
         criteriaHint: "One per line: the points you check when you review",
         talk: "Talk it through with the helper",
         answerTo: "Answer: {question}",
@@ -5023,12 +5023,18 @@ export const catalogs = {
         repoName: "Repo name",
         create: "Create",
         writeOwn: "Write it yourself",
+        edit: "Edit",
+        doneEditing: "Done",
+        addDescription: "Add description…",
+        addCriteria: "Add acceptance criteria",
+        polish: "Refine with helper",
       },
+      peek: { expand: "Open full screen", close: "Close preview", compareBadge: "Compare" },
       boardLabels: {
         view: { board: "Board", list: "List" },
         grouping: { status: "Status", repo: "Repo", agent: "Helper", none: "No grouping" },
         ordering: { manual: "Default", priority: "Priority", updated: "Last updated", created: "Created" },
-        lane: { todo: "To do", working: "In progress", waiting: "For you to see", closed: "Closed" },
+        lane: { todo: "Todo", working: "In Progress", waiting: "In Review", closed: "Done" },
         stage: { talk: "Talk it through", work: "Get it worked", finish: "Finish" },
         newIssue: "New ticket",
       },
@@ -8302,7 +8308,6 @@ export interface Messages {
   "web.issue.board.putBack": undefined;
   "web.issue.board.recent": undefined;
   "web.issue.board.retryMove": undefined;
-  "web.issue.board.spots": { readonly of: string | number; readonly taken: string | number };
   "web.issue.board.whichLane": undefined;
   "web.issue.boardLabels.grouping.agent": undefined;
   "web.issue.boardLabels.grouping.none": undefined;
@@ -8556,6 +8561,9 @@ export interface Messages {
   "web.issue.page.pickFirst": undefined;
   "web.issue.page.shown": { readonly of: string | number; readonly shown: string | number };
   "web.issue.page.view": undefined;
+  "web.issue.peek.close": undefined;
+  "web.issue.peek.compareBadge": undefined;
+  "web.issue.peek.expand": undefined;
   "web.issue.reading": undefined;
   "web.issue.reopen.line": { readonly issue: string | number };
   "web.issue.reopen.reopen": undefined;
@@ -8572,26 +8580,29 @@ export interface Messages {
   "web.issue.sheet.stageDone": { readonly stage: string | number };
   "web.issue.task.repo": undefined;
   "web.issue.task.written": undefined;
+  "web.issue.todo.addCriteria": undefined;
+  "web.issue.todo.addDescription": undefined;
   "web.issue.todo.againHint": undefined;
   "web.issue.todo.answerHint": undefined;
   "web.issue.todo.answerTo": { readonly question: string | number };
   "web.issue.todo.create": undefined;
   "web.issue.todo.criteria": undefined;
   "web.issue.todo.criteriaHint": undefined;
-  "web.issue.todo.criteriaSummary": { readonly first: string | number; readonly n: string | number };
   "web.issue.todo.description": undefined;
   "web.issue.todo.descriptionHint": undefined;
+  "web.issue.todo.doneEditing": undefined;
   "web.issue.todo.draft": undefined;
   "web.issue.todo.draftStatus": undefined;
   "web.issue.todo.drafted": undefined;
   "web.issue.todo.draftedLine": undefined;
+  "web.issue.todo.edit": undefined;
   "web.issue.todo.firstRepo": undefined;
   "web.issue.todo.inQueue": { readonly ago: string | number };
   "web.issue.todo.newRepo": undefined;
   "web.issue.todo.newRepoLink": undefined;
-  "web.issue.todo.noCriteria": undefined;
   "web.issue.todo.pickForMe": undefined;
   "web.issue.todo.pickHelper": undefined;
+  "web.issue.todo.polish": undefined;
   "web.issue.todo.priority": undefined;
   "web.issue.todo.questions": { readonly n: number };
   "web.issue.todo.questionsLine": undefined;

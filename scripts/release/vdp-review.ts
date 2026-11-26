@@ -302,6 +302,7 @@ export function buildScreenMatrix(ids: SeededWorkspaceIds, themes: readonly Revi
     { id: "chat", label: "Chat Channels", route: "/chat", settleMs: 550 },
     { id: "runs", label: "Runs & Trajectories", route: "/runs", waitTestId: "runs-page", settleMs: 500 },
     { id: "agents", label: "Agents Roster", route: "/agents", settleMs: 500 },
+    { id: "runtimes", label: "Runtimes & Engines", route: "/runtimes", waitTestId: "runtimes-page", settleMs: 500 },
     { id: "library", label: "Library & Artifacts", route: "/library", waitTestId: "library-page", settleMs: 650 },
     { id: "artifact-outline", label: "Artifact · Outline", route: `/artifacts/${ids.artifacts.outline}`, waitTestId: "artifact-outline-view", settleMs: 650 },
     {
@@ -677,7 +678,101 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
 
   const [adaId, miloId, soraId] = agentIds;
 
-  const issueSpecs = [
+  // Create a local sandbox repository so seeded issues carry realistic repo badges and dispatch cleanly.
+  const repoName = "vibevalley";
+  runSoft(cliBin, ["repo", "create", repoName], { cwd: root, env: cliEnv, timeoutMs: 20_000 });
+
+  // Upload bundled Papertrails screenshots so the board renders live card thumbnails and an interactive ```compare card.
+  const uploadAsset = (relPath: string, name: string): string | undefined => {
+    const absPath = resolve(root, relPath);
+    if (!existsSync(absPath)) return undefined;
+    const res = runSoft(cliBin, ["attachment", "upload", absPath, "--name", name, "--json"], { cwd: root, env: cliEnv, timeoutMs: 20_000 });
+    if (!res.ok) return undefined;
+    try {
+      return parseJsonOutput(res.stdout, CreatedEntitySchema, `attachment upload ${name}`).id;
+    } catch {
+      return undefined;
+    }
+  };
+  const beforeImgId = uploadAsset("assets/site/hero-morning-960.webp", "issues-board-before.webp");
+  const afterImgId = uploadAsset("assets/site/hero-day-960.webp", "issues-board-after.webp");
+  const previewImgId = uploadAsset("assets/site/hero-evening-960.webp", "papertrails-tokens-preview.webp");
+
+  const compareBlock =
+    beforeImgId && afterImgId
+      ? [
+          "",
+          "```compare",
+          JSON.stringify(
+            {
+              title: "Issues Board & Preview-First Detail Polish",
+              before: { attachment: beforeImgId, label: "Before (Raw Form)" },
+              after: { attachment: afterImgId, label: "After (Preview-First)" },
+              annotations: [
+                { n: 1, side: "after", rect: [0.08, 0.14, 0.42, 0.24], tone: "fixed", note: "Kanban cards render crisp image thumbnails with compare badge" },
+                { n: 2, side: "after", rect: [0.54, 0.22, 0.36, 0.28], tone: "note", note: "Preview-first markdown + visual criteria checklist" },
+              ],
+            },
+            null,
+            2,
+          ),
+          "```",
+        ].join("\n")
+      : "";
+
+  const issueSpecs: readonly {
+    readonly title: string;
+    readonly priority: "urgent" | "high" | "medium" | "low";
+    readonly status: "backlog" | "todo" | "in_progress" | "in_review" | "done" | "canceled";
+    readonly agent?: string | undefined;
+    readonly attachments?: readonly string[] | undefined;
+    readonly description: string;
+    readonly criteria: readonly string[];
+  }[] = [
+    {
+      title: "Polish Kanban card thumbnails, Quick-Peek modal, and preview-first issue detail",
+      priority: "high",
+      status: "backlog",
+      agent: miloId,
+      attachments: [beforeImgId, afterImgId].filter((id): id is string => id !== undefined),
+      description: [
+        "## Overview",
+        "Upgrade the Issues board so reviewers scan thumbnails at a glance, inspect drafts in a centered **Quick-Peek** modal, and read formatted `<Markdown>` + `<Compare>` blocks before entering edit mode.",
+        compareBlock,
+        "",
+        "## UX Highlights",
+        "- Card thumbnails extract the first `compare` or image attachment cleanly",
+        "- Draft detail renders Markdown, criteria checklist, and a calm action bar by default",
+      ].join("\n"),
+      criteria: [
+        "Board cards with images or compare blocks display restrained rounded thumbnails",
+        "Clicking a card opens Quick-Peek with an Open full screen button",
+        "Draft issues render Markdown and interactive Compare sliders without empty textarea walls",
+      ],
+    },
+    {
+      title: "Unify Papertrails light and dark surface contrast tokens across 12 artifact views",
+      priority: "medium",
+      status: "backlog",
+      agent: miloId,
+      attachments: previewImgId ? [previewImgId] : undefined,
+      description: [
+        "## Audit Scope",
+        "Verify WCAG AA contrast (>= 4.5:1) across `page`, `side`, `elevated`, and `ink` tokens in both light and dark modes across Dashboard, Design System, Whiteboard, and Settings.",
+      ].join("\n"),
+      criteria: ["All 12 artifact views use theme tokens without hardcoded hex borders", "Dark and light screenshots pass contrast checks"],
+    },
+    {
+      title: "Add incremental snapshot compaction for long-lived whiteboard sessions",
+      priority: "medium",
+      status: "backlog",
+      agent: adaId,
+      description: [
+        "## Goal",
+        "Compact Loro update history when collaborative whiteboards cross 500 incremental edits while preserving per-origin undo checkpoints.",
+      ].join("\n"),
+      criteria: ["History preview remains deterministic before and after compaction"],
+    },
     {
       title: "Wire live VDP DevTools protocol for remote inspection and screenshot capture",
       priority: "urgent",
@@ -702,7 +797,7 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       title: "Fix outline multiline wrapping and keyboard indent stability",
       priority: "high",
       status: "in_review",
-      agent: miloId,
+      agent: adaId,
       description: [
         "## Problem",
         "Long bullet items in `OutlineView` clipped horizontally at 1280px instead of wrapping cleanly beneath the disclosure chevron.",
@@ -728,28 +823,6 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       ],
     },
     {
-      title: "Unify Papertrails light and dark surface contrast tokens across 12 artifact views",
-      priority: "medium",
-      status: "todo",
-      agent: miloId,
-      description: [
-        "## Audit Scope",
-        "Verify WCAG AA contrast (>= 4.5:1) across `surface`, `panel`, `side`, and `ink` tokens in both light and dark modes across Dashboard, Design System, Whiteboard, and Settings.",
-      ].join("\n"),
-      criteria: ["All 12 artifact views use theme tokens without hardcoded hex borders"],
-    },
-    {
-      title: "Add incremental snapshot compaction for long-lived whiteboard sessions",
-      priority: "medium",
-      status: "todo",
-      agent: adaId,
-      description: [
-        "## Goal",
-        "Compact Loro update history when collaborative whiteboards cross 500 incremental edits while preserving per-origin undo checkpoints.",
-      ].join("\n"),
-      criteria: ["History preview remains deterministic before and after compaction"],
-    },
-    {
       title: "Publish Q4 developer ergonomics retrospective and release checklist",
       priority: "low",
       status: "done",
@@ -760,23 +833,36 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       ].join("\n"),
       criteria: ["Checklist archived and announced in #release-ops"],
     },
-  ] as const;
+    {
+      title: "Archive legacy 0/6 lane concurrency header counter after unlimited queue redesign",
+      priority: "low",
+      status: "canceled",
+      agent: miloId,
+      description: [
+        "## Outcome",
+        "Replaced the noisy `0 / 6` concurrency indicator on the Kanban header with clean PM lane labels (`待办 / 进行中 / 待验收 / 已完成`).",
+      ].join("\n"),
+      criteria: ["Board header shows lane icon, title, and issue count pill only"],
+    },
+  ];
 
   const issueIds: string[] = [];
   for (let idx = 0; idx < issueSpecs.length; idx++) {
     const spec = issueSpecs[idx]!;
     const descPath = writeTempPayload(payloadDir, `issue-${idx + 1}.md`, spec.description);
-    const createArgs = ["issue", "create", spec.title, "--priority", spec.priority, "--description", `@${descPath}`];
-    // Assign agents up front only for in_progress items; other statuses transition cleanly before optional assignment.
-    if (spec.agent && spec.status === "in_progress") createArgs.push("--agent", spec.agent);
+    const createArgs = ["issue", "create", spec.title, "--repo", repoName, "--priority", spec.priority, "--description", `@${descPath}`];
+    if (spec.agent) createArgs.push("--agent", spec.agent);
     for (const criterion of spec.criteria) createArgs.push("--criterion", criterion);
+    for (const attId of spec.attachments ?? []) createArgs.push("--attach", attId);
     const created = vvJson(createArgs, CreatedEntitySchema, `issue create #${idx + 1}`);
     issueIds.push(created.id);
     const transitions: Record<typeof spec.status, readonly string[]> = {
+      backlog: [],
       todo: ["todo"],
-      in_progress: ["todo", "in_progress"],
-      in_review: ["todo", "in_progress", "in_review"],
-      done: ["todo", "in_progress", "in_review", "done"],
+      in_progress: ["todo"],
+      in_review: ["todo"],
+      done: ["canceled"],
+      canceled: ["canceled"],
     };
     for (const stepStatus of transitions[spec.status]) {
       const res = runSoft(cliBin, ["issue", "status", created.id, stepStatus], { cwd: root, env: cliEnv, timeoutMs: 15_000 });

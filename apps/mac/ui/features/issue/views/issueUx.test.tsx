@@ -238,3 +238,89 @@ test("Board integrates filter bar, preserves long card titles, and suppresses un
   expect(app.count("id:issue-group-working")).toBe(1);
   expect(app.count("id:issue-group-waiting")).toBe(1);
 });
+
+test("Board uses professional PM lane labels without concurrency badge, renders card thumbnails, and opens Quick-Peek modal", async () => {
+  setLocale("zh");
+  const compareDesc = [
+    "Visual audit for Kanban cards:",
+    "```compare",
+    JSON.stringify({
+      title: "Board Card Polish",
+      before: { attachment: "att-before", label: "Before" },
+      after: { attachment: "att-after", label: "After" },
+    }),
+    "```",
+  ].join("\n");
+  const compareIssue = makeIssueFixture({
+    id: "i-compare-card",
+    number: 21,
+    title: "Compare card with Before/After thumbnail",
+    description: compareDesc,
+    status: "backlog",
+    repo: "vibevalley",
+    stage: { state: "draft", acts: [] },
+  });
+  const imageIssue = makeIssueFixture({
+    id: "i-image-card",
+    number: 22,
+    title: "Card with plain image attachment",
+    description: "Verify image thumbnail rendering on board card.",
+    status: "backlog",
+    repo: "vibevalley",
+    attachments: [{ id: "att-shot", name: "preview.png", type: "image/png", size: 4096 }],
+    stage: { state: "draft", acts: [] },
+  });
+
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 15, issues: [compareIssue, imageIssue] },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "zh" });
+  fake.respond("issue.history.list", [
+    { issue: compareIssue, sessions: [], missingSessions: [] },
+    { issue: imageIssue, sessions: [], missingSessions: [] },
+  ]);
+  fake.respond("attachment.file", (payload: unknown) => {
+    const id = (payload as { id?: string } | undefined)?.id ?? "";
+    return { path: `/tmp/${id}.png`, type: "image/png", name: `${id}.png` };
+  });
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:card-preview") === 2);
+
+  // Professional PM lane labels and no 0/6 concurrency counter badge.
+  const texts = app.texts();
+  expect(texts).toContain("待办");
+  expect(texts).toContain("进行中");
+  expect(texts).toContain("待验收");
+  expect(texts).toContain("已完成");
+  expect(app.count("id:lane-working-slots")).toBe(0);
+
+  // Compare card carries the subtle Compare badge; plain image attachment does not.
+  expect(app.count("id:card-preview-compare")).toBe(1);
+
+  // Clicking a card opens Quick-Peek modal with preview-first Compare content, dismissible via Close, or expandable to full screen.
+  await app.press("id:issue-card >> nth=0");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1 && app.count("id:compare-card") === 1);
+  expect(app.count("id:issue")).toBe(0);
+  expect(app.count("id:issue-peek-expand")).toBe(1);
+
+  await app.press("id:issue-peek-close");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 0);
+
+  // Reopen via list view and click Expand to transition into full-screen IssueView.
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:issue-list") === 1);
+  await app.press("id:issue-card >> nth=0");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  await app.press("id:issue-peek-expand");
+  await fake.pumpUntil(app, () => app.count("id:issue") === 1);
+  expect(app.count("id:issue-peek-modal")).toBe(0);
+});

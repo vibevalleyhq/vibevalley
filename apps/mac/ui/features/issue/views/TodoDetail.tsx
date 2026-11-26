@@ -1,4 +1,4 @@
-import { computed, signal, Text, View } from "nsh";
+import { computed, keymap, signal, Text, View } from "nsh";
 import { Input, Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -10,6 +10,9 @@ import { Button } from "../../../design/Button";
 import { ConfirmButton } from "../../../design/ConfirmButton";
 import { TextArea, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
+import { Markdown } from "../../../design/Markdown";
+import { CountPill } from "../../../design/Tag";
+import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
 import { useWorkAgents } from "../../../infra/agents";
@@ -26,7 +29,7 @@ import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
 import { IssueThread } from "./IssueThread";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
-import { Fold, IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
+import { IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 
 interface Draft {
   title: string;
@@ -62,10 +65,7 @@ export const dispatchedNotice = (open: (id: string | undefined) => void) => (got
   else open(got.id);
 };
 
-// The bare fields of the sheet: no box until the pointer or the focus is on them.
-const bare = "w-full rounded-md border border-transparent bg-transparent text-ink placeholder:text-faint hover:border-line focus:border-focus";
-
-/** An issue not sent yet. In the backlog it is a draft: the box says what is wanted (or answers what its refiner asked) and sends a helper to draft it. */
+/** An issue not sent yet. Preview-first reading and review, with light click-to-edit controls. */
 export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined) => void }) {
   // Until the user edits a field, a draft coming back fills them.
   const [form, setForm] = createSignal({ draft: untrack(() => draftOf(props.item)), edited: false });
@@ -77,6 +77,9 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const busy = computed(() => act.busy() || move()?.state === "moving");
   const word = signal("");
   const newRepo = signal(false);
+  const editingDesc = signal(false);
+  const editingCriteria = signal(false);
+  const refineOpen = signal(false);
   const agents = useWorkAgents(true);
   const repoList = useRepos();
   const repos = computed(() => ready(repoList, []).map((p) => p.name));
@@ -225,16 +228,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           <Stages at="talk" />
         </View>
       </If>
-      <Input
-        multiline
-        submitBehavior="submit"
-        testID="issue-title"
-        value={d().title}
-        onChange={(e) => edit({ title: e.value.replace(/[\r\n]+/gu, " ") })}
-        placeholder={t("web.issue.todo.titleHint")}
-        accessibilityLabel={t("web.issue.todo.title")}
-        class={`${bare} -mx-2 px-2 py-1 text-2xl leading-snug font-semibold`}
-      />
+      <TodoTitle value={d().title} editable={!closed()} onCommit={(title) => edit({ title })} />
     </View>
   );
 
@@ -243,65 +237,87 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const own = signal(false);
   const written = computed(() => refined() || d().description.trim() !== "" || criteria().length > 0);
   const fields = computed(() => written() || own() || !backlog());
-  const talkTone = computed<"water" | "wheat">(() => (drafting() ? "water" : "wheat"));
+  const showTalkInput = computed(() => questions().length > 0 || !written() || refineOpen());
+  const talkHighlight = computed<"water" | "wheat" | undefined>(() => (drafting() ? "water" : questions().length > 0 ? "wheat" : undefined));
   const talk = () => (
     <If when={backlog()}>
       <View
+        testID="issue-talk-card"
         accessibilityLabel={t("web.issue.todo.talk")}
-        class="mt-5 rounded-xl border px-4 py-3.5"
-        style={{ borderColor: mix(talkTone(), 0.35), backgroundColor: mix(talkTone(), 0.08) }}
+        class={`mt-5 rounded-xl border px-4 py-3 ${talkHighlight() ? "" : "border-line bg-side"}`}
+        style={talkHighlight() ? { borderColor: mix(talkHighlight()!, 0.35), backgroundColor: mix(talkHighlight()!, 0.08) } : undefined}
       >
-        <View class="flex-row items-center gap-2">
-          <Icon name={drafting() ? "bolt" : "idea"} size={15} tone={talkTone()} />
-          <Text class="min-w-0 flex-1 text-sm font-semibold text-ink">{said()[0]}</Text>
-        </View>
-        <Text class="mt-1.5 text-sm leading-relaxed text-muted">{said()[1]}</Text>
-        <Each of={questions()} key={(a) => a.question}>
-          {(a) => (
-            <View class="mt-2">
-              <Text class="text-sm text-ink">{`· ${a().question}`}</Text>
-              <If when={a().options.length}>
-                <View class="mt-1.5 flex-row flex-wrap gap-1.5 pl-3" accessibilityLabel={t("web.issue.todo.answerTo", { question: a().question })}>
-                  <Each of={a().options} key={(o) => o}>
-                    {(o) => (
-                      <Button disabled={busy()} onPress={() => word.set(o())}>
-                        {o()}
-                      </Button>
-                    )}
-                  </Each>
-                </View>
-              </If>
+        <View class="flex-row flex-wrap items-center justify-between gap-3">
+          <View class="min-w-0 flex-1">
+            <View class="flex-row items-center gap-2">
+              <Icon name={drafting() ? "bolt" : "idea"} size={14} tone={talkHighlight() ?? "muted"} />
+              <Text class="min-w-0 flex-1 text-sm font-semibold text-ink">{said()[0]}</Text>
             </View>
-          )}
-        </Each>
-        <TextArea
-          testID="issue-talk"
-          class="mt-3"
-          rows={2}
-          value={word()}
-          onInput={(v) => word.set(v)}
-          submit
-          onSubmit={() => canRefine() && void draft()}
-          placeholder={questions().length > 0 ? t("web.issue.todo.answerHint") : refined() ? t("web.issue.todo.againHint") : t("web.issue.todo.whatHint")}
-          accessibilityLabel={t("web.issue.todo.whatLabel")}
-        />
-        <View class="mt-3.5 flex-row flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: mix(talkTone(), 0.18) }}>
-          <Button
-            tone={written() ? "primary" : "plain"}
-            testID="issue-start"
-            disabled={!startable()}
-            accessibilityLabel={d().agent ? undefined : t("web.issue.todo.pickHelper")}
-            onPress={() => void start()}
-          >
-            {t("web.issue.todo.start")}
-          </Button>
-          <Button testID="issue-draft" tone={written() ? "plain" : "primary"} disabled={!canRefine()} onPress={() => void draft()}>
-            {refined() ? t("web.issue.todo.redraft") : t("web.issue.todo.draft")}
-          </Button>
+            <Text class="mt-0.5 text-xs leading-relaxed text-muted">{said()[1]}</Text>
+          </View>
+          <View class="shrink-0 flex-row flex-wrap items-center gap-2">
+            <Button
+              tone={written() ? "primary" : "plain"}
+              testID="issue-start"
+              disabled={!startable()}
+              accessibilityLabel={d().agent ? undefined : t("web.issue.todo.pickHelper")}
+              onPress={() => void start()}
+            >
+              {t("web.issue.todo.start")}
+            </Button>
+            <If when={!showTalkInput()}>
+              <Button testID="issue-draft-toggle" tone="quiet" disabled={busy() || Boolean(drafting())} onPress={() => refineOpen.set(true)}>
+                {refined() || written() ? t("web.issue.todo.polish") : t("web.issue.todo.draft")}
+              </Button>
+            </If>
+          </View>
         </View>
+        <If when={showTalkInput()}>
+          <Each of={questions()} key={(a) => a.question}>
+            {(a) => (
+              <View class="mt-2.5">
+                <Text class="text-sm text-ink">{`· ${a().question}`}</Text>
+                <If when={a().options.length}>
+                  <View class="mt-1.5 flex-row flex-wrap gap-1.5 pl-3" accessibilityLabel={t("web.issue.todo.answerTo", { question: a().question })}>
+                    <Each of={a().options} key={(o) => o}>
+                      {(o) => (
+                        <Button disabled={busy()} onPress={() => word.set(o())}>
+                          {o()}
+                        </Button>
+                      )}
+                    </Each>
+                  </View>
+                </If>
+              </View>
+            )}
+          </Each>
+          <TextArea
+            testID="issue-talk"
+            class="mt-3"
+            rows={2}
+            value={word()}
+            onInput={(v) => word.set(v)}
+            submit
+            onSubmit={() => canRefine() && void draft()}
+            placeholder={questions().length > 0 ? t("web.issue.todo.answerHint") : refined() ? t("web.issue.todo.againHint") : t("web.issue.todo.whatHint")}
+            accessibilityLabel={t("web.issue.todo.whatLabel")}
+          />
+          <View class="mt-3 flex-row flex-wrap items-center gap-2">
+            <Button testID="issue-draft" tone={written() ? "plain" : "primary"} disabled={!canRefine()} onPress={() => void draft()}>
+              {refined() ? t("web.issue.todo.redraft") : t("web.issue.todo.draft")}
+            </Button>
+            <If when={refineOpen() && written() && questions().length === 0}>
+              <Button testID="issue-draft-cancel" tone="quiet" onPress={() => refineOpen.set(false)}>
+                {t("web.issue.never")}
+              </Button>
+            </If>
+          </View>
+        </If>
       </View>
     </If>
   );
+
+  const hasDescription = computed(() => d().description.trim() !== "");
   const main = (
     <>
       <If
@@ -309,40 +325,127 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         else={
           <>
             {talk()}
-            <View role="button" testID="issue-write-own" onPress={() => own.set(true)} class="-mx-1.5 mt-3 self-start rounded-md px-1.5 py-1 hover:bg-hover">
+            <View
+              role="button"
+              testID="issue-write-own"
+              onPress={() => {
+                own.set(true);
+                editingDesc.set(true);
+              }}
+              class="-mx-1.5 mt-3 self-start rounded-md px-1.5 py-1 hover:bg-hover"
+            >
               <Text class="text-sm text-muted">{t("web.issue.todo.writeOwn")}</Text>
             </View>
           </>
         }
       >
-        <Input
-          multiline
-          testID="issue-description"
-          value={d().description}
-          onChange={(e) => edit({ description: e.value })}
-          placeholder={t("web.issue.todo.descriptionHint")}
-          accessibilityLabel={t("web.issue.todo.description")}
-          class={`${bare} -mx-2 min-h-22 px-2 py-1.5 text-base`}
-        />
-        <View class="mt-4 overflow-hidden rounded-lg border border-line bg-page px-3.5">
-          <Fold
-            bordered={false}
-            label={t("web.issue.todo.criteria")}
-            summary={
-              criteria().length === 0
-                ? t("web.issue.todo.noCriteria")
-                : t("web.issue.todo.criteriaSummary", { n: criteria().length, first: criteria()[0] ?? "" })
+        <View>
+          <If
+            when={editingDesc()}
+            else={
+              <If
+                when={hasDescription()}
+                else={
+                  <If when={!closed()}>
+                    <View role="button" testID="issue-edit-description" onPress={() => editingDesc.set(true)} class="-mx-2 rounded-md px-2 py-2 hover:bg-hover">
+                      <Text class="text-sm text-faint">{t("web.issue.todo.addDescription")}</Text>
+                    </View>
+                  </If>
+                }
+              >
+                <View class="mb-2 flex-row items-center justify-between gap-2">
+                  <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.description")}</Text>
+                  <If when={!closed()}>
+                    <Button size="compact" tone="quiet" icon="edit" testID="issue-edit-description" onPress={() => editingDesc.set(true)}>
+                      {t("web.issue.todo.edit")}
+                    </Button>
+                  </If>
+                </View>
+                <View testID="issue-description-preview">
+                  <Markdown size="sm" text={d().description} />
+                </View>
+              </If>
             }
-            defaultOpen={criteria().length === 0}
           >
+            <View class="mb-2 flex-row items-center justify-between gap-2">
+              <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.description")}</Text>
+              <Button size="compact" tone="quiet" icon="check" testID="issue-edit-description-done" onPress={() => editingDesc.set(false)}>
+                {t("web.issue.todo.doneEditing")}
+              </Button>
+            </View>
+            <Input
+              multiline
+              autoFocus
+              testID="issue-description"
+              value={d().description}
+              onChange={(e) => edit({ description: e.value })}
+              placeholder={t("web.issue.todo.descriptionHint")}
+              accessibilityLabel={t("web.issue.todo.description")}
+              class="min-h-22 w-full rounded-md border border-line bg-page px-2.5 py-2 text-sm text-ink placeholder:text-faint focus:border-focus"
+            />
+          </If>
+        </View>
+
+        <View class="mt-5">
+          <If
+            when={editingCriteria()}
+            else={
+              <If
+                when={criteria().length > 0}
+                else={
+                  <If when={!closed()}>
+                    <Button size="compact" tone="quiet" icon="add" testID="issue-edit-criteria" class="self-start" onPress={() => editingCriteria.set(true)}>
+                      {t("web.issue.todo.addCriteria")}
+                    </Button>
+                  </If>
+                }
+              >
+                <View testID="issue-criteria-preview">
+                  <View class="mb-2 flex-row items-center justify-between gap-2">
+                    <View class="flex-row items-center gap-1.5">
+                      <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.criteria")}</Text>
+                      <CountPill count={criteria().length} />
+                    </View>
+                    <If when={!closed()}>
+                      <Button size="compact" tone="quiet" icon="edit" testID="issue-edit-criteria" onPress={() => editingCriteria.set(true)}>
+                        {t("web.issue.todo.edit")}
+                      </Button>
+                    </If>
+                  </View>
+                  <View class="overflow-hidden rounded-lg border border-line bg-page">
+                    <Each of={criteria()} key="index">
+                      {(c, i) => (
+                        <View
+                          testID="todo-criterion"
+                          class={`flex-row items-start gap-2.5 px-3.5 py-2.5 ${i() < criteria().length - 1 ? "border-b" : ""}`}
+                          style={i() < criteria().length - 1 ? { borderColor: mix("line", 0.55) } : undefined}
+                        >
+                          <View class="mt-1 h-3 w-3 shrink-0 rounded-full border border-idle" />
+                          <Text class="min-w-0 flex-1 text-sm leading-snug text-ink">{c()}</Text>
+                        </View>
+                      )}
+                    </Each>
+                  </View>
+                </View>
+              </If>
+            }
+          >
+            <View class="mb-2 flex-row items-center justify-between gap-2">
+              <Text class="text-xs font-semibold text-muted">{t("web.issue.todo.criteria")}</Text>
+              <Button size="compact" tone="quiet" icon="check" testID="issue-edit-criteria-done" onPress={() => editingCriteria.set(false)}>
+                {t("web.issue.todo.doneEditing")}
+              </Button>
+            </View>
             <TextArea
+              testID="issue-criteria-input"
+              autoFocus
               rows={3}
               value={d().criteria}
               onInput={(v) => edit({ criteria: v })}
               placeholder={t("web.issue.todo.criteriaHint")}
               accessibilityLabel={t("web.issue.todo.criteria")}
             />
-          </Fold>
+          </If>
         </View>
         {talk()}
       </If>
@@ -485,6 +588,75 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     </>
   );
   return <IssueSheet heading={heading} main={main} side={side} />;
+}
+
+/** Preview-first wrapping draft title: click toggles inline multiline input; Return/blur commits, Escape cancels. */
+function TodoTitle(props: { value: string; editable: boolean; onCommit: (title: string) => void }) {
+  const editing = signal(false);
+  let typed = "";
+  const finish = (keep: boolean) => {
+    if (!editing()) return;
+    editing.set(false);
+    const next = typed.replace(/[\r\n]+/gu, " ").trim();
+    if (keep && next !== "" && next !== props.value) props.onCommit(next);
+  };
+  return (
+    <If
+      when={editing()}
+      else={
+        <If
+          when={props.editable}
+          else={
+            <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
+              {props.value}
+            </Text>
+          }
+        >
+          <View
+            role="button"
+            testID="issue-title-trigger"
+            accessibilityLabel={t("web.issue.detail.rename")}
+            tooltip={<Bubble text={t("web.issue.detail.rename")} />}
+            onPress={() => {
+              typed = props.value;
+              editing.set(true);
+            }}
+            class="-mx-1 max-w-full self-start rounded-sm px-1 hover:bg-hover"
+          >
+            <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
+              {props.value || t("web.issue.todo.titleHint")}
+            </Text>
+          </View>
+        </If>
+      }
+    >
+      <TodoTitleInput initial={props.value} onInput={(v) => (typed = v)} onFinish={finish} />
+    </If>
+  );
+}
+
+function TodoTitleInput(props: { initial: string; onInput: (v: string) => void; onFinish: (keep: boolean) => void }) {
+  const draft = signal(untrack(() => props.initial));
+  keymap.bind("escape", () => props.onFinish(false), { when: "always" });
+  return (
+    <Input
+      multiline
+      submitBehavior="submit"
+      autoFocus
+      testID="issue-title-input"
+      value={draft()}
+      onChange={(e) => {
+        const clean = e.value.replace(/[\r\n]+/gu, " ");
+        draft.set(clean);
+        props.onInput(clean);
+      }}
+      onSubmit={() => props.onFinish(true)}
+      onBlur={() => props.onFinish(true)}
+      placeholder={t("web.issue.todo.titleHint")}
+      accessibilityLabel={t("web.issue.todo.title")}
+      class="-mx-2 w-full rounded-md border border-focus bg-page px-2 py-1 text-2xl leading-snug font-semibold text-ink placeholder:text-faint"
+    />
+  );
 }
 
 function NewRepoPopoverBody(props: { onClose: () => void; onMade: (name: string) => void }) {
