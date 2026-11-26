@@ -819,7 +819,7 @@ impl SessionEngine {
 
     /// Upserts an orchestrator session row and updates live state.
     pub async fn upsert_orchestrator_async(&self, session: &Session) -> std::result::Result<(), ApiError> {
-        self.persist_session_update_async(session).await.map_err(super::session_error)
+        self.persist_session_update_async(session).await.map_err(super::types::session_error)
     }
 
     pub(super) async fn persist_session_update_async(&self, session: &Session) -> Result<()> {

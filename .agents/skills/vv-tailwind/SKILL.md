@@ -27,11 +27,11 @@ description: 在 VibeValley 的工作台（apps/mac/ui，nsh 的 Tailwind class�
 | 要什么 | class | 令牌在哪 |
 |---|---|---|
 | 表面、字、线、状态色 | `bg-page` `bg-side` `bg-rail` `text-ink` `text-muted` `text-faint` `border-line` `bg-hover` `bg-selected` `border-focus` `bg-accent` `hover:bg-accent-hover` `text-leaf` `bg-wheat` `text-berry` `text-water` `bg-idle` `bg-scrim` `bg-code-bg` | `theme.json` 的 `cssVars.light`、`cssVars.dark`：两套同名，跟着主题换 |
-| 像素皮的颜色 | `bg-cream-50` `text-bark-900` `bg-leaf-500` … | `theme.json` 的 `cssVars.theme`：不跟主题换 |
+| Papertrails 固定色 | `bg-cream-50` `text-bark-900` `bg-leaf-500` … | `theme.json` 的 `cssVars.theme`：不跟主题换 |
 | 字号带行高 | `text-2xs` `text-xs` `text-sm` `text-base` `text-lg` `text-xl` `text-2xl` `text-3xl` | `nsh.json` 的 `tailwind.fontSize`（11、12、13、14、16、20、24、30） |
-| 字体 | `font-sans` `font-mono` `font-pixel` | `tailwind.fontFamily` |
+| 字体 | `font-sans` `font-mono` | `tailwind.fontFamily` |
 | 圆角 | `rounded-xs`(3) `rounded-sm`(4) `rounded-md`(6) `rounded-lg`(8) `rounded-xl`(12) `rounded-full` | `tailwind.radius` |
-| 阴影 | `shadow-raise` `shadow-float` `shadow-px` | `tailwind.shadow` |
+| 阴影 | `shadow-raise` `shadow-float` | `tailwind.shadow` |
 | 缓动 | `ease-out` `ease-in` `ease-in-out` `ease-spring`，时长 `duration-120` 这类 | `tailwind.ease` |
 | 留白 | `p-1`=4px，`gap-1.5`=6px，`px-2.5`=10px，`py-px`=1px | 4px 的倍数 |
 

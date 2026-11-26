@@ -16,15 +16,17 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
   const acts: { type: string; [key: string]: unknown }[] = [];
   const calls: { op: string; payload: unknown }[] = [];
   const subscriptions = new Map<string, { name: string; payload: unknown }>();
-  const pixelDir = decodeURI(new URL("../../../../assets/pixel", import.meta.url).pathname);
+  const assetsDir = decodeURI(new URL("../../../../assets", import.meta.url).pathname);
   const responses: Record<string, unknown> = {
-    "host.pixelDir": { path: pixelDir },
+    "host.assetsDir": { path: assetsDir },
     "repo.list": [],
     ...rpcResponses,
   };
   let rev = 0;
+  let boundApp: App | null = null;
+  let seenPosts = 0;
 
-  const action = (data: unknown) => {
+  const processAction = (data: unknown) => {
     const a = data as { type: string; id?: string; op?: string; name?: string; payload?: unknown };
     if (a.type === "call") {
       const op = a.op ?? "";
@@ -41,16 +43,30 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
     } else if (!["watch", "unwatch", "applied", "ready"].includes(a.type)) {
       acts.push(a);
     }
-    return null;
   };
 
-  const pump = async (app: App) => {
-    for (let round = 0; round < 30 && queue.length > 0; round++) {
-      for (const [name, data] of queue.splice(0)) await app.host.send(name, data);
+  const sync = (app: App | null = boundApp) => {
+    if (!app) return;
+    boundApp = app;
+    const posts = app.host.posts();
+    while (seenPosts < posts.length) {
+      const msg = posts[seenPosts++];
+      if (msg?.name === "action") processAction(msg.data);
     }
   };
 
+  const pump = async (app: App) => {
+    boundApp = app;
+    for (let round = 0; round < 30; round++) {
+      sync(app);
+      if (queue.length === 0) break;
+      for (const [name, data] of queue.splice(0)) await app.host.send(name, data);
+    }
+    sync(app);
+  };
+
   const releaseDeferred = async (app: App, op?: string) => {
+    sync(app);
     for (let i = 0; i < heldReplies.length;) {
       const entry = heldReplies[i];
       if (entry === undefined) break;
@@ -65,11 +81,13 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
   };
 
   const pushFrame = async (app: App, topic: string, data: unknown) => {
+    sync(app);
     await app.host.send(`frame:${topic}`, { rev: ++rev, data });
     await pump(app);
   };
 
   const emitSub = async (app: App, name: string, event: unknown) => {
+    sync(app);
     for (const [id, sub] of subscriptions) {
       if (sub.name === name) queue.push([`sub:${id}`, { event }]);
     }
@@ -77,14 +95,25 @@ function workspaceHost(params: Record<string, unknown>, rpcResponses: Record<str
   };
 
   return {
-    options: { params: { pixelDir, ...params }, handlers: { action, ready: null } },
-    acts,
-    calls,
-    subscriptions,
+    options: { params: { assetsDir, ...params }, handlers: { action: null, ready: null } },
+    get acts() {
+      sync();
+      return acts;
+    },
+    get calls() {
+      sync();
+      return calls;
+    },
+    get subscriptions() {
+      sync();
+      return subscriptions;
+    },
     clearActs: () => {
+      sync();
       acts.length = 0;
     },
     clearCalls: () => {
+      sync();
       calls.length = 0;
     },
     pump,
@@ -145,10 +174,14 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   });
 
   expect(app.count("id:workspace-sidebar")).toBe(1);
+  expect(app.count("id:sidebar-repo-path-vibevalley")).toBe(1);
+  expect(app.count("id:sidebar-tabs-group-vibevalley")).toBe(0);
   expect(app.texts()).toContain("vibevalley");
+  expect(app.texts()).toContain("/work/vibevalley");
   expect(app.texts()).toContain("README.md");
   expect(app.texts()).toContain("Antigravity");
   expect(app.texts()).toContain("notes");
+  expect(app.texts()).toContain("/tmp/notes");
   expect(app.texts()).not.toContain("其他文件夹");
   expect(app.texts()).not.toContain("Other folders");
 
@@ -160,15 +193,16 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   expect(host.acts).toContainEqual({ type: "activate_tab", path: "/work/vibevalley", tab_id: 103 });
 
   await app.hover("text:vibevalley");
-  await app.press(`label:${t("web.shell.sidebar.newChat", { name: "vibevalley" })}`);
+  await app.press("id:sidebar-new-repo-vibevalley");
+  expect(app.count("id:sidebar-new-chat-repo-vibevalley")).toBe(1);
+  expect(app.count("id:sidebar-new-term-repo-vibevalley")).toBe(1);
+  await app.press("id:sidebar-new-chat-repo-vibevalley");
   expect(host.acts).toContainEqual({ type: "new_chat_at", path: "/work/vibevalley" });
 
   await app.press("text:notes");
   expect(host.acts).toContainEqual({ type: "activate_path", path: "/tmp/notes" });
 
-  await app.press(`label:${t("web.shell.sidebar.manageRepos")}`);
-  expect(host.acts).toContainEqual({ type: "open_route", path: "/repos" });
-
+  expect(app.count("label:Manage repositories")).toBe(0);
   await app.press(`label:${t("web.shell.sidebar.addRepo")}`);
   expect(host.acts).toContainEqual({ type: "add_project" });
 
@@ -193,6 +227,69 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   expect(app.texts()).not.toContain("README.md");
   await app.press(`label:${t("web.shell.sidebar.expandCurrent")}`);
   expect(app.texts()).toContain("README.md");
+});
+
+test("regression: sidebar and GitPanel parse detached-HEAD worktrees with omitted branch/upstream fields and display shortened home path", async () => {
+  const host = workspaceHost({ view: "sidebar" }, { "repo.list": [{ name: "vibevalley", path: "/Users/lucas/orca/vibevalley", git: true }] });
+  const app = await open("../ShellApp.story.tsx", { width: 280, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  await host.pump(app);
+
+  // Mimics Rust #[skip_serializing_none] omitting `branch` on a detached-HEAD worktree.
+  await host.pushFrame(app, "rail", {
+    panel: "files",
+    projects: [
+      {
+        id: 1,
+        name: "vibevalley",
+        path: "/Users/lucas/orca/vibevalley",
+        initials: "VV",
+        active: true,
+        attention: false,
+        terminals: 4,
+        branch: "main",
+        worktrees: [
+          { path: "/Users/lucas/orca/vibevalley", branch: "main", main: true },
+          { path: "/private/tmp/vv-detached", main: false },
+        ],
+        tabs: [
+          { id: 1, title: "git pull", active: false, kind: "terminal" },
+          { id: 2, title: "Antigravity 1", active: false, kind: "chat" },
+          { id: 3, title: "zsh", active: false, kind: "terminal" },
+          { id: 4, title: "Antigravity 2", active: true, kind: "chat" },
+        ],
+      },
+    ],
+  });
+
+  expect(app.count("id:sidebar-repo-path-vibevalley")).toBe(1);
+  expect(app.texts()).toContain("~/orca/vibevalley");
+  expect(app.texts()).toContain("git pull");
+  expect(app.texts()).toContain("Antigravity 1");
+  expect(app.texts()).toContain("zsh");
+  expect(app.texts()).toContain("Antigravity 2");
+
+  const inspectorHost = workspaceHost({ view: "sidebar", role: "inspector" });
+  const inspector = await open("../ShellApp.story.tsx", {
+    width: 340,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    host: inspectorHost.options,
+  });
+  await inspectorHost.pump(inspector);
+  await inspectorHost.pushFrame(inspector, "rail", { panel: "git", projects: [] });
+  await inspectorHost.pushFrame(inspector, "git", {
+    repo: true,
+    busy: false,
+    branches: [{ name: "main", head: true }],
+    worktrees: [
+      { path: "/work/repo", branch: "main", main: true, locked: false, current: true, changed: 0, conflicts: 0, ahead: 0, behind: 0 },
+      { path: "/tmp/wt-detached", main: false, locked: false, current: false, changed: 1, conflicts: 0, ahead: 0, behind: 0 },
+    ],
+  });
+  await inspector.press(`label:${t("web.shell.sidebar.gitBranches")}`);
+  expect(inspector.texts()).toContain("/tmp/wt-detached");
+  expect(inspector.texts()).toContain("(detached)");
 });
 
 test("workspace sidebar right-click opens standalone RepoDetailPanel for managed repos and local folders", async () => {
@@ -375,6 +472,35 @@ test("workspace inspector FileTree expands, collapses, opens files, and handles 
   await app.rightClick("text:README.md");
   await app.press(`text:${t("web.shell.fileTree.newTerminalInDir")}`);
   expect(host.acts).toContainEqual({ type: "new_terminal_at", path: "/work/app" });
+
+  // Unsupported preview files ask whether to open with Default App or open in-app.
+  host.clearActs();
+  host.clearCalls();
+  await host.pushFrame(app, "files", {
+    root: "/work/app",
+    name: "app",
+    expanded: [],
+    selected: null,
+    items: [
+      { id: "/work/app/README.md", label: "README.md", tone: "modified" },
+      { id: "/work/app/guide.pdf", label: "guide.pdf", tone: "clean" },
+    ],
+  } satisfies FilesFrame);
+  await app.press("text:guide.pdf");
+  expect(host.acts.filter((a) => a.type === "open_file")).toEqual([]);
+  await host.pump(app);
+  expect(app.count("id:file-unsupported-popover")).toBe(1);
+
+  await app.press("id:file-open-default");
+  expect(host.calls).toContainEqual({ op: "host.openFile", payload: { path: "/work/app/guide.pdf" } });
+  await host.pump(app);
+  expect(app.count("id:file-unsupported-popover")).toBe(0);
+
+  await app.press("text:guide.pdf");
+  await host.pump(app);
+  expect(app.count("id:file-unsupported-popover")).toBe(1);
+  await app.press("id:file-open-in-app");
+  expect(host.acts).toContainEqual({ type: "open_file", path: "/work/app/guide.pdf" });
 });
 
 test("workspace inspector GitPanel drives changes, staging/commit, branches, and commits tabs", async () => {
@@ -514,7 +640,7 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
           mcpServers: null,
           tools: null,
           settings: { enabled: true, binPath: "", defaultModel: "gemini-4-neon", defaultEffort: "high", env: {} },
-          quota: { left: 0.74, text: "5h window" },
+          quota: { left: 74, text: "5h window" },
           stop: "ok",
           checkedAt: 1_700_000_000_000,
         },
@@ -547,11 +673,24 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   expect(app.count("id:workspace-chat-pane")).toBe(1);
   expect(app.count("id:chat-empty")).toBe(1);
 
+  // Pre-chat quota popover hides empty 0-turn context and cache cards.
+  await app.press("id:chat-telemetry-toggle");
+  await host.pump(app);
+  expect(app.count("id:chat-telemetry-drawer")).toBe(1);
+  expect(app.texts()).toContain(t("web.shell.chat.telemetryQuota", { pct: 74 }));
+  expect(app.texts()).not.toContain(t("web.shell.chat.telemetryContextTitle"));
+  expect(app.texts()).not.toContain(t("web.shell.chat.telemetryCacheTitle"));
+  await app.press("id:chat-telemetry-toggle");
+  await host.pump(app);
+  expect(app.count("id:chat-telemetry-drawer")).toBe(0);
+
   await app.type("id:chat-composer-input", "Inspect acp.rs");
   await app.press("id:chat-send");
   await host.pump(app);
 
-  expect(host.calls.some((c) => c.op === "session.openWorkspace")).toBe(true);
+  const openCall = host.calls.find((c) => c.op === "session.openWorkspace");
+  expect(openCall).toBeDefined();
+  expect((openCall?.payload as Record<string, unknown> | undefined)?.permissionMode).toBe("bypass");
   expect(host.calls.some((c) => c.op === "session.send")).toBe(true);
   expect(host.acts.some((a) => a.type === "bind_chat_session" && a.tab_id === 42 && a.session_id === "sess-ws-1")).toBe(true);
   expect([...host.subscriptions.values()].some((s) => s.name === "session.watch")).toBe(true);
@@ -602,14 +741,51 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   await host.pump(app);
 
   expect(host.acts.some((a) => a.type === "update_chat_tab")).toBe(false);
+  expect(app.count("id:chat-header")).toBe(0);
   expect(app.count("id:chat-header-title")).toBe(0);
-  expect(app.count("id:chat-permission-mode")).toBe(1);
+  expect(app.count("id:chat-permission-mode")).toBe(0);
+  expect(app.count("id:chat-cwd-chip")).toBe(0);
 
+  // Completed thinking + edit cluster starts folded with an edited-file shortcut strip, then expands on demand.
+  expect(app.count("id:chat-activity-g:2")).toBe(1);
+  expect(app.count("id:chat-tool-3")).toBe(0);
   host.clearActs();
   await app.press(`label:${t("web.shell.chat.toolOpenFile")}`);
   await app.press(`label:${t("web.shell.chat.toolOpenDiff")}`);
   expect(host.acts).toContainEqual({ type: "open_file_adjacent", path: "crates/runtime/src/oar/acp/mod.rs", line: 136 });
   expect(host.acts).toContainEqual({ type: "open_diff_adjacent", path: "crates/runtime/src/oar/acp/mod.rs", staged: false });
+
+  await app.press("id:chat-activity-toggle-g:2");
+  await host.pump(app);
+  expect(app.count("id:chat-thinking")).toBe(1);
+  expect(app.count("id:chat-tool-3")).toBe(1);
+  await app.press("id:chat-tool-toggle-3");
+  await host.pump(app);
+  expect(app.texts()).toContain(t("web.shell.chat.toolInput"));
+  expect(app.texts()).toContain(t("web.shell.chat.toolOutput"));
+
+  // Failed tool calls auto-expand their input/output details immediately.
+  await host.emitSub(app, "session.watch", {
+    kind: "event",
+    session: "sess-ws-1",
+    event: {
+      seq: 6,
+      revision: 1,
+      time: 1_700_000_006_000,
+      type: "tool/call",
+      action: "run_command",
+      actionText: "Run",
+      tool: "run_command",
+      text: "cargo test",
+      input: JSON.stringify({ command: "cargo test -p vibevalley-runtime" }),
+      output: "error: test failed",
+      ok: false,
+    },
+  });
+  await host.pump(app);
+  expect(app.count("id:chat-tool-6")).toBe(1);
+  expect(app.texts()).toContain("$ cargo test -p vibevalley-runtime");
+  expect(app.texts()).toContain("error: test failed");
 
   expect(app.count("id:chat-permission-perm-1")).toBe(1);
   expect(app.count("id:chat-interaction-interaction_01")).toBe(1);
@@ -631,7 +807,9 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   });
   expect(app.count("id:chat-interaction-interaction_01")).toBe(0);
 
-  expect(app.count("id:chat-steering-banner")).toBe(1);
+  expect(app.count("id:chat-steering-banner")).toBe(0);
+  expect(app.texts()).not.toContain("你");
+  expect(app.texts()).not.toContain("You");
   expect(app.count("id:chat-composer-card")).toBe(1);
   expect(app.count("id:chat-composer-attachments")).toBe(0);
   host.clearCalls();
@@ -662,6 +840,14 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   await host.pump(app);
   expect(app.count("id:chat-telemetry-drawer")).toBe(1);
   expect(app.texts()).toContain(t("web.shell.chat.telemetryCacheTitle"));
+  expect(app.texts()).toContain(t("web.shell.chat.telemetryQuota", { pct: 74 }));
+  expect(app.texts()).toContain("5h window");
+  await app.keyboard.press("escape");
+  await host.pump(app);
+  expect(app.count("id:chat-telemetry-drawer")).toBe(0);
+  await app.press("id:chat-telemetry-toggle");
+  await host.pump(app);
+  expect(app.count("id:chat-telemetry-drawer")).toBe(1);
   await app.press("id:chat-telemetry-toggle");
   await host.pump(app);
   expect(app.count("id:chat-telemetry-drawer")).toBe(0);
@@ -671,7 +857,7 @@ test("workspace ChatPane drives openWorkspace, session.watch, tool adjacent open
   await freshHost.pump(freshApp);
   expect(freshApp.count("id:chat-telemetry-toggle")).toBe(0);
   expect(freshApp.count("id:chat-swarm-pill")).toBe(0);
-  expect(freshApp.count("id:chat-cwd-chip")).toBe(1);
+  expect(freshApp.count("id:chat-header")).toBe(0);
 });
 
 test("workspace SwarmPanel hides pill when absent, switches Overview/Roster/Board tabs, filters board, and loads child transcripts", async () => {
@@ -1278,4 +1464,160 @@ test("workspace ChatPane opens RichPreviewModal when clicking inline mermaid pre
 
   await app.press("id:rich-preview-close");
   expect(app.count("id:rich-preview-modal")).toBe(0);
+});
+
+test("workspace ChatPane shows collapsed activity latest command, ticks elapsed time live, and renders update_steps todo progress panel", async () => {
+  const start = 1_700_000_000_000;
+  const workingSession = {
+    id: "sess-live-1",
+    controller: "user" as const,
+    name: "Antigravity",
+    runtime: "antigravity",
+    brief: "Live progress",
+    cwd: "/work/vibevalley",
+    policy: { kind: "directCwd" as const, repo: "vibevalley", permissionMode: "acceptEdits" as const },
+    bindings: [],
+    hiredAt: start,
+    runs: 1,
+    phase: { _tag: "working" as const, since: start, doing: { action: "run_command" as const, label: "Running" } },
+  };
+  const host = workspaceHost(
+    { view: "workspace-chat", tabId: 80, sessionId: "sess-live-1", runtime: "antigravity", cwd: "/work/vibevalley" },
+    { "runtime.list": [] },
+  );
+  const app = await open("../ShellApp.story.tsx", {
+    width: 820,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: start },
+    host: host.options,
+  });
+  const clock = app.clock;
+  if (!clock) throw new Error("live activity timer test requires a manual virtual clock");
+  await host.pump(app);
+
+  await host.emitSub(app, "session.watch", {
+    kind: "state",
+    session: workingSession,
+    permissionMode: "acceptEdits",
+    pendingPermissions: [],
+    pendingInteractions: [],
+  });
+  await host.emitSub(app, "session.watch", {
+    kind: "history",
+    session: "sess-live-1",
+    events: [
+      { seq: 1, revision: 1, time: start, type: "user/message", text: "Run checks and track steps" },
+      { seq: 2, revision: 1, time: start + 1_000, type: "assistant/thinking", text: "Preparing verification" },
+      {
+        seq: 3,
+        revision: 1,
+        time: start + 2_000,
+        type: "tool/call",
+        action: "other",
+        tool: "update_steps",
+        text: "update_steps",
+        input: JSON.stringify({
+          steps: [
+            { status: "done", title: "Simplify Content Hub" },
+            { status: "in_progress", title: "Upgrade Chat UI" },
+            { status: "pending", title: "Capture screenshots" },
+          ],
+          kind: "other",
+        }),
+        ok: true,
+      },
+      {
+        seq: 4,
+        revision: 1,
+        time: start + 3_000,
+        type: "tool/call",
+        action: "run_command",
+        tool: "run_command",
+        text: "vp run mac:check",
+        input: JSON.stringify({ command: "vp run mac:check" }),
+      },
+    ],
+  });
+  await host.pump(app);
+
+  // User bubble omits "你" / "You".
+  expect(app.texts()).toContain("Run checks and track steps");
+  expect(app.texts()).not.toContain("你");
+  expect(app.texts()).not.toContain("You");
+
+  // Todo progress panel auto-expands with current fraction and steps.
+  expect(app.count("id:chat-todo-panel")).toBe(1);
+  expect(app.count("id:chat-todo-list")).toBe(1);
+  expect(app.texts()).toContain("1/3");
+  expect(app.texts()).toContain("Simplify Content Hub");
+  expect(app.texts()).toContain("Upgrade Chat UI");
+  expect(app.texts()).toContain("Capture screenshots");
+
+  // Collapse the running activity cluster to reveal the latest executed command preview.
+  await app.press("id:chat-activity-toggle-g:2");
+  await host.pump(app);
+  expect(app.count("id:chat-activity-latest-cmd-g:2")).toBe(1);
+  expect(app.texts()).toContain("$ vp run mac:check");
+
+  // Advance clock while active and verify the group timer updates live.
+  await clock.fastForward(5_000);
+  await host.pump(app);
+  expect(app.texts()).toContain("4.0s");
+
+  // Finish running command, push updated steps, and mark session resting -> timer stops ticking.
+  await host.emitSub(app, "session.watch", {
+    kind: "event",
+    session: "sess-live-1",
+    event: { seq: 5, revision: 1, time: start + 5_000, type: "tool/result", call: 4, ok: true, text: "", output: "checks ok" },
+  });
+  await host.emitSub(app, "session.watch", {
+    kind: "event",
+    session: "sess-live-1",
+    event: {
+      seq: 6,
+      revision: 1,
+      time: start + 6_000,
+      type: "tool/call",
+      action: "other",
+      tool: "update_steps",
+      text: "update_steps",
+      input: JSON.stringify({
+        steps: [
+          { status: "done", title: "Simplify Content Hub" },
+          { status: "done", title: "Upgrade Chat UI" },
+          { status: "done", title: "Capture screenshots" },
+        ],
+      }),
+      ok: true,
+    },
+  });
+  await host.emitSub(app, "session.watch", {
+    kind: "event",
+    session: "sess-live-1",
+    event: { seq: 7, revision: 1, time: start + 7_000, type: "run/end", text: "done" },
+  });
+  await host.emitSub(app, "session.watch", {
+    kind: "state",
+    session: { ...workingSession, phase: { _tag: "resting" as const } },
+    permissionMode: "acceptEdits",
+    pendingPermissions: [],
+    pendingInteractions: [],
+  });
+  await host.pump(app);
+
+  expect(app.texts()).toContain("3/3");
+  expect(app.texts()).toContain("5.0s");
+  await clock.fastForward(5_000);
+  await host.pump(app);
+  expect(app.texts()).toContain("5.0s");
+  expect(app.texts()).not.toContain("10.0s");
+
+  // Expanding an update_steps tool call inside the activity cluster renders the checklist instead of raw JSON.
+  await app.press("id:chat-activity-toggle-g:2");
+  await app.press("id:chat-tool-toggle-3");
+  await host.pump(app);
+  expect(app.texts()).not.toContain(t("web.shell.chat.toolInput"));
+  expect(app.texts()).toContain("Simplify Content Hub");
 });

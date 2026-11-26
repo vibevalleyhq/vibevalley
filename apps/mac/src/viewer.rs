@@ -419,7 +419,39 @@ fn file_skeleton(line_height: f32, colors: &Palette) -> AnyElement {
     rows.into_any_element()
 }
 
-fn state_card(title: &'static str, detail: String, hint: Option<&'static str>, danger: bool, colors: &Palette) -> AnyElement {
+fn state_card_action(id: &'static str, icon_name: &'static str, label: &'static str, primary: bool, colors: &Palette) -> gpui::Stateful<gpui::Div> {
+    let hover = colors.hover;
+    let base = div()
+        .id(id)
+        .h(px(28.0))
+        .px(px(10.0))
+        .rounded(px(6.0))
+        .border_1()
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap(px(6.0))
+        .text_size(px(12.0))
+        .font_weight(FontWeight::MEDIUM)
+        .cursor_pointer();
+    if primary {
+        base.border_color(colors.accent)
+            .bg(colors.accent)
+            .text_color(colors.bg)
+            .hover(|s| s.opacity(0.9))
+            .child(gpui_icon(icon_name, 13.0, colors.bg))
+            .child(label)
+    } else {
+        base.border_color(colors.border)
+            .bg(colors.bg)
+            .text_color(colors.text)
+            .hover(move |s| s.bg(hover))
+            .child(gpui_icon(icon_name, 13.0, colors.muted))
+            .child(label)
+    }
+}
+
+fn state_card(title: &'static str, detail: String, hint: Option<&'static str>, danger: bool, actions: Vec<AnyElement>, colors: &Palette) -> AnyElement {
     let (bg, border, title_color) = if danger {
         (colors.removed_bg, Hsla { a: 0.35, ..colors.danger }, colors.danger)
     } else {
@@ -451,7 +483,8 @@ fn state_card(title: &'static str, detail: String, hint: Option<&'static str>, d
                         .text_color(if danger { colors.text } else { colors.muted })
                         .child(detail),
                 )
-                .children(hint.map(|h| div().pt(px(2.0)).text_size(px(11.5)).text_color(colors.faint).child(h))),
+                .children(hint.map(|h| div().pt(px(2.0)).text_size(px(11.5)).text_color(colors.faint).child(h)))
+                .children((!actions.is_empty()).then(|| div().pt(px(8.0)).flex().flex_row().items_center().gap(px(8.0)).children(actions))),
         )
         .into_any_element()
 }
@@ -595,22 +628,34 @@ impl Render for FileViewer {
                 },
             )
         });
+        let fallback_actions = |cx: &mut Context<Self>| -> Vec<AnyElement> {
+            vec![
+                state_card_action("viewer-open-default", "open", "Open with Default App", true, &colors)
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::OpenInEditor(EditorTarget::DefaultApp))))
+                    .into_any_element(),
+                state_card_action("viewer-reveal-finder", "folder", "Reveal in Finder", false, &colors)
+                    .on_click(cx.listener(|_, _, _, cx| cx.emit(ViewerEvent::Reveal)))
+                    .into_any_element(),
+            ]
+        };
         let body = match &self.state {
             State::Loading if self.show_skeleton => file_skeleton(line_height, &colors),
             State::Loading => div().size_full().into_any_element(),
-            State::Error(e) => state_card("Could not open file", e.clone(), None, true, &colors),
+            State::Error(e) => state_card("Could not open file", e.clone(), None, true, Vec::new(), &colors),
             State::Binary(size) => state_card(
                 "Binary file",
                 format!("{} ({size} bytes) — preview is not available.", format_bytes(*size)),
-                Some("Use Open in editor or Reveal to inspect it externally."),
+                Some("Use Open with Default App or Reveal in Finder to inspect it externally."),
                 false,
+                fallback_actions(cx),
                 &colors,
             ),
             State::TooLarge(size) => state_card(
                 "File too large to preview",
                 format!("{} exceeds the {} viewer limit.", format_bytes(*size), format_bytes(MAX_BYTES)),
-                Some("Use Open in editor to view the full file."),
+                Some("Use Open with Default App or Open in editor to view the full file."),
                 false,
+                fallback_actions(cx),
                 &colors,
             ),
             State::Image => div()
@@ -630,7 +675,7 @@ impl Render for FileViewer {
                         .child(img(self.path.clone()).size_full().object_fit(ObjectFit::Contain)),
                 )
                 .into_any_element(),
-            State::Text { lines, .. } if lines.is_empty() => state_card("Empty file", "This file has no content yet.".into(), None, false, &colors),
+            State::Text { lines, .. } if lines.is_empty() => state_card("Empty file", "This file has no content yet.".into(), None, false, Vec::new(), &colors),
             State::Text { lines, .. } => {
                 let lines = lines.clone();
                 let digits = lines.len().max(1).to_string().len().max(3);

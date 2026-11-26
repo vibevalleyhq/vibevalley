@@ -34,19 +34,32 @@ function updateWords(state: UpdateState): string {
 export function UpdateRow(props: { state: Accessor<UpdateState | undefined>; last?: boolean }) {
   const update = currentHost().update;
   const sessions = useSessionsSlice();
+  const [checking, setChecking] = createSignal(false);
   const working = computed(() => (sessions()?.sessions ?? []).filter((s) => s.phase._tag === "working").length);
-  const check = () => void update?.check().catch((e: unknown) => toast(reasonOf(e), "bad"));
+  const check = () => {
+    if (!update || checking()) return;
+    setChecking(() => true);
+    void update
+      .check()
+      .then(
+        () => {
+          if (props.state()?._tag === "idle") toast(t("web.setting.about.upToDate"));
+        },
+        (e: unknown) => toast(reasonOf(e), "bad"),
+      )
+      .finally(() => setChecking(() => false));
+  };
   const install = () => void update?.install().catch((e: unknown) => toast(reasonOf(e), "bad"));
   return (
     <If when={props.state()}>
       {(s) => (
         <SettingRow label={t("web.setting.about.update")} hint={t("web.setting.about.updateHint")} last={props.last}>
           <Text testID="update-state" class="text-sm tabular-nums text-muted">
-            {updateWords(s())}
+            {checking() && s()._tag === "idle" ? t("web.setting.about.checking") : updateWords(s())}
           </Text>
           <If when={s()._tag === "idle" || s()._tag === "failed"}>
-            <Button icon="refresh" testID="update-check" onPress={check}>
-              {t("web.setting.about.check")}
+            <Button icon="refresh" testID="update-check" disabled={checking()} onPress={check}>
+              {checking() ? t("web.setting.about.checking") : t("web.setting.about.check")}
             </Button>
           </If>
           <If when={variant(s(), "_tag", "ready")}>

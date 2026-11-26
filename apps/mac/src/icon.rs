@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use gpui::{
     AnyElement, AnyView, App, AppContext as _, Bounds, Context, Div, ElementId, FillOptions, FillRule, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    MouseButton, ParentElement as _, Path, PathBuilder, PathStyle, Pixels, Render, SharedString, Stateful, StatefulInteractiveElement as _, StrokeOptions,
-    Styled as _, Window, canvas, div, hsla, point, px,
+    MouseButton, ParentElement as _, Path, PathBuilder, PathStyle, Pixels, Render, SharedString, Stateful, StatefulInteractiveElement as _, Styled as _,
+    Window, canvas, div, hsla, point, px,
 };
 use vibevalley_rich::icon::{IconShape, Num, PathOp, icon_paths, icon_shapes};
 
@@ -52,7 +52,7 @@ fn feed_ops(pb: &mut PathBuilder, ops: &[PathOp], x0: f32, y0: f32, scale: f32) 
     }
 }
 
-fn build_shape_paths(shapes: &[IconShape], paths: &[vibevalley_rich::icon::Path], bounds: Bounds<Pixels>, color: Hsla) -> Vec<(Path<Pixels>, Hsla)> {
+fn build_shape_paths(shapes: &[IconShape], paths: &[vibevalley_rich::icon::Path], bounds: Bounds<Pixels>, color: Hsla) -> Vec<(Path, Hsla)> {
     let w = f32::from(bounds.size.width);
     let h = f32::from(bounds.size.height);
     let side = w.min(h);
@@ -74,7 +74,7 @@ fn build_shape_paths(shapes: &[IconShape], paths: &[vibevalley_rich::icon::Path]
         };
         if shape.fill {
             let rule = if shape.evenodd { FillRule::EvenOdd } else { FillRule::NonZero };
-            let mut pb = PathBuilder::fill().with_style(PathStyle::Fill(FillOptions::default().with_fill_rule(rule).with_tolerance(0.05)));
+            let mut pb = PathBuilder::fill().with_style(PathStyle::Fill(FillOptions { fill_rule: rule }));
             feed_ops(&mut pb, ops, x0, y0, scale);
             if let Ok(built) = pb.build() {
                 out.push((built, paint_color));
@@ -84,8 +84,7 @@ fn build_shape_paths(shapes: &[IconShape], paths: &[vibevalley_rich::icon::Path]
             && width > 0.0
         {
             let stroke_width = width * scale;
-            let mut pb = PathBuilder::stroke(px(stroke_width))
-                .with_style(PathStyle::Stroke(StrokeOptions::default().with_line_width(stroke_width).with_tolerance(0.05)));
+            let mut pb = PathBuilder::stroke(px(stroke_width));
             feed_ops(&mut pb, ops, x0, y0, scale);
             if let Ok(built) = pb.build() {
                 out.push((built, paint_color));

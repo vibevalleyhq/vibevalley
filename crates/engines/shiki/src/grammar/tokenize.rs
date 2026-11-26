@@ -2,8 +2,10 @@ use std::time::{Duration, Instant};
 
 use rustc_hash::FxHashMap;
 
+use super::attributes::Injection;
+use super::tokens::TokenHandler;
+use super::types::{AttributedScopeStack, Grammar, StateStack};
 use crate::error::RegexError;
-use crate::grammar::{AttributedScopeStack, Grammar, Injection, StateStack, TokenHandler};
 use crate::matcher::InjectionPriority;
 use crate::regex_engine::{CaptureIndex, FindOption, RegexEngine, RegexScanner, RegexString};
 use crate::rule::{BeginWhileRule, CaptureRule, CompiledRule, MatchTarget, Rule, RuleId};

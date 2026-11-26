@@ -1,13 +1,16 @@
-use std::io::{BufRead, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Read};
 use std::sync::Arc;
 use std::time::Duration;
 
+use axum::body::{Body, Bytes};
+use axum::http::{HeaderMap, StatusCode};
+use futures_util::StreamExt as _;
 use serde_json::{Value, json};
 use tokio_util::io::{StreamReader, SyncIoBridge};
-use vibevalley_protocol::{Issue, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE, SliceKind};
+use vibevalley_protocol::{ApiError, BizCode, Envelope, Issue, SCOPE_REMOTE_CLIENT, SCOPE_REMOTE_MACHINE, SliceKind};
 
 use crate::context::SliceSubscription;
-use crate::gateway::api::{BoxFuture, ClientKind, GatewayPorts, RemoteAuth, RemoteDeviceIdentity};
+use crate::gateway::api::{BoxFuture, CallerContext, ClientKind, GatewayPorts, RemoteAuth, RemoteDeviceIdentity, Server};
 use crate::gateway::bridge::fake::{FakeServer, empty_bundle};
 
 use super::auth::is_loopback;

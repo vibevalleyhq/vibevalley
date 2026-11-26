@@ -15,9 +15,6 @@ This product includes software from other projects:
   invite and stop routes.
   Copyright (c) 2025 Agora Community
 
-- Fusion Pixel Font (https://github.com/TakWolf/fusion-pixel-font),
-  SIL Open Font License 1.1; assets/fonts/fusion-pixel-OFL.txt.
-
 - gse (https://github.com/go-ego/gse, v1.1.0), Apache License 2.0.
   crates/server/src/team/memory/gse.rs cuts Chinese as it does;
   crates/server/src/team/memory/data/zh_s.txt.gz is its data/dict/zh/s_1.txt,
@@ -44,14 +41,8 @@ This product includes software from other projects:
   tables from its dict1 dataset.
   Copyright (c) 2022-present zh-lx
 
-- Hugeicons (https://hugeicons.com, @hugeicons/core-free-icons 4.3.5), MIT License.
-  design/pixel/icons holds its SVGs; the pixel button glyphs in assets/pixel are
-  redrawn from their shapes.
-  Copyright (c) 2025 Hugeicons
-
 - LobeHub Icons (https://github.com/lobehub/lobe-icons), MIT License.
-  design/pixel/logos holds its PNGs of the coding agents' logos; the runtimes' pixel
-  logos in assets/pixel are redrawn from them.
+  assets/engines/*.png embeds coding-agent emblems derived from its icon set.
   Copyright (c) 2023 LobeHub
 
 - vscode-textmate (https://github.com/microsoft/vscode-textmate), first-mate

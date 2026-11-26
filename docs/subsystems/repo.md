@@ -72,4 +72,4 @@
 
 - `crates/git/src/tests.rs`：git 封装、冲突预检与无检出合入。
 - `crates/server/tests/issue_board.rs`：合并、冲突、检查失败退回、留分支。
-- `apps/mac/src/pixel/tests.rs` 的 `map_draws_an_island_per_repo`：群岛地图一个仓库一座岛。
+- `apps/mac/ui/app/scenarios.test.tsx`：仓库列表、语言条与提交日历页面验证。

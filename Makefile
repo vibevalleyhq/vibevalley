@@ -1,4 +1,4 @@
-.PHONY: help rust rust-changed rust-audit rust-loom protocol protocol-write goldens ts mac mobile site docs check verify dev-server dev-mac
+.PHONY: help rust rust-changed rust-audit rust-loom protocol protocol-write goldens ts mac mobile site docs check verify dev-server dev-mac package-alpha bump build-alpha build-beta build-release
 
 help:
 	@printf '%s\n' \
@@ -17,7 +17,12 @@ help:
 		'  check           rust + rust-audit + ts + docs' \
 		'  verify          rust + rust-audit + protocol + ts + mac:build-test + docs' \
 		'  dev-server      cargo run -p vibevalley-server' \
-		'  dev-mac         cargo run -p vibevalley-mac'
+		'  dev-mac         cargo run -p vibevalley-mac' \
+		'  package-alpha   vp run package:mac:alpha' \
+		'  bump            vp run bump' \
+		'  build-alpha     vp run build:alpha' \
+		'  build-beta      vp run build:beta' \
+		'  build-release   vp run build:release'
 
 rust:
 	cargo xtask check
@@ -51,3 +56,13 @@ dev-server:
 	cargo run -p vibevalley-server
 dev-mac:
 	cargo run -p vibevalley-mac
+package-alpha:
+	vp run package:mac:alpha
+bump:
+	vp run bump
+build-alpha:
+	vp run build:alpha
+build-beta:
+	vp run build:beta
+build-release:
+	vp run build:release

@@ -77,7 +77,7 @@ export const kindLabel = (a: { readonly artifactType: ArtifactType }): string =>
 
 export const artifactIcon = (a: { readonly artifactType: ArtifactType }): IconName => artifactTypeIcon[a.artifactType];
 
-export const artifactSuffix = (a: { readonly artifactType: ArtifactType }): string => artifactSuffixOf(a);
+const artifactSuffix = (a: { readonly artifactType: ArtifactType }): string => artifactSuffixOf(a);
 
 /** The card's second line: what it is, its snapshot version if any, and its note. */
 const cardLine = (card: Card) =>

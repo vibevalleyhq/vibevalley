@@ -195,7 +195,7 @@ pub fn VvCodeBlock(props: VvCodeBlockProps, cx: Scope<VvCodeBlockEvent>) -> impl
         .on_press(move |_: &PressEvent| {
             let code = props.code.get_untracked();
             let language = props.language.get_untracked();
-            set_clipboard(code.to_string());
+            drop(set_clipboard(code.to_string()));
             let seq = copy_seq.get_untracked().wrapping_add(1);
             copy_seq.set(seq);
             copied.set(true);

@@ -138,17 +138,63 @@ impl Config {
     }
 }
 
-#[derive(Debug)]
-pub struct StartError(pub String);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StartErrorKind {
+    DatabaseSchema,
+    Database,
+    Storage,
+    Boot,
+}
+
+#[derive(Debug, Clone)]
+pub struct StartError {
+    pub kind: StartErrorKind,
+    pub message: String,
+    pub detail: Option<String>,
+    pub db_path: Option<PathBuf>,
+}
+
+impl StartError {
+    pub fn new(kind: StartErrorKind, message: impl Into<String>) -> Self {
+        Self {
+            kind,
+            message: message.into(),
+            detail: None,
+            db_path: None,
+        }
+    }
+
+    pub(crate) fn from_db_error(err: crate::service::DbError, fallback_path: Option<PathBuf>) -> Self {
+        if let Some(report) = err.schema_mismatch() {
+            return Self {
+                kind: StartErrorKind::DatabaseSchema,
+                message: format!("the database: {report}"),
+                detail: Some(report.format_detail()),
+                db_path: report.db_path.clone().or(fallback_path),
+            };
+        }
+        Self {
+            kind: StartErrorKind::Database,
+            message: format!("the database: {err}"),
+            detail: None,
+            db_path: fallback_path,
+        }
+    }
+}
 
 impl std::fmt::Display for StartError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "the server did not start: {}", self.0)
+        write!(f, "the server did not start: {}", self.message)
     }
 }
 
 impl std::error::Error for StartError {}
 
 pub(crate) fn failed(what: &str) -> impl Fn(&dyn std::fmt::Display) -> StartError + '_ {
-    move |e| StartError(format!("{what}: {e}"))
+    let kind = if what == "the storage" {
+        StartErrorKind::Storage
+    } else {
+        StartErrorKind::Boot
+    };
+    move |e| StartError::new(kind, format!("{what}: {e}"))
 }

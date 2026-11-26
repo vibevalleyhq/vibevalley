@@ -1,4 +1,4 @@
-import { computed, effect, List, signal, Text, untracked, View } from "nsh";
+import { Clipboard, computed, effect, List, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { PhaseView, SessionEvent, SessionPermissionDecision, SessionView } from "@vibevalley/protocol";
@@ -6,8 +6,20 @@ import type { PhaseView, SessionEvent, SessionPermissionDecision, SessionView } 
 import type { IconName } from "../../design/icons";
 import { Icon } from "../design/Icon";
 import type { MobileLayout } from "../design/layout";
-import { EmptyPanel, FieldInput, MarkdownText, PillButton, SectionCard, SplitPane, StatusTag, TopBar, type TagTone } from "../design/ui";
-import { hapticImpact, hapticNotification, type RemoteSession } from "../infra/session";
+import {
+  EmptyPanel,
+  FieldInput,
+  MarkdownText,
+  PillButton,
+  SearchInput,
+  SectionCard,
+  SplitPane,
+  StatusTag,
+  TopBar,
+  useTimeout,
+  type TagTone,
+} from "../design/ui";
+import { hapticImpact, hapticNotification, hapticSelection, type RemoteSession } from "../infra/session";
 
 interface OptimisticSessionEvent {
   readonly sessionId: string;
@@ -75,11 +87,14 @@ export function SessionsTab(props: {
   readonly onSelectSession: (id: string | undefined) => void;
 }) {
   const promptDrafts = signal<Readonly<Record<string, string>>>({});
+  const searchQuery = signal("");
   const sending = signal(false);
   const stopping = signal(false);
   const busyAction = signal<string | undefined>(undefined);
   const interactionDrafts = signal<Readonly<Record<string, string>>>({});
   const actionError = signal<string | undefined>(undefined);
+  const copiedSessionId = signal<string | undefined>(undefined);
+  const resetCopied = useTimeout();
   const pendingEvents = signal<readonly OptimisticSessionEvent[]>([]);
   // Keyed by `${sessionId}:${seq}` so confirming seq N in one session never suppresses deduplication in another.
   const confirmedSeqKeys = new Set<string>();
@@ -102,6 +117,32 @@ export function SessionsTab(props: {
   const machineLabelOf = (machineId: string | undefined): string | undefined => {
     if (machineId === undefined || machineId === "") return undefined;
     return machineNames().get(machineId) ?? machineId;
+  };
+  const filteredSessions = computed(() => {
+    const q = searchQuery().trim().toLowerCase();
+    const list = sessionList();
+    if (q === "") return list;
+    return list.filter((s) => {
+      const hay = [s.id, s.name, s.runtime, s.brief, s.phaseText, machineLabelOf(s.machine) ?? ""].join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  });
+  const hasSearchQuery = computed(() => searchQuery().trim() !== "");
+  const clearSearch = () => {
+    hapticSelection();
+    searchQuery.set("");
+  };
+  const copySessionId = (id: string) => {
+    void Clipboard.writeText(id).then(
+      () => {
+        hapticImpact("light");
+        copiedSessionId.set(id);
+        resetCopied(() => {
+          if (untracked(copiedSessionId) === id) copiedSessionId.set(undefined);
+        }, 1500);
+      },
+      () => undefined,
+    );
   };
   const selectedView = computed(() => {
     const id = props.selectedSessionId();
@@ -315,36 +356,70 @@ export function SessionsTab(props: {
 
   const renderMaster = () => (
     <If when={sessionList().length > 0} else={<EmptyPanel testID="sessions-empty" icon="terminal" message={t("web.remote.session.empty")} />}>
-      <List testID="sessions-list" each={sessionList()} keyExtractor={(s) => s.id} estimatedItemSize={88} class="min-h-0 flex-1" contentClass="gap-2.5 p-3.5">
-        {(s) => {
-          const active = computed(() => isDual() && props.selectedSessionId() === s().id);
-          return (
-            <SectionCard
-              testID={`session-row-${s().id}`}
-              onPress={() => {
-                hapticImpact("light");
-                props.onSelectSession(s().id);
-              }}
-              class={`gap-2 ${active() ? "border-focus bg-selected" : ""}`}
-            >
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{s().name}</Text>
-                <StatusTag label={s().phaseText || s().phase._tag} tone={phaseTone(s().phase)} dot />
-              </View>
-              <Text class="truncate text-xs text-muted">{phaseSubtitle(s())}</Text>
-              <View class="flex-row flex-wrap items-center gap-2">
-                <View class="flex-row items-center gap-1.5">
-                  <Icon name="runtimes" size={12} tone="faint" />
-                  <Text class="font-mono text-2xs text-faint">{s().runtime}</Text>
-                </View>
-                <If when={machineLabelOf(s().machine)}>
-                  {(label) => <StatusTag testID={`session-machine-${s().id}`} label={label()} icon="devices" tone="neutral" />}
-                </If>
-              </View>
-            </SectionCard>
-          );
-        }}
-      </List>
+      <View class="min-h-0 flex-1">
+        <View class="border-b border-line bg-side px-3.5 py-2.5">
+          <SearchInput
+            testID="session-search-input"
+            clearTestID="session-search-clear"
+            value={searchQuery()}
+            onInput={(v) => searchQuery.set(v)}
+            placeholder={t("web.session.hub.searchHint")}
+            clearLabel={t("web.session.hub.clear")}
+          />
+        </View>
+        <If
+          when={filteredSessions().length > 0}
+          else={
+            <EmptyPanel
+              testID="sessions-empty"
+              icon="search"
+              message={t("web.session.hub.emptyFiltered")}
+              actionLabel={hasSearchQuery() ? t("web.session.hub.clearFilter") : undefined}
+              actionIcon="refresh"
+              actionTestID="sessions-clear-filters"
+              onAction={clearSearch}
+            />
+          }
+        >
+          <List
+            testID="sessions-list"
+            each={filteredSessions()}
+            keyExtractor={(s) => s.id}
+            estimatedItemSize={88}
+            class="min-h-0 flex-1"
+            contentClass="gap-2.5 p-3.5"
+          >
+            {(s) => {
+              const active = computed(() => isDual() && props.selectedSessionId() === s().id);
+              return (
+                <SectionCard
+                  testID={`session-row-${s().id}`}
+                  onPress={() => {
+                    hapticImpact("light");
+                    props.onSelectSession(s().id);
+                  }}
+                  class={`gap-2 ${active() ? "border-focus bg-selected" : ""}`}
+                >
+                  <View class="flex-row items-center justify-between gap-2">
+                    <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{s().name}</Text>
+                    <StatusTag label={s().phaseText || s().phase._tag} tone={phaseTone(s().phase)} dot />
+                  </View>
+                  <Text class="truncate text-xs text-muted">{phaseSubtitle(s())}</Text>
+                  <View class="flex-row flex-wrap items-center gap-2">
+                    <View class="flex-row items-center gap-1.5">
+                      <Icon name="runtimes" size={12} tone="faint" />
+                      <Text class="font-mono text-2xs text-faint">{s().runtime}</Text>
+                    </View>
+                    <If when={machineLabelOf(s().machine)}>
+                      {(label) => <StatusTag testID={`session-machine-${s().id}`} label={label()} icon="devices" tone="neutral" />}
+                    </If>
+                  </View>
+                </SectionCard>
+              );
+            }}
+          </List>
+        </If>
+      </View>
     </If>
   );
 
@@ -460,19 +535,32 @@ export function SessionsTab(props: {
         subtitle={detailSubtitle()}
         onBack={isDual() ? undefined : () => props.onSelectSession(undefined)}
         right={
-          <If when={isWorking()}>
+          <View class="flex-row items-center gap-1.5">
             <PillButton
-              testID="session-stop-button"
-              tone="danger"
+              testID="session-copy-id"
               size="sm"
-              icon="stop"
-              label={t("web.remote.session.stop")}
-              disabled={stopping()}
+              tone={copiedSessionId() === props.selectedSessionId() ? "ok" : "plain"}
+              icon={copiedSessionId() === props.selectedSessionId() ? "check" : "copy"}
+              label={copiedSessionId() === props.selectedSessionId() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
               onPress={() => {
-                void stopSession();
+                const id = props.selectedSessionId();
+                if (id !== undefined) copySessionId(id);
               }}
             />
-          </If>
+            <If when={isWorking()}>
+              <PillButton
+                testID="session-stop-button"
+                tone="danger"
+                size="sm"
+                icon="stop"
+                label={t("web.remote.session.stop")}
+                disabled={stopping()}
+                onPress={() => {
+                  void stopSession();
+                }}
+              />
+            </If>
+          </View>
         }
       />
 

@@ -12,6 +12,7 @@ import type {
   SessionView,
 } from "@vibevalley/protocol";
 import { assignedAgentOf, executionsOf, omitUndefined, sessionIdsOf, shortTitle, stageWantsUser } from "@vibevalley/protocol/rules";
+import { IssueLane as IssueLaneSchema } from "@vibevalley/protocol/schema";
 
 import { ago, tookText } from "../../../infra/base/format";
 import { matches } from "../../../infra/base/search";
@@ -22,7 +23,7 @@ import { stageTone } from "./overview";
 
 export type Lane = IssueLane;
 
-export const lanes: Lane[] = ["todo", "working", "waiting", "closed"];
+export const lanes: Lane[] = [...IssueLaneSchema.options];
 
 export const laneLabel: Record<Lane, string> = {
   todo: t("web.issue.boardLabels.lane.todo"),

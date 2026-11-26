@@ -16,10 +16,7 @@
     "@solidjs/vite-plugin": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",
-    "@types/opentype.js": "catalog:",
-    "opentype.js": "catalog:",
     "sharp": "catalog:",
-    "subset-font": "catalog:",
     "tailwindcss": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

@@ -1,4 +1,4 @@
-import { Scroll, Text, View, type JSX } from "nsh";
+import { Scroll, Text, View, windowSize, type JSX } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -227,10 +227,10 @@ const groupKeys = ["frequent", "faces", "hands", "things", "nature", "signs"] as
 const groupName = (id: string) => (isOneOf(groupKeys, id) ? t(`web.channel.emoji.groups.${id}`) : id);
 
 /** Every emoji the farm offers, the usual ones first. */
-function EmojiPicker(props: { onPick: (emoji: string) => void; onClose?: () => void }) {
+function EmojiPicker(props: { width: number; onPick: (emoji: string) => void; onClose?: () => void }) {
   const groups = [{ id: "frequent", emoji: quickReactions }, ...emojiGroups];
   return (
-    <View testID="emoji-picker" accessibilityLabel={t("web.channel.emoji.open")} class="gap-2" style={{ width: width - 16 }}>
+    <View testID="emoji-picker" accessibilityLabel={t("web.channel.emoji.open")} class="gap-2" style={{ width: props.width - 16 }}>
       <Each of={groups} key={(g) => g.id}>
         {(g) => (
           <View accessibilityLabel={groupName(g().id)}>
@@ -267,6 +267,8 @@ export function EmojiPopover(props: {
   label: string;
   testid?: string;
 }) {
+  const popupWidth = () => Math.min(width, Math.max(220, windowSize().width - 24));
+  const popupHeight = () => Math.min(height, Math.max(180, Math.round(windowSize().height * 0.6)));
   return (
     <Popover
       open={props.open}
@@ -274,21 +276,17 @@ export function EmojiPopover(props: {
       placement="top"
       align="end"
       offset={4}
-      popupClass="rounded-lg border border-line bg-elevated p-2 shadow-float"
-      popupStyle={{ width, maxHeight: height }}
+      popupClass="flex-col overflow-hidden rounded-lg border border-line bg-elevated p-2 shadow-float"
+      popupStyle={{ width: popupWidth(), maxHeight: popupHeight() }}
       trigger={
         <View testID={props.testid} accessibilityLabel={props.label} tooltip={<Bubble text={props.label} />}>
           {props.trigger}
         </View>
       }
     >
-      <ScrollBox>
-        <EmojiPicker onPick={props.onPick} onClose={() => props.onOpenChange(false)} />
-      </ScrollBox>
+      <Scroll style={{ maxHeight: popupHeight() - 16 }}>
+        <EmojiPicker width={popupWidth()} onPick={props.onPick} onClose={() => props.onOpenChange(false)} />
+      </Scroll>
     </Popover>
   );
-}
-
-function ScrollBox(props: { children: JSX.Element }) {
-  return <Scroll style={{ maxHeight: height - 16 }}>{props.children}</Scroll>;
 }

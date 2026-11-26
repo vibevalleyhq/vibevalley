@@ -1,6 +1,6 @@
-# 第七篇：工程架构、跨平台接口与像素资产管线
+# 第七篇：工程架构、跨平台接口与 Papertrails 资产管线
 
-工作台代码与原生界面工程上围绕四个基座构建：`nsh` 运行时与响应式适配、桌面跨语言桥接、离线资产加工生产链以及多密级自动化视觉验收管线。
+工作台代码与原生界面工程上围绕四个基座构建：`nsh` 运行时与响应式适配、桌面跨语言桥接、单源 Papertrails 资产同步链以及多密级自动化视觉验收管线。
 
 ## 7.1 `nsh` 运行时适配与响应式桥接
 
@@ -25,15 +25,17 @@
   - 检测 `host.available() && host.params.view !== undefined` 自动切换为 `desktop` 宿主实现（否则回落至无宿主的 `browser` 兼容兜底，用于脱离 macOS 壳的单元测试与组件故事）。
   - 暴露的能力包括：系统命令行工具探测/安装/卸载（`commandLine`）、系统原生通知（`notify`）、状态栏摘要同步（`tray`）、应用主题与语言切换（`theme` / `locale`）、Finder 定位打开文件（`reveal`）、开场加载进度回传（`opening`）以及每秒轮询 Zod 校验后的原生应用自更新状态（`update`：`watch` / `check` / `install`）。
 
-## 7.3 像素字与素材加工管线
+## 7.3 Papertrails 资产同步管线
 
-VibeValley 的全部像素图与矢量图标在独立工程目录下管理并输出至根目录 `assets/`：
+全部原始素材、3D 纸雕编译脚本与生成管线存放在同级独立仓库 `vibevalley-assets` 中，制作规范在该仓的 `docs/PAPERCRAFT_QUALITY.md`。`bash design/sync-assets.sh --all` 编译材质、渲染横竖母图、裁切角色与场景，再同步成品至本仓。
 
-| 资产门类 | 源目录与加工工具 | 成品输出位置与消费方式 |
+| 资产门类 | 源目录与同步脚本 | 成品输出位置与消费方式 |
 | --- | --- | --- |
-| **2D 像素精绘、切图与提示词** | `design/pixel/`（`prompts/`、`process.py`、`straighten.py`、`title_layers.py`、`hd_batch.sh`）与 `design/assets/`、`design/art.sh` | 经纠偏、去杂与网格规整后沉淀到 `assets/pixel/`（配 `sprites.json` 记录逻辑宽高 `w/h`、足底锚点 `ax/ay` 与 `yard` 框）与 `assets/cursors/`（配 `cursors.json`）；工作台通过 `apps/mac/ui/infra/pixelManifests.ts` 直接引入 JSON 清单并从 `host.pixelDir` 加载 PNG |
-| **像素字体** | `assets/fonts/`（`fusion-pixel-12px-proportional-zh_hans.otf` 与开源授权文本 `fusion-pixel-OFL.txt`） | 注册给 `nsh` 与 GPUI 的像素文字体名 `Fusion Pixel 12px Prop zh-Hans`，保证中英混排在整倍缩放下笔划锐利清晰 |
-| **工作台线条图标与农机 Logo** | `crates/rich/src/icon.rs`、`apps/mac/ui/design/icons.ts`、`design/pixel/icons/`、`design/pixel/logos/` | 97 枚 `reicon` SVG 路径静态下沉至原生 `crates/rich/src/icon.rs`（`VvIcon`，以无锁 `OnceLock<Vec<Path>>` 零拷贝缓存解析路径）；TS 侧 `icons.ts` 仅保留纯类型 `IconName` 与 `actionIcon` 映射供 `<Icon name>` 调用；农机品牌与工具图标同时在像素目录维护静态切片供 `RuntimeIcon` 与像素农具栏消费 |
+| **3D 纸雕场景（`diorama`）** | `vibevalley-assets` + `design/diorama.sh` | 同步 `manifest.json`、`meshes.bin`、`lights.json`、`foley.json` 与 `print/`、`stock/` 贴图到 `assets/diorama/`。六张 1024 px 材质使用一张 3072 × 2048 BC1 图集，完整农场包预算 16 MiB |
+| **品牌、通道图标与开场画** | `vibevalley-assets` 仓（`render_brand.swift`）+ `scripts/gen/mac-branding.ts` + `design/sync-assets.sh` | 产出 `apps/mac/resources/{appicon-*.png,icon*.icns,dmg-background.png}`、`assets/icons/app-{32,64,256}.png` 与 `assets/brand/{opening-*.webp,tray-*.png}` |
+| **官网首图与场景切片** | 素材仓的 `render_shots --mode publication`、`build_tile_kit.py` 与 `pack_all.sh` | 四个时段各有独立横竖构图。浏览器按屏幕方向与像素密度取档，产物见 [官网素材](apps/site/README.md) |
+| **角色头像与引擎徽标** | `vibevalley-assets` 仓（`build_avatars.py` / `build_engines.py`）+ `design/sync-assets.sh` | 同步至 `assets/avatars/`（14 角色、8 物种、6 主助手、用户与 1x/2x 导航肖像）及 `assets/engines/`（10 引擎 + 3 连接器）；工作台经 `apps/mac/ui/design/art.ts` 调 `host.assetsDir` 拼接 `file://` URL |
+| **工作台线条图标** | `crates/rich/src/icon.rs`、`apps/mac/ui/design/icons.ts`、`scripts/gen/icons.ts` | 97 枚 `reicon` SVG 路径静态下沉至原生 `crates/rich/src/icon.rs`（`VvIcon`，无锁 `OnceLock<Vec<Path>>` 缓存）；TS 侧 `icons.ts` 仅保留纯类型 `IconName` 与 `actionIcon` 映射供 `<Icon name>` 调用，移动端与非 GPUI 载体经 `iconPaths.gen.ts` 矢量回退 |
 | **多端设计令牌生成与护栏** | `design/tokens.json`、`scripts/gen/tokens.ts`、`scripts/audit/ui-tokens.ts` | 从单源 `tokens.json` 生成并校验 `theme.json`、`nsh.json`、`theme_tokens.rs` 及 `global.css` 缓动曲线；`ui-tokens.ts` 对工作台与工作区外壳 `apps/mac/ui/{app,features,design,workspace}` 做 AST 扫描拦截硬编码色值、任意 Tailwind 类与裸控件 |
 
 ## 7.4 多密级测试场景与自动化验收报告管线
@@ -47,8 +49,8 @@ VibeValley 的全部像素图与矢量图标在独立工程目录下管理并输
    - 包含无头交互、主题令牌与外壳测试（`interactions.test.tsx`、`components.test.tsx`、`scenarios.test.tsx`、`theme.test.tsx`、`workspace/workspace.test.tsx`）。
    - `scripts/audit/mac-tests.ts` 并发驱动 `.tools/bin/nsh test` 执行工作台测试套件，解析每套用例通过/失败计数与耗时并生成结构化报告 JSON。
    - 真实 GPUI 窗口截图验收通过 `vp run ui:gallery` 统一驱动（`scripts/audit/ui-gallery.ts`），输出固定页面、工作区与农场的 Light/Dark/窄窗截图并校验 `dump.json` 零报错。
-3. **像素场景无屏光栅自检与状态转储（`apps/mac/src/pixel/tests.rs` & `apps/mac/src/debug.rs`）**：
-   - 像素测试直接在 CPU 上调用 `draw::raster` 生成实际 `RgbaImage` PNG（指定 `VIBEVALLEY_PIXEL_OUT` 可落盘查看），验证重叠帮工绘制顺序、点击命中盒与炭火地标对齐，不依赖图形显卡或屏幕窗口。
-   - `debug.rs` 对外提供运行中窗口完整树与像素画布指标转储（缓存图片数、帧绘耗时 `last_paint_ms`、萤火虫采样坐标与点击事件历史 `taps`）。
+3. **纸雕场景单测与状态转储（`apps/mac/src/diorama/` & `apps/mac/src/debug.rs`）**：
+   - Rust 单元测试验证切片到地块阶段的映射、开场 WebP 缓存回收与 `vibevalley-diorama` 逻辑。
+   - `debug.rs` 对外提供运行中窗口完整树与纸雕画布指标转储（`diorama` 字段含渲染器类型、时段、聚焦建筑、地块/偶人数与 GPU/回读遥测）。
 4. **综合质量看板（`scripts/audit/ui-report.ts`）**：
    - 汇总 `mac-tests.ts` 结果、6+1（含英文 `en`）种情景密级枚举覆盖表、壳组件就绪与错误统计及各端截图对比画廊，输出单一离线 HTML 验收报告（默认目录 `/tmp/vv-ui-report`）。

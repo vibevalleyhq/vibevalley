@@ -3,6 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
@@ -10,8 +11,8 @@ use tracing::Instrument;
 use tracing::instrument::WithSubscriber;
 use vibevalley_protocol::{PublishPlatform, PullRequestState};
 
-use super::Pull;
 use super::publish::{HostRunner, HostedRepo, remote_pull_state};
+use super::service::{DEFAULT_POLL_SECONDS, Pull};
 use super::snapshot::{GitHubCheck, GitHubComment, GitHubPullSnapshot, GitHubReview, checks_fingerprint, checks_verdict, failed_job_log, fetch_snapshot};
 use crate::context::now;
 use crate::service::issue::{KnownPullEvent, PullRecord};
@@ -327,6 +328,56 @@ async fn poll_one(pulls: &Pull, row: &PullRecord, remote: &str, current: GitHubP
     let events = collect_sorted_poll_events(row, &current);
     for event in events {
         state.record_and_notify_async(pulls, row, &current.viewer, linked_issue_id, event).await;
+    }
+}
+
+impl Pull {
+    pub async fn refresh_async(&self) {
+        refresh(self).await;
+    }
+
+    pub async fn poll_async(&self) {
+        poll(self).await;
+    }
+
+    /// Starts the background PR refresh/poll loop on `ctx.task`.
+    pub fn start_poller(self: &Arc<Self>, poll_seconds: Option<u64>) {
+        let Some(secs) = poll_seconds else { return };
+        let interval = Duration::from_secs(if secs > 0 { secs } else { DEFAULT_POLL_SECONDS });
+        let cancel = self.ctx.task.child_token();
+        let task_cancel = cancel.clone();
+        let weak = Arc::downgrade(self);
+        let span = tracing::debug_span!("pull.poll", interval_secs = interval.as_secs());
+        let handle = self.ctx.task.spawn(
+            async move {
+                let mut timer = tokio::time::interval_at(tokio::time::Instant::now() + interval, interval);
+                timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                loop {
+                    tokio::select! {
+                        biased;
+                        _ = task_cancel.cancelled() => return,
+                        _ = timer.tick() => {}
+                    }
+                    if task_cancel.is_cancelled() {
+                        return;
+                    }
+                    let Some(p) = weak.upgrade() else { return };
+                    if p.closed.load(std::sync::atomic::Ordering::Relaxed) {
+                        return;
+                    }
+                    tokio::select! {
+                        biased;
+                        _ = task_cancel.cancelled() => return,
+                        _ = async {
+                            p.refresh_async().await;
+                            p.poll_async().await;
+                        } => {}
+                    }
+                }
+            }
+            .instrument(span),
+        );
+        *self.poller.lock() = Some((cancel, handle));
     }
 }
 

@@ -20,7 +20,7 @@ Artifact（`Artifact`）是用户、主助手和执行会话共同创作与交�
 | `crates/server/src/db/entity/` 与 `crates/server/src/service/` | 严格一表一文件，仅 5 张作品表：`artifact.rs`、`artifact_version.rs`、`artifact_collab.rs`、`artifact_change.rs`、`artifact_suggestion.rs`（无 `artifact_block`、`artifact_block_revision` 与 SQL-KV `artifact_entry`）；全部 SeaORM 查询收拢在顶层 `service/` 的 `artifact.rs`（`ArtifactService`，挂于 `ctx.service.artifact`） |
 | `crates/core/src/collab/` | Loro 内容平面协同内核：`presence.rs`（纯内存 `PresenceHub`）与 `doc.rs`（`CollabDoc`、`CommitMeta`、持久化游标建议、时间旅行、浅快照压缩与按 `origin` 选择性撤销） |
 | `crates/protocol/src/contract/artifact.rs`、`packages/protocol/src/artifact/` | 跨端契约（Rust 为源、生成 TS 形状与端点）：单一 12 类 `ArtifactType`、目录与版本接口、统一协同/在场/建议/历史接口与边界 Zod Schema |
-| `apps/mac/ui/features/artifact/`、`apps/mac/ui/features/content/` | 原生应用 nsh TSX 页面：二元内容中心（作品 + 素材）、12 类作品专用视图、实时协作者光标与在场胶囊、建议接受/拒绝交互、`TimelineBar` 时间旅行滑块、`<artifact-view-context>` 上报 |
+| `apps/mac/ui/features/artifact/`、`apps/mac/ui/features/content/` | 原生应用 nsh TSX 页面：二元内容中心（作品 + 素材）、12 类作品专用视图（统一单行顶栏 + 收纳操作菜单）、实时协作者光标与在场胶囊、建议接受/拒绝交互、右侧 `HistoryPanel` 版本与历史面板、`<artifact-view-context>` 上报 |
 
 接口见 [capabilities.md](docs/reference/capabilities.md)（`artifact.*` 及同属 `artifact/` 域的 `library.*`、`media.*`）。
 
@@ -99,6 +99,6 @@ Artifact（`Artifact`）是用户、主助手和执行会话共同创作与交�
 - `crates/core/tests/collab_loro.rs`：内容平面实时协同单测与并发收敛测试（Ephemeral TTL、并发修改收敛、持久游标建议、时间旅行、浅快照压缩与按 `origin` 选择性撤销）。
 - `crates/server/tests/artifact.rs`：作品目录创建与物化、版本快照、5 张表持久化、12 种 `ArtifactType` 双语技能读取、实时在场、人机建议与按 `origin` 选择性撤销，以及 `issue_id` 置空外键测试。
 - `crates/server/tests/mcp.rs`：主助手与执行会话经 `/mcp` 调用作品工具并发共编。
-- `apps/mac/ui/features/artifact/` 页面测试：二元内容中心、实时在场与建议交互、`TimelineBar` 时间旅行（`nsh/test`）。
+- `apps/mac/ui/features/artifact/` 页面测试：二元内容中心、实时在场与建议交互、`HistoryPanel` 版本与时间旅行（`nsh/test`）。
 
 演讲者视图在 HTML 发回页数后显示页码、下一页与备注。尚未收到回执时，页面显示「等待演示页就绪」。载入错误显示具体原因（[原生页面验收](.agents/skills/vv-acceptance/references/app.md#演示页的就绪回执)）。

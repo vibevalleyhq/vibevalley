@@ -1,0 +1,82 @@
+{
+  "presets": {
+    "dawn": {
+      "label": "拂晓",
+      "azimuthDeg": -56.0,
+      "elevationDeg": 26.0,
+      "keyColor": [1.0, 0.78, 0.55],
+      "keyIntensity": 1.60,
+      "skyColor": [0.68, 0.76, 0.92],
+      "groundColor": [0.44, 0.36, 0.30],
+      "hemiIntensity": 0.32,
+      "shadowLeak": [0.28, 0.18, 0.20],
+      "shadowStrength": 0.76,
+      "tableBg": [0.12, 0.085, 0.058],
+      "fogColor": [0.80, 0.70, 0.60],
+      "lampIntensity": 0.85,
+      "lampColor": [1.0, 0.72, 0.34],
+      "exposure": 0.82
+    },
+    "noon": {
+      "label": "正午",
+      "azimuthDeg": -48.0,
+      "elevationDeg": 44.0,
+      "keyColor": [1.0, 0.86, 0.67],
+      "keyIntensity": 1.65,
+      "skyColor": [0.76, 0.82, 0.90],
+      "groundColor": [0.48, 0.40, 0.31],
+      "hemiIntensity": 0.30,
+      "shadowLeak": [0.36, 0.22, 0.10],
+      "shadowStrength": 0.74,
+      "tableBg": [0.13, 0.088, 0.058],
+      "fogColor": [0.86, 0.79, 0.66],
+      "lampIntensity": 0.28,
+      "lampColor": [1.0, 0.74, 0.36],
+      "exposure": 0.80
+    },
+    "dusk": {
+      "label": "黄昏",
+      "azimuthDeg": -62.0,
+      "elevationDeg": 20.0,
+      "keyColor": [1.0, 0.58, 0.31],
+      "keyIntensity": 1.32,
+      "skyColor": [0.34, 0.32, 0.62],
+      "groundColor": [0.22, 0.16, 0.26],
+      "hemiIntensity": 0.28,
+      "shadowLeak": [0.14, 0.10, 0.28],
+      "shadowStrength": 0.80,
+      "tableBg": [0.095, 0.066, 0.050],
+      "fogColor": [0.40, 0.26, 0.38],
+      "lampIntensity": 2.15,
+      "lampColor": [1.0, 0.66, 0.26],
+      "exposure": 0.80
+    },
+    "night": {
+      "label": "深夜",
+      "azimuthDeg": -38.0,
+      "elevationDeg": 44.0,
+      "keyColor": [0.44, 0.60, 0.98],
+      "keyIntensity": 0.44,
+      "skyColor": [0.11, 0.19, 0.42],
+      "groundColor": [0.045, 0.06, 0.13],
+      "hemiIntensity": 0.22,
+      "shadowLeak": [0.05, 0.08, 0.22],
+      "shadowStrength": 0.84,
+      "tableBg": [0.095, 0.062, 0.042],
+      "fogColor": [0.038, 0.065, 0.16],
+      "lampIntensity": 3.30,
+      "lampColor": [1.0, 0.62, 0.22],
+      "exposure": 0.85
+    }
+  },
+  "tiltShift": {
+    "focusScreenY": 0.48,
+    "halfBand": 0.16,
+    "ramp": 0.30,
+    "maxBlurPx": 14.5,
+    "depthWeight": 0.68,
+    "aoRadius": 0.52,
+    "aoIntensity": 0.70,
+    "vignette": 0.22
+  }
+}

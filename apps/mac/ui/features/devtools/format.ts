@@ -1,8 +1,16 @@
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import { type DebugTimelineEvent, type DebugTimelineLane, type DebugTrajectoryKind, type EventTokens, VibeValleyApiError } from "@vibevalley/protocol";
+import {
+  type DebugTimelineEvent,
+  type DebugTimelineLane,
+  type DebugTrajectoryKind,
+  type EventTokens,
+  SliceKindValues,
+  VibeValleyApiError,
+} from "@vibevalley/protocol";
 import { BizCode } from "@vibevalley/protocol/api";
+import { DebugTimelineLane as DebugTimelineLaneSchema } from "@vibevalley/protocol/schema";
 
 import type { TagTone } from "../../design/Tag";
 
@@ -12,11 +20,11 @@ export type TimelineLaneFilter = "all" | DebugTimelineLane;
 
 export const DEVTOOLS_TABS: readonly DevToolsTab[] = ["overview", "routes", "timeline", "trajectory", "state", "lab"];
 
-export const TIMELINE_LANES: readonly TimelineLaneFilter[] = ["all", "core_apply", "bridge_rpc", "oar_wire", "gpui_frame"];
+export const TIMELINE_LANES: readonly TimelineLaneFilter[] = ["all", ...DebugTimelineLaneSchema.options];
 
 export const QUICK_ROUTES: readonly string[] = ["/issues", "/chat", "/repos", "/workspace", "/library", "/agents", "/farm", "/settings"];
 
-export const SLICE_NAMES = ["board", "sessions", "collab", "inbox", "ops", "farm"] as const;
+export const SLICE_NAMES = SliceKindValues;
 
 export const LATENCY_PRESETS_MS: readonly number[] = [0, 300, 1000];
 

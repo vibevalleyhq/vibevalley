@@ -788,7 +788,7 @@ fn weixin_is_tied_to_another_channel_and_a_quoted_reply_goes_to_its_thread() {
     let thread = vibevalley_runtime::rt::block_on(s.test_internals().channel.thread_under_async(&root)).unwrap();
     post(&thread, "串里的话");
     let threaded = nth(&world, "weixin", 1);
-    assert_eq!(threaded.text, "【主助手 · 在任务话题里】\n串里的话");
+    assert_eq!(threaded.text, "【主助手 · 在工单话题里】\n串里的话");
     world.wx_log.lock().unwrap().push(json!({
         "message_id": 7_000_000_000_000_009_999u64,
         "from_user_id": USER,

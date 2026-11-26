@@ -1,39 +1,25 @@
 {
-  "title": {
-    "cloud-big-1": "/gen/images/cloud-big-1-4bfe88d9ea3c.webp",
-    "cloud-wisp-1": "/gen/images/cloud-wisp-1-e5cf966855e6.webp",
-    "cloud-mid-2": "/gen/images/cloud-mid-2-de4659f2bfd8.webp",
-    "puff-1": "/gen/images/puff-1-85b6dab9f20c.webp",
-    "puff-2": "/gen/images/puff-2-807cfba6e83d.webp",
-    "wisp-1": "/gen/images/wisp-1-3d461d356d1b.webp",
-    "wisp-2": "/gen/images/wisp-2-a45de5099675.webp",
-    "fern": "/gen/images/fern-94b43a28420d.webp",
-    "grass-tall": "/gen/images/grass-tall-4d264d3227f8.webp",
-    "dandelion-3": "/gen/images/dandelion-3-0ff432deba92.webp",
-    "grass-daisy": "/gen/images/grass-daisy-05fdb8723451.webp",
-    "dandelion-2": "/gen/images/dandelion-2-dfd8d79f6495.webp",
-    "grass-yellow": "/gen/images/grass-yellow-22a68b4fda3e.webp",
-    "seed-1": "/gen/images/seed-1-be47188d96eb.webp",
-    "seed-2": "/gen/images/seed-2-63adc3ce859d.webp",
-    "seed-3": "/gen/images/seed-3-e66513b1e6bf.webp",
-    "seed-4": "/gen/images/seed-4-79f9009c0fe6.webp",
-    "manager-morning": "/gen/images/manager-morning-6a300d33faba.webp",
-    "manager-day": "/gen/images/manager-day-a690c75e2b16.webp",
-    "manager-evening": "/gen/images/manager-evening-95dec7e83743.webp",
-    "manager-night": "/gen/images/manager-night-803bb74239a4.webp",
-    "dog-sit": "/gen/images/dog-sit-e82114721a36.webp",
-    "dog-tail": "/gen/images/dog-tail-2ecb0a75a8bb.webp",
-    "dog-look": "/gen/images/dog-look-6f16a761303b.webp",
-    "dog-sleep": "/gen/images/dog-sleep-f83f97d05356.webp",
-    "grass-low": "/gen/images/grass-low-5b5f3b450c42.webp",
-    "dandelion-1": "/gen/images/dandelion-1-e7283e470e46.webp",
-    "grass-dandelion": "/gen/images/grass-dandelion-51f976c88c47.webp"
-  },
   "backgrounds": {
-    "morning": "/gen/images/title-morning-7cda06672183.webp",
-    "day": "/gen/images/title-day-5163f58eb447.webp",
-    "evening": "/gen/images/title-evening-d7cb30cfd711.webp",
-    "night": "/gen/images/title-night-206a36c7cba9.webp"
+    "morning": {
+      "src": "/gen/images/hero-morning-63301427345f.webp",
+      "srcset": "/gen/images/hero-morning-960-5ef82c49c49e.webp 960w, /gen/images/hero-morning-63301427345f.webp 1600w, /gen/images/hero-morning-3200-bffe89b90d2a.webp 3200w",
+      "portraitSrcset": "/gen/images/hero-morning-portrait-720-c9c2a1452516.webp 720w, /gen/images/hero-morning-portrait-1080-a735a86cc6c7.webp 1080w"
+    },
+    "day": {
+      "src": "/gen/images/hero-day-686d2ad75e37.webp",
+      "srcset": "/gen/images/hero-day-960-5e26d77b3392.webp 960w, /gen/images/hero-day-686d2ad75e37.webp 1600w, /gen/images/hero-day-3200-83e38555b7e3.webp 3200w",
+      "portraitSrcset": "/gen/images/hero-day-portrait-720-49ee570c4c25.webp 720w, /gen/images/hero-day-portrait-1080-9bfe9ce7d7da.webp 1080w"
+    },
+    "evening": {
+      "src": "/gen/images/hero-evening-60babdded766.webp",
+      "srcset": "/gen/images/hero-evening-960-75e3222b7a11.webp 960w, /gen/images/hero-evening-60babdded766.webp 1600w, /gen/images/hero-evening-3200-f377f8da1be9.webp 3200w",
+      "portraitSrcset": "/gen/images/hero-evening-portrait-720-7ca0c317d203.webp 720w, /gen/images/hero-evening-portrait-1080-2160a4a029ea.webp 1080w"
+    },
+    "night": {
+      "src": "/gen/images/hero-night-3f55fded2f88.webp",
+      "srcset": "/gen/images/hero-night-960-37ec7299692c.webp 960w, /gen/images/hero-night-3f55fded2f88.webp 1600w, /gen/images/hero-night-3200-116db0245373.webp 3200w",
+      "portraitSrcset": "/gen/images/hero-night-portrait-720-88a81fd29173.webp 720w, /gen/images/hero-night-portrait-1080-fd507ee85460.webp 1080w"
+    }
   },
   "shots": {
     "native-farm": {

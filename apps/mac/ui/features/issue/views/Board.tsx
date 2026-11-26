@@ -27,7 +27,6 @@ import {
 } from "../model/cards";
 import { laneOrder, type Ordering } from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
-import { emptyLaneGuide } from "../model/onboarding";
 import { CardFace, FlagChip, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 
 /** Under the closed ones: how many older are folded away, or back to the recent ones. */
@@ -54,6 +53,43 @@ const emptyText: Record<Lane, string> = {
   closed: t("web.issue.board.empty.closed"),
 };
 
+interface EmptyLaneGuide {
+  readonly icon: IconName;
+  readonly titleKey:
+    | "web.issue.board.emptyGuide.todoTitle"
+    | "web.issue.board.emptyGuide.workingTitle"
+    | "web.issue.board.emptyGuide.waitingTitle"
+    | "web.issue.board.emptyGuide.closedTitle";
+  readonly bodyKey:
+    | "web.issue.board.emptyGuide.todoBody"
+    | "web.issue.board.emptyGuide.workingBody"
+    | "web.issue.board.emptyGuide.waitingBody"
+    | "web.issue.board.emptyGuide.closedBody";
+}
+
+const emptyLaneGuide: Record<Lane, EmptyLaneGuide> = {
+  todo: {
+    icon: "add",
+    titleKey: "web.issue.board.emptyGuide.todoTitle",
+    bodyKey: "web.issue.board.emptyGuide.todoBody",
+  },
+  working: {
+    icon: "play",
+    titleKey: "web.issue.board.emptyGuide.workingTitle",
+    bodyKey: "web.issue.board.emptyGuide.workingBody",
+  },
+  waiting: {
+    icon: "diff",
+    titleKey: "web.issue.board.emptyGuide.waitingTitle",
+    bodyKey: "web.issue.board.emptyGuide.waitingBody",
+  },
+  closed: {
+    icon: "check",
+    titleKey: "web.issue.board.emptyGuide.closedTitle",
+    bodyKey: "web.issue.board.emptyGuide.closedBody",
+  },
+};
+
 export interface BoardProps {
   cards: BoardCard[];
   summary?: BoardSummary | undefined;
@@ -71,6 +107,7 @@ export interface BoardProps {
   onPlace: (card: BoardCard, before: string | undefined) => void;
   /** The todo lane's placeholder card. */
   onNew: () => void;
+  onClearFilter?: (() => void) | undefined;
 }
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -204,6 +241,9 @@ export function IssueBoard(props: BoardProps) {
                 cards={cardsByLane()[l()]}
                 count={laneCounts()[l()]}
                 slots={l() === "working" ? workingSlots() : undefined}
+                showClear={
+                  props.filtered === true && props.cards.length === 0 && props.onClearFilter !== undefined && (narrow() ? l() === lane() : l() === "todo")
+                }
                 drag={drag}
               />
             </If>
@@ -231,7 +271,15 @@ export function IssueBoard(props: BoardProps) {
   );
 }
 
-function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; count: number; slots?: { taken: number; of: number } | undefined; drag: Drag }) {
+function LaneView(props: {
+  board: BoardProps;
+  lane: Lane;
+  cards: BoardCard[];
+  count: number;
+  slots?: { taken: number; of: number } | undefined;
+  showClear: boolean;
+  drag: Drag;
+}) {
   const p = () => props.board;
   const over = computed(() => props.drag.over() === props.lane);
   const folded = computed(() => props.lane === "closed" && !props.board.older && props.cards.length > closedShown);
@@ -239,7 +287,7 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
   const shown = computed(() => (folded() ? ordered().slice(0, closedShown) : ordered()));
   const hidden = computed(() => (folded() ? ordered().length - closedShown : 0));
   const guide = () => emptyLaneGuide[props.lane];
-  const showTopNew = computed(() => props.lane === "todo" && (props.board.loading || props.cards.length > 0));
+  const showBottomNew = computed(() => props.lane === "todo" && (props.board.loading || props.cards.length > 0));
   return (
     <View
       ref={(r) => props.drag.lane(props.lane, r)}
@@ -268,18 +316,6 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
           <Hint text={emptyText[props.lane]} />
         </View>
       </View>
-      <If when={showTopNew()}>
-        <View
-          onPress={() => p().onNew()}
-          role="button"
-          testID="issue-new"
-          accessibilityLabel={t("web.issue.new.title")}
-          class={`group mt-1.5 h-9 w-full shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-dashed border-line ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:bg-page active:translate-y-px`}
-        >
-          <Icon name="add" size={14} tone="muted" />
-          <Text class="text-sm font-medium text-muted group-hover:text-ink">{t("web.issue.new.card")}</Text>
-        </View>
-      </If>
       <Scroll class="mt-2 min-h-0 shrink" contentClass="gap-1.5 pb-0.5">
         <If
           when={p().loading}
@@ -322,11 +358,18 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
                   >
                     <Text class="text-center text-2xs leading-snug text-muted">{t("web.issue.board.emptyGuide.filtered")}</Text>
                   </If>
-                  <If when={props.lane === "todo"}>
-                    <View class="pt-1">
-                      <Button size="compact" icon="add" testID="issue-new" onPress={() => p().onNew()}>
-                        {t("web.issue.new.card")}
-                      </Button>
+                  <If when={props.lane === "todo" || props.showClear}>
+                    <View class="flex-row flex-wrap items-center justify-center gap-1.5 pt-1">
+                      <If when={props.lane === "todo"}>
+                        <Button size="compact" icon="add" testID="issue-new" onPress={() => p().onNew()}>
+                          {t("web.issue.new.card")}
+                        </Button>
+                      </If>
+                      <If when={props.showClear}>
+                        <Button size="compact" tone="plain" icon="close" testID="board-clear-filter" onPress={() => p().onClearFilter?.()}>
+                          {t("web.issue.page.clear")}
+                        </Button>
+                      </If>
                     </View>
                   </If>
                 </View>
@@ -337,6 +380,18 @@ function LaneView(props: { board: BoardProps; lane: Lane; cards: BoardCard[]; co
           <Text class="px-1 text-xs text-faint">{t("web.issue.reading")}</Text>
         </If>
       </Scroll>
+      <If when={showBottomNew()}>
+        <View
+          onPress={() => p().onNew()}
+          role="button"
+          testID="issue-new"
+          accessibilityLabel={t("web.issue.new.title")}
+          class={`group mt-2 h-9 w-full shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-dashed border-line ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:bg-page active:translate-y-px`}
+        >
+          <Icon name="add" size={14} tone="muted" />
+          <Text class="text-sm font-medium text-muted group-hover:text-ink">{t("web.issue.new.card")}</Text>
+        </View>
+      </If>
     </View>
   );
 }
@@ -389,13 +444,24 @@ function CardView(props: {
       look().flags.length > 0,
   );
   const draggable = computed(() => props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving");
+  // Dragging sends a synthetic press on mouse-up; suppress opening the card right after a drag ends.
+  let suppressPressUntil = 0;
   const pan = PanResponder.create({
     // A press opens the card; only a move of a few points starts a drag.
     onMoveShouldSetPanResponder: (_, g) => draggable() && Math.abs(g.dx) + Math.abs(g.dy) > 4,
-    onPanResponderGrant: (_, g) => void props.drag.start(props.card, look().title, g.x0, g.y0),
+    onPanResponderGrant: (_, g) => {
+      suppressPressUntil = Number.POSITIVE_INFINITY;
+      void props.drag.start(props.card, look().title, g.x0, g.y0);
+    },
     onPanResponderMove: (_, g) => props.drag.move(g.moveX, g.moveY),
-    onPanResponderRelease: () => props.drag.end(true),
-    onPanResponderTerminate: () => props.drag.end(false),
+    onPanResponderRelease: () => {
+      suppressPressUntil = Date.now() + 300;
+      props.drag.end(true);
+    },
+    onPanResponderTerminate: () => {
+      suppressPressUntil = Date.now() + 300;
+      props.drag.end(false);
+    },
   });
   const before = computed(() => props.drag.before() === props.card.id);
   const urgency = computed(() => cardUrgencyTone(props.card));
@@ -414,7 +480,10 @@ function CardView(props: {
               el.focus();
             });
         }}
-        onPress={() => props.onOpen(props.card.id)}
+        onPress={() => {
+          if (props.drag.dragging() !== undefined || Date.now() < suppressPressUntil) return;
+          props.onOpen(props.card.id);
+        }}
         role="button"
         testID="issue-card"
         accessibilityLabel={look().title}

@@ -14,13 +14,26 @@ use vibevalley_runtime::oar::Registry;
 
 use crate::agent::{Agent, Profile};
 use crate::channel::{ChannelMessageEvent, Chat};
+use crate::config::Config;
 use crate::context::Context;
 use crate::context::api::BoxFuture;
 use crate::context::port::CronOrchestratorPort;
 use crate::game::Game;
-use crate::issue::{IssueChat, SessionChat};
+use crate::issue::{Board, IssueChat, SessionChat};
 use crate::runtime::{OUTBOX_SESSION_REPORTED, OutboxSessionReported, Runtime, SessionLifecycleEvent};
 use crate::setting::Setting;
+
+/// Seeds the 3 starter guide issues once on a fresh real-server database.
+/// Skipped for test and scripted boots (`probe_runtimes == false` or injected fakes).
+pub(crate) async fn seed_starter_issues_on_boot(config: &Config, setting: &Setting, board: &Board) {
+    if !config.probe_runtimes || config.registry.is_some() || config.model_client.is_some() || config.media_network.is_some() || config.offline_media {
+        return;
+    }
+    let locale = setting.status().locale;
+    if let Err(e) = board.seed_starter_issues_if_fresh_async(locale).await {
+        eprintln!("vibevalley-server: issue: seeding starter issues: {e}");
+    }
+}
 
 pub(crate) fn build_runtimes(setting: &Arc<Setting>, home: &std::path::Path, execution: SharedExecution, model: Option<Arc<dyn ModelClient>>) -> Registry {
     let mut registry = Registry::new();

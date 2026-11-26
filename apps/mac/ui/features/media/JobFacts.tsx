@@ -240,8 +240,8 @@ export function ResultAudio(props: {
             <View
               role="button"
               testID={`${props.prefix}-play`}
-              accessibilityLabel={playing() ? t("web.catalog.stop") : t("web.catalog.play")}
-              tooltip={<Bubble text={playing() ? t("web.catalog.stop") : t("web.catalog.play")} />}
+              accessibilityLabel={playing() ? t("web.base.stop") : t("web.base.play")}
+              tooltip={<Bubble text={playing() ? t("web.base.stop") : t("web.base.play")} />}
               disabled={act.busy()}
               onPress={() => togglePlay(file().path)}
               class={`size-7 shrink-0 items-center justify-center rounded-md border ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px ${

@@ -4,31 +4,13 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest};
 use tokio_util::sync::CancellationToken;
+use vibevalley_protocol::HostLiveVoicePhase as Phase;
+pub use vibevalley_protocol::HostLiveVoiceState as State;
 use vibevalley_server::gateway::api::SharedLiveVoice;
-
-#[derive(Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct State {
-    phase: Phase,
-    muted: bool,
-    problem: Option<String>,
-    heard: String,
-    said: String,
-}
-
-#[derive(Clone, Copy, Default, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-enum Phase {
-    #[default]
-    Idle,
-    Connecting,
-    Live,
-    Stopping,
-}
 
 #[derive(Default)]
 struct Call {

@@ -10,11 +10,10 @@ use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{ApiError, Channel, ChannelLast, ChannelUnread, DEFAULT_ORCHESTRATOR, EVERYONE, USER_ID};
 
 use super::types::{
-    AddressedMessage, ArtifactRef, Committed, FileAt, Place, Reach, Seat, ThreadSubject, actor_of, channel_type, line_of, meta_of, meta_text, new_id,
-    notify_of, subject_kind,
+    AddressedMessage, ArtifactRef, CALLERS_MAX, Committed, FileAt, LAST_MAX, Place, Reach, Seat, THREAD_TITLE_MAX, ThreadSubject, actor_of, channel_type,
+    line_of, meta_of, meta_text, new_id, notify_of, subject_kind,
 };
 use super::words::{self, Nameable};
-use super::{CALLERS_MAX, LAST_MAX, THREAD_TITLE_MAX};
 use crate::context::{LookIn, internal, missing, now};
 use crate::service::channel::{ChannelRow, ChannelService, EventRow, MsgRow, NewThread, ParticipantRow};
 use crate::service::{DbError, Service, Tx};

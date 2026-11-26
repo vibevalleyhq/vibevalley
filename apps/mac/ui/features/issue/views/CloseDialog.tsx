@@ -157,7 +157,14 @@ export function CloseIssueDialog(props: { issue: Issue; session?: Session | unde
   const surface = computed(() => closeDialogSurface(flow()));
 
   return (
-    <Dialog open onClose={close} title={t("web.issue.close.title", { issue: issueTitle(props.issue) })} wide={isCloseDialogWide(flow())} testid="close-issue">
+    <Dialog
+      open
+      onClose={close}
+      title={t("web.issue.close.title", { issue: issueTitle(props.issue) })}
+      size={isCloseDialogWide(flow()) ? "xl" : "sm"}
+      height={isCloseDialogWide(flow()) ? "fixed" : "auto"}
+      testid="close-issue"
+    >
       <If when={variant(surface(), "kind", "confirm")}>
         {(confirm) => (
           <View class="gap-5">

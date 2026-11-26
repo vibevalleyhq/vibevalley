@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
+import { computed, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { ArtifactType } from "@vibevalley/protocol";
@@ -11,44 +11,82 @@ import { Quiet } from "../../design/layout";
 import { motionClass } from "../../design/motion";
 import { Segmented } from "../../design/Segmented";
 import { mix } from "../../design/tone";
-import { spelled } from "../../infra/base/search";
 import { ready, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { closeTemplatePicker, type TemplateCategory, templatePickerState } from "../../infra/state/contentNav";
-import { useArtifacts } from "../artifact";
-import { CONTENT_TEMPLATES, type ContentTemplate, createFromTemplate, TEMPLATE_CATEGORIES, templateDesc, templateIcon, templateName } from "./templates";
+import { artifactTypeLabel, useArtifacts } from "../artifact";
+import {
+  CONTENT_TEMPLATES,
+  type ContentTemplate,
+  createFromTemplate,
+  TEMPLATE_CATEGORIES,
+  templateArtifactType,
+  templateBadge,
+  templateDesc,
+  templateIcon,
+  templateMatchesQuery,
+  templateName,
+} from "./templates";
 
 export function TemplateModal() {
   const state = () => templatePickerState.get();
   return (
-    <Dialog open={state() !== undefined} onClose={closeTemplatePicker} title={t("web.library.content.templates.title")} wide testid="content-template-modal">
-      <If when={state()}>{(s) => <TemplateModalBody initialCategory={untracked(() => s().category)} />}</If>
+    <Dialog
+      open={state() !== undefined}
+      onClose={closeTemplatePicker}
+      title={t("web.library.content.templates.title")}
+      size="xl"
+      height="fixed"
+      scroll={false}
+      testid="content-template-modal"
+    >
+      <If when={state()}>
+        {(s) => <TemplateModalBody initialCategory={untracked(() => s().category)} initialArtifactType={untracked(() => s().artifactType)} />}
+      </If>
     </Dialog>
   );
 }
 
-function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
+type TemplateTab = TemplateCategory | `type:${ArtifactType}`;
+
+function TemplateModalBody(props: { initialCategory: TemplateCategory; initialArtifactType?: ArtifactType | undefined }) {
   const queries = useQueryClient();
   const router = useRouter();
   const artifacts = useArtifacts(() => ({}));
   const act = createAct();
-  const category = signal<TemplateCategory>(untracked(() => props.initialCategory));
+  const scopedType = untracked(() => props.initialArtifactType);
+  const hasTypeTab = scopedType !== undefined && scopedType !== "outline" && scopedType !== "whiteboard";
+  const initialTab: TemplateTab = hasTypeTab ? `type:${scopedType}` : untracked(() => props.initialCategory);
+  const selectedTab = signal<TemplateTab>(initialTab);
   const query = signal("");
 
   const filtered = computed(() => {
-    const q = query().trim().toLowerCase();
+    const q = query().trim();
+    const tab = selectedTab();
     return CONTENT_TEMPLATES.filter((tpl) => {
-      const catMatch = q ? true : category() === "recommended" ? tpl.recommended : tpl.category === category();
+      const catMatch = q
+        ? true
+        : hasTypeTab && tab === `type:${scopedType}`
+          ? templateArtifactType(tpl) === scopedType
+          : tab === "recommended"
+            ? tpl.recommended
+            : tab === "apps"
+              ? tpl.standaloneApp === true
+              : tab === "engineering"
+                ? tpl.engineering === true
+                : tpl.category === tab;
       if (!catMatch) return false;
-      if (!q) return true;
-      return spelled(templateName(tpl), q) || spelled(templateDesc(tpl), q);
+      return templateMatchesQuery(tpl, q);
     });
   });
   const hasFiltered = computed(() => filtered().length > 0);
-  const categoryOptions = TEMPLATE_CATEGORIES.map((c) => ({
-    value: c,
-    label: t(`web.library.content.templates.cat.${c}`),
-  }));
+  const categoryOptions: { value: TemplateTab; label: string }[] = [
+    ...(hasTypeTab ? [{ value: `type:${scopedType}` as TemplateTab, label: artifactTypeLabel(scopedType) }] : []),
+    ...TEMPLATE_CATEGORIES.map((c) => ({
+      value: c as TemplateTab,
+      label: t(`web.library.content.templates.cat.${c}`),
+    })),
+  ];
 
   const pick = (tpl: ContentTemplate) => {
     if (act.busy()) return;
@@ -58,28 +96,47 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
   };
 
   return (
-    <View class="gap-3.5">
-      <View class="flex-row flex-wrap items-center gap-2.5">
+    <View class="min-h-0 flex-1">
+      <View class="shrink-0 flex-row flex-wrap items-center gap-2.5 border-b border-line px-5 py-3">
         <SearchField
           testid="content-template-search"
+          autoFocus
           value={query()}
           onInput={(v) => query.set(v)}
+          onSubmit={() => {
+            const first = filtered().at(0);
+            if (first !== undefined) pick(first);
+          }}
           placeholder={t("web.library.content.templates.search")}
           label={t("web.library.content.templates.search")}
           class="w-60 min-w-44"
         />
-        <Segmented
-          testid="content-template-category"
-          label={t("web.library.content.templates.title")}
-          value={category()}
-          onChange={(v) => category.set(v)}
-          options={categoryOptions}
-        />
+        <View class={query().trim().length > 0 ? "opacity-50" : undefined}>
+          <Segmented
+            testid="content-template-category"
+            label={t("web.library.content.templates.title")}
+            value={selectedTab()}
+            onChange={(v) => selectedTab.set(v)}
+            options={categoryOptions}
+          />
+        </View>
+        <If when={query().trim().length > 0}>
+          <Text testID="content-template-search-count" class="text-xs text-muted tabular-nums">
+            {t("web.library.content.templates.searchCount", { n: filtered().length })}
+          </Text>
+        </If>
       </View>
 
-      <Scroll style={{ maxHeight: Math.max(280, windowSize().height * 0.62) }} contentClass="pb-1">
-        <If when={hasFiltered()} else={<Quiet>{t("web.library.content.templates.empty")}</Quiet>}>
-          <View class="flex-row flex-wrap gap-3">
+      <Scroll class="min-h-0 flex-1" contentClass="px-5 py-4">
+        <If
+          when={hasFiltered()}
+          else={
+            <View class="py-12">
+              <Quiet>{t("web.library.content.templates.empty")}</Quiet>
+            </View>
+          }
+        >
+          <View class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             <Each of={filtered()} key={(tpl) => tpl.id}>
               {(tpl) => (
                 <View
@@ -88,7 +145,7 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
                   accessibilityLabel={templateName(tpl())}
                   disabled={act.busy()}
                   onPress={() => pick(tpl())}
-                  class={`group w-58 shrink-0 overflow-hidden rounded-lg border border-line bg-page ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:shadow-raise active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+                  class={`group overflow-hidden rounded-lg border border-line bg-page ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:shadow-raise active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
                 >
                   <TemplatePreview tpl={tpl()} />
                   <View class="gap-1 p-2.5">
@@ -111,7 +168,7 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
 function TemplatePreview(props: { tpl: ContentTemplate }) {
   const tpl = () => props.tpl;
   return (
-    <View class="h-20 w-full items-center justify-center border-b border-line bg-side px-4 py-2.5">
+    <View class="relative h-20 w-full items-center justify-center border-b border-line bg-side px-4 py-2.5">
       <If when={tpl().kind === "note"}>
         <View class="h-full w-full justify-center gap-1.5 rounded-sm border border-line bg-page px-3 py-2">
           <View class="flex-row items-center gap-1.5">
@@ -163,11 +220,22 @@ function TemplatePreview(props: { tpl: ContentTemplate }) {
           </View>
         </View>
       </If>
+
+      <View class="absolute top-1.5 right-1.5 flex-row items-center gap-1">
+        <If when={tpl().standaloneApp === true}>
+          <View class="size-5 items-center justify-center rounded-sm border border-line bg-page">
+            <Icon name="devices" size={12} tone="accent" />
+          </View>
+        </If>
+        <View class="rounded-sm border border-line bg-page px-1.5 py-0.5">
+          <Text class="text-2xs font-medium text-muted">{templateBadge(tpl())}</Text>
+        </View>
+      </View>
     </View>
   );
 }
 
-type DeliverablePreviewKind = "design-system" | "dashboard" | "slides" | "design" | "motion" | "prototype" | "document";
+type DeliverablePreviewKind = "design-system" | "dashboard" | "slides" | "design" | "motion" | "prototype" | "diagram" | "sheet" | "storyboard" | "document";
 
 function deliverablePreviewKind(type: ArtifactType): DeliverablePreviewKind {
   switch (type) {
@@ -177,13 +245,13 @@ function deliverablePreviewKind(type: ArtifactType): DeliverablePreviewKind {
     case "design":
     case "motion":
     case "prototype":
+    case "diagram":
+    case "sheet":
+    case "storyboard":
       return type;
     case "docs":
     case "outline":
     case "whiteboard":
-    case "sheet":
-    case "diagram":
-    case "storyboard":
       return "document";
   }
 }
@@ -260,6 +328,56 @@ function DeliverablePreview(props: { tpl: ContentTemplate }) {
           <View class="flex-1 items-center justify-center gap-1.5 px-3">
             <View class="h-2 w-24 rounded-xs bg-ink opacity-70" />
             <View class="h-2.5 w-14 rounded-xs bg-accent" />
+          </View>
+        </View>
+      </If>
+      <If when={previewKind() === "diagram"}>
+        <View class="h-full w-full flex-row items-center justify-center gap-1.5">
+          <View class="h-7 w-10 items-center justify-center rounded-sm border border-line bg-page">
+            <View class="h-1.5 w-5 rounded-xs bg-ink opacity-70" />
+          </View>
+          <View class="h-0.5 w-3 bg-accent" />
+          <View class="h-7 w-10 items-center justify-center rounded-sm border border-accent bg-ok-soft">
+            <View class="h-1.5 w-5 rounded-xs bg-ok-ink opacity-80" />
+          </View>
+          <View class="h-0.5 w-3 bg-water" />
+          <View class="h-7 w-10 items-center justify-center rounded-sm border border-line bg-page">
+            <View class="h-1.5 w-5 rounded-xs bg-water opacity-80" />
+          </View>
+        </View>
+      </If>
+      <If when={previewKind() === "sheet"}>
+        <View class="h-full w-40 justify-center gap-1 rounded-sm border border-line bg-page p-2">
+          <View class="flex-row gap-1 border-b border-line pb-1">
+            <View class="h-1.5 flex-1 rounded-xs bg-accent opacity-75" />
+            <View class="h-1.5 flex-1 rounded-xs bg-ink opacity-60" />
+            <View class="h-1.5 flex-1 rounded-xs bg-ink opacity-60" />
+          </View>
+          <View class="flex-row gap-1">
+            <View class="h-1.5 flex-1 rounded-xs bg-faint opacity-50" />
+            <View class="h-1.5 flex-1 rounded-xs bg-faint opacity-45" />
+            <View class="h-1.5 flex-1 rounded-xs bg-ok-soft" />
+          </View>
+          <View class="flex-row gap-1">
+            <View class="h-1.5 flex-1 rounded-xs bg-faint opacity-50" />
+            <View class="h-1.5 flex-1 rounded-xs bg-faint opacity-45" />
+            <View class="h-1.5 flex-1 rounded-xs bg-wheat opacity-65" />
+          </View>
+        </View>
+      </If>
+      <If when={previewKind() === "storyboard"}>
+        <View class="h-full w-full flex-row items-center justify-center gap-1.5">
+          <View class="h-11 w-12 justify-between rounded-sm border border-line bg-page p-1">
+            <View class="h-5 rounded-xs bg-selected" />
+            <View class="h-1 w-6 rounded-xs bg-faint opacity-50" />
+          </View>
+          <View class="h-11 w-12 justify-between rounded-sm border border-accent bg-page p-1">
+            <View class="h-5 rounded-xs bg-ok-soft" />
+            <View class="h-1 w-7 rounded-xs bg-accent opacity-70" />
+          </View>
+          <View class="h-11 w-12 justify-between rounded-sm border border-line bg-page p-1">
+            <View class="h-5 rounded-xs bg-selected" />
+            <View class="h-1 w-6 rounded-xs bg-faint opacity-50" />
           </View>
         </View>
       </If>

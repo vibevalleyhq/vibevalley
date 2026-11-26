@@ -18,17 +18,24 @@ cargo run -p vibevalley-cli -- doctor        # 命令行，对着运行中的服
 - **重载**：服务端不自动重载，修改 `crates/` 需重新构建、重启。调试构建的应用从磁盘读 `apps/mac/ui/build/`（工作台 `App.tsx`）与 `apps/mac/ui/build-shell/`（轻量壳窗格 `ShellApp.tsx`）的页面包：改了 TSX 跑 `vp run mac:check` 重新打包，再重开应用，不用重新编译 Rust。
 - **不看屏幕检查应用**：`VIBEVALLEY_DEBUG_DUMP=<文件>` 每秒把外壳的状态写成 JSON，`VIBEVALLEY_DEBUG_SCRIPT=<文件>` 一行一步地驱动应用，带 `--features shot` 构建时能截图（[验收的应用分册](.agents/skills/vv-acceptance/references/app.md)）。
 
-## 发版
+## 发版与本地构建
+
+版本号采用三位 SemVer 并按三阶段区分后缀：`X.Y.Z-alpha.N`（alpha）、`X.Y.Z-beta.N`（beta）与 `X.Y.Z`（release，无后缀），统一记录在根目录 `package.json` 的 `"version"` 字段中，先 bump 再打包。
 
 ```bash
-vp run release alpha     # 在 main 上打下一个 alpha
-vp run release beta      # 首次在 main 切出 release/x.y 并打 beta.1；之后在 release/x.y 打下一个 beta
-vp run release final     # 在 release/x.y 打正式版（须先有同版本 beta）
+vp run bump -- alpha             # 递增三位版本号后的 alpha（如 0.1.0-alpha.1 → 0.1.0-alpha.2；支持 --patch / --minor / --major）
+vp run bump -- beta              # 升至 beta（如 0.1.0-alpha.2 → 0.1.0-beta.1 → 0.1.0-beta.2）
+vp run bump -- release           # 摘掉预发布后缀成为正式版（如 0.1.0-beta.2 → 0.1.0；若已正式版则 patch +1）
+
+vp run build:alpha -- --bump     # 先 bump alpha，再走 [profile.alpha] + --fast 产出 .app、.dmg、.zip 与 release.json，并写入本地更新源（支持 --install 装入 /Applications）
+vp run build:beta -- --bump      # 先 bump beta，默认先跑 make verify，再走 [profile.release] 产出 .app、.dmg、.zip 与 release.json
+vp run build:release -- --bump   # 先 bump release，默认先跑 make verify，再走 [profile.release] 产出 .app、.dmg、.zip 与 release.json
 ```
 
-- **三阶段**：`alpha` 自用，功能可变、数据可能重建；`beta` 冻结功能只修缺陷，修复先进 `main` 再 cherry-pick 到 `release/x.y`；`final` 与最后一个 beta 使用同一份代码。
-- **发布脚本**（`scripts/release/release.ts`）校验工作区干净、分支与 origin 一致，由已有 tag 推算下一版本号。beta 与正式版先在 Mac 上运行 `make verify`，确认后打 tag 推送。GitHub 对每个发布标签重新执行 CI，通过后才打包并创建草稿。
-- **打包**：`vp run package:mac` 构建原生应用、命令行、灵动岛和页面，写出 `apps/mac/dist` 下的 `.app`、`.dmg`、`.zip` 和 `release.json`。Rust 发布配置（`Cargo.toml` `[profile.release]`）启用 `strip = "symbols"`、`lto = "thin"` 与 `codegen-units = 1`（保留默认 `panic = "unwind"`，因为 `nsh-core` SVG 引擎依赖 `catch_unwind`）；`scripts/release/package.ts` 复制 `assets/` 时通过 `scripts/release/package-assets.ts` 的 `shouldPackageAsset` 过滤仅官网使用的 `assets/title/` 与 `assets/pixel/title-*.jpg`，两份 `--release` 字节码已单份嵌入 `vibevalley-mac`，不再向 `Contents/Resources/ui` 复制开发页面包。本地默认 ad-hoc 签名；`--sign <Developer ID>` 指定签名身份，`--notary-profile <配置名>` 提交公证并装订票据。`--version` 指定版本，未指定时取当前版本标签，无标签是 `0.0.0`。两个包的更新验收见[应用验收](.agents/skills/vv-acceptance/references/app.md#打包和更新)。
+- **本地 git 可选开关**：`bump` 与 `build:*` 默认只改根目录 `package.json` 并产出安装包，不动 git、也不推送远端触发 CI；需要本地留痕时可追加 `-- --commit`（仅提交 `package.json`）和 `-- --tag`（只打本地 `v<version>` tag，不 push），预演加 `-- --dry-run`。
+- **三阶段与打包差异**：`alpha` 使用 `Cargo.toml` 的 `[profile.alpha]`（增量编译、`thin` LTO 关闭、16 codegen-units）与 `--fast`，默认跳过 `make verify`，同时产出 `.app`、`.dmg`、`.zip` 与 `release.json`（可用 `-- --no-zip` 关闭），并自动把本地 `file://.../release.json` 写入 `VibeValley-Alpha.app` 的 `Info.plist`（`VibeValleyUpdateFeed`，可用 `-- --no-local-feed` 关闭）；首次加 `-- --install` 装进 `/Applications/VibeValley-Alpha.app` 后，后续每次 `vp run build:alpha -- --bump` 即可在运行中的应用内直接检查更新、做 SHA-512 与包标识校验并原地替换重启。`beta` 与 `release` 使用 `[profile.release]`（`strip = "symbols"`、`lto = "thin"`、`codegen-units = 1`），默认先跑 `make verify`（可用 `-- --skip-verify` 跳过）并全量打包 `.app`、`.dmg`、`.zip` 和 `release.json`，且绝不读取或写入本地 `file://` 更新源。
+- **打包脚本细节**：`scripts/release/package.ts` 按 `--version > HEAD 上精确 v* 标签 > 根目录 package.json "version" > "0.0.0"` 解析版本号并按版本号分流通道（`VibeValley-Alpha` / `VibeValley-Beta` / `VibeValley` / `VibeValley-Dev`）；经 `scripts/release/package-assets.ts` 过滤仅官网使用的图片，在 `scripts/release/dmg-layout.ts` 中使用 Apple 原生 `ULFO`（LZFSE）压缩与 Papertrails 风格安装器背景（`apps/mac/resources/dmg-background.png`）。本地默认 ad-hoc 签名；`--sign <Developer ID>` 指定签名身份，`--notary-profile <配置名>` 提交公证并装订票据。两个包的更新验收见[应用验收](.agents/skills/vv-acceptance/references/app.md#打包和更新)。
+- **远端 tag 发版（需要时启用）**：若后续启用 GitHub 发布工作流，可用 `vp run release alpha|beta|final` 检查分支并推送 `v*` 标签。
 - **公开发布**。发布任务使用 Apple 芯片 runner。打包脚本检查应用、CLI 和灵动岛的 Mach-O 架构和最低系统版本。Info.plist 的最低版本为 macOS 14.0。Developer ID 打包还应有应用分发证书及私钥。公证需要当前 runner 钥匙串中可用的 notarytool profile。GitHub 仓库变量仅提供名称。当前托管 runner 的工作流还需接入签名材料及公证凭据的装配步骤。只有当前提交有同名版本标签时，更新清单才给出该版本的 GitHub 发布页。
 
 
@@ -49,7 +56,7 @@ vp run release final     # 在 release/x.y 打正式版（须先有同版本 bet
 - `vp run docs:verify`：校验 Note、skill、文档链接、旧名字、用语表、词典与生成的参考表。
 - 帮工交付前，服务端运行工单 worktree 的 `.vibevalley/check`。脚本清除 `VIBEVALLEY_*` 和模型钥匙等环境变量，安装锁定版本的依赖，运行 `vp check --deny-warnings`。它按改动和新增文件选择 Rust、契约、SQL、页面和软件包的检查，最后运行 `docs:verify`。新 worktree 的 `.vibevalley/setup` 安装依赖并构建软件包声明。[仓库检查](.vibevalley/check)
 
-测试不连接真实模型：服务端的测试在 `crates/server/tests`，助手用替身模型，帮工用 oar 的 scripted 农机（`crates/server/src/fake/runtime.rs`）。页面的测试用 `nsh/test` 写在 `apps/mac/ui`，喂样例的 `Transport`；像素场景的测试在 `apps/mac/src/pixel/tests.rs`。
+测试不连接真实模型：服务端的测试在 `crates/server/tests`，助手用替身模型，帮工用 oar 的 scripted 农机（`crates/server/src/fake/runtime.rs`）。页面的测试用 `nsh/test` 写在 `apps/mac/ui`，喂样例的 `Transport`；3D 纸雕农场与开场的测试在 `apps/mac/src/diorama/` 与 `apps/mac/crates/diorama/`。
 
 CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`docs:verify`、脚本与软件包测试、`deadcode` 和官网构建。Rust 工作区和原生页面不在 CI 上查（macOS 机器一次要 16 到 44 分钟）：合并前在本机跑 `make verify`，它包含 `cargo xtask check`、`cargo xtask audit`、`cargo xtask protocol`、`vp run packages:check` 和 `vp run mac:build-test`。[CI 工作流](.github/workflows/ci.yml)
 
@@ -118,14 +125,12 @@ CI 只在 Linux 上运行：PR 标题与正文、`vp check`、`docs:verify`、�
 
 ## 素材、音效和官网
 
-原图存放在独立的 `vibevalley-art` 仓库（克隆在同级目录或设 `VIBEVALLEY_ART`，由 `design/art.sh` 链入 `design/`）：
+全部原始 Papertrails 素材、生成脚本与 3D 纸雕源文件存放在独立的 `vibevalley-assets` 仓库（克隆在同级目录或设 `VIBEVALLEY_ASSETS_REPO`），由 `design/sync-assets.sh` 仅同步轻量成品到 `assets/{diorama,brand,icons,avatars,engines,site}/` 并更新 `apps/mac/resources/`：
 
 ```bash
-design/art.sh
-design/pixel/gen.sh <名字>             # 生成原图；两倍密用 hd-<名字>
-python3 design/pixel/process.py         # 切全部原图到 assets/pixel/ 与 sprites.json
-python3 design/pixel/process.py map plots  # 仅切指定素材
-python3 design/pixel/rail_faces.py --check  # 校验导航栏六套头像在 1×、2× 屏上的像素
+design/sync-assets.sh --all             # 在 vibevalley-assets 打包并全量同步纸雕、品牌、头像、引擎与官网产物
+design/sync-assets.sh --with-avatars    # 同步品牌、图标、引擎、官网与角色头像，并重生成 macOS 通道图标和 DMG 背景
+design/diorama.sh                       # 单独编译并同步 3D 纸雕场景产物到 assets/diorama/
 ```
 
-切图规则见[工程流程](docs/subsystems/process.md#怎么走)。应用图标位于 `assets/icons/` 与 `apps/mac/resources/icon.icns`。音效配方在 `apps/mac/ui/design/pixel/sound.ts`（[农场的皮](docs/subsystems/farm.md#模型和不变量)）。官网位于 [apps/site/README.md](apps/site/README.md)，通过 `vp run site:deploy` 部署。
+素材管线见[工程流程](docs/subsystems/process.md#怎么走)。应用图标位于 `assets/icons/` 与 `apps/mac/resources/icon*.icns`。音效触发在 `apps/mac/ui/design/sound.ts`，合成器在 `apps/mac/src/audio.rs`（[农场的皮](docs/subsystems/farm.md#模型和不变量)）。官网位于 [apps/site/README.md](apps/site/README.md)，通过 `vp run site:deploy` 部署。

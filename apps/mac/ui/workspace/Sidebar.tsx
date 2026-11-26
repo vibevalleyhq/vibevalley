@@ -4,7 +4,9 @@ import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession, isOrchestratorSession, sessionBranch, sessionIssueId, sessionRepo, sessionWorktree } from "@vibevalley/protocol/rules";
+import { HostRailRunningState as HostRailRunningStateSchema } from "@vibevalley/protocol/schema";
 
+import { engineLogoUrl } from "../design/art";
 import { Icon } from "../design/Icon";
 import type { IconName } from "../design/icons";
 import { ActiveBar } from "../design/layout";
@@ -19,7 +21,7 @@ import { FileTree, filesFrameSchema } from "./FileTree";
 import { GitPanel, gitFrameSchema, type GitTab } from "./GitPanel";
 import { RepoDetailPanel, type RepoDetailTarget } from "./RepoDetailPanel";
 
-type RailRunningState = "working" | "ready" | "idle";
+type RailRunningState = z.infer<typeof HostRailRunningStateSchema>;
 
 type RailTab = {
   id: number;
@@ -35,7 +37,7 @@ type RailTab = {
 
 type RailWorktree = {
   path: string;
-  branch: string | null;
+  branch?: string | null;
   main: boolean;
 };
 
@@ -71,7 +73,7 @@ const railTabSchema: z.ZodType<RailTab> = z.object({
   active: z.boolean(),
   kind: z.string(),
   running: z.exactOptional(z.boolean()),
-  runningState: z.exactOptional(z.enum(["working", "ready", "idle"])),
+  runningState: z.exactOptional(HostRailRunningStateSchema),
   runningAgent: z.exactOptional(z.string().nullable()),
   runningLabel: z.exactOptional(z.string().nullable()),
   attention: z.exactOptional(z.boolean()),
@@ -79,7 +81,7 @@ const railTabSchema: z.ZodType<RailTab> = z.object({
 
 const railWorktreeSchema: z.ZodType<RailWorktree> = z.object({
   path: z.string(),
-  branch: z.string().nullable(),
+  branch: z.exactOptional(z.string().nullable()),
   main: z.boolean(),
 });
 
@@ -150,12 +152,8 @@ type ActivitySummary = {
 const ROW_BASE_PAD = 10;
 const INDENT_STEP = 12;
 
-const KNOWN_RUNTIME_LOGOS = new Set(["claude", "codex", "opencode", "cursor", "kimi", "pi", "grok", "antigravity"]);
-
-function runtimeLogoOf(agent: string | undefined): string | undefined {
-  if (!agent) return undefined;
-  const key = agent.toLowerCase().replace(/^acp:/u, "");
-  return KNOWN_RUNTIME_LOGOS.has(key) ? `logo-${key}` : undefined;
+function formatDisplayPath(path: string): string {
+  return path.replace(/^\/(?:Users|home)\/[^/]+/u, "~");
 }
 
 function normPath(p: string | undefined): string {
@@ -328,13 +326,10 @@ function ChevronButton(props: { expanded: boolean; label: string; onToggle: () =
     <Button
       onPress={props.onToggle}
       accessibilityLabel={props.label}
-      class={`h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
+      class={`h-4.5 w-4 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
     >
-      <View
-        class={`size-2.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
-        style={{ transform: [{ rotate: props.expanded ? "90deg" : "0deg" }] }}
-      >
-        <Icon name="expand" size={10} tone="muted" />
+      <View class="h-4 w-4 shrink-0 items-center justify-center">
+        <Icon name={props.expanded ? "choose" : "expand"} size={14} tone="muted" />
       </View>
     </Button>
   );
@@ -357,7 +352,7 @@ interface SidebarTreeCtx {
   readonly openMenuKey: () => string | null;
   readonly setOpenMenuKey: (key: string | null) => void;
   readonly sweepPhase: () => boolean;
-  readonly spriteSrc: (name: string | undefined) => string | undefined;
+  readonly engineLogoSrc: (agent: string | undefined) => string | undefined;
   readonly isRepoExpanded: (repo: RepoNode) => boolean;
   readonly isGroupExpanded: (group: WorktreeGroup) => boolean;
   readonly setFold: (key: string, expanded: boolean) => void;
@@ -458,7 +453,7 @@ function TabRow(props: { group: WorktreeGroup; tab: RailTab; depth: number; ctx:
   // Each terminal/chat tab displays strictly its own status (never polluted by group.sessionRunning).
   const state = computed(() => (props.tab.kind === "terminal" || props.tab.kind === "chat" ? tabRunningState(props.tab) : "idle"));
   const ownAgent = () => (props.tab.kind === "terminal" || props.tab.kind === "chat" ? props.tab.runningAgent : undefined);
-  const logoSrc = () => props.ctx.spriteSrc(runtimeLogoOf(ownAgent() ?? undefined));
+  const logoSrc = () => props.ctx.engineLogoSrc(ownAgent() ?? undefined);
   const canClose = computed(() => props.tab.kind === "terminal" || props.tab.kind === "chat" || props.group.tabs.length > 1);
   const tabIconTone = () => (state() === "working" ? "leaf" : isSelected() ? "ink" : "muted");
   const fallbackIcon = (): IconName =>
@@ -569,14 +564,69 @@ function TabRow(props: { group: WorktreeGroup; tab: RailTab; depth: number; ctx:
   );
 }
 
+function NewAtMenu(props: { menuKey: string; name: string; path: string; foldKey: string; testKey: string; ctx: SidebarTreeCtx }) {
+  const isOpen = () => props.ctx.openMenuKey() === props.menuKey;
+  return (
+    <Menu
+      open={isOpen()}
+      onOpenChange={(e) => {
+        if (e.open) props.ctx.setOpenMenuKey(props.menuKey);
+        else if (props.ctx.openMenuKey() === props.menuKey) props.ctx.setOpenMenuKey(null);
+      }}
+      placement="bottom"
+      align="end"
+      offset={4}
+      popupClass={`${menuPopupClass} ${motionClass("transition-opacity duration-120 ease-out")}`}
+      popupStartingClass={popupTransition("opacity-0")}
+      popupEndingClass={popupTransition("opacity-0")}
+      trigger={
+        <View
+          testID={`sidebar-new-${props.testKey}`}
+          accessibilityLabel={t("web.shell.sidebar.newMenu", { name: props.name })}
+          tooltip={<Bubble text={t("web.shell.sidebar.newMenu", { name: props.name })} />}
+          class={`size-5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus`}
+        >
+          <Icon name="add" size={12} tone="muted" />
+        </View>
+      }
+    >
+      <MenuItem
+        testID={`sidebar-new-chat-${props.testKey}`}
+        onSelect={() => {
+          props.ctx.setFold(props.foldKey, true);
+          act({ type: "new_chat_at", path: props.path });
+        }}
+        class="h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover"
+      >
+        <Icon name="chat" size={13} tone="muted" />
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.newChatHere")}</Text>
+      </MenuItem>
+      <MenuItem
+        testID={`sidebar-new-term-${props.testKey}`}
+        onSelect={() => {
+          props.ctx.setFold(props.foldKey, true);
+          act({ type: "new_terminal_at", path: props.path });
+        }}
+        class="h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover"
+      >
+        <Icon name="terminal" size={13} tone="muted" />
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.newTerminalHere")}</Text>
+      </MenuItem>
+    </Menu>
+  );
+}
+
 function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) {
   const rowKey = () => `wt:${props.group.path}`;
+  const newMenuKey = () => `new:wt:${props.group.path}`;
   const expandable = computed(() => isGroupExpandable(props.group));
   const expanded = computed(() => props.ctx.isGroupExpanded(props.group));
   const isHovered = computed(() => props.ctx.hoveredKey() === rowKey());
+  const isMenuOpen = computed(() => props.ctx.openMenuKey() === newMenuKey());
+  const showActions = computed(() => isHovered() || isMenuOpen());
   const isSelected = computed(() => props.group.active && props.group.tabs.length === 0);
   const summary = computed(() => summarizeGroup(props.group));
-  const sessionLogo = () => (props.group.sessionRunning ? props.ctx.spriteSrc(runtimeLogoOf(props.group.sessionAgent)) : undefined);
+  const sessionLogo = () => (props.group.sessionRunning ? props.ctx.engineLogoSrc(props.group.sessionAgent) : undefined);
   const tipText = () =>
     formatSummaryTooltip(
       props.group.isMain
@@ -616,11 +666,14 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
                 <If when={props.group.isMain}>
                   <Text class="shrink-0 text-2xs font-medium text-faint">{t("web.shell.sidebar.mainLabel")}</Text>
                 </If>
+                <If when={expanded() && props.group.tabs.length > 0}>
+                  <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{String(props.group.tabs.length)}</Text>
+                </If>
               </View>
             </Button>
             <View class="shrink-0 flex-row items-center gap-1">
               <If
-                when={isHovered()}
+                when={showActions()}
                 else={
                   <If
                     when={expandable() && !expanded()}
@@ -647,25 +700,13 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
                 >
                   <CollapsedSummary summary={summary()} />
                 </If>
-                <ShellIconButton
-                  compact
-                  icon="chat"
-                  size={12}
-                  label={t("web.shell.sidebar.newChat", { name: props.group.label })}
-                  onPress={() => {
-                    props.ctx.setFold(groupFoldKey(props.group), true);
-                    act({ type: "new_chat_at", path: props.group.path });
-                  }}
-                />
-                <ShellIconButton
-                  compact
-                  icon="add"
-                  size={12}
-                  label={t("web.shell.sidebar.newTerminal", { name: props.group.label })}
-                  onPress={() => {
-                    props.ctx.setFold(groupFoldKey(props.group), true);
-                    act({ type: "new_terminal_at", path: props.group.path });
-                  }}
+                <NewAtMenu
+                  menuKey={newMenuKey()}
+                  name={props.group.label}
+                  path={props.group.path}
+                  foldKey={groupFoldKey(props.group)}
+                  testKey={`wt-${props.group.label}`}
+                  ctx={props.ctx}
                 />
               </If>
               <If when={expandable()}>
@@ -696,17 +737,19 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
 
 function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; ctx: SidebarTreeCtx }) {
   const rowKey = () => `repo:${props.repo.path}`;
+  const newMenuKey = () => `new:repo:${props.repo.path}`;
   const hasMultipleWorktrees = computed(() => props.repo.groups.length > 1);
   const mainGroup = () => props.repo.groups[0];
   const expandable = computed(() => isRepoExpandable(props.repo));
   const expanded = computed(() => props.ctx.isRepoExpanded(props.repo));
   const isHovered = computed(() => props.ctx.hoveredKey() === rowKey());
+  const isMenuOpen = computed(() => props.ctx.openMenuKey() === newMenuKey());
+  const showActions = computed(() => isHovered() || isMenuOpen());
   const summary = computed(() => summarizeRepo(props.repo));
   const showActiveCard = computed(() => props.repo.active && expandable() && expanded());
   const isRepoSelected = computed(() => props.repo.active && (!expandable() || !expanded()));
-  const plotSrc = () => (props.repo.vibevalley ? props.ctx.spriteSrc(props.repo.active ? "plot-flowering" : "plot-leafy") : undefined);
   const mainSessionRunning = computed(() => !hasMultipleWorktrees() && mainGroup().sessionRunning);
-  const mainSessionLogo = () => (mainSessionRunning() ? props.ctx.spriteSrc(runtimeLogoOf(mainGroup().sessionAgent)) : undefined);
+  const mainSessionLogo = () => (mainSessionRunning() ? props.ctx.engineLogoSrc(mainGroup().sessionAgent) : undefined);
   const repoTip = () => formatSummaryTooltip(props.repo.path, summary(), expandable() && !expanded());
 
   return (
@@ -721,29 +764,32 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
               if (props.ctx.hoveredKey() === rowKey()) props.ctx.setHoveredKey(null);
             }}
             tooltip={<Bubble text={repoTip()} />}
-            class={`${rowClass(isRepoSelected())} pl-2.5`}
+            class={`relative min-h-11 flex-row items-start gap-1.5 rounded-md py-1.5 pr-1.5 pl-2.5 ${isRepoSelected() ? "bg-selected" : "hover:bg-hover"}`}
           >
             <If when={isRepoSelected()}>
               <ActiveBar />
             </If>
             <Button
               onPress={() => act({ type: "activate_path", path: props.repo.path })}
-              class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
+              class="min-w-0 flex-1 flex-row items-start gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
             >
-              <View class="size-4 shrink-0 items-center justify-center">
-                <If when={plotSrc()} else={<Icon name="folder" size={14} tone={props.repo.active ? "ink" : "muted"} />}>
-                  {(src) => <Image src={src()} class="size-4 object-contain" />}
-                </If>
+              <View class="mt-0.5 size-4 shrink-0 items-center justify-center">
+                <Icon name={props.repo.vibevalley ? "repos" : "folder"} size={14} tone={props.repo.active ? "leaf" : "muted"} />
               </View>
-              <View class="min-w-0 flex-1 flex-row items-center gap-1">
-                <Text class="shrink truncate text-sm font-semibold text-ink">{props.repo.name}</Text>
-                <If when={props.parentHint}>{(hint) => <Text class="shrink truncate text-2xs text-faint">{hint()}</Text>}</If>
+              <View class="min-w-0 flex-1 gap-0.5">
+                <View class="min-w-0 flex-row items-center gap-1">
+                  <Text class="shrink truncate text-sm font-semibold text-ink">{props.repo.name}</Text>
+                  <If when={props.parentHint}>{(hint) => <Text class="shrink truncate text-2xs text-faint">{hint()}</Text>}</If>
+                </View>
+                <Text testID={`sidebar-repo-path-${props.repo.name}`} class="truncate font-mono text-2xs text-faint">
+                  {formatDisplayPath(props.repo.path)}
+                </Text>
               </View>
             </Button>
 
-            <View class="shrink-0 flex-row items-center gap-0.5">
+            <View class="mt-0.5 shrink-0 flex-row items-center gap-0.5">
               <If
-                when={isHovered()}
+                when={showActions()}
                 else={
                   <If
                     when={expandable() && !expanded()}
@@ -770,25 +816,13 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
                   </If>
                 }
               >
-                <ShellIconButton
-                  compact
-                  icon="chat"
-                  size={12}
-                  label={t("web.shell.sidebar.newChat", { name: props.repo.name })}
-                  onPress={() => {
-                    props.ctx.setFold(repoFoldKey(props.repo), true);
-                    act({ type: "new_chat_at", path: props.repo.path });
-                  }}
-                />
-                <ShellIconButton
-                  compact
-                  icon="add"
-                  size={12}
-                  label={t("web.shell.sidebar.newTerminal", { name: props.repo.name })}
-                  onPress={() => {
-                    props.ctx.setFold(repoFoldKey(props.repo), true);
-                    act({ type: "new_terminal_at", path: props.repo.path });
-                  }}
+                <NewAtMenu
+                  menuKey={newMenuKey()}
+                  name={props.repo.name}
+                  path={props.repo.path}
+                  foldKey={repoFoldKey(props.repo)}
+                  testKey={`repo-${props.repo.name}`}
+                  ctx={props.ctx}
                 />
                 <If when={props.repo.projectId !== undefined && !props.repo.vibevalley}>
                   <ShellIconButton
@@ -873,7 +907,7 @@ export function Sidebar() {
   const isInspector = hostParams.role === "inspector";
   const board = isInspector ? () => null : sliceFrame("board");
   const sessionsSlice = isInspector ? () => null : sliceFrame("sessions");
-  const pixelDir = signal<string | undefined>(hostParams.pixelDir);
+  const assetsDir = signal<string | undefined>(hostParams.assetsDir);
   const foldOverrides = signal<Record<string, boolean>>({});
   const hoveredKey = signal<string | null>(null);
   const openMenuKey = signal<string | null>(null);
@@ -910,9 +944,9 @@ export function Sidebar() {
   });
 
   if (host.available()) {
-    if (!untracked(pixelDir)) {
-      void hostApi.pixelDir().then((env) => {
-        if (env.bizCode === 0 && env.data?.path) pixelDir.set(env.data.path);
+    if (!untracked(assetsDir)) {
+      void hostApi.assetsDir().then((env) => {
+        if (env.bizCode === 0 && env.data?.path) assetsDir.set(env.data.path);
       });
     }
     if (hostParams.role !== "inspector") {
@@ -929,9 +963,9 @@ export function Sidebar() {
 
   const panel = () => rail()?.panel ?? "files";
 
-  const spriteSrc = (name: string | undefined) => {
-    const dir = pixelDir();
-    return dir && name ? `file://${encodeURI(`${dir}/${name}.png`)}` : undefined;
+  const engineLogoSrc = (agent: string | undefined) => {
+    const dir = assetsDir();
+    return dir ? engineLogoUrl(dir, agent) : undefined;
   };
 
   const gitTab = signal<GitTab>("changes");
@@ -1271,7 +1305,7 @@ export function Sidebar() {
     openMenuKey: () => openMenuKey(),
     setOpenMenuKey: (key) => openMenuKey.set(key),
     sweepPhase: () => sweepPhase(),
-    spriteSrc,
+    engineLogoSrc,
     isRepoExpanded,
     isGroupExpanded,
     setFold,
@@ -1291,12 +1325,6 @@ export function Sidebar() {
             <View desktop={{ windowDrag: true }} class="h-9 flex-row items-center justify-between border-b border-line pr-2 pl-3">
               <Text class="text-xs font-semibold text-ink">{t("web.shell.sidebar.title")}</Text>
               <View class="flex-row items-center gap-1">
-                <ShellIconButton
-                  icon="catalog"
-                  size={13}
-                  label={t("web.shell.sidebar.manageRepos")}
-                  onPress={() => act({ type: "open_route", path: "/repos" })}
-                />
                 <If when={hasFoldableItems()}>
                   <ShellIconButton
                     icon={anyExpanded() ? "collapseAll" : "expandAll"}
@@ -1305,15 +1333,13 @@ export function Sidebar() {
                     onPress={toggleCollapseAll}
                   />
                 </If>
-                <Button
+                <ShellIconButton
+                  icon="folder"
+                  size={13}
+                  label={t("web.shell.sidebar.addRepo")}
+                  tooltip={t("web.shell.sidebar.addRepoTooltip")}
                   onPress={() => act({ type: "add_project" })}
-                  accessibilityLabel={t("web.shell.sidebar.addRepo")}
-                  tooltip={<Bubble text={t("web.shell.sidebar.addRepoTooltip")} />}
-                  class={`h-5.5 flex-row items-center gap-1 rounded-md border border-line bg-hover px-2 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
-                >
-                  <Icon name="add" size={11} tone="ink" />
-                  <Text class="text-2xs font-medium text-ink">{t("web.shell.sidebar.addRepoButton")}</Text>
-                </Button>
+                />
               </View>
             </View>
 
@@ -1331,7 +1357,7 @@ export function Sidebar() {
           </>
         }
       >
-        {(repo) => <RepoDetailPanel repo={repo()} spriteSrc={spriteSrc} onClose={() => detailRepoPath.set(null)} />}
+        {(repo) => <RepoDetailPanel repo={repo()} onClose={() => detailRepoPath.set(null)} />}
       </If>
     </View>
   );

@@ -1,32 +1,31 @@
-import { cleanup, computed, keymap, PanResponder, Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
+import { computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type Channel, defaultOrchestrator, type SessionView } from "@vibevalley/protocol";
+import { type Channel, type SessionView, userId } from "@vibevalley/protocol";
 import { isFreeUserSession, sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
-import { OrchestratorFace } from "../../../design/domain/Face";
+import { OrchestratorFace, UserFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import { ActiveBar, Kbd, SidebarSection } from "../../../design/layout";
 import { motionClass } from "../../../design/motion";
+import { Segmented } from "../../../design/Segmented";
+import { type DotTone } from "../../../design/Tag";
 import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
-import { useAgent } from "../../../infra/agents";
+import { useAgent, useOrchestrators } from "../../../infra/agents";
 import { api } from "../../../infra/api";
 import { useNow } from "../../../infra/base/dom";
-import { tookText } from "../../../infra/base/format";
-import { orchestratorMood, orchestratorSession, type OrchestratorMood, useCollabSlice, useSessionsSlice } from "../../../infra/frame";
+import { orchestratorMood, type OrchestratorMood, useCollabSlice, useSessionsSlice } from "../../../infra/frame";
 import { ready, settingsQuery, useAgents, useQuery } from "../../../infra/query";
 import { fixOf } from "../../../infra/readiness";
-import { Link as A, useRouter } from "../../../infra/router";
+import { useRouter } from "../../../infra/router";
 import { runsHref } from "../../session";
 import { useMarkedChat } from "../model/marks";
-import { archivedOf, channelName, chatPath, directsOf, groupsOf, sessionThreadOf, topsOf, unreadTotal, unreadUnder } from "../model/places";
-import { Count, Dot, HelperFace, PhaseGlyph, ThinkingDots, phaseDot, phaseText } from "./presence";
+import { archivedOf, type ChatFilter, channelName, channelTime, chatPath, directPeerOf, sidebarChannelsOf, unreadTotal, unreadUnder } from "../model/places";
+import { Count, Dot, dutyShort, HelperFace, phaseDot, phaseText } from "./presence";
 import { switcher } from "./QuickSwitcher";
-
-export const markOf = (c: Channel | undefined) => (c?.type === "direct" ? "@" : "#");
 
 export const orchestratorMoodLabels: Record<OrchestratorMood, string> = {
   idle: t("web.channel.mood.idle"),
@@ -66,39 +65,94 @@ export function BarButton(props: {
   );
 }
 
+type CollageSlot = { readonly kind: "user"; readonly id: string } | { readonly kind: "orchestrator"; readonly id: string };
+
+/** Avatar for a chat row: agent face with presence dot for directs, or a compact member collage / chat icon for channels. */
+export function ChannelAvatar(props: { channel: Channel | undefined; size?: number | undefined; dot?: DotTone | undefined }) {
+  const orchestrators = useOrchestrators();
+  const size = () => props.size ?? 36;
+  const peerId = () => directPeerOf(props.channel);
+  const isOrchestrator = () => {
+    const id = peerId();
+    return id !== undefined && orchestrators().some((a) => a.id === id);
+  };
+  const slots = computed((): readonly CollageSlot[] => {
+    const ch = props.channel;
+    if (!ch || ch.type === "direct") return [];
+    const orcIds = new Set(orchestrators().map((a) => a.id));
+    const explicit = (ch.members ?? []).filter((id) => orcIds.has(id));
+    const fallback = ch.orchestrator && orcIds.has(ch.orchestrator) ? [ch.orchestrator] : [];
+    const picked = (explicit.length > 0 ? explicit : fallback).slice(0, 3);
+    if (picked.length === 0) return [];
+    return [{ kind: "user", id: userId }, ...picked.map((id): CollageSlot => ({ kind: "orchestrator", id }))];
+  });
+  return (
+    <If
+      when={props.channel?.type === "direct"}
+      else={
+        <If
+          when={size() >= 32 && slots().length >= 2}
+          else={
+            <View class="shrink-0 items-center justify-center rounded-md border border-line bg-page" style={{ width: size(), height: size() }}>
+              <Icon name="chat" size={size() >= 32 ? 16 : 14} tone="muted" />
+            </View>
+          }
+        >
+          <View
+            class="shrink-0 flex-row flex-wrap items-center justify-center gap-0.5 overflow-hidden rounded-md border border-line bg-page p-0.5"
+            style={{ width: size(), height: size() }}
+          >
+            <Each of={slots()} key={(slot) => `${slot.kind}:${slot.id}`}>
+              {(slot) => (
+                <If when={slot().kind === "user"} else={<OrchestratorFace size={14} agent={slot().id} />}>
+                  <UserFace size={14} />
+                </If>
+              )}
+            </Each>
+          </View>
+        </If>
+      }
+    >
+      <View class="relative shrink-0" style={{ width: size(), height: size() }}>
+        <If when={isOrchestrator()} else={<HelperFace agent={peerId() ?? ""} size={size()} />}>
+          <OrchestratorFace size={size()} agent={peerId()} />
+        </If>
+        <If when={props.dot}>
+          {(tone) => (
+            <View class="absolute -right-0.5 -bottom-0.5">
+              <Dot tone={tone()} size={size() >= 32 ? 7 : 5} />
+            </View>
+          )}
+        </If>
+      </View>
+    </If>
+  );
+}
+
 export function Sidebar(props: { channel: Channel | undefined; thread: Channel | undefined; onNew: () => void; onSearch: () => void; onPick: () => void }) {
   const collab = useCollabSlice();
-  const sessionsSlice = useSessionsSlice();
   const router = useRouter();
   const chat = useMarkedChat();
-  const channels = computed(() => topsOf(chat()));
-  const channelGroups = computed(() => groupsOf(channels()));
-  const directs = computed(() => directsOf(chat()));
+  const settings = useQuery(settingsQuery);
+  const filter = signal<ChatFilter>("all");
+  const menuOpen = signal(false);
+  const items = computed(() => sidebarChannelsOf(chat(), filter()));
   const archived = computed(() => archivedOf(chat()));
-  const sessions = computed(() => (sessionsSlice()?.sessions ?? []).filter((h) => !isFreeUserSession(h)));
-  const picking = signal(false);
+  const channelSummary = computed(() => (chat() === collab()?.chat ? collab()?.channelSummary : undefined));
+  const totalUnread = computed(() => unreadTotal(chat(), channelSummary()));
+  const unreadOf = (c: Channel) => unreadUnder(chat(), c, channelSummary());
+  const archivedUnread = computed(() => archived().reduce((sum, c) => sum + unreadOf(c), 0));
+  const lacks = computed(() => {
+    const readiness = ready(settings, undefined)?.readiness.orchestrator;
+    return readiness?.ready === false ? fixOf(readiness.missing) : undefined;
+  });
   const go = (c: Channel) => {
     router.navigate(chatPath(c));
     props.onPick();
   };
-  const act = createAct();
-  const reorder = createReorder((id, onto) => void act.run(() => api.channel.update({ id, before: onto.id, category: onto.category })));
-  const channelSummary = computed(() => (chat() === collab()?.chat ? collab()?.channelSummary : undefined));
-  const totalUnread = computed(() => unreadTotal(chat(), channelSummary()));
-  const unreadOf = (c: Channel) => unreadUnder(chat(), c, channelSummary());
-  const unreadSum = (list: readonly Channel[]) => list.reduce((sum, c) => sum + unreadOf(c), 0);
-  const helpersUnread = computed(() =>
-    sessions().reduce((sum, h) => {
-      const th = sessionThreadOf(chat(), h);
-      return sum + (th ? unreadOf(th) : 0);
-    }, 0),
-  );
-  const row = (c: () => Channel) => (
-    <ChannelRow channel={c()} here={c().id === props.channel?.id} unread={unreadOf(c())} onClick={() => go(c())} reorder={reorder} />
-  );
   return (
     <View accessibilityLabel={t("web.channel.side")} testID="channels-side" class="w-full flex-1 border-r border-line bg-side">
-      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
+      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-1.5 border-b border-line px-3.5">
         <Text role="header" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
           {t("web.channel.tab.chat")}
         </Text>
@@ -107,103 +161,127 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
             <Count n={totalUnread()} />
           </View>
         </If>
+        <BarButton
+          icon="log"
+          size={14}
+          compact
+          testid="chat-open-runs"
+          label={t("web.channel.runsEntry")}
+          onPress={() => {
+            router.navigate(runsHref());
+            props.onPick();
+          }}
+        />
+        <Popover
+          open={menuOpen()}
+          onOpenChange={(e) => menuOpen.set(e.open)}
+          placement="bottom"
+          align="end"
+          offset={4}
+          popupClass="w-56 flex-col overflow-hidden rounded-lg border border-line bg-elevated p-1 shadow-float"
+          popupStyle={{ maxHeight: Math.min(352, Math.max(180, Math.round(windowSize().height * 0.7))) }}
+          trigger={
+            <View
+              testID="chat-new"
+              accessibilityLabel={t("web.channel.newChat")}
+              tooltip={<Bubble text={t("web.channel.newChat")} />}
+              class={`h-6 w-6 shrink-0 items-center justify-center rounded-md ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px ${
+                menuOpen() ? "bg-selected" : ""
+              }`}
+            >
+              <Icon name="add" size={14} tone={menuOpen() ? "ink" : "muted"} />
+            </View>
+          }
+        >
+          <View class="min-h-0 shrink gap-0.5">
+            <View
+              role="menuitem"
+              testID="new-channel"
+              class="shrink-0 flex-row items-center gap-2 rounded-md px-2 py-1.5 hover:bg-hover"
+              onPress={() => {
+                menuOpen.set(false);
+                props.onNew();
+              }}
+            >
+              <Icon name="chat" size={14} tone="muted" />
+              <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.channel.newChannel")}</Text>
+            </View>
+            <View class="my-1 h-px shrink-0 bg-line" />
+            <DirectPicker
+              onPicked={(id) => {
+                menuOpen.set(false);
+                router.navigate(`/chat/${id}`);
+                props.onPick();
+              }}
+            />
+          </View>
+        </Popover>
       </View>
-      <Scroll class="flex-1" contentClass="px-3 py-3">
+      <View class="shrink-0 gap-2 px-3 pt-2.5 pb-2">
         <View
           role="button"
           testID="switcher-open"
           onPress={() => switcher.show()}
-          class={`mb-3 h-8 w-full flex-row items-center gap-2 rounded-md border border-line bg-page px-2.5 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
+          class={`h-8 w-full flex-row items-center gap-2 rounded-md border border-line bg-page px-2.5 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
         >
           <Icon name="search" size={14} tone="faint" />
           <Text class="min-w-0 flex-1 truncate text-sm text-muted">{t("web.channel.switcher.open")}</Text>
           <Kbd>{keymap.label("mod+j")}</Kbd>
         </View>
-        <Section
-          item="channels"
-          title={t("web.channel.channelsTitle")}
-          count={Math.max(1, channels().length)}
-          unread={unreadSum(channels())}
-          action={<BarButton icon="add" size={14} compact testid="new-channel" label={t("web.channel.newChannel")} onPress={() => props.onNew()} />}
-        >
-          <Each of={channelGroups()} key={(g) => g.category ?? "__default__"}>
-            {(g) => (
-              <If
-                when={g().category}
-                else={
-                  <Each of={g().channels} key={(c) => c.id}>
-                    {(c) => row(c)}
-                  </Each>
-                }
-              >
-                {(name) => (
-                  <Section title={name()} item={`category:${name()}`} count={g().channels.length} unread={unreadSum(g().channels)} nested>
-                    <Each of={g().channels} key={(c) => c.id}>
-                      {(c) => row(c)}
-                    </Each>
-                  </Section>
-                )}
-              </If>
-            )}
-          </Each>
-        </Section>
-        <Section
-          item="directs"
-          title={t("web.channel.directsTitle")}
-          count={directs().length}
-          unread={unreadSum(directs())}
-          action={
-            <Popover
-              open={picking()}
-              onOpenChange={(e) => picking.set(e.open)}
-              placement="bottom"
-              align="end"
-              offset={4}
-              popupClass="max-h-80 w-56 rounded-lg border border-line bg-elevated p-1 shadow-float"
-              trigger={
-                <View
-                  testID="new-direct"
-                  accessibilityLabel={t("web.channel.direct.add")}
-                  tooltip={<Bubble text={t("web.channel.direct.add")} />}
-                  class={`h-6 w-6 shrink-0 items-center justify-center rounded-md ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px ${
-                    picking() ? "bg-selected" : ""
-                  }`}
-                >
-                  <Icon name="add" size={14} tone={picking() ? "ink" : "muted"} />
-                </View>
-              }
-            >
-              <DirectPicker
-                onPicked={(id) => {
-                  picking.set(false);
-                  router.navigate(`/chat/${id}`);
-                  props.onPick();
-                }}
-              />
-            </Popover>
-          }
-        >
-          <Each of={directs()} key={(c) => c.id}>
-            {(c) => row(c)}
-          </Each>
-        </Section>
-        <Section title={t("web.channel.helpers")} item="helpers" count={sessions().length} unread={helpersUnread()}>
-          <If when={sessions().length === 0}>
-            <Text class="px-2 py-1 text-xs text-muted">{t("web.channel.noHelpers")}</Text>
-          </If>
-          <Each of={sessions()} key={(h) => h.id}>
-            {(h) => <SessionRow h={h()} active={!!props.thread && sessionThreadOf(chat(), h())?.id === props.thread.id} onShow={go} />}
-          </Each>
-        </Section>
+        <Segmented
+          block
+          testid="chat-filter"
+          label={t("web.channel.filter.label")}
+          value={filter()}
+          onChange={(v) => filter.set(v)}
+          options={[
+            { value: "all", label: t("web.channel.filter.all") },
+            { value: "group", label: t("web.channel.filter.group") },
+            { value: "direct", label: t("web.channel.filter.direct") },
+          ]}
+        />
+      </View>
+      <Scroll class="flex-1" contentClass="gap-0.5 px-2 pb-2">
+        <If when={items().length === 0}>
+          <Text testID="chat-empty" class="px-2 py-4 text-center text-xs text-muted">
+            {t("web.channel.emptyList")}
+          </Text>
+        </If>
+        <Each of={items()} key={(c) => c.id}>
+          {(c) => <ChannelRow channel={c()} here={c().id === props.channel?.id} unread={unreadOf(c())} lacks={lacks()} onClick={() => go(c())} />}
+        </Each>
         <If when={archived().length > 0}>
-          <Section title={t("web.channel.manage.archivedTitle")} item="archived" count={archived().length} unread={unreadSum(archived())} closed>
+          <SidebarSection
+            title={t("web.channel.manage.archivedTitle")}
+            count={archived().length}
+            collapsedBadge={
+              <If when={archivedUnread() > 0}>
+                <Count n={archivedUnread()} />
+              </If>
+            }
+            closed
+            testID="side-section-archived"
+            toggleTestID="side-section-toggle"
+            class="mt-2 px-1"
+            listClass="mt-0.5 gap-0.5"
+          >
             <Each of={archived()} key={(c) => c.id}>
-              {(c) => row(c)}
+              {(c) => <ChannelRow channel={c()} here={c().id === props.channel?.id} unread={unreadOf(c())} lacks={lacks()} onClick={() => go(c())} />}
             </Each>
-          </Section>
+          </SidebarSection>
         </If>
       </Scroll>
-      <OrchestratorLine agent={(props.thread ?? props.channel)?.orchestrator ?? defaultOrchestrator} />
+      <If when={lacks()}>
+        {(fix) => (
+          <View testID="channel-readiness-alert" class="flex-row items-center gap-2 border-t border-line px-3 py-2">
+            <Icon name="warn" size={14} tone="berry" />
+            <Text class="min-w-0 flex-1 truncate text-xs text-berry">{t("web.channel.lacks", { why: fix().words })}</Text>
+            <TextLink href={fix().href} testid="orchestrator-fix">
+              {t("web.channel.lacksFix")}
+            </TextLink>
+          </View>
+        )}
+      </If>
     </View>
   );
 }
@@ -219,7 +297,7 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
     if (id !== undefined) props.onPicked(id);
   };
   return (
-    <Scroll testID="direct-picker" accessibilityLabel={t("web.channel.direct.pick")} contentClass="gap-0.5">
+    <Scroll testID="direct-picker" accessibilityLabel={t("web.channel.direct.pick")} class="min-h-0 shrink" contentClass="gap-0.5">
       <Text class="px-2 py-1 text-xs font-semibold text-muted">{t("web.channel.direct.pick")}</Text>
       <If when={all.status() === "success" && agents().length === 0}>
         <Text class="px-2 py-1 text-sm text-muted">{t("web.channel.direct.none")}</Text>
@@ -243,258 +321,128 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
   );
 }
 
-function Section(props: {
-  title: string;
-  item: string;
-  count: number;
-  unread?: number;
-  action?: JSX.Element;
-  nested?: boolean;
-  closed?: boolean;
-  children: JSX.Element;
+type PreviewLine = { readonly text: string; readonly tone: "muted" | "accent" | "berry" };
+
+function ChannelRow(props: {
+  channel: Channel;
+  here: boolean;
+  unread: number;
+  lacks: { readonly words: string; readonly href: string } | undefined;
+  onClick: () => void;
 }) {
-  return (
-    <SidebarSection
-      title={props.title}
-      count={props.count}
-      collapsedBadge={
-        <If when={(props.unread ?? 0) > 0}>
-          <Count n={props.unread ?? 0} />
-        </If>
-      }
-      action={props.action}
-      closed={props.closed}
-      testID={`side-section-${props.item}`}
-      toggleTestID="side-section-toggle"
-      class={props.nested === true ? "mt-1 mb-1 pl-2" : "mb-3"}
-      listClass="mt-0.5 gap-0.5"
-    >
-      {props.children}
-    </SidebarSection>
-  );
-}
-
-/** A channel's row being dragged onto another: dropped there, it is placed before it, in its group. */
-function createReorder(place: (id: string, onto: Channel) => void) {
-  const dragged = signal<string | undefined>(undefined);
-  const over = signal<string | undefined>(undefined);
-  const rows = new Map<string, { ref: ViewRef; channel: () => Channel }>();
-  let rects: [Channel, { y: number; h: number }][] = [];
-  // The pointer moves on while the rows are measured: where it is by then is what counts.
-  let pointer = 0;
-  const takes = (c: Channel) => c.type === "channel" && !c.default;
-  const look = () => {
-    const id = dragged();
-    over.set(rects.find(([c, r]) => c.id !== id && takes(c) && pointer >= r.y && pointer <= r.y + r.h)?.[0].id);
+  const sessionsSlice = useSessionsSlice();
+  const orchestrators = useOrchestrators();
+  const now = useNow();
+  const peerId = () => directPeerOf(props.channel);
+  const isOrc = () => {
+    const id = peerId();
+    return id !== undefined && orchestrators().some((a) => a.id === id);
   };
-  return {
-    dragged,
-    over,
-    takes,
-    row: (id: string, ref: ViewRef, channel: () => Channel) => {
-      rows.set(id, { ref, channel });
-      cleanup(() => rows.get(id)?.ref === ref && rows.delete(id));
-    },
-    start: (id: string, y: number) => {
-      dragged.set(id);
-      pointer = y;
-      rects = [];
-      void Promise.all(
-        [...rows.values()].map(async (row) => {
-          const m = await row.ref.measure();
-          return m ? ([row.channel(), { y: m.pagePosition.y, h: m.bounds.size.height }] as [Channel, { y: number; h: number }]) : undefined;
-        }),
-      ).then((measured) => {
-        if (dragged() !== id) return;
-        rects = measured.filter((r) => r !== undefined);
-        look();
-      });
-    },
-    move: (y: number) => {
-      pointer = y;
-      look();
-    },
-    end: (dropped: boolean) => {
-      const id = dragged();
-      const onto = rects.find(([c]) => c.id === over())?.[0];
-      dragged.set(undefined);
-      over.set(undefined);
-      if (dropped && id !== undefined && onto) place(id, onto);
-    },
-  };
-}
-
-function ChannelRow(props: { channel: Channel; here: boolean; unread: number; onClick?: () => void; reorder: ReturnType<typeof createReorder> }) {
-  const quiet = () => props.channel.notify === "none";
-  const movable = () => props.reorder.takes(props.channel);
-  const pan = PanResponder.create({
-    // A press opens the channel; only a move of a few points starts a drag.
-    onMoveShouldSetPanResponder: (_, g) => movable() && Math.abs(g.dx) + Math.abs(g.dy) > 4,
-    onPanResponderGrant: (_, g) => props.reorder.start(props.channel.id, g.y0),
-    onPanResponderMove: (_, g) => props.reorder.move(g.moveY),
-    onPanResponderRelease: () => props.reorder.end(true),
-    onPanResponderTerminate: () => props.reorder.end(false),
+  const peerAgent = useAgent(peerId);
+  const mood = computed((): OrchestratorMood => {
+    const id = peerId();
+    return id !== undefined && isOrc() ? orchestratorMood(sessionsSlice()?.sessions, id) : "idle";
   });
+  const workerSession = computed((): SessionView | undefined => {
+    if (props.channel.type !== "direct" || isOrc()) return undefined;
+    const id = peerId();
+    if (!id) return undefined;
+    const matching = (sessionsSlice()?.sessions ?? []).filter((h) => !isFreeUserSession(h) && h.role === "worker" && sessionProfile(h) === id);
+    return matching.find((h) => h.phase._tag === "working") ?? matching.find((h) => h.phase._tag === "failed");
+  });
+  const dotTone = computed((): DotTone | undefined => {
+    if (props.channel.type !== "direct") return undefined;
+    if (isOrc()) {
+      if (props.lacks) return "berry";
+      if (mood() === "thinking") return "wheat";
+      if (mood() === "listening" || mood() === "speaking") return "leaf";
+      return "idle";
+    }
+    const session = workerSession();
+    return session ? phaseDot(session.phase) : undefined;
+  });
+  const timeText = () => channelTime(props.channel.last?.at ?? props.channel.at, now());
+  const preview = computed((): PreviewLine => {
+    if (props.channel.type === "direct" && isOrc()) {
+      if (props.lacks) return { text: t("web.channel.lacks", { why: props.lacks.words }), tone: "berry" };
+      if (mood() === "thinking" || mood() === "speaking") return { text: orchestratorMoodLabels[mood()], tone: "accent" };
+    }
+    const active = workerSession();
+    if (active && active.phase._tag === "working") {
+      return { text: phaseText(active, now()), tone: "accent" };
+    }
+    const last = props.channel.last;
+    if (last) {
+      const body = last.text.replace(/\s+/gu, " ").trim();
+      if (body) {
+        const who = last.from === userId ? t("web.channel.messages.user") : last.name;
+        const formatted = props.channel.type === "channel" ? (who ? `${who}: ${body}` : body) : last.from === userId ? `${who}: ${body}` : body;
+        return { text: formatted, tone: "muted" };
+      }
+    }
+    if (props.channel.type === "channel") {
+      return { text: props.channel.description || t("web.channel.emptyPreview"), tone: "muted" };
+    }
+    if (isOrc()) {
+      return { text: orchestratorMoodLabels[mood()], tone: "muted" };
+    }
+    const duty = peerAgent()?.duty;
+    return { text: (duty ? dutyShort(duty) : "") || t("web.channel.emptyPreview"), tone: "muted" };
+  });
+  const quiet = () => props.channel.notify === "none";
+  const previewToneClass = () => {
+    switch (preview().tone) {
+      case "berry":
+        return "text-berry";
+      case "accent":
+        return "text-accent";
+      case "muted":
+        return "text-muted";
+    }
+  };
   return (
     <View
-      {...pan.panHandlers}
-      ref={(r) => props.reorder.row(props.channel.id, r, () => props.channel)}
-      tooltip={
-        <If when={movable()}>
-          <Bubble text={t("web.channel.manage.drag")} />
-        </If>
-      }
       role="button"
       testID={`channel-row-${props.channel.id}`}
       accessibilityLabel={channelName(props.channel)}
       accessibilityState={{ selected: props.here }}
-      onPress={() => props.onClick?.()}
-      class={`relative h-7 flex-row items-center gap-2 rounded-md px-2 focus-visible:outline-2 focus-visible:outline-focus ${props.here ? "bg-selected" : "hover:bg-hover"} ${
-        props.reorder.dragged() === props.channel.id ? "opacity-40" : ""
+      onPress={() => props.onClick()}
+      class={`relative flex-row items-center gap-2.5 rounded-md px-2 py-2 focus-visible:outline-2 focus-visible:outline-focus ${
+        props.here ? "bg-selected" : "hover:bg-hover"
       }`}
     >
       <If when={props.here}>
         <ActiveBar />
       </If>
-      <If when={props.reorder.over() === props.channel.id}>
-        <View testID="channel-drop-before" class="pointer-events-none absolute inset-x-0 top-0 h-0.5 rounded-full bg-accent" />
-      </If>
-      <Text class={`w-3.5 shrink-0 text-center font-mono text-sm ${props.here ? "text-muted" : "text-faint"}`}>{markOf(props.channel)}</Text>
-      <Text
-        class={`min-w-0 flex-1 truncate text-sm ${props.unread > 0 ? "font-semibold" : "font-medium"} ${quiet() && !props.here ? "text-muted" : "text-ink"}`}
-      >
-        {channelName(props.channel)}
-      </Text>
-      <If when={props.channel.notify && props.channel.notify !== "all"}>
-        <Text class="shrink-0 text-2xs text-faint">
-          {props.channel.notify === "none" ? t("web.channel.manage.muted") : t("web.channel.manage.mentionsOnly")}
-        </Text>
-      </If>
-      <If when={props.unread > 0}>
-        <Count n={props.unread} />
-      </If>
-    </View>
-  );
-}
-
-function SessionRow(props: { h: SessionView; active: boolean; onShow: (c: Channel) => void }) {
-  const collab = useCollabSlice();
-  const now = useNow();
-  const thread = computed(() => sessionThreadOf(collab()?.chat, props.h));
-  const unread = computed(() => {
-    const current = thread();
-    return current ? unreadUnder(collab()?.chat, current, collab()?.channelSummary) : 0;
-  });
-  const phase = computed(() => phaseText(props.h, now()));
-  return (
-    <View
-      role="button"
-      testID={`session-row-${props.h.id}`}
-      disabled={!thread()}
-      onPress={() => {
-        const current = thread();
-        if (current) props.onShow(current);
-      }}
-      tooltip={<Bubble text={`${props.h.name} · ${phase()}`} />}
-      class={`relative h-8 flex-row items-center gap-2 overflow-hidden rounded-md px-2 focus-visible:outline-2 focus-visible:outline-focus ${props.active ? "bg-selected" : "hover:bg-hover"}`}
-    >
-      <If when={props.active}>
-        <ActiveBar />
-      </If>
-      <View class="min-w-0 flex-1 flex-row items-center gap-2">
-        <View class="relative shrink-0">
-          <HelperFace agent={sessionProfile(props.h) ?? ""} runtime={props.h.runtime} size={22} />
-          <View class="absolute -right-0.5 -bottom-0.5">
-            <Dot tone={phaseDot(props.h.phase)} size={6} />
-          </View>
+      <ChannelAvatar channel={props.channel} size={36} dot={dotTone()} />
+      <View class="min-w-0 flex-1 gap-0.5">
+        <View class="flex-row items-center gap-1.5">
+          <Text
+            class={`min-w-0 flex-1 truncate text-sm ${props.unread > 0 || props.here ? "font-semibold" : "font-medium"} ${
+              quiet() && !props.here ? "text-muted" : "text-ink"
+            }`}
+          >
+            {channelName(props.channel)}
+          </Text>
+          <If when={timeText()}>{(label) => <Text class="shrink-0 font-mono text-2xs text-faint">{label()}</Text>}</If>
         </View>
-        <Text class={`min-w-0 flex-1 truncate text-sm text-ink ${unread() > 0 ? "font-semibold" : "font-medium"}`}>{props.h.name}</Text>
-      </View>
-      <View class="min-w-0 shrink flex-row items-center gap-1.5 pr-1.5">
-        <View class="min-w-0 max-w-24 flex-row items-center gap-1 overflow-hidden">
-          <PhaseGlyph phase={props.h.phase} size={12} />
-          <Text class="min-w-0 shrink truncate text-2xs text-muted">{phase()}</Text>
-        </View>
-        <If when={unread() > 0}>
-          <Count n={unread()} />
-        </If>
-      </View>
-    </View>
-  );
-}
-
-/** The orchestrator that looks after the place open, and what it is doing. */
-function OrchestratorLine(props: { agent: string }) {
-  const sessions = useSessionsSlice();
-  const profile = useAgent(() => props.agent);
-  const now = computed((): OrchestratorMood => orchestratorMood(sessions()?.sessions, props.agent));
-  const settings = useQuery(settingsQuery);
-  // Listening is not a promise the orchestrator can keep without its model: then the line says what it lacks, and where that is set.
-  const lacks = computed(() => {
-    const readiness = ready(settings, undefined)?.readiness.orchestrator;
-    return readiness?.ready === false ? fixOf(readiness.missing) : undefined;
-  });
-  const clock = useNow();
-  const since = computed(() => {
-    const phase = orchestratorSession(sessions()?.sessions, props.agent)?.phase;
-    return phase?._tag === "working" ? phase.since : undefined;
-  });
-  const dotTone = computed(() => (lacks() ? "berry" : now() === "idle" ? "idle" : now() === "thinking" ? "wheat" : "leaf"));
-  return (
-    <View
-      testID="channel-orchestrator-line"
-      accessibilityLabel={t("web.channel.orchestrator")}
-      class="flex-row items-center gap-2 border-t border-line px-2 py-1.5"
-    >
-      <A
-        href={runsHref({ session: props.agent })}
-        testID="channel-orchestrator-runs"
-        accessibilityLabel={t("web.channel.orchestratorRuns")}
-        tooltip={<Bubble text={t("web.channel.orchestratorRuns")} />}
-        class={`group min-w-0 flex-1 flex-row items-center gap-2.5 rounded-md px-1.5 py-1 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
-      >
-        <View class="relative shrink-0">
-          <OrchestratorFace size={32} agent={props.agent} />
-          <View class="absolute -right-0.5 -bottom-0.5">
-            <Dot tone={dotTone()} size={7} />
-          </View>
-        </View>
-        <View class="min-w-0 flex-1 gap-0.5">
-          <View class="flex-row items-center gap-1.5">
-            <Text class="min-w-0 truncate text-sm font-semibold text-ink">{profile()?.name || t("web.channel.orchestrator")}</Text>
-            <If when={since()}>{(at) => <Text class="shrink-0 font-mono text-2xs text-faint">{tookText(Math.max(0, clock() - at()))}</Text>}</If>
-          </View>
-          <View class="flex-row items-center gap-1.5">
-            <If
-              when={lacks()}
-              else={
-                <>
-                  <Text testID={`orchestrator-${now()}`} class="min-w-0 truncate text-xs text-muted">
-                    {orchestratorMoodLabels[now()]}
-                  </Text>
-                  <If when={now() === "thinking"}>
-                    <ThinkingDots />
-                  </If>
-                </>
-              }
-            >
-              {(fix) => <Text class="min-w-0 flex-1 truncate text-xs text-berry">{t("web.channel.lacks", { why: fix().words })}</Text>}
+        <View class="flex-row items-center gap-1.5">
+          <Text class={`min-w-0 flex-1 truncate text-xs ${previewToneClass()}`}>{preview().text}</Text>
+          <View class="shrink-0 flex-row items-center gap-1">
+            <If when={props.channel.notify === "none"}>
+              <View tooltip={<Bubble text={t("web.channel.manage.muted")} />}>
+                <Icon name="hide" size={12} tone="faint" />
+              </View>
+            </If>
+            <If when={props.channel.notify === "mentions"}>
+              <Text class="text-2xs text-faint">{t("web.channel.manage.mentionsOnly")}</Text>
+            </If>
+            <If when={props.unread > 0}>
+              <Count n={props.unread} />
             </If>
           </View>
         </View>
-        <If when={!lacks()}>
-          <Icon name="log" size={14} tone="faint" />
-        </If>
-      </A>
-      <If when={lacks()}>
-        {(fix) => (
-          <View class="shrink-0 pr-1.5">
-            <TextLink href={fix().href} testid="orchestrator-fix">
-              {t("web.channel.lacksFix")}
-            </TextLink>
-          </View>
-        )}
-      </If>
+      </View>
     </View>
   );
 }

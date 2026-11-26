@@ -630,10 +630,7 @@
    }
   },
   {
-   "op": "host.pixelDir"
-  },
-  {
-   "op": "host.pixelManifest"
+   "op": "host.assetsDir"
   },
   {
    "op": "host.sha256",

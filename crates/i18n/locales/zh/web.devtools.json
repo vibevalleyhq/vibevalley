@@ -72,7 +72,7 @@
   },
   "trajectory": {
     "kind": {
-      "issueSession": "任务",
+      "issueSession": "工单",
       "workspaceChat": "对话",
       "orchestrator": "主助手"
     },
@@ -98,7 +98,7 @@
     "counts": "实体计数",
     "caches": "缓存统计",
     "entries": "{count} 项",
-    "issues": "任务",
+    "issues": "工单",
     "sessions": "执行会话",
     "channels": "频道",
     "agents": "角色",

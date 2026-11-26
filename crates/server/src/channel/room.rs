@@ -11,12 +11,13 @@ use vibevalley_protocol::{
 };
 
 use super::model::{ChatModel, Q, WriteTx};
+use super::service::Chat;
 use super::types::{
-    AddressedMessage, ChannelDispatched, ChannelEvent, Committed, DeliveryTargetKind, HeldBy, Info, Place, QueuedDelivery, ReadOptions, ReadResult, Reason,
-    Seat, head, info_of, new_id, notify_of, optional, to_message,
+    AddressedMessage, CATCH_UP_MAX, ChannelDispatched, ChannelEvent, Committed, DeliveryTargetKind, FIRST_CHANNEL, HeldBy, Info, LOG_KEEP, NO_NUMBER, Place,
+    QueuedDelivery, READ_LIMIT, ReadOptions, ReadResult, Reason, Seat, THREAD_TITLE_MAX, head, info_of, new_id, no_channel, notify_of, optional, refused,
+    to_message,
 };
 use super::words;
-use super::{CATCH_UP_MAX, Chat, FIRST_CHANNEL, LOG_KEEP, NO_NUMBER, READ_LIMIT, THREAD_TITLE_MAX, no_channel, refused};
 use crate::context::{LookIn, Sink, missing, now};
 use crate::service::channel::{ChannelRow, DeliveryRow, EventRow, MsgRow, ParticipantRow};
 
@@ -764,7 +765,7 @@ impl Chat {
     /// change from now on; `Reset` when too far behind.
     pub fn follow(&self, channel: &str, after: i64, sink: Sink) -> Result<(), ApiError> {
         if self.model().channel(channel).is_none() {
-            return Err(super::no_channel(channel));
+            return Err(no_channel(channel));
         }
         // Subscribed before the missed ones are read: nothing falls in between.
         let live = self.subscribe_events();

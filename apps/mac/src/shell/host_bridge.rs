@@ -9,7 +9,7 @@ use crate::host::percent_decode;
 use crate::hosted::{Action, HostedEvent, HostedView};
 use crate::theme::{MotionChoice, ThemeChoice, Ui};
 
-use super::{Shell, update_menus};
+use super::{InspectorSlot, Shell, should_mount_inspector, update_menus};
 
 impl Shell {
     pub fn on_action(&mut self, action: Action, window: &mut Window, cx: &mut Context<Self>) {
@@ -24,23 +24,23 @@ impl Shell {
             }
             Action::GlobalRoute { path } => {
                 let next_native = path == "/workspace";
-                let had_pixel = self.chrome.native_pixel.is_some();
+                let had_diorama = self.chrome.native_diorama.is_some();
                 let route_changed = self.chrome.last_route.as_deref() != Some(path.as_str());
                 let native_changed = self.chrome.native_workspace != next_native;
                 self.chrome.native_workspace = next_native;
                 if self.chrome.native_workspace {
                     self.with_workspace_project(window, cx, |_, _, _, _| {});
                 }
-                if !path.starts_with("/farm") && path != "/tree" && path != "/map" {
-                    self.chrome.native_pixel = None;
+                if !path.starts_with("/farm") {
+                    self.chrome.native_diorama = None;
                 }
-                let pixel_changed = had_pixel != self.chrome.native_pixel.is_some();
+                let diorama_changed = had_diorama != self.chrome.native_diorama.is_some();
                 self.sync_devtools_route(&path);
                 if route_changed {
                     self.chrome.last_route = Some(path);
                     self.save_settings(cx);
                 }
-                if route_changed || native_changed || pixel_changed {
+                if route_changed || native_changed || diorama_changed {
                     self.publish_host_debug(cx);
                     cx.notify();
                 }
@@ -116,10 +116,10 @@ impl Shell {
             Action::OpenFile { path } => self.open_file(PathBuf::from(path), None, window, cx),
             Action::OpenFarm { repo } => {
                 let props = if repo.is_empty() { json!({}) } else { json!({ "repo": repo }) };
-                self.show_pixel("farm", props, window, cx)
+                self.show_diorama("farm", props, window, cx)
             }
-            Action::OpenRepoMap => self.show_pixel("map", json!({}), window, cx),
-            Action::OpenTree => self.show_pixel("tree", json!({}), window, cx),
+            Action::OpenRepoMap => self.navigate_workbench("/repos", cx),
+            Action::OpenTree => self.navigate_workbench("/settings/memory", cx),
             Action::OpenDiff { path, staged } => {
                 let spec = if staged {
                     vibevalley_workspace::DiffSpec::Staged
@@ -192,13 +192,13 @@ impl Shell {
         }
     }
 
-    /// A pixel scene's ask: a VibeValley page (the hosted `vv` view, given
-    /// the route) or a terminal.
-    pub fn on_pixel_event(&mut self, event: crate::pixel::view::PixelEvent, window: &mut Window, cx: &mut Context<Self>) {
+    /// Handles events emitted by a [`crate::diorama::DioramaView`] (sound cues,
+    /// bridge host calls, workbench routes, and worktree terminals).
+    pub fn on_diorama_event(&mut self, event: crate::diorama::DioramaEvent, window: &mut Window, cx: &mut Context<Self>) {
         match event {
-            crate::pixel::view::PixelEvent::Sound(name) => self.chrome.workbench.read(cx).play_farm_sound(name, cx),
-            crate::pixel::view::PixelEvent::HostCall { op, reply } => self.host_call(op, reply, window, cx),
-            crate::pixel::view::PixelEvent::Route(route) => self.open_pane(
+            crate::diorama::DioramaEvent::Sound(name) => self.chrome.workbench.read(cx).play_farm_sound(name, cx),
+            crate::diorama::DioramaEvent::HostCall { op, reply } => self.host_call(op, reply, window, cx),
+            crate::diorama::DioramaEvent::Route(route) => self.open_pane(
                 PaneKind::Hosted {
                     module: "vv".into(),
                     props: json!({ "route": route }),
@@ -206,8 +206,7 @@ impl Shell {
                 window,
                 cx,
             ),
-            crate::pixel::view::PixelEvent::Pixel { scene, props } => self.open_pane(PaneKind::Pixel { scene, props }, window, cx),
-            crate::pixel::view::PixelEvent::Terminal { cwd, title } => {
+            crate::diorama::DioramaEvent::Terminal { cwd, title } => {
                 self.open_terminal_at(PathBuf::from(cwd), Some(title), None, window, cx, |_| {});
             }
         }
@@ -341,7 +340,7 @@ impl Shell {
             }
             HostOp::Opening(state) => {
                 if let Some(opening) = &self.overlays.launch {
-                    let phase = crate::serving::opening_pixel_phase(state.phase);
+                    let phase = crate::serving::opening_phase(state.phase);
                     opening.update(cx, |view, _| view.set_phase(phase, (state.progress as f32).clamp(0.0, 100.0)));
                 }
                 self.overlays.opening = Some(serde_json::to_value(&state).unwrap_or(Value::Null));
@@ -543,7 +542,7 @@ impl Shell {
                 return;
             }
             HostOp::PlaySound(req) => {
-                let name = crate::audio::SoundName::from(req.name);
+                let name = req.name;
                 crate::audio::dispatch(reply, move || crate::audio::play_sound(name));
                 return;
             }
@@ -579,18 +578,18 @@ impl Shell {
                 });
                 return;
             }
-            // VibeValley's built pixel art: sprites.json and its PNGs.
-            HostOp::PixelDir => {
+            // VibeValley's processed Papertrails assets directory (`avatars/`, `engines/`, `brand/`, ...).
+            HostOp::AssetsDir => {
                 Self::bg(
                     cx,
                     || {
-                        let dir = crate::pixel::assets_dir().join("pixel");
-                        dir.join("sprites.json").is_file().then_some(dir)
+                        let dir = crate::assets::assets_dir();
+                        dir.is_dir().then_some(dir)
                     },
                     move |_, found, _| {
                         reply.send(match found {
                             Some(dir) => Envelope::ok(json!({ "path": dir })),
-                            None => refusal(BizCode::NotFound, "the pixel art is not installed"),
+                            None => refusal(BizCode::NotFound, "the assets directory is not installed"),
                         });
                     },
                 );
@@ -599,23 +598,19 @@ impl Shell {
             HostOp::AppletList => {
                 Self::bg(cx, crate::applet::AppletHost::list, move |_, result, _| {
                     reply.send(match result {
-                        Ok(list) => {
-                            let mapped: Vec<vibevalley_protocol::ArtifactAppletInfo> = list.into_iter().map(Into::into).collect();
-                            Envelope::ok(json!(mapped))
-                        }
+                        Ok(list) => Envelope::ok(json!(list)),
                         Err(error) => refusal(BizCode::Refused, error),
                     });
                 });
                 return;
             }
-            HostOp::AppletInstall(req) => {
-                let request: crate::applet::AppletInstallRequest = req.into();
+            HostOp::AppletInstall(request) => {
                 Self::bg(
                     cx,
                     move || crate::applet::AppletHost::install_applet(request),
                     move |_, result, _| {
                         reply.send(match result {
-                            Ok(info) => Envelope::ok(json!(vibevalley_protocol::ArtifactAppletInfo::from(info))),
+                            Ok(info) => Envelope::ok(json!(info)),
                             Err(error) => refusal(BizCode::Refused, error),
                         });
                     },
@@ -648,7 +643,7 @@ impl Shell {
                 );
                 return;
             }
-            stateless @ (HostOp::PixelManifest | HostOp::Sha256(_) | HostOp::RandomBytes(_) | HostOp::Qr(_)) => {
+            stateless @ (HostOp::Sha256(_) | HostOp::RandomBytes(_) | HostOp::Qr(_)) => {
                 crate::host::handle_stateless_op(&stateless).expect("stateless HostOp handled")
             }
         };
@@ -684,6 +679,33 @@ impl Shell {
             HostedEvent::Ready => {}
         })
     }
+
+    /// Lazily spawns the inspector QuickJS view only when the workspace inspector is visible
+    /// at a wide enough viewport, and drops it immediately when closed.
+    pub(super) fn sync_inspector(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.chrome.inspector_open {
+            self.chrome.inspector = None;
+            return;
+        }
+        if !should_mount_inspector(
+            self.chrome.native_workspace,
+            self.chrome.inspector_open,
+            f32::from(window.viewport_size().width),
+        ) {
+            return;
+        }
+        if self.chrome.inspector.is_some() {
+            return;
+        }
+        let dark = Ui::get(cx).colors.dark;
+        let view = cx.new(|cx| HostedView::new("sidebar", serde_json::from_value(json!({"role":"inspector"})).unwrap(), dark, window, cx));
+        let sub = cx.subscribe_in(&view, window, |this, _, event: &HostedEvent, window, cx| match event {
+            HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
+            HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
+            HostedEvent::Ready => this.push_sidebar(cx),
+        });
+        self.chrome.inspector = Some(InspectorSlot { view, _sub: sub });
+    }
 }
 
 fn host_info_payload(settings: &crate::theme::Settings, fonts: &[String]) -> Value {
@@ -698,7 +720,7 @@ fn host_info_payload(settings: &crate::theme::Settings, fonts: &[String]) -> Val
         "uiFontSize": settings.ui_font_size,
         "theme": settings.theme.as_str(),
         "motion": settings.effective_motion().as_str(),
-        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "pixelDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet"],
+        "capabilities": ["notify", "tray", "locale", "reveal", "theme", "motion", "font", "opening", "openTerminal", "openUrl", "openFile", "assetsDir", "playAudio", "readFile", "commandLine", "pickFile", "saveFile", "update", "mossVoice", "applet"],
     })
 }
 

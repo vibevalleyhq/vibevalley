@@ -270,6 +270,7 @@ export class DirectoryArtifactClient {
 export function useArtifactDirectory(
   id: () => ArtifactId,
   version?: () => number | undefined,
+  reloadKey?: () => number,
 ): {
   readonly client: Accessor<DirectoryArtifactClient>;
   readonly snapshot: Accessor<DirectorySnapshot>;
@@ -281,6 +282,8 @@ export function useArtifactDirectory(
   effect(() => {
     const curId = id();
     const curVer = version ? version() : undefined;
+    const _reload = reloadKey ? reloadKey() : 0;
+    void _reload;
     const client = new DirectoryArtifactClient(curId, curVer);
     clientSig.set(client);
     snapshot.set(client.get());

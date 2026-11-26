@@ -15,7 +15,7 @@ import { App } from "./Workbench";
 const params = readHostParams();
 setLocale(params.locale);
 // A picture that is on disk, so attachments draw (the fixture's own path is made up).
-const shown = { path: `${(responses["host.pixelDir"] as { path: string }).path}/map.png`, type: "image/png" };
+const shown = { path: `${(responses["host.assetsDir"] as { path: string }).path}/avatars/owner.png`, type: "image/png" };
 setTransport(fixtureTransport({ state, responses: { ...responses, "attachment.file": shown } }));
 appHistory.navigate(params.route ?? "/issues", { replace: true });
 mount(() => <App />);

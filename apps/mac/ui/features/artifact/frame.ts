@@ -29,25 +29,50 @@ function escapeCloseTag(raw: string, tag: "style" | "script"): string {
   return raw.replace(new RegExp(`</${tag}`, "giu"), `<\\/${tag}`);
 }
 
-/** Assembles a self-contained, CSP-sandboxed document for a `prototype` artifact directory by inlining
- * local `./styles.css` and `./app.js` references from `structure/*` without network or same-origin access. */
-export function buildPrototypeDocument(files: ReadonlyMap<string, string>): string {
-  const rawHtml = files.get("structure/index.html") ?? '<!doctype html><html><head><meta charset="utf-8" /></head><body><main id="app"></main></body></html>';
+function lookupRelFile(files: ReadonlyMap<string, string>, rawRef: string): string | undefined {
+  const normalized = rawRef.replace(/^(?:\.\.\/)+/u, "").replace(/^\.\//u, "");
+  return files.get(`structure/${normalized}`) ?? files.get(normalized) ?? files.get(`asset/${normalized}`);
+}
 
-  let assembled = rawHtml.replace(/<link\b[^>]*href=["'](?:\.\/)?([^"']+\.css)["'][^>]*>/giu, (match, rel: string) => {
-    const css = files.get(`structure/${rel}`) ?? files.get(rel);
+function pickHtmlEntry(files: ReadonlyMap<string, string>, entryPath?: string): string {
+  if (entryPath !== undefined) {
+    const chosen = files.get(entryPath);
+    if (chosen !== undefined) return chosen;
+  }
+  const primary = files.get("structure/index.html");
+  if (primary !== undefined) return primary;
+  const fallbackKey = [...files.keys()]
+    .filter((k) => /\.(?:html|htm)$/iu.test(k))
+    .toSorted((a, b) => a.localeCompare(b))
+    .at(0);
+  if (fallbackKey !== undefined) {
+    return files.get(fallbackKey) ?? '<!doctype html><html><head><meta charset="utf-8" /></head><body><main id="app"></main></body></html>';
+  }
+  return '<!doctype html><html><head><meta charset="utf-8" /></head><body><main id="app"></main></body></html>';
+}
+
+/** Assembles a self-contained, CSP-sandboxed document for a `prototype` or HTML artifact directory by inlining
+ * local `.css`, `.js`/`.mjs`, and `.svg` references without network or same-origin access. */
+export function buildPrototypeDocument(files: ReadonlyMap<string, string>, entryPath?: string): string {
+  const rawHtml = pickHtmlEntry(files, entryPath);
+
+  let assembled = rawHtml.replace(/<link\b[^>]*href=["']([^"']+\.css)["'][^>]*>/giu, (match, rel: string) => {
+    const css = lookupRelFile(files, rel);
     return css !== undefined ? `<style>\n${escapeCloseTag(css, "style")}\n</style>` : match;
   });
 
-  assembled = assembled.replace(
-    /<script\b([^>]*)src=["'](?:\.\/)?([^"']+\.m?js)["']([^>]*)><\/script>/giu,
-    (match, before: string, rel: string, after: string) => {
-      const js = files.get(`structure/${rel}`) ?? files.get(rel);
-      if (js === undefined) return match;
-      const isModule = /\btype=["']module["']/iu.test(`${before} ${after}`);
-      return `<script${isModule ? ' type="module"' : ""}>\n${escapeCloseTag(js, "script")}\n</script>`;
-    },
-  );
+  assembled = assembled.replace(/<img\b([^>]*)src=["']([^"']+\.svg)["']([^>]*)>/giu, (match, before: string, rel: string, after: string) => {
+    const svg = lookupRelFile(files, rel);
+    if (svg === undefined) return match;
+    return `<img${before}src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}"${after}>`;
+  });
+
+  assembled = assembled.replace(/<script\b([^>]*)src=["']([^"']+\.m?js)["']([^>]*)><\/script>/giu, (match, before: string, rel: string, after: string) => {
+    const js = lookupRelFile(files, rel);
+    if (js === undefined) return match;
+    const isModule = /\btype=["']module["']/iu.test(`${before} ${after}`);
+    return `<script${isModule ? ' type="module"' : ""}>\n${escapeCloseTag(js, "script")}\n</script>`;
+  });
 
   return withPolicy(assembled);
 }

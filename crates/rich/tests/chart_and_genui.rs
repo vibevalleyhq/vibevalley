@@ -9,7 +9,7 @@ use vibevalley_rich::{
     ASYNC_CHART_BYTE_THRESHOLD, VvGenUiActionEvent, cached_render_chart, chart_cache_stats, clear_chart_cache, render_chart, vv_chart, vv_gen_ui, vv_markdown,
 };
 
-use crate::support::{TestHarness, assert_inline_svg_image};
+use crate::support::{DIAGRAM_CACHE_TEST_LOCK, TestHarness, assert_inline_svg_image};
 
 static CHART_GENUI_TEST_LOCK: Mutex<()> = Mutex::new(());
 
@@ -190,6 +190,7 @@ fn native_vv_genui_compound_interest_simulator_updates_kpis_and_chart_reactively
 #[test]
 fn native_vv_genui_renders_all_19_node_kinds_supports_tabs_and_select_and_handles_invalid_spec() {
     let _guard = CHART_GENUI_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let _diagram_guard = DIAGRAM_CACHE_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
 
     let mut harness = TestHarness::mount(Root::new::<NativeGenUiRoot>(|| NativeGenUiRootProps {
         spec: ALL_19_KINDS_JSONL.to_owned(),

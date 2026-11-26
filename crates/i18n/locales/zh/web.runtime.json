@@ -60,7 +60,7 @@
   "defaultEffort": "默认推理强度",
   "default": "默认",
   "maxWorking": "最多同时干活",
-  "maxWorkingHint": "用它的执行会话同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受 VibeValley 整体的上限（同时 6 张任务）。",
+  "maxWorkingHint": "用它的执行会话同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受 VibeValley 整体的上限（同时 6 张工单）。",
   "noLimit": "不另设",
   "budget": "每日预算（元）",
   "budgetLabel": "每日预算",

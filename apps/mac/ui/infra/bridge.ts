@@ -299,7 +299,7 @@ const HostFontSchema = z.object({
 });
 
 const OpenTerminalSchema = z.object({ terminalId: z.string() });
-const PixelDirSchema = z.object({ path: z.string() });
+const AssetsDirSchema = z.object({ path: z.string() });
 const PickFileSchema = z.object({ path: z.string(), name: z.string(), type: z.string() }).nullable();
 const ReadFileSchema = z.object({ data: z.string(), type: z.string(), name: z.string() });
 const AppletListSchema = z.array(ArtifactAppletInfo);
@@ -327,8 +327,8 @@ export const hostApi = {
   /** Opens an existing absolute path in the system's default app. */
   openFile: (path: string) => call("host.openFile", { path }),
   openWorktreeFile: (worktree: string, path: string) => call("host.openFile", { worktree, path }),
-  /** VibeValley's built pixel art: the folder with sprites.json and its PNGs. */
-  pixelDir: () => callDecoded("host.pixelDir", {}, PixelDirSchema),
+  /** VibeValley's bundled Papertrails assets root (`assets/`). */
+  assetsDir: () => callDecoded("host.assetsDir", {}, AssetsDirSchema),
   /** Plays a named UI sound synthesized and cached in Rust. */
   playSound: (name: string) => call("host.playSound", { name }),
   /** Opens the native file picker and returns the chosen path, or null when canceled. */

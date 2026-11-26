@@ -1,0 +1,232 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use vibevalley_core::ManualClock;
+use vibevalley_protocol::{BizCode, IssueFilter, IssueLastRun, IssueRequest, IssueUpdateInput, Landing, Outcome};
+use vibevalley_runtime::oar::Registry;
+
+use super::*;
+use crate::context::{Context, Http, LiveState, Outbox, StateFeed, TaskGroup};
+use crate::service::Service;
+
+#[tokio::test]
+async fn issue_list_uses_injected_clock_for_patrol_order() {
+    let dir = tempfile::tempdir().unwrap();
+    let service = Service::open(dir.path()).await.unwrap();
+    let outbox = Arc::new(Outbox::new(service.clone()));
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let ctx = Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        outbox,
+        Arc::new(StateFeed::new()),
+        vibevalley_core::system_clock(),
+        http.clone(),
+        http,
+    ));
+    let board = Board::open_standalone_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+    let clock = ManualClock::new(1_000);
+
+    // A parent whose children are all closed is InReview with `stage.since == None`,
+    // so `pick_issues(..., clock.now_ms())` falls back to `clock.now_ms()`.
+    let first = board
+        .create_async(NewIssue {
+            title: "no-since".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let mut child = board
+        .create_async(NewIssue {
+            title: "closed-child".into(),
+            parent: Some(first.id.clone()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    child.delivered = Some(Landing::Merged);
+    child.closed_at = Some(900);
+
+    let mut second = board
+        .create_async(NewIssue {
+            title: "explicit-since".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    second.last_run = Some(IssueLastRun {
+        started_at: 4_000,
+        ended_at: Some(5_000),
+        outcome: Some(Outcome::Completed),
+    });
+    board.state().put_issues_async(&[child, second]).await.unwrap();
+
+    let filter = IssueFilter {
+        wants_user: Some(true),
+        ..Default::default()
+    };
+    // At clock=1_000, `first` falls back to `clock.now_ms()` (1_000) < 5_000, so `first` sorts before `second`.
+    let list_early = board.issue_list_endpoint_async(&filter, &clock).await.unwrap();
+    let titles_early: Vec<&str> = list_early.iter().map(|i| i.title.as_str()).collect();
+    assert_eq!(titles_early, vec!["no-since", "explicit-since"]);
+
+    // Advancing ManualClock past 5_000 flips the patrol ordering deterministically.
+    clock.advance(Duration::from_secs(10));
+    let list_late = board.issue_list_endpoint_async(&filter, &clock).await.unwrap();
+    let titles_late: Vec<&str> = list_late.iter().map(|i| i.title.as_str()).collect();
+    assert_eq!(titles_late, vec!["explicit-since", "no-since"]);
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}
+
+#[tokio::test]
+async fn issue_attachments_create_update_closed_rejection_and_brief_paths() {
+    use vibevalley_protocol::{Assignment, Execution, IssueCanceled};
+
+    let dir = tempfile::tempdir().unwrap();
+    let service = Service::open(dir.path()).await.unwrap();
+    let outbox = Arc::new(Outbox::new(service.clone()));
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let ctx = Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        outbox,
+        Arc::new(StateFeed::new()),
+        vibevalley_core::system_clock(),
+        http.clone(),
+        http,
+    ));
+    let storage = crate::storage::Storage::open_async(dir.path(), ctx.clone()).await.unwrap();
+    let (runtime, opened) = crate::runtime::Runtime::open_with_registry_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+    let board = Board::with_storage(ctx.clone(), runtime, opened, None, None, Some(storage.clone()))
+        .await
+        .unwrap();
+
+    let att1 = storage
+        .keep_async(b"spec document bytes".to_vec(), "spec.md".into(), "text/markdown".into())
+        .await
+        .unwrap();
+    let att2 = storage
+        .keep_async(b"\x89PNG\r\n\x1a\nmock".to_vec(), "mockup.png".into(), "image/png".into())
+        .await
+        .unwrap();
+
+    // Creating an issue with duplicate attachment IDs resolves & deduplicates them.
+    let created = board
+        .create_from_request_async(&IssueRequest {
+            title: "Attach files".into(),
+            description: Some("Check the attached spec.".into()),
+            attachments: Some(vec![att1.id.clone(), att1.id.clone()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(created.attachments, vec![att1.clone()]);
+
+    // Creating with an unknown attachment ID fails with NotFound.
+    let missing_err = board
+        .create_from_request_async(&IssueRequest {
+            title: "Missing file".into(),
+            attachments: Some(vec!["nonexistent-sha256".into()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(missing_err.biz_code, BizCode::NotFound);
+
+    // `brief()` includes local CAS paths when attachments are non-empty.
+    let with_att = board::brief(&created, std::slice::from_ref(&created), None, Some(storage.as_ref()));
+    assert!(with_att.contains("Attachments:"));
+    assert!(with_att.contains("spec.md"));
+    assert!(with_att.contains(&storage.path_of(&att1.id).display().to_string()));
+
+    // `brief()` is unchanged when attachments are empty.
+    let plain = board
+        .create_from_request_async(&IssueRequest {
+            title: "Plain issue".into(),
+            description: Some("No files.".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(plain.attachments.is_empty());
+    let without_att = board::brief(&plain, std::slice::from_ref(&plain), None, Some(storage.as_ref()));
+    let expected_plain = vibevalley_core::prompts::issue_brief(&plain.title, &plain.description, &plain.criteria, plain.deliver);
+    assert_eq!(without_att, expected_plain);
+
+    // Updating attachments on an open issue that has already started (in_progress/in_review) is allowed.
+    let mut started = board.get_async(&created.id).await.unwrap();
+    started.assignments = vec![Assignment {
+        id: format!("{}-a1", started.id),
+        issue: started.id.clone(),
+        agent: "scripted".into(),
+        assigned_at: 100,
+        ended_at: None,
+        executions: vec![Execution::Worker {
+            session: "s-run-1".into(),
+            started_at: 100,
+        }],
+    }];
+    board.state().put_issues_async(&[started]).await.unwrap();
+
+    let updated = board
+        .update_from_input_async(IssueUpdateInput {
+            id: created.id.clone(),
+            attachments: Some(vec![att1.id.clone(), att2.id.clone()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(updated.attachments, vec![att1.clone(), att2.clone()]);
+
+    // Clearing attachments on an open issue works and persists.
+    let cleared = board
+        .update_from_input_async(IssueUpdateInput {
+            id: created.id.clone(),
+            attachments: Some(vec![]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(cleared.attachments.is_empty());
+
+    // Rejecting attachment updates on closed issues (Done & Canceled).
+    let mut done_issue = board.get_async(&created.id).await.unwrap();
+    done_issue.delivered = Some(Landing::Merged);
+    done_issue.closed_at = Some(500);
+    let mut canceled_issue = board.get_async(&plain.id).await.unwrap();
+    canceled_issue.canceled = Some(IssueCanceled::Dismissed);
+    canceled_issue.closed_at = Some(600);
+    board.state().put_issues_async(&[done_issue, canceled_issue]).await.unwrap();
+
+    let err_done = board
+        .update_from_input_async(IssueUpdateInput {
+            id: created.id.clone(),
+            attachments: Some(vec![att1.id.clone()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(err_done.biz_code, BizCode::IssueRefused);
+
+    let err_canceled = board
+        .update_from_input_async(IssueUpdateInput {
+            id: plain.id.clone(),
+            attachments: Some(vec![att1.id.clone()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(err_canceled.biz_code, BizCode::IssueRefused);
+
+    storage.close_async().await;
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}

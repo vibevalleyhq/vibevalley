@@ -127,8 +127,6 @@ impl Island {
         let mut child = {
             let _guard = handle.enter();
             Command::new(binary)
-                .arg("--font")
-                .arg(crate::pixel::assets_dir().join("fonts/fusion-pixel-12px-proportional-zh_hans.otf"))
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .kill_on_drop(true)

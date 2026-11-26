@@ -18,13 +18,17 @@ fn main() {
     println!("cargo:rerun-if-env-changed=NSH_BIN");
     println!("cargo:rerun-if-env-changed=VIBEVALLEY_EMBED_UI");
 
-    let release = std::env::var("PROFILE").as_deref() == Ok("release") || std::env::var_os("VIBEVALLEY_EMBED_UI").is_some();
+    let release = std::env::var_os("CARGO_CFG_DEBUG_ASSERTIONS").is_none() || std::env::var_os("VIBEVALLEY_EMBED_UI").is_some();
     if release {
         watch(&ui);
     }
 
-    build_entry(&repo, &ui, "App.tsx", &ui.join("build"), &out_root.join("ui"), release);
-    build_entry(&repo, &ui, "ShellApp.tsx", &ui.join("build-shell"), &out_root.join("ui-shell"), release);
+    let (ui_out, shell_out) = (out_root.join("ui"), out_root.join("ui-shell"));
+    let (dev_ui, dev_shell) = (ui.join("build"), ui.join("build-shell"));
+    std::thread::scope(|s| {
+        s.spawn(|| build_entry(&repo, &ui, "App.tsx", &dev_ui, &ui_out, release));
+        s.spawn(|| build_entry(&repo, &ui, "ShellApp.tsx", &dev_shell, &shell_out, release));
+    });
 }
 
 fn build_entry(repo: &Path, ui: &Path, entry: &str, dev_dir: &Path, out: &Path, release: bool) {

@@ -6,7 +6,6 @@ import { t } from "@vibevalley/i18n";
 import { ToastHost } from "../design/ToastHost";
 import { AgentsRoute } from "../features/agent";
 import { ArtifactsPage, PresenterPage, StandaloneArtifactPage } from "../features/artifact";
-import { CatalogPage } from "../features/catalog";
 import { ChannelSidePane, ChatPage } from "../features/channel";
 import { ContentShell } from "../features/content";
 import { Follow } from "../features/inbox";
@@ -71,7 +70,7 @@ function redirectRoute(from: string, to: string, keepRest = false): RouteDefinit
 /** The repo whose farm was open last (VibeValley's farm/store.ts lastFarm). */
 const lastFarm = defineStored("farm.repo", z.string().nullable(), null);
 
-/** The farm is the app's own GPU-painted view: this page asks the shell for it (`openFarm`, the pixel:farm pane). */
+/** The farm is the app's own GPU-painted diorama view: this page asks the shell for it (`openFarm`). */
 function Farm(props: { repo: string }) {
   effect(() => {
     if (props.repo) lastFarm.set(props.repo);
@@ -117,21 +116,6 @@ function RepoFarm() {
   return <Keyed key={params().repo}>{() => <Farm repo={untracked(() => params().repo)} />}</Keyed>;
 }
 
-/** The memory tree is the app's GPU-painted view too (`openTree`, the pixel:tree pane). */
-function Tree() {
-  effect(() => act({ type: "openTree" }));
-  return (
-    <View testID="tree" class="flex-1 items-center justify-center bg-page p-6">
-      <Text class="text-sm text-muted">{t("web.tree.sky")}</Text>
-    </View>
-  );
-}
-
-function RepoMap() {
-  effect(() => act({ type: "openRepoMap" }));
-  return <View testID="repo-map" class="flex-1" />;
-}
-
 function MissingPage(props: { invalid?: boolean }) {
   return (
     <View testID="route-missing" class="flex-1 items-center justify-center gap-4 bg-page p-6">
@@ -164,8 +148,7 @@ const routes: readonly RouteDefinition[] = [
       </Shell>
     ),
     children: [
-      { path: "/tree", meta: { skin: "farm" }, component: Tree },
-      { path: "/map", meta: { place: "workspace" }, component: RepoMap },
+      redirectRoute("/tree", "/settings/memory"),
       { path: "/farm", meta: { skin: "farm" }, component: FarmHome },
       { path: "/farm/", meta: { skin: "farm" }, component: () => <Farm repo="" /> },
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
@@ -183,7 +166,6 @@ const routes: readonly RouteDefinition[] = [
       page("/agents", "team", (rest) => <AgentsRoute rest={rest()} />),
       page("/runtimes", "runtimes", (rest) => <RuntimesPage rest={rest()} />),
       page("/repos", "workspace", (rest) => <ReposPage rest={rest()} />),
-      page("/catalog", "catalog", (rest) => <CatalogPage rest={rest()} />),
       {
         path: "/content",
         component: () => (

@@ -1,31 +1,40 @@
-import { computed, effect, host, keymap, Scroll, signal, Text, untracked, View } from "nsh";
-import { Input, Menu, MenuItem, MenuSeparator, TextView } from "nsh/base";
+import { computed, effect, host, keymap, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
+import { Input, Menu, MenuItem, MenuSeparator, Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import type { PhaseView } from "@vibevalley/protocol";
 
-import { Button } from "../design/Button";
-import { CodeBlock } from "../design/code/CodeBlock";
-import { Diagram } from "../design/code/Diagram";
-import { TextInput } from "../design/Field";
 import { Icon } from "../design/Icon";
-import { actionIcon, type IconName } from "../design/icons";
 import { motionClass, popupTransition } from "../design/motion";
 import { RichPreviewModal, type RichPreviewPayload } from "../design/RichPreviewModal";
 import { Dot } from "../design/Tag";
 import { Bubble } from "../design/Tip";
 import { mix } from "../design/tone";
-import { act, hostApi } from "../infra/bridge";
+import { variant } from "../infra/base/dom";
+import { act } from "../infra/bridge";
 import { readChatPaneParams } from "../infra/hostParams";
-import { formatGenUiAction, richNative, type VvDiagramPressEvent, type VvGenUiActionEvent } from "../infra/rich";
+import { formatGenUiAction } from "../infra/rich";
+import {
+  ActivityGroup,
+  ChatMarkdown,
+  ContextBar,
+  InteractionCard,
+  MemoryRecalledRow,
+  PermissionCard,
+  ThinkingBlock,
+  thoughtLabel,
+  TodoProgressPanel,
+  ToolCallCard,
+} from "./chat/ActivityWidgets";
 import {
   asThoughtLevel,
   clampThoughtLevel,
   computeTelemetry,
   defaultThoughtLevelFor,
-  extractToolTarget,
   fetchWorkspaceRuntimes,
   formatTokens,
+  groupChatSteps,
+  latestSessionTodos,
   mergeChatSteps,
   openWorkspaceSession,
   pickWorkspaceFile,
@@ -43,7 +52,6 @@ import {
   type SessionEvent,
   type SessionInteractionRequest,
   type SessionPermissionDecision,
-  type SessionPermissionMode,
   type SessionPermissionRequest,
   type SessionSwarmState,
   type ThoughtLevel,
@@ -51,11 +59,6 @@ import {
 } from "./chatSession";
 import { menuPopupClass, menuSeparatorClass, ShellIconButton } from "./chrome";
 import { SwarmPanel } from "./SwarmPanel";
-
-function actionIconFor(action: SessionEvent["action"]): IconName {
-  if (action !== undefined && action in actionIcon) return actionIcon[action];
-  return "bolt";
-}
 
 function phaseFromSessionTag(tag: PhaseView["_tag"]): ChatPhase {
   switch (tag) {
@@ -70,390 +73,6 @@ function phaseFromSessionTag(tag: PhaseView["_tag"]): ChatPhase {
   }
 }
 
-function phaseTone(phase: ChatPhase): "leaf" | "water" | "wheat" | "berry" | "idle" {
-  switch (phase) {
-    case "working":
-      return "water";
-    case "waiting":
-      return "wheat";
-    case "error":
-      return "berry";
-    case "ready":
-      return "leaf";
-    case "starting":
-      return "idle";
-  }
-}
-
-function phaseLabel(phase: ChatPhase): string {
-  switch (phase) {
-    case "starting":
-      return t("web.shell.chat.statusStarting");
-    case "ready":
-      return t("web.shell.chat.statusReady");
-    case "working":
-      return t("web.shell.chat.statusWorking");
-    case "waiting":
-      return t("web.shell.chat.statusWaiting");
-    case "error":
-      return t("web.shell.chat.statusError");
-  }
-}
-
-function thoughtLabel(level: ThoughtLevel): string {
-  switch (level) {
-    case "minimal":
-      return "Min";
-    case "low":
-      return t("web.shell.chat.thoughtLow");
-    case "medium":
-      return t("web.shell.chat.thoughtMedium");
-    case "high":
-      return t("web.shell.chat.thoughtHigh");
-    case "xhigh":
-    case "max":
-      return t("web.shell.chat.thoughtMax");
-  }
-}
-
-function basenameOf(path: string): string {
-  const trimmed = path.replace(/\/+$/u, "");
-  return trimmed.split("/").pop() || trimmed || "/";
-}
-
-function ChatMarkdown(props: {
-  text: string;
-  streaming?: boolean;
-  onGenUiAction?: (event: VvGenUiActionEvent) => void;
-  onDiagramPress?: (event: VvDiagramPressEvent) => void;
-}) {
-  const native = richNative();
-  const openLink = (url: string) => {
-    if (url.startsWith("/")) {
-      act({ type: "open_route", path: url });
-    } else if (url.startsWith("file://")) {
-      act({ type: "open_file_adjacent", path: decodeURI(url.slice("file://".length)) });
-    } else {
-      void hostApi.openUrl(url);
-    }
-  };
-  const handleGenUiAction = (event: VvGenUiActionEvent) => {
-    if (props.onGenUiAction) {
-      props.onGenUiAction(event);
-      return;
-    }
-    if (event.action.trim() === "navigate" && event.payload.trim().startsWith("/")) {
-      act({ type: "open_route", path: event.payload.trim() });
-    }
-  };
-  if (native) {
-    const VvMarkdown = native.VvMarkdown;
-    return (
-      <VvMarkdown
-        text={props.text}
-        size="sm"
-        streaming={props.streaming === true}
-        selectable
-        onLinkPress={(e) => openLink(e.url)}
-        onGenUiAction={handleGenUiAction}
-        onDiagramPress={props.onDiagramPress}
-      />
-    );
-  }
-  return (
-    <TextView
-      markdown={props.text}
-      selectable
-      onLinkPress={(e) => openLink(e.url)}
-      renderCodeBlock={(block) => {
-        switch (block.language) {
-          case "mermaid":
-            return <Diagram source={block.code} interactive onPress={props.onDiagramPress} />;
-          default:
-            return <CodeBlock code={block.code} language={block.language} />;
-        }
-      }}
-    />
-  );
-}
-
-function ThinkingBlock(props: { step: SessionEvent }) {
-  const open = signal(false);
-  return (
-    <View testID="chat-thinking" class="rounded-lg border border-line bg-side">
-      <View
-        role="button"
-        testID={`chat-thinking-toggle-${props.step.seq}`}
-        accessibilityState={{ expanded: open() }}
-        onPress={() => open.set(!open())}
-        class="h-7 flex-row items-center gap-1.5 px-2.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-      >
-        <View
-          class={`size-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
-          style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
-        >
-          <Icon name="expand" size={10} tone="muted" />
-        </View>
-        <Icon name="idea" size={12} tone="muted" />
-        <Text class="min-w-0 flex-1 truncate text-xs font-medium text-muted">{t("web.shell.chat.thinking")}</Text>
-      </View>
-      <If when={open()}>
-        <View class="border-t border-line bg-page px-3 py-2">
-          <Text class="text-xs text-muted select-text">{props.step.text}</Text>
-        </View>
-      </If>
-    </View>
-  );
-}
-
-function ToolCallCard(props: { step: SessionEvent }) {
-  const open = signal(false);
-  const target = () => extractToolTarget(props.step);
-  const running = () => props.step.ok === undefined;
-  const failed = () => props.step.ok === false;
-  const statusText = () => (running() ? t("web.shell.chat.toolRunning") : failed() ? t("web.shell.chat.toolFailed") : t("web.shell.chat.toolOk"));
-
-  return (
-    <View testID={`chat-tool-${props.step.seq}`} class="rounded-lg border border-line bg-side">
-      <View class="min-h-8 flex-row items-center gap-1.5 px-2 py-1">
-        <View
-          role="button"
-          testID={`chat-tool-toggle-${props.step.seq}`}
-          accessibilityState={{ expanded: open() }}
-          onPress={() => open.set(!open())}
-          class="min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm px-1 py-0.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
-        >
-          <View
-            class={`size-3.5 shrink-0 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
-            style={{ transform: [{ rotate: open() ? "90deg" : "0deg" }] }}
-          >
-            <Icon name="expand" size={10} tone="muted" />
-          </View>
-          <Icon name={actionIconFor(props.step.action)} size={14} tone={failed() ? "berry" : running() ? "water" : "muted"} />
-          <Text class={`shrink-0 text-xs font-medium ${failed() ? "text-berry" : "text-ink"}`}>{props.step.actionText ?? props.step.tool ?? ""}</Text>
-          <Text class={`min-w-0 flex-1 truncate font-mono text-xs ${failed() ? "text-berry" : "text-muted"}`}>{target()?.path ?? props.step.text}</Text>
-          <View class="shrink-0 flex-row items-center gap-1">
-            <If when={running()} else={<Icon name={failed() ? "cross" : "check"} size={12} />}>
-              <Dot tone="water" size={6} ring={false} />
-            </If>
-            <Text class={`text-2xs ${failed() ? "text-berry" : running() ? "text-water" : "text-faint"}`}>{statusText()}</Text>
-          </View>
-        </View>
-        <If when={target()}>
-          {(hit) => (
-            <View class="shrink-0 flex-row items-center gap-0.5">
-              <ShellIconButton
-                compact
-                icon="file"
-                label={t("web.shell.chat.toolOpenFile")}
-                onPress={() =>
-                  act({
-                    type: "open_file_adjacent",
-                    path: hit().path,
-                    ...(hit().line !== undefined ? { line: hit().line } : {}),
-                  })
-                }
-              />
-              <If when={hit().canDiff}>
-                <ShellIconButton
-                  compact
-                  icon="diff"
-                  label={t("web.shell.chat.toolOpenDiff")}
-                  onPress={() => act({ type: "open_diff_adjacent", path: hit().path, staged: false })}
-                />
-              </If>
-            </View>
-          )}
-        </If>
-      </View>
-      <If when={open()}>
-        <View class="gap-1.5 border-t border-line bg-page p-2.5">
-          <If when={props.step.input}>
-            {(raw) => (
-              <Scroll class="max-h-36 rounded-md border border-line bg-code-bg px-2.5 py-2">
-                <Text class="font-mono text-xs text-code-ink select-text">{raw()}</Text>
-              </Scroll>
-            )}
-          </If>
-          <If
-            when={props.step.output}
-            else={<Text class="text-xs text-faint">{running() ? t("web.shell.chat.toolPending") : t("web.shell.chat.toolNoOutput")}</Text>}
-          >
-            {(out) => (
-              <Scroll class={`max-h-48 rounded-md border px-2.5 py-2 ${failed() ? "border-berry bg-bad-soft" : "border-line bg-side"}`}>
-                <Text class={`font-mono text-xs select-text ${failed() ? "text-berry" : "text-ink"}`}>{out()}</Text>
-              </Scroll>
-            )}
-          </If>
-        </View>
-      </If>
-    </View>
-  );
-}
-
-function InteractionCard(props: {
-  interaction: SessionInteractionRequest;
-  busy: boolean;
-  onRespond: (decision: { kind: "select"; optionId: string } | { kind: "custom"; text: string } | { kind: "cancel" }) => void;
-}) {
-  const selectedId = signal<string>(untracked(() => props.interaction.options[0]?.id ?? ""));
-  const custom = signal("");
-  const canConfirm = () => custom().trim().length > 0 || selectedId().length > 0;
-  const submit = () => {
-    const trimmed = custom().trim();
-    if (trimmed.length > 0) {
-      props.onRespond({ kind: "custom", text: trimmed });
-      return;
-    }
-    if (selectedId().length > 0) {
-      props.onRespond({ kind: "select", optionId: selectedId() });
-    }
-  };
-
-  return (
-    <View
-      testID={`chat-interaction-${props.interaction.requestId}`}
-      class="gap-2.5 rounded-lg border border-line bg-elevated p-3 shadow-raise"
-      style={{ borderLeftColor: mix("wheat", 0.95) }}
-    >
-      <View class="flex-row flex-wrap items-center gap-2">
-        <View class="h-5 flex-row items-center gap-1 rounded-sm bg-warn-soft px-2">
-          <Icon name="warn" size={12} tone="warn-ink" />
-          <Text class="text-2xs font-semibold text-warn-ink">{t("web.shell.chat.interactionBadge")}</Text>
-        </View>
-        <Text class="font-mono text-2xs text-faint">{props.interaction.requestId}</Text>
-      </View>
-      <Text class="text-sm font-semibold text-ink">{props.interaction.question}</Text>
-      <If when={props.interaction.options.length > 0}>
-        <View class="gap-1.5">
-          <Each of={props.interaction.options} key={(o) => o.id}>
-            {(opt) => {
-              const chosen = () => custom().trim().length === 0 && selectedId() === opt().id;
-              return (
-                <View
-                  role="button"
-                  testID={`chat-interaction-option-${opt().id}`}
-                  accessibilityState={{ selected: chosen() }}
-                  onPress={() => {
-                    selectedId.set(opt().id);
-                    custom.set("");
-                  }}
-                  class={`gap-0.5 rounded-md border px-2.5 py-2 focus-visible:outline-2 focus-visible:outline-focus ${
-                    chosen() ? "border-accent bg-ok-soft" : "border-line bg-page hover:bg-hover"
-                  }`}
-                >
-                  <View class="flex-row items-center gap-2">
-                    <Icon name={chosen() ? "ticked" : "choose"} size={12} tone={chosen() ? "accent" : "muted"} />
-                    <Text class="min-w-0 flex-1 text-sm font-medium text-ink">{opt().label}</Text>
-                  </View>
-                  <If when={opt().description}>{(desc) => <Text class="pl-5 text-xs text-muted">{desc()}</Text>}</If>
-                  <If when={opt().warning}>
-                    {(warn) => (
-                      <View class="mt-1 ml-5 flex-row items-center gap-1 rounded-sm bg-warn-soft px-1.5 py-0.5">
-                        <Icon name="warn" size={12} tone="warn-ink" />
-                        <Text class="min-w-0 flex-1 text-2xs text-warn-ink">{warn()}</Text>
-                      </View>
-                    )}
-                  </If>
-                </View>
-              );
-            }}
-          </Each>
-        </View>
-      </If>
-      <View class="flex-row items-center gap-2">
-        <If when={props.interaction.allowCustom}>
-          <TextInput
-            testID={`chat-interaction-custom-${props.interaction.requestId}`}
-            value={custom()}
-            onInput={(v) => custom.set(v)}
-            onSubmit={submit}
-            placeholder={t("web.shell.chat.interactionCustomPlaceholder")}
-            accessibilityLabel={t("web.shell.chat.interactionCustomPlaceholder")}
-            class="min-w-0 flex-1"
-            wide={false}
-          />
-        </If>
-        <Button testID={`chat-interaction-decline-${props.interaction.requestId}`} disabled={props.busy} onPress={() => props.onRespond({ kind: "cancel" })}>
-          {t("web.shell.chat.interactionDecline")}
-        </Button>
-        <Button tone="primary" testID={`chat-interaction-confirm-${props.interaction.requestId}`} disabled={props.busy || !canConfirm()} onPress={submit}>
-          {t("web.shell.chat.interactionConfirm")}
-        </Button>
-      </View>
-    </View>
-  );
-}
-
-function PermissionCard(props: { permission: SessionPermissionRequest; busy: boolean; onRespond: (decision: SessionPermissionDecision) => void }) {
-  return (
-    <View
-      testID={`chat-permission-${props.permission.requestId}`}
-      class="gap-2 rounded-lg border border-line bg-elevated p-3 shadow-raise"
-      style={{ borderLeftColor: mix("wheat", 0.95) }}
-    >
-      <View class="flex-row items-center gap-2">
-        <View class="h-5 flex-row items-center gap-1 rounded-sm bg-warn-soft px-2">
-          <Icon name="lock" size={12} tone="warn-ink" />
-          <Text class="text-2xs font-semibold text-warn-ink">{t("web.shell.chat.permissionBadge")}</Text>
-        </View>
-        <Text class="font-mono text-xs font-semibold text-ink">{props.permission.tool}</Text>
-      </View>
-      <If when={props.permission.summary}>
-        <Text class="text-sm text-ink">{props.permission.summary}</Text>
-      </If>
-      <If when={props.permission.input}>
-        {(raw) => (
-          <Scroll class="max-h-28 rounded-md border border-line bg-code-bg px-2.5 py-1.5">
-            <Text class="font-mono text-xs text-code-ink select-text">{raw()}</Text>
-          </Scroll>
-        )}
-      </If>
-      <View class="flex-row items-center justify-end gap-1.5">
-        <Button
-          tone="danger"
-          size="compact"
-          testID={`chat-permission-deny-${props.permission.requestId}`}
-          disabled={props.busy}
-          onPress={() => props.onRespond("deny")}
-        >
-          {t("web.shell.chat.permissionDeny")}
-        </Button>
-        <Button
-          size="compact"
-          testID={`chat-permission-session-${props.permission.requestId}`}
-          disabled={props.busy}
-          onPress={() => props.onRespond("allowAlways")}
-        >
-          {t("web.shell.chat.permissionAllowSession")}
-        </Button>
-        <Button
-          tone="primary"
-          size="compact"
-          testID={`chat-permission-once-${props.permission.requestId}`}
-          disabled={props.busy}
-          onPress={() => props.onRespond("allowOnce")}
-        >
-          {t("web.shell.chat.permissionAllowOnce")}
-        </Button>
-      </View>
-    </View>
-  );
-}
-
-function ContextBar(props: { cached: number; uncached: number; class: string }) {
-  return (
-    <View class={props.class}>
-      <If when={props.cached > 0}>
-        <View class="h-full bg-leaf" style={{ width: `${props.cached}%` }} />
-      </If>
-      <If when={props.uncached > 0}>
-        <View class="h-full bg-water" style={{ width: `${props.uncached}%` }} />
-      </If>
-    </View>
-  );
-}
-
 export function WorkspaceChatPane() {
   const { tabId, cwd, repo, sessionId: initialSessionId, runtime: initialRuntime } = readChatPaneParams();
 
@@ -462,7 +81,6 @@ export function WorkspaceChatPane() {
   const runtime = signal<string>(initialRuntime);
   const model = signal<string>("");
   const thoughtLevel = signal<ThoughtLevel | undefined>(undefined);
-  const permissionMode = signal<SessionPermissionMode>("acceptEdits");
   const phase = signal<ChatPhase>(initialSessionId ? "starting" : "ready");
   const steps = signal<SessionEvent[]>([]);
   const steeredSeqs = signal<ReadonlySet<number>>(new Set());
@@ -494,6 +112,8 @@ export function WorkspaceChatPane() {
   const hasAttention = computed(() => pendingInteractions().length > 0 || pendingPermissions().length > 0);
   const effectivePhase = computed((): ChatPhase => (hasAttention() ? "waiting" : phase()));
   const shownSteps = computed(() => visibleChatSteps(steps()));
+  const feedItems = computed(() => groupChatSteps(shownSteps()));
+  const latestTodos = computed(() => latestSessionTodos(shownSteps()));
   const telemetry = computed(() => computeTelemetry(steps(), latestTokens()));
 
   if (host.available()) {
@@ -530,7 +150,6 @@ export function WorkspaceChatPane() {
           } else if (ev.effort === undefined || (info !== undefined && info.effortLevels.length === 0)) {
             thoughtLevel.set(undefined);
           }
-          permissionMode.set(ev.permissionMode);
           pendingPermissions.set(ev.pendingPermissions);
           pendingInteractions.set(ev.pendingInteractions);
           if (ev.tokens !== undefined) latestTokens.set(ev.tokens);
@@ -625,7 +244,7 @@ export function WorkspaceChatPane() {
       runtime: untracked(runtime),
       model: untracked(model) || undefined,
       ...(effort !== undefined ? { effort } : {}),
-      permissionMode: untracked(permissionMode),
+      permissionMode: "bypass",
     });
     if (!res.ok) {
       phase.set("error");
@@ -642,7 +261,6 @@ export function WorkspaceChatPane() {
     } else if (info !== undefined && info.effortLevels.length === 0) {
       thoughtLevel.set(undefined);
     }
-    permissionMode.set(ws.permissionMode);
     sessionId.set(ws.id);
     if (host.available() && tabId > 0) {
       act({ type: "bind_chat_session", tab_id: tabId, session_id: ws.id, runtime: ws.session.runtime });
@@ -741,7 +359,7 @@ export function WorkspaceChatPane() {
     else phase.set("ready");
   };
 
-  const applyConfig = async (patch: { model?: string; effort?: ThoughtLevel; permissionMode?: SessionPermissionMode }) => {
+  const applyConfig = async (patch: { model?: string; effort?: ThoughtLevel }) => {
     const sid = untracked(sessionId);
     if (!sid) return;
     const res = await setWorkspaceConfig(sid, patch);
@@ -790,17 +408,27 @@ export function WorkspaceChatPane() {
 
   const modelOptions = computed(() => currentModels().map((m) => ({ value: m.id, label: m.label })));
 
-  const permissionOptions: readonly { value: SessionPermissionMode; label: string }[] = [
-    { value: "ask", label: t("web.shell.chat.modeAsk") },
-    { value: "acceptEdits", label: t("web.shell.chat.modeAcceptEdits") },
-    { value: "bypass", label: t("web.shell.chat.modeBypass") },
-    { value: "readOnly", label: t("web.shell.chat.modeReadOnly") },
-  ];
-
-  const hasTelemetry = computed(() => telemetry().turns > 0 || telemetry().contextUsed > 0 || currentRuntime()?.quotaPct !== undefined);
-  const telemetryWarn = computed(() => {
+  const hasSessionTelemetry = computed(() => telemetry().turns > 0 || telemetry().contextUsed > 0);
+  const hasTelemetry = computed(() => hasSessionTelemetry() || currentRuntime()?.quotaPct !== undefined);
+  const quotaPct = computed(() => {
     const q = currentRuntime()?.quotaPct;
+    return q === undefined ? undefined : Math.max(0, Math.min(100, Math.round(q)));
+  });
+  const showQuotaPill = computed(() => telemetry().contextUsed === 0 && quotaPct() !== undefined);
+  const telemetryWarn = computed(() => {
+    const q = quotaPct();
     return telemetry().contextPct >= 85 || (q !== undefined && q <= 15);
+  });
+  const telemetryTooltip = computed(() => {
+    const parts: string[] = [];
+    if (telemetry().contextUsed > 0 || telemetry().turns > 0) {
+      parts.push(t("web.shell.chat.telemetryContext", { pct: telemetry().contextPct }));
+    }
+    const q = quotaPct();
+    if (q !== undefined) {
+      parts.push(t("web.shell.chat.telemetryQuota", { pct: q }));
+    }
+    return parts.join(" · ") || t("web.shell.chat.telemetryDetails");
   });
   const cachedBarPercent = computed(() => {
     const tel = telemetry();
@@ -819,104 +447,8 @@ export function WorkspaceChatPane() {
   const composerMenuClass = `${menuPopupClass} ${motionClass("transition-opacity duration-120 ease-out")}`;
   const composerMenuItemClass = "h-7 flex-row items-center justify-between gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
 
-  const permissionLabel = computed(() => permissionOptions.find((o) => o.value === permissionMode())?.label ?? permissionMode());
-
   return (
     <View testID="workspace-chat-pane" class="min-h-0 flex-1 bg-page">
-      <View testID="chat-header" class="h-8 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-3">
-        <View class="min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden">
-          <View class="h-5 shrink-0 flex-row items-center gap-1 rounded-sm border border-line bg-side px-1.5">
-            <Dot tone={phaseTone(effectivePhase())} size={6} ring={false} />
-            <Text testID="chat-phase-label" class="text-2xs font-medium text-muted">
-              {phaseLabel(effectivePhase())}
-            </Text>
-          </View>
-          <If when={cwd.length > 0}>
-            <View
-              testID="chat-cwd-chip"
-              tooltip={<Bubble text={cwd} />}
-              class="h-5 min-w-0 max-w-36 shrink flex-row items-center gap-1 overflow-hidden rounded-sm border border-line bg-side px-1.5"
-            >
-              <View class="shrink-0">
-                <Icon name="folder" size={12} tone="faint" />
-              </View>
-              <Text class="min-w-0 shrink truncate font-mono text-2xs text-muted">{basenameOf(cwd)}</Text>
-            </View>
-          </If>
-          <If when={swarm()}>
-            {(sw) => (
-              <View
-                role="button"
-                testID="chat-swarm-pill"
-                accessibilityLabel={swarmOpen() ? t("web.shell.swarm.closeDrawer") : t("web.shell.swarm.openDrawer")}
-                accessibilityState={{ expanded: swarmOpen() }}
-                tooltip={<Bubble text={sw().title ?? t("web.shell.swarm.openDrawer")} />}
-                onPress={() => swarmOpen.set(!swarmOpen())}
-                class={`h-5 shrink-0 flex-row items-center gap-1 rounded-sm border border-line px-1.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
-                  swarmOpen() ? "bg-selected" : "bg-side"
-                }`}
-              >
-                <Dot tone={sw().workingCount > 0 ? "leaf" : "idle"} size={6} ring={false} />
-                <Text class="font-mono text-2xs font-medium text-ink tabular-nums">
-                  {t("web.shell.swarm.pill", { working: sw().workingCount, active: sw().activeCount })}
-                </Text>
-              </View>
-            )}
-          </If>
-        </View>
-        <View class="shrink-0 flex-row items-center gap-1">
-          <Menu
-            placement="bottom"
-            align="end"
-            offset={4}
-            popupClass={composerMenuClass}
-            popupStartingClass={popupTransition("opacity-0")}
-            popupEndingClass={popupTransition("opacity-0")}
-            trigger={
-              <View
-                testID="chat-permission-mode"
-                accessibilityLabel={t("web.shell.chat.permissionMode")}
-                tooltip={<Bubble text={t("web.shell.chat.permissionMode")} />}
-                class="h-6 shrink-0 flex-row items-center gap-1 rounded-md px-1.5 hover:bg-hover aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
-              >
-                <Text class="text-xs font-medium text-muted">{permissionLabel()}</Text>
-                <View class="shrink-0" style={{ transform: [{ rotate: "90deg" }] }}>
-                  <Icon name="expand" size={9} tone="faint" />
-                </View>
-              </View>
-            }
-          >
-            <Each of={permissionOptions} key={(opt) => opt.value}>
-              {(opt) => (
-                <MenuItem
-                  testID={`chat-permission-mode-${opt().value}`}
-                  onSelect={() => {
-                    const next = opt().value;
-                    permissionMode.set(next);
-                    void applyConfig({ permissionMode: next });
-                  }}
-                  class={composerMenuItemClass}
-                >
-                  <Text class="text-xs text-ink">{opt().label}</Text>
-                  <If when={permissionMode() === opt().value}>
-                    <Icon name="check" size={12} tone="accent" />
-                  </If>
-                </MenuItem>
-              )}
-            </Each>
-          </Menu>
-          <If when={cwd.length > 0}>
-            <ShellIconButton
-              compact
-              icon="terminal"
-              size={13}
-              label={t("web.shell.chat.openTerminal")}
-              onPress={() => act({ type: "new_terminal_at", path: cwd })}
-            />
-          </If>
-        </View>
-      </View>
-
       <If when={swarmOpen() && swarm() !== undefined}>
         <SwarmPanel sessionId={sessionId()} swarm={swarm()!} onClose={() => swarmOpen.set(false)} />
       </If>
@@ -930,86 +462,102 @@ export function WorkspaceChatPane() {
           </View>
         </If>
 
-        <Each of={shownSteps()} key={(s) => s.seq}>
-          {(step) => (
-            <View testID={`chat-step-${step().seq}`} class="gap-1.5">
-              <If when={step().type === "user/message"}>
-                <View
-                  class="gap-1 rounded-lg border border-line bg-side px-3 py-2"
-                  style={steeredSeqs().has(step().seq) ? { borderLeftColor: mix("water", 0.9), backgroundColor: mix("water", 0.08) } : undefined}
-                >
-                  <View class="flex-row items-center gap-1.5">
-                    <Text class="text-xs font-semibold text-ink">{t("web.shell.chat.you")}</Text>
-                    <If when={steeredSeqs().has(step().seq)}>
-                      <View class="rounded-sm px-1.5 py-px" style={{ backgroundColor: mix("water", 0.14) }}>
-                        <Text class="text-2xs font-medium text-water">{t("web.shell.chat.steerTag")}</Text>
-                      </View>
-                    </If>
-                  </View>
-                  <Text class="text-sm text-ink select-text">{step().text}</Text>
-                </View>
-              </If>
+        <Each of={feedItems()} key={(item) => item.key}>
+          {(item) => (
+            <If
+              when={variant(item(), "kind", "activity")}
+              else={
+                <If when={variant(item(), "kind", "step")}>
+                  {(single) => (
+                    <View testID={`chat-step-${single().step.seq}`} class="gap-1.5">
+                      <If when={single().step.type === "user/message"}>
+                        <View
+                          class="gap-1 rounded-lg border border-line bg-side px-3 py-2"
+                          style={steeredSeqs().has(single().step.seq) ? { borderLeftColor: mix("water", 0.9), backgroundColor: mix("water", 0.08) } : undefined}
+                        >
+                          <If when={steeredSeqs().has(single().step.seq)}>
+                            <View class="flex-row items-center gap-1.5">
+                              <View class="rounded-sm px-1.5 py-px" style={{ backgroundColor: mix("water", 0.14) }}>
+                                <Text class="text-2xs font-medium text-water">{t("web.shell.chat.steerTag")}</Text>
+                              </View>
+                            </View>
+                          </If>
+                          <Text class="text-sm text-ink select-text">{single().step.text}</Text>
+                        </View>
+                      </If>
 
-              <If when={step().type === "assistant/thinking"}>
-                <ThinkingBlock step={step()} />
-              </If>
+                      <If when={single().step.type === "assistant/thinking"}>
+                        <ThinkingBlock step={single().step} durationMs={single().durationMs} running={single().trailing && effectivePhase() === "working"} />
+                      </If>
 
-              <If when={step().type === "tool/call"}>
-                <ToolCallCard step={step()} />
-              </If>
+                      <If when={single().step.type === "tool/call"}>
+                        <ToolCallCard step={single().step} durationMs={single().durationMs} />
+                      </If>
 
-              <If when={step().type === "assistant/message"}>
-                <View class="rounded-lg px-1 py-0.5">
-                  <ChatMarkdown
-                    text={step().text}
-                    streaming={effectivePhase() === "working"}
-                    onDiagramPress={(ev) => richPreview.set({ kind: "mermaid", source: ev.source })}
-                    onGenUiAction={(ev) => {
-                      const action = ev.action.trim();
-                      const payload = ev.payload.trim();
-                      if (action === "navigate" && payload.startsWith("/")) {
-                        act({ type: "open_route", path: payload });
-                        return;
-                      }
-                      if (action !== "state_change") {
-                        const text = formatGenUiAction(ev);
-                        if (text) {
-                          draft.set(text);
-                          void send();
-                        }
-                      }
-                    }}
-                  />
-                </View>
-              </If>
+                      <If when={single().step.type === "memory/recalled"}>
+                        <MemoryRecalledRow step={single().step} />
+                      </If>
 
-              <If when={step().type === "interaction/resolved"}>
-                <View class="flex-row items-center gap-2 rounded-md border border-line bg-side px-3 py-1.5">
-                  <View
-                    class={`h-5 items-center justify-center rounded-sm px-1.5 ${step().interactionResolution?.accepted === false ? "bg-bad-soft" : "bg-ok-soft"}`}
-                  >
-                    <Text class={`text-2xs font-semibold ${step().interactionResolution?.accepted === false ? "text-berry" : "text-ok-ink"}`}>
-                      {step().interactionResolution?.accepted === false ? t("web.shell.chat.interactionDeclined") : t("web.shell.chat.interactionAnswered")}
-                    </Text>
-                  </View>
-                  <Text class="min-w-0 flex-1 truncate text-xs text-muted">{step().interactionResolution?.choice ?? step().text}</Text>
-                </View>
-              </If>
+                      <If when={single().step.type === "assistant/message"}>
+                        <View class="rounded-lg px-1 py-0.5">
+                          <ChatMarkdown
+                            text={single().step.text}
+                            streaming={effectivePhase() === "working"}
+                            onDiagramPress={(ev) => richPreview.set({ kind: "mermaid", source: ev.source })}
+                            onGenUiAction={(ev) => {
+                              const action = ev.action.trim();
+                              const payload = ev.payload.trim();
+                              if (action === "navigate" && payload.startsWith("/")) {
+                                act({ type: "open_route", path: payload });
+                                return;
+                              }
+                              if (action !== "state_change") {
+                                const text = formatGenUiAction(ev);
+                                if (text) {
+                                  draft.set(text);
+                                  void send();
+                                }
+                              }
+                            }}
+                          />
+                        </View>
+                      </If>
 
-              <If when={step().type === "run/error"}>
-                <View class="flex-row items-start gap-2 rounded-md border border-berry bg-bad-soft px-3 py-2">
-                  <Icon name="cross" size={14} tone="berry" />
-                  <Text class="min-w-0 flex-1 text-xs text-berry select-text">{step().text}</Text>
-                </View>
-              </If>
+                      <If when={single().step.type === "interaction/resolved"}>
+                        <View class="flex-row items-center gap-2 rounded-md border border-line bg-side px-3 py-1.5">
+                          <View
+                            class={`h-5 items-center justify-center rounded-sm px-1.5 ${single().step.interactionResolution?.accepted === false ? "bg-bad-soft" : "bg-ok-soft"}`}
+                          >
+                            <Text class={`text-2xs font-semibold ${single().step.interactionResolution?.accepted === false ? "text-berry" : "text-ok-ink"}`}>
+                              {single().step.interactionResolution?.accepted === false
+                                ? t("web.shell.chat.interactionDeclined")
+                                : t("web.shell.chat.interactionAnswered")}
+                            </Text>
+                          </View>
+                          <Text class="min-w-0 flex-1 truncate text-xs text-muted">{single().step.interactionResolution?.choice ?? single().step.text}</Text>
+                        </View>
+                      </If>
 
-              <If when={step().type === "llm/retry"}>
-                <View class="flex-row items-center gap-2 rounded-md bg-warn-soft px-3 py-1.5">
-                  <Icon name="retry" size={12} tone="warn-ink" />
-                  <Text class="min-w-0 flex-1 text-xs text-warn-ink">{step().text}</Text>
-                </View>
-              </If>
-            </View>
+                      <If when={single().step.type === "run/error"}>
+                        <View class="flex-row items-start gap-2 rounded-md border border-berry bg-bad-soft px-3 py-2">
+                          <Icon name="cross" size={14} tone="berry" />
+                          <Text class="min-w-0 flex-1 text-xs text-berry select-text">{single().step.text}</Text>
+                        </View>
+                      </If>
+
+                      <If when={single().step.type === "llm/retry"}>
+                        <View class="flex-row items-center gap-2 rounded-md bg-warn-soft px-3 py-1.5">
+                          <Icon name="retry" size={12} tone="warn-ink" />
+                          <Text class="min-w-0 flex-1 text-xs text-warn-ink">{single().step.text}</Text>
+                        </View>
+                      </If>
+                    </View>
+                  )}
+                </If>
+              }
+            >
+              {(activity) => <ActivityGroup item={activity()} working={effectivePhase() === "working"} />}
+            </If>
           )}
         </Each>
 
@@ -1033,68 +581,7 @@ export function WorkspaceChatPane() {
           )}
         </If>
 
-        <If when={effectivePhase() === "working"}>
-          <View testID="chat-steering-banner" class="flex-row items-center gap-1.5 rounded-md px-2.5 py-1" style={{ backgroundColor: mix("water", 0.1) }}>
-            <Dot tone="water" size={6} ring={false} />
-            <Text class="min-w-0 flex-1 truncate text-xs font-medium text-water">{t("web.shell.chat.steeringBanner")}</Text>
-          </View>
-        </If>
-
-        <If when={telemetryOpen() && hasTelemetry()}>
-          <View testID="chat-telemetry-drawer" class="flex-row flex-wrap gap-2 rounded-lg border border-line bg-side p-2.5">
-            <View class="min-w-48 flex-1 gap-1.5 rounded-lg border border-line bg-page p-2.5">
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryContextTitle")}</Text>
-                <Text class="shrink-0 font-mono text-xs text-ink tabular-nums">
-                  {`${telemetry().contextPct}% · ${formatTokens(telemetry().contextUsed)}/${formatTokens(telemetry().contextWindow)}`}
-                </Text>
-              </View>
-              <ContextBar cached={cachedBarPercent()} uncached={uncachedBarPercent()} class="h-1.5 flex-row overflow-hidden rounded-full bg-selected" />
-              <View class="flex-row flex-wrap gap-2">
-                <Text class="font-mono text-2xs text-ok-ink">{`${t("web.shell.chat.telemetryCached")} ${formatTokens(telemetry().cachedRead)}`}</Text>
-                <Text class="font-mono text-2xs text-water">{`${t("web.shell.chat.telemetryUncached")} ${formatTokens(telemetry().uncachedInput)}`}</Text>
-                <Text class="font-mono text-2xs text-muted">{`${t("web.shell.chat.telemetryOutput")} ${formatTokens(telemetry().output)}`}</Text>
-                <If when={telemetry().reasoning > 0}>
-                  <Text class="font-mono text-2xs text-warn-ink">{`${t("web.shell.chat.telemetryReasoning")} ${formatTokens(telemetry().reasoning)}`}</Text>
-                </If>
-              </View>
-            </View>
-
-            <View class="min-w-48 flex-1 gap-1.5 rounded-lg border border-line bg-page p-2.5">
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryCacheTitle")}</Text>
-                <Text class="shrink-0 font-mono text-xs font-semibold text-ok-ink tabular-nums">
-                  {t("web.shell.chat.telemetryCache", { pct: telemetry().cacheHitPct })}
-                </Text>
-              </View>
-              <Text class="font-mono text-sm font-semibold text-ink tabular-nums">
-                {t("web.shell.chat.telemetryTurns", { turns: telemetry().turns, tools: telemetry().toolCount })}
-              </Text>
-            </View>
-
-            <View class="min-w-48 flex-1 gap-1.5 rounded-lg border border-line bg-page p-2.5">
-              <View class="flex-row items-center justify-between gap-2">
-                <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryQuotaTitle")}</Text>
-                <If when={currentRuntime()?.quotaPct !== undefined}>
-                  <Text class="shrink-0 font-mono text-xs text-ink tabular-nums">
-                    {t("web.shell.chat.telemetryQuota", { pct: Math.round(currentRuntime()?.quotaPct ?? 0) })}
-                  </Text>
-                </If>
-              </View>
-              <If
-                when={currentRuntime()?.quotaPct !== undefined}
-                else={<Text class="text-2xs text-faint">{t("web.shell.chat.telemetryQuotaUnavailable")}</Text>}
-              >
-                <View class="gap-1">
-                  <View class="h-1.5 overflow-hidden rounded-full bg-selected">
-                    <View class="h-full bg-accent" style={{ width: `${Math.min(100, Math.max(0, Math.round(currentRuntime()?.quotaPct ?? 0)))}%` }} />
-                  </View>
-                  <If when={currentRuntime()?.quotaText}>{(label) => <Text class="text-2xs text-faint">{label()}</Text>}</If>
-                </View>
-              </If>
-            </View>
-          </View>
-        </If>
+        <If when={latestTodos()}>{(todo) => <TodoProgressPanel checklist={todo()} working={effectivePhase() === "working"} />}</If>
 
         <View testID="chat-composer-card" class={`rounded-xl border bg-page ${composerFocused() ? "border-focus" : "border-line"}`}>
           <If when={attachedFiles().length > 0}>
@@ -1280,25 +767,130 @@ export function WorkspaceChatPane() {
             </View>
 
             <View class="shrink-0 flex-row items-center gap-1">
+              <If when={swarm()}>
+                {(sw) => (
+                  <View
+                    role="button"
+                    testID="chat-swarm-pill"
+                    accessibilityLabel={swarmOpen() ? t("web.shell.swarm.closeDrawer") : t("web.shell.swarm.openDrawer")}
+                    accessibilityState={{ expanded: swarmOpen() }}
+                    tooltip={<Bubble text={sw().title ?? t("web.shell.swarm.openDrawer")} />}
+                    onPress={() => swarmOpen.set(!swarmOpen())}
+                    class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md border border-line px-1.5 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
+                      swarmOpen() ? "bg-selected" : "bg-side"
+                    }`}
+                  >
+                    <Dot tone={sw().workingCount > 0 ? "leaf" : "idle"} size={6} ring={false} />
+                    <Text class="font-mono text-2xs font-medium text-ink tabular-nums">
+                      {t("web.shell.swarm.pill", { working: sw().workingCount, active: sw().activeCount })}
+                    </Text>
+                  </View>
+                )}
+              </If>
               <If when={hasTelemetry()}>
-                <View
-                  role="button"
-                  testID="chat-telemetry-toggle"
-                  tooltip={<Bubble text={t("web.shell.chat.telemetryContext", { pct: telemetry().contextPct })} />}
-                  accessibilityLabel={telemetryOpen() ? t("web.shell.chat.telemetryHide") : t("web.shell.chat.telemetryDetails")}
-                  accessibilityState={{ expanded: telemetryOpen() }}
-                  onPress={() => telemetryOpen.set(!telemetryOpen())}
-                  class={`h-6 shrink-0 flex-row items-center gap-1.5 rounded-md px-2 hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus ${
-                    telemetryOpen() ? "bg-selected" : ""
-                  }`}
+                <Popover
+                  open={telemetryOpen()}
+                  onOpenChange={(e) => telemetryOpen.set(e.open)}
+                  placement="top"
+                  align="end"
+                  offset={8}
+                  popupClass={`w-72 flex-col overflow-hidden rounded-xl border border-line bg-elevated p-2.5 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
+                  popupStyle={{ maxHeight: Math.min(420, Math.max(200, Math.round(windowSize().height * 0.7))) }}
+                  popupStartingClass={popupTransition("opacity-0")}
+                  trigger={
+                    <View
+                      role="button"
+                      testID="chat-telemetry-toggle"
+                      tooltip={
+                        <If when={!telemetryOpen()}>
+                          <Bubble text={telemetryTooltip()} />
+                        </If>
+                      }
+                      accessibilityLabel={telemetryOpen() ? t("web.shell.chat.telemetryHide") : t("web.shell.chat.telemetryDetails")}
+                      accessibilityState={{ expanded: telemetryOpen() }}
+                      class={`h-6 shrink-0 flex-row items-center gap-1.5 rounded-full border border-line bg-side px-2 shadow-raise hover:bg-hover aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus ${
+                        telemetryOpen() ? "bg-selected" : ""
+                      }`}
+                    >
+                      <If
+                        when={showQuotaPill()}
+                        else={
+                          <ContextBar
+                            cached={cachedBarPercent()}
+                            uncached={uncachedBarPercent()}
+                            class="h-1.5 w-6 shrink-0 flex-row overflow-hidden rounded-full bg-selected"
+                          />
+                        }
+                      >
+                        <View class="h-1.5 w-6 shrink-0 overflow-hidden rounded-full bg-selected">
+                          <View class={(quotaPct() ?? 100) <= 15 ? "h-full bg-wheat" : "h-full bg-accent"} style={{ width: `${quotaPct() ?? 0}%` }} />
+                        </View>
+                      </If>
+                      <Text class={`font-mono text-2xs tabular-nums ${telemetryWarn() ? "text-warn-ink" : "text-muted"}`}>
+                        {`${showQuotaPill() ? (quotaPct() ?? 0) : telemetry().contextPct}%`}
+                      </Text>
+                    </View>
+                  }
                 >
-                  <ContextBar
-                    cached={cachedBarPercent()}
-                    uncached={uncachedBarPercent()}
-                    class="h-1.5 w-6 shrink-0 flex-row overflow-hidden rounded-full bg-selected"
-                  />
-                  <Text class={`font-mono text-2xs tabular-nums ${telemetryWarn() ? "text-warn-ink" : "text-faint"}`}>{`${telemetry().contextPct}%`}</Text>
-                </View>
+                  <Scroll class="min-h-0 shrink">
+                    <View testID="chat-telemetry-drawer" class="gap-2">
+                      <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
+                        <View class="flex-row items-center justify-between gap-2">
+                          <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryQuotaTitle")}</Text>
+                          <If when={quotaPct() !== undefined}>
+                            <Text class={`shrink-0 font-mono text-xs tabular-nums ${(quotaPct() ?? 100) <= 15 ? "font-semibold text-warn-ink" : "text-ink"}`}>
+                              {t("web.shell.chat.telemetryQuota", { pct: quotaPct() ?? 0 })}
+                            </Text>
+                          </If>
+                        </View>
+                        <If when={quotaPct() !== undefined} else={<Text class="text-2xs text-faint">{t("web.shell.chat.telemetryQuotaUnavailable")}</Text>}>
+                          <View class="gap-1">
+                            <View class="h-1.5 overflow-hidden rounded-full bg-selected">
+                              <View class={(quotaPct() ?? 100) <= 15 ? "h-full bg-wheat" : "h-full bg-accent"} style={{ width: `${quotaPct() ?? 0}%` }} />
+                            </View>
+                            <If when={currentRuntime()?.quotaText}>{(label) => <Text class="text-2xs text-faint">{label()}</Text>}</If>
+                          </View>
+                        </If>
+                      </View>
+
+                      <If when={hasSessionTelemetry()}>
+                        <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
+                          <View class="flex-row items-center justify-between gap-2">
+                            <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryContextTitle")}</Text>
+                            <Text class="shrink-0 font-mono text-xs text-ink tabular-nums">
+                              {`${telemetry().contextPct}% · ${formatTokens(telemetry().contextUsed)}/${formatTokens(telemetry().contextWindow)}`}
+                            </Text>
+                          </View>
+                          <ContextBar
+                            cached={cachedBarPercent()}
+                            uncached={uncachedBarPercent()}
+                            class="h-1.5 flex-row overflow-hidden rounded-full bg-selected"
+                          />
+                          <View class="flex-row flex-wrap gap-2">
+                            <Text class="font-mono text-2xs text-ok-ink">{`${t("web.shell.chat.telemetryCached")} ${formatTokens(telemetry().cachedRead)}`}</Text>
+                            <Text class="font-mono text-2xs text-water">{`${t("web.shell.chat.telemetryUncached")} ${formatTokens(telemetry().uncachedInput)}`}</Text>
+                            <Text class="font-mono text-2xs text-muted">{`${t("web.shell.chat.telemetryOutput")} ${formatTokens(telemetry().output)}`}</Text>
+                            <If when={telemetry().reasoning > 0}>
+                              <Text class="font-mono text-2xs text-warn-ink">{`${t("web.shell.chat.telemetryReasoning")} ${formatTokens(telemetry().reasoning)}`}</Text>
+                            </If>
+                          </View>
+                        </View>
+
+                        <View class="flex-row items-center justify-between gap-2 rounded-lg border border-line bg-side px-2.5 py-2">
+                          <View class="min-w-0 gap-0.5">
+                            <Text class="truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryCacheTitle")}</Text>
+                            <Text class="font-mono text-xs font-semibold text-ink tabular-nums">
+                              {t("web.shell.chat.telemetryTurns", { turns: telemetry().turns, tools: telemetry().toolCount })}
+                            </Text>
+                          </View>
+                          <Text class="shrink-0 font-mono text-xs font-semibold text-ok-ink tabular-nums">
+                            {t("web.shell.chat.telemetryCache", { pct: telemetry().cacheHitPct })}
+                          </Text>
+                        </View>
+                      </If>
+                    </View>
+                  </Scroll>
+                </Popover>
               </If>
 
               <If when={effectivePhase() === "working"}>

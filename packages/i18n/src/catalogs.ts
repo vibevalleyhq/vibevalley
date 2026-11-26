@@ -141,7 +141,7 @@ export const catalogs = {
       persona: {
         append: { label: "追加到系统提示", detail: "保留引擎自带的工作方式，在后面加上人设。大多数情况选这个。" },
         replace: { label: "替换系统提示", detail: "整段换掉引擎自带的系统提示。只有你清楚自己在做什么时才用。" },
-        prompt: { label: "写进任务开头", detail: "每个任务前面加上人设。所有引擎都能用，但会被长对话冲淡。" },
+        prompt: { label: "写进工单开头", detail: "每个工单前面加上人设。所有引擎都能用，但会被长对话冲淡。" },
       },
       personaLabel: "人设",
       personaTip: "它是谁、怎么干活、什么不做。会按下面的方式交给引擎。",
@@ -257,7 +257,57 @@ export const catalogs = {
         rail: "这篇的旁注",
         railShow: "打开旁注",
         railHide: "收起旁注",
+        backToLibrary: "返回作品库",
+        previewTab: "预览",
+        filesTab: "文件",
+        filesTabCount: "文件 ({n})",
+        viewMode: "视图模式",
+        liveVersion: "实时",
+        directory: "目录",
+        newFileLabel: "新文件路径",
+        discard: "放弃更改",
+        unsaved: "未保存",
+        deleteFileAsk: "删除文件「{path}」？",
+        snapshotNote: "手动快照",
       },
+      docs: { split: "分栏", edit: "编辑", read: "阅读" },
+      outline: {
+        progress: "{done}/{total} 已完成",
+        hideDone: "隐藏已完成",
+        showDone: "显示已完成",
+        quickAdd: "输入内容后按回车快速添加…",
+        kindHeading: "标题",
+        kindBullet: "要点",
+        kindTodo: "待办",
+        cycleKind: "切换类型 ({kind})",
+        indent: "缩进",
+        outdent: "取消缩进",
+        addChild: "添加子项",
+        untitled: "新条目",
+      },
+      sheet: { filterPlaceholder: "筛选行…", addRow: "新增一行", empty: "暂无工作表", rowsCount: "{n} 行" },
+      diagram: { visual: "图谱视图", structure: "节点与连线", nodes: "节点", edges: "连线" },
+      motion: {
+        timeline: "时间线片段",
+        layers: "{n} 个图层",
+        play: "播放",
+        stop: "暂停",
+        restart: "回到开头",
+        loop: "循环播放",
+        prevStep: "后退 0.5 秒",
+        nextStep: "前进 0.5 秒",
+        chapters: "章节",
+      },
+      storyboard: {
+        gridMode: "分镜卡片",
+        animaticMode: "动态预演",
+        totalDuration: "总时长 {sec} 秒",
+        shotOf: "第 {n} / {total} 镜",
+        sfx: "音效",
+        transition: "转场",
+      },
+      prototype: { viewportLabel: "视口尺寸", viewportFull: "铺满", viewportTablet: "平板", viewportMobile: "手机", reload: "重新载入" },
+      files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
       issue: { title: "作品" },
       blocks: { saved: "都存好了", user: "你", start: "从这里开始写……" },
       canvas: { label: "打开的作品", close: "关掉", openPage: "在作品页打开" },
@@ -280,14 +330,16 @@ export const catalogs = {
         storyboard: "分镜脚本",
       },
       timeline: {
-        toggle: "时间轴历史",
-        title: "时间轴",
+        title: "历史记录",
+        show: "打开历史记录",
+        hide: "收起历史记录",
+        savedVersions: "已保存版本",
+        commits: "变更记录",
         loading: "正在载入历史…",
         empty: "还没有可回放的提交",
-        prev: "上一个提交",
-        next: "下一个提交",
         backToLive: "回到最新",
         previewBanner: "历史只读预览 · {summary}",
+        versionBanner: "正在查看第 {version} 稿（只读）{note}",
         turn: "第 {n} 轮",
         restore: "恢复到此版本",
         restored: "已恢复到所选版本",
@@ -350,11 +402,42 @@ export const catalogs = {
         styleSolid: "实线",
         styleDashed: "虚线",
       },
-      design: { noProps: "当前画板未声明可调属性（data-props）" },
-      designSystem: { components: "组件预览" },
+      design: {
+        themeLight: "浅色",
+        themeDark: "深色",
+        propsTitle: "属性控制杆",
+        enabled: "开启",
+        disabled: "关闭",
+        emptyCanvas: "暂无画板元素，可在工作区中添加组件",
+      },
+      designSystem: {
+        components: "组件预览",
+        colors: "色彩令牌",
+        typography: "字体排印",
+        spacing: "间距尺度",
+        radius: "圆角尺度",
+        guidelinesDo: "推荐",
+        guidelinesDont: "避免",
+        previewTheme: "预览主题",
+        specimen: "Aa Bb 永和九年 0123456789",
+      },
       slidesStore: { addSlide: "加一页" },
       edit: { save: "存成新的一稿", saved: "存成了第 {version} 稿" },
-      slides: { previous: "上一页", next: "下一页", present: "全屏放映", presenter: "演讲者视图" },
+      slides: {
+        previous: "上一页",
+        next: "下一页",
+        present: "全屏放映",
+        presenter: "演讲者视图",
+        editSlide: "编辑本页",
+        doneEdit: "完成编辑",
+        slideTitleLabel: "标题",
+        slideSubtitleLabel: "副标题",
+        slideLayoutLabel: "版式",
+        layoutCover: "封面",
+        layoutContent: "正文",
+        slideBulletsLabel: "要点（每行一条）",
+        slideNotesLabel: "演讲备注",
+      },
       presenter: {
         missing: "没说要讲哪一份幻灯片：从作品的「演讲者视图」打开。",
         current: "这一页",
@@ -372,7 +455,6 @@ export const catalogs = {
       standalone: { missing: "这份作品已经删掉了，或者没有这份作品。", version: "第 {version} 稿", live: "最新" },
       applet: {
         button: "安装为桌面应用",
-        buttonInstalled: "桌面应用已安装",
         badgeInstalled: "已安装",
         modalTitle: "本地桌面应用",
         subtitle: "将这份作品安装为独立 Mac 应用，可从聚焦搜索或程序坞直接打开。",
@@ -388,6 +470,8 @@ export const catalogs = {
         reinstall: "更新并重装",
         installing: "正在安装…",
         open: "打开应用",
+        openApp: "打开独立应用",
+        manageApp: "管理应用",
         uninstall: "卸载",
         installedToast: "已安装「{name}.app」",
         uninstalledToast: "已卸载「{name}.app」",
@@ -493,13 +577,12 @@ export const catalogs = {
       route: { missing: "这个页面不存在", invalid: "这个地址无效", home: "返回应用" },
       place: {
         chat: { label: "对话", hint: "频道与话题" },
-        issues: { label: "任务", hint: "每件任务从记下到完成" },
+        issues: { label: "工单", hint: "每张工单从记下到完成" },
         runs: { label: "运行与轨迹", hint: "执行会话、主助手审批与历史轨迹" },
         workspace: { hint: "管理仓库与工作区", name: "工作区" },
-        content: { label: "内容", hint: "媒体库、作品与笔记" },
+        content: { label: "作品", hint: "作品、大纲笔记与素材" },
         runtimes: { label: "引擎", hint: "本机与远端已安装的编码引擎" },
         team: { label: "团队", hint: "角色与团队模板" },
-        catalog: { label: "素材图鉴", hint: "像素与界面素材：每张图、指针、声音和工作台零件" },
         settings: { label: "设置", hint: "通用与外观、模型与密钥、语音与通话、外部连接、关于与数据" },
       },
       link: { connecting: "连接中", open: "已连上", lost: "断了，重连中" },
@@ -589,10 +672,10 @@ export const catalogs = {
           everywhere: "到处",
           composer: "输入框",
           lists: "菜单和名单",
-          issues: "任务",
+          issues: "工单",
           pictures: "看图",
           library: "媒体库",
-          farm: "像素农场",
+          farm: "农场",
           desktop: "桌面版（系统全局）",
         },
         say: {
@@ -612,8 +695,8 @@ export const catalogs = {
           farmMenu: "放下农具，或打开菜单",
           debug: "调试台",
           voice: "跟主助手说话（在设置里能换）",
-          command: "命令：建任务、让主助手记住、叫停、私聊",
-          newIssue: "新建任务",
+          command: "命令：建工单、让主助手记住、叫停、私聊",
+          newIssue: "新建工单",
           libraryMove: "在素材之间挪",
           libraryLook: "全屏看选中的图",
           libraryRemove: "从库里拿掉选中的",
@@ -636,70 +719,19 @@ export const catalogs = {
         zoomOut: "缩小",
         zoomReset: "重置缩放",
       },
-      updateReady: "{next} 已下好，去「关于」重启",
+      updateInstall: "立即更新",
+      updateInstalling: "重启中…",
+      updateReadyOneClick: "{next} 已就绪，点击一键重启更新",
+      updateReadyTitle: "更新到 {next}",
+      updateNotesTitle: "本次更新内容",
       intent: { timedOut: "等了太久没回音，可以重试", offline: "没连上 VibeValley，这一下没发出去" },
       pickTooLarge: "{name} 没加上：超过 512 MiB 了",
       openTerminal: "在这里打开终端",
-    },
-    "web.catalog": {
-      ground: { check: "格子", grass: "草地", night: "夜里" },
-      tab: { sprites: "图", cursors: "指针", sounds: "音效" },
-      shelves: "图鉴的书架",
-      find: "找素材",
-      background: "底色",
-      categories: "分类",
-      all: "全部",
-      count: "{n} 张，切自 design/pixel/raw。",
-      pick: "点一张看大图：尺寸、落脚点、会动的帧，和它是从哪张原图切出来的、怎么重画。",
-      findHint: "找：名字、类别、动物、衣服（熊、雨衣、lang-、icon-……）",
-      noMatch: "没有对得上的。",
-      moves: "动",
-      copied: "复制了",
-      copy: "复制",
-      anchor: "落脚点",
-      head: "头",
-      zoom: "放大",
-      marks: "落脚点和头",
-      stop: "停",
       play: "播放",
-      frames: "{n} 帧",
-      fps: "每秒几帧",
-      perSecond: "{n} 帧/秒",
-      size: "尺寸",
-      pixels: "{w} × {h} 像素",
-      from: "来自",
-      unrecorded: "没记下来（不再用的旧图）",
-      redraw: "重画",
-      recut: "重新切",
-      cursorsIntro: "鼠标在农场里的样子：平时、指着能点的、拿着工具时。",
-      cursorsFind: "找：指针的名字（glove、water、harvest……）",
-      cursorsNote:
-        "红点是点下去落在哪。平时是手套，指着能点的伸出食指；拿着工具时是那件工具，能用的带闪光，用不上的带禁止标记。切自 design/pixel/raw/ui-cursors.png（design/pixel/process.py ui-cursors）。",
-      noCursors: "这个版本没有带上指针的图（assets/cursors）。",
-      soundsIntro: "农场里的每个声音，点一下就能听。",
-      soundsFind: "找：声音的名字或分组（浇水、院子、coin……）",
-      soundsRecipes: "音效都是现合成的，没有音频文件：配方在",
-      soundsMuted: "。关了音效就听不到。",
-      playSound: "播放 {name}",
-      shelf: {
-        helpers: { label: "帮工", hint: "七种动物、四套衣服：站、走、干活、欢呼、发愁；在建筑前坐、读、敲、修" },
-        orchestrator: { hint: "六种样子，各有说话、听和头像" },
-        dog: { label: "狗", hint: "睡、醒、伸懒腰、摇尾巴、叫、跳、翻肚皮……" },
-        plots: { label: "地块", hint: "从空地到熟了，长草、干了、枯了、锁着" },
-        yard: { label: "院子", hint: "地图、道具、镜头前的草木、小动物" },
-        map: { label: "地图", hint: "每个仓库一座岛，罗盘、云、排队的种子袋、空位的木桩" },
-        machines: { label: "农机", hint: "每台是一种 runtime" },
-        icons: { label: "图标", hint: "面板、入口和提示用的" },
-        acts: { label: "在做什么", hint: "帮工头上的小图标：读、改、跑命令、搜……" },
-        medals: { label: "奖章与成就", hint: "奖章、成就图案、印章、金币" },
-        logos: { hint: "农机上的 agent、聊天软件、网页和桌面的图标" },
-        langs: { label: "语言", hint: "仓库页上种了什么" },
-        ui: { label: "界面", hint: "精力瓶、田头的按钮、日历的格子" },
-        other: { label: "其他", hint: "没归上类的" },
-      },
+      stop: "停止",
     },
     "web.channel": {
-      tab: { chat: "聊天", issues: "任务", crons: "定时任务" },
+      tab: { chat: "聊天", issues: "工单", crons: "定时任务" },
       defaultRepo: "默认仓库 {repo}",
       channels: "频道列表",
       defaultHint: "默认的频道：你、主助手和执行会话都在这儿",
@@ -714,8 +746,11 @@ export const catalogs = {
       channelsTitle: "频道",
       directsTitle: "私聊",
       newChannel: "创建频道",
-      helpers: "执行会话",
-      noHelpers: "没有在场的执行会话",
+      newChat: "发起聊天",
+      filter: { label: "筛选会话", all: "全部", group: "频道", direct: "私聊" },
+      emptyPreview: "暂无消息",
+      emptyList: "这里还没有对话",
+      runsEntry: "查看执行会话",
       mood: { idle: "在歇着", listening: "在听", thinking: "在想", speaking: "在说" },
       orchestrator: "主助手",
       nobodyOnIt: "现在没有执行会话在干，串还留着",
@@ -739,7 +774,7 @@ export const catalogs = {
         settingsOf: "# {name} 的设置",
         save: "保存",
       },
-      issues: { empty: "这个频道里还没有任务。在聊天里跟主助手说一件要做的事，它会派执行会话，任务就列在这里。", thread: "任务话题" },
+      issues: { empty: "这个频道里还没有工单。在聊天里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。", thread: "工单话题" },
       crons: {
         empty: "还没有定时任务：跟主助手说「每天九点跑一遍测试」。",
         next: "下次 {next}",
@@ -843,7 +878,6 @@ export const catalogs = {
         archivedTitle: "已归档",
         muted: "不提醒",
         mentionsOnly: "只 @",
-        drag: "拖到另一个频道上，排在它前面",
       },
       threadList: {
         title: "这个频道的话题",
@@ -871,7 +905,7 @@ export const catalogs = {
         searching: "在找…",
         failed: "没搜成：{why}",
       },
-      direct: { add: "开一个私聊", pick: "和谁私聊", none: "还没有角色", open: "和{name}私聊" },
+      direct: { pick: "和谁私聊", none: "还没有角色", open: "和{name}私聊" },
       emoji: { open: "表情", groups: { frequent: "常用", faces: "表情", hands: "手势", things: "东西", nature: "自然", signs: "符号" }, more: "更多表情" },
       media: {
         pdf: "PDF · 在新标签页里看",
@@ -882,7 +916,7 @@ export const catalogs = {
         preview: "链接预览",
       },
       names: {
-        issueThread: "任务话题",
+        issueThread: "工单话题",
         talkThread: "{who}的话题",
         thread: "话题",
         mention: { orchestrator: "@主助手", user: "@用户", everyone: "@所有人" },
@@ -892,7 +926,7 @@ export const catalogs = {
       },
       threadWidth: "话题的宽窄（拖动，双击回默认）",
       commands: {
-        issue: { name: "记一个任务", args: "标题", note: "记进备选，在这个频道的仓库里", needs: "/issue 后面写任务的标题" },
+        issue: { name: "记一个工单", args: "标题", note: "记进备选，在这个频道的仓库里", needs: "/issue 后面写工单的标题" },
         remember: { name: "让主助手记住", args: "一句话", note: "记进这里主助手的记忆", needs: "/remember 后面写要它记住的话" },
         stop: { name: "叫停主助手", args: "", note: "这里的主助手停下这一轮，派出去的执行会话照常干活", needs: "" },
         dm: { name: "私聊", args: "名字", note: "打开和这份角色的私聊", needs: "/dm 后面写角色的名字或 id" },
@@ -908,7 +942,6 @@ export const catalogs = {
       },
       lacks: "回不了话：{why}",
       lacksFix: "去设置",
-      orchestratorRuns: "查看主助手轨迹与待审批调用",
     },
     "web.connector": {
       connectors: {
@@ -932,7 +965,7 @@ export const catalogs = {
             "2": "QQ 只让机器人在你说话后的一小段时间里回复。过了时间的汇报先攒着，隔一会儿再试，你下次说一句就一起发过来。",
           },
         },
-        always: "执行会话能在这台电脑上跑命令，所以只认你；回复时引用某条汇报，你的话会进那件活的任务话题。VibeValley 只往外连，不开端口。",
+        always: "执行会话能在这台电脑上跑命令，所以只认你；回复时引用某条汇报，你的话会进那件活的工单话题。VibeValley 只往外连，不开端口。",
         state: {
           off: "没连接",
           waiting: "等你扫码",
@@ -1034,7 +1067,7 @@ export const catalogs = {
         correlationId: "关联 #{id}",
       },
       trajectory: {
-        kind: { issueSession: "任务", workspaceChat: "对话", orchestrator: "主助手" },
+        kind: { issueSession: "工单", workspaceChat: "对话", orchestrator: "主助手" },
         silentError: "静默错误",
         tokens: "Token 消耗",
         rawPayload: "原始载荷",
@@ -1057,7 +1090,7 @@ export const catalogs = {
         counts: "实体计数",
         caches: "缓存统计",
         entries: "{count} 项",
-        issues: "任务",
+        issues: "工单",
         sessions: "执行会话",
         channels: "频道",
         agents: "角色",
@@ -1081,73 +1114,9 @@ export const catalogs = {
       status: { loading: "加载中…", error: "加载开发者工具数据失败：{reason}", disabled: "服务端未启用开发者工具。", empty: "暂无数据。" },
     },
     "web.farm": {
-      panel: {
-        shop: "商店",
-        warehouse: "仓库",
-        graphs: "任务与成就",
-        log: "农场日志",
-        orchestrator: "助手和宠物",
-        harvest: "收获{name}的地",
-        sow: "播种 · 第 {plot} 块地",
-        water: "给{name}浇水",
-        menu: "菜单",
-        shopClosed: "商店还在装修，下一版开张。现在有 {coins} 金币，先攒着。",
-      },
-      menu: {
-        agents: "帮工名册",
-        runtimes: "农具",
-        skills: "技能书",
-        issues: "工单",
-        catalog: "图鉴",
-        chat: "田头（频道）",
-        connectors: "连接器",
-        repos: "仓库",
-      },
-      tool: {
-        hand: { hint: "点一块地看详情，点空地播种" },
-        water: { hint: "给帮工带句话，正在干活的会中途收到" },
-        bug: { hint: "活没做成（地里有虫）：让它接着修" },
-        weed: { hint: "没过验收的意见会长成杂草：帮工修完、下一次验收通过就拔掉" },
-        harvest: { hint: "熟了的地：收下成果，帮工收工" },
-        shovel: { hint: "正在干活的叫停；没在干活的请它收工" },
-      },
-      native: {
-        islandWorking: "{repo} · {count}/{limit} 在干活",
-        islandQueued: " · 排队 {count}",
-        islandGone: "{repo} · 不在仓库列表里",
-        ledger: "账本与时间",
-        achievements: "任务与成就",
-        log: "农场日志",
-        warehouse: "仓库里的工单",
-        shop: "小摊",
-        workbench: "工作台",
-        map: "群岛",
-        tree: "记忆树",
-        phone: "像素手机",
-        noMessages: "还没有消息",
-        empty: "这里还没有记录",
-        progress: "Lv.{level} · 经验 {xp}/{need}",
-        coins: "金币 {coins}",
-        workers: "在田帮工 {count} 名",
-        dawn: "清晨",
-        noon: "正午",
-        dusk: "黄昏",
-        night: "夜晚",
-        previous: "上一页",
-        next: "下一页 · {page}/{pages}",
-        score: "得分 {score}",
-        restart: "点击或按空格重开",
-        steer: "方向键 / WASD 控制",
-        pending: "正在发送…",
-        accepted: "已收到",
-        close: "关闭",
-        loading: "载入中…",
-        treeCounts: "叶 {leaves} · 果 {fruits} · 种 {seeds}",
-        treeGrowth: "{rounds} 轮 · 长到 {growth}%",
-        leaf: "叶片记忆",
-        fruit: "果实原则",
-        seed: "种子习惯",
-      },
+      panel: { harvest: "收获{name}的地", sow: "播种 · 第 {plot} 块地", water: "给{name}浇水" },
+      menu: { issues: "工单", repos: "仓库" },
+      native: { close: "关闭", loading: "载入中…" },
       chat: {
         channels: "频道",
         enlarge: "放大对话窗口",
@@ -1156,21 +1125,10 @@ export const catalogs = {
           "这里是田头，你、助手和帮工都在这儿说话。跟我说一句要做的活，比如「让测试小吴跑一遍测试」。\n\n帮工来了以后，写 @w1 这样的名字就是直接叫它；每张工单下面挂着它的工单串。",
         send: "发送",
       },
-      friends: { helpers: "帮工" },
-      hud: { toLevel: "{xp}/{need} commit", toLevelNext: "{xp}/{need} commit · Lv.{next} 开垦", tree: "记忆树", workbench: "工作台" },
-      overlay: {
-        clearAt: "Lv.{level} 开垦",
-        idle: "今天种点什么？",
-        click: "点击：{text}",
-        unclaimed: "没开垦的地",
-        flowerbed: "花坛",
-        bare: "第 {plot} 块地 · 空地",
-      },
-      quota: { left: "剩余额度", quota: "额度" },
-      sign: { noRepo: "没有仓库", repo: "仓库" },
+      hud: { workbench: "工作台" },
       sow: {
         homeless: "这座农场不是哪个仓库的",
-        toMap: "种地要先进一个仓库的农场：回地图挑一座岛。",
+        toMap: "种地要先进一个仓库的农场：去「仓库」里挑一个仓库。",
         noRepos: "工作台里还没有仓库：先在「仓库」页开一个。",
         makeRepo: "去开一个仓库",
         plantIn: "种在 {repo}",
@@ -1196,39 +1154,6 @@ export const catalogs = {
       },
       harvest: { repo: "仓库 {repo}", counts: "{commits} 个提交 · {files} 个文件", letGo: "请它收工", take: "确认收获，合进 {base}", resolve: "让它解决冲突" },
       plotOf: "{name}的地",
-      aim: {
-        flowerbed: "开垦好的花坛",
-        clearAt: "Lv.{level} 开垦这块地",
-        unread: "这块地的工单还没读到",
-        look: "看看这块地",
-        sow: "播种",
-        water: "给{name}浇水（带句话）",
-        nothingYet: "还没种东西，先用手播种",
-        bug: "杀虫：让它接着修",
-        noBugs: "这块地没有虫",
-        weeds: "帮工修完、验收通过草就拔了",
-        noWeeds: "没有杂草",
-        harvestRipe: "收获，帮工收工",
-        harvestLook: "收获：看看它改了什么",
-        nothingToHarvest: "空地没有东西可收",
-        shovelStop: "铲除：叫停",
-        shovelDismiss: "铲除：请它收工",
-        noShovel: "空地不用铲",
-        unavailable: "这张工单{state}，先打开地块看看",
-      },
-      crop: {
-        empty: "空地",
-        seeded: "刚播种",
-        sprout: "发芽",
-        leafy: "长叶",
-        flowering: "开花",
-        wheat: "成熟",
-        withered: "枯萎",
-        weeds: "长草",
-        dry: "干旱",
-        harvested: "收完了",
-        locked: "没开垦",
-      },
     },
     "web.farm.phone": {
       ringing: "来电…",
@@ -1246,8 +1171,6 @@ export const catalogs = {
       hangUp: "挂断",
       app: { missed: "未接", channels: "频道", games: "游戏" },
       game: { blocks: "方块", sokoban: "推箱子", dino: "小恐龙", bugs: "贪吃虫", merge: "种田 2048" },
-      phone: "手机",
-      new: "新",
       brand: "农场通",
       openChat: "展开田头",
       key: { up: "上", left: "左", right: "右", down: "下" },
@@ -1310,7 +1233,7 @@ export const catalogs = {
     },
     "web.inbox": { tray: { working: "{n} 个执行会话在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "频道 {n} 条没读" } },
     "web.issue": {
-      family: { children: "子任务", parent: "父任务" },
+      family: { children: "子工单", parent: "父工单" },
       reading: "在读……",
       never: "算了",
       later: "先放着",
@@ -1323,18 +1246,18 @@ export const catalogs = {
           todo: "想到要做的先写在这里，拖到「处理中」就派人开工；上下拖排先后。",
           working: "没有在干的活。",
           waiting: "做完的、没做成的在这里等你看；拖到「已关」完成或取消。",
-          closed: "已完成、已取消的任务；拖回「处理中」重开。",
+          closed: "已完成、已取消的工单；拖回「处理中」重开。",
         },
         emptyGuide: {
           todoTitle: "待办还是空的",
-          todoBody: "记下要做的任务，选好仓库和角色就能派发开工。",
-          workingTitle: "暂无处理中任务",
-          workingBody: "给待办任务选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
+          todoBody: "记下要做的工单，选好仓库和角色就能派发开工。",
+          workingTitle: "暂无处理中工单",
+          workingBody: "给待办工单选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
           waitingTitle: "暂无待验收改动",
           waitingBody: "执行会话跑完一轮或有疑问时会停在这里，方便看改动、回复或完成交付。",
-          closedTitle: "还没有已关任务",
-          closedBody: "已完成或取消的任务会留在这里，拖回「处理中」即可随时重开。",
-          filtered: "当前筛选条件下此列没有任务。",
+          closedTitle: "还没有已关工单",
+          closedBody: "已完成或取消的工单会留在这里，拖回「处理中」即可随时重开。",
+          filtered: "当前筛选条件下此列没有工单。",
         },
         whichLane: "看哪一列",
         spots: "{taken} / {of} 个并发上限",
@@ -1351,15 +1274,23 @@ export const catalogs = {
         order: "排序",
         reset: "恢复默认",
       },
-      list: { noRepo: "没有仓库", all: "全部任务", unfold: "展开 {group}", fold: "收起 {group}", writeIn: "在「{group}」写一张" },
+      list: {
+        noRepo: "没有仓库",
+        all: "全部工单",
+        unfold: "展开 {group}",
+        fold: "收起 {group}",
+        writeIn: "在「{group}」写一张",
+        empty: "暂无工单，按 C 或点右上角「新工单」写下第一条。",
+        emptyFiltered: "当前筛选条件下没有匹配的工单。",
+      },
       page: {
         pickFirst: "还差一点：选好派哪个执行会话、在哪个仓库里做，再点「开工」。",
         notDrafted: "先没起草：{why}",
-        historyUnread: "任务记录没读到：",
-        notFound: "找不到这个任务",
-        notFoundLine: "没有 {id} 这个任务：可能已经删掉了，或者链接写错了。",
-        find: "找任务：标题、执行会话、仓库",
-        findLabel: "找任务",
+        historyUnread: "工单记录没读到：",
+        notFound: "找不到这个工单",
+        notFoundLine: "没有 {id} 这个工单：可能已经删掉了，或者链接写错了。",
+        find: "找工单：标题、执行会话、仓库",
+        findLabel: "找工单",
         filter: "筛选",
         byRepo: "按仓库看",
         allRepos: "所有仓库",
@@ -1369,12 +1300,12 @@ export const catalogs = {
         clear: "清掉筛选",
         view: "看法",
         missing: "这一轮的记录缺失：{what}。对它的操作暂不可用。",
-        backToBoard: "任务",
+        backToBoard: "工单",
       },
       marks: { priority: "优先级：{word}" },
       sheet: { less: "收起", more: "更多", at: "在「{stage}」", stageDone: "{stage}做完了" },
       acts: {
-        reopened: "任务重开了",
+        reopened: "工单重开了",
         goesOn: "{helper} 接着做。",
         rejectWith: "打回，照上面修",
         carry: "带过去",
@@ -1386,12 +1317,12 @@ export const catalogs = {
       },
       close: {
         title: "关上「{issue}」",
-        working: "{who} 还在干这个任务。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
+        working: "{who} 还在干这个工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
         completable: "完成就是把 {who} 的分支合进仓库的主分支，先看一遍改动；取消就是让它收工，改动不合进去。",
-        notCompletable: "这个任务现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
+        notCompletable: "这个工单现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
         review: "看改动，完成",
         stopAndCancel: "叫停并取消",
-        cancel: "取消任务",
+        cancel: "取消工单",
       },
       changes: {
         checkOutput: "检查输出",
@@ -1402,13 +1333,13 @@ export const catalogs = {
         mergedCommit: "合入提交",
         reading: "正在看它改了什么…",
         unreadable: "看不了改动：",
-        none: "这个任务没有改动。完成就是请它收工。",
+        none: "这个工单没有改动。完成就是请它收工。",
         conflict: "合进 {base} 会冲突，先没法完成",
         resolveHow: "让它在自己的分支上把 {base} 合进来、解决冲突、跑一遍测试再提交；解决了再来完成。",
         behind: "它干活这段时间，{base} 上多了 {n} 个提交；完成时会合在一起（多一个合并提交）。",
         uncommitted: "还有 {n} 个文件没提交，完成时会先帮它提交：",
         resolve: "让它解决冲突",
-        moved: "任务状态变了，先回到任务看看要你做的事。",
+        moved: "工单状态变了，先回到工单看看要你做的事。",
         counts: "{commits} 个提交 · {files} 个文件",
         commits: "提交 {n}",
         files: "改了的文件 {n}",
@@ -1416,8 +1347,8 @@ export const catalogs = {
         binary: "二进制",
       },
       reopen: {
-        title: "重开这个任务",
-        line: "「{issue}」由同一份角色的新执行会话接着做，它会知道这个任务原来要做什么、上一次是怎么关的。",
+        title: "重开这个工单",
+        line: "「{issue}」由同一份角色的新执行会话接着做，它会知道这个工单原来要做什么、上一次是怎么关的。",
         what: "这次要它做什么（不填就是接着做完）",
         whatLabel: "这次要做什么",
         reopen: "重开",
@@ -1435,7 +1366,7 @@ export const catalogs = {
         tellIdle: "说一句，它接着做一轮",
         progress: "做到哪了",
         met: "{met} / {of} 条做到了",
-        noCriteria: "{answer, select, true {这个任务没写做完的标准：交回来时看结论判断。} other {这个任务没写做完的标准：交回来时看改动判断。}}",
+        noCriteria: "{answer, select, true {这个工单没写做完的标准：交回来时看结论判断。} other {这个工单没写做完的标准：交回来时看改动判断。}}",
         rejected: "上次打回的",
         made: "做出了什么",
         nothingToSee: "没有可看的改动。",
@@ -1501,7 +1432,7 @@ export const catalogs = {
         repo: "仓库",
         noRepo: "没有仓库",
         rename: "改标题",
-        trail: "任务在哪",
+        trail: "工单在哪",
       },
       task: { repo: "仓库", written: "写于" },
       todo: {
@@ -1513,7 +1444,7 @@ export const catalogs = {
         drafted: "草稿写好了",
         draftedLine: "看一遍、改一改，没问题就开工。",
         what: "想做什么？",
-        whatLine: "写一句就行：执行会话读过代码，替你写成任务。",
+        whatLine: "写一句就行：执行会话读过代码，替你写成工单。",
         titleHint: "比如：给登录页加上记住我",
         title: "标题",
         descriptionHint: "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
@@ -1556,7 +1487,7 @@ export const catalogs = {
         ordering: { manual: "默认", priority: "优先级", updated: "最近更新", created: "创建时间" },
         lane: { todo: "待办", working: "处理中", waiting: "等你看", closed: "已关" },
         stage: { talk: "聊清楚", work: "安排活", finish: "完成" },
-        newIssue: "新任务",
+        newIssue: "新工单",
       },
       trigger: {
         issue: "派出去",
@@ -1567,7 +1498,7 @@ export const catalogs = {
         refine: "起草",
         runtime: "引擎自己",
       },
-      run: { working: "正在干", heard: "中途听到 {n} 句", reconcile: "需要核对工作区", currentChanges: "查看任务当前改动" },
+      run: { working: "正在干", heard: "中途听到 {n} 句", reconcile: "需要核对工作区", currentChanges: "查看工单当前改动" },
       card: {
         orchestrator: "主助手",
         refining: "{name}在起草",
@@ -1611,7 +1542,7 @@ export const catalogs = {
         ran: "第 {n} 轮",
         used: "共用 {span}",
         noSteps: "还什么都没做。",
-        stepsGone: "轨迹只留 30 天（配置里的 session.trajectory_days），这个任务的已经清掉了。",
+        stepsGone: "轨迹只留 30 天（配置里的 session.trajectory_days），这个工单的已经清掉了。",
         change: { A: { mark: "新", label: "新增" }, M: { mark: "改", label: "修改" }, D: { mark: "删", label: "删除" } },
         and: "、",
         doing: "正在{action}",
@@ -1621,11 +1552,11 @@ export const catalogs = {
         changes: "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
         changesUncommitted: "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
         justNow: "刚刚",
-        reviewAfterFailedCheck: "核对修复后，再次完成任务以重跑检查",
+        reviewAfterFailedCheck: "核对修复后，再次完成工单以重跑检查",
       },
       new: {
-        title: "新任务",
-        card: "新任务",
+        title: "新工单",
+        card: "新工单",
         words: "要做什么",
         placeholder: "要做什么？一句话就行，执行会话会照它起草",
         keys: "⌘ 回车记下",
@@ -1647,56 +1578,6 @@ export const catalogs = {
         uploading: "正在上传 {name}…",
         remove: "移除附件 {name}",
       },
-      guide: {
-        title: "任务流转指南",
-        summary: "写下需求并指派角色，执行会话在独立 worktree 改代码，完成后经验收合入主分支。",
-        collapse: "收起指南",
-        expand: "展开指南",
-        stage: {
-          todo: "写下目标、挑好仓库和角色，按先后排好待办。",
-          working: "确认派发或拖入此列，执行会话自动开 worktree 干活。",
-          waiting: "跑完一轮后在此验收改动、回答问题，或打回继续修。",
-          closed: "验收通过后完成交付并合入主分支，需要时可随时重开。",
-        },
-      },
-      onboarding: {
-        title: "开始使用 VibeValley",
-        subtitle: "完成下面三步准备工作，就能让执行会话在独立 worktree 里帮你改代码。",
-        progress: "{done} / {total} 已就绪",
-        step1Title: "添加代码仓库",
-        step1Desc: "绑定本机 Git 仓库，执行会话会在独立工作区里改动代码。",
-        step1Action: "添加仓库",
-        step1Manage: "管理仓库",
-        step1Ready: "{n} 个仓库已就绪",
-        step2Title: "检查或配置引擎",
-        step2Desc: "确认本机已安装并启用编码引擎（如 Claude Code、Codex 等）。",
-        step2Action: "配置引擎",
-        step2Manage: "管理引擎",
-        step2Ready: "{n} 个引擎已就绪",
-        step3Title: "创建第一条任务，或在聊天中派活",
-        step3Desc: "写下需求直接派给执行会话，按 C 键快速新建，或从下方模板一键预填。",
-        step3Ready: "{n} 条任务",
-        newIssue: "新建任务",
-        openChat: "去聊天派活",
-        templatesTitle: "或选一个起步模板快速开始",
-        templates: {
-          bug: {
-            title: "修复缺陷",
-            desc: "定位报错或异常行为并补回归测试",
-            prompt: "修复：[简述问题现象]\n\n复现步骤：\n1. \n预期结果：\n验收标准：补充回归测试并通过检查",
-          },
-          feature: {
-            title: "新增功能",
-            desc: "明确范围、交互和验收标准后交给执行会话",
-            prompt: "实现：[简述功能目标]\n\n范围：\n- \n不涉及：\n- \n验收标准：补齐测试并验证关键路径",
-          },
-          refactor: {
-            title: "排查并重构",
-            desc: "清理重复逻辑、收敛边界并保持行为一致",
-            prompt: "重构：[目标模块或路径]\n\n目标：\n- 简化结构，消除重复逻辑\n- 保持对外行为和现有测试不变",
-          },
-        },
-      },
     },
     "web.library": {
       upload: "上传",
@@ -1705,7 +1586,7 @@ export const catalogs = {
       makeTitle: "生成",
       empty: "还没有媒体文件",
       emptyHow: "生成一张图或一段语音、上传或拖进来一个文件，或者在对话里让执行会话把找到的东西放进来。",
-      nothingShown: "没有符合筛选的内容。",
+      nothingShown: "没有符合筛选的作品。",
       drop: "松开，放进媒体库",
       kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
       sortLabel: "排序",
@@ -1752,12 +1633,15 @@ export const catalogs = {
       understood: "理解的结果",
       makeTabs: { image: "生图", speech: "单人语音", audio: "音频工作台" },
       content: {
-        title: "内容",
+        title: "作品",
         new: "新建",
-        searchAll: "搜索全部内容…",
-        sidebarToggle: "展开或收起内容导航",
+        searchAll: "搜索全部作品…",
+        sidebarToggle: "展开或收起作品导航",
         recent: "全部最近",
         pinned: "置顶收藏",
+        pinnedEmpty: "还没有置顶作品。悬停任意作品或素材并点击图钉即可置顶到这里。",
+        installedApps: "已安装应用",
+        installedAppsEmpty: "还没有安装独立应用。在任意作品卡片或详情右上角点击「安装为应用」，即可把它装成独立的 macOS 桌面应用并在此集中启动与管理。",
         pin: "置顶",
         unpin: "取消置顶",
         pinnedToast: "已置顶收藏",
@@ -1767,9 +1651,8 @@ export const catalogs = {
         media: "素材",
         sendArtifact: "发到频道",
         exportArtifact: "导出",
-        turnIntoIssue: "转为任务",
-        issueCreated: "已创建任务",
-        source: { all: "全部来源", agent: "执行会话交付", user: "我创建的" },
+        turnIntoIssue: "转为工单",
+        issueCreated: "已创建工单",
         artifactType: { all: "全部作品" },
         inspector: {
           openExternal: "系统打开",
@@ -1780,29 +1663,81 @@ export const catalogs = {
           stopAudio: "停止播放",
         },
         templates: {
-          title: "新建内容",
+          title: "新建作品",
           search: "搜索模板…",
+          searchCount: "找到 {n} 个模板",
           empty: "没有匹配的模板",
-          cat: { recommended: "推荐", note: "大纲笔记", whiteboard: "白板与图表", deliverable: "交付作品", ai: "AI 生成" },
+          cat: {
+            recommended: "推荐",
+            apps: "独立应用",
+            engineering: "研发工程",
+            note: "大纲笔记",
+            whiteboard: "白板与图表",
+            deliverable: "交付作品",
+            ai: "AI 生成",
+          },
           items: {
             noteBlank: { name: "空白大纲笔记", desc: "轻量单栏大纲，支持缩进、待办与双链" },
             noteTech: { name: "技术方案大纲", desc: "背景目标、核心设计与拆解清单" },
             noteMeeting: { name: "会议纪要", desc: "讨论焦点、关键结论与后续待办" },
             noteDaily: { name: "每日工作记录", desc: "今日主线、阻塞点与交接摘要" },
+            notePrReview: { name: "代码评审清单", desc: "正确性、边界条件、并发安全与回归测试核对" },
+            noteDebug: { name: "故障排查记录", desc: "复现路径、假设验证、日志线索与根因定位" },
+            noteRelease: { name: "发版核对清单", desc: "预检门禁、灰度放量、监控观察与回滚预案" },
+            noteOncall: { name: "值班交接单", desc: "活跃告警、待跟进事项、变更窗口与联系人" },
+            noteOnboarding: { name: "代码库导读", desc: "目录拓扑、关键入口、本地运行与常见坑点" },
+            noteSprintRetro: { name: "迭代复盘大纲", desc: "交付亮点、摩擦瓶颈、工程债与改进行动" },
             wbBlank: { name: "空白白板", desc: "自由无限画布，点阵网格与原生连线" },
             wbArch: { name: "系统架构图", desc: "分层节点与数据流箭头连线" },
             wbTimeline: { name: "产品发布时间线", desc: "里程碑节点与交付阶段节奏" },
             wbJourney: { name: "用户旅程图", desc: "关键触点、痛点观察与改进机会" },
             wbWorkshop: { name: "启动工作坊", desc: "目标拆解、发散便签与收口结论" },
+            wbEventStorming: { name: "事件风暴画布 (DDD)", desc: "领域命令、聚合、领域事件与读模型推演" },
+            wbC4: { name: "C4 容器架构画布", desc: "边界网关、应用服务、异步队列与存储拓扑" },
+            wbIncidentMap: { name: "故障根因推理图", desc: "症状现象、候选假设、验证结果与止血动作" },
+            wbTradeoff: { name: "技术选型对比板", desc: "候选方案、约束权重、风险评估与最终决策" },
             artDocs: { name: "协作文档", desc: "长文规范、评审报告或技术说明" },
+            docRfc: { name: "RFC 技术设计文档", desc: "问题背景、方案对比、接口契约与灰度回滚" },
+            docAdr: { name: "架构决策记录 (ADR)", desc: "决策上下文、候选权衡、最终结论与影响面" },
+            docPostmortem: { name: "故障复盘报告", desc: "影响面、时间线、五问根因分析与防再发项" },
+            docApiSpec: { name: "接口契约规范", desc: "端点路由、鉴权、请求响应结构与错误码定义" },
+            docRunbook: { name: "运维处置手册", desc: "告警阈值、排查命令、降级开关与回滚步骤" },
+            docSecurity: { name: "安全威胁建模", desc: "信任边界、STRIDE 威胁面、缓解措施与审计" },
+            docMigration: { name: "数据与结构迁移方案", desc: "双写兼容、分批回填、校验脚本与回滚演练" },
+            docPerf: { name: "性能压测与调优报告", desc: "压测基线、瓶颈剖析、优化前后对比与容量结论" },
             artSlides: { name: "演示幻灯片", desc: "宽屏多页演示文稿与分页备注" },
+            slidesArchReview: { name: "架构评审演示稿", desc: "目标约束、核心拓扑、关键权衡与风险缓释" },
+            slidesReleaseDemo: { name: "技术分享与发版宣讲", desc: "版本亮点、实现剖析、性能收益与后续规划" },
             artDashboard: { name: "数据看板", desc: "指标卡片、趋势核验与明细表" },
+            dashSlo: { name: "服务 SLO 与稳定性看板", desc: "可用性、P99 延迟、错误预算消耗与告警明细" },
+            dashDora: { name: "研发效能看板 (DORA)", desc: "部署频次、变更前置时间、故障率与恢复时长" },
             artDesign: { name: "界面画板", desc: "多画板界面探索与组件属性调节" },
             artDesignSystem: { name: "设计体系", desc: "色彩令牌、字阶规范与对比度核验" },
             artMotion: { name: "动态短片", desc: "可交互动效预览与视频导出" },
             artHtml: { name: "单页网页", desc: "独立可交互网页与版本迭代" },
+            protoApiPlayground: { name: "接口报文与 Schema 沙盒", desc: "离线 JSON 校验格式化、请求构造与 cURL 生成" },
+            protoComponentLab: { name: "交互组件状态实验台", desc: "多态预览（正常/加载/空/报错）、明暗主题与视口切换" },
+            protoFocusStudio: { name: "专注番茄钟与白噪音工坊", desc: "环形倒计时、WebAudio 雨声/暖噪合成与本地任务队列，适合装成桌面独立应用" },
+            protoSynthPad: { name: "便携合成器与 16 步鼓机", desc: "零外链 WebAudio 鼓机步进音序器、实时波形示波器与键盘演奏台" },
+            protoParticleLab: { name: "生成式流体粒子实验室", desc: "60fps Canvas 旋度场粒子物理模拟、鼠标引力扰动与多色板切换" },
+            protoTokenCalculator: { name: "AI Token 成本与缓存估算器", desc: "实时滑动估算 DAU、命中率、多档模型月度成本并导出预算摘要" },
+            protoCssGlassStudio: { name: "流体网格与毛玻璃参数工坊", desc: "动态渐变光球叠加模糊透明度实时调节，一键复制 CSS" },
+            protoDeskKanban: { name: "极简桌面看板与便签栏", desc: "三列桌面微型进度看板，带优先级标签、完成度统计与本地记忆" },
+            designWorkspaceUi: { name: "多端工作台界面画板", desc: "含桌面/移动端画板、实时属性控制杆与响应式卡片节点树" },
+            dsPapertrails: { name: "Papertrails 设计体系规范", desc: "完整明暗色彩令牌、字阶圆角尺度与实时组件变体规范" },
+            motionLaunchReel: { name: "产品发布动效短片", desc: "3 章节纯时间确定性多图层动画序列，支持时间轴播放预览" },
+            storyboardProductFilm: { name: "产品宣讲分镜脚本文案", desc: "含景别构图、运镜节奏、对白旁白与动态预演的多镜头分镜板" },
             artSheet: { name: "电子表格", desc: "多工作表结构化表格与 CSV 导出" },
+            sheetBenchmark: { name: "性能基准测试表", desc: "QPS、P50/P95/P99 延迟、内存占用与对比结论" },
+            sheetTechMatrix: { name: "技术方案评估矩阵", desc: "分维度加权打分、改造成本与运维复杂度对比" },
+            sheetTestMatrix: { name: "测试与回归矩阵", desc: "核心用例、环境覆盖、预期结果与最近通过状态" },
+            sheetApiInventory: { name: "接口与依赖台账", desc: "端点清单、鉴权方式、限流策略与负责人记录" },
             artDiagram: { name: "结构图表", desc: "节点、连线与架构流程表达" },
+            diagMicroservices: { name: "微服务拓扑图", desc: "边缘网关、业务服务、事件总线与存储依赖" },
+            diagSequence: { name: "调用时序图", desc: "客户端、认证、核心服务与持久化请求链路" },
+            diagErd: { name: "数据实体关系图 (ER)", desc: "核心实体表、外键关联与索引归属关系" },
+            diagCicd: { name: "CI/CD 交付流水线", desc: "静态检查、单测集成、制品构建与灰度发布" },
+            diagStateMachine: { name: "状态机流转图", desc: "生命周期状态节点、合法跃迁条件与终态收敛" },
             artStoryboard: { name: "分镜脚本", desc: "镜头清单、景别、色调与对白脚本" },
             aiImage: { name: "AI 生成图片", desc: "根据描述生成概念插画、图标或配图" },
             aiSpeech: { name: "AI 单人语音", desc: "将文案合成为自然人声音频文件" },
@@ -1812,6 +1747,18 @@ export const catalogs = {
             noteTech: "## 背景与目标\n- 说明要解决的核心问题与收益边界\n## 核心设计\n- 梳理模块边界与数据流\n## 实施拆解\n- [ ] 拆分任务步骤并补全验收测试",
             noteMeeting: "## 讨论焦点\n- 记录本次沟通的核心议题\n## 关键结论\n- 写下已达成一致的决定\n## 后续待办\n- [ ] 跟进确认后的行动项",
             noteDaily: "## 今日主线\n- [ ] 列出今天优先推进的事项\n## 阻塞与风险\n- 记录需要协作解开的卡点\n## 交接摘要\n- 今日完成的结果与后续衔接点",
+            notePrReview:
+              "## 变更范围与意图\n- 确认改动是否聚焦单一职责、无无关夹带\n## 正确性与边界\n- [ ] 空值、并发竞态与错误传播是否显式处理\n- [ ] 外部输入是否在边界完成解码与校验\n## 质量与测试\n- [ ] 新增行为与回归边界是否均有自动化测试覆盖\n- [ ] 无重复逻辑、临时兜底或静默吞错",
+            noteDebug:
+              "## 问题现象\n- 报错信息、复现环境与影响范围\n## 假设与排查记录\n- [ ] 核对最近提交与配置变更\n- [ ] 采集链路观测日志与关键指标快照\n- [ ] 在最小复现用例中锁定触发条件\n## 根因与修复\n- 写明根本原因、修复方案与补充回归测试",
+            noteRelease:
+              "## 发布前门禁\n- [ ] 全部 CI 检查、构建与契约校验绿灯通过\n- [ ] 数据库结构迁移脚本与向后兼容已验证\n## 灰度与监控\n- [ ] 先发布 5% 灰度并观察错误率与 P99 延迟 15 分钟\n- [ ] 确认核心业务指标与告警面板无异常\n## 回滚预案\n- 记录一键回滚命令、开关名称与值班负责人",
+            noteOncall:
+              "## 值班周期与交接人\n- 交接时段、主备值班人及升级联系人\n## 活跃告警与处理中事项\n- [ ] 列出尚未关闭的告警与当前处置进展\n## 本周期重点观察\n- 近期上线变更、定时任务窗口与容量水位\n## 常用工具入口\n- 监控面板、链路观测平台与快速止血开关",
+            noteOnboarding:
+              "## 仓库定位与目录结构\n- 核心入口目录、共享契约包与构建产物位置\n## 本地开发与校验命令\n- [ ] 安装依赖并启动本地服务与热更新\n- [ ] 跑通单测、静态检查与格式化命令\n## 核心请求主线\n- 从边界入口、领域层到持久化存储的完整路径\n## 常见注意事项\n- 环境变量、本地状态目录与高频踩坑提示",
+            noteSprintRetro:
+              "## 本轮交付亮点\n- 顺利上线的核心特性与超预期成果\n## 过程中的摩擦点\n- 返工原因、等待阻塞、工具链或需求不清之处\n## 工程债与质量盘点\n- 本轮新增或暴露出的技术债清单\n## 下轮改进行动\n- [ ] 明确责任人、落地方式与验收时间点",
             wbBlankTitle: "中心主题",
             wbBlankBody: "从工具栏添加卡片、便签与连线",
             wbArchN1Title: "接入层 · UI",
@@ -1829,11 +1776,11 @@ export const catalogs = {
             wbTlP3Title: "阶段三 · 验收发布",
             wbTlP3Body: "双主题截图核验与发布上线",
             wbJourneyJ1Title: "1. 触发入口",
-            wbJourneyJ1Body: "进入统一内容工作台",
+            wbJourneyJ1Body: "进入统一作品工作台",
             wbJourneyJ2Title: "2. 定位筛选",
             wbJourneyJ2Body: "一次定位笔记、作品与素材",
             wbJourneyJ3Title: "3. 协作交付",
-            wbJourneyJ3Body: "发到频道或转为任务推进",
+            wbJourneyJ3Body: "发到频道或转为工单推进",
             wbJourneyS1Title: "痛点观察",
             wbJourneyS1Body: "减少列表与编辑页之间的来回切换",
             wbJourneyE1: "定位",
@@ -1846,9 +1793,352 @@ export const catalogs = {
             wbWorkW3Body: "收敛第一阶段优先落地的改动",
             wbWorkE1: "发散",
             wbWorkE2: "收敛",
+            wbEsCmdTitle: "Command · 提交变更",
+            wbEsCmdBody: "校验输入权限与幂等键",
+            wbEsAggTitle: "Aggregate · 领域聚合",
+            wbEsAggBody: "维护状态不变量与业务规则",
+            wbEsEvtTitle: "Event · 变更已持久化",
+            wbEsEvtBody: "同事务写入 Outbox 事件表",
+            wbEsReadTitle: "Read Model · 切片投影",
+            wbEsReadBody: "增量更新视图并广播客户端",
+            wbEsE1: "校验并执行",
+            wbEsE2: "发布事件",
+            wbEsE3: "异步投影",
+            wbC4EdgeTitle: "API 网关 · HTTP/WS",
+            wbC4EdgeBody: "鉴权、限流与契约边界解码",
+            wbC4AppTitle: "核心服务 · Rust",
+            wbC4AppBody: "核心状态机、事务与协同内核",
+            wbC4QueueTitle: "Async Queue · 异步队列",
+            wbC4QueueBody: "执行耗时媒体与外部投递任务",
+            wbC4DbTitle: "主库 · SQLite / PostgreSQL",
+            wbC4DbBody: "单一持久化真源与版本快照",
+            wbC4E1: "RPC 调用",
+            wbC4E2: "入队",
+            wbC4E3: "事务落库",
+            wbIncSymTitle: "现象 · P99 延迟突增",
+            wbIncSymBody: "核心接口超时率升至 3.2%",
+            wbIncHyp1Title: "假设 A · 慢查询锁表",
+            wbIncHyp1Body: "检查连接池等待与索引失效",
+            wbIncHyp2Title: "假设 B · 上游限流重试",
+            wbIncHyp2Body: "核对重试放大与超时配置",
+            wbIncFixTitle: "止血 · 降级与限流",
+            wbIncFixBody: "开启熔断保护并回滚可疑发布",
+            wbIncE1: "排查",
+            wbIncE2: "验证",
+            wbIncE3: "处置",
+            wbToReqTitle: "约束 · 一致性与延迟",
+            wbToReqBody: "跨节点协作需强收敛且低开销",
+            wbToOptATitle: "方案 A · CRDT 本地优先",
+            wbToOptABody: "离线可用，冲突自动无锁合并",
+            wbToOptBTitle: "方案 B · OT 中心协调",
+            wbToOptBBody: "服务端定序，实现复杂度集中在锁",
+            wbToDecTitle: "结论 · 采纳方案 A",
+            wbToDecBody: "复用已有协同内核并控住复杂度",
+            wbToE1: "评估",
+            wbToE2: "对比",
+            wbToE3: "定案",
+            docRfcBody:
+              "# {title}\n\n- **状态**：Draft / Review / Accepted\n- **负责人**：\n- **关联工单**：\n\n## 1. 背景与动机\n\n描述当前系统痛点、触发契机与本次要解决的核心问题。\n\n## 2. 目标与非目标\n\n### 目标\n- 明确可量化的工程收益与功能边界。\n\n### 非目标\n- 显式列出本次故意不做的部分，防止范围蔓延。\n\n## 3. 备选方案对比\n\n| 维度 | 方案 A（推荐） | 方案 B |\n|---|---|---|\n| 复杂度 | 低，复用现有模块 | 高，需新增独立状态 |\n| 性能与可靠性 | 满足 SLA | 存在额外网络跳数 |\n| 回滚成本 | 可通过开关秒级回退 | 涉及不可逆数据结构改动 |\n\n## 4. 详细设计\n\n### 4.1 模块边界与接口契约\n```ts\n// 在此贴入核心类型、接口签名或状态机定义\n```\n\n### 4.2 数据模型与存储变更\n- 说明新增/变更的表结构、索引与迁移策略。\n\n### 4.3 失败模式与并发安全\n- 梳理超时、重试幂等、部分失败与降级路径。\n\n## 5. 测试、灰度与回滚计划\n- [ ] 单元测试与集成测试\n- [ ] 指标监控与告警阈值\n- [ ] 灰度放量节奏与一键回滚步骤\n",
+            docAdrBody:
+              "# {title}\n\n- **状态**：Proposed / Accepted / Superseded\n- **日期**：\n- **决策人**：\n\n## 1. 上下文与问题陈述\n\n描述促使我们做出架构决策的技术背景、约束条件与业务诉求。\n\n## 2. 决策驱动因素\n- 性能与延迟预算\n- 开发维护成本与团队熟悉度\n- 长期演进与可替换性\n\n## 3. 候选方案\n1. **方案一**：\n2. **方案二**：\n3. **维持现状**：\n\n## 4. 决策结果\n\n**选定方案**：写明最终拍板的方案与核心理由。\n\n### 正面影响\n- 带来的收益与简化。\n\n### 负面影响与风险缓释\n- 需要承担的代价及对应的防护措施。\n\n## 5. 校验与后续复核\n- 说明如何在代码审查、静态门禁或压测中长期守住该决策。\n",
+            docPostmortemBody:
+              "# {title}\n\n- **严重级别**：SEV-1 / SEV-2 / SEV-3\n- **持续时长**：\n- **影响面**：受影响接口、功能或用户比例\n\n## 1. 事件摘要\n\n用两三句话客观概括故障表现、触发原因与最终恢复手段（对事不对人）。\n\n## 2. 关键时间线（UTC+8）\n| 时间 | 事件 / 动作 |\n|---|---|\n| 00:00 | 变更发布 / 触发条件出现 |\n| 00:05 | 告警触发并开始排查 |\n| 00:12 | 定位直接原因并执行止血/回滚 |\n| 00:18 | 指标恢复正常，事件降级关闭 |\n\n## 3. 根因分析（5 Whys）\n1. 为什么发生表层异常？\n2. 为什么防线未能拦截？\n3. 为什么监控没有更早预警？\n4. 根本系统性诱因是什么？\n\n## 4. 做得好的地方与待改进项\n- **有效止血**：\n- **暴露短板**：\n\n## 5. 整改行动项（Action Items）\n| 类型 | 行动项 | 负责人 | 截止日期 | 状态 |\n|---|---|---|---|---|\n| 预防 | 补充回归测试与静态检查 | | | 待办 |\n| 探测 | 完善告警阈值与观测面板 | | | 待办 |\n",
+            docApiSpecBody:
+              '# {title}\n\n- **协议版本**：v1\n- **鉴权方式**：Bearer Token / HMAC\n- **幂等键**：`Idempotency-Key`\n\n## 1. 端点总览\n\n| 方法 | 路径 | 说明 | 限流 |\n|---|---|---|---|\n| GET | `/api/v1/resources` | 分页查询列表 | 120 req/min |\n| POST | `/api/v1/resources` | 创建资源 | 30 req/min |\n| PUT | `/api/v1/resources/:id` | 全量更新资源 | 60 req/min |\n\n## 2. 请求与响应契约\n\n### 请求载荷\n```json\n{\n  "id": "res_01",\n  "name": "example",\n  "options": {}\n}\n```\n\n### 成功响应（`200 OK`）\n```json\n{\n  "bizCode": 0,\n  "message": "ok",\n  "data": {}\n}\n```\n\n## 3. 业务错误码\n\n| HTTP 状态 | `bizCode` | 含义 | 客户端处理建议 |\n|---|---|---|---|\n| 400 | 400001 | 参数校验失败 | 高亮字段提示用户 |\n| 409 | 409001 | 版本冲突 / 乐观锁失败 | 拉取最新快照后重试 |\n\n## 4. 兼容性与变更记录\n- 遵循向后兼容扩展原则，禁止无版本变更破坏已有字段。\n',
+            docRunbookBody:
+              "# {title}\n\n- **服务名称**：\n- **所属团队 / 值班频道**：\n- **监控面板链接**：\n\n## 1. 服务依赖与架构简图\n- 列出上下游强依赖、弱依赖及降级后预期行为。\n\n## 2. 常见告警与排查步骤\n\n### 告警 A：错误率 > 1% 或 P99 延迟超阈值\n1. 检查最近 30 分钟发布与配置变更记录。\n2. 执行诊断命令确认进程存活、连接池与磁盘水位：\n```bash\ncurl -fsS http://127.0.0.1:8787/healthz\n```\n3. 查看错误聚合日志，确认是上游超时、数据库锁等待还是参数异常。\n\n## 3. 紧急止血开关与降级操作\n- **限流 / 降级开关**：写明配置键、生效方式与副作用。\n- **流量切换**：说明多实例或备份节点切换步骤。\n\n## 4. 回滚流程\n```bash\n# 确认上一稳定版本标识并执行回滚\n```\n\n## 5. 升级路径\n- 若 15 分钟内未能定位或止血，立即升级至对应模块负责人。\n",
+            docSecurityBody:
+              "# {title}\n\n- **评审范围**：\n- **数据密级**：公开 / 内部 / 敏感凭据\n\n## 1. 资产与信任边界\n- 列出核心敏感资产（密钥、令牌、用户代码库、数据库）。\n- 标注不可信输入入口（外部 HTTP、第三方回调、本地用户输入、模型工具调用）。\n\n## 2. STRIDE 威胁分析\n\n| 威胁类别 | 攻击面与场景 | 现有防线 | 剩余风险与待补措施 |\n|---|---|---|---|\n| 身份伪造 (Spoofing) | 伪造请求来源或越权令牌 | 边界鉴权校验 | 补充签名过期校验 |\n| 数据篡改 (Tampering) | 路径穿越或载荷注入 | 规范化路径校验与参数化查询 | 增加静态检查拦截 |\n| 信息泄露 (Info Disclosure) | 日志或报错打印密钥 | `Secret` 脱敏包装 | 审查日志输出链路 |\n| 拒绝服务 (DoS) | 超大附件或恶意高频请求 | 请求体上限与限流 | 补充超时与并发上限 |\n| 权限提升 (Elevation) | 未授权访问管理端点 | 基于角色的能力校验 | 添加回归权限单测 |\n\n## 3. 安全上线核对\n- [ ] 密钥不进仓库与日志\n- [ ] 高危输入全部在入口完成白名单/结构解码\n",
+            docMigrationBody:
+              "# {title}\n\n- **涉及存储**：SQLite / PostgreSQL / 对象目录\n- **是否可在线无停机执行**：是 / 否\n\n## 1. 变更前后对比\n- 列出新增表、字段变更、约束调整或文件目录结构变动。\n\n## 2. 分阶段迁移步骤（Expand & Contract）\n1. **阶段 1（兼容扩展）**：新增结构并保持旧读路径可用，启用双写。\n2. **阶段 2（离线/分批回填）**：按主键游标分批回填历史数据并限速，避免锁表。\n3. **阶段 3（校验切换）**：运行一致性比对脚本确认 0 误差后切换读路径。\n4. **阶段 4（安全清理）**：观察一个稳定周期后再移除旧字段或兜底逻辑。\n\n## 3. 一致性校验脚本\n```sql\n-- 在此写明核对行数、校验和与抽样比对查询\n```\n\n## 4. 回滚与恢复预案\n- 写明每一步如果失败如何止损、是否需要从快照恢复及预计恢复时间（RTO）。\n",
+            docPerfBody:
+              "# {title}\n\n- **测试环境**：硬件规格、数据集规模、并发模型\n- **压测工具**：\n\n## 1. 性能目标与基线\n\n| 指标 | 优化前基线 | 目标阈值 | 优化后实测 | 提升幅度 |\n|---|---|---|---|---|\n| QPS / 吞吐 | | | | |\n| P50 延迟 | | | | |\n| P99 延迟 | | | | |\n| 峰值内存 / CPU | | | | |\n\n## 2. 瓶颈定位与火焰图剖析\n- 记录锁竞争、频繁分配、序列化开销或 N+1 查询等关键瓶颈。\n\n## 3. 实施的优化措施\n1. **优化项一**：说明改动原理与局部权衡。\n2. **优化项二**：说明缓存策略或批处理改造。\n\n## 4. 容量评估与结论\n- 给出单机推荐并发上限、安全水位线与后续监控建议。\n",
+            diagMsNodeGateway: "边缘网关 (Gateway)",
+            diagMsNodeAuth: "鉴权服务 (Auth)",
+            diagMsNodeCore: "核心业务 (Core)",
+            diagMsNodeQueue: "异步队列 (Queue)",
+            diagMsNodeMedia: "媒体计算 (Media)",
+            diagMsNodeDb: "主数据库 (Primary DB)",
+            diagMsEdgeAuth: "令牌校验",
+            diagMsEdgeRpc: "内部 RPC",
+            diagMsEdgeEmit: "投递任务",
+            diagMsEdgeRead: "事务读写",
+            diagMsEdgeStore: "状态落库",
+            diagSeqClient: "客户端 App",
+            diagSeqApi: "API 入口层",
+            diagSeqGuard: "权限与校验",
+            diagSeqDomain: "领域服务",
+            diagSeqOutbox: "数据库 + Outbox",
+            diagSeqBus: "实时事件流",
+            diagSeqE1: "1. 请求",
+            diagSeqE2: "2. 校验",
+            diagSeqE3: "3. 执行",
+            diagSeqE4: "4. 同事务落库",
+            diagSeqE5: "5. 推送切片",
+            diagErdUser: "用户 / 角色 (agent)",
+            diagErdRepo: "代码仓库 (repo)",
+            diagErdIssue: "工单 (issue)",
+            diagErdSession: "执行会话 (session)",
+            diagErdArtifact: "协作作品",
+            diagErdVersion: "版本快照 (version)",
+            diagErdE1: "绑定仓库",
+            diagErdE2: "派发会话",
+            diagErdE3: "归属角色",
+            diagErdE4: "生成作品",
+            diagErdE5: "1:N 快照",
+            diagCiLint: "静态检查与格式",
+            diagCiUnit: "单测与契约校验",
+            diagCiBuild: "产物构建打包",
+            diagCiCanary: "灰度环境发布",
+            diagCiSmoke: "冒烟与观测检查",
+            diagCiProd: "全量上线",
+            diagCiE1: "通过",
+            diagCiE2: "归档",
+            diagCiE3: "部署",
+            diagCiE4: "绿灯",
+            diagCiE5: "放量",
+            diagSmDraft: "草稿 (Draft)",
+            diagSmQueued: "待执行 (Queued)",
+            diagSmRunning: "运行中 (Running)",
+            diagSmReview: "待验收 (In Review)",
+            diagSmDone: "已完成 (Done)",
+            diagSmCanceled: "已取消 (Canceled)",
+            diagSmE1: "派发",
+            diagSmE2: "开始运行",
+            diagSmE3: "提交改动",
+            diagSmE4: "打回修改",
+            diagSmE5: "验收通过",
+            diagSmE6: "关闭取消",
+            sheetBenchTab1: "基准对比",
+            sheetBenchTab2: "环境参数",
+            sheetBenchColCase: "测试场景",
+            sheetBenchColBaseline: "基线 QPS",
+            sheetBenchColCurrent: "优化后 QPS",
+            sheetBenchColP99: "P99 延迟 (ms)",
+            sheetBenchColMem: "内存 (MB)",
+            sheetBenchColStatus: "结论",
+            sheetBenchR1Case: "列表分页查询 (1000 条)",
+            sheetBenchR1Status: "达成 (+68%)",
+            sheetBenchR2Case: "并发写入事务 (64 并发)",
+            sheetBenchR2Status: "达成 (+52%)",
+            sheetBenchR3Case: "大文档增量同步 (10k 节点)",
+            sheetBenchR3Status: "达成 (-41% 延迟)",
+            sheetBenchR4Case: "冷启动全量投影",
+            sheetBenchR4Status: "观察中",
+            sheetBenchEnvKey: "参数项",
+            sheetBenchEnvVal: "配置值",
+            sheetBenchEnvR1: "并发连接数",
+            sheetBenchEnvR2: "数据集规模",
+            sheetBenchEnvR3: "预热轮次",
+            sheetTechTab: "评分矩阵",
+            sheetTechColDim: "评估维度",
+            sheetTechColWeight: "权重",
+            sheetTechColOptA: "方案 A（原生集成）",
+            sheetTechColOptB: "方案 B（外置服务）",
+            sheetTechColNote: "评分依据",
+            sheetTechR1Dim: "端到端延迟",
+            sheetTechR1Note: "零进程间序列化往返",
+            sheetTechR2Dim: "部署与运维成本",
+            sheetTechR2Note: "单二进制交付，零额外守护进程",
+            sheetTechR3Dim: "故障隔离能力",
+            sheetTechR3Note: "外置进程崩溃不影响主宿主",
+            sheetTechR4Dim: "开发交付周期",
+            sheetTechR4Note: "复用现有契约与存储底座",
+            sheetTechR5Dim: "长期扩展弹性",
+            sheetTechR5Note: "支持后期按网关端口拆分",
+            sheetTestTab: "回归用例",
+            sheetTestColId: "编号",
+            sheetTestColArea: "模块",
+            sheetTestColCase: "用例描述",
+            sheetTestColEnv: "测试层",
+            sheetTestColOwner: "负责人",
+            sheetTestColResult: "状态",
+            sheetTestR1Area: "鉴权边界",
+            sheetTestR1Case: "非法令牌拒绝并返回 401",
+            sheetTestR1Env: "集成测试",
+            sheetTestR1Owner: "服务端",
+            sheetTestR1Res: "通过",
+            sheetTestR2Area: "状态机",
+            sheetTestR2Case: "并发冲突写入触发乐观锁保护",
+            sheetTestR2Env: "单元测试",
+            sheetTestR2Owner: "核心域",
+            sheetTestR2Res: "通过",
+            sheetTestR3Area: "桌面端界面",
+            sheetTestR3Case: "明暗主题切换与快捷键响应正常",
+            sheetTestR3Env: "端到端UI",
+            sheetTestR3Owner: "前端",
+            sheetTestR3Res: "通过",
+            sheetTestR4Area: "数据库迁移",
+            sheetTestR4Case: "旧库平滑对齐并校验无漂移",
+            sheetTestR4Env: "冒烟测试",
+            sheetTestR4Owner: "存储层",
+            sheetTestR4Res: "待复核",
+            sheetApiTab: "接口台账",
+            sheetApiColMethod: "方法",
+            sheetApiColPath: "路径",
+            sheetApiColAuth: "鉴权",
+            sheetApiColRate: "限流",
+            sheetApiColOwner: "归属模块",
+            sheetApiColStability: "稳定性",
+            sheetApiR1Auth: "回环 / Bearer",
+            sheetApiR1Rate: "无限制 (本地)",
+            sheetApiR1Owner: "工单域",
+            sheetApiR1Stab: "稳定 v1",
+            sheetApiR2Auth: "令牌鉴权 (Bearer)",
+            sheetApiR2Rate: "60 次/分钟",
+            sheetApiR2Owner: "作品域",
+            sheetApiR2Stab: "稳定 v1",
+            sheetApiR3Auth: "Bearer + 角色",
+            sheetApiR3Rate: "30 次/分钟",
+            sheetApiR3Owner: "会话域",
+            sheetApiR3Stab: "灰度中",
+            sheetApiR4Auth: "配对签名",
+            sheetApiR4Rate: "10 次/分钟",
+            sheetApiR4Owner: "远程门",
+            sheetApiR4Stab: "稳定 v1",
+            dashSloP1: "核心可用性 (%)",
+            dashSloP2: "P99 延迟 (ms)",
+            dashSloP3: "错误预算剩余 (%)",
+            dashSloP4: "近 7 天告警次数",
+            dashSloServiceCol: "服务名",
+            dashSloAvailCol: "可用率",
+            dashSloP99Col: "P99 延迟",
+            dashSloBudgetCol: "预算剩余",
+            dashSloAlertsCol: "告警",
+            dashSloR1: "接入网关 (Gateway)",
+            dashSloR2: "核心状态引擎 (Core)",
+            dashSloR3: "协同与存储 (Storage)",
+            dashSloR4: "实时订阅流 (SSE)",
+            dashDoraP1: "周部署次数",
+            dashDoraP2: "变更前置时间 (h)",
+            dashDoraP3: "变更失败率 (%)",
+            dashDoraP4: "平均恢复时长 (min)",
+            dashDoraWeekCol: "周期",
+            dashDoraDeployCol: "部署数",
+            dashDoraLeadCol: "前置时间(h)",
+            dashDoraCfrCol: "失败率(%)",
+            dashDoraMttrCol: "恢复耗时 (分)",
+            slidesArchS1Sub: "背景目标、系统边界与核心权衡",
+            slidesArchS1Notes: "开场 2 分钟先对齐本次评审要解决的核心约束与非目标。",
+            slidesArchS2Title: "背景与核心约束",
+            slidesArchS2Sub: "为什么现有方案不足以支撑下一步演进",
+            slidesArchS2B1: "延迟与一致性指标要求",
+            slidesArchS2B2: "存量数据兼容性与迁移窗口",
+            slidesArchS2B3: "单机与远程多端同步边界",
+            slidesArchS2Notes: "明确哪些指标是硬约束，哪些可以分阶段演进。",
+            slidesArchS3Title: "目标架构与模块分层",
+            slidesArchS3Sub: "单向依赖有向无环图与进门一次解码",
+            slidesArchS3B1: "边界层只做解码与鉴权转发",
+            slidesArchS3B2: "核心领域规则保持纯函数可测",
+            slidesArchS3B3: "持久化统一收口于单一服务层",
+            slidesArchS3Notes: "结合结构图讲解请求主线与异常恢复路径。",
+            slidesArchS4Title: "关键技术权衡",
+            slidesArchS4Sub: "方案对比与风险控制",
+            slidesArchS4B1: "已选方案的长期收益与代价",
+            slidesArchS4B2: "降级开关与灰度回滚策略",
+            slidesArchS4B3: "性能压测与容量水位验证",
+            slidesArchS4Notes: "重点回应评审人最关心的回滚与并发安全性问题。",
+            slidesArchS5Title: "交付里程碑与行动项",
+            slidesArchS5Sub: "分阶段落地排期与验收标准",
+            slidesArchS5B1: "阶段一：核心骨架与契约落定",
+            slidesArchS5B2: "阶段二：集成联调与压测验收",
+            slidesArchS5B3: "阶段三：灰度放量与全量上线",
+            slidesArchS5Notes: "确认评审结论、阻塞依赖与各阶段责任人。",
+            slidesRelS1Sub: "新能力总览、核心收益与现场演示",
+            slidesRelS1Notes: "控制在 15 分钟内，重点讲清楚解决了什么痛点。",
+            slidesRelS2Title: "为什么做这次升级",
+            slidesRelS2Sub: "从用户与研发高频痛点出发",
+            slidesRelS2B1: "上线前人工核对耗时且易漏项",
+            slidesRelS2B2: "跨模块排查链路长、缺乏统一视图",
+            slidesRelS2B3: "关键指标与回归基线缺少自动化门禁",
+            slidesRelS2Notes: "用 1-2 个真实故障或卡点案例开场最有共鸣。",
+            slidesRelS3Title: "核心功能与架构亮点",
+            slidesRelS3Sub: "做对了哪些关键设计",
+            slidesRelS3B1: "声明式模板与结构化目录落盘",
+            slidesRelS3B2: "零额外网络往返的本地沙盒预览",
+            slidesRelS3B3: "双端词典与自动化契约测试守门",
+            slidesRelS3Notes: "展示核心流程图或现场操作录屏。",
+            slidesRelS4Title: "线上效果与性能数据",
+            slidesRelS4Sub: "实测收益对比",
+            slidesRelS4B1: "核心操作响应耗时降低 45%",
+            slidesRelS4B2: "自动化回归覆盖率提升至 95%+",
+            slidesRelS4B3: "零破坏性变更平滑升级",
+            slidesRelS4Notes: "用真实对比数据收口价值。",
+            slidesRelS5Title: "下一步计划与 Q&A",
+            slidesRelS5Sub: "后续演进路线与反馈收集",
+            slidesRelS5B1: "补齐更多团队自定义模板能力",
+            slidesRelS5B2: "打通工单流转一键沉淀到作品库",
+            slidesRelS5B3: "欢迎在团队频道留下使用反馈",
+            slidesRelS5Notes: "预留 5 分钟问答并记录反馈问题。",
+            protoApiTitle: "接口报文与 Schema 沙盒",
+            protoApiSub: "离线格式化 JSON、检查字段类型并一键生成 cURL 请求",
+            protoApiBtnPretty: "格式化 JSON",
+            protoApiBtnMinify: "压缩",
+            protoApiBtnCopy: "生成 cURL",
+            protoApiPayloadLabel: "请求 JSON 载荷",
+            protoApiCurlLabel: "生成命令",
+            protoApiValid: "JSON 语法合法",
+            protoApiInvalid: "JSON 解析错误：",
+            protoCompTitle: "交互组件状态实验台",
+            protoCompSub: "快速核验组件在正常、加载、空态、报错及不同视口与明暗主题下的表现",
+            protoCompStateLabel: "组件状态",
+            protoCompThemeLabel: "外观主题",
+            protoCompWidthLabel: "预览宽度",
+            protoCompStateDefault: "正常",
+            protoCompStateLoading: "加载中",
+            protoCompStateEmpty: "空数据",
+            protoCompStateError: "报错态",
+            protoCompThemeLight: "浅色",
+            protoCompThemeDark: "深色",
+            protoCompCardTitle: "服务部署状态卡",
+            protoCompCardBody: "当前版本 v2.4.0 已在 3 个可用区健康运行，P99 延迟 18ms。",
+            protoCompLoadingText: "正在拉取最新健康状态与指标…",
+            protoCompEmptyText: "暂无符合条件的运行实例，可调整筛选条件或新建部署。",
+            protoCompErrorText: "连接超时 (504)：上游状态聚合接口未在 3000ms 内响应，请重试。",
+            designDesktopName: "桌面端工作台",
+            designMobileName: "移动端伴侣",
+            designPropDensity: "视图密度",
+            designPropBanner: "展示公告横幅",
+            designPropCta: "主按钮文案",
+            designPropCtaDefault: "安装为桌面应用",
+            designHeroSub: "全原生双端实时协同，一处修改多画板同步响应。",
+            designMetricsTitle: "核心指标契约",
+            designActionTitle: "桌面打包配置",
+            dsButtonTitle: "按钮 Button",
+            dsButtonSummary: "用于触发明确动作；同一操作栏仅保留 1 个 primary 主操作。",
+            dsButtonDo: "动词开头写明结果，例如「保存并发布」",
+            dsButtonDont: "避免在同一操作栏并列两个主按钮",
+            dsBadgeTitle: "徽章 Badge",
+            dsBadgeSummary: "轻量状态与分类标签，保持简短可读。",
+            dsBadgeDo: "控制在 2–4 个字或短单词内",
+            motionCh1: "开场引子",
+            motionCh2: "核心特性揭幕",
+            motionCh3: "行动收尾",
+            motionSc2Headline: "离线零依赖，直接装成独立桌面应用",
+            motionSc2CardTitle: "纯时间确定性渲染",
+            motionSc2CardBody: "任意时刻 t 始终对应一致的关键帧进度与缓动轨迹",
+            motionSc3Headline: "立即在工作台探索并导出",
+            sbTone: "暖纸胶片 · 克制沉稳",
+            sbS1Scene: "开场 · 工作台全景",
+            sbS1Visual: "清晨光线洒在桌面工作台，卡片与时间线逐层展开。",
+            sbS1Dialogue: "把每一次对话里的灵感，直接沉淀为可运行的作品。",
+            sbS2Scene: "演示 · 一键独立安装",
+            sbS2Visual: "点击右上角安装按钮，交互应用以透明沉浸标题栏窗口弹出。",
+            sbS2Dialogue: "无需浏览器标签页，它本身就是一个趁手的 Mac 桌面工具。",
+            sbS3Scene: "收尾 · 本地持久运行",
+            sbS3Visual: "特写聚焦番茄钟与波形示波器在独立窗口里稳定跳动。",
+            sbS3Dialogue: "离线可用，随时唤醒，专为专注与创作而生。",
           },
         },
-        search: { title: "搜索内容", placeholder: "搜索笔记、作品和素材…", empty: "未找到匹配的笔记、作品或素材", typeMedia: "素材" },
+        search: {
+          title: "搜索作品",
+          placeholder: "搜索笔记、作品和素材…",
+          empty: "未找到匹配的笔记、作品或素材",
+          typeMedia: "素材",
+          scopeAll: "全部",
+          scopeArtifacts: "作品",
+          scopeMedia: "素材",
+        },
       },
     },
     "web.media": {
@@ -1956,7 +2246,7 @@ export const catalogs = {
         own: "它自己记的",
         intro:
           "这个 agent 派出去的执行会话共用一份记忆。每一轮开始，和这一轮有关的几条放在它收到的话前面；一轮结束，它在汇报里写的「记住：」那几行，和这件活做到哪了，记进来。",
-        issues: "手上的任务",
+        issues: "手上的工单",
         noIssues: "它的执行会话还没做完过一轮。",
         helper: "执行会话",
         allRepos: "所有仓库",
@@ -2112,7 +2402,7 @@ export const catalogs = {
         offline: "已断开",
         disconnect: "断开连接",
       },
-      tabs: { inbox: "收件箱", channels: "频道", sessions: "会话", issues: "任务" },
+      tabs: { inbox: "收件箱", channels: "频道", sessions: "会话", issues: "工单" },
       inbox: { approve: "同意", deny: "拒绝", answer: "回复", empty: "收件箱为空，暂时没有待处理项。" },
       channel: { replyPlaceholder: "输入消息回复…", send: "发送", empty: "这个频道还没有消息。" },
       session: { promptPlaceholder: "给执行会话发一条指令…", send: "发送", stop: "停止", events: "轨迹", empty: "当前没有运行中的执行会话。" },
@@ -2122,7 +2412,7 @@ export const catalogs = {
         approve: "通过验收",
         changes: "打回修改",
         status: "状态",
-        empty: "没有符合条件的任务。",
+        empty: "没有符合条件的工单。",
       },
       controlPlane: {
         title: "总控端连接",
@@ -2290,7 +2580,7 @@ export const catalogs = {
       defaultEffort: "默认推理强度",
       default: "默认",
       maxWorking: "最多同时干活",
-      maxWorkingHint: "用它的执行会话同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受 VibeValley 整体的上限（同时 6 张任务）。",
+      maxWorkingHint: "用它的执行会话同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受 VibeValley 整体的上限（同时 6 张工单）。",
       noLimit: "不另设",
       budget: "每日预算（元）",
       budgetLabel: "每日预算",
@@ -2403,7 +2693,7 @@ export const catalogs = {
         earlier: "更早的几步",
         unasked: "自己起的一轮",
         subagentGot: "子代理接到",
-        issue: "任务",
+        issue: "工单",
         told: "带话",
         usedTools: "用了 {n} 个工具",
         process: "这一轮的轨迹",
@@ -2441,25 +2731,25 @@ export const catalogs = {
       },
       hub: {
         search: "搜索运行与轨迹",
-        searchHint: "搜名字、任务、仓库…",
+        searchHint: "搜名字、工单、仓库…",
         scopeLabel: "按范围看",
         scope: { all: "全部", active: "进行中", orchestrator: "主助手", worker: "执行会话" },
         list: "运行列表",
         back: "全部运行",
         filterAgent: "角色：{name}",
-        filterIssue: "任务：{label}",
+        filterIssue: "工单：{label}",
         clearFilter: "清掉筛选",
         clear: "清除",
         empty: "还没有运行记录。",
         emptyFiltered: "没有符合当前筛选的运行。",
         pick: "选一条运行，查看完整轨迹。",
-        openIssue: "看任务",
+        openIssue: "看工单",
         openProfile: "看角色",
         orchestratorRole: "主助手",
         status: { working: "进行中", listening: "在听", resting: "待命", done: "已完成", failed: "失败", interrupted: "已中断", closed: "已结束" },
       },
       subagents: {
-        heading: "子任务",
+        heading: "子代理任务",
         root: "主线程",
         wait: "{who}在等「{targets}」",
         observed: "{ago}确认 · {status}",
@@ -2545,14 +2835,14 @@ export const catalogs = {
         voice: "电话 通话 MOSS Live 实时 视觉 转写 语音",
         connections: "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
         remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
-        about: "版本 家目录 设置文件 数据 素材图鉴 version catalog",
+        about: "版本 家目录 设置文件 数据 version",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
       general: {
         languageHint: "界面、主助手和执行会话说的话都用它",
         start: "启动时打开",
         startHint: "打开应用、或者打开首页时先进哪里",
-        starts: { workbench: "工作台", farm: "像素农场" },
+        starts: { workbench: "工作台", farm: "农场" },
       },
       appearance: {
         theme: "主题",
@@ -2562,7 +2852,7 @@ export const catalogs = {
         motionHint: "关闭后跳过界面过渡动画与背景帧循环，更适合 UI 测试与专注模式。",
         motionOption: { off: "无动画", on: "动画", system: "跟随系统" },
         scale: "界面大小",
-        scaleHint: "缩放整个工作台；像素农场按整数倍放大，不跟着变",
+        scaleHint: "缩放整个工作台；农场按整数倍放大，不跟着变",
         monoFont: "终端与代码字体",
         monoFontRow: "终端与代码字体（支持 Nerd Font）",
         monoFontHint: "用于终端、Diff 与文件预览的等宽字体，内置 Nerd Font 图标回退链",
@@ -2582,14 +2872,10 @@ export const catalogs = {
         repos: "仓库目录",
         reposHint: "这个空间的仓库，每个文件夹都是一个 git 仓库",
         worktrees: "工作树目录",
-        worktreesHint: "执行会话运行时每个任务自己的检出",
+        worktreesHint: "执行会话运行时每个工单自己的检出",
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
-        devTools: "开发与图鉴",
-        catalog: "素材图鉴",
-        catalogHint: "查看像素角色、指针、声音与工作台组件样式",
-        openCatalog: "打开素材图鉴",
         update: "更新",
         updateHint: "桌面版从 GitHub 上的发布自己更新",
         upToDate: "已是最新",
@@ -2643,9 +2929,8 @@ export const catalogs = {
       sidebar: {
         title: "仓库与终端",
         addRepo: "添加仓库",
-        addRepoButton: "仓库",
         addRepoTooltip: "添加本地仓库或文件夹",
-        manageRepos: "管理仓库",
+        newMenu: "新建：{name}",
         running: "正在运行",
         runningAgent: "{agent} 正在运行",
         ready: "待命",
@@ -2657,8 +2942,6 @@ export const catalogs = {
         attentionCount: "{n} 需要关注",
         closeTab: "关闭标签",
         tabMore: "更多操作",
-        newTerminal: "新终端：{name}",
-        newChat: "新对话：{name}",
         closeFolder: "关闭文件夹：{name}",
         closeFolderMenu: "关闭文件夹",
         repoDetails: "仓库详情",
@@ -2693,6 +2976,9 @@ export const catalogs = {
         copyAbsPath: "复制绝对路径",
         revealInFinder: "在 Finder 中显示",
         newTerminalInDir: "在此目录新建终端",
+        unsupportedHint: "此文件暂不支持应用内预览",
+        openWithDefault: "用默认方式打开",
+        openInApp: "在应用内打开",
       },
       git: {
         title: "版本控制",
@@ -2768,21 +3054,12 @@ export const catalogs = {
         thoughtMedium: "中",
         thoughtHigh: "高",
         thoughtMax: "极深",
-        permissionMode: "权限模式",
-        modeAsk: "逐次确认",
-        modeAcceptEdits: "放行编辑",
-        modeBypass: "自动放行",
-        modeReadOnly: "只读模式",
-        openTerminal: "在此目录打开终端",
-        statusStarting: "连接引擎中…",
-        statusReady: "就绪",
-        statusWorking: "执行中",
         statusWaiting: "等待确认",
-        statusError: "会话异常",
         emptyTitle: "在当前工作区直接对话",
         emptyHint: "选择引擎后直接提问，工具调用结果可一键在右侧分栏打开源码或 Diff。",
-        you: "你",
         steerTag: "轮中引导",
+        todoTitle: "任务进度",
+        todoToolLabel: "更新进度",
         thinking: "思考过程",
         toolOpenFile: "打开文件",
         toolOpenDiff: "查看 Diff",
@@ -2791,6 +3068,20 @@ export const catalogs = {
         toolFailed: "失败",
         toolPending: "等待输出…",
         toolNoOutput: "无输出",
+        activityThinking: "思考 {n} 次",
+        activityRead: "读取 {n} 个文件",
+        activitySearch: "搜索 {n} 次",
+        activityEdit: "编辑 {n} 个文件",
+        activityCommand: "运行 {n} 条命令",
+        activityOther: "调用 {n} 个工具",
+        activitySteps: "{n} 步",
+        activityRunning: "执行中",
+        activityFailed: "{n} 项失败",
+        toolInput: "输入",
+        toolOutput: "输出",
+        toolLines: "{n} 行",
+        copy: "复制",
+        copied: "已复制",
         interactionBadge: "需要你确认 · 不会自动批准",
         interactionAnswered: "已回复",
         interactionDeclined: "已拒绝",
@@ -2802,8 +3093,7 @@ export const catalogs = {
         permissionAllowSession: "本会话始终允许",
         permissionDeny: "拒绝",
         composerPlaceholder: "向 {runtime} 提问或下达改动任务… (Enter 发送，Shift+Enter 换行)",
-        steerPlaceholder: "会话运行中，输入指令即插入轮中引导 (Steer)…",
-        steeringBanner: "回合进行中 · 发送将经 session.send 插入轮中引导，不中断上下文",
+        steerPlaceholder: "继续输入或补充指令…",
         send: "发送",
         steer: "插入引导",
         stop: "停止",
@@ -2872,7 +3162,7 @@ export const catalogs = {
         typeFolder: "普通目录",
         activity: "工作区",
         activitySummary: "{worktrees} 工作树 · {tabs} 标签",
-        openIssues: "进行中任务",
+        openIssues: "进行中工单",
         runningSessions: "运行中会话",
         maxSessions: "并发上限",
         pullRequest: "合并请求",
@@ -2883,43 +3173,6 @@ export const catalogs = {
         worktrees: "工作树",
         tabsCount: "{n} 标签",
         closeFolder: "从工作区关闭目录",
-      },
-    },
-    "web.tree": { sky: "农场的记忆星空" },
-    "web.ui.pixel": {
-      sound: {
-        group: { ui: "界面", tools: "农具", field: "地里", yard: "院子", reward: "奖励", voice: "语音" },
-        label: {
-          tap: "点击",
-          nope: "点不了",
-          pick: "拿工具",
-          open: "展开",
-          close: "收起",
-          water: "浇水",
-          spray: "杀虫",
-          weed: "除草",
-          harvest: "收获",
-          shovel: "铲除",
-          plant: "播种",
-          ripe: "熟了",
-          bug: "长虫",
-          coin: "金币",
-          levelUp: "升级",
-          achievement: "成就",
-          arrive: "帮工到了",
-          rustle: "草叶沙沙",
-          splash: "扑通",
-          thud: "踩土",
-          woof: "小狗叫",
-          meow: "小猫叫",
-          mew: "小猫短叫",
-          purr: "小猫呼噜",
-          yip: "小狗跳",
-          pant: "小狗喘气",
-          voiceOn: "语音接通",
-          voiceOff: "语音挂断",
-          ring: "来电",
-        },
       },
     },
     "web.voice": {
@@ -3225,7 +3478,57 @@ export const catalogs = {
         rail: "Beside this artifact",
         railShow: "Show the side panel",
         railHide: "Hide the side panel",
+        backToLibrary: "Back to artifacts",
+        previewTab: "Preview",
+        filesTab: "Files",
+        filesTabCount: "Files ({n})",
+        viewMode: "View mode",
+        liveVersion: "Live",
+        directory: "Directory",
+        newFileLabel: "New file path",
+        discard: "Discard",
+        unsaved: "Unsaved",
+        deleteFileAsk: "Delete file “{path}”?",
+        snapshotNote: "Snapshot",
       },
+      docs: { split: "Split", edit: "Edit", read: "Read" },
+      outline: {
+        progress: "{done}/{total} done",
+        hideDone: "Hide done",
+        showDone: "Show done",
+        quickAdd: "Type and press Enter to add…",
+        kindHeading: "Heading",
+        kindBullet: "Bullet",
+        kindTodo: "Todo",
+        cycleKind: "Switch type ({kind})",
+        indent: "Indent",
+        outdent: "Outdent",
+        addChild: "Add child",
+        untitled: "New item",
+      },
+      sheet: { filterPlaceholder: "Filter rows…", addRow: "Add row", empty: "No sheets", rowsCount: "{n} rows" },
+      diagram: { visual: "Diagram", structure: "Nodes & edges", nodes: "Nodes", edges: "Edges" },
+      motion: {
+        timeline: "Timeline scenes",
+        layers: "{n} layers",
+        play: "Play",
+        stop: "Stop",
+        restart: "Restart",
+        loop: "Loop",
+        prevStep: "Step back 0.5s",
+        nextStep: "Step forward 0.5s",
+        chapters: "Chapters",
+      },
+      storyboard: {
+        gridMode: "Grid",
+        animaticMode: "Animatic",
+        totalDuration: "{sec}s total",
+        shotOf: "Shot {n} of {total}",
+        sfx: "SFX",
+        transition: "Transition",
+      },
+      prototype: { viewportLabel: "Viewport", viewportFull: "Full", viewportTablet: "Tablet", viewportMobile: "Mobile", reload: "Reload" },
+      files: { codeMode: "Code", htmlPreviewMode: "Preview" },
       issue: { title: "Artifacts" },
       blocks: { saved: "All saved", user: "You", start: "Start writing here…" },
       canvas: { label: "Open artifact", close: "Close", openPage: "Open its page" },
@@ -3248,14 +3551,16 @@ export const catalogs = {
         storyboard: "Storyboard",
       },
       timeline: {
-        toggle: "History timeline",
-        title: "Timeline",
+        title: "Version history",
+        show: "Show version history",
+        hide: "Hide version history",
+        savedVersions: "Saved versions",
+        commits: "Changes",
         loading: "Loading history…",
         empty: "No history commits yet",
-        prev: "Previous commit",
-        next: "Next commit",
         backToLive: "Back to live",
         previewBanner: "Read-only history preview · {summary}",
+        versionBanner: "Viewing version {version} (read-only){note}",
         turn: "Turn {n}",
         restore: "Restore",
         restored: "Restored to selected commit",
@@ -3318,11 +3623,42 @@ export const catalogs = {
         styleSolid: "Solid",
         styleDashed: "Dashed",
       },
-      design: { noProps: "This artboard declares no adjustable props (data-props)" },
-      designSystem: { components: "Components" },
+      design: {
+        themeLight: "Light",
+        themeDark: "Dark",
+        propsTitle: "Props Inspector",
+        enabled: "Enabled",
+        disabled: "Disabled",
+        emptyCanvas: "No layers in this artboard yet",
+      },
+      designSystem: {
+        components: "Components",
+        colors: "Color Tokens",
+        typography: "Typography",
+        spacing: "Spacing",
+        radius: "Radius",
+        guidelinesDo: "Do",
+        guidelinesDont: "Don't",
+        previewTheme: "Preview Theme",
+        specimen: "The quick brown fox jumps · 0123456789",
+      },
       slidesStore: { addSlide: "Add slide" },
       edit: { save: "Save as a new version", saved: "Saved as version {version}" },
-      slides: { previous: "Previous slide", next: "Next slide", present: "Present full screen", presenter: "Presenter view" },
+      slides: {
+        previous: "Previous slide",
+        next: "Next slide",
+        present: "Present full screen",
+        presenter: "Presenter view",
+        editSlide: "Edit slide",
+        doneEdit: "Done",
+        slideTitleLabel: "Title",
+        slideSubtitleLabel: "Subtitle",
+        slideLayoutLabel: "Layout",
+        layoutCover: "Cover",
+        layoutContent: "Content",
+        slideBulletsLabel: "Bullets (one per line)",
+        slideNotesLabel: "Speaker notes",
+      },
       presenter: {
         missing: "No deck named: open the presenter view from an artifact's controls.",
         current: "This slide",
@@ -3340,7 +3676,6 @@ export const catalogs = {
       standalone: { missing: "This artifact was deleted, or there is no such artifact.", version: "v{version}", live: "Live" },
       applet: {
         button: "Install as App",
-        buttonInstalled: "App Installed",
         badgeInstalled: "Installed",
         modalTitle: "Local Desktop App",
         subtitle: "Install this artifact as a standalone Mac app you can launch from Spotlight or the Dock.",
@@ -3356,6 +3691,8 @@ export const catalogs = {
         reinstall: "Update & Reinstall",
         installing: "Installing…",
         open: "Open App",
+        openApp: "Open Standalone App",
+        manageApp: "Manage App",
         uninstall: "Uninstall",
         installedToast: "Installed “{name}.app”",
         uninstalledToast: "Uninstalled “{name}.app”",
@@ -3462,13 +3799,12 @@ export const catalogs = {
       route: { missing: "This page does not exist", invalid: "This address is invalid", home: "Back to the app" },
       place: {
         chat: { label: "Chat", hint: "Channels and threads" },
-        issues: { label: "Tasks", hint: "Every task from creation to completion" },
+        issues: { label: "Issues", hint: "Every issue from creation to completion" },
         runs: { label: "Runs & trajectories", hint: "Active sessions, orchestrator approvals, and trajectories" },
         workspace: { hint: "Manage repositories and workspaces", name: "Workspace" },
-        content: { label: "Content", hint: "Library, artifacts, and notes" },
+        content: { label: "Artifacts", hint: "Artifacts, notes, and media" },
         runtimes: { label: "Engines", hint: "Installed coding engines across machines" },
         team: { label: "Team", hint: "Roles and team templates" },
-        catalog: { label: "Catalog", hint: "Assets: pixel sprites, cursors, sounds, and workbench UI kit" },
         settings: { label: "Settings", hint: "General & appearance, models & keys, voice, connections, about" },
       },
       link: { connecting: "Connecting", open: "Connected", lost: "Lost, reconnecting" },
@@ -3620,67 +3956,16 @@ export const catalogs = {
         zoomOut: "Zoom out",
         zoomReset: "Reset zoom",
       },
-      updateReady: "{next} is ready: restart from About",
+      updateInstall: "Update",
+      updateInstalling: "Restarting…",
+      updateReadyOneClick: "{next} is ready — click to update & restart",
+      updateReadyTitle: "Update to {next}",
+      updateNotesTitle: "What's new",
       intent: { timedOut: "No answer in time; try again", offline: "Not connected to the farm, so this was not sent" },
       pickTooLarge: "{name} was not added: it is over 512 MiB",
       openTerminal: "Open a terminal here",
-    },
-    "web.catalog": {
-      ground: { check: "Checks", grass: "Grass", night: "Night" },
-      tab: { sprites: "Pictures", cursors: "Cursors", sounds: "Sounds" },
-      shelves: "The catalog's shelves",
-      find: "Find a picture",
-      background: "Background",
-      categories: "Categories",
-      all: "All",
-      count: "{n} pictures, cut from design/pixel/raw.",
-      pick: "Click one for a big view: its size, anchor, animation frames, and which source sheet it was cut from and how to redraw it.",
-      findHint: "Find: name, kind, animal, outfit (bear, raincoat, lang-, icon-…)",
-      noMatch: "Nothing matches.",
-      moves: "anim",
-      copied: "Copied",
-      copy: "Copy",
-      anchor: "Anchor",
-      head: "Head",
-      zoom: "Zoom",
-      marks: "Anchor and head",
-      stop: "Stop",
       play: "Play",
-      frames: "{n} frames",
-      fps: "Frames per second",
-      perSecond: "{n} fps",
-      size: "Size",
-      pixels: "{w} × {h} px",
-      from: "From",
-      unrecorded: "Not recorded (an old picture no longer used)",
-      redraw: "Redraw",
-      recut: "Cut again",
-      cursorsIntro: "The mouse on the farm: normally, over something clickable, and holding a tool.",
-      cursorsFind: "Find: a cursor's name (glove, water, harvest…)",
-      cursorsNote:
-        "The red dot is where a click lands. Normally a glove, a pointing finger over something clickable; holding a tool, that tool, sparkling where it can be used and with a no-entry mark where it cannot. Cut from design/pixel/raw/ui-cursors.png (design/pixel/process.py ui-cursors).",
-      noCursors: "This build has no cursor pictures (assets/cursors).",
-      soundsIntro: "Every sound on the farm: click one to hear it.",
-      soundsFind: "Find: a sound's name or group (water, yard, coin…)",
-      soundsRecipes: "The sounds are synthesized on the fly, with no audio files: the recipes are in",
-      soundsMuted: ". With sound off they are silent.",
-      playSound: "Play {name}",
-      shelf: {
-        helpers: { label: "Helpers", hint: "Seven animals, four outfits: stand, walk, work, cheer, worry; sit, read, type and fix by the buildings" },
-        orchestrator: { hint: "Six looks, each with talking, listening and a portrait" },
-        dog: { label: "Dog", hint: "Sleep, wake, stretch, wag, bark, jump, roll over…" },
-        plots: { label: "Plots", hint: "From bare soil to ripe, weedy, dry, withered and locked" },
-        yard: { label: "Yard", hint: "The map, props, plants in front of the camera, little animals" },
-        map: { label: "Map", hint: "An island for each repo, the compass, clouds, queued seed bags, stumps for free spots" },
-        machines: { label: "Machines", hint: "Each is a runtime" },
-        icons: { label: "Icons", hint: "For panels, entries and hints" },
-        acts: { label: "Doing", hint: "The little icons over a helper's head: read, edit, run a command, search…" },
-        medals: { label: "Medals and badges", hint: "Medals, badge emblems, stamps, coins" },
-        logos: { hint: "The agents on the machines, the chat apps, the web and desktop icons" },
-        langs: { label: "Languages", hint: "What a repo page has planted" },
-        ui: { label: "Interface", hint: "The energy bottle, the farm chat's buttons, the calendar's cells" },
-        other: { label: "Other", hint: "What fits no shelf" },
-      },
+      stop: "Stop",
     },
     "web.channel": {
       tab: { chat: "Chat", issues: "Tickets", crons: "Scheduled tasks" },
@@ -3698,8 +3983,11 @@ export const catalogs = {
       channelsTitle: "Channels",
       directsTitle: "Direct messages",
       newChannel: "Create a channel",
-      helpers: "Helpers",
-      noHelpers: "No helpers here",
+      newChat: "New chat",
+      filter: { label: "Filter chats", all: "All", group: "Channels", direct: "Direct" },
+      emptyPreview: "No messages yet",
+      emptyList: "No chats yet",
+      runsEntry: "View running sessions",
       mood: { idle: "resting", listening: "listening", thinking: "thinking", speaking: "speaking" },
       orchestrator: "Assistant",
       nobodyOnIt: "No helper is on it now; the thread stays",
@@ -3830,7 +4118,6 @@ export const catalogs = {
         archivedTitle: "Archived",
         muted: "Muted",
         mentionsOnly: "Only @",
-        drag: "Drop on another channel to place it before that one",
       },
       threadList: {
         title: "This channel's threads",
@@ -3858,7 +4145,7 @@ export const catalogs = {
         searching: "Searching…",
         failed: "The search failed: {why}",
       },
-      direct: { add: "New direct message", pick: "Talk with", none: "No profiles yet", open: "Talk with {name}" },
+      direct: { pick: "Talk with", none: "No profiles yet", open: "Talk with {name}" },
       emoji: {
         open: "Emoji",
         groups: { frequent: "Frequent", faces: "Faces", hands: "Hands", things: "Things", nature: "Nature", signs: "Signs" },
@@ -3904,7 +4191,6 @@ export const catalogs = {
       },
       lacks: "cannot answer: {why}",
       lacksFix: "Settings",
-      orchestratorRuns: "View assistant trajectory and pending approvals",
     },
     "web.connector": {
       connectors: {
@@ -4084,73 +4370,9 @@ export const catalogs = {
       },
     },
     "web.farm": {
-      panel: {
-        shop: "Shop",
-        warehouse: "Warehouse",
-        graphs: "Tasks and achievements",
-        log: "Farm log",
-        orchestrator: "Assistant and pets",
-        harvest: "Harvest {name}'s plot",
-        sow: "Sow · plot {plot}",
-        water: "Water {name}",
-        menu: "Menu",
-        shopClosed: "The shop is being done up and opens in the next version. You have {coins} coins: save them for now.",
-      },
-      menu: {
-        agents: "Helper roster",
-        runtimes: "Machines",
-        skills: "Skill book",
-        issues: "Tickets",
-        catalog: "Catalog",
-        chat: "Farm chat (channels)",
-        connectors: "Connectors",
-        repos: "Repos",
-      },
-      tool: {
-        hand: { hint: "Click a plot for its details, an empty one to sow" },
-        water: { hint: "Pass a helper a word; one at work hears it on the way" },
-        bug: { hint: "The job failed (bugs in the plot): have it go on fixing" },
-        weed: { hint: "Review notes that did not pass grow as weeds: pulled when the helper fixes them and the next review passes" },
-        harvest: { hint: "A ripe plot: bring in the result and let the helper go" },
-        shovel: { hint: "Stops one at work; lets one not at work go" },
-      },
-      native: {
-        islandWorking: "{repo} · {count}/{limit} working",
-        islandQueued: " · {count} queued",
-        islandGone: "{repo} · repository unavailable",
-        ledger: "Ledger & clock",
-        achievements: "Achievements",
-        log: "Farm log",
-        warehouse: "Stored issues",
-        shop: "Shop",
-        workbench: "Workbench",
-        map: "Islands",
-        tree: "Memory tree",
-        phone: "Pixel phone",
-        noMessages: "No messages yet",
-        empty: "No records yet",
-        progress: "Lv.{level} · XP {xp}/{need}",
-        coins: "Coins {coins}",
-        workers: "Helpers here: {count}",
-        dawn: "Dawn",
-        noon: "Noon",
-        dusk: "Dusk",
-        night: "Night",
-        previous: "Previous",
-        next: "Next · {page}/{pages}",
-        score: "Score {score}",
-        restart: "Click or Space to restart",
-        steer: "Arrow keys / WASD",
-        pending: "Sending…",
-        accepted: "Accepted",
-        close: "Close",
-        loading: "Loading…",
-        treeCounts: "Leaves {leaves} · Fruits {fruits} · Seeds {seeds}",
-        treeGrowth: "{rounds} rounds · {growth}% grown",
-        leaf: "Memory",
-        fruit: "Principle",
-        seed: "Habit",
-      },
+      panel: { harvest: "Harvest {name}'s plot", sow: "Sow · plot {plot}", water: "Water {name}" },
+      menu: { issues: "Tickets", repos: "Repos" },
+      native: { close: "Close", loading: "Loading…" },
       chat: {
         channels: "Channels",
         enlarge: "Enlarge the chat window",
@@ -4159,21 +4381,10 @@ export const catalogs = {
           'This is the farm chat, where you, the assistant and the helpers talk. Tell me something to do, such as "have the tester run the tests".\n\nOnce helpers arrive, write a name like @w1 to call one directly; each ticket has its own thread under it.',
         send: "Send",
       },
-      friends: { helpers: "Helpers" },
-      hud: { toLevel: "{xp}/{need} commits", toLevelNext: "{xp}/{need} commits · Lv.{next} clears a plot", tree: "Memory tree", workbench: "Workbench" },
-      overlay: {
-        clearAt: "Lv.{level} clears it",
-        idle: "What shall we plant today?",
-        click: "Click: {text}",
-        unclaimed: "Uncleared plot",
-        flowerbed: "Flowerbed",
-        bare: "Plot {plot} · empty",
-      },
-      quota: { left: "Allowance left", quota: "Allowance" },
-      sign: { noRepo: "No repo", repo: "Repo" },
+      hud: { workbench: "Workbench" },
       sow: {
         homeless: "This farm belongs to no repo",
-        toMap: "To plant, enter a repo's farm first: go back to the map and pick an island.",
+        toMap: "To plant, enter a repo's farm first: open Repos and pick a repository.",
         noRepos: "No repos in the workbench yet: make one on the Repos page first.",
         makeRepo: "Make a repo",
         plantIn: "Planting in {repo}",
@@ -4205,39 +4416,6 @@ export const catalogs = {
         resolve: "Have it resolve the conflict",
       },
       plotOf: "{name}'s plot",
-      aim: {
-        flowerbed: "A cleared flowerbed",
-        clearAt: "Lv.{level} clears this plot",
-        unread: "This plot's ticket has not been read yet",
-        look: "Look at this plot",
-        sow: "Sow",
-        water: "Water {name} (pass a word)",
-        nothingYet: "Nothing planted yet: sow with the hand first",
-        bug: "Spray: have it go on fixing",
-        noBugs: "No bugs in this plot",
-        weeds: "Weeds are pulled once the helper fixes them and the review passes",
-        noWeeds: "No weeds",
-        harvestRipe: "Harvest, let the helper go",
-        harvestLook: "Harvest: see what it changed",
-        nothingToHarvest: "Nothing to harvest on an empty plot",
-        shovelStop: "Shovel: stop it",
-        shovelDismiss: "Shovel: let it go",
-        noShovel: "Nothing to shovel on an empty plot",
-        unavailable: "This ticket is {state}: open the plot to see",
-      },
-      crop: {
-        empty: "empty",
-        seeded: "just sown",
-        sprout: "sprouting",
-        leafy: "leafy",
-        flowering: "flowering",
-        wheat: "ripe",
-        withered: "withered",
-        weeds: "weedy",
-        dry: "dry",
-        harvested: "harvested",
-        locked: "uncleared",
-      },
     },
     "web.farm.phone": {
       ringing: "Incoming…",
@@ -4258,8 +4436,6 @@ export const catalogs = {
       hangUp: "Hang up",
       app: { missed: "Missed", channels: "Chat", games: "Games" },
       game: { blocks: "Blocks", sokoban: "Sokoban", dino: "Dino", bugs: "Bug snake", merge: "Farm 2048" },
-      phone: "Phone",
-      new: "NEW",
       brand: "FarmTel",
       openChat: "Open the farm chat",
       key: { up: "Up", left: "Left", right: "Right", down: "Down" },
@@ -4387,7 +4563,15 @@ export const catalogs = {
         order: "Order",
         reset: "Reset",
       },
-      list: { noRepo: "No repo", all: "All tickets", unfold: "Unfold {group}", fold: "Fold {group}", writeIn: 'Write one in "{group}"' },
+      list: {
+        noRepo: "No repo",
+        all: "All tickets",
+        unfold: "Unfold {group}",
+        fold: "Fold {group}",
+        writeIn: 'Write one in "{group}"',
+        empty: "No tickets yet. Press C or click New issue to create one.",
+        emptyFiltered: "No tickets match the current filter.",
+      },
       page: {
         pickFirst: "Almost: pick which helper and which repo, then press Start.",
         notDrafted: "Not drafted: {why}",
@@ -4690,57 +4874,6 @@ export const catalogs = {
         uploading: "Uploading {name}…",
         remove: "Remove attachment {name}",
       },
-      guide: {
-        title: "How issues flow",
-        summary: "Assign a helper to launch a worktree session, then inspect changes in Review to complete.",
-        collapse: "Hide guide",
-        expand: "Show guide",
-        stage: {
-          todo: "Capture work, pick a repo and helper, and order your queue.",
-          working: "Dispatch or drag here to launch an isolated worktree session.",
-          waiting: "Review changes, answer questions, or send back for another round.",
-          closed: "Complete to merge into the base branch, or reopen anytime.",
-        },
-      },
-      onboarding: {
-        title: "Get started with VibeValley",
-        subtitle: "Complete these three steps to dispatch tickets to helpers in isolated worktrees.",
-        progress: "{done} / {total} ready",
-        step1Title: "Add a Git repository",
-        step1Desc: "Link a local Git repository so helpers can work in isolated worktrees.",
-        step1Action: "Add repository",
-        step1Manage: "Manage repos",
-        step1Ready: "{n, plural, one {# repo ready} other {# repos ready}}",
-        step2Title: "Connect a coding engine",
-        step2Desc: "Verify a local coding engine (such as Claude Code or Codex) is installed and enabled.",
-        step2Action: "Configure engines",
-        step2Manage: "Manage engines",
-        step2Ready: "{n, plural, one {# engine ready} other {# engines ready}}",
-        step3Title: "Create your first ticket",
-        step3Desc: "Describe what to build, press C to create a ticket, or pick a starter template below.",
-        step3Ready: "{n, plural, one {# ticket} other {# tickets}}",
-        newIssue: "New ticket",
-        openChat: "Open chat",
-        templatesTitle: "Or start from a template",
-        templates: {
-          bug: {
-            title: "Fix a bug",
-            desc: "Track down a failure and add a regression test",
-            prompt: "Fix: [describe the issue]\n\nSteps to reproduce:\n1. \nExpected behavior:\nAcceptance criteria: add a regression test and pass checks",
-          },
-          feature: {
-            title: "Add a feature",
-            desc: "Define scope and criteria for a helper to build",
-            prompt: "Add: [describe the feature]\n\nScope:\n- \nOut of scope:\n- \nAcceptance criteria: cover the main flow with tests",
-          },
-          refactor: {
-            title: "Audit & refactor",
-            desc: "Simplify boundaries while keeping behavior intact",
-            prompt:
-              "Refactor: [target module or path]\n\nGoals:\n- Simplify structure and remove duplication\n- Keep external behavior and existing tests unchanged",
-          },
-        },
-      },
     },
     "web.library": {
       upload: "Upload",
@@ -4796,12 +4929,16 @@ export const catalogs = {
       understood: "What it shows",
       makeTabs: { image: "Image", speech: "Speech", audio: "Audio workbench" },
       content: {
-        title: "Content",
+        title: "Artifacts",
         new: "New",
-        searchAll: "Search all content…",
-        sidebarToggle: "Toggle content sidebar",
+        searchAll: "Search all artifacts…",
+        sidebarToggle: "Toggle artifacts sidebar",
         recent: "All recent",
         pinned: "Pinned",
+        pinnedEmpty: "Nothing pinned yet. Hover any artifact or media item and click the pin icon to keep it handy here.",
+        installedApps: "Installed Apps",
+        installedAppsEmpty:
+          "No standalone apps installed yet. Click “Install as App” on any artifact card or toolbar to install it as an independent macOS app and manage it here.",
         pin: "Pin",
         unpin: "Unpin",
         pinnedToast: "Pinned",
@@ -4813,7 +4950,6 @@ export const catalogs = {
         exportArtifact: "Export",
         turnIntoIssue: "Turn into ticket",
         issueCreated: "Ticket created",
-        source: { all: "All sources", agent: "From helpers", user: "Created by me" },
         artifactType: { all: "All artifacts" },
         inspector: {
           openExternal: "Open externally",
@@ -4824,29 +4960,102 @@ export const catalogs = {
           stopAudio: "Stop audio",
         },
         templates: {
-          title: "New content",
+          title: "New artifact",
           search: "Search templates…",
+          searchCount: "{n} matching templates",
           empty: "No matching templates",
-          cat: { recommended: "Recommended", note: "Outline notes", whiteboard: "Whiteboards", deliverable: "Deliverables", ai: "AI media" },
+          cat: {
+            recommended: "Recommended",
+            apps: "Mini Apps",
+            engineering: "Engineering",
+            note: "Outline notes",
+            whiteboard: "Whiteboards",
+            deliverable: "Deliverables",
+            ai: "AI media",
+          },
           items: {
             noteBlank: { name: "Blank outline note", desc: "Single-column outline with nesting, todos, and wikilinks" },
             noteTech: { name: "Tech spec outline", desc: "Context, goals, architecture, and implementation checklist" },
             noteMeeting: { name: "Meeting notes", desc: "Key discussion points, decisions, and follow-up todos" },
             noteDaily: { name: "Daily log", desc: "Today's focus, blockers, and handoff summary" },
+            notePrReview: { name: "Code Review Checklist", desc: "Correctness, edge cases, concurrency safety, and regression checks" },
+            noteDebug: { name: "Debugging Log", desc: "Reproduction path, hypotheses, telemetry clues, and root cause" },
+            noteRelease: { name: "Release Checklist", desc: "Preflight gates, canary rollout, monitoring, and rollback plan" },
+            noteOncall: { name: "On-Call Handoff", desc: "Active alerts, pending follow-ups, deploy windows, and contacts" },
+            noteOnboarding: { name: "Codebase Onboarding", desc: "Directory layout, entry points, local dev setup, and gotchas" },
+            noteSprintRetro: { name: "Sprint Retrospective", desc: "Shipped highlights, friction bottlenecks, tech debt, and action items" },
             wbBlank: { name: "Blank whiteboard", desc: "Infinite canvas with dot grid and native connectors" },
             wbArch: { name: "System architecture", desc: "Layered service nodes with directional data-flow arrows" },
             wbTimeline: { name: "Launch timeline", desc: "Milestone cards and delivery stages" },
             wbJourney: { name: "User journey", desc: "Touchpoints, friction points, and improvement opportunities" },
             wbWorkshop: { name: "Kickoff workshop", desc: "Goal framing, brainstorming stickies, and convergence" },
+            wbEventStorming: { name: "Event Storming (DDD)", desc: "Domain commands, aggregates, domain events, and read projections" },
+            wbC4: { name: "C4 Container Canvas", desc: "Edge gateway, core service, async queue, and storage topology" },
+            wbIncidentMap: { name: "Incident Root-Cause Map", desc: "Symptoms, candidate hypotheses, verification, and mitigation" },
+            wbTradeoff: { name: "Tech Trade-off Board", desc: "Options comparison, weighted constraints, risks, and final call" },
             artDocs: { name: "Collaborative doc", desc: "Long-form specs, review reports, and technical guides" },
+            docRfc: { name: "Engineering RFC", desc: "Context, alternatives comparison, contracts, and rollout plan" },
+            docAdr: { name: "Architecture Decision Record (ADR)", desc: "Decision context, evaluated trade-offs, outcome, and impact" },
+            docPostmortem: { name: "Incident Postmortem", desc: "Impact, timeline, five-whys root cause, and prevention actions" },
+            docApiSpec: { name: "API & Contract Spec", desc: "Endpoints, auth, request/response schemas, and error codes" },
+            docRunbook: { name: "Service Runbook", desc: "Alert thresholds, triage commands, kill switches, and rollback" },
+            docSecurity: { name: "Security & Threat Model", desc: "Trust boundaries, STRIDE threat matrix, mitigations, and audit" },
+            docMigration: { name: "Data & Schema Migration Plan", desc: "Dual-write compatibility, batch backfill, verification, and rollback" },
+            docPerf: { name: "Performance & Benchmark Report", desc: "Baseline load profile, bottlenecks, before/after comparison, capacity" },
             artSlides: { name: "Slide deck", desc: "Widescreen multi-slide deck with speaker notes" },
+            slidesArchReview: { name: "Architecture Review Deck", desc: "Goals, core topology, key trade-offs, and risk mitigation" },
+            slidesReleaseDemo: { name: "Tech Talk & Release Demo", desc: "Highlights, implementation deep dive, benchmarks, and roadmap" },
             artDashboard: { name: "Data dashboard", desc: "KPI cards, trend charts, and verified tables" },
+            dashSlo: { name: "Service SLO & Reliability", desc: "Availability, P99 latency, error budget burn, and alert breakdown" },
+            dashDora: { name: "Engineering DORA Metrics", desc: "Deploy frequency, lead time, change failure rate, and MTTR" },
             artDesign: { name: "Design canvas", desc: "Multi-artboard UI explorations with live prop controls" },
             artDesignSystem: { name: "Design system", desc: "Color tokens, typography scale, and contrast checks" },
             artMotion: { name: "Motion clip", desc: "Interactive animated canvas with video export" },
             artHtml: { name: "Web page", desc: "Standalone interactive HTML page with version history" },
+            protoApiPlayground: { name: "API & JSON Payload Sandbox", desc: "Offline JSON format/validate, request builder, and cURL generator" },
+            protoComponentLab: { name: "Interactive UI State Sandbox", desc: "State matrix (default/loading/empty/error), theme, and width switcher" },
+            protoFocusStudio: {
+              name: "Focus Studio & Ambient Timer",
+              desc: "Animated SVG ring timer, WebAudio rain & brown-noise mixer, and task queue built for standalone desktop use",
+            },
+            protoSynthPad: {
+              name: "Pocket Synth & 16-Step Drum Machine",
+              desc: "Offline WebAudio drum step sequencer, live Canvas oscilloscope, and playable synth keys",
+            },
+            protoParticleLab: {
+              name: "Generative Flow Field Studio",
+              desc: "60fps Canvas curl-noise particle simulation with pointer gravity and live palette controls",
+            },
+            protoTokenCalculator: {
+              name: "AI Token & Cost Simulator",
+              desc: "Interactive DAU, prompt cache, and model tier monthly cost breakdown with Markdown export",
+            },
+            protoCssGlassStudio: {
+              name: "Mesh & Frosted Glass Studio",
+              desc: "Animated mesh orbs with real-time blur, fill alpha, radius sliders, and 1-click CSS copy",
+            },
+            protoDeskKanban: { name: "Mini Desk Kanban Board", desc: "Lightweight 3-column desktop task board with priority pills and completion meter" },
+            designWorkspaceUi: { name: "Multi-Viewport Workspace UI", desc: "Desktop & mobile artboards with live interactive props and token-bound UI tree" },
+            dsPapertrails: {
+              name: "Papertrails Design System",
+              desc: "Light/dark color tokens, type hierarchy, spacing/radius scales, and live component specs",
+            },
+            motionLaunchReel: { name: "Product Launch Motion Reel", desc: "3-chapter deterministic motion sequence ready for live playback scrubbing" },
+            storyboardProductFilm: {
+              name: "Product Film Storyboard",
+              desc: "Multi-shot visual script with framing, camera moves, dialogue, and animatic preview",
+            },
             artSheet: { name: "Workbook sheet", desc: "Multi-sheet structured tables and CSV export" },
+            sheetBenchmark: { name: "Benchmark Matrix", desc: "QPS, P50/P95/P99 latency, memory footprint, and comparison verdict" },
+            sheetTechMatrix: { name: "Tech Evaluation Matrix", desc: "Weighted criteria scoring, effort, and operational complexity" },
+            sheetTestMatrix: { name: "QA & Regression Matrix", desc: "Core test cases, layer coverage, expected behavior, and status" },
+            sheetApiInventory: { name: "API & Dependency Inventory", desc: "Endpoint registry, auth mode, rate limits, and owning module" },
             artDiagram: { name: "Architecture diagram", desc: "Nodes, edges, and architecture flows" },
+            diagMicroservices: { name: "Microservices Topology", desc: "Edge gateway, domain services, event bus, and storage links" },
+            diagSequence: { name: "Request Sequence Flow", desc: "Client, auth guard, core service, outbox, and live stream flow" },
+            diagErd: { name: "Database ER Model", desc: "Core entity tables, foreign-key relations, and ownership links" },
+            diagCicd: { name: "CI/CD Release Pipeline", desc: "Lint & format, unit/contract checks, bundle build, and canary" },
+            diagStateMachine: { name: "State Machine Flow", desc: "Lifecycle states, valid transitions, and terminal convergence" },
             artStoryboard: { name: "Storyboard shots", desc: "Shot list, framing, palette, and dialogue" },
             aiImage: { name: "AI image", desc: "Generate concept art, icons, or illustrations from text" },
             aiSpeech: { name: "AI speech", desc: "Synthesize natural voiceover audio from text" },
@@ -4859,6 +5068,18 @@ export const catalogs = {
               "## Discussion Focus\n- Key agenda topics for this session\n## Key Decisions\n- Record agreed conclusions and trade-offs\n## Follow-ups\n- [ ] Track confirmed action items",
             noteDaily:
               "## Today's Focus\n- [ ] List today's top priorities\n## Blockers & Risks\n- Note items awaiting collaboration\n## Handoff Summary\n- Outcomes shipped and next steps",
+            notePrReview:
+              "## Scope & Intent\n- Confirm the change has a single clear responsibility with no unrelated edits\n## Correctness & Edge Cases\n- [ ] Null values, concurrency races, and error propagation are handled explicitly\n- [ ] External inputs are decoded and validated at the boundary\n## Quality & Tests\n- [ ] Automated tests cover new behavior and regression boundaries\n- [ ] No duplicated logic, temporary fallbacks, or swallowed errors",
+            noteDebug:
+              "## Symptom & Impact\n- Error output, reproduction environment, and blast radius\n## Hypotheses & Checks\n- [ ] Inspect recent commits and config changes\n- [ ] Capture telemetry logs and metric snapshots\n- [ ] Isolate trigger conditions in a minimal repro\n## Root Cause & Fix\n- Document root cause, fix design, and regression test added",
+            noteRelease:
+              "## Preflight Gates\n- [ ] All CI checks, builds, and contract parity checks are green\n- [ ] Schema migrations and backward compatibility verified\n## Canary & Monitoring\n- [ ] Roll out 5% canary and watch error rate and P99 latency for 15 min\n- [ ] Confirm core KPIs and alert panels remain clean\n## Rollback Plan\n- Record one-command rollback steps, kill switches, and on-call lead",
+            noteOncall:
+              "## Shift & Contacts\n- Handoff window, primary/secondary engineers, and escalation contacts\n## Active Alerts & Open Items\n- [ ] List unresolved alerts and current mitigation status\n## Watchlist This Shift\n- Recent deploys, scheduled cron windows, and capacity headroom\n## Quick Links\n- Dashboards, telemetry viewer, and emergency feature flags",
+            noteOnboarding:
+              "## Repository Purpose & Layout\n- Core entry directories, shared contract packages, and build outputs\n## Local Dev & Verification\n- [ ] Install dependencies and start local server / UI\n- [ ] Run unit tests, linter, and formatter\n## Primary Request Path\n- End-to-end flow from boundary handler through domain rules to storage\n## Common Gotchas\n- Environment variables, local state directories, and frequent pitfalls",
+            noteSprintRetro:
+              "## Highlights Shipped\n- Key features delivered and outcomes exceeding expectations\n## Friction & Bottlenecks\n- Rework causes, blockers, tooling gaps, or unclear specs\n## Tech Debt Inventory\n- Engineering debt introduced or uncovered this sprint\n## Next Sprint Actions\n- [ ] Assign lead, concrete change, and target verification date",
             wbBlankTitle: "Central Topic",
             wbBlankBody: "Add cards, stickies, and arrows from the toolbar",
             wbArchN1Title: "Client / UI",
@@ -4893,13 +5114,351 @@ export const catalogs = {
             wbWorkW3Body: "Pick top priorities for first milestone",
             wbWorkE1: "explore",
             wbWorkE2: "decide",
+            wbEsCmdTitle: "Command · Submit Change",
+            wbEsCmdBody: "Validate permissions and idempotency key",
+            wbEsAggTitle: "Aggregate · Domain Core",
+            wbEsAggBody: "Enforce state invariants and rules",
+            wbEsEvtTitle: "Event · Change Persisted",
+            wbEsEvtBody: "Write Outbox event in same transaction",
+            wbEsReadTitle: "Read Model · Slice Projection",
+            wbEsReadBody: "Fold incremental slice and push to clients",
+            wbEsE1: "validate",
+            wbEsE2: "emit",
+            wbEsE3: "project",
+            wbC4EdgeTitle: "API Gateway · HTTP/WS",
+            wbC4EdgeBody: "Auth, rate limits, and boundary decoding",
+            wbC4AppTitle: "Core Service · Rust",
+            wbC4AppBody: "State machine, transactions, and collab",
+            wbC4QueueTitle: "Async Queue",
+            wbC4QueueBody: "Execute media and outbound deliveries",
+            wbC4DbTitle: "SQLite / PostgreSQL",
+            wbC4DbBody: "Single source of truth and snapshots",
+            wbC4E1: "RPC",
+            wbC4E2: "enqueue",
+            wbC4E3: "commit",
+            wbIncSymTitle: "Symptom · P99 Latency Spike",
+            wbIncSymBody: "Core endpoint timeout rate reached 3.2%",
+            wbIncHyp1Title: "Hypothesis A · Lock Contention",
+            wbIncHyp1Body: "Inspect pool wait time and query plan",
+            wbIncHyp2Title: "Hypothesis B · Upstream Retries",
+            wbIncHyp2Body: "Check retry amplification and timeouts",
+            wbIncFixTitle: "Mitigation · Shed & Rollback",
+            wbIncFixBody: "Enable circuit breaker and revert deploy",
+            wbIncE1: "triage",
+            wbIncE2: "verify",
+            wbIncE3: "mitigate",
+            wbToReqTitle: "Constraint · Consistency & Speed",
+            wbToReqBody: "Multi-peer convergence with low overhead",
+            wbToOptATitle: "Option A · Local-First CRDT",
+            wbToOptABody: "Offline-ready, lock-free merge semantics",
+            wbToOptBTitle: "Option B · Central OT Server",
+            wbToOptBBody: "Server sequencing, higher lock complexity",
+            wbToDecTitle: "Decision · Adopt Option A",
+            wbToDecBody: "Reuse existing collab core with low risk",
+            wbToE1: "evaluate",
+            wbToE2: "compare",
+            wbToE3: "decide",
+            docRfcBody:
+              "# {title}\n\n- **Status**: Draft / Review / Accepted\n- **Lead**:\n- **Related Ticket**:\n\n## 1. Context & Motivation\n\nDescribe the current bottleneck, trigger, and core problem this RFC solves.\n\n## 2. Goals & Non-Goals\n\n### Goals\n- Define measurable engineering outcomes and scope boundaries.\n\n### Non-Goals\n- Explicitly state what is out of scope to prevent drift.\n\n## 3. Alternatives Comparison\n\n| Dimension | Option A (Recommended) | Option B |\n|---|---|---|\n| Complexity | Low, reuses existing modules | High, introduces parallel state |\n| Performance & Reliability | Meets SLA | Extra network hops |\n| Rollback Cost | Feature flag toggle in seconds | Irreversible schema changes |\n\n## 4. Detailed Design\n\n### 4.1 Module Boundaries & Contracts\n```ts\n// Paste core types, API signatures, or state machine definitions\n```\n\n### 4.2 Data Model & Storage\n- Describe new or updated tables, indexes, and migration strategy.\n\n### 4.3 Failure Modes & Concurrency\n- Cover timeouts, idempotency, partial failures, and fallbacks.\n\n## 5. Testing, Rollout & Rollback\n- [ ] Unit and integration tests\n- [ ] Metrics and alert thresholds\n- [ ] Canary schedule and one-command rollback\n",
+            docAdrBody:
+              "# {title}\n\n- **Status**: Proposed / Accepted / Superseded\n- **Date**:\n- **Deciders**:\n\n## 1. Context & Problem Statement\n\nDescribe the technical forces, constraints, and product requirements driving this decision.\n\n## 2. Decision Drivers\n- Performance and latency budget\n- Maintenance cost and team familiarity\n- Long-term evolution and replaceability\n\n## 3. Considered Options\n1. **Option 1**:\n2. **Option 2**:\n3. **Status quo**:\n\n## 4. Decision Outcome\n\n**Chosen option**: State the selected option and core rationale.\n\n### Positive Consequences\n- Expected benefits and simplifications.\n\n### Negative Consequences & Mitigations\n- Trade-offs accepted and guardrails put in place.\n\n## 5. Verification & Review\n- Explain how code review, static audits, or benchmarks enforce this decision.\n",
+            docPostmortemBody:
+              "# {title}\n\n- **Severity**: SEV-1 / SEV-2 / SEV-3\n- **Duration**:\n- **Impact**: Affected endpoints, features, or percentage of traffic\n\n## 1. Executive Summary\n\nSummarize the failure symptoms, root cause, and resolution in 2-3 blameless sentences.\n\n## 2. Timeline (UTC)\n| Time | Event / Action |\n|---|---|\n| 00:00 | Deploy or trigger condition occurred |\n| 00:05 | Alert fired and investigation began |\n| 00:12 | Direct cause isolated; mitigation/rollback started |\n| 00:18 | Metrics recovered and incident mitigated |\n\n## 3. Root Cause Analysis (5 Whys)\n1. Why did the user-facing error occur?\n2. Why did existing safeguards not catch it?\n3. Why did monitoring not alert earlier?\n4. What was the underlying systemic cause?\n\n## 4. What Went Well & What Needs Work\n- **Effective mitigation**:\n- **Gaps uncovered**:\n\n## 5. Action Items\n| Category | Action | Lead | Due Date | Status |\n|---|---|---|---|---|\n| Prevention | Add regression test and static gate | | | Todo |\n| Detection | Tune alert threshold and dashboard | | | Todo |\n",
+            docApiSpecBody:
+              '# {title}\n\n- **Version**: v1\n- **Auth**: Bearer Token / HMAC\n- **Idempotency**: `Idempotency-Key`\n\n## 1. Endpoints Overview\n\n| Method | Path | Description | Rate Limit |\n|---|---|---|---|\n| GET | `/api/v1/resources` | Paginated list | 120 req/min |\n| POST | `/api/v1/resources` | Create resource | 30 req/min |\n| PUT | `/api/v1/resources/:id` | Replace resource | 60 req/min |\n\n## 2. Request & Response Contract\n\n### Request Payload\n```json\n{\n  "id": "res_01",\n  "name": "example",\n  "options": {}\n}\n```\n\n### Success Response (`200 OK`)\n```json\n{\n  "bizCode": 0,\n  "message": "ok",\n  "data": {}\n}\n```\n\n## 3. Business Error Codes\n\n| HTTP Status | `bizCode` | Meaning | Client Handling |\n|---|---|---|---|\n| 400 | 400001 | Validation failed | Highlight invalid field |\n| 409 | 409001 | Version conflict | Reload snapshot and retry |\n\n## 4. Compatibility Policy\n- Follow additive evolution; never break existing fields without a version bump.\n',
+            docRunbookBody:
+              "# {title}\n\n- **Service**:\n- **Owning Team / Channel**:\n- **Dashboard Link**:\n\n## 1. Dependencies & Degraded Modes\n- List hard and soft dependencies along with expected fallback behavior.\n\n## 2. Common Alerts & Triage\n\n### Alert A: Error Rate > 1% or P99 Latency Breach\n1. Check deploys and config changes in the last 30 minutes.\n2. Verify health, connection pool saturation, and disk headroom:\n```bash\ncurl -fsS http://127.0.0.1:8787/healthz\n```\n3. Inspect aggregated error logs to distinguish upstream timeouts, DB locks, or bad payloads.\n\n## 3. Emergency Kill Switches\n- **Load shedding / feature flags**: Document config keys, reload mechanism, and side effects.\n- **Traffic failover**: Document steps to shift traffic to healthy instances.\n\n## 4. Rollback Procedure\n```bash\n# Identify last known good artifact and trigger rollback\n```\n\n## 5. Escalation\n- Escalate to the module lead if not mitigated within 15 minutes.\n",
+            docSecurityBody:
+              "# {title}\n\n- **Scope**:\n- **Data Classification**: Public / Internal / Sensitive Credentials\n\n## 1. Assets & Trust Boundaries\n- List sensitive assets (keys, tokens, repositories, databases).\n- Mark untrusted inputs (external HTTP, webhooks, user uploads, model tool calls).\n\n## 2. STRIDE Threat Matrix\n\n| Category | Threat Scenario | Existing Control | Residual Risk & Follow-up |\n|---|---|---|---|\n| Spoofing | Forged origin or stolen token | Boundary auth check | Add token expiry enforcement |\n| Tampering | Path traversal or payload injection | Path canonicalization & parameterized SQL | Add static audit check |\n| Info Disclosure | Secrets leaked in logs or errors | `Secret` redaction wrapper | Audit error formatting paths |\n| Denial of Service | Oversized payloads or request floods | Size caps and rate limits | Enforce per-route timeouts |\n| Elevation | Unauthorized admin endpoint access | Role capability gates | Add negative auth tests |\n\n## 3. Security Release Sign-off\n- [ ] No secrets committed or logged\n- [ ] Untrusted inputs decoded strictly at boundaries\n",
+            docMigrationBody:
+              "# {title}\n\n- **Target Storage**: SQLite / PostgreSQL / Directory Store\n- **Zero-Downtime**: Yes / No\n\n## 1. Schema Comparison\n- Summarize new tables, column updates, constraints, or directory layout changes.\n\n## 2. Expand & Contract Rollout\n1. **Phase 1 (Expand)**: Add new structures while keeping old readers working; enable dual-write.\n2. **Phase 2 (Backfill)**: Backfill historical records in throttled keyset batches to avoid locks.\n3. **Phase 3 (Verify & Cutover)**: Run parity verification to confirm zero mismatch, then switch reads.\n4. **Phase 4 (Contract)**: Remove deprecated columns or fallback code after one stable cycle.\n\n## 3. Parity Verification Query\n```sql\n-- Record row-count, checksum, and sample verification queries\n```\n\n## 4. Rollback & Recovery\n- Document stop-the-bleeding steps per phase, snapshot restore path, and expected RTO.\n",
+            docPerfBody:
+              "# {title}\n\n- **Environment**: Hardware specs, dataset size, concurrency profile\n- **Load Tool**:\n\n## 1. Targets & Benchmark Comparison\n\n| Metric | Baseline | Target | After Optimization | Delta |\n|---|---|---|---|---|\n| Throughput (QPS) | | | | |\n| P50 Latency | | | | |\n| P99 Latency | | | | |\n| Peak Memory / CPU | | | | |\n\n## 2. Bottlenecks & Flamegraph Findings\n- Summarize lock contention, hot allocations, serialization overhead, or N+1 queries.\n\n## 3. Applied Optimizations\n1. **Change 1**: Explain mechanism and local trade-offs.\n2. **Change 2**: Explain caching, indexing, or batching improvements.\n\n## 4. Capacity Verdict\n- State recommended per-node concurrency limit, safety margin, and ongoing alerts.\n",
+            diagMsNodeGateway: "Edge Gateway",
+            diagMsNodeAuth: "Auth Service",
+            diagMsNodeCore: "Core Domain",
+            diagMsNodeQueue: "Async Queue",
+            diagMsNodeMedia: "Media Engine",
+            diagMsNodeDb: "Primary DB",
+            diagMsEdgeAuth: "verify token",
+            diagMsEdgeRpc: "internal RPC",
+            diagMsEdgeEmit: "dispatch",
+            diagMsEdgeRead: "tx read/write",
+            diagMsEdgeStore: "persist state",
+            diagSeqClient: "Client App",
+            diagSeqApi: "API Boundary",
+            diagSeqGuard: "Auth & Decode",
+            diagSeqDomain: "Domain Service",
+            diagSeqOutbox: "DB + Outbox",
+            diagSeqBus: "Live SSE Feed",
+            diagSeqE1: "1. request",
+            diagSeqE2: "2. validate",
+            diagSeqE3: "3. execute",
+            diagSeqE4: "4. tx commit",
+            diagSeqE5: "5. push slice",
+            diagErdUser: "Agent (agent)",
+            diagErdRepo: "Repository (repo)",
+            diagErdIssue: "Ticket (issue)",
+            diagErdSession: "Session (session)",
+            diagErdArtifact: "Artifact (artifact)",
+            diagErdVersion: "Snapshot (version)",
+            diagErdE1: "scoped to",
+            diagErdE2: "launches",
+            diagErdE3: "uses profile",
+            diagErdE4: "produces",
+            diagErdE5: "1:N snapshots",
+            diagCiLint: "Lint & Format",
+            diagCiUnit: "Unit & Contract",
+            diagCiBuild: "Build & Package",
+            diagCiCanary: "Canary Deploy",
+            diagCiSmoke: "Smoke & Metrics",
+            diagCiProd: "Full Rollout",
+            diagCiE1: "pass",
+            diagCiE2: "archive",
+            diagCiE3: "deploy",
+            diagCiE4: "green",
+            diagCiE5: "promote",
+            diagSmDraft: "Draft",
+            diagSmQueued: "Queued",
+            diagSmRunning: "Running",
+            diagSmReview: "In Review",
+            diagSmDone: "Done",
+            diagSmCanceled: "Canceled",
+            diagSmE1: "dispatch",
+            diagSmE2: "start",
+            diagSmE3: "submit",
+            diagSmE4: "send back",
+            diagSmE5: "complete",
+            diagSmE6: "cancel",
+            sheetBenchTab1: "Benchmarks",
+            sheetBenchTab2: "Environment",
+            sheetBenchColCase: "Scenario",
+            sheetBenchColBaseline: "Baseline QPS",
+            sheetBenchColCurrent: "Current QPS",
+            sheetBenchColP99: "P99 (ms)",
+            sheetBenchColMem: "Memory (MB)",
+            sheetBenchColStatus: "Verdict",
+            sheetBenchR1Case: "Paginated list query (1000 rows)",
+            sheetBenchR1Status: "Pass (+68%)",
+            sheetBenchR2Case: "Concurrent write tx (64 clients)",
+            sheetBenchR2Status: "Pass (+52%)",
+            sheetBenchR3Case: "Incremental doc sync (10k nodes)",
+            sheetBenchR3Status: "Pass (-41% lat)",
+            sheetBenchR4Case: "Cold-boot slice projection",
+            sheetBenchR4Status: "Watch",
+            sheetBenchEnvKey: "Parameter",
+            sheetBenchEnvVal: "Value",
+            sheetBenchEnvR1: "Concurrency",
+            sheetBenchEnvR2: "Dataset Size",
+            sheetBenchEnvR3: "Warmup Rounds",
+            sheetTechTab: "Scoring Matrix",
+            sheetTechColDim: "Criterion",
+            sheetTechColWeight: "Weight",
+            sheetTechColOptA: "Option A (Embedded)",
+            sheetTechColOptB: "Option B (Sidecar)",
+            sheetTechColNote: "Rationale",
+            sheetTechR1Dim: "End-to-End Latency",
+            sheetTechR1Note: "Zero IPC serialization roundtrip",
+            sheetTechR2Dim: "Ops & Deployment Cost",
+            sheetTechR2Note: "Single binary with no extra daemon",
+            sheetTechR3Dim: "Fault Isolation",
+            sheetTechR3Note: "External crash stays isolated",
+            sheetTechR4Dim: "Delivery Lead Time",
+            sheetTechR4Note: "Reuses shared contracts and store",
+            sheetTechR5Dim: "Long-Term Scaling",
+            sheetTechR5Note: "Can split behind gateway later",
+            sheetTestTab: "Regression Cases",
+            sheetTestColId: "ID",
+            sheetTestColArea: "Area",
+            sheetTestColCase: "Scenario",
+            sheetTestColEnv: "Layer",
+            sheetTestColOwner: "Lead",
+            sheetTestColResult: "Status",
+            sheetTestR1Area: "Auth Boundary",
+            sheetTestR1Case: "Invalid token rejected with 401",
+            sheetTestR1Env: "Integration",
+            sheetTestR1Owner: "Server",
+            sheetTestR1Res: "Pass",
+            sheetTestR2Area: "State Machine",
+            sheetTestR2Case: "Concurrent writes enforce optimistic lock",
+            sheetTestR2Env: "Unit",
+            sheetTestR2Owner: "Core",
+            sheetTestR2Res: "Pass",
+            sheetTestR3Area: "Desktop UI",
+            sheetTestR3Case: "Theme switch and shortcuts respond cleanly",
+            sheetTestR3Env: "E2E UI",
+            sheetTestR3Owner: "Frontend",
+            sheetTestR3Res: "Pass",
+            sheetTestR4Area: "DB Migration",
+            sheetTestR4Case: "Legacy DB reconciles with zero drift",
+            sheetTestR4Env: "Smoke",
+            sheetTestR4Owner: "Storage",
+            sheetTestR4Res: "Review",
+            sheetApiTab: "API Registry",
+            sheetApiColMethod: "Method",
+            sheetApiColPath: "Path",
+            sheetApiColAuth: "Auth",
+            sheetApiColRate: "Rate Limit",
+            sheetApiColOwner: "Domain",
+            sheetApiColStability: "Stability",
+            sheetApiR1Auth: "Loopback / Bearer",
+            sheetApiR1Rate: "Unlimited (local)",
+            sheetApiR1Owner: "Issue",
+            sheetApiR1Stab: "Stable v1",
+            sheetApiR2Auth: "Bearer",
+            sheetApiR2Rate: "60 req/min",
+            sheetApiR2Owner: "Artifact",
+            sheetApiR2Stab: "Stable v1",
+            sheetApiR3Auth: "Bearer + Role",
+            sheetApiR3Rate: "30 req/min",
+            sheetApiR3Owner: "Session",
+            sheetApiR3Stab: "Canary",
+            sheetApiR4Auth: "Pair Signature",
+            sheetApiR4Rate: "10 req/min",
+            sheetApiR4Owner: "Remote",
+            sheetApiR4Stab: "Stable v1",
+            dashSloP1: "Availability (%)",
+            dashSloP2: "P99 Latency (ms)",
+            dashSloP3: "Error Budget Left (%)",
+            dashSloP4: "7d Alerts",
+            dashSloServiceCol: "Service",
+            dashSloAvailCol: "Availability",
+            dashSloP99Col: "P99",
+            dashSloBudgetCol: "Budget Left",
+            dashSloAlertsCol: "Alerts",
+            dashSloR1: "Edge Gateway",
+            dashSloR2: "Core State Engine",
+            dashSloR3: "Collab & Storage",
+            dashSloR4: "Live SSE Stream",
+            dashDoraP1: "Deploys / Week",
+            dashDoraP2: "Lead Time (h)",
+            dashDoraP3: "Failure Rate (%)",
+            dashDoraP4: "MTTR (min)",
+            dashDoraWeekCol: "Week",
+            dashDoraDeployCol: "Deploys",
+            dashDoraLeadCol: "Lead Time (h)",
+            dashDoraCfrCol: "CFR (%)",
+            dashDoraMttrCol: "MTTR (m)",
+            slidesArchS1Sub: "Context, boundaries, and key trade-offs",
+            slidesArchS1Notes: "Spend 2 minutes aligning on constraints and explicit non-goals.",
+            slidesArchS2Title: "Context & Constraints",
+            slidesArchS2Sub: "Why the current design cannot carry the next milestone",
+            slidesArchS2B1: "Latency and consistency targets",
+            slidesArchS2B2: "Legacy data compatibility and migration window",
+            slidesArchS2B3: "Local-first and remote sync boundary",
+            slidesArchS2Notes: "Clarify hard constraints versus staged improvements.",
+            slidesArchS3Title: "Target Architecture",
+            slidesArchS3Sub: "Acyclic module layering and boundary decoding",
+            slidesArchS3B1: "Gateway handles auth and edge validation only",
+            slidesArchS3B2: "Core domain rules stay pure and deterministic",
+            slidesArchS3B3: "Persistence consolidated behind one service",
+            slidesArchS3Notes: "Walk through the primary request path and recovery flow.",
+            slidesArchS4Title: "Key Trade-offs",
+            slidesArchS4Sub: "Options evaluated and risk mitigations",
+            slidesArchS4B1: "Long-term maintenance gains vs near-term cost",
+            slidesArchS4B2: "Kill switches and canary rollback strategy",
+            slidesArchS4B3: "Benchmarking and capacity headroom checks",
+            slidesArchS4Notes: "Address concurrency safety and rollback questions directly.",
+            slidesArchS5Title: "Milestones & Next Steps",
+            slidesArchS5Sub: "Phased rollout schedule and acceptance criteria",
+            slidesArchS5B1: "Phase 1: Core contracts and storage schema",
+            slidesArchS5B2: "Phase 2: Integration and load verification",
+            slidesArchS5B3: "Phase 3: Canary rollout and general availability",
+            slidesArchS5Notes: "Confirm review sign-off, blockers, and leads.",
+            slidesRelS1Sub: "Feature overview, engineering wins, and live demo",
+            slidesRelS1Notes: "Keep under 15 minutes; highlight the core problem solved.",
+            slidesRelS2Title: "Why We Built This",
+            slidesRelS2Sub: "Addressing high-frequency engineering friction",
+            slidesRelS2B1: "Manual preflight checklists were slow and error-prone",
+            slidesRelS2B2: "Cross-module debugging lacked a unified view",
+            slidesRelS2B3: "Metrics and regression baselines lacked automated gates",
+            slidesRelS2Notes: "Open with 1-2 real incidents or bottlenecks.",
+            slidesRelS3Title: "Core Capabilities & Design",
+            slidesRelS3Sub: "Key architectural decisions that paid off",
+            slidesRelS3B1: "Declarative templates with structured directory storage",
+            slidesRelS3B2: "Zero-network offline sandbox previews",
+            slidesRelS3B3: "Bilingual catalogs and automated contract parity checks",
+            slidesRelS3Notes: "Walk through the live workflow or diagram.",
+            slidesRelS4Title: "Measured Impact",
+            slidesRelS4Sub: "Before vs after verification results",
+            slidesRelS4B1: "45% faster core workflow turnaround",
+            slidesRelS4B2: "95%+ automated regression coverage",
+            slidesRelS4B3: "Zero-downtime upgrade with zero schema drift",
+            slidesRelS4Notes: "Anchor the value proposition with concrete numbers.",
+            slidesRelS5Title: "Roadmap & Q&A",
+            slidesRelS5Sub: "Upcoming improvements and feedback loop",
+            slidesRelS5B1: "Support team-authored custom template packs",
+            slidesRelS5B2: "One-click ticket handoff from content artifacts",
+            slidesRelS5B3: "Share feedback in the engineering channel",
+            slidesRelS5Notes: "Leave 5 minutes for open Q&A.",
+            protoApiTitle: "API & JSON Payload Sandbox",
+            protoApiSub: "Format JSON offline, inspect payload shape, and generate cURL commands",
+            protoApiBtnPretty: "Format JSON",
+            protoApiBtnMinify: "Minify",
+            protoApiBtnCopy: "Generate cURL",
+            protoApiPayloadLabel: "Request JSON Payload",
+            protoApiCurlLabel: "Generated Command",
+            protoApiValid: "Valid JSON payload",
+            protoApiInvalid: "JSON parse error: ",
+            protoCompTitle: "Interactive UI State Sandbox",
+            protoCompSub: "Preview default, loading, empty, and error states across themes and viewport widths",
+            protoCompStateLabel: "Component State",
+            protoCompThemeLabel: "Theme",
+            protoCompWidthLabel: "Viewport Width",
+            protoCompStateDefault: "Default",
+            protoCompStateLoading: "Loading",
+            protoCompStateEmpty: "Empty",
+            protoCompStateError: "Error",
+            protoCompThemeLight: "Light",
+            protoCompThemeDark: "Dark",
+            protoCompCardTitle: "Service Deployment Status",
+            protoCompCardBody: "Release v2.4.0 is healthy across 3 zones with 18ms P99 latency.",
+            protoCompLoadingText: "Fetching latest health checks and metrics…",
+            protoCompEmptyText: "No matching active instances. Adjust filters or create a deployment.",
+            protoCompErrorText: "Gateway timeout (504): upstream health aggregator missed the 3000ms deadline.",
+            designDesktopName: "Desktop Workspace",
+            designMobileName: "Mobile Companion",
+            designPropDensity: "Density",
+            designPropBanner: "Show Release Banner",
+            designPropCta: "Primary CTA",
+            designPropCtaDefault: "Install as Desktop App",
+            designHeroSub: "Native real-time collaboration across artboards with shared tokens.",
+            designMetricsTitle: "Service Contracts",
+            designActionTitle: "Desktop Bundle Setup",
+            dsButtonTitle: "Button",
+            dsButtonSummary: "Triggers a primary user action; keep one primary button per toolbar.",
+            dsButtonDo: 'Start with an action verb (e.g. "Save & Publish")',
+            dsButtonDont: "Avoid placing two primary buttons side-by-side",
+            dsBadgeTitle: "Badge",
+            dsBadgeSummary: "Compact status and category indicator.",
+            dsBadgeDo: "Keep labels concise (1–2 short words)",
+            motionCh1: "Opening Hook",
+            motionCh2: "Feature Reveal",
+            motionCh3: "Closing CTA",
+            motionSc2Headline: "Zero external dependencies — installable as a native app",
+            motionSc2CardTitle: "Pure-Time Deterministic Engine",
+            motionSc2CardBody: "Every timestamp t maps deterministically to easing curves and layer transforms",
+            motionSc3Headline: "Preview & Ship Directly from Content Hub",
+            sbTone: "Warm Editorial · Crisp Contrast",
+            sbS1Scene: "Opening · Studio Overview",
+            sbS1Visual: "Morning light illuminates the desktop workbench as cards and timelines fan out cleanly.",
+            sbS1Dialogue: "Turn every conversation idea directly into a runnable artifact.",
+            sbS2Scene: "Demo · One-Click Install as App",
+            sbS2Visual: "User clicks Install as App; an interactive mini-app opens in a unified immersive titlebar window.",
+            sbS2Dialogue: "No browser chrome — just a focused Mac utility ready from Spotlight or your Dock.",
+            sbS3Scene: "Closing · Built for Flow",
+            sbS3Visual: "Close-up of the ring timer and oscilloscope pulsing smoothly inside the standalone applet.",
+            sbS3Dialogue: "Offline-safe, instant launch, crafted for daily focus and exploration.",
           },
         },
         search: {
-          title: "Search content",
+          title: "Search artifacts",
           placeholder: "Search notes, artifacts, and media…",
           empty: "No matching notes, artifacts, or media",
           typeMedia: "Media",
+          scopeAll: "All",
+          scopeArtifacts: "Artifacts",
+          scopeMedia: "Media",
         },
       },
     },
@@ -5638,7 +6197,7 @@ export const catalogs = {
         voice: "call phone recognition speech MOSS live realtime vision transcription",
         connections: "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
         remote: "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
-        about: "version home folder settings data catalog",
+        about: "version home folder settings data",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
       general: {
@@ -5679,10 +6238,6 @@ export const catalogs = {
         copy: "Copy the path",
         copied: "Path copied",
         reveal: "Show in Finder",
-        devTools: "Developer tools",
-        catalog: "Asset catalog",
-        catalogHint: "Inspect sprites, cursors, sounds, and workbench UI components",
-        openCatalog: "Open catalog",
         update: "Updates",
         updateHint: "The desktop app updates itself from the releases on GitHub",
         upToDate: "Up to date",
@@ -5736,9 +6291,8 @@ export const catalogs = {
       sidebar: {
         title: "Repos & terminals",
         addRepo: "Add repository",
-        addRepoButton: "Repo",
         addRepoTooltip: "Add a local repository or folder",
-        manageRepos: "Manage repositories",
+        newMenu: "New in {name}",
         running: "Running",
         runningAgent: "{agent} running",
         ready: "Ready",
@@ -5750,8 +6304,6 @@ export const catalogs = {
         attentionCount: "{n} attention",
         closeTab: "Close tab",
         tabMore: "More actions",
-        newTerminal: "New terminal: {name}",
-        newChat: "New chat: {name}",
         closeFolder: "Close folder: {name}",
         closeFolderMenu: "Close folder",
         repoDetails: "Repository details",
@@ -5786,6 +6338,9 @@ export const catalogs = {
         copyAbsPath: "Copy full path",
         revealInFinder: "Reveal in Finder",
         newTerminalInDir: "New terminal in folder",
+        unsupportedHint: "In-app preview is not available for this file",
+        openWithDefault: "Open with Default App",
+        openInApp: "Open in App",
       },
       git: {
         title: "Source Control",
@@ -5861,21 +6416,12 @@ export const catalogs = {
         thoughtMedium: "Med",
         thoughtHigh: "High",
         thoughtMax: "Max",
-        permissionMode: "Permissions",
-        modeAsk: "Ask",
-        modeAcceptEdits: "Accept edits",
-        modeBypass: "Bypass",
-        modeReadOnly: "Read-only",
-        openTerminal: "Open terminal here",
-        statusStarting: "Connecting…",
-        statusReady: "Ready",
-        statusWorking: "Working",
         statusWaiting: "Needs reply",
-        statusError: "Error",
         emptyTitle: "Direct coding chat in this workspace",
         emptyHint: "Pick a runtime and start chatting. Tool call cards open files and diffs directly in an adjacent split pane.",
-        you: "You",
         steerTag: "Steer",
+        todoTitle: "Progress",
+        todoToolLabel: "Update steps",
         thinking: "Thinking",
         toolOpenFile: "Open file",
         toolOpenDiff: "View diff",
@@ -5884,6 +6430,20 @@ export const catalogs = {
         toolFailed: "Failed",
         toolPending: "Waiting for output…",
         toolNoOutput: "No output",
+        activityThinking: "{n} thoughts",
+        activityRead: "Read {n}",
+        activitySearch: "Searched {n}",
+        activityEdit: "Edited {n}",
+        activityCommand: "Ran {n} cmds",
+        activityOther: "{n} tools",
+        activitySteps: "{n} steps",
+        activityRunning: "Running",
+        activityFailed: "{n} failed",
+        toolInput: "Input",
+        toolOutput: "Output",
+        toolLines: "{n} lines",
+        copy: "Copy",
+        copied: "Copied",
         interactionBadge: "Needs your confirmation · never auto-approved",
         interactionAnswered: "Answered",
         interactionDeclined: "Declined",
@@ -5895,8 +6455,7 @@ export const catalogs = {
         permissionAllowSession: "Allow for session",
         permissionDeny: "Deny",
         composerPlaceholder: "Ask {runtime} or describe a change… (Enter to send, Shift+Enter for newline)",
-        steerPlaceholder: "Turn running — type to steer mid-turn…",
-        steeringBanner: "Turn active · sending steers mid-turn via session.send without cancelling context",
+        steerPlaceholder: "Add instructions while running…",
         send: "Send",
         steer: "Steer",
         stop: "Stop",
@@ -5976,43 +6535,6 @@ export const catalogs = {
         worktrees: "Worktrees",
         tabsCount: "{n} tabs",
         closeFolder: "Close folder from workspace",
-      },
-    },
-    "web.tree": { sky: "The farm's sky of memories" },
-    "web.ui.pixel": {
-      sound: {
-        group: { ui: "Interface", tools: "Tools", field: "In the field", yard: "Yard", reward: "Rewards", voice: "Voice" },
-        label: {
-          tap: "Tap",
-          nope: "Nope",
-          pick: "Pick a tool",
-          open: "Open",
-          close: "Close",
-          water: "Water",
-          spray: "Spray",
-          weed: "Weed",
-          harvest: "Harvest",
-          shovel: "Shovel",
-          plant: "Sow",
-          ripe: "Ripe",
-          bug: "Bugs",
-          coin: "Coin",
-          levelUp: "Level up",
-          achievement: "Achievement",
-          arrive: "Helper arrives",
-          rustle: "Rustling grass",
-          splash: "Splash",
-          thud: "Footstep",
-          woof: "Puppy barks",
-          meow: "Kitten meows",
-          mew: "Kitten mews",
-          purr: "Kitten purrs",
-          yip: "Puppy jumps",
-          pant: "Puppy pants",
-          voiceOn: "Call connected",
-          voiceOff: "Call ended",
-          ring: "Ringing",
-        },
       },
     },
     "web.voice": {
@@ -6318,13 +6840,14 @@ export interface Messages {
   "web.artifact.applet.bundleIdLabel": undefined;
   "web.artifact.applet.bundlePathLabel": undefined;
   "web.artifact.applet.button": undefined;
-  "web.artifact.applet.buttonInstalled": undefined;
   "web.artifact.applet.install": undefined;
   "web.artifact.applet.installedToast": { readonly name: string | number };
   "web.artifact.applet.installing": undefined;
+  "web.artifact.applet.manageApp": undefined;
   "web.artifact.applet.modalTitle": undefined;
   "web.artifact.applet.nameRequired": undefined;
   "web.artifact.applet.open": undefined;
+  "web.artifact.applet.openApp": undefined;
   "web.artifact.applet.openedToast": { readonly name: string | number };
   "web.artifact.applet.reinstall": undefined;
   "web.artifact.applet.statusInstalled": undefined;
@@ -6342,23 +6865,78 @@ export interface Messages {
   "web.artifact.card.open": { readonly title: string | number };
   "web.artifact.card.version": { readonly version: string | number };
   "web.artifact.dashboard.exportCsv": undefined;
-  "web.artifact.design.noProps": undefined;
+  "web.artifact.design.disabled": undefined;
+  "web.artifact.design.emptyCanvas": undefined;
+  "web.artifact.design.enabled": undefined;
+  "web.artifact.design.propsTitle": undefined;
+  "web.artifact.design.themeDark": undefined;
+  "web.artifact.design.themeLight": undefined;
+  "web.artifact.designSystem.colors": undefined;
   "web.artifact.designSystem.components": undefined;
+  "web.artifact.designSystem.guidelinesDo": undefined;
+  "web.artifact.designSystem.guidelinesDont": undefined;
+  "web.artifact.designSystem.previewTheme": undefined;
+  "web.artifact.designSystem.radius": undefined;
+  "web.artifact.designSystem.spacing": undefined;
+  "web.artifact.designSystem.specimen": undefined;
+  "web.artifact.designSystem.typography": undefined;
+  "web.artifact.diagram.edges": undefined;
+  "web.artifact.diagram.nodes": undefined;
+  "web.artifact.diagram.structure": undefined;
+  "web.artifact.diagram.visual": undefined;
+  "web.artifact.docs.edit": undefined;
+  "web.artifact.docs.read": undefined;
+  "web.artifact.docs.split": undefined;
   "web.artifact.edit.save": undefined;
   "web.artifact.edit.saved": { readonly version: string | number };
+  "web.artifact.files.codeMode": undefined;
+  "web.artifact.files.htmlPreviewMode": undefined;
   "web.artifact.issue.title": undefined;
+  "web.artifact.motion.chapters": undefined;
+  "web.artifact.motion.layers": { readonly n: string | number };
+  "web.artifact.motion.loop": undefined;
+  "web.artifact.motion.nextStep": undefined;
+  "web.artifact.motion.play": undefined;
+  "web.artifact.motion.prevStep": undefined;
+  "web.artifact.motion.restart": undefined;
+  "web.artifact.motion.stop": undefined;
+  "web.artifact.motion.timeline": undefined;
+  "web.artifact.outline.addChild": undefined;
+  "web.artifact.outline.cycleKind": { readonly kind: string | number };
+  "web.artifact.outline.hideDone": undefined;
+  "web.artifact.outline.indent": undefined;
+  "web.artifact.outline.kindBullet": undefined;
+  "web.artifact.outline.kindHeading": undefined;
+  "web.artifact.outline.kindTodo": undefined;
+  "web.artifact.outline.outdent": undefined;
+  "web.artifact.outline.progress": { readonly done: string | number; readonly total: string | number };
+  "web.artifact.outline.quickAdd": undefined;
+  "web.artifact.outline.showDone": undefined;
+  "web.artifact.outline.untitled": undefined;
   "web.artifact.page.all": undefined;
+  "web.artifact.page.backToLibrary": undefined;
   "web.artifact.page.delete": undefined;
   "web.artifact.page.deleteAsk": { readonly title: string | number };
+  "web.artifact.page.deleteFileAsk": { readonly path: string | number };
   "web.artifact.page.deleted": { readonly title: string | number };
+  "web.artifact.page.directory": undefined;
+  "web.artifact.page.discard": undefined;
+  "web.artifact.page.filesTab": undefined;
+  "web.artifact.page.filesTabCount": { readonly n: string | number };
   "web.artifact.page.gone": undefined;
+  "web.artifact.page.liveVersion": undefined;
   "web.artifact.page.more": undefined;
   "web.artifact.page.new": undefined;
+  "web.artifact.page.newFileLabel": undefined;
   "web.artifact.page.none": undefined;
+  "web.artifact.page.previewTab": undefined;
   "web.artifact.page.rail": undefined;
   "web.artifact.page.railHide": undefined;
   "web.artifact.page.railShow": undefined;
+  "web.artifact.page.snapshotNote": undefined;
   "web.artifact.page.title": undefined;
+  "web.artifact.page.unsaved": undefined;
+  "web.artifact.page.viewMode": undefined;
   "web.artifact.presenter.aside": undefined;
   "web.artifact.presenter.clock": undefined;
   "web.artifact.presenter.current": undefined;
@@ -6371,37 +6949,63 @@ export interface Messages {
   "web.artifact.presenter.notes": undefined;
   "web.artifact.presenter.restart": undefined;
   "web.artifact.presenter.waiting": undefined;
+  "web.artifact.prototype.reload": undefined;
+  "web.artifact.prototype.viewportFull": undefined;
+  "web.artifact.prototype.viewportLabel": undefined;
+  "web.artifact.prototype.viewportMobile": undefined;
+  "web.artifact.prototype.viewportTablet": undefined;
+  "web.artifact.sheet.addRow": undefined;
+  "web.artifact.sheet.empty": undefined;
+  "web.artifact.sheet.filterPlaceholder": undefined;
+  "web.artifact.sheet.rowsCount": { readonly n: string | number };
+  "web.artifact.slides.doneEdit": undefined;
+  "web.artifact.slides.editSlide": undefined;
+  "web.artifact.slides.layoutContent": undefined;
+  "web.artifact.slides.layoutCover": undefined;
   "web.artifact.slides.next": undefined;
   "web.artifact.slides.present": undefined;
   "web.artifact.slides.presenter": undefined;
   "web.artifact.slides.previous": undefined;
+  "web.artifact.slides.slideBulletsLabel": undefined;
+  "web.artifact.slides.slideLayoutLabel": undefined;
+  "web.artifact.slides.slideNotesLabel": undefined;
+  "web.artifact.slides.slideSubtitleLabel": undefined;
+  "web.artifact.slides.slideTitleLabel": undefined;
   "web.artifact.slidesStore.addSlide": undefined;
   "web.artifact.standalone.live": undefined;
   "web.artifact.standalone.missing": undefined;
   "web.artifact.standalone.version": { readonly version: string | number };
+  "web.artifact.storyboard.animaticMode": undefined;
+  "web.artifact.storyboard.gridMode": undefined;
+  "web.artifact.storyboard.sfx": undefined;
+  "web.artifact.storyboard.shotOf": { readonly n: string | number; readonly total: string | number };
+  "web.artifact.storyboard.totalDuration": { readonly sec: string | number };
+  "web.artifact.storyboard.transition": undefined;
   "web.artifact.suggestions.accept": undefined;
   "web.artifact.suggestions.by": { readonly name: string | number };
   "web.artifact.suggestions.delete": undefined;
   "web.artifact.suggestions.reject": undefined;
   "web.artifact.suggestions.title": { readonly n: string | number };
   "web.artifact.timeline.backToLive": undefined;
+  "web.artifact.timeline.commits": undefined;
   "web.artifact.timeline.compact": undefined;
   "web.artifact.timeline.compacted": undefined;
   "web.artifact.timeline.empty": undefined;
   "web.artifact.timeline.fork": undefined;
   "web.artifact.timeline.forkTitle": { readonly title: string | number };
   "web.artifact.timeline.forked": { readonly title: string | number };
+  "web.artifact.timeline.hide": undefined;
   "web.artifact.timeline.loading": undefined;
-  "web.artifact.timeline.next": undefined;
-  "web.artifact.timeline.prev": undefined;
   "web.artifact.timeline.previewBanner": { readonly summary: string | number };
   "web.artifact.timeline.restore": undefined;
   "web.artifact.timeline.restored": undefined;
+  "web.artifact.timeline.savedVersions": undefined;
+  "web.artifact.timeline.show": undefined;
   "web.artifact.timeline.title": undefined;
-  "web.artifact.timeline.toggle": undefined;
   "web.artifact.timeline.turn": { readonly n: string | number };
   "web.artifact.timeline.undoTurn": undefined;
   "web.artifact.timeline.undoneOrigin": undefined;
+  "web.artifact.timeline.versionBanner": { readonly note: string | number; readonly version: string | number };
   "web.artifact.types.dashboard": undefined;
   "web.artifact.types.defaultBadge": undefined;
   "web.artifact.types.design": undefined;
@@ -6619,8 +7223,6 @@ export interface Messages {
   "web.base.openTerminal": undefined;
   "web.base.orchestrator": undefined;
   "web.base.pickTooLarge": { readonly name: string | number };
-  "web.base.place.catalog.hint": undefined;
-  "web.base.place.catalog.label": undefined;
   "web.base.place.chat.hint": undefined;
   "web.base.place.chat.label": undefined;
   "web.base.place.content.hint": undefined;
@@ -6637,6 +7239,7 @@ export interface Messages {
   "web.base.place.team.label": undefined;
   "web.base.place.workspace.hint": undefined;
   "web.base.place.workspace.name": undefined;
+  "web.base.play": undefined;
   "web.base.query.invalidResponse": undefined;
   "web.base.rail": undefined;
   "web.base.reading": undefined;
@@ -6692,6 +7295,7 @@ export interface Messages {
   "web.base.shortcuts.say.tool": undefined;
   "web.base.shortcuts.say.voice": undefined;
   "web.base.shortcuts.title": undefined;
+  "web.base.stop": undefined;
   "web.base.table.columns": undefined;
   "web.base.table.empty": undefined;
   "web.base.table.next": undefined;
@@ -6732,78 +7336,14 @@ export interface Messages {
   "web.base.toasts": undefined;
   "web.base.unreachable": undefined;
   "web.base.update": undefined;
-  "web.base.updateReady": { readonly next: string | number };
+  "web.base.updateInstall": undefined;
+  "web.base.updateInstalling": undefined;
+  "web.base.updateNotesTitle": undefined;
+  "web.base.updateReadyOneClick": { readonly next: string | number };
+  "web.base.updateReadyTitle": { readonly next: string | number };
   "web.base.user": undefined;
   "web.base.working": { readonly n: string | number };
   "web.base.write": undefined;
-  "web.catalog.all": undefined;
-  "web.catalog.anchor": undefined;
-  "web.catalog.background": undefined;
-  "web.catalog.categories": undefined;
-  "web.catalog.copied": undefined;
-  "web.catalog.copy": undefined;
-  "web.catalog.count": { readonly n: string | number };
-  "web.catalog.cursorsFind": undefined;
-  "web.catalog.cursorsIntro": undefined;
-  "web.catalog.cursorsNote": undefined;
-  "web.catalog.find": undefined;
-  "web.catalog.findHint": undefined;
-  "web.catalog.fps": undefined;
-  "web.catalog.frames": { readonly n: string | number };
-  "web.catalog.from": undefined;
-  "web.catalog.ground.check": undefined;
-  "web.catalog.ground.grass": undefined;
-  "web.catalog.ground.night": undefined;
-  "web.catalog.head": undefined;
-  "web.catalog.marks": undefined;
-  "web.catalog.moves": undefined;
-  "web.catalog.noCursors": undefined;
-  "web.catalog.noMatch": undefined;
-  "web.catalog.perSecond": { readonly n: string | number };
-  "web.catalog.pick": undefined;
-  "web.catalog.pixels": { readonly h: string | number; readonly w: string | number };
-  "web.catalog.play": undefined;
-  "web.catalog.playSound": { readonly name: string | number };
-  "web.catalog.recut": undefined;
-  "web.catalog.redraw": undefined;
-  "web.catalog.shelf.acts.hint": undefined;
-  "web.catalog.shelf.acts.label": undefined;
-  "web.catalog.shelf.dog.hint": undefined;
-  "web.catalog.shelf.dog.label": undefined;
-  "web.catalog.shelf.helpers.hint": undefined;
-  "web.catalog.shelf.helpers.label": undefined;
-  "web.catalog.shelf.icons.hint": undefined;
-  "web.catalog.shelf.icons.label": undefined;
-  "web.catalog.shelf.langs.hint": undefined;
-  "web.catalog.shelf.langs.label": undefined;
-  "web.catalog.shelf.logos.hint": undefined;
-  "web.catalog.shelf.machines.hint": undefined;
-  "web.catalog.shelf.machines.label": undefined;
-  "web.catalog.shelf.map.hint": undefined;
-  "web.catalog.shelf.map.label": undefined;
-  "web.catalog.shelf.medals.hint": undefined;
-  "web.catalog.shelf.medals.label": undefined;
-  "web.catalog.shelf.orchestrator.hint": undefined;
-  "web.catalog.shelf.other.hint": undefined;
-  "web.catalog.shelf.other.label": undefined;
-  "web.catalog.shelf.plots.hint": undefined;
-  "web.catalog.shelf.plots.label": undefined;
-  "web.catalog.shelf.ui.hint": undefined;
-  "web.catalog.shelf.ui.label": undefined;
-  "web.catalog.shelf.yard.hint": undefined;
-  "web.catalog.shelf.yard.label": undefined;
-  "web.catalog.shelves": undefined;
-  "web.catalog.size": undefined;
-  "web.catalog.soundsFind": undefined;
-  "web.catalog.soundsIntro": undefined;
-  "web.catalog.soundsMuted": undefined;
-  "web.catalog.soundsRecipes": undefined;
-  "web.catalog.stop": undefined;
-  "web.catalog.tab.cursors": undefined;
-  "web.catalog.tab.sounds": undefined;
-  "web.catalog.tab.sprites": undefined;
-  "web.catalog.unrecorded": undefined;
-  "web.catalog.zoom": undefined;
   "web.channel.channels": undefined;
   "web.channel.channelsTitle": undefined;
   "web.channel.closeThread": undefined;
@@ -6876,7 +7416,6 @@ export interface Messages {
   "web.channel.dialog.repoNone": undefined;
   "web.channel.dialog.save": undefined;
   "web.channel.dialog.settingsOf": { readonly name: string | number };
-  "web.channel.direct.add": undefined;
   "web.channel.direct.none": undefined;
   "web.channel.direct.open": { readonly name: string | number };
   "web.channel.direct.pick": undefined;
@@ -6890,16 +7429,21 @@ export interface Messages {
   "web.channel.emoji.more": undefined;
   "web.channel.emoji.open": undefined;
   "web.channel.empty": { readonly label: string | number };
+  "web.channel.emptyList": undefined;
+  "web.channel.emptyPreview": undefined;
   "web.channel.farmSearch.failed": { readonly why: string | number };
   "web.channel.farmSearch.filters": undefined;
   "web.channel.farmSearch.hint": undefined;
   "web.channel.farmSearch.none": undefined;
   "web.channel.farmSearch.searching": undefined;
   "web.channel.farmSearch.title": undefined;
+  "web.channel.filter.all": undefined;
+  "web.channel.filter.direct": undefined;
+  "web.channel.filter.group": undefined;
+  "web.channel.filter.label": undefined;
   "web.channel.find": undefined;
   "web.channel.findHint": undefined;
   "web.channel.findMessages": undefined;
-  "web.channel.helpers": undefined;
   "web.channel.inChannel": undefined;
   "web.channel.issues.empty": undefined;
   "web.channel.issues.thread": undefined;
@@ -6910,7 +7454,6 @@ export interface Messages {
   "web.channel.manage.archivedTitle": undefined;
   "web.channel.manage.category": undefined;
   "web.channel.manage.categoryHint": undefined;
-  "web.channel.manage.drag": undefined;
   "web.channel.manage.members": undefined;
   "web.channel.manage.membersHint": undefined;
   "web.channel.manage.mentionsOnly": undefined;
@@ -6988,16 +7531,16 @@ export interface Messages {
   "web.channel.names.talkThread": { readonly who: string | number };
   "web.channel.names.thread": undefined;
   "web.channel.newChannel": undefined;
-  "web.channel.noHelpers": undefined;
+  "web.channel.newChat": undefined;
   "web.channel.nobodyOnIt": undefined;
   "web.channel.orchestrator": undefined;
-  "web.channel.orchestratorRuns": undefined;
   "web.channel.pins.failed": { readonly why: string | number };
   "web.channel.pins.none": undefined;
   "web.channel.pins.open": undefined;
   "web.channel.pins.title": undefined;
   "web.channel.replies": { readonly n: number };
   "web.channel.reply": undefined;
+  "web.channel.runsEntry": undefined;
   "web.channel.sayInThread": { readonly name: string | number };
   "web.channel.sendTo": { readonly label: string | number };
   "web.channel.settings": undefined;
@@ -7192,108 +7735,23 @@ export interface Messages {
   "web.devtools.trajectory.turnIndex": { readonly index: string | number };
   "web.devtools.trajectory.turns": undefined;
   "web.devtools.trajectory.voyageRecords": undefined;
-  "web.farm.aim.bug": undefined;
-  "web.farm.aim.clearAt": { readonly level: string | number };
-  "web.farm.aim.flowerbed": undefined;
-  "web.farm.aim.harvestLook": undefined;
-  "web.farm.aim.harvestRipe": undefined;
-  "web.farm.aim.look": undefined;
-  "web.farm.aim.noBugs": undefined;
-  "web.farm.aim.noShovel": undefined;
-  "web.farm.aim.noWeeds": undefined;
-  "web.farm.aim.nothingToHarvest": undefined;
-  "web.farm.aim.nothingYet": undefined;
-  "web.farm.aim.shovelDismiss": undefined;
-  "web.farm.aim.shovelStop": undefined;
-  "web.farm.aim.sow": undefined;
-  "web.farm.aim.unavailable": { readonly state: string | number };
-  "web.farm.aim.unread": undefined;
-  "web.farm.aim.water": { readonly name: string | number };
-  "web.farm.aim.weeds": undefined;
   "web.farm.chat.channels": undefined;
   "web.farm.chat.enlarge": undefined;
   "web.farm.chat.fold": undefined;
   "web.farm.chat.greeting": undefined;
   "web.farm.chat.send": undefined;
-  "web.farm.crop.dry": undefined;
-  "web.farm.crop.empty": undefined;
-  "web.farm.crop.flowering": undefined;
-  "web.farm.crop.harvested": undefined;
-  "web.farm.crop.leafy": undefined;
-  "web.farm.crop.locked": undefined;
-  "web.farm.crop.seeded": undefined;
-  "web.farm.crop.sprout": undefined;
-  "web.farm.crop.weeds": undefined;
-  "web.farm.crop.wheat": undefined;
-  "web.farm.crop.withered": undefined;
-  "web.farm.friends.helpers": undefined;
   "web.farm.harvest.counts": { readonly commits: string | number; readonly files: string | number };
   "web.farm.harvest.letGo": undefined;
   "web.farm.harvest.repo": { readonly repo: string | number };
   "web.farm.harvest.resolve": undefined;
   "web.farm.harvest.take": { readonly base: string | number };
-  "web.farm.hud.toLevel": { readonly need: string | number; readonly xp: string | number };
-  "web.farm.hud.toLevelNext": { readonly need: string | number; readonly next: string | number; readonly xp: string | number };
-  "web.farm.hud.tree": undefined;
   "web.farm.hud.workbench": undefined;
-  "web.farm.menu.agents": undefined;
-  "web.farm.menu.catalog": undefined;
-  "web.farm.menu.chat": undefined;
-  "web.farm.menu.connectors": undefined;
   "web.farm.menu.issues": undefined;
   "web.farm.menu.repos": undefined;
-  "web.farm.menu.runtimes": undefined;
-  "web.farm.menu.skills": undefined;
-  "web.farm.native.accepted": undefined;
-  "web.farm.native.achievements": undefined;
   "web.farm.native.close": undefined;
-  "web.farm.native.coins": { readonly coins: string | number };
-  "web.farm.native.dawn": undefined;
-  "web.farm.native.dusk": undefined;
-  "web.farm.native.empty": undefined;
-  "web.farm.native.fruit": undefined;
-  "web.farm.native.islandGone": { readonly repo: string | number };
-  "web.farm.native.islandQueued": { readonly count: string | number };
-  "web.farm.native.islandWorking": { readonly count: string | number; readonly limit: string | number; readonly repo: string | number };
-  "web.farm.native.leaf": undefined;
-  "web.farm.native.ledger": undefined;
   "web.farm.native.loading": undefined;
-  "web.farm.native.log": undefined;
-  "web.farm.native.map": undefined;
-  "web.farm.native.next": { readonly page: string | number; readonly pages: string | number };
-  "web.farm.native.night": undefined;
-  "web.farm.native.noMessages": undefined;
-  "web.farm.native.noon": undefined;
-  "web.farm.native.pending": undefined;
-  "web.farm.native.phone": undefined;
-  "web.farm.native.previous": undefined;
-  "web.farm.native.progress": { readonly level: string | number; readonly need: string | number; readonly xp: string | number };
-  "web.farm.native.restart": undefined;
-  "web.farm.native.score": { readonly score: string | number };
-  "web.farm.native.seed": undefined;
-  "web.farm.native.shop": undefined;
-  "web.farm.native.steer": undefined;
-  "web.farm.native.tree": undefined;
-  "web.farm.native.treeCounts": { readonly fruits: string | number; readonly leaves: string | number; readonly seeds: string | number };
-  "web.farm.native.treeGrowth": { readonly growth: string | number; readonly rounds: string | number };
-  "web.farm.native.warehouse": undefined;
-  "web.farm.native.workbench": undefined;
-  "web.farm.native.workers": { readonly count: string | number };
-  "web.farm.overlay.bare": { readonly plot: string | number };
-  "web.farm.overlay.clearAt": { readonly level: string | number };
-  "web.farm.overlay.click": { readonly text: string | number };
-  "web.farm.overlay.flowerbed": undefined;
-  "web.farm.overlay.idle": undefined;
-  "web.farm.overlay.unclaimed": undefined;
-  "web.farm.panel.graphs": undefined;
   "web.farm.panel.harvest": { readonly name: string | number };
-  "web.farm.panel.log": undefined;
-  "web.farm.panel.menu": undefined;
-  "web.farm.panel.orchestrator": undefined;
-  "web.farm.panel.shop": undefined;
-  "web.farm.panel.shopClosed": { readonly coins: string | number };
   "web.farm.panel.sow": { readonly plot: string | number };
-  "web.farm.panel.warehouse": undefined;
   "web.farm.panel.water": { readonly name: string | number };
   "web.farm.phone.again": undefined;
   "web.farm.phone.answer": undefined;
@@ -7364,14 +7822,12 @@ export interface Messages {
   "web.farm.phone.merge.stages": undefined;
   "web.farm.phone.merge.start": undefined;
   "web.farm.phone.missed": { readonly n: string | number };
-  "web.farm.phone.new": undefined;
   "web.farm.phone.noCalls": undefined;
   "web.farm.phone.noMissed": undefined;
   "web.farm.phone.openChat": undefined;
   "web.farm.phone.paused": undefined;
   "web.farm.phone.phase.idle": undefined;
   "web.farm.phone.phase.live": undefined;
-  "web.farm.phone.phone": undefined;
   "web.farm.phone.pressA": { readonly what: string | number };
   "web.farm.phone.resume": undefined;
   "web.farm.phone.ringing": undefined;
@@ -7393,10 +7849,6 @@ export interface Messages {
   "web.farm.phone.sokoban.undo": undefined;
   "web.farm.phone.start": undefined;
   "web.farm.plotOf": { readonly name: string | number };
-  "web.farm.quota.left": undefined;
-  "web.farm.quota.quota": undefined;
-  "web.farm.sign.noRepo": undefined;
-  "web.farm.sign.repo": undefined;
   "web.farm.sow.draft": undefined;
   "web.farm.sow.homeless": undefined;
   "web.farm.sow.how": { readonly repo: string | number };
@@ -7412,12 +7864,6 @@ export interface Messages {
   "web.farm.sow.start": undefined;
   "web.farm.sow.toMap": undefined;
   "web.farm.sow.who": undefined;
-  "web.farm.tool.bug.hint": undefined;
-  "web.farm.tool.hand.hint": undefined;
-  "web.farm.tool.harvest.hint": undefined;
-  "web.farm.tool.shovel.hint": undefined;
-  "web.farm.tool.water.hint": undefined;
-  "web.farm.tool.weed.hint": undefined;
   "web.farm.water.drops.0": undefined;
   "web.farm.water.drops.1": undefined;
   "web.farm.water.drops.2": undefined;
@@ -7625,14 +8071,6 @@ export interface Messages {
   "web.issue.display.show": undefined;
   "web.issue.family.children": undefined;
   "web.issue.family.parent": undefined;
-  "web.issue.guide.collapse": undefined;
-  "web.issue.guide.expand": undefined;
-  "web.issue.guide.stage.closed": undefined;
-  "web.issue.guide.stage.todo": undefined;
-  "web.issue.guide.stage.waiting": undefined;
-  "web.issue.guide.stage.working": undefined;
-  "web.issue.guide.summary": undefined;
-  "web.issue.guide.title": undefined;
   "web.issue.issue.and": undefined;
   "web.issue.issue.asking": { readonly n: number; readonly who: string | number };
   "web.issue.issue.askingLine": undefined;
@@ -7684,6 +8122,8 @@ export interface Messages {
   "web.issue.issue.whoRuntime": { readonly name: string | number; readonly runtime: string | number };
   "web.issue.later": undefined;
   "web.issue.list.all": undefined;
+  "web.issue.list.empty": undefined;
+  "web.issue.list.emptyFiltered": undefined;
   "web.issue.list.fold": { readonly group: string | number };
   "web.issue.list.noRepo": undefined;
   "web.issue.list.unfold": { readonly group: string | number };
@@ -7704,34 +8144,6 @@ export interface Messages {
   "web.issue.new.title": undefined;
   "web.issue.new.words": undefined;
   "web.issue.noHelper": undefined;
-  "web.issue.onboarding.newIssue": undefined;
-  "web.issue.onboarding.openChat": undefined;
-  "web.issue.onboarding.progress": { readonly done: string | number; readonly total: string | number };
-  "web.issue.onboarding.step1Action": undefined;
-  "web.issue.onboarding.step1Desc": undefined;
-  "web.issue.onboarding.step1Manage": undefined;
-  "web.issue.onboarding.step1Ready": { readonly n: number };
-  "web.issue.onboarding.step1Title": undefined;
-  "web.issue.onboarding.step2Action": undefined;
-  "web.issue.onboarding.step2Desc": undefined;
-  "web.issue.onboarding.step2Manage": undefined;
-  "web.issue.onboarding.step2Ready": { readonly n: number };
-  "web.issue.onboarding.step2Title": undefined;
-  "web.issue.onboarding.step3Desc": undefined;
-  "web.issue.onboarding.step3Ready": { readonly n: number };
-  "web.issue.onboarding.step3Title": undefined;
-  "web.issue.onboarding.subtitle": undefined;
-  "web.issue.onboarding.templates.bug.desc": undefined;
-  "web.issue.onboarding.templates.bug.prompt": undefined;
-  "web.issue.onboarding.templates.bug.title": undefined;
-  "web.issue.onboarding.templates.feature.desc": undefined;
-  "web.issue.onboarding.templates.feature.prompt": undefined;
-  "web.issue.onboarding.templates.feature.title": undefined;
-  "web.issue.onboarding.templates.refactor.desc": undefined;
-  "web.issue.onboarding.templates.refactor.prompt": undefined;
-  "web.issue.onboarding.templates.refactor.title": undefined;
-  "web.issue.onboarding.templatesTitle": undefined;
-  "web.issue.onboarding.title": undefined;
   "web.issue.orchestrator": undefined;
   "web.issue.page.allHelpers": undefined;
   "web.issue.page.allRepos": undefined;
@@ -7826,26 +8238,31 @@ export interface Messages {
   "web.library.content.inspector.reveal": undefined;
   "web.library.content.inspector.saveAs": undefined;
   "web.library.content.inspector.stopAudio": undefined;
+  "web.library.content.installedApps": undefined;
+  "web.library.content.installedAppsEmpty": undefined;
   "web.library.content.issueCreated": undefined;
   "web.library.content.media": undefined;
   "web.library.content.new": undefined;
   "web.library.content.newNote": undefined;
   "web.library.content.pin": undefined;
   "web.library.content.pinned": undefined;
+  "web.library.content.pinnedEmpty": undefined;
   "web.library.content.pinnedToast": undefined;
   "web.library.content.recent": undefined;
   "web.library.content.search.empty": undefined;
   "web.library.content.search.placeholder": undefined;
+  "web.library.content.search.scopeAll": undefined;
+  "web.library.content.search.scopeArtifacts": undefined;
+  "web.library.content.search.scopeMedia": undefined;
   "web.library.content.search.title": undefined;
   "web.library.content.search.typeMedia": undefined;
   "web.library.content.searchAll": undefined;
   "web.library.content.sendArtifact": undefined;
   "web.library.content.sidebarToggle": undefined;
-  "web.library.content.source.agent": undefined;
-  "web.library.content.source.all": undefined;
-  "web.library.content.source.user": undefined;
   "web.library.content.templates.cat.ai": undefined;
+  "web.library.content.templates.cat.apps": undefined;
   "web.library.content.templates.cat.deliverable": undefined;
+  "web.library.content.templates.cat.engineering": undefined;
   "web.library.content.templates.cat.note": undefined;
   "web.library.content.templates.cat.recommended": undefined;
   "web.library.content.templates.cat.whiteboard": undefined;
@@ -7876,28 +8293,404 @@ export interface Messages {
   "web.library.content.templates.items.artSlides.name": undefined;
   "web.library.content.templates.items.artStoryboard.desc": undefined;
   "web.library.content.templates.items.artStoryboard.name": undefined;
+  "web.library.content.templates.items.dashDora.desc": undefined;
+  "web.library.content.templates.items.dashDora.name": undefined;
+  "web.library.content.templates.items.dashSlo.desc": undefined;
+  "web.library.content.templates.items.dashSlo.name": undefined;
+  "web.library.content.templates.items.designWorkspaceUi.desc": undefined;
+  "web.library.content.templates.items.designWorkspaceUi.name": undefined;
+  "web.library.content.templates.items.diagCicd.desc": undefined;
+  "web.library.content.templates.items.diagCicd.name": undefined;
+  "web.library.content.templates.items.diagErd.desc": undefined;
+  "web.library.content.templates.items.diagErd.name": undefined;
+  "web.library.content.templates.items.diagMicroservices.desc": undefined;
+  "web.library.content.templates.items.diagMicroservices.name": undefined;
+  "web.library.content.templates.items.diagSequence.desc": undefined;
+  "web.library.content.templates.items.diagSequence.name": undefined;
+  "web.library.content.templates.items.diagStateMachine.desc": undefined;
+  "web.library.content.templates.items.diagStateMachine.name": undefined;
+  "web.library.content.templates.items.docAdr.desc": undefined;
+  "web.library.content.templates.items.docAdr.name": undefined;
+  "web.library.content.templates.items.docApiSpec.desc": undefined;
+  "web.library.content.templates.items.docApiSpec.name": undefined;
+  "web.library.content.templates.items.docMigration.desc": undefined;
+  "web.library.content.templates.items.docMigration.name": undefined;
+  "web.library.content.templates.items.docPerf.desc": undefined;
+  "web.library.content.templates.items.docPerf.name": undefined;
+  "web.library.content.templates.items.docPostmortem.desc": undefined;
+  "web.library.content.templates.items.docPostmortem.name": undefined;
+  "web.library.content.templates.items.docRfc.desc": undefined;
+  "web.library.content.templates.items.docRfc.name": undefined;
+  "web.library.content.templates.items.docRunbook.desc": undefined;
+  "web.library.content.templates.items.docRunbook.name": undefined;
+  "web.library.content.templates.items.docSecurity.desc": undefined;
+  "web.library.content.templates.items.docSecurity.name": undefined;
+  "web.library.content.templates.items.dsPapertrails.desc": undefined;
+  "web.library.content.templates.items.dsPapertrails.name": undefined;
+  "web.library.content.templates.items.motionLaunchReel.desc": undefined;
+  "web.library.content.templates.items.motionLaunchReel.name": undefined;
   "web.library.content.templates.items.noteBlank.desc": undefined;
   "web.library.content.templates.items.noteBlank.name": undefined;
   "web.library.content.templates.items.noteDaily.desc": undefined;
   "web.library.content.templates.items.noteDaily.name": undefined;
+  "web.library.content.templates.items.noteDebug.desc": undefined;
+  "web.library.content.templates.items.noteDebug.name": undefined;
   "web.library.content.templates.items.noteMeeting.desc": undefined;
   "web.library.content.templates.items.noteMeeting.name": undefined;
+  "web.library.content.templates.items.noteOnboarding.desc": undefined;
+  "web.library.content.templates.items.noteOnboarding.name": undefined;
+  "web.library.content.templates.items.noteOncall.desc": undefined;
+  "web.library.content.templates.items.noteOncall.name": undefined;
+  "web.library.content.templates.items.notePrReview.desc": undefined;
+  "web.library.content.templates.items.notePrReview.name": undefined;
+  "web.library.content.templates.items.noteRelease.desc": undefined;
+  "web.library.content.templates.items.noteRelease.name": undefined;
+  "web.library.content.templates.items.noteSprintRetro.desc": undefined;
+  "web.library.content.templates.items.noteSprintRetro.name": undefined;
   "web.library.content.templates.items.noteTech.desc": undefined;
   "web.library.content.templates.items.noteTech.name": undefined;
+  "web.library.content.templates.items.protoApiPlayground.desc": undefined;
+  "web.library.content.templates.items.protoApiPlayground.name": undefined;
+  "web.library.content.templates.items.protoComponentLab.desc": undefined;
+  "web.library.content.templates.items.protoComponentLab.name": undefined;
+  "web.library.content.templates.items.protoCssGlassStudio.desc": undefined;
+  "web.library.content.templates.items.protoCssGlassStudio.name": undefined;
+  "web.library.content.templates.items.protoDeskKanban.desc": undefined;
+  "web.library.content.templates.items.protoDeskKanban.name": undefined;
+  "web.library.content.templates.items.protoFocusStudio.desc": undefined;
+  "web.library.content.templates.items.protoFocusStudio.name": undefined;
+  "web.library.content.templates.items.protoParticleLab.desc": undefined;
+  "web.library.content.templates.items.protoParticleLab.name": undefined;
+  "web.library.content.templates.items.protoSynthPad.desc": undefined;
+  "web.library.content.templates.items.protoSynthPad.name": undefined;
+  "web.library.content.templates.items.protoTokenCalculator.desc": undefined;
+  "web.library.content.templates.items.protoTokenCalculator.name": undefined;
+  "web.library.content.templates.items.sheetApiInventory.desc": undefined;
+  "web.library.content.templates.items.sheetApiInventory.name": undefined;
+  "web.library.content.templates.items.sheetBenchmark.desc": undefined;
+  "web.library.content.templates.items.sheetBenchmark.name": undefined;
+  "web.library.content.templates.items.sheetTechMatrix.desc": undefined;
+  "web.library.content.templates.items.sheetTechMatrix.name": undefined;
+  "web.library.content.templates.items.sheetTestMatrix.desc": undefined;
+  "web.library.content.templates.items.sheetTestMatrix.name": undefined;
+  "web.library.content.templates.items.slidesArchReview.desc": undefined;
+  "web.library.content.templates.items.slidesArchReview.name": undefined;
+  "web.library.content.templates.items.slidesReleaseDemo.desc": undefined;
+  "web.library.content.templates.items.slidesReleaseDemo.name": undefined;
+  "web.library.content.templates.items.storyboardProductFilm.desc": undefined;
+  "web.library.content.templates.items.storyboardProductFilm.name": undefined;
   "web.library.content.templates.items.wbArch.desc": undefined;
   "web.library.content.templates.items.wbArch.name": undefined;
   "web.library.content.templates.items.wbBlank.desc": undefined;
   "web.library.content.templates.items.wbBlank.name": undefined;
+  "web.library.content.templates.items.wbC4.desc": undefined;
+  "web.library.content.templates.items.wbC4.name": undefined;
+  "web.library.content.templates.items.wbEventStorming.desc": undefined;
+  "web.library.content.templates.items.wbEventStorming.name": undefined;
+  "web.library.content.templates.items.wbIncidentMap.desc": undefined;
+  "web.library.content.templates.items.wbIncidentMap.name": undefined;
   "web.library.content.templates.items.wbJourney.desc": undefined;
   "web.library.content.templates.items.wbJourney.name": undefined;
   "web.library.content.templates.items.wbTimeline.desc": undefined;
   "web.library.content.templates.items.wbTimeline.name": undefined;
+  "web.library.content.templates.items.wbTradeoff.desc": undefined;
+  "web.library.content.templates.items.wbTradeoff.name": undefined;
   "web.library.content.templates.items.wbWorkshop.desc": undefined;
   "web.library.content.templates.items.wbWorkshop.name": undefined;
   "web.library.content.templates.search": undefined;
+  "web.library.content.templates.searchCount": { readonly n: string | number };
+  "web.library.content.templates.seed.dashDoraCfrCol": undefined;
+  "web.library.content.templates.seed.dashDoraDeployCol": undefined;
+  "web.library.content.templates.seed.dashDoraLeadCol": undefined;
+  "web.library.content.templates.seed.dashDoraMttrCol": undefined;
+  "web.library.content.templates.seed.dashDoraP1": undefined;
+  "web.library.content.templates.seed.dashDoraP2": undefined;
+  "web.library.content.templates.seed.dashDoraP3": undefined;
+  "web.library.content.templates.seed.dashDoraP4": undefined;
+  "web.library.content.templates.seed.dashDoraWeekCol": undefined;
+  "web.library.content.templates.seed.dashSloAlertsCol": undefined;
+  "web.library.content.templates.seed.dashSloAvailCol": undefined;
+  "web.library.content.templates.seed.dashSloBudgetCol": undefined;
+  "web.library.content.templates.seed.dashSloP1": undefined;
+  "web.library.content.templates.seed.dashSloP2": undefined;
+  "web.library.content.templates.seed.dashSloP3": undefined;
+  "web.library.content.templates.seed.dashSloP4": undefined;
+  "web.library.content.templates.seed.dashSloP99Col": undefined;
+  "web.library.content.templates.seed.dashSloR1": undefined;
+  "web.library.content.templates.seed.dashSloR2": undefined;
+  "web.library.content.templates.seed.dashSloR3": undefined;
+  "web.library.content.templates.seed.dashSloR4": undefined;
+  "web.library.content.templates.seed.dashSloServiceCol": undefined;
+  "web.library.content.templates.seed.designActionTitle": undefined;
+  "web.library.content.templates.seed.designDesktopName": undefined;
+  "web.library.content.templates.seed.designHeroSub": undefined;
+  "web.library.content.templates.seed.designMetricsTitle": undefined;
+  "web.library.content.templates.seed.designMobileName": undefined;
+  "web.library.content.templates.seed.designPropBanner": undefined;
+  "web.library.content.templates.seed.designPropCta": undefined;
+  "web.library.content.templates.seed.designPropCtaDefault": undefined;
+  "web.library.content.templates.seed.designPropDensity": undefined;
+  "web.library.content.templates.seed.diagCiBuild": undefined;
+  "web.library.content.templates.seed.diagCiCanary": undefined;
+  "web.library.content.templates.seed.diagCiE1": undefined;
+  "web.library.content.templates.seed.diagCiE2": undefined;
+  "web.library.content.templates.seed.diagCiE3": undefined;
+  "web.library.content.templates.seed.diagCiE4": undefined;
+  "web.library.content.templates.seed.diagCiE5": undefined;
+  "web.library.content.templates.seed.diagCiLint": undefined;
+  "web.library.content.templates.seed.diagCiProd": undefined;
+  "web.library.content.templates.seed.diagCiSmoke": undefined;
+  "web.library.content.templates.seed.diagCiUnit": undefined;
+  "web.library.content.templates.seed.diagErdArtifact": undefined;
+  "web.library.content.templates.seed.diagErdE1": undefined;
+  "web.library.content.templates.seed.diagErdE2": undefined;
+  "web.library.content.templates.seed.diagErdE3": undefined;
+  "web.library.content.templates.seed.diagErdE4": undefined;
+  "web.library.content.templates.seed.diagErdE5": undefined;
+  "web.library.content.templates.seed.diagErdIssue": undefined;
+  "web.library.content.templates.seed.diagErdRepo": undefined;
+  "web.library.content.templates.seed.diagErdSession": undefined;
+  "web.library.content.templates.seed.diagErdUser": undefined;
+  "web.library.content.templates.seed.diagErdVersion": undefined;
+  "web.library.content.templates.seed.diagMsEdgeAuth": undefined;
+  "web.library.content.templates.seed.diagMsEdgeEmit": undefined;
+  "web.library.content.templates.seed.diagMsEdgeRead": undefined;
+  "web.library.content.templates.seed.diagMsEdgeRpc": undefined;
+  "web.library.content.templates.seed.diagMsEdgeStore": undefined;
+  "web.library.content.templates.seed.diagMsNodeAuth": undefined;
+  "web.library.content.templates.seed.diagMsNodeCore": undefined;
+  "web.library.content.templates.seed.diagMsNodeDb": undefined;
+  "web.library.content.templates.seed.diagMsNodeGateway": undefined;
+  "web.library.content.templates.seed.diagMsNodeMedia": undefined;
+  "web.library.content.templates.seed.diagMsNodeQueue": undefined;
+  "web.library.content.templates.seed.diagSeqApi": undefined;
+  "web.library.content.templates.seed.diagSeqBus": undefined;
+  "web.library.content.templates.seed.diagSeqClient": undefined;
+  "web.library.content.templates.seed.diagSeqDomain": undefined;
+  "web.library.content.templates.seed.diagSeqE1": undefined;
+  "web.library.content.templates.seed.diagSeqE2": undefined;
+  "web.library.content.templates.seed.diagSeqE3": undefined;
+  "web.library.content.templates.seed.diagSeqE4": undefined;
+  "web.library.content.templates.seed.diagSeqE5": undefined;
+  "web.library.content.templates.seed.diagSeqGuard": undefined;
+  "web.library.content.templates.seed.diagSeqOutbox": undefined;
+  "web.library.content.templates.seed.diagSmCanceled": undefined;
+  "web.library.content.templates.seed.diagSmDone": undefined;
+  "web.library.content.templates.seed.diagSmDraft": undefined;
+  "web.library.content.templates.seed.diagSmE1": undefined;
+  "web.library.content.templates.seed.diagSmE2": undefined;
+  "web.library.content.templates.seed.diagSmE3": undefined;
+  "web.library.content.templates.seed.diagSmE4": undefined;
+  "web.library.content.templates.seed.diagSmE5": undefined;
+  "web.library.content.templates.seed.diagSmE6": undefined;
+  "web.library.content.templates.seed.diagSmQueued": undefined;
+  "web.library.content.templates.seed.diagSmReview": undefined;
+  "web.library.content.templates.seed.diagSmRunning": undefined;
+  "web.library.content.templates.seed.docAdrBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docApiSpecBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docMigrationBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docPerfBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docPostmortemBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docRfcBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docRunbookBody": { readonly title: string | number };
+  "web.library.content.templates.seed.docSecurityBody": { readonly title: string | number };
+  "web.library.content.templates.seed.dsBadgeDo": undefined;
+  "web.library.content.templates.seed.dsBadgeSummary": undefined;
+  "web.library.content.templates.seed.dsBadgeTitle": undefined;
+  "web.library.content.templates.seed.dsButtonDo": undefined;
+  "web.library.content.templates.seed.dsButtonDont": undefined;
+  "web.library.content.templates.seed.dsButtonSummary": undefined;
+  "web.library.content.templates.seed.dsButtonTitle": undefined;
+  "web.library.content.templates.seed.motionCh1": undefined;
+  "web.library.content.templates.seed.motionCh2": undefined;
+  "web.library.content.templates.seed.motionCh3": undefined;
+  "web.library.content.templates.seed.motionSc2CardBody": undefined;
+  "web.library.content.templates.seed.motionSc2CardTitle": undefined;
+  "web.library.content.templates.seed.motionSc2Headline": undefined;
+  "web.library.content.templates.seed.motionSc3Headline": undefined;
   "web.library.content.templates.seed.noteDaily": undefined;
+  "web.library.content.templates.seed.noteDebug": undefined;
   "web.library.content.templates.seed.noteMeeting": undefined;
+  "web.library.content.templates.seed.noteOnboarding": undefined;
+  "web.library.content.templates.seed.noteOncall": undefined;
+  "web.library.content.templates.seed.notePrReview": undefined;
+  "web.library.content.templates.seed.noteRelease": undefined;
+  "web.library.content.templates.seed.noteSprintRetro": undefined;
   "web.library.content.templates.seed.noteTech": undefined;
+  "web.library.content.templates.seed.protoApiBtnCopy": undefined;
+  "web.library.content.templates.seed.protoApiBtnMinify": undefined;
+  "web.library.content.templates.seed.protoApiBtnPretty": undefined;
+  "web.library.content.templates.seed.protoApiCurlLabel": undefined;
+  "web.library.content.templates.seed.protoApiInvalid": undefined;
+  "web.library.content.templates.seed.protoApiPayloadLabel": undefined;
+  "web.library.content.templates.seed.protoApiSub": undefined;
+  "web.library.content.templates.seed.protoApiTitle": undefined;
+  "web.library.content.templates.seed.protoApiValid": undefined;
+  "web.library.content.templates.seed.protoCompCardBody": undefined;
+  "web.library.content.templates.seed.protoCompCardTitle": undefined;
+  "web.library.content.templates.seed.protoCompEmptyText": undefined;
+  "web.library.content.templates.seed.protoCompErrorText": undefined;
+  "web.library.content.templates.seed.protoCompLoadingText": undefined;
+  "web.library.content.templates.seed.protoCompStateDefault": undefined;
+  "web.library.content.templates.seed.protoCompStateEmpty": undefined;
+  "web.library.content.templates.seed.protoCompStateError": undefined;
+  "web.library.content.templates.seed.protoCompStateLabel": undefined;
+  "web.library.content.templates.seed.protoCompStateLoading": undefined;
+  "web.library.content.templates.seed.protoCompSub": undefined;
+  "web.library.content.templates.seed.protoCompThemeDark": undefined;
+  "web.library.content.templates.seed.protoCompThemeLabel": undefined;
+  "web.library.content.templates.seed.protoCompThemeLight": undefined;
+  "web.library.content.templates.seed.protoCompTitle": undefined;
+  "web.library.content.templates.seed.protoCompWidthLabel": undefined;
+  "web.library.content.templates.seed.sbS1Dialogue": undefined;
+  "web.library.content.templates.seed.sbS1Scene": undefined;
+  "web.library.content.templates.seed.sbS1Visual": undefined;
+  "web.library.content.templates.seed.sbS2Dialogue": undefined;
+  "web.library.content.templates.seed.sbS2Scene": undefined;
+  "web.library.content.templates.seed.sbS2Visual": undefined;
+  "web.library.content.templates.seed.sbS3Dialogue": undefined;
+  "web.library.content.templates.seed.sbS3Scene": undefined;
+  "web.library.content.templates.seed.sbS3Visual": undefined;
+  "web.library.content.templates.seed.sbTone": undefined;
+  "web.library.content.templates.seed.sheetApiColAuth": undefined;
+  "web.library.content.templates.seed.sheetApiColMethod": undefined;
+  "web.library.content.templates.seed.sheetApiColOwner": undefined;
+  "web.library.content.templates.seed.sheetApiColPath": undefined;
+  "web.library.content.templates.seed.sheetApiColRate": undefined;
+  "web.library.content.templates.seed.sheetApiColStability": undefined;
+  "web.library.content.templates.seed.sheetApiR1Auth": undefined;
+  "web.library.content.templates.seed.sheetApiR1Owner": undefined;
+  "web.library.content.templates.seed.sheetApiR1Rate": undefined;
+  "web.library.content.templates.seed.sheetApiR1Stab": undefined;
+  "web.library.content.templates.seed.sheetApiR2Auth": undefined;
+  "web.library.content.templates.seed.sheetApiR2Owner": undefined;
+  "web.library.content.templates.seed.sheetApiR2Rate": undefined;
+  "web.library.content.templates.seed.sheetApiR2Stab": undefined;
+  "web.library.content.templates.seed.sheetApiR3Auth": undefined;
+  "web.library.content.templates.seed.sheetApiR3Owner": undefined;
+  "web.library.content.templates.seed.sheetApiR3Rate": undefined;
+  "web.library.content.templates.seed.sheetApiR3Stab": undefined;
+  "web.library.content.templates.seed.sheetApiR4Auth": undefined;
+  "web.library.content.templates.seed.sheetApiR4Owner": undefined;
+  "web.library.content.templates.seed.sheetApiR4Rate": undefined;
+  "web.library.content.templates.seed.sheetApiR4Stab": undefined;
+  "web.library.content.templates.seed.sheetApiTab": undefined;
+  "web.library.content.templates.seed.sheetBenchColBaseline": undefined;
+  "web.library.content.templates.seed.sheetBenchColCase": undefined;
+  "web.library.content.templates.seed.sheetBenchColCurrent": undefined;
+  "web.library.content.templates.seed.sheetBenchColMem": undefined;
+  "web.library.content.templates.seed.sheetBenchColP99": undefined;
+  "web.library.content.templates.seed.sheetBenchColStatus": undefined;
+  "web.library.content.templates.seed.sheetBenchEnvKey": undefined;
+  "web.library.content.templates.seed.sheetBenchEnvR1": undefined;
+  "web.library.content.templates.seed.sheetBenchEnvR2": undefined;
+  "web.library.content.templates.seed.sheetBenchEnvR3": undefined;
+  "web.library.content.templates.seed.sheetBenchEnvVal": undefined;
+  "web.library.content.templates.seed.sheetBenchR1Case": undefined;
+  "web.library.content.templates.seed.sheetBenchR1Status": undefined;
+  "web.library.content.templates.seed.sheetBenchR2Case": undefined;
+  "web.library.content.templates.seed.sheetBenchR2Status": undefined;
+  "web.library.content.templates.seed.sheetBenchR3Case": undefined;
+  "web.library.content.templates.seed.sheetBenchR3Status": undefined;
+  "web.library.content.templates.seed.sheetBenchR4Case": undefined;
+  "web.library.content.templates.seed.sheetBenchR4Status": undefined;
+  "web.library.content.templates.seed.sheetBenchTab1": undefined;
+  "web.library.content.templates.seed.sheetBenchTab2": undefined;
+  "web.library.content.templates.seed.sheetTechColDim": undefined;
+  "web.library.content.templates.seed.sheetTechColNote": undefined;
+  "web.library.content.templates.seed.sheetTechColOptA": undefined;
+  "web.library.content.templates.seed.sheetTechColOptB": undefined;
+  "web.library.content.templates.seed.sheetTechColWeight": undefined;
+  "web.library.content.templates.seed.sheetTechR1Dim": undefined;
+  "web.library.content.templates.seed.sheetTechR1Note": undefined;
+  "web.library.content.templates.seed.sheetTechR2Dim": undefined;
+  "web.library.content.templates.seed.sheetTechR2Note": undefined;
+  "web.library.content.templates.seed.sheetTechR3Dim": undefined;
+  "web.library.content.templates.seed.sheetTechR3Note": undefined;
+  "web.library.content.templates.seed.sheetTechR4Dim": undefined;
+  "web.library.content.templates.seed.sheetTechR4Note": undefined;
+  "web.library.content.templates.seed.sheetTechR5Dim": undefined;
+  "web.library.content.templates.seed.sheetTechR5Note": undefined;
+  "web.library.content.templates.seed.sheetTechTab": undefined;
+  "web.library.content.templates.seed.sheetTestColArea": undefined;
+  "web.library.content.templates.seed.sheetTestColCase": undefined;
+  "web.library.content.templates.seed.sheetTestColEnv": undefined;
+  "web.library.content.templates.seed.sheetTestColId": undefined;
+  "web.library.content.templates.seed.sheetTestColOwner": undefined;
+  "web.library.content.templates.seed.sheetTestColResult": undefined;
+  "web.library.content.templates.seed.sheetTestR1Area": undefined;
+  "web.library.content.templates.seed.sheetTestR1Case": undefined;
+  "web.library.content.templates.seed.sheetTestR1Env": undefined;
+  "web.library.content.templates.seed.sheetTestR1Owner": undefined;
+  "web.library.content.templates.seed.sheetTestR1Res": undefined;
+  "web.library.content.templates.seed.sheetTestR2Area": undefined;
+  "web.library.content.templates.seed.sheetTestR2Case": undefined;
+  "web.library.content.templates.seed.sheetTestR2Env": undefined;
+  "web.library.content.templates.seed.sheetTestR2Owner": undefined;
+  "web.library.content.templates.seed.sheetTestR2Res": undefined;
+  "web.library.content.templates.seed.sheetTestR3Area": undefined;
+  "web.library.content.templates.seed.sheetTestR3Case": undefined;
+  "web.library.content.templates.seed.sheetTestR3Env": undefined;
+  "web.library.content.templates.seed.sheetTestR3Owner": undefined;
+  "web.library.content.templates.seed.sheetTestR3Res": undefined;
+  "web.library.content.templates.seed.sheetTestR4Area": undefined;
+  "web.library.content.templates.seed.sheetTestR4Case": undefined;
+  "web.library.content.templates.seed.sheetTestR4Env": undefined;
+  "web.library.content.templates.seed.sheetTestR4Owner": undefined;
+  "web.library.content.templates.seed.sheetTestR4Res": undefined;
+  "web.library.content.templates.seed.sheetTestTab": undefined;
+  "web.library.content.templates.seed.slidesArchS1Notes": undefined;
+  "web.library.content.templates.seed.slidesArchS1Sub": undefined;
+  "web.library.content.templates.seed.slidesArchS2B1": undefined;
+  "web.library.content.templates.seed.slidesArchS2B2": undefined;
+  "web.library.content.templates.seed.slidesArchS2B3": undefined;
+  "web.library.content.templates.seed.slidesArchS2Notes": undefined;
+  "web.library.content.templates.seed.slidesArchS2Sub": undefined;
+  "web.library.content.templates.seed.slidesArchS2Title": undefined;
+  "web.library.content.templates.seed.slidesArchS3B1": undefined;
+  "web.library.content.templates.seed.slidesArchS3B2": undefined;
+  "web.library.content.templates.seed.slidesArchS3B3": undefined;
+  "web.library.content.templates.seed.slidesArchS3Notes": undefined;
+  "web.library.content.templates.seed.slidesArchS3Sub": undefined;
+  "web.library.content.templates.seed.slidesArchS3Title": undefined;
+  "web.library.content.templates.seed.slidesArchS4B1": undefined;
+  "web.library.content.templates.seed.slidesArchS4B2": undefined;
+  "web.library.content.templates.seed.slidesArchS4B3": undefined;
+  "web.library.content.templates.seed.slidesArchS4Notes": undefined;
+  "web.library.content.templates.seed.slidesArchS4Sub": undefined;
+  "web.library.content.templates.seed.slidesArchS4Title": undefined;
+  "web.library.content.templates.seed.slidesArchS5B1": undefined;
+  "web.library.content.templates.seed.slidesArchS5B2": undefined;
+  "web.library.content.templates.seed.slidesArchS5B3": undefined;
+  "web.library.content.templates.seed.slidesArchS5Notes": undefined;
+  "web.library.content.templates.seed.slidesArchS5Sub": undefined;
+  "web.library.content.templates.seed.slidesArchS5Title": undefined;
+  "web.library.content.templates.seed.slidesRelS1Notes": undefined;
+  "web.library.content.templates.seed.slidesRelS1Sub": undefined;
+  "web.library.content.templates.seed.slidesRelS2B1": undefined;
+  "web.library.content.templates.seed.slidesRelS2B2": undefined;
+  "web.library.content.templates.seed.slidesRelS2B3": undefined;
+  "web.library.content.templates.seed.slidesRelS2Notes": undefined;
+  "web.library.content.templates.seed.slidesRelS2Sub": undefined;
+  "web.library.content.templates.seed.slidesRelS2Title": undefined;
+  "web.library.content.templates.seed.slidesRelS3B1": undefined;
+  "web.library.content.templates.seed.slidesRelS3B2": undefined;
+  "web.library.content.templates.seed.slidesRelS3B3": undefined;
+  "web.library.content.templates.seed.slidesRelS3Notes": undefined;
+  "web.library.content.templates.seed.slidesRelS3Sub": undefined;
+  "web.library.content.templates.seed.slidesRelS3Title": undefined;
+  "web.library.content.templates.seed.slidesRelS4B1": undefined;
+  "web.library.content.templates.seed.slidesRelS4B2": undefined;
+  "web.library.content.templates.seed.slidesRelS4B3": undefined;
+  "web.library.content.templates.seed.slidesRelS4Notes": undefined;
+  "web.library.content.templates.seed.slidesRelS4Sub": undefined;
+  "web.library.content.templates.seed.slidesRelS4Title": undefined;
+  "web.library.content.templates.seed.slidesRelS5B1": undefined;
+  "web.library.content.templates.seed.slidesRelS5B2": undefined;
+  "web.library.content.templates.seed.slidesRelS5B3": undefined;
+  "web.library.content.templates.seed.slidesRelS5Notes": undefined;
+  "web.library.content.templates.seed.slidesRelS5Sub": undefined;
+  "web.library.content.templates.seed.slidesRelS5Title": undefined;
   "web.library.content.templates.seed.wbArchE1": undefined;
   "web.library.content.templates.seed.wbArchE2": undefined;
   "web.library.content.templates.seed.wbArchN1Body": undefined;
@@ -7908,6 +8701,39 @@ export interface Messages {
   "web.library.content.templates.seed.wbArchN3Title": undefined;
   "web.library.content.templates.seed.wbBlankBody": undefined;
   "web.library.content.templates.seed.wbBlankTitle": undefined;
+  "web.library.content.templates.seed.wbC4AppBody": undefined;
+  "web.library.content.templates.seed.wbC4AppTitle": undefined;
+  "web.library.content.templates.seed.wbC4DbBody": undefined;
+  "web.library.content.templates.seed.wbC4DbTitle": undefined;
+  "web.library.content.templates.seed.wbC4E1": undefined;
+  "web.library.content.templates.seed.wbC4E2": undefined;
+  "web.library.content.templates.seed.wbC4E3": undefined;
+  "web.library.content.templates.seed.wbC4EdgeBody": undefined;
+  "web.library.content.templates.seed.wbC4EdgeTitle": undefined;
+  "web.library.content.templates.seed.wbC4QueueBody": undefined;
+  "web.library.content.templates.seed.wbC4QueueTitle": undefined;
+  "web.library.content.templates.seed.wbEsAggBody": undefined;
+  "web.library.content.templates.seed.wbEsAggTitle": undefined;
+  "web.library.content.templates.seed.wbEsCmdBody": undefined;
+  "web.library.content.templates.seed.wbEsCmdTitle": undefined;
+  "web.library.content.templates.seed.wbEsE1": undefined;
+  "web.library.content.templates.seed.wbEsE2": undefined;
+  "web.library.content.templates.seed.wbEsE3": undefined;
+  "web.library.content.templates.seed.wbEsEvtBody": undefined;
+  "web.library.content.templates.seed.wbEsEvtTitle": undefined;
+  "web.library.content.templates.seed.wbEsReadBody": undefined;
+  "web.library.content.templates.seed.wbEsReadTitle": undefined;
+  "web.library.content.templates.seed.wbIncE1": undefined;
+  "web.library.content.templates.seed.wbIncE2": undefined;
+  "web.library.content.templates.seed.wbIncE3": undefined;
+  "web.library.content.templates.seed.wbIncFixBody": undefined;
+  "web.library.content.templates.seed.wbIncFixTitle": undefined;
+  "web.library.content.templates.seed.wbIncHyp1Body": undefined;
+  "web.library.content.templates.seed.wbIncHyp1Title": undefined;
+  "web.library.content.templates.seed.wbIncHyp2Body": undefined;
+  "web.library.content.templates.seed.wbIncHyp2Title": undefined;
+  "web.library.content.templates.seed.wbIncSymBody": undefined;
+  "web.library.content.templates.seed.wbIncSymTitle": undefined;
   "web.library.content.templates.seed.wbJourneyE1": undefined;
   "web.library.content.templates.seed.wbJourneyE2": undefined;
   "web.library.content.templates.seed.wbJourneyJ1Body": undefined;
@@ -7924,6 +8750,17 @@ export interface Messages {
   "web.library.content.templates.seed.wbTlP2Title": undefined;
   "web.library.content.templates.seed.wbTlP3Body": undefined;
   "web.library.content.templates.seed.wbTlP3Title": undefined;
+  "web.library.content.templates.seed.wbToDecBody": undefined;
+  "web.library.content.templates.seed.wbToDecTitle": undefined;
+  "web.library.content.templates.seed.wbToE1": undefined;
+  "web.library.content.templates.seed.wbToE2": undefined;
+  "web.library.content.templates.seed.wbToE3": undefined;
+  "web.library.content.templates.seed.wbToOptABody": undefined;
+  "web.library.content.templates.seed.wbToOptATitle": undefined;
+  "web.library.content.templates.seed.wbToOptBBody": undefined;
+  "web.library.content.templates.seed.wbToOptBTitle": undefined;
+  "web.library.content.templates.seed.wbToReqBody": undefined;
+  "web.library.content.templates.seed.wbToReqTitle": undefined;
   "web.library.content.templates.seed.wbWorkE1": undefined;
   "web.library.content.templates.seed.wbWorkE2": undefined;
   "web.library.content.templates.seed.wbWorkW1Body": undefined;
@@ -8644,8 +9481,6 @@ export interface Messages {
   "web.session.trajectory.want": undefined;
   "web.session.trajectory.wantHint": undefined;
   "web.session.trajectory.wrong": undefined;
-  "web.setting.about.catalog": undefined;
-  "web.setting.about.catalogHint": undefined;
   "web.setting.about.check": undefined;
   "web.setting.about.checking": undefined;
   "web.setting.about.cli": undefined;
@@ -8657,7 +9492,6 @@ export interface Messages {
   "web.setting.about.cliTaken": { readonly link: string | number };
   "web.setting.about.copied": undefined;
   "web.setting.about.copy": undefined;
-  "web.setting.about.devTools": undefined;
   "web.setting.about.download": undefined;
   "web.setting.about.downloading": { readonly next: string | number; readonly percent: string | number };
   "web.setting.about.failed": { readonly why: string | number };
@@ -8669,7 +9503,6 @@ export interface Messages {
   "web.setting.about.manual.readOnly": { readonly next: string | number };
   "web.setting.about.manual.translocated": { readonly next: string | number };
   "web.setting.about.newFarmQuestion": undefined;
-  "web.setting.about.openCatalog": undefined;
   "web.setting.about.ready": { readonly next: string | number };
   "web.setting.about.readyNewFarm": { readonly next: string | number };
   "web.setting.about.repos": undefined;
@@ -8786,10 +9619,21 @@ export interface Messages {
   "web.setting.words.remote": undefined;
   "web.setting.words.skills": undefined;
   "web.setting.words.voice": undefined;
+  "web.shell.chat.activityCommand": { readonly n: string | number };
+  "web.shell.chat.activityEdit": { readonly n: string | number };
+  "web.shell.chat.activityFailed": { readonly n: string | number };
+  "web.shell.chat.activityOther": { readonly n: string | number };
+  "web.shell.chat.activityRead": { readonly n: string | number };
+  "web.shell.chat.activityRunning": undefined;
+  "web.shell.chat.activitySearch": { readonly n: string | number };
+  "web.shell.chat.activitySteps": { readonly n: string | number };
+  "web.shell.chat.activityThinking": { readonly n: string | number };
   "web.shell.chat.attachFile": undefined;
   "web.shell.chat.chooseModel": undefined;
   "web.shell.chat.composerPlaceholder": { readonly runtime: string | number };
   "web.shell.chat.configFailed": { readonly why: string | number };
+  "web.shell.chat.copied": undefined;
+  "web.shell.chat.copy": undefined;
   "web.shell.chat.emptyHint": undefined;
   "web.shell.chat.emptyTitle": undefined;
   "web.shell.chat.interactionAnswered": undefined;
@@ -8798,31 +9642,20 @@ export interface Messages {
   "web.shell.chat.interactionCustomPlaceholder": undefined;
   "web.shell.chat.interactionDecline": undefined;
   "web.shell.chat.interactionDeclined": undefined;
-  "web.shell.chat.modeAcceptEdits": undefined;
-  "web.shell.chat.modeAsk": undefined;
-  "web.shell.chat.modeBypass": undefined;
-  "web.shell.chat.modeReadOnly": undefined;
   "web.shell.chat.model": undefined;
-  "web.shell.chat.openTerminal": undefined;
   "web.shell.chat.permissionAllowOnce": undefined;
   "web.shell.chat.permissionAllowSession": undefined;
   "web.shell.chat.permissionBadge": undefined;
   "web.shell.chat.permissionDeny": undefined;
-  "web.shell.chat.permissionMode": undefined;
   "web.shell.chat.removeFile": { readonly name: string | number };
   "web.shell.chat.respondFailed": { readonly why: string | number };
   "web.shell.chat.runtime": undefined;
   "web.shell.chat.send": undefined;
   "web.shell.chat.sendFailed": { readonly why: string | number };
-  "web.shell.chat.statusError": undefined;
-  "web.shell.chat.statusReady": undefined;
-  "web.shell.chat.statusStarting": undefined;
   "web.shell.chat.statusWaiting": undefined;
-  "web.shell.chat.statusWorking": undefined;
   "web.shell.chat.steer": undefined;
   "web.shell.chat.steerPlaceholder": undefined;
   "web.shell.chat.steerTag": undefined;
-  "web.shell.chat.steeringBanner": undefined;
   "web.shell.chat.stop": undefined;
   "web.shell.chat.stopFailed": { readonly why: string | number };
   "web.shell.chat.telemetryCache": { readonly pct: string | number };
@@ -8846,22 +9679,29 @@ export interface Messages {
   "web.shell.chat.thoughtMax": undefined;
   "web.shell.chat.thoughtMedium": undefined;
   "web.shell.chat.title": undefined;
+  "web.shell.chat.todoTitle": undefined;
+  "web.shell.chat.todoToolLabel": undefined;
   "web.shell.chat.toolFailed": undefined;
+  "web.shell.chat.toolInput": undefined;
+  "web.shell.chat.toolLines": { readonly n: string | number };
   "web.shell.chat.toolNoOutput": undefined;
   "web.shell.chat.toolOk": undefined;
   "web.shell.chat.toolOpenDiff": undefined;
   "web.shell.chat.toolOpenFile": undefined;
+  "web.shell.chat.toolOutput": undefined;
   "web.shell.chat.toolPending": undefined;
   "web.shell.chat.toolRunning": undefined;
-  "web.shell.chat.you": undefined;
   "web.shell.fileTree.collapseAllDirs": undefined;
   "web.shell.fileTree.copyAbsPath": undefined;
   "web.shell.fileTree.copyRelPath": undefined;
   "web.shell.fileTree.empty": undefined;
   "web.shell.fileTree.loading": undefined;
   "web.shell.fileTree.newTerminalInDir": undefined;
+  "web.shell.fileTree.openInApp": undefined;
+  "web.shell.fileTree.openWithDefault": undefined;
   "web.shell.fileTree.revealInFinder": undefined;
   "web.shell.fileTree.title": undefined;
+  "web.shell.fileTree.unsupportedHint": undefined;
   "web.shell.git.branches": undefined;
   "web.shell.git.cancel": undefined;
   "web.shell.git.changes": undefined;
@@ -8962,7 +9802,6 @@ export interface Messages {
   "web.shell.section.collapse": { readonly title: string | number };
   "web.shell.section.expand": { readonly title: string | number };
   "web.shell.sidebar.addRepo": undefined;
-  "web.shell.sidebar.addRepoButton": undefined;
   "web.shell.sidebar.addRepoTooltip": undefined;
   "web.shell.sidebar.attentionCount": { readonly n: string | number };
   "web.shell.sidebar.backToRepos": undefined;
@@ -8985,11 +9824,9 @@ export interface Messages {
   "web.shell.sidebar.gitCommitsTip": undefined;
   "web.shell.sidebar.mainLabel": undefined;
   "web.shell.sidebar.mainWorktree": { readonly label: string | number };
-  "web.shell.sidebar.manageRepos": undefined;
   "web.shell.sidebar.needsAttention": undefined;
-  "web.shell.sidebar.newChat": { readonly name: string | number };
   "web.shell.sidebar.newChatHere": undefined;
-  "web.shell.sidebar.newTerminal": { readonly name: string | number };
+  "web.shell.sidebar.newMenu": { readonly name: string | number };
   "web.shell.sidebar.newTerminalHere": undefined;
   "web.shell.sidebar.ready": undefined;
   "web.shell.sidebar.readyAgent": { readonly agent: string | number };
@@ -9030,42 +9867,6 @@ export interface Messages {
   "web.shell.swarm.transcriptRefresh": undefined;
   "web.shell.swarm.transcriptThinking": undefined;
   "web.shell.swarm.transcriptTitle": undefined;
-  "web.tree.sky": undefined;
-  "web.ui.pixel.sound.group.field": undefined;
-  "web.ui.pixel.sound.group.reward": undefined;
-  "web.ui.pixel.sound.group.tools": undefined;
-  "web.ui.pixel.sound.group.ui": undefined;
-  "web.ui.pixel.sound.group.voice": undefined;
-  "web.ui.pixel.sound.group.yard": undefined;
-  "web.ui.pixel.sound.label.achievement": undefined;
-  "web.ui.pixel.sound.label.arrive": undefined;
-  "web.ui.pixel.sound.label.bug": undefined;
-  "web.ui.pixel.sound.label.close": undefined;
-  "web.ui.pixel.sound.label.coin": undefined;
-  "web.ui.pixel.sound.label.harvest": undefined;
-  "web.ui.pixel.sound.label.levelUp": undefined;
-  "web.ui.pixel.sound.label.meow": undefined;
-  "web.ui.pixel.sound.label.mew": undefined;
-  "web.ui.pixel.sound.label.nope": undefined;
-  "web.ui.pixel.sound.label.open": undefined;
-  "web.ui.pixel.sound.label.pant": undefined;
-  "web.ui.pixel.sound.label.pick": undefined;
-  "web.ui.pixel.sound.label.plant": undefined;
-  "web.ui.pixel.sound.label.purr": undefined;
-  "web.ui.pixel.sound.label.ring": undefined;
-  "web.ui.pixel.sound.label.ripe": undefined;
-  "web.ui.pixel.sound.label.rustle": undefined;
-  "web.ui.pixel.sound.label.shovel": undefined;
-  "web.ui.pixel.sound.label.splash": undefined;
-  "web.ui.pixel.sound.label.spray": undefined;
-  "web.ui.pixel.sound.label.tap": undefined;
-  "web.ui.pixel.sound.label.thud": undefined;
-  "web.ui.pixel.sound.label.voiceOff": undefined;
-  "web.ui.pixel.sound.label.voiceOn": undefined;
-  "web.ui.pixel.sound.label.water": undefined;
-  "web.ui.pixel.sound.label.weed": undefined;
-  "web.ui.pixel.sound.label.woof": undefined;
-  "web.ui.pixel.sound.label.yip": undefined;
   "web.voice.moss.connecting": undefined;
   "web.voice.moss.hangUp": undefined;
   "web.voice.moss.intro": undefined;

@@ -2,7 +2,7 @@ import { colorScheme, host, Storage } from "nsh";
 
 import { createPersistentStorage, setActiveStorageHydrated, type StorageBackend } from "./state/storage";
 
-// What nsh's JS engine (still in 0.6.0) lacks and the reused VibeValley code calls.
+// What nsh's JS engine (still in 0.7.1) lacks and the reused VibeValley code calls.
 // Import it first in every entry that loads VibeValley modules.
 // The engine has Intl.NumberFormat and Intl.DateTimeFormat only.
 

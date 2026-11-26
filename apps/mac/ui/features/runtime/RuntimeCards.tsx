@@ -21,7 +21,6 @@ import { DataTable, tableCell } from "../../design/DataTable";
 import { Select, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Card, Quiet, Toggle } from "../../design/layout";
-import { SpriteOr } from "../../design/pixel/icons";
 import { Segmented } from "../../design/Segmented";
 import { Bubble, Hint } from "../../design/Tip";
 import { mix } from "../../design/tone";
@@ -31,7 +30,7 @@ import { momentText, yuan } from "../../infra/base/format";
 import { hostApi } from "../../infra/bridge";
 import { createEffect, untrack } from "../../infra/solid";
 import { defineColumns, useTable } from "../../infra/table";
-import { bottleSprite, type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
+import { type Quota, quotaLevel, quotaOf, windowLabel } from "./quota";
 
 const toneChoices1 = {
   plenty: "bg-accent",
@@ -118,9 +117,7 @@ export function Usage(props: { info: RuntimeInfo; terminalDirectory?: string | u
             else={
               <View class="flex-row items-start gap-3">
                 <View class="w-14 shrink-0 items-center gap-1">
-                  <SpriteOr name={bottleSprite(quota())} size={52}>
-                    <Bottle quota={quota()} size={52} />
-                  </SpriteOr>
+                  <Bottle quota={quota()} size={52} />
                   <Text class="text-sm font-medium tabular-nums text-ink">{quota().short || "—"}</Text>
                 </View>
                 <View class="min-w-0 flex-1 gap-2.5">

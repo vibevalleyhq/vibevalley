@@ -3,12 +3,40 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    Actor, AgentRole, ArtifactCard, ArtifactViewContext, Attachment, ChannelType, ChatMessage, Embed, MessageKind, Notify, Outcome, Reaction, Spent,
-    SubjectKind, USER_ID,
+    Actor, AgentRole, ApiError, ArtifactCard, ArtifactViewContext, Attachment, BizCode, ChannelType, ChatMessage, Embed, MessageKind, Notify, Outcome,
+    Reaction, Spent, SubjectKind, USER_ID,
 };
 
+use crate::context::{LookIn, missing, refused as refuse};
 use crate::service::channel::{ChannelRow, EventRow, MsgRow};
+
+pub(super) const CHANNEL_EVENT_CAPACITY: usize = 1024;
+/// The channel a new farm opens with.
+pub(super) const FIRST_CHANNEL: &str = "general";
+/// The state keeps these many channels; the database keeps all.
+pub const KEEP_CHANNELS: i64 = 100;
+pub(super) const THREAD_TITLE_MAX: usize = 24;
+pub(super) const LAST_MAX: usize = 80;
+pub(super) const SEARCH_MAX: i64 = 50;
+pub(super) const RETRY_WINDOW_MS: i64 = 60_000;
+pub(super) const HELD_SHOWN: usize = 3;
+pub(super) const READ_LIMIT: i64 = 30;
+pub(super) const SEND_KEY_MAX: usize = 64;
+pub(super) const CALLERS_MAX: i64 = 20;
+/// A follower further behind than this is told to start again.
+pub const CATCH_UP_MAX: usize = 200;
+pub(super) const LOG_KEEP: i64 = 80;
+pub(super) const NO_NUMBER: i64 = i32::MAX as i64;
+
+pub(super) fn refused(text: String) -> ApiError {
+    refuse(BizCode::ChannelRefused, text)
+}
+
+pub(super) fn no_channel(id: &str) -> ApiError {
+    missing(t("server.channel.noChannel", &[("id", id.into())]), LookIn::Channel)
+}
 
 /// A session woken by an agent's words is not woken by another's within
 /// this; an orchestrator always is.

@@ -7,15 +7,15 @@
 1. **先分清改动归属哪个渲染载体**：
    - 工作台与工作区外壳页面（`apps/mac/ui/{App.tsx,app,features,farm,workspace}/`）：统一用 `nsh` Tailwind 令牌 class + `apps/mac/ui/design/` 原子；工作区外壳共享节头与菜单样式集中在 `apps/mac/ui/workspace/chrome.tsx`。
    - 官网站点（`apps/site/`）：用 Tailwind CSS v4 读 `apps/site/src/ui/global.css` 的 `@theme static`。
-   - 原生 GPUI/像素/终端（`apps/mac/src/`）：用 Rust `theme.rs` 与 `pixel::draw::DrawList`。
+   - 原生 GPUI/纸雕/终端（`apps/mac/src/`）：用 Rust `theme.rs` 与 `diorama::DioramaScene`。
 2. **复用已有的共用原语**：新建跨模块帮手或状态原语前，先查 [primitives.md](docs/reference/primitives.md) 与 `apps/mac/ui/design/` 目录，禁止抄写第二份功能重叠的按钮、标签、弹窗、分栏或复选框。
-3. **严守两套图标边界**：工作台按钮、导航与表单操作只能使用 `crates/rich/src/icon.rs`（原生 `VvIcon`）承载、`apps/mac/ui/design/icons.ts` 声明 `IconName` 的 `reicon` 图标（`<Icon name>`）；像素头像、农机标识与装饰图只能取 `assets/pixel/`；两者均严禁使用 emoji 替代，也不在页面局部用 `<Canvas>` 手绘新图标路径。
+3. **严守两套图标边界**：工作台按钮、导航与表单操作只能使用 `crates/rich/src/icon.rs`（原生 `VvIcon`）承载、`apps/mac/ui/design/icons.ts` 声明 `IconName` 的 `reicon` 图标（`<Icon name>`）；角色头像、引擎徽标与品牌图只能取从 `vibevalley-assets` 同步的 `assets/{avatars,engines,brand,icons}/`；两者均严禁使用 emoji 替代，也不在页面局部用 `<Canvas>` 手绘新图标路径。
 
 ## 8.2 样式、色彩与布局纪律
 
 1. **颜色与字号全部走令牌，写死 hex 必拒**：
    - 工作台只使用源自 `design/tokens.json` 并生成到 `apps/mac/ui/design/theme.json` 的颜色类名（`bg-page` / `bg-side` / `bg-rail` / `text-ink` / `text-muted` / `border-line` / `bg-accent` / `leaf` / `wheat` / `berry` / `water` 等）和 `apps/mac/ui/nsh.json` 定义的 `fontSize` / `radius` / `ease` / `shadow`。
-   - 需要随主题自适应的半透明底色一律调用 `apps/mac/ui/design/tone.ts` 的 `mix(name, weight)`；状态标签与提醒优先使用语义类组合（`bg-ok-soft text-ok-ink`、`bg-warn-soft text-warn-ink`、`bg-bad-soft text-berry`、`bg-hover text-muted`），工作台 UI 禁止直接拿像素画布色（如 `bg-hat`、`text-bark-900`）或手写 `mix("wheat", 0.22)` 当浅/深双主题状态徽标。
+   - 需要随主题自适应的半透明底色一律调用 `apps/mac/ui/design/tone.ts` 的 `mix(name, weight)`；状态标签与提醒优先使用语义类组合（`bg-ok-soft text-ok-ink`、`bg-warn-soft text-warn-ink`、`bg-bad-soft text-berry`、`bg-hover text-muted`），工作台 UI 禁止拿不随主题切换的 Papertrails 固定色或手写 `mix("wheat", 0.22)` 当浅/深双主题状态徽标。
    - 新增语义色用途必须同步写入 `design/tokens.json` 后执行 `vpx scripts/gen/tokens.ts` 重生成，不直接手改生成产物。
 2. **遵循 `nsh` 样式与响应式规范（[vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)、[nsh-tsx.md](docs/style/nsh-tsx.md)）**：
    - 文字颜色与字号不会从父级 `<View>` 继承，所有字体样式直接挂在 `<Text>` 上。
@@ -36,7 +36,7 @@
 6. **双主题四级表面抬升规则（Light / Dark Parity）**：
    - 背景严格遵守 `rail → side → page → elevated` 四级递增，确保深色模式下浮层始终比主底更亮而不出现「深色沉底倒挂」：
      - 所有携带 `shadow-float` 的弹窗（`Dialog`）、菜单（`MoreMenu` / 工作区右键菜单）、下拉列表（`Select`）、弹层（`Popover` / `DisplayMenu`）、浮动操作条以及在 `bg-side` 容器内抬起的控件（`Segmented` 滑块、看板卡片 `Board`、命令面板 `Palette`）统一使用 `bg-elevated`。
-     - 开关与滑块的圆钮（`ToggleSwitch`、`Slider`、`CatalogDetail`）在浅/深双主题下统一使用暖纸白 `bg-paper` 保持实体触感。
+     - 开关与滑块的圆钮（`ToggleSwitch`、`Slider`）在浅/深双主题下统一使用暖纸白 `bg-paper` 保持实体触感。
      - 工作台与工作区外壳禁止写死 `rgba(...)` 或亮/暗手工特例。
 
 ## 8.3 状态、并发与键盘可达性

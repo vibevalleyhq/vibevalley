@@ -3,7 +3,17 @@
 // and the chat for the state frame (`chatState`, `crons`). The messages are
 // VibeValley's MessageList.stories.tsx rows (talk, reports, rich, edited /
 // pinned / deleted), the cron its Tabs.stories.tsx card.
-import type { Actor, Channel, ChatMessage, CronView, Feature, GitHubStatus, Readiness, SettingsStatus } from "@vibevalley/protocol";
+import {
+  type Actor,
+  type Channel,
+  type ChatMessage,
+  type CronView,
+  type Feature,
+  FeatureValues,
+  type GitHubStatus,
+  type Readiness,
+  type SettingsStatus,
+} from "@vibevalley/protocol";
 import { messageId } from "@vibevalley/protocol/schema";
 
 const now = Date.now();
@@ -135,7 +145,7 @@ const voice = {
   greeting: "你好！今天种点什么？",
 };
 
-const features: readonly Feature[] = ["orchestrator", "image", "understanding", "speech", "speakers", "voiceDesign", "transcription", "live", "vision", "call"];
+const features: readonly Feature[] = FeatureValues;
 const readiness = Object.fromEntries(features.map((f): [Feature, Readiness] => [f, { ready: true }])) as Record<Feature, Readiness>;
 
 const settings: SettingsStatus = {

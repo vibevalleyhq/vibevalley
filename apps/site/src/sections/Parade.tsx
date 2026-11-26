@@ -4,73 +4,83 @@ import { observeVisibility, createReveal, createScrollAnimation } from "../ui/sc
 
 /** While the section crosses the screen, from its top at the screen's bottom to its bottom at the screen's top. */
 const CROSSING: ["start end", "end start"] = ["start end", "end start"];
+
+interface Walker {
+  readonly look: string;
+  readonly portrait: string;
+  readonly figurine?: string;
+}
+
 interface Props {
   copy: Copy["parade"];
-  /** The plots behind, left to right. */
+  /** Isometric Papertrails crop & garden tiles behind the path. */
   plots: string[];
-  /** Each helper's side frames in a step: step, stand, step, stand. */
-  walkers: string[][];
+  /** Seven species helpers in Papertrails cardstock medallions & figurines. */
+  walkers: readonly Walker[];
+  /** Foreground Papertrails bamboo and willow cutouts. */
   front: string[];
 }
+
 export default function Parade(props: Props) {
   const ref = createReveal<HTMLElement>();
   const back = createScrollAnimation<HTMLDivElement>(ref, CROSSING, () => [{ keyframes: { transform: ["translateX(60px)", "translateX(-60px)"] } }]);
-  const near = createScrollAnimation<HTMLDivElement>(ref, CROSSING, () => [{ keyframes: { transform: ["translateX(-150px)", "translateX(150px)"] } }]);
+  const near = createScrollAnimation<HTMLDivElement>(ref, CROSSING, () => [{ keyframes: { transform: ["translateX(-120px)", "translateX(120px)"] } }]);
   observeVisibility(ref);
   return (
-    <>
-      <section
-        ref={ref.set}
-        id="parade"
-        aria-labelledby="parade-title"
-        class="@container relative h-100 overflow-hidden border-y-2 border-bark-900 bg-[image:var(--scene-parade-background)]"
-      >
-        <div ref={back.set} aria-hidden="true" class="absolute bottom-27 -left-[10%] flex w-[120%] items-end gap-6">
-          {props.plots.map((src) => (
-            <img loading="lazy" src={src} alt="" class="w-25.5 max-w-none [image-rendering:pixelated]" />
-          ))}
-        </div>
+    <section
+      ref={ref.set}
+      id="parade"
+      aria-labelledby="parade-title"
+      class="@container relative h-104 overflow-hidden border-y border-border-soft/35 bg-[image:var(--scene-parade-background)]"
+    >
+      <div ref={back.set} aria-hidden="true" class="absolute bottom-26 -left-[10%] flex w-[120%] items-end gap-5">
+        {props.plots.map((src) => (
+          <img loading="lazy" src={src} alt="" class="w-28 max-w-none drop-shadow-[0_4px_6px_rgb(91_67_43_/_0.2)]" />
+        ))}
+      </div>
+      <div
+        aria-hidden="true"
+        class="absolute bottom-10 h-16 w-full border-y border-(--color-path-edge)/50 bg-[image:repeating-linear-gradient(90deg,var(--color-path)_0_28px,var(--color-path-groove)_28px_30px)]"
+      />
+      {props.walkers.map((walker, i) => (
         <div
           aria-hidden="true"
-          class="absolute bottom-9.5 h-16 w-full border-y-2 border-(--color-path-edge) bg-[image:repeating-linear-gradient(90deg,var(--color-path)_0_22px,var(--color-path-groove)_22px_26px)]"
-        />
-        {props.walkers.map((frames, i) => (
+          class="absolute bottom-14 left-0 [animation-name:walk-across] [animation-duration:30000ms] [animation-timing-function:linear] [animation-iteration-count:infinite]"
+          style={{
+            "animation-duration": `${26 + (i % 3) * 7}s`,
+            "animation-delay": `${-i * 5.2}s`,
+          }}
+        >
           <div
-            aria-hidden="true"
-            class="absolute bottom-13.5 left-0 h-21 w-12 [animation-name:walk-across] [animation-duration:30000ms] [animation-timing-function:linear] [animation-iteration-count:infinite]"
+            class="motion-safe:[animation-name:paper-bob] motion-safe:[animation-duration:1800ms] motion-safe:[animation-timing-function:ease-in-out] motion-safe:[animation-iteration-count:infinite]"
             style={{
-              "animation-duration": `${26 + (i % 3) * 7}s`,
-              "animation-delay": `${-i * 5.3}s`,
+              "animation-delay": `${-i * 0.35}s`,
             }}
           >
-            {frames.map((src, j) => (
-              <img
-                src={src}
-                alt=""
-                loading="lazy"
-                class="absolute inset-0 w-full h-full [animation-name:walk-frame] [animation-duration:600ms] [animation-timing-function:steps(1)] [animation-iteration-count:infinite] object-contain object-bottom opacity-0 [image-rendering:pixelated]"
-                style={{
-                  "animation-delay": `${j * 0.15}s`,
-                }}
-              />
-            ))}
+            {walker.figurine !== undefined ? (
+              <img loading="lazy" src={walker.figurine} alt="" class="h-22 w-auto max-w-none drop-shadow-[0_6px_8px_rgb(91_67_43_/_0.28)]" />
+            ) : (
+              <div class="rounded-md border-2 border-paper-core bg-card p-1 shadow-card">
+                <img loading="lazy" src={walker.portrait} alt="" class="h-14 w-14 rounded-sm object-cover" />
+              </div>
+            )}
           </div>
+        </div>
+      ))}
+      <div ref={near.set} aria-hidden="true" class="pointer-events-none absolute -bottom-3 -left-[10%] flex w-[120%] items-end gap-32">
+        {props.front.map((src) => (
+          <img loading="lazy" src={src} alt="" class="h-28 w-auto max-w-none drop-shadow-[0_4px_8px_rgb(91_67_43_/_0.22)]" />
         ))}
-        <div ref={near.set} aria-hidden="true" class="absolute -bottom-4.5 -left-[10%] flex w-[120%] items-end gap-30">
-          {props.front.map((src) => (
-            <img loading="lazy" src={src} alt="" class="w-37.5 max-w-none [image-rendering:pixelated]" />
-          ))}
-        </div>
-        <div
-          data-reveal
-          class="absolute inset-x-0 top-5.5 z-2 mx-auto w-[min(760px,100%_-_32px)] border-2 border-bark-900 bg-cream-50 [box-shadow:inset_0_0_0_2px_var(--color-rim),_4px_4px_0_var(--color-drop)] px-5.5 py-3.5 text-center"
-        >
-          <h2 id="parade-title" class="text-2xl sm:text-[length:30px]">
-            {props.copy.title}
-          </h2>
-          <p class="mt-1.5 text-sm sm:text-base">{props.copy.text}</p>
-        </div>
-      </section>
-    </>
+      </div>
+      <div
+        data-reveal
+        class="absolute inset-x-0 top-5.5 z-2 mx-auto w-[min(760px,100%_-_32px)] rounded-lg border border-border-soft/45 bg-card/95 [box-shadow:var(--inset-shadow-rim),_var(--shadow-card)] backdrop-blur-xs px-6 py-4 text-center"
+      >
+        <h2 id="parade-title" class="text-2xl sm:text-[length:28px] text-bark-900">
+          {props.copy.title}
+        </h2>
+        <p class="mt-1.5 text-sm sm:text-base text-bark-800">{props.copy.text}</p>
+      </div>
+    </section>
   );
 }

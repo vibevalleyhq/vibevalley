@@ -1,6 +1,6 @@
 # AGENTS.md
 
-VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：任务派给角色（Agent），服务端为它派一个执行会话（Session，经 Rust 的 oar 驱动本机的编码引擎），按角色设置在仓库目录或任务的 worktree 里一轮一轮运行，用户看改动、合进主分支；用户、主助手（替用户派活的 agent）和执行会话在频道里说话。外面另有一层像素农场皮肤：仓库是岛，在做的任务是一块地，帮工在地上干活，默认频道画成田头（[概念](docs/concepts.md)）。它是全原生的，桌面宿主运行于 macOS：服务端和命令行是 Rust（`crates/`），桌面应用是 `apps/mac`（GPUI 窗口，里面带着服务端；工作台是 nsh 跑的 TSX 页面，像素农场由 Rust 画），另提供独立原生移动端 `apps/mobile`（`nsh/mobile`，iOS 优先、Android 就绪，经默认关闭的 Tailscale / 回环受认证远程门接入 Mac，见[移动远程控制方案](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)）；契约、词典、工具说明和提示以 Rust 为源，TS 由它生成。还在做的部分见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)。改 `crates/`、`apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
+VibeValley 是 AI 版的 Linear，一个在本机管编码 agent 的工作台，和 Multica 是一类东西：任务派给角色（Agent），服务端为它派一个执行会话（Session，经 Rust 的 oar 驱动本机的编码引擎），按角色设置在仓库目录或任务的 worktree 里一轮一轮运行，用户看改动、合进主分支；用户、主助手（替用户派活的 agent）和执行会话在频道里说话。外面另有一层 Papertrails 纸雕农场皮肤：仓库是院，在做的任务是一块地，帮工在地上干活，默认频道画成田头（[概念](docs/concepts.md)）。它是全原生的，桌面宿主运行于 macOS：服务端和命令行是 Rust（`crates/`），桌面应用是 `apps/mac`（GPUI 窗口，里面带着服务端；工作台是 nsh 跑的 TSX 页面，3D 纸雕农场由 Rust `wgpu` 画），另提供独立原生移动端 `apps/mobile`（`nsh/mobile`，iOS 优先、Android 就绪，经默认关闭的 Tailscale / 回环受认证远程门接入 Mac，见[移动远程控制方案](.agents/notes/proposed/architecture/2026-11-23-mobile-remote-tailscale-nsh.md)）；契约、词典、工具说明和提示以 Rust 为源，TS 由它生成。还在做的部分见[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)。改 `crates/`、`apps/`、`packages/` 之前读 [docs/architecture.md](docs/architecture.md)；写文档照 [docs/AGENTS.md](docs/AGENTS.md) 和 [docs/style/writing.md](docs/style/writing.md)；子系统沉淀在 [docs/subsystems](docs/subsystems/README.md)，计划写成 [Agent Notes](.agents/notes/README.md)。
 
 ## 目录
 
@@ -18,17 +18,17 @@ crates/server/             服务端（二进制 vibevalley-server）：扁平�
                            外部接入：gateway/（api/、bridge/、http/、remote/，收拢进程内桥、Axum HTTP/SSE 门与默认关闭的受认证远程监听门，不导入业务域）；
                            扁平深业务域（全单数，主结构体为 <domain>::Service 或朴素单数名）：runtime/（session/ + worktree/，经 SessionDriver 与 agent/ 解耦）、agent/（profile/、memory/、tool/、mcp/、orchestrator/）、issue/（board、edit、family、refine、pull/、chat）、artifact/（storage/ 作品目录 + 统一多人/多 Agent 实时协同 collab + 12 类 ArtifactType 渐进披露技能 types + 并列 library 与 media/，仅 5 张作品表，删旧 block/entry/Html 划词引擎），以及 channel/、connector/、cron/、voice/、machine/、debug/、game.rs、fake/；assets/ 是工具说明（tools/）、12 种作品类型技能指南（artifact/types/）、主助手和执行会话的提示
 crates/cli/                命令行（二进制 vibevalley，clap）：按业务域组织的纯 HTTP 客户端；评测另拆为可选二进制 vibevalley-eval（--features eval）
-apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳（src/shell/*）、终端、宿主能力和像素场景（src/pixel：农场、地图、记忆树、开场、图鉴）；
-                           crates/ 是桌面独占支撑 crate（pixel、terminal、workspace）；
+apps/mac/                  原生应用（二进制 vibevalley-mac）：src/ 是窗口外壳（src/shell/*）、终端、宿主能力和 Papertrails 场景（src/diorama：3D 纸雕农场与开场）；
+                           crates/ 是桌面独占支撑 crate（diorama、terminal、workspace）；
                            ui/ 是 nsh 跑的 TSX：app（含 6 项主导航，详见 docs/subsystems/app.md）、workspace（侧栏/Git/文件/命令面板）、design（共享令牌与组件）、features/<概念>（含 12 类作品实时共编视图、5 栏设置与远程访问面板）、farm、infra
 apps/mobile/               独立原生移动应用（nsh/mobile，iOS 优先、Android 就绪）：经 @vibevalley/protocol/remote 连接 Mac 远程门，4 标签页（收件箱、频道、会话、任务）与 97 枚 reicons 矢量回退
 apps/island/               刘海上的灵动岛（Swift）：单独的小程序（apps/island/README.md）
-apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成），图和像素字用根目录 assets/ 的
-assets/                    全部的图、像素字、指针和像素村的地图
+apps/site/                 官网 vibevalley.dev（Vite + Solid 2 静态生成），Papertrails 图用根目录 assets/ 的
+assets/                    从 vibevalley-assets 同步的轻量 Papertrails 产物：diorama/、brand/、icons/、avatars/、engines/、site/
 packages/protocol/         页面用的契约：src/<概念>/shapes.gen.ts 和 endpoints.gen.ts 是生成的；Zod（schema.ts）、端点表（api.ts）、双端规则（rules/）、
                            纯 Web Fetch 远程传输层（@vibevalley/protocol/remote：remote/transport.ts）、client.ts、宿主接口（host.ts）是手写的
 packages/i18n/             页面里 t("key")：src/catalogs.ts 由 i18n:gen 从 crates/i18n/locales 写出
-design/                    生图提示词、脚本和切图规则；原图在单独的仓库 vibevalley-art，design/art.sh 链接进来
+design/                    设计令牌（tokens.json）与素材同步脚本（sync-assets.sh、diorama.sh）；所有原始素材与生成脚本在同级仓库 vibevalley-assets
 docs/                      当前的行为和约定；subsystems/ 是各子系统从架构角度沉淀下来的样子（docs/AGENTS.md）
 .agents/notes/             Agent Notes：具体的计划，做完沉淀进 docs/subsystems
 .agents/skills/            仓库自己的 skill：验收（vv-acceptance）等；.claude/skills 链接到这里
@@ -97,20 +97,20 @@ agent 照着已有的代码抄，走最短的路，所以要让容易的写法�
 - **Rust 异步与并发**：共用单一 `vibevalley-runtime::rt`，异步函数与 `Drop` 禁 `rt::block_on`（用 `close_async`），测试用 `start_paused` + `ManualClock` 及 `--features loom` 内核，`crates/rich` 重计算离线程卸载（[Rust 异步并发规范](docs/style/rust-async-concurrency.md)，`cargo xtask audit`）。
 - **封闭的联合穷尽处理**：Rust 的 `match` 不写吞掉新成员的 `_`（`router.rs` 对全部 `EndpointId` 与 `NativeEndpointId` 穷尽分发）；TS 按 `_tag`、`kind`、`type` 分支时 `switch` 覆盖全部成员（`switch-exhaustiveness-check` 查）。
 - **契约改在 Rust**：形状和接口表改 `crates/protocol/src/contract`，TS 的类型由它生成；页面要用的同改手写的 `schema.ts` 与 `api.ts`，它们的测试对着生成物查（[契约](docs/subsystems/foundation.md#契约规则和数据库)）。
-- **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`cargo xtask protocol --write`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、golden（`cargo xtask goldens`）和生成的参考表由脚本写出，`cargo xtask protocol` 和 `vp run docs:verify` 查是不是最新。宿主 `state.db` 与服务端、持久执行统一使用 `SeaORM` + `SeaQuery`（服务端与持久执行同时支持 SQLite 与 PostgreSQL）。
+- **生成的不手改**：`packages/protocol` 的 `shapes.gen.ts` 与 `endpoints.gen.ts`（`cargo xtask protocol --write`）、`client.ts`（`api:client`）、`packages/i18n/src/catalogs.ts`（`i18n:gen`）、`iconPaths.gen.ts`（`icons:gen`）、golden（`cargo xtask goldens`）和生成的参考表由脚本写出，`cargo xtask protocol` 和 `vp run docs:verify` 查是不是最新。宿主 `state.db` 与服务端、持久执行统一使用 `SeaORM` + `SeaQuery`（服务端与持久执行同时支持 SQLite 与 PostgreSQL，前向增量迁移由 `seaql_server_migrations` / `seaql_migrations` 跟踪并在启动时校验表结构）。
 - **内部不留兼容**：改名、改形状、改落盘格式直接改，不写兼容层、旧数据兜底或迁移脚本；对外 HTTP `v1` 是唯一例外（[接口版本](docs/subsystems/core.md)）。
 - **页面不折状态**：页面只读按域推来的切片（`board`、`sessions`、`collab`、`inbox`、`ops`、`farm`）并写画面摆法，请求只经 `Transport`；缺数据就补进契约与纯投影或调接口问服务端（[客户端](docs/subsystems/app.md)）。
 - **页面守 `nsh` 响应式**：动态 JSX 分支用 `<If>`、列表用带稳定 `key` 的 `<Each>` 或 `<List>`，不解构 `props`、不提前求值访问器、多处派生用 `computed()`（[NSH TSX 规范](docs/style/nsh-tsx.md)）。
 - **处理函数要薄**：`gateway/` 的 HTTP 门、进程内桥、`router.rs` 和页面组件只做鉴权、转发与展示，规则留在所属模块或纯函数里（[架构](docs/architecture.md)）。
 - **执行会话没有权限确认**：服务端只听 `127.0.0.1`，执行会话只在工作区开工（[执行会话](docs/subsystems/session.md)）。
 - **包之间只经包名**：TS 跨包只经 `package.json` 的 `exports` 写 `@vibevalley/*`（`no-cross-package-path` 查）；Rust 跨 crate 只经 `Cargo.toml` 的依赖。
-- **图标分两套**：工作台用 `crates/rich/src/icon.rs` 原生 `VvIcon` 渲染的 97 枚 reicon 线条图标（TS 侧由 `apps/mac/ui/design/icons.ts` 声明 `IconName`，经 `<Icon name>` 使用；无原生 `VvIcon` 的载体及 `apps/mobile` 使用 `scripts/gen/icons.ts` 单源生成的 `iconPaths.gen.ts` 与 `<Canvas>` + `Path2D` 矢量回退），像素皮与头像、引擎 logo 用 `design/pixel` 生成的像素图，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
+- **图标分两套**：工作台用 `crates/rich/src/icon.rs` 原生 `VvIcon` 渲染的 97 枚 reicon 线条图标（TS 侧由 `apps/mac/ui/design/icons.ts` 声明 `IconName`，经 `<Icon name>` 使用；无原生 `VvIcon` 的载体及 `apps/mobile` 使用 `scripts/gen/icons.ts` 单源生成的 `iconPaths.gen.ts` 与 `<Canvas>` + `Path2D` 矢量回退），角色头像、引擎标识与品牌图标使用从 `vibevalley-assets` 经 `design/sync-assets.sh` 同步到 `assets/{avatars,engines,brand,icons}/` 的 Papertrails 纸雕产物，都不用字符符号代替（[图标与令牌](docs/design/01-philosophy-and-tokens.md)）。
 - **界面照田间工作台**：工作台、工作区外壳、移动端和原生壳面的颜色、圆角、字号、阴影和缓动一律走 `design/tokens.json`（由 `vp run tokens:gen` 同步写出 `apps/mac/ui/design/theme.json`、`apps/mac/ui/nsh.json`、`apps/mac/src/theme_tokens.rs` 及 `apps/mobile` 令牌）；照 [设计系统](docs/design/README.md) 与 [Agent UI 指南](docs/design/08-agent-ui-guide.md)，class 写法照 [vv-tailwind](.agents/skills/vv-tailwind/SKILL.md)。
 - **密钥**：家目录的 `settings.json` 不进仓库；日志、快照和文档里不出现真实密钥。
 - **话放在哪**：对用户的话进 `crates/i18n/locales/{zh,en}/<宿主.模块>.json`，Rust 调 `vibevalley_i18n::t`，TS 调 `t("key")`（`vpx scripts/gen/i18n.ts check` 查漏翻）；对模型的话用中文写进 `crates/server/assets`（[话放在哪](docs/subsystems/foundation.md)）。
 - **代码风格**：代码和接口用实际业务概念，种地双关只留在农场的皮里（`stale-names.ts` 查，[用语表](docs/README.md#用语)）；命名站在领域视角说管什么事，不用 `utils`、`state` 一类泛词和自造架构黑话，服务端顶层业务域与结构体一律用单数（顶层持久化服务层为 `service::Service`，深业务域为 `<domain>::Service`，基础模块为 `Storage`/`Setting`/`Provider`/`Repo`/`Game`，依赖字段为 `app.issue`/`ctx.service`），复数只用于集合、计数与列表接口（[命名](docs/style/naming.md)）；英文注释只写不看就会改错的约束与原因（[代码风格](docs/style/code.md)）。
-- **测试**：行为在能发现出错的最低层测；服务端的测试在 `crates/*/tests`，用 scripted 引擎与真 git 离线跑；页面的测试用 `nsh/test` 喂样例的 `Transport`，像素场景在 CPU 上画出来查；不写硬编码睡眠等待（TS 由 `no-test-sleep` 查）；修缺陷补 `regression` 测试。
-- **改完要验证**：先跑最窄的静态与单元检查；改了接口、服务、页面或像素场景，照 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 在真实程序上验收并附上证据。
+- **测试**：行为在能发现出错的最低层测；服务端的测试在 `crates/*/tests`，用 scripted 引擎与真 git 离线跑；页面的测试用 `nsh/test` 喂样例的 `Transport`，纸雕场景与开场逻辑在 `apps/mac/src/diorama/` 单元测试中核验；不写硬编码睡眠等待（TS 由 `no-test-sleep` 查）；修缺陷补 `regression` 测试。
+- **改完要验证**：先跑最窄的静态与单元检查；改了接口、服务、页面或纸雕场景，照 [vv-acceptance](.agents/skills/vv-acceptance/SKILL.md) 在真实程序上验收并附上证据。
 - **分支、提交和 PR**：同批改动默认合一个 PR，只经 squash 合入 `main`；分支 `<类>/<主题>`，提交与 PR 用英文写改完后的行为（标题不超过 100 字符、不带 agent 署名，commit-msg hook 与 CI 查），操作照 [vv-pr](.agents/skills/vv-pr/SKILL.md)（[分支、提交和 PR](docs/development.md)）。
 - **文档和 Note**：改行为同改对应文档（优先改 `docs/subsystems/`，见 [文档规矩](docs/AGENTS.md)）；非平凡改动先写 `proposed/` Note，上线后把长期成立的沉淀进子系统并删掉 Note（[什么时候写](.agents/notes/README.md#什么时候写)）。
 

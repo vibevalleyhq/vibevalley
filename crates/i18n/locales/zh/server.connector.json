@@ -22,7 +22,7 @@
   "line": {
     "orchestrator": "主助手",
     "dispatch": "派活",
-    "thread": "在任务话题里",
+    "thread": "在工单话题里",
     "head": "【{who}】",
     "headWhat": "【{who} · {what}】"
   },

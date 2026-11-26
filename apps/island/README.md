@@ -8,7 +8,7 @@ the issue to open from its stdout. The native app (`apps/mac`) does not start it
 Sources/IslandCore/Messages.swift   the lines the app and the island exchange: {"glance": …} in, {"open": "<issue>"} out
 Sources/IslandCore/Geometry.swift   where the island goes: out of the notch, or a tab from the menu bar without one
 Sources/VibeValleyIsland/main.swift an accessory app (no Dock icon) reading its stdin; it quits when stdin closes
-Sources/VibeValleyIsland/Island.swift the panel, the hover that opens it, the rows, the pixel font
+Sources/VibeValleyIsland/Island.swift the panel, the hover that opens it, the rows, system typography
 Tests/IslandCoreTests/              the messages and the placement (Swift Testing)
 ```
 
@@ -22,5 +22,5 @@ closed and open into that folder (it must exist) (`closed.png`, `open.png`) and 
 
 ```bash
 mkdir -p /tmp/island && echo '{"glance":{"working":1,"waiting":1,"rows":[{"issue":"i1","number":41,"title":"修登录页","doing":"等你验收","tone":"waiting"}]}}' |
-  apps/island/.build/release/VibeValleyIsland --font assets/fonts/fusion-pixel-12px-proportional-zh_hans.otf --snapshot /tmp/island
+  apps/island/.build/release/VibeValleyIsland --snapshot /tmp/island
 ```

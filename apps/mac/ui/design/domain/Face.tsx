@@ -4,10 +4,10 @@ import { t } from "@vibevalley/i18n";
 import { defaultOrchestrator, type Look } from "@vibevalley/protocol";
 
 import { orchestratorLookOf } from "../../infra/agents";
-import { ready, useAgents, useSprites } from "../../infra/query";
-import { useSpriteUrl } from "../pixel/atlas";
+import { ready, useAgents } from "../../infra/query";
+import { orchestratorPortraitUrl, ownerPortraitUrl, roleAvatarUrl, speciesPortraitUrl, useAssetsDir } from "../art";
 import { tone } from "../tone";
-import { castPrefix, hexColor, orchestratorLooks } from "./cast";
+import { castOf, hexColor, orchestratorLooks } from "./cast";
 import { initialOf, RuntimeBadge } from "./RuntimeBadge";
 
 /** `hex` moved `part` of the way to white. */
@@ -33,27 +33,19 @@ function Initial(props: { size: number; letter: string; ground: string; muted?: 
   );
 }
 
-interface Cut {
-  readonly src: string;
-  readonly left: number;
-  readonly top: number;
-  readonly width: number;
-  readonly height: number;
-}
-
-/** The part of a sprite a face shows, in a clipping square. */
-function Crop(props: { size: number; cut: Cut; class?: string; ground?: string; muted?: boolean | undefined }) {
+/** A square Papertrails portrait clipped to rounded cardstock corners. */
+function Portrait(props: { size: number; src: string; class?: string; ground?: string; muted?: boolean | undefined }) {
   return (
     <View
       class={`shrink-0 overflow-hidden rounded-sm ${props.class ?? ""}`}
       style={{ width: props.size, height: props.size, backgroundColor: props.ground, opacity: props.muted === true ? 0.6 : 1 }}
     >
-      <Image src={props.cut.src} style={{ position: "absolute", left: props.cut.left, top: props.cut.top, width: props.cut.width, height: props.cut.height }} />
+      <Image src={props.src} style={{ width: props.size, height: props.size, objectFit: "cover" }} />
     </View>
   );
 }
 
-/** A helper's head: its role portrait if chosen, else its farm sprite cropped to the head on a leaf green ground. */
+/** A helper's portrait: its Papertrails role avatar if chosen, else its species portrait. */
 export function AgentFace(props: {
   agentId: string;
   runtime?: string | undefined;
@@ -62,101 +54,76 @@ export function AgentFace(props: {
   muted?: boolean | undefined;
   name?: string;
 }) {
-  const sprites = useSprites();
+  const assetsDir = useAssetsDir();
   const agents = useAgents();
-  const url = useSpriteUrl();
   const size = () => props.size ?? 24;
-  const avatarSprite = computed(() => {
-    const all = ready(sprites, undefined);
-    const avatar = props.look?.avatar;
-    return all && avatar && avatar in all ? avatar : undefined;
-  });
-  const cut = computed((): Cut | undefined => {
-    const all = ready(sprites, undefined);
-    if (!all) return undefined;
-    const avatar = avatarSprite();
-    if (avatar) {
-      const src = url(avatar);
-      return src ? { src, left: 0, top: 0, width: size(), height: size() } : undefined;
-    }
-    const name = `${castPrefix(props.look, props.agentId, (n) => n in all)}-down`;
-    const found = Object.hasOwn(all, name) ? name : "bear-farmer-down";
-    const sp = Object.hasOwn(all, found) ? all[found] : undefined;
-    const src = url(found);
-    if (!sp || !src) return undefined;
-    const k = size() / (sp.h * 0.5);
-    const cx = sp.w / 2;
-    const cy = sp.h * 0.25 + sp.h * 0.03;
-    return { src, left: size() / 2 - cx * k, top: size() / 2 - cy * k, width: sp.w * k, height: sp.h * k };
+  const src = computed(() => {
+    const dir = assetsDir();
+    if (!dir) return undefined;
+    const roleUrl = roleAvatarUrl(dir, props.look?.avatar);
+    if (roleUrl) return roleUrl;
+    const { species } = castOf(props.look, props.agentId);
+    return speciesPortraitUrl(dir, species);
   });
   const name = computed(() => props.name ?? ready(agents, []).find((a) => a.id === props.agentId)?.name ?? props.agentId);
-  // The hat's colour lightened toward paper, opaque so the letter reads in both themes; the leaf wash without a hat.
   const ground = () => (props.look?.hat ? toward(hexColor(props.look.hat), 0.6) : tone("avatar-leaf"));
   return (
     <View class="shrink-0" style={{ width: size(), height: size() }}>
-      <If when={cut()} else={<Initial size={size()} letter={initialOf(name())} ground={ground()} muted={props.muted} />}>
-        {(c) => <Crop size={size()} cut={c()} class={avatarSprite() ? "bg-side" : "bg-px-leaf-wash"} muted={props.muted} />}
+      <If when={src()} else={<Initial size={size()} letter={initialOf(name())} ground={ground()} muted={props.muted} />}>
+        {(url) => <Portrait size={size()} src={url()} class="bg-avatar-paper" muted={props.muted} />}
       </If>
       <If when={props.runtime}>{(runtime) => <RuntimeBadge runtime={runtime()} size={Math.max(10, Math.min(24, Math.round(size() * 0.4)))} />}</If>
     </View>
   );
 }
 
-/** An orchestrator's head (the default one when agent is none), preferring an explicit or profile role portrait before manager-<look>. */
+/** An orchestrator's portrait, preferring an explicit or profile role avatar before its Papertrails manager look. */
 export function OrchestratorFace(props: { size?: number; agent?: string | undefined; look?: string; avatar?: string | undefined }) {
-  const sprites = useSprites();
+  const assetsDir = useAssetsDir();
   const agents = useAgents();
-  const url = useSpriteUrl();
   const size = () => props.size ?? 24;
-  const avatarSprite = computed(() => {
-    const all = ready(sprites, undefined);
-    if (!all) return undefined;
+  const src = computed(() => {
+    const dir = assetsDir();
+    if (!dir) return undefined;
     const candidate =
       props.avatar ?? (props.look === undefined ? ready(agents, []).find((a) => a.id === (props.agent ?? defaultOrchestrator))?.look.avatar : undefined);
-    return candidate && candidate in all ? candidate : undefined;
-  });
-  const cut = computed((): Cut | undefined => {
-    const all = ready(sprites, undefined);
-    if (!all) return undefined;
-    const avatar = avatarSprite();
-    if (avatar) {
-      const src = url(avatar);
-      return src ? { src, left: 0, top: 0, width: size(), height: size() } : undefined;
-    }
+    const roleUrl = roleAvatarUrl(dir, candidate);
+    if (roleUrl) return roleUrl;
     const look = props.look ?? orchestratorLookOf(ready(agents, []), props.agent);
-    const name = `manager-${look}-face` in all ? `manager-${look}-face` : "manager-face";
-    const sp = Object.hasOwn(all, name) ? all[name] : undefined;
-    if (!sp) return undefined;
-    const dpr = pixelRatio();
-    if (sp.railSize === size() && (dpr === 1 || dpr === 2)) {
-      const src = url(`rail/${name}-${dpr}x`);
-      return src ? { src, left: 0, top: 0, width: size(), height: size() } : undefined;
+    if (size() <= 40) {
+      return orchestratorPortraitUrl(dir, look, pixelRatio() >= 2 ? 2 : 1);
     }
-    const src = url(name);
-    if (!src) return undefined;
-    const k = size() / (sp.w * 0.86);
-    return { src, left: (size() - sp.w * k) / 2, top: size() * 0.04, width: sp.w * k, height: sp.h * k };
+    return orchestratorPortraitUrl(dir, look);
   });
   const letter = computed(() => {
     const agent = props.look === undefined ? ready(agents, []).find((a) => a.id === (props.agent ?? defaultOrchestrator)) : undefined;
     return initialOf(agent?.name ?? orchestratorLooks.find((l) => l.id === (props.look ?? "farmer"))?.name ?? "?");
   });
   return (
-    <If when={cut()} else={<Initial size={size()} letter={letter()} ground={tone("avatar-sky")} />}>
-      {(c) => (
-        <If when={avatarSprite()} else={<Crop size={size()} cut={c()} ground={tone("avatar-sky")} />}>
-          <Crop size={size()} cut={c()} class="bg-side" />
-        </If>
-      )}
+    <If when={src()} else={<Initial size={size()} letter={letter()} ground={tone("avatar-sky")} />}>
+      {(url) => <Portrait size={size()} src={url()} class="bg-avatar-paper" />}
     </If>
   );
 }
 
-/** The user: user badge in a wheat square. */
+/** The user: courtyard owner portrait when assets are available, else a compact badge. */
 export function UserFace(props: { size?: number }) {
+  const assetsDir = useAssetsDir();
+  const size = () => props.size ?? 24;
+  const src = computed(() => {
+    const dir = assetsDir();
+    return dir ? ownerPortraitUrl(dir) : undefined;
+  });
   return (
-    <View class="shrink-0 items-center justify-center rounded-sm bg-selected" style={{ width: props.size ?? 24, height: props.size ?? 24 }}>
-      <Text class="text-xs font-semibold text-muted">{t("web.base.user")}</Text>
-    </View>
+    <If
+      when={src()}
+      else={
+        <View class="shrink-0 items-center justify-center rounded-sm bg-selected" style={{ width: size(), height: size() }}>
+          <Text class="text-xs font-semibold text-muted">{t("web.base.user")}</Text>
+        </View>
+      }
+    >
+      {(url) => <Portrait size={size()} src={url()} class="bg-avatar-paper" />}
+    </If>
   );
 }

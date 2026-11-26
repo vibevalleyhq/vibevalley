@@ -10,9 +10,7 @@ import { Dialog } from "../../design/Dialog";
 import { Field, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Banner, Toggle } from "../../design/layout";
-import { motionClass } from "../../design/motion";
 import { Tag } from "../../design/Tag";
-import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { currentHost } from "../../infra/host";
 import { defineQuery, ready, useQuery, useQueryClient } from "../../infra/query";
@@ -26,12 +24,14 @@ const appletsQuery = defineQuery({
   },
 });
 
-function useInstalledApplet(artifactId: () => string) {
+export function useInstalledApplets() {
   const list = useQuery(() => appletsQuery(), { enabled: () => currentHost().applet !== undefined });
-  return computed((): ArtifactAppletInfo | undefined => {
-    const items = ready(list, []);
-    return items.find((item) => item.artifactId === artifactId() && item.installed);
-  });
+  return computed((): readonly ArtifactAppletInfo[] => ready(list, []));
+}
+
+export function useInstalledApplet(artifactId: () => string) {
+  const list = useInstalledApplets();
+  return computed((): ArtifactAppletInfo | undefined => list().find((item) => item.artifactId === artifactId() && item.installed));
 }
 
 interface InstallAppletModalProps {
@@ -41,7 +41,7 @@ interface InstallAppletModalProps {
 }
 
 /** Modal to install, update, launch, or uninstall a local macOS artifact applet. */
-function InstallAppletModal(props: InstallAppletModalProps) {
+export function InstallAppletModal(props: InstallAppletModalProps) {
   return (
     <Dialog open={props.open} onClose={props.onClose} title={t("web.artifact.applet.modalTitle")} testid="install-applet-modal">
       <If when={props.open}>
@@ -213,42 +213,5 @@ function InstallAppletModalBody(props: { artifact: Artifact }) {
         </Button>
       </View>
     </View>
-  );
-}
-
-/** Toolbar trigger for installing/managing a local macOS applet; hidden when the host has no `applet` capability. */
-export function InstallAppletButton(props: { artifact: Artifact; testID?: string | undefined; onOpenChange?: ((open: boolean) => void) | undefined }) {
-  const modalOpen = signal(false);
-  const installed = useInstalledApplet(() => props.artifact.id);
-  const setOpen = (next: boolean) => {
-    modalOpen.set(next);
-    props.onOpenChange?.(next);
-  };
-  const label = () => (installed() ? t("web.artifact.applet.buttonInstalled") : t("web.artifact.applet.button"));
-
-  return (
-    <If when={currentHost().applet !== undefined}>
-      <>
-        <View
-          role="button"
-          testID={props.testID ?? "artifact-install-applet"}
-          accessibilityLabel={label()}
-          accessibilityState={{ selected: installed() !== undefined }}
-          tooltip={<Bubble text={label()} />}
-          onPress={() => setOpen(true)}
-          class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md border px-2 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus ${
-            installed() ? "border-line bg-ok-soft hover:bg-hover" : "border-line bg-page hover:border-faint hover:bg-hover"
-          }`}
-        >
-          <Icon name="devices" size={12} tone={installed() ? "ok-ink" : "muted"} />
-          <If when={installed()}>
-            <Text testID="artifact-install-applet-badge" class="text-2xs font-medium text-ok-ink">
-              {t("web.artifact.applet.badgeInstalled")}
-            </Text>
-          </If>
-        </View>
-        <InstallAppletModal open={modalOpen()} artifact={props.artifact} onClose={() => setOpen(false)} />
-      </>
-    </If>
   );
 }

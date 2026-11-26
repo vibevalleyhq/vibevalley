@@ -1,9 +1,9 @@
 use std::io::Read as _;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
 
 use sha2::Digest as _;
-use tokio::io::AsyncWriteExt as _;
+use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
 use super::releases::{self, Build};
 
@@ -13,6 +13,12 @@ const TEXT_TIMEOUT: Duration = Duration::from_secs(60);
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(1800);
 const MAX_HTTPS_REDIRECTS: usize = 10;
 
+enum FetchTarget {
+    Https,
+    LoopbackHttp,
+    LocalFile(PathBuf),
+}
+
 fn is_loopback_http(url: &str) -> bool {
     url.strip_prefix("http://")
         .and_then(|rest| rest.split('/').next())
@@ -20,14 +26,47 @@ fn is_loopback_http(url: &str) -> bool {
         .is_some_and(|address| address.ip().is_loopback())
 }
 
-fn validate_url(url: &str) -> Result<bool, String> {
+fn local_file_path(url: &str) -> Result<PathBuf, String> {
+    let rest = url
+        .strip_prefix("file://")
+        .ok_or_else(|| "local file URL must start with file:///".to_string())?;
+    if !rest.starts_with('/') {
+        return Err("local file URL must use an absolute path".into());
+    }
+    if rest.contains(['?', '#']) {
+        return Err("local file URL must not contain query or fragment".into());
+    }
+    // Check raw segments before `url::Url::parse` normalizes dot segments away.
+    for segment in rest.split('/') {
+        let decoded = percent_encoding::percent_decode_str(segment)
+            .decode_utf8()
+            .map_err(|_| "local file URL contains invalid UTF-8".to_string())?;
+        if decoded == ".." || decoded.contains('/') || decoded.contains('\\') || decoded.contains('\0') {
+            return Err("local file URL must not contain '..' path traversal".into());
+        }
+    }
+    let parsed = url::Url::parse(url).map_err(|e| format!("invalid file URL: {e}"))?;
+    if parsed.scheme() != "file" || parsed.host().is_some() {
+        return Err("local file URL must reference a local absolute path".into());
+    }
+    let path = parsed.to_file_path().map_err(|()| "local file URL cannot be converted to a path".to_string())?;
+    if !path.is_absolute() || path.components().any(|component| matches!(component, Component::ParentDir)) {
+        return Err("local file URL must be an absolute path without '..'".into());
+    }
+    Ok(path)
+}
+
+fn validate_url(url: &str) -> Result<FetchTarget, String> {
     if url.starts_with("https://") {
-        return Ok(false);
+        return Ok(FetchTarget::Https);
     }
     if is_loopback_http(url) {
-        return Ok(true);
+        return Ok(FetchTarget::LoopbackHttp);
     }
-    Err("only https URLs (or loopback http feeds) are allowed".into())
+    if url.starts_with("file://") {
+        return local_file_path(url).map(FetchTarget::LocalFile);
+    }
+    Err("only https URLs, loopback http feeds, or local file URLs are allowed".into())
 }
 
 fn build_client(local_http: bool, total_timeout: Duration) -> Result<reqwest::Client, String> {
@@ -93,8 +132,71 @@ pub async fn text(url: &str) -> Result<(u16, String), String> {
     .await
 }
 
+async fn read_local_text(path: &Path) -> Result<(u16, String), String> {
+    let file = match tokio::fs::File::open(path).await {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok((404, String::new())),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    let meta = file.metadata().await.map_err(|e| format!("{}: {e}", path.display()))?;
+    if !meta.is_file() {
+        return Err(format!("{}: not a regular file", path.display()));
+    }
+    if meta.len() > MAX_TEXT_BYTES as u64 {
+        return Err(format!("response exceeds {MAX_TEXT_BYTES} byte limit"));
+    }
+    let mut limited = file.take((MAX_TEXT_BYTES + 1) as u64);
+    let mut body = Vec::new();
+    limited.read_to_end(&mut body).await.map_err(|e| format!("{}: {e}", path.display()))?;
+    if body.len() > MAX_TEXT_BYTES {
+        return Err(format!("response exceeds {MAX_TEXT_BYTES} byte limit"));
+    }
+    Ok((200, String::from_utf8_lossy(&body).into_owned()))
+}
+
+async fn copy_local_file(from: &Path, to: &Path, size: u64, mut percent: impl FnMut(u8)) -> Result<(), String> {
+    let mut reader = tokio::fs::File::open(from).await.map_err(|e| format!("{}: {e}", from.display()))?;
+    let meta = reader.metadata().await.map_err(|e| format!("{}: {e}", from.display()))?;
+    if !meta.is_file() {
+        return Err(format!("{}: not a regular file", from.display()));
+    }
+    if meta.len() > size {
+        return Err(format!("download exceeds expected {size} bytes"));
+    }
+    let file = tokio::fs::File::create(to).await.map_err(|e| format!("{}: {e}", to.display()))?;
+    let mut writer = tokio::io::BufWriter::new(file);
+    let mut buffer = vec![0u8; 1 << 16];
+    let mut got = 0u64;
+    let mut last_pct = None;
+    percent(0);
+    loop {
+        let n = reader.read(&mut buffer).await.map_err(|e| format!("{}: {e}", from.display()))?;
+        if n == 0 {
+            break;
+        }
+        got = got.saturating_add(n as u64);
+        if got > size {
+            drop(writer);
+            let _ = tokio::fs::remove_file(to).await;
+            return Err(format!("download exceeded expected {size} bytes"));
+        }
+        writer.write_all(&buffer[..n]).await.map_err(|e| format!("{}: {e}", to.display()))?;
+        let pct = (got.saturating_mul(100) / size.max(1)).min(100) as u8;
+        if last_pct != Some(pct) {
+            last_pct = Some(pct);
+            percent(pct);
+        }
+    }
+    writer.flush().await.map_err(|e| format!("{}: {e}", to.display()))?;
+    Ok(())
+}
+
 async fn text_with_backoff(url: &str, mut backoff: impl Iterator<Item = Duration>) -> Result<(u16, String), String> {
-    let local = validate_url(url)?;
+    let local = match validate_url(url)? {
+        FetchTarget::Https => false,
+        FetchTarget::LoopbackHttp => true,
+        FetchTarget::LocalFile(path) => return read_local_text(&path).await,
+    };
     let client = build_client(local, TEXT_TIMEOUT)?;
     loop {
         let (status, body) = text_once_async(&client, url).await?;
@@ -109,7 +211,11 @@ async fn text_with_backoff(url: &str, mut backoff: impl Iterator<Item = Duration
 }
 
 async fn download(url: &str, to: &Path, size: u64, mut percent: impl FnMut(u8)) -> Result<(), String> {
-    let local = validate_url(url)?;
+    let local = match validate_url(url)? {
+        FetchTarget::Https => false,
+        FetchTarget::LoopbackHttp => true,
+        FetchTarget::LocalFile(path) => return copy_local_file(&path, to, size, percent).await,
+    };
     let client = build_client(local, DOWNLOAD_TIMEOUT)?;
     let mut resp = client.get(url).send().await.map_err(|e| format!("http: {e}"))?;
     if !resp.status().is_success() {
@@ -227,6 +333,14 @@ fn validate_bundle_id(running_bundle_id: Option<&str>, next_plist: &str, file: &
     Ok(())
 }
 
+fn verify_downloaded_archive(zip_path: &Path, expected_size: u64, expected_sha512: &str, file_name: &str) -> Result<(), String> {
+    let (size, sha512) = measure(zip_path).map_err(|e| e.to_string())?;
+    if size != expected_size || !sha512.eq_ignore_ascii_case(expected_sha512) {
+        return Err(format!("{file_name}: not the file the release lists"));
+    }
+    inspect_archive(zip_path)
+}
+
 pub async fn staged_app(url: &str, build: &Build, version: &str, bundle: &Path, folder: &Path, percent: impl FnMut(u8)) -> Result<PathBuf, String> {
     let running = signature(bundle).await.map_err(|why| format!("running app signature: {why}"))?;
     let running_plist = tokio::fs::read_to_string(bundle.join("Contents/Info.plist")).await.unwrap_or_default();
@@ -239,15 +353,9 @@ pub async fn staged_app(url: &str, build: &Build, version: &str, bundle: &Path, 
     let expected_size = build.size;
     let expected_sha512 = build.sha512.clone();
     let file_name = build.file.clone();
-    tokio::task::spawn_blocking(move || {
-        let (size, sha512) = measure(&zip_for_verify).map_err(|e| e.to_string())?;
-        if size != expected_size || !sha512.eq_ignore_ascii_case(&expected_sha512) {
-            return Err(format!("{file_name}: not the file the release lists"));
-        }
-        inspect_archive(&zip_for_verify)
-    })
-    .await
-    .map_err(|e| format!("verify archive task failed: {e}"))??;
+    tokio::task::spawn_blocking(move || verify_downloaded_archive(&zip_for_verify, expected_size, &expected_sha512, &file_name))
+        .await
+        .map_err(|e| format!("verify archive task failed: {e}"))??;
     // ditto keeps what a .app holds that unzip would lose (symlinks, extended attributes).
     let unpacked = tokio::process::Command::new("/usr/bin/ditto")
         .args(["-x", "-k"])
@@ -459,5 +567,87 @@ mod tests {
 
         assert_eq!(unpacked_app(dir.path(), Path::new("/Applications/VibeValley-Alpha.app")).unwrap(), alpha);
         assert_eq!(unpacked_app(dir.path(), Path::new("/Applications/Renamed.app")).unwrap(), alpha);
+    }
+
+    #[tokio::test]
+    async fn local_file_feed_reads_manifest_returns_404_when_missing_and_rejects_traversal() {
+        let dir = tempfile::tempdir().unwrap();
+        let spaced = dir.path().join("alpha dist");
+        std::fs::create_dir(&spaced).unwrap();
+        let manifest = spaced.join("release.json");
+        std::fs::write(&manifest, r#"{"version":"0.1.0-alpha.2","page":"","builds":[]}"#).unwrap();
+
+        let manifest_url = url::Url::from_file_path(&manifest).unwrap().to_string();
+        let (status, body) = text(&manifest_url).await.unwrap();
+        assert_eq!(status, 200);
+        assert!(body.contains("0.1.0-alpha.2"));
+
+        let missing_url = url::Url::from_file_path(spaced.join("missing.json")).unwrap().to_string();
+        assert_eq!(text(&missing_url).await.unwrap(), (404, String::new()));
+
+        let oversized = spaced.join("huge.json");
+        std::fs::write(&oversized, vec![b'a'; MAX_TEXT_BYTES + 1]).unwrap();
+        let oversized_url = url::Url::from_file_path(&oversized).unwrap().to_string();
+        assert!(text(&oversized_url).await.unwrap_err().contains("byte limit"));
+
+        for bad in [
+            format!("file://{}/../release.json", spaced.display()),
+            format!("file://{}/%2e%2e/release.json", spaced.display()),
+            format!("file://{}/..%2frelease.json", spaced.display()),
+            "file://evil.example/dist/release.json".into(),
+            "file://relative/release.json".into(),
+            format!("{manifest_url}?foo=1"),
+        ] {
+            assert!(text(&bad).await.is_err(), "expected rejection for {bad}");
+        }
+    }
+
+    #[tokio::test]
+    async fn local_file_zip_streams_through_size_sha512_archive_and_bundle_id_checks() {
+        use zip::write::SimpleFileOptions;
+
+        let dir = tempfile::tempdir().unwrap();
+        let dist = dir.path().join("dist");
+        std::fs::create_dir(&dist).unwrap();
+        let source_zip = dist.join("VibeValley-0.1.0-alpha.2-arm64.zip");
+        let plist = "<dict><key>CFBundleIdentifier</key><string>dev.vibevalley.app.alpha</string></dict>";
+        {
+            let file = std::fs::File::create(&source_zip).unwrap();
+            let mut writer = zip::ZipWriter::new(file);
+            let opts = SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored)
+                .unix_permissions(0o100644);
+            writer.start_file("VibeValley-Alpha.app/Contents/Info.plist", opts).unwrap();
+            writer.write_all(plist.as_bytes()).unwrap();
+            writer.finish().unwrap();
+        }
+        let (size, sha512) = measure(&source_zip).unwrap();
+        let zip_url = url::Url::from_file_path(&source_zip).unwrap().to_string();
+
+        let staged_zip = dir.path().join("staged.zip");
+        let mut progress = Vec::new();
+        download(&zip_url, &staged_zip, size, |p| progress.push(p)).await.unwrap();
+        assert_eq!(progress.first().copied(), Some(0));
+        assert_eq!(progress.last().copied(), Some(100));
+
+        verify_downloaded_archive(&staged_zip, size, &sha512, "VibeValley-0.1.0-alpha.2-arm64.zip").unwrap();
+        validate_bundle_id(Some("dev.vibevalley.app.alpha"), plist, "VibeValley-0.1.0-alpha.2-arm64.zip").unwrap();
+
+        // Tampered SHA-512 must still fail for local file:// archives.
+        assert!(verify_downloaded_archive(&staged_zip, size, "00", "VibeValley-0.1.0-alpha.2-arm64.zip").is_err());
+
+        // Oversized local zip and traversal URL must be rejected at download time.
+        let rejected = dir.path().join("rejected.zip");
+        assert!(download(&zip_url, &rejected, size - 1, |_| {}).await.is_err());
+        assert!(
+            download(
+                &format!("file://{}/../VibeValley-0.1.0-alpha.2-arm64.zip", dist.display()),
+                &rejected,
+                size,
+                |_| {}
+            )
+            .await
+            .is_err()
+        );
     }
 }

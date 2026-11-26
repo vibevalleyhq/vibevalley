@@ -7,7 +7,7 @@ import { cleanup, host } from "nsh";
 import { setLocale } from "@vibevalley/i18n";
 
 import { applyMotion } from "../design/motion";
-import { SOUNDS, playSound, type SoundName } from "../design/pixel/sound";
+import { SOUNDS, playSound, type SoundName } from "../design/sound";
 import { useBridge } from "../infra/bridged";
 import { readHostParams } from "../infra/hostParams";
 import { appHistory } from "../infra/router";

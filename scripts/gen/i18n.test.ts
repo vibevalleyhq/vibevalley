@@ -28,7 +28,7 @@ describe("i18n glyph label anti-regression check", () => {
     const entries = new Map<string, string>([
       ["web.farm.phone.controls.help", "←→ move ↑ turn"],
       ["web.issue.issue.changes", "{branch} → {base} · {commits} commits · +{added} -{removed}"],
-      ["web.catalog.pixels", "{w} × {h} px"],
+      ["web.media.dimensions", "{w} × {h} px"],
       ["web.setting.hint", "Adjust with ⌘+ / ⌘-"],
       ["server.artifact.note", 'Changed: "{old}" → "{new}"'],
     ]);

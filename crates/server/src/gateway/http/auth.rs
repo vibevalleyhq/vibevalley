@@ -12,7 +12,7 @@ use vibevalley_protocol::{ApiError, BizCode, Caller, Envelope, SCOPE_REMOTE_MACH
 
 use crate::gateway::api::{CallerContext, CallerPrincipal, ClientIdentity, ClientKind, RemoteDeviceIdentity};
 
-use super::{HttpState, refuse, reply};
+use super::shared::{HttpState, refuse, reply};
 
 #[derive(serde::Deserialize)]
 struct TokenQuery {

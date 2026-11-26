@@ -3,10 +3,7 @@ node_modules/
 .DS_Store
 __pycache__/
 
-# Image pipeline scratch: keyed and cut intermediates, codex run logs, rejected drafts
-design/assets/logs/
-design/pixel/logs/
-design/assets/rejected/
+# Image pipeline scratch: codex run logs, rejected drafts
 design/mockups/*/logs/
 design/mockups/v2/rejected/
 
@@ -17,9 +14,7 @@ design/mockups/v2/rejected/
 !.env.example
 design/sounds/*.wav
 
-# The source images live in their own repository (vibevalley-art); design/art.sh links them here.
-design/pixel/raw
-design/assets/raw
+# Local mockup drafts
 design/mockups/v1
 design/mockups/v2
 

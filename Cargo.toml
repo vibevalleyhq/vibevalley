@@ -14,7 +14,7 @@ members = [
   "crates/engines/pele",
   "crates/engines/shiki",
   "apps/mac",
-  "apps/mac/crates/pixel",
+  "apps/mac/crates/diorama",
   "apps/mac/crates/terminal",
   "apps/mac/crates/workspace",
   "xtask",
@@ -30,6 +30,7 @@ license = "Apache-2.0"
 arc-swap = "1"
 backon = "1"
 base64 = "0.23.1"
+bytemuck = { version = "1.25.2", features = ["derive"] }
 flume = "0.12.0"
 futures-util = { version = "0.3.34", features = ["sink"] }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
@@ -70,6 +71,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 url = "2.5.8"
 uuid = { version = "1.29.2", features = ["v4", "v7"] }
+wgpu = "29.0.4"
 
 [profile.dev]
 opt-level = 0
@@ -105,8 +107,8 @@ opt-level = 2
 [profile.dev.package.vibevalley-pele]
 opt-level = 2
 
-[profile.dev.package.vibevalley-pixel]
-opt-level = 3
+[profile.dev.package.vibevalley-diorama]
+opt-level = 2
 
 [profile.dev.package.vibevalley-rich]
 opt-level = 2
@@ -115,6 +117,14 @@ opt-level = 2
 # Keep default unwinding (`panic = "unwind"`): nsh-core's SVG engine relies on catch_unwind.
 lto = "thin"
 codegen-units = 1
+strip = "symbols"
+
+[profile.alpha]
+inherits = "release"
+opt-level = 2
+lto = false
+codegen-units = 16
+incremental = true
 strip = "symbols"
 
 [profile.loom]

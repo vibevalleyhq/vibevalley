@@ -2,7 +2,6 @@ import { Clipboard, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
-import { ButtonLink } from "../../design/Button";
 import { SettingRow, SettingsGroup, SettingsPage } from "../../design/domain/settings";
 import { IconButton } from "../../design/IconButton";
 import { Quiet } from "../../design/layout";
@@ -75,13 +74,6 @@ export function AboutPage() {
           </>
         )}
       </If>
-      <SettingsGroup title={t("web.setting.about.devTools")}>
-        <SettingRow label={t("web.setting.about.catalog")} hint={t("web.setting.about.catalogHint")} last>
-          <ButtonLink href="/catalog" icon="catalog" testID="open-catalog">
-            {t("web.setting.about.openCatalog")}
-          </ButtonLink>
-        </SettingRow>
-      </SettingsGroup>
     </SettingsPage>
   );
 }

@@ -1,7 +1,14 @@
 import { computed, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { list, t } from "@vibevalley/i18n";
-import type { ProviderConnectionUpdate, ProviderModelListing, ProviderStatus, ProviderUpdate } from "@vibevalley/protocol";
+import {
+  type Feature,
+  FeatureValues,
+  type ProviderConnectionUpdate,
+  type ProviderModelListing,
+  type ProviderStatus,
+  type ProviderUpdate,
+} from "@vibevalley/protocol";
 import { same } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
@@ -22,7 +29,7 @@ import { providerQuery, ready, settingsQuery, useQuery, useQueryClient } from ".
 import { Link } from "../../infra/router";
 
 /** The uses an account serves, in the order the uses table shows them: what the account page lists as its models. */
-const adaptedUses = ["image", "understanding", "speech", "speakers", "voiceDesign", "transcription", "live", "vision"] as const;
+const adaptedUses = FeatureValues.filter((f): f is Exclude<Feature, "orchestrator" | "call"> => f !== "orchestrator" && f !== "call");
 
 type Use = (typeof adaptedUses)[number];
 type UseHint = "imageNotice" | "understandingNotice" | "speechNotice" | "liveHint";

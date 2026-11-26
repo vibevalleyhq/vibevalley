@@ -37,7 +37,7 @@ import { ChangesBody, ChangesHead, ConflictFiles } from "./CloseDialog";
 import { IssueAttachments } from "./IssueAttachments";
 import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
 import { IssueThread } from "./IssueThread";
-import { Fold, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
+import { Fold, IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel } from "./Sheet";
 
 export { OrchestratorIssueDetail };
 
@@ -124,7 +124,7 @@ export function IssueDetail(props: {
           )}
         </If>
         <Icon name="next" size={12} tone="muted" />
-        <Text class="shrink-0 font-mono text-xs text-muted tabular-nums">{`#${props.issue.number}`}</Text>
+        <IssueNumberPill number={props.issue.number} />
       </View>
       <View class="flex-row flex-wrap items-baseline gap-x-2">
         <IssueTitle shown={s().title} full={live().title} editable={s().open} state={labeled().state("title")} onSave={(title) => setLabel({ title })} />

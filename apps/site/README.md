@@ -19,16 +19,16 @@ vp run site:deploy                                    # 构建，再发到 Cloud
 
 `src/Document.tsx` 管文档、分享元信息、首屏资源与字体；`src/App.tsx` 选择首页或 404，`src/sections/Home.tsx` 拼出两种语言的首页。所有区块都在构建时写进 HTML，无脚本也能阅读。屏幕内外的节点随整个文档一起接管，不按可见性另建根。
 
-`src/ui/global.css` 持有颜色、字体、硬阴影、动画和 `<html data-scene>` 的时辰规则；颜色、字号、阴影写在它的 `@theme` 里，class 名就是令牌名（`bg-cream-100`、`text-sm`、`shadow-hard`），不另存一份值。共用组件在 `src/ui/ui.tsx`，动画的订阅与清理在 `src/ui/`（`entrance.ts`、`scroll.ts`、`Presence.tsx`、`image.ts`）。
+`src/ui/global.css` 持有 Papertrails 纸艺色板、排版、卡片圆角与柔和暖影、动画和 `<html data-scene>` 的时辰规则；颜色、字号、圆角、阴影写在它的 `@theme` 里，class 名就是令牌名（`bg-cream-100`、`text-sm`、`shadow-card`），不另存一份值。共用组件在 `src/ui/ui.tsx`，矢量图标在 `src/ui/icons.tsx`，动画的订阅与清理在 `src/ui/`（`entrance.ts`、`scroll.ts`、`Presence.tsx`、`image.ts`）。
 
 ## 素材
 
-不另存原图：场景素材来自 `assets/`，截图来自 `docs/images/`，摆放的数据在 `src/base/scene.ts`。
+不另存原图：场景、立体纸艺切片、角色肖像和引擎徽章来自 `assets/{site,avatars,engines,icons}/`，截图来自 `docs/images/`，时辰与萤火虫数据在 `src/base/scene.ts`。
 
-- `scripts/images.ts` 读取 `scene.ts` 的 `SHOWN` 和时辰清单，用 Sharp 生成 WebP 与多尺寸截图；缺图、尺寸或清单就失败。
+- `scripts/images.ts` 检查每个时段的三档横图与两档竖图，将素材仓已编码的 WebP 原样写入站点。首屏的预加载和 `<picture>` 使用同一组媒体条件与候选尺寸，后续时段在滚动接近时加载。减弱动效时，场景和诗句在选定时段直接切换。页面截图由 Sharp 从 PNG 分档编码。
 - 转换后的图写到 `public/gen/images/`，路径和尺寸由同一步写入 `src/base/images.generated.json`；不要手改生成清单。
-- `scripts/prepare.ts` 把像素字体裁成页面实际用到的字，复制图标，并调用 `scripts/card.ts` 绘制分享图。输出都在 `public/gen/`，不进 git。
-- 分享图每种语言一张，1200×630；字形转成 SVG 路径，不依赖构建机的字体。改了 `hero` 文案，构建会重新生成。
+- `scripts/prepare.ts` 复制 Papertrails 图标，并调用 `scripts/card.ts` 以 `assets/site/postcard.png` 为底绘制分享图。输出都在 `public/gen/`，不进 git。
+- 分享图每种语言一张，1200×630。改了 `hero` 文案，构建会重新生成。
 
 ## 动画
 

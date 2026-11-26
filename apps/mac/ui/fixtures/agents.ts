@@ -4,7 +4,18 @@
 // (features/agent/AgentsPage.stories.tsx) and the runtime detail
 // (features/runtime/RuntimesPage.stories.tsx); the helpers are the
 // issues fixture's 老周 and 小林.
-import type { Agent, AgentTemplate, AgentValidation, Look, RepoActivity, RepoLanguages, RepoSummary, RuntimeInfo, Skill } from "@vibevalley/protocol";
+import {
+  type Agent,
+  type AgentTemplate,
+  type AgentValidation,
+  type Look,
+  type RepoActivity,
+  type RepoLanguages,
+  type RepoSummary,
+  RuntimeCapabilityValues,
+  type RuntimeInfo,
+  type Skill,
+} from "@vibevalley/protocol";
 
 const now = Date.now();
 const hour = 3_600_000;
@@ -90,7 +101,7 @@ const ready = (command: string, version: string) => ({ status: "available" as co
 
 const runtime = (more: Partial<RuntimeInfo> & Pick<RuntimeInfo, "id" | "preset">): RuntimeInfo => ({
   stop: "",
-  support: { steer: true, refused: {}, capabilities: ["listModels", "accountUsage", "checkUpdate", "skills", "mcpServers", "tools"], inProcess: false },
+  support: { steer: true, refused: {}, capabilities: RuntimeCapabilityValues.filter((c) => c !== "upgrade"), inProcess: false },
   installation: ready(`/opt/homebrew/bin/${more.id}`, "1.0.0"),
   models: null,
   usage: null,
@@ -142,7 +153,7 @@ const runtimes: RuntimeInfo[] = [
     support: {
       steer: true,
       refused: { appendSystemPrompt: "Codex 只收开发者说明，不收追加的系统提示" },
-      capabilities: ["listModels", "accountUsage", "skills"],
+      capabilities: RuntimeCapabilityValues.filter((c) => c === "listModels" || c === "accountUsage" || c === "skills"),
       inProcess: false,
     },
     models: [{ id: "gpt-5", name: "GPT-5", effortLevels: ["minimal", "low", "medium", "high"], isDefault: true }],

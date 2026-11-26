@@ -66,12 +66,15 @@
     "audio": "Audio workbench"
   },
   "content": {
-    "title": "Content",
+    "title": "Artifacts",
     "new": "New",
-    "searchAll": "Search all content…",
-    "sidebarToggle": "Toggle content sidebar",
+    "searchAll": "Search all artifacts…",
+    "sidebarToggle": "Toggle artifacts sidebar",
     "recent": "All recent",
     "pinned": "Pinned",
+    "pinnedEmpty": "Nothing pinned yet. Hover any artifact or media item and click the pin icon to keep it handy here.",
+    "installedApps": "Installed Apps",
+    "installedAppsEmpty": "No standalone apps installed yet. Click “Install as App” on any artifact card or toolbar to install it as an independent macOS app and manage it here.",
     "pin": "Pin",
     "unpin": "Unpin",
     "pinnedToast": "Pinned",
@@ -83,11 +86,6 @@
     "exportArtifact": "Export",
     "turnIntoIssue": "Turn into ticket",
     "issueCreated": "Ticket created",
-    "source": {
-      "all": "All sources",
-      "agent": "From helpers",
-      "user": "Created by me"
-    },
     "artifactType": {
       "all": "All artifacts"
     },
@@ -100,11 +98,14 @@
       "stopAudio": "Stop audio"
     },
     "templates": {
-      "title": "New content",
+      "title": "New artifact",
       "search": "Search templates…",
+      "searchCount": "{n} matching templates",
       "empty": "No matching templates",
       "cat": {
         "recommended": "Recommended",
+        "apps": "Mini Apps",
+        "engineering": "Engineering",
         "note": "Outline notes",
         "whiteboard": "Whiteboards",
         "deliverable": "Deliverables",
@@ -127,6 +128,30 @@
           "name": "Daily log",
           "desc": "Today's focus, blockers, and handoff summary"
         },
+        "notePrReview": {
+          "name": "Code Review Checklist",
+          "desc": "Correctness, edge cases, concurrency safety, and regression checks"
+        },
+        "noteDebug": {
+          "name": "Debugging Log",
+          "desc": "Reproduction path, hypotheses, telemetry clues, and root cause"
+        },
+        "noteRelease": {
+          "name": "Release Checklist",
+          "desc": "Preflight gates, canary rollout, monitoring, and rollback plan"
+        },
+        "noteOncall": {
+          "name": "On-Call Handoff",
+          "desc": "Active alerts, pending follow-ups, deploy windows, and contacts"
+        },
+        "noteOnboarding": {
+          "name": "Codebase Onboarding",
+          "desc": "Directory layout, entry points, local dev setup, and gotchas"
+        },
+        "noteSprintRetro": {
+          "name": "Sprint Retrospective",
+          "desc": "Shipped highlights, friction bottlenecks, tech debt, and action items"
+        },
         "wbBlank": {
           "name": "Blank whiteboard",
           "desc": "Infinite canvas with dot grid and native connectors"
@@ -147,17 +172,81 @@
           "name": "Kickoff workshop",
           "desc": "Goal framing, brainstorming stickies, and convergence"
         },
+        "wbEventStorming": {
+          "name": "Event Storming (DDD)",
+          "desc": "Domain commands, aggregates, domain events, and read projections"
+        },
+        "wbC4": {
+          "name": "C4 Container Canvas",
+          "desc": "Edge gateway, core service, async queue, and storage topology"
+        },
+        "wbIncidentMap": {
+          "name": "Incident Root-Cause Map",
+          "desc": "Symptoms, candidate hypotheses, verification, and mitigation"
+        },
+        "wbTradeoff": {
+          "name": "Tech Trade-off Board",
+          "desc": "Options comparison, weighted constraints, risks, and final call"
+        },
         "artDocs": {
           "name": "Collaborative doc",
           "desc": "Long-form specs, review reports, and technical guides"
+        },
+        "docRfc": {
+          "name": "Engineering RFC",
+          "desc": "Context, alternatives comparison, contracts, and rollout plan"
+        },
+        "docAdr": {
+          "name": "Architecture Decision Record (ADR)",
+          "desc": "Decision context, evaluated trade-offs, outcome, and impact"
+        },
+        "docPostmortem": {
+          "name": "Incident Postmortem",
+          "desc": "Impact, timeline, five-whys root cause, and prevention actions"
+        },
+        "docApiSpec": {
+          "name": "API & Contract Spec",
+          "desc": "Endpoints, auth, request/response schemas, and error codes"
+        },
+        "docRunbook": {
+          "name": "Service Runbook",
+          "desc": "Alert thresholds, triage commands, kill switches, and rollback"
+        },
+        "docSecurity": {
+          "name": "Security & Threat Model",
+          "desc": "Trust boundaries, STRIDE threat matrix, mitigations, and audit"
+        },
+        "docMigration": {
+          "name": "Data & Schema Migration Plan",
+          "desc": "Dual-write compatibility, batch backfill, verification, and rollback"
+        },
+        "docPerf": {
+          "name": "Performance & Benchmark Report",
+          "desc": "Baseline load profile, bottlenecks, before/after comparison, capacity"
         },
         "artSlides": {
           "name": "Slide deck",
           "desc": "Widescreen multi-slide deck with speaker notes"
         },
+        "slidesArchReview": {
+          "name": "Architecture Review Deck",
+          "desc": "Goals, core topology, key trade-offs, and risk mitigation"
+        },
+        "slidesReleaseDemo": {
+          "name": "Tech Talk & Release Demo",
+          "desc": "Highlights, implementation deep dive, benchmarks, and roadmap"
+        },
         "artDashboard": {
           "name": "Data dashboard",
           "desc": "KPI cards, trend charts, and verified tables"
+        },
+        "dashSlo": {
+          "name": "Service SLO & Reliability",
+          "desc": "Availability, P99 latency, error budget burn, and alert breakdown"
+        },
+        "dashDora": {
+          "name": "Engineering DORA Metrics",
+          "desc": "Deploy frequency, lead time, change failure rate, and MTTR"
         },
         "artDesign": {
           "name": "Design canvas",
@@ -175,13 +264,97 @@
           "name": "Web page",
           "desc": "Standalone interactive HTML page with version history"
         },
+        "protoApiPlayground": {
+          "name": "API & JSON Payload Sandbox",
+          "desc": "Offline JSON format/validate, request builder, and cURL generator"
+        },
+        "protoComponentLab": {
+          "name": "Interactive UI State Sandbox",
+          "desc": "State matrix (default/loading/empty/error), theme, and width switcher"
+        },
+        "protoFocusStudio": {
+          "name": "Focus Studio & Ambient Timer",
+          "desc": "Animated SVG ring timer, WebAudio rain & brown-noise mixer, and task queue built for standalone desktop use"
+        },
+        "protoSynthPad": {
+          "name": "Pocket Synth & 16-Step Drum Machine",
+          "desc": "Offline WebAudio drum step sequencer, live Canvas oscilloscope, and playable synth keys"
+        },
+        "protoParticleLab": {
+          "name": "Generative Flow Field Studio",
+          "desc": "60fps Canvas curl-noise particle simulation with pointer gravity and live palette controls"
+        },
+        "protoTokenCalculator": {
+          "name": "AI Token & Cost Simulator",
+          "desc": "Interactive DAU, prompt cache, and model tier monthly cost breakdown with Markdown export"
+        },
+        "protoCssGlassStudio": {
+          "name": "Mesh & Frosted Glass Studio",
+          "desc": "Animated mesh orbs with real-time blur, fill alpha, radius sliders, and 1-click CSS copy"
+        },
+        "protoDeskKanban": {
+          "name": "Mini Desk Kanban Board",
+          "desc": "Lightweight 3-column desktop task board with priority pills and completion meter"
+        },
+        "designWorkspaceUi": {
+          "name": "Multi-Viewport Workspace UI",
+          "desc": "Desktop & mobile artboards with live interactive props and token-bound UI tree"
+        },
+        "dsPapertrails": {
+          "name": "Papertrails Design System",
+          "desc": "Light/dark color tokens, type hierarchy, spacing/radius scales, and live component specs"
+        },
+        "motionLaunchReel": {
+          "name": "Product Launch Motion Reel",
+          "desc": "3-chapter deterministic motion sequence ready for live playback scrubbing"
+        },
+        "storyboardProductFilm": {
+          "name": "Product Film Storyboard",
+          "desc": "Multi-shot visual script with framing, camera moves, dialogue, and animatic preview"
+        },
         "artSheet": {
           "name": "Workbook sheet",
           "desc": "Multi-sheet structured tables and CSV export"
         },
+        "sheetBenchmark": {
+          "name": "Benchmark Matrix",
+          "desc": "QPS, P50/P95/P99 latency, memory footprint, and comparison verdict"
+        },
+        "sheetTechMatrix": {
+          "name": "Tech Evaluation Matrix",
+          "desc": "Weighted criteria scoring, effort, and operational complexity"
+        },
+        "sheetTestMatrix": {
+          "name": "QA & Regression Matrix",
+          "desc": "Core test cases, layer coverage, expected behavior, and status"
+        },
+        "sheetApiInventory": {
+          "name": "API & Dependency Inventory",
+          "desc": "Endpoint registry, auth mode, rate limits, and owning module"
+        },
         "artDiagram": {
           "name": "Architecture diagram",
           "desc": "Nodes, edges, and architecture flows"
+        },
+        "diagMicroservices": {
+          "name": "Microservices Topology",
+          "desc": "Edge gateway, domain services, event bus, and storage links"
+        },
+        "diagSequence": {
+          "name": "Request Sequence Flow",
+          "desc": "Client, auth guard, core service, outbox, and live stream flow"
+        },
+        "diagErd": {
+          "name": "Database ER Model",
+          "desc": "Core entity tables, foreign-key relations, and ownership links"
+        },
+        "diagCicd": {
+          "name": "CI/CD Release Pipeline",
+          "desc": "Lint & format, unit/contract checks, bundle build, and canary"
+        },
+        "diagStateMachine": {
+          "name": "State Machine Flow",
+          "desc": "Lifecycle states, valid transitions, and terminal convergence"
         },
         "artStoryboard": {
           "name": "Storyboard shots",
@@ -204,6 +377,12 @@
         "noteTech": "## Context & Goals\n- Core problem statement and expected impact\n## Core Design\n- Module boundaries and data flow\n## Implementation Checklist\n- [ ] Break down steps and add verification checks",
         "noteMeeting": "## Discussion Focus\n- Key agenda topics for this session\n## Key Decisions\n- Record agreed conclusions and trade-offs\n## Follow-ups\n- [ ] Track confirmed action items",
         "noteDaily": "## Today's Focus\n- [ ] List today's top priorities\n## Blockers & Risks\n- Note items awaiting collaboration\n## Handoff Summary\n- Outcomes shipped and next steps",
+        "notePrReview": "## Scope & Intent\n- Confirm the change has a single clear responsibility with no unrelated edits\n## Correctness & Edge Cases\n- [ ] Null values, concurrency races, and error propagation are handled explicitly\n- [ ] External inputs are decoded and validated at the boundary\n## Quality & Tests\n- [ ] Automated tests cover new behavior and regression boundaries\n- [ ] No duplicated logic, temporary fallbacks, or swallowed errors",
+        "noteDebug": "## Symptom & Impact\n- Error output, reproduction environment, and blast radius\n## Hypotheses & Checks\n- [ ] Inspect recent commits and config changes\n- [ ] Capture telemetry logs and metric snapshots\n- [ ] Isolate trigger conditions in a minimal repro\n## Root Cause & Fix\n- Document root cause, fix design, and regression test added",
+        "noteRelease": "## Preflight Gates\n- [ ] All CI checks, builds, and contract parity checks are green\n- [ ] Schema migrations and backward compatibility verified\n## Canary & Monitoring\n- [ ] Roll out 5% canary and watch error rate and P99 latency for 15 min\n- [ ] Confirm core KPIs and alert panels remain clean\n## Rollback Plan\n- Record one-command rollback steps, kill switches, and on-call lead",
+        "noteOncall": "## Shift & Contacts\n- Handoff window, primary/secondary engineers, and escalation contacts\n## Active Alerts & Open Items\n- [ ] List unresolved alerts and current mitigation status\n## Watchlist This Shift\n- Recent deploys, scheduled cron windows, and capacity headroom\n## Quick Links\n- Dashboards, telemetry viewer, and emergency feature flags",
+        "noteOnboarding": "## Repository Purpose & Layout\n- Core entry directories, shared contract packages, and build outputs\n## Local Dev & Verification\n- [ ] Install dependencies and start local server / UI\n- [ ] Run unit tests, linter, and formatter\n## Primary Request Path\n- End-to-end flow from boundary handler through domain rules to storage\n## Common Gotchas\n- Environment variables, local state directories, and frequent pitfalls",
+        "noteSprintRetro": "## Highlights Shipped\n- Key features delivered and outcomes exceeding expectations\n## Friction & Bottlenecks\n- Rework causes, blockers, tooling gaps, or unclear specs\n## Tech Debt Inventory\n- Engineering debt introduced or uncovered this sprint\n## Next Sprint Actions\n- [ ] Assign lead, concrete change, and target verification date",
         "wbBlankTitle": "Central Topic",
         "wbBlankBody": "Add cards, stickies, and arrows from the toolbar",
         "wbArchN1Title": "Client / UI",
@@ -237,14 +416,344 @@
         "wbWorkW3Title": "Converge",
         "wbWorkW3Body": "Pick top priorities for first milestone",
         "wbWorkE1": "explore",
-        "wbWorkE2": "decide"
+        "wbWorkE2": "decide",
+        "wbEsCmdTitle": "Command · Submit Change",
+        "wbEsCmdBody": "Validate permissions and idempotency key",
+        "wbEsAggTitle": "Aggregate · Domain Core",
+        "wbEsAggBody": "Enforce state invariants and rules",
+        "wbEsEvtTitle": "Event · Change Persisted",
+        "wbEsEvtBody": "Write Outbox event in same transaction",
+        "wbEsReadTitle": "Read Model · Slice Projection",
+        "wbEsReadBody": "Fold incremental slice and push to clients",
+        "wbEsE1": "validate",
+        "wbEsE2": "emit",
+        "wbEsE3": "project",
+        "wbC4EdgeTitle": "API Gateway · HTTP/WS",
+        "wbC4EdgeBody": "Auth, rate limits, and boundary decoding",
+        "wbC4AppTitle": "Core Service · Rust",
+        "wbC4AppBody": "State machine, transactions, and collab",
+        "wbC4QueueTitle": "Async Queue",
+        "wbC4QueueBody": "Execute media and outbound deliveries",
+        "wbC4DbTitle": "SQLite / PostgreSQL",
+        "wbC4DbBody": "Single source of truth and snapshots",
+        "wbC4E1": "RPC",
+        "wbC4E2": "enqueue",
+        "wbC4E3": "commit",
+        "wbIncSymTitle": "Symptom · P99 Latency Spike",
+        "wbIncSymBody": "Core endpoint timeout rate reached 3.2%",
+        "wbIncHyp1Title": "Hypothesis A · Lock Contention",
+        "wbIncHyp1Body": "Inspect pool wait time and query plan",
+        "wbIncHyp2Title": "Hypothesis B · Upstream Retries",
+        "wbIncHyp2Body": "Check retry amplification and timeouts",
+        "wbIncFixTitle": "Mitigation · Shed & Rollback",
+        "wbIncFixBody": "Enable circuit breaker and revert deploy",
+        "wbIncE1": "triage",
+        "wbIncE2": "verify",
+        "wbIncE3": "mitigate",
+        "wbToReqTitle": "Constraint · Consistency & Speed",
+        "wbToReqBody": "Multi-peer convergence with low overhead",
+        "wbToOptATitle": "Option A · Local-First CRDT",
+        "wbToOptABody": "Offline-ready, lock-free merge semantics",
+        "wbToOptBTitle": "Option B · Central OT Server",
+        "wbToOptBBody": "Server sequencing, higher lock complexity",
+        "wbToDecTitle": "Decision · Adopt Option A",
+        "wbToDecBody": "Reuse existing collab core with low risk",
+        "wbToE1": "evaluate",
+        "wbToE2": "compare",
+        "wbToE3": "decide",
+        "docRfcBody": "# {title}\n\n- **Status**: Draft / Review / Accepted\n- **Lead**:\n- **Related Ticket**:\n\n## 1. Context & Motivation\n\nDescribe the current bottleneck, trigger, and core problem this RFC solves.\n\n## 2. Goals & Non-Goals\n\n### Goals\n- Define measurable engineering outcomes and scope boundaries.\n\n### Non-Goals\n- Explicitly state what is out of scope to prevent drift.\n\n## 3. Alternatives Comparison\n\n| Dimension | Option A (Recommended) | Option B |\n|---|---|---|\n| Complexity | Low, reuses existing modules | High, introduces parallel state |\n| Performance & Reliability | Meets SLA | Extra network hops |\n| Rollback Cost | Feature flag toggle in seconds | Irreversible schema changes |\n\n## 4. Detailed Design\n\n### 4.1 Module Boundaries & Contracts\n```ts\n// Paste core types, API signatures, or state machine definitions\n```\n\n### 4.2 Data Model & Storage\n- Describe new or updated tables, indexes, and migration strategy.\n\n### 4.3 Failure Modes & Concurrency\n- Cover timeouts, idempotency, partial failures, and fallbacks.\n\n## 5. Testing, Rollout & Rollback\n- [ ] Unit and integration tests\n- [ ] Metrics and alert thresholds\n- [ ] Canary schedule and one-command rollback\n",
+        "docAdrBody": "# {title}\n\n- **Status**: Proposed / Accepted / Superseded\n- **Date**:\n- **Deciders**:\n\n## 1. Context & Problem Statement\n\nDescribe the technical forces, constraints, and product requirements driving this decision.\n\n## 2. Decision Drivers\n- Performance and latency budget\n- Maintenance cost and team familiarity\n- Long-term evolution and replaceability\n\n## 3. Considered Options\n1. **Option 1**:\n2. **Option 2**:\n3. **Status quo**:\n\n## 4. Decision Outcome\n\n**Chosen option**: State the selected option and core rationale.\n\n### Positive Consequences\n- Expected benefits and simplifications.\n\n### Negative Consequences & Mitigations\n- Trade-offs accepted and guardrails put in place.\n\n## 5. Verification & Review\n- Explain how code review, static audits, or benchmarks enforce this decision.\n",
+        "docPostmortemBody": "# {title}\n\n- **Severity**: SEV-1 / SEV-2 / SEV-3\n- **Duration**:\n- **Impact**: Affected endpoints, features, or percentage of traffic\n\n## 1. Executive Summary\n\nSummarize the failure symptoms, root cause, and resolution in 2-3 blameless sentences.\n\n## 2. Timeline (UTC)\n| Time | Event / Action |\n|---|---|\n| 00:00 | Deploy or trigger condition occurred |\n| 00:05 | Alert fired and investigation began |\n| 00:12 | Direct cause isolated; mitigation/rollback started |\n| 00:18 | Metrics recovered and incident mitigated |\n\n## 3. Root Cause Analysis (5 Whys)\n1. Why did the user-facing error occur?\n2. Why did existing safeguards not catch it?\n3. Why did monitoring not alert earlier?\n4. What was the underlying systemic cause?\n\n## 4. What Went Well & What Needs Work\n- **Effective mitigation**:\n- **Gaps uncovered**:\n\n## 5. Action Items\n| Category | Action | Lead | Due Date | Status |\n|---|---|---|---|---|\n| Prevention | Add regression test and static gate | | | Todo |\n| Detection | Tune alert threshold and dashboard | | | Todo |\n",
+        "docApiSpecBody": "# {title}\n\n- **Version**: v1\n- **Auth**: Bearer Token / HMAC\n- **Idempotency**: `Idempotency-Key`\n\n## 1. Endpoints Overview\n\n| Method | Path | Description | Rate Limit |\n|---|---|---|---|\n| GET | `/api/v1/resources` | Paginated list | 120 req/min |\n| POST | `/api/v1/resources` | Create resource | 30 req/min |\n| PUT | `/api/v1/resources/:id` | Replace resource | 60 req/min |\n\n## 2. Request & Response Contract\n\n### Request Payload\n```json\n{\n  \"id\": \"res_01\",\n  \"name\": \"example\",\n  \"options\": {}\n}\n```\n\n### Success Response (`200 OK`)\n```json\n{\n  \"bizCode\": 0,\n  \"message\": \"ok\",\n  \"data\": {}\n}\n```\n\n## 3. Business Error Codes\n\n| HTTP Status | `bizCode` | Meaning | Client Handling |\n|---|---|---|---|\n| 400 | 400001 | Validation failed | Highlight invalid field |\n| 409 | 409001 | Version conflict | Reload snapshot and retry |\n\n## 4. Compatibility Policy\n- Follow additive evolution; never break existing fields without a version bump.\n",
+        "docRunbookBody": "# {title}\n\n- **Service**:\n- **Owning Team / Channel**:\n- **Dashboard Link**:\n\n## 1. Dependencies & Degraded Modes\n- List hard and soft dependencies along with expected fallback behavior.\n\n## 2. Common Alerts & Triage\n\n### Alert A: Error Rate > 1% or P99 Latency Breach\n1. Check deploys and config changes in the last 30 minutes.\n2. Verify health, connection pool saturation, and disk headroom:\n```bash\ncurl -fsS http://127.0.0.1:8787/healthz\n```\n3. Inspect aggregated error logs to distinguish upstream timeouts, DB locks, or bad payloads.\n\n## 3. Emergency Kill Switches\n- **Load shedding / feature flags**: Document config keys, reload mechanism, and side effects.\n- **Traffic failover**: Document steps to shift traffic to healthy instances.\n\n## 4. Rollback Procedure\n```bash\n# Identify last known good artifact and trigger rollback\n```\n\n## 5. Escalation\n- Escalate to the module lead if not mitigated within 15 minutes.\n",
+        "docSecurityBody": "# {title}\n\n- **Scope**:\n- **Data Classification**: Public / Internal / Sensitive Credentials\n\n## 1. Assets & Trust Boundaries\n- List sensitive assets (keys, tokens, repositories, databases).\n- Mark untrusted inputs (external HTTP, webhooks, user uploads, model tool calls).\n\n## 2. STRIDE Threat Matrix\n\n| Category | Threat Scenario | Existing Control | Residual Risk & Follow-up |\n|---|---|---|---|\n| Spoofing | Forged origin or stolen token | Boundary auth check | Add token expiry enforcement |\n| Tampering | Path traversal or payload injection | Path canonicalization & parameterized SQL | Add static audit check |\n| Info Disclosure | Secrets leaked in logs or errors | `Secret` redaction wrapper | Audit error formatting paths |\n| Denial of Service | Oversized payloads or request floods | Size caps and rate limits | Enforce per-route timeouts |\n| Elevation | Unauthorized admin endpoint access | Role capability gates | Add negative auth tests |\n\n## 3. Security Release Sign-off\n- [ ] No secrets committed or logged\n- [ ] Untrusted inputs decoded strictly at boundaries\n",
+        "docMigrationBody": "# {title}\n\n- **Target Storage**: SQLite / PostgreSQL / Directory Store\n- **Zero-Downtime**: Yes / No\n\n## 1. Schema Comparison\n- Summarize new tables, column updates, constraints, or directory layout changes.\n\n## 2. Expand & Contract Rollout\n1. **Phase 1 (Expand)**: Add new structures while keeping old readers working; enable dual-write.\n2. **Phase 2 (Backfill)**: Backfill historical records in throttled keyset batches to avoid locks.\n3. **Phase 3 (Verify & Cutover)**: Run parity verification to confirm zero mismatch, then switch reads.\n4. **Phase 4 (Contract)**: Remove deprecated columns or fallback code after one stable cycle.\n\n## 3. Parity Verification Query\n```sql\n-- Record row-count, checksum, and sample verification queries\n```\n\n## 4. Rollback & Recovery\n- Document stop-the-bleeding steps per phase, snapshot restore path, and expected RTO.\n",
+        "docPerfBody": "# {title}\n\n- **Environment**: Hardware specs, dataset size, concurrency profile\n- **Load Tool**:\n\n## 1. Targets & Benchmark Comparison\n\n| Metric | Baseline | Target | After Optimization | Delta |\n|---|---|---|---|---|\n| Throughput (QPS) | | | | |\n| P50 Latency | | | | |\n| P99 Latency | | | | |\n| Peak Memory / CPU | | | | |\n\n## 2. Bottlenecks & Flamegraph Findings\n- Summarize lock contention, hot allocations, serialization overhead, or N+1 queries.\n\n## 3. Applied Optimizations\n1. **Change 1**: Explain mechanism and local trade-offs.\n2. **Change 2**: Explain caching, indexing, or batching improvements.\n\n## 4. Capacity Verdict\n- State recommended per-node concurrency limit, safety margin, and ongoing alerts.\n",
+        "diagMsNodeGateway": "Edge Gateway",
+        "diagMsNodeAuth": "Auth Service",
+        "diagMsNodeCore": "Core Domain",
+        "diagMsNodeQueue": "Async Queue",
+        "diagMsNodeMedia": "Media Engine",
+        "diagMsNodeDb": "Primary DB",
+        "diagMsEdgeAuth": "verify token",
+        "diagMsEdgeRpc": "internal RPC",
+        "diagMsEdgeEmit": "dispatch",
+        "diagMsEdgeRead": "tx read/write",
+        "diagMsEdgeStore": "persist state",
+        "diagSeqClient": "Client App",
+        "diagSeqApi": "API Boundary",
+        "diagSeqGuard": "Auth & Decode",
+        "diagSeqDomain": "Domain Service",
+        "diagSeqOutbox": "DB + Outbox",
+        "diagSeqBus": "Live SSE Feed",
+        "diagSeqE1": "1. request",
+        "diagSeqE2": "2. validate",
+        "diagSeqE3": "3. execute",
+        "diagSeqE4": "4. tx commit",
+        "diagSeqE5": "5. push slice",
+        "diagErdUser": "Agent (agent)",
+        "diagErdRepo": "Repository (repo)",
+        "diagErdIssue": "Ticket (issue)",
+        "diagErdSession": "Session (session)",
+        "diagErdArtifact": "Artifact (artifact)",
+        "diagErdVersion": "Snapshot (version)",
+        "diagErdE1": "scoped to",
+        "diagErdE2": "launches",
+        "diagErdE3": "uses profile",
+        "diagErdE4": "produces",
+        "diagErdE5": "1:N snapshots",
+        "diagCiLint": "Lint & Format",
+        "diagCiUnit": "Unit & Contract",
+        "diagCiBuild": "Build & Package",
+        "diagCiCanary": "Canary Deploy",
+        "diagCiSmoke": "Smoke & Metrics",
+        "diagCiProd": "Full Rollout",
+        "diagCiE1": "pass",
+        "diagCiE2": "archive",
+        "diagCiE3": "deploy",
+        "diagCiE4": "green",
+        "diagCiE5": "promote",
+        "diagSmDraft": "Draft",
+        "diagSmQueued": "Queued",
+        "diagSmRunning": "Running",
+        "diagSmReview": "In Review",
+        "diagSmDone": "Done",
+        "diagSmCanceled": "Canceled",
+        "diagSmE1": "dispatch",
+        "diagSmE2": "start",
+        "diagSmE3": "submit",
+        "diagSmE4": "send back",
+        "diagSmE5": "complete",
+        "diagSmE6": "cancel",
+        "sheetBenchTab1": "Benchmarks",
+        "sheetBenchTab2": "Environment",
+        "sheetBenchColCase": "Scenario",
+        "sheetBenchColBaseline": "Baseline QPS",
+        "sheetBenchColCurrent": "Current QPS",
+        "sheetBenchColP99": "P99 (ms)",
+        "sheetBenchColMem": "Memory (MB)",
+        "sheetBenchColStatus": "Verdict",
+        "sheetBenchR1Case": "Paginated list query (1000 rows)",
+        "sheetBenchR1Status": "Pass (+68%)",
+        "sheetBenchR2Case": "Concurrent write tx (64 clients)",
+        "sheetBenchR2Status": "Pass (+52%)",
+        "sheetBenchR3Case": "Incremental doc sync (10k nodes)",
+        "sheetBenchR3Status": "Pass (-41% lat)",
+        "sheetBenchR4Case": "Cold-boot slice projection",
+        "sheetBenchR4Status": "Watch",
+        "sheetBenchEnvKey": "Parameter",
+        "sheetBenchEnvVal": "Value",
+        "sheetBenchEnvR1": "Concurrency",
+        "sheetBenchEnvR2": "Dataset Size",
+        "sheetBenchEnvR3": "Warmup Rounds",
+        "sheetTechTab": "Scoring Matrix",
+        "sheetTechColDim": "Criterion",
+        "sheetTechColWeight": "Weight",
+        "sheetTechColOptA": "Option A (Embedded)",
+        "sheetTechColOptB": "Option B (Sidecar)",
+        "sheetTechColNote": "Rationale",
+        "sheetTechR1Dim": "End-to-End Latency",
+        "sheetTechR1Note": "Zero IPC serialization roundtrip",
+        "sheetTechR2Dim": "Ops & Deployment Cost",
+        "sheetTechR2Note": "Single binary with no extra daemon",
+        "sheetTechR3Dim": "Fault Isolation",
+        "sheetTechR3Note": "External crash stays isolated",
+        "sheetTechR4Dim": "Delivery Lead Time",
+        "sheetTechR4Note": "Reuses shared contracts and store",
+        "sheetTechR5Dim": "Long-Term Scaling",
+        "sheetTechR5Note": "Can split behind gateway later",
+        "sheetTestTab": "Regression Cases",
+        "sheetTestColId": "ID",
+        "sheetTestColArea": "Area",
+        "sheetTestColCase": "Scenario",
+        "sheetTestColEnv": "Layer",
+        "sheetTestColOwner": "Lead",
+        "sheetTestColResult": "Status",
+        "sheetTestR1Area": "Auth Boundary",
+        "sheetTestR1Case": "Invalid token rejected with 401",
+        "sheetTestR1Env": "Integration",
+        "sheetTestR1Owner": "Server",
+        "sheetTestR1Res": "Pass",
+        "sheetTestR2Area": "State Machine",
+        "sheetTestR2Case": "Concurrent writes enforce optimistic lock",
+        "sheetTestR2Env": "Unit",
+        "sheetTestR2Owner": "Core",
+        "sheetTestR2Res": "Pass",
+        "sheetTestR3Area": "Desktop UI",
+        "sheetTestR3Case": "Theme switch and shortcuts respond cleanly",
+        "sheetTestR3Env": "E2E UI",
+        "sheetTestR3Owner": "Frontend",
+        "sheetTestR3Res": "Pass",
+        "sheetTestR4Area": "DB Migration",
+        "sheetTestR4Case": "Legacy DB reconciles with zero drift",
+        "sheetTestR4Env": "Smoke",
+        "sheetTestR4Owner": "Storage",
+        "sheetTestR4Res": "Review",
+        "sheetApiTab": "API Registry",
+        "sheetApiColMethod": "Method",
+        "sheetApiColPath": "Path",
+        "sheetApiColAuth": "Auth",
+        "sheetApiColRate": "Rate Limit",
+        "sheetApiColOwner": "Domain",
+        "sheetApiColStability": "Stability",
+        "sheetApiR1Auth": "Loopback / Bearer",
+        "sheetApiR1Rate": "Unlimited (local)",
+        "sheetApiR1Owner": "Issue",
+        "sheetApiR1Stab": "Stable v1",
+        "sheetApiR2Auth": "Bearer",
+        "sheetApiR2Rate": "60 req/min",
+        "sheetApiR2Owner": "Artifact",
+        "sheetApiR2Stab": "Stable v1",
+        "sheetApiR3Auth": "Bearer + Role",
+        "sheetApiR3Rate": "30 req/min",
+        "sheetApiR3Owner": "Session",
+        "sheetApiR3Stab": "Canary",
+        "sheetApiR4Auth": "Pair Signature",
+        "sheetApiR4Rate": "10 req/min",
+        "sheetApiR4Owner": "Remote",
+        "sheetApiR4Stab": "Stable v1",
+        "dashSloP1": "Availability (%)",
+        "dashSloP2": "P99 Latency (ms)",
+        "dashSloP3": "Error Budget Left (%)",
+        "dashSloP4": "7d Alerts",
+        "dashSloServiceCol": "Service",
+        "dashSloAvailCol": "Availability",
+        "dashSloP99Col": "P99",
+        "dashSloBudgetCol": "Budget Left",
+        "dashSloAlertsCol": "Alerts",
+        "dashSloR1": "Edge Gateway",
+        "dashSloR2": "Core State Engine",
+        "dashSloR3": "Collab & Storage",
+        "dashSloR4": "Live SSE Stream",
+        "dashDoraP1": "Deploys / Week",
+        "dashDoraP2": "Lead Time (h)",
+        "dashDoraP3": "Failure Rate (%)",
+        "dashDoraP4": "MTTR (min)",
+        "dashDoraWeekCol": "Week",
+        "dashDoraDeployCol": "Deploys",
+        "dashDoraLeadCol": "Lead Time (h)",
+        "dashDoraCfrCol": "CFR (%)",
+        "dashDoraMttrCol": "MTTR (m)",
+        "slidesArchS1Sub": "Context, boundaries, and key trade-offs",
+        "slidesArchS1Notes": "Spend 2 minutes aligning on constraints and explicit non-goals.",
+        "slidesArchS2Title": "Context & Constraints",
+        "slidesArchS2Sub": "Why the current design cannot carry the next milestone",
+        "slidesArchS2B1": "Latency and consistency targets",
+        "slidesArchS2B2": "Legacy data compatibility and migration window",
+        "slidesArchS2B3": "Local-first and remote sync boundary",
+        "slidesArchS2Notes": "Clarify hard constraints versus staged improvements.",
+        "slidesArchS3Title": "Target Architecture",
+        "slidesArchS3Sub": "Acyclic module layering and boundary decoding",
+        "slidesArchS3B1": "Gateway handles auth and edge validation only",
+        "slidesArchS3B2": "Core domain rules stay pure and deterministic",
+        "slidesArchS3B3": "Persistence consolidated behind one service",
+        "slidesArchS3Notes": "Walk through the primary request path and recovery flow.",
+        "slidesArchS4Title": "Key Trade-offs",
+        "slidesArchS4Sub": "Options evaluated and risk mitigations",
+        "slidesArchS4B1": "Long-term maintenance gains vs near-term cost",
+        "slidesArchS4B2": "Kill switches and canary rollback strategy",
+        "slidesArchS4B3": "Benchmarking and capacity headroom checks",
+        "slidesArchS4Notes": "Address concurrency safety and rollback questions directly.",
+        "slidesArchS5Title": "Milestones & Next Steps",
+        "slidesArchS5Sub": "Phased rollout schedule and acceptance criteria",
+        "slidesArchS5B1": "Phase 1: Core contracts and storage schema",
+        "slidesArchS5B2": "Phase 2: Integration and load verification",
+        "slidesArchS5B3": "Phase 3: Canary rollout and general availability",
+        "slidesArchS5Notes": "Confirm review sign-off, blockers, and leads.",
+        "slidesRelS1Sub": "Feature overview, engineering wins, and live demo",
+        "slidesRelS1Notes": "Keep under 15 minutes; highlight the core problem solved.",
+        "slidesRelS2Title": "Why We Built This",
+        "slidesRelS2Sub": "Addressing high-frequency engineering friction",
+        "slidesRelS2B1": "Manual preflight checklists were slow and error-prone",
+        "slidesRelS2B2": "Cross-module debugging lacked a unified view",
+        "slidesRelS2B3": "Metrics and regression baselines lacked automated gates",
+        "slidesRelS2Notes": "Open with 1-2 real incidents or bottlenecks.",
+        "slidesRelS3Title": "Core Capabilities & Design",
+        "slidesRelS3Sub": "Key architectural decisions that paid off",
+        "slidesRelS3B1": "Declarative templates with structured directory storage",
+        "slidesRelS3B2": "Zero-network offline sandbox previews",
+        "slidesRelS3B3": "Bilingual catalogs and automated contract parity checks",
+        "slidesRelS3Notes": "Walk through the live workflow or diagram.",
+        "slidesRelS4Title": "Measured Impact",
+        "slidesRelS4Sub": "Before vs after verification results",
+        "slidesRelS4B1": "45% faster core workflow turnaround",
+        "slidesRelS4B2": "95%+ automated regression coverage",
+        "slidesRelS4B3": "Zero-downtime upgrade with zero schema drift",
+        "slidesRelS4Notes": "Anchor the value proposition with concrete numbers.",
+        "slidesRelS5Title": "Roadmap & Q&A",
+        "slidesRelS5Sub": "Upcoming improvements and feedback loop",
+        "slidesRelS5B1": "Support team-authored custom template packs",
+        "slidesRelS5B2": "One-click ticket handoff from content artifacts",
+        "slidesRelS5B3": "Share feedback in the engineering channel",
+        "slidesRelS5Notes": "Leave 5 minutes for open Q&A.",
+        "protoApiTitle": "API & JSON Payload Sandbox",
+        "protoApiSub": "Format JSON offline, inspect payload shape, and generate cURL commands",
+        "protoApiBtnPretty": "Format JSON",
+        "protoApiBtnMinify": "Minify",
+        "protoApiBtnCopy": "Generate cURL",
+        "protoApiPayloadLabel": "Request JSON Payload",
+        "protoApiCurlLabel": "Generated Command",
+        "protoApiValid": "Valid JSON payload",
+        "protoApiInvalid": "JSON parse error: ",
+        "protoCompTitle": "Interactive UI State Sandbox",
+        "protoCompSub": "Preview default, loading, empty, and error states across themes and viewport widths",
+        "protoCompStateLabel": "Component State",
+        "protoCompThemeLabel": "Theme",
+        "protoCompWidthLabel": "Viewport Width",
+        "protoCompStateDefault": "Default",
+        "protoCompStateLoading": "Loading",
+        "protoCompStateEmpty": "Empty",
+        "protoCompStateError": "Error",
+        "protoCompThemeLight": "Light",
+        "protoCompThemeDark": "Dark",
+        "protoCompCardTitle": "Service Deployment Status",
+        "protoCompCardBody": "Release v2.4.0 is healthy across 3 zones with 18ms P99 latency.",
+        "protoCompLoadingText": "Fetching latest health checks and metrics…",
+        "protoCompEmptyText": "No matching active instances. Adjust filters or create a deployment.",
+        "protoCompErrorText": "Gateway timeout (504): upstream health aggregator missed the 3000ms deadline.",
+        "designDesktopName": "Desktop Workspace",
+        "designMobileName": "Mobile Companion",
+        "designPropDensity": "Density",
+        "designPropBanner": "Show Release Banner",
+        "designPropCta": "Primary CTA",
+        "designPropCtaDefault": "Install as Desktop App",
+        "designHeroSub": "Native real-time collaboration across artboards with shared tokens.",
+        "designMetricsTitle": "Service Contracts",
+        "designActionTitle": "Desktop Bundle Setup",
+        "dsButtonTitle": "Button",
+        "dsButtonSummary": "Triggers a primary user action; keep one primary button per toolbar.",
+        "dsButtonDo": "Start with an action verb (e.g. \"Save & Publish\")",
+        "dsButtonDont": "Avoid placing two primary buttons side-by-side",
+        "dsBadgeTitle": "Badge",
+        "dsBadgeSummary": "Compact status and category indicator.",
+        "dsBadgeDo": "Keep labels concise (1–2 short words)",
+        "motionCh1": "Opening Hook",
+        "motionCh2": "Feature Reveal",
+        "motionCh3": "Closing CTA",
+        "motionSc2Headline": "Zero external dependencies — installable as a native app",
+        "motionSc2CardTitle": "Pure-Time Deterministic Engine",
+        "motionSc2CardBody": "Every timestamp t maps deterministically to easing curves and layer transforms",
+        "motionSc3Headline": "Preview & Ship Directly from Content Hub",
+        "sbTone": "Warm Editorial · Crisp Contrast",
+        "sbS1Scene": "Opening · Studio Overview",
+        "sbS1Visual": "Morning light illuminates the desktop workbench as cards and timelines fan out cleanly.",
+        "sbS1Dialogue": "Turn every conversation idea directly into a runnable artifact.",
+        "sbS2Scene": "Demo · One-Click Install as App",
+        "sbS2Visual": "User clicks Install as App; an interactive mini-app opens in a unified immersive titlebar window.",
+        "sbS2Dialogue": "No browser chrome — just a focused Mac utility ready from Spotlight or your Dock.",
+        "sbS3Scene": "Closing · Built for Flow",
+        "sbS3Visual": "Close-up of the ring timer and oscilloscope pulsing smoothly inside the standalone applet.",
+        "sbS3Dialogue": "Offline-safe, instant launch, crafted for daily focus and exploration."
       }
     },
     "search": {
-      "title": "Search content",
+      "title": "Search artifacts",
       "placeholder": "Search notes, artifacts, and media…",
       "empty": "No matching notes, artifacts, or media",
-      "typeMedia": "Media"
+      "typeMedia": "Media",
+      "scopeAll": "All",
+      "scopeArtifacts": "Artifacts",
+      "scopeMedia": "Media"
     }
   }
 }

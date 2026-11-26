@@ -302,7 +302,7 @@ fn markdown_capabilities_json(path: &Path) -> String {
     if let Ok(canon) = std::fs::canonicalize(work_root) {
         roots.push(canon);
     }
-    let assets = crate::pixel::assets_dir();
+    let assets = crate::assets::assets_dir();
     if let Ok(canon) = std::fs::canonicalize(assets) {
         roots.push(canon);
     }

@@ -285,7 +285,7 @@ pub struct Look {
     #[serialize_always]
     #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub outfit: Option<Outfit>,
-    /// An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A helper has null.
+    /// An orchestrator's look (default is farmer). A helper has null.
     #[serialize_always]
     #[cfg_attr(feature = "ts-gen", ts(optional = false))]
     pub orchestrator: Option<OrchestratorLook>,
@@ -295,7 +295,7 @@ pub struct Look {
     pub trim: String,
     pub hat: String,
     pub eye: String,
-    /// Optional generated portrait sprite name (`avatar-*`), used instead of the animal face when set.
+    /// Optional portrait asset id (`avatar-*`), used instead of the default species portrait when set.
     #[serde(default)]
     pub avatar: Option<String>,
 }

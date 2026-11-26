@@ -27,7 +27,7 @@
 | `crates/core/src/` | 纯规则中心：`reduce`、`SliceMask` 与按域切片投影、状态派生、收件箱、依赖、挂钟抽象 [clock.rs](crates/core/src/clock.rs)（`Clock` / `ManualClock`）、定时任务（`cron/`）、作品引擎（`artifact/`） |
 | `crates/runtime/src/` | 进程级共享 Tokio 运行时 `rt.rs`（`rt::handle`、`rt::current_or_global_handle`、`run_command_with_timeout`）、幂等析构门 `teardown_gate.rs`、`oar/` 驱动与自研 `agent/` 持久对话引擎（`execution.db`） |
 | `crates/rich/`、`crates/engines/{onig,pele,shiki}` | 原生富内容组件与内部引擎（`canvas`、`chart`、`genui`、`pinyin`）及底层正则/高亮/图谱引擎 |
-| `apps/mac/crates/workspace/src/store/mod.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局；连同 `pixel`、`terminal` 共 3 个桌面支撑 crate |
+| `apps/mac/crates/workspace/src/store/mod.rs` | 原生应用外壳的 `state.db`（SQLite）：项目、终端与布局；连同 `diorama`、`terminal` 共 3 个桌面支撑 crate |
 | `crates/i18n/src/lib.rs`、`crates/i18n/locales/` | 消息格式与词典；词典构建时编进去，前端 `web.*` 词典挂在可选特性 `web` 下（仅 `crates/rich` 开启） |
 | `crates/server/src/fake/runtime.rs` | 测试和验收沙箱用的替身农机 `pi`（`VIBEVALLEY_TEST_RUNTIMES=1`） |
 | `packages/protocol/src/<概念>/` | 页面用的契约：生成的 `shapes.gen.ts`，手写的 `schema.ts`（Zod）和 `api.ts`（额外导出或别名才设 `shapes.ts`）；`src/rules/` 是页面用的纯函数规则；`@vibevalley/protocol/remote`（[transport.ts](packages/protocol/src/remote/transport.ts)）导出零平台依赖的纯 Web Fetch `HttpRemoteTransport`（Bearer 鉴权、`Last-Event-ID` SSE 续读与 `vibevalley://pair` 解析）；`src/client.ts` 是生成的 `VibeValleyApi` |
@@ -37,7 +37,7 @@
 ### 仓库和包
 
 - **Rust 为准**：服务端（`vibevalley-server`）、命令行（`vibevalley-cli`）、原生应用（`apps/mac`）都是 Rust；TS 承接桌面工作台（`apps/mac/ui`）、独立原生移动端（`apps/mobile`，`nsh/mobile`，iOS 优先、Android 就绪）、2 个共用包（`packages/{protocol,i18n}`）、官网（`apps/site`）与脚本，不维护浏览器应用与 Electron 桌面壳。
-- **一个 Cargo 工作区（17 个成员）**：成员按层组织为 `crates/*`（`protocol`、`i18n`、`core`、`git`、`files`、`runtime`、`rich`、`server`、`cli`）、`crates/engines/{onig,pele,shiki}`、`apps/mac`、桌面支撑 `apps/mac/crates/{pixel,terminal,workspace}` 与 `xtask`（包名仍保留 `vibevalley-*`，使 `core` 不遮蔽 `::core`），版本与 edition 写在根 `Cargo.toml` 的 `[workspace.package]`，依赖各 crate 自己写；`cargo xtask check` 跑 `cargo fmt --check`、`cargo clippy -D warnings` 与 `cargo test`。
+- **一个 Cargo 工作区（17 个成员）**：成员按层组织为 `crates/*`（`protocol`、`i18n`、`core`、`git`、`files`、`runtime`、`rich`、`server`、`cli`）、`crates/engines/{onig,pele,shiki}`、`apps/mac`、桌面支撑 `apps/mac/crates/{diorama,terminal,workspace}` 与 `xtask`（包名仍保留 `vibevalley-*`，使 `core` 不遮蔽 `::core`），版本与 edition 写在根 `Cargo.toml` 的 `[workspace.package]`，依赖各 crate 自己写；`cargo xtask check` 跑 `cargo fmt --check`、`cargo clippy -D warnings` 与 `cargo test`。
 - **TS 依赖版本集中**：版本在 `pnpm-workspace.yaml` 的 catalog，各包写 `catalog:`（`scripts/audit/catalog.test.ts` 查）。
 - **跨包走包名**：TS 跨包写 `@vibevalley/*`（`no-cross-package-path` 查）；`apps/mac/ui` 经 `nsh.json` 的别名解析它们；`packages/*` 的类型导出指向 `dist/*.d.ts`（`vp run packages:build`）。
 
@@ -77,7 +77,7 @@
 | 3 | 276 | 509 |
 | 6 | 754 | 1027 |
 
-- **按序加表与双后端迁移**：服务端与 `durable` 表结构通过 `SeaORM` 实体与 `Migrator` 管理，SQLite 与 PostgreSQL 在建表与索引层面保持等价。
+- **按序加表与双后端迁移**：服务端与 `durable` 表结构通过 `SeaORM` 实体与前向增量 `Migrator`（`seaql_server_migrations` / `seaql_migrations`）管理，禁止直接原地修改已发布的迁移文件；SQLite 与 PostgreSQL 在建表与索引层面保持等价，启动时由 [verify.rs](crates/server/src/db/verify.rs) 自动核验表与列是否与实体一致，遇到旧版未跟踪迁移或结构漂移时快速失败并由桌面端展示诊断与备份重置入口。
 
 ### 测试金字塔
 
@@ -89,7 +89,7 @@
 | 模块 | 模块的类型、真 git、脚本农机（`vibevalley-runtime::oar` 的 `scripted`）、脚本模型 | `crates/server/tests/issue_board.rs`、`crates/server/tests/*.rs` |
 | 服务端整体 | 起真的 `vibevalley-server`、经 HTTP | `crates/server/tests/start.rs`、`crates/cli/tests/cli.rs` |
 | 页面 | `nsh/test`，样例的 `Transport` | `apps/mac/ui/app/*.test.tsx`、`apps/mac/ui/features/*/*.test.ts` |
-| 像素场景 | 真的素材、样例帧，在 CPU 上画 | `apps/mac/src/pixel/tests.rs` |
+| 纸雕场景 | 切片映射、开场资源与 `vibevalley-diorama` 单测 | `apps/mac/src/diorama/`、`apps/mac/crates/diorama/` |
 
 - **不靠睡眠等待**：Rust 测试用 `until` 与 `TurnGate`（[support/mod.rs](crates/server/tests/support/mod.rs)）确定性同步轮次；TS 测试禁止写死 `setTimeout` 或 `waitForTimeout`（`vibevalley/no-test-sleep` 查）。
 - **对照 golden**：`reduce` 与出帧、artifact 的规则对着 golden；artifact 的 golden 由 `cargo xtask goldens --check` 校验（`crates/core/tests/projection.rs`、`crates/core/tests/artifact_golden.rs`）。

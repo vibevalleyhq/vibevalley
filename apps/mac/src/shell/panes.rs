@@ -15,12 +15,12 @@ use crate::theme::Ui;
 use crate::viewer::FileViewer;
 
 use super::projects::SidebarTopics;
-use super::{PaneSlot, PixelSlot, Shell, TerminalSlot};
+use super::{DioramaSlot, PaneSlot, Shell, TerminalSlot};
 
 impl Shell {
     pub(super) fn navigate_workbench(&mut self, route: &str, cx: &mut Context<Self>) {
         self.chrome.native_workspace = false;
-        self.chrome.native_pixel = None;
+        self.chrome.native_diorama = None;
         self.chrome.explicit_route = true;
         self.chrome.last_route = Some(route.to_string());
         self.sync_devtools_route(route);
@@ -30,11 +30,11 @@ impl Shell {
     }
 
     pub(super) fn show_workspace(&mut self, cx: &mut Context<Self>) {
-        if self.chrome.native_workspace && self.chrome.native_pixel.is_none() && self.chrome.last_route.as_deref() == Some("/workspace") {
+        if self.chrome.native_workspace && self.chrome.native_diorama.is_none() && self.chrome.last_route.as_deref() == Some("/workspace") {
             return;
         }
         self.chrome.native_workspace = true;
-        self.chrome.native_pixel = None;
+        self.chrome.native_diorama = None;
         self.chrome.last_route = Some("/workspace".to_string());
         self.sync_devtools_route("/workspace");
         self.chrome.workbench.update(cx, |v, cx| v.navigate("/workspace", cx));
@@ -42,16 +42,17 @@ impl Shell {
         cx.notify();
     }
 
-    pub(super) fn show_pixel(&mut self, scene: &str, mut props: Value, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn show_diorama(&mut self, scene: &str, mut props: Value, window: &mut Window, cx: &mut Context<Self>) {
         if props.get("cwd").is_none() {
             props["cwd"] = json!(self.workspace.ws.active().map(|p| p.root().to_path_buf()));
         }
-        let view = cx.new(|cx| crate::pixel::view::PixelView::new(scene, props, cx));
-        let sub = cx.subscribe_in(&view, window, |this, _, event: &crate::pixel::view::PixelEvent, window, cx| {
-            this.on_pixel_event(event.clone(), window, cx)
+        let view = cx.new(|cx| crate::diorama::DioramaView::new(scene, props, cx));
+        let sub = cx.subscribe_in(&view, window, |this, _, event: &crate::diorama::DioramaEvent, window, cx| {
+            this.on_diorama_event(event.clone(), window, cx)
         });
         self.chrome.native_workspace = false;
-        self.chrome.native_pixel = Some(PixelSlot { view, _sub: sub });
+        window.focus(&gpui::Focusable::focus_handle(view.read(cx), cx), cx);
+        self.chrome.native_diorama = Some(DioramaSlot { view, _sub: sub });
         self.publish_host_debug(cx);
         cx.notify();
     }
@@ -63,8 +64,8 @@ impl Shell {
             self.navigate_workbench(props["route"].as_str().unwrap_or("/issues"), cx);
             return;
         }
-        if let PaneKind::Pixel { scene, props } = kind {
-            self.show_pixel(&scene, props, window, cx);
+        if let PaneKind::Diorama { scene, props } = kind {
+            self.show_diorama(&scene, props, window, cx);
             return;
         }
         self.show_workspace(cx);
@@ -994,19 +995,19 @@ impl Shell {
                     _sub: sub,
                 }
             }
-            PaneKind::Pixel { scene, mut props } => {
+            PaneKind::Diorama { scene, mut props } => {
                 if !props.is_object() {
                     props = json!({});
                 }
                 if props.get("cwd").is_none() {
                     props["cwd"] = json!(root);
                 }
-                let view = cx.new(|cx| crate::pixel::view::PixelView::new(&scene, props, cx));
-                let sub = cx.subscribe_in(&view, window, |this, _, event: &crate::pixel::view::PixelEvent, window, cx| {
-                    this.on_pixel_event(event.clone(), window, cx)
+                let view = cx.new(|cx| crate::diorama::DioramaView::new(&scene, props, cx));
+                let sub = cx.subscribe_in(&view, window, |this, _, event: &crate::diorama::DioramaEvent, window, cx| {
+                    this.on_diorama_event(event.clone(), window, cx)
                 });
                 PaneSlot {
-                    entity: PaneEntity::Pixel(view),
+                    entity: PaneEntity::Diorama(view),
                     _sub: sub,
                 }
             }

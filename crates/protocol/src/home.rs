@@ -10,6 +10,55 @@ use serde::{Deserialize, Serialize};
 pub const SERVER_FILE: &str = "server.json";
 pub const SETTINGS_FILE: &str = "settings.json";
 
+/// Canonical non-standard environment variables recognized across VibeValley crates and scripts.
+pub const CANONICAL_ENV_VARS: &[&str] = &[
+    "DEEPSEEK_API_KEY",
+    "DEEPSEEK_BASE_URL",
+    "GIT_CONFIG_GLOBAL",
+    "MAC_TESTS_CONCURRENCY",
+    "OAR_SUBAGENT_DEPTH",
+    "VIBEVALLEY_AGENTS_TRACE",
+    "VIBEVALLEY_APPS_DIR",
+    "VIBEVALLEY_ASSETS",
+    "VIBEVALLEY_ASSETS_REPO",
+    "VIBEVALLEY_CHANNEL",
+    "VIBEVALLEY_CONTROL_PLANE_LABEL",
+    "VIBEVALLEY_CONTROL_PLANE_TOKEN",
+    "VIBEVALLEY_CONTROL_PLANE_URL",
+    "VIBEVALLEY_DEBUG",
+    "VIBEVALLEY_DEBUG_DUMP",
+    "VIBEVALLEY_DEBUG_SCRIPT",
+    "VIBEVALLEY_DIORAMA_DIST",
+    "VIBEVALLEY_EMBED_UI",
+    "VIBEVALLEY_FAKE_SERVER",
+    "VIBEVALLEY_HOME",
+    "VIBEVALLEY_IO_WORKERS",
+    "VIBEVALLEY_ISLAND",
+    "VIBEVALLEY_LOG",
+    "VIBEVALLEY_NO_ANIMATION",
+    "VIBEVALLEY_NO_ISLAND",
+    "VIBEVALLEY_NO_OPENING",
+    "VIBEVALLEY_NOTARY_PROFILE",
+    "VIBEVALLEY_OAR_DEPTH",
+    "VIBEVALLEY_PORT",
+    "VIBEVALLEY_REMOTE_ALLOW_ALL",
+    "VIBEVALLEY_REMOTE_BIND",
+    "VIBEVALLEY_REMOTE_TOKEN",
+    "VIBEVALLEY_SANDBOX",
+    "VIBEVALLEY_SERVER",
+    "VIBEVALLEY_SERVER_BIN",
+    "VIBEVALLEY_SERVER_NAME",
+    "VIBEVALLEY_SHIM_BIN",
+    "VIBEVALLEY_SIGN_IDENTITY",
+    "VIBEVALLEY_SKIP_LOGIN_PATH",
+    "VIBEVALLEY_STORE",
+    "VIBEVALLEY_TOKEN",
+    "VIBEVALLEY_UI_BUNDLE",
+    "VIBEVALLEY_UI_DEV",
+    "VIBEVALLEY_UPDATE_FEED",
+    "VIBEVALLEY_WORK_ROOT",
+];
+
 /// Release channel of the running binary: separates default ports and on-disk homes across concurrent channels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReleaseChannel {
@@ -387,5 +436,16 @@ mod tests {
             PathBuf::from("/Users/tester/.vibevalley-beta")
         );
         assert!(home_for(ReleaseChannel::Alpha).ends_with(".vibevalley-alpha"));
+    }
+
+    #[test]
+    fn canonical_env_vars_are_unique_and_well_formed() {
+        let mut seen = std::collections::BTreeSet::new();
+        for &name in CANONICAL_ENV_VARS {
+            assert!(!name.is_empty());
+            assert!(name.bytes().all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_'));
+            assert!(name.contains('_'));
+            assert!(seen.insert(name), "duplicate canonical env var: {name}");
+        }
     }
 }

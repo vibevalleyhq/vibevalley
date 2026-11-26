@@ -13,9 +13,9 @@ import { CodeBlock } from "../design/code/CodeBlock";
 import { ConfirmButton } from "../design/ConfirmButton";
 import { DataTable, tableCell } from "../design/DataTable";
 import { Dialog } from "../design/Dialog";
-import { AgentFace } from "../design/domain/Face";
-import { PoseSprite } from "../design/domain/PoseSprite";
+import { AgentFace, OrchestratorFace } from "../design/domain/Face";
 import { RuntimeBadge } from "../design/domain/RuntimeBadge";
+import { RuntimeIcon } from "../design/domain/RuntimeIcon";
 import { Field, TextInput } from "../design/Field";
 import { IconButton } from "../design/IconButton";
 import { KeyField } from "../design/KeyField";
@@ -133,7 +133,7 @@ function ComponentBench() {
   const removingKey = signal(false);
   const dialogOpen = signal(false);
   const pickedMenu = signal("none");
-  const pose = signal<"idle" | "walk">("idle");
+  const look = signal<"farmer" | "foreman">("farmer");
   const settledInput = signal("alpha");
   const settledVal = createSettled(settledInput, 250);
   const now = useNow(30_000);
@@ -311,9 +311,10 @@ function ComponentBench() {
             <AgentFace agentId="laozhou" name="老周" runtime="claude" size={28} />
             <RuntimeBadge runtime="claude" size={14} />
           </View>
-          <PoseSprite cast={{ species: "bear", outfit: "farmer" }} pose={pose()} height={32} />
-          <Button testID="toggle-pose" onPress={() => pose.set(pose() === "idle" ? "walk" : "idle")}>
-            {`pose:${pose()}`}
+          <OrchestratorFace size={32} look={look()} />
+          <RuntimeIcon runtime="claude" size={28} />
+          <Button testID="toggle-look" onPress={() => look.set(look() === "farmer" ? "foreman" : "farmer")}>
+            {`look:${look()}`}
           </Button>
         </View>
         <View testID="domain-worklog-live">

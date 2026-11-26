@@ -3,26 +3,12 @@ use std::time::Duration;
 
 use base64::Engine as _;
 use parking_lot::Mutex;
-use serde::Serialize;
 use tokio_util::sync::CancellationToken;
+use vibevalley_protocol::HostSpeechAudioPhase as Phase;
+pub use vibevalley_protocol::HostSpeechAudioState as State;
 use vibevalley_protocol::MediaSpeechEvent;
 use vibevalley_server::gateway::api::media::{SharedSpeechStreams, SpeechClaim};
 
-#[derive(Clone, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct State {
-    phase: Phase,
-    problem: Option<String>,
-}
-#[derive(Clone, Copy, Default, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-enum Phase {
-    #[default]
-    Idle,
-    Playing,
-    Draining,
-    Stopping,
-}
 #[derive(Default)]
 struct Playback {
     state: State,

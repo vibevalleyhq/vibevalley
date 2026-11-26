@@ -2,7 +2,7 @@
 //   - "changes": commit box, conflicts, staged & unstaged file diffs
 //   - "branches": current branch, local branches (click to checkout) & worktrees
 //   - "commits": commit history log (click to open commit diff)
-import { Clipboard, computed, effect, Scroll, signal, Text, untracked, View, type TextStyle } from "nsh";
+import { Clipboard, computed, effect, keymap, Scroll, signal, Text, untracked, View, type TextStyle } from "nsh";
 import { Button, ContextMenu, Input, MenuItem, MenuSeparator } from "nsh/base";
 import { z } from "zod";
 
@@ -10,6 +10,7 @@ import { t } from "@vibevalley/i18n";
 import { sessionIssueId, sessionWorktree } from "@vibevalley/protocol/rules";
 
 import { Button as DesignButton } from "../design/Button";
+import { SearchField } from "../design/Field";
 import { Icon } from "../design/Icon";
 import { ActiveBar } from "../design/layout";
 import { motionClass } from "../design/motion";
@@ -34,7 +35,7 @@ const autoDirection: TextStyle = { writingDirection: "auto" };
 export type GitRow = { path: string; code: string; tone: string };
 export type GitWorktree = {
   path: string;
-  branch: string | null;
+  branch?: string | null;
   main: boolean;
   locked: boolean;
   current?: boolean;
@@ -56,7 +57,7 @@ export type GitFrame = {
   staged?: GitRow[];
   changes?: GitRow[];
   conflicts?: GitRow[];
-  branches?: { name: string; head: boolean; upstream: string | null }[];
+  branches?: { name: string; head: boolean; upstream?: string | null }[];
   worktrees?: GitWorktree[];
   log?: { id: string; short: string; summary: string; author: string; time: number }[];
 };
@@ -64,7 +65,7 @@ export type GitFrame = {
 const gitRowSchema = z.object({ path: z.string(), code: z.string(), tone: z.string() });
 const gitWorktreeSchema = z.object({
   path: z.string(),
-  branch: z.string().nullable(),
+  branch: z.exactOptional(z.string().nullable()),
   main: z.boolean(),
   locked: z.boolean(),
   current: z.exactOptional(z.boolean()),
@@ -87,7 +88,7 @@ export const gitFrameSchema: z.ZodType<GitFrame> = z.object({
   staged: z.exactOptional(z.array(gitRowSchema)),
   changes: z.exactOptional(z.array(gitRowSchema)),
   conflicts: z.exactOptional(z.array(gitRowSchema)),
-  branches: z.exactOptional(z.array(z.object({ name: z.string(), head: z.boolean(), upstream: z.string().nullable() }))),
+  branches: z.exactOptional(z.array(z.object({ name: z.string(), head: z.boolean(), upstream: z.exactOptional(z.string().nullable()) }))),
   worktrees: z.exactOptional(z.array(gitWorktreeSchema)),
   log: z.exactOptional(z.array(z.object({ id: z.string(), short: z.string(), summary: z.string(), author: z.string(), time: z.number() }))),
 });
@@ -440,6 +441,8 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
   });
   const committing = signal(false);
   const commitNotice = signal<string | null>(null);
+  const commitFocused = signal(false);
+  const fileQuery = signal("");
   const branchQuery = signal("");
   const switchingBranch = signal<string | null>(null);
   let commitStartFrame: GitFrame | null = null;
@@ -488,11 +491,33 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
   const logCount = computed(() => f()?.log?.length ?? 0);
   const canCreate = computed(() => newBranch().trim() !== "" && !creatingWt());
   const canCommit = computed(() => !committing() && stagedCount() > 0 && message().trim() !== "");
+  const totalDiffFiles = computed(() => stagedCount() + changesCount());
+  const showFileFilter = computed(() => totalDiffFiles() >= 6);
+  const normalizedFileQuery = computed(() => (showFileFilter() ? fileQuery().trim().toLowerCase() : ""));
+  const filteredConflicts = computed(() => {
+    const q = normalizedFileQuery();
+    const list = f()?.conflicts ?? [];
+    return q ? list.filter((r) => r.path.toLowerCase().includes(q)) : list;
+  });
+  const filteredStaged = computed(() => {
+    const q = normalizedFileQuery();
+    const list = f()?.staged ?? [];
+    return q ? list.filter((r) => r.path.toLowerCase().includes(q)) : list;
+  });
+  const filteredChanges = computed(() => {
+    const q = normalizedFileQuery();
+    const list = f()?.changes ?? [];
+    return q ? list.filter((r) => r.path.toLowerCase().includes(q)) : list;
+  });
   const changedCount = computed(() => stagedCount() + changesCount() + conflictsCount());
   const branchLabel = computed(() => f()?.branch ?? `detached ${f()?.head ?? ""}`);
   const filteredBranches = computed(() => {
     const q = branchQuery().trim().toLowerCase();
     return (f()?.branches ?? []).filter((b) => !q || b.name.toLowerCase().includes(q));
+  });
+  effect(() => {
+    if (!commitFocused() || !canCommit()) return;
+    return keymap.bind("mod+enter", () => commit(), { when: "always" });
   });
   const subTabs: readonly { readonly id: GitTab; readonly label: () => string }[] = [
     {
@@ -660,16 +685,35 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   <Input
                     value={message()}
                     onChange={({ value }) => message.set(value)}
+                    onFocus={() => commitFocused.set(true)}
+                    onBlur={() => commitFocused.set(false)}
                     placeholder={t("web.shell.git.commitPlaceholder")}
                     multiline
                     class="min-h-14 rounded-md border border-line bg-elevated px-2.5 py-1.5 text-xs leading-normal text-ink placeholder:text-faint hover:border-faint focus:border-focus"
                   />
-                  <DesignButton tone="primary" class="px-3" disabled={!canCommit()} onPress={commit}>
-                    {committing()
-                      ? t("web.shell.git.committing")
-                      : stagedCount() > 0
-                        ? t("web.shell.git.commitStaged", { count: stagedCount() })
-                        : t("web.shell.git.noStaged")}
+                  <DesignButton
+                    tone="primary"
+                    class="px-3"
+                    disabled={!canCommit()}
+                    tooltip={
+                      <Bubble text={`${stagedCount() > 0 ? t("web.shell.git.commitStaged", { count: stagedCount() }) : t("web.shell.git.noStaged")} (⌘↩)`} />
+                    }
+                    onPress={commit}
+                  >
+                    <View class="flex-row items-center gap-1.5">
+                      <Text class="min-w-0 truncate text-sm font-medium text-page">
+                        {committing()
+                          ? t("web.shell.git.committing")
+                          : stagedCount() > 0
+                            ? t("web.shell.git.commitStaged", { count: stagedCount() })
+                            : t("web.shell.git.noStaged")}
+                      </Text>
+                      <If when={canCommit()}>
+                        <View class="shrink-0 items-center justify-center rounded-xs px-1 py-px" style={{ backgroundColor: mix("page", 0.2) }}>
+                          <Text class="font-mono text-2xs font-medium text-page tabular-nums">⌘↩</Text>
+                        </View>
+                      </If>
+                    </View>
                   </DesignButton>
                   <If when={stagedCount() === 0 && changesCount() > 0}>
                     <Button
@@ -690,22 +734,43 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                   </If>
                 </View>
 
+                <If when={showFileFilter()}>
+                  <View class="border-b border-line px-3 py-2">
+                    <SearchField
+                      testid="git-files-filter"
+                      clearTestid="git-files-filter-clear"
+                      value={fileQuery()}
+                      onInput={(v) => fileQuery.set(v)}
+                      placeholder={t("web.shell.palette.placeholder.files")}
+                      label={t("web.issue.page.filter")}
+                      clearLabel={t("web.issue.page.clear")}
+                    />
+                  </View>
+                </If>
+
                 <If when={conflictsCount() > 0}>
                   <View class="pb-1">
                     <SectionHead
                       title={t("web.shell.git.conflicts")}
-                      count={conflictsCount()}
+                      count={filteredConflicts().length}
                       tone="danger"
                       collapsible
                       expanded={isOpen("conflicts")}
                       onToggle={() => toggleSection("conflicts")}
+                      right={
+                        <If when={normalizedFileQuery().length > 0 && filteredConflicts().length !== conflictsCount()}>
+                          <Text class="mr-1 font-mono text-2xs text-faint tabular-nums">{`${filteredConflicts().length}/${conflictsCount()}`}</Text>
+                        </If>
+                      }
                     />
                     <If when={isOpen("conflicts")}>
-                      <View class="gap-px">
-                        <Each of={f()?.conflicts ?? []} key={(r) => r.path}>
-                          {(row) => <FileRow row={row()} staged={false} />}
-                        </Each>
-                      </View>
+                      <If when={filteredConflicts().length > 0} else={<PanelEmpty text={t("web.shell.palette.empty.files")} compact />}>
+                        <View class="gap-px">
+                          <Each of={filteredConflicts()} key={(r) => r.path}>
+                            {(row) => <FileRow row={row()} staged={false} />}
+                          </Each>
+                        </View>
+                      </If>
                     </If>
                   </View>
                 </If>
@@ -713,28 +778,35 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 <View class="pb-1">
                   <SectionHead
                     title={t("web.shell.git.staged")}
-                    count={stagedCount()}
+                    count={filteredStaged().length}
                     collapsible
                     expanded={isOpen("staged")}
                     onToggle={() => toggleSection("staged")}
                     borderTop={conflictsCount() > 0}
                     right={
                       <If when={stagedCount() > 0}>
-                        <ShellIconButton
-                          label={t("web.shell.git.unstageAll")}
-                          icon="minus"
-                          onPress={() => act({ type: "unstage", paths: (f()?.staged ?? []).map((r) => r.path) })}
-                        />
+                        <View class="flex-row items-center gap-1">
+                          <If when={normalizedFileQuery().length > 0 && filteredStaged().length !== stagedCount()}>
+                            <Text class="font-mono text-2xs text-faint tabular-nums">{`${filteredStaged().length}/${stagedCount()}`}</Text>
+                          </If>
+                          <ShellIconButton
+                            label={t("web.shell.git.unstageAll")}
+                            icon="minus"
+                            onPress={() => act({ type: "unstage", paths: (f()?.staged ?? []).map((r) => r.path) })}
+                          />
+                        </View>
                       </If>
                     }
                   />
                   <If when={isOpen("staged")}>
                     <If when={stagedCount() > 0} else={<PanelEmpty text={t("web.shell.git.stagedEmpty")} compact />}>
-                      <View class="gap-px">
-                        <Each of={f()?.staged ?? []} key={(r) => r.path}>
-                          {(row) => <FileRow row={row()} staged />}
-                        </Each>
-                      </View>
+                      <If when={filteredStaged().length > 0} else={<PanelEmpty text={t("web.shell.palette.empty.files")} compact />}>
+                        <View class="gap-px">
+                          <Each of={filteredStaged()} key={(r) => r.path}>
+                            {(row) => <FileRow row={row()} staged />}
+                          </Each>
+                        </View>
+                      </If>
                     </If>
                   </If>
                 </View>
@@ -742,28 +814,35 @@ export function GitPanel(props: { frame: GitFrame | null; tab?: GitTab }) {
                 <View class="pb-1">
                   <SectionHead
                     title={t("web.shell.git.changes")}
-                    count={changesCount()}
+                    count={filteredChanges().length}
                     collapsible
                     expanded={isOpen("changes")}
                     onToggle={() => toggleSection("changes")}
                     borderTop
                     right={
                       <If when={changesCount() > 0}>
-                        <ShellIconButton
-                          label={t("web.shell.git.stageAll")}
-                          icon="add"
-                          onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
-                        />
+                        <View class="flex-row items-center gap-1">
+                          <If when={normalizedFileQuery().length > 0 && filteredChanges().length !== changesCount()}>
+                            <Text class="font-mono text-2xs text-faint tabular-nums">{`${filteredChanges().length}/${changesCount()}`}</Text>
+                          </If>
+                          <ShellIconButton
+                            label={t("web.shell.git.stageAll")}
+                            icon="add"
+                            onPress={() => act({ type: "stage", paths: (f()?.changes ?? []).map((r) => r.path) })}
+                          />
+                        </View>
                       </If>
                     }
                   />
                   <If when={isOpen("changes")}>
                     <If when={changesCount() > 0} else={<PanelEmpty text={t("web.shell.git.clean")} compact />}>
-                      <View class="gap-px">
-                        <Each of={f()?.changes ?? []} key={(r) => r.path}>
-                          {(row) => <FileRow row={row()} staged={false} />}
-                        </Each>
-                      </View>
+                      <If when={filteredChanges().length > 0} else={<PanelEmpty text={t("web.shell.palette.empty.files")} compact />}>
+                        <View class="gap-px">
+                          <Each of={filteredChanges()} key={(r) => r.path}>
+                            {(row) => <FileRow row={row()} staged={false} />}
+                          </Each>
+                        </View>
+                      </If>
                     </If>
                   </If>
                 </View>

@@ -2,19 +2,21 @@ import { Scroll, Text, View, type JSX } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
-import { ARTIFACT_TYPES, type LibraryFileKind } from "@vibevalley/protocol";
+import { ARTIFACT_TYPES, type LibraryFileKind, LibraryFileKindValues } from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import type { IconName } from "../../design/icons";
-import { ActiveBar } from "../../design/layout";
-import { motionClass } from "../../design/motion";
+import { ActiveBar, Kbd } from "../../design/layout";
+import { Bubble } from "../../design/Tip";
+import { currentHost } from "../../infra/host";
 import { ready, useQuery, useQueryClient } from "../../infra/query";
 import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import {
+  activeArtifactType,
   type ContentBucket,
   contentBrowseBucket,
   contentSidebarOpen,
@@ -23,9 +25,10 @@ import {
   openContentSearch,
   openTemplatePicker,
   pinnedKeys,
+  templatePickerContextFor,
 } from "../../infra/state/contentNav";
 import { defineStored } from "../../infra/state/stored";
-import { artifactTypeIcon, artifactTypeLabel, useArtifacts } from "../artifact";
+import { artifactTypeIcon, artifactTypeLabel, useArtifacts, useInstalledApplets } from "../artifact";
 import { libraryQuery } from "../media";
 import { createQuickBlankNote } from "./templates";
 
@@ -38,7 +41,7 @@ const artifactFacets = ARTIFACT_TYPES.map((type) => ({
   label: () => artifactTypeLabel(type),
 }));
 
-const mediaKinds: readonly LibraryFileKind[] = ["image", "audio", "video", "other"];
+const mediaKinds: readonly LibraryFileKind[] = LibraryFileKindValues;
 
 const mediaKindIcons: Record<LibraryFileKind, IconName> = {
   image: "image",
@@ -62,9 +65,18 @@ export function ContentSidebar() {
 
   const artifacts = useArtifacts(() => ({}));
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
+  const installedApplets = useInstalledApplets();
 
   const allArtifacts = createMemo(() => ready(artifacts, undefined) ?? []);
   const allMedia = createMemo(() => ready(media, undefined) ?? []);
+  const installedIds = createMemo(
+    () =>
+      new Set(
+        installedApplets()
+          .filter((item) => item.installed)
+          .map((item) => item.artifactId),
+      ),
+  );
 
   const inBrowse = createMemo(() => location().pathname === "/library" || location().pathname.startsWith("/library/"));
   const bucket = () => contentBrowseBucket();
@@ -82,6 +94,7 @@ export function ContentSidebar() {
       artifacts: allArtifacts(),
       media: allMedia(),
       pinned: new Set(pinnedKeys()),
+      installedArtifactIds: installedIds(),
     }),
   );
 
@@ -112,7 +125,14 @@ export function ContentSidebar() {
         <Text role="header" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
           {t("web.library.content.title")}
         </Text>
-        <Button tone="primary" size="compact" icon="add" testID="content-new-btn" onPress={() => openTemplatePicker()}>
+        <Button
+          tone="primary"
+          size="compact"
+          icon="add"
+          testID="content-new-btn"
+          tooltip={<Bubble text={`${t("web.library.content.new")} (⌘N)`} />}
+          onPress={() => openTemplatePicker(templatePickerContextFor(bucket(), inBrowse() ? undefined : activeArtifactType()))}
+        >
           {t("web.library.content.new")}
         </Button>
       </View>
@@ -127,6 +147,7 @@ export function ContentSidebar() {
         >
           <Icon name="search" size={14} tone="faint" />
           <Text class="min-w-0 flex-1 truncate text-xs text-faint group-hover:text-muted">{t("web.library.content.searchAll")}</Text>
+          <Kbd>⌘F</Kbd>
         </View>
         <View class="gap-0.5">
           <NavRow
@@ -146,6 +167,17 @@ export function ContentSidebar() {
             active={inBrowse() && bucket().kind === "pinned"}
             onPress={() => selectBucket({ kind: "pinned" })}
           />
+          <If when={currentHost().applet !== undefined}>
+            <NavRow
+              testID="content-nav-apps"
+              icon="devices"
+              iconTone="ok-ink"
+              label={t("web.library.content.installedApps")}
+              count={countForBucket(counts(), { kind: "apps" })}
+              active={inBrowse() && bucket().kind === "apps"}
+              onPress={() => selectBucket({ kind: "apps" })}
+            />
+          </If>
         </View>
 
         <NavSection
@@ -254,14 +286,9 @@ function NavSection(props: {
             }
             accessibilityState={{ expanded: props.open }}
             onPress={() => props.onToggle()}
-            class="h-4.5 w-3.5 shrink-0 items-center justify-center rounded-sm hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
+            class="h-4 w-4 shrink-0 items-center justify-center rounded-sm hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
           >
-            <View
-              class={`size-2.5 items-center justify-center ${motionClass("transition-transform duration-120 ease-out")}`}
-              style={{ transform: [{ rotate: props.open ? "90deg" : "0deg" }] }}
-            >
-              <Icon name="expand" size={10} tone={props.active ? "muted" : "faint"} />
-            </View>
+            <Icon name={props.open ? "choose" : "expand"} size={14} tone="muted" />
           </View>
           <View
             role="button"
@@ -301,7 +328,7 @@ function NavRow(props: {
       accessibilityLabel={props.label}
       accessibilityState={{ selected: props.active }}
       onPress={() => props.onPress()}
-      class={rowClass(props.active, props.indent === true)}
+      class={`${rowClass(props.active, props.indent === true)} ${!props.active && props.indent === true && props.count === 0 ? "opacity-60" : ""}`}
     >
       <If when={props.active}>
         <ActiveBar />
@@ -312,7 +339,9 @@ function NavRow(props: {
       >
         {props.label}
       </Text>
-      <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{String(props.count)}</Text>
+      <If when={props.count > 0}>
+        <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{String(props.count)}</Text>
+      </If>
     </View>
   );
 }

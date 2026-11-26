@@ -37,39 +37,21 @@ export function StandaloneArtifactPage(props: { id: string }) {
 
   return (
     <View testID="standalone-artifact-page" class="h-full min-h-0 min-w-0 flex-1 bg-page">
-      <View testID="standalone-artifact-header" class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
-        <If
-          when={shown()}
-          else={
-            <If when={showSkeleton()}>
-              <View class="min-w-0 flex-1 flex-row items-center gap-2">
-                <SkeletonBar class="size-6 rounded-md" />
-                <SkeletonBar class="h-4 w-40 rounded-sm" />
-                <SkeletonBar class="h-4 w-16 rounded-sm" />
-              </View>
-            </If>
-          }
+      <If when={!shown()}>
+        <View
+          testID="standalone-artifact-header"
+          desktop={{ windowDrag: true }}
+          class="h-9.5 shrink-0 flex-row items-center gap-2 border-b border-line bg-page pr-3 pl-20"
         >
-          {(a) => (
-            <>
-              <View class="size-6 shrink-0 items-center justify-center rounded-md bg-side">
-                <Icon name={artifactIcon(a())} size={14} tone="muted" />
-              </View>
-              <Text testID="standalone-artifact-title" class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
-                {a().title}
-              </Text>
-              <View testID="standalone-artifact-type" class="h-5 shrink-0 items-center justify-center rounded-sm bg-selected px-1.5">
-                <Text class="text-2xs font-medium text-ink">{kindLabel(a())}</Text>
-              </View>
-              <View testID="standalone-artifact-version" class="h-5 shrink-0 items-center justify-center rounded-sm border border-line bg-side px-1.5">
-                <Text class="font-mono text-2xs font-medium text-muted tabular-nums">
-                  {(displayVersion() ?? 0) > 0 ? t("web.artifact.standalone.version", { version: displayVersion() ?? 0 }) : t("web.artifact.standalone.live")}
-                </Text>
-              </View>
-            </>
-          )}
-        </If>
-      </View>
+          <If when={showSkeleton()}>
+            <View class="min-w-0 flex-1 flex-row items-center gap-2">
+              <SkeletonBar class="size-5 rounded-sm" />
+              <SkeletonBar class="h-4 w-40 rounded-sm" />
+              <SkeletonBar class="h-4 w-16 rounded-sm" />
+            </View>
+          </If>
+        </View>
+      </If>
 
       <If when={artifact.error()}>
         <Banner testID="standalone-artifact-error" class="m-3">
@@ -94,7 +76,34 @@ export function StandaloneArtifactPage(props: { id: string }) {
           </If>
         }
       >
-        {(a) => <ArtifactDirectoryView artifact={a()} version={askedVersion()} compact />}
+        {(a) => (
+          <ArtifactDirectoryView
+            artifact={a()}
+            version={askedVersion()}
+            headerTestID="standalone-artifact-header"
+            headerClass="h-9.5 shrink-0 flex-row items-center gap-2 border-b border-line bg-page pr-3 pl-20"
+            headerWindowDrag
+            menuTestID="standalone-artifact-more"
+            headerLeft={
+              <>
+                <View class="size-5 shrink-0 items-center justify-center rounded-sm bg-side">
+                  <Icon name={artifactIcon(a())} size={12} tone="muted" />
+                </View>
+                <Text testID="standalone-artifact-title" class="min-w-0 shrink truncate text-sm font-semibold text-ink">
+                  {a().title}
+                </Text>
+                <View testID="standalone-artifact-type" class="h-5 shrink-0 items-center justify-center rounded-sm bg-selected px-1.5">
+                  <Text class="text-2xs font-medium text-ink">{kindLabel(a())}</Text>
+                </View>
+                <View testID="standalone-artifact-version" class="h-5 shrink-0 items-center justify-center rounded-sm border border-line bg-side px-1.5">
+                  <Text class="font-mono text-2xs font-medium text-muted tabular-nums">
+                    {(displayVersion() ?? 0) > 0 ? t("web.artifact.standalone.version", { version: displayVersion() ?? 0 }) : t("web.artifact.standalone.live")}
+                  </Text>
+                </View>
+              </>
+            }
+          />
+        )}
       </If>
     </View>
   );

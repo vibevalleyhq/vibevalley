@@ -11,8 +11,8 @@
 | 概念 | 农场里 | 页面 | 协议 | HTTP |
 |---|---|---|---|---|
 | Host | — | — | 服务端 `ServerConfig` 的 `home`（`$VIBEVALLEY_HOME`，不进协议） | — |
-| 空间 | 大地图（`apps/mac/src/pixel/farm/islands.rs`） | `/repos` | `SpaceState`、6 路切片（`SliceKind`）；目录是服务端 `ServerConfig` 的 `work_root` | `/api/v1/slice/{name}`、`/api/v1/live` |
-| 仓库 | 大地图上的一座岛 | `/repos/:repo`（`features/repo`） | `RepoSummary`、`RepoActivity`、`RepoLanguages` | `/api/v1/repo/…` |
+| 空间 | 纸雕农场（`apps/mac/src/diorama/`） | `/repos` | `SpaceState`、6 路切片（`SliceKind`）；目录是服务端 `ServerConfig` 的 `work_root` | `/api/v1/slice/{name}`、`/api/v1/live` |
+| 仓库 | 仓库院落 | `/repos/:repo`（`features/repo`） | `RepoSummary`、`RepoActivity`、`RepoLanguages` | `/api/v1/repo/…` |
 | 助手 | 田头的助手 | `/orchestrator`、`/orchestrator/<档案 id>`（`features/orchestrator`） | `SpaceState.sessions`（`role: "orchestrator"`）、`Channel.orchestrator` | `/api/v1/channel/message/send`、`/api/v1/orchestrator/…` |
 | 档案、技能 | 小动物、技能书 | `/agents`（`features/agent`）、`/settings/skills`（`features/runtime/SkillsPage.tsx`） | `Agent`、`AgentTemplate`、`Skill` | `/api/v1/agent/…`、`/api/v1/skill/…` |
 | 农机 | 农具 | `/runtimes`（`features/runtime`） | `RuntimeInfo`、`RuntimeSettings` | `/api/v1/runtime/…` |

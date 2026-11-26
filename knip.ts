@@ -48,8 +48,8 @@ const config: KnipConfig = {
       ignoreDependencies: ["tsrs"],
     },
   },
-  // Programs on the machine, not packages: Xcode's swift, Rust's cargo, and macOS packaging tools (hdiutil, sips).
-  ignoreBinaries: ["swift", "cargo", "hdiutil", "sips"],
+  // Programs on the machine, not packages: Xcode's swift, Rust's cargo, make, and macOS packaging tools (hdiutil, sips).
+  ignoreBinaries: ["swift", "cargo", "make", "hdiutil", "sips"],
   // Rust owns the complete wire contract; unused TS projections are not dead Rust API types.
   // Handwritten re-exports and schemas remain checked.
   ignoreIssues: { "packages/protocol/src/**/*.gen.ts": ["exports", "types"] },

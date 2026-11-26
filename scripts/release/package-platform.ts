@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -139,6 +140,18 @@ export function compileAppIconCatalog(sourcePng: string, destinationAssetsCar: s
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
+}
+
+export function compileAppIconCatalogCached(sourcePng: string, destinationAssetsCar: string, cacheDir: string): void {
+  const hash = createHash("sha256").update(readFileSync(sourcePng)).update(minimumMacOS).digest("hex").slice(0, 12);
+  const cached = join(cacheDir, `Assets-${hash}.car`);
+  if (existsSync(cached)) {
+    cpSync(cached, destinationAssetsCar);
+    return;
+  }
+  mkdirSync(cacheDir, { recursive: true });
+  compileAppIconCatalog(sourcePng, cached);
+  cpSync(cached, destinationAssetsCar);
 }
 
 const version = (v: string) => (v + ".0.0").split(".").slice(0, 3).join(".");

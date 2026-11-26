@@ -165,7 +165,7 @@ private func shapeOf(_ screen: NSScreen) -> ScreenShape {
   return ScreenShape(frame: frame, notch: notch, menuBarHeight: frame.maxY - screen.visibleFrame.maxY)
 }
 
-/** The page's pixel font (apps/web public/fonts), for the island to read like the farm; its name, or nil. */
+/** Optional custom font override; falls back to the macOS system font when nil. */
 private func registerFont(_ path: String) -> String? {
   let url = URL(fileURLWithPath: path) as CFURL
   CTFontManagerRegisterFontsForURL(url, .process, nil)

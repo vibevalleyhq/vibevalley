@@ -26,7 +26,7 @@ machines: Array<Machine>,
  */
 sessions: Array<Session>, crons: Array<Cron>,
 /**
- * The farm's pixel-only station and step history, by session; no business rule reads it.
+ * The farm scene's station and step history, by session; no business rule reads it.
  */
 plays?: { [key in string]: SessionPlay },
 /**

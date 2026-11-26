@@ -9,17 +9,18 @@ import { Dialog } from "../../design/Dialog";
 import { Select } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
-import { Empty, Quiet } from "../../design/layout";
+import { Empty } from "../../design/layout";
 import { Lightbox, type Picture } from "../../design/Lightbox";
 import { readFiles } from "../../design/picked";
 import { Segmented } from "../../design/Segmented";
 import { CountPill } from "../../design/Tag";
 import { toast } from "../../design/toasts";
-import { api } from "../../infra/api";
+import { api, reasonOf } from "../../infra/api";
 import { attachmentData, decodeBase64Utf8 } from "../../infra/attachment";
 import { fileUrl, importLocalAttachment, localPathFromUri, useAttachmentFile } from "../../infra/attachmentFile";
 import { hostApi } from "../../infra/bridge";
 import { useCollabSlice, useOpsSlice } from "../../infra/frame";
+import { currentHost } from "../../infra/host";
 import { ready, useAgents, useQuery, useQueryClient } from "../../infra/query";
 import { useRouter, useSearchParams } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
@@ -32,26 +33,15 @@ import {
   openContentSearch,
   openTemplatePicker,
   pinnedKeys,
+  templatePickerContextFor,
   togglePinned,
 } from "../../infra/state/contentNav";
 import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
-import { artifactTypeLabel, buildOutlineFromMarkdown, inferArtifactFromName, useArtifacts } from "../artifact";
+import { artifactTypeLabel, buildOutlineFromMarkdown, inferArtifactFromName, InstallAppletModal, useArtifacts, useInstalledApplets } from "../artifact";
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
 import { Inspector } from "./Inspector";
-import {
-  type ArtifactTypeFilter,
-  justify,
-  kindOf,
-  making,
-  type Names,
-  neighbor,
-  shownArtifacts,
-  shownMedia,
-  type SourceFilter,
-  sourceFilters,
-  understoodText,
-} from "./items";
+import { type ArtifactTypeFilter, justify, kindOf, making, type Names, neighbor, shownArtifacts, shownMedia, understoodText } from "./items";
 import {
   activeFileId,
   askRemove,
@@ -62,6 +52,7 @@ import {
   closeLightbox,
   focusFile,
   initialLibrarySelection,
+  isAppsBucket,
   isAskingRemove,
   isPinnedBucket,
   type LibrarySelection,
@@ -83,6 +74,7 @@ import { UnderstandingPanel } from "./UnderstandingPanel";
 type Make = "image" | "speech" | "audio";
 const makes: readonly Make[] = ["image", "speech", "audio"];
 const tileMin = 96;
+const isMediaMakeSupported = (b: ContentBucket) => showsMediaInBucket(b) && bucketFileKind(b) !== "video" && bucketFileKind(b) !== "other";
 const tileMax = 280;
 
 const deliverableNameRe =
@@ -117,6 +109,8 @@ function titleOfBucket(bucket: ContentBucket): string {
       return t("web.library.content.recent");
     case "pinned":
       return t("web.library.content.pinned");
+    case "apps":
+      return t("web.library.content.installedApps");
     case "artifacts":
       return artifactTypeTitle(bucket.artifactType);
     case "media":
@@ -132,18 +126,32 @@ export function LibraryPage() {
   const queries = useQueryClient();
   const [search, setSearch] = useSearchParams();
   const sort = signal<LibrarySort>("recent");
-  const source = signal<SourceFilter>("all");
   const items = useQuery(() => libraryQuery({ text: "", sort: sort() }), { interval: () => 10_000, keepPrevious: true });
   const artifactsQuery = useArtifacts(() => ({}));
+  const installedApplets = useInstalledApplets();
   const selection = signal<LibrarySelection>(initialLibrarySelection);
   const dragging = signal(false);
   const seen = signal<ReadonlyMap<string, Seen>>(new Map());
+  const appletTarget = signal<Artifact | undefined>(undefined);
   const act = createAct();
 
   const bucket = () => contentBrowseBucket();
   const tile = () => Math.min(tileMax, Math.max(tileMin, prefsNow().libraryTile));
+  const effectiveSort = createMemo((): LibrarySort => (!showsMediaInBucket(bucket()) && sort() === "size" ? "recent" : sort()));
+  const sortOptions = createMemo(() => {
+    const allowed = showsMediaInBucket(bucket()) ? LibrarySortValues : LibrarySortValues.filter((v) => v !== "size");
+    return allowed.map((value) => ({ value, label: t(`web.library.sort.${value}`) }));
+  });
   const allMedia = createMemo((): readonly LibraryItem[] => ready(items, undefined) ?? []);
   const allArtifacts = createMemo((): readonly Artifact[] => ready(artifactsQuery, undefined) ?? []);
+  const installedMap = createMemo(
+    () =>
+      new Map(
+        installedApplets()
+          .filter((item) => item.installed)
+          .map((item) => [item.artifactId, item]),
+      ),
+  );
   const jobs = (): readonly MediaJob[] => ops()?.media ?? [];
   const mediaSummary = () => ops()?.mediaSummary;
   const working = createMemo(() => making(jobs(), mediaSummary()));
@@ -151,22 +159,21 @@ export function LibraryPage() {
 
   const pinnedSet = createMemo(() => new Set(pinnedKeys()));
   const pinnedOnly = () => isPinnedBucket(bucket());
+  const appsOnly = () => isAppsBucket(bucket());
 
-  const visibleArtifacts = createMemo(() =>
-    showsArtifactsInBucket(bucket())
-      ? shownArtifacts(allArtifacts(), {
-          source: source(),
-          artifactType: bucketArtifactType(bucket()),
-          sort: sort(),
-          pinnedOnly: pinnedOnly(),
-          pinned: pinnedSet(),
-        })
-      : [],
-  );
+  const visibleArtifacts = createMemo(() => {
+    if (!showsArtifactsInBucket(bucket())) return [];
+    const base = shownArtifacts(allArtifacts(), {
+      artifactType: bucketArtifactType(bucket()),
+      sort: effectiveSort(),
+      pinnedOnly: pinnedOnly(),
+      pinned: pinnedSet(),
+    });
+    return appsOnly() ? base.filter((a) => installedMap().has(a.id)) : base;
+  });
   const visibleMedia = createMemo(() =>
     showsMediaInBucket(bucket())
       ? shownMedia(allMedia(), {
-          source: source(),
           fileKind: bucketFileKind(bucket()),
           pinnedOnly: pinnedOnly(),
           pinned: pinnedSet(),
@@ -238,9 +245,6 @@ export function LibraryPage() {
     const currentBucket = untracked(contentBrowseBucket);
     if (!showsMediaInBucket(currentBucket) || isPinnedBucket(currentBucket)) {
       contentBrowseBucket.set({ kind: "media" });
-    }
-    if (untracked(source) !== "all") {
-      source.set("all");
     }
     const mediaList = allMedia();
     const target = mediaList.find((item) => item.attachment.id === targetId);
@@ -444,19 +448,6 @@ export function LibraryPage() {
             </Text>
             <CountPill count={totalCount()} />
           </View>
-          <Segmented
-            label={t("web.library.content.source.all")}
-            testid="library-source"
-            value={source()}
-            onChange={(v) => {
-              source.set(v);
-              selection.set(cancelRemove(untracked(selection)));
-            }}
-            options={sourceFilters.map((value) => ({
-              value,
-              label: t(`web.library.content.source.${value}`),
-            }))}
-          />
           <View class="min-w-0 flex-1" />
           <If when={!contentSidebarOpen.get()}>
             <IconButton icon="search" size={14} label={t("web.library.content.searchAll")} testid="content-search-btn" onClick={() => openContentSearch()} />
@@ -466,11 +457,11 @@ export function LibraryPage() {
             testid="library-sort"
             size="control"
             quiet
-            value={sort()}
+            value={effectiveSort()}
             onChange={(v) => sort.set(v)}
-            options={LibrarySortValues.map((value) => ({ value, label: t(`web.library.sort.${value}`) }))}
+            options={sortOptions()}
           />
-          <If when={showsMediaInBucket(bucket())}>
+          <If when={showsMediaInBucket(bucket()) && visibleMedia().length > 0}>
             <Segmented
               label={t("web.library.tileSize")}
               testid="library-tile-size"
@@ -482,6 +473,16 @@ export function LibraryPage() {
                 { value: "lg", label: "L" },
               ]}
             />
+          </If>
+          <If when={isMediaMakeSupported(bucket())}>
+            <Button
+              size="compact"
+              testID="library-make-btn"
+              icon="generate"
+              onPress={() => setSearch({ make: bucketFileKind(bucket()) === "audio" ? "audio" : "image" })}
+            >
+              {t("web.library.make")}
+            </Button>
           </If>
           <Button size="compact" testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
             {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
@@ -519,7 +520,48 @@ export function LibraryPage() {
             <If when={showsMediaInBucket(bucket()) && !pinnedOnly() && activeMediaCount() > 0 && working().length > 0}>
               <MakingTiles jobs={working()} width={inner()} height={tile()} label={(job) => t(`web.library.job.${job.kind}`)} />
             </If>
-            <If when={!nothingShown()} else={<Quiet>{t("web.library.nothingShown")}</Quiet>}>
+            <If
+              when={!nothingShown()}
+              else={
+                <Empty
+                  icon={
+                    appsOnly() ? "devices" : pinnedOnly() ? "pin" : showsArtifactsInBucket(bucket()) && !showsMediaInBucket(bucket()) ? "artifacts" : "media"
+                  }
+                  testid={appsOnly() ? "library-apps-empty" : "library-nothing-shown"}
+                  action={
+                    <View class="flex-row flex-wrap items-center justify-center gap-2">
+                      <If when={bucket().kind === "artifacts"}>
+                        <Button tone="primary" icon="add" onPress={() => openTemplatePicker(templatePickerContextFor(bucket()))}>
+                          {t("web.library.content.new")}
+                        </Button>
+                      </If>
+                      <If when={bucket().kind === "media"}>
+                        <>
+                          <Button icon="upload" onPress={() => void pickFiles()}>
+                            {t("web.library.upload")}
+                          </Button>
+                          <If when={isMediaMakeSupported(bucket())}>
+                            <Button
+                              tone="primary"
+                              icon="generate"
+                              onPress={() => setSearch({ make: bucketFileKind(bucket()) === "audio" ? "audio" : "image" })}
+                            >
+                              {t("web.library.make")}
+                            </Button>
+                          </If>
+                        </>
+                      </If>
+                    </View>
+                  }
+                >
+                  {appsOnly()
+                    ? t("web.library.content.installedAppsEmpty")
+                    : pinnedOnly()
+                      ? t("web.library.content.pinnedEmpty")
+                      : t("web.library.nothingShown")}
+                </Empty>
+              }
+            >
               <If when={visibleArtifacts().length > 0}>
                 <View class="gap-2.5">
                   <If when={sectionCount() > 1}>
@@ -530,9 +572,28 @@ export function LibraryPage() {
                   </If>
                   <ArtifactTiles
                     artifacts={visibleArtifacts()}
+                    width={inner()}
                     onOpen={(id) => openArtifact(id)}
                     isPinned={(id) => isPinned(`artifact:${id}`)}
                     onTogglePin={(id) => handleTogglePin(`artifact:${id}`)}
+                    onDelete={(art) => {
+                      void act.run(async () => {
+                        await api.artifact.delete({ id: art.id });
+                        toast(t("web.artifact.page.deleted", { title: art.title }));
+                        void queries.invalidate({ prefix: ["artifacts"] });
+                      });
+                    }}
+                    installedApplets={installedMap()}
+                    canInstallApplet={currentHost().applet !== undefined}
+                    onInstallApplet={(a) => appletTarget.set(a)}
+                    onOpenApplet={(id) =>
+                      void currentHost()
+                        .applet?.open(id)
+                        .then(
+                          () => toast(t("web.artifact.applet.openedToast", { name: installedMap().get(id)?.appName ?? id })),
+                          (e: unknown) => toast(reasonOf(e), "bad"),
+                        )
+                    }
                   />
                 </View>
               </If>
@@ -550,6 +611,7 @@ export function LibraryPage() {
                     picked={picked()}
                     active={active()}
                     isPinned={(id) => isPinned(`media:${id}`)}
+                    onTogglePin={(id) => handleTogglePin(`media:${id}`)}
                     seen={(id) => seen().get(id)}
                     onSeen={(id, s) => {
                       const was = seen();
@@ -607,14 +669,23 @@ export function LibraryPage() {
         onAt={(at) => selection.set(at === undefined ? closeLightbox(untracked(selection)) : openLightbox(untracked(selection), at, imageItems().length))}
       />
 
-      <Dialog open={make() !== undefined} onClose={() => setSearch({ make: undefined })} title={t("web.library.makeTitle")} wide testid="library-make-dialog">
-        <Segmented
-          label={t("web.library.makeTitle")}
-          testid="library-make-form"
-          value={make() ?? "image"}
-          onChange={(value) => setSearch({ make: value })}
-          options={makes.map((value) => ({ value, label: t(`web.library.makeTabs.${value}`) }))}
-        />
+      <Dialog
+        open={make() !== undefined}
+        onClose={() => setSearch({ make: undefined })}
+        title={t("web.library.makeTitle")}
+        size="lg"
+        height="fixed"
+        toolbar={
+          <Segmented
+            label={t("web.library.makeTitle")}
+            testid="library-make-form"
+            value={make() ?? "image"}
+            onChange={(value) => setSearch({ make: value })}
+            options={makes.map((value) => ({ value, label: t(`web.library.makeTabs.${value}`) }))}
+          />
+        }
+        testid="library-make-dialog"
+      >
         <If when={make() === "image"}>
           <ImagePanel />
         </If>
@@ -632,13 +703,16 @@ export function LibraryPage() {
             open
             onClose={() => setSearch({ understand: undefined })}
             title={t("web.library.understandTitle", { name: file().name })}
-            wide
+            size="lg"
+            height="fixed"
             testid="library-understand-dialog"
           >
             <UnderstandingPanel file={file()} />
           </Dialog>
         )}
       </If>
+
+      <If when={appletTarget()}>{(a) => <InstallAppletModal open artifact={a()} onClose={() => appletTarget.set(undefined)} />}</If>
     </View>
   );
 }

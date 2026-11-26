@@ -15,9 +15,9 @@ use vibevalley_protocol::{
 use vibevalley_runtime::oar::voyage::{Header as VoyageHeader, Kind as VoyageKind, Reader as VoyageReader, Record as VoyageRecord};
 use vibevalley_runtime::oar::{EventKind as OarEventKind, StopReason, Usage as OarUsage};
 
-use super::DebugDataSource;
 use super::collector::clip_utf8;
 use super::redact::{Redactor, contains_ascii_ci};
+use super::types::DebugDataSource;
 
 const RAW_PAYLOAD_MAX_BYTES: usize = 4096;
 const SILENT_ERROR_MARKERS: [&str; 6] = [

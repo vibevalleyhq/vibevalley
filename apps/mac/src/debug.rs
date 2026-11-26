@@ -71,7 +71,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
                             Some(PaneEntity::Markdown(m)) => v["markdown"] = json!({ "status": m.read(cx).status(), "reloads": m.read(cx).reloads() }),
                             Some(PaneEntity::Diff(d)) => v["diff"] = json!(d.read(cx).summary()),
                             Some(PaneEntity::Hosted(view)) => v["hosted"] = view.read(cx).debug_state(),
-                            Some(PaneEntity::Pixel(view)) => v["pixel"] = view.read(cx).debug_state(),
+                            Some(PaneEntity::Diorama(view)) => v["diorama"] = view.read(cx).debug_state(),
                             None => {}
                         },
                     }
@@ -100,6 +100,11 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
     json!({
         "loaded": shell.workspace.loaded,
         "load_error": shell.workspace.load_error,
+        "startup_failure": shell.overlays.startup.failure.as_ref().map(|f| json!({
+            "kind": f.kind.as_str(),
+            "summary": f.summary,
+            "db_path": f.db_path,
+        })),
         "panel": format!("{:?}", shell.chrome.panel),
         "native_workspace": shell.chrome.native_workspace,
         "sidebar_visible": shell.chrome.sidebar_visible,
@@ -110,7 +115,7 @@ pub fn dump(shell: &Shell, cx: &App) -> Value {
         "sidebar": shell.chrome.sidebar.read(cx).debug_state(),
         "inspector": shell.chrome.inspector.as_ref().map(|s| s.view.read(cx).debug_state()),
         "workbench": shell.chrome.workbench.read(cx).debug_state(),
-        "pixel": shell.chrome.native_pixel.as_ref().map(|s| s.view.read(cx).debug_state()),
+        "diorama": shell.chrome.native_diorama.as_ref().map(|s| s.view.read(cx).debug_state()),
         "palette": shell.overlays.palette.as_ref().map(|p| json!({
             "open": p.open, "mode": p.mode.as_str(), "query": p.query, "view": p.view.read(cx).debug_state(),
         })),
@@ -128,17 +133,10 @@ pub fn start(shell: Entity<Shell>, window: WindowHandle<Shell>, cx: &mut App) {
         cx.spawn(async move |cx| {
             loop {
                 cx.background_executor().timer(Duration::from_millis(1000)).await;
-                let (value, pictures) = cx.update(|cx| {
-                    let pictures = shell.update(cx, |s, cx| dump_pixels(s, &path, cx));
-                    (dump(shell.read(cx), cx), pictures)
+                let value = cx.update(|cx| {
+                    shell.update(cx, |s, cx| step_unpainted_dioramas(s, cx));
+                    dump(shell.read(cx), cx)
                 });
-                cx.background_executor()
-                    .spawn(async move {
-                        for (file, list, atlas) in pictures {
-                            let _ = crate::pixel::draw::raster(&list, atlas.as_deref(), 2.0).save(&file);
-                        }
-                    })
-                    .await;
                 let text = serde_json::to_string_pretty(&value).unwrap_or_default();
                 let tmp = path.with_extension("tmp");
                 if std::fs::write(&tmp, text).is_ok() {
@@ -319,48 +317,30 @@ fn shot(_: &mut Window, path: &str) {
     eprintln!("debug script: shot {path}: build with --features shot");
 }
 
-fn active_pixel(s: &Shell, cx: &App) -> Option<Entity<crate::pixel::view::PixelView>> {
+fn active_diorama(s: &Shell, cx: &App) -> Option<Entity<crate::diorama::DioramaView>> {
     let _ = cx;
-    if let Some(slot) = &s.chrome.native_pixel {
+    if let Some(slot) = &s.chrome.native_diorama {
         return Some(slot.view.clone());
     }
     let project = s.workspace.ws.active()?;
     let tab = project.layout.active_tab()?;
     match s.workspace.panes.get(&(project.id(), tab.id)).map(|p| &p.entity) {
-        Some(PaneEntity::Pixel(v)) => Some(v.clone()),
+        Some(PaneEntity::Diorama(v)) => Some(v.clone()),
         _ => None,
     }
 }
 
-/// Each open pixel pane's last frame as a PNG beside the dump
-/// (`<dump>.<scene>-<tab>.png`), painted on the CPU from the same draw list.
-fn dump_pixels(
-    shell: &Shell,
-    path: &std::path::Path,
-    cx: &mut App,
-) -> Vec<(
-    PathBuf,
-    std::sync::Arc<crate::pixel::draw::DrawList>,
-    Option<std::sync::Arc<crate::pixel::atlas::Atlas>>,
-)> {
-    let mut out = Vec::new();
-    if let Some(slot) = &shell.chrome.native_pixel {
-        slot.view.update(cx, |v, _| v.draw_unpainted());
-        let v = slot.view.read(cx);
-        if let Some((list, atlas)) = v.snapshot() {
-            out.push((path.with_extension(format!("{}-native.png", v.kind)), list, atlas));
+/// Advances any active diorama views while the screen is locked so debug dumps
+/// reflect up-to-date telemetry.
+fn step_unpainted_dioramas(shell: &Shell, cx: &mut App) {
+    if let Some(slot) = &shell.chrome.native_diorama {
+        slot.view.update(cx, |v, cx| v.draw_unpainted(cx));
+    }
+    for pane in shell.workspace.panes.values() {
+        if let PaneEntity::Diorama(view) = &pane.entity {
+            view.update(cx, |v, cx| v.draw_unpainted(cx));
         }
     }
-    for ((_, tab), pane) in &shell.workspace.panes {
-        if let PaneEntity::Pixel(view) = &pane.entity {
-            view.update(cx, |v, _| v.draw_unpainted());
-            let v = view.read(cx);
-            if let Some((list, atlas)) = v.snapshot() {
-                out.push((path.with_extension(format!("{}-{tab}.png", v.kind)), list, atlas));
-            }
-        }
-    }
-    out
 }
 
 fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui::Context<Shell>) {
@@ -409,32 +389,22 @@ fn run(s: &mut Shell, cmd: &str, window: &mut Window, cx: &mut gpui::Context<She
             let props = serde_json::from_str(props).unwrap_or(json!({}));
             s.open_pane(PaneKind::Hosted { module: module.into(), props }, window, cx)
         }
-        "pixel" => {
+        "diorama" => {
             let (scene, props) = arg.split_once(' ').unwrap_or((arg, "{}"));
             let props = serde_json::from_str(props).unwrap_or(json!({}));
-            s.open_pane(PaneKind::Pixel { scene: scene.into(), props }, window, cx)
+            s.open_pane(PaneKind::Diorama { scene: scene.into(), props }, window, cx)
         }
-        // `pixel_tap:<x>,<y>[,right]` and `pixel_point:<x>,<y>` on the active pixel pane, art pixels.
-        "pixel_tap" | "pixel_point" => {
+        // `diorama_clock:<time of day 0..1>`
+        "diorama_clock" => {
             let parts: Vec<&str> = arg.split(',').collect();
-            let num = |i: usize| parts.get(i).and_then(|v| v.trim().parse::<f32>().ok()).unwrap_or(0.0);
-            if let Some(view) = active_pixel(s, cx) {
-                let p = crate::pixel::level::pt(num(0), num(1));
-                let right = parts.get(2) == Some(&"right");
-                view.update(cx, |v, cx| if name == "pixel_tap" { v.tap(p, right, cx) } else { v.point(Some(p)) });
-            }
-        }
-        // `pixel_clock:<time of day 0..1>[,<speed>]`
-        "pixel_clock" => {
-            let parts: Vec<&str> = arg.split(',').collect();
-            if let Some(view) = active_pixel(s, cx) {
+            if let Some(view) = active_diorama(s, cx) {
                 view.update(cx, |v, cx| {
-                    v.set_clock(parts[0].parse().ok(), parts.get(1).and_then(|p| p.parse().ok()));
+                    v.set_clock(parts[0].parse().ok());
                     cx.notify();
                 });
             }
         }
-        // `close_kind:pixel` / `close_kind:hosted` / `close_kind:terminal`: closes every such tab of the active project
+        // `close_kind:diorama` / `close_kind:hosted` / `close_kind:terminal`: closes every such tab of the active project
         // (scripts clean up what they opened, since the layout is saved).
         // `close_kind:terminal@/private/tmp` also needs the title to contain what follows `@`.
         "close_kind" => {

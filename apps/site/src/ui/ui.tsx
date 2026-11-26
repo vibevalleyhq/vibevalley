@@ -1,19 +1,19 @@
 /** @jsxImportSource @solidjs/web */
 import type { JSX } from "@solidjs/web";
-import { animate, inView, steps } from "motion";
+import { animate, inView } from "motion";
 import { createSignal, omit, onSettled } from "solid-js";
 
 import { createElementRef, reducedMotion } from "./scroll";
 
-export function PixelLink(props: { primary?: boolean; children: JSX.Element } & Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "class" | "style">) {
+export function PaperLink(props: { primary?: boolean; children: JSX.Element } & Omit<JSX.AnchorHTMLAttributes<HTMLAnchorElement>, "class" | "style">) {
   const rest = omit(props, "primary", "children");
   return (
     <a
       class={[
-        "inline-flex items-center gap-2.5 border-2 border-bark-900 px-5 py-2.5 font-pixel text-2xl leading-none active:[translate:0.125rem_0.125rem]",
+        "inline-flex items-center gap-2.5 rounded-md border px-5 py-2.5 font-sans text-base font-semibold leading-none transition-[transform,background-color,box-shadow] ease-out duration-200 hover:-translate-y-0.5 active:translate-y-0",
         props.primary === true
-          ? "bg-leaf-500 hover:bg-leaf-hover text-cream-50 [box-shadow:inset_2px_2px_0_var(--color-leaf-hover),_var(--shadow-hard)] active:[box-shadow:inset_2px_2px_0_var(--color-leaf-hover)]"
-          : "bg-cream-50 hover:bg-cream-hover text-bark-900 [box-shadow:var(--inset-shadow-lit),_var(--shadow-hard)] active:[box-shadow:var(--inset-shadow-lit)]",
+          ? "border-leaf-700/80 bg-leaf-500 hover:bg-leaf-hover text-paper-core [box-shadow:inset_0_1px_0_rgb(255_250_240_/_0.35),_var(--shadow-card)]"
+          : "border-border-soft/60 bg-card hover:bg-cream-hover text-bark-900 [box-shadow:var(--inset-shadow-rim),_var(--shadow-card)]",
       ]}
       {...rest}
     >
@@ -28,7 +28,7 @@ export function Section(props: { id: string; title: string; alt?: boolean; ref?:
       ref={props.ref}
       id={props.id}
       aria-labelledby={`${props.id}-title`}
-      class={["relative px-[clamp(16px,_5vw,_64px)] py-[clamp(64px,_9vw,_120px)]", props.alt === true && "border-y-2 border-y-bark-900 bg-cream-100"]}
+      class={["relative px-[clamp(16px,_5vw,_64px)] py-[clamp(64px,_9vw,_120px)]", props.alt === true && "border-y border-y-border-soft/30 bg-cream-100"]}
     >
       <div class="mx-auto max-w-280">
         <Heading id={`${props.id}-title`}>{props.title}</Heading>
@@ -44,7 +44,7 @@ export function Heading(props: { id?: string; class?: JSX.ClassValue | undefined
       id={props.id}
       data-reveal
       class={[
-        "mb-9 flex items-center gap-3.5 text-[length:clamp(30px,_3.6vw,_42px)] before:content-[''] before:w-3.5 before:h-3.5 before:shrink-0 before:border-2 before:border-solid before:border-bark-900 before:bg-wheat before:shadow-hard-sm",
+        "mb-9 flex items-center gap-3.5 text-[length:clamp(28px,_3.4vw,_40px)] text-bark-900 before:content-[''] before:w-3.5 before:h-3.5 before:shrink-0 before:rounded-[4px] before:border before:border-solid before:border-bark-800/70 before:bg-wheat before:shadow-card-sm",
         props.class,
       ]}
     >
@@ -63,7 +63,7 @@ export function CountUp(props: { to: number }) {
     const stop = inView(
       element,
       () => {
-        const run = animate(0, props.to, { duration: 1.1, ease: steps(Math.min(12, props.to)), onUpdate: (value) => setShown(Math.round(value)) });
+        const run = animate(0, props.to, { duration: 0.9, ease: [0.22, 1, 0.36, 1], onUpdate: (value) => setShown(Math.round(value)) });
         cancel = () => run.stop();
         return undefined;
       },

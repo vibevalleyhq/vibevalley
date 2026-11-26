@@ -4,7 +4,7 @@
 
 同时开十几个终端盯着编码 Agent，精力很快耗在来回切窗口上。**VibeValley** 是跑在本机的**个人与小团队 Agent OS**，让你像经营一座**机械化农场**一样用 AI 放大产出——多机并行、分田隔离、流水产出、由人掌闸（[概念](docs/concepts.md)）。
 
-![像素农场：仓库化作岛屿，真实执行进度长成庄稼](docs/images/farm.png)
+![纸雕农场：仓库化作江南院落，真实执行进度长成庄稼](docs/images/farm.png)
 
 ## 像经营机械化农场一样管理 Agent
 
@@ -12,7 +12,7 @@
 |---|---|
 | **统一农机调度** | 经 [oar](https://github.com/botiverse/oar) 驱动本机 Claude Code、Codex、Antigravity（`agy` / ACP）等引擎及内置引擎，到额度或日预算自动停派。 |
 | **分田并行，由人掌闸** | 最多 6 路并发（单仓库默认 3 路），每项任务独占分支与 Git worktree；看清 Diff 与冲突、点击「完成」才合入主分支，重启可从断点续接。 |
-| **三种工作姿态** | **对话**托管给主助手拆单盯盘；**工作区**并排开原生终端、OAR 直连对话与 Diff；**像素农场**全局总览——仓库是岛、任务是地、进度长成庄稼。 |
+| **三种工作姿态** | **对话**托管给主助手拆单盯盘；**工作区**并排开原生终端、OAR 直连对话与 Diff；**纸雕农场**全局总览——仓库是院、任务是地、进度长成庄稼。 |
 | **统一产出仓** | 笔记、作品与媒体收在同一侧栏（19 套双语模板）：单栏大纲笔记、纯 Rust 无限白板 `VvWhiteboard`、幻灯片／看板／网页作品与右侧协作对话。 |
 | **全本机与自动化** | 仅监听 `127.0.0.1`，数据与记忆留在你的 Mac；配定时任务、零模型巡查，及支持 `--json` / `--dry-run` 的 5 域纯 HTTP 命令行 `vibevalley`。 |
 
@@ -25,7 +25,7 @@
 
 ```mermaid
 flowchart LR
-  you(["你"]) -- "对话 / 任务 / 工作区" --> app["原生 macOS 应用<br/>GPUI · nsh TSX · 像素农场 · VvWhiteboard"]
+  you(["你"]) -- "对话 / 任务 / 工作区" --> app["原生 macOS 应用<br/>GPUI · nsh TSX · 3D 纸雕农场 · VvWhiteboard"]
   cli["vibevalley CLI<br/>5 域纯 HTTP · --json"] -- "127.0.0.1" --> server
   app -- "进程内桥" --> server
   server -- "StateFrame" --> app
@@ -42,8 +42,8 @@ flowchart LR
 ```
 
 - **单一 Rust 服务端**（`crates/server`）：内嵌于应用或独立运行，承载主助手、执行会话、频道、任务、作品、笔记与媒体。
-- **唯一核心状态**（`crates/core`）：全部业务状态由纯函数 `reduce` 经不可变「事实」折叠，界面与像素农场只读 `StateFrame`。
-- **原生 macOS 客户端**（`apps/mac`）：GPUI 窗口内置 PTY 终端、文件／Diff 查看、像素农场与 `VvWhiteboard`；工作台与直连对话由 `nsh` 跑 TSX；另附命令行 `vibevalley`（`crates/cli`）。仅支持 macOS（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
+- **唯一核心状态**（`crates/core`）：全部业务状态由纯函数 `reduce` 经不可变「事实」折叠，界面与纸雕农场只读域切片。
+- **原生 macOS 客户端**（`apps/mac`）：GPUI 窗口内置 PTY 终端、文件／Diff 查看、3D 纸雕农场与 `VvWhiteboard`；工作台与直连对话由 `nsh` 跑 TSX；另附命令行 `vibevalley`（`crates/cli`）。仅支持 macOS（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
 - **契约单源**（`crates/protocol`）：Rust 定义形状与接口，自动生成 TS 类型与客户端，三端严格对齐。详见 [docs/architecture.md](docs/architecture.md)。
 
 ## 快速开始
@@ -90,11 +90,11 @@ cargo run -p vibevalley-cli -- --json issue list      # 以原始 JSON 列出任
 
 ```
 crates/            Rust 核心：protocol、core、runtime（oar 与自研引擎）、rich（原生富内容与白板）、server、cli
-apps/mac/          原生 macOS 应用：GPUI 外壳、PTY 终端与像素农场（Rust），工作台与工作区页面（nsh TSX）
+apps/mac/          原生 macOS 应用：GPUI 外壳、PTY 终端与 3D 纸雕农场（Rust），工作台与工作区页面（nsh TSX）
 apps/island/       刘海灵动岛小程序（Swift）
 apps/site/         官网 vibevalley.dev（Vite + Solid 2 静态生成）
 packages/          页面共享 TS 包：生成的契约与 Zod 校验、词典目录
-assets/ · design/  像素素材、字体、地图与设计令牌（design/tokens.json）
+assets/ · design/  Papertrails 纸雕场景、头像、引擎标识、品牌图标与设计令牌（design/tokens.json）
 docs/ · .agents/   文档（docs/README.md）、架构提案（Agent Notes）与校验脚本（scripts/）
 ```
 
@@ -103,7 +103,7 @@ docs/ · .agents/   文档（docs/README.md）、架构提案（Agent Notes）�
 ## 致谢
 
 - **核心技术**：[oar](https://github.com/botiverse/oar)（Apache-2.0，多引擎运行时模型）· [pi](https://github.com/earendil-works/pi)（持久执行参考）· [GPUI](https://www.gpui.rs/)（Zed / [gpui-fast](https://github.com/longbridge/gpui-fast)）· [nsh](https://github.com/longbridge/nsh)（原生 TSX 视图运行时）· [Ghostty](https://ghostty.org/)（[libghostty-vt](https://github.com/uzaaft/libghostty-rs) 终端引擎）· [Loro](https://loro.dev/)（CRDT 协同内容引擎）
-- **字体与像素素材**：[Fusion Pixel Font](https://github.com/TakWolf/fusion-pixel-font)（OFL 1.1）· [Hugeicons](https://hugeicons.com/) / [LobeHub Icons](https://github.com/lobehub/lobe-icons)（MIT）
+- **图标与素材**：[reicon](https://reicon.dev/)（MIT）· [LobeHub Icons](https://github.com/lobehub/lobe-icons)（MIT）
 
 ## 许可证
 

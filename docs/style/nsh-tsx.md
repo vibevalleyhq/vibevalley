@@ -1,6 +1,6 @@
 # NSH TSX 编码与响应式规范
 
-`apps/mac/ui` 与 `apps/mobile/src` 的页面运行在 `nsh`（`0.6.0`）的细粒度响应式模型上，不是 React 的虚拟 DOM 整树重渲染。违反本规范会导致子树反复卸载重挂、滚动位置跳动、输入框失焦、菜单鼠标移出即关闭或列表复用串态。本文只管 `nsh` TSX 的响应式语义；格式、命名与样式另见 [code.md](docs/style/code.md)、[naming.md](docs/style/naming.md) 与 [08-agent-ui-guide.md](docs/design/08-agent-ui-guide.md)。
+`apps/mac/ui` 与 `apps/mobile/src` 的页面运行在 `nsh`（`0.7.1`）的细粒度响应式模型上，不是 React 的虚拟 DOM 整树重渲染。违反本规范会导致子树反复卸载重挂、滚动位置跳动、输入框失焦、菜单鼠标移出即关闭或列表复用串态。本文只管 `nsh` TSX 的响应式语义；格式、命名与样式另见 [code.md](docs/style/code.md)、[naming.md](docs/style/naming.md) 与 [08-agent-ui-guide.md](docs/design/08-agent-ui-guide.md)。
 
 ## 核心心智模型
 

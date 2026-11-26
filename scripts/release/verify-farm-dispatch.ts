@@ -19,26 +19,16 @@ const WINDOW = [1280, 820] as const;
 // The farm-chat-input rectangle in window points with the handset open at this viewport.
 const CHAT_INPUT = [125, 599, 732, 651] as const;
 
-const LdtkEntity = z.object({
-  __identifier: z.string(),
-  px: z.tuple([z.number(), z.number()]),
-  width: z.number(),
-  height: z.number(),
-  __pivot: z.tuple([z.number(), z.number()]),
-  fieldInstances: z.array(z.object({ __identifier: z.string(), __value: z.unknown() })),
-});
-const LdtkFile = z.object({
-  levels: z.array(z.object({ layerInstances: z.array(z.object({ entityInstances: z.array(LdtkEntity) })) })),
-});
 const ChatRequest = z.object({
   messages: z.array(z.looseObject({ role: z.string(), content: z.unknown().optional(), tool_call_id: z.string().optional() })),
   tools: z.array(z.object({ function: z.object({ name: z.string() }) })).optional(),
 });
 const ServerReceipt = z.looseObject({ pid: z.number(), url: z.string() });
 const DumpState = z.object({
-  pixel: z
+  diorama: z
     .object({
       kind: z.string().optional(),
+      frames_seen: z.number().optional(),
       taps: z.array(z.string()).optional(),
       placed: z.unknown().optional(),
     })
@@ -68,28 +58,6 @@ function save(path: string, value: unknown): void {
   writeFileSync(path, JSON.stringify(value, null, 2) + "\n");
 }
 
-function managerArea(assets: string): readonly [number, number, number, number] {
-  const ldtk = LdtkFile.parse(JSON.parse(readFileSync(join(assets, "village.ldtk"), "utf8")));
-  const level = ldtk.levels[0];
-  assert(level !== undefined, `Missing level[0] in ${assets}/village.ldtk`);
-  const areas = level.layerInstances
-    .flatMap((layer) => layer.entityInstances)
-    .filter(
-      (entity) =>
-        (entity.__identifier === "Prop" || entity.__identifier === "Area") &&
-        entity.fieldInstances.some((f) => f.__identifier === "spot" && f.__value === "manager"),
-    );
-  if (areas.length !== 1 || areas[0] === undefined) {
-    throw new Error(`Expected one manager in ${assets}/village.ldtk, found ${areas.length}`);
-  }
-  const area = areas[0];
-  const [x, y] = area.px;
-  const w = area.width;
-  const h = area.height;
-  const [ax, ay] = area.__pivot;
-  return [x - ax * w, y - ay * h, x + (1 - ax) * w, y + (1 - ay) * h];
-}
-
 function midpoint(bounds: readonly [number, number, number, number]): readonly [number, number] {
   return [(bounds[0] + bounds[2]) / 2, (bounds[1] + bounds[3]) / 2];
 }
@@ -116,7 +84,7 @@ async function stopProcess(proc: ChildProcess): Promise<void> {
   }
 }
 
-async function verify(app: string, cli: string, assets: string, root: string): Promise<void> {
+async function verify(app: string, cli: string, root: string): Promise<void> {
   const home = join(root, "home");
   const work = join(root, "work");
   const user = join(root, "user");
@@ -198,15 +166,15 @@ async function verify(app: string, cli: string, assets: string, root: string): P
     VIBEVALLEY_DEBUG_SCRIPT: join(root, "steps.jsonl"),
   };
 
-  const area = managerArea(assets);
-  const [mx, my] = midpoint(area);
+  const [cx, cy] = [WINDOW[0] / 2, WINDOW[1] / 2];
   const [ix, iy] = midpoint(CHAT_INPUT);
   const steps = [
     `resize:${WINDOW[0]},${WINDOW[1]}`,
     'hosted:vv {"route":"/farm"}',
     "draw",
     "draw",
-    `pixel_tap:${mx},${my}`,
+    `mouse:click,${cx},${cy}`,
+    "key:p",
     "draw",
     "draw",
     `shot:${root}/chat.png`,
@@ -248,17 +216,14 @@ async function verify(app: string, cli: string, assets: string, root: string): P
   const fieldOpen = () => {
     try {
       const state = DumpState.parse(JSON.parse(readFileSync(join(root, "dump.json"), "utf8")));
-      const farm = state.pixel;
-      if (farm === null || farm === undefined || farm.kind !== "farm" || !farm.taps || farm.taps.length === 0) {
+      const farm = state.diorama;
+      if (farm === null || farm === undefined || farm.kind !== "farm" || (farm.frames_seen ?? 0) === 0) {
         return undefined;
       }
-      const expected = 'Spot { id: "manager", opens: "chat" }';
-      assert(farm.taps[0] === expected, `first farm action mismatch: ${JSON.stringify(farm.taps)}`);
       return {
         viewport: WINDOW,
-        managerArea: area,
-        managerTap: [mx, my],
-        firstAction: expected,
+        focusTap: [cx, cy],
+        firstAction: "key:p",
         farmViewport: farm.placed,
         inputBounds: CHAT_INPUT,
         inputTap: [ix, iy],
@@ -408,11 +373,10 @@ if (import.meta.main) {
   const appPath = realpathSync(resolve(appArg));
   const isDir = statSync(appPath).isDirectory();
   const binary = isDir ? join(appPath, "Contents/MacOS/vibevalley-mac") : appPath;
-  const assets = isDir ? join(appPath, "Contents/Resources/assets") : join(resolve(import.meta.dirname, "../.."), "assets");
   const cliPath = values.cli ? realpathSync(resolve(values.cli)) : join(dirname(binary), "vibevalley");
   if (!existsSync(cliPath)) throw new Error(`Missing CLI binary: ${cliPath}`);
   const evidence = realpathSync(mkdtempSync(join(tmpdir(), "vv-native-dispatch-")));
   console.log(evidence);
-  await verify(binary, cliPath, assets, evidence);
+  await verify(binary, cliPath, evidence);
   console.log("Passed native farm chat, scheduled dispatch and CLI diagnostics");
 }

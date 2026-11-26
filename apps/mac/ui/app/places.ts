@@ -21,15 +21,6 @@ export const runsPlace: Place = {
   group: "work",
 };
 
-export const catalogPlace: Place = {
-  id: "catalog",
-  label: t("web.base.place.catalog.label"),
-  hint: t("web.base.place.catalog.hint"),
-  icon: "catalog",
-  path: "/catalog",
-  group: "setup",
-};
-
 export const settingsPlace: Place = {
   id: "settings",
   label: t("web.base.place.settings.label"),

@@ -15,7 +15,7 @@ use vibevalley_protocol::{
     MachineWireFrame, MachineWorktreeCleanup, MachineWorktreePrepare, MachineWorktreeResult, Millis, RuntimeCapability,
 };
 
-use super::{Machine, MachineDescriptor, MachinePlatform as RtPlatform, MachineStatus as RtStatus, WorkdirHandle, WorkdirSpec};
+use super::types::{Machine, MachineDescriptor, MachinePlatform as RtPlatform, MachineStatus as RtStatus, WorkdirHandle, WorkdirSpec};
 use crate::BoxFuture;
 use crate::oar::core::{HISTORY_LIMIT, RECORD_HISTORY_LIMIT, StatusFold};
 use crate::oar::{

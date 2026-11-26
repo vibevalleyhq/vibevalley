@@ -35,7 +35,7 @@ export function MoreMenu(props: {
       placement={props.side ?? "bottom"}
       align="end"
       offset={4}
-      popupClass={`min-w-44 gap-0.5 rounded-lg border border-line bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
+      popupClass={`min-w-44 max-w-72 max-h-80 gap-0.5 rounded-lg border border-line bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
       popupStartingClass={popupTransition("opacity-0")}
       popupEndingClass={popupTransition("opacity-0")}
       trigger={

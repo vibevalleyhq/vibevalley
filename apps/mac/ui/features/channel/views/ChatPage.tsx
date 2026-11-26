@@ -18,7 +18,7 @@ import { ArtifactCanvas } from "../../artifact";
 import { useMarkedChat } from "../model/marks";
 import { channelLabel, channelName, chatPath, pointedAt, topOf, topsOf } from "../model/places";
 import { FarmSearch, Members, Pins, ThreadList, ThreadPane } from "./ChannelPanels";
-import { BarButton, markOf, Sidebar } from "./ChannelSidebar";
+import { BarButton, ChannelAvatar, Sidebar } from "./ChannelSidebar";
 import { Composer, FileDrop } from "./Composer";
 import { ChannelSettingsDialog, NewChannelDialog } from "./Dialogs";
 import { MessageList } from "./MessageList";
@@ -131,8 +131,11 @@ function HeadPopover(props: {
       placement="bottom"
       align="end"
       offset={4}
-      popupClass="rounded-lg border border-line bg-elevated p-2 shadow-float"
-      popupStyle={{ width: props.width, maxHeight: 448 }}
+      popupClass="flex-col overflow-hidden rounded-lg border border-line bg-elevated p-2 shadow-float"
+      popupStyle={{
+        width: Math.min(props.width, Math.max(240, windowSize().width - 24)),
+        maxHeight: Math.min(448, Math.max(200, Math.round(windowSize().height * 0.72))),
+      }}
       trigger={
         <View
           testID={props.testid}
@@ -172,9 +175,7 @@ function ChannelMain(props: { channel: Channel | undefined; point: number | unde
         <If when={!md()}>
           <BarButton icon="chat" size={16} label={t("web.channel.channels")} testid="channels-drawer" onPress={() => props.onDrawer()} />
         </If>
-        <View class="h-6 w-6 shrink-0 items-center justify-center rounded-md border border-line bg-side">
-          <Text class="font-mono text-xs font-semibold text-muted">{markOf(props.channel)}</Text>
-        </View>
+        <ChannelAvatar channel={props.channel} size={24} />
         <View class="min-w-0 flex-1 flex-row items-center gap-2 overflow-hidden">
           <View
             class="shrink-0"

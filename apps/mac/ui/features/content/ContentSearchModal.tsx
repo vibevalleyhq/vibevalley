@@ -1,4 +1,4 @@
-import { computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
+import { computed, keymap, Scroll, signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -8,19 +8,28 @@ import { Dialog } from "../../design/Dialog";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
 import { Kbd } from "../../design/layout";
+import { Segmented } from "../../design/Segmented";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
 import { spelled } from "../../infra/base/search";
 import { ready, useQuery } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
-import { closeContentSearch, contentBrowseBucket, contentFocusMediaId, contentSearchOpen, mediaKindOf } from "../../infra/state/contentNav";
+import { closeContentSearch, contentBrowseBucket, contentFocusMediaId, contentSearchOpen, isPinned, mediaKindOf } from "../../infra/state/contentNav";
 import { artifactHref, artifactIcon, kindLabel, useArtifacts } from "../artifact";
 import { libraryQuery } from "../media";
 
 export function ContentSearchModal() {
   return (
-    <Dialog open={contentSearchOpen.get()} onClose={closeContentSearch} title={t("web.library.content.search.title")} wide testid="content-search-modal">
+    <Dialog
+      open={contentSearchOpen.get()}
+      onClose={closeContentSearch}
+      title={t("web.library.content.search.title")}
+      size="md"
+      height="fixed"
+      scroll={false}
+      testid="content-search-modal"
+    >
       <If when={contentSearchOpen.get()}>
         <SearchBody />
       </If>
@@ -65,16 +74,18 @@ function SearchBody() {
   const media = useQuery(() => libraryQuery({ text: "", sort: "recent" }), { interval: () => 10_000, keepPrevious: true });
 
   const query = signal("");
+  const scope = signal<"all" | "artifacts" | "media">("all");
   const active = signal(0);
 
   const hits = createMemo((): readonly SearchHit[] => {
     const q = query().trim().toLowerCase();
-    const allArtifacts = ready(artifacts, undefined) ?? [];
-    const allMedia = ready(media, undefined) ?? [];
+    const curScope = scope();
+    const allArtifacts = curScope === "media" ? [] : (ready(artifacts, undefined) ?? []);
+    const allMedia = curScope === "artifacts" ? [] : (ready(media, undefined) ?? []);
     const currentNow = now();
 
     const artifactHits: SearchHit[] = allArtifacts
-      .filter((a) => !q || spelled(a.title, q) || spelled(kindLabel(a), q))
+      .filter((a) => !q || spelled(a.title, q) || spelled(kindLabel(a), q) || spelled(a.byName, q) || a.artifactType.toLowerCase().includes(q))
       .map((a) => ({
         key: `artifact:${a.id}`,
         kind: "artifact",
@@ -139,43 +150,62 @@ function SearchBody() {
   keymap.bind({ up: () => move(-1), down: () => move(1) }, { when: "always" });
 
   return (
-    <View class="gap-3">
-      <View class="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 hover:border-faint focus-within:border-focus">
-        <Icon name="search" size={16} tone="muted" />
-        <Input
-          autoFocus
-          testID="content-search-input"
-          value={query()}
-          placeholder={t("web.library.content.search.placeholder")}
-          accessibilityLabel={t("web.library.content.search.title")}
-          submitBehavior="submit"
-          onChange={(e) => {
-            query.set(e.value);
-            active.set(0);
-          }}
-          onSubmit={() => {
-            const idx = clampedIndex();
-            const chosen = idx >= 0 ? hits()[idx] : undefined;
-            if (chosen) openHit(chosen);
-          }}
-          class="min-w-0 flex-1 text-base text-ink placeholder:text-faint"
-        />
-        <If when={query().length > 0}>
-          <View
-            role="button"
-            accessibilityLabel={t("web.issue.page.clear")}
-            onPress={() => {
-              query.set("");
+    <View class="min-h-0 flex-1">
+      <View class="shrink-0 gap-2.5 border-b border-line px-5 py-3">
+        <View class="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 hover:border-faint focus-within:border-focus">
+          <Icon name="search" size={16} tone="muted" />
+          <Input
+            autoFocus
+            testID="content-search-input"
+            value={query()}
+            placeholder={t("web.library.content.search.placeholder")}
+            accessibilityLabel={t("web.library.content.search.title")}
+            submitBehavior="submit"
+            onChange={(e) => {
+              query.set(e.value);
               active.set(0);
             }}
-            class="size-5 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
-          >
-            <Icon name="close" size={12} tone="muted" />
-          </View>
-        </If>
+            onSubmit={() => {
+              const idx = clampedIndex();
+              const chosen = idx >= 0 ? hits()[idx] : undefined;
+              if (chosen) openHit(chosen);
+            }}
+            class="min-w-0 flex-1 text-base text-ink placeholder:text-faint"
+          />
+          <If when={query().length > 0}>
+            <View
+              role="button"
+              accessibilityLabel={t("web.issue.page.clear")}
+              onPress={() => {
+                query.set("");
+                active.set(0);
+              }}
+              class="size-5 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
+            >
+              <Icon name="close" size={12} tone="muted" />
+            </View>
+          </If>
+        </View>
+
+        <View class="flex-row items-center justify-between gap-2">
+          <Segmented
+            testid="content-search-scope"
+            label={t("web.library.content.search.title")}
+            value={scope()}
+            onChange={(v) => {
+              scope.set(v);
+              active.set(0);
+            }}
+            options={[
+              { value: "all", label: t("web.library.content.search.scopeAll") },
+              { value: "artifacts", label: t("web.library.content.search.scopeArtifacts") },
+              { value: "media", label: t("web.library.content.search.scopeMedia") },
+            ]}
+          />
+        </View>
       </View>
 
-      <Scroll accessibilityLabel={t("web.library.content.search.title")} style={{ maxHeight: Math.max(240, windowSize().height * 0.54) }} contentClass="gap-1">
+      <Scroll accessibilityLabel={t("web.library.content.search.title")} class="min-h-0 flex-1" contentClass="gap-1 px-5 py-3">
         <If when={hits().length === 0}>
           <Text class="px-2 py-6 text-center text-sm text-muted">{t("web.library.content.search.empty")}</Text>
         </If>
@@ -197,6 +227,9 @@ function SearchBody() {
                   <Text class="truncate text-sm font-medium text-ink">{hit().title}</Text>
                   <Text class="truncate text-xs text-muted">{hit().subtitle}</Text>
                 </View>
+                <If when={isPinned(hit().key)}>
+                  <Icon name="pin" size={11} tone="wheat" />
+                </If>
                 <View class="shrink-0 rounded-sm border border-line bg-side px-1.5 py-0.5">
                   <Text class="text-2xs font-medium text-muted">{hit().badge}</Text>
                 </View>
@@ -206,7 +239,7 @@ function SearchBody() {
         </Each>
       </Scroll>
 
-      <View class="flex-row items-center gap-3 border-t border-line pt-2">
+      <View class="shrink-0 flex-row items-center gap-3 border-t border-line bg-side px-5 py-2.5">
         <View class="flex-row items-center gap-1">
           <Kbd>↑↓</Kbd>
           <Text class="text-2xs text-faint">{t("web.base.shortcuts.say.move")}</Text>

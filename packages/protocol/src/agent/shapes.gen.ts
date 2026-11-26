@@ -40,11 +40,11 @@ export type Look = {
  */
 species: Species | null, outfit: Outfit | null,
 /**
- * An orchestrator's look: its sprites are manager-<look>, the plain one is farmer. A helper has null.
+ * An orchestrator's look (default is farmer). A helper has null.
  */
 orchestrator: OrchestratorLook | null, build: Build, head: Head, body: string, trim: string, hat: string, eye: string,
 /**
- * Optional generated portrait sprite name (`avatar-*`), used instead of the animal face when set.
+ * Optional portrait asset id (`avatar-*`), used instead of the default species portrait when set.
  */
 avatar?: string, };
 

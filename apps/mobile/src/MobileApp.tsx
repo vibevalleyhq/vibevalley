@@ -228,8 +228,65 @@ export function MobileApp(props: MobileAppProps = {}) {
         </Text>
         <StatusTag testID="connection-status" label={status().label} tone={status().tone} dot />
       </View>
-      <PillButton testID="disconnect-button" size="sm" tone="plain" icon="close" label={t("web.remote.state.disconnect")} onPress={() => handleDisconnect()} />
+      <View class="shrink-0 flex-row items-center gap-1.5">
+        <View
+          role="button"
+          testID="mobile-refresh-button"
+          accessibilityLabel={t("web.devtools.actions.refresh")}
+          onPress={() => session.reconnect()}
+          class="size-8 items-center justify-center rounded-full border border-line bg-page active:bg-hover"
+        >
+          <Icon name="refresh" size={14} tone="muted" />
+        </View>
+        <PillButton
+          testID="disconnect-button"
+          size="sm"
+          tone="plain"
+          icon="close"
+          label={t("web.remote.state.disconnect")}
+          onPress={() => handleDisconnect()}
+        />
+      </View>
     </View>
+  );
+
+  const renderConnectionBanner = () => (
+    <If
+      when={session.connectionState() === "reconnecting"}
+      else={
+        <If when={session.connectionState() === "unauthorized"}>
+          <View testID="connection-banner" class="flex-row items-center justify-between gap-2.5 border-b border-berry bg-bad-soft px-4 py-2">
+            <View class="min-w-0 flex-1 flex-row items-center gap-2">
+              <Icon name="warn" size={14} tone="berry" />
+              <Text class="min-w-0 flex-1 text-xs font-medium text-berry">{t("web.remote.state.unauthorized")}</Text>
+            </View>
+            <PillButton
+              testID="connection-repair-button"
+              size="sm"
+              tone="danger"
+              icon="link"
+              label={t("web.remote.mobile.pairAction")}
+              onPress={() => handleDisconnect()}
+            />
+          </View>
+        </If>
+      }
+    >
+      <View testID="connection-banner" class="flex-row items-center justify-between gap-2.5 border-b border-line bg-warn-soft px-4 py-2">
+        <View class="min-w-0 flex-1 flex-row items-center gap-2">
+          <Icon name="wait" size={14} tone="warn-ink" />
+          <Text class="min-w-0 flex-1 text-xs font-medium text-warn-ink">{t("web.remote.state.reconnecting")}</Text>
+        </View>
+        <PillButton
+          testID="connection-retry-button"
+          size="sm"
+          tone="plain"
+          icon="refresh"
+          label={t("web.devtools.actions.refresh")}
+          onPress={() => session.reconnect()}
+        />
+      </View>
+    </If>
   );
 
   return (
@@ -242,6 +299,8 @@ export function MobileApp(props: MobileAppProps = {}) {
             else={
               <SafeScreen testID="mobile-home" bottomInset={!mobileAvailable}>
                 {renderHeader(creds().serverName, status, false)}
+
+                {renderConnectionBanner()}
 
                 {renderActiveTab()}
 
@@ -350,6 +409,15 @@ export function MobileApp(props: MobileAppProps = {}) {
                   <View testID="rail-connection-dot" class={`size-2.5 rounded-full ${status().dotClass}`} />
                   <View
                     role="button"
+                    testID="rail-refresh-button"
+                    accessibilityLabel={t("web.devtools.actions.refresh")}
+                    onPress={() => session.reconnect()}
+                    class="size-9 items-center justify-center rounded-lg border border-line bg-page active:bg-hover"
+                  >
+                    <Icon name="refresh" size={16} tone="muted" />
+                  </View>
+                  <View
+                    role="button"
                     testID="rail-disconnect-button"
                     accessibilityLabel={t("web.remote.state.disconnect")}
                     onPress={() => handleDisconnect()}
@@ -369,6 +437,8 @@ export function MobileApp(props: MobileAppProps = {}) {
                 }}
               >
                 {renderHeader(creds().serverName, status, true)}
+
+                {renderConnectionBanner()}
 
                 {renderActiveTab()}
               </View>

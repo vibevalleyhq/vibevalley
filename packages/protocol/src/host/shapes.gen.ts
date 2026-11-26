@@ -1,6 +1,7 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { Locale } from "../common/shapes.gen";
+import type { InboxItem } from "../inbox/shapes.gen";
 
 export const HostPanelValues = ["files", "git"] as const;
 export type HostPanel = (typeof HostPanelValues)[number];
@@ -142,6 +143,64 @@ export type HostAppletInstallPayload = { artifactId: string, artifactType: strin
 export type HostAppletIdPayload = { artifactId: string, };
 
 /**
+ * Result payload returned by `host.appletUninstall`.
+ */
+export type AppletRemoveResult = { removed: boolean, bundlePath?: string, };
+
+/**
+ * Result payload returned by `host.appletOpen`.
+ */
+export type AppletOpenResult = { opened: boolean, bundlePath: string, };
+
+/**
+ * Status snapshot for the bundled CLI symlink (`host.cliState` / `cliInstall` / `cliRemove`).
+ */
+export type HostCommandLineState = { command: string, link: string, installed: boolean, onPath: boolean, taken: boolean, };
+
+/**
+ * Encoded QR code grid including its quiet zone (`'1'` = dark, `'0'` = light).
+ */
+export type QrMatrix = { size: number, rows: Array<string>, };
+
+/**
+ * Local regular file metadata returned by `host.pickFile`.
+ */
+export type HostLocalFile = { path: string, name: string, type: string, size: number, };
+
+/**
+ * Native live-voice playback/call phase (`host.voice*`).
+ */
+export const HostLiveVoicePhaseValues = ["idle", "connecting", "live", "stopping"] as const;
+/**
+ * Native live-voice playback/call phase (`host.voice*`).
+ */
+export type HostLiveVoicePhase = (typeof HostLiveVoicePhaseValues)[number];
+
+/**
+ * Snapshot returned by `host.voice*` bridge operations.
+ */
+export type HostLiveVoiceState = { phase: HostLiveVoicePhase, muted: boolean, problem: string | null, heard: string, said: string, };
+
+/**
+ * Native speech-stream playback phase (`host.speech*`).
+ */
+export const HostSpeechAudioPhaseValues = ["idle", "playing", "draining", "stopping"] as const;
+/**
+ * Native speech-stream playback phase (`host.speech*`).
+ */
+export type HostSpeechAudioPhase = (typeof HostSpeechAudioPhaseValues)[number];
+
+/**
+ * Snapshot returned by `host.speech*` bridge operations.
+ */
+export type HostSpeechAudioState = { phase: HostSpeechAudioPhase, problem: string | null, };
+
+/**
+ * Farm phone call history entry tracked by the diorama shell.
+ */
+export type HostPhoneCallLog = { call: InboxItem, answered: boolean, };
+
+/**
  * Every `host.*` bridge call answered by the native shell, decoded once at the boundary.
  */
-export type HostOp = { "op": "host.info" } | { "op": "host.updateState" } | { "op": "host.updateCheck" } | { "op": "host.updateInstall" } | { "op": "host.cliState" } | { "op": "host.cliInstall" } | { "op": "host.cliRemove" } | { "op": "host.font", "payload": HostFontPayload } | { "op": "host.notify", "payload": HostNotifyPayload } | { "op": "host.tray", "payload": HostTrayPayload } | { "op": "host.locale", "payload": Locale } | { "op": "host.reveal", "payload": string } | { "op": "host.theme", "payload": HostThemeChoice } | { "op": "host.motion", "payload": HostMotionChoice } | { "op": "host.opening", "payload": HostOpeningPayload } | { "op": "host.openTerminal", "payload": HostOpenTerminalPayload } | { "op": "host.openUrl", "payload": HostOpenUrlPayload } | { "op": "host.openFile", "payload": HostOpenFilePayload } | { "op": "host.pickFile" } | { "op": "host.saveFile", "payload": HostSaveFilePayload } | { "op": "host.speechState", "payload": HostIdPayload } | { "op": "host.speechStart", "payload": HostIdPayload } | { "op": "host.speechStop", "payload": HostIdPayload } | { "op": "host.voiceState", "payload": HostIdPayload } | { "op": "host.voiceStart", "payload": HostIdPayload } | { "op": "host.voiceStop", "payload": HostIdPayload } | { "op": "host.voiceMute", "payload": HostVoiceMutePayload } | { "op": "host.playAudio", "payload": HostPlayAudioPayload } | { "op": "host.playSound", "payload": HostPlaySoundPayload } | { "op": "host.seekAudio", "payload": HostSeekAudioPayload } | { "op": "host.audioState" } | { "op": "host.pcmStart", "payload": HostPcmStartPayload } | { "op": "host.pcmAppend", "payload": HostPcmAppendPayload } | { "op": "host.stopAudio" } | { "op": "host.readFile", "payload": HostReadFilePayload } | { "op": "host.pixelDir" } | { "op": "host.pixelManifest" } | { "op": "host.sha256", "payload": HostSha256Payload } | { "op": "host.randomBytes", "payload": HostRandomBytesPayload } | { "op": "host.qr", "payload": HostQrPayload } | { "op": "host.appletList" } | { "op": "host.appletInstall", "payload": HostAppletInstallPayload } | { "op": "host.appletUninstall", "payload": HostAppletIdPayload } | { "op": "host.appletOpen", "payload": HostAppletIdPayload };
+export type HostOp = { "op": "host.info" } | { "op": "host.updateState" } | { "op": "host.updateCheck" } | { "op": "host.updateInstall" } | { "op": "host.cliState" } | { "op": "host.cliInstall" } | { "op": "host.cliRemove" } | { "op": "host.font", "payload": HostFontPayload } | { "op": "host.notify", "payload": HostNotifyPayload } | { "op": "host.tray", "payload": HostTrayPayload } | { "op": "host.locale", "payload": Locale } | { "op": "host.reveal", "payload": string } | { "op": "host.theme", "payload": HostThemeChoice } | { "op": "host.motion", "payload": HostMotionChoice } | { "op": "host.opening", "payload": HostOpeningPayload } | { "op": "host.openTerminal", "payload": HostOpenTerminalPayload } | { "op": "host.openUrl", "payload": HostOpenUrlPayload } | { "op": "host.openFile", "payload": HostOpenFilePayload } | { "op": "host.pickFile" } | { "op": "host.saveFile", "payload": HostSaveFilePayload } | { "op": "host.speechState", "payload": HostIdPayload } | { "op": "host.speechStart", "payload": HostIdPayload } | { "op": "host.speechStop", "payload": HostIdPayload } | { "op": "host.voiceState", "payload": HostIdPayload } | { "op": "host.voiceStart", "payload": HostIdPayload } | { "op": "host.voiceStop", "payload": HostIdPayload } | { "op": "host.voiceMute", "payload": HostVoiceMutePayload } | { "op": "host.playAudio", "payload": HostPlayAudioPayload } | { "op": "host.playSound", "payload": HostPlaySoundPayload } | { "op": "host.seekAudio", "payload": HostSeekAudioPayload } | { "op": "host.audioState" } | { "op": "host.pcmStart", "payload": HostPcmStartPayload } | { "op": "host.pcmAppend", "payload": HostPcmAppendPayload } | { "op": "host.stopAudio" } | { "op": "host.readFile", "payload": HostReadFilePayload } | { "op": "host.assetsDir" } | { "op": "host.sha256", "payload": HostSha256Payload } | { "op": "host.randomBytes", "payload": HostRandomBytesPayload } | { "op": "host.qr", "payload": HostQrPayload } | { "op": "host.appletList" } | { "op": "host.appletInstall", "payload": HostAppletInstallPayload } | { "op": "host.appletUninstall", "payload": HostAppletIdPayload } | { "op": "host.appletOpen", "payload": HostAppletIdPayload };

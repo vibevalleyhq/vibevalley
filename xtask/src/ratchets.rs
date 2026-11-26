@@ -233,7 +233,7 @@ fn is_thread_sleep_zeroed_zone(path: &str) -> bool {
         || path.starts_with("crates/i18n/")
         || path.starts_with("crates/rich/")
         || path.starts_with("crates/engines/")
-        || path.starts_with("apps/mac/crates/pixel/")
+        || path.starts_with("apps/mac/crates/diorama/")
         || path.starts_with("apps/mac/crates/workspace/")
         || path.starts_with("apps/mac/crates/terminal/src/"))
         && path.ends_with(".rs")

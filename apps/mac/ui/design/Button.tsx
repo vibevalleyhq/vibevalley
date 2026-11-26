@@ -27,7 +27,7 @@ const inks: Record<Tone, Ink> = { plain: "ink", primary: "page", quiet: "ink", d
 const inkClass: Record<Ink, string> = { ink: "text-ink", page: "text-page", berry: "text-berry" };
 
 /** Words or other children: a string becomes a Text in `ink`'s color and `size`. */
-export function Words(props: { children?: JSX.Element; ink?: Ink; class?: string }) {
+function Words(props: { children?: JSX.Element; ink?: Ink; class?: string }) {
   return (
     <If when={typeof props.children === "string" || typeof props.children === "number"} else={props.children}>
       <Text class={`min-w-0 truncate ${props.class ?? "text-sm"} ${inkClass[props.ink ?? "ink"]}`}>{props.children}</Text>

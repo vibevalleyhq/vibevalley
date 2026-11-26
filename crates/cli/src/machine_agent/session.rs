@@ -10,8 +10,8 @@ use parking_lot::Mutex;
 use vibevalley_protocol::{MachineInputKind, MachineSessionAck, MachineSessionEvent, MachineSessionInput, MachineSessionRespond, MachineWireFrame};
 use vibevalley_runtime::oar::{self, ContentBlock, EventKind, InteractionDecision, InteractionOption, PermissionDecision};
 
-use super::TransportSlot;
 use super::mcp_proxy::LocalMcpProxy;
+use super::transport::TransportSlot;
 use super::worktree::WorktreeManager;
 
 pub const EVENT_RING_CAPACITY: usize = 4096;

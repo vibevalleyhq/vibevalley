@@ -61,7 +61,7 @@ function PadKey(props: { button: PadButton }) {
       style={side() ? { left: side()?.[0], top: side()?.[1] } : undefined}
     >
       <If when={!side()}>
-        <Text class="font-pixel text-xs text-cream-50">{props.button.toUpperCase()}</Text>
+        <Text class="font-mono text-xs font-semibold text-cream-50">{props.button.toUpperCase()}</Text>
       </If>
     </View>
   );

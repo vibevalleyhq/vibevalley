@@ -3,6 +3,7 @@ import { computed, Scroll, signal, Text, View } from "nsh";
 import { t } from "@vibevalley/i18n";
 import type { IssueStatus } from "@vibevalley/protocol";
 
+import { Button } from "../../../design/Button";
 import { OrchestratorFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
@@ -26,6 +27,7 @@ export type ListAdd = (where: NewIssueAt) => void;
 /** The issues as rows, grouped as the user picked: Linear's list. A row opens the issue as a card does. */
 export function IssueList(props: {
   cards: BoardCard[];
+  filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
   older: boolean;
@@ -34,6 +36,7 @@ export function IssueList(props: {
   onOlder: () => void;
   onOpen: (id: string) => void;
   onAdd: ListAdd;
+  onClearFilter?: (() => void) | undefined;
 }) {
   const folded = signal<ReadonlySet<string>>(new Set());
   const nameOf = useNameOf();
@@ -57,110 +60,126 @@ export function IssueList(props: {
   return (
     <If when={!props.loading} else={<EmptyNote>{t("web.issue.reading")}</EmptyNote>}>
       <Scroll testID="issue-list" class="min-h-0 flex-1" onLayout={box.onLayout}>
-        <View class="px-3 pb-4">
-          <Each of={groups()} key={(g) => g.key}>
-            {(g) => {
-              const groupLane = computed(() => g().lane);
-              const ordered = computed(() => {
-                const l = groupLane();
-                return l ? laneOrder(l, g().rows, props.ordering) : orderRows(g().rows, props.ordering, rowKeys);
-              });
-              const folding = computed(() => groupLane() === "closed" && !props.older && ordered().length > closedShown);
-              const rows = computed(() => (folding() ? ordered().slice(0, closedShown) : ordered()));
-              const hidden = computed(() => (folding() ? ordered().length - closedShown : 0));
-              const isFolded = computed(() => folded().has(g().key));
-              const label = computed(() => {
-                const l = groupLane();
-                return props.grouping === "status" && l
-                  ? laneLabel[l]
-                  : props.grouping === "repo"
-                    ? g().key || t("web.issue.list.noRepo")
-                    : props.grouping === "agent"
-                      ? g().key
-                        ? nameOf()(g().key)
-                        : t("web.issue.noHelper")
-                      : t("web.issue.list.all");
-              });
-              return (
-                <View accessibilityLabel={label()} testID="issue-group" class="mb-1.5">
-                  {/* A head of words on the page, not a bar: its line under it sets the group off. */}
-                  <View class="mt-2 h-8.5 flex-row items-center rounded-t-md border-b border-line bg-page pr-1 hover:bg-hover">
-                    <View
-                      role="button"
-                      testID={`issue-group-${g().key || "none"}`}
-                      onPress={() => fold(g().key)}
-                      accessibilityLabel={isFolded() ? t("web.issue.list.unfold", { group: label() }) : t("web.issue.list.fold", { group: label() })}
-                      class="h-full min-w-0 flex-1 flex-row items-center gap-2 px-2.5"
-                    >
+        <If
+          when={props.cards.length > 0}
+          else={
+            <View testID="issue-list-empty" class="items-start gap-2 px-5 py-6">
+              <Text class="text-xs text-muted">{props.filtered === true ? t("web.issue.list.emptyFiltered") : t("web.issue.list.empty")}</Text>
+              <If when={props.filtered === true ? props.onClearFilter : undefined}>
+                {(clear) => (
+                  <Button size="compact" tone="plain" icon="close" testID="issue-list-clear-filter" onPress={() => clear()()}>
+                    {t("web.issue.page.clear")}
+                  </Button>
+                )}
+              </If>
+            </View>
+          }
+        >
+          <View class="px-3 pb-4">
+            <Each of={groups()} key={(g) => g.key}>
+              {(g) => {
+                const groupLane = computed(() => g().lane);
+                const ordered = computed(() => {
+                  const l = groupLane();
+                  return l ? laneOrder(l, g().rows, props.ordering) : orderRows(g().rows, props.ordering, rowKeys);
+                });
+                const folding = computed(() => groupLane() === "closed" && !props.older && ordered().length > closedShown);
+                const rows = computed(() => (folding() ? ordered().slice(0, closedShown) : ordered()));
+                const hidden = computed(() => (folding() ? ordered().length - closedShown : 0));
+                const isFolded = computed(() => folded().has(g().key));
+                const label = computed(() => {
+                  const l = groupLane();
+                  return props.grouping === "status" && l
+                    ? laneLabel[l]
+                    : props.grouping === "repo"
+                      ? g().key || t("web.issue.list.noRepo")
+                      : props.grouping === "agent"
+                        ? g().key
+                          ? nameOf()(g().key)
+                          : t("web.issue.noHelper")
+                        : t("web.issue.list.all");
+                });
+                return (
+                  <View accessibilityLabel={label()} testID="issue-group" class="mb-1.5">
+                    {/* A head of words on the page, not a bar: its line under it sets the group off. */}
+                    <View class="mt-2 h-8.5 flex-row items-center rounded-t-md border-b border-line bg-page pr-1 hover:bg-hover">
                       <View
-                        class="w-4 shrink-0 items-center justify-center"
-                        style={{
-                          transform: [{ rotate: isFolded() ? "0deg" : "90deg" }],
-                          ...(motionOff() ? {} : { transitionProperty: "transform", transitionDuration: motionDuration(120) }),
-                        }}
+                        role="button"
+                        testID={`issue-group-${g().key || "none"}`}
+                        onPress={() => fold(g().key)}
+                        accessibilityLabel={isFolded() ? t("web.issue.list.unfold", { group: label() }) : t("web.issue.list.fold", { group: label() })}
+                        class="h-full min-w-0 flex-1 flex-row items-center gap-2 px-2.5"
                       >
-                        <Icon name="expand" size={10} tone="muted" />
-                      </View>
-                      <If when={props.grouping !== "none"}>
-                        <View class="w-4 shrink-0 items-center justify-center">
-                          <If when={props.grouping === "status" ? groupLane() : undefined}>{(l) => <StatusMark status={laneStatus[l()]} size={14} />}</If>
-                          <If when={props.grouping === "repo"}>
-                            <Icon name="folder" size={14} tone="muted" />
-                          </If>
-                          <If when={props.grouping === "agent"}>
-                            <If when={g().key} else={<NoFaceMark size={14} />}>
-                              {(key) => (
-                                <If when={isOrchestrator(key())} else={<AgentFaceOf agent={key()} size={16} />}>
-                                  <OrchestratorFace size={16} agent={key()} />
-                                </If>
-                              )}
-                            </If>
-                          </If>
+                        <View
+                          class="w-4 shrink-0 items-center justify-center"
+                          style={{
+                            transform: [{ rotate: isFolded() ? "0deg" : "90deg" }],
+                            ...(motionOff() ? {} : { transitionProperty: "transform", transitionDuration: motionDuration(120) }),
+                          }}
+                        >
+                          <Icon name="expand" size={10} tone="muted" />
                         </View>
+                        <If when={props.grouping !== "none"}>
+                          <View class="w-4 shrink-0 items-center justify-center">
+                            <If when={props.grouping === "status" ? groupLane() : undefined}>{(l) => <StatusMark status={laneStatus[l()]} size={14} />}</If>
+                            <If when={props.grouping === "repo"}>
+                              <Icon name="folder" size={14} tone="muted" />
+                            </If>
+                            <If when={props.grouping === "agent"}>
+                              <If when={g().key} else={<NoFaceMark size={14} />}>
+                                {(key) => (
+                                  <If when={isOrchestrator(key())} else={<AgentFaceOf agent={key()} size={16} />}>
+                                    <OrchestratorFace size={16} agent={key()} />
+                                  </If>
+                                )}
+                              </If>
+                            </If>
+                          </View>
+                        </If>
+                        <Text class="truncate text-sm font-semibold text-ink">{label()}</Text>
+                        <CountPill count={g().rows.length} />
+                      </View>
+                      <If when={canAdd(g())}>
+                        <IconButton
+                          testid="issue-group-add"
+                          icon="add"
+                          size={14}
+                          label={t("web.issue.list.writeIn", { group: label() })}
+                          onClick={() => add(g())}
+                        />
                       </If>
-                      <Text class="truncate text-sm font-semibold text-ink">{label()}</Text>
-                      <CountPill count={g().rows.length} />
                     </View>
-                    <If when={canAdd(g())}>
-                      <IconButton
-                        testid="issue-group-add"
-                        icon="add"
-                        size={14}
-                        label={t("web.issue.list.writeIn", { group: label() })}
-                        onClick={() => add(g())}
-                      />
+                    <If when={!isFolded()}>
+                      <View class="mt-0.5 gap-px">
+                        <Each of={rows()} key={(c) => c.id}>
+                          {(c) => {
+                            const l = groupLane();
+                            return (
+                              <Row
+                                card={c()}
+                                wide={wide()}
+                                selected={c().id === props.selected}
+                                showRepo={props.grouping !== "repo"}
+                                groupStatus={props.grouping === "status" && l ? laneStatus[l] : undefined}
+                                onOpen={props.onOpen}
+                                nameOf={nameOf()}
+                              />
+                            );
+                          }}
+                        </Each>
+                        <If when={hidden() > 0 || (groupLane() === "closed" && props.older && g().rows.length > closedShown)}>
+                          <View class="pt-1">
+                            <OlderLink hidden={hidden()} onClick={props.onOlder} />
+                          </View>
+                        </If>
+                      </View>
                     </If>
                   </View>
-                  <If when={!isFolded()}>
-                    <View class="mt-0.5 gap-px">
-                      <Each of={rows()} key={(c) => c.id}>
-                        {(c) => {
-                          const l = groupLane();
-                          return (
-                            <Row
-                              card={c()}
-                              wide={wide()}
-                              selected={c().id === props.selected}
-                              showRepo={props.grouping !== "repo"}
-                              groupStatus={props.grouping === "status" && l ? laneStatus[l] : undefined}
-                              onOpen={props.onOpen}
-                              nameOf={nameOf()}
-                            />
-                          );
-                        }}
-                      </Each>
-                      <If when={hidden() > 0 || (groupLane() === "closed" && props.older && g().rows.length > closedShown)}>
-                        <View class="pt-1">
-                          <OlderLink hidden={hidden()} onClick={props.onOlder} />
-                        </View>
-                      </If>
-                    </View>
-                  </If>
-                </View>
-              );
-            }}
-          </Each>
-        </View>
+                );
+              }}
+            </Each>
+          </View>
+        </If>
       </Scroll>
     </If>
   );

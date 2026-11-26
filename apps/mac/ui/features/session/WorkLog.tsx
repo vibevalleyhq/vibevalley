@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, View, type JSX } from "nsh";
+import { Clipboard, computed, Scroll, signal, Text, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { SessionEvent } from "@vibevalley/protocol";
@@ -9,9 +9,11 @@ import { Markdown } from "../../design/Markdown";
 import { motionClass } from "../../design/motion";
 import { Dot } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
+import { toast } from "../../design/toasts";
 import { mix, tone } from "../../design/tone";
 import { useNow } from "../../infra/base/dom";
 import { ago, tookText } from "../../infra/base/format";
+import { useTimeout } from "../../infra/base/timer";
 import { createEffect } from "../../infra/solid";
 import { createRunEvents } from "./events";
 import {
@@ -323,8 +325,46 @@ export function WorkLogStep(props: { step: SessionEvent; now: number }) {
   );
 }
 
+function WorkLogCopyButton(props: { testID: string; copied: boolean; onCopy: () => void }) {
+  return (
+    <View
+      role="button"
+      testID={props.testID}
+      accessibilityLabel={props.copied ? t("web.base.rich.copied") : t("web.base.rich.copy")}
+      tooltip={<Bubble text={props.copied ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
+      onPress={props.onCopy}
+      class="flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+    >
+      <Icon name={props.copied ? "check" : "copy"} size={11} tone={props.copied ? "leaf" : "muted"} />
+      <Text class={`text-2xs ${props.copied ? "font-medium text-ok-ink" : "text-muted"}`}>
+        {props.copied ? t("web.base.rich.copied") : t("web.base.rich.copy")}
+      </Text>
+    </View>
+  );
+}
+
 function ToolStep(props: { step: SessionEvent; now: number }) {
   const open = signal(false);
+  const copiedSlot = signal<"input" | "output" | undefined>(undefined);
+  const resetCopy = useTimeout();
+  createEffect(
+    () => props.step.seq,
+    () => {
+      open.set(false);
+      copiedSlot.set(undefined);
+    },
+    { defer: true },
+  );
+  const copyPayload = (slot: "input" | "output", value: string) => {
+    void Clipboard.writeText(value).then(
+      () => {
+        copiedSlot.set(slot);
+        resetCopy(() => copiedSlot.set(undefined), 1500);
+        toast(t("web.base.rich.copied"));
+      },
+      () => undefined,
+    );
+  };
   const farm = computed(() => farmToolText(props.step.text));
   const kind = () => (farm() ? t("web.session.log.farm") : (props.step.actionText ?? ""));
   const input = computed(() => readableInput(props.step));
@@ -375,11 +415,23 @@ function ToolStep(props: { step: SessionEvent; now: number }) {
           </View>
           <If when={input()}>
             {(text) => (
-              <Scroll class="max-h-40 rounded-md border border-line bg-code-bg px-2.5 py-2">
-                <Text class="font-mono text-xs text-code-ink select-text">{text()}</Text>
-              </Scroll>
+              <View class="gap-1">
+                <View class="flex-row items-center justify-between gap-2">
+                  <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.input")}</Text>
+                  <WorkLogCopyButton testID="worklog-copy-input" copied={copiedSlot() === "input"} onCopy={() => copyPayload("input", text())} />
+                </View>
+                <Scroll class="max-h-40 rounded-md border border-line bg-code-bg px-2.5 py-2">
+                  <Text class="font-mono text-xs text-code-ink select-text">{text()}</Text>
+                </Scroll>
+              </View>
             )}
           </If>
+          <View class="flex-row items-center justify-between gap-2">
+            <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.output")}</Text>
+            <If when={props.step.output}>
+              {(out) => <WorkLogCopyButton testID="worklog-copy-output" copied={copiedSlot() === "output"} onCopy={() => copyPayload("output", out())} />}
+            </If>
+          </View>
           <If
             when={props.step.output}
             else={<Text class="text-xs text-faint">{running() ? t("web.session.log.pending") : t("web.session.log.noOutput")}</Text>}

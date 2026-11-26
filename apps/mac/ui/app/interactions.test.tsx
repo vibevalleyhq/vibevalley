@@ -221,6 +221,7 @@ test("directory artifact files: lists, edits, and saves via artifact.file.{list,
   });
 
   await fake.pumpUntil(app, () => app.count("id:artifact-directory-view") === 1 && app.count("id:artifact-docs-editor") === 1);
+  expect(app.count("id:artifact-collab-bar")).toBe(0);
   expect(fake.calls.some((c) => c.op === "artifact.file.list")).toBe(true);
   expect(fake.calls.some((c) => c.op === "artifact.file.get")).toBe(true);
 
@@ -323,9 +324,18 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
   expect(app.count("id:content-sidebar")).toBe(1);
 
   fake.clearCalls();
+  await app.press("id:content-nav-artifact-slides");
+  await fake.pump(app);
   await app.press("id:content-new-btn");
   await fake.pump(app);
   expect(app.count("id:content-template-modal")).toBe(1);
+  expect(app.count("id:content-template-category-type:slides")).toBe(1);
+  expect(app.count("id:content-template-tpl-art-slides")).toBe(1);
+  expect(app.count("id:content-template-tpl-slides-arch-review")).toBe(1);
+  expect(app.count("id:content-template-tpl-note-tech")).toBe(0);
+  await app.press("id:content-template-category-note");
+  await fake.pump(app);
+  expect(app.count("id:content-template-tpl-note-tech")).toBe(1);
   await app.press("id:content-template-tpl-note-tech");
   await fake.pumpUntil(app, () => app.count("id:artifacts") === 1 && app.count("id:artifact-directory-view") === 1);
   const createCall = fake.calls.find((c) => c.op === "artifact.create");
@@ -347,7 +357,12 @@ test("content hub: 12-type sidebar, outline template creation via artifact.creat
   expect(app.count("id:desk")).toBe(0);
   expect(app.count("id:artifact-header")).toBe(1);
   expect(app.count("id:artifact-collab-bar")).toBe(0);
-  expect(app.count("id:artifact-view-mode")).toBe(1);
+  expect(app.count("id:artifact-more")).toBe(1);
+  expect(app.count("id:artifact-view-mode")).toBe(0);
+  await app.press("id:artifact-more");
+  await fake.pumpUntil(app, () => app.count("id:artifact-view-mode") === 1);
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => app.count("id:artifact-view-mode") === 0);
 
   await app.press("id:content-sidebar-toggle");
   await fake.pump(app);
@@ -487,7 +502,7 @@ test("whiteboard presence: consumes artifact.presence.follow, publishes via arti
   expect(writtenPaths.some((p) => p.startsWith("presence/"))).toBe(false);
 });
 
-test("timeline: scrubs history preview and executes restore, fork, and selective undoOrigin", async () => {
+test("history panel: opens on right rail, previews commit, restores, forks, saves snapshot, and selectively undoes origin", async () => {
   const aid = "art-mine" as ArtifactId;
   const historyEntries: ArtifactHistoryEntry[] = [
     { frontiers: "f-latest", author: "w1", agent: "w1", turn: 2, origin: "session:w1:turn:2", summary: "补充落点线", at: SCENARIO_NOW - 60_000 },
@@ -518,32 +533,38 @@ test("timeline: scrubs history preview and executes restore, fork, and selective
     }));
   });
 
-  await fake.pumpUntil(app, () => app.count("id:artifact-timeline-toggle") === 1);
-  await app.press("id:artifact-timeline-toggle");
-  await fake.pumpUntil(app, () => app.count("id:artifact-timeline-bar") === 1 && app.count("id:timeline-node-0") === 1);
+  await fake.pumpUntil(app, () => app.count("id:artifact-history-toggle") === 1);
+  expect(app.count("id:artifact-version-menu")).toBe(0);
+  await app.press("id:artifact-history-toggle");
+  await fake.pumpUntil(app, () => app.count("id:artifact-history-panel") === 1 && app.count("id:history-commit-1") === 1);
 
   fake.clearCalls();
-  await app.press("id:timeline-node-0");
+  await app.press("id:history-commit-1");
   await fake.pumpUntil(app, () => app.count("id:artifact-history-preview") === 1);
   expect(fake.calls.find((c) => c.op === "artifact.history.preview")?.payload).toEqual({ id: aid, frontiers: "f-initial" });
   expect(app.texts()).toContain("历史快照内容");
 
   fake.clearCalls();
-  await app.press("id:timeline-restore");
+  await app.press("id:history-restore");
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.restore"));
   expect(fake.calls.find((c) => c.op === "artifact.history.restore")?.payload).toMatchObject({ id: aid, frontiers: "f-initial" });
 
-  await fake.pumpUntil(app, () => app.count("id:timeline-node-1") === 1);
-  await app.press("id:timeline-node-1");
-  await fake.pumpUntil(app, () => app.enabled("id:timeline-undo-origin"));
+  await fake.pumpUntil(app, () => app.count("id:history-commit-0") === 1);
+  await app.press("id:history-commit-0");
+  await fake.pumpUntil(app, () => app.enabled("id:history-undo-origin"));
   fake.clearCalls();
-  await app.press("id:timeline-undo-origin");
+  await app.press("id:history-undo-origin");
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.undoOrigin"));
   expect(fake.calls.find((c) => c.op === "artifact.history.undoOrigin")?.payload).toEqual({ id: aid, origin: "session:w1:turn:2" });
 
-  await fake.pumpUntil(app, () => app.enabled("id:timeline-fork"));
+  await fake.pumpUntil(app, () => app.count("id:history-save-snapshot") === 1);
   fake.clearCalls();
-  await app.press("id:timeline-fork");
+  await app.press("id:history-save-snapshot");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.version.create"));
+
+  await fake.pumpUntil(app, () => app.enabled("id:history-fork"));
+  fake.clearCalls();
+  await app.press("id:history-fork");
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "artifact.history.fork"));
   expect(fake.calls.find((c) => c.op === "artifact.history.fork")?.payload).toMatchObject({ id: aid, frontiers: "f-latest" });
 });
@@ -844,4 +865,227 @@ test("regression: defineStored preferences persist through nsh Storage and survi
   const rootReload = await mountApp("/", undefined, { storage: persisted });
   await rootReload.fake.pumpUntil(rootReload.app, () => rootReload.fake.acts.some((a) => a.type === "openFarm"));
   expect(rootReload.fake.acts.some((a) => a.type === "openFarm")).toBe(true);
+});
+
+test("bottom-left update control: one-click install when idle, downloading pill, and confirm dialog when sessions are working", async () => {
+  const readyApp = await mountApp("/issues", (f) => {
+    f.respond("host.updateState", {
+      _tag: "ready",
+      version: "0.4.0",
+      next: "0.4.1",
+      notes: ["Faster content views"],
+      newFarm: false,
+      page: "",
+    });
+    f.respond("host.updateInstall", null);
+  });
+
+  await readyApp.fake.setSlice(readyApp.app, "sessions", {
+    ...readyApp.fixture.state.sessions,
+    sessions: [],
+  });
+  await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.app.count("id:rail-update-btn") === 1);
+  readyApp.fake.clearCalls();
+  await readyApp.app.press("id:rail-update-btn");
+  await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.fake.calls.some((c) => c.op === "host.updateInstall"));
+  expect(readyApp.app.count("id:rail-update-confirm-dialog")).toBe(0);
+
+  const downloadingApp = await mountApp("/issues", (f) => {
+    f.respond("host.updateState", {
+      _tag: "downloading",
+      version: "0.4.0",
+      next: "0.4.1",
+      percent: 42,
+    });
+  });
+  await downloadingApp.fake.pumpUntil(downloadingApp.app, () => downloadingApp.app.count("id:rail-update-downloading") === 1);
+  expect(downloadingApp.app.texts()).toContain("42%");
+
+  const busyApp = await mountApp("/issues", (f) => {
+    f.respond("host.updateState", {
+      _tag: "ready",
+      version: "0.4.0",
+      next: "0.4.1",
+      notes: ["Fix issue sync"],
+      newFarm: false,
+      page: "",
+    });
+    f.respond("host.updateInstall", null);
+  });
+  await busyApp.fake.pumpUntil(busyApp.app, () => busyApp.app.count("id:rail-update-btn") === 1);
+  busyApp.fake.clearCalls();
+  await busyApp.app.press("id:rail-update-btn");
+  await busyApp.fake.pumpUntil(busyApp.app, () => busyApp.app.count("id:rail-update-confirm-dialog") === 1);
+  expect(busyApp.fake.calls.some((c) => c.op === "host.updateInstall")).toBe(false);
+  await busyApp.app.press("id:rail-update-confirm-sure");
+  await busyApp.fake.pumpUntil(busyApp.app, () => busyApp.fake.calls.some((c) => c.op === "host.updateInstall"));
+});
+
+test("content & artifact UX: library quick generate, outline inline edit, dashboard KPIs, and diagram preview", async () => {
+  const lib = await mountApp("/library", (f) => {
+    for (const [op, handler] of Object.entries(artifactResponses)) {
+      f.respond(op, handler);
+    }
+  });
+  expect(lib.app.count("id:library-source")).toBe(0);
+  expect(lib.app.count("id:library-make-btn")).toBe(1);
+  await lib.app.press("id:content-nav-artifact-docs");
+  await lib.fake.pump(lib.app);
+  expect(lib.app.count("id:library-make-btn")).toBe(0);
+  await lib.app.press("id:content-nav-recent");
+  await lib.fake.pump(lib.app);
+  await lib.app.press("id:library-make-btn");
+  await lib.fake.pumpUntil(lib.app, () => lib.app.count("id:library-make-dialog") === 1);
+
+  const protoArtifact = (scenarios.typical.responses["artifact.list"] as Artifact[] | undefined)?.find((a) => a.artifactType === "prototype");
+  if (protoArtifact) {
+    const protoApp = await mountApp(`/artifacts/${protoArtifact.id}`, (f) => {
+      for (const [op, handler] of Object.entries(artifactResponses)) {
+        f.respond(op, handler);
+      }
+    });
+    await protoApp.fake.pumpUntil(protoApp.app, () => protoApp.app.count("id:artifact-prototype-view") === 1);
+    expect(protoApp.app.count("id:prototype-preview-bar")).toBe(0);
+    expect(protoApp.app.count("id:prototype-viewport")).toBe(1);
+    expect(protoApp.app.count("id:artifact-version-menu")).toBe(0);
+    expect(protoApp.app.count("id:artifact-history-toggle")).toBe(1);
+    const firstVersion = protoArtifact.versions[0];
+    if (firstVersion !== undefined) {
+      await protoApp.app.press("id:artifact-history-toggle");
+      await protoApp.fake.pumpUntil(protoApp.app, () => protoApp.app.count("id:artifact-history-panel") === 1);
+      expect(protoApp.app.count(`id:artifact-version-${firstVersion.version}`)).toBe(1);
+    }
+  }
+
+  const outlineArtifact = (scenarios.typical.responses["artifact.list"] as Artifact[] | undefined)?.find((a) => a.artifactType === "outline");
+  if (!outlineArtifact) throw new Error("typical scenario must provide an outline artifact");
+  const outlineApp = await mountApp(`/artifacts/${outlineArtifact.id}`, (f) => {
+    for (const [op, handler] of Object.entries(artifactResponses)) {
+      f.respond(op, handler);
+    }
+  });
+  await outlineApp.fake.pumpUntil(
+    outlineApp.app,
+    () => outlineApp.app.count("id:artifact-outline-view") === 1 && outlineApp.app.count("id:outline-add-item") === 1,
+  );
+  expect(outlineApp.app.count("id:artifact-collab-bar")).toBe(0);
+  outlineApp.fake.clearCalls();
+  await outlineApp.app.press("id:outline-add-item");
+  await outlineApp.fake.pumpUntil(outlineApp.app, () => outlineApp.fake.calls.some((c) => c.op === "artifact.file.write"));
+
+  const dashboardId = "art-dash-ux" as ArtifactId;
+  const dashArtifact: Artifact = {
+    id: dashboardId,
+    title: "Service SLO",
+    artifactType: "dashboard",
+    isDefault: false,
+    by: "user",
+    byName: "用户",
+    version: 0,
+    seq: 1,
+    versions: [],
+    at: SCENARIO_NOW,
+    updated: SCENARIO_NOW,
+  };
+  const dashFiles = new Map<string, string>([
+    [
+      "structure/dashboard.json",
+      JSON.stringify({
+        title: "Service SLO",
+        panels: [
+          {
+            id: "avail",
+            kind: "kpi",
+            label: "Availability",
+            format: "percent",
+            source: { dataset: "structure/data/sample.json", field: "availability", agg: "avg" },
+          },
+        ],
+      }),
+    ],
+    [
+      "structure/data/sample.json",
+      JSON.stringify({
+        schema: [
+          { name: "service", label: "Service", type: "string" },
+          { name: "availability", label: "Availability", type: "number" },
+        ],
+        rows: [
+          { service: "gw", availability: 99.9 },
+          { service: "core", availability: 99.7 },
+        ],
+      }),
+    ],
+  ]);
+  const dashApp = await mountApp(`/artifacts/${dashboardId}`, (f) => {
+    for (const [op, handler] of Object.entries(artifactResponses)) {
+      f.respond(op, handler);
+    }
+    f.respond("artifact.get", () => dashArtifact);
+    f.respond("artifact.file.list", () => ({
+      artifactId: dashboardId,
+      seq: 1,
+      files: [...dashFiles.keys()].map((path) => ({ path, mime: "application/json", size: 64, hash: path, updatedAt: SCENARIO_NOW })),
+    }));
+    f.respond("artifact.file.get", (p: { path?: string }) => ({
+      artifactId: dashboardId,
+      path: p.path ?? "",
+      mime: "application/json",
+      encoding: "utf8",
+      content: dashFiles.get(p.path ?? "") ?? "{}",
+      size: 64,
+      hash: p.path ?? "",
+      updatedAt: SCENARIO_NOW,
+    }));
+  });
+  await dashApp.fake.pumpUntil(dashApp.app, () => dashApp.app.count("id:artifact-dashboard-view") === 1 && dashApp.app.texts().includes("99.8%"));
+  expect(dashApp.app.texts()).toContain("99.8%");
+
+  const diagramId = "art-diag-ux" as ArtifactId;
+  const diagArtifact: Artifact = {
+    id: diagramId,
+    title: "Gateway Flow",
+    artifactType: "diagram",
+    isDefault: false,
+    by: "user",
+    byName: "用户",
+    version: 0,
+    seq: 1,
+    versions: [],
+    at: SCENARIO_NOW,
+    updated: SCENARIO_NOW,
+  };
+  const diagJson = JSON.stringify({
+    title: "Gateway Flow",
+    kind: "architecture",
+    direction: "LR",
+    nodes: [
+      { id: "gw", label: "Gateway", kind: "gateway" },
+      { id: "db", label: "DB", kind: "database" },
+    ],
+    edges: [{ id: "e1", from: "gw", to: "db", label: "reads" }],
+  });
+  const diagApp = await mountApp(`/artifacts/${diagramId}`, (f) => {
+    for (const [op, handler] of Object.entries(artifactResponses)) {
+      f.respond(op, handler);
+    }
+    f.respond("artifact.get", () => diagArtifact);
+    f.respond("artifact.file.list", () => ({
+      artifactId: diagramId,
+      seq: 1,
+      files: [{ path: "structure/diagram.json", mime: "application/json", size: diagJson.length, hash: "d1", updatedAt: SCENARIO_NOW }],
+    }));
+    f.respond("artifact.file.get", () => ({
+      artifactId: diagramId,
+      path: "structure/diagram.json",
+      mime: "application/json",
+      encoding: "utf8",
+      content: diagJson,
+      size: diagJson.length,
+      hash: "d1",
+      updatedAt: SCENARIO_NOW,
+    }));
+  });
+  await diagApp.fake.pumpUntil(diagApp.app, () => diagApp.app.count("id:artifact-diagram-view") === 1 && diagApp.app.count("id:diagram") === 1);
+  expect(diagApp.app.count("id:diagram")).toBe(1);
 });

@@ -236,17 +236,18 @@ export function MessageList(props: { channel: Channel | undefined; filter?: stri
         )}
       </List>
       <If when={awayFrom() !== undefined}>
-        <View class="absolute bottom-3 w-full items-center">
+        <View class="pointer-events-none absolute right-0 bottom-3.5 left-0 items-center">
           <View
             role="button"
             testID="to-latest"
+            accessibilityLabel={unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}
             onPress={toLatest}
-            class={`h-7 flex-row items-center gap-1.5 rounded-full border border-line bg-elevated px-3 shadow-float ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
+            class={`pointer-events-auto h-8 flex-row items-center gap-1.5 rounded-full border bg-elevated px-3.5 shadow-float ${
+              unseen() > 0 ? "border-accent" : "border-line"
+            } ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
           >
-            <View style={{ transform: [{ rotate: "90deg" }] }}>
-              <Icon name="expand" size={12} tone="muted" />
-            </View>
-            <Text class="text-xs font-medium text-ink">
+            <Icon name="moveDown" size={12} tone={unseen() > 0 ? "accent" : "muted"} />
+            <Text class={`text-xs font-medium tabular-nums ${unseen() > 0 ? "text-accent" : "text-ink"}`}>
               {unseen() > 0 ? t("web.channel.messages.newBelow", { n: unseen() }) : t("web.channel.messages.toLatest")}
             </Text>
           </View>
@@ -348,7 +349,7 @@ function DayLine(props: { label: string; tone?: "new" }) {
   return (
     <View class="flex-row items-center gap-3 py-3">
       <View class={`h-px flex-1 ${line()}`} />
-      <Text class={`text-xs ${props.tone === "new" ? "text-berry" : "text-muted"}`}>{props.label}</Text>
+      <Text class={`text-xs ${props.tone === "new" ? "font-semibold text-berry" : "font-medium text-muted"}`}>{props.label}</Text>
       <View class={`h-px flex-1 ${line()}`} />
     </View>
   );
@@ -402,7 +403,7 @@ function Frame(props: {
           <If when={props.continues !== true}>
             <View class="flex-row items-baseline gap-2">
               <Text class="text-sm font-semibold text-ink">{props.name}</Text>
-              <Text class="min-w-0 shrink truncate text-xs text-muted">{props.meta}</Text>
+              <Text class="min-w-0 shrink truncate text-xs text-muted tabular-nums">{props.meta}</Text>
             </View>
           </If>
           {props.children}

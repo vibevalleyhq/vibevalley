@@ -15,7 +15,80 @@
     "more": "More",
     "rail": "Beside this artifact",
     "railShow": "Show the side panel",
-    "railHide": "Hide the side panel"
+    "railHide": "Hide the side panel",
+    "backToLibrary": "Back to artifacts",
+    "previewTab": "Preview",
+    "filesTab": "Files",
+    "filesTabCount": "Files ({n})",
+    "viewMode": "View mode",
+    "liveVersion": "Live",
+    "directory": "Directory",
+    "newFileLabel": "New file path",
+    "discard": "Discard",
+    "unsaved": "Unsaved",
+    "deleteFileAsk": "Delete file “{path}”?",
+    "snapshotNote": "Snapshot"
+  },
+  "docs": {
+    "split": "Split",
+    "edit": "Edit",
+    "read": "Read"
+  },
+  "outline": {
+    "progress": "{done}/{total} done",
+    "hideDone": "Hide done",
+    "showDone": "Show done",
+    "quickAdd": "Type and press Enter to add…",
+    "kindHeading": "Heading",
+    "kindBullet": "Bullet",
+    "kindTodo": "Todo",
+    "cycleKind": "Switch type ({kind})",
+    "indent": "Indent",
+    "outdent": "Outdent",
+    "addChild": "Add child",
+    "untitled": "New item"
+  },
+  "sheet": {
+    "filterPlaceholder": "Filter rows…",
+    "addRow": "Add row",
+    "empty": "No sheets",
+    "rowsCount": "{n} rows"
+  },
+  "diagram": {
+    "visual": "Diagram",
+    "structure": "Nodes & edges",
+    "nodes": "Nodes",
+    "edges": "Edges"
+  },
+  "motion": {
+    "timeline": "Timeline scenes",
+    "layers": "{n} layers",
+    "play": "Play",
+    "stop": "Stop",
+    "restart": "Restart",
+    "loop": "Loop",
+    "prevStep": "Step back 0.5s",
+    "nextStep": "Step forward 0.5s",
+    "chapters": "Chapters"
+  },
+  "storyboard": {
+    "gridMode": "Grid",
+    "animaticMode": "Animatic",
+    "totalDuration": "{sec}s total",
+    "shotOf": "Shot {n} of {total}",
+    "sfx": "SFX",
+    "transition": "Transition"
+  },
+  "prototype": {
+    "viewportLabel": "Viewport",
+    "viewportFull": "Full",
+    "viewportTablet": "Tablet",
+    "viewportMobile": "Mobile",
+    "reload": "Reload"
+  },
+  "files": {
+    "codeMode": "Code",
+    "htmlPreviewMode": "Preview"
   },
   "issue": {
     "title": "Artifacts"
@@ -55,14 +128,16 @@
     "storyboard": "Storyboard"
   },
   "timeline": {
-    "toggle": "History timeline",
-    "title": "Timeline",
+    "title": "Version history",
+    "show": "Show version history",
+    "hide": "Hide version history",
+    "savedVersions": "Saved versions",
+    "commits": "Changes",
     "loading": "Loading history…",
     "empty": "No history commits yet",
-    "prev": "Previous commit",
-    "next": "Next commit",
     "backToLive": "Back to live",
     "previewBanner": "Read-only history preview · {summary}",
+    "versionBanner": "Viewing version {version} (read-only){note}",
     "turn": "Turn {n}",
     "restore": "Restore",
     "restored": "Restored to selected commit",
@@ -128,10 +203,23 @@
     "styleDashed": "Dashed"
   },
   "design": {
-    "noProps": "This artboard declares no adjustable props (data-props)"
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "propsTitle": "Props Inspector",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "emptyCanvas": "No layers in this artboard yet"
   },
   "designSystem": {
-    "components": "Components"
+    "components": "Components",
+    "colors": "Color Tokens",
+    "typography": "Typography",
+    "spacing": "Spacing",
+    "radius": "Radius",
+    "guidelinesDo": "Do",
+    "guidelinesDont": "Don't",
+    "previewTheme": "Preview Theme",
+    "specimen": "The quick brown fox jumps · 0123456789"
   },
   "slidesStore": {
     "addSlide": "Add slide"
@@ -144,7 +232,16 @@
     "previous": "Previous slide",
     "next": "Next slide",
     "present": "Present full screen",
-    "presenter": "Presenter view"
+    "presenter": "Presenter view",
+    "editSlide": "Edit slide",
+    "doneEdit": "Done",
+    "slideTitleLabel": "Title",
+    "slideSubtitleLabel": "Subtitle",
+    "slideLayoutLabel": "Layout",
+    "layoutCover": "Cover",
+    "layoutContent": "Content",
+    "slideBulletsLabel": "Bullets (one per line)",
+    "slideNotesLabel": "Speaker notes"
   },
   "presenter": {
     "missing": "No deck named: open the presenter view from an artifact's controls.",
@@ -167,7 +264,6 @@
   },
   "applet": {
     "button": "Install as App",
-    "buttonInstalled": "App Installed",
     "badgeInstalled": "Installed",
     "modalTitle": "Local Desktop App",
     "subtitle": "Install this artifact as a standalone Mac app you can launch from Spotlight or the Dock.",
@@ -183,6 +279,8 @@
     "reinstall": "Update & Reinstall",
     "installing": "Installing…",
     "open": "Open App",
+    "openApp": "Open Standalone App",
+    "manageApp": "Manage App",
     "uninstall": "Uninstall",
     "installedToast": "Installed “{name}.app”",
     "uninstalledToast": "Uninstalled “{name}.app”",

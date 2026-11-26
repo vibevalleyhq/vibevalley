@@ -1,99 +1,82 @@
-/** ax/ay anchor the sprite's feet (assets/pixel/sprites.json). */
-export interface Art {
-  src: string;
-  w: number;
-  h: number;
-  ax: number;
-  ay: number;
-}
+export type Building = "b_notice_pavilion" | "b_study_courtyard" | "b_waterwheel_mill" | "b_warehouse";
+export type Scenery = "b_bookshop" | "t_bridge_arch" | "p_boat";
+export type PlotStage = "t_soil_bed" | "t_paddy_water" | "t_crop_sprout" | "t_crop_wheat";
+export type FrontProp = "p_bamboo" | "p_willow" | "p_lantern_post";
+export type BubbleIcon = "chat" | "spark" | "seedling" | "book" | "search" | "edit" | "terminal" | "check";
 
-export type Pose = "side" | "side-1" | "side-2" | "up" | "read" | "work" | "tinker-1" | "tinker-2" | "hammer-1" | "hammer-2" | "cheer";
-export const THINGS = ["prop-board", "machine-seeder", "prop-table", "prop-crates", "machine-windmill", "machine-beehive", "machine-tractor"] as const;
-export const PLOTS = ["plot-empty", "plot-seeded", "plot-sprout", "plot-leafy", "plot-flowering", "plot-wheat"] as const;
-export const BUBBLES = [
-  "act-speaking_text",
-  "act-thinking",
-  "icon-seeds",
-  "act-read_file",
-  "act-search",
-  "act-edit_file",
-  "act-run_command",
-  "mark-check",
-] as const;
-export const MARKS = ["coins-stack", "stamp-done"] as const;
-export const FRONT = ["fg-grass", "fg-fern"] as const;
-export type Thing = (typeof THINGS)[number];
-export type PlotStage = (typeof PLOTS)[number];
-export type Bubble = (typeof BUBBLES)[number];
-export type StoryArt = Record<Pose | Thing | PlotStage | Bubble | (typeof MARKS)[number] | (typeof FRONT)[number], Art>;
+export type StoryArt = Record<"helper" | Building | Scenery | PlotStage | FrontProp, string>;
 
-/** The field: how wide and high, where things stand (their feet) and where the helper walks. */
-export const FIELD = { w: 820, h: 132, stand: 96, path: 112 } as const;
+/** The diorama strip coordinate space: width, height, where structures stand, and the stone path line. */
+export const FIELD = { w: 1200, h: 280, stand: 214, path: 244 } as const;
 
-/** Initial x in field pixels. */
-export const START = 18;
+/** Initial x in stage coordinates. */
+export const START = 44;
 
 /** Steps follow copy.how.steps order. */
 export interface Place {
-  /** Where the helper works (its feet on the path). */
+  /** Where the helper works along the stone path. */
   at: number;
   plot: number;
-  thing: { name: Thing; x: number };
-  /** The plot before the helper gets there, then as the work goes (the stage from each share of the work on). */
+  thing: { name: Building; x: number; width: number };
+  /** The plot before the helper gets there, then as the work progresses. */
   stages: [[number, PlotStage], ...[number, PlotStage][]];
 }
 
 export const PLACES: readonly Place[] = [
-  { at: 96, plot: 168, thing: { name: "prop-board", x: 96 }, stages: [[0, "plot-empty"]] },
   {
-    at: 330,
-    plot: 330,
-    thing: { name: "machine-seeder", x: 270 },
+    at: 160,
+    plot: 270,
+    thing: { name: "b_notice_pavilion", x: 136, width: 132 },
+    stages: [[0, "t_soil_bed"]],
+  },
+  {
+    at: 470,
+    plot: 470,
+    thing: { name: "b_study_courtyard", x: 378, width: 146 },
     stages: [
-      [0, "plot-empty"],
-      [0.3, "plot-seeded"],
-      [0.72, "plot-sprout"],
+      [0, "t_soil_bed"],
+      [0.3, "t_paddy_water"],
+      [0.72, "t_crop_sprout"],
     ],
   },
   {
-    at: 478,
-    plot: 590,
-    thing: { name: "prop-table", x: 528 },
+    at: 760,
+    plot: 870,
+    thing: { name: "b_waterwheel_mill", x: 752, width: 144 },
     stages: [
-      [0, "plot-sprout"],
-      [0.35, "plot-leafy"],
-      [0.75, "plot-flowering"],
+      [0, "t_crop_sprout"],
+      [0.45, "t_crop_wheat"],
     ],
   },
   {
-    at: 712,
-    plot: 712,
-    thing: { name: "prop-crates", x: 776 },
+    at: 1040,
+    plot: 1040,
+    thing: { name: "b_warehouse", x: 1126, width: 136 },
     stages: [
-      [0, "plot-flowering"],
-      [0.15, "plot-wheat"],
+      [0, "t_crop_sprout"],
+      [0.18, "t_crop_wheat"],
     ],
   },
 ];
 
-/** x is measured in the back layer's own scroll space. */
-export const BACK: readonly { name: Thing; x: number }[] = [
-  { name: "machine-windmill", x: 120 },
-  { name: "machine-beehive", x: 300 },
-  { name: "machine-tractor", x: 470 },
+/** Distant Jiangnan landmarks in the background parallax layer. */
+export const BACK: readonly { name: Scenery; x: number; width: number }[] = [
+  { name: "b_bookshop", x: 210, width: 110 },
+  { name: "t_bridge_arch", x: 520, width: 112 },
+  { name: "p_boat", x: 760, width: 88 },
 ];
 
-/** x is measured in the front layer's own scroll space. */
-export const NEAR: readonly { name: (typeof FRONT)[number]; x: number }[] = [
-  { name: "fg-grass", x: 40 },
-  { name: "fg-fern", x: 300 },
-  { name: "fg-grass", x: 560 },
-  { name: "fg-fern", x: 860 },
-  { name: "fg-grass", x: 1100 },
+/** Foreground Papertrails foliage brushing past the lower edge. */
+export const NEAR: readonly { name: FrontProp; x: number; width: number }[] = [
+  { name: "p_bamboo", x: 64, width: 58 },
+  { name: "p_willow", x: 420, width: 92 },
+  { name: "p_lantern_post", x: 740, width: 42 },
+  { name: "p_bamboo", x: 1090, width: 58 },
+  { name: "p_willow", x: 1420, width: 92 },
 ];
 
-/** How fast each layer passes as the camera goes along, the field itself at 1. */
-export const PACE = { sky: 0.08, hills: 0.3, back: 0.55, field: 1, near: 1.4 } as const;
+/** How fast each layer passes as the camera tracks the helper, with the field at 1. */
+export const PACE = { sky: 0.08, hills: 0.28, back: 0.55, field: 1, near: 1.35 } as const;
 
 export interface Moment {
   /** The step, 0 to 3. */
@@ -136,19 +119,19 @@ export function stageOf(i: number, now: Moment): PlotStage {
   return stage[1];
 }
 
-/** Multiple poses play in alternating frames. */
-export function workAt(place: number, work: number): { poses: [Pose, ...Pose[]]; bubble?: Bubble | undefined } {
+/** Current vector action bubble for each stage of work. */
+export function workAt(place: number, work: number): { bubble?: BubbleIcon | undefined } {
   switch (place) {
     case 0:
-      return work < 0.5 ? { poses: ["up"], bubble: work > 0.12 ? "act-speaking_text" : undefined } : { poses: ["read"], bubble: "act-thinking" };
+      return work < 0.5 ? { bubble: work > 0.12 ? "chat" : undefined } : { bubble: "spark" };
     case 1:
-      return work < 0.45 ? { poses: ["work"], bubble: work > 0.12 ? "icon-seeds" : undefined } : { poses: ["tinker-1", "tinker-2"], bubble: "icon-seeds" };
+      return { bubble: work > 0.12 ? "seedling" : undefined };
     case 2: {
-      const tools: Bubble[] = ["act-read_file", "act-search", "act-edit_file", "act-run_command", "mark-check"];
-      return { poses: ["hammer-1", "hammer-2"], bubble: tools[Math.min(tools.length - 1, Math.floor(work * tools.length))] };
+      const tools: BubbleIcon[] = ["book", "search", "edit", "terminal", "check"];
+      return { bubble: tools[Math.min(tools.length - 1, Math.floor(work * tools.length))] };
     }
     default:
-      return { poses: work < 0.2 ? ["up"] : ["cheer"] };
+      return { bubble: work > 0.3 ? "check" : undefined };
   }
 }
 

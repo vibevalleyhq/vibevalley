@@ -1,0 +1,20 @@
+pub mod asset;
+pub mod camera;
+pub mod domain;
+pub mod foley;
+pub mod math;
+pub mod metal;
+pub mod nav;
+pub mod pick;
+pub mod rig;
+pub mod spring;
+pub mod world;
+
+pub use asset::{AssetBundle, BoneDesc, CompressedTexture};
+pub use camera::CameraPreset;
+pub use domain::{HelperTaskSync, PlayerIntent, PlotActionOutcome, PlotTicketSync, ScreenAnchor, YardSnapshotSync};
+pub use foley::{SoundKind, synthesize_wav};
+pub use metal::{DofMode, FrameOutput, FrameStats, MetalRenderer, RenderQuality, RenderSceneInput, WgpuRenderer, prepare_scene_input};
+pub use nav::{LandZone, NavGraph, PlacementStatus, is_in_canal, surface_height_at, validate_placement};
+pub use rig::{BonePalette, MAX_BONES, MachineRig, PuppetAnimState, PuppetRig, SkeletonPose};
+pub use world::{DioramaHit, DioramaWorld, PlotStage, TimeOfDay};

@@ -10,8 +10,8 @@
       "hint": "频道与话题"
     },
     "issues": {
-      "label": "任务",
-      "hint": "每件任务从记下到完成"
+      "label": "工单",
+      "hint": "每张工单从记下到完成"
     },
     "runs": {
       "label": "运行与轨迹",
@@ -22,8 +22,8 @@
       "name": "工作区"
     },
     "content": {
-      "label": "内容",
-      "hint": "媒体库、作品与笔记"
+      "label": "作品",
+      "hint": "作品、大纲笔记与素材"
     },
     "runtimes": {
       "label": "引擎",
@@ -32,10 +32,6 @@
     "team": {
       "label": "团队",
       "hint": "角色与团队模板"
-    },
-    "catalog": {
-      "label": "素材图鉴",
-      "hint": "像素与界面素材：每张图、指针、声音和工作台零件"
     },
     "settings": {
       "label": "设置",
@@ -196,10 +192,10 @@
       "everywhere": "到处",
       "composer": "输入框",
       "lists": "菜单和名单",
-      "issues": "任务",
+      "issues": "工单",
       "pictures": "看图",
       "library": "媒体库",
-      "farm": "像素农场",
+      "farm": "农场",
       "desktop": "桌面版（系统全局）"
     },
     "say": {
@@ -219,8 +215,8 @@
       "farmMenu": "放下农具，或打开菜单",
       "debug": "调试台",
       "voice": "跟主助手说话（在设置里能换）",
-      "command": "命令：建任务、让主助手记住、叫停、私聊",
-      "newIssue": "新建任务",
+      "command": "命令：建工单、让主助手记住、叫停、私聊",
+      "newIssue": "新建工单",
       "libraryMove": "在素材之间挪",
       "libraryLook": "全屏看选中的图",
       "libraryRemove": "从库里拿掉选中的"
@@ -243,11 +239,17 @@
     "zoomOut": "缩小",
     "zoomReset": "重置缩放"
   },
-  "updateReady": "{next} 已下好，去「关于」重启",
+  "updateInstall": "立即更新",
+  "updateInstalling": "重启中…",
+  "updateReadyOneClick": "{next} 已就绪，点击一键重启更新",
+  "updateReadyTitle": "更新到 {next}",
+  "updateNotesTitle": "本次更新内容",
   "intent": {
     "timedOut": "等了太久没回音，可以重试",
     "offline": "没连上 VibeValley，这一下没发出去"
   },
   "pickTooLarge": "{name} 没加上：超过 512 MiB 了",
-  "openTerminal": "在这里打开终端"
+  "openTerminal": "在这里打开终端",
+  "play": "播放",
+  "stop": "停止"
 }

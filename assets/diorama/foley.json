@@ -1,0 +1,42 @@
+{
+  "sampleRate": 44100,
+  "masterGain": 0.75,
+  "sounds": {
+    "foldUp": {
+      "durationSec": 0.24,
+      "brushCenterHz": 1150.0,
+      "brushQ": 0.95,
+      "crackleCount": 34,
+      "resonancesHz": [1480.0, 2650.0, 4100.0],
+      "lowThumpHz": 135.0,
+      "lowThumpGain": 0.18
+    },
+    "cardTap": {
+      "durationSec": 0.11,
+      "brushCenterHz": 1750.0,
+      "brushQ": 1.4,
+      "crackleCount": 14,
+      "resonancesHz": [1950.0, 3200.0, 4850.0],
+      "lowThumpHz": 180.0,
+      "lowThumpGain": 0.10
+    },
+    "harvestStamp": {
+      "durationSec": 0.18,
+      "brushCenterHz": 920.0,
+      "brushQ": 1.1,
+      "crackleCount": 22,
+      "resonancesHz": [1120.0, 2240.0, 3600.0],
+      "lowThumpHz": 110.0,
+      "lowThumpGain": 0.28
+    },
+    "paperStep": {
+      "durationSec": 0.08,
+      "brushCenterHz": 1450.0,
+      "brushQ": 1.2,
+      "crackleCount": 10,
+      "resonancesHz": [1680.0, 2900.0, 4400.0],
+      "lowThumpHz": 160.0,
+      "lowThumpGain": 0.06
+    }
+  }
+}

@@ -61,7 +61,10 @@ fn run() -> Result<(), String> {
     }
 
     vibevalley_runtime::rt::block_on(async {
-        let app = vibevalley_server::create_app(config).await.map_err(|e| e.to_string())?;
+        let app = vibevalley_server::create_app(config).await.map_err(|e| match &e.detail {
+            Some(detail) => format!("{e}\n{detail}"),
+            None => e.to_string(),
+        })?;
         let addr = format!("127.0.0.1:{port}").parse().map_err(|e| format!("{e}"))?;
         let listener = vibevalley_server::gateway::serve(app.server(), addr).map_err(|e| format!("listening on {addr}: {e}"))?;
         let url = listener.url();

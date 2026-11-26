@@ -13,7 +13,7 @@ use vibevalley_rich::{
     vv_markdown_options,
 };
 
-use crate::support::TestHarness;
+use crate::support::{DIAGRAM_CACHE_TEST_LOCK, TestHarness};
 
 #[derive(Default)]
 struct RecordedMarkdownEvents {
@@ -200,6 +200,7 @@ fn MarkdownTestRoot() -> impl IntoElement {
 
 #[test]
 fn vv_markdown_mounts_in_core_and_emits_typed_events_without_canvas_svg_view_kind() {
+    let _guard = DIAGRAM_CACHE_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     RECORDED_EVENTS.with(|e| *e.borrow_mut() = RecordedMarkdownEvents::default());
     let mut harness = TestHarness::mount(Root::of::<MarkdownTestRoot>());
 

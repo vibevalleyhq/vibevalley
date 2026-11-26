@@ -12,7 +12,7 @@ export default function Devices(props: { copy: Copy["devices"]; mac: Screenshot 
     <Section ref={root.set} id="devices" title={props.copy.title}>
       <div class="grid items-center gap-12 lg:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)]">
         <div>
-          <p data-reveal class="max-w-[36em]">
+          <p data-reveal class="max-w-[36em] text-bark-900">
             {props.copy.text}
           </p>
           <p data-reveal class="mt-5 text-[length:15px] text-bark-800">
@@ -20,7 +20,7 @@ export default function Devices(props: { copy: Copy["devices"]; mac: Screenshot 
           </p>
         </div>
         <div ref={screen.set} class="relative mx-auto w-full max-w-160">
-          <div class="border-6 border-bark-900 bg-bark-900 [box-shadow:4px_4px_0_var(--color-drop)]">
+          <div class="overflow-hidden rounded-lg border-4 border-slate-900 bg-slate-900 shadow-card-lg">
             <img
               loading="lazy"
               decoding="async"
@@ -33,7 +33,7 @@ export default function Devices(props: { copy: Copy["devices"]; mac: Screenshot 
               class="block h-auto w-full"
             />
           </div>
-          <div class="-mx-[4%] h-3 border-2 border-bark-900 bg-cream-300 [box-shadow:3px_3px_0_var(--color-drop)]" />
+          <div class="-mx-[3%] mt-1 h-3 rounded-b-md border border-border-soft/50 bg-cream-300 shadow-card-sm" />
         </div>
       </div>
     </Section>

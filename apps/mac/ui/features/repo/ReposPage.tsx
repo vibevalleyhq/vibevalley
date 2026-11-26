@@ -9,7 +9,6 @@ import { OpenTerminal } from "../../design/domain/OpenTerminal";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { Empty, ListCard, ListRow } from "../../design/layout";
-import { SpriteOr } from "../../design/pixel/icons";
 import { Bubble } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { mix } from "../../design/tone";
@@ -35,43 +34,36 @@ const activityQuery = defineQuery({
 });
 const useSurvey = (repo: () => string) => ({ languages: useQuery(() => languagesQuery(repo())), activity: useQuery(() => activityQuery(repo())) });
 
-/** The map's crops (plot-flowering … plot-withered) as the shade of their bed, so a repo reads the same in both. */
+/** Recency tint for a repository card, from freshly worked (leaf) to quiet (bark). */
 const recencyShade: Record<Recency, () => string> = {
-  never: () => mix("bark", 0.25),
-  day: () => mix("leaf", 0.95),
-  week: () => mix("leaf", 0.7),
-  month: () => mix("leaf", 0.45),
-  quarter: () => mix("wheat", 0.55),
-  older: () => mix("bark", 0.55),
+  never: () => mix("bark", 0.16),
+  day: () => mix("leaf", 0.35),
+  week: () => mix("leaf", 0.24),
+  month: () => mix("leaf", 0.14),
+  quarter: () => mix("wheat", 0.24),
+  older: () => mix("bark", 0.18),
 };
 
-/** A repo's picture: its bed, as green as it was worked recently. */
+const recencyIconTone: Record<Recency, "leaf" | "wheat" | "muted"> = {
+  never: "muted",
+  day: "leaf",
+  week: "leaf",
+  month: "leaf",
+  quarter: "wheat",
+  older: "muted",
+};
+
+/** A repo's recency badge tile. */
 function Plot(props: { recency: Recency; size: number; label?: string }) {
-  return (
-    <SpriteOr name={recencyPicture[props.recency]} size={props.size} label={props.label}>
-      <PlotStandIn {...props} />
-    </SpriteOr>
-  );
-}
-
-/** The map's crops, so a repo looks the same in both. */
-const recencyPicture: Record<Recency, string> = {
-  never: "plot-empty",
-  day: "plot-flowering",
-  week: "plot-leafy",
-  month: "plot-sprout",
-  quarter: "plot-dry",
-  older: "plot-withered",
-};
-
-function PlotStandIn(props: { recency: Recency; size: number; label?: string }) {
   return (
     <View
       role={props.label ? "image" : undefined}
       accessibilityLabel={props.label}
-      class="shrink-0 rounded-md border-2"
-      style={{ width: props.size, height: props.size, backgroundColor: recencyShade[props.recency](), borderColor: mix("bark", 0.5) }}
-    />
+      class="shrink-0 items-center justify-center rounded-md border border-line"
+      style={{ width: props.size, height: props.size, backgroundColor: recencyShade[props.recency]() }}
+    >
+      <Icon name="repos" size={Math.max(16, Math.round(props.size * 0.45))} tone={recencyIconTone[props.recency]} />
+    </View>
   );
 }
 
@@ -142,11 +134,11 @@ export function ReposPage(props: { rest: string }) {
       </Scroll>
       <Scroll class="min-h-120 min-w-0 flex-1 bg-page md:min-h-0" contentClass="p-4">
         {/* Keyed by the name, a plain value: the panel's queries ask about this one repo for its life. */}
-        <If when={selected()?.name} else={<RepoMapLink />}>
+        <If when={selected()?.name} else={<ReposOverviewEmpty />}>
           {(name) => <Keyed key={name()}>{() => <RepoPanel name={untrack(name)} repos={sorted} now={now()} />}</Keyed>}
         </If>
       </Scroll>
-      <Dialog open={creating()} onClose={() => creating.set(false)} title={t("web.repo.add")} testid="new-repo-dialog">
+      <Dialog open={creating()} onClose={() => creating.set(false)} title={t("web.repo.add")} size="sm" height="fixed" scroll={false} testid="new-repo-dialog">
         <NewRepoForm
           onDone={(made) => {
             creating.set(false);
@@ -158,18 +150,9 @@ export function ReposPage(props: { rest: string }) {
   );
 }
 
-function RepoMapLink() {
-  const router = useRouter();
+function ReposOverviewEmpty() {
   return (
-    <Empty
-      icon="farm"
-      testid="repos-map"
-      action={
-        <Button tone="primary" icon="farm" testID="open-repo-map" onPress={() => router.navigate("/map")}>
-          {t("web.farm.native.map")}
-        </Button>
-      }
-    >
+    <Empty icon="repos" testid="repos-empty">
       {t("web.repo.allLine")}
     </Empty>
   );

@@ -70,7 +70,7 @@ const DesignTokensSchema = z.object({
     water: z.record(z.string(), HexColorSchema),
     violet: z.record(z.string(), HexColorSchema),
     teal: z.record(z.string(), HexColorSchema),
-    pixel: z.record(z.string(), z.record(z.string(), HexColorSchema)),
+    paper: z.record(z.string(), z.record(z.string(), HexColorSchema)),
   }),
   semantic: z.object({
     light: SemanticModeSchema,
@@ -92,7 +92,6 @@ const DesignTokensSchema = z.object({
     fontFamily: z.object({
       sans: z.string(),
       mono: z.string(),
-      pixel: z.string(),
       terminalMono: z.string(),
     }),
     fontSize: z.record(z.string(), z.tuple([z.number(), z.number()])),
@@ -165,11 +164,11 @@ export function parseDesignTokens(raw: string): DesignTokens {
   return DesignTokensSchema.parse(JSON.parse(raw));
 }
 
-export function flattenPixelTheme(tokens: DesignTokens): Record<string, string> {
+export function flattenPaperTheme(tokens: DesignTokens): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [family, entries] of Object.entries(tokens.primitives.pixel)) {
+  for (const [family, entries] of Object.entries(tokens.primitives.paper)) {
     for (const [key, value] of Object.entries(entries)) {
-      if (key in out) throw new Error(`Duplicate pixel token "${key}" in primitives.pixel.${family}`);
+      if (key in out) throw new Error(`Duplicate paper token "${key}" in primitives.paper.${family}`);
       out[key] = value;
     }
   }
@@ -187,7 +186,7 @@ function pickSemanticCssVars(mode: SemanticMode): Record<string, string> {
 export function renderThemeJson(tokens: DesignTokens): string {
   const doc = {
     cssVars: {
-      theme: flattenPixelTheme(tokens),
+      theme: flattenPaperTheme(tokens),
       light: pickSemanticCssVars(tokens.semantic.light),
       dark: pickSemanticCssVars(tokens.semantic.dark),
     },
@@ -220,7 +219,9 @@ function stringifyCompactArrays(value: unknown, indent = 0): string {
 export function renderNshJson(tokens: DesignTokens, currentRaw: string): string {
   const manifest = NshManifestSchema.parse(JSON.parse(currentRaw));
   const currentShadow = typeof manifest.tailwind?.shadow === "object" && manifest.tailwind.shadow !== null ? manifest.tailwind.shadow : {};
-  const shadowRecord = Object.fromEntries(Object.entries(currentShadow).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  const shadowRecord = Object.fromEntries(
+    Object.entries(currentShadow).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[0] !== "px"),
+  );
   const { tailwind: _tailwind, ...rest } = manifest;
 
   const updated = {
@@ -232,7 +233,6 @@ export function renderNshJson(tokens: DesignTokens, currentRaw: string): string 
       fontFamily: {
         sans: tokens.geometry.fontFamily.sans,
         mono: tokens.geometry.fontFamily.mono,
-        pixel: tokens.geometry.fontFamily.pixel,
       },
       shadow: {
         ...shadowRecord,
@@ -240,7 +240,6 @@ export function renderNshJson(tokens: DesignTokens, currentRaw: string): string 
         float: "0 8px 24px #0000002e",
         raise: "0 1px 2px #00000018",
         "toggle-thumb": shadowRecord["toggle-thumb"] ?? "0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a",
-        px: shadowRecord.px ?? "2px 2px 0 #1e140a73",
       },
     },
   };

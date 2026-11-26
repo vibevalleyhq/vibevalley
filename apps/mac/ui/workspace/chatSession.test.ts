@@ -11,10 +11,16 @@ import {
   defaultThoughtLevelFor,
   extractToolTarget,
   fetchWorkspaceRuntimes,
+  formatDurationMs,
   formatTokens,
+  formatToolDetails,
+  groupChatSteps,
+  latestSessionTodos,
   mergeChatSteps,
   parseBoardTokens,
+  parseTodoChecklist,
   preferredModelFor,
+  thinkingPreview,
   toWorkspaceRuntime,
   visibleChatSteps,
 } from "./chatSession";
@@ -196,6 +202,22 @@ test("toWorkspaceRuntime preserves empty effortLevels for models on runtimes tha
   );
   expect(refused.models.map((m) => m.effortLevels)).toEqual([[], []]);
   expect(refused.models.map((m) => m.defaultEffort)).toEqual([undefined, undefined]);
+
+  const withQuota = toWorkspaceRuntime(
+    makeRuntimeInfo({
+      quota: { left: 74, text: "5h window" },
+    }),
+  );
+  expect(withQuota.quotaPct).toBe(74);
+  expect(withQuota.quotaText).toBe("5h window");
+
+  const withWindowFallback = toWorkspaceRuntime(
+    makeRuntimeInfo({
+      usage: { status: "ok", subscription: null, windows: [{ label: "Gemini · 5h", usedPercent: 28, resetsAt: null }] },
+    }),
+  );
+  expect(withWindowFallback.quotaPct).toBe(72);
+  expect(withWindowFallback.quotaText).toBe("Gemini · 5h");
 });
 
 test("preferredModelFor, defaultThoughtLevelFor, and clampThoughtLevel select and clamp model effort cleanly", () => {
@@ -298,4 +320,155 @@ test("fetchWorkspaceRuntimes returns server preset labels without hardcoded fall
   } finally {
     setTransport(prev);
   }
+});
+
+test("groupChatSteps keeps single intermediate steps bare and aggregates consecutive steps", () => {
+  const events: SessionEvent[] = [
+    step(1, "user/message", { text: "Check ACP" }),
+    step(2, "assistant/thinking", { text: "Inspecting mod.rs" }),
+    step(3, "assistant/message", { text: "One step done." }),
+    step(4, "user/message", { text: "Fix it and test" }),
+    step(5, "assistant/thinking", { text: "Planning edits" }),
+    step(6, "tool/call", { action: "read_file", input: JSON.stringify({ path: "src/a.rs", start_line: 10 }), ok: true }),
+    step(7, "tool/call", { action: "search", input: JSON.stringify({ query: "Handshake", path: "src" }), ok: true }),
+    step(8, "tool/call", { action: "edit_file", tool: "replace_file_content", input: JSON.stringify({ path: "src/a.rs", StartLine: 15 }), ok: true }),
+    step(9, "tool/call", { action: "edit_file", tool: "replace_file_content", input: JSON.stringify({ path: "src/a.rs", StartLine: 42 }), ok: true }),
+    step(10, "tool/call", { action: "run_command", input: JSON.stringify({ command: "cargo test" }), ok: false }),
+  ];
+
+  const items = groupChatSteps(events);
+  expect(items.map((item) => item.kind)).toEqual(["step", "step", "step", "step", "activity"]);
+  expect(items[1]).toMatchObject({ kind: "step", key: "s:2", durationMs: 1_000 });
+
+  const cluster = items[4];
+  expect(cluster?.kind).toBe("activity");
+  if (cluster?.kind === "activity") {
+    expect(cluster.key).toBe("g:5");
+    expect(cluster.trailing).toBe(true);
+    expect(cluster.summary).toEqual({
+      totalSteps: 6,
+      thinkingCount: 1,
+      readCount: 1,
+      searchCount: 1,
+      editCount: 2,
+      commandCount: 1,
+      otherToolCount: 0,
+      totalTools: 5,
+      runningCount: 0,
+      failedCount: 1,
+      startedAt: 1_700_000_005_000,
+      durationMs: 5_000,
+      editedFiles: [{ path: "src/a.rs", line: 42, canDiff: true }],
+      latestCommand: { seq: 10, command: "cargo test", running: false, failed: true },
+    });
+  }
+
+  const runningPreference = groupChatSteps([
+    step(1, "assistant/thinking", { text: "Checking" }),
+    step(2, "tool/call", { action: "run_command", input: JSON.stringify({ command: "vp run mac:check" }), ok: undefined }),
+    step(3, "tool/call", { action: "run_command", input: JSON.stringify({ command: "git status" }), ok: true }),
+  ]);
+  const runningCluster = runningPreference[0];
+  expect(runningCluster?.kind).toBe("activity");
+  if (runningCluster?.kind === "activity") {
+    expect(runningCluster.summary.latestCommand).toEqual({
+      seq: 2,
+      command: "vp run mac:check",
+      running: true,
+      failed: false,
+    });
+  }
+
+  const loneTrailing = groupChatSteps([step(1, "assistant/thinking", { text: "Still thinking" })]);
+  expect(loneTrailing[0]).toMatchObject({ kind: "step", key: "s:1", trailing: true });
+});
+
+test("parseTodoChecklist and latestSessionTodos parse update_steps, TodoWrite, and update_plan payloads", () => {
+  const step1 = step(1, "tool/call", {
+    tool: "update_steps",
+    action: "other",
+    input: JSON.stringify({
+      steps: [
+        { status: "done", title: "Simplify Content Hub source filter & docs" },
+        { status: "in_progress", title: "Unify Artifact single-row header & dropdown" },
+        { status: "pending", title: "Verify native screenshots" },
+        { status: "skipped", title: "Optional cleanup" },
+        { status: "failed", title: "Broken check" },
+      ],
+      kind: "other",
+    }),
+  });
+  const parsed = parseTodoChecklist(step1);
+  expect(parsed).toEqual({
+    seq: 1,
+    doneCount: 1,
+    inProgressCount: 1,
+    failedCount: 1,
+    totalCount: 5,
+    activeStep: { status: "in_progress", title: "Unify Artifact single-row header & dropdown" },
+    steps: [
+      { status: "done", title: "Simplify Content Hub source filter & docs" },
+      { status: "in_progress", title: "Unify Artifact single-row header & dropdown" },
+      { status: "pending", title: "Verify native screenshots" },
+      { status: "skipped", title: "Optional cleanup" },
+      { status: "failed", title: "Broken check" },
+    ],
+  });
+  expect(formatToolDetails(step1).headline).toBe("1/5 · Unify Artifact single-row header & dropdown");
+
+  const step2 = step(2, "tool/call", {
+    tool: "TodoWrite",
+    input: JSON.stringify({ todos: [{ content: "Write docs", status: "completed" }] }),
+  });
+  expect(parseTodoChecklist(step2)?.doneCount).toBe(1);
+
+  const step3 = step(3, "tool/call", {
+    tool: "update_plan",
+    input: JSON.stringify({ plan: [{ step: "Run tests", status: "in-progress" }] }),
+  });
+  expect(parseTodoChecklist(step3)?.inProgressCount).toBe(1);
+
+  expect(latestSessionTodos([step1, step2, step3])?.seq).toBe(3);
+  expect(parseTodoChecklist(step(4, "tool/call", { tool: "run_command", input: JSON.stringify({ command: "ls" }) }))).toBeUndefined();
+});
+
+test("formatToolDetails, formatDurationMs, and thinkingPreview extract scannable summaries", () => {
+  expect(formatDurationMs(420)).toBe("420ms");
+  expect(formatDurationMs(4_240)).toBe("4.2s");
+  expect(formatDurationMs(72_000)).toBe("1m 12s");
+  expect(formatDurationMs(undefined)).toBeUndefined();
+
+  expect(thinkingPreview("  Line one\n\n  Line two  ")).toBe("Line one Line two");
+  expect(thinkingPreview("a".repeat(20), 10)).toBe("aaaaaaaaa…");
+
+  const cmd = formatToolDetails(
+    step(1, "tool/call", {
+      action: "run_command",
+      input: JSON.stringify({ command: "cargo test -p vibevalley-mac", cwd: "/work/vibevalley" }),
+      output: "running 1 test\nok",
+    }),
+  );
+  expect(cmd).toEqual({
+    headline: "$ cargo test -p vibevalley-mac",
+    formattedInput: "$ cargo test -p vibevalley-mac\ncwd: /work/vibevalley",
+    outputLines: 2,
+  });
+
+  const search = formatToolDetails(
+    step(2, "tool/call", {
+      action: "search",
+      input: JSON.stringify({ query: "groupChatSteps", path: "apps/mac/ui" }),
+    }),
+  );
+  expect(search.headline).toBe("groupChatSteps in apps/mac/ui");
+
+  const edit = formatToolDetails(
+    step(3, "tool/call", {
+      action: "edit_file",
+      input: JSON.stringify({ path: "src/lib.rs", StartLine: 12, EndLine: 28 }),
+    }),
+  );
+  expect(edit.headline).toBe("src/lib.rs:12-28");
+  expect(edit.formattedInput).toBe('{\n  "path": "src/lib.rs",\n  "StartLine": 12,\n  "EndLine": 28\n}');
+  expect(edit.outputLines).toBe(0);
 });

@@ -12,7 +12,7 @@ use vibevalley_protocol::{
     MediaSource, MediaSpeakersRequest, MediaSpeechRequest, MediaVoiceDesignRequest, Session,
 };
 
-use super::{ToolRegistry, Who, given};
+use super::registry::{ToolRegistry, Who, given};
 use crate::agent::mcp::ResourceReadArgs as McpResourceReadArgs;
 use crate::artifact::{AddedBy, Maker};
 

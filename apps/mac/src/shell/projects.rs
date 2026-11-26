@@ -493,7 +493,7 @@ impl Shell {
                                 md.update(cx, |v, cx| v.reload(cx));
                             }
                         }
-                        PaneEntity::Diff(_) | PaneEntity::Hosted(_) | PaneEntity::Pixel(_) => {}
+                        PaneEntity::Diff(_) | PaneEntity::Hosted(_) | PaneEntity::Diorama(_) => {}
                     }
                 }
             }
@@ -628,7 +628,7 @@ impl Shell {
                                 PaneKind::File { .. } => ("file", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
                                 PaneKind::Diff { .. } => ("diff", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
                                 PaneKind::Hosted { .. } => ("hosted", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
-                                PaneKind::Pixel { .. } => ("pixel", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
+                                PaneKind::Diorama { .. } => ("diorama", false, vibevalley_protocol::HostRailRunningState::Idle, None, None, false),
                             };
                             vibevalley_protocol::HostRailTab {
                                 id: t.id,

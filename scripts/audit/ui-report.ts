@@ -75,7 +75,7 @@ const defaultOutDir = "/tmp/vv-ui-report";
 const scenarioDensities = ["empty", "minimal", "typical", "dense", "extreme", "edge"] as const;
 const dumpSlugs = ["empty", "minimal", "typical", "dense", "extreme", "edge", "en"] as const;
 const galleryScenarioFilters = ["all", "empty", "typical", "dense", "extreme", "edge", "en"] as const;
-const galleryViewFilters = ["all", "issues", "runs", "chat", "media", "workspace", "pixel", "dark", "narrow"] as const;
+const galleryViewFilters = ["all", "issues", "runs", "chat", "media", "workspace", "diorama", "dark", "narrow"] as const;
 
 function parseOutDir(argv: string[]): string {
   for (let i = 0; i < argv.length; i++) {
@@ -323,14 +323,13 @@ function classifyShot(name: string): { scenarios: string[]; views: string[] } {
     parts.includes("orchestrator") ||
     parts.includes("repos") ||
     parts.includes("runtimes") ||
-    parts.includes("catalog") ||
     parts.includes("settings") ||
     parts.includes("connectors") ||
     parts.includes("artifacts")
   ) {
     views.push("workspace");
   }
-  if (parts.includes("farm") || parts.includes("tree") || parts.includes("map")) views.push("pixel");
+  if (parts.includes("farm") || parts.includes("diorama")) views.push("diorama");
   if (parts.includes("dark")) views.push("dark");
   if (parts.includes("narrow")) views.push("narrow");
   return { scenarios, views };
@@ -367,8 +366,8 @@ const componentRows = [
   { group: "富文本与代码", target: "Markdown / CodeBlock", verified: "超长代码折叠展开、剪贴板复制及虚拟时钟 1.6s 已复制状态复位" },
   {
     group: "时钟与领域件",
-    target: "useNow / createSettled / PoseSprite / AgentFace / RuntimeBadge / WorkLog / Trajectory / SubagentProgress",
-    verified: "100ms/200ms 防抖收敛、65s 相对时间更新与进行中计时、像素动画开关与子助手进度",
+    target: "useNow / createSettled / AgentFace / OrchestratorFace / RuntimeBadge / WorkLog / Trajectory / SubagentProgress",
+    verified: "100ms/200ms 防抖收敛、65s 相对时间更新与进行中计时、纸雕肖像与引擎徽标及子助手进度",
   },
 ];
 

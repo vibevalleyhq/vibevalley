@@ -6,7 +6,7 @@ const lightTokens: Readonly<Record<string, string>> = themeJson.cssVars.light;
 const darkTokens: Readonly<Record<string, string>> = themeJson.cssVars.dark;
 const baseTokens: Readonly<Record<string, string>> = themeJson.cssVars.theme;
 
-/** Resolves a semantic or pixel token hex color following the active color scheme. */
+/** Resolves a semantic or paper theme token hex color following the active color scheme. */
 export function tone(name: string): string {
   const scheme = colorScheme();
   const palette = scheme === "dark" ? darkTokens : lightTokens;

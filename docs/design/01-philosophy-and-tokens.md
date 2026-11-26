@@ -1,6 +1,6 @@
 # 第一篇：设计哲学与设计令牌体系
 
-工作台视觉风格定名为**田间工作台**：以干净、可读、可长时间注视的工程工具面为骨架，用有限的农庄色调锚定品牌归属；像素场景与品牌落页则使用独立的像素暖色盘与昼夜光影语言。
+工作台视觉风格定名为**田间工作台**：以干净、可读、可长时间注视的工程工具面为骨架，用有限的农庄色调锚定品牌归属；3D 纸雕场景与品牌落页则使用统一的 Papertrails 棉纸暖色盘与昼夜光影语言。
 
 ## 1.1 设计哲学与双皮视觉调性
 
@@ -12,10 +12,10 @@
 4. **嵌套圆角逐级减一档**：外框圆角减去内边距大于或等于下一级内框圆角（如 `lg` 8px 框内套 `md` 6px 控件，最小到 `xs` 3px）。
 5. **1px 实线与两档阴影**：卡片与分区默认靠 `1px` `border-line` 隔开，只在悬浮与抬起时使用 `shadow-raise` 或 `shadow-float`。
 6. **容器不撑开**：列表行与网格项始终携带 `min-w-0` 和截断策略，防止长路径、URL 或中英混排撑破父容器。
-7. **线条图标与像素图分工明确**：工作台功能操作使用 `crates/rich/src/icon.rs` 原生 `VvIcon` 渲染的 97 枚 `reicon` 线条图标（TS 侧由 `apps/mac/ui/design/icons.ts` 声明 `IconName`，经 `<Icon>` 调用），角色头像、农机图标与场景元素使用 `design/pixel` 产出的像素图，不使用系统 emoji 字符替代业务图标。
+7. **线条图标与 Papertrails 纸雕图分工明确**：工作台功能操作使用 `crates/rich/src/icon.rs` 原生 `VvIcon` 渲染的 97 枚 `reicon` 线条图标（TS 侧由 `apps/mac/ui/design/icons.ts` 声明 `IconName`，经 `<Icon>` 调用），角色头像、引擎徽标与品牌图标使用从 `vibevalley-assets` 经 `design/sync-assets.sh` 同步到 `assets/{avatars,engines,brand,icons}/` 的 Papertrails 产物，不使用系统 emoji 字符替代业务图标。
 8. **双语同框对齐**：同一界面与同一份状态内可同时出现中英文内容与标识符，标签长度按弹性排布而非硬编码固定宽度。
-9. **键盘是一等操作**：页面导航、列表选中、命令面板、关闭弹窗和农具切换全部绑定明确键位并标在快捷键面板中。
-10. **工作台像工具，农场像世界**：工作台追求低噪声和信息密度，农场和记忆树追求物理空间、昼夜氛围和动画连续性，两者的配色系统相互隔离。
+9. **键盘是一等操作**：页面导航、列表选中、命令面板、关闭弹窗和农庄时光切换全部绑定明确键位并标在快捷键面板中。
+10. **工作台像工具，农场像世界**：工作台追求低噪声和信息密度，纸雕农场追求立体空间、昼夜氛围和动画连续性，两者的配色系统相互隔离。
 
 ## 1.2 表面体系与色彩阶梯
 
@@ -25,7 +25,7 @@
 
 | 生成 / 同步目标 | 产出内容 | 校验方式 |
 | --- | --- | --- |
-| `apps/mac/ui/design/theme.json` | 工作台与工作区外壳 `cssVars.theme` 像素色及 `cssVars.{light,dark}` 语义变量 | `vpx scripts/gen/tokens.ts --check` |
+| `apps/mac/ui/design/theme.json` | 工作台与工作区外壳 `cssVars.theme` Papertrails 固定色及 `cssVars.{light,dark}` 语义变量 | `vpx scripts/gen/tokens.ts --check` |
 | `apps/mac/ui/nsh.json` | 工作台与工作区外壳 `tailwind.{fontSize,radius,ease,fontFamily,shadow}` 静态配置 | `vpx scripts/gen/tokens.ts --check` |
 | `apps/mac/src/theme_tokens.rs` | 原生壳 `DARK_*`/`LIGHT_*`、终端 16 色与语法 16 色常量 | `vpx scripts/gen/tokens.ts --check` |
 | `apps/site/src/ui/global.css` | 同步 `--ease-out` 减速度曲线（`cubic-bezier(0.2, 0, 0, 1)`） | `vpx scripts/gen/tokens.ts --check` |
@@ -64,13 +64,13 @@ UI 代码由 `scripts/audit/ui-tokens.ts` 通过 AST 扫描校验（覆盖工作
 | 遮罩与代码 | `code-bg` / `code-ink` | `#1c1917` / `#e7e5e2` | `#0e0d0c` / `#e7e5e2` | 行内代码与代码块背景及文字色 |
 | 浮层阴影变量 | `float` / `raise` | `#1c191724` / `#1c191714` | `#00000066` / `#00000059` | 动态主题下的阴影基准色 |
 
-### 像素固定色与状态插值（`cssVars.theme` 与 `tone.ts`）
+### Papertrails 固定色与状态插值（`cssVars.theme` 与 `tone.ts`）
 
-`apps/mac/ui/design/theme.json` 中的 `cssVars.theme` 定义跨主题固定色：
+`apps/mac/ui/design/theme.json` 中的 `cssVars.theme`（由 `design/tokens.json` 的 `primitives.paper` 生成）定义跨主题固定色：
 
-- **奶白与树皮阶梯**：`cream-50` (`#f7e8c4`)、`cream-100` (`#eedcb2`)、`cream-200` (`#e2c995`)、`cream-300` (`#c8a46e`)、`cream-hover` (`#f1dcab`)、`cream-input` (`#fff4d8`)、`bark-400`..`bark-950` (`#9b7550`..`#1e140b`，其中 `bark-600: #67482d`、`bark-900: #2f1f13`)。
-- **像素绿与高亮色**：`leaf-300/500/600/700/hover`（`#b4cb7c` / `#74a046` / `#5a8234` / `#3f6427` / `#84b052`）、`wheat-hover` (`#efb84e`)、`wheat-700` (`#b8682a`)、`berry-500` (`#c84a3a`)、`water-500` (`#4f8fbd`)、`peach` (`#f3b07a`)、`ground` (`#2b3320`)、`rim` (`#fff4d8`)、`paper` (`#fffaf0`)、`hat` (`#f2b53a`)、`ok` (`#6cd38f`)、`bad` (`#ff6a58`)。
-- **专项微场景色调**：农机 LCD 绿屏（`lcd-paper: #c9dc9a`, `lcd-ink: #22341a` 等 9 色）、手机壳（`phone-shade: #4a321e`, `phone-lit: #8a6440` 等）、阶段徽标（`agent-stage-center/middle/edge`）、图鉴、补丁（`patch-add-bg` / `patch-del-bg`）与差异填充（`diff-add-fill` / `diff-mod-fill` / `diff-del-fill`）卡片色。
+- **棉纸与树皮阶梯**：`paper` (`#fffaf0`)、`avatar-paper` / `avatar-soft-paper` / `avatar-leaf` / `avatar-sky`、`cream-50`..`cream-300`、`bark-400`..`bark-950`（其中 `bark-600: #67482d`、`bark-900: #2f1f13`）。
+- **语义强调与高亮色**：`leaf-300/500/700`、`wheat-hover`、`berry-500`、`water-500`。
+- **专项微场景色调**：农庄掌机 LCD 绿屏（`lcd-panel`、`lcd-paper`、`lcd-light`、`lcd-dark`、`lcd-ink`、`lcd-pale`）、手机失败态（`phone-failed`）与阶段徽标（`agent-stage-center/middle/edge`）。
 - **动态半透明**：由于 `nsh` 不支持 CSS `color-mix()`，工作台一律调用 `apps/mac/ui/design/tone.ts` 的 `mix(name, weight)` 按给定 `[0, 1]` 透明度生成当前主题对应的 `rgba(...)`，`tone(name)` 直接读取当前主题颜色值。
 
 ### 原生外壳与官网等其余四端色系
@@ -80,7 +80,7 @@ UI 代码由 `scripts/audit/ui-tokens.ts` 通过 AST 扫描校验（覆盖工作
   - `Palette::light`：`bg: #fcfcfb`, `surface: #f6f5f3`, `elevated: #fcfcfb`, `border: #e6e4e0`, `text: #1c1917`, `muted: #5e5852`, `faint: #716a64`, `accent: #4d7a2a`, `danger: #a83a2c`, `warning: #b45d0e`, `success: #3f7329`, `info: #2c6aa3`, `added_bg: 0x4d7a2a@0.13`, `removed_bg: 0xa83a2c@0.10`, `match_bg: 0xe5a93c@0.34`, `selected: 0x4d7a2a@0.14`, `hover: 0x1c1917@0.055`。
   - 终端与语法：`Palette` 内置 16 色 ANSI 调色板（`ansi[16]`）与 16 色代码语法色（`syntax[16]`）。
   - 工作区外壳（`apps/mac/ui/workspace/`）与工作台同样直接读取 `theme.json` / `nsh.json` 的语义 Tailwind 令牌与 `design/tone.ts` 的 `mix()`。
-- **官网（`apps/site/src/ui/global.css`）**：通过 Tailwind v4 `@theme static` 清空 Tailwind 默认色板（`--color-*: initial`），显式定义 `cream-*`、`bark-*`、`leaf-*`、`wheat`、`berry`、`water`、`drop`、`shade`、`dusk`、`firefly`、`path*` 以及昼夜时段滤镜变量 `--sky`、`--ground`、`--smoke`、`--farmer`。
+- **官网（`apps/site/src/ui/global.css`）**：通过 Tailwind v4 `@theme static` 清空 Tailwind 默认色板（`--color-*: initial`），显式定义 Papertrails 棉纸（`#F7F1E2` / `#EFE4CE` / `#FAF4E6`）、暖棕墨线（`#7C6447` / `#4E3B29`）、江南青瓦/运河蓝/竹青/灯笼琥珀色阶以及昼夜时段滤镜变量。
 - **灵动岛（`apps/island/Sources/VibeValleyIsland/Island.swift`）**：手写同步 `design/tokens.json` 的固定暖棕调色常量，前景色采用 `cream` (`#eedcb2`) 与 `dim` (`#a89a7a`)，状态色采用 `working` (`#74a046`)、`waiting` (`#e5a93c`)、`stuck` (`#c84a3a`)。
 
 ## 1.3 控件尺寸与圆角矩阵
@@ -98,7 +98,7 @@ UI 代码由 `scripts/audit/ui-tokens.ts` 通过 AST 扫描校验（覆盖工作
 | 载体 | 令牌 / 结构 | 数值 | 使用约束 |
 | --- | --- | --- | --- |
 | **工作台与工作区外壳 (`apps/mac/ui/nsh.json`)** | `xs` / `sm` / `md` / `lg` / `xl` / `full` | `3px` / `4px` / `6px` / `8px` / `12px` / `9999px` | 遵循嵌套减一档：外框圆角减去内边距 ≥ 内层圆角 |
-| **官网 (`apps/site/src/ui/global.css`)** | `--radius-*: initial` | 默认直角 `0px`（局部云朵用 `rounded-[3px]`，光晕用 `rounded-full`） | 保持像素复古锐利直边，配合 `--shadow-hard*` 硬偏置阴影 |
+| **官网 (`apps/site/src/ui/global.css`)** | Papertrails 卡纸圆角 | `6px` / `10px` / `14px`（徽章 `rounded-full`） | 与柔和暖棕投影（`rgb(91 67 43 / 0.18)`）配合呈现手工折纸卡片质感 |
 | **灵动岛 (`apps/island/Sources/IslandCore/Geometry.swift`)** | `closed` / `open` | `10` / `16` | 收起为刘海耳翼小圆角，展开面板为 16px 圆角 |
 
 ## 1.4 1px 边框、两档阴影与层级体系
@@ -110,8 +110,7 @@ UI 代码由 `scripts/audit/ui-tokens.ts` 通过 AST 扫描校验（覆盖工作
   - `shadow-raise`：`0 1px 2px #00000018`（浅浮分段器拇指、局部提示胶囊）。
   - `shadow-float`：`0 8px 24px #0000002e`（下拉菜单、气泡提示、模态 `Dialog`）。
   - `shadow-toggle-thumb`：`0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a`。
-  - `shadow-px`：`2px 2px 0 #1e140a73`（像素卡硬边阴影）。
-  - 官网 `global.css` 另定 `--shadow-hard` 与 `--shadow-hard-lg` 像素硬偏置阴影。
+  - 官网 `global.css` 使用柔和暖棕卡纸投影（`rgb(91 67 43 / 0.14..0.24)`）。
 
 > 注：`nsh.json` 中 `tailwind.shadow` 的 `float` 与 `raise` 固定为静态 `#rrggbbaa` 值（不支持引用 `theme.json` 随浅/深主题切换的变量），具体边界见 [第九篇](docs/design/09-design-system-audit.md)。
 
@@ -128,9 +127,9 @@ UI 代码由 `scripts/audit/ui-tokens.ts` 通过 AST 扫描校验（覆盖工作
 
 ### 字体栈与字号阶梯
 
-- **工作台字体（`apps/mac/ui/nsh.json`）**：`sans` 为 `"PingFang SC"`、`mono` 为 `"Menlo"`、`pixel` 为 `"FusionPixel"`（实际多字体字符回退链位于原生终端 `apps/mac/src/terminal/element.rs` 与官网 `apps/site/src/ui/global.css`）。
+- **工作台字体（`apps/mac/ui/nsh.json`）**：`sans` 为 `"PingFang SC"`、`mono` 为 `"Menlo"`（实际多字体字符回退链位于原生终端 `apps/mac/src/terminal/element.rs` 与官网 `apps/site/src/ui/global.css`）。
 - **原生与终端字体（`apps/mac/src/theme.rs`、`apps/mac/src/terminal/element.rs`）**：界面基准字号 `ui_font_size = 13.0`，等宽字体默认 `"Maple Mono NF CN"`（回退链依次探测 `SF Mono`、`JetBrains Maple Mono`、`JetBrainsMono Nerd Font`、`Menlo`、`Monaco`），并携带 Nerd Font / PingFang SC / Apple Color Emoji 字符级回退列表。
-- **像素字体（`assets/fonts/fusion-pixel-12px-proportional-zh_hans.otf`）**：在 GPUI 与 `nsh` 像素视图内显式注册 `Fusion Pixel 12px Prop zh-Hans`。
+- **官网排印（`apps/site/src/ui/global.css`）**：标题使用衬线体（`Songti SC` / `Georgia`），正文与代码分别使用系统无衬线体（`PingFang SC` / `-apple-system`）与等宽体（`Maple Mono NF CN` / `Menlo`），不加载外置像素字体。
 
 工作台字号行高阶梯（`apps/mac/ui/nsh.json` `tailwind.fontSize`）：
 
@@ -173,5 +172,5 @@ UI 代码由 `scripts/audit/ui-tokens.ts` 通过 AST 扫描校验（覆盖工作
 | 载体与配置源 | 时长阶梯 | 缓动曲线 / 函数 | 用途划分 |
 | --- | --- | --- | --- |
 | **工作台与工作区外壳 (`apps/mac/ui/nsh.json`)** | `120ms` (`duration-120`)<br>`180ms` (`duration-180`)<br>`280ms` (`duration-280`) | `ease-out`: `cubic-bezier(0.2, 0.0, 0.0, 1.0)`<br>`ease-in`: `cubic-bezier(0.4, 0.0, 1.0, 1.0)`<br>`ease-in-out`: `cubic-bezier(0.4, 0.0, 0.2, 1.0)`<br>`ease-spring`: `cubic-bezier(0.34, 1.4, 0.64, 1.0)` | `120ms` 负责按钮按下、悬停、`Segmented` 激活换色与工作区行交互；`180ms` 负责 `Toggle` 开关圆点滑移与焦点显现；`280ms` 负责较大区域或折展切换 |
-| **官网 (`apps/site/src/ui/global.css`)** | 过渡交互 `0.15s`–`0.25s`；像素场景帧动画 `steps(...)` | `--ease-out: cubic-bezier(0.2, 0, 0, 1)`（同步自 `design/tokens.json`） | 兼顾 `@media (prefers-reduced-motion: reduce)` 与 `[data-off]` 静态降级关闭全部过渡和动画 |
+| **官网 (`apps/site/src/ui/global.css`)** | 过渡交互 `0.15s`–`0.25s`；平滑纸雕入场缓动 | `--ease-out: cubic-bezier(0.2, 0, 0, 1)`（同步自 `design/tokens.json`） | 兼顾 `@media (prefers-reduced-motion: reduce)` 与 `[data-off]` 静态降级关闭全部过渡和动画 |
 | **灵动岛 (`Island.swift`)** | 展收形变 `0.2s`；鼠标离开防误收宽限 `0.25s` | AppKit `easeOut` | 高频移入移出防闪烁保护 |

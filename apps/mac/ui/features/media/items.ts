@@ -9,39 +9,13 @@ import {
   type MediaJob,
   type MediaSummary,
   type MediaUnderstandingJob,
-  userId,
 } from "@vibevalley/protocol";
 
 import { type ArtifactFacet, artifactFacetOf, mediaKindOf } from "../../infra/state/contentNav";
 
-export type SourceFilter = "all" | "agent" | "user";
-export const sourceFilters: readonly SourceFilter[] = ["all", "agent", "user"];
-
 export type ArtifactTypeFilter = ArtifactFacet;
 
 export const kindOf = (mime: string): LibraryFileKind => mediaKindOf(mime);
-
-const isMediaFromSource = (item: LibraryItem, source: SourceFilter): boolean => {
-  switch (source) {
-    case "all":
-      return true;
-    case "agent":
-      return item.origin.kind === "generated" || item.origin.kind === "fetched";
-    case "user":
-      return item.origin.kind === "uploaded";
-  }
-};
-
-const isArtifactFromSource = (artifact: Artifact, source: SourceFilter): boolean => {
-  switch (source) {
-    case "all":
-      return true;
-    case "agent":
-      return artifact.by !== userId;
-    case "user":
-      return artifact.by === userId;
-  }
-};
 
 export const artifactMatchesType = (a: { readonly artifactType: ArtifactType }, type: ArtifactTypeFilter | undefined): boolean =>
   type === undefined || artifactFacetOf(a) === type;
@@ -49,7 +23,6 @@ export const artifactMatchesType = (a: { readonly artifactType: ArtifactType }, 
 export const shownArtifacts = (
   all: readonly Artifact[],
   filter: {
-    readonly source: SourceFilter;
     readonly artifactType?: ArtifactTypeFilter | undefined;
     readonly sort: LibrarySort;
     readonly pinnedOnly?: boolean | undefined;
@@ -57,10 +30,7 @@ export const shownArtifacts = (
   },
 ): Artifact[] => {
   const filtered = all.filter(
-    (a) =>
-      isArtifactFromSource(a, filter.source) &&
-      artifactMatchesType(a, filter.artifactType) &&
-      (filter.pinnedOnly !== true || filter.pinned?.has(`artifact:${a.id}`) === true),
+    (a) => artifactMatchesType(a, filter.artifactType) && (filter.pinnedOnly !== true || filter.pinned?.has(`artifact:${a.id}`) === true),
   );
   if (filter.sort === "name") return filtered.toSorted((a, b) => a.title.localeCompare(b.title));
   return filtered.toSorted((a, b) => b.updated - a.updated);
@@ -69,7 +39,6 @@ export const shownArtifacts = (
 export const shownMedia = (
   items: readonly LibraryItem[],
   filter: {
-    readonly source: SourceFilter;
     readonly fileKind?: LibraryFileKind | undefined;
     readonly pinnedOnly?: boolean | undefined;
     readonly pinned?: ReadonlySet<string> | undefined;
@@ -77,7 +46,6 @@ export const shownMedia = (
 ): LibraryItem[] =>
   items.filter(
     (item) =>
-      isMediaFromSource(item, filter.source) &&
       (filter.fileKind === undefined || kindOf(item.attachment.type) === filter.fileKind) &&
       (filter.pinnedOnly !== true || filter.pinned?.has(`media:${item.attachment.id}`) === true),
   );

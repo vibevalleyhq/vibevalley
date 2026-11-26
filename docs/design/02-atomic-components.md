@@ -73,26 +73,25 @@
 
 ## 2.4 对话框、菜单、表格与分栏
 
-- **`Dialog`（`apps/mac/ui/design/Dialog.tsx`）**：模态层覆盖 `bg-scrim`（`z-30`），居中容器 `rounded-lg border border-line bg-elevated shadow-float`，内置标题栏、ESC 监听与背景防穿透锁；常规宽上限 `480`（`min(480, windowWidth * 0.92)`），`wide` 变体宽上限 `1080`（`min(1080, windowWidth * 0.94)`）用于并行呈现差异审查的场景。
-- **`MoreMenu`（`apps/mac/ui/design/MoreMenu.tsx`）**：点击「更多」按钮在 `z-20` 弹出的动作清单，支持分隔线、危险条目红字及图标前置。
+- **`Dialog`（`apps/mac/ui/design/Dialog.tsx`）**：模态层覆盖 `bg-scrim`（`z-30`），居中容器 `rounded-lg border border-line bg-elevated shadow-float`，内置标题栏、ESC 监听与背景防穿透锁；提供四档固定宽度（`sm` `480` / `md` `640` / `lg` `820` / `xl` `1000`，均按视口留边距取小）与两种高度模式（`auto` 受像素上限与视口比例 `maxHeight` 双重封顶，用于确认框与轻表单；`fixed` 锁定固定高度并在内部滚动，用于带 Tab、搜索、列表浏览、预览或差异审查的弹窗），并统一锚定在稳定的顶部 `marginTop` Y 坐标上避免切换高度时上下跳动；支持固定不随正文滚动的 `toolbar` / `footer` 槽位及 `scroll={false}` 自定义布局。非打断性的单字段创建与微确认优先使用就地锚定的 `Popover` 或 `ConfirmButton`，避免全屏遮罩打断操作。
+- **`MoreMenu`（`apps/mac/ui/design/MoreMenu.tsx`）**：点击「更多」按钮在 `z-20` 弹出的动作清单（`min-w-44 max-w-72 max-h-80`），支持分隔线、危险条目红字及图标前置。
 - **`DataTable`（`apps/mac/ui/design/DataTable.tsx`）**：通用等高行数据表，固定列宽与 `min-w-0` 弹性列配比，支持列头排序、空态回落、行点击整行响应。
 - **`Splitter` 与 `usePaneWidth`（`apps/mac/ui/design/Splitter.tsx`）**：`1px` 隐形加宽可拖拽热区线条；按 `side` 枚举（靠左/靠右面板）计算向外扩展像素差，并自动写入持久化偏好。
 - **`ShortcutSheet`（`apps/mac/ui/design/ShortcutSheet.tsx`）**：按下 `?` 呼出的快捷键速查弹窗，按 `shortcutPlaces` 作用域分组呈现所有可用按键组合与键帽徽标。
 
 ## 2.5 领域原子与附件磁贴
 
-位于 `apps/mac/ui/design/domain/` 与 `apps/mac/ui/design/pixel/`：
+位于 `apps/mac/ui/design/domain/` 与 `apps/mac/ui/design/art.ts`：
 
 | 原语 | 文件 | 用途 |
 | --- | --- | --- |
 | `AttachmentTile` | `apps/mac/ui/design/domain/AttachmentTile.tsx` | 以固定磁贴形态展示附件：按类型映射图标、文件名、体积，以及图片/媒体内联缩略图或点击放大入口 |
-| `AgentFace` / `OrchestratorFace` | `apps/mac/ui/design/domain/Face.tsx` | 按档案与农机特征渲染像素头像（无图片资源或加载中时退回首字母色块兜底）；读取 `apps/mac/ui/design/domain/cast.ts` 的 `castHash` / `castPrefix` 确定小动物物种与服饰前缀 |
-| `PoseSprite` | `apps/mac/ui/design/domain/PoseSprite.tsx` | 从像素精灵图集中截取当前姿态帧渲染在工作台档案卡或状态条上 |
-| `RuntimeBadge` / `RuntimeIcon` | `apps/mac/ui/design/domain/RuntimeBadge.tsx`、`apps/mac/ui/design/domain/RuntimeIcon.tsx` | 将农机 ID（Claude Code / Codex / Cursor / OpenCode 等）映射为可辨识图标与标签 |
+| `AgentFace` / `OrchestratorFace` / `UserFace` | `apps/mac/ui/design/domain/Face.tsx` | 渲染 Papertrails 纸雕角色头像、物种肖像、主助手与用户肖像（无图片资源或加载中时退回首字母色块兜底）；读取 `apps/mac/ui/design/domain/cast.ts` 确定默认物种与造型 |
+| `RuntimeBadge` / `RuntimeIcon` | `apps/mac/ui/design/domain/RuntimeBadge.tsx`、`apps/mac/ui/design/domain/RuntimeIcon.tsx` | 从 `assets/engines/*.png` 渲染纸雕卡纸衬底的引擎徽标与标签（缺图退回 `<Icon name="runtimes" />`） |
 | `OpenTerminal` | `apps/mac/ui/design/domain/OpenTerminal.tsx` | 一键通知桌面宿主在指定仓库或 worktree 工作目录拉起嵌入式原生终端标签页 |
 | `Qr` | `apps/mac/ui/design/Qr.tsx` | 本机/配对服务链接的二维码矢量绘制组件 |
 | `SettingsPage` / `SettingsGroup` / `SettingRow` / `KeyRow` | `apps/mac/ui/design/domain/settings.tsx` | 设置二级页共用布局壳，串联 `SettingsSearch` 实现设置项关键词检索与 `mix("wheat", 0.15)` 高亮匹配行 |
-| `usePixelDir` / `useSpriteUrl` / `useCursorUrl` | `apps/mac/ui/design/pixel/atlas.ts` | 通过 `host.pixelDir` 向原生壳索取本机图片目录路径并拼接 `file://` URL；缺图目录时静默退回占位 |
+| `useAssetsDir` / `roleAvatarUrl` / `engineLogoUrl` | `apps/mac/ui/design/art.ts` | 通过 `host.assetsDir` 向原生壳索取本机 `assets/` 目录路径并拼接 `file://` URL；缺图目录时静默退回占位 |
 
 ## 2.6 工作区外壳共享原语（`apps/mac/ui/workspace/chrome.tsx`）
 

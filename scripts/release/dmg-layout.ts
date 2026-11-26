@@ -15,13 +15,11 @@ function appleScriptString(value: string): string {
   return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 }
 
-export function buildFinderLayoutScript(volumeName: string, appBundleFilename: string): string {
+export function buildFinderLayoutScript(volumeName: string, appBundleFilename: string, mountPoint?: string): string {
   const [x1, y1, x2, y2] = dmgWindowLayout.bounds;
   const [appX, appY] = dmgWindowLayout.appPosition;
   const [appsX, appsY] = dmgWindowLayout.applicationsPosition;
-  return [
-    'tell application "Finder"',
-    `  tell disk ${appleScriptString(volumeName)}`,
+  const body = [
     "    open",
     "    set current view of container window to icon view",
     "    set toolbar visible of container window to false",
@@ -37,8 +35,32 @@ export function buildFinderLayoutScript(volumeName: string, appBundleFilename: s
     "    close",
     "    open",
     "    update without registering applications",
-    "    delay 2",
+    "    delay 1",
     "    close",
+  ];
+  if (mountPoint !== undefined) {
+    return [
+      `set targetDisk to (POSIX file ${appleScriptString(mountPoint)} as alias)`,
+      'tell application "Finder"',
+      "  repeat 20 times",
+      "    if exists folder targetDisk then exit repeat",
+      "    delay 0.25",
+      "  end repeat",
+      "  tell folder targetDisk",
+      ...body,
+      "  end tell",
+      "end tell",
+    ].join("\n");
+  }
+  const diskName = appleScriptString(volumeName);
+  return [
+    'tell application "Finder"',
+    "  repeat 20 times",
+    `    if exists disk ${diskName} then exit repeat`,
+    "    delay 0.25",
+    "  end repeat",
+    `  tell disk ${diskName}`,
+    ...body,
     "  end tell",
     "end tell",
   ].join("\n");
@@ -50,15 +72,28 @@ function parseAttachDevice(plistXml: string): string {
   return devMatch[1];
 }
 
+function parseAttachMountPoint(plistXml: string): string | null {
+  const mntMatch = /<key>mount-point<\/key>\s*<string>([^<]+)<\/string>/u.exec(plistXml);
+  return mntMatch?.[1] ?? null;
+}
+
+function copyTreeFast(src: string, dest: string): void {
+  const res = spawnSync("cp", ["-cR", src, dest], { stdio: "ignore" });
+  if (res.status !== 0) {
+    cpSync(src, dest, { recursive: true });
+  }
+}
+
 export interface StyledDmgOptions {
   appPath: string;
   bundleName: string;
   volumeName: string;
   backgroundPath: string;
+  volumeIconPath?: string;
   outputPath: string;
 }
 
-export function createStyledDmg({ appPath, bundleName, volumeName, backgroundPath, outputPath }: StyledDmgOptions): void {
+export function createStyledDmg({ appPath, bundleName, volumeName, backgroundPath, volumeIconPath, outputPath }: StyledDmgOptions): void {
   const appBundleFilename = `${bundleName}.app`;
   const work = mkdtempSync(join(tmpdir(), "vv-dmg-"));
   const stage = join(work, "stage");
@@ -67,9 +102,13 @@ export function createStyledDmg({ appPath, bundleName, volumeName, backgroundPat
 
   try {
     mkdirSync(join(stage, ".background"), { recursive: true });
-    cpSync(appPath, join(stage, appBundleFilename), { recursive: true });
+    copyTreeFast(appPath, join(stage, appBundleFilename));
     symlinkSync("/Applications", join(stage, "Applications"));
     cpSync(backgroundPath, join(stage, ".background", "background.png"));
+    if (volumeIconPath) {
+      // Reserve HFS+ volume space for the icon file before Finder layout runs.
+      cpSync(volumeIconPath, join(stage, ".VolumeIcon.icns"));
+    }
 
     // HFS+ reliably persists Finder .DS_Store background-picture aliases across macOS versions.
     execFileSync("hdiutil", ["create", "-volname", volumeName, "-srcfolder", stage, "-fs", "HFS+", "-format", "UDRW", "-ov", rwDmg], {
@@ -81,12 +120,21 @@ export function createStyledDmg({ appPath, bundleName, volumeName, backgroundPat
       stdio: ["ignore", "pipe", "inherit"],
     });
     device = parseAttachDevice(attachPlist);
+    const mountPoint = parseAttachMountPoint(attachPlist) ?? `/Volumes/${volumeName}`;
 
-    const script = buildFinderLayoutScript(volumeName, appBundleFilename);
+    const script = buildFinderLayoutScript(volumeName, appBundleFilename, mountPoint);
     const layout = spawnSync("osascript", ["-e", script], { encoding: "utf8" });
     if (layout.status !== 0) {
       // Headless CI runners lack a Finder WindowServer session; keep the DMG build succeeding.
       console.warn(`Warning: Finder DMG layout skipped (${layout.stderr.trim() || `exit ${layout.status}`})`);
+    }
+
+    // Finder's open/update/close clears volume custom-icon metadata and can drop dotfile icons, so stamp after layout.
+    if (volumeIconPath) {
+      const targetIcon = join(mountPoint, ".VolumeIcon.icns");
+      cpSync(volumeIconPath, targetIcon);
+      spawnSync("xcrun", ["SetFile", "-a", "V", targetIcon], { stdio: "ignore" });
+      spawnSync("xcrun", ["SetFile", "-a", "C", mountPoint], { stdio: "ignore" });
     }
 
     execFileSync("sync");
@@ -97,7 +145,7 @@ export function createStyledDmg({ appPath, bundleName, volumeName, backgroundPat
     device = null;
 
     rmSync(outputPath, { force: true });
-    execFileSync("hdiutil", ["convert", rwDmg, "-format", "UDZO", "-imagekey", "zlib-level=9", "-o", outputPath], {
+    execFileSync("hdiutil", ["convert", rwDmg, "-format", "ULFO", "-o", outputPath], {
       stdio: "inherit",
     });
   } finally {

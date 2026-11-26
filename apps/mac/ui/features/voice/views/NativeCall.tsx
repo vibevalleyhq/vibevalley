@@ -2,6 +2,7 @@ import { cleanup, signal, Text, View } from "nsh";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
+import { InboxSlice } from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -12,8 +13,9 @@ import { Bubble } from "../../../design/Tip";
 import { useInterval } from "../../../infra/base/timer";
 import { transport } from "../../../infra/transport";
 
+const activeCallPhases = InboxSlice.shape.call.exclude(["ending", "error"]);
 const CallState = z.object({
-  phase: z.enum(["idle", "connecting", "live", "stopping"]),
+  phase: z.enum([...activeCallPhases.options, "stopping"]),
   muted: z.boolean(),
   problem: z.string().nullable(),
   heard: z.string(),

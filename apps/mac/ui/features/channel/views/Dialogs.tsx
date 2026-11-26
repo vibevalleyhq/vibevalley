@@ -214,6 +214,7 @@ export function ChannelSettingsDialog(props: { channel: Channel; open: boolean; 
       open={props.open}
       onClose={() => props.onClose()}
       title={t("web.channel.dialog.settingsOf", { name: channelName(props.channel) })}
+      size="md"
       testid="channel-settings-dialog"
     >
       <If when={props.open}>

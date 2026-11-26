@@ -14,7 +14,7 @@ import { shortMomentText } from "../../../infra/base/format";
 import { createIssueActs } from "../model/acts";
 import { stageTone } from "../model/overview";
 import { ActLines } from "./ActLines";
-import { IssueSheet, Property, SheetLabel } from "./Sheet";
+import { IssueNumberPill, IssueSheet, Property, SheetLabel } from "./Sheet";
 
 export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (id: string) => void; onClose: (review: boolean) => void }) {
   const acts = createIssueActs(() => props.issue, {
@@ -32,7 +32,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
       <View class="mb-1.5 flex-row flex-wrap items-center gap-1">
         <Text class="text-xs text-muted">{props.issue.repo || t("web.issue.detail.noRepo")}</Text>
         <Icon name="next" size={12} tone="muted" />
-        <Text class="shrink-0 font-mono text-xs text-muted tabular-nums">{`#${props.issue.number}`}</Text>
+        <IssueNumberPill number={props.issue.number} />
       </View>
       <Text role="header" class="text-lg font-semibold text-ink">
         {props.issue.title}

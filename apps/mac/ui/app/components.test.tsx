@@ -109,8 +109,8 @@ test("all workbench controls, overlays, rich blocks, virtual-clock hooks, and do
   const momentBefore = app.texts().find((s) => s.startsWith("moment:"));
   expect(momentBefore).toBeDefined();
 
-  await app.press("id:toggle-pose");
-  expect(app.texts()).toContain("pose:walk");
+  await app.press("id:toggle-look");
+  expect(app.texts()).toContain("look:foreman");
   await clock.fastForward(65_000);
   const textsAfter = app.texts();
   expect(textsAfter).toContain("ago:1 分钟前");

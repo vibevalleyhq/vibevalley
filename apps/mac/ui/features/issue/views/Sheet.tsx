@@ -1,11 +1,15 @@
-import { context, effect, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
+import { Clipboard, context, effect, Scroll, signal, Text, untracked, View, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
 import { Select } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
+import { Bubble } from "../../../design/Tip";
+import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
+import { useTimeout } from "../../../infra/base/timer";
+import { createEffect } from "../../../infra/solid";
 import type { Tone } from "../model/cards";
 import { type Stage, stageLabel, stages } from "../model/issue";
 
@@ -280,5 +284,39 @@ export function Pick<V extends string>(props: {
         <Text class={`min-w-0 truncate text-sm ${props.value === "" ? "text-faint" : "text-ink"}`}>{shown()}</Text>
       </View>
     </If>
+  );
+}
+
+/** Clickable `#number` pill that copies the issue reference with transient check feedback. */
+export function IssueNumberPill(props: { number: number }) {
+  const copied = signal(false);
+  const reset = useTimeout();
+  createEffect(
+    () => props.number,
+    () => copied.set(false),
+    { defer: true },
+  );
+  const copy = () => {
+    void Clipboard.writeText(`#${props.number}`).then(
+      () => {
+        copied.set(true);
+        reset(() => copied.set(false), 1500);
+        toast(t("web.base.rich.copied"));
+      },
+      () => undefined,
+    );
+  };
+  return (
+    <View
+      role="button"
+      testID="issue-copy-id"
+      accessibilityLabel={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")}
+      tooltip={<Bubble text={copied() ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
+      onPress={copy}
+      class="-mx-1 shrink-0 flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus"
+    >
+      <Text class={`font-mono text-xs tabular-nums ${copied() ? "text-leaf" : "text-muted"}`}>{`#${props.number}`}</Text>
+      <Icon name={copied() ? "check" : "copy"} size={12} tone={copied() ? "leaf" : "muted"} />
+    </View>
   );
 }

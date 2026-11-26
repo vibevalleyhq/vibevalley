@@ -1,11 +1,23 @@
-import { computed, effect, List, platform, Scroll, signal, Text, untracked, View } from "nsh";
+import { Clipboard, computed, effect, List, platform, Scroll, signal, Text, untracked, View } from "nsh";
 import { isAvailable as mobileAvailable, SegmentedControl } from "nsh/mobile";
 
 import { t } from "@vibevalley/i18n";
 import type { Issue, IssueStatus } from "@vibevalley/protocol";
 
 import type { MobileLayout } from "../design/layout";
-import { EmptyPanel, FieldInput, MarkdownText, PillButton, SectionCard, SplitPane, StatusTag, TopBar, type TagTone } from "../design/ui";
+import {
+  EmptyPanel,
+  FieldInput,
+  MarkdownText,
+  PillButton,
+  SearchInput,
+  SectionCard,
+  SplitPane,
+  StatusTag,
+  TopBar,
+  useTimeout,
+  type TagTone,
+} from "../design/ui";
 import { hapticImpact, hapticNotification, hapticSelection, type RemoteSession } from "../infra/session";
 
 type IssueFilterKind = "all" | "active" | "review" | "done";
@@ -38,6 +50,11 @@ function matchesFilter(issue: Issue, filter: IssueFilterKind): boolean {
   }
 }
 
+function matchesIssueSearch(issue: Issue, query: string): boolean {
+  const hay = [`#${String(issue.number)}`, issue.id, issue.title, issue.description, issue.repo, issue.status].join(" ").toLowerCase();
+  return hay.includes(query);
+}
+
 function statusTone(status: IssueStatus): TagTone {
   switch (status) {
     case "done":
@@ -61,9 +78,12 @@ export function IssuesTab(props: {
   readonly onSelectIssue: (id: string | undefined) => void;
 }) {
   const filter = signal<IssueFilterKind>("all");
+  const searchQuery = signal("");
   const commentDrafts = signal<Readonly<Record<string, string>>>({});
   const busy = signal(false);
   const actionError = signal<string | undefined>(undefined);
+  const copiedIssueId = signal<string | undefined>(undefined);
+  const resetCopied = useTimeout();
   const isDual = computed(() => props.layout().mode === "dual_pane");
   // `SegmentedControl` in nsh/mobile maps to UISegmentedControl (iOS only); Android uses the pill filter bar.
   const useNativeSegmented = mobileAvailable && platform.os === "ios";
@@ -74,8 +94,29 @@ export function IssuesTab(props: {
     if (machineId === undefined || machineId === "") return undefined;
     return machineNames().get(machineId) ?? machineId;
   };
-  const filteredIssues = computed(() => allIssues().filter((issue) => matchesFilter(issue, filter())));
+  const filteredIssues = computed(() => {
+    const q = searchQuery().trim().toLowerCase();
+    return allIssues().filter((issue) => matchesFilter(issue, filter()) && (q === "" || matchesIssueSearch(issue, q)));
+  });
   const hasFilteredIssues = computed(() => filteredIssues().length > 0);
+  const hasActiveFilter = computed(() => filter() !== "all" || searchQuery().trim() !== "");
+  const clearFilters = () => {
+    hapticSelection();
+    filter.set("all");
+    searchQuery.set("");
+  };
+  const copyIssueRef = (issue: Issue) => {
+    void Clipboard.writeText(`#${String(issue.number)}`).then(
+      () => {
+        hapticImpact("light");
+        copiedIssueId.set(issue.id);
+        resetCopied(() => {
+          if (untracked(copiedIssueId) === issue.id) copiedIssueId.set(undefined);
+        }, 1500);
+      },
+      () => undefined,
+    );
+  };
   const selectedIssue = computed(() => {
     const id = props.selectedIssueId();
     if (id === undefined) return undefined;
@@ -174,7 +215,15 @@ export function IssuesTab(props: {
 
   const renderMaster = () => (
     <View class="min-h-0 flex-1">
-      <View class="border-b border-line bg-side px-3.5 py-2.5">
+      <View class="gap-2 border-b border-line bg-side px-3.5 py-2.5">
+        <SearchInput
+          testID="issue-search-input"
+          clearTestID="issue-search-clear"
+          value={searchQuery()}
+          onInput={(v) => searchQuery.set(v)}
+          placeholder={t("web.issue.page.find")}
+          clearLabel={t("web.session.hub.clear")}
+        />
         <If
           when={useNativeSegmented}
           else={
@@ -213,7 +262,20 @@ export function IssuesTab(props: {
         </If>
       </View>
 
-      <If when={hasFilteredIssues()} else={<EmptyPanel testID="issues-empty" icon="issues" message={t("web.remote.issue.empty")} />}>
+      <If
+        when={hasFilteredIssues()}
+        else={
+          <EmptyPanel
+            testID="issues-empty"
+            icon={hasActiveFilter() ? "search" : "issues"}
+            message={t("web.remote.issue.empty")}
+            actionLabel={hasActiveFilter() ? t("web.session.hub.clearFilter") : undefined}
+            actionIcon="refresh"
+            actionTestID="issues-clear-filters"
+            onAction={clearFilters}
+          />
+        }
+      >
         <List
           testID="issues-list"
           each={filteredIssues()}
@@ -263,6 +325,16 @@ export function IssuesTab(props: {
             title={`#${String(issue().number)} ${issue().title}`}
             subtitle={issue().repo}
             onBack={isDual() ? undefined : () => props.onSelectIssue(undefined)}
+            right={
+              <PillButton
+                testID="issue-copy-id"
+                size="sm"
+                tone={copiedIssueId() === issue().id ? "ok" : "plain"}
+                icon={copiedIssueId() === issue().id ? "check" : "copy"}
+                label={copiedIssueId() === issue().id ? t("web.base.rich.copied") : `#${String(issue().number)}`}
+                onPress={() => copyIssueRef(issue())}
+              />
+            }
           />
 
           <If when={actionError()}>

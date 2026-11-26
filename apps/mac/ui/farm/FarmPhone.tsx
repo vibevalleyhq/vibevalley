@@ -4,9 +4,12 @@ import { z } from "zod";
 
 import { t, setLocale } from "@vibevalley/i18n";
 import type { InboxItem } from "@vibevalley/protocol";
+import { InboxSlice } from "@vibevalley/protocol/schema";
 
+import { OrchestratorFace } from "../design/domain/Face";
 import { TextArea } from "../design/Field";
-import { SpriteIcon } from "../design/pixel/icons";
+import { Icon } from "../design/Icon";
+import type { IconName } from "../design/icons";
 import { useFollowed } from "../features/channel/model/follow";
 import { api, newSendKey, reasonOf } from "../infra/api";
 import { callDecoded, frame } from "../infra/bridge";
@@ -18,8 +21,9 @@ import { GameIcon, GamePad, PhoneGame, type GameId } from "./PhoneGames";
 
 type Screen = "home" | "missed" | "log" | "orchestrator" | "games" | GameId;
 type Calls = FarmCalls;
+const activeCallPhases = InboxSlice.shape.call.exclude(["ending", "error"]);
 const voiceSchema = z.object({
-  phase: z.enum(["idle", "connecting", "live", "stopping"]),
+  phase: z.enum([...activeCallPhases.options, "stopping"]),
   problem: z.string().nullable(),
   heard: z.string(),
   said: z.string(),
@@ -39,8 +43,8 @@ const labelTone = {
 } as const;
 
 function Label(props: { children: JSX.Element; size?: 14 | 18 | 20; tone?: keyof typeof labelTone }) {
-  const sizeClass = props.size === 20 ? "text-xl" : props.size === 18 ? "text-[18px]" : props.size === 14 ? "text-base" : "text-xs";
-  return <Text class={`font-pixel ${sizeClass} ${labelTone[props.tone ?? "ink"]}`}>{props.children}</Text>;
+  const sizeClass = props.size === 20 ? "text-xl font-semibold" : props.size === 18 ? "text-lg font-medium" : props.size === 14 ? "text-base" : "text-xs";
+  return <Text class={`font-mono ${sizeClass} ${labelTone[props.tone ?? "ink"]}`}>{props.children}</Text>;
 }
 function Press(props: { children: JSX.Element; run: () => void; id?: string; selected?: boolean; disabled?: boolean }) {
   return (
@@ -57,7 +61,7 @@ function Press(props: { children: JSX.Element; run: () => void; id?: string; sel
 }
 function IconKey(props: { label: string; run: () => void; children: JSX.Element; id: string }) {
   return (
-    <View testID={props.id} role="button" accessibilityLabel={props.label} onPress={props.run} class="w-1/3 items-center gap-1 pb-3">
+    <View testID={props.id} role="button" accessibilityLabel={props.label} onPress={props.run} class="items-center gap-1">
       <View class="h-11 w-11 items-center justify-center border-2 border-lcd-dark bg-lcd-pale">{props.children}</View>
       <Label>{props.label}</Label>
     </View>
@@ -100,11 +104,11 @@ function Chat(props: { fold: () => void; large: () => boolean; resize: () => voi
         <View role="button" testID="chat-channel" onPress={() => menu.set(!menu())} class="flex-1">
           <Label>{room()?.title ?? t("web.farm.chat.channels")}</Label>
         </View>
-        <View role="button" accessibilityLabel={t("web.farm.chat.enlarge")} onPress={props.resize}>
-          <SpriteIcon name="button-fullscreen" size={16} />
+        <View role="button" accessibilityLabel={t("web.farm.chat.enlarge")} onPress={props.resize} class="p-0.5">
+          <Icon name="enlarge" size={14} tone="bark" />
         </View>
-        <View role="button" accessibilityLabel={t("web.farm.chat.fold")} testID="chat-fold" onPress={props.fold}>
-          <SpriteIcon name="button-collapse" size={16} />
+        <View role="button" accessibilityLabel={t("web.farm.chat.fold")} testID="chat-fold" onPress={props.fold} class="p-0.5">
+          <Icon name="collapse" size={14} tone="bark" />
         </View>
       </View>
       <If when={menu()}>
@@ -237,13 +241,13 @@ function Handset(props: { calls: () => Calls }) {
         break;
     }
   };
-  const helpers = [
-    { id: "missed", label: t("web.farm.phone.app.missed"), icon: "icon-bell", run: () => app.set("missed") },
-    { id: "log", label: t("web.farm.phone.log"), icon: "icon-log", run: () => app.set("log") },
-    { id: "orchestrator", label: t("web.farm.phone.manager"), icon: "manager-face", run: () => void dial() },
-    { id: "channels", label: t("web.farm.phone.app.channels"), icon: "icon-board", run: () => route("/chat") },
-    { id: "issues", label: t("web.farm.menu.issues"), icon: "icon-task-board", run: () => route("/issues") },
-    { id: "games", label: t("web.farm.phone.app.games"), icon: "icon-hand", run: () => app.set("games") },
+  const helpers: readonly { id: string; label: string; icon?: IconName; run: () => void }[] = [
+    { id: "missed", label: t("web.farm.phone.app.missed"), icon: "inbox", run: () => app.set("missed") },
+    { id: "log", label: t("web.farm.phone.log"), icon: "log", run: () => app.set("log") },
+    { id: "orchestrator", label: t("web.farm.phone.manager"), run: () => void dial() },
+    { id: "channels", label: t("web.farm.phone.app.channels"), icon: "chat", run: () => route("/chat") },
+    { id: "issues", label: t("web.farm.menu.issues"), icon: "issues", run: () => route("/issues") },
+    { id: "games", label: t("web.farm.phone.app.games"), icon: "bolt", run: () => app.set("games") },
   ];
   const time = () => [clock().getHours(), clock().getMinutes()].map((n) => String(n).padStart(2, "0")).join(":");
   return (
@@ -263,24 +267,26 @@ function Handset(props: { calls: () => Calls }) {
           </View>
           <View class="flex-1 flex-row">
             <If when={!chatOnly()}>
-              <View style={{ flex: unfolded() ? 0 : 1, width: game() ? 332 : unfolded() ? 296 : 212 }}>
+              <View style={{ flex: unfolded() ? 0 : 1, width: game() ? 332 : unfolded() ? 296 : "100%" }}>
                 <If
                   when={ringing()}
                   else={
                     <>
                       <If when={app() === "home"}>
-                        <View class="flex-row flex-wrap px-2 pt-4">
-                          <Each of={helpers}>
+                        <View class="grid grid-cols-3 gap-x-1 gap-y-3 px-2 pt-4">
+                          <Each of={helpers} key={(a) => a.id}>
                             {(a) => (
                               <IconKey id={a().id} label={a().label} run={a().run}>
-                                <SpriteIcon name={a().icon} size={28} />
+                                <If when={a().icon} else={<OrchestratorFace size={28} />}>
+                                  {(icon) => <Icon name={icon()} size={22} tone="bark" />}
+                                </If>
                               </IconKey>
                             )}
                           </Each>
                         </View>
                       </If>
                       <If when={app() === "games"}>
-                        <View testID="phone-games" class="flex-row flex-wrap px-2 pt-4">
+                        <View testID="phone-games" class="grid grid-cols-3 gap-x-1 gap-y-3 px-2 pt-4">
                           <Each of={games}>
                             {(g) => (
                               <IconKey id={g()} label={t(`web.farm.phone.game.${g()}`)} run={() => app.set(g())}>
@@ -334,7 +340,7 @@ function Handset(props: { calls: () => Calls }) {
                       </If>
                       <If when={app() === "orchestrator"}>
                         <View class="flex-1 items-center justify-center gap-2">
-                          <SpriteIcon name="manager-face" size={60} />
+                          <OrchestratorFace size={60} />
                           <Label size={18}>{t("web.farm.phone.manager")}</Label>
                           <Label>{error() || activeCall().problem || t(active() ? "web.farm.phone.phase.live" : "web.farm.phone.phase.idle")}</Label>
                           <Press run={() => (active() ? void voice("host.voiceStop") : void dial())}>
@@ -348,7 +354,7 @@ function Handset(props: { calls: () => Calls }) {
                   {(item) => (
                     <View class="flex-1 items-center justify-center gap-3">
                       <Label>{t("web.farm.phone.ringing")}</Label>
-                      <SpriteIcon name="manager-face" size={60} />
+                      <OrchestratorFace size={60} />
                       <Label size={20}>{item().who}</Label>
                       <Label>{item().words.label}</Label>
                       <Label>{item().text}</Label>

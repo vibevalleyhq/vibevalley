@@ -1,39 +1,36 @@
 # 第六篇：系统级桌面架构、全页面清单与状态机拓扑
 
-VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` 托管工作台页面、CPU 像素场景、菜单栏托盘与刘海灵动岛集成在同一进程树及轻量随行进程中。
+VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` 托管工作台页面、`wgpu` 3D 纸雕场景、菜单栏托盘与刘海灵动岛集成在同一进程树及轻量随行进程中。
 
 ## 6.1 macOS 多载体宿主拓扑
 
 | 宿主模块 | 职责与实现位置 | 通信 / 渲染方式 |
 | --- | --- | --- |
-| **主窗口外壳（`Shell`）** | 管理窗口根视图、菜单栏、热键上下文、原生分屏工作区、像素场景栈与 `OpeningScene` 遮罩（`apps/mac/src/shell/`） | GPUI 根实体；同时托管最多 3 个 `HostedView`（`workbench` 主路由、`sidebar` contextual 边栏、`inspector` 右侧检查器）及弹出的 `Palette` 命令面板 |
-| **进程内通信桥（`BridgeHub`）** | 衔接宿主视图 `call`、`frame:state` 帧广播、`live` 增量事件与流式 `subscribe`（`apps/mac/src/hosted/` 与 `crates/server/src/transport/bridge/`） | 线程安全通道直连进程内 `vibevalley-server`（无需绕回本地 loopback HTTP） |
+| **主窗口外壳（`Shell`）** | 管理窗口根视图、菜单栏、热键上下文、原生分屏工作区、纸雕场景栈与 `OpeningView` 遮罩（`apps/mac/src/shell/`） | GPUI 根实体；同时托管最多 3 个 `HostedView`（`workbench` 主路由、`sidebar` contextual 边栏、`inspector` 右侧检查器）及弹出的 `Palette` 命令面板 |
+| **进程内通信桥（`BridgeHub`）** | 衔接宿主视图 `call`、`frame:state` 帧广播、`live` 增量事件与流式 `subscribe`（`apps/mac/src/hosted/` 与 `crates/server/src/gateway/bridge/`） | 线程安全通道直连进程内 `vibevalley-server`（无需绕回本地 loopback HTTP） |
 | **刘海灵动岛（`apps/island`）** | 悬停在 Mac 刘海位置的常驻态浮窗，实时速览正在运行与等待回应的工单（`Island.swift`、`Geometry.swift`、`apps/mac/src/island.rs`） | `Shell` 启动子进程并通过管道推送 `glance(&frame)`（最多 `12` 条精简行）；窗口配置为无边框 `NSPanel`（`.nonactivatingPanel` + `canJoinAllSpaces` + `mainMenuWindow + 3` 层级），几何参数：`wing: 72`、`tabWidth: 200`、`openWidth: 420`、`rowHeight: 28`、`maxRows = 6`；环境变量 `VIBEVALLEY_NO_ISLAND` 可禁用；点击直接发回工单 ID 唤醒主窗切至 `/issues/:id` |
-| **系统菜单栏托盘（`tray.rs`）** | 在系统状态栏驻留 `18×18` 嫩芽像素图标（`assets/pixel/app-sprout.png`），显示即时活动摘要并提供「打开主窗 / 退出」（`apps/mac/src/tray.rs`） | AppKit `NSStatusBar` + `flume` 通道通知 GPUI 主线程激活窗口 |
+| **系统菜单栏托盘（`tray.rs`）** | 在系统状态栏驻留 Papertrails 通道托盘图标（`assets/brand/tray-{release,alpha,beta,dev}.png`），显示即时活动摘要并提供「打开主窗 / 退出」（`apps/mac/src/tray.rs`） | AppKit `NSStatusBar` + `flume` 通道通知 GPUI 主线程激活窗口 |
 
-## 6.2 窗口外框、像素场景与工作台全页面清单
+## 6.2 窗口外框、纸雕场景与工作台全页面清单
 
 ### 全局导航栏（`Shell.tsx` Rail）与三大角色
 
-全局左侧导航 Rail（宽窗 `76px`、农场模式 `72px`，窄窗 `< 640px` 收窄至 `68px` / `56px` 且隐去按钮文字）负责跨空间导航：顶部锚定通往 `/farm` 的农庄主角头像槽位（右下角带 `frames.link` 连接状态灯）；`globalShell` 下先挂载 `/workspace` 终端工作区入口，随后在滚动区按 `work` / `setup` / `reference` 三组渲染 `places.ts` 中的前 8 项入口（加上底部固定的第 9 项 `settings` 与条件显现的 `update` 提示槽位）。未读数字徽标以 `text-bark-900` 深棕墨色落在 `bg-wheat` 麦黄圆丸上，在深浅双主题均保持大于 `7:1` 对比度。
+全局左侧导航 Rail（宽窗 `76px`、农场模式 `72px`，窄窗 `< 640px` 收窄至 `68px` / `56px` 且隐去按钮文字）负责跨空间导航：顶部锚定通往 `/farm` 的农庄主角头像槽位（右下角带 `frames.link` 连接状态灯）；`globalShell` 下挂载工作区与 6 项一级导航入口（加上底部固定的设置与运行态提示槽位）。未读数字徽标以 `text-bark-900` 深棕墨色落在 `bg-wheat` 麦黄圆丸上，在深浅双主题均保持大于 `7:1` 对比度。
 
 系统围绕三类角色划分可见界面：
 
-| 角色 | 业务定位 | 在工作台中的面貌 | 在像素农场中的面貌 |
+| 角色 | 业务定位 | 在工作台中的面貌 | 在纸雕农场中的面貌 |
 | --- | --- | --- | --- |
-| **用户（`Owner`）** | 提出需求、回答询问、审查变更并合入主分支 | 群聊发言人、工单发起者与批准者 | 农场主（在农庄外框切换视角、用手机呼唤与使用底部 6 工具） |
-| **助手（`Orchestrator`）** | 唯一的全局协调与派单者，理解对话并维护工单生命周期 | 置顶于 `/agents`、`/orchestrator` 与频道消息流中 | 院内长椅/门前看板附近行走的人形管家（默认穿农夫装等 6 种造型），点击打开助手面板 |
-| **帮工（`Worker`）** | 按档案配置在仓库或独立 worktree 中一轮一轮执行代码的编码 agent | `/agents` 中的帮工组卡片、工单负责人、`/runs` 轨迹主体 | 7 种毛绒小动物（熊/兔/狐/猫/猫头鹰/刺猬/浣熊），穿 4 套服饰穿梭于地边、图书馆、工坊与信号塔 |
+| **用户（`Owner`）** | 提出需求、回答询问、审查变更并合入主分支 | 群聊发言人、工单发起者与批准者 | 农场主（在农庄外框切换视角、用手机呼唤与点按地块/建筑） |
+| **助手（`Orchestrator`）** | 唯一的全局协调与派单者，理解对话并维护工单生命周期 | 置顶于 `/agents`、`/orchestrator` 与频道消息流中 | 院内行走的主助手纸雕偶人（6 套江南工坊造型），点击打开助手面板 |
+| **帮工（`Worker`）** | 按档案配置在仓库或独立 worktree 中一轮一轮执行代码的编码 agent | `/agents` 中的帮工组卡片、工单负责人、`/runs` 轨迹主体 | 纸雕小动物偶人（熊/兔/狐/猫/柴犬/猫头鹰/刺猬/浣熊），穿梭于地块、书屋、工坊与信号塔 |
 
-### 五个 GPU 像素场景（`apps/mac/src/pixel/view.rs` `Scene` 枚举）
+### 原生 Papertrails 场景（`apps/mac/src/diorama/`）
 
-| 场景分支 | 对应入口 / 触发 | 交互内容与能力 |
+| 场景组件 | 对应入口 / 触发 | 交互内容与能力 |
 | --- | --- | --- |
-| `Farm`（`/farm`、`/farm/:repo`） | 主农庄实时视图 | 至多 9 块农田地块（后 3 块按农庄等级 `5`/`8`/`12` 解锁）、3 处带 2.5D 深度遮挡的地标建筑（图书馆 `skills`、管家看板 `manager`、黑铁工坊 `runtimes`）、24 小时昼夜循环、左下农庄手机与内嵌游戏、底部 6 工具 |
-| `Map`（`/map`） | 仓库群岛海图 | 按活跃工单数与近期提交排序渲染各代码仓库岛屿，展示每座岛上占坑干活与排队等待中的帮工；点击岛屿进入对应仓库农场或工作区 |
-| `Tree`（`/tree`） | 长期记忆树 | 随已跑轮次动态长出分支的递归像素大树；叶子、果实与种子代表长期记性条目，点按果实可展开查看对应回忆详情；随昼夜变化切换日/夜山丘底景 |
-| `Opening` | 应用启动与加载遮罩 | 当服务端或工作台尚未就绪时叠盖全窗；展示随本机时段切换的早/午/夜农场欢迎画与 5 阶段情绪跑图动画（可通过 `VIBEVALLEY_NO_OPENING=1` 跳过） |
-| `Catalog`（`/catalog`） | 资产图鉴书架 | 14 个分类货架陈列全部静态与烘焙像素切片，提供格子/草地/夜间三种底色试色检视 |
+| `DioramaView`（`/farm`、`/farm/:repo`） | 主农庄实时 3D 视图（`apps/mac/src/diorama/view.rs`） | 9 块农田地块、可聚焦掀顶的江南院落建筑、4 档昼夜光影循环（`1..4`）、左下农庄手机与内嵌小游戏 |
+| `OpeningView` | 应用启动与加载遮罩（`apps/mac/src/diorama/opening.rs`） | 当服务端或工作台尚未就绪时叠盖全窗；展示随本机时段切换的 `assets/brand/opening-{morning,day,night}.webp` 欢迎画与进度条（可通过 `VIBEVALLEY_NO_OPENING=1` 跳过） |
 
 ### 工作台全量路由与页面表（`App.tsx` 与 `places.ts`）
 
@@ -50,10 +47,8 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 | `/orchestrator`、`/orchestrator/*` | `agents` | 助手的 `memory`（记性）与 `voice`（语音）配置标签页、跳往 `/runs` 的运行轨迹链接以及 `/orchestrator[/id]/trajectory` 兼容重定向（`OrchestratorPage.tsx`） |
 | `/runtimes` | `runtimes` | 农机安装检测、CLI 可用性与额度精力瓶水位仪（`RuntimesPage.tsx`） |
 | `/repos` | `repos` | 已接入代码仓库管理、并发槽位上限（`maxSessions`）与项目检验命令配置 |
-| `/map` | `repos` | 像素仓库群岛（共享仓库配置空间） |
-| `/farm`、`/farm/:repo` | `skin: "farm"` | 农庄主页或指定仓库视角；通过宿主事件在 GPUI 层叠载入 `PixelView` |
-| `/tree` | `skin: "farm"` | 记忆树像素场景页 |
-| `/catalog` | `catalog` | 像素图鉴货架查看页 |
+| `/farm`、`/farm/:repo` | `skin: "farm"` | 农庄主页或指定仓库视角；通过宿主事件在 GPUI 层叠载入 `DioramaView` |
+| `/tree` | 重定向 | 重定向至 `/settings/memory` 记忆管理页 |
 | `/workspace` | `workspace` | 触发外壳呈现原生代码文件树、Git 变更面板、DiffView、FileViewer 与 GPU 终端分屏区域 |
 | `/settings`、`/settings/*` | `settings` | 多分区设置页（外观、密钥、快捷键、MCP、技能库、语音、更新等），支持即时高亮检索 |
 
@@ -75,8 +70,8 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 
 | 断点 / 阈值 | 作用对象 | 降级行为 |
 | --- | --- | --- |
-| `< 640px` (`40rem` / `sm`) | 全局 Rail（`Shell.tsx`）与农庄手机（`chrome.rs`） | Rail 从 `76px` 收缩至 `68px` 且按钮隐去底部文字仅保留居中图标；农庄展开手机宽度不足 `640px` 时收起左侧菜单进入纯聊天布局（`chat_only`） |
-| `< 680px` | 农场像素 HUD（`chrome.rs`）与档案列表（`AgentsPage.tsx`） | 农场顶部右侧按钮流式折行、底部 6 把农具按钮单格从 `52px` 收缩至 `44px`；`AgentsPage` 隐藏行内右侧摘要/标签/农机列 |
+| `< 640px` (`40rem` / `sm`) | 全局 Rail（`Shell.tsx`）与农庄手机（`FarmPhone.tsx`） | Rail 从 `76px` 收缩至 `68px` 且按钮隐去底部文字仅保留居中图标；农庄展开手机宽度不足 `640px` 时收起左侧菜单进入纯聊天布局（`chat_only`） |
+| `< 680px` | 档案列表（`AgentsPage.tsx`） | `AgentsPage` 隐藏行内右侧摘要/标签/农机列 |
 | `< 768px` (`48rem` / `md`) | 工作台多栏详情页面（`/runs`、`/issues`、`/chat` 等） | 左右分栏退化为单栏列表/详情切换，选中条目后切换详情并呈现「返回」按钮（`issues` 保留面包屑返回栈） |
 | `< 1040px` | 原生工作区检查器（`shell/render.rs`） | 右侧文件/Git 检查器栏及拖拽分隔线自动隐去，优先把水平像素留给代码/Diff/终端主视口 |
 
@@ -90,7 +85,7 @@ VibeValley 作为 macOS 全原生桌面应用，将 GPUI 窗口外壳、`nsh` �
 
 ## 6.6 异常容灾、断连降级与结构化错因
 
-- **异步启服与零白屏等待（`LateServer` & `OpeningScene`）**：`Shell` 启动时通过 `apps/mac/src/hosted/late.rs` 在后台线程并行拉起 `vibevalley-server`（探针检查、数据库与配置初始化）。服务未完全就绪前，工作台请求与帧订阅在 `LateServer` 的 `OnceLock` 上安全挂起而不报错退出，前台由 `OpeningScene` 实时展示启动阶段与进度；若服务端启动彻底失败，`load_error` 与 `OpeningScene` 立刻转为明确失败说明。
+- **异步启服与零白屏等待（`LateServer` & `OpeningView`）**：`Shell` 启动时通过 `apps/mac/src/hosted/late.rs` 在后台线程并行拉起 `vibevalley-server`（探针检查、数据库与配置初始化）。服务未完全就绪前，工作台请求与帧订阅在 `LateServer` 的 `OnceLock` 上安全挂起而不报错退出，前台由 `OpeningView` 实时展示启动阶段与进度；若服务端启动彻底失败，`load_error` 与 `OpeningView` 立刻转为明确失败说明。
 - **五源结构化故障（`apps/mac/ui/infra/api.ts` `UiFault`）**：所有桥接响应、语音调用错误、客户端异常与网络连接断落统一归一为 `UiFault`（携带 `tag`、`bizCode`、`reason`、`next` 修复指引与服务端定义 `bizCodeMeta[bizCode].retryable` 标志），阻止静默吞错或将原始 JSON 栈抛给用户。
 - **断线排队、重放去重与局部补读**：
   - `infra/frame.ts` 监控连接 `Link` 三态（`connecting` / `open` / `lost`）；发送消息与建单流使用 `createRequestKey()` / `newSendKey()` 绑定唯一随机 16 字节十六进制发送键，保证断线重传不产生重复消息或工单。

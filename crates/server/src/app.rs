@@ -7,11 +7,12 @@ use std::sync::{Arc, OnceLock};
 use crate::agent::{Agent, AgentDriver, Mcp, Memory, Orchestrator, OrchestratorParts, PendingExecution, Profile, Resource, ToolRegistry};
 use crate::artifact::Manager as ArtifactManager;
 use crate::boot::{
-    LazyCronOrchestrator, build_runtimes, register_session_reported_outbox, seat_orchestrators_and_watch, spawn_chat_artifact_bridge, spawn_skin_event_bridge,
+    LazyCronOrchestrator, build_runtimes, register_session_reported_outbox, seat_orchestrators_and_watch, seed_starter_issues_on_boot,
+    spawn_chat_artifact_bridge, spawn_skin_event_bridge,
 };
 use crate::channel::Chat;
 use crate::config::failed;
-pub use crate::config::{Config, StartError};
+pub use crate::config::{Config, StartError, StartErrorKind};
 use crate::connector::Connector;
 use crate::context::port::{CronOrchestratorPort, MemoryRecallPort};
 use crate::context::{Context, Fetch, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup, install_tls};
@@ -140,8 +141,10 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
     }
 
     let service = match config.database_url.as_deref() {
-        Some(url) => Box::pin(Service::open_url(url)).await.map_err(|e| failed("the database")(&e))?,
-        None => Box::pin(Service::open(&config.home)).await.map_err(|e| failed("the database")(&e))?,
+        Some(url) => Box::pin(Service::open_url(url)).await.map_err(|e| StartError::from_db_error(e, None))?,
+        None => Box::pin(Service::open(&config.home))
+            .await
+            .map_err(|e| StartError::from_db_error(e, Some(config.home.join("server.db"))))?,
     };
     let (http, download): (Arc<dyn Fetch>, Arc<dyn Fetch>) = match &config.media_network {
         Some(network) => network.clone(),
@@ -237,6 +240,7 @@ async fn create_app_inner(config: Config) -> Result<App, StartError> {
     ))
     .await
     .map_err(|e| failed("the board")(&e))?;
+    seed_starter_issues_on_boot(&config, &setting, &board).await;
     let publisher = config.publisher.clone().unwrap_or_else(|| Arc::new(Publisher::default()));
     let pull = Box::pin(Pull::open_async(ctx.clone(), publisher, Some(repo.clone()), Some(board.clone()), None, None))
         .await

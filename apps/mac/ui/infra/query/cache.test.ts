@@ -9,11 +9,11 @@ describe("defineQuery", () => {
   test("with schema decodes valid payloads, fails on invalid payloads without retrying, and validates setData", async () => {
     const client = createQueryClient();
     let calls = 0;
-    let payload: unknown = { path: "/tmp/sprites" };
+    let payload: unknown = { path: "/tmp/assets" };
 
-    const pixelQuery = defineQuery({
+    const assetsQuery = defineQuery({
       schema: z.object({ path: z.string() }),
-      key: () => ["test", "pixel"],
+      key: () => ["test", "assets"],
       fetch: () => {
         calls += 1;
         return Promise.resolve(payload);
@@ -22,17 +22,17 @@ describe("defineQuery", () => {
       retryWhen: () => true,
     });
 
-    const first = await client.fetch(pixelQuery());
-    expect(first).toEqual({ path: "/tmp/sprites" });
+    const first = await client.fetch(assetsQuery());
+    expect(first).toEqual({ path: "/tmp/assets" });
     expect(calls).toBe(1);
 
-    client.setData(pixelQuery(), () => ({ value: { path: "/tmp/other" } }));
-    expect(client.read(pixelQuery()).record?.value).toEqual({ path: "/tmp/other" });
+    client.setData(assetsQuery(), () => ({ value: { path: "/tmp/other" } }));
+    expect(client.read(assetsQuery()).record?.value).toEqual({ path: "/tmp/other" });
 
     payload = { path: 123 };
     let caught: unknown;
     try {
-      await client.fetch(pixelQuery(), true);
+      await client.fetch(assetsQuery(), true);
     } catch (error) {
       caught = error;
     }
@@ -42,7 +42,7 @@ describe("defineQuery", () => {
     let writeError: unknown;
     try {
       const invalidWrite = JSON.parse('{"path":42}') as { path: string };
-      client.setData(pixelQuery(), () => ({ value: invalidWrite }));
+      client.setData(assetsQuery(), () => ({ value: invalidWrite }));
     } catch (error) {
       writeError = error;
     }

@@ -1,7 +1,7 @@
 {
   "family": {
-    "children": "子任务",
-    "parent": "父任务"
+    "children": "子工单",
+    "parent": "父工单"
   },
   "reading": "在读……",
   "never": "算了",
@@ -15,18 +15,18 @@
       "todo": "想到要做的先写在这里，拖到「处理中」就派人开工；上下拖排先后。",
       "working": "没有在干的活。",
       "waiting": "做完的、没做成的在这里等你看；拖到「已关」完成或取消。",
-      "closed": "已完成、已取消的任务；拖回「处理中」重开。"
+      "closed": "已完成、已取消的工单；拖回「处理中」重开。"
     },
     "emptyGuide": {
       "todoTitle": "待办还是空的",
-      "todoBody": "记下要做的任务，选好仓库和角色就能派发开工。",
-      "workingTitle": "暂无处理中任务",
-      "workingBody": "给待办任务选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
+      "todoBody": "记下要做的工单，选好仓库和角色就能派发开工。",
+      "workingTitle": "暂无处理中工单",
+      "workingBody": "给待办工单选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
       "waitingTitle": "暂无待验收改动",
       "waitingBody": "执行会话跑完一轮或有疑问时会停在这里，方便看改动、回复或完成交付。",
-      "closedTitle": "还没有已关任务",
-      "closedBody": "已完成或取消的任务会留在这里，拖回「处理中」即可随时重开。",
-      "filtered": "当前筛选条件下此列没有任务。"
+      "closedTitle": "还没有已关工单",
+      "closedBody": "已完成或取消的工单会留在这里，拖回「处理中」即可随时重开。",
+      "filtered": "当前筛选条件下此列没有工单。"
     },
     "whichLane": "看哪一列",
     "spots": "{taken} / {of} 个并发上限",
@@ -45,19 +45,21 @@
   },
   "list": {
     "noRepo": "没有仓库",
-    "all": "全部任务",
+    "all": "全部工单",
     "unfold": "展开 {group}",
     "fold": "收起 {group}",
-    "writeIn": "在「{group}」写一张"
+    "writeIn": "在「{group}」写一张",
+    "empty": "暂无工单，按 C 或点右上角「新工单」写下第一条。",
+    "emptyFiltered": "当前筛选条件下没有匹配的工单。"
   },
   "page": {
     "pickFirst": "还差一点：选好派哪个执行会话、在哪个仓库里做，再点「开工」。",
     "notDrafted": "先没起草：{why}",
-    "historyUnread": "任务记录没读到：",
-    "notFound": "找不到这个任务",
-    "notFoundLine": "没有 {id} 这个任务：可能已经删掉了，或者链接写错了。",
-    "find": "找任务：标题、执行会话、仓库",
-    "findLabel": "找任务",
+    "historyUnread": "工单记录没读到：",
+    "notFound": "找不到这个工单",
+    "notFoundLine": "没有 {id} 这个工单：可能已经删掉了，或者链接写错了。",
+    "find": "找工单：标题、执行会话、仓库",
+    "findLabel": "找工单",
     "filter": "筛选",
     "byRepo": "按仓库看",
     "allRepos": "所有仓库",
@@ -67,7 +69,7 @@
     "clear": "清掉筛选",
     "view": "看法",
     "missing": "这一轮的记录缺失：{what}。对它的操作暂不可用。",
-    "backToBoard": "任务"
+    "backToBoard": "工单"
   },
   "marks": {
     "priority": "优先级：{word}"
@@ -79,7 +81,7 @@
     "stageDone": "{stage}做完了"
   },
   "acts": {
-    "reopened": "任务重开了",
+    "reopened": "工单重开了",
     "goesOn": "{helper} 接着做。",
     "rejectWith": "打回，照上面修",
     "carry": "带过去",
@@ -91,12 +93,12 @@
   },
   "close": {
     "title": "关上「{issue}」",
-    "working": "{who} 还在干这个任务。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
+    "working": "{who} 还在干这个工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
     "completable": "完成就是把 {who} 的分支合进仓库的主分支，先看一遍改动；取消就是让它收工，改动不合进去。",
-    "notCompletable": "这个任务现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
+    "notCompletable": "这个工单现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
     "review": "看改动，完成",
     "stopAndCancel": "叫停并取消",
-    "cancel": "取消任务"
+    "cancel": "取消工单"
   },
   "changes": {
     "checkOutput": "检查输出",
@@ -111,13 +113,13 @@
     "mergedCommit": "合入提交",
     "reading": "正在看它改了什么…",
     "unreadable": "看不了改动：",
-    "none": "这个任务没有改动。完成就是请它收工。",
+    "none": "这个工单没有改动。完成就是请它收工。",
     "conflict": "合进 {base} 会冲突，先没法完成",
     "resolveHow": "让它在自己的分支上把 {base} 合进来、解决冲突、跑一遍测试再提交；解决了再来完成。",
     "behind": "它干活这段时间，{base} 上多了 {n} 个提交；完成时会合在一起（多一个合并提交）。",
     "uncommitted": "还有 {n} 个文件没提交，完成时会先帮它提交：",
     "resolve": "让它解决冲突",
-    "moved": "任务状态变了，先回到任务看看要你做的事。",
+    "moved": "工单状态变了，先回到工单看看要你做的事。",
     "counts": "{commits} 个提交 · {files} 个文件",
     "commits": "提交 {n}",
     "files": "改了的文件 {n}",
@@ -125,8 +127,8 @@
     "binary": "二进制"
   },
   "reopen": {
-    "title": "重开这个任务",
-    "line": "「{issue}」由同一份角色的新执行会话接着做，它会知道这个任务原来要做什么、上一次是怎么关的。",
+    "title": "重开这个工单",
+    "line": "「{issue}」由同一份角色的新执行会话接着做，它会知道这个工单原来要做什么、上一次是怎么关的。",
     "what": "这次要它做什么（不填就是接着做完）",
     "whatLabel": "这次要做什么",
     "reopen": "重开"
@@ -144,7 +146,7 @@
     "tellIdle": "说一句，它接着做一轮",
     "progress": "做到哪了",
     "met": "{met} / {of} 条做到了",
-    "noCriteria": "{answer, select, true {这个任务没写做完的标准：交回来时看结论判断。} other {这个任务没写做完的标准：交回来时看改动判断。}}",
+    "noCriteria": "{answer, select, true {这个工单没写做完的标准：交回来时看结论判断。} other {这个工单没写做完的标准：交回来时看改动判断。}}",
     "rejected": "上次打回的",
     "made": "做出了什么",
     "nothingToSee": "没有可看的改动。",
@@ -214,7 +216,7 @@
     "repo": "仓库",
     "noRepo": "没有仓库",
     "rename": "改标题",
-    "trail": "任务在哪"
+    "trail": "工单在哪"
   },
   "task": {
     "repo": "仓库",
@@ -229,7 +231,7 @@
     "drafted": "草稿写好了",
     "draftedLine": "看一遍、改一改，没问题就开工。",
     "what": "想做什么？",
-    "whatLine": "写一句就行：执行会话读过代码，替你写成任务。",
+    "whatLine": "写一句就行：执行会话读过代码，替你写成工单。",
     "titleHint": "比如：给登录页加上记住我",
     "title": "标题",
     "descriptionHint": "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
@@ -294,7 +296,7 @@
       "work": "安排活",
       "finish": "完成"
     },
-    "newIssue": "新任务"
+    "newIssue": "新工单"
   },
   "trigger": {
     "issue": "派出去",
@@ -309,7 +311,7 @@
     "working": "正在干",
     "heard": "中途听到 {n} 句",
     "reconcile": "需要核对工作区",
-    "currentChanges": "查看任务当前改动"
+    "currentChanges": "查看工单当前改动"
   },
   "card": {
     "orchestrator": "主助手",
@@ -354,7 +356,7 @@
     "ran": "第 {n} 轮",
     "used": "共用 {span}",
     "noSteps": "还什么都没做。",
-    "stepsGone": "轨迹只留 30 天（配置里的 session.trajectory_days），这个任务的已经清掉了。",
+    "stepsGone": "轨迹只留 30 天（配置里的 session.trajectory_days），这个工单的已经清掉了。",
     "change": {
       "A": {
         "mark": "新",
@@ -377,11 +379,11 @@
     "changes": "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
     "changesUncommitted": "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
     "justNow": "刚刚",
-    "reviewAfterFailedCheck": "核对修复后，再次完成任务以重跑检查"
+    "reviewAfterFailedCheck": "核对修复后，再次完成工单以重跑检查"
   },
   "new": {
-    "title": "新任务",
-    "card": "新任务",
+    "title": "新工单",
+    "card": "新工单",
     "words": "要做什么",
     "placeholder": "要做什么？一句话就行，执行会话会照它起草",
     "keys": "⌘ 回车记下",
@@ -406,55 +408,5 @@
     "uploadFailed": "附件上传失败：{why}",
     "uploading": "正在上传 {name}…",
     "remove": "移除附件 {name}"
-  },
-  "guide": {
-    "title": "任务流转指南",
-    "summary": "写下需求并指派角色，执行会话在独立 worktree 改代码，完成后经验收合入主分支。",
-    "collapse": "收起指南",
-    "expand": "展开指南",
-    "stage": {
-      "todo": "写下目标、挑好仓库和角色，按先后排好待办。",
-      "working": "确认派发或拖入此列，执行会话自动开 worktree 干活。",
-      "waiting": "跑完一轮后在此验收改动、回答问题，或打回继续修。",
-      "closed": "验收通过后完成交付并合入主分支，需要时可随时重开。"
-    }
-  },
-  "onboarding": {
-    "title": "开始使用 VibeValley",
-    "subtitle": "完成下面三步准备工作，就能让执行会话在独立 worktree 里帮你改代码。",
-    "progress": "{done} / {total} 已就绪",
-    "step1Title": "添加代码仓库",
-    "step1Desc": "绑定本机 Git 仓库，执行会话会在独立工作区里改动代码。",
-    "step1Action": "添加仓库",
-    "step1Manage": "管理仓库",
-    "step1Ready": "{n} 个仓库已就绪",
-    "step2Title": "检查或配置引擎",
-    "step2Desc": "确认本机已安装并启用编码引擎（如 Claude Code、Codex 等）。",
-    "step2Action": "配置引擎",
-    "step2Manage": "管理引擎",
-    "step2Ready": "{n} 个引擎已就绪",
-    "step3Title": "创建第一条任务，或在聊天中派活",
-    "step3Desc": "写下需求直接派给执行会话，按 C 键快速新建，或从下方模板一键预填。",
-    "step3Ready": "{n} 条任务",
-    "newIssue": "新建任务",
-    "openChat": "去聊天派活",
-    "templatesTitle": "或选一个起步模板快速开始",
-    "templates": {
-      "bug": {
-        "title": "修复缺陷",
-        "desc": "定位报错或异常行为并补回归测试",
-        "prompt": "修复：[简述问题现象]\n\n复现步骤：\n1. \n预期结果：\n验收标准：补充回归测试并通过检查"
-      },
-      "feature": {
-        "title": "新增功能",
-        "desc": "明确范围、交互和验收标准后交给执行会话",
-        "prompt": "实现：[简述功能目标]\n\n范围：\n- \n不涉及：\n- \n验收标准：补齐测试并验证关键路径"
-      },
-      "refactor": {
-        "title": "排查并重构",
-        "desc": "清理重复逻辑、收敛边界并保持行为一致",
-        "prompt": "重构：[目标模块或路径]\n\n目标：\n- 简化结构，消除重复逻辑\n- 保持对外行为和现有测试不变"
-      }
-    }
   }
 }

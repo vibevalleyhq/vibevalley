@@ -1,4 +1,4 @@
-import { colorScheme, Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
+import { Clipboard, colorScheme, Scroll, signal, Text, View, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { OrchestratorEval, Session, SessionEvent } from "@vibevalley/protocol";
@@ -13,10 +13,12 @@ import { Markdown } from "../../design/Markdown";
 import { motionClass } from "../../design/motion";
 import { Dot } from "../../design/Tag";
 import { Bubble } from "../../design/Tip";
+import { toast } from "../../design/toasts";
 import { mix, tone } from "../../design/tone";
 import { useNow } from "../../infra/base/dom";
 import { ago } from "../../infra/base/format";
-import { createMemo } from "../../infra/solid";
+import { useTimeout } from "../../infra/base/timer";
+import { createEffect, createMemo } from "../../infra/solid";
 import { createSessionEvents } from "./events";
 import {
   cacheHit,
@@ -47,6 +49,36 @@ const laneNames: Record<Lane, string> = {
   model: t("web.session.trajectory.lane.model"),
   tool: t("web.session.trajectory.lane.tool"),
 };
+
+type StepFilter = "all" | "tools" | "errors";
+
+const stepFilters: readonly StepFilter[] = ["all", "tools", "errors"];
+
+function stepFilterLabel(kind: StepFilter): string {
+  switch (kind) {
+    case "all":
+      return t("web.session.hub.scope.all");
+    case "tools":
+      return t("web.session.runs.span.tool");
+    case "errors":
+      return t("web.session.runs.span.error");
+  }
+}
+
+function isErrorStep(step: SessionEvent): boolean {
+  return step.type === "run/error" || (step.type === "tool/call" && step.ok === false);
+}
+
+function matchesStepFilter(step: SessionEvent, filter: StepFilter): boolean {
+  switch (filter) {
+    case "all":
+      return true;
+    case "tools":
+      return step.type === "tool/call";
+    case "errors":
+      return isErrorStep(step);
+  }
+}
 
 interface TagTone {
   readonly bgClass: string;
@@ -201,6 +233,7 @@ export function Trajectory(props: {
   head?: JSX.Element;
 }) {
   const query = signal("");
+  const stepFilter = signal<StepFilter>("all");
   const open = signal<ReadonlySet<number>>(new Set());
   const collapsedRuns = signal<ReadonlySet<string>>(new Set());
   const marked = signal<number>();
@@ -209,6 +242,12 @@ export function Trajectory(props: {
   const rowRefs = new Map<number, ViewRef>();
 
   const shown = createMemo(() => shownEvents(props.steps));
+  const errorCount = createMemo(() => shown().filter(isErrorStep).length);
+  const hasActiveFilter = createMemo(() => query().trim().length > 0 || stepFilter() !== "all");
+  const clearFilters = () => {
+    query.set("");
+    stepFilter.set("all");
+  };
   const end = createMemo(() => {
     const last = props.steps.at(-1)?.time ?? props.now;
     return props.working === true && props.now > last ? props.now : last;
@@ -218,6 +257,7 @@ export function Trajectory(props: {
 
   const groups = createMemo((): readonly RunGroup[] => {
     const firstAsked = shown().find((s) => s.type === "user/message" && s.under === undefined)?.seq;
+    const filter = stepFilter();
     const q = query().trim().toLowerCase();
     const views = runsOf(shown());
     const out: RunGroup[] = [];
@@ -227,6 +267,7 @@ export function Trajectory(props: {
       const allSteps = view.asked ? [view.asked, ...view.steps] : view.steps;
       const rows: RowSpec[] = [];
       for (const step of allSteps) {
+        if (!matchesStepFilter(step, filter)) continue;
         const tag = tagOf(step, props.asked, step.seq === firstAsked);
         if (q && !haystack(step, tag).includes(q)) continue;
         rows.push({
@@ -267,7 +308,7 @@ export function Trajectory(props: {
   });
 
   const show = (seq: number) => {
-    query.set("");
+    clearFilters();
     const targetGroup = groups().find((g) => g.rows.some((r) => r.step.seq === seq));
     if (targetGroup && collapsedRuns().has(targetGroup.key)) {
       collapsedRuns.set(new Set([...collapsedRuns()].filter((k) => k !== targetGroup.key)));
@@ -288,11 +329,38 @@ export function Trajectory(props: {
 
   return (
     <View testID="trajectory" class="min-h-0 flex-1">
-      <View class="flex-row items-center gap-3 pb-2">
+      <View class="flex-row flex-wrap items-center gap-2 pb-2">
         <View class="min-w-0 flex-1">{props.head}</View>
+        <View testID="trajectory-filters" class="flex-row items-center gap-1 rounded-md border border-line bg-side p-0.5">
+          <Each of={stepFilters} key={(f) => f}>
+            {(f) => {
+              const active = () => stepFilter() === f();
+              const hasErrors = () => f() === "errors" && errorCount() > 0;
+              const label = () => (hasErrors() ? `${stepFilterLabel(f())} (${errorCount()})` : stepFilterLabel(f()));
+              return (
+                <View
+                  role="button"
+                  testID={`trajectory-filter-${f()}`}
+                  accessibilityState={{ selected: active() }}
+                  onPress={() => stepFilter.set(f())}
+                  class={`h-6 flex-row items-center rounded-sm px-2 focus-visible:outline-2 focus-visible:outline-focus ${
+                    active() ? "bg-page shadow-raise" : "hover:bg-hover"
+                  }`}
+                >
+                  <Text
+                    class={`text-xs ${active() ? (hasErrors() ? "font-medium text-berry" : "font-medium text-ink") : hasErrors() ? "text-berry" : "text-muted"}`}
+                  >
+                    {label()}
+                  </Text>
+                </View>
+              );
+            }}
+          </Each>
+        </View>
         <SearchField
           testid="trajectory-search"
-          clearLabel={t("web.base.lightbox.close")}
+          clearTestid="trajectory-search-clear"
+          clearLabel={t("web.session.hub.clear")}
           value={query()}
           onInput={(v) => query.set(v)}
           placeholder={t("web.session.trajectory.searchHint")}
@@ -313,14 +381,21 @@ export function Trajectory(props: {
         <If
           when={groups().length > 0}
           else={
-            <Text testID="steps-empty" class="px-2 py-3 text-sm text-muted">
-              {t("web.session.trajectory.noMatch")}
-            </Text>
+            <View class="items-start gap-2 px-2 py-4">
+              <Text testID="steps-empty" class="text-sm text-muted">
+                {t("web.session.trajectory.noMatch")}
+              </Text>
+              <If when={hasActiveFilter()}>
+                <Button size="compact" icon="refresh" testID="trajectory-clear-filters" onPress={clearFilters}>
+                  {t("web.session.hub.clearFilter")}
+                </Button>
+              </If>
+            </View>
           }
         >
           <Each of={groups()} key={(g) => g.key}>
             {(group, groupIdx) => {
-              const isRunOpen = () => query().trim().length > 0 || !collapsedRuns().has(group().key);
+              const isRunOpen = () => hasActiveFilter() || !collapsedRuns().has(group().key);
               const metaParts = () => {
                 const g = group();
                 return [
@@ -424,6 +499,7 @@ function Row(props: { spec: RowSpec; open: boolean; marked: boolean; refTo: (el:
     >
       <View
         role="button"
+        testID={`step-toggle-${String(step().seq)}`}
         accessibilityLabel={`${props.spec.tag} ${oneLine(bodyText()).trim()}`}
         accessibilityState={{ expanded: props.open }}
         onPress={() => props.onToggle()}
@@ -516,7 +592,42 @@ function ToolLine(props: { step: SessionEvent; failed: boolean }) {
   );
 }
 
+function CopyStepButton(props: { testID: string; copied: boolean; onCopy: () => void }) {
+  return (
+    <View
+      role="button"
+      testID={props.testID}
+      accessibilityLabel={props.copied ? t("web.base.rich.copied") : t("web.base.rich.copy")}
+      tooltip={<Bubble text={props.copied ? t("web.base.rich.copied") : t("web.base.rich.copy")} />}
+      onPress={props.onCopy}
+      class="flex-row items-center gap-1 rounded-sm px-1.5 py-0.5 focus-visible:outline-2 focus-visible:outline-focus hover:bg-hover"
+    >
+      <Icon name={props.copied ? "check" : "copy"} size={11} tone={props.copied ? "leaf" : "muted"} />
+      <Text class={`text-2xs ${props.copied ? "font-medium text-ok-ink" : "text-muted"}`}>
+        {props.copied ? t("web.base.rich.copied") : t("web.base.rich.copy")}
+      </Text>
+    </View>
+  );
+}
+
 function ToolDetail(props: { step: SessionEvent }) {
+  const copiedSlot = signal<"input" | "output" | undefined>(undefined);
+  const resetCopy = useTimeout();
+  createEffect(
+    () => props.step.seq,
+    () => copiedSlot.set(undefined),
+    { defer: true },
+  );
+  const copyPayload = (slot: "input" | "output", value: string) => {
+    void Clipboard.writeText(value).then(
+      () => {
+        copiedSlot.set(slot);
+        resetCopy(() => copiedSlot.set(undefined), 1500);
+        toast(t("web.base.rich.copied"));
+      },
+      () => undefined,
+    );
+  };
   const input = () => readableInput(props.step);
   const running = () => props.step.ok === undefined;
   const failed = () => props.step.ok === false;
@@ -535,12 +646,24 @@ function ToolDetail(props: { step: SessionEvent }) {
         </View>
       </View>
       <If when={input()}>
-        <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.input")}</Text>
-        <Scroll class="max-h-40 rounded-md border border-line bg-code-bg px-2.5 py-2">
-          <Text class="select-text font-mono text-xs text-code-ink">{input() ?? ""}</Text>
-        </Scroll>
+        {(text) => (
+          <>
+            <View class="flex-row items-center justify-between gap-2">
+              <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.input")}</Text>
+              <CopyStepButton testID="tool-copy-input" copied={copiedSlot() === "input"} onCopy={() => copyPayload("input", text())} />
+            </View>
+            <Scroll class="max-h-40 rounded-md border border-line bg-code-bg px-2.5 py-2">
+              <Text class="select-text font-mono text-xs text-code-ink">{text()}</Text>
+            </Scroll>
+          </>
+        )}
       </If>
-      <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.output")}</Text>
+      <View class="flex-row items-center justify-between gap-2">
+        <Text class="text-2xs font-medium text-muted">{t("web.session.trajectory.output")}</Text>
+        <If when={props.step.output}>
+          {(out) => <CopyStepButton testID="tool-copy-output" copied={copiedSlot() === "output"} onCopy={() => copyPayload("output", out())} />}
+        </If>
+      </View>
       <If
         when={props.step.output}
         else={<Text class="text-xs text-faint">{running() ? t("web.session.trajectory.pending") : t("web.session.trajectory.noOutput")}</Text>}

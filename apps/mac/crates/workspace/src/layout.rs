@@ -73,9 +73,8 @@ pub enum PaneKind {
         #[serde(default)]
         props: serde_json::Value,
     },
-    /// A GPU-painted pixel scene drawn by the app (`farm`, `map`, `tree`,
-    /// `opening`, `catalog`); `props` is passed through untouched.
-    Pixel {
+    /// A GPU-painted Papertrails diorama scene drawn by the app (`farm`); `props` is passed through untouched.
+    Diorama {
         scene: String,
         #[serde(default)]
         props: serde_json::Value,
@@ -698,7 +697,7 @@ mod tests {
         l.split(
             g2,
             Axis::Vertical,
-            PaneKind::Pixel {
+            PaneKind::Diorama {
                 scene: "farm".into(),
                 props: serde_json::json!({}),
             },

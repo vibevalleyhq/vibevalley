@@ -554,7 +554,7 @@ async fn create_work_issue(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
         .await
 }
 
-async fn create_work_session(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+pub(crate) async fn create_session_table_and_index(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     manager
         .create_table(
             Table::create()
@@ -598,7 +598,11 @@ async fn create_work_session(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
                 .col(Session::HiredAt)
                 .to_owned(),
         )
-        .await?;
+        .await
+}
+
+async fn create_work_session(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    create_session_table_and_index(manager).await?;
 
     manager
         .create_table(
@@ -1520,7 +1524,7 @@ async fn create_content_media_and_library(manager: &SchemaManager<'_>) -> Result
         .await
 }
 
-async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+pub(crate) async fn create_content_artifact(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     manager
         .create_table(
             Table::create()

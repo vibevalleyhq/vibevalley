@@ -4,6 +4,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
+/// Serializes tests that mount `VvDiagram` or inspect global diagram/canvas LRU stats.
+pub static DIAGRAM_CACHE_TEST_LOCK: Mutex<()> = Mutex::new(());
+
 use nsh_core::canvas::Drawing;
 use nsh_core::element::{Registry, Root};
 use nsh_core::platform::Appearance;

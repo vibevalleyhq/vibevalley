@@ -927,7 +927,7 @@ fn handle_standalone_host_call(op: HostOp, reply: crate::hosted::Replier, cx: &m
             "terminal": false,
             "theme": Ui::get(cx).settings.theme.as_str(),
             "motion": Ui::get(cx).settings.effective_motion().as_str(),
-            "capabilities": ["openUrl", "openFile", "pixelDir", "playAudio", "readFile", "saveFile"],
+            "capabilities": ["openUrl", "openFile", "assetsDir", "playAudio", "readFile", "saveFile"],
         })),
         HostOp::OpenUrl(req) => match url::Url::parse(&req.url) {
             Ok(parsed) if matches!(parsed.scheme(), "http" | "https" | "mailto") => {
@@ -945,12 +945,12 @@ fn handle_standalone_host_call(op: HostOp, reply: crate::hosted::Replier, cx: &m
                 refusal(BizCode::InvalidInput, "openFile takes the absolute path of an existing file")
             }
         }
-        HostOp::PixelDir => {
-            let dir = crate::pixel::assets_dir().join("pixel");
-            if dir.join("sprites.json").is_file() {
+        HostOp::AssetsDir => {
+            let dir = crate::assets::assets_dir();
+            if dir.is_dir() {
                 Envelope::ok(json!({ "path": dir }))
             } else {
-                refusal(BizCode::NotFound, "the pixel art is not installed")
+                refusal(BizCode::NotFound, "the assets directory is not installed")
             }
         }
         HostOp::PlayAudio(req) => {
@@ -958,7 +958,7 @@ fn handle_standalone_host_call(op: HostOp, reply: crate::hosted::Replier, cx: &m
             return;
         }
         HostOp::PlaySound(req) => {
-            let name = crate::audio::SoundName::from(req.name);
+            let name = req.name;
             crate::audio::dispatch(reply, move || crate::audio::play_sound(name));
             return;
         }

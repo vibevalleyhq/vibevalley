@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 
-use super::{ToolRegistry, Who, given};
+use super::registry::{ToolRegistry, Who, given};
 use crate::agent::memory::{By, Note};
 use crate::agent::profile::text;
 

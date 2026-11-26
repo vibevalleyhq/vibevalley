@@ -25,7 +25,7 @@ import { type CriterionRow, stageTone } from "../model/overview";
 import { updateIssueAttachments } from "../model/write";
 import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
-import { IssueSheet, Note, Property, SheetLabel } from "./Sheet";
+import { IssueNumberPill, IssueSheet, Note, Property, SheetLabel } from "./Sheet";
 
 /** A question of the helper's: its options are replies as they are, one click each. */
 export function Question(props: { ask: QuestionItem; busy: boolean; onPick: (words: string) => void }) {
@@ -248,7 +248,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
       <View class="mb-1.5 flex-row flex-wrap items-center gap-1">
         <Text class="text-xs text-muted">{t("web.issue.orchestrator")}</Text>
         <Icon name="next" size={12} tone="muted" />
-        <Text class="shrink-0 font-mono text-xs text-muted tabular-nums">{`#${props.issue.number}`}</Text>
+        <IssueNumberPill number={props.issue.number} />
       </View>
       <Text role="header" class="text-lg font-semibold text-ink">
         {props.issue.title}

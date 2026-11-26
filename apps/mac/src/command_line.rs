@@ -1,16 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct State {
-    command: &'static str,
-    link: PathBuf,
-    installed: bool,
-    on_path: bool,
-    taken: bool,
-}
+pub use vibevalley_protocol::HostCommandLineState as State;
 
 pub struct CommandLine {
     binary: PathBuf,
@@ -44,8 +34,8 @@ impl CommandLine {
         let installed = self.owns_link();
         let taken = !installed && std::fs::symlink_metadata(&self.link).is_ok();
         State {
-            command: "vibevalley",
-            link: self.link.clone(),
+            command: "vibevalley".into(),
+            link: self.link.to_string_lossy().into_owned(),
             installed,
             on_path: self.link.parent().is_some_and(|dir| self.path.iter().any(|entry| same_dir(entry, dir))),
             taken,

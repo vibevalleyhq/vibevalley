@@ -48,7 +48,9 @@
     "all": "All tickets",
     "unfold": "Unfold {group}",
     "fold": "Fold {group}",
-    "writeIn": "Write one in \"{group}\""
+    "writeIn": "Write one in \"{group}\"",
+    "empty": "No tickets yet. Press C or click New issue to create one.",
+    "emptyFiltered": "No tickets match the current filter."
   },
   "page": {
     "pickFirst": "Almost: pick which helper and which repo, then press Start.",
@@ -406,55 +408,5 @@
     "uploadFailed": "Upload failed: {why}",
     "uploading": "Uploading {name}…",
     "remove": "Remove attachment {name}"
-  },
-  "guide": {
-    "title": "How issues flow",
-    "summary": "Assign a helper to launch a worktree session, then inspect changes in Review to complete.",
-    "collapse": "Hide guide",
-    "expand": "Show guide",
-    "stage": {
-      "todo": "Capture work, pick a repo and helper, and order your queue.",
-      "working": "Dispatch or drag here to launch an isolated worktree session.",
-      "waiting": "Review changes, answer questions, or send back for another round.",
-      "closed": "Complete to merge into the base branch, or reopen anytime."
-    }
-  },
-  "onboarding": {
-    "title": "Get started with VibeValley",
-    "subtitle": "Complete these three steps to dispatch tickets to helpers in isolated worktrees.",
-    "progress": "{done} / {total} ready",
-    "step1Title": "Add a Git repository",
-    "step1Desc": "Link a local Git repository so helpers can work in isolated worktrees.",
-    "step1Action": "Add repository",
-    "step1Manage": "Manage repos",
-    "step1Ready": "{n, plural, one {# repo ready} other {# repos ready}}",
-    "step2Title": "Connect a coding engine",
-    "step2Desc": "Verify a local coding engine (such as Claude Code or Codex) is installed and enabled.",
-    "step2Action": "Configure engines",
-    "step2Manage": "Manage engines",
-    "step2Ready": "{n, plural, one {# engine ready} other {# engines ready}}",
-    "step3Title": "Create your first ticket",
-    "step3Desc": "Describe what to build, press C to create a ticket, or pick a starter template below.",
-    "step3Ready": "{n, plural, one {# ticket} other {# tickets}}",
-    "newIssue": "New ticket",
-    "openChat": "Open chat",
-    "templatesTitle": "Or start from a template",
-    "templates": {
-      "bug": {
-        "title": "Fix a bug",
-        "desc": "Track down a failure and add a regression test",
-        "prompt": "Fix: [describe the issue]\n\nSteps to reproduce:\n1. \nExpected behavior:\nAcceptance criteria: add a regression test and pass checks"
-      },
-      "feature": {
-        "title": "Add a feature",
-        "desc": "Define scope and criteria for a helper to build",
-        "prompt": "Add: [describe the feature]\n\nScope:\n- \nOut of scope:\n- \nAcceptance criteria: cover the main flow with tests"
-      },
-      "refactor": {
-        "title": "Audit & refactor",
-        "desc": "Simplify boundaries while keeping behavior intact",
-        "prompt": "Refactor: [target module or path]\n\nGoals:\n- Simplify structure and remove duplication\n- Keep external behavior and existing tests unchanged"
-      }
-    }
   }
 }

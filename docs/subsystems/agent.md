@@ -10,7 +10,7 @@
 | 档案、技能库（`Skill`）与农机设置的持久化（`config.json`）及原子更新事务 | 助手如何使用档案（[助手](docs/subsystems/orchestrator.md)）、`vibevalley` 农机内部实现（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
 | 档案模板的读取、安装、按模板更新与本地模板导入（`agent-templates/<id>/`） | 会话如何启动与并发上限（[帮工](docs/subsystems/session.md)） |
 | 农机注册表、后台探测、模型与能力缓存、派活前配置解析（`Agent.resolve`） | 档案记忆的存储与召回（[记性](docs/subsystems/memory.md)） |
-| 档案可派性预检（`agentProblems`：农机缺失、选项不兼容、额度/预算耗尽） | 像素角色贴图渲染（[农场的皮](docs/subsystems/farm.md)） |
+| 档案可派性预检（`agentProblems`：农机缺失、选项不兼容、额度/预算耗尽） | 纸雕偶人场景渲染（[农场的皮](docs/subsystems/farm.md)） |
 | 每日花费 | 对话怎么拼提示、怎么压缩（[VibeValley 自己的 agent](docs/subsystems/brain.md)） |
 农机详情区分缺少可执行文件、首次需要登录和账户用量报告登录失效。找不到文件时可填写命令路径。登录入口打开本机终端，用户自行登录后可重新检测。探测出错时展示失败原因。[农机详情](apps/mac/ui/features/runtime/RuntimesPage.tsx)
 
@@ -39,14 +39,14 @@
 - **挑档案顺序（`presets.rs`）**：依次匹配：点名的档案名或 ID → 点名的农机上首个可用档案 → 用户界面选定的档案 → 工单文字命中 `Agent.tags` 最多的可用档案。建单和起草都用它。
 - **自带的技能只读，按 id 引用**：技能列表先列自带的（`builtIn: true`），再列用户自己写的；`skill.update`、`skill.delete` 碰到自带的一律拒绝，新建技能不占它们的 id。档案只存技能的 id，所以 VibeValley 一更新，勾了它的档案都拿到新版本。模板在 `agent.json` 的 `skills` 里写自带技能的 id，安装时勾上；按模板更新时再勾上，用户另勾的留着。任何档案都能勾自带的技能。
 - **从模板按需安装与更新**：新农场默认只装 `orchestrator` 及 `agent.starters` 指定的模板；用户在工作台一键采用时由服务端优先匹配本机已安装且启用的农机并按需调整 `personaMode`；`agent.template.update` 仅覆盖 `duty`、`tags`、人设和 `worktree`，保留用户改过的名称、外观、农机与模型（旧档案尚未带头像时顺带继承模板头像）。
-- **外观确定性补齐**：缺省外观按档案 `id` 哈希取模补齐，前后端算法一致；通用角色头像位于 `assets/pixel/avatar-*.png` 并登记在 `sprites.json` 中，优先于动物头像显示在工作台列表与卡片中。
+- **外观确定性补齐**：缺省外观按档案 `id` 哈希取模补齐，前后端算法一致；通用角色头像位于 `assets/avatars/avatar-*.png`（由 `vibevalley-assets` 同步），优先于动物物种肖像显示在工作台列表与卡片中。
 - **农机列表**：`vibevalley-runtime::oar` 默认注册 `claude`、`codex`、ACP 农机（`acp:gemini`、`grok`、`kimi`、`codebuddy`、`opencode`）、SDK 农机（`qwen`、`qoder`）、自研 `vibevalley` 与测试用 `scripted`；`pi` 仅在 `VIBEVALLEY_TEST_RUNTIMES=1` 沙箱下作为替身注册，`cursor` 与未注册驱动的农机显示为不支持。各驱动协议与用量归约见[帮工](docs/subsystems/session.md#一次农机执行怎样复核)。
 - **预检与开会话共用同一套规则**：合并农机默认设置与档案覆盖后，统一检查农机安装、额度预算与选项兼容性；预检与派活调同一函数，唤醒已有 `Session` 时不重复检查启停与派活预算。
 - **探测代数防倒退**：完整探测分配递增序号，慢返回的旧探测不覆盖新缓存；探测结果经 `/api/v1/live` 的 `Runtime` 窄事件推送，不进 `SpaceState`。
 
 ## 内置的模板
 
-内置模板位于 `crates/server/assets/agent/templates/`（顺序见 `index.json`），含默认助手 `orchestrator` 与 13 个覆盖全流程的通用帮工角色模板（均配有风格标签 `style`、分类 `category`、`avatar-*` 像素头像及中英结构化人设）：
+内置模板位于 `crates/server/assets/agent/templates/`（顺序见 `index.json`），含默认助手 `orchestrator` 与 13 个覆盖全流程的通用帮工角色模板（均配有风格标签 `style`、分类 `category`、`avatar-*` Papertrails 头像及中英结构化人设）：
 
 | 角色 ID | 档案名称 | 分类 | 能力/技能 | 职责（`duty`） |
 |---|---|---|---|---|

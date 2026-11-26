@@ -105,6 +105,7 @@ export {
   type SessionEventListInput,
   type SessionEventPage,
   type SessionEventType,
+  SessionEventTypeValues,
   type SessionInteractionRequest,
   type SessionListInput,
   type SessionOpenWorkspaceInput,
@@ -247,7 +248,7 @@ export type {
   OrchestratorEval,
   OrchestratorEvalRequest,
 } from "./orchestrator/shapes.gen";
-export type { AchievementList, ChooseTitleRequest, Crop, FarmFrame } from "./game/shapes.gen";
+export type { AchievementList, ChooseTitleRequest, FarmFrame } from "./game/shapes.gen";
 export { type Attachment, type AttachmentImportPathInput, type AttachmentUpload } from "./attachment/shapes.gen";
 export {
   type ConnectorID,
@@ -270,6 +271,7 @@ export {
 } from "./voice/shapes";
 export {
   type Feature,
+  FeatureValues,
   type MemorySource,
   type MemorySourceInfo,
   type MemorySourceKind,
@@ -299,11 +301,12 @@ export {
   type RemoteStatus,
   type RemoteWhoami,
 } from "./remote/shapes.gen";
-export type { ConnectionSaveRequest, DesktopConnectionSnapshot } from "./host/shapes.gen";
+export { type ConnectionSaveRequest, type DesktopConnectionSnapshot, HostSpeechAudioPhaseValues } from "./host/shapes.gen";
 export type { MachineInfo, MachinePlatform, MachineStatus } from "./machine/shapes.gen";
 export {
   type LibraryAddRequest,
   type LibraryFileKind,
+  LibraryFileKindValues,
   type LibraryItem,
   type LibraryListRequest,
   type LibraryOrigin,

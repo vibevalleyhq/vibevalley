@@ -955,6 +955,7 @@ pub struct HostAppletInstallPayload {
     pub artifact_id: String,
     pub artifact_type: String,
     pub app_name: String,
+    #[serde(default)]
     pub always_on_top: bool,
 }
 
@@ -966,6 +967,114 @@ pub struct HostAppletInstallPayload {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostAppletIdPayload {
     pub artifact_id: String,
+}
+
+/// Result payload returned by `host.appletUninstall`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct AppletRemoveResult {
+    pub removed: bool,
+    #[serde(default)]
+    pub bundle_path: Option<String>,
+}
+
+/// Result payload returned by `host.appletOpen`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AppletOpenResult {
+    pub opened: bool,
+    pub bundle_path: String,
+}
+
+/// Status snapshot for the bundled CLI symlink (`host.cliState` / `cliInstall` / `cliRemove`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostCommandLineState {
+    pub command: String,
+    pub link: String,
+    pub installed: bool,
+    pub on_path: bool,
+    pub taken: bool,
+}
+
+/// Encoded QR code grid including its quiet zone (`'1'` = dark, `'0'` = light).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct QrMatrix {
+    pub size: usize,
+    pub rows: Vec<String>,
+}
+
+/// Local regular file metadata returned by `host.pickFile`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostLocalFile {
+    pub path: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub size: u64,
+}
+
+/// Native live-voice playback/call phase (`host.voice*`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum HostLiveVoicePhase {
+    #[default]
+    Idle,
+    Connecting,
+    Live,
+    Stopping,
+}
+
+/// Snapshot returned by `host.voice*` bridge operations.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostLiveVoiceState {
+    pub phase: HostLiveVoicePhase,
+    pub muted: bool,
+    pub problem: Option<String>,
+    pub heard: String,
+    pub said: String,
+}
+
+/// Native speech-stream playback phase (`host.speech*`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum HostSpeechAudioPhase {
+    #[default]
+    Idle,
+    Playing,
+    Draining,
+    Stopping,
+}
+
+/// Snapshot returned by `host.speech*` bridge operations.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostSpeechAudioState {
+    pub phase: HostSpeechAudioPhase,
+    pub problem: Option<String>,
+}
+
+/// Farm phone call history entry tracked by the diorama shell.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostPhoneCallLog {
+    pub call: super::inbox::InboxItem,
+    pub answered: bool,
 }
 
 /// Every `host.*` bridge call answered by the native shell, decoded once at the boundary.
@@ -1043,10 +1152,8 @@ pub enum HostOp {
     StopAudio,
     #[serde(rename = "host.readFile")]
     ReadFile(HostReadFilePayload),
-    #[serde(rename = "host.pixelDir")]
-    PixelDir,
-    #[serde(rename = "host.pixelManifest")]
-    PixelManifest,
+    #[serde(rename = "host.assetsDir")]
+    AssetsDir,
     #[serde(rename = "host.sha256")]
     Sha256(HostSha256Payload),
     #[serde(rename = "host.randomBytes")]
@@ -1100,8 +1207,7 @@ impl HostOp {
         "host.pcmAppend",
         "host.stopAudio",
         "host.readFile",
-        "host.pixelDir",
-        "host.pixelManifest",
+        "host.assetsDir",
         "host.sha256",
         "host.randomBytes",
         "host.qr",
@@ -1152,8 +1258,7 @@ impl HostOp {
             HostOp::PcmAppend(_) => "host.pcmAppend",
             HostOp::StopAudio => "host.stopAudio",
             HostOp::ReadFile(_) => "host.readFile",
-            HostOp::PixelDir => "host.pixelDir",
-            HostOp::PixelManifest => "host.pixelManifest",
+            HostOp::AssetsDir => "host.assetsDir",
             HostOp::Sha256(_) => "host.sha256",
             HostOp::RandomBytes(_) => "host.randomBytes",
             HostOp::Qr(_) => "host.qr",
@@ -1239,8 +1344,7 @@ impl HostOp {
             "host.pcmAppend" => serde_json::from_value(payload).map(HostOp::PcmAppend).map_err(|e| format!("pcmAppend: {e}")),
             "host.stopAudio" => expect_empty(&payload).map(|()| HostOp::StopAudio),
             "host.readFile" => serde_json::from_value(payload).map(HostOp::ReadFile).map_err(|e| format!("readFile: {e}")),
-            "host.pixelDir" => expect_empty(&payload).map(|()| HostOp::PixelDir),
-            "host.pixelManifest" => expect_empty(&payload).map(|()| HostOp::PixelManifest),
+            "host.assetsDir" => expect_empty(&payload).map(|()| HostOp::AssetsDir),
             "host.sha256" => serde_json::from_value(payload).map(HostOp::Sha256).map_err(|e| format!("sha256: {e}")),
             "host.randomBytes" => serde_json::from_value(payload)
                 .map(HostOp::RandomBytes)
@@ -1312,6 +1416,16 @@ crate::typescript::module! {
     ArtifactAppletInfo,
     HostAppletInstallPayload,
     HostAppletIdPayload,
+    AppletRemoveResult,
+    AppletOpenResult,
+    HostCommandLineState,
+    QrMatrix,
+    HostLocalFile,
+    HostLiveVoicePhase,
+    HostLiveVoiceState,
+    HostSpeechAudioPhase,
+    HostSpeechAudioState,
+    HostPhoneCallLog,
     HostOp];
     aliases: [];
 }
@@ -1481,8 +1595,7 @@ mod tests {
                 json!({ "path": "/tmp/note.txt" }),
                 HostOp::ReadFile(HostReadFilePayload { path: "/tmp/note.txt".into() }),
             ),
-            ("host.pixelDir", json!({}), HostOp::PixelDir),
-            ("host.pixelManifest", json!({}), HostOp::PixelManifest),
+            ("host.assetsDir", json!({}), HostOp::AssetsDir),
             (
                 "host.sha256",
                 json!({ "text": "abc" }),
@@ -1543,7 +1656,10 @@ mod tests {
     #[test]
     fn host_op_from_wire_rejects_unknown_ops_and_malformed_payloads() {
         assert!(!HostOp::is_known_op("host.unknown"));
+        assert!(!HostOp::is_known_op("host.pixelDir"));
+        assert!(!HostOp::is_known_op("host.pixelManifest"));
         assert_eq!(HostOp::from_wire("host.unknown", json!({})).unwrap_err(), "the host has no op host.unknown");
+        assert!(HostOp::from_wire("host.assetsDir", json!({ "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.info", json!({ "extra": 1 })).is_err());
         assert!(HostOp::from_wire("host.locale", json!("fr")).is_err());
         assert!(HostOp::from_wire("host.theme", json!("sepia")).is_err());

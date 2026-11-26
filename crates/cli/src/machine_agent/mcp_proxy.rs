@@ -17,7 +17,7 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use uuid::Uuid;
 use vibevalley_protocol::{MachineMcpRequest, MachineMcpResponse, MachineWireFrame};
 
-use super::TransportSlot;
+use super::transport::TransportSlot;
 
 const MAX_BODY_BYTES: usize = 16 * 1024 * 1024;
 const DEFAULT_MCP_TIMEOUT: Duration = Duration::from_secs(60);

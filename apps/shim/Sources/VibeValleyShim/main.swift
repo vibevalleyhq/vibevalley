@@ -14,6 +14,8 @@ final class ShimAppDelegate: NSObject, NSApplicationDelegate {
     self.config = config
     self.windowController = ShimWindowController(
       title: config.title,
+      artifactId: config.artifactId,
+      serverHome: config.serverHome,
       alwaysOnTop: config.alwaysOnTop
     )
     super.init()
@@ -31,6 +33,9 @@ final class ShimAppDelegate: NSObject, NSApplicationDelegate {
     }
     windowController.onReconnectRequested = { [weak self] in
       self?.socketClient?.reconnect()
+    }
+    windowController.onOpenInHostRequested = { [weak self] in
+      self?.openInHost(nil)
     }
 
     guard let artifactId = config.artifactId, !artifactId.isEmpty else {
@@ -94,19 +99,24 @@ final class ShimAppDelegate: NSObject, NSApplicationDelegate {
     socketClient?.reconnect()
   }
 
+  @objc private func resetWindowSize(_ sender: Any?) {
+    windowController.resetWindowSize()
+  }
+
   private func buildMainMenu() {
     let mainMenu = NSMenu()
 
     let appMenuItem = NSMenuItem()
     let appMenu = NSMenu(title: config.title)
     appMenu.addItem(
-      NSMenuItem(title: "Open in VibeValley", action: #selector(openInHost(_:)), keyEquivalent: "")
+      NSMenuItem(title: "Open in VibeValley", action: #selector(openInHost(_:)), keyEquivalent: "e")
     )
     let pinItem = NSMenuItem(
       title: "Always on Top",
       action: #selector(toggleAlwaysOnTop(_:)),
-      keyEquivalent: ""
+      keyEquivalent: "p"
     )
+    pinItem.keyEquivalentModifierMask = [.command, .shift]
     pinItem.state = windowController.alwaysOnTop ? .on : .off
     alwaysOnTopMenuItem = pinItem
     appMenu.addItem(pinItem)
@@ -137,6 +147,10 @@ final class ShimAppDelegate: NSObject, NSApplicationDelegate {
 
     let windowMenuItem = NSMenuItem()
     let windowMenu = NSMenu(title: "Window")
+    windowMenu.addItem(
+      NSMenuItem(title: "Reset Window Size", action: #selector(resetWindowSize(_:)), keyEquivalent: "0")
+    )
+    windowMenu.addItem(.separator())
     windowMenu.addItem(
       NSMenuItem(title: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
     )
