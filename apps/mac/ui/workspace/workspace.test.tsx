@@ -650,11 +650,11 @@ test("workspace Palette handles commands filter/select/close and remote search/f
   const app = await open("../ShellApp.story.tsx", { width: 640, height: 420, colorScheme: "light", platform: "macos", host: host.options });
   await host.pump(app);
 
+  // Regression: Rust #[skip_serializing_none] omits `note` when None.
   await host.pushFrame(app, "palette", {
     mode: "commands",
     query: "",
     loading: false,
-    note: null,
     items: [
       { id: "cmd-issue", label: "New issue", section: "Actions" },
       { id: "cmd-farm", label: "Open farm", section: "Navigation", detail: "Switch view" },

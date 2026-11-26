@@ -32,7 +32,7 @@ const paletteFrameSchema = z.object({
   query: z.string(),
   items: z.array(paletteItemSchema),
   loading: z.boolean(),
-  note: z.string().nullable(),
+  note: z.string().nullable().optional(),
 });
 
 const modeIcons: Record<PaletteMode, IconName> = {
