@@ -35,7 +35,7 @@ async function mountRoute(route: string, state: SliceBundle, configure?: (fake: 
   return { app, fake };
 }
 
-test("RuntimesPage: top-level nav above Team, 3-column full-height layout, machine-grouped, installed coding agents ONLY", async () => {
+test("RuntimesPage: top-level nav above Experts, 3-column full-height layout, machine-grouped, installed coding agents ONLY", async () => {
   setLocale("en");
   const sliceMachines: SliceMachine[] = [
     {
@@ -214,7 +214,7 @@ test("RuntimesPage: renders calm empty state when no coding agents are installed
   expect(app.texts()).toContain(t("web.runtime.noneInstalled"));
 });
 
-test("Navigation: Runtimes sits directly above Team, Team has no sub-tabs, and /skills + /memory redirect to Settings", async () => {
+test("Navigation: Runtimes sits directly above Experts, Experts has no sub-tabs, and /skills + /memory redirect to Settings", async () => {
   setLocale("en");
   const { places } = await import("../../app/places");
   const runtimesIndex = places.findIndex((p) => p.id === "runtimes");

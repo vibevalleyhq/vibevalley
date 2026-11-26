@@ -586,7 +586,7 @@ export const catalogs = {
         content: { label: "作品", hint: "作品、大纲笔记与素材" },
         farm: { label: "农场", hint: "3D 纸雕农场与院落现场" },
         runtimes: { label: "引擎", hint: "本机与远端已安装的编码引擎" },
-        team: { label: "团队", hint: "角色与团队模板" },
+        team: { label: "专家", hint: "专家角色与能力模板" },
         settings: { label: "设置", hint: "个人资料、通用与外观、模型与引擎、MCP 接入、语音与连接、数据与关于" },
       },
       dashboard: {
@@ -4102,7 +4102,7 @@ export const catalogs = {
         content: { label: "Artifacts", hint: "Artifacts, notes, and media" },
         farm: { label: "Farm", hint: "3D papercraft farm courtyard" },
         runtimes: { label: "Engines", hint: "Installed coding engines across machines" },
-        team: { label: "Team", hint: "Roles and team templates" },
+        team: { label: "Experts", hint: "Experts and templates" },
         settings: { label: "Settings", hint: "Profile, general & appearance, models & engines, MCP, connections, data & about" },
       },
       dashboard: {

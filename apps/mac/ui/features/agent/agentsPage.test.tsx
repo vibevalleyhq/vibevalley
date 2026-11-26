@@ -83,7 +83,7 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   expect(app.count("id:open-templates")).toBe(1);
   expect(app.count("id:new-orchestrator")).toBe(1);
   expect(app.count("id:new-agent")).toBe(1);
-  expect(app.texts()).toContain("团队");
+  expect(app.texts()).toContain("专家");
   expect(app.texts()).toContain("模板库");
 
   // Localized Chinese error text replaces raw English, paired with a direct 去设置 link.
