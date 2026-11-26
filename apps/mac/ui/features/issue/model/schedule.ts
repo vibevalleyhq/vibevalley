@@ -514,3 +514,61 @@ export function shiftIssueDates(
     dueAt: hasDue ? addUtcDays(utcDayStart(issue.dueAt!), deltaDays) : undefined,
   });
 }
+
+export type TimelineDragMode = "move" | "resize-start" | "resize-end";
+
+export interface TimelineDragResult {
+  readonly startMs: number;
+  readonly endMs: number;
+  readonly durationDays: number;
+  readonly dates: { startAt?: number; dueAt?: number };
+}
+
+/** Computes snapped `[startMs, endMs]` and API date patch for bar drag (`move`) or edge resize (`resize-start` / `resize-end`), clamping `startAt <= dueAt`. */
+export function computeTimelineDrag(
+  issue: Pick<Issue, "startAt" | "dueAt">,
+  span: Pick<ScheduledSpan, "startMs" | "endMs">,
+  mode: TimelineDragMode,
+  deltaDays: number,
+): TimelineDragResult {
+  const baseStart = utcDayStart(span.startMs);
+  const baseEnd = utcDayStart(span.endMs);
+  switch (mode) {
+    case "move": {
+      const startMs = addUtcDays(baseStart, deltaDays);
+      const endMs = addUtcDays(baseEnd, deltaDays);
+      return {
+        startMs,
+        endMs,
+        durationDays: Math.max(1, utcDayDiff(startMs, endMs) + 1),
+        dates: shiftIssueDates(issue, deltaDays, { startMs: baseStart, endMs: baseEnd }),
+      };
+    }
+    case "resize-start": {
+      const startMs = Math.min(baseEnd, addUtcDays(baseStart, deltaDays));
+      const endMs = baseEnd;
+      return {
+        startMs,
+        endMs,
+        durationDays: Math.max(1, utcDayDiff(startMs, endMs) + 1),
+        dates: omitUndefined({
+          startAt: startMs,
+          dueAt: isPositiveTimestamp(issue.dueAt) ? utcDayStart(issue.dueAt) : baseEnd !== startMs ? baseEnd : undefined,
+        }),
+      };
+    }
+    case "resize-end": {
+      const startMs = baseStart;
+      const endMs = Math.max(baseStart, addUtcDays(baseEnd, deltaDays));
+      return {
+        startMs,
+        endMs,
+        durationDays: Math.max(1, utcDayDiff(startMs, endMs) + 1),
+        dates: omitUndefined({
+          startAt: isPositiveTimestamp(issue.startAt) ? utcDayStart(issue.startAt) : endMs !== baseStart ? baseStart : undefined,
+          dueAt: endMs,
+        }),
+      };
+    }
+  }
+}

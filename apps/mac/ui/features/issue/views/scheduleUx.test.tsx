@@ -8,7 +8,7 @@ import type { Issue, IssueId, SliceBundle } from "@vibevalley/protocol";
 
 import { fakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../../fixtures/scenarios";
-import { addUtcDays, DAY_MS, utcDayStart } from "../model/schedule";
+import { addUtcDays, computeTimelineDrag, DAY_MS, timelineScaleSpec, utcDayStart } from "../model/schedule";
 import { createFrameQueue } from "./IssueTimeline";
 
 function makeIssue(overrides: Partial<Omit<Issue, "id">> & { id: string; number: number; title: string }): Issue {
@@ -32,9 +32,40 @@ function makeIssue(overrides: Partial<Omit<Issue, "id">> & { id: string; number:
   };
 }
 
-test("IssuesPage supports Timeline (Gantt) and Calendar views with scale switching, quick date shifts, overflow toggle, and day creation", async () => {
+test("computeTimelineDrag snaps move and edge resizes while clamping startAt <= dueAt", () => {
+  const d1 = Date.UTC(2026, 10, 20);
+  const d2 = Date.UTC(2026, 10, 23);
+  const span = { startMs: d1, endMs: d2 };
+
+  const moved = computeTimelineDrag({ startAt: d1, dueAt: d2 }, span, "move", 2);
+  expect(moved.startMs).toBe(addUtcDays(d1, 2));
+  expect(moved.endMs).toBe(addUtcDays(d2, 2));
+  expect(moved.durationDays).toBe(4);
+  expect(moved.dates).toEqual({ startAt: addUtcDays(d1, 2), dueAt: addUtcDays(d2, 2) });
+
+  // Left handle clamped so startAt never exceeds dueAt.
+  const clampedStart = computeTimelineDrag({ startAt: d1, dueAt: d2 }, span, "resize-start", 10);
+  expect(clampedStart.startMs).toBe(d2);
+  expect(clampedStart.endMs).toBe(d2);
+  expect(clampedStart.durationDays).toBe(1);
+  expect(clampedStart.dates).toEqual({ startAt: d2, dueAt: d2 });
+
+  // Right handle clamped so dueAt never precedes startAt.
+  const clampedEnd = computeTimelineDrag({ startAt: d1, dueAt: d2 }, span, "resize-end", -10);
+  expect(clampedEnd.startMs).toBe(d1);
+  expect(clampedEnd.endMs).toBe(d1);
+  expect(clampedEnd.durationDays).toBe(1);
+  expect(clampedEnd.dates).toEqual({ startAt: d1, dueAt: d1 });
+
+  // Due-only issue extended rightward preserves startMs as startAt.
+  const dueOnlyExtended = computeTimelineDrag({ dueAt: d1 }, { startMs: d1, endMs: d1 }, "resize-end", 2);
+  expect(dueOnlyExtended.dates).toEqual({ startAt: d1, dueAt: addUtcDays(d1, 2) });
+});
+
+test("IssuesPage supports Timeline (Gantt) direct drag/resize, short-bar #N labels, sticky month header, and Calendar views", async () => {
   setLocale("zh");
   const todayMs = utcDayStart(SCENARIO_NOW); // 2026-11-20
+  const monthDayW = timelineScaleSpec.month.dayWidth; // 28
 
   const epicParent = makeIssue({
     id: "i-epic",
@@ -51,14 +82,14 @@ test("IssuesPage supports Timeline (Gantt) and Calendar views with scale switchi
     status: "in_progress",
     priority: "urgent",
     startAt: todayMs,
-    dueAt: addUtcDays(todayMs, 3),
+    dueAt: addUtcDays(todayMs, 3), // 4 days -> 108px (>= 92 -> #11 + title)
   });
   const extraA = makeIssue({
     id: "i-extra-a",
     number: 12,
     title: "Calendar overlap A",
     startAt: todayMs,
-    dueAt: addUtcDays(todayMs, 1),
+    dueAt: addUtcDays(todayMs, 1), // 2 days -> 52px (>= 36 && < 92 -> compact #12)
   });
   const extraB = makeIssue({
     id: "i-extra-b",
@@ -122,25 +153,84 @@ test("IssuesPage supports Timeline (Gantt) and Calendar views with scale switchi
   await app.press("id:issue-view-timeline");
   await fake.pumpUntil(app, () => app.count("id:issue-timeline") === 1);
 
-  // 4 scheduled rows (parent epic rolled up + 3 explicitly scheduled children/items) and 1 unscheduled.
+  // 4 scheduled rows, no floating 3-button pill beside bars, sticky month label visible after scrollToToday().
   expect(app.count("id:timeline-row")).toBe(4);
   expect(app.count("id:timeline-bar")).toBe(4);
   expect(app.count("id:timeline-today-line")).toBe(1);
   expect(app.count("id:timeline-unscheduled-toggle")).toBe(1);
+  expect(app.count("id:timeline-shift-prev")).toBe(0);
+  expect(app.count("id:timeline-shift-next")).toBe(0);
+  expect(app.count("id:timeline-edit-dates")).toBe(0);
+  expect(app.texts()).toContain("2026 年 11 月");
 
-  // Scale switcher cycles week / quarter / month cleanly.
+  // Short bar (2 days = 52px >= 36px && < 92px) renders compact #12 instead of blank pill.
+  expect(app.count("id:timeline-lane-i-extra-a >> id:timeline-bar >> text:#12")).toBe(1);
+  expect(app.count("id:timeline-lane-i-extra-a >> id:timeline-bar >> text:Calendar overlap A")).toBe(0);
+
+  // Scale switcher cycles week / quarter / month cleanly and keeps month header visible.
   await app.press("id:timeline-scale-week");
+  expect(app.texts()).toContain("2026 年 11 月");
+  await app.scroll("id:timeline-grid-scroll", 220);
+  const novHeader = app.layout("id:timeline-month-label >> nth=0");
+  const gridScroll = app.layout("id:timeline-grid-scroll");
+  expect(novHeader?.clipped).toBe(false);
+  expect(novHeader && gridScroll ? novHeader.x >= gridScroll.x : false).toBe(true);
   await app.press("id:timeline-scale-quarter");
   await app.press("id:timeline-scale-month");
+  await app.press("id:timeline-today");
+  expect(app.texts()).toContain("2026 年 11 月");
 
-  // Shift +1d inline sends issue.update with shifted startAt/dueAt.
-  await app.press("id:timeline-lane-i-child-1 >> id:timeline-shift-next");
+  // Micro-drag (< 4px) on bar does not commit an update and preserves click -> onOpen.
+  await app.drag("id:timeline-lane-i-child-1 >> id:timeline-bar", { x: 2, y: 0 });
+  expect(fake.calls.filter((c) => c.op === "issue.update")).toHaveLength(0);
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  await app.press("id:issue-peek-close");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 0);
+
+  // Dragging bar body by +1 day shows live preview pill mid-drag and commits once on release.
+  await app.dragAndHold("id:timeline-lane-i-child-1 >> id:timeline-bar", { x: monthDayW, y: 0 });
+  await fake.pumpUntil(app, () => app.count("id:timeline-drag-pill") === 1);
+  expect(app.shows("id:timeline-drag-pill >> text:2026-11-21 -> 2026-11-24")).toBe(true);
+  expect(fake.calls.filter((c) => c.op === "issue.update")).toHaveLength(0);
+  await app.drop();
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.update"));
-  const shiftCall = fake.calls.find((c) => c.op === "issue.update");
-  expect(shiftCall?.payload).toMatchObject({
+  const bodyDragCall = fake.calls.find((c) => c.op === "issue.update");
+  expect(bodyDragCall?.payload).toMatchObject({
     id: "i-child-1",
     startAt: todayMs + DAY_MS,
     dueAt: addUtcDays(todayMs, 4),
+  });
+  expect(app.count("id:timeline-drag-pill")).toBe(0);
+  expect(app.count("id:issue-peek-modal")).toBe(0);
+
+  // Dragging right edge handle extends dueAt by +2 days independently (from Nov 21..Nov 24 -> Nov 21..Nov 26).
+  await app.drag("id:timeline-lane-i-child-1 >> id:timeline-resize-end", { x: monthDayW * 2, y: 0 });
+  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length >= 2);
+  const resizeEndCall = fake.calls.filter((c) => c.op === "issue.update").at(1);
+  expect(resizeEndCall?.payload).toMatchObject({
+    id: "i-child-1",
+    startAt: todayMs + DAY_MS,
+    dueAt: addUtcDays(todayMs, 6),
+  });
+
+  // Dragging left edge handle rightward clamps startAt <= dueAt (clamped to Nov 26..Nov 26).
+  await app.drag("id:timeline-lane-i-child-1 >> id:timeline-resize-start", { x: monthDayW * 10, y: 0 });
+  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length >= 3);
+  const resizeStartCall = fake.calls.filter((c) => c.op === "issue.update").at(2);
+  expect(resizeStartCall?.payload).toMatchObject({
+    id: "i-child-1",
+    startAt: addUtcDays(todayMs, 6),
+    dueAt: addUtcDays(todayMs, 6),
+  });
+
+  // Dragging left edge handle leftward extends startAt back to Nov 21 independently.
+  await app.drag("id:timeline-lane-i-child-1 >> id:timeline-resize-start", { x: -monthDayW * 5, y: 0 });
+  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length >= 4);
+  const resizeLeftCall = fake.calls.filter((c) => c.op === "issue.update").at(3);
+  expect(resizeLeftCall?.payload).toMatchObject({
+    id: "i-child-1",
+    startAt: todayMs + DAY_MS,
+    dueAt: addUtcDays(todayMs, 6),
   });
 
   // Toggle unscheduled drawer and schedule the unscheduled item to today.
@@ -148,7 +238,7 @@ test("IssuesPage supports Timeline (Gantt) and Calendar views with scale switchi
   await fake.pumpUntil(app, () => app.count("id:timeline-unscheduled-list") === 1);
   expect(app.count("id:timeline-unscheduled-item")).toBe(1);
   await app.press("id:timeline-schedule-today-i-unsched");
-  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length >= 2);
+  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length >= 5);
 
   // Clicking a Gantt bar opens Quick-Peek modal.
   await app.press("id:timeline-lane-i-child-1 >> id:timeline-bar");
