@@ -229,6 +229,111 @@ test("workspace sidebar renders repos, tabs, collapse toggle, and posts project/
   expect(app.texts()).toContain("README.md");
 });
 
+test("workspace sidebar header toggles sidebar collapse and repo/worktree chevrons transition expand/collapse state", async () => {
+  const host = workspaceHost(
+    { view: "sidebar" },
+    {
+      "repo.list": [{ name: "vibevalley", path: "/work/vibevalley", git: true }],
+    },
+  );
+  const app = await open("../ShellApp.story.tsx", { width: 280, height: 760, colorScheme: "light", platform: "macos", host: host.options });
+  await host.pump(app);
+
+  await host.pushFrame(app, "slice:board", { seq: 1, issues: [] });
+  await host.pushFrame(app, "slice:sessions", { seq: 1, sessions: [], machines: [] });
+  await host.pushFrame(app, "rail", {
+    panel: "files",
+    projects: [
+      {
+        id: 1,
+        name: "vibevalley",
+        path: "/work/vibevalley",
+        initials: "VV",
+        active: true,
+        attention: false,
+        terminals: 2,
+        branch: "main",
+        worktrees: [
+          { path: "/work/vibevalley", branch: "main", main: true },
+          { path: "/work/vibevalley-ui", branch: "feat/ui", main: false },
+        ],
+        tabs: [{ id: 201, title: "main-zsh", active: true, kind: "terminal", running: true, runningState: "working" }],
+      },
+      {
+        id: 3,
+        name: "vibevalley-ui",
+        path: "/work/vibevalley-ui",
+        mainRoot: "/work/vibevalley",
+        initials: "VU",
+        active: false,
+        attention: false,
+        terminals: 1,
+        branch: "feat/ui",
+        tabs: [{ id: 202, title: "ui-term", active: false, kind: "terminal" }],
+      },
+      {
+        id: 2,
+        name: "notes",
+        path: "/tmp/notes",
+        initials: "NO",
+        active: false,
+        attention: false,
+        terminals: 0,
+        tabs: [],
+      },
+    ],
+  });
+
+  // Header sidebar toggle posts the supported palette_select sidebar.toggle host action.
+  expect(app.count("id:sidebar-toggle")).toBe(1);
+  expect(app.count("id:sidebar-fold-all")).toBe(1);
+  host.clearActs();
+  await app.press("id:sidebar-toggle");
+  expect(host.acts).toContainEqual({ type: "palette_select", id: "sidebar.toggle" });
+
+  // Non-expandable repo does not render a fold toggle; expandable repo & worktrees start expanded.
+  expect(app.count("id:sidebar-repo-toggle-notes")).toBe(0);
+  expect(app.count("id:sidebar-repo-toggle-vibevalley")).toBe(1);
+  expect(app.count("id:sidebar-repo-toggle-vibevalley-expanded")).toBe(1);
+  expect(app.count("id:sidebar-repo-toggle-vibevalley-collapsed")).toBe(0);
+  expect(app.count("id:sidebar-repo-summary-vibevalley")).toBe(0);
+  expect(app.count("id:sidebar-wt-toggle-feat/ui")).toBe(1);
+  expect(app.count("id:sidebar-wt-toggle-feat/ui-expanded")).toBe(1);
+  expect(app.texts()).toContain("main-zsh");
+  expect(app.texts()).toContain("ui-term");
+
+  // Collapsing an individual worktree switches its chevron to collapsed and displays its summary pill.
+  await app.press("id:sidebar-wt-toggle-feat/ui");
+  expect(app.count("id:sidebar-wt-toggle-feat/ui-expanded")).toBe(0);
+  expect(app.count("id:sidebar-wt-toggle-feat/ui-collapsed")).toBe(1);
+  expect(app.count("id:sidebar-wt-summary-feat/ui")).toBe(1);
+  expect(app.texts()).not.toContain("ui-term");
+  expect(app.texts()).toContain("main-zsh");
+
+  // Re-expanding the worktree restores its expanded chevron and child tab row.
+  await app.press("id:sidebar-wt-toggle-feat/ui");
+  expect(app.count("id:sidebar-wt-toggle-feat/ui-expanded")).toBe(1);
+  expect(app.count("id:sidebar-wt-toggle-feat/ui-collapsed")).toBe(0);
+  expect(app.count("id:sidebar-wt-summary-feat/ui")).toBe(0);
+  expect(app.texts()).toContain("ui-term");
+
+  // Collapsing the repo row hides worktrees/tabs, flips the icon state, and renders the collapsed summary pill.
+  await app.press("id:sidebar-repo-toggle-vibevalley");
+  expect(app.count("id:sidebar-repo-toggle-vibevalley-expanded")).toBe(0);
+  expect(app.count("id:sidebar-repo-toggle-vibevalley-collapsed")).toBe(1);
+  expect(app.count("id:sidebar-repo-summary-vibevalley")).toBe(1);
+  expect(app.texts()).not.toContain("main-zsh");
+  expect(app.texts()).not.toContain("ui-term");
+
+  // Expanding the repo row restores its expanded icon and child rows.
+  await app.press("id:sidebar-repo-toggle-vibevalley");
+  expect(app.count("id:sidebar-repo-toggle-vibevalley-expanded")).toBe(1);
+  expect(app.count("id:sidebar-repo-toggle-vibevalley-collapsed")).toBe(0);
+  expect(app.count("id:sidebar-repo-summary-vibevalley")).toBe(0);
+  expect(app.texts()).toContain("main-zsh");
+  expect(app.texts()).toContain("ui-term");
+});
+
 test("regression: sidebar and GitPanel parse detached-HEAD worktrees with omitted branch/upstream fields and display shortened home path", async () => {
   const host = workspaceHost({ view: "sidebar" }, { "repo.list": [{ name: "vibevalley", path: "/Users/lucas/orca/vibevalley", git: true }] });
   const app = await open("../ShellApp.story.tsx", { width: 280, height: 760, colorScheme: "light", platform: "macos", host: host.options });

@@ -3071,6 +3071,8 @@ export const catalogs = {
     "web.shell": {
       sidebar: {
         title: "仓库与终端",
+        toggleSidebar: "收起侧边栏",
+        toggleSidebarTooltip: "收起侧边栏 (⌘B)",
         addRepo: "添加仓库",
         addRepoTooltip: "添加本地仓库或文件夹",
         newMenu: "新建：{name}",
@@ -3092,7 +3094,9 @@ export const catalogs = {
         mainWorktree: "{label} · 主目录",
         mainLabel: "主目录",
         collapseAll: "折叠全部",
+        collapseAllTooltip: "折叠全部仓库与工作树",
         expandCurrent: "展开当前",
+        expandCurrentTooltip: "展开当前仓库与活动工作树",
         collapseItem: "折叠 {name}",
         expandItem: "展开 {name}",
         newTerminalHere: "在此新建终端",
@@ -6584,6 +6588,8 @@ export const catalogs = {
     "web.shell": {
       sidebar: {
         title: "Repos & terminals",
+        toggleSidebar: "Hide sidebar",
+        toggleSidebarTooltip: "Hide sidebar (⌘B)",
         addRepo: "Add repository",
         addRepoTooltip: "Add a local repository or folder",
         newMenu: "New in {name}",
@@ -6605,7 +6611,9 @@ export const catalogs = {
         mainWorktree: "{label} · main",
         mainLabel: "main",
         collapseAll: "Collapse all",
+        collapseAllTooltip: "Collapse all repositories and worktrees",
         expandCurrent: "Expand current",
+        expandCurrentTooltip: "Expand active repositories and worktrees",
         collapseItem: "Collapse {name}",
         expandItem: "Expand {name}",
         newTerminalHere: "New terminal here",
@@ -10243,9 +10251,11 @@ export interface Messages {
   "web.shell.sidebar.closeFolderMenu": undefined;
   "web.shell.sidebar.closeTab": undefined;
   "web.shell.sidebar.collapseAll": undefined;
+  "web.shell.sidebar.collapseAllTooltip": undefined;
   "web.shell.sidebar.collapseItem": { readonly name: string | number };
   "web.shell.sidebar.copyPath": undefined;
   "web.shell.sidebar.expandCurrent": undefined;
+  "web.shell.sidebar.expandCurrentTooltip": undefined;
   "web.shell.sidebar.expandItem": { readonly name: string | number };
   "web.shell.sidebar.files": undefined;
   "web.shell.sidebar.filesTip": undefined;
@@ -10272,6 +10282,8 @@ export interface Messages {
   "web.shell.sidebar.tabMore": undefined;
   "web.shell.sidebar.terminalCount": { readonly n: string | number };
   "web.shell.sidebar.title": undefined;
+  "web.shell.sidebar.toggleSidebar": undefined;
+  "web.shell.sidebar.toggleSidebarTooltip": undefined;
   "web.shell.sidebar.workingCount": { readonly n: string | number };
   "web.shell.swarm.boardAll": undefined;
   "web.shell.swarm.boardBrief": undefined;
