@@ -332,3 +332,21 @@ test("NewIssue unified AgentSelect surfaces agent.validate readiness diagnostics
   await fake.pump(app);
   expect(app.texts()).toContain("就绪");
 });
+
+test("6-lane Kanban fits all 6 lanes at 1680px and renders 5 unclipped lanes at 1280px", async () => {
+  setLocale("zh");
+  const wide = await mountBoard("typical", undefined, { width: 1680, height: 820 });
+  await wide.fake.pumpUntil(wide.app, () => wide.app.count("id:lane-canceled") === 1);
+  const canceled1680 = wide.app.layout("id:lane-canceled")!;
+  const backlog1680 = wide.app.layout("id:lane-backlog")!;
+  expect(backlog1680.x).toBeGreaterThanOrEqual(76);
+  expect(canceled1680.x + canceled1680.width).toBeLessThanOrEqual(1680);
+
+  const laptop = await mountBoard("typical", undefined, { width: 1280, height: 820 });
+  await laptop.fake.pumpUntil(laptop.app, () => laptop.app.count("id:lane-done") === 1);
+  const scroll1280 = laptop.app.layout("id:board-scroll")!;
+  const done1280 = laptop.app.layout("id:lane-done")!;
+  const canceled1280 = laptop.app.layout("id:lane-canceled")!;
+  expect(done1280.x + done1280.width).toBeLessThanOrEqual(scroll1280.x + scroll1280.width + 1);
+  expect(canceled1280.x).toBeGreaterThanOrEqual(scroll1280.x + scroll1280.width);
+});

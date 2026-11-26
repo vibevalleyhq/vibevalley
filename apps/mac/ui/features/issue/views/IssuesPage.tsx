@@ -1,4 +1,4 @@
-import { cleanup, keymap, Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
+import { cleanup, keymap, Scroll, signal, Text, untracked, View, windowSize, type JSX } from "nsh";
 import { Popover } from "nsh/base";
 
 import { list, t } from "@vibevalley/i18n";
@@ -57,7 +57,78 @@ import { NewIssue, type NewIssueAt } from "./NewIssue";
 import { createIssueChrome, IssueChromeContext } from "./Sheet";
 import { dispatchedNotice, TodoDetail } from "./TodoDetail";
 
-type Closing = { issue: Issue; session: Session | undefined; review: boolean; lane?: Lane };
+export type IssueOverlay =
+  | { readonly kind: "none" }
+  | { readonly kind: "peeking"; readonly id: string }
+  | { readonly kind: "new"; readonly at: NewIssueAt }
+  | {
+      readonly kind: "closing";
+      readonly issue: Issue;
+      readonly session: Session | undefined;
+      readonly review: boolean;
+      readonly lane?: Lane;
+      readonly returnPeekId?: string;
+    }
+  | { readonly kind: "reopening"; readonly issue: Issue; readonly lane: Lane };
+
+export type IssueOverlayEvent =
+  | { readonly kind: "peek"; readonly id: string }
+  | { readonly kind: "openNew"; readonly at: NewIssueAt }
+  | { readonly kind: "openClose"; readonly issue: Issue; readonly session: Session | undefined; readonly review: boolean; readonly lane?: Lane }
+  | { readonly kind: "openReopen"; readonly issue: Issue; readonly lane: Lane }
+  | { readonly kind: "dismiss" }
+  | { readonly kind: "clear" };
+
+export function initialIssueOverlay(): IssueOverlay {
+  return { kind: "none" };
+}
+
+export function issueOverlayTransition(state: IssueOverlay, event: IssueOverlayEvent): IssueOverlay {
+  switch (event.kind) {
+    case "peek":
+      return { kind: "peeking", id: event.id };
+    case "openNew":
+      return { kind: "new", at: event.at };
+    case "openClose": {
+      const returnPeekId = state.kind === "peeking" ? state.id : state.kind === "closing" ? state.returnPeekId : undefined;
+      return {
+        kind: "closing",
+        issue: event.issue,
+        session: event.session,
+        review: event.review,
+        ...(event.lane !== undefined ? { lane: event.lane } : {}),
+        ...(returnPeekId !== undefined ? { returnPeekId } : {}),
+      };
+    }
+    case "openReopen":
+      return { kind: "reopening", issue: event.issue, lane: event.lane };
+    case "dismiss":
+      if (state.kind === "closing" && state.returnPeekId !== undefined) {
+        return { kind: "peeking", id: state.returnPeekId };
+      }
+      return { kind: "none" };
+    case "clear":
+      return { kind: "none" };
+  }
+}
+
+export function effectiveIssueOverlay(state: IssueOverlay, rest: string, routeDefaults: NewIssueAt, openId: string | undefined): IssueOverlay {
+  if (rest === "new") return { kind: "new", at: routeDefaults };
+  if (openId !== undefined && state.kind === "peeking") return { kind: "none" };
+  return state;
+}
+
+export function isIssueOverlayBlocking(state: IssueOverlay): boolean {
+  switch (state.kind) {
+    case "none":
+      return false;
+    case "peeking":
+    case "new":
+    case "closing":
+    case "reopening":
+      return true;
+  }
+}
 
 /** `rest` is the path after /issues/. */
 export function IssuesPage(props: { rest: string }) {
@@ -127,8 +198,10 @@ export function IssuesPage(props: { rest: string }) {
     );
   };
   const older = signal(false);
-  const closing = signal<Closing>();
-  const reopening = signal<{ issue: Issue; lane: Lane }>();
+  const overlay = signal<IssueOverlay>(initialIssueOverlay());
+  const dispatchOverlay = (event: IssueOverlayEvent) => {
+    overlay.set(issueOverlayTransition(untracked(overlay), event));
+  };
   const history = useIssueHistory(older);
 
   const look = boardLook.get;
@@ -146,9 +219,8 @@ export function IssuesPage(props: { rest: string }) {
     if (path === "/farm" || path?.startsWith("/farm/") === true) return t("web.base.farm");
   };
   const returnTo = signal<string>();
-  const peeking = signal<string>();
   const open = (to: string | undefined) => {
-    if (to !== undefined) peeking.set(undefined);
+    if (to !== undefined) dispatchOverlay({ kind: "clear" });
     if (!to && fromScene()) {
       router.history.back();
       return;
@@ -159,11 +231,11 @@ export function IssuesPage(props: { rest: string }) {
   };
   const peek = (to: string) => {
     returnTo.set(to);
-    peeking.set(to);
+    dispatchOverlay({ kind: "peek", id: to });
   };
-  const closePeek = () => peeking.set(undefined);
+  const closePeek = () => dispatchOverlay({ kind: "clear" });
   const expandPeek = (to: string) => {
-    peeking.set(undefined);
+    dispatchOverlay({ kind: "clear" });
     open(to);
   };
   const notice = dispatchedNotice(open);
@@ -185,9 +257,25 @@ export function IssuesPage(props: { rest: string }) {
     const at = id();
     return at === undefined ? undefined : all().find((c) => c.id === at || (c.kind === "issue" && issueIs(c.issue, at)));
   });
+  const activeOverlay = createMemo(() =>
+    effectiveIssueOverlay(overlay(), props.rest, { ...(repo() ? { repo: repo() } : {}), ...(agent() ? { agent: agent() } : {}) }, id()),
+  );
   const peekCard = createMemo(() => {
-    const at = id() === undefined ? peeking() : undefined;
-    return at === undefined ? undefined : all().find((c) => c.id === at || (c.kind === "issue" && issueIs(c.issue, at)));
+    const cur = activeOverlay();
+    if (cur.kind !== "peeking") return undefined;
+    return all().find((c) => c.id === cur.id || (c.kind === "issue" && issueIs(c.issue, cur.id)));
+  });
+  const newDraftAt = createMemo(() => {
+    const cur = activeOverlay();
+    return cur.kind === "new" ? cur.at : undefined;
+  });
+  const closingOverlay = createMemo(() => {
+    const cur = activeOverlay();
+    return cur.kind === "closing" ? cur : undefined;
+  });
+  const reopeningOverlay = createMemo(() => {
+    const cur = activeOverlay();
+    return cur.kind === "reopening" ? cur : undefined;
   });
 
   const place = async (c: BoardCard, before: string | undefined) => {
@@ -212,15 +300,17 @@ export function IssuesPage(props: { rest: string }) {
       await sendMove(moves, { id: c.id, status: to, lane: to }).done;
     } else if (move === "revive") {
       await sendMove(moves, { id: c.id, status: "backlog", lane: to }).done;
-    } else if (move === "close" && c.kind === "issue" && c.session) closing.set({ issue: c.issue, session: c.session, review: false, lane: to });
-    else if (move === "close" && c.kind === "family") closing.set({ issue: c.issue, session: undefined, review: false, lane: to });
-    else if (move === "reopen" && (c.kind === "issue" || c.kind === "family")) reopening.set({ issue: c.issue, lane: to });
+    } else if (move === "close" && c.kind === "issue" && c.session) {
+      dispatchOverlay({ kind: "openClose", issue: c.issue, session: c.session, review: false, lane: to });
+    } else if (move === "close" && c.kind === "family") {
+      dispatchOverlay({ kind: "openClose", issue: c.issue, session: undefined, review: false, lane: to });
+    } else if (move === "reopen" && (c.kind === "issue" || c.kind === "family")) {
+      dispatchOverlay({ kind: "openReopen", issue: c.issue, lane: to });
+    }
   };
 
-  const newAt = signal<NewIssueAt>();
-  const draftAt = () => (props.rest === "new" ? { ...(repo() ? { repo: repo() } : {}), ...(agent() ? { agent: agent() } : {}) } : newAt());
   const closeDraft = () => {
-    newAt.set(undefined);
+    dispatchOverlay({ kind: "clear" });
     if (props.rest === "new") open(undefined);
   };
   const startNew = (where: NewIssueAt) => {
@@ -229,22 +319,27 @@ export function IssuesPage(props: { rest: string }) {
     const agent = where.agent || f.agent;
     const text = where.text;
     const machineId = where.machineId;
-    newAt.set({
-      ...(repo ? { repo } : {}),
-      ...(agent ? { agent } : {}),
-      ...(text ? { text } : {}),
-      ...(machineId ? { machineId } : {}),
-      ...(where.parent ? { parent: where.parent } : {}),
-      ...(where.startAt !== undefined ? { startAt: where.startAt } : {}),
-      ...(where.dueAt !== undefined ? { dueAt: where.dueAt } : {}),
+    dispatchOverlay({
+      kind: "openNew",
+      at: {
+        ...(repo ? { repo } : {}),
+        ...(agent ? { agent } : {}),
+        ...(text ? { text } : {}),
+        ...(machineId ? { machineId } : {}),
+        ...(where.parent ? { parent: where.parent } : {}),
+        ...(where.startAt !== undefined ? { startAt: where.startAt } : {}),
+        ...(where.dueAt !== undefined ? { dueAt: where.dueAt } : {}),
+      },
     });
   };
   const updateScheduleDates = async (issueId: string, dates: { startAt?: number; dueAt?: number }) => {
     await sendLabel(labelSets, omitUndefined({ id: issueId, startAt: dates.startAt, dueAt: dates.dueAt })).done;
   };
   const addInList: ListAdd = (where) => startNew(where);
-  const overlayDialogUp = () => draftAt() !== undefined || closing() !== undefined || reopening() !== undefined;
-  const dialogUp = () => overlayDialogUp() || peekCard() !== undefined;
+  const dialogUp = () => {
+    const cur = activeOverlay();
+    return cur.kind === "peeking" ? peekCard() !== undefined : isIssueOverlayBlocking(cur);
+  };
   // C, unless a field has focus, a dialog is up or an issue is open.
   keymap.bind(
     "c",
@@ -383,7 +478,7 @@ export function IssuesPage(props: { rest: string }) {
                 cards={all}
                 known={!history.loading() && history.rows() !== undefined}
                 open={open}
-                onClose={(issue, session, review) => closing.set({ issue, session, review })}
+                onClose={(issue, session, review) => dispatchOverlay({ kind: "openClose", issue, session, review })}
               />
             </IssueView>
           )}
@@ -391,27 +486,29 @@ export function IssuesPage(props: { rest: string }) {
       </If>
       <If when={peekCard()}>
         {(c) => (
-          <IssuePeekModal card={c()} blocked={overlayDialogUp} onExpand={expandPeek} onClose={closePeek}>
+          <IssuePeekModal card={c()} blocked={() => activeOverlay().kind !== "peeking"} onExpand={expandPeek} onClose={closePeek}>
             <Each of={[c().id]} key={(cur) => cur}>
               {(at) => (
                 <Detail
                   id={at()}
                   cards={all}
                   known={!history.loading() && history.rows() !== undefined}
-                  open={(to) => (to === undefined ? closePeek() : peeking.set(to))}
-                  onClose={(issue, session, review) => closing.set({ issue, session, review })}
+                  open={(to) => (to === undefined ? closePeek() : dispatchOverlay({ kind: "peek", id: to }))}
+                  onClose={(issue, session, review) => dispatchOverlay({ kind: "openClose", issue, session, review })}
                 />
               )}
             </Each>
           </IssuePeekModal>
         )}
       </If>
-      <If when={draftAt()}>{(at) => <NewIssue at={at()} onKeep={keepNew} onClose={closeDraft} />}</If>
-      <If when={closing()}>
-        {(c) => <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} lane={c().lane} onClose={() => closing.set(undefined)} />}
+      <If when={newDraftAt()}>{(at) => <NewIssue at={at()} onKeep={keepNew} onClose={closeDraft} />}</If>
+      <If when={closingOverlay()}>
+        {(c) => (
+          <CloseIssueDialog issue={c().issue} session={c().session} review={c().review} lane={c().lane} onClose={() => dispatchOverlay({ kind: "dismiss" })} />
+        )}
       </If>
-      <If when={reopening()}>
-        {(r) => <ReopenDialog issue={r().issue} lane={r().lane} onClose={() => reopening.set(undefined)} onReopened={() => open(r().issue.id)} />}
+      <If when={reopeningOverlay()}>
+        {(r) => <ReopenDialog issue={r().issue} lane={r().lane} onClose={() => dispatchOverlay({ kind: "dismiss" })} onReopened={() => open(r().issue.id)} />}
       </If>
     </View>
   );
