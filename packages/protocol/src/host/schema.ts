@@ -346,6 +346,11 @@ export const HostAppletIdPayload = z.object({
   artifactId: z.string(),
 }) satisfies Codec<T.HostAppletIdPayload>;
 
+const HostCaptureWebViewPayload = z.object({
+  width: z.exactOptional(z.number()),
+  height: z.exactOptional(z.number()),
+}) satisfies Codec<T.HostCaptureWebViewPayload>;
+
 export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.info") }),
   z.object({ op: z.literal("host.updateState") }),
@@ -390,4 +395,5 @@ export const HostOp = z.discriminatedUnion("op", [
   z.object({ op: z.literal("host.appletInstall"), payload: HostAppletInstallPayload }),
   z.object({ op: z.literal("host.appletUninstall"), payload: HostAppletIdPayload }),
   z.object({ op: z.literal("host.appletOpen"), payload: HostAppletIdPayload }),
+  z.object({ op: z.literal("host.captureWebView"), payload: HostCaptureWebViewPayload }),
 ]) satisfies Codec<T.HostOp>;

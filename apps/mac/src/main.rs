@@ -1,6 +1,7 @@
 mod applet;
 mod assets;
 mod audio;
+mod capture;
 mod command_line;
 mod debug;
 mod diff;

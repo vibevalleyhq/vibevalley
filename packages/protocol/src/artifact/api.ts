@@ -54,6 +54,8 @@ export interface ArtifactHandlers {
   readonly "artifact.history.undoOrigin": (a: T.ArtifactHistoryUndoOriginRequest) => Promise<T.Artifact>;
   /** Compact old operation history into a shallow snapshot while keeping current state intact. */
   readonly "artifact.history.compact": (a: T.ArtifactHistoryCompactRequest) => Promise<T.Artifact>;
+  /** Saves a derived auto-captured cover image outside the artifact directory and CRDT. */
+  readonly "artifact.cover.set": (a: T.ArtifactCoverSetRequest) => Promise<T.ArtifactCover>;
 }
 
 export const artifactEndpoints: readonly Endpoint[] = [
@@ -231,6 +233,13 @@ export const artifactEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: S.ArtifactHistoryCompactRequest,
     result: S.Artifact,
+    can: ["user", "remote"],
+  },
+  {
+    op: "artifact.cover.set",
+    about: ["id"],
+    input: S.ArtifactCoverSetRequest,
+    result: S.ArtifactCover,
     can: ["user", "remote"],
   },
 ];

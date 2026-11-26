@@ -265,6 +265,7 @@ MOSS Live 语音通话
 | `artifact.history.fork` | 从指定的历史前沿分叉出一篇新作品 | `/api/v1/artifact/history/fork` | ✓ | ✓ |   |   |
 | `artifact.history.undoOrigin` | 按提交来源选择性撤销某一轮的改动，保留其他人的并发编辑 | `/api/v1/artifact/history/undoOrigin` | ✓ | ✓ |   |   |
 | `artifact.history.compact` | 把较早的操作历史压缩成浅快照，当前内容保持不变 | `/api/v1/artifact/history/compact` | ✓ | ✓ |   |   |
+| `artifact.cover.set` | cap.op.artifact.cover.set | `/api/v1/artifact/cover/set` | ✓ | ✓ |   |   |
 
 ## game
 

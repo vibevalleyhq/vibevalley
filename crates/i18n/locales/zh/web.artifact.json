@@ -3,6 +3,13 @@
     "version": "第 {version} 稿",
     "open": "打开「{title}」"
   },
+  "preview": {
+    "slides": "{n} 页",
+    "shots": "{n} 镜",
+    "scenes": "{n} 场",
+    "nodes": "{n} 节点",
+    "edges": "{n} 连线"
+  },
   "page": {
     "delete": "删掉",
     "deleteAsk": "删掉「{title}」？对话里的卡片还在。",

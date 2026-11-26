@@ -1465,6 +1465,15 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Artifact"),
     },
     Endpoint {
+        op: "artifact.cover.set",
+        module: "artifact",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("ArtifactCoverSetRequest"),
+        result: Some("ArtifactCover"),
+    },
+    Endpoint {
         op: "provider.get",
         module: "provider",
         about: &[],
@@ -2813,6 +2822,13 @@ pub mod ops {
         type Input = t::ArtifactHistoryCompactRequest;
         type Result = t::Artifact;
     }
+    /// Saves a derived auto-captured cover image outside the artifact directory and CRDT.
+    pub struct ArtifactCoverSet;
+    impl Op for ArtifactCoverSet {
+        const NAME: &'static str = "artifact.cover.set";
+        type Input = t::ArtifactCoverSetRequest;
+        type Result = t::ArtifactCover;
+    }
     pub struct ProviderGet;
     impl Op for ProviderGet {
         const NAME: &'static str = "provider.get";
@@ -3338,6 +3354,7 @@ endpoint_ids! {
     ArtifactHistoryFork => "artifact.history.fork",
     ArtifactHistoryUndoOrigin => "artifact.history.undoOrigin",
     ArtifactHistoryCompact => "artifact.history.compact",
+    ArtifactCoverSet => "artifact.cover.set",
     // provider & setting
     ProviderGet => "provider.get",
     ProviderUpdate => "provider.update",

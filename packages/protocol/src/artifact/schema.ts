@@ -27,6 +27,133 @@ const ArtifactVersion = z.object({
   number: z.exactOptional(z.number()),
 }) satisfies Codec<T.ArtifactVersion>;
 
+export const ArtifactCover = z.object({
+  path: z.string(),
+  url: z.string(),
+  mime: z.string(),
+  seq: z.number(),
+  width: z.exactOptional(z.number().int().min(1)),
+  height: z.exactOptional(z.number().int().min(1)),
+  updatedAt: z.number(),
+}) satisfies Codec<T.ArtifactCover>;
+
+export const ArtifactCoverSetRequest = z.object({
+  id: ArtifactId,
+  seq: z.number(),
+  mime: z.string(),
+  data: z.string(),
+  width: z.exactOptional(z.number().int().min(1)),
+  height: z.exactOptional(z.number().int().min(1)),
+}) satisfies Codec<T.ArtifactCoverSetRequest>;
+
+export const ArtifactPreviewOutlineItem = z.object({
+  depth: z.number().int().min(0),
+  text: z.string(),
+  kind: z.string(),
+  checked: z.exactOptional(z.boolean()),
+}) satisfies Codec<T.ArtifactPreviewOutlineItem>;
+
+export const ArtifactPreviewSwatch = z.object({
+  name: z.string(),
+  light: z.string(),
+  dark: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactPreviewSwatch>;
+
+export const ArtifactPreviewKpi = z.object({
+  label: z.string(),
+  value: z.string(),
+}) satisfies Codec<T.ArtifactPreviewKpi>;
+
+export const ArtifactPreviewMinimapShape = z.object({
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+  kind: z.string(),
+  label: z.exactOptional(z.string()),
+}) satisfies Codec<T.ArtifactPreviewMinimapShape>;
+
+export const ArtifactPreview = z.discriminatedUnion("_tag", [
+  z.object({
+    _tag: z.literal("docs"),
+    heading: z.exactOptional(z.string()),
+    excerpt: z.string(),
+  }),
+  z.object({
+    _tag: z.literal("outline"),
+    items: z.array(ArtifactPreviewOutlineItem),
+    todoDone: z.number().int().min(0),
+    todoTotal: z.number().int().min(0),
+  }),
+  z.object({
+    _tag: z.literal("design-system"),
+    swatches: z.array(ArtifactPreviewSwatch),
+    fonts: z.array(z.string()),
+  }),
+  z.object({
+    _tag: z.literal("dashboard"),
+    kpis: z.array(ArtifactPreviewKpi),
+    series: z.array(z.number()),
+  }),
+  z.object({
+    _tag: z.literal("sheet"),
+    sheetName: z.exactOptional(z.string()),
+    columns: z.array(z.string()),
+    rows: z.array(z.array(z.string())),
+    totalRows: z.number().int().min(0),
+    totalCols: z.number().int().min(0),
+  }),
+  z.object({
+    _tag: z.literal("slides"),
+    firstTitle: z.exactOptional(z.string()),
+    firstSubtitle: z.exactOptional(z.string()),
+    slideCount: z.number().int().min(0),
+  }),
+  z.object({
+    _tag: z.literal("whiteboard"),
+    shapes: z.array(ArtifactPreviewMinimapShape),
+    nodeCount: z.number().int().min(0),
+  }),
+  z.object({
+    _tag: z.literal("diagram"),
+    kind: z.exactOptional(z.string()),
+    nodes: z.array(z.string()),
+    nodeCount: z.number().int().min(0),
+    edgeCount: z.number().int().min(0),
+  }),
+  z.object({
+    _tag: z.literal("design"),
+    artboard: z.exactOptional(z.string()),
+    width: z.exactOptional(z.number().int().min(1)),
+    height: z.exactOptional(z.number().int().min(1)),
+    theme: z.exactOptional(z.string()),
+    nodes: z.array(z.string()),
+    frameAsset: z.exactOptional(z.string()),
+    framePath: z.exactOptional(z.string()),
+  }),
+  z.object({
+    _tag: z.literal("storyboard"),
+    shotCount: z.number().int().min(0),
+    firstShot: z.exactOptional(z.string()),
+    durationSec: z.exactOptional(z.number()),
+    frameAsset: z.exactOptional(z.string()),
+    framePath: z.exactOptional(z.string()),
+  }),
+  z.object({
+    _tag: z.literal("motion"),
+    sceneCount: z.number().int().min(0),
+    durationSec: z.exactOptional(z.number()),
+    firstScene: z.exactOptional(z.string()),
+    frameAsset: z.exactOptional(z.string()),
+    framePath: z.exactOptional(z.string()),
+  }),
+  z.object({
+    _tag: z.literal("prototype"),
+    heading: z.exactOptional(z.string()),
+    subtitle: z.exactOptional(z.string()),
+  }),
+]) satisfies Codec<T.ArtifactPreview>;
+
 export const Artifact = z.object({
   id: ArtifactId,
   title: z.string(),
@@ -42,6 +169,8 @@ export const Artifact = z.object({
   versions: z.array(ArtifactVersion),
   at: z.number(),
   updated: z.number(),
+  preview: z.exactOptional(ArtifactPreview),
+  cover: z.exactOptional(ArtifactCover),
 }) satisfies Codec<T.Artifact>;
 
 export const ArtifactFileMeta = z.object({

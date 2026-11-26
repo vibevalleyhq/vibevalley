@@ -990,6 +990,28 @@ pub struct AppletOpenResult {
     pub bundle_path: String,
 }
 
+/// Request payload for `host.captureWebView`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostCaptureWebViewPayload {
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+}
+
+/// Captured raster image returned by `host.captureWebView`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostCapturedImage {
+    pub mime: String,
+    pub data: String,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// Status snapshot for the bundled CLI symlink (`host.cliState` / `cliInstall` / `cliRemove`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -1168,6 +1190,8 @@ pub enum HostOp {
     AppletUninstall(HostAppletIdPayload),
     #[serde(rename = "host.appletOpen")]
     AppletOpen(HostAppletIdPayload),
+    #[serde(rename = "host.captureWebView")]
+    CaptureWebView(HostCaptureWebViewPayload),
 }
 
 impl HostOp {
@@ -1215,6 +1239,7 @@ impl HostOp {
         "host.appletInstall",
         "host.appletUninstall",
         "host.appletOpen",
+        "host.captureWebView",
     ];
 
     pub fn is_known_op(op: &str) -> bool {
@@ -1266,6 +1291,7 @@ impl HostOp {
             HostOp::AppletInstall(_) => "host.appletInstall",
             HostOp::AppletUninstall(_) => "host.appletUninstall",
             HostOp::AppletOpen(_) => "host.appletOpen",
+            HostOp::CaptureWebView(_) => "host.captureWebView",
         }
     }
 
@@ -1358,6 +1384,9 @@ impl HostOp {
                 .map(HostOp::AppletUninstall)
                 .map_err(|e| format!("appletUninstall: {e}")),
             "host.appletOpen" => serde_json::from_value(payload).map(HostOp::AppletOpen).map_err(|e| format!("appletOpen: {e}")),
+            "host.captureWebView" => serde_json::from_value(optional_object(payload))
+                .map(HostOp::CaptureWebView)
+                .map_err(|e| format!("captureWebView: {e}")),
             other => Err(format!("the host has no op {other}")),
         }
     }
@@ -1418,6 +1447,8 @@ crate::typescript::module! {
     HostAppletIdPayload,
     AppletRemoveResult,
     AppletOpenResult,
+    HostCaptureWebViewPayload,
+    HostCapturedImage,
     HostCommandLineState,
     QrMatrix,
     HostLocalFile,
@@ -1640,6 +1671,15 @@ mod tests {
                 json!({ "artifactId": "art-1" }),
                 HostOp::AppletOpen(HostAppletIdPayload { artifact_id: "art-1".into() }),
             ),
+            ("host.captureWebView", json!(null), HostOp::CaptureWebView(HostCaptureWebViewPayload::default())),
+            (
+                "host.captureWebView",
+                json!({ "width": 640, "height": 400 }),
+                HostOp::CaptureWebView(HostCaptureWebViewPayload {
+                    width: Some(640),
+                    height: Some(400),
+                }),
+            ),
         ];
 
         let mut seen = std::collections::BTreeSet::new();
@@ -1682,6 +1722,7 @@ mod tests {
         );
         assert!(HostOp::from_wire("host.appletUninstall", json!({})).is_err());
         assert!(HostOp::from_wire("host.appletOpen", json!({ "artifactId": "art-1", "extra": 1 })).is_err());
+        assert!(HostOp::from_wire("host.captureWebView", json!({ "width": 640, "extra": true })).is_err());
     }
 
     #[test]

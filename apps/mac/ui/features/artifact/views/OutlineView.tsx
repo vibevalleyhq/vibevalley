@@ -1,25 +1,28 @@
-import { computed, effect, Scroll, signal, Text, untracked, View } from "nsh";
-import { Input } from "nsh/base";
+import { computed, effect, keymap, Scroll, signal, Text, untracked, View, type InputRef } from "nsh";
+import { Input, Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
+import { Checkbox } from "../../../design/Checkbox";
 import { Icon } from "../../../design/Icon";
-import { IconButton } from "../../../design/IconButton";
 import { Empty } from "../../../design/layout";
+import { motionClass, popupTransition } from "../../../design/motion";
 import { Bubble } from "../../../design/Tip";
 import type { OutlineDocument, OutlineNode } from "../html";
 import {
-  addOutlineChild,
-  addOutlineRootItem,
-  addOutlineSibling,
-  cycleOutlineKind,
-  deleteOutlineNode,
-  flattenOutline,
-  indentOutlineNode,
-  outdentOutlineNode,
-  toggleOutlineTodo,
-  updateOutlineText,
-} from "./previewModel";
+  adjacentOutlineRowId,
+  canIndentOutlineNode,
+  canOutdentOutlineNode,
+  deleteEmptyOutlineNode,
+  flushOutlineDraftText,
+  indentOutlineWithFocus,
+  insertOutlineSibling,
+  moveOutlineNodeVertical,
+  outdentOutlineWithFocus,
+  outlineRowPaddingLeft,
+  visibleOutlineRows,
+} from "./outlineEditor";
+import { addOutlineChild, addOutlineRootItem, deleteOutlineNode, toggleOutlineTodo } from "./previewModel";
 
 export interface OutlineViewProps {
   readonly doc: OutlineDocument;
@@ -28,6 +31,12 @@ export interface OutlineViewProps {
   readonly addRequest?: number | undefined;
   readonly onSaveDoc: (next: OutlineDocument, summary: string) => void;
 }
+
+const rowMenuPopupClass = `min-w-40 gap-0.5 rounded-lg border border-line bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`;
+const rowMenuItemClass = "h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
+const rowMenuSeparatorClass = "my-1 h-px bg-line";
+
+const OUTLINE_KINDS: readonly OutlineNode["kind"][] = ["heading", "bullet", "todo"];
 
 function kindLabelFor(kind: OutlineNode["kind"]): string {
   switch (kind) {
@@ -40,6 +49,25 @@ function kindLabelFor(kind: OutlineNode["kind"]): string {
   }
 }
 
+function setOutlineNodeKind(doc: OutlineDocument, nodeId: string, kind: OutlineNode["kind"]): OutlineDocument {
+  if (!Object.hasOwn(doc.nodes, nodeId)) return doc;
+  const node = doc.nodes[nodeId];
+  if (node.kind === kind) return doc;
+  return {
+    ...doc,
+    nodes: {
+      ...doc.nodes,
+      [nodeId]: {
+        id: node.id,
+        text: node.text,
+        kind,
+        children: node.children,
+        ...(kind === "todo" ? { checked: node.checked === true } : {}),
+      },
+    },
+  };
+}
+
 export function OutlineView(props: OutlineViewProps) {
   const editingId = signal<string | undefined>(undefined);
   const editingText = signal("");
@@ -47,12 +75,20 @@ export function OutlineView(props: OutlineViewProps) {
   const quickText = signal("");
   const quickKind = signal<"bullet" | "todo">("bullet");
 
+  let activeInputRef: InputRef | undefined;
+  let nextNodeSeq = 0;
+  const makeNodeId = () => `n_${Date.now().toString(36)}_${++nextNodeSeq}`;
+
   const readOnly = () => props.version !== undefined;
-  const rows = computed(() => {
-    const all = flattenOutline(props.doc, collapsedIds());
-    if (props.hideDone !== true) return all;
-    return all.filter((r) => !(r.node.kind === "todo" && r.node.checked === true));
-  });
+  const rows = computed(() => visibleOutlineRows(props.doc, { collapsed: collapsedIds(), hideDone: props.hideDone }));
+
+  const refocusEditingInput = (targetId: string) => {
+    queueMicrotask(() => {
+      if (untracked(editingId) === targetId) {
+        activeInputRef?.focus();
+      }
+    });
+  };
 
   const toggleCollapse = (id: string) => {
     const prev = untracked(collapsedIds);
@@ -62,40 +98,106 @@ export function OutlineView(props: OutlineViewProps) {
     collapsedIds.set(next);
   };
 
+  const commitEdit = (nodeId: string, addSiblingAfter: boolean) => {
+    if (untracked(editingId) !== nodeId) return;
+    const baseDoc = flushOutlineDraftText(props.doc, nodeId, untracked(editingText).trim());
+    if (addSiblingAfter) {
+      const siblingId = makeNodeId();
+      const res = insertOutlineSibling(baseDoc, nodeId, siblingId, "");
+      editingId.set(res.focusId);
+      editingText.set("");
+      props.onSaveDoc(res.doc, `Add outline item ${res.focusId}`);
+      return;
+    }
+    editingId.set(undefined);
+    if (baseDoc !== props.doc) {
+      props.onSaveDoc(baseDoc, `Edit ${nodeId}`);
+    }
+  };
+
   const beginEdit = (node: OutlineNode) => {
     if (readOnly()) return;
+    const prevId = untracked(editingId);
+    if (prevId !== undefined && prevId !== node.id) {
+      commitEdit(prevId, false);
+    }
     editingId.set(node.id);
     editingText.set(node.text);
   };
 
-  const commitEdit = (nodeId: string, addSiblingAfter: boolean) => {
-    if (untracked(editingId) !== nodeId) return;
-    const text = untracked(editingText).trim();
+  const cancelEdit = () => {
     editingId.set(undefined);
-    if (!Object.hasOwn(props.doc.nodes, nodeId)) return;
-    const existing = props.doc.nodes[nodeId];
+  };
 
-    let nextDoc = text !== existing.text ? updateOutlineText(props.doc, nodeId, text || existing.text) : props.doc;
-    if (addSiblingAfter) {
-      const siblingId = `n_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`;
-      nextDoc = addOutlineSibling(nextDoc, nodeId, siblingId, "");
-      editingId.set(siblingId);
+  const handleIndent = (direction: "in" | "out") => {
+    const nodeId = untracked(editingId);
+    if (nodeId === undefined || readOnly()) return;
+    const baseDoc = flushOutlineDraftText(props.doc, nodeId, untracked(editingText));
+    const prevCollapsed = untracked(collapsedIds);
+    const res = direction === "in" ? indentOutlineWithFocus(baseDoc, nodeId, prevCollapsed) : outdentOutlineWithFocus(baseDoc, nodeId, prevCollapsed);
+    if (res.collapsed !== prevCollapsed) {
+      collapsedIds.set(res.collapsed);
+    }
+    if (res.changed) {
+      editingId.set(res.focusId);
+      props.onSaveDoc(res.doc, `${direction === "in" ? "Indent" : "Outdent"} ${nodeId}`);
+      refocusEditingInput(res.focusId);
+    } else if (baseDoc !== props.doc) {
+      props.onSaveDoc(baseDoc, `Edit ${nodeId}`);
+    }
+  };
+
+  const handleMoveRowFocus = (direction: "up" | "down") => {
+    const nodeId = untracked(editingId);
+    if (nodeId === undefined || readOnly()) return;
+    const nextId = adjacentOutlineRowId(untracked(rows), nodeId, direction);
+    if (nextId === undefined) return;
+    const baseDoc = flushOutlineDraftText(props.doc, nodeId, untracked(editingText).trim());
+    const nextText = Object.hasOwn(baseDoc.nodes, nextId) ? baseDoc.nodes[nextId].text : "";
+    editingId.set(nextId);
+    editingText.set(nextText);
+    if (baseDoc !== props.doc) {
+      props.onSaveDoc(baseDoc, `Edit ${nodeId}`);
+    }
+  };
+
+  const handleMoveNodeVertical = (direction: "up" | "down") => {
+    const nodeId = untracked(editingId);
+    if (nodeId === undefined || readOnly()) return;
+    const baseDoc = flushOutlineDraftText(props.doc, nodeId, untracked(editingText));
+    const res = moveOutlineNodeVertical(baseDoc, nodeId, direction);
+    if (res.changed) {
+      editingId.set(res.focusId);
+      props.onSaveDoc(res.doc, `Move ${nodeId} ${direction}`);
+      refocusEditingInput(res.focusId);
+    } else if (baseDoc !== props.doc) {
+      props.onSaveDoc(baseDoc, `Edit ${nodeId}`);
+    }
+  };
+
+  const handleDeleteEmpty = () => {
+    const nodeId = untracked(editingId);
+    if (nodeId === undefined || readOnly()) return;
+    const draft = untracked(editingText);
+    const res = deleteEmptyOutlineNode(props.doc, untracked(rows), nodeId, draft);
+    if (!res.deleted) return;
+    if (res.focusId !== undefined && Object.hasOwn(res.doc.nodes, res.focusId)) {
+      editingId.set(res.focusId);
+      editingText.set(res.doc.nodes[res.focusId].text);
+    } else {
+      editingId.set(undefined);
       editingText.set("");
-      props.onSaveDoc(nextDoc, `Add outline item ${siblingId}`);
-      return;
     }
-    if (nextDoc !== props.doc) {
-      props.onSaveDoc(nextDoc, `Edit ${nodeId}`);
-    }
+    props.onSaveDoc(res.doc, `Delete ${nodeId}`);
   };
 
   const handleAddRoot = () => {
     if (readOnly()) return;
-    const id = `n_${Date.now().toString(36)}`;
-    const next = addOutlineRootItem(props.doc, id, t("web.artifact.outline.untitled"), "bullet");
-    props.onSaveDoc(next, `Add outline item ${id}`);
+    const id = makeNodeId();
+    const next = addOutlineRootItem(props.doc, id, "", "bullet");
     editingId.set(id);
     editingText.set("");
+    props.onSaveDoc(next, `Add outline item ${id}`);
   };
 
   let handledAddRequest = untracked(() => props.addRequest ?? 0);
@@ -106,10 +208,39 @@ export function OutlineView(props: OutlineViewProps) {
     untracked(() => handleAddRoot());
   });
 
+  // Guard keymap bindings with low-frequency computed booleans so keystrokes never rebind listeners.
+  const isEditingAny = computed(() => !readOnly() && editingId() !== undefined);
+  effect(() => {
+    if (!isEditingAny()) return;
+    return keymap.bind(
+      {
+        tab: () => handleIndent("in"),
+        "shift+tab": () => handleIndent("out"),
+        up: () => handleMoveRowFocus("up"),
+        down: () => handleMoveRowFocus("down"),
+        "alt+up": () => handleMoveNodeVertical("up"),
+        "alt+down": () => handleMoveNodeVertical("down"),
+        escape: () => cancelEdit(),
+      },
+      { when: "always" },
+    );
+  });
+
+  const isEditingEmpty = computed(() => !readOnly() && editingId() !== undefined && editingText() === "");
+  effect(() => {
+    if (!isEditingEmpty()) return;
+    return keymap.bind(
+      {
+        backspace: () => handleDeleteEmpty(),
+      },
+      { when: "always" },
+    );
+  });
+
   const handleQuickSubmit = () => {
     const text = untracked(quickText).trim();
     if (!text || readOnly()) return;
-    const id = `n_${Date.now().toString(36)}`;
+    const id = makeNodeId();
     const next = addOutlineRootItem(props.doc, id, text, untracked(quickKind));
     quickText.set("");
     props.onSaveDoc(next, `Add outline item ${id}`);
@@ -120,49 +251,48 @@ export function OutlineView(props: OutlineViewProps) {
       <If when={rows().length > 0} else={<Empty icon="notes">{t("web.artifact.blocks.start")}</Empty>}>
         <View class="gap-0.5">
           <Each of={rows()} key={(row) => row.node.id}>
-            {(row) => {
+            {(row, idx) => {
               const id = () => row().node.id;
               const isEditing = () => editingId() === id();
               const isCollapsed = () => collapsedIds().has(id());
-              const canOutdent = () => !readOnly() && row().parentId !== undefined;
+              const canOutdent = () => !readOnly() && canOutdentOutlineNode(props.doc, id());
+              const canIndent = () => !readOnly() && canIndentOutlineNode(props.doc, id());
+              const isHeading = () => row().node.kind === "heading";
               return (
                 <View
                   testID={`outline-node-${id()}`}
-                  class="group flex-row items-start gap-1.5 rounded-md py-1 pr-1.5 hover:bg-hover"
-                  style={{ paddingLeft: 6 + row().depth * 18 }}
+                  class={`group relative flex-row items-start gap-1 rounded-md py-1 pr-2 ${isEditing() ? "" : "hover:bg-hover"} ${
+                    isHeading() && idx() > 0 ? "mt-2" : ""
+                  }`}
+                  style={{ paddingLeft: outlineRowPaddingLeft(row().depth) }}
                 >
-                  <If when={row().hasChildren} else={<View class="mt-0.5 size-4 shrink-0" />}>
+                  <If when={row().hasChildren} else={<View class="mt-px h-6 w-5 shrink-0" />}>
                     <View
                       role="button"
                       testID={`outline-collapse-${id()}`}
                       accessibilityState={{ expanded: !isCollapsed() }}
                       onPress={() => toggleCollapse(id())}
-                      class="mt-0.5 size-4 shrink-0 items-center justify-center rounded-xs hover:bg-selected"
+                      class="mt-px h-6 w-5 shrink-0 items-center justify-center rounded-xs hover:bg-selected"
                     >
                       <Icon name={isCollapsed() ? "expand" : "choose"} size={12} tone="muted" />
                     </View>
                   </If>
 
-                  <If when={row().node.kind === "todo"}>
-                    <View
-                      role="button"
-                      testID={`outline-todo-${id()}`}
-                      onPress={() => {
-                        if (readOnly()) return;
-                        props.onSaveDoc(toggleOutlineTodo(props.doc, id()), `Toggle ${id()}`);
-                      }}
-                      class={`mt-0.5 size-4 shrink-0 items-center justify-center rounded-xs border ${
-                        row().node.checked === true ? "border-accent bg-accent" : "border-idle bg-page"
-                      }`}
-                    >
-                      <If when={row().node.checked === true}>
-                        <Icon name="ticked" size={12} tone="page" />
+                  <If when={!isHeading()}>
+                    <View class="mt-px h-6 w-5 shrink-0 items-center justify-center">
+                      <If when={row().node.kind === "todo"} else={<View class="size-1.5 rounded-full bg-faint" />}>
+                        <Checkbox
+                          checked={row().node.checked === true}
+                          disabled={readOnly()}
+                          label={row().node.text || t("web.artifact.outline.untitled")}
+                          testid={`outline-todo-${id()}`}
+                          onChange={() => {
+                            if (readOnly()) return;
+                            props.onSaveDoc(toggleOutlineTodo(props.doc, id()), `Toggle ${id()}`);
+                          }}
+                        />
                       </If>
                     </View>
-                  </If>
-
-                  <If when={row().node.kind === "bullet"}>
-                    <View class="mt-2 size-1.5 shrink-0 rounded-full bg-faint" />
                   </If>
 
                   <View class="min-w-0 flex-1">
@@ -173,15 +303,19 @@ export function OutlineView(props: OutlineViewProps) {
                           role="button"
                           testID={`outline-text-${id()}`}
                           onPress={() => beginEdit(row().node)}
-                          class="min-h-5 justify-center rounded-xs px-1"
+                          class="w-full rounded-sm border border-transparent px-1.5"
                         >
                           <Text
                             class={
-                              row().node.kind === "heading"
-                                ? "text-base font-semibold text-ink"
+                              isHeading()
+                                ? row().node.text
+                                  ? "text-base leading-6 font-semibold text-ink"
+                                  : "text-base leading-6 font-semibold text-faint"
                                 : row().node.checked === true
-                                  ? "text-sm text-muted line-through"
-                                  : "text-sm text-ink"
+                                  ? "text-sm leading-6 text-muted line-through"
+                                  : row().node.text
+                                    ? "text-sm leading-6 text-ink"
+                                    : "text-sm leading-6 text-faint"
                             }
                           >
                             {row().node.text || t("web.artifact.outline.untitled")}
@@ -190,71 +324,133 @@ export function OutlineView(props: OutlineViewProps) {
                       }
                     >
                       <Input
+                        ref={(el) => {
+                          activeInputRef = el;
+                        }}
                         autoFocus
+                        multiline
+                        scrollbar={false}
                         testID={`outline-node-input-${id()}`}
                         accessibilityLabel={row().node.text || t("web.artifact.outline.untitled")}
+                        placeholder={t("web.artifact.outline.untitled")}
                         value={editingText()}
                         submitBehavior="submit"
-                        onChange={(e) => editingText.set(e.value)}
-                        onSubmit={() => commitEdit(id(), true)}
-                        onKeyPress={(e) => {
-                          if (e.key === "Escape") editingId.set(undefined);
+                        onChange={(e) => {
+                          if (untracked(editingText) !== e.value) editingText.set(e.value);
                         }}
+                        onSubmit={() => commitEdit(id(), true)}
                         onBlur={() => commitEdit(id(), false)}
-                        class={`h-6 w-full rounded-sm border border-focus bg-page px-1.5 text-ink ${
-                          row().node.kind === "heading" ? "text-base font-semibold" : "text-sm"
+                        class={`w-full rounded-sm border border-transparent bg-hover px-1.5 leading-6 text-ink placeholder:text-faint ${
+                          isHeading() ? "text-base font-semibold" : "text-sm"
                         }`}
                       />
                     </If>
                   </View>
 
                   <If when={!readOnly() && !isEditing()}>
-                    <View class="shrink-0 flex-row items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-                      <View
-                        role="button"
-                        testID={`outline-kind-${id()}`}
-                        tooltip={<Bubble text={t("web.artifact.outline.cycleKind", { kind: kindLabelFor(row().node.kind) })} />}
-                        onPress={() => props.onSaveDoc(cycleOutlineKind(props.doc, id()), `Cycle kind ${id()}`)}
-                        class="h-5 items-center justify-center rounded-xs px-1 hover:bg-selected"
+                    <View class="absolute top-1.5 right-1.5 z-10">
+                      <Menu
+                        placement="bottom"
+                        align="end"
+                        offset={4}
+                        popupClass={rowMenuPopupClass}
+                        popupStartingClass={popupTransition("opacity-0")}
+                        popupEndingClass={popupTransition("opacity-0")}
+                        trigger={
+                          <View
+                            testID={`outline-more-${id()}`}
+                            accessibilityLabel={t("web.artifact.page.more")}
+                            class="size-5 shrink-0 items-center justify-center rounded-xs opacity-0 group-hover:opacity-100 hover:bg-selected focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-focus aria-expanded:bg-selected aria-expanded:opacity-100"
+                          >
+                            <Icon name="more" size={14} tone="muted" />
+                          </View>
+                        }
                       >
-                        <Text class="font-mono text-2xs text-muted">{kindLabelFor(row().node.kind)}</Text>
-                      </View>
-                      <If when={canOutdent()}>
-                        <IconButton
-                          icon="back"
-                          size={12}
-                          label={t("web.artifact.outline.outdent")}
-                          testid={`outline-outdent-${id()}`}
-                          onClick={() => props.onSaveDoc(outdentOutlineNode(props.doc, id()), `Outdent ${id()}`)}
-                        />
-                      </If>
-                      <IconButton
-                        icon="indent"
-                        size={12}
-                        label={t("web.artifact.outline.indent")}
-                        testid={`outline-indent-${id()}`}
-                        onClick={() => props.onSaveDoc(indentOutlineNode(props.doc, id()), `Indent ${id()}`)}
-                      />
-                      <IconButton
-                        icon="add"
-                        size={12}
-                        label={t("web.artifact.outline.addChild")}
-                        testid={`outline-child-${id()}`}
-                        onClick={() => {
-                          const childId = `n_${Date.now().toString(36)}`;
-                          const next = addOutlineChild(props.doc, id(), childId, "");
-                          props.onSaveDoc(next, `Add child ${childId}`);
-                          editingId.set(childId);
-                          editingText.set("");
-                        }}
-                      />
-                      <IconButton
-                        icon="delete"
-                        size={12}
-                        label={t("web.artifact.page.delete")}
-                        testid={`outline-delete-${id()}`}
-                        onClick={() => props.onSaveDoc(deleteOutlineNode(props.doc, id()), `Delete ${id()}`)}
-                      />
+                        <Each of={OUTLINE_KINDS} key={(kind) => kind}>
+                          {(kind) => (
+                            <MenuItem
+                              testID={`outline-kind-${kind()}-${id()}`}
+                              onSelect={() => {
+                                const next = setOutlineNodeKind(props.doc, id(), kind());
+                                if (next !== props.doc) props.onSaveDoc(next, `Set kind ${kind()} ${id()}`);
+                              }}
+                              class={rowMenuItemClass}
+                            >
+                              <Text class="min-w-0 flex-1 truncate text-sm text-ink">{kindLabelFor(kind())}</Text>
+                              <If when={row().node.kind === kind()}>
+                                <Icon name="check" size={12} tone="accent" />
+                              </If>
+                            </MenuItem>
+                          )}
+                        </Each>
+                        <MenuSeparator class={rowMenuSeparatorClass} />
+                        <MenuItem
+                          testID={`outline-child-${id()}`}
+                          onSelect={() => {
+                            const childId = makeNodeId();
+                            const prevCollapsed = untracked(collapsedIds);
+                            if (prevCollapsed.has(id())) {
+                              const nextCollapsed = new Set(prevCollapsed);
+                              nextCollapsed.delete(id());
+                              collapsedIds.set(nextCollapsed);
+                            }
+                            const next = addOutlineChild(props.doc, id(), childId, "");
+                            editingId.set(childId);
+                            editingText.set("");
+                            props.onSaveDoc(next, `Add child ${childId}`);
+                          }}
+                          class={rowMenuItemClass}
+                        >
+                          <View class="size-3.5 shrink-0 items-center justify-center">
+                            <Icon name="add" size={14} tone="muted" />
+                          </View>
+                          <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.artifact.outline.addChild")}</Text>
+                        </MenuItem>
+                        <If when={canIndent()}>
+                          <MenuItem
+                            testID={`outline-indent-${id()}`}
+                            onSelect={() => {
+                              const prevCollapsed = untracked(collapsedIds);
+                              const res = indentOutlineWithFocus(props.doc, id(), prevCollapsed);
+                              if (res.collapsed !== prevCollapsed) collapsedIds.set(res.collapsed);
+                              if (res.changed) props.onSaveDoc(res.doc, `Indent ${id()}`);
+                            }}
+                            class={rowMenuItemClass}
+                          >
+                            <View class="size-3.5 shrink-0 items-center justify-center">
+                              <Icon name="indent" size={14} tone="muted" />
+                            </View>
+                            <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.artifact.outline.indent")}</Text>
+                          </MenuItem>
+                        </If>
+                        <If when={canOutdent()}>
+                          <MenuItem
+                            testID={`outline-outdent-${id()}`}
+                            onSelect={() => {
+                              const prevCollapsed = untracked(collapsedIds);
+                              const res = outdentOutlineWithFocus(props.doc, id(), prevCollapsed);
+                              if (res.changed) props.onSaveDoc(res.doc, `Outdent ${id()}`);
+                            }}
+                            class={rowMenuItemClass}
+                          >
+                            <View class="size-3.5 shrink-0 items-center justify-center">
+                              <Icon name="back" size={14} tone="muted" />
+                            </View>
+                            <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.artifact.outline.outdent")}</Text>
+                          </MenuItem>
+                        </If>
+                        <MenuSeparator class={rowMenuSeparatorClass} />
+                        <MenuItem
+                          testID={`outline-delete-${id()}`}
+                          onSelect={() => props.onSaveDoc(deleteOutlineNode(props.doc, id()), `Delete ${id()}`)}
+                          class="h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-bad-soft focus:bg-bad-soft"
+                        >
+                          <View class="size-3.5 shrink-0 items-center justify-center">
+                            <Icon name="delete" size={14} tone="berry" />
+                          </View>
+                          <Text class="min-w-0 flex-1 truncate text-sm text-berry">{t("web.artifact.page.delete")}</Text>
+                        </MenuItem>
+                      </Menu>
                     </View>
                   </If>
                 </View>
@@ -265,14 +461,25 @@ export function OutlineView(props: OutlineViewProps) {
       </If>
 
       <If when={!readOnly()}>
-        <View class="mt-1 flex-row items-center gap-2 rounded-md border border-line bg-side px-2.5 py-1.5">
+        <View
+          testID="outline-quick-bar"
+          class="mt-1 flex-row items-center gap-1 rounded-md py-1 pr-2 hover:bg-hover focus-within:bg-hover"
+          style={{ paddingLeft: outlineRowPaddingLeft(0) }}
+        >
+          <View class="h-6 w-5 shrink-0 items-center justify-center">
+            <Icon name="add" size={12} tone="faint" />
+          </View>
           <View
             role="button"
             testID="outline-quick-kind"
+            accessibilityLabel={t("web.artifact.outline.cycleKind", { kind: kindLabelFor(quickKind()) })}
+            tooltip={<Bubble text={t("web.artifact.outline.cycleKind", { kind: kindLabelFor(quickKind()) })} />}
             onPress={() => quickKind.set(quickKind() === "bullet" ? "todo" : "bullet")}
-            class="h-5 shrink-0 items-center justify-center rounded-xs border border-line bg-page px-1.5 hover:bg-hover"
+            class="h-6 w-5 shrink-0 items-center justify-center rounded-xs hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
           >
-            <Text class="font-mono text-2xs text-muted">{kindLabelFor(quickKind())}</Text>
+            <If when={quickKind() === "todo"} else={<View class="size-1.5 rounded-full bg-faint" />}>
+              <View class="size-3.5 items-center justify-center rounded-xs border border-idle bg-page" />
+            </If>
           </View>
           <Input
             testID="outline-quick-add"
@@ -280,9 +487,15 @@ export function OutlineView(props: OutlineViewProps) {
             placeholder={t("web.artifact.outline.quickAdd")}
             accessibilityLabel={t("web.artifact.outline.quickAdd")}
             submitBehavior="submit"
-            onChange={(e) => quickText.set(e.value)}
+            onFocus={() => {
+              const prevId = untracked(editingId);
+              if (prevId !== undefined) commitEdit(prevId, false);
+            }}
+            onChange={(e) => {
+              if (untracked(quickText) !== e.value) quickText.set(e.value);
+            }}
             onSubmit={handleQuickSubmit}
-            class="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint"
+            class="min-w-0 flex-1 rounded-sm border border-transparent bg-transparent px-1.5 text-sm leading-6 text-ink placeholder:text-faint"
           />
         </View>
       </If>

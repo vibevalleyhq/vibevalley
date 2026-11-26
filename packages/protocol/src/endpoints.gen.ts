@@ -163,6 +163,7 @@ export const servedEndpoints = [
   { op: "artifact.history.fork", can: ["user", "remote"], about: ["id"] },
   { op: "artifact.history.undoOrigin", can: ["user", "remote"], about: ["id"] },
   { op: "artifact.history.compact", can: ["user", "remote"], about: ["id"] },
+  { op: "artifact.cover.set", can: ["user", "remote"], about: ["id"] },
   { op: "provider.get", can: ["user"], about: [] },
   { op: "provider.update", can: ["user"], about: [] },
   { op: "provider.voice.list", can: ["user"], about: ["connection"] },

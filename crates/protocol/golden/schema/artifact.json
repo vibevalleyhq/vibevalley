@@ -608,5 +608,181 @@
   {
    "id": "a1"
   }
+ ],
+ "ArtifactCover": [
+  {
+   "path": "/tmp/artifact/a1/.cover-3-2000.png",
+   "url": "/api/v1/artifact/a1/cover?seq=3",
+   "mime": "image/png",
+   "seq": 3,
+   "width": 640,
+   "height": 400,
+   "updatedAt": 2000
+  }
+ ],
+ "ArtifactCoverSetRequest": [
+  {
+   "id": "a1",
+   "seq": 3,
+   "mime": "image/png",
+   "data": "iVBORw0KGgo=",
+   "width": 640,
+   "height": 400
+  }
+ ],
+ "ArtifactPreviewOutlineItem": [
+  {
+   "depth": 1,
+   "text": "Ship cards",
+   "kind": "todo",
+   "checked": true
+  }
+ ],
+ "ArtifactPreviewSwatch": [
+  {
+   "name": "accent",
+   "light": "#4d7a2a",
+   "dark": "#84cc16"
+  }
+ ],
+ "ArtifactPreviewKpi": [
+  {
+   "label": "ARR",
+   "value": "$3,000"
+  }
+ ],
+ "ArtifactPreviewMinimapShape": [
+  {
+   "x": 0.1,
+   "y": 0.2,
+   "w": 0.3,
+   "h": 0.15,
+   "kind": "card",
+   "label": "Start"
+  }
+ ],
+ "ArtifactPreview": [
+  {
+   "_tag": "docs",
+   "heading": "Spec",
+   "excerpt": "Short summary line"
+  },
+  {
+   "_tag": "outline",
+   "items": [
+    {
+     "depth": 0,
+     "text": "Goals",
+     "kind": "heading"
+    }
+   ],
+   "todoDone": 1,
+   "todoTotal": 2
+  },
+  {
+   "_tag": "design-system",
+   "swatches": [
+    {
+     "name": "accent",
+     "light": "#4d7a2a",
+     "dark": "#84cc16"
+    }
+   ],
+   "fonts": [
+    "Inter"
+   ]
+  },
+  {
+   "_tag": "dashboard",
+   "kpis": [
+    {
+     "label": "ARR",
+     "value": "$3,000"
+    }
+   ],
+   "series": [
+    0.5,
+    1
+   ]
+  },
+  {
+   "_tag": "sheet",
+   "sheetName": "Budget",
+   "columns": [
+    "Item",
+    "Cost"
+   ],
+   "rows": [
+    [
+     "Infra",
+     "120"
+    ]
+   ],
+   "totalRows": 1,
+   "totalCols": 2
+  },
+  {
+   "_tag": "slides",
+   "firstTitle": "Launch",
+   "firstSubtitle": "Q4",
+   "slideCount": 5
+  },
+  {
+   "_tag": "whiteboard",
+   "shapes": [
+    {
+     "x": 0.1,
+     "y": 0.1,
+     "w": 0.4,
+     "h": 0.2,
+     "kind": "card",
+     "label": "Idea"
+    }
+   ],
+   "nodeCount": 1
+  },
+  {
+   "_tag": "diagram",
+   "kind": "architecture",
+   "nodes": [
+    "Gateway",
+    "Router"
+   ],
+   "nodeCount": 2,
+   "edgeCount": 1
+  },
+  {
+   "_tag": "design",
+   "artboard": "Home",
+   "width": 1280,
+   "height": 800,
+   "theme": "light",
+   "nodes": [
+    "Hero"
+   ],
+   "frameAsset": "asset/hero.png",
+   "framePath": "/tmp/artifact/a1/asset/hero.png"
+  },
+  {
+   "_tag": "storyboard",
+   "shotCount": 3,
+   "firstShot": "Desk closeup",
+   "durationSec": 9.5,
+   "frameAsset": "asset/frames/sh01.png",
+   "framePath": "/tmp/artifact/a1/asset/frames/sh01.png"
+  },
+  {
+   "_tag": "motion",
+   "sceneCount": 2,
+   "durationSec": 6,
+   "firstScene": "Intro",
+   "frameAsset": "asset/image/logo.png",
+   "framePath": "/tmp/artifact/a1/asset/image/logo.png"
+  },
+  {
+   "_tag": "prototype",
+   "heading": "App",
+   "subtitle": "Interactive demo"
+  }
  ]
 }

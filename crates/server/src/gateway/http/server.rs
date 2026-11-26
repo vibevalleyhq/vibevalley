@@ -159,6 +159,7 @@ fn authenticated_api_routes() -> Router<HttpState> {
         .route("/api/v1/subscribe/{name}", get(subscribe).post(command))
         .route("/api/v1/issue/watch/{id}", get(issue_watch).post(command))
         .route("/api/v1/attachment/{id}", get(attachment).post(command))
+        .route("/api/v1/artifact/{id}/cover", get(artifact_cover).post(command))
         .route("/api/v1/{*path}", post(command).get(not_allowed))
 }
 
@@ -401,6 +402,37 @@ async fn attachment(State(state): State<HttpState>, AuthenticatedQuery(ctx): Aut
     match serve_file_range(&headers, spec).await {
         Ok(response) => response,
         Err(FileServeError::Open(e)) => refuse(BizCode::NotFound, e.to_string()),
+        Err(FileServeError::Seek(e)) => refuse(BizCode::InternalError, e.to_string()),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ArtifactCoverReply {
+    cover: Option<vibevalley_protocol::ArtifactCover>,
+}
+
+async fn artifact_cover(State(state): State<HttpState>, AuthenticatedQuery(ctx): AuthenticatedQuery, Path(id): Path<String>, headers: HeaderMap) -> Response {
+    let envelope = state.server.call_with_async(ctx, "artifact.get".into(), serde_json::json!({ "id": id })).await;
+    if envelope.biz_code != 0 {
+        return reply(envelope);
+    }
+    let Some(cover) = envelope
+        .data
+        .and_then(|d| serde_json::from_value::<ArtifactCoverReply>(d).ok())
+        .and_then(|r| r.cover)
+    else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let spec = FileRangeSpec {
+        path: std::path::Path::new(&cover.path),
+        content_type: &cover.mime,
+        filename: "cover",
+        cache_control: "private, no-cache",
+        truncated_msg: "artifact cover truncated",
+    };
+    match serve_file_range(&headers, spec).await {
+        Ok(response) => response,
+        Err(FileServeError::Open(_)) => StatusCode::NOT_FOUND.into_response(),
         Err(FileServeError::Seek(e)) => refuse(BizCode::InternalError, e.to_string()),
     }
 }
