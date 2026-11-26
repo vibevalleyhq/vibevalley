@@ -4,6 +4,7 @@ pub mod collab;
 pub mod content;
 pub mod debug;
 pub mod infra;
+pub mod mcp;
 pub mod team;
 pub mod work;
 
@@ -91,6 +92,8 @@ pub enum Command {
     Doctor(infra::doctor::DoctorCmd),
     /// Discover and live-debug running VibeValley instances over VDP
     Debug(debug::DebugCmd),
+    /// Run a stdio MCP (Model Context Protocol) JSON-RPC 2.0 server for Issues and VDP
+    Mcp(mcp::McpCmd),
 }
 
 pub async fn run(client: &Client, command: Command) -> Done {
@@ -120,5 +123,6 @@ pub async fn run(client: &Client, command: Command) -> Done {
         Command::Machine(cmd) => infra::machine::run(client, cmd).await,
         Command::Doctor(cmd) => infra::doctor::run(client, cmd).await,
         Command::Debug(cmd) => debug::run(client, cmd).await,
+        Command::Mcp(cmd) => mcp::run(client, cmd).await,
     }
 }

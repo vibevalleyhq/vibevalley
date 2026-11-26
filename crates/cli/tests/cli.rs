@@ -200,6 +200,7 @@ const COMMANDS: &[&str] = &[
     "library list",
     "machine list",
     "machine up",
+    "mcp",
     "media input delete",
     "media input list",
     "media input upload",
