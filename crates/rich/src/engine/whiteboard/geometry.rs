@@ -16,7 +16,8 @@ impl Default for Camera {
     fn default() -> Self {
         Self {
             pan_x: 36.0,
-            pan_y: 28.0,
+            // Clear the 48px top-left HUD band (12px inset + 36px pill) on empty boards.
+            pan_y: 64.0,
             zoom: 1.0,
         }
     }

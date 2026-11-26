@@ -26,11 +26,16 @@ pub struct TestHarness {
     pub images: HashMap<NodeId, ImageSource>,
     pub canvases: HashMap<NodeId, Arc<Drawing>>,
     pub frames: HashMap<NodeId, Bounds<Points>>,
+    pub parents: HashMap<NodeId, NodeId>,
     pub clipboard_writes: Vec<String>,
 }
 
 impl TestHarness {
     pub fn mount(root: Root) -> Self {
+        Self::mount_with_size(root, Size::new(px(900.0), px(700.0)))
+    }
+
+    pub fn mount_with_size(root: Root, viewport: Size<Points>) -> Self {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
@@ -39,7 +44,7 @@ impl TestHarness {
         let wake_state = Arc::new((Mutex::new(0u64), Condvar::new()));
         let notify_state = Arc::clone(&wake_state);
 
-        let mut core = Core::new(ApproxTextEngine, Size::new(px(900.0), px(700.0)));
+        let mut core = Core::new(ApproxTextEngine, viewport);
         core.set_task_runtime(runtime.handle().clone());
         core.set_task_notify(Arc::new(move || {
             let (lock, cvar) = &*notify_state;
@@ -65,6 +70,7 @@ impl TestHarness {
             images: HashMap::new(),
             canvases: HashMap::new(),
             frames: HashMap::new(),
+            parents: HashMap::new(),
             clipboard_writes: Vec::new(),
         };
         harness.commit();
@@ -174,11 +180,32 @@ impl TestHarness {
         self.texts.values().any(|t| t.text.contains(needle))
     }
 
+    pub fn screen_bounds(&self, id: NodeId) -> Option<Bounds<Points>> {
+        let local = *self.frames.get(&id)?;
+        let mut ox = local.origin.x.0;
+        let mut oy = local.origin.y.0;
+        let mut cur = id;
+        while let Some(&parent) = self.parents.get(&cur) {
+            if let Some(pf) = self.frames.get(&parent) {
+                ox += pf.origin.x.0;
+                oy += pf.origin.y.0;
+            }
+            cur = parent;
+        }
+        Some(Bounds::new(point(px(ox), px(oy)), local.size))
+    }
+
     fn record_batch(&mut self, batch: &MountBatch) {
         for item in &batch.items {
             match item {
                 MountItem::Create { id, kind } => {
                     self.kinds.insert(*id, *kind);
+                }
+                MountItem::Insert { parent, child, .. } => {
+                    self.parents.insert(*child, *parent);
+                }
+                MountItem::Remove { id } => {
+                    self.parents.remove(id);
                 }
                 MountItem::Delete { id } => {
                     self.kinds.remove(id);
@@ -188,6 +215,7 @@ impl TestHarness {
                     self.images.remove(id);
                     self.canvases.remove(id);
                     self.frames.remove(id);
+                    self.parents.remove(id);
                 }
                 MountItem::Frame { id, frame } => {
                     self.frames.insert(*id, *frame);
