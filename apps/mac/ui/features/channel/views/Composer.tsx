@@ -7,6 +7,7 @@ import type { ArtifactViewContext, Channel } from "@vibevalley/protocol";
 import { sessionProfile } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
+import { CompareUploadDialog, type CompareUploadResult } from "../../../design/Compare";
 import { AttachmentTile } from "../../../design/domain/AttachmentTile";
 import { OrchestratorFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
@@ -86,6 +87,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const sessions = useSessionsSlice();
   const problem = signal<string | undefined>(undefined);
   const emoji = signal(false);
+  const compareOpen = signal(false);
   const focused = signal(false);
   // Where the caret is (and the selection's end), as the input last said; `placed` moves it.
   const selection = signal({ start: 0, end: 0 });
@@ -135,6 +137,18 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const attach = (files: readonly File[]) => {
     const id = props.channel?.id;
     if (id && files.length > 0) void attachFiles(id, files, uploadFailed);
+  };
+  const insertCompare = (result: CompareUploadResult) => {
+    const id = props.channel?.id;
+    if (!id) return;
+    for (const file of result.attachments) {
+      drafts.add(id, file);
+    }
+    const now = untracked(box.text);
+    const sep = now.trim() === "" ? "" : now.endsWith("\n") ? "\n" : "\n\n";
+    const next = `${now}${sep}${result.block}\n`;
+    put(next, next.length);
+    compareOpen.set(false);
   };
   /** The box as it is now, with its caret at. */
   const put = (next: string, caret: number) => {
@@ -388,6 +402,13 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             </View>
           </If>
           <BoxButton icon="attach" testid="attach" label={t("web.channel.composer.attach")} onPress={() => void pick()} disabled={!props.channel} />
+          <BoxButton
+            icon="diff"
+            testid="composer-compare-btn"
+            label={t("web.base.compare.addAction")}
+            onPress={() => compareOpen.set(true)}
+            disabled={!props.channel}
+          />
           <EmojiPopover
             open={emoji()}
             onOpenChange={(v) => emoji.set(v)}
@@ -429,6 +450,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
           </View>
         </View>
       </View>
+      <CompareUploadDialog open={compareOpen()} onClose={() => compareOpen.set(false)} onSubmit={insertCompare} />
     </View>
   );
 }

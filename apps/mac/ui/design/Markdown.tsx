@@ -2,7 +2,7 @@
 // with a stock `nsh/base` `TextView` fallback when running headless under `nsh test`.
 // Issue numbers (#12), @mentions, Shiki code blocks, Mermaid diagrams,
 // JSON Canvas, SVG Charts, reactive GenUI, and LaTeX math are all handled natively in Rust.
-import { Clipboard, signal } from "nsh";
+import { Clipboard, computed, signal, View } from "nsh";
 import { TextView } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -22,6 +22,8 @@ import { Chart } from "./code/Chart";
 import { CodeBlock } from "./code/CodeBlock";
 import { Diagram } from "./code/Diagram";
 import { GenUi } from "./code/GenUi";
+import { Compare } from "./Compare";
+import { splitMarkdownCompareBlocks } from "./compareModel";
 import { followDesignHref, useDesignHost } from "./host";
 import { RichPreviewModal, type RichPreviewPayload } from "./RichPreviewModal";
 
@@ -75,12 +77,86 @@ export interface MarkdownProps {
   onDiagramPress?: (event: VvDiagramPressEvent) => void;
 }
 
+interface MarkdownChunkProps {
+  readonly text: string;
+  readonly class?: string | undefined;
+  readonly size: "base" | "sm" | "doc";
+  readonly baseDir?: string | undefined;
+  readonly mentions?: boolean | undefined;
+  readonly streaming?: boolean | undefined;
+  readonly selectable?: boolean | undefined;
+  readonly onIssuePress?: ((event: VvIssuePressEvent) => void) | undefined;
+  readonly onMentionPress?: ((event: VvMentionPressEvent) => void) | undefined;
+  readonly onTaskPress?: ((event: VvTaskPressEvent) => void) | undefined;
+  readonly onCodeCopy?: ((event: VvCodeCopyEvent) => void) | undefined;
+  readonly onGenUiAction: (event: VvGenUiActionEvent) => void;
+  readonly onDiagramPress: (event: VvDiagramPressEvent) => void;
+  readonly onOpenLink: (url: string) => void;
+  readonly onDefaultIssuePress: (number: number) => void;
+}
+
+function MarkdownChunk(props: MarkdownChunkProps) {
+  const native = richNative();
+  if (native) {
+    const VvMarkdown = native.VvMarkdown;
+    return (
+      <VvMarkdown
+        text={props.text}
+        size={props.size}
+        baseDir={props.baseDir ?? null}
+        mentions={props.mentions === true}
+        streaming={props.streaming === true}
+        selectable={props.selectable ?? true}
+        class={props.class}
+        onLinkPress={(e) => props.onOpenLink(e.url)}
+        onIssuePress={(e) => {
+          if (props.onIssuePress) props.onIssuePress(e);
+          else props.onDefaultIssuePress(e.number);
+        }}
+        onMentionPress={props.onMentionPress}
+        onTaskPress={props.onTaskPress}
+        onCodeCopy={props.onCodeCopy}
+        onGenUiAction={props.onGenUiAction}
+        onDiagramPress={props.onDiagramPress}
+      />
+    );
+  }
+  return (
+    <TextView
+      markdown={props.text}
+      selectable={props.selectable ?? true}
+      classes={{
+        ...fallbackClasses,
+        ...fallbackHeadings(props.size),
+        root: `min-w-0 gap-0 text-ink ${props.size === "sm" ? "text-sm" : "text-base"} ${props.class ?? ""}`,
+      }}
+      renderCodeBlock={(block) => {
+        switch (block.language) {
+          case "mermaid":
+            return <Diagram source={block.code} interactive onPress={props.onDiagramPress} />;
+          case "chart":
+            return <Chart spec={block.code} />;
+          case "canvas":
+            return <Canvas data={block.code} />;
+          case "genui":
+            return <GenUi spec={block.code} streaming={props.streaming} onAction={props.onGenUiAction} />;
+          default:
+            return <CodeBlock code={block.code} language={block.language} onCopy={props.onCodeCopy} />;
+        }
+      }}
+      onLinkPress={(e) => props.onOpenLink(e.url)}
+      onTaskPress={props.onTaskPress}
+    />
+  );
+}
+
 /** Chat text, descriptions, notes, and reports. */
 export function Markdown(props: MarkdownProps) {
   const designHost = useDesignHost();
   const preview = signal<RichPreviewPayload | undefined>(undefined);
   const size = () => props.size ?? "base";
   const openLink = (url: string) => followDesignHref(designHost, url);
+  const openIssue = (number: number) => designHost.navigate(`/issues/${number}`);
   const handleDiagramPress = (event: VvDiagramPressEvent) => {
     if (props.onDiagramPress) {
       props.onDiagramPress(event);
@@ -109,61 +185,68 @@ export function Markdown(props: MarkdownProps) {
     const summary = formatGenUiAction(event);
     if (summary) designHost.toast(summary);
   };
-  const native = richNative();
-  if (native) {
-    const VvMarkdown = native.VvMarkdown;
-    return (
-      <>
-        <VvMarkdown
-          text={props.text}
-          size={size()}
-          baseDir={props.baseDir ?? null}
-          mentions={props.mentions === true}
-          streaming={props.streaming === true}
-          selectable={props.selectable ?? true}
-          class={props.class}
-          onLinkPress={(e) => openLink(e.url)}
-          onIssuePress={(e) => {
-            if (props.onIssuePress) props.onIssuePress(e);
-            else designHost.navigate(`/issues/${e.number}`);
-          }}
-          onMentionPress={props.onMentionPress}
-          onTaskPress={props.onTaskPress}
-          onCodeCopy={props.onCodeCopy}
-          onGenUiAction={handleGenUiAction}
-          onDiagramPress={handleDiagramPress}
-        />
-        <RichPreviewModal payload={preview()} onClose={() => preview.set(undefined)} />
-      </>
-    );
-  }
+  const segments = computed(() => splitMarkdownCompareBlocks(props.text));
+  const hasCompare = computed(() => segments().some((seg) => seg.kind === "compare"));
+  const keyedSegments = computed(() => {
+    let mdIdx = 0;
+    let cmpIdx = 0;
+    return segments().map((seg) => (seg.kind === "compare" ? { ...seg, key: `cmp:${cmpIdx++}` } : { ...seg, key: `md:${mdIdx++}` }));
+  });
+
   return (
     <>
-      <TextView
-        markdown={props.text}
-        selectable={props.selectable ?? true}
-        classes={{
-          ...fallbackClasses,
-          ...fallbackHeadings(size()),
-          root: `min-w-0 gap-0 text-ink ${size() === "sm" ? "text-sm" : "text-base"} ${props.class ?? ""}`,
-        }}
-        renderCodeBlock={(block) => {
-          switch (block.language) {
-            case "mermaid":
-              return <Diagram source={block.code} interactive onPress={handleDiagramPress} />;
-            case "chart":
-              return <Chart spec={block.code} />;
-            case "canvas":
-              return <Canvas data={block.code} />;
-            case "genui":
-              return <GenUi spec={block.code} streaming={props.streaming} onAction={handleGenUiAction} />;
-            default:
-              return <CodeBlock code={block.code} language={block.language} onCopy={props.onCodeCopy} />;
-          }
-        }}
-        onLinkPress={(e) => openLink(e.url)}
-        onTaskPress={props.onTaskPress}
-      />
+      <If
+        when={hasCompare()}
+        else={
+          <MarkdownChunk
+            text={props.text}
+            class={props.class}
+            size={size()}
+            baseDir={props.baseDir ?? undefined}
+            mentions={props.mentions}
+            streaming={props.streaming}
+            selectable={props.selectable}
+            onIssuePress={props.onIssuePress}
+            onMentionPress={props.onMentionPress}
+            onTaskPress={props.onTaskPress}
+            onCodeCopy={props.onCodeCopy}
+            onGenUiAction={handleGenUiAction}
+            onDiagramPress={handleDiagramPress}
+            onOpenLink={openLink}
+            onDefaultIssuePress={openIssue}
+          />
+        }
+      >
+        <View testID="markdown-compare-flow" class={`min-w-0 gap-2 ${props.class ?? ""}`}>
+          <Each of={keyedSegments()} key={(seg) => seg.key}>
+            {(seg) => (
+              <If
+                when={((s) => (s.kind === "compare" ? s.spec : undefined))(seg())}
+                else={
+                  <MarkdownChunk
+                    text={((s) => (s.kind === "markdown" ? s.text : ""))(seg())}
+                    size={size()}
+                    baseDir={props.baseDir ?? undefined}
+                    mentions={props.mentions}
+                    streaming={props.streaming}
+                    selectable={props.selectable}
+                    onIssuePress={props.onIssuePress}
+                    onMentionPress={props.onMentionPress}
+                    onTaskPress={props.onTaskPress}
+                    onCodeCopy={props.onCodeCopy}
+                    onGenUiAction={handleGenUiAction}
+                    onDiagramPress={handleDiagramPress}
+                    onOpenLink={openLink}
+                    onDefaultIssuePress={openIssue}
+                  />
+                }
+              >
+                {(spec) => <Compare spec={spec()} />}
+              </If>
+            )}
+          </Each>
+        </View>
+      </If>
       <RichPreviewModal payload={preview()} onClose={() => preview.set(undefined)} />
     </>
   );
