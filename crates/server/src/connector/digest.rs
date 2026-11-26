@@ -125,6 +125,13 @@ pub enum PersonalEventKind {
         session_name: String,
         summary: String,
     },
+    PermissionRequest {
+        request_id: String,
+        session_name: String,
+        tool: String,
+        summary: String,
+        input: Option<String>,
+    },
 }
 
 impl PersonalEventKind {
@@ -137,13 +144,19 @@ impl PersonalEventKind {
             Self::IssueFailed { .. } => "failed",
             Self::RunCompleted { .. } => "run_completed",
             Self::RunFailed { .. } => "run_failed",
+            Self::PermissionRequest { .. } => "perm",
         }
     }
 
     pub fn is_urgent(&self) -> bool {
         matches!(
             self,
-            Self::IssueAsking { .. } | Self::IssueConflict { .. } | Self::IssueInterrupted { .. } | Self::IssueFailed { .. } | Self::RunFailed { .. }
+            Self::IssueAsking { .. }
+                | Self::IssueConflict { .. }
+                | Self::IssueInterrupted { .. }
+                | Self::IssueFailed { .. }
+                | Self::RunFailed { .. }
+                | Self::PermissionRequest { .. }
         )
     }
 }
@@ -169,9 +182,12 @@ impl PersonalEvent {
 
     /// Stable `connector_outbox.message_id` used for deduplication and workbench-settled withdrawal.
     pub fn outbox_message_id(&self) -> String {
-        match self.issue_id.as_deref() {
-            Some(issue_id) => format!("push:issue:{issue_id}:{}:{}", self.kind.category(), short_hash(&self.dedupe_key)),
-            None => format!("push:run:{}:{}", self.kind.category(), short_hash(&self.dedupe_key)),
+        match (&self.kind, self.issue_id.as_deref(), self.session_id.as_deref()) {
+            (PersonalEventKind::PermissionRequest { request_id, .. }, _, Some(session_id)) => {
+                format!("push:perm:{session_id}:{request_id}")
+            }
+            (_, Some(issue_id), _) => format!("push:issue:{issue_id}:{}:{}", self.kind.category(), short_hash(&self.dedupe_key)),
+            _ => format!("push:run:{}:{}", self.kind.category(), short_hash(&self.dedupe_key)),
         }
     }
 }
@@ -183,6 +199,150 @@ pub fn parse_push_issue_message_id(message_id: &str) -> Option<(&str, &str)> {
     let issue_id = parts.next().filter(|s| !s.is_empty())?;
     let category = parts.next().filter(|s| !s.is_empty())?;
     Some((issue_id, category))
+}
+
+/// Parses a `push:perm:<session_id>:<request_id>` outbox message id.
+pub fn parse_push_perm_message_id(message_id: &str) -> Option<(&str, &str)> {
+    let rest = message_id.strip_prefix("push:perm:")?;
+    let (session_id, request_id) = rest.split_once(':')?;
+    if session_id.is_empty() || request_id.is_empty() {
+        return None;
+    }
+    Some((session_id, request_id))
+}
+
+/// Actionable push message reference resolved from an inbound quote.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PushTarget<'a> {
+    Issue { issue_id: &'a str, category: &'a str },
+    Permission { session_id: &'a str, request_id: &'a str },
+}
+
+/// Parses an actionable `push:issue:...` or `push:perm:...` outbox message id.
+pub fn parse_push_message_id(message_id: &str) -> Option<PushTarget<'_>> {
+    if let Some((issue_id, category)) = parse_push_issue_message_id(message_id) {
+        return Some(PushTarget::Issue { issue_id, category });
+    }
+    if let Some((session_id, request_id)) = parse_push_perm_message_id(message_id) {
+        return Some(PushTarget::Permission { session_id, request_id });
+    }
+    None
+}
+
+/// Structured command parsed from a quote-reply to a `push:issue:...` message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IssueReplyAction {
+    Answer { text: String },
+    Accept,
+    Reject { reason: String },
+    Retry { words: Option<String> },
+}
+
+/// Structured command parsed from a quote-reply to a `push:perm:...` message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PermissionReplyAction {
+    AllowOnce,
+    AllowAlways,
+    Deny { reason: Option<String> },
+}
+
+/// Reason a quote-reply could not be mapped to an actionable command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplyParseError {
+    EmptyAnswer,
+    ReviewUnrecognized,
+    RejectNeedsReason,
+    StuckUnrecognized,
+    ConflictNeedsWorkbench,
+    PermissionUnrecognized,
+    UnsupportedCategory,
+}
+
+fn strip_command_prefix<'a>(input: &'a str, keyword: &str) -> Option<&'a str> {
+    let prefix = input.get(..keyword.len())?;
+    if !prefix.eq_ignore_ascii_case(keyword) {
+        return None;
+    }
+    let rest = &input[keyword.len()..];
+    if rest.is_empty() {
+        return Some("");
+    }
+    let first = rest.chars().next()?;
+    if first.is_whitespace() || matches!(first, ':' | '：' | '.' | '。' | '!' | '！') {
+        Some(rest.trim_start_matches(|c: char| c.is_whitespace() || matches!(c, ':' | '：')))
+    } else {
+        None
+    }
+}
+
+fn strip_trailing_punct(s: &str) -> &str {
+    s.trim_end_matches(['.', '。', '!', '！'])
+}
+
+/// Parses a user quote-reply to an issue push notification (`asking` / `reviewing` / `failed` / `interrupted` / `conflict`).
+pub fn parse_issue_reply(category: &str, text: &str) -> Result<IssueReplyAction, ReplyParseError> {
+    let trimmed = text.trim();
+    match category {
+        "asking" => {
+            if trimmed.is_empty() {
+                Err(ReplyParseError::EmptyAnswer)
+            } else {
+                Ok(IssueReplyAction::Answer { text: trimmed.to_string() })
+            }
+        }
+        "reviewing" => {
+            let bare = strip_trailing_punct(trimmed).trim();
+            let lower = bare.to_ascii_lowercase();
+            if matches!(lower.as_str(), "accept" | "ok" | "approve" | "approved" | "lgtm" | "pass" | "yes")
+                || matches!(bare, "通过" | "同意" | "确认" | "确认通过" | "通过验收" | "验收通过")
+            {
+                return Ok(IssueReplyAction::Accept);
+            }
+            for kw in ["reject", "changes", "rework", "打回", "拒绝", "退回"] {
+                if let Some(rest) = strip_command_prefix(trimmed, kw) {
+                    let reason = rest.trim();
+                    if reason.is_empty() || strip_trailing_punct(reason).trim().is_empty() {
+                        return Err(ReplyParseError::RejectNeedsReason);
+                    }
+                    return Ok(IssueReplyAction::Reject { reason: reason.to_string() });
+                }
+            }
+            Err(ReplyParseError::ReviewUnrecognized)
+        }
+        "failed" | "interrupted" => {
+            for kw in ["retry", "resume", "rerun", "重试", "恢复", "继续", "接着做", "接着修"] {
+                if let Some(rest) = strip_command_prefix(trimmed, kw) {
+                    let clean = strip_trailing_punct(rest).trim();
+                    let words = (!clean.is_empty()).then(|| rest.trim().to_string());
+                    return Ok(IssueReplyAction::Retry { words });
+                }
+            }
+            Err(ReplyParseError::StuckUnrecognized)
+        }
+        "conflict" => Err(ReplyParseError::ConflictNeedsWorkbench),
+        _ => Err(ReplyParseError::UnsupportedCategory),
+    }
+}
+
+/// Parses a user quote-reply to a permission request push notification (`push:perm:<session_id>:<request_id>`).
+pub fn parse_permission_reply(text: &str) -> Result<PermissionReplyAction, ReplyParseError> {
+    let trimmed = text.trim();
+    let bare = strip_trailing_punct(trimmed).trim();
+    let lower = bare.to_ascii_lowercase();
+    if matches!(lower.as_str(), "allow always" | "always" | "always allow") || matches!(bare, "始终允许" | "总是允许") {
+        return Ok(PermissionReplyAction::AllowAlways);
+    }
+    if matches!(lower.as_str(), "allow" | "allow once" | "approve" | "ok" | "yes") || matches!(bare, "允许" | "同意" | "批准" | "一次允许") {
+        return Ok(PermissionReplyAction::AllowOnce);
+    }
+    for kw in ["deny", "reject", "no", "拒绝", "禁止", "不允许", "不同意"] {
+        if let Some(rest) = strip_command_prefix(trimmed, kw) {
+            let clean = strip_trailing_punct(rest).trim();
+            let reason = (!clean.is_empty()).then(|| rest.trim().to_string());
+            return Ok(PermissionReplyAction::Deny { reason });
+        }
+    }
+    Err(ReplyParseError::PermissionUnrecognized)
 }
 
 fn issue_stage_stamp(issue: &Issue, fallback_at: Millis, extra: &str) -> String {
@@ -294,7 +454,7 @@ pub fn personal_event_for_run(
     })
 }
 
-fn issue_target_label(number: Option<i64>, title: Option<&str>) -> String {
+pub(super) fn issue_target_label(number: Option<i64>, title: Option<&str>) -> String {
     let clean_title = title.map(|t| clip_plain(t, 48)).unwrap_or_default();
     match (number, clean_title.is_empty()) {
         (Some(n), false) => format!("#{n} {clean_title}"),
@@ -373,6 +533,37 @@ pub fn format_personal_event_in(locale: &str, event: &PersonalEvent) -> String {
             let name = clip_plain(session_name, 40);
             let s = clip_plain(summary, 240);
             t_in(locale, "server.connector.push.runFailed", &[("name", name.into()), ("summary", s.into())])
+        }
+        PersonalEventKind::PermissionRequest {
+            session_name,
+            tool,
+            summary,
+            input,
+            ..
+        } => {
+            let session = clip_plain(session_name, 40);
+            let tool = clip_plain(tool, 40);
+            let summary = clip_plain(summary, 180);
+            match input.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                Some(raw_input) => {
+                    let clipped = clip_plain(raw_input, 160);
+                    t_in(
+                        locale,
+                        "server.connector.push.permissionInput",
+                        &[
+                            ("session", session.into()),
+                            ("tool", tool.into()),
+                            ("summary", summary.into()),
+                            ("input", clipped.into()),
+                        ],
+                    )
+                }
+                None => t_in(
+                    locale,
+                    "server.connector.push.permission",
+                    &[("session", session.into()), ("tool", tool.into()), ("summary", summary.into())],
+                ),
+            }
         }
     }
 }
@@ -485,5 +676,98 @@ mod tests {
         // Quiet worker produces no personal push.
         issue.stage.stuck = Some(StuckReason::Quiet);
         assert!(personal_event_for_issue(&issue, None, 6_000, None).is_none());
+    }
+
+    #[test]
+    fn permission_push_formats_parses_and_reply_commands_parse_cleanly() {
+        let perm_ev = PersonalEvent {
+            dedupe_key: "perm:s1:req-9".into(),
+            issue_id: None,
+            issue_number: None,
+            issue_title: None,
+            session_id: Some("s1".into()),
+            channel_id: None,
+            is_child_review: false,
+            at: 10_000,
+            kind: PersonalEventKind::PermissionRequest {
+                request_id: "req-9".into(),
+                session_name: "Workspace".into(),
+                tool: "shell".into(),
+                summary: "Run cargo test".into(),
+                input: Some("cargo test -p vibevalley-server".into()),
+            },
+        };
+        assert!(perm_ev.is_urgent());
+        let perm_msg_id = perm_ev.outbox_message_id();
+        assert_eq!(perm_msg_id, "push:perm:s1:req-9");
+        assert_eq!(
+            parse_push_message_id(&perm_msg_id),
+            Some(PushTarget::Permission {
+                session_id: "s1",
+                request_id: "req-9"
+            })
+        );
+        let zh_perm = format_personal_event_in("zh", &perm_ev);
+        assert!(zh_perm.contains("【请求授权 · Workspace】"));
+        assert!(zh_perm.contains("cargo test -p vibevalley-server"));
+        let en_perm = format_personal_event_in("en", &perm_ev);
+        assert!(en_perm.contains("[Permission Request · Workspace]"));
+        assert!(en_perm.contains("Reply allow to approve or deny to reject."));
+
+        // Asking reply parsing
+        assert_eq!(
+            parse_issue_reply("asking", "  Yes, enable quiet hours  "),
+            Ok(IssueReplyAction::Answer {
+                text: "Yes, enable quiet hours".into()
+            })
+        );
+        assert_eq!(parse_issue_reply("asking", "   "), Err(ReplyParseError::EmptyAnswer));
+
+        // Reviewing reply parsing
+        assert_eq!(parse_issue_reply("reviewing", "accept"), Ok(IssueReplyAction::Accept));
+        assert_eq!(parse_issue_reply("reviewing", " OK! "), Ok(IssueReplyAction::Accept));
+        assert_eq!(parse_issue_reply("reviewing", "通过。"), Ok(IssueReplyAction::Accept));
+        assert_eq!(
+            parse_issue_reply("reviewing", "reject: missing edge case tests"),
+            Ok(IssueReplyAction::Reject {
+                reason: "missing edge case tests".into()
+            })
+        );
+        assert_eq!(
+            parse_issue_reply("reviewing", "打回 缺少边界测试"),
+            Ok(IssueReplyAction::Reject {
+                reason: "缺少边界测试".into()
+            })
+        );
+        assert_eq!(parse_issue_reply("reviewing", "reject"), Err(ReplyParseError::RejectNeedsReason));
+        assert_eq!(parse_issue_reply("reviewing", "reject:   "), Err(ReplyParseError::RejectNeedsReason));
+        assert_eq!(parse_issue_reply("reviewing", "maybe later"), Err(ReplyParseError::ReviewUnrecognized));
+        assert_eq!(parse_issue_reply("reviewing", "retry"), Err(ReplyParseError::ReviewUnrecognized));
+
+        // Failed / Interrupted reply parsing
+        assert_eq!(parse_issue_reply("failed", "retry"), Ok(IssueReplyAction::Retry { words: None }));
+        assert_eq!(
+            parse_issue_reply("interrupted", "resume check git log first"),
+            Ok(IssueReplyAction::Retry {
+                words: Some("check git log first".into())
+            })
+        );
+        assert_eq!(parse_issue_reply("failed", "重试"), Ok(IssueReplyAction::Retry { words: None }));
+        assert_eq!(parse_issue_reply("interrupted", "accept"), Err(ReplyParseError::StuckUnrecognized));
+        assert_eq!(parse_issue_reply("conflict", "retry"), Err(ReplyParseError::ConflictNeedsWorkbench));
+
+        // Permission reply parsing
+        assert_eq!(parse_permission_reply("allow"), Ok(PermissionReplyAction::AllowOnce));
+        assert_eq!(parse_permission_reply("允许。"), Ok(PermissionReplyAction::AllowOnce));
+        assert_eq!(parse_permission_reply("allow always"), Ok(PermissionReplyAction::AllowAlways));
+        assert_eq!(parse_permission_reply("始终允许"), Ok(PermissionReplyAction::AllowAlways));
+        assert_eq!(parse_permission_reply("deny"), Ok(PermissionReplyAction::Deny { reason: None }));
+        assert_eq!(
+            parse_permission_reply("deny: too risky"),
+            Ok(PermissionReplyAction::Deny {
+                reason: Some("too risky".into())
+            })
+        );
+        assert_eq!(parse_permission_reply("maybe"), Err(ReplyParseError::PermissionUnrecognized));
     }
 }

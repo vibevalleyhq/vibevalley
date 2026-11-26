@@ -30,7 +30,7 @@ fn look_in_issues() -> Next {
 }
 
 /// Maps a [`BoardError`] into an endpoint refusal.
-fn api(e: BoardError) -> ApiError {
+pub(super) fn api(e: BoardError) -> ApiError {
     match e {
         BoardError::NoIssue(r) => ApiError::new(BizCode::IssueNotFound, t("server.issue.issueRef", &[("ref", r.into())])).with_next(vec![look_in_issues()]),
         BoardError::Refused(r) => ApiError::new(BizCode::IssueRefused, r.text()),

@@ -11,7 +11,9 @@ use vibevalley_protocol::{
 };
 use vibevalley_runtime::oar::Registry;
 
-use super::session::{self, MailboxEntry, MailboxSource, Report, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory};
+use super::session::{
+    self, MailboxEntry, MailboxSource, PermissionEvent, Report, RuntimeDriver, SessionDriver, SessionEngine, SessionLifecycleEvent, Trajectory,
+};
 use super::types::{Opened, Result, RuntimeConfig, io};
 use super::worktree::Worktree;
 use crate::context::{Context, now};
@@ -212,6 +214,18 @@ impl Runtime {
 
     pub fn subscribe_doing(&self) -> broadcast::Receiver<(String, Millis, vibevalley_protocol::Doing)> {
         self.session.subscribe_doing()
+    }
+
+    pub fn subscribe_permissions(&self) -> broadcast::Receiver<PermissionEvent> {
+        self.session.subscribe_permissions()
+    }
+
+    pub fn has_pending_permission(&self, session_id: &str, request_id: &str) -> bool {
+        self.session
+            .workspace_snapshot(session_id)
+            .pending_permissions
+            .iter()
+            .any(|p| p.request_id == request_id)
     }
 
     pub fn who(&self, token: &str) -> Option<String> {

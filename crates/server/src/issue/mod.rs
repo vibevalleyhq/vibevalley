@@ -97,3 +97,91 @@ impl crate::context::port::CronBoardPort for Board {
         Box::pin(async move { Board::tell_async(self, id, words).await.map_err(board_err) })
     }
 }
+
+impl crate::context::port::ConnectorIssuePort for Board {
+    fn get_issue_async<'a>(
+        &'a self,
+        id: &'a str,
+    ) -> crate::BoxFuture<'a, std::result::Result<Option<vibevalley_protocol::Issue>, vibevalley_protocol::ApiError>> {
+        Box::pin(async move { Board::issue_async(self, id).await.map_err(actions::api) })
+    }
+
+    fn answer_asking_async<'a>(
+        &'a self,
+        id: &'a str,
+        text: &'a str,
+    ) -> crate::BoxFuture<'a, std::result::Result<vibevalley_protocol::Issue, vibevalley_protocol::ApiError>> {
+        Box::pin(async move {
+            let issue = Board::get_async(self, id).await?;
+            if issue.status.is_closed() || issue.stage.state != vibevalley_protocol::IssueStageKind::Asking {
+                return Err(vibevalley_protocol::ApiError::new(
+                    vibevalley_protocol::BizCode::IssueRefused,
+                    vibevalley_i18n::t("server.issue.nothingToAccept", &[]),
+                ));
+            }
+            Board::tell_async(self, &issue.id, text).await.map_err(actions::api)?;
+            Board::get_async(self, &issue.id).await
+        })
+    }
+
+    fn accept_review_async<'a>(&'a self, id: &'a str) -> crate::BoxFuture<'a, std::result::Result<vibevalley_protocol::Issue, vibevalley_protocol::ApiError>> {
+        Box::pin(async move {
+            let issue = Board::get_async(self, id).await?;
+            if issue.status.is_closed() || issue.stage.state != vibevalley_protocol::IssueStageKind::Reviewing {
+                return Err(vibevalley_protocol::ApiError::new(
+                    vibevalley_protocol::BizCode::IssueRefused,
+                    vibevalley_i18n::t("server.issue.nothingToAccept", &[]),
+                ));
+            }
+            Board::move_to_async(self, &issue.id, vibevalley_protocol::IssueStatus::Done, None)
+                .await
+                .map_err(actions::api)?;
+            Board::get_async(self, &issue.id).await
+        })
+    }
+
+    fn reject_review_async<'a>(
+        &'a self,
+        id: &'a str,
+        reason: &'a str,
+    ) -> crate::BoxFuture<'a, std::result::Result<vibevalley_protocol::Issue, vibevalley_protocol::ApiError>> {
+        Box::pin(async move {
+            let issue = Board::get_async(self, id).await?;
+            if issue.status.is_closed() || issue.stage.state != vibevalley_protocol::IssueStageKind::Reviewing {
+                return Err(vibevalley_protocol::ApiError::new(
+                    vibevalley_protocol::BizCode::IssueRefused,
+                    vibevalley_i18n::t("server.issue.nothingToAccept", &[]),
+                ));
+            }
+            let findings = vibevalley_core::brief::findings_of(reason);
+            Board::review_async(self, &issue.id, false, &findings, "", None).await.map_err(actions::api)?;
+            Board::get_async(self, &issue.id).await
+        })
+    }
+
+    fn retry_issue_async<'a>(
+        &'a self,
+        id: &'a str,
+        words: Option<&'a str>,
+    ) -> crate::BoxFuture<'a, std::result::Result<vibevalley_protocol::Issue, vibevalley_protocol::ApiError>> {
+        Box::pin(async move {
+            let issue = Board::get_async(self, id).await?;
+            let retryable = !issue.status.is_closed()
+                && issue.stage.state == vibevalley_protocol::IssueStageKind::Stuck
+                && matches!(
+                    issue.stage.stuck,
+                    Some(vibevalley_protocol::StuckReason::Failed | vibevalley_protocol::StuckReason::Interrupted)
+                );
+            if !retryable {
+                return Err(vibevalley_protocol::ApiError::new(
+                    vibevalley_protocol::BizCode::IssueRefused,
+                    vibevalley_i18n::t("server.issue.nothingToAccept", &[]),
+                ));
+            }
+            Board::move_to_async(self, &issue.id, vibevalley_protocol::IssueStatus::Todo, words)
+                .await
+                .map_err(actions::api)?;
+            Board::get_async(self, &issue.id).await
+        })
+    }
+}

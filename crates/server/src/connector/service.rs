@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use parking_lot::Mutex;
@@ -14,12 +14,13 @@ use vibevalley_protocol::{
 
 use super::adapter::App;
 use super::bridge::{self, Bridge, Env, Handoff};
-use super::digest::{PersonalEvent, personal_event_for_issue, personal_event_for_run};
+use super::digest::{PersonalEvent, PersonalEventKind, personal_event_for_issue, personal_event_for_run};
 use super::notify::{NotifyDecision, NotifyOptions, NotifyRouter};
 use super::{feishu, qq, weixin};
 use crate::channel::{ChannelEvent, Chat, to_message};
-use crate::context::port::{DigestDeliveryPort, DigestTargets};
+use crate::context::port::{ConnectorIssuePort, DigestDeliveryPort, DigestTargets};
 use crate::context::{Context, OUTBOX_CONNECTOR_NOTIFY, OutboxConnectorNotify, OutboxEvent, OutboxSessionReported, now};
+use crate::runtime::{PermissionEvent, Runtime};
 use crate::setting::Setting;
 
 /// How long a message in or out is kept after it went through, for a reply to point at.
@@ -108,8 +109,9 @@ pub struct Connector {
     env: Arc<Env>,
     bridges: Vec<Arc<Bridge>>,
     notify: Arc<NotifyRouter>,
-    /// Cancelled and awaited on close to end background feed/board tasks.
-    feed: Mutex<Option<(CancellationToken, Vec<JoinHandle<()>>)>>,
+    cancel: CancellationToken,
+    /// Awaited on close to end background feed/board/permission tasks.
+    feed: Mutex<Option<Vec<JoinHandle<()>>>>,
 }
 
 impl Connector {
@@ -119,6 +121,8 @@ impl Connector {
             ctx: ctx.clone(),
             setting,
             chat: chat.clone(),
+            issue: OnceLock::new(),
+            runtime: OnceLock::new(),
             retry_first: options.retry_first,
             retry_most: options.retry_most,
             reconnect: options.reconnect,
@@ -176,8 +180,23 @@ impl Connector {
             env,
             bridges,
             notify,
-            feed: Mutex::new(Some((cancel, vec![feed_handle, board_handle]))),
+            cancel,
+            feed: Mutex::new(Some(vec![feed_handle, board_handle])),
         }))
+    }
+
+    /// Attaches issue board and runtime handles so quote-replies execute actions and permission requests push live.
+    pub fn attach_actions(&self, issue: Arc<dyn ConnectorIssuePort>, runtime: Arc<Runtime>) {
+        let _ = self.env.issue.set(issue);
+        let _ = self.env.runtime.set(runtime.clone());
+        let perm_rx = runtime.subscribe_permissions();
+        let handle = self.env.ctx.spawn(
+            "connector.permission_events",
+            watch_permission_events(self.env.clone(), self.bridges.clone(), self.notify.clone(), perm_rx, self.cancel.clone()),
+        );
+        if let Some(handles) = self.feed.lock().as_mut() {
+            handles.push(handle);
+        }
     }
 
     pub fn setting(&self) -> &Arc<Setting> {
@@ -226,9 +245,9 @@ impl Connector {
         for b in &self.bridges {
             b.stop_async().await;
         }
+        self.cancel.cancel();
         let feed = self.feed.lock().take();
-        if let Some((cancel, handles)) = feed {
-            cancel.cancel();
+        if let Some(handles) = feed {
             for handle in handles {
                 let _ = handle.await;
             }
@@ -494,6 +513,81 @@ async fn watch_board_events(
         for event in events {
             let channel_notify = event.channel_id.as_deref().map(|cid| env.chat.notify_of(cid)).unwrap_or(Notify::All);
             let _ = notify.submit_event_async(&env.ctx, None, &event, channel_notify).await;
+        }
+    }
+}
+
+async fn watch_permission_events(
+    env: Arc<Env>,
+    bridges: Vec<Arc<Bridge>>,
+    notify: Arc<NotifyRouter>,
+    mut perm_rx: broadcast::Receiver<PermissionEvent>,
+    cancel: CancellationToken,
+) {
+    loop {
+        let ev = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return,
+            res = perm_rx.recv() => match res {
+                Ok(ev) => ev,
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => return,
+            },
+        };
+        if env.closing.load(Ordering::SeqCst) {
+            return;
+        }
+        match ev {
+            PermissionEvent::Requested {
+                session_id,
+                session_name,
+                channel_id,
+                request,
+                at,
+            } => {
+                let has_paired = notify
+                    .options()
+                    .push_targets
+                    .iter()
+                    .any(|id| bridges.iter().any(|b| b.id() == *id && b.is_paired()));
+                if !has_paired {
+                    continue;
+                }
+                let top_channel = channel_id.as_deref().map(|cid| env.chat.top_of(cid).id);
+                let channel_notify = top_channel.as_deref().map(|cid| env.chat.notify_of(cid)).unwrap_or(Notify::All);
+                let event = PersonalEvent {
+                    dedupe_key: format!("perm:{session_id}:{}", request.request_id),
+                    issue_id: None,
+                    issue_number: None,
+                    issue_title: None,
+                    session_id: Some(session_id),
+                    channel_id: top_channel,
+                    is_child_review: false,
+                    at,
+                    kind: PersonalEventKind::PermissionRequest {
+                        request_id: request.request_id,
+                        session_name,
+                        tool: request.tool,
+                        summary: request.summary,
+                        input: request.input,
+                    },
+                };
+                let _ = notify.submit_event_async(&env.ctx, None, &event, channel_notify).await;
+            }
+            PermissionEvent::Resolved { session_id, request_id } => {
+                for b in &bridges {
+                    if b.is_paired() {
+                        b.withdraw_perm_push_async(&session_id, &request_id).await;
+                    }
+                }
+            }
+            PermissionEvent::ClearedSession { session_id } => {
+                for b in &bridges {
+                    if b.is_paired() {
+                        b.withdraw_session_perm_pushes_async(&session_id).await;
+                    }
+                }
+            }
         }
     }
 }

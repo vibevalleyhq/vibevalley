@@ -1348,3 +1348,129 @@ test("createRemoteSession keeps ready() false until async tokenStore settles and
   expect(app.count("id:mobile-splash")).toBe(0);
   expect(app.count("id:pair-screen")).toBe(0);
 });
+
+test("InboxTab inline quick actions complete review accept/reject and retry/resume without page navigation", async () => {
+  const quickActionInbox = {
+    seq: 10,
+    call: "idle",
+    callReason: "",
+    items: [
+      {
+        id: "inbox-review-1",
+        kind: "review",
+        from: { kind: "orchestrator" },
+        who: "Assistant",
+        text: "Ready for acceptance",
+        at: NOW + 300,
+        target: { kind: "issue", id: "issue-1" },
+        words: {
+          label: "Review",
+          title: "Review #101",
+          body: "Ready to ship #101",
+          tray: "Review #101",
+        },
+      },
+      {
+        id: "inbox-fix-1",
+        kind: "fix",
+        from: { kind: "session", id: "sess-1", name: "Builder Fox", agent: "builder" },
+        who: "Builder Fox",
+        text: "Tests failed in CI",
+        at: NOW + 200,
+        target: { kind: "session", id: "sess-1" },
+        words: {
+          label: "Failed",
+          title: "Builder Fox failed",
+          body: "Tests failed in CI",
+          tray: "Builder Fox failed",
+        },
+      },
+      {
+        id: "inbox-int-1",
+        kind: "interrupted",
+        from: { kind: "session", id: "sess-2", name: "Verifier Owl", agent: "verifier" },
+        who: "Verifier Owl",
+        text: "Stopped halfway",
+        at: NOW + 100,
+        target: { kind: "session", id: "sess-2" },
+        words: {
+          label: "Interrupted",
+          title: "Verifier Owl stopped",
+          body: "Stopped halfway",
+          tray: "Verifier Owl stopped",
+        },
+      },
+    ],
+  };
+
+  const sessionsWithIssueBindings = {
+    seq: 11,
+    machines: [],
+    sessions: [
+      {
+        ...sampleSessionsSlice.sessions[0],
+        bindings: [{ kind: "issue", id: "issue-2" }],
+      },
+      {
+        ...sampleSessionsSlice.sessions[0],
+        id: "sess-2",
+        name: "Verifier Owl",
+        bindings: [{ kind: "issue", id: "issue-3" }],
+      },
+    ],
+  };
+
+  const app = await open("./App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: harnessCredentialsStorage("iPhone"),
+    network: createFullNetwork({
+      [`GET ${BASE}/api/v1/slice/inbox`]: sseResponse([{ id: "10", data: quickActionInbox }]),
+      [`GET ${BASE}/api/v1/slice/sessions`]: sseResponse([{ id: "11", data: sessionsWithIssueBindings }]),
+    }),
+  });
+
+  await app.waitFor("id:inbox-accept-inbox-review-1");
+  await app.waitFor("id:inbox-reject-inbox-review-1");
+  await app.waitFor("id:inbox-retry-inbox-fix-1");
+  await app.waitFor("id:inbox-resume-inbox-int-1");
+
+  // 1. Accept review inline without navigating away from Inbox.
+  await app.press("id:inbox-accept-inbox-review-1");
+  await app.waitUntil(() => app.requests().some((r) => r.url === `${BASE}/api/v1/issue/status/update`));
+  const acceptReq = app.requests().find((r) => r.url === `${BASE}/api/v1/issue/status/update`);
+  expect(JSON.parse(acceptReq?.body ?? "{}")).toEqual({ id: "issue-1", status: "done" });
+  expect(app.shows("id:inbox-tab")).toBe(true);
+  expect(app.count("id:issues-tab")).toBe(0);
+
+  // 2. Reject review inline with reason without navigating away.
+  await app.press("id:inbox-reject-inbox-review-1");
+  await app.waitFor("id:inbox-reject-input-inbox-review-1");
+  await app.type("id:inbox-reject-input-inbox-review-1", "Please add regression test");
+  await app.press("id:inbox-reject-submit-inbox-review-1");
+  await app.waitUntil(() => app.requests().some((r) => r.url === `${BASE}/api/v1/issue/review`));
+  const rejectReq = app.requests().find((r) => r.url === `${BASE}/api/v1/issue/review`);
+  expect(JSON.parse(rejectReq?.body ?? "{}")).toEqual({
+    id: "issue-1",
+    pass: false,
+    text: "Please add regression test",
+  });
+  await app.waitFor("id:inbox-reject-input-inbox-review-1", { state: "gone" });
+  expect(app.shows("id:inbox-tab")).toBe(true);
+
+  // 3. Retry on `fix` card resolves issue via session binding and moves to todo.
+  await app.press("id:inbox-retry-inbox-fix-1");
+  await app.waitUntil(() => app.requests().filter((r) => r.url === `${BASE}/api/v1/issue/status/update`).length === 2);
+  const retryReq = app.requests().filter((r) => r.url === `${BASE}/api/v1/issue/status/update`)[1];
+  expect(JSON.parse(retryReq?.body ?? "{}")).toEqual({ id: "issue-2", status: "todo" });
+  expect(app.shows("id:inbox-tab")).toBe(true);
+
+  // 4. Resume on `interrupted` card resolves issue via session binding and moves to todo.
+  await app.press("id:inbox-resume-inbox-int-1");
+  await app.waitUntil(() => app.requests().filter((r) => r.url === `${BASE}/api/v1/issue/status/update`).length === 3);
+  const resumeReq = app.requests().filter((r) => r.url === `${BASE}/api/v1/issue/status/update`)[2];
+  expect(JSON.parse(resumeReq?.body ?? "{}")).toEqual({ id: "issue-3", status: "todo" });
+  expect(app.shows("id:inbox-tab")).toBe(true);
+});

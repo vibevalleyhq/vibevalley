@@ -95,3 +95,12 @@ pub trait CronBoardPort: Send + Sync {
     fn move_to_todo_async<'a>(&'a self, id: &'a str, words: Option<&'a str>) -> BoxFuture<'a, Result<(), ApiError>>;
     fn tell_async<'a>(&'a self, id: &'a str, words: &'a str) -> BoxFuture<'a, Result<(), ApiError>>;
 }
+
+/// Executes actionable connector quote-replies against `issue::Board` without a `connector -> issue` edge.
+pub trait ConnectorIssuePort: Send + Sync {
+    fn get_issue_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Option<Issue>, ApiError>>;
+    fn answer_asking_async<'a>(&'a self, id: &'a str, text: &'a str) -> BoxFuture<'a, Result<Issue, ApiError>>;
+    fn accept_review_async<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<Issue, ApiError>>;
+    fn reject_review_async<'a>(&'a self, id: &'a str, reason: &'a str) -> BoxFuture<'a, Result<Issue, ApiError>>;
+    fn retry_issue_async<'a>(&'a self, id: &'a str, words: Option<&'a str>) -> BoxFuture<'a, Result<Issue, ApiError>>;
+}

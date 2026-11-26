@@ -72,7 +72,29 @@
     "failed": "[Failed · {target}]\n{summary}\n\nInspect in VibeValley or reply to retry.",
     "runCompleted": "[Round Completed · {name}]\n{summary}",
     "runCompletedTokens": "[Round Completed · {name}]\n{summary}\n({tokens} tokens spent)",
-    "runFailed": "[Round Failed · {name}]\n{summary}"
+    "runFailed": "[Round Failed · {name}]\n{summary}",
+    "permission": "[Permission Request · {session}]\nTool: {tool}\n{summary}\n\nReply allow to approve or deny to reject.",
+    "permissionInput": "[Permission Request · {session}]\nTool: {tool}\n{summary}\nInput: {input}\n\nReply allow to approve or deny to reject."
+  },
+  "reply": {
+    "answered": "[Answered · {target}]\nSent your answer to the helper to continue.",
+    "accepted": "[Completed · {target}]\nReview accepted; ticket is now done.",
+    "rejected": "[Sent Back · {target}]\nRequested changes: {reason}",
+    "retried": "[Retried · {target}]\nRestarted a new round of work.",
+    "permAllowed": "[Allowed · {session}]\nApproved the permission request.",
+    "permAllowedAlways": "[Allowed · {session}]\nApproved the permission request (always).",
+    "permDenied": "[Denied · {session}]\nDenied the permission request.",
+    "alreadyHandled": "[Already Handled · {target}]\nThis notification was already handled or expired.",
+    "permAlreadyHandled": "[Already Handled · {session}]\nThis permission request was already resolved or expired.",
+    "emptyAnswer": "[Invalid Reply · {target}]\nAnswer cannot be empty; reply with your answer.",
+    "reviewHint": "[Invalid Command · {target}]\nReply accept / ok to complete, or reject <reason> to request changes.",
+    "rejectNeedsReason": "[Reason Required · {target}]\nInclude feedback after reject, e.g. reject add unit tests.",
+    "stuckHint": "[Invalid Command · {target}]\nReply retry or resume to restart this ticket.",
+    "conflictHint": "[Merge Conflict · {target}]\nResolve the merge conflict in VibeValley before retrying.",
+    "permHint": "[Invalid Command · {session}]\nReply allow to approve or deny to reject.",
+    "actionFailed": "[Action Refused · {target}]\n{why}",
+    "permFailed": "[Permission Failed · {session}]\n{why}",
+    "noActionPort": "Ticket actions are unavailable here; handle this in VibeValley."
   },
   "cronDigest": {
     "title": "[Progress Digest · {title}]",

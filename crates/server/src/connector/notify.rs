@@ -473,4 +473,77 @@ mod tests {
         let _ = ctx.shutdown(Duration::from_secs(1)).await;
         service.close().await;
     }
+
+    #[tokio::test]
+    async fn notify_router_pushes_urgent_permission_requests_with_push_perm_id() {
+        use std::sync::Arc;
+
+        use vibevalley_core::{Clock, ManualClock};
+
+        use crate::context::{Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
+        use crate::service::Service;
+
+        let dir = tempfile::tempdir().unwrap();
+        let service = Service::open(dir.path()).await.unwrap();
+        let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+        let outbox = Arc::new(Outbox::new(service.clone()).with_clock(clock.clone()));
+        let ctx = Arc::new(Context::new(
+            service.clone(),
+            TaskGroup::new(),
+            Arc::new(LiveState::new()),
+            outbox.clone(),
+            Arc::new(StateFeed::new()),
+            clock.clone(),
+            Arc::new(Http),
+            Arc::new(PublicDownload),
+        ));
+
+        let delivered = Arc::new(Mutex::new(Vec::<String>::new()));
+        let delivered_tx = delivered.clone();
+        outbox.register(crate::context::OUTBOX_CONNECTOR_NOTIFY, move |item| {
+            let delivered_tx = delivered_tx.clone();
+            async move {
+                let p: OutboxConnectorNotify = item.decode().map_err(|e| e.to_string())?;
+                delivered_tx.lock().push(p.message_id);
+                Ok::<(), String>(())
+            }
+        });
+
+        let router = NotifyRouter::new(NotifyOptions {
+            quiet_hours: Some(QuietHours::new(0, 0, 23, 59, "UTC", true)),
+            ..Default::default()
+        });
+
+        let perm = PersonalEvent {
+            dedupe_key: "perm:sess-42:req-7".into(),
+            issue_id: None,
+            issue_number: None,
+            issue_title: None,
+            session_id: Some("sess-42".into()),
+            channel_id: None,
+            is_child_review: false,
+            at: clock.now_ms(),
+            kind: PersonalEventKind::PermissionRequest {
+                request_id: "req-7".into(),
+                session_name: "Workspace".into(),
+                tool: "shell".into(),
+                summary: "Run tests".into(),
+                input: None,
+            },
+        };
+
+        assert_eq!(
+            router.submit_event_async(&ctx, Some(ConnectorID::Weixin), &perm, Notify::All).await.unwrap(),
+            NotifyDecision::Allow
+        );
+        assert_eq!(
+            router.submit_event_async(&ctx, Some(ConnectorID::Weixin), &perm, Notify::All).await.unwrap(),
+            NotifyDecision::Suppress(SuppressReason::Duplicate)
+        );
+        assert_eq!(outbox.drain_once(clock.now_ms()).await.unwrap(), 1);
+        assert_eq!(*delivered.lock(), vec!["push:perm:sess-42:req-7".to_string()]);
+
+        let _ = ctx.shutdown(Duration::from_secs(1)).await;
+        service.close().await;
+    }
 }

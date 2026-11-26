@@ -306,6 +306,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     let connector = Connector::open_async(ctx.clone(), setting.clone(), channel.clone(), overrides.connector.unwrap_or_default())
         .await
         .map_err(|e| failed("the connectors")(&e.message))?;
+    connector.attach_actions(board.clone(), runtime.clone());
 
     let game = Game::open_async(&config.home, ctx.clone(), repo.clone()).await;
     game.count_commits(config.git_emails.clone());

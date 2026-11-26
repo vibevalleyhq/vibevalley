@@ -16,7 +16,7 @@ use vibevalley_core::{SliceMask, derive_issues, overlay_sessions};
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
     ApiError, Deliverable, Doing, Issue, IssueAnswer, IssueReportMemoryScope, LastRun, Millis, Outcome, Phase, PhaseDone, PhaseFailed, PhaseResting,
-    PhaseWorking, ProjectCheckStatus, Question, RunTrigger, Session, SessionAction, SessionClose, SessionSubagents, Spent,
+    PhaseWorking, ProjectCheckStatus, Question, RunTrigger, Session, SessionAction, SessionClose, SessionPermissionRequest, SessionSubagents, Spent,
 };
 use vibevalley_runtime::agent::durable::BoxFuture;
 use vibevalley_runtime::oar::{ContentBlock, EventKind, McpServer, PermissionDecision, PermissionMode, SessionOptions, StopReason};
@@ -44,6 +44,25 @@ pub enum SessionLifecycleEvent {
         id: String,
         closed: Option<SessionClose>,
         merged_commits: Option<i64>,
+    },
+}
+
+/// Out-of-band workspace permission lifecycle events for external push connectors.
+#[derive(Debug, Clone)]
+pub enum PermissionEvent {
+    Requested {
+        session_id: String,
+        session_name: String,
+        channel_id: Option<String>,
+        request: SessionPermissionRequest,
+        at: Millis,
+    },
+    Resolved {
+        session_id: String,
+        request_id: String,
+    },
+    ClearedSession {
+        session_id: String,
     },
 }
 
@@ -116,6 +135,7 @@ pub(super) struct Inner {
     pub trajectory: Option<Arc<Trajectory>>,
     events: broadcast::Sender<SessionLifecycleEvent>,
     doing_events: broadcast::Sender<(String, Millis, Doing)>,
+    permission_events: broadcast::Sender<PermissionEvent>,
     live: SessionGenerationTable<Arc<dyn vibevalley_runtime::oar::Session>>,
     pub(super) extras: Mutex<HashMap<String, SessionExtra>>,
     door: Mutex<Door>,
@@ -150,6 +170,7 @@ impl SessionEngine {
         }
         let (events, _) = broadcast::channel(256);
         let (doing_events, _) = broadcast::channel(512);
+        let (permission_events, _) = broadcast::channel(128);
         Ok(SessionEngine(Arc::new(Inner {
             ctx,
             durable,
@@ -161,6 +182,7 @@ impl SessionEngine {
             trajectory,
             events,
             doing_events,
+            permission_events,
             live: SessionGenerationTable::new(),
             extras: Mutex::new(extras),
             door: Mutex::new(Door::default()),
@@ -206,8 +228,17 @@ impl SessionEngine {
         self.0.doing_events.subscribe()
     }
 
+    /// Subscribes to workspace permission request/resolution events.
+    pub fn subscribe_permissions(&self) -> broadcast::Receiver<PermissionEvent> {
+        self.0.permission_events.subscribe()
+    }
+
     pub(super) fn emit_lifecycle(&self, event: SessionLifecycleEvent) {
         let _ = self.0.events.send(event);
+    }
+
+    pub(super) fn emit_permission(&self, event: PermissionEvent) {
+        let _ = self.0.permission_events.send(event);
     }
 
     /// Who hears rounds end; set once.
@@ -1062,12 +1093,10 @@ impl SessionEngine {
                 input,
                 summary,
             } => {
-                if self
-                    .session_async(session_id)
-                    .await
-                    .is_some_and(|s| s.controller == vibevalley_protocol::SessionController::User)
+                if let Some(session) = self.session_async(session_id).await
+                    && session.controller == vibevalley_protocol::SessionController::User
                 {
-                    self.on_workspace_permission_requested(session_id, request_id, tool, input, summary);
+                    self.on_workspace_permission_requested(&session, request_id, tool, input, summary);
                 } else if self.0.config.permission == PermissionMode::Bypass
                     && let Some(agent) = self.0.live.get_if_current(session_id, generation)
                 {

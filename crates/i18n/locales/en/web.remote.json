@@ -63,6 +63,11 @@
     "approve": "Approve",
     "deny": "Deny",
     "answer": "Answer",
+    "accept": "Accept",
+    "reject": "Reject",
+    "rejectReasonPlaceholder": "Reason for changes…",
+    "retry": "Retry",
+    "resume": "Resume",
     "empty": "Inbox is clear. Nothing needs your attention."
   },
   "channel": {

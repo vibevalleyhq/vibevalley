@@ -2688,7 +2688,17 @@ export const catalogs = {
         disconnect: "断开连接",
       },
       tabs: { inbox: "收件箱", channels: "频道", sessions: "会话", issues: "工单" },
-      inbox: { approve: "同意", deny: "拒绝", answer: "回复", empty: "收件箱为空，暂时没有待处理项。" },
+      inbox: {
+        approve: "同意",
+        deny: "拒绝",
+        answer: "回复",
+        accept: "通过验收",
+        reject: "打回",
+        rejectReasonPlaceholder: "输入打回原因…",
+        retry: "重试",
+        resume: "继续",
+        empty: "收件箱为空，暂时没有待处理项。",
+      },
       channel: { replyPlaceholder: "输入消息回复…", send: "发送", empty: "这个频道还没有消息。" },
       session: { promptPlaceholder: "给执行会话发一条指令…", send: "发送", stop: "停止", events: "轨迹", empty: "当前没有运行中的执行会话。" },
       issue: {
@@ -6487,7 +6497,17 @@ export const catalogs = {
         disconnect: "Disconnect",
       },
       tabs: { inbox: "Inbox", channels: "Channels", sessions: "Sessions", issues: "Issues" },
-      inbox: { approve: "Approve", deny: "Deny", answer: "Answer", empty: "Inbox is clear. Nothing needs your attention." },
+      inbox: {
+        approve: "Approve",
+        deny: "Deny",
+        answer: "Answer",
+        accept: "Accept",
+        reject: "Reject",
+        rejectReasonPlaceholder: "Reason for changes…",
+        retry: "Retry",
+        resume: "Resume",
+        empty: "Inbox is clear. Nothing needs your attention.",
+      },
       channel: { replyPlaceholder: "Write a reply…", send: "Send", empty: "No messages in this channel yet." },
       session: {
         promptPlaceholder: "Send instructions to this helper…",
@@ -10295,10 +10315,15 @@ export interface Messages {
   "web.remote.devices.platform.sandbox": undefined;
   "web.remote.devices.revoke": undefined;
   "web.remote.devices.title": undefined;
+  "web.remote.inbox.accept": undefined;
   "web.remote.inbox.answer": undefined;
   "web.remote.inbox.approve": undefined;
   "web.remote.inbox.deny": undefined;
   "web.remote.inbox.empty": undefined;
+  "web.remote.inbox.reject": undefined;
+  "web.remote.inbox.rejectReasonPlaceholder": undefined;
+  "web.remote.inbox.resume": undefined;
+  "web.remote.inbox.retry": undefined;
   "web.remote.issue.approve": undefined;
   "web.remote.issue.changes": undefined;
   "web.remote.issue.comment": undefined;

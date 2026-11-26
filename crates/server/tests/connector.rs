@@ -1388,3 +1388,234 @@ fn scheduled_cron_digest_summarizes_issues_and_runs_over_weixin_and_survives_res
         s.close_blocking();
     }
 }
+
+#[test]
+fn weixin_quote_replies_drive_asking_reviewing_stuck_and_permission_requests() {
+    use crate::support::{HookRuntime, quick, repo, wait_stage};
+    use vibevalley_core::{Clock, ManualClock, SystemClock};
+    use vibevalley_protocol::{IssueStageKind as StageKind, IssueStatus, SessionPermissionMode};
+    use vibevalley_runtime::oar::StopReason;
+    use vibevalley_runtime::oar::scripted::{Script, Step};
+    use vibevalley_server::connector::NotifyOptions;
+    use vibevalley_server::issue::NewIssue;
+
+    let dir = tempfile::tempdir().unwrap();
+    let world = World::new();
+    let main_repo = repo(dir.path(), "app");
+    let clock = Arc::new(ManualClock::new(SystemClock.now_ms()));
+
+    vibevalley_i18n::set_locale("zh");
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    registry.register(HookRuntime::new("qa_flow", quick(), |turn| {
+        if turn.index == 0 {
+            turn.report(r#"{"status":"blocked","summary":"need choice","questions":[{"question":"确认部署端口吗？","options":[]}]}"#);
+        } else if turn.index == 1 {
+            turn.commit("port.txt", "8790\n");
+            turn.done("已写入端口配置");
+        } else {
+            turn.commit("port.txt", "8791\n");
+            turn.done("已按反馈更新端口");
+        }
+    }));
+    registry.register(HookRuntime::new(
+        "fail_then_fix",
+        Script::new()
+            .turn(vec![Step::text("boom"), Step::finish(StopReason::Error)])
+            .turn(vec![Step::text("Working on it.\n\nDone, committed.")]),
+        |turn| {
+            if turn.index > 0 {
+                turn.commit("recovered.txt", "ok\n");
+                turn.done("重试修复完成");
+            }
+        },
+    ));
+    registry.register(HookRuntime::new(
+        "perm_worker",
+        Script::new().turn(vec![
+            Step::Permission {
+                request_id: "perm-wx-1".into(),
+                tool: "shell".into(),
+                input: serde_json::json!({"cmd": "cargo check"}),
+                summary: "Run cargo check".into(),
+                denied: vec![Step::text("denied"), Step::finish(StopReason::Completed)],
+            },
+            Step::text("allowed and finished"),
+            Step::finish(StopReason::Completed),
+        ]),
+        |_| {},
+    ));
+
+    let s = vibevalley_server::app::create_app_with_overrides_blocking(
+        Config {
+            registry: Some(Arc::new(registry)),
+            probe_runtimes: false,
+            tick_crons: false,
+            link_previews: false,
+            orchestrator_listens: false,
+            clock,
+            ..Config::under(dir.path())
+        },
+        vibevalley_server::app::Overrides {
+            connector: Some(Options {
+                vendors: Vendors {
+                    weixin: world.http.clone(),
+                    qq_api: world.http.clone(),
+                    qq_token: format!("{}/app/getAppAccessToken", world.http),
+                    feishu_accounts: world.http.clone(),
+                    lark_accounts: world.http.clone(),
+                    feishu_open: world.http.clone(),
+                    lark_open: world.http.clone(),
+                },
+                retry_first: Duration::from_millis(60),
+                retry_most: Duration::from_millis(160),
+                reconnect: Duration::from_millis(40),
+                moment: Duration::from_millis(1500),
+                poll_floor: Duration::from_millis(30),
+                notify: NotifyOptions {
+                    issue_cooldown: Duration::ZERO,
+                    rate_limit_max: 50,
+                    ..Default::default()
+                },
+            }),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    weixin_connected(&s, &world);
+    call(&s, "channel.create", json!({ "name": "#act-bridge" }));
+    call(&s, "connector.channel.set", json!({ "id": "weixin", "channel": "#act-bridge" }));
+
+    let quote_wx = |ext_id: &str, text: &str, ctx_tok: &str| {
+        static IDS: AtomicUsize = AtomicUsize::new(900);
+        let id = 7_000_000_000_000_010_000u64 + IDS.fetch_add(1, Ordering::SeqCst) as u64;
+        world.wx_log.lock().unwrap().push(json!({
+            "message_id": id,
+            "from_user_id": USER,
+            "message_type": 1,
+            "context_token": ctx_tok,
+            "item_list": [
+                { "type": 1, "text_item": { "text": text } },
+                { "type": 1, "ref_msg": { "svr_id": ext_id.parse::<u64>().unwrap() } },
+            ],
+        }));
+        world.wx_log_notify.notify_waiters();
+    };
+
+    let board = s.test_internals().board.clone();
+
+    // 1. Issue Asking -> quote-reply answers directly -> Reviewing -> quote-reply `reject <reason>` -> Reviewing -> `accept`.
+    let i1 = vibevalley_runtime::rt::block_on(board.create_async(NewIssue {
+        title: "微信闭环操作".into(),
+        description: "验证问答和验收".into(),
+        repo: Some(main_repo.clone()),
+        agent: "qa_flow".into(),
+        ..Default::default()
+    }))
+    .unwrap();
+    vibevalley_runtime::rt::block_on(board.move_to_async(&i1.id, IssueStatus::Todo, None)).unwrap();
+    wait_stage(&board, &i1.id, StageKind::Asking);
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+
+    let ask_push = nth(&world, "weixin", 0);
+    assert!(ask_push.text.contains("【需要回复 · #1 微信闭环操作】"), "{}", ask_push.text);
+
+    quote_wx(&ask_push.id, "使用 8790 端口", "ctx-ask-reply");
+    let ask_receipt = nth(&world, "weixin", 1);
+    assert!(ask_receipt.text.contains("【已回复 · #1 微信闭环操作】"), "{}", ask_receipt.text);
+    wait_stage(&board, &i1.id, StageKind::Reviewing);
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+
+    let review_push_1 = nth(&world, "weixin", 2);
+    assert!(review_push_1.text.contains("【待你验收 · #1 微信闭环操作】"), "{}", review_push_1.text);
+
+    // Reject without reason -> localized refusal receipt.
+    quote_wx(&review_push_1.id, "reject", "ctx-rej-empty");
+    let rej_refusal = nth(&world, "weixin", 3);
+    assert!(rej_refusal.text.contains("【缺少打回原因 · #1 微信闭环操作】"), "{}", rej_refusal.text);
+
+    // Reject with reason -> triggers rework round -> second Reviewing push.
+    quote_wx(&review_push_1.id, "reject 请改成 8791 端口", "ctx-rej-ok");
+    let rej_receipt = nth(&world, "weixin", 4);
+    assert!(rej_receipt.text.contains("【已打回 · #1 微信闭环操作】"), "{}", rej_receipt.text);
+    wait_stage(&board, &i1.id, StageKind::Reviewing);
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+
+    let review_push_2 = nth(&world, "weixin", 5);
+    assert!(review_push_2.text.contains("已按反馈更新端口"), "{}", review_push_2.text);
+
+    // Accept -> completes issue & lands branch!
+    quote_wx(&review_push_2.id, "accept", "ctx-acc-ok");
+    let acc_receipt = nth(&world, "weixin", 6);
+    assert!(acc_receipt.text.contains("【已完成 · #1 微信闭环操作】"), "{}", acc_receipt.text);
+    crate::support::wait_until_settled(Some(s.ctx()), Duration::from_secs(15), "issue done", || {
+        vibevalley_runtime::rt::block_on(board.issue_async(&i1.id))
+            .ok()
+            .flatten()
+            .filter(|i| i.status == IssueStatus::Done)
+    });
+
+    // Idempotency: quoting the already-completed review push again does not error/rerun and sends alreadyHandled receipt.
+    quote_wx(&review_push_2.id, "ok", "ctx-acc-dup");
+    let dup_receipt = nth(&world, "weixin", 7);
+    assert!(dup_receipt.text.contains("【无需重复处理 · #1 微信闭环操作】"), "{}", dup_receipt.text);
+
+    // 2. Failed issue -> quote-reply `retry` -> restarts and completes to Reviewing.
+    let i2 = vibevalley_runtime::rt::block_on(board.create_async(NewIssue {
+        title: "失败重试工单".into(),
+        description: "测试 retry".into(),
+        repo: Some(main_repo.clone()),
+        agent: "fail_then_fix".into(),
+        ..Default::default()
+    }))
+    .unwrap();
+    vibevalley_runtime::rt::block_on(board.move_to_async(&i2.id, IssueStatus::Todo, None)).unwrap();
+    wait_stage(&board, &i2.id, StageKind::Stuck);
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+
+    let fail_push = nth(&world, "weixin", 8);
+    assert!(fail_push.text.contains("【执行失败 · #2 失败重试工单】"), "{}", fail_push.text);
+
+    quote_wx(&fail_push.id, "retry", "ctx-retry-ok");
+    let retry_receipt = nth(&world, "weixin", 9);
+    assert!(retry_receipt.text.contains("【已重试 · #2 失败重试工单】"), "{}", retry_receipt.text);
+    wait_stage(&board, &i2.id, StageKind::Reviewing);
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+    let i2_rev = nth(&world, "weixin", 10);
+    assert!(i2_rev.text.contains("【待你验收 · #2 失败重试工单】"), "{}", i2_rev.text);
+
+    // 3. Workspace PermissionRequest -> pushes `push:perm:<session_id>:<request_id>` -> quote-reply `allow` resolves it!
+    let ws = call(
+        &s,
+        "session.openWorkspace",
+        json!({
+            "runtime": "perm_worker",
+            "cwd": main_repo.to_string_lossy(),
+            "title": "权限会话",
+            "permissionMode": SessionPermissionMode::Ask,
+        }),
+    );
+    let ws_id = ws["id"].as_str().unwrap().to_owned();
+    call(&s, "session.send", json!({ "id": ws_id, "text": "run check" }));
+
+    let perm_push = nth(&world, "weixin", 11);
+    assert!(perm_push.text.contains("【请求授权 ·"), "{}", perm_push.text);
+    assert!(perm_push.text.contains("Run cargo check"), "{}", perm_push.text);
+
+    quote_wx(&perm_push.id, "allow", "ctx-perm-allow");
+    let perm_receipt = wait_notify(&world.sent_notify, "weixin perm allow receipt", || {
+        world.by("weixin").into_iter().find(|m| m.text.contains("【已授权 · 权限会话】"))
+    });
+    assert!(perm_receipt.text.contains("【已授权 ·"), "{}", perm_receipt.text);
+    assert!(!s.test_internals().runtime.has_pending_permission(&ws_id, "perm-wx-1"));
+
+    // Repeating quote-reply after permission resolved is idempotent.
+    quote_wx(&perm_push.id, "deny", "ctx-perm-dup");
+    let perm_dup_receipt = wait_notify(&world.sent_notify, "weixin perm dup receipt", || {
+        world.by("weixin").into_iter().find(|m| m.text.contains("【无需重复处理 · 权限会话】"))
+    });
+    assert!(perm_dup_receipt.text.contains("【无需重复处理 ·"), "{}", perm_dup_receipt.text);
+
+    s.close_blocking();
+}

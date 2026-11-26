@@ -17,7 +17,7 @@ mod types;
 mod workspace;
 
 pub use driver::{AgentProfileInfo, Drive, HelperPlace, Persona, RuntimeDriver, SessionDriver};
-pub use engine::{DraftEnd, Hire, Rounds, SessionEngine, SessionLifecycleEvent};
+pub use engine::{DraftEnd, Hire, PermissionEvent, Rounds, SessionEngine, SessionLifecycleEvent};
 pub(crate) use engine::{OUTBOX_SESSION_REPORTED, OutboxSessionReported};
 pub use journal::{Journal, Trajectory};
 pub use mailbox::{MailboxEntry, MailboxSource, MailboxStatus};

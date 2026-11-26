@@ -63,6 +63,11 @@
     "approve": "同意",
     "deny": "拒绝",
     "answer": "回复",
+    "accept": "通过验收",
+    "reject": "打回",
+    "rejectReasonPlaceholder": "输入打回原因…",
+    "retry": "重试",
+    "resume": "继续",
     "empty": "收件箱为空，暂时没有待处理项。"
   },
   "channel": {
