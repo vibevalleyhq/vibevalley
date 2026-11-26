@@ -152,6 +152,7 @@ mod tests {
                 runs: 1,
                 last_run: None,
                 spent: None,
+                telemetry: None,
                 subagents: None,
                 tool_connections: None,
                 machine: None,
