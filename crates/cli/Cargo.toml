@@ -40,6 +40,7 @@ url = { workspace = true }
 uuid = { workspace = true }
 vibevalley-core = { path = "../core", default-features = false }
 vibevalley-git = { path = "../git" }
+vibevalley-mcp = { workspace = true }
 vibevalley-protocol = { path = "../protocol" }
 vibevalley-runtime = { path = "../runtime" }
 

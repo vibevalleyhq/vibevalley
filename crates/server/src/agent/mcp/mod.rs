@@ -1,19 +1,44 @@
-//! The helpers' MCP door (`gateway/mcp`): JSON-RPC over `POST /mcp`. Each
-//! helper's token, minted by the runtime when it starts the helper, names it;
-//! its tools are dispatched asynchronously through [`ToolDispatchPort`].
+//! The helpers' MCP door (`gateway/mcp`): JSON-RPC over `POST /mcp` backed by
+//! `vibevalley-mcp` (SEP-2575 stateless core, SEP-2640 Skills over MCP exposing
+//! all 12 embedded artifact type guides, and legacy `initialize` compatibility).
+//! Each helper's token, minted by the runtime when it starts the helper, names
+//! it; its tools are dispatched asynchronously through [`ToolDispatchPort`].
 
 pub mod resource;
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
-use serde::Deserialize;
-use serde_json::{Map, Value, json};
+use include_dir::{Dir, include_dir};
+use serde_json::{Value, json};
+use vibevalley_mcp::{
+    McpHandler, RequestContext, ResourceContent, ResourceDef, ResourceTemplateDef, RpcError, ServerCapabilities, ServerInfo, SkillCatalog, ToolCallResult,
+    ToolDef, dispatch_json, error_code, scrub_resource_content, scrub_tool_result,
+};
 use vibevalley_protocol::Session;
 
 use crate::BoxFuture;
 use crate::context::api::Mcp as McpGateway;
 
 pub use resource::{McpResourceContentWire, McpResourceTemplateWire, McpResourceWire, Resource, ResourceReadArgs, ResourceReader};
+
+static ARTIFACT_SKILL_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/assets/artifact/types");
+
+static ARTIFACT_SKILLS: LazyLock<SkillCatalog> = LazyLock::new(|| {
+    let mut entries = Vec::new();
+    collect_embedded_skill_files(&ARTIFACT_SKILL_DIR, &mut entries);
+    SkillCatalog::from_embedded_entries("artifact", &entries)
+});
+
+fn collect_embedded_skill_files<'a>(dir: &'a Dir<'a>, out: &mut Vec<(&'a str, &'a str)>) {
+    for file in dir.files() {
+        if let (Some(path), Some(body)) = (file.path().to_str(), file.contents_utf8()) {
+            out.push((path, body));
+        }
+    }
+    for sub in dir.dirs() {
+        collect_embedded_skill_files(sub, out);
+    }
+}
 
 /// Tool schema description exposed to the MCP door without importing `agent/tool`.
 #[derive(Debug, Clone)]
@@ -35,167 +60,274 @@ pub trait ToolDispatchPort: Send + Sync {
 }
 
 const UNKNOWN_CALLER: &str = "没认出你是谁：这些工具只给执行会话用";
-const PROTOCOL: &str = "2025-06-18";
 
 fn is_readonly_issue_tool(name: &str) -> bool {
     matches!(name, "issue_list" | "issue_get")
 }
 
-#[derive(Deserialize)]
-struct RpcRequest {
-    #[serde(default)]
-    id: Option<Value>,
-    #[serde(default)]
-    method: String,
-    #[serde(default)]
-    params: Value,
-}
-
-#[derive(Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-struct InitializeParams {
-    #[serde(default)]
-    protocol_version: Option<String>,
-}
-
-#[derive(Deserialize, Default)]
-struct ToolCallParams {
-    #[serde(default)]
-    name: String,
-    #[serde(default)]
-    arguments: Value,
-}
-
-#[derive(Deserialize, Default)]
-struct ResourceReadParams {
-    #[serde(default)]
-    uri: String,
-}
-
-/// JSON-RPC MCP endpoint serving helper tools and `vv://` resources over `POST /mcp`.
+/// JSON-RPC MCP endpoint serving helper tools, `vv://` resources, and `skill://artifact/*` guides over `POST /mcp`.
 pub struct Mcp {
     dispatch: Arc<dyn ToolDispatchPort>,
-    tools: Vec<ToolSpecWire>,
+    tools: Vec<ToolDef>,
     version: String,
 }
 
 impl Mcp {
     pub fn new(dispatch: Arc<dyn ToolDispatchPort>, version: String) -> Arc<Mcp> {
-        let tools = dispatch.helper_tools();
+        let tools = dispatch
+            .helper_tools()
+            .into_iter()
+            .map(|t| {
+                let mut schema: Value = serde_json::from_str(&t.parameters_json).unwrap_or_else(|_| json!({}));
+                schema["type"] = json!("object");
+                ToolDef {
+                    name: t.name,
+                    description: t.description,
+                    input_schema: schema,
+                }
+            })
+            .collect();
         Arc::new(Mcp { dispatch, tools, version })
     }
+}
 
-    async fn result_async(&self, token: &str, method: &str, params: Value) -> Result<Value, (i64, String)> {
-        match method {
-            "initialize" => {
-                let init: InitializeParams = serde_json::from_value(params).unwrap_or_default();
-                let version = init.protocol_version.as_deref().unwrap_or(PROTOCOL);
-                Ok(json!({
-                    "protocolVersion": version,
-                    "capabilities": { "tools": {}, "resources": {} },
-                    "serverInfo": { "name": "vibevalley", "version": self.version },
-                }))
+impl McpHandler for Mcp {
+    fn server_info(&self) -> ServerInfo {
+        ServerInfo::new("vibevalley", self.version.clone())
+    }
+
+    fn capabilities(&self) -> ServerCapabilities {
+        ServerCapabilities::default().with_tools().with_resources().with_skills_extension(true)
+    }
+
+    fn skills(&self) -> Option<&SkillCatalog> {
+        Some(&ARTIFACT_SKILLS)
+    }
+
+    fn authorize_read<'a>(&'a self, ctx: &'a RequestContext) -> vibevalley_mcp::BoxFuture<'a, Result<(), RpcError>> {
+        Box::pin(async move {
+            let token = ctx.bearer_token.as_deref().unwrap_or("");
+            if !token.is_empty() && self.dispatch.session_for_token(token).await.is_none() {
+                return Err(RpcError::unauthorized(UNKNOWN_CALLER));
             }
-            "ping" => Ok(json!({})),
-            // The list is anyone's; a call names its caller (the tools refuse an unknown one themselves).
-            "tools/list" => {
-                let tools: Vec<Value> = self
-                    .tools
-                    .iter()
-                    .map(|t| {
-                        let mut schema: Value = serde_json::from_str(&t.parameters_json).unwrap_or_else(|_| json!({}));
-                        schema["type"] = json!("object");
-                        json!({ "name": t.name, "description": t.description, "inputSchema": schema })
-                    })
-                    .collect();
-                Ok(json!({ "tools": tools }))
-            }
-            "tools/call" => {
-                let call: ToolCallParams = serde_json::from_value(params).unwrap_or_default();
-                let args = match call.arguments {
-                    Value::Object(map) => Value::Object(map),
-                    _ => Value::Object(Map::new()),
-                };
-                let args_json = serde_json::to_string(&args).unwrap_or_else(|_| "{}".to_string());
-                let called = if token.is_empty() {
-                    if !is_readonly_issue_tool(&call.name) {
-                        return Ok(json!({ "content": [{ "type": "text", "text": UNKNOWN_CALLER }], "isError": true }));
-                    }
-                    self.dispatch.call_readonly_issue_tool_async(&call.name, &args_json).await
-                } else {
-                    let Some(me) = self.dispatch.session_for_token(token).await else {
-                        return Ok(json!({ "content": [{ "type": "text", "text": UNKNOWN_CALLER }], "isError": true }));
-                    };
-                    self.dispatch.call_helper_async(me, &call.name, &args_json).await
-                };
-                let (text, error) = match called {
-                    Ok(text) => (text, false),
-                    Err(why) if why.starts_with("没成：") => (why, true),
-                    Err(why) => (format!("没成：{why}"), true),
-                };
-                let text = if token.is_empty() { text } else { text.replace(token, "[redacted]") };
-                Ok(json!({ "content": [{ "type": "text", "text": text }], "isError": error }))
-            }
-            "resources/list" => {
-                if !token.is_empty() && self.dispatch.session_for_token(token).await.is_none() {
-                    return Err((-32001, UNKNOWN_CALLER.to_string()));
+            Ok(())
+        })
+    }
+
+    fn list_tools<'a>(&'a self, _ctx: &'a RequestContext) -> vibevalley_mcp::BoxFuture<'a, Result<Vec<ToolDef>, RpcError>> {
+        Box::pin(async { Ok(self.tools.clone()) })
+    }
+
+    fn call_tool<'a>(&'a self, ctx: &'a RequestContext, name: &'a str, arguments: Value) -> vibevalley_mcp::BoxFuture<'a, Result<ToolCallResult, RpcError>> {
+        Box::pin(async move {
+            let token = ctx.bearer_token.as_deref().unwrap_or("");
+            let args_json = serde_json::to_string(&arguments).unwrap_or_else(|_| "{}".to_string());
+            let called = if token.is_empty() {
+                if !is_readonly_issue_tool(name) {
+                    return Ok(ToolCallResult::error(UNKNOWN_CALLER));
                 }
-                let resources = self.dispatch.list_resources_async().await;
-                Ok(json!({ "resources": resources }))
-            }
-            "resources/templates/list" => {
-                if !token.is_empty() && self.dispatch.session_for_token(token).await.is_none() {
-                    return Err((-32001, UNKNOWN_CALLER.to_string()));
-                }
-                let templates = self.dispatch.list_resource_templates();
-                Ok(json!({ "resourceTemplates": templates }))
-            }
-            "resources/read" => {
-                let read: ResourceReadParams = serde_json::from_value(params).unwrap_or_default();
-                let uri = read.uri.trim();
-                if uri.is_empty() {
-                    return Err((-32602, "missing resource uri".to_string()));
-                }
-                let session = if token.is_empty() {
-                    None
-                } else {
-                    let Some(me) = self.dispatch.session_for_token(token).await else {
-                        return Err((-32001, UNKNOWN_CALLER.to_string()));
-                    };
-                    Some(me)
+                self.dispatch.call_readonly_issue_tool_async(name, &args_json).await
+            } else {
+                let Some(me) = self.dispatch.session_for_token(token).await else {
+                    return Ok(ToolCallResult::error(UNKNOWN_CALLER));
                 };
-                let mut content = self.dispatch.read_resource_async(session, uri).await.map_err(|why| (-32002, why))?;
-                if !token.is_empty() {
-                    content.text = content.text.replace(token, "[redacted]");
-                }
-                Ok(json!({ "contents": [content] }))
+                self.dispatch.call_helper_async(me, name, &args_json).await
+            };
+            let mut result = match called {
+                Ok(text) => ToolCallResult::text(text),
+                Err(why) if why.starts_with("没成：") => ToolCallResult::error(why),
+                Err(why) => ToolCallResult::error(format!("没成：{why}")),
+            };
+            if !token.is_empty() {
+                scrub_tool_result(&mut result, &[token]);
             }
-            other => Err((-32601, format!("method not found: {other}"))),
-        }
+            Ok(result)
+        })
+    }
+
+    fn list_resources<'a>(&'a self, ctx: &'a RequestContext) -> vibevalley_mcp::BoxFuture<'a, Result<Vec<ResourceDef>, RpcError>> {
+        Box::pin(async move {
+            self.authorize_read(ctx).await?;
+            let resources = self
+                .dispatch
+                .list_resources_async()
+                .await
+                .into_iter()
+                .map(|r| ResourceDef {
+                    uri: r.uri,
+                    name: r.name,
+                    description: r.description,
+                    mime_type: Some(r.mime_type),
+                })
+                .collect();
+            Ok(resources)
+        })
+    }
+
+    fn list_resource_templates<'a>(&'a self, ctx: &'a RequestContext) -> vibevalley_mcp::BoxFuture<'a, Result<Vec<ResourceTemplateDef>, RpcError>> {
+        Box::pin(async move {
+            self.authorize_read(ctx).await?;
+            let templates = self
+                .dispatch
+                .list_resource_templates()
+                .into_iter()
+                .map(|t| ResourceTemplateDef {
+                    uri_template: t.uri_template,
+                    name: t.name,
+                    description: t.description,
+                    mime_type: Some(t.mime_type),
+                })
+                .collect();
+            Ok(templates)
+        })
+    }
+
+    fn read_resource<'a>(&'a self, ctx: &'a RequestContext, uri: &'a str) -> vibevalley_mcp::BoxFuture<'a, Result<ResourceContent, RpcError>> {
+        Box::pin(async move {
+            let token = ctx.bearer_token.as_deref().unwrap_or("");
+            let session = if token.is_empty() {
+                None
+            } else {
+                let Some(me) = self.dispatch.session_for_token(token).await else {
+                    return Err(RpcError::unauthorized(UNKNOWN_CALLER));
+                };
+                Some(me)
+            };
+            let wire = self.dispatch.read_resource_async(session, uri).await.map_err(RpcError::resource_not_found)?;
+            let mut content = ResourceContent::text(wire.uri, wire.mime_type, wire.text);
+            if !token.is_empty() {
+                scrub_resource_content(&mut content, &[token]);
+            }
+            Ok(content)
+        })
     }
 }
 
 impl McpGateway for Mcp {
     fn message_json(&self, _token: &str, message_json: &str) -> Option<String> {
-        let req: RpcRequest = serde_json::from_str(message_json).ok()?;
+        let req: vibevalley_mcp::RpcRequest = serde_json::from_str(message_json).ok()?;
         let id = req.id.filter(|id| !id.is_null())?;
-        serde_json::to_string(&json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "error": { "code": -32603, "message": "sync Mcp::message_json is unsupported; use Mcp::message_json_async" },
-        }))
-        .ok()
+        let resp = vibevalley_mcp::RpcResponse::err(
+            id,
+            RpcError::new(error_code::INTERNAL_ERROR, "sync Mcp::message_json is unsupported; use Mcp::message_json_async"),
+        );
+        serde_json::to_string(&resp).ok()
     }
 
     fn message_json_async(self: Arc<Self>, token: String, message_json: String) -> BoxFuture<'static, Option<String>> {
         Box::pin(async move {
-            let req: RpcRequest = serde_json::from_str(&message_json).ok()?;
-            let id = req.id.filter(|id| !id.is_null())?;
-            let response = match self.result_async(&token, &req.method, req.params).await {
-                Ok(result) => json!({ "jsonrpc": "2.0", "id": id, "result": result }),
-                Err((code, why)) => json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": why } }),
+            let ctx = RequestContext {
+                protocol_version: None,
+                meta: Default::default(),
+                bearer_token: (!token.is_empty()).then_some(token),
             };
-            serde_json::to_string(&response).ok()
+            dispatch_json(self.as_ref(), &ctx, &message_json).await.ok().flatten()
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vibevalley_mcp::{EXT_SKILLS, HttpHeaders, PROTOCOL_STATELESS, dispatch_http, error_code};
+
+    struct StubDispatch;
+
+    impl ToolDispatchPort for StubDispatch {
+        fn helper_tools(&self) -> Vec<ToolSpecWire> {
+            vec![ToolSpecWire {
+                name: "issue_list".into(),
+                description: "List issues".into(),
+                parameters_json: r#"{"properties":{}}"#.into(),
+            }]
+        }
+
+        fn session_for_token<'a>(&'a self, _token: &'a str) -> BoxFuture<'a, Option<Session>> {
+            Box::pin(async { None })
+        }
+
+        fn call_helper_async<'a>(&'a self, _session: Session, _name: &'a str, _args_json: &'a str) -> BoxFuture<'a, Result<String, String>> {
+            Box::pin(async { Ok("ok".into()) })
+        }
+
+        fn call_readonly_issue_tool_async<'a>(&'a self, _name: &'a str, _args_json: &'a str) -> BoxFuture<'a, Result<String, String>> {
+            Box::pin(async { Ok("[]".into()) })
+        }
+
+        fn list_resources_async<'a>(&'a self) -> BoxFuture<'a, Vec<McpResourceWire>> {
+            Box::pin(async { Vec::new() })
+        }
+
+        fn list_resource_templates(&self) -> Vec<McpResourceTemplateWire> {
+            Vec::new()
+        }
+
+        fn read_resource_async<'a>(&'a self, _session: Option<Session>, uri: &'a str) -> BoxFuture<'a, Result<McpResourceContentWire, String>> {
+            let msg = format!("missing: {uri}");
+            Box::pin(async move { Err(msg) })
+        }
+    }
+
+    #[tokio::test]
+    async fn server_mcp_exposes_discover_and_all_12_artifact_skills() {
+        let mcp = Mcp::new(Arc::new(StubDispatch), "0.1.0-test".into());
+
+        // SEP-2575 server/discover without initialize.
+        let discover_req = r#"{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{}}"#;
+        let reply = dispatch_http(mcp.as_ref(), &HttpHeaders::default(), None, discover_req).await;
+        assert_eq!(reply.status, 200);
+        assert_eq!(reply.headers.protocol_version, PROTOCOL_STATELESS);
+        let body: Value = serde_json::from_str(reply.body.as_deref().unwrap()).unwrap();
+        assert_eq!(body["result"]["stateless"], true);
+        assert_eq!(body["result"]["capabilities"]["extensions"][EXT_SKILLS]["directoryRead"], true);
+
+        // SEP-2640 skills/list exposes all 12 embedded artifact types.
+        let list_req = r#"{"jsonrpc":"2.0","id":2,"method":"skills/list","params":{}}"#;
+        let list_reply = dispatch_http(mcp.as_ref(), &HttpHeaders::default(), None, list_req).await;
+        let list_body: Value = serde_json::from_str(list_reply.body.as_deref().unwrap()).unwrap();
+        let skills = list_body["result"]["skills"].as_array().unwrap();
+        assert_eq!(skills.len(), 12, "{skills:?}");
+        for slug in [
+            "dashboard",
+            "design",
+            "design-system",
+            "diagram",
+            "docs",
+            "motion",
+            "outline",
+            "prototype",
+            "sheet",
+            "slides",
+            "storyboard",
+            "whiteboard",
+        ] {
+            let expected_uri = format!("skill://artifact/{slug}");
+            assert!(skills.iter().any(|s| s["uri"] == expected_uri), "missing {expected_uri}");
+        }
+
+        // SEP-2640 skills/get + supporting file + resources/read on skill://.
+        let get_req = r#"{"jsonrpc":"2.0","id":3,"method":"skills/get","params":{"uri":"skill://artifact/outline"}}"#;
+        let get_reply = dispatch_http(mcp.as_ref(), &HttpHeaders::default(), None, get_req).await;
+        let get_body: Value = serde_json::from_str(get_reply.body.as_deref().unwrap()).unwrap();
+        assert_eq!(get_body["result"]["uri"], "skill://artifact/outline");
+        assert!(get_body["result"]["content"].as_str().unwrap().contains("outline"));
+
+        let read_ref = r#"{"jsonrpc":"2.0","id":4,"method":"resources/read","params":{"uri":"skill://artifact/outline/references/format.md"}}"#;
+        let read_reply = dispatch_http(mcp.as_ref(), &HttpHeaders::default(), None, read_ref).await;
+        let read_body: Value = serde_json::from_str(read_reply.body.as_deref().unwrap()).unwrap();
+        assert_eq!(read_body["result"]["contents"][0]["uri"], "skill://artifact/outline/references/format.md");
+        assert_eq!(read_body["result"]["contents"][0]["mimeType"], "text/markdown");
+        assert!(!read_body["result"]["contents"][0]["text"].as_str().unwrap().is_empty());
+
+        // SEP-2243 header mismatch returns -32020.
+        let bad_headers = HttpHeaders {
+            protocol_version: Some(PROTOCOL_STATELESS.into()),
+            method: Some("tools/call".into()),
+            name: None,
+        };
+        let mismatch = dispatch_http(mcp.as_ref(), &bad_headers, None, list_req).await;
+        assert_eq!(mismatch.status, 400);
+        let mismatch_body: Value = serde_json::from_str(mismatch.body.as_deref().unwrap()).unwrap();
+        assert_eq!(mismatch_body["error"]["code"], error_code::HEADER_MISMATCH);
     }
 }
