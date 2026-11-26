@@ -1,4 +1,4 @@
-import { computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
+import { cleanup, computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, type MachinePlatform, type MachineStatus, RuntimeCapabilityValues, type RuntimeInfo, type SessionView } from "@vibevalley/protocol";
@@ -166,12 +166,13 @@ export function RuntimesPage(props: { rest: string }) {
   const machines = useMergedMachines();
 
   const sidebarOpen = signal(true);
-  const inspectorOpen = signal(true);
+  const inspectorOverride = signal<boolean | undefined>(undefined);
+  const inspectorOpen = () => inspectorOverride() ?? lg();
   const inspectorWidth = usePaneWidth("runtime-inspector", 304, 248, 420);
   const refreshingAll = createAct();
   const refreshingOne = createAct();
 
-  keymap.bind("mod+\\", () => sidebarOpen.set(!sidebarOpen()), { when: "always" });
+  cleanup(keymap.bind("mod+\\", () => sidebarOpen.set(!sidebarOpen()), { when: "always" }));
 
   const groups = computed(() => buildMachineRuntimeGroups(machines(), ready(runtimes, []), t("web.runtime.machines.kind.local")));
   const totalInstalled = computed(() => groups().reduce((sum, g) => sum + g.runtimes.length, 0));
@@ -326,7 +327,7 @@ export function RuntimesPage(props: { rest: string }) {
                 label={inspectorOpen() ? t("web.runtime.inspectorHide") : t("web.runtime.inspectorShow")}
                 testid="runtimes-inspector-toggle"
                 pressed={inspectorOpen()}
-                onClick={() => inspectorOpen.set(!inspectorOpen())}
+                onClick={() => inspectorOverride.set(!inspectorOpen())}
               />
             </View>
           </View>
@@ -380,7 +381,7 @@ export function RuntimesPage(props: { rest: string }) {
                 size={14}
                 label={t("web.runtime.inspectorHide")}
                 testid="runtimes-inspector-close"
-                onClick={() => inspectorOpen.set(false)}
+                onClick={() => inspectorOverride.set(false)}
               />
             </View>
             <Scroll class="min-h-0 flex-1" contentClass="gap-4 p-3.5 pb-6">

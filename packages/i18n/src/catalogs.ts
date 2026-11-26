@@ -2794,8 +2794,8 @@ export const catalogs = {
       modelCount: "{n} 个",
       noModels: "这个引擎不报告模型列表。",
       effort: "推理强度",
-      unreported: "不报告。",
-      none: "没有。",
+      unreported: "当前引擎未上报这一项。",
+      none: "暂无。",
       library: {
         book: "技能书",
         search: "搜索技能",
@@ -6458,7 +6458,7 @@ export const catalogs = {
       modelCount: "{n}",
       noModels: "This runtime does not report its models.",
       effort: "Effort",
-      unreported: "Not reported.",
+      unreported: "Not reported by this engine.",
       none: "None.",
       library: {
         book: "Skill book",

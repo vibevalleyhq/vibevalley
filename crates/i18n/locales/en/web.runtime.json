@@ -72,7 +72,7 @@
   "modelCount": "{n}",
   "noModels": "This runtime does not report its models.",
   "effort": "Effort",
-  "unreported": "Not reported.",
+  "unreported": "Not reported by this engine.",
   "none": "None.",
   "library": {
     "book": "Skill book",

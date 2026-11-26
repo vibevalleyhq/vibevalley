@@ -5,8 +5,10 @@ import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 import type { MachineInfo, RuntimeInfo, SessionsSlice, SliceBundle } from "@vibevalley/protocol";
 
+import type { DesignHost } from "../../design/host";
 import { fakeHost, type FakeHost } from "../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../fixtures/scenarios";
+import type { SlicesSource } from "../../infra/frame";
 
 type SliceMachine = SessionsSlice["machines"][number];
 
@@ -20,12 +22,12 @@ function withMachines(base: SliceBundle, machines: SliceMachine[]): SliceBundle 
   };
 }
 
-async function mountRoute(route: string, state: SliceBundle, configure?: (fake: FakeHost) => void) {
+async function mountRoute(route: string, state: SliceBundle, configure?: (fake: FakeHost) => void, viewport = { width: 1200, height: 800 }) {
   const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route, locale: "en" });
   configure?.(fake);
   const app = await open("../../app/main.tsx", {
-    width: 1200,
-    height: 800,
+    width: viewport.width,
+    height: viewport.height,
     colorScheme: "light",
     platform: "macos",
     clock: { time: SCENARIO_NOW },
@@ -243,4 +245,220 @@ test("Navigation: Runtimes sits directly above Experts, Experts has no sub-tabs,
 
   await app.host.send("route", "/team/memory");
   await fake.pumpUntil(app, () => app.count("id:settings-memory") === 1);
+});
+
+test("regression: narrow viewport (< 1024px) collapses inspector by default and keeps toggle smooth", async () => {
+  setLocale("en");
+  const { app, fake } = await mountRoute("/runtimes", scenarios.typical.state, undefined, { width: 900, height: 720 });
+  await fake.pumpUntil(app, () => app.count("id:runtime-row-local-claude") === 1);
+
+  expect(app.count("id:runtimes-sidebar")).toBe(1);
+  expect(app.count("id:runtimes-main")).toBe(1);
+  expect(app.count("id:runtimes-inspector")).toBe(0);
+  expect(app.count("id:runtime-detail")).toBe(1);
+
+  await app.press("id:runtimes-inspector-toggle");
+  await fake.pump(app);
+  expect(app.count("id:runtimes-inspector")).toBe(1);
+
+  await app.press("id:runtimes-inspector-close");
+  await fake.pump(app);
+  expect(app.count("id:runtimes-inspector")).toBe(0);
+
+  // Resizing below 1024px without an explicit toggle collapses the inspector; widening restores it.
+  const wide = await mountRoute("/runtimes", scenarios.typical.state, undefined, { width: 1200, height: 800 });
+  await wide.fake.pumpUntil(wide.app, () => wide.app.count("id:runtimes-inspector") === 1);
+  await wide.app.setViewport(900, 720);
+  await wide.fake.pump(wide.app);
+  expect(wide.app.count("id:runtimes-inspector")).toBe(0);
+  await wide.app.setViewport(1200, 800);
+  await wide.fake.pump(wide.app);
+  expect(wide.app.count("id:runtimes-inspector")).toBe(1);
+});
+
+test("regression: repeated /runtimes mount/unmount cycles keep subscription and timer counts flat", async () => {
+  const { effect, signal } = await import("nsh");
+  const { QueryProvider } = await import("../../infra/query");
+  const { createQueryClient } = await import("../../infra/query/cache");
+  const { RuntimesPage } = await import("./RuntimesPage");
+  const { Router, Routes, route } = await import("../../infra/router");
+  const { memoryHistory } = await import("../../infra/router/history");
+  const { createSlices, SlicesContext } = await import("../../infra/frame");
+  const { setTransport } = await import("../../infra/transport");
+  const { DesignHostProvider } = await import("../../design/host");
+
+  // 1. Full app route cycling via FakeHost: zero bridge subscriptions or duplicate slice watches per visit.
+  setLocale("en");
+  const { app, fake } = await mountRoute("/issues", scenarios.typical.state);
+  const countWatchOrSubPosts = () =>
+    (app.host.posts?.() ?? []).filter((p) => {
+      const data = p.data;
+      if (typeof data !== "object" || data === null || !("type" in data)) return false;
+      return data.type === "watch" || data.type === "unwatch" || data.type === "subscribe" || data.type === "unsubscribe";
+    }).length;
+  const initialWatchPosts = countWatchOrSubPosts();
+  expect(fake.subscriptions.size).toBe(0);
+
+  for (let i = 0; i < 3; i++) {
+    await app.host.send("route", "/runtimes");
+    await fake.pumpUntil(app, () => app.count("id:runtimes-page") === 1);
+    expect(fake.subscriptions.size).toBe(0);
+    await app.host.send("route", "/issues");
+    await fake.pumpUntil(app, () => app.count("id:issues-page") === 1);
+    expect(fake.subscriptions.size).toBe(0);
+  }
+  expect(countWatchOrSubPosts()).toBe(initialWatchPosts);
+
+  // 2. Direct QueryClient + Slices + timer accounting across repeated RuntimesPage mount/unmount cycles.
+  const sliceListeners = new Map<string, Set<() => void>>();
+  let linkSubs = 0;
+  const mockSource: SlicesSource = {
+    get: (kind) => scenarios.typical.state[kind],
+    subscribe: (kind, fn) => {
+      let set = sliceListeners.get(kind);
+      if (!set) {
+        set = new Set();
+        sliceListeners.set(kind, set);
+      }
+      set.add(fn);
+      return () => {
+        set.delete(fn);
+      };
+    },
+    refresh: () => {},
+    link: () => "open",
+    subscribeLink: (listener) => {
+      linkSubs++;
+      void listener;
+      return () => {
+        linkSubs--;
+      };
+    },
+  };
+
+  setTransport({
+    call: async (op) => {
+      if (op === "host.assetsDir") return { bizCode: 0, message: "ok", data: { path: "/tmp/assets" } };
+      const responses: Record<string, unknown> = scenarios.typical.responses;
+      return { bizCode: 0, message: "ok", data: responses[op] ?? [] };
+    },
+    slice: () => () => {},
+    live: () => () => {},
+  });
+
+  const client = createQueryClient();
+  let activeQuerySubs = 0;
+  const wrappedClient: typeof client = {
+    ...client,
+    subscribe: (q, listener, demand) => {
+      activeQuerySubs++;
+      const handle = client.subscribe(q, listener, demand);
+      let stopped = false;
+      return {
+        ...handle,
+        stop: () => {
+          if (!stopped) {
+            stopped = true;
+            activeQuerySubs--;
+          }
+          handle.stop();
+        },
+      };
+    },
+  };
+
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  const activeTimers = new Set<number>();
+  globalThis.setTimeout = (fn: (...args: unknown[]) => void, ms?: number, ...rest: unknown[]) => {
+    const id = realSetTimeout(fn, ms, ...rest);
+    activeTimers.add(id);
+    return id;
+  };
+  globalThis.clearTimeout = (id?: number) => {
+    if (id !== undefined) activeTimers.delete(id);
+    realClearTimeout(id);
+  };
+
+  try {
+    const alive = signal(true);
+    const history = memoryHistory("/other");
+    const fakeDesignHost: DesignHost = {
+      openExternal: () => {},
+      openFile: () => {},
+      navigate: (p) => history.navigate(p),
+      saveFile: () => Promise.resolve({ saved: false }),
+      renderQr: () => Promise.resolve(undefined),
+      toast: () => {},
+      getPrefWidth: () => undefined,
+      setPrefWidth: () => {},
+      formatError: (error) => (error instanceof Error ? error.message : String(error)),
+    };
+    const routes = [
+      { path: route("/other/*"), component: () => null },
+      { path: route("/runtimes/*"), component: () => <RuntimesPage rest="" /> },
+    ];
+    effect(() => {
+      if (!alive()) return;
+      void DesignHostProvider({
+        host: fakeDesignHost,
+        get children() {
+          return Router({
+            history,
+            get children() {
+              return SlicesContext.Provider({
+                value: createSlices(mockSource),
+                get children() {
+                  return QueryProvider({
+                    client: wrappedClient,
+                    get children() {
+                      return Routes({
+                        routes,
+                        fallback: () => null,
+                        invalid: () => null,
+                      });
+                    },
+                  });
+                },
+              });
+            },
+          });
+        },
+      });
+    });
+
+    await new Promise((resolve) => realSetTimeout(resolve, 30));
+    expect(activeQuerySubs).toBe(0);
+
+    let baselineUnmountedTimers: number | undefined;
+    for (let i = 0; i < 3; i++) {
+      history.navigate("/runtimes");
+      await new Promise((resolve) => realSetTimeout(resolve, 30));
+      expect(activeQuerySubs).toBeGreaterThan(0);
+
+      history.navigate("/other");
+      await new Promise((resolve) => realSetTimeout(resolve, 30));
+      expect(activeQuerySubs).toBe(0);
+      const sliceCount = [...sliceListeners.values()].reduce((sum, set) => sum + set.size, 0);
+      expect(sliceCount).toBe(1);
+      expect(linkSubs).toBe(1);
+      if (baselineUnmountedTimers === undefined) baselineUnmountedTimers = activeTimers.size;
+      else expect(activeTimers.size).toBe(baselineUnmountedTimers);
+    }
+    alive.set(false);
+    expect(activeTimers.size).toBe(0);
+    expect(linkSubs).toBe(0);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+  }
+});
+
+test("i18n: runtime inventory unreported copy avoids literal fragment in zh and en", () => {
+  setLocale("zh");
+  expect(t("web.runtime.unreported")).toBe("当前引擎未上报这一项。");
+  expect(t("web.runtime.none")).toBe("暂无。");
+  setLocale("en");
+  expect(t("web.runtime.unreported")).toBe("Not reported by this engine.");
+  expect(t("web.runtime.none")).toBe("None.");
 });
