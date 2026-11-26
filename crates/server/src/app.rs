@@ -303,7 +303,7 @@ async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Resu
     let game = Game::open_async(&config.home, ctx.clone(), repo.clone()).await;
     game.count_commits(config.git_emails.clone());
     spawn_skin_event_bridge(&ctx, &game, &runtime, &channel).await;
-    register_session_reported_outbox(&ctx, &issue_chat, &session_chat, &agent, &game, &runtime);
+    register_session_reported_outbox(&ctx, &issue_chat, &session_chat, &agent, &game, &runtime, &connector, &cron);
 
     let debug = build_debug_kit(
         &ctx,

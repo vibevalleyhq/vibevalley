@@ -17,14 +17,14 @@ use tracing::Instrument as _;
 use vibevalley_core::SliceMask;
 use vibevalley_core::channel::for_user;
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus};
+use vibevalley_protocol::{ApiError, ChatMessage, ConnectorID, ConnectorLogin, ConnectorState, ConnectorStatus, IssueStageKind, StuckReason};
 
 use super::adapter::{App, AppFailed, FailedKind, Inbound, LoginIo, Progress, Receiving};
-use super::digest::{DIGEST_OVER, digest, is_pairing, short_id, split_text, user_line};
+use super::digest::{DIGEST_OVER, digest, is_pairing, parse_push_issue_message_id, short_id, split_text, user_line};
 use crate::channel::{Chat, Saying};
 use crate::context::{Context, now};
-use crate::service::DbError;
 use crate::service::connector::{ConnectorAccountRow, ConnectorInboundRow};
+use crate::service::{DbError, internal_db};
 use crate::setting::{Secret, Setting};
 
 /// WeChat's official client rests this long too.
@@ -138,6 +138,38 @@ pub async fn handoff_async(chat: &Chat, message: &str) -> Result<Handoff, ApiErr
         return Ok(Handoff::Settled);
     }
     Ok(Handoff::Unseen)
+}
+
+async fn outgoing_handoff_async(ctx: &Context, chat: &Chat, message: &str) -> Result<Handoff, ApiError> {
+    if message.starts_with("digest:") {
+        return Ok(Handoff::Unseen);
+    }
+    if let Some((issue_id, category)) = parse_push_issue_message_id(message) {
+        let Some(raw_issue) = ctx.service.issue.get(issue_id).await.map_err(internal_db)? else {
+            return Ok(Handoff::Settled);
+        };
+        let sessions = ctx.service.session.all().await.map_err(internal_db)?;
+        let derived = vibevalley_core::derive_issues(&[raw_issue], &sessions);
+        let Some(issue) = derived.into_iter().next() else {
+            return Ok(Handoff::Settled);
+        };
+        if issue.status.is_closed() {
+            return Ok(Handoff::Settled);
+        }
+        let still_matches = match category {
+            "asking" => issue.stage.state == IssueStageKind::Asking,
+            "reviewing" => issue.stage.state == IssueStageKind::Reviewing,
+            "conflict" => issue.stage.state == IssueStageKind::Stuck && issue.stage.stuck == Some(StuckReason::Conflict),
+            "interrupted" => issue.stage.state == IssueStageKind::Stuck && issue.stage.stuck == Some(StuckReason::Interrupted),
+            "failed" => issue.stage.state == IssueStageKind::Stuck && issue.stage.stuck == Some(StuckReason::Failed),
+            _ => true,
+        };
+        return Ok(if still_matches { Handoff::Unseen } else { Handoff::Settled });
+    }
+    if message.starts_with("push:") {
+        return Ok(Handoff::Unseen);
+    }
+    handoff_async(chat, message).await
 }
 
 struct SigningIn {
@@ -312,6 +344,21 @@ impl Bridge {
         }
     }
 
+    async fn clear_transient_err_async(&self) {
+        let changed = {
+            let mut s = self.shown.lock();
+            if s.account.as_ref().is_some_and(|a| paused(a, now())) || s.error.is_empty() {
+                false
+            } else {
+                s.error.clear();
+                true
+            }
+        };
+        if changed {
+            self.tell_async().await;
+        }
+    }
+
     fn record_loaded(&self, account: Option<Account>, err: Option<String>) {
         let unread = account.as_ref().is_some_and(|a| !self.app.reads(&a.keys));
         {
@@ -394,6 +441,41 @@ impl Bridge {
         }
     }
 
+    /// A personal notification or scheduled digest pushed directly to the linked peer.
+    pub async fn offer_notification_async(self: &Arc<Self>, message_id: &str, body: &str, at: i64) {
+        if self.snapshot().filter(|a| !a.user.is_empty()).is_none() {
+            return;
+        }
+        let pieces = split_text(body, self.app.max_chars());
+        match self.env.ctx.service.connector.add_outgoing_once(self.id(), message_id, &pieces, at).await {
+            Ok(true) => self.changed_async().await,
+            Ok(false) => {}
+            Err(e) => self.set_err_async(e.to_string()).await,
+        }
+    }
+
+    /// Withdraws any pending issue push rows when the issue has already been handled in the workbench.
+    pub async fn withdraw_issue_pushes_async(self: &Arc<Self>, issue_id: &str) {
+        let connectors = &self.env.ctx.service.connector;
+        let Ok(listed) = connectors.pending_outgoing(self.id()).await else {
+            return;
+        };
+        let mut withdrew = false;
+        for row in listed {
+            if parse_push_issue_message_id(&row.message).is_some_and(|(iid, _)| iid == issue_id) && connectors.withdraw(&row.message).await.is_ok() {
+                withdrew = true;
+            }
+        }
+        if withdrew {
+            self.tell_async().await;
+        }
+    }
+
+    /// Effective top-level channel id bound to this connector account.
+    pub fn status_channel_id(&self, chat: &Chat) -> String {
+        self.snapshot().and_then(|a| a.channel).unwrap_or_else(|| chat.default_channel())
+    }
+
     /// Prepares pending outgoing batches asynchronously.
     async fn prepare_drain_async(self: &Arc<Self>, late: bool) -> Result<Option<DrainPlan>, ()> {
         let Some(a) = self.snapshot().filter(|a| !a.user.is_empty()) else {
@@ -414,7 +496,7 @@ impl Bridge {
             if settled.iter().any(|s| s == &row.message) || unseen.iter().any(|s| s == &row.message) {
                 continue;
             }
-            match handoff_async(&self.env.chat, &row.message).await {
+            match outgoing_handoff_async(&self.env.ctx, &self.env.chat, &row.message).await {
                 Ok(Handoff::Unseen) => unseen.push(row.message.clone()),
                 Ok(Handoff::Settled) => {
                     if let Err(e) = connectors.withdraw(&row.message).await {
@@ -436,12 +518,15 @@ impl Bridge {
         if paused(&a, now()) || pending.is_empty() {
             return Ok(None);
         }
-        let batches: Vec<(Vec<i64>, String)> = if late && pending.len() > DIGEST_OVER {
-            let lines: Vec<String> = pending.iter().map(|r| r.body.clone()).collect();
-            vec![(pending.iter().map(|r| r.seq).collect(), digest(&lines))]
+        let (digests, regular): (Vec<_>, Vec<_>) = pending.into_iter().partition(|r| r.message.starts_with("digest:"));
+        let mut batches: Vec<(Vec<i64>, String)> = Vec::new();
+        if late && regular.len() > DIGEST_OVER {
+            let lines: Vec<String> = regular.iter().map(|r| r.body.clone()).collect();
+            batches.push((regular.iter().map(|r| r.seq).collect(), digest(&lines)));
         } else {
-            pending.iter().map(|r| (vec![r.seq], r.body.clone())).collect()
-        };
+            batches.extend(regular.into_iter().map(|r| (vec![r.seq], r.body.clone())));
+        }
+        batches.extend(digests.into_iter().map(|r| (vec![r.seq], r.body.clone())));
         Ok(Some(DrainPlan { account: a, batches }))
     }
 
@@ -463,7 +548,7 @@ impl Bridge {
             let ok = match sent {
                 Ok(ext) => match connectors.sent(&rows, now(), &ext).await {
                     Ok(()) => {
-                        self.set_err_async("").await;
+                        self.clear_transient_err_async().await;
                         self.tell_async().await;
                         true
                     }
@@ -481,7 +566,7 @@ impl Bridge {
                             self.pause_async().await;
                         }
                         // Tried again later, and with the user's next message.
-                        FailedKind::Restricted => self.set_err_async("").await,
+                        FailedKind::Restricted => self.clear_transient_err_async().await,
                         FailedKind::Failed => self.set_err_async(refused.message).await,
                     }
                     false
@@ -987,6 +1072,10 @@ impl Bridge {
 
     pub fn has_account(&self) -> bool {
         self.snapshot().is_some()
+    }
+
+    pub fn is_paired(&self) -> bool {
+        self.snapshot().is_some_and(|a| !a.user.is_empty())
     }
 
     pub async fn stop_async(&self) {
