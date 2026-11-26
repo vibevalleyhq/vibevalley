@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 use std::time::{Duration, Instant};
 
 use serde_json::json;
@@ -210,13 +212,13 @@ async fn bash_streams_updates_respects_timeout_and_cancels_mid_run_under_500ms()
     let updates_ref = updates.clone();
     let mut ctx = ToolContext::background();
     ctx.on_update = Some(Arc::new(move |u| {
-        updates_ref.lock().unwrap().push(u.text);
+        updates_ref.lock().push(u.text);
     }));
 
     let ok = tool.execute_with_context(&json!({"command": "echo hi; sleep 0.05; echo err >&2"}), &ctx).await;
     assert!(!ok.is_error, "{}", ok.text);
     assert_eq!(ok.text, "hi\nerr\n");
-    let streamed = updates.lock().unwrap().concat();
+    let streamed = updates.lock().concat();
     assert_eq!(streamed, "hi\nerr\n");
 
     let fail = tool.execute(&json!({"command": "exit 3"})).await;

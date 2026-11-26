@@ -20,9 +20,11 @@ import {
   parseBoardTokens,
   parseTodoChecklist,
   preferredModelFor,
+  setWorkspaceConfig,
   thinkingPreview,
   toWorkspaceRuntime,
   visibleChatSteps,
+  watchWorkspaceSession,
 } from "./chatSession";
 
 const step = (seq: number, type: SessionEvent["type"], more: Partial<SessionEvent> = {}): SessionEvent => ({
@@ -471,4 +473,44 @@ test("formatToolDetails, formatDurationMs, and thinkingPreview extract scannable
   expect(edit.headline).toBe("src/lib.rs:12-28");
   expect(edit.formattedInput).toBe('{\n  "path": "src/lib.rs",\n  "StartLine": 12,\n  "EndLine": 28\n}');
   expect(edit.outputLines).toBe(0);
+});
+
+test("regression: setWorkspaceConfig and watchWorkspaceSession log and report malformed payloads", async () => {
+  const prev = transport();
+  const origConsoleError = console.error;
+  const logged: unknown[][] = [];
+  console.error = (...args: unknown[]) => {
+    logged.push(args);
+  };
+
+  try {
+    let pushWatchFrame: ((raw: unknown) => void) | undefined;
+    setTransport({
+      ...prev,
+      call: async () => ({ bizCode: 0, message: "ok", data: { unexpected: true } }),
+      subscribe: (_channel, _payload, onData) => {
+        pushWatchFrame = onData;
+        return () => {};
+      },
+    });
+
+    const configResult = await setWorkspaceConfig("sess-bad", { model: "deepseek-chat" });
+    expect(configResult.ok).toBe(false);
+    if (!configResult.ok) {
+      expect(configResult.reason.length).toBeGreaterThan(0);
+    }
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0]?.[0])).toContain("session.setConfig");
+
+    const received: unknown[] = [];
+    const stop = watchWorkspaceSession("sess-bad", (ev) => received.push(ev));
+    pushWatchFrame?.({ kind: "not-a-valid-watch-event" });
+    stop();
+    expect(received).toHaveLength(0);
+    expect(logged).toHaveLength(2);
+    expect(String(logged[1]?.[0])).toContain("session.watch");
+  } finally {
+    console.error = origConsoleError;
+    setTransport(prev);
+  }
 });

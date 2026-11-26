@@ -1,7 +1,9 @@
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+
+use parking_lot::Mutex;
 use std::time::{Duration, Instant};
 
 use axum::Router;
@@ -164,7 +166,7 @@ async fn fetch_balance_parses_user_balance_endpoint() {
         "/user/balance",
         get(move |headers: HeaderMap| {
             let auth = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).map(ToString::to_string);
-            *seen_for_route.lock().unwrap() = auth;
+            *seen_for_route.lock() = auth;
             async move {
                 (
                     StatusCode::OK,
@@ -178,7 +180,7 @@ async fn fetch_balance_parses_user_balance_endpoint() {
 
     let client = OpenAiClient::new(format!("http://{addr}"), || Some("sk-bal".into())).with_retry(RetryPolicy::none());
     let bal = client.fetch_balance().await.unwrap();
-    assert_eq!(seen_auth.lock().unwrap().as_deref(), Some("Bearer sk-bal"));
+    assert_eq!(seen_auth.lock().as_deref(), Some("Bearer sk-bal"));
     assert!(bal.is_available);
     assert_eq!(bal.balance_infos.len(), 1);
     assert_eq!(bal.balance_infos[0].currency, "CNY");

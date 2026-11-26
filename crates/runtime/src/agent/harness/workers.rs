@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use crate::BoxFuture;
 use crate::agent::core::engine::{ATTACHED_SIGNAL, BrainProvider};
@@ -28,7 +30,7 @@ impl Workers {
         if !conv.starts_with("worker:") {
             return Err(Error::Invalid("invalid worker conversation".into()));
         }
-        let mut workers = self.0.lock().unwrap();
+        let mut workers = self.0.lock();
         if workers.contains_key(conv) {
             return Err(Error::Invalid("worker runtime already attached".into()));
         }
@@ -37,15 +39,15 @@ impl Workers {
     }
 
     pub fn detach(&self, conv: &str) {
-        self.0.lock().unwrap().remove(conv);
+        self.0.lock().remove(conv);
     }
 
     pub fn brain(&self, conv: &str) -> Option<Arc<Brain>> {
-        self.0.lock().unwrap().get(conv).map(|w| w.brain.clone())
+        self.0.lock().get(conv).map(|w| w.brain.clone())
     }
 
     pub fn observe(&self, conv: &str, event: AgentEvent) {
-        let on = self.0.lock().unwrap().get(conv).map(|w| w.on.clone());
+        let on = self.0.lock().get(conv).map(|w| w.on.clone());
         if let Some(on) = on {
             on(event);
         }

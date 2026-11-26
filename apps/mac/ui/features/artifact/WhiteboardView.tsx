@@ -58,6 +58,15 @@ const BoardElementSchema = z
 
 type BoardElement = z.output<typeof BoardElementSchema>;
 
+export function parseBoardElement(elKey: string, rawEl: unknown, context: string): BoardElement | undefined {
+  const parsed = BoardElementSchema.safeParse(rawEl);
+  if (!parsed.success) {
+    console.warn(`[WhiteboardView] ignored malformed board element (${context})`, { elKey, issues: parsed.error.issues });
+    return undefined;
+  }
+  return parsed.data;
+}
+
 export interface BoardDocument {
   readonly version: number;
   readonly grid: string | boolean;
@@ -208,10 +217,10 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
       seen.add(peer.id);
     }
 
-    for (const rawEl of Object.values(boardDoc().elements)) {
-      const parsed = BoardElementSchema.safeParse(rawEl);
-      if (parsed.success && parsed.data.type === "claim") {
-        claims.push(parsed.data);
+    for (const [elKey, rawEl] of Object.entries(boardDoc().elements)) {
+      const el = parseBoardElement(elKey, rawEl, "presences");
+      if (el && el.type === "claim") {
+        claims.push(el);
       }
     }
 
@@ -241,8 +250,7 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
       return;
     }
     const raw: unknown = boardDoc().elements[firstId];
-    const parsed = raw !== undefined ? BoardElementSchema.safeParse(raw) : undefined;
-    const el = parsed?.success === true ? parsed.data : undefined;
+    const el = raw !== undefined ? parseBoardElement(firstId, raw, "selection") : undefined;
     presence.publish({
       id: userId,
       name: t("web.artifact.blocks.user"),
@@ -286,7 +294,10 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
     const handleNativeBatch = (ev: VvWhiteboardBatchEvent) => {
       if (props.version !== undefined) return;
       const parsed = z.array(WhiteboardWriteSchema).safeParse(parseJsonSafe(ev.writesJson));
-      if (!parsed.success) return;
+      if (!parsed.success) {
+        console.error("[WhiteboardView] dropped malformed native whiteboard batch", { issues: parsed.error.issues });
+        return;
+      }
       const writes = parsed.data.filter((w) => !w.path.startsWith("presence/"));
       if (writes.length === 0) return;
 
@@ -335,10 +346,12 @@ export function WhiteboardView(props: WhiteboardViewerProps) {
 
     const handleNativeSelection = (ev: VvWhiteboardSelectionEvent) => {
       const parsed = z.array(z.string()).safeParse(parseJsonSafe(ev.idsJson));
-      if (parsed.success) {
-        selectedIds.set(parsed.data);
-        publishSelectionPresence(parsed.data);
+      if (!parsed.success) {
+        console.warn("[WhiteboardView] dropped malformed native selection payload", { issues: parsed.error.issues });
+        return;
       }
+      selectedIds.set(parsed.data);
+      publishSelectionPresence(parsed.data);
     };
 
     const handleNativeCursorMove = (ev: VvWhiteboardCursorEvent) => {
@@ -445,9 +458,9 @@ function WhiteboardHeadlessFallback(props: HeadlessProps) {
 
   const elements = computed((): BoardElement[] => {
     const out: BoardElement[] = [];
-    for (const rawEl of Object.values(props.boardDoc().elements)) {
-      const parsed = BoardElementSchema.safeParse(rawEl);
-      if (parsed.success) out.push(parsed.data);
+    for (const [elKey, rawEl] of Object.entries(props.boardDoc().elements)) {
+      const el = parseBoardElement(elKey, rawEl, "elements");
+      if (el) out.push(el);
     }
     return out;
   });

@@ -729,7 +729,11 @@ export async function setWorkspaceConfig(
   const env = await transport().call("session.setConfig", payload);
   if (env.bizCode !== 0) return { ok: false, reason: env.message };
   const parsed = SessionWorkspaceSchema.safeParse(env.data);
-  return parsed.success ? { ok: true, workspace: parsed.data } : { ok: true };
+  if (!parsed.success) {
+    console.error("[chatSession] malformed session.setConfig response", { id, issues: parsed.error.issues });
+    return { ok: false, reason: parsed.error.message };
+  }
+  return { ok: true, workspace: parsed.data };
 }
 
 export async function respondWorkspaceInteraction(
@@ -774,7 +778,11 @@ export function watchWorkspaceSession(id: string, onEvent: (event: SessionWatchE
     payload,
     (raw) => {
       const parsed = SessionWatchEventSchema.safeParse(raw);
-      if (parsed.success) onEvent(parsed.data);
+      if (!parsed.success) {
+        console.error("[chatSession] dropped malformed session.watch event", { id, issues: parsed.error.issues });
+        return;
+      }
+      onEvent(parsed.data);
     },
     () => onEnd?.(),
   );

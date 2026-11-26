@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
+
+use parking_lot::{Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -162,21 +164,21 @@ impl Engine {
     }
 
     pub fn with_compactor(self, compactor: Compactor) -> Self {
-        *self.compactor.lock().unwrap() = Some(compactor);
+        *self.compactor.lock() = Some(compactor);
         self
     }
 
     pub fn with_extensions(self, extensions: ExtensionRunner) -> Self {
-        *self.extensions.write().unwrap() = extensions;
+        *self.extensions.write() = extensions;
         self
     }
 
     pub fn set_compactor(&self, compactor: Compactor) {
-        *self.compactor.lock().unwrap() = Some(compactor);
+        *self.compactor.lock() = Some(compactor);
     }
 
     pub fn set_extensions(&self, extensions: ExtensionRunner) {
-        *self.extensions.write().unwrap() = extensions;
+        *self.extensions.write() = extensions;
     }
 
     pub fn store(&self) -> &Store {
@@ -184,11 +186,11 @@ impl Engine {
     }
 
     pub fn scheduler(&self) -> Option<Scheduler> {
-        self.scheduler.lock().unwrap().clone()
+        self.scheduler.lock().clone()
     }
 
     pub fn extensions_snapshot(&self) -> ExtensionRunner {
-        self.extensions.read().unwrap().clone()
+        self.extensions.read().clone()
     }
 
     pub fn emit(&self, conversation: &str, task_id: &str, event: AgentEvent) {
@@ -216,7 +218,7 @@ impl Engine {
     }
 
     pub fn register(&self, s: &Scheduler) {
-        *self.scheduler.lock().unwrap() = Some(s.clone());
+        *self.scheduler.lock() = Some(s.clone());
         let code = self.clone();
         crate::agent::codemode::register_with(s, move |tc, name, args| {
             let code = code.clone();
@@ -454,7 +456,7 @@ impl Engine {
     }
 
     fn effective_compactor(&self, brain: &Brain) -> Compactor {
-        if let Some(custom) = self.compactor.lock().unwrap().clone() {
+        if let Some(custom) = self.compactor.lock().clone() {
             return custom;
         }
         Compactor::with_llm(self.store.clone(), brain.client.clone(), &brain.model)

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use crate::BoxFuture;
 use crate::oar::core::{CoreSession, Driver, SessionCore, render_text};
@@ -40,7 +42,7 @@ impl WorkerDriver {
         caps: Capabilities,
     ) -> Result<Arc<dyn Session>> {
         let conversation = worker_conversation(session);
-        let mut commands: HashMap<String, (String, Value)> = HashMap::new();
+        let commands: Mutex<HashMap<String, (String, Value)>> = Mutex::new(HashMap::new());
         let sink = core.clone();
         let observer_cwd = cwd.clone();
         let observer = move |event| match event {
@@ -48,7 +50,7 @@ impl WorkerDriver {
             AgentEvent::ReasoningDelta { delta } => sink.emit_root(EventKind::ThinkingDelta { text: delta }),
             AgentEvent::ToolStart { id, name, arguments } => {
                 let input: Value = serde_json::from_str(&arguments).unwrap_or(Value::String(arguments));
-                commands.insert(id.clone(), (name.clone(), input.clone()));
+                commands.lock().insert(id.clone(), (name.clone(), input.clone()));
                 sink.emit_root(EventKind::ToolCallStarted { id, name, input });
             }
             AgentEvent::ToolEnd { id, name: _, output } => {
@@ -58,7 +60,8 @@ impl WorkerDriver {
                     ok,
                     output: output.text,
                 });
-                if let Some((tool, input)) = commands.remove(&id)
+                let tracked = commands.lock().remove(&id);
+                if let Some((tool, input)) = tracked
                     && ok
                     && matches!(tool.as_str(), "write" | "edit")
                     && let Some(path) = input["path"].as_str()
@@ -122,7 +125,6 @@ impl WorkerDriver {
             } => {}
             AgentEvent::AgentEnd { .. } => {}
         };
-        let observer = Mutex::new(observer);
         let brain = Arc::new(brain);
 
         let conv_write = conversation.clone();
@@ -194,7 +196,7 @@ impl WorkerDriver {
 
         execution
             .harness
-            .attach_worker(&conversation, brain.clone(), Arc::new(move |e| observer.lock().unwrap()(e)))
+            .attach_worker(&conversation, brain.clone(), Arc::new(observer))
             .await
             .map_err(failed)?;
 
@@ -220,11 +222,11 @@ impl WorkerDriver {
         let active = self.active.clone();
         let model = self.brain.model.clone();
         let cancel = self.cancel.child_token();
-        *active.lock().unwrap() = Some(task.id.clone());
+        *active.lock() = Some(task.id.clone());
         crate::rt::spawn(async move {
             let result = shared.scheduler.wait_until_done(&task.id, &cancel).await;
             {
-                let mut guard = active.lock().unwrap();
+                let mut guard = active.lock();
                 if guard.as_deref() != Some(&task.id) {
                     return;
                 }
@@ -352,7 +354,7 @@ impl Driver for WorkerDriver {
 
     fn abort(&self) -> BoxFuture<'_, Result<()>> {
         Box::pin(async move {
-            let active_id = self.active.lock().unwrap().clone();
+            let active_id = self.active.lock().clone();
             if let Some(id) = active_id {
                 self.execution.scheduler.abort(&id).await.map_err(failed)?;
             }
@@ -375,7 +377,7 @@ impl Driver for WorkerDriver {
                 })
                 .await
                 .map_err(failed)?
-                .or_else(|| self.active.lock().unwrap().clone())
+                .or_else(|| self.active.lock().clone())
                 .ok_or_else(|| AgentError::Rejected(format!("unknown_request: {id}")))?;
             let (approved, reason) = match decision {
                 PermissionDecision::AllowOnce | PermissionDecision::AllowAlways => (true, String::new()),
@@ -408,7 +410,7 @@ impl Driver for WorkerDriver {
     fn signal_dispose(&self) {
         self.cancel.cancel();
         self.execution.workers().detach(&self.conversation);
-        if let Some(id) = self.active.lock().unwrap().clone() {
+        if let Some(id) = self.active.lock().clone() {
             let scheduler = self.execution.scheduler.clone();
             crate::rt::current_or_global_handle().spawn(async move {
                 let _ = scheduler.abort(&id).await;

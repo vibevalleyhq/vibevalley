@@ -721,3 +721,35 @@ test("IssuesTab renders only server-provided moves and omits quick transitions w
   expect(app.count("id:issue-move-in_review")).toBe(0);
   expect(app.count("id:issue-move-done")).toBe(0);
 });
+
+test("regression: ChannelsTab reports Reset reload failures and keeps history intact on malformed follow events", async () => {
+  let listCalls = 0;
+  const app = await open("../../App.story.tsx", {
+    platform: "macos",
+    locale: "en-US",
+    width: 390,
+    height: 844,
+    storage: harnessStorage(),
+    network: {
+      [`GET ${BASE}/api/v1/slice/inbox`]: sseResponse([{ id: "1", data: sampleInboxSlice }]),
+      [`GET ${BASE}/api/v1/slice/collab`]: sseResponse([{ id: "2", data: sampleCollabSlice }]),
+      [`GET ${BASE}/api/v1/slice/sessions`]: sseResponse([{ id: "3", data: sampleSessionsSlice }]),
+      [`GET ${BASE}/api/v1/slice/board`]: sseResponse([{ id: "4", data: sampleBoardSlice }]),
+      [`POST ${BASE}/api/v1/channel/message/list`]: () => {
+        listCalls++;
+        if (listCalls === 1) return okEnvelope(sampleChannelHistory);
+        return errEnvelope("channel reset reload failed");
+      },
+      [`GET ${BASE}/api/v1/subscribe/channel.follow*`]: () => sseResponse([{ data: { _tag: "Bogus" } }, { data: { _tag: "Reset" } }]),
+    },
+  });
+
+  await app.press("id:tab-channels");
+  await app.waitFor("id:channel-row-ch-1");
+  await app.press("id:channel-row-ch-1");
+  await app.waitFor("id:channel-error");
+
+  expect(app.count("id:channel-error")).toBe(1);
+  expect(app.texts()).toContain("channel reset reload failed");
+  expect(app.count("id:channel-message-msg-1")).toBe(1);
+});

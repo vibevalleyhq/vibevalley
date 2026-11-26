@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use serde_json::json;
 
@@ -26,7 +28,7 @@ impl MockModel {
 impl ModelClient for MockModel {
     fn complete<'a>(&'a self, request: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> crate::BoxFuture<'a, crate::agent::Result<Completion>> {
         Box::pin(async move {
-            self.seen.lock().unwrap().push(request.clone());
+            self.seen.lock().push(request.clone());
             on(Delta::Text(self.reply.clone()));
             Ok(Completion {
                 message: Message {

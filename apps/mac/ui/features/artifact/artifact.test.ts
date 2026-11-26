@@ -10,6 +10,7 @@ import { formatGenUiAction } from "../../infra/rich";
 import { artifactTypeIcon, artifactTypeLabel } from "./ArtifactCard";
 import { artifactSuffixOf, buildOutlineFromMarkdown, entryPathOf, inferArtifactFromName } from "./html";
 import { presenceHighlightCommand } from "./shell";
+import { parseBoardElement } from "./WhiteboardView";
 
 test("covers all 12 ArtifactType metadata entries, labels, icons, suffixes, and entry paths", () => {
   expect(ArtifactTypeValues).toHaveLength(12);
@@ -110,4 +111,22 @@ test("decodes UTF-8 base64 markdown and formats GenUI action payloads cleanly", 
   expect(formatGenUiAction({ action: "submit", payload: "approved=true" })).toBe("submit: approved=true");
   expect(formatGenUiAction({ action: "confirm", payload: "" })).toBe("confirm");
   expect(formatGenUiAction({ action: "", payload: "fallback" })).toBe("fallback");
+});
+
+test("regression: parseBoardElement logs warning for malformed whiteboard elements", () => {
+  const origWarn = console.warn;
+  const warned: unknown[][] = [];
+  console.warn = (...args: unknown[]) => {
+    warned.push(args);
+  };
+  try {
+    expect(parseBoardElement("ok-1", { id: "ok-1", type: "card", x: 10, y: 20 }, "elements")).toMatchObject({ id: "ok-1", type: "card" });
+    expect(warned).toHaveLength(0);
+
+    expect(parseBoardElement("bad-1", { id: "", type: 123 }, "elements")).toBeUndefined();
+    expect(warned).toHaveLength(1);
+    expect(String(warned[0]?.[0])).toContain("WhiteboardView");
+  } finally {
+    console.warn = origWarn;
+  }
 });

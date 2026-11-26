@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 use std::time::Duration;
 
 use serde_json::{Value, json};
@@ -33,8 +35,8 @@ impl MockClient {
 impl ModelClient for MockClient {
     fn complete<'a>(&'a self, request: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> crate::BoxFuture<'a, AiResult<Completion>> {
         Box::pin(async move {
-            self.seen.lock().unwrap().push(request.clone());
-            let next = self.replies.lock().unwrap().pop_front().expect("unexpected model call");
+            self.seen.lock().push(request.clone());
+            let next = self.replies.lock().pop_front().expect("unexpected model call");
             if let Some(text) = &next.message.content {
                 on(Delta::Text(text.clone()));
             }
@@ -91,7 +93,7 @@ async fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::dura
     let conv = worker_conversation("s1");
     let events = Arc::new(Mutex::new(Vec::new()));
     let sink = events.clone();
-    harness.attach_worker(&conv, brain, Arc::new(move |ev| sink.lock().unwrap().push(ev))).await?;
+    harness.attach_worker(&conv, brain, Arc::new(move |ev| sink.lock().push(ev))).await?;
 
     let (_, task, _) = harness
         .submit(Request {
@@ -107,7 +109,7 @@ async fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::dura
     let done = harness.scheduler().wait(&task.id, Duration::from_secs(3)).await?;
     assert_eq!(done.terminal_reason, "completed");
     {
-        let recorded = events.lock().unwrap();
+        let recorded = events.lock();
         assert!(recorded.iter().any(|e| matches!(e, AgentEvent::AgentStart)));
         assert!(recorded.iter().any(|e| matches!(e, AgentEvent::TextDelta { delta } if delta == "hello worker")));
         assert!(recorded.iter().any(|e| matches!(e, AgentEvent::AgentEnd { .. })));
@@ -160,7 +162,7 @@ async fn harness_worker_prompt_fork_and_standin_recovery() -> crate::agent::dura
     let d2 = harness2.scheduler().wait(&t2.id, Duration::from_secs(3)).await?;
     assert_eq!(d2.result["output"], "resumed without ext");
     {
-        let seen = client2.seen.lock().unwrap();
+        let seen = client2.seen.lock();
         assert!(seen[0].tools.iter().any(|t| t.name == "ext_ping"));
     }
 

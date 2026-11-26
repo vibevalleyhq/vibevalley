@@ -5,10 +5,11 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use futures_util::FutureExt as _;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex as AsyncMutex;
 
@@ -76,9 +77,7 @@ struct JsonlInner {
 
 impl Drop for JsonlInner {
     fn drop(&mut self) {
-        if let Ok(mut guard) = self.lock_file.lock() {
-            guard.take();
-        }
+        self.lock_file.lock().take();
     }
 }
 
@@ -470,7 +469,7 @@ impl StorageBackend for JsonlStorage {
             }
             self.0.hub.mark_closed();
             self.0.state.lock().await.open_files.clear();
-            self.0.lock_file.lock().unwrap_or_else(|e| e.into_inner()).take();
+            self.0.lock_file.lock().take();
             Ok(())
         })
     }

@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::FutureExt as _;
+use parking_lot::Mutex;
 use serde_json::{Value, json};
 use tokio::sync::{Mutex as AsyncMutex, Notify, mpsc};
 use tokio_util::sync::CancellationToken;
@@ -164,14 +165,14 @@ impl Owner {
     fn signal_shutdown(&self) -> Option<tokio::task::JoinHandle<()>> {
         let e = &self.engine;
         {
-            let rt = e.rt.lock().unwrap();
+            let rt = e.rt.lock();
             e.shutdown.cancel();
             for cancel in rt.active.values() {
                 cancel.cancel();
             }
         }
         e.wake.notify_one();
-        self.coordinator.lock().unwrap().take()
+        self.coordinator.lock().take()
     }
 
     async fn close_async(&self) {
@@ -195,7 +196,7 @@ async fn wait_idle(e: &Engine) {
         let notified = e.idle.notified();
         tokio::pin!(notified);
         notified.as_mut().enable();
-        if e.rt.lock().unwrap().active.is_empty() {
+        if e.rt.lock().active.is_empty() {
             return;
         }
         notified.await;
@@ -240,7 +241,7 @@ impl Scheduler {
         Fut: Future<Output = Result<Transition>> + Send + 'static,
     {
         let boxed: Phase = Arc::new(move |tc| Box::pin(handler(tc)));
-        self.0.engine.rt.lock().unwrap().handlers.insert((kind.into(), phase.into()), boxed);
+        self.0.engine.rt.lock().handlers.insert((kind.into(), phase.into()), boxed);
     }
 
     pub async fn start(&self, task: Task) -> Result<(Task, bool)> {
@@ -249,7 +250,7 @@ impl Scheduler {
             return Err(Error::Closed);
         }
         let result = e.store.write_async(move |tx| Box::pin(async move { tx.create_task_async(task).await })).await?;
-        e.rt.lock().unwrap().started = true;
+        e.rt.lock().started = true;
         e.wake.notify_one();
         Ok(result)
     }
@@ -280,7 +281,7 @@ impl Scheduler {
         if e.shutdown.is_cancelled() {
             return Err(Error::Closed);
         }
-        let active_ids: HashSet<String> = e.rt.lock().unwrap().active.keys().cloned().collect();
+        let active_ids: HashSet<String> = e.rt.lock().active.keys().cloned().collect();
         let aborts = e
             .store
             .write_async(move |tx| {
@@ -330,7 +331,7 @@ impl Scheduler {
             })
             .await?;
         {
-            let mut rt = e.rt.lock().unwrap();
+            let mut rt = e.rt.lock();
             rt.started = true;
             record_abort(&mut rt, aborts);
         }
@@ -349,7 +350,7 @@ impl Scheduler {
             .store
             .write_async(move |tx| Box::pin(async move { abort_tree(tx, &id, "aborted").await }))
             .await?;
-        let mut rt = e.rt.lock().unwrap();
+        let mut rt = e.rt.lock();
         record_abort(&mut rt, order);
         Ok(())
     }
@@ -359,7 +360,7 @@ impl Scheduler {
     }
 
     pub fn active_workers(&self) -> usize {
-        self.0.engine.rt.lock().unwrap().active.len()
+        self.0.engine.rt.lock().active.len()
     }
 
     pub async fn wait_until_done(&self, id: &str, cancel: &CancellationToken) -> Result<Task> {
@@ -495,7 +496,7 @@ async fn run_scheduler(e: Arc<Engine>, mut changes: mpsc::Receiver<()>) {
     loop {
         let step = if e.shutdown.is_cancelled() {
             DispatchStep::Stop
-        } else if !e.rt.lock().unwrap().started {
+        } else if !e.rt.lock().started {
             DispatchStep::Wait(None)
         } else {
             match dispatch(&e).await {
@@ -548,7 +549,7 @@ async fn run_scheduler(e: Arc<Engine>, mut changes: mpsc::Receiver<()>) {
 async fn dispatch(e: &Arc<Engine>) -> Result<Option<Duration>> {
     let _guard = e.dispatch_lock.lock().await;
     let (active_ids, capacity) = {
-        let rt = e.rt.lock().unwrap();
+        let rt = e.rt.lock();
         let active_ids: HashSet<String> = rt.active.keys().cloned().collect();
         let capacity = e.max_workers.saturating_sub(active_ids.len());
         (active_ids, capacity)
@@ -599,7 +600,7 @@ async fn dispatch(e: &Arc<Engine>) -> Result<Option<Duration>> {
     for (task, signal, children) in claimed {
         let cancel = e.shutdown.child_token();
         let handler = {
-            let mut rt = e.rt.lock().unwrap();
+            let mut rt = e.rt.lock();
             rt.active.insert(task.id.clone(), cancel.clone());
             rt.handlers.get(&(task.kind.clone(), task.phase_name.clone())).cloned()
         };
@@ -681,7 +682,7 @@ async fn dispatch(e: &Arc<Engine>) -> Result<Option<Duration>> {
             };
 
             {
-                let mut rt = engine.rt.lock().unwrap();
+                let mut rt = engine.rt.lock();
                 record_abort(&mut rt, aborted_order);
                 rt.active.remove(&task_id);
                 engine.idle.notify_waiters();

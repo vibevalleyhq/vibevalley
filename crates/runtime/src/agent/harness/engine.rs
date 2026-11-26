@@ -1,5 +1,7 @@
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use serde_json::json;
 
@@ -94,7 +96,7 @@ impl Harness {
 
     pub fn register_extension(&self, ext: Arc<dyn Extension>) {
         let runner = {
-            let mut reg = self.registry.lock().unwrap();
+            let mut reg = self.registry.lock();
             ext.register_phases(&self.scheduler, &self.engine);
             reg.register(ext);
             reg.runner()
@@ -103,7 +105,7 @@ impl Harness {
     }
 
     pub fn extension_names(&self) -> Vec<String> {
-        self.registry.lock().unwrap().extensions().iter().map(|e| e.name().to_owned()).collect()
+        self.registry.lock().extensions().iter().map(|e| e.name().to_owned()).collect()
     }
 
     pub fn with_experiments(
@@ -197,7 +199,7 @@ impl Harness {
         F: for<'a, 'b> FnOnce(&'a mut Tx<'b>, &'a Task) -> BoxFuture<'a, Result<()>> + Send + 'static,
     {
         let (sections, tool_specs): (Vec<PromptSection>, Vec<ToolSpec>) = {
-            let reg = self.registry.lock().unwrap();
+            let reg = self.registry.lock();
             (reg.sections(), reg.tool_specs())
         };
         let assembled = if sections.is_empty() {
@@ -221,7 +223,7 @@ impl Harness {
     }
 
     pub async fn reconcile_sections(&self, conv: &str) -> Result<Vec<PromptSection>> {
-        let active_sections = self.registry.lock().unwrap().sections();
+        let active_sections = self.registry.lock().sections();
         let conv = conv.to_owned();
         let recovery = self
             .store

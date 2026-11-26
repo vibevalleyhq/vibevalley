@@ -1,10 +1,11 @@
 //! Dual-backend SeaORM `StorageBackend` supporting SQLite and PostgreSQL.
 
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::FutureExt as _;
+use parking_lot::Mutex;
 use sea_orm::{
     AccessMode, ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DatabaseTransaction, DbBackend, SqliteTransactionMode, SqlxSqliteConnector,
     TransactionOptions, TransactionTrait,
@@ -49,16 +50,8 @@ impl Drop for SeaOrmInner {
     fn drop(&mut self) {
         self.hub.mark_closed();
         let _guard = crate::rt::handle().enter();
-        if let Ok(slot) = self.read_conn.get_mut() {
-            slot.take();
-        } else if let Ok(mut slot) = self.read_conn.lock() {
-            slot.take();
-        }
-        if let Ok(slot) = self.write_conn.get_mut() {
-            slot.take();
-        } else if let Ok(mut slot) = self.write_conn.lock() {
-            slot.take();
-        }
+        self.read_conn.get_mut().take();
+        self.write_conn.get_mut().take();
     }
 }
 
@@ -205,13 +198,12 @@ impl SeaOrmStorage {
         if self.0.hub.is_closed() {
             return Err(Error::Closed);
         }
-        if let Some(conn) = self.0.read_conn.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        if let Some(conn) = self.0.read_conn.lock().as_ref() {
             return Ok(conn.clone());
         }
         self.0
             .write_conn
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
             .as_ref()
             .cloned()
             .ok_or_else(|| Error::Invalid("sea-orm storage has no connection".into()))
@@ -224,7 +216,6 @@ impl SeaOrmStorage {
         self.0
             .write_conn
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
             .as_ref()
             .cloned()
             .ok_or_else(|| Error::Invalid("sea-orm storage has no writer connection".into()))
@@ -336,8 +327,8 @@ impl StorageBackend for SeaOrmStorage {
                 return Ok(());
             }
             self.0.hub.mark_closed();
-            let read_conn = self.0.read_conn.lock().unwrap_or_else(|e| e.into_inner()).take();
-            let write_conn = self.0.write_conn.lock().unwrap_or_else(|e| e.into_inner()).take();
+            let read_conn = self.0.read_conn.lock().take();
+            let write_conn = self.0.write_conn.lock().take();
             if self.0.owns_conns {
                 if let Some(conn) = read_conn {
                     let _ = conn.close().await;

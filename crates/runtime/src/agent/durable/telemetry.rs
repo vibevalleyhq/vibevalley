@@ -1,9 +1,9 @@
 //! Metadata-only durable telemetry aligned with `pi-durable`'s `DURABLE_TELEMETRY_SCHEMA`.
 
+use parking_lot::Mutex;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
-use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
@@ -90,17 +90,17 @@ impl MemoryTelemetrySink {
     }
 
     pub fn events(&self) -> Vec<TelemetryEvent> {
-        self.events.lock().unwrap().clone()
+        self.events.lock().clone()
     }
 
     pub fn clear(&self) {
-        self.events.lock().unwrap().clear();
+        self.events.lock().clear();
     }
 }
 
 impl TelemetrySink for MemoryTelemetrySink {
     fn record(&self, event: &TelemetryEvent) {
-        self.events.lock().unwrap().push(event.clone());
+        self.events.lock().push(event.clone());
     }
 }
 
@@ -129,11 +129,10 @@ impl TelemetrySink for JsonlTelemetrySink {
         let Ok(line) = serde_json::to_string(event) else {
             return;
         };
-        if let Ok(mut file) = self.file.lock() {
-            let _ = file.write_all(line.as_bytes());
-            let _ = file.write_all(b"\n");
-            let _ = file.flush();
-        }
+        let mut file = self.file.lock();
+        let _ = file.write_all(line.as_bytes());
+        let _ = file.write_all(b"\n");
+        let _ = file.flush();
     }
 }
 

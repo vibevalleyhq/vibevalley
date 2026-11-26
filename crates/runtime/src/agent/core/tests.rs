@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+
+use parking_lot::Mutex;
 use std::time::Duration;
 
 use serde_json::{Value, json};
@@ -45,7 +47,7 @@ impl ScriptedClient {
     where
         F: FnOnce(&ChatRequest, &mut (dyn FnMut(Delta) + Send)) -> AiResult<Completion> + Send + 'static,
     {
-        self.responses.lock().unwrap().push_back(Box::new(f));
+        self.responses.lock().push_back(Box::new(f));
     }
 
     fn push_ok(&self, completion: Completion) {
@@ -53,15 +55,15 @@ impl ScriptedClient {
     }
 
     fn captured_requests(&self) -> Vec<ChatRequest> {
-        self.requests.lock().unwrap().clone()
+        self.requests.lock().clone()
     }
 }
 
 impl ModelClient for ScriptedClient {
     fn complete<'a>(&'a self, request: &'a ChatRequest, on: &'a mut (dyn FnMut(Delta) + Send)) -> BoxFuture<'a, AiResult<Completion>> {
         Box::pin(async move {
-            self.requests.lock().unwrap().push(request.clone());
-            let next = self.responses.lock().unwrap().pop_front().expect("unexpected model call");
+            self.requests.lock().push(request.clone());
+            let next = self.responses.lock().pop_front().expect("unexpected model call");
             next(request, on)
         })
     }
@@ -144,7 +146,7 @@ impl FixedBrainProvider {
     }
 
     fn events(&self) -> Vec<AgentEvent> {
-        self.events.lock().unwrap().clone()
+        self.events.lock().clone()
     }
 }
 
@@ -154,7 +156,7 @@ impl BrainProvider for FixedBrainProvider {
     }
 
     fn observe(&self, _conv: &str, _task: &str, event: AgentEvent) {
-        self.events.lock().unwrap().push(event);
+        self.events.lock().push(event);
     }
 }
 

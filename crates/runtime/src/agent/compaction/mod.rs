@@ -8,7 +8,9 @@ pub mod summarizer;
 mod tests;
 
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use serde_json::json;
 use tokio::sync::Notify;
@@ -156,12 +158,12 @@ impl Compactor {
             .await?;
         if tokens >= self.hard_tokens {
             self.compact(conv, Level::Hard, None).await?;
-        } else if tokens >= self.soft_tokens && self.active.0.lock().unwrap().insert(conv.to_owned()) {
+        } else if tokens >= self.soft_tokens && self.active.0.lock().insert(conv.to_owned()) {
             let compactor = self.clone();
             let conv = conv.to_owned();
             crate::rt::current_or_global_handle().spawn(async move {
                 let _ = compactor.compact(&conv, Level::Soft, None).await;
-                compactor.active.0.lock().unwrap().remove(&conv);
+                compactor.active.0.lock().remove(&conv);
                 compactor.active.1.notify_waiters();
             });
         }
@@ -173,7 +175,7 @@ impl Compactor {
             let notified = self.active.1.notified();
             tokio::pin!(notified);
             notified.as_mut().enable();
-            if self.active.0.lock().unwrap().is_empty() {
+            if self.active.0.lock().is_empty() {
                 return;
             }
             notified.await;

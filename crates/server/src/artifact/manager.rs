@@ -421,8 +421,12 @@ impl Manager {
                 .await
         {
             let num_str = said.number.to_string();
-            let _ = self.ctx.service.artifact.set_message_id(&id, &num_str).await;
-            let _ = self.ctx.service.artifact.set_version_message_id(&id, 1, &num_str).await;
+            if let Err(err) = self.ctx.service.artifact.set_message_id(&id, &num_str).await {
+                tracing::warn!(artifact_id = %id, message_id = %num_str, error = %err, "artifact.set_message_id backlink failed");
+            }
+            if let Err(err) = self.ctx.service.artifact.set_version_message_id(&id, 1, &num_str).await {
+                tracing::warn!(artifact_id = %id, version = 1, message_id = %num_str, error = %err, "artifact.set_version_message_id backlink failed");
+            }
         }
 
         self.get_async(&id).await
@@ -501,7 +505,15 @@ impl Manager {
             .await
         {
             let num_str = said.number.to_string();
-            let _ = self.ctx.service.artifact.set_version_message_id(&fresh.id, next_ver, &num_str).await;
+            if let Err(err) = self.ctx.service.artifact.set_version_message_id(&fresh.id, next_ver, &num_str).await {
+                tracing::warn!(
+                    artifact_id = %fresh.id,
+                    version = next_ver,
+                    message_id = %num_str,
+                    error = %err,
+                    "artifact.set_version_message_id backlink failed"
+                );
+            }
         }
         self.get_async(&fresh.id).await
     }
