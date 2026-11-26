@@ -102,4 +102,4 @@ Space 下：
 
 配置的来源、优先级、校验和配置键说明见[设置和配置](docs/subsystems/setting.md#模型和不变量)。启动流程见[客户端](docs/subsystems/app.md#怎么走)。原生应用外壳自己的项目、布局和设置另存在 `~/Library/Application Support/VibeValley/state.db`。
 
-演进至多端分布式部署的目标逻辑架构与物理部署拓扑见[目标架构与部署拓扑](docs/architecture-topology.md)。服务端扁平化与单数架构直接切换方案见[服务端扁平化与单数架构重构](.agents/notes/proposed/architecture/2026-11-24-first-principles-server-spine.md)，作品目录化存储、统一实时协同与 12 类技能体系见[作品目录化存储、统一实时协同引擎与 12 类产品技能体系](.agents/notes/proposed/architecture/2026-11-24-artifact-unified-collab.md)。
+演进至多端分布式部署的目标逻辑架构与物理部署拓扑见[目标架构与部署拓扑](docs/architecture-topology.md)，作品目录化存储与统一实时协同细节见[Artifact](docs/subsystems/artifact.md)。

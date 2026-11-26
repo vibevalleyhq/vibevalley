@@ -43,7 +43,7 @@ flowchart LR
 
 - **单一 Rust 服务端**（`crates/server`）：内嵌于应用或独立运行，承载主助手、执行会话、频道、任务、作品、笔记与媒体。
 - **唯一核心状态**（`crates/core`）：全部业务状态由纯函数 `reduce` 经不可变「事实」折叠，界面与纸雕农场只读域切片。
-- **原生 macOS 客户端**（`apps/mac`）：GPUI 窗口内置 PTY 终端、文件／Diff 查看、3D 纸雕农场与 `VvWhiteboard`；工作台与直连对话由 `nsh` 跑 TSX；另附命令行 `vibevalley`（`crates/cli`）。仅支持 macOS（[原生计划](.agents/notes/proposed/architecture/2026-11-14-native-vibevalley.md)）。
+- **原生 macOS 客户端**（`apps/mac`）：GPUI 窗口内置 PTY 终端、文件／Diff 查看、3D 纸雕农场与 `VvWhiteboard`；工作台与直连对话由 `nsh` 跑 TSX；另附命令行 `vibevalley`（`crates/cli`）。仅支持 macOS。
 - **契约单源**（`crates/protocol`）：Rust 定义形状与接口，自动生成 TS 类型与客户端，三端严格对齐。详见 [docs/architecture.md](docs/architecture.md)。
 
 ## 快速开始
@@ -95,10 +95,10 @@ apps/island/       刘海灵动岛小程序（Swift）
 apps/site/         官网 vibevalley.dev（Vite + Solid 2 静态生成）
 packages/          页面共享 TS 包：生成的契约与 Zod 校验、词典目录
 assets/ · design/  Papertrails 纸雕场景、头像、引擎标识、品牌图标与设计令牌（design/tokens.json）
-docs/ · .agents/   文档（docs/README.md）、架构提案（Agent Notes）与校验脚本（scripts/）
+docs/ · .agents/   文档（docs/README.md）、仓库 skills（.agents/skills/）与校验脚本（scripts/）
 ```
 
-- [docs/guide.md](docs/guide.md)（使用指南）· [docs/development.md](docs/development.md)（开发与发版）· [AGENTS.md](AGENTS.md)（规矩与命令）· [docs/README.md](docs/README.md)（文档地图与用语表）· [.agents/notes/README.md](.agents/notes/README.md)（Agent Notes）
+- [docs/guide.md](docs/guide.md)（使用指南）· [docs/development.md](docs/development.md)（开发与发版）· [AGENTS.md](AGENTS.md)（规矩与命令）· [docs/README.md](docs/README.md)（文档地图与用语表）· [docs/subsystems/README.md](docs/subsystems/README.md)（子系统架构）
 
 ## 致谢
 

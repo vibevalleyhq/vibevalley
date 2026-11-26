@@ -84,7 +84,7 @@
 ## 还没做的
 
 - MCP 连接观察：Rust 版从简，当前不在计划内。
-- `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证：[持久执行与驱动验收](.agents/notes/proposed/architecture/2026-11-18-native-durable-execution.md)。
+- `opencode`、`grok`、`kimi`、`codebuddy`、`qwen`、`qoder` 的真实厂商 CLI 实机验证：`#55`。
 
 ## 怎么验证
 

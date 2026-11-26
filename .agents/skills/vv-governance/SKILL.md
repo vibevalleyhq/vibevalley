@@ -11,7 +11,7 @@ description: 在 VibeValley 里管住 agent 写的代码不变坏：加规矩、
 
 ## 先读哪里
 
-- 要回答「白皮书的某一条在这里怎么样」，或者下面任何一步碰到具体的一条：读 [references/whitepaper.md](.agents/skills/vv-governance/references/whitepaper.md) 里对应的一行。每条写了处境：**已有**（在哪）、**已做**（吸收白皮书时加的，在哪）、**改写**（思路留下、换成这里的做法）、**以后做**（什么条件下做，挂在[提案](.agents/notes/proposed/process/2026-10-30-whitepaper-checks-that-say-how.md)）、**不做**（为什么）。
+- 要回答「白皮书的某一条在这里怎么样」，或者下面任何一步碰到具体的一条：读 [references/whitepaper.md](.agents/skills/vv-governance/references/whitepaper.md) 里对应的一行。每条写了处境：**已有**（在哪）、**已做**（吸收白皮书时加的，在哪）、**改写**（思路留下、换成这里的做法）、**以后做**（什么条件下做，见[工程流程](docs/subsystems/process.md#还没做的按条件触发的白皮书治理项)）、**不做**（为什么）。
 - 回答这类问题时，先给处境的结论，再给在哪、为什么；以后做的说出触发条件；不做的说出它和哪条规矩冲突。不要把白皮书的原文当成这里的做法讲。
 - 评审具体子领域的 PR / 重构时，按改动范围加载对应清单（只读用得上的那份）：
   - 涉及 Rust 异步、Tokio 运行时边界、`Hub::on_async`、Axum/SSE/Range、虚拟时钟、`loom` 状态机或 `crates/rich` 后台渲染：读 [references/rust-concurrency-checklist.md](.agents/skills/vv-governance/references/rust-concurrency-checklist.md)。
@@ -45,7 +45,7 @@ agent 照着已有的代码抄、走最短的路，写在文字里的规矩会�
 
 ## 3. 写计划前问清边界
 
-带着猜测写下去的代码，猜错了要整块返工；问一句只花用户几秒。写计划 Note 或开工前，下面四类有一类说不清，就问用户，不猜：
+带着猜测写下去的代码，猜错了要整块返工；问一句只花用户几秒。建规划 Issue 或开工前，下面四类有一类说不清，就问用户，不猜：
 
 - **失败和边界**：外面的接口超时或失败时，是忽略、重试几次，还是停下回滚？
 - **并发和重复**：同一张工单、同一个人重复触发时，是排队、丢掉新的，还是取消旧的？

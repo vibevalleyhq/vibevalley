@@ -73,7 +73,7 @@ TypeScript 的页面（`apps/mac/ui`）、官网、共用包和它们的测试�
 | 测试里一步步讲在测什么 | `// No room yet: it waits.` |
 | 历史和出处 | `// ported from the Go server's session.go`<br>`// as on the web page` |
 | 别处的叫法 | CSS 类名（`focus-visible:ring-2`）、旧框架（Pixi、Base UI）、别的语言的常量写法（`QUOTA_LOW`） |
-| 推理过程、行为说明 | 行为写进 [docs](docs/README.md)，理由写进 [Agent Note](.agents/notes/README.md) |
+| 推理过程、行为说明 | 行为写进 [docs](docs/README.md)，理由写进[子系统文档](docs/subsystems/README.md)的「为什么这样」或架构 Issue |
 
 ### 改代码时
 

@@ -127,8 +127,9 @@ PR/MR 创建或更新后在串内记录真实链接；关联保存在 Issue，�
 
 ## 还没做的
 
-- 多帮工协作同一块地、逐条勾选持久化验收标准：[一块地上几个人一起种](.agents/notes/proposed/architecture/2026-10-18-a-crew-on-one-plot.md)。
-- 工单详情的讨论、里程碑、步骤与轮次合为一条活动流：[工单详情的经过合成一条活动流](.agents/notes/proposed/feature/2026-11-11-issue-activity-stream.md)。
+- 多帮工协作同一块地、逐条勾选持久化验收标准：`#50`。
+- 工单详情的讨论、里程碑、步骤与轮次合为一条活动流：`#49`。
+- Hub/Machine 解耦与按空间隔离：`#36`。
 
 ## 怎么验证
 

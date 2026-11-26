@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "prepare": "vp config --hooks --no-agent && vp run packages:build",
-    "notes:catalog": "vpx scripts/docs/agent-notes.ts --write",
     "site:deploy": "vp run --filter @vibevalley/site deploy",
     "bump": "vpx scripts/release/bump.ts",
     "build:alpha": "vpx scripts/release/build.ts alpha",
