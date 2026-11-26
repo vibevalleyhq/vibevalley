@@ -18,7 +18,6 @@
 | `executionsOf` | `issues.ts` | Every execution, in assignment and start order. |
 | `sessionIdsOf` | `issues.ts` | The external helper contexts that executed it, in order. |
 | `latestSessionIdOf` | `issues.ts` |  |
-| `shortTitle` | `issues.ts` | One short line for a title: its first line, and of a long one, the first sentence, else up to its last pause that fits. failing those, cut. |
 | `closedText` | `issues.ts` | What its close says: done with what it delivered, or canceled and why. |
 | `omitUndefined` | `omit.ts` |  |
 | `isOneOf` | `oneOf.ts` |  |
