@@ -53,7 +53,9 @@
     "about": "About & Data",
     "memory": "Memory",
     "chat": "Chat apps",
-    "width": "Navigation width (drag; double-click for the default)"
+    "width": "Navigation width (drag; double-click for the default)",
+    "groupWorkspace": "Workspace",
+    "groupConnect": "Voice & Connections"
   },
   "words": {
     "general": "language start workbench farm theme dark light size zoom scale font animation motion reduce",
@@ -70,6 +72,7 @@
     "device": "This device only"
   },
   "general": {
+    "intro": "Configure language, startup behavior, theme, and display preferences.",
     "languageHint": "The page, the assistant and the helpers all speak it",
     "startupTitle": "Startup",
     "start": "Open on start",
@@ -110,6 +113,7 @@
     "intro": "Helpers can also look things up in, and write to, memory outside VibeValley."
   },
   "about": {
+    "intro": "Inspect version details, desktop updates, CLI installation, and local data paths.",
     "version": "Version",
     "versionHint": "The server on this machine",
     "files": "Files",

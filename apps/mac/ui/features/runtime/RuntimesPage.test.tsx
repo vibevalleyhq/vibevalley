@@ -130,6 +130,10 @@ test("RuntimesPage: top-level nav above Team, 3-column full-height layout, machi
   expect(app.count("id:runtime-row-local-codex")).toBe(1);
   expect(app.count("id:runtime-row-local-vibevalley")).toBe(1);
   expect(app.count("id:runtime-row-local-opencode")).toBe(0);
+  expect(app.count("id:runtime-detail")).toBe(1);
+  expect(app.count("id:runtime-bin-path")).toBe(1);
+  expect(app.texts()).toContain(t("web.runtime.installation"));
+  expect(app.texts()).toContain(t("web.runtime.available"));
 
   // Remote & sandbox machines: installed coding agents appear; unavailable cursor on sbx-42 MUST NOT appear!
   expect(app.count("id:runtime-row-gpu-linux-codex")).toBe(1);

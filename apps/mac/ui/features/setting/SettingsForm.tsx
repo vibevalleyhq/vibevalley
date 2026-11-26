@@ -195,7 +195,7 @@ function SourceField(props: { draft: SourceDraft; last: boolean; set: (change: P
   const label = () => sourceLabels[props.draft.kind];
   return (
     <View testID={`source-${props.draft.kind}`} class={props.last ? "" : "border-b border-line"}>
-      <View class="flex-row items-center gap-2 px-4 py-3">
+      <View class="min-h-13 flex-row items-center gap-2.5 px-4 py-3">
         <Text class="text-sm font-medium text-ink">{label()}</Text>
         <SourceMark draft={props.draft} />
         <View class="flex-1" />
@@ -215,7 +215,7 @@ function SourceField(props: { draft: SourceDraft; last: boolean; set: (change: P
         />
       </View>
       <If when={props.draft.open}>
-        <View class="gap-3 border-t border-line bg-page px-4 py-3">
+        <View class="gap-3.5 border-t border-line bg-side px-4 py-3.5">
           <TextInput
             testID="source-address"
             accessibilityLabel={t("web.setting.source.address", { label: label() })}
@@ -294,13 +294,21 @@ export function GitHub() {
         {(s) => (
           <SettingsGroup>
             <SettingRow label={t("web.setting.github.cli")} hint={t("web.setting.github.cliHint")} tip={s().reason || undefined}>
-              <Icon name={s().installed ? "check" : "cross"} size={16} />
-              <Text class="font-mono text-sm tabular-nums text-ink">{s().installed ? (s().version ?? "") : t("web.setting.github.noGh")}</Text>
+              <View class={`flex-row items-center gap-1.5 rounded-full px-2 py-0.5 ${s().installed ? "bg-ok-soft" : "bg-bad-soft"}`}>
+                <Icon name={s().installed ? "check" : "cross"} size={12} tone={s().installed ? "ok-ink" : "berry"} />
+                <Text class={`font-mono text-xs font-medium tabular-nums ${s().installed ? "text-ok-ink" : "text-berry"}`}>
+                  {s().installed ? (s().version ?? "") : t("web.setting.github.noGh")}
+                </Text>
+              </View>
               <IconButton icon="refresh" testid="github-recheck" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
             </SettingRow>
             <SettingRow label={t("web.setting.github.login")} hint={t("web.setting.github.loginHint")} last>
-              <Icon name={s().loggedIn ? "check" : "warn"} size={16} />
-              <Text class="text-sm text-ink">{s().loggedIn ? (s().account ?? "") : t("web.setting.github.notLoggedIn")}</Text>
+              <View class={`flex-row items-center gap-1.5 rounded-full px-2 py-0.5 ${s().loggedIn ? "bg-ok-soft" : "bg-warn-soft"}`}>
+                <Icon name={s().loggedIn ? "check" : "warn"} size={12} tone={s().loggedIn ? "ok-ink" : "warn-ink"} />
+                <Text class={`text-xs font-medium ${s().loggedIn ? "text-ok-ink" : "text-warn-ink"}`}>
+                  {s().loggedIn ? (s().account ?? "") : t("web.setting.github.notLoggedIn")}
+                </Text>
+              </View>
             </SettingRow>
           </SettingsGroup>
         )}
