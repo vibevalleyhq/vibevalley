@@ -131,6 +131,7 @@ export function LibraryPage() {
   const installedApplets = useInstalledApplets();
   const selection = signal<LibrarySelection>(initialLibrarySelection);
   const dragging = signal(false);
+  const gridWidth = signal<number | undefined>(undefined);
   const seen = signal<ReadonlyMap<string, Seen>>(new Map());
   const appletTarget = signal<Artifact | undefined>(undefined);
   const act = createAct();
@@ -198,11 +199,15 @@ export function LibraryPage() {
   const inspectorOpen = createMemo(() => chosen().length > 0);
 
   const inner = createMemo(() => {
+    const measured = gridWidth();
+    if (measured !== undefined && measured > 0) {
+      return Math.max(220, measured - 32);
+    }
     const w = windowSize().width;
-    const appRailW = w < 640 ? 56 : 68;
+    const appRailW = w < 640 ? 68 : 76;
     const sideW = contentSidebarOpen.get() ? 232 : 0;
     const inspW = inspectorOpen() && w >= 640 ? 304 : 0;
-    return Math.max(220, w - appRailW - sideW - inspW - 32);
+    return Math.max(220, w - appRailW - sideW - inspW - 36);
   });
 
   const rows = createMemo(() => {
@@ -489,7 +494,15 @@ export function LibraryPage() {
           </Button>
         </View>
 
-        <Scroll testID="library-grid" class="min-h-0 flex-1" contentClass="gap-5 p-4">
+        <Scroll
+          testID="library-grid"
+          onLayout={(e) => {
+            const w = Math.floor(e.bounds.size.width);
+            if (w > 0 && w !== untracked(gridWidth)) gridWidth.set(w);
+          }}
+          class="min-h-0 flex-1"
+          contentClass="gap-5 p-4"
+        >
           <If
             when={!empty()}
             else={
