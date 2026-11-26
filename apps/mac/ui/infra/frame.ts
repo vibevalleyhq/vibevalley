@@ -25,6 +25,7 @@ const SLICE_KINDS = SliceKindValues;
 
 export interface Slices {
   readonly slice: <K extends SliceKind>(kind: K) => Accessor<SliceMap[K] | undefined>;
+  readonly refresh: (kind: SliceKind) => void;
   readonly link: Accessor<Link>;
   readonly sessionsById: Accessor<ReadonlyMap<string, SessionView>>;
   readonly sessionsByIssue: Accessor<ReadonlyMap<string, SessionView>>;
@@ -34,6 +35,7 @@ export interface Slices {
 export interface SlicesSource {
   readonly get: <K extends SliceKind>(kind: K) => SliceMap[K] | undefined;
   readonly subscribe: (kind: SliceKind, listener: () => void) => () => void;
+  readonly refresh: (kind: SliceKind) => void;
   readonly link: () => Link;
   readonly subscribeLink: (listener: () => void) => () => void;
 }
@@ -111,6 +113,12 @@ export const slices: SlicesSource = {
       channel.stop = undefined;
       channel.value = undefined;
     };
+  },
+  refresh: (kind: SliceKind): void => {
+    const channel = channels[kind];
+    if (channel.listeners.size === 0) return;
+    // Re-subscribe without clearing channel.value so the bridge pushes a fresh snapshot with zero UI flash.
+    channel.connect();
   },
   link: (): Link => currentLink,
   subscribeLink: (listener: () => void): (() => void) => {
@@ -209,6 +217,10 @@ export function createSlices(source: SlicesSource = slices): Slices {
 
   return {
     slice: ensureSlice,
+    refresh: (kind: SliceKind): void => {
+      ensureSlice(kind);
+      source.refresh(kind);
+    },
     link: () => linkSig(),
     sessionsById: () => {
       syncSessions();
@@ -238,6 +250,11 @@ export const useCollabSlice = (): Accessor<CollabSlice | undefined> => useSlice(
 export const useInboxSlice = (): Accessor<InboxSlice | undefined> => useSlice("inbox");
 export const useOpsSlice = (): Accessor<OpsSlice | undefined> => useSlice("ops");
 export const useLink = (): Accessor<Link> => useSlices().link;
+
+export function useRefreshSlice(kind: SliceKind): () => void {
+  const s = useSlices();
+  return () => s.refresh(kind);
+}
 
 export function useSessionsMap(): Accessor<ReadonlyMap<string, SessionView>> {
   return useSlices().sessionsById;

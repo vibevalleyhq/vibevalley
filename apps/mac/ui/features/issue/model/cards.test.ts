@@ -5,7 +5,7 @@ import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 import type { Issue, IssueId, IssueStageKind, Session, SessionId } from "@vibevalley/protocol";
 
-import { type BoardCard, cardLook, cardUrgencyTone } from "./cards";
+import { type BoardCard, cardLook, cardMove, cardUrgencyTone, historyKey } from "./cards";
 import { localizeIssueError } from "./issueError";
 import { issueState } from "./overview";
 
@@ -110,4 +110,35 @@ test("localizeIssueError maps raw English API-key failures to localized copy wit
 
   const unrelated = localizeIssueError("exit status 1");
   expect(unrelated).toEqual({ text: "exit status 1" });
+});
+
+test("historyKey tracks board seq and non-session issue status changes", () => {
+  const backlogIssue: Issue = { ...makeIssue("i-draft", "draft"), status: "backlog" };
+  const doneIssue: Issue = { ...backlogIssue, status: "done" };
+  const k1 = historyKey({ seq: 1, issues: [backlogIssue] }, []);
+  const k2 = historyKey({ seq: 2, issues: [backlogIssue] }, []);
+  const k3 = historyKey({ seq: 2, issues: [doneIssue] }, []);
+  expect(k1).not.toBe(k2);
+  expect(k2).not.toBe(k3);
+  expect(historyKey(undefined, [])).toBe("");
+});
+
+test("cardMove allows dragging todo to closed and closed to todo (revive)", () => {
+  const todoCard: BoardCard = {
+    kind: "todo",
+    id: "i-todo",
+    lane: "todo",
+    issue: { ...makeIssue("i-todo", "draft"), status: "backlog", moves: ["todo", "done", "canceled"] },
+  };
+  expect(cardMove(todoCard, "closed")).toBe("close");
+  expect(cardMove(todoCard, "working")).toBe("start");
+
+  const closedCard: BoardCard = {
+    kind: "todo",
+    id: "i-closed",
+    lane: "closed",
+    issue: { ...makeIssue("i-closed", "done"), status: "done", moves: ["backlog"] },
+  };
+  expect(cardMove(closedCard, "todo")).toBe("revive");
+  expect(cardMove(closedCard, "working")).toBeUndefined();
 });

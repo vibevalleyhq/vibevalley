@@ -2,7 +2,16 @@ import { computed, keymap, signal, Text, View } from "nsh";
 import { Input, Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
-import { type Attachment, type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
+import {
+  type Attachment,
+  type Deliverable,
+  DeliverableValues,
+  type Issue,
+  type IssueStatus,
+  type IssueUpdate,
+  type Priority,
+  PriorityValues,
+} from "@vibevalley/protocol";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../../design/act";
@@ -25,7 +34,7 @@ import { rememberPick } from "../../../infra/state/prefs";
 import { IssueArtifacts } from "../../artifact";
 import { useIssues } from "../model/history";
 import { isRefined, newIssueTitle } from "../model/issue";
-import { issueMove, issueMoveOf, sendMove } from "../model/moves";
+import { issueMove, issueMoveOf, movedIssue, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
 import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
@@ -152,8 +161,18 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     return got;
   };
 
-  const backlog = () => props.item.status === "backlog";
-  const closed = () => props.item.status === "done" || props.item.status === "canceled";
+  const liveStatus = computed(() => movedIssue(props.item, moves.list()).status);
+  const backlog = () => liveStatus() === "backlog";
+  const closed = () => liveStatus() === "done" || liveStatus() === "canceled";
+  const todoStatuses: readonly IssueStatus[] = ["backlog", "todo", "done", "canceled"];
+  const todoStatusLabel = (status: IssueStatus): string => {
+    if (status === "backlog") return t("web.issue.todo.draftStatus");
+    if (status === "todo") return t("web.issue.todo.todoStatus");
+    return t(`shared.status.${status}`);
+  };
+  const statusOptions = computed(() =>
+    todoStatuses.filter((s) => s === liveStatus() || props.item.moves.includes(s)).map((s) => ({ value: s, label: todoStatusLabel(s) })),
+  );
   const drafting = () => props.item.refining;
   const refined = () => isRefined(props.item);
   const questions = () => props.item.questions;
@@ -205,9 +224,28 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const markStatus = (status: "done" | "canceled" | "backlog") => {
     const id = props.item.id;
     const pendingEdit = status === "done" ? unsaved() : undefined;
-    return sendMove(moves, { id, status, ...(pendingEdit ? { edit: pendingEdit } : {}) }).done.then((done) => {
+    return sendMove(moves, {
+      id,
+      status,
+      lane: status === "backlog" ? "todo" : "closed",
+      ...(pendingEdit ? { edit: pendingEdit } : {}),
+    }).done.then((done) => {
       if (done?.replied && pendingEdit) saved(done.replied.reply);
     });
+  };
+  const changeStatus = (next: IssueStatus) => {
+    if (next === liveStatus()) return;
+    if (next === "todo") {
+      if (!d().agent || !d().repo) {
+        toast(t("web.issue.page.pickFirst"));
+        return;
+      }
+      void start();
+      return;
+    }
+    if (next === "backlog" || next === "done" || next === "canceled") {
+      void markStatus(next);
+    }
   };
   const remove = () => {
     const id = props.item.id;
@@ -494,8 +532,15 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const side = (
     <>
       <SheetLabel first>{t("web.issue.detail.properties")}</SheetLabel>
-      <Property label={t("web.issue.todo.status")} icon={<StatusMark status={props.item.status} size={13} />}>
-        {closed() ? t(`shared.status.${props.item.status}`) : backlog() ? t("web.issue.todo.draftStatus") : t("web.issue.todo.todoStatus")}
+      <Property label={t("web.issue.todo.status")} icon={<StatusMark status={liveStatus()} size={13} />} inset>
+        <Pick
+          label={t("web.issue.todo.status")}
+          testid="todo-status"
+          value={liveStatus()}
+          disabled={busy() || statusOptions().length <= 1}
+          onChange={(v) => changeStatus(v)}
+          options={statusOptions()}
+        />
       </Property>
       <Property
         label={t("web.issue.detail.helper")}

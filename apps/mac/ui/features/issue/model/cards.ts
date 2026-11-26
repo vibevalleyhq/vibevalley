@@ -48,13 +48,15 @@ function laneOf(s: IssueStatus): Lane {
   return "closed";
 }
 
-export type Move = "start" | "close" | "reopen";
+export type Move = "start" | "close" | "reopen" | "revive";
 
 /** A drop between lanes, if the server lets the issue go there (`Issue.moves`). A task's issue has no moves. */
 function moveOf(from: Lane, to: Lane, moves: IssueStatus[]): Move | undefined {
   if (from === "todo" && to === "working" && moves.includes("todo")) return "start";
-  if ((from === "working" || from === "waiting") && to === "closed" && (moves.includes("done") || moves.includes("canceled"))) return "close";
+  if ((from === "todo" || from === "working" || from === "waiting") && to === "closed" && (moves.includes("done") || moves.includes("canceled")))
+    return "close";
   if (from === "closed" && to === "working" && moves.includes("todo")) return "reopen";
+  if (from === "closed" && to === "todo" && moves.includes("backlog")) return "revive";
   return undefined;
 }
 
@@ -86,13 +88,10 @@ export function boardRows(
   return [...live, ...history.filter((r) => !kept.has(r.issue.id))];
 }
 
-/** What the history adds to the board changes only when an issue gets a session or one leaves the farm. */
+/** Tracks board sequence, every issue's status + sessions, and active farm sessions so non-session transitions invalidate issue history too. */
 export const historyKey = (board: BoardSlice | undefined, sessions: readonly SessionView[] | undefined): string =>
   board
-    ? `${board.issues
-        .filter((i) => sessionIdsOf(i).length > 0)
-        .map((i) => `${i.id}:${sessionIdsOf(i).join(",")}`)
-        .join(";")}|${(sessions ?? []).map((s) => s.id).join(",")}`
+    ? `${board.seq}|${board.issues.map((i) => `${i.id}:${i.status}:${sessionIdsOf(i).join(",")}`).join(";")}|${(sessions ?? []).map((s) => s.id).join(",")}`
     : "";
 
 /** The palette's names (src/style.css) a mark or flag is tinted with. */

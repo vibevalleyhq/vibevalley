@@ -100,7 +100,9 @@
     "clear": "清掉筛选",
     "view": "看法",
     "missing": "这一轮的记录缺失：{what}。对它的操作暂不可用。",
-    "backToBoard": "工单"
+    "backToBoard": "工单",
+    "refresh": "刷新工单",
+    "refreshing": "正在同步…"
   },
   "marks": {
     "priority": "优先级：{word}"

@@ -1416,6 +1416,8 @@ export const catalogs = {
         view: "看法",
         missing: "这一轮的记录缺失：{what}。对它的操作暂不可用。",
         backToBoard: "工单",
+        refresh: "刷新工单",
+        refreshing: "正在同步…",
       },
       marks: { priority: "优先级：{word}" },
       sheet: { less: "收起", more: "更多", at: "在「{stage}」", stageDone: "{stage}做完了" },
@@ -4872,6 +4874,8 @@ export const catalogs = {
         view: "View",
         missing: "The run's record is missing: {what}. Its acts are not available.",
         backToBoard: "Issues",
+        refresh: "Refresh issues",
+        refreshing: "Syncing…",
       },
       marks: { priority: "Priority: {word}" },
       sheet: { less: "Less", more: "More", at: 'At "{stage}"', stageDone: "{stage}: done" },
@@ -8599,6 +8603,8 @@ export interface Messages {
   "web.issue.page.notFound": undefined;
   "web.issue.page.notFoundLine": { readonly id: string | number };
   "web.issue.page.pickFirst": undefined;
+  "web.issue.page.refresh": undefined;
+  "web.issue.page.refreshing": undefined;
   "web.issue.page.shown": { readonly of: string | number; readonly shown: string | number };
   "web.issue.page.view": undefined;
   "web.issue.peek.close": undefined;

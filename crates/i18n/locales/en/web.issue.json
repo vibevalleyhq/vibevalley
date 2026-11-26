@@ -100,7 +100,9 @@
     "clear": "Clear the filter",
     "view": "View",
     "missing": "The run's record is missing: {what}. Its acts are not available.",
-    "backToBoard": "Issues"
+    "backToBoard": "Issues",
+    "refresh": "Refresh issues",
+    "refreshing": "Syncing…"
   },
   "marks": {
     "priority": "Priority: {word}"
