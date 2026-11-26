@@ -1,6 +1,16 @@
 import { expect, test } from "vite-plus/test";
 
-import { AppletInstallInput, AppletOpenResult, AppletRemoveResult, ArtifactAppletInfo, CommandLineState, MotionChoice, ThemeChoice, UpdateState } from "./host";
+import {
+  AppletInstallInput,
+  AppletOpenResult,
+  AppletRemoveResult,
+  ArtifactAppletInfo,
+  CommandLineState,
+  HostCapturedImage,
+  MotionChoice,
+  ThemeChoice,
+  UpdateState,
+} from "./host";
 
 test("host state schemas decode valid wire payloads and reject malformed shapes", () => {
   expect(
@@ -56,4 +66,13 @@ test("host state schemas decode valid wire payloads and reject malformed shapes"
   ).toBe("Metrics");
   expect(AppletRemoveResult.parse({ removed: true }).removed).toBe(true);
   expect(AppletOpenResult.parse({ opened: true }).opened).toBe(true);
+  expect(
+    HostCapturedImage.parse({
+      mime: "image/png",
+      data: "iVBORw0KGgo=",
+      width: 640,
+      height: 400,
+    }).width,
+  ).toBe(640);
+  expect(HostCapturedImage.safeParse({ mime: "image/png" }).success).toBe(false);
 });

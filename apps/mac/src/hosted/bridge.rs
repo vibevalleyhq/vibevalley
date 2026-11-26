@@ -160,8 +160,8 @@ mod tests {
     #[test]
     fn host_op_from_wire_round_trips_representative_ops_and_errors() {
         use vibevalley_protocol::{
-            HostFontPayload, HostMotionChoice, HostOp, HostOpeningPayload, HostOpeningPhase, HostPlaySoundPayload, HostQrPayload, HostSoundName,
-            HostThemeChoice, Locale,
+            HostCaptureWebViewPayload, HostFontPayload, HostMotionChoice, HostOp, HostOpeningPayload, HostOpeningPhase, HostPlaySoundPayload, HostQrPayload,
+            HostSoundName, HostThemeChoice, Locale,
         };
         use vibevalley_server::gateway::bridge::BizCode;
 
@@ -202,6 +202,14 @@ mod tests {
                 HostOp::Qr(HostQrPayload {
                     text: "https://vibevalley.dev".into(),
                     border: Some(2),
+                }),
+            ),
+            (
+                "host.captureWebView",
+                json!({ "width": 640, "height": 400 }),
+                HostOp::CaptureWebView(HostCaptureWebViewPayload {
+                    width: Some(640),
+                    height: Some(400),
                 }),
             ),
         ];
