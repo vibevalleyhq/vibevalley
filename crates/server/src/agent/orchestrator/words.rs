@@ -149,6 +149,13 @@ pub fn picked_agent(name: &str) -> String {
 pub fn picked_repo(repo: &str) -> String {
     format!("（用户选定了仓库：{repo}，派活就派在这个仓库里）\n")
 }
+pub fn command_note(name: &str, args: &str) -> String {
+    if args.trim().is_empty() {
+        format!("（用户调用了技能 /{name}，先用 load_skill 读取该技能再照着执行）\n")
+    } else {
+        format!("（用户调用了技能 /{name}，参数：{args}；先用 load_skill 读取该技能再照着执行）\n")
+    }
+}
 pub fn user_line(text: &str) -> String {
     format!("用户说：{text}")
 }

@@ -13,6 +13,8 @@ const AgentProblem = z.object({
 
 export const PersonaMode = z.enum(T.PersonaModeValues) satisfies Codec<T.PersonaMode>;
 
+export const Toolset = z.enum(T.ToolsetValues) satisfies Codec<T.Toolset>;
+
 const MCPServerStdio = z.object({
   type: z.literal("stdio"),
   name: z.string(),
@@ -66,6 +68,7 @@ export const Agent = z.object({
   persona: z.string(),
   personaMode: PersonaMode,
   skills: z.array(z.string()),
+  toolsets: z.array(Toolset),
   mcpServers: z.array(MCPServer),
   disallowedTools: z.array(z.string()),
   env: z.record(z.string(), z.string()),

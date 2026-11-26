@@ -103,6 +103,11 @@ export const ChannelEvent = z.discriminatedUnion("_tag", [
   z.object({ _tag: z.literal("Reset") }),
 ]) satisfies Codec<T.ChannelEvent>;
 
+export const ChannelCommand = z.object({
+  name: z.string(),
+  args: z.string(),
+}) satisfies Codec<T.ChannelCommand>;
+
 export const SayRequest = z.object({
   id: z.string(),
   text: z.string(),
@@ -114,6 +119,7 @@ export const SayRequest = z.object({
   repo: z.exactOptional(z.string()),
   sendKey: z.exactOptional(z.string()),
   to: z.exactOptional(z.string()),
+  command: z.exactOptional(ChannelCommand),
 }) satisfies Codec<T.SayRequest>;
 
 export const ChannelUpdate = z.object({

@@ -39,8 +39,12 @@ impl Chat {
         if self.ctx.live.set_call(CallState::Live, String::new()) {
             self.ctx.mark_dirty(SliceMask::INBOX);
         }
+        let command = s.command.filter(|c| !c.name.trim().is_empty()).map(|c| vibevalley_protocol::ChannelCommand {
+            name: c.name.trim().to_string(),
+            args: c.args.trim().to_string(),
+        });
         let files = self.attachments_of(&s.attachments).await?;
-        if s.text.trim().is_empty() && files.is_empty() {
+        if s.text.trim().is_empty() && files.is_empty() && command.is_none() {
             return Err(refused(t("server.channel.empty", &[])));
         }
         if s.send_key.encode_utf16().count() > SEND_KEY_MAX {
@@ -90,7 +94,22 @@ impl Chat {
                 spoken: voice.then_some(true),
                 response_port: s.response_port.clone(),
                 voice_mode: s.voice_mode.clone(),
+                command: command.clone(),
                 ..Meta::default()
+            };
+            let body_text = if s.text.trim().is_empty() {
+                command
+                    .as_ref()
+                    .map(|c| {
+                        if c.args.is_empty() {
+                            format!("/{}", c.name)
+                        } else {
+                            format!("/{} {}", c.name, c.args)
+                        }
+                    })
+                    .unwrap_or_default()
+            } else {
+                s.text.trim().to_string()
             };
             let empty = meta == Meta::default();
             let written = self
@@ -101,7 +120,7 @@ impl Chat {
                         read_by: Some(USER_ID.into()),
                         reply_to: s.reply_to,
                         meta: (!empty).then_some(meta),
-                        ..Write::new(&place, USER_ID, MessageKind::Chat, s.text.trim())
+                        ..Write::new(&place, USER_ID, MessageKind::Chat, &body_text)
                     },
                 )
                 .await?;

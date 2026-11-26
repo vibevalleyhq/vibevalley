@@ -13,7 +13,9 @@ mod plan;
 mod registry;
 #[cfg(test)]
 mod tests;
+pub mod toolset;
 
 pub use chat::message_line;
-pub use dispatch::{Held, Tool, held, helper, orchestrator, unrun};
+pub use dispatch::{Held, Tool, held, held_for, helper, orchestrator, unrun};
 pub use registry::{Route, ToolRegistry, Who, Words};
+pub use toolset::{Role, ToolAccess, access_of, allows, can_role, denied_message, toolset_of};

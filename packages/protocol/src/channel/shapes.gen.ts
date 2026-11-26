@@ -65,11 +65,20 @@ export type Chat = { channels: Array<Channel>, userMentions: Array<UserMention>,
  */
 export type ChannelEvent = { "_tag": "Message", message: ChatMessage, } | { "_tag": "Reset", };
 
+/**
+ * Structured slash-command invocation sent with a channel message.
+ */
+export type ChannelCommand = { name: string, args: string, };
+
 export type SayRequest = { id: string, text: string, viewContext?: ArtifactViewContext, replyTo?: number, attachments?: Array<string>, station?: number, agent?: string, repo?: string, sendKey?: string,
 /**
  * Orchestrator profile id that alone receives this message (e.g. `/imagegen`).
  */
-to?: string, };
+to?: string,
+/**
+ * Optional slash skill invocation parsed by the channel composer.
+ */
+command?: ChannelCommand, };
 
 export type ChannelUpdate = { description?: string, repo?: string, name?: string,
 /**

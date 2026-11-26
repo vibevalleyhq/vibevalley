@@ -52,6 +52,7 @@ function makeAgent(id: string, role: Agent["role"], name: string, duty = ""): Ag
     persona: "",
     personaMode: "append",
     skills: [],
+    toolsets: ["issue", "session", "channel", "resource", "memory", "library", "artifact"],
     mcpServers: [],
     disallowedTools: [],
     env: {},

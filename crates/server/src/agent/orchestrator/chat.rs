@@ -188,14 +188,20 @@ impl Orchestrator {
             .filter(|_| c.row.deleted_at.is_none())
             .map(|vc| format!("{}\n", format_artifact_view_context(vc)))
             .unwrap_or_default();
+        let command_note = meta
+            .command
+            .as_ref()
+            .filter(|cmd| !cmd.name.trim().is_empty())
+            .map(|cmd| words::command_note(cmd.name.trim(), cmd.args.trim()))
+            .unwrap_or_default();
         let text = c.row.body.trim();
         let said = match meta.voice_mode.as_deref() {
-            Some("dictated") => format!("{picked_note}{view_note}{}{}", words::DICTATED, words::user_line(text)),
-            Some("conversation") => format!("{}\n{}", text::PROMPTS.voice, words::user_line(text)),
+            Some("dictated") => format!("{picked_note}{view_note}{command_note}{}{}", words::DICTATED, words::user_line(text)),
+            Some("conversation") => format!("{}\n{command_note}{}", text::PROMPTS.voice, words::user_line(text)),
             _ if from_user && (c.channel_type == ChannelType::Direct || c.row.channel_id == chat.default_channel()) => {
-                format!("{picked_note}{view_note}{}", words::user_line(text))
+                format!("{picked_note}{view_note}{command_note}{}", words::user_line(text))
             }
-            _ => format!("{picked_note}{}", words::chat_line(&m.target, &line)),
+            _ => format!("{picked_note}{command_note}{}", words::chat_line(&m.target, &line)),
         };
         let input = Input {
             agent: Some(d.recipient_id.clone()),

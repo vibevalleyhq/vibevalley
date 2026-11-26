@@ -65,6 +65,79 @@ impl PersonaMode {
     }
 }
 
+/// Capability groups controlling which built-in farm tools an agent profile can call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum Toolset {
+    #[serde(rename = "issue")]
+    Issue,
+    #[serde(rename = "session")]
+    Session,
+    #[serde(rename = "channel")]
+    Channel,
+    #[serde(rename = "repo")]
+    Repo,
+    #[serde(rename = "cron")]
+    Cron,
+    #[serde(rename = "resource")]
+    Resource,
+    #[serde(rename = "memory")]
+    Memory,
+    #[serde(rename = "media")]
+    Media,
+    #[serde(rename = "library")]
+    Library,
+    #[serde(rename = "artifact")]
+    Artifact,
+}
+
+impl Toolset {
+    pub const ALL: [Toolset; 10] = [
+        Toolset::Issue,
+        Toolset::Session,
+        Toolset::Channel,
+        Toolset::Repo,
+        Toolset::Cron,
+        Toolset::Resource,
+        Toolset::Memory,
+        Toolset::Media,
+        Toolset::Library,
+        Toolset::Artifact,
+    ];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Toolset::Issue => "issue",
+            Toolset::Session => "session",
+            Toolset::Channel => "channel",
+            Toolset::Repo => "repo",
+            Toolset::Cron => "cron",
+            Toolset::Resource => "resource",
+            Toolset::Memory => "memory",
+            Toolset::Media => "media",
+            Toolset::Library => "library",
+            Toolset::Artifact => "artifact",
+        }
+    }
+
+    /// Default enabled toolsets for an agent role.
+    pub fn defaults_for(role: AgentRole) -> Vec<Toolset> {
+        match role {
+            AgentRole::Orchestrator => Self::ALL.to_vec(),
+            AgentRole::Worker => vec![
+                Toolset::Issue,
+                Toolset::Session,
+                Toolset::Channel,
+                Toolset::Resource,
+                Toolset::Memory,
+                Toolset::Library,
+                Toolset::Artifact,
+            ],
+        }
+    }
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
@@ -361,6 +434,8 @@ pub struct Agent {
     pub persona: String,
     pub persona_mode: PersonaMode,
     pub skills: Vec<String>,
+    #[serde(default)]
+    pub toolsets: Vec<Toolset>,
     pub mcp_servers: Vec<MCPServer>,
     pub disallowed_tools: Vec<String>,
     pub env: BTreeMap<String, String>,
@@ -511,6 +586,7 @@ crate::typescript::module! {
     types: [AgentProblemLevel,
     AgentProblem,
     PersonaMode,
+    Toolset,
     MCPServerStdio,
     MCPServerHTTP,
     MCPServer,

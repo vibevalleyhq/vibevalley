@@ -385,6 +385,7 @@
       "persona": "",
       "personaMode": "append",
       "skills": [],
+      "toolsets": ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "artifact"],
       "mcpServers": [],
       "disallowedTools": [],
       "env": {},
@@ -415,6 +416,7 @@
       "persona": "你是后端老周：先读测试，再改代码，改完把测试跑一遍。",
       "personaMode": "append",
       "skills": ["review"],
+      "toolsets": ["issue", "session", "channel", "resource", "memory", "library", "artifact"],
       "mcpServers": [
         {
           "type": "stdio",
@@ -458,6 +460,7 @@
       "persona": "",
       "personaMode": "append",
       "skills": [],
+      "toolsets": ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "artifact"],
       "mcpServers": [],
       "disallowedTools": [],
       "env": {},
@@ -489,6 +492,7 @@
       "persona": "",
       "personaMode": "append",
       "skills": [],
+      "toolsets": ["issue", "session", "channel", "repo", "cron", "resource", "memory", "media", "library", "artifact"],
       "mcpServers": [],
       "disallowedTools": [],
       "env": {},

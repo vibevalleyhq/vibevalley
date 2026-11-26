@@ -267,7 +267,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         storage: storage.clone(),
         repos_root: repo.root().to_path_buf(),
     });
-    let mcp = Mcp::new(tool.clone(), config.version.clone());
+    let mcp = Mcp::with_home(tool.clone(), config.version.clone(), config.home.clone());
 
     let key = setting.clone();
     let orchestrator = Box::pin(Orchestrator::open_async(OrchestratorParts {

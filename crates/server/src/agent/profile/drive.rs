@@ -14,13 +14,25 @@ use crate::context::error::LookIn;
 use crate::context::port::MemoryRecallPort;
 use crate::runtime::{AgentProfileInfo, Drive, HelperPlace, Persona, RuntimeError, SessionDriver};
 
-/// `instructions`: the persona, then each of its skills.
+/// `instructions`: the persona, followed by an on-demand index of its skills.
 pub fn instructions(agent: &Agent, library: &[Skill]) -> String {
     let mut parts = vec![agent.persona.trim().to_string()];
+    let mut index = Vec::new();
     for id in &agent.skills {
         if let Some(skill) = library.iter().find(|s| &s.id == id) {
-            parts.push(format!("## {}\n{}", skill.name, skill.body.trim()));
+            let desc = skill.description.trim();
+            if desc.is_empty() {
+                index.push(format!("- {} ({})", skill.name, skill.id));
+            } else {
+                index.push(format!("- {} ({})：{desc}", skill.name, skill.id));
+            }
         }
+    }
+    if !index.is_empty() {
+        parts.push(format!(
+            "## 技能\n需要时通过 `load_skill` 或 MCP `skills/get` / `resources/read`（`skill://`）按需读取以下技能全文：\n{}",
+            index.join("\n")
+        ));
     }
     parts.retain(|p| !p.is_empty());
     parts.join("\n\n")

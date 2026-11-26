@@ -60,6 +60,8 @@ export {
   SpeciesValues,
   type TemplateCategory,
   TemplateCategoryValues,
+  type Toolset,
+  ToolsetValues,
 } from "./agent/shapes";
 export {
   type InventoryEntry,
@@ -148,6 +150,7 @@ export {
 } from "./session/shapes.gen";
 export {
   type Channel,
+  type ChannelCommand,
   type ChannelEvent,
   type ChannelRequest,
   type ChannelSummary,

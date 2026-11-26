@@ -607,3 +607,95 @@ fn workspace_coding_agent_receives_mcp_door_on_open_and_relaunch() {
     drop(listener2);
     app2.close_blocking();
 }
+
+#[test]
+fn helper_toolsets_narrow_mcp_tools_and_serve_user_and_builtin_skills() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let (opened_tx, opened_rx) = std::sync::mpsc::channel();
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(Recording {
+        inner: ScriptedRuntime::demo(),
+        opened: opened_tx,
+    }));
+    let app = vibevalley_server::create_app_blocking(vibevalley_server::Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        orchestrator_listens: false,
+        link_previews: false,
+        ..vibevalley_server::Config::under(dir.path())
+    })
+    .unwrap();
+    let listener = vibevalley_server::gateway::http::serve(app.server(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let door = format!("{}/mcp", listener.url());
+    app.set_mcp_url(door.clone());
+
+    let call = |op: &str, p| app.router().call_as(Caller::User, op, p);
+    assert!(call("repo.create", json!({ "name": "farm" })).data.is_some());
+
+    let created_skill = call(
+        "skill.create",
+        json!({ "id": "", "name": "deploy-check", "description": "Verify deploy readiness", "body": "Check migrations first." }),
+    );
+    assert_eq!(created_skill.biz_code, 0, "{}", created_skill.message);
+
+    let mut helper = vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.install_template_async("reviewer")).unwrap();
+    helper.runtime = "scripted".into();
+    helper.name = "窄权限帮工".into();
+    helper.toolsets = vec![vibevalley_protocol::Toolset::Issue];
+    vibevalley_runtime::rt::block_on(app.test_internals().agent.profile.store.save_async(helper)).unwrap();
+
+    let made = call("issue.create", json!({ "title": "narrow check", "repo": "farm", "agent": "窄权限帮工" }));
+    let id = made.data.unwrap()["id"].as_str().unwrap().to_string();
+    assert!(call("issue.status.update", json!({ "id": id, "status": "todo" })).data.is_some());
+
+    let opts = opened_rx.recv_timeout(Duration::from_secs(5)).expect("helper opened");
+    let token = vibevalley_token_from(&opts, &door);
+
+    // Worktree must NOT receive a copied skills directory.
+    assert!(!opts.cwd.join(".agents/skills/deploy-check").exists());
+
+    // `tools/list` only exposes Issue toolset tools for this helper.
+    let listed = rpc(&door, &token, 1, "tools/list", json!({}));
+    let names: Vec<&str> = listed["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|t| t["name"].as_str())
+        .collect();
+    assert!(names.contains(&"issue_list"), "{names:?}");
+    assert!(!names.contains(&"memory_search"), "{names:?}");
+    assert!(!names.contains(&"channel_say"), "{names:?}");
+
+    // `tools/call` on a tool outside `toolsets` fails cleanly.
+    let blocked = rpc(
+        &door,
+        &token,
+        2,
+        "tools/call",
+        json!({ "name": "memory_search", "arguments": { "query": "test" } }),
+    );
+    assert_eq!(blocked["result"]["isError"], true, "{blocked}");
+    assert!(text_of(&blocked).contains("memory"), "{blocked}");
+
+    // SEP-2640 serves user skill from `$VIBEVALLEY_HOME/skills` and built-in skills on demand.
+    let skills = rpc(&door, &token, 3, "skills/list", json!({}));
+    let skill_uris: Vec<&str> = skills["result"]["skills"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|s| s["uri"].as_str())
+        .collect();
+    assert!(skill_uris.contains(&"skill://local/deploy-check"), "{skill_uris:?}");
+    assert!(skill_uris.contains(&"skill://built-in/reviewer"), "{skill_uris:?}");
+    assert!(skill_uris.contains(&"skill://artifact/outline"), "{skill_uris:?}");
+
+    let user_skill = rpc(&door, &token, 4, "skills/get", json!({ "uri": "skill://local/deploy-check" }));
+    assert!(
+        user_skill["result"]["content"].as_str().unwrap().contains("Check migrations first."),
+        "{user_skill}"
+    );
+
+    drop(listener);
+    app.close_blocking();
+}

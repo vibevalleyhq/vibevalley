@@ -3,10 +3,10 @@ use std::sync::{Arc, LazyLock};
 use parking_lot::Mutex;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
-use vibevalley_protocol::Session;
+use vibevalley_protocol::{Agent, Session};
 
 use super::registry::{Route, ToolRegistry, Who, Words};
-use super::{chat, content, issue, memory, plan};
+use super::{chat, content, issue, memory, plan, toolset};
 use crate::BoxFuture;
 use crate::agent::mcp::{McpResourceContentWire, McpResourceTemplateWire, McpResourceWire, ResourceReader, ToolDispatchPort, ToolSpecWire};
 
@@ -19,8 +19,15 @@ static HELPER: LazyLock<Vec<Words>> = LazyLock::new(|| words_of(include_str!("..
 
 impl ToolRegistry {
     pub fn helper_tools_wire(&self) -> Vec<ToolSpecWire> {
+        self.helper_tools_for(None)
+    }
+
+    /// Returns helper tool definitions filtered by the session's agent profile toolsets and `can` narrowing.
+    pub fn helper_tools_for(&self, session: Option<&Session>) -> Vec<ToolSpecWire> {
+        let profile = session.and_then(|s| s.profile.as_deref()).and_then(|id| self.profile.agent(id));
         helper()
             .into_iter()
+            .filter(|t| toolset::allows(profile.as_ref(), &t.words.op, &t.words.name, toolset::Role::Helper))
             .map(|t| ToolSpecWire {
                 name: t.words.name,
                 description: t.words.description,
@@ -52,6 +59,10 @@ impl ToolRegistry {
 impl ToolDispatchPort for ToolRegistry {
     fn helper_tools(&self) -> Vec<ToolSpecWire> {
         self.helper_tools_wire()
+    }
+
+    fn helper_tools_for(&self, session: Option<&Session>) -> Vec<ToolSpecWire> {
+        ToolRegistry::helper_tools_for(self, session)
     }
 
     fn session_for_token<'a>(&'a self, token: &'a str) -> BoxFuture<'a, Option<Session>> {
@@ -248,6 +259,15 @@ pub fn unrun() -> Vec<String> {
 impl Tool {
     /// The tool run as `who`: its answer, or its refusal in words for the model.
     pub async fn run_async(&self, tools: &ToolRegistry, who: &Who, raw_json: &str) -> Result<String, String> {
+        let profile = match who {
+            Who::Orchestrator(route) if !route.agent.is_empty() => tools.profile.agent(&route.agent),
+            Who::Orchestrator(_) => None,
+            Who::Helper(session) => session.profile.as_deref().and_then(|id| tools.profile.agent(id)),
+        };
+        let role = toolset::Role::from_who(who);
+        if !toolset::allows(profile.as_ref(), &self.words.op, &self.words.name, role) {
+            return Err(toolset::denied_message(profile.as_ref(), &self.words.op, &self.words.name, role));
+        }
         (self.run)(tools, who, &self.words, raw_json).await
     }
 
@@ -294,8 +314,14 @@ impl vibevalley_runtime::agent::Tool for Held {
 
 /// The orchestrator's tools for its loop.
 pub fn held(tools: &Arc<ToolRegistry>, route: &Arc<Mutex<Route>>) -> Vec<Box<dyn vibevalley_runtime::agent::Tool>> {
+    held_for(tools, route, None)
+}
+
+/// The orchestrator's tools filtered by `agent`'s enabled toolsets and `can` narrowing.
+pub fn held_for(tools: &Arc<ToolRegistry>, route: &Arc<Mutex<Route>>, agent: Option<&Agent>) -> Vec<Box<dyn vibevalley_runtime::agent::Tool>> {
     orchestrator()
         .into_iter()
+        .filter(|t| toolset::allows(agent, &t.words.op, &t.words.name, toolset::Role::Orchestrator))
         .map(|tool| {
             Box::new(Held {
                 tool,

@@ -232,6 +232,10 @@ impl Runtime {
         self.session.who(token)
     }
 
+    pub fn opening_session(&self, id: &str) -> Option<vibevalley_protocol::Session> {
+        self.session.opening_session(id)
+    }
+
     pub fn base_branch(&self, session: &str) -> Option<String> {
         self.session.base_branch(session)
     }

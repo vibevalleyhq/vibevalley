@@ -125,7 +125,10 @@ impl ToolRegistry {
 
     pub async fn session_for_token_async(&self, token: &str) -> Option<Session> {
         let id = self.runtime.who(token)?;
-        self.ctx.service.session.get(&id).await.ok().flatten()
+        if let Some(saved) = self.ctx.service.session.get(&id).await.ok().flatten() {
+            return Some(saved);
+        }
+        self.runtime.opening_session(&id)
     }
 }
 

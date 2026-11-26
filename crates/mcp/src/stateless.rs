@@ -2,6 +2,7 @@
 //! SEP-2243 Routable Streamable HTTP header validation (`MCP-Protocol-Version`,
 //! `Mcp-Method`, `Mcp-Name`).
 
+use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -51,6 +52,12 @@ pub trait McpHandler: Send + Sync {
     /// Optional SEP-2640 skill catalog served via `skills/list`, `skills/get`, and `resources/read` (`skill://`).
     fn skills(&self) -> Option<&SkillCatalog> {
         None
+    }
+
+    /// Dynamic async SEP-2640 skill catalog hook; defaults to [`McpHandler::skills`].
+    fn resolve_skills_async<'a>(&'a self, _ctx: &'a RequestContext) -> BoxFuture<'a, Option<Cow<'a, SkillCatalog>>> {
+        let skills = self.skills().map(Cow::Borrowed);
+        Box::pin(async move { skills })
     }
 
     /// Optional read-access authorization hook checked before serving `skills/*` and `skill://` reads.
@@ -401,7 +408,7 @@ pub async fn dispatch_request<H: McpHandler + ?Sized>(handler: &H, base_ctx: &Re
         },
         "resources/list" => match handler.list_resources(&ctx).await {
             Ok(mut resources) => {
-                if let Some(catalog) = handler.skills() {
+                if let Some(catalog) = handler.resolve_skills_async(&ctx).await {
                     for skill_res in catalog.as_resources() {
                         if !resources.iter().any(|existing| existing.uri == skill_res.uri) {
                             resources.push(skill_res);
@@ -414,7 +421,7 @@ pub async fn dispatch_request<H: McpHandler + ?Sized>(handler: &H, base_ctx: &Re
         },
         "resources/templates/list" => match handler.list_resource_templates(&ctx).await {
             Ok(mut templates) => {
-                if let Some(catalog) = handler.skills() {
+                if let Some(catalog) = handler.resolve_skills_async(&ctx).await {
                     for skill_tpl in catalog.as_resource_templates() {
                         if !templates.iter().any(|existing| existing.uri_template == skill_tpl.uri_template) {
                             templates.push(skill_tpl);
@@ -433,7 +440,7 @@ pub async fn dispatch_request<H: McpHandler + ?Sized>(handler: &H, base_ctx: &Re
             } else if SkillCatalog::is_skill_uri(uri) {
                 if let Err(err) = handler.authorize_read(&ctx).await {
                     Err(err)
-                } else if let Some(content) = handler.skills().and_then(|c| c.read_resource(uri)) {
+                } else if let Some(content) = handler.resolve_skills_async(&ctx).await.and_then(|c| c.read_resource(uri)) {
                     Ok(json!({ "contents": [content] }))
                 } else {
                     Err(RpcError::resource_not_found(format!("skill not found: {uri}")))
@@ -445,7 +452,11 @@ pub async fn dispatch_request<H: McpHandler + ?Sized>(handler: &H, base_ctx: &Re
         "skills/list" => match handler.authorize_read(&ctx).await {
             Ok(()) => {
                 let params: SkillListParams = serde_json::from_value(req.params).unwrap_or_default();
-                let skills = handler.skills().map(|c| c.list(params.tag.as_deref())).unwrap_or_default();
+                let skills = handler
+                    .resolve_skills_async(&ctx)
+                    .await
+                    .map(|c| c.list(params.tag.as_deref()))
+                    .unwrap_or_default();
                 Ok(json!({ "skills": skills }))
             }
             Err(err) => Err(err),
@@ -461,7 +472,7 @@ pub async fn dispatch_request<H: McpHandler + ?Sized>(handler: &H, base_ctx: &Re
                     .or_else(|| params.name.as_deref().map(str::trim).filter(|s| !s.is_empty()));
                 match key {
                     None => Err(RpcError::invalid_params("skills/get requires 'uri' or 'name'")),
-                    Some(selector) => match handler.skills().and_then(|c| c.get(selector, params.file.as_deref())) {
+                    Some(selector) => match handler.resolve_skills_async(&ctx).await.and_then(|c| c.get(selector, params.file.as_deref())) {
                         Some(doc) => serde_json::to_value(doc).map_err(|e| RpcError::internal(e.to_string())),
                         None => Err(RpcError::resource_not_found(format!("skill not found: {selector}"))),
                     },

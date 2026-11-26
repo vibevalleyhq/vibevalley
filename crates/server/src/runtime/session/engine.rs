@@ -80,6 +80,7 @@ pub(super) fn ended_phase(outcome: Outcome) -> Phase {
 struct Door {
     url: Option<String>,
     tokens: HashMap<String, String>,
+    opening: HashMap<String, Session>,
 }
 
 /// A drafting round that ended: what the drafter said, for the issue
@@ -375,6 +376,11 @@ impl SessionEngine {
         self.0.door.lock().tokens.get(token).cloned()
     }
 
+    /// Snapshot of a session whose runtime handle is currently opening before `go_live_async` persists it.
+    pub fn opening_session(&self, id: &str) -> Option<Session> {
+        self.0.door.lock().opening.get(id).cloned()
+    }
+
     /// Mints (or reuses) the per-session MCP bearer token so remote sessions can
     /// authenticate over the WS MCP reverse tunnel even without a local HTTP MCP URL.
     pub(super) fn mcp_token_for(&self, session: &str) -> String {
@@ -617,7 +623,14 @@ impl SessionEngine {
             system_prompt,
             ..Default::default()
         };
-        let agent = drive.runtime.open(opts).await?;
+        self.0.door.lock().opening.insert(session.id.clone(), session.clone());
+        let agent = match drive.runtime.open(opts).await {
+            Ok(agent) => agent,
+            Err(err) => {
+                self.0.door.lock().opening.remove(&session.id);
+                return Err(err.into());
+            }
+        };
         Ok((agent, prompt))
     }
 
@@ -644,6 +657,7 @@ impl SessionEngine {
             prev.dispose().await;
         }
         let id = session.id.clone();
+        self.0.door.lock().opening.remove(&id);
         let previous = session
             .subagents
             .as_ref()

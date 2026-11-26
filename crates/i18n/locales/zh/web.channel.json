@@ -297,7 +297,9 @@
       "remember": "记下了",
       "stop": "叫停了",
       "imagegen": "交给主助手了，画好会发到这里"
-    }
+    },
+    "skillArgs": "说明（可选）",
+    "skillNote": "用技能执行"
   },
   "lacks": "回不了话：{why}",
   "lacksFix": "去设置"

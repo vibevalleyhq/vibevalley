@@ -165,6 +165,20 @@ export const catalogs = {
       disallowedExample: "比如 WebSearch",
       ownMcp: "{runtime} 自己连的 MCP",
       ownMcpTip: "引擎自己报告的，和上面加的叠在一起。",
+      toolsets: "能力集",
+      toolsetsTip: "控制这个角色能调用哪些农场内建工具（服务端也会按角色权限兜底校验）。",
+      toolset: {
+        issue: "工单",
+        session: "执行会话",
+        channel: "频道消息",
+        repo: "仓库",
+        cron: "定时任务",
+        resource: "资源读取",
+        memory: "记忆",
+        media: "媒体",
+        library: "资料库",
+        artifact: "作品",
+      },
       unreported: "这个引擎不报告这一项。",
       none: "没有。",
       role: { orchestrator: "主助手", worker: "执行角色" },
@@ -1082,6 +1096,8 @@ export const catalogs = {
           notReady: "生图还没设置好：{why}，回车去设置",
         },
         done: { issue: "记下了 #{n}", remember: "记下了", stop: "叫停了", imagegen: "交给主助手了，画好会发到这里" },
+        skillArgs: "说明（可选）",
+        skillNote: "用技能执行",
       },
       lacks: "回不了话：{why}",
       lacksFix: "去设置",
@@ -3865,6 +3881,20 @@ export const catalogs = {
       disallowedExample: "such as WebSearch",
       ownMcp: "MCP servers {runtime} connects itself",
       ownMcpTip: "Reported by the runtime, together with those added above.",
+      toolsets: "Toolsets",
+      toolsetsTip: "Controls which built-in farm toolsets this profile can call (the server also enforces role permissions).",
+      toolset: {
+        issue: "Issues",
+        session: "Sessions",
+        channel: "Channels",
+        repo: "Repositories",
+        cron: "Crons",
+        resource: "Resources",
+        memory: "Memory",
+        media: "Media",
+        library: "Library",
+        artifact: "Artifacts",
+      },
       unreported: "This runtime does not report this.",
       none: "None.",
       role: { orchestrator: "Assistant", worker: "Helper" },
@@ -4823,6 +4853,8 @@ export const catalogs = {
           notReady: "Images aren't set up: {why}. Press Enter to set it up",
         },
         done: { issue: "Written down as #{n}", remember: "Remembered", stop: "Stopped", imagegen: "Handed to the assistant; the image will be posted here" },
+        skillArgs: "args (optional)",
+        skillNote: "Run skill",
       },
       lacks: "cannot answer: {why}",
       lacksFix: "Settings",
@@ -7816,6 +7848,18 @@ export interface Messages {
   "web.agent.templates.updateHint": undefined;
   "web.agent.templates.updated": undefined;
   "web.agent.templates.willUse": { readonly runtime: string | number };
+  "web.agent.toolset.artifact": undefined;
+  "web.agent.toolset.channel": undefined;
+  "web.agent.toolset.cron": undefined;
+  "web.agent.toolset.issue": undefined;
+  "web.agent.toolset.library": undefined;
+  "web.agent.toolset.media": undefined;
+  "web.agent.toolset.memory": undefined;
+  "web.agent.toolset.repo": undefined;
+  "web.agent.toolset.resource": undefined;
+  "web.agent.toolset.session": undefined;
+  "web.agent.toolsets": undefined;
+  "web.agent.toolsetsTip": undefined;
   "web.agent.unnamed": undefined;
   "web.agent.unnamedAgent": undefined;
   "web.agent.unreported": undefined;
@@ -8507,6 +8551,8 @@ export interface Messages {
   "web.channel.commands.remember.name": undefined;
   "web.channel.commands.remember.needs": undefined;
   "web.channel.commands.remember.note": undefined;
+  "web.channel.commands.skillArgs": undefined;
+  "web.channel.commands.skillNote": undefined;
   "web.channel.commands.stop.args": undefined;
   "web.channel.commands.stop.name": undefined;
   "web.channel.commands.stop.needs": undefined;

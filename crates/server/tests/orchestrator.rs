@@ -677,4 +677,84 @@ fn regression_a_stale_approval_cannot_grant_the_next_call_over_http() {
     reopened.close_blocking();
 }
 
+#[test]
+fn channel_command_invokes_user_skill_on_demand_and_orchestrator_toolsets_narrow_tools() {
+    vibevalley_i18n::set_locale("zh");
+    let dir = tempfile::tempdir().unwrap();
+    let clock = Arc::new(ManualClock::new(1_700_000_000_000));
+    let model = SignaledScripted::new([
+        call("c1", "load_skill", json!({ "name": "release-check" })),
+        say("已按 release-check 核对完成。"),
+    ]);
+    let mut registry = vibevalley_runtime::oar::Registry::new();
+    registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
+    let started = vibevalley_server::create_app_blocking(vibevalley_server::Config {
+        registry: Some(Arc::new(registry)),
+        probe_runtimes: false,
+        link_previews: false,
+        tick_crons: false,
+        model_client: Some(model.clone()),
+        clock,
+        ..vibevalley_server::Config::under(dir.path())
+    })
+    .unwrap();
+    let hub = started.router().clone();
+    let user = |op: &str, p: Value| {
+        let e = hub.call_as(Caller::User, op, p);
+        assert_eq!(e.biz_code, 0, "{op}: {}", e.message);
+        e.data.unwrap_or(Value::Null)
+    };
+
+    user(
+        "skill.create",
+        json!({
+            "id": "",
+            "name": "release-check",
+            "description": "Pre-release checklist",
+            "body": "Run tests before shipping."
+        }),
+    );
+
+    let agents: Vec<vibevalley_protocol::Agent> = serde_json::from_value(user("agent.list", json!({}))).unwrap();
+    let mut orch = agents.into_iter().find(|a| a.id == "orchestrator").unwrap();
+    orch.toolsets = vec![vibevalley_protocol::Toolset::Issue];
+    user("agent.update", serde_json::to_value(orch).unwrap());
+
+    let general = started.test_internals().channel.default_channel();
+    user(
+        "channel.message.send",
+        json!({
+            "id": general,
+            "text": "/release-check v1.2",
+            "command": { "name": "release-check", "args": "v1.2" },
+            "sendKey": "slash-cmd"
+        }),
+    );
+
+    crate::support::wait_until_channel_event(started.test_internals().channel, Duration::from_secs(30), "skill command reply", || {
+        let said = user("channel.message.list", json!({ "id": general }));
+        said.as_array()?
+            .iter()
+            .find(|m| m["from"] == "orchestrator" && m["text"] == "已按 release-check 核对完成。")
+            .cloned()
+    });
+
+    let seen = model.seen.lock().unwrap().clone();
+    let tool_names: Vec<&str> = seen[0].tools.iter().map(|t| t.name.as_str()).collect();
+    assert!(tool_names.contains(&"issue_list"), "{tool_names:?}");
+    assert!(tool_names.contains(&"load_skill"), "{tool_names:?}");
+    assert!(!tool_names.contains(&"cron_list"), "cron should be filtered out by toolsets: {tool_names:?}");
+    let prompt_input = seen[0].messages.last().unwrap().content.clone().unwrap_or_default();
+    assert!(prompt_input.contains("/release-check"), "{prompt_input}");
+    assert!(prompt_input.contains("v1.2"), "{prompt_input}");
+    let skill_result = seen[1]
+        .messages
+        .iter()
+        .find(|m| m.role == Role::Tool)
+        .and_then(|m| m.content.clone())
+        .unwrap_or_default();
+    assert!(skill_result.contains("Run tests before shipping."), "{skill_result}");
+    started.close_blocking();
+}
+
 mod grading;

@@ -23,7 +23,8 @@ import { type Accessor, createMemo, createSignal, onSettled } from "../../../inf
 import { defineAtom } from "../../../infra/state/atom";
 import { defineIntent, type Intent, type Intents } from "../../../infra/state/intent";
 import { defineStored, orFallback } from "../../../infra/state/stored";
-import { commandNameables, commandOf, runCommand, typedCommand } from "./commands";
+import { useSkills } from "../../runtime";
+import { commandNameables, commandOf, type ParsedCommand, runCommand, typedCommand } from "./commands";
 import { followed, useMessage } from "./follow";
 import { insertName, type Nameable, nameables, offeredFor, typedName } from "./mentions";
 
@@ -117,6 +118,7 @@ export function createComposer(
 
   const orchestrators = useOrchestrators();
   const settings = useQuery(settingsQuery);
+  const skills = useSkills();
   const readiness = () => ready(settings, undefined)?.readiness;
   const here = computed(() => channelOf(ways.target().id)?.orchestrator ?? defaultOrchestrator);
   const hidden = (kind: Trigger["kind"], found: { readonly start: number } | undefined) => {
@@ -142,7 +144,7 @@ export function createComposer(
     });
   const offered = createMemo(() => {
     const c = commandTyping();
-    if (c) return offeredFor(commandNameables(readiness()), c.query);
+    if (c) return offeredFor(commandNameables(readiness(), ready(skills, [])), c.query);
     const t = typing();
     return t ? offeredFor(nameables(sessions()?.sessions ?? [], orchestrators(), here(), Date.now()), t.query) : [];
   });
@@ -163,7 +165,7 @@ export function createComposer(
     place(next.caret);
   };
 
-  const command = async (c: NonNullable<ReturnType<typeof commandOf>>) => {
+  const command = async (c: Extract<ParsedCommand, { readonly kind: "builtin" }>) => {
     setSending(true);
     try {
       const done = await commanding.run(() => runCommand(c, { channel: channelOf(ways.target().id), orchestrator: here(), readiness: readiness() }));
@@ -178,11 +180,19 @@ export function createComposer(
 
   const send = async () => {
     if (disposed || busy()) return;
-    const asked = commandOf(text());
-    if (asked && !((ways.target().attachments?.length ?? 0) !== 0)) return command(asked);
+    const asked = commandOf(text(), ready(skills, []));
+    if (asked?.kind === "builtin" && !((ways.target().attachments?.length ?? 0) !== 0)) return command(asked);
     const body = intent();
     if (!body.text && !((body.attachments?.length ?? 0) !== 0)) return;
-    const said = { ...body, id: channelOf(body.id)?.id ?? body.id };
+    const said: Said =
+      asked?.kind === "skill"
+        ? {
+            ...body,
+            id: channelOf(body.id)?.id ?? body.id,
+            to: body.to ?? here(),
+            command: { name: asked.skill.id, args: asked.args },
+          }
+        : { ...body, id: channelOf(body.id)?.id ?? body.id };
     edit("", 0);
     ways.sent?.();
     const end = await ways.says.send(said).done;

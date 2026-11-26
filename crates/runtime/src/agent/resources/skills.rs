@@ -10,14 +10,42 @@ use crate::agent::tools::{ReplayPolicy, Tool, ToolContext, ToolOutput, TypedTool
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillInfo {
+    pub id: String,
     pub name: String,
     pub description: String,
     pub path: PathBuf,
+    pub content: Option<String>,
+}
+
+impl SkillInfo {
+    /// Creates an in-memory skill entry backed by embedded markdown instead of a workspace file.
+    pub fn inline(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        description: impl Into<String>,
+        path: impl Into<PathBuf>,
+        content: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            description: description.into(),
+            path: path.into(),
+            content: Some(content.into()),
+        }
+    }
 }
 
 pub fn default_skill_dirs(cwd: &Path) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(vv_home) = std::env::var_os("VIBEVALLEY_HOME").filter(|v| !v.is_empty()) {
+        dirs.push(PathBuf::from(vv_home).join("skills"));
+    }
     let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
-    vec![home.join(".agents/skills"), home.join(".claude/skills"), cwd.join(".agents/skills")]
+    dirs.push(home.join(".agents/skills"));
+    dirs.push(home.join(".claude/skills"));
+    dirs.push(cwd.join(".agents/skills"));
+    dirs
 }
 
 /// YAML's simple `key: value` lines only (quotes and folded `>`/`|`).
@@ -79,14 +107,16 @@ pub fn scan_skills(dirs: &[PathBuf]) -> Vec<SkillInfo> {
             let Ok(text) = std::fs::read_to_string(&path) else { continue };
             let fm = front_matter(&text);
             let folder = sub.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-            let name = fm.get("name").filter(|n| !n.is_empty()).cloned().unwrap_or(folder);
+            let name = fm.get("name").filter(|n| !n.is_empty()).cloned().unwrap_or_else(|| folder.clone());
             if found.iter().any(|s| s.name == name) {
                 continue;
             }
             found.push(SkillInfo {
+                id: folder,
                 name,
                 description: fm.get("description").cloned().unwrap_or_default(),
                 path,
+                content: None,
             });
         }
     }
@@ -111,13 +141,29 @@ pub fn skill_index(skills: &[SkillInfo], max: usize) -> String {
         .join("\n")
 }
 
+pub fn find_skill<'a>(skills: &'a [SkillInfo], key: &str) -> Option<&'a SkillInfo> {
+    let trimmed = key.trim();
+    skills
+        .iter()
+        .find(|s| s.name == trimmed)
+        .or_else(|| skills.iter().find(|s| !s.id.is_empty() && s.id == trimmed))
+        .or_else(|| {
+            skills
+                .iter()
+                .find(|s| s.name.eq_ignore_ascii_case(trimmed) || (!s.id.is_empty() && s.id.eq_ignore_ascii_case(trimmed)))
+        })
+}
+
 pub fn read_skill(skills: &[SkillInfo], name: &str) -> Result<String, String> {
-    let Some(s) = skills.iter().find(|s| s.name == name) else {
+    let Some(s) = find_skill(skills, name) else {
         let known: Vec<&str> = skills.iter().map(|s| s.name.as_str()).collect();
         let list = if known.is_empty() { "（没有）".to_string() } else { known.join("、") };
         return Err(format!("没有叫 {name} 的技能。有：{list}"));
     };
-    let text = std::fs::read_to_string(&s.path).map_err(|_| format!("读不到 {}", s.path.display()))?;
+    let text = match &s.content {
+        Some(raw) => raw.clone(),
+        None => std::fs::read_to_string(&s.path).map_err(|_| format!("读不到 {}", s.path.display()))?,
+    };
     Ok(format!("# {}\n（来自 {}）\n\n{}", s.name, s.path.display(), skill_body(&text)))
 }
 
@@ -161,12 +207,10 @@ impl TypedTool for LoadSkill {
             }
             let skills = (self.skills)();
             let text = read_skill(&skills, &args.name)?;
-            let path = skills
-                .iter()
-                .find(|s| s.name == args.name)
-                .map(|s| s.path.display().to_string())
-                .unwrap_or_default();
-            Ok(TypedToolOutput::ok_with(text, LoadSkillDetails { name: args.name, path }))
+            let matched = find_skill(&skills, &args.name);
+            let name = matched.map(|s| s.name.clone()).unwrap_or_else(|| args.name.clone());
+            let path = matched.map(|s| s.path.display().to_string()).unwrap_or_default();
+            Ok(TypedToolOutput::ok_with(text, LoadSkillDetails { name, path }))
         })
     }
 }

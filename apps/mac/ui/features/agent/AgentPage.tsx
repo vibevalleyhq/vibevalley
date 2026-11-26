@@ -19,7 +19,7 @@ import { agentsQuery, ready, useAgents, useQueryClient, useRuntimes } from "../.
 import { Link as A, useRouter, useSearch } from "../../infra/router";
 import { untrack } from "../../infra/solid";
 import { runsHref } from "../session";
-import { ConfigTabs, supportOf } from "./AgentConfig";
+import { ConfigTabs, defaultToolsets, supportOf } from "./AgentConfig";
 import { LookPanel, Stage } from "./AgentLook";
 import { FromTemplate } from "./FromTemplate";
 import { newOrchestrator, OrchestratorProfile } from "./OrchestratorProfile";
@@ -39,6 +39,7 @@ function newAgent(runtime: string, catalog: readonly RuntimeInfo[]): Agent {
     persona: "",
     personaMode: supportOf(info).refused[sessionAppendSystemPrompt] ? "prompt" : "append",
     skills: [],
+    toolsets: defaultToolsets("worker"),
     mcpServers: [],
     disallowedTools: [],
     env: {},

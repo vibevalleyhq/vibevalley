@@ -67,6 +67,7 @@ impl Chat {
             attachments: body.attachments.unwrap_or_default(),
             to: body.to,
             view_context: body.view_context,
+            command: body.command,
             ..Saying::default()
         })
         .await?;

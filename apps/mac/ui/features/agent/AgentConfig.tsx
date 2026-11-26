@@ -8,6 +8,8 @@ import {
   type PersonaMode,
   type RuntimeInfo,
   type RuntimeSupport,
+  type Toolset,
+  ToolsetValues,
   sessionAppendSystemPrompt,
   sessionDisallowedTools,
   sessionEffort,
@@ -431,12 +433,22 @@ function SkillPicker(props: { draft: Agent; runtime?: RuntimeInfo | undefined; p
   );
 }
 
+const workerToolsets: readonly Toolset[] = ["issue", "session", "channel", "resource", "memory", "library", "artifact"];
+
+export const defaultToolsets = (role: Agent["role"]): Toolset[] => (role === "orchestrator" ? [...ToolsetValues] : [...workerToolsets]);
+
 const mcpTarget = (s: MCPServer) => (s.type === "stdio" ? [s.command, ...s.args].join(" ") : s.url);
 
 function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: Patch }) {
   const support = computed(() => supportOf(props.runtime));
   const mcpRefused = computed(() => support().refused[sessionMcpServers]);
   const toolsRefused = computed(() => support().refused[sessionDisallowedTools]);
+  const roleToolsets = computed(() => (props.draft.role === "orchestrator" ? [...ToolsetValues] : workerToolsets));
+  const toggleToolset = (ts: Toolset) => {
+    const current = props.draft.toolsets;
+    const next = current.includes(ts) ? current.filter((item) => item !== ts) : [...current, ts];
+    props.patch({ ...props.draft, toolsets: next });
+  };
   const type = signal<"stdio" | "http">("stdio");
   const name = signal("");
   const target = signal("");
@@ -458,6 +470,27 @@ function Tools(props: { draft: Agent; runtime?: RuntimeInfo | undefined; patch: 
   };
   return (
     <>
+      <Labeled label={t("web.agent.toolsets")} tip={t("web.agent.toolsetsTip")}>
+        <View class="flex-row flex-wrap gap-2">
+          <Each of={roleToolsets()} key={(ts) => ts}>
+            {(ts) => {
+              const on = () => props.draft.toolsets.includes(ts());
+              return (
+                <View
+                  class={`flex-row items-center gap-2 rounded-md border px-2.5 py-1.5 ${
+                    on() ? "border-accent bg-selected" : "border-line hover:border-faint hover:bg-hover"
+                  }`}
+                >
+                  <Checkbox testid={`toolset-${ts()}`} checked={on()} onChange={() => toggleToolset(ts())} label={t(`web.agent.toolset.${ts()}`)} />
+                  <View role="button" accessibilityLabel={t(`web.agent.toolset.${ts()}`)} onPress={() => toggleToolset(ts())}>
+                    <Text class="text-xs font-medium text-ink">{t(`web.agent.toolset.${ts()}`)}</Text>
+                  </View>
+                </View>
+              );
+            }}
+          </Each>
+        </View>
+      </Labeled>
       <Labeled
         label={t("web.agent.mcp")}
         hint={mcpRefused() ?? t("web.agent.mcpHint")}

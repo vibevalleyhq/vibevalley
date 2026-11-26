@@ -113,6 +113,20 @@
   "disallowedExample": "such as WebSearch",
   "ownMcp": "MCP servers {runtime} connects itself",
   "ownMcpTip": "Reported by the runtime, together with those added above.",
+  "toolsets": "Toolsets",
+  "toolsetsTip": "Controls which built-in farm toolsets this profile can call (the server also enforces role permissions).",
+  "toolset": {
+    "issue": "Issues",
+    "session": "Sessions",
+    "channel": "Channels",
+    "repo": "Repositories",
+    "cron": "Crons",
+    "resource": "Resources",
+    "memory": "Memory",
+    "media": "Media",
+    "library": "Library",
+    "artifact": "Artifacts"
+  },
   "unreported": "This runtime does not report this.",
   "none": "None.",
   "role": {

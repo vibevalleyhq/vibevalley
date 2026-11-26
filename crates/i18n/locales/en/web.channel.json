@@ -297,7 +297,9 @@
       "remember": "Remembered",
       "stop": "Stopped",
       "imagegen": "Handed to the assistant; the image will be posted here"
-    }
+    },
+    "skillArgs": "args (optional)",
+    "skillNote": "Run skill"
   },
   "lacks": "cannot answer: {why}",
   "lacksFix": "Settings"

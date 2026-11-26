@@ -113,6 +113,20 @@
   "disallowedExample": "比如 WebSearch",
   "ownMcp": "{runtime} 自己连的 MCP",
   "ownMcpTip": "引擎自己报告的，和上面加的叠在一起。",
+  "toolsets": "能力集",
+  "toolsetsTip": "控制这个角色能调用哪些农场内建工具（服务端也会按角色权限兜底校验）。",
+  "toolset": {
+    "issue": "工单",
+    "session": "执行会话",
+    "channel": "频道消息",
+    "repo": "仓库",
+    "cron": "定时任务",
+    "resource": "资源读取",
+    "memory": "记忆",
+    "media": "媒体",
+    "library": "资料库",
+    "artifact": "作品"
+  },
   "unreported": "这个引擎不报告这一项。",
   "none": "没有。",
   "role": {
