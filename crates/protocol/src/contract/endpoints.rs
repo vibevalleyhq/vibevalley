@@ -295,6 +295,24 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("RepoSummary"),
     },
     Endpoint {
+        op: "repo.mount",
+        module: "repo",
+        about: &[],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("MountRepo"),
+        result: Some("RepoSummary"),
+    },
+    Endpoint {
+        op: "repo.unmount",
+        module: "repo",
+        about: &["id"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("RepoUnmountInput"),
+        result: None,
+    },
+    Endpoint {
         op: "repo.language.list",
         module: "repo",
         about: &["id"],
@@ -1976,6 +1994,18 @@ pub mod ops {
         type Input = t::NewRepo;
         type Result = t::RepoSummary;
     }
+    pub struct RepoMount;
+    impl Op for RepoMount {
+        const NAME: &'static str = "repo.mount";
+        type Input = t::MountRepo;
+        type Result = t::RepoSummary;
+    }
+    pub struct RepoUnmount;
+    impl Op for RepoUnmount {
+        const NAME: &'static str = "repo.unmount";
+        type Input = t::RepoUnmountInput;
+        type Result = ();
+    }
     pub struct RepoLanguageList;
     impl Op for RepoLanguageList {
         const NAME: &'static str = "repo.language.list";
@@ -3215,6 +3245,8 @@ endpoint_ids! {
     RepoList => "repo.list",
     RepoValidate => "repo.validate",
     RepoCreate => "repo.create",
+    RepoMount => "repo.mount",
+    RepoUnmount => "repo.unmount",
     RepoLanguageList => "repo.language.list",
     RepoTemplateList => "repo.template.list",
     RepoActivityGet => "repo.activity.get",

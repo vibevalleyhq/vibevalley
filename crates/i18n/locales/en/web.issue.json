@@ -286,6 +286,7 @@
     "whichRepo": "Which repo",
     "firstRepo": "No repo yet: make one",
     "newRepoLink": "New repo",
+    "mountLocalLink": "Mount local repo",
     "priority": "Priority",
     "inQueue": "Queued {ago}: it starts by itself in the board's order when a spot frees up.",
     "unqueue": "Unqueue",

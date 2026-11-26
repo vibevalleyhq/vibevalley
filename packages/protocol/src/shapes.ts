@@ -79,6 +79,7 @@ export type {
   Changes,
   GitHubStatus,
   LanguageCount,
+  MountRepo,
   NewRepo,
   RepoActivity,
   RepoLanguages,

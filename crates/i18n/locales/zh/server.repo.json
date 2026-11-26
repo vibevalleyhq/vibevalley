@@ -37,5 +37,12 @@
   "publish.platformFailed": "托管平台调用失败：{stage}。请检查工具安装与登录状态。",
   "publish.pushedWithoutLink": "SHA {sha} 已推送，但未确认 PR/MR 链接：{why}。可重试查询已有请求。",
   "publish.userOnly": "只有本机的用户可以发布已有分支",
-  "publish.pushUnconfirmed": "SHA {sha} 的推送未确认成功。尚未尝试创建 PR/MR；重试前请核对远端。"
+  "publish.pushUnconfirmed": "SHA {sha} 的推送未确认成功。尚未尝试创建 PR/MR；重试前请核对远端。",
+  "mount": {
+    "emptyPath": "请提供本地仓库路径",
+    "notFound": "目录不存在：{path}",
+    "notDir": "该路径不是文件夹：{path}",
+    "notGit": "「{path}」还不是 Git 仓库（可勾选初始化 Git 后关联）",
+    "unmountManaged": "「{name}」是工作区托管仓库，不能取消关联"
+  }
 }

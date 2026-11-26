@@ -255,6 +255,7 @@
   },
   "repoDetail": {
     "badgeManaged": "VibeValley repo",
+    "badgeMounted": "Local mount",
     "badgeFolder": "Local folder",
     "openFullPage": "Open full repository page",
     "copied": "Path copied",

@@ -33,6 +33,8 @@ export const servedEndpoints = [
   { op: "repo.list", can: ["user", "remote", "orchestrator"], about: [] },
   { op: "repo.validate", can: ["user", "remote"], about: [] },
   { op: "repo.create", can: ["user", "remote"], about: [] },
+  { op: "repo.mount", can: ["user", "remote"], about: [] },
+  { op: "repo.unmount", can: ["user", "remote"], about: ["id"] },
   { op: "repo.language.list", can: ["user", "remote"], about: ["id"] },
   { op: "repo.template.list", can: ["user", "remote"], about: ["id"] },
   { op: "repo.activity.get", can: ["user", "remote"], about: ["id"] },

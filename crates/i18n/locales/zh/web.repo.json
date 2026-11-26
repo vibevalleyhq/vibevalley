@@ -88,5 +88,22 @@
   "busy": "进行中…",
   "download": "下载到工作区",
   "create": "创建仓库",
-  "otherLang": "其他"
+  "otherLang": "其他",
+  "mountLocal": "关联本地仓库",
+  "local": "本地目录",
+  "localPath": "本地目录路径",
+  "localPathHint": "直接关联磁盘上已有的 Git 仓库，不搬运也不复制原目录文件。",
+  "localPathPlaceholder": "/Users/你的名字/projects/my-repo",
+  "pickFolder": "选择文件夹",
+  "mount": "关联仓库",
+  "mounting": "正在关联…",
+  "initGit": "若还不是 Git 仓库则顺便初始化",
+  "initGitHint": "如果所选目录尚未初始化 Git，会创建仓库并提交初始空提交以便派发工作树。",
+  "nameOptionalHint": "可选；留空默认使用目录名，若重名会自动追加后缀。",
+  "badgeManaged": "工作区托管",
+  "badgeLocal": "本地关联",
+  "unmount": "取消关联",
+  "unmounting": "取消中…",
+  "unmounted": "已取消关联 {name}（磁盘原目录已保留）",
+  "unmountTip": "仅从 VibeValley 列表移除关联，不会删除磁盘上的本地文件夹"
 }

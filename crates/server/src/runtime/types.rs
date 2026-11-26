@@ -94,6 +94,8 @@ pub struct RuntimeConfig {
     /// `repo` under it is kept as its name, and a bare name is looked for
     /// there; otherwise `repo` is a path.
     pub repos_dir: Option<PathBuf>,
+    /// Shared repository manager for resolving mounted external repos and symlinks.
+    pub repo: Option<std::sync::Arc<crate::repo::Repo>>,
 }
 
 pub type BoardConfig = RuntimeConfig;
@@ -109,6 +111,7 @@ impl RuntimeConfig {
             model: None,
             quiet_after: Duration::from_secs(240),
             repos_dir: None,
+            repo: None,
         }
     }
 

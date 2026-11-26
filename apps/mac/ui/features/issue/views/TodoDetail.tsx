@@ -17,6 +17,7 @@ import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { ConfirmButton } from "../../../design/ConfirmButton";
+import { AgentReadinessNote, AgentSelect } from "../../../design/domain/AgentSelect";
 import { TextArea, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { Markdown } from "../../../design/Markdown";
@@ -24,9 +25,10 @@ import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { mix } from "../../../design/tone";
-import { useWorkAgents } from "../../../infra/agents";
-import { api } from "../../../infra/api";
+import { useWorkAgentReadiness, useWorkAgents } from "../../../infra/agents";
+import { api, reasonOf } from "../../../infra/api";
 import { ago, shortMomentText } from "../../../infra/base/format";
+import { hostApi } from "../../../infra/bridge";
 import { ready, useQueryClient, useRepos } from "../../../infra/query";
 import { createEffect, createSignal, untrack } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
@@ -100,10 +102,11 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const editingCriteria = signal(false);
   const refineOpen = signal(false);
   const agents = useWorkAgents(true);
+  const agentReadiness = useWorkAgentReadiness(true);
   const allIssues = useIssues();
+  const queries = useQueryClient();
   const repoList = useRepos();
   const repos = computed(() => ready(repoList, []).map((p) => p.name));
-  const agentOptions = computed(() => agents().map((a) => ({ value: a.id, label: a.runtime ? `${a.name} · ${a.runtime}` : a.name })));
   const repoOptions = computed(() => [...new Set([...repos(), ...(d().repo ? [d().repo] : [])])].map((p) => ({ value: p, label: p })));
   const priorityOptions = computed(() => PriorityValues.map((p) => ({ value: p, label: t(`shared.priority.${p}`) })));
   const deliverOptions = computed(() => DeliverableValues.map((v) => ({ value: v, label: t(`shared.deliverable.${v}`) })));
@@ -543,6 +546,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         />
       </Property>
       <Property
+        align="start"
         label={t("web.issue.detail.helper")}
         icon={
           <If when={d().agent} else={<Icon name="agents" size={13} tone="muted" />}>
@@ -551,14 +555,23 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         }
         inset
       >
-        <Pick
-          label={t("web.issue.detail.helper")}
-          testid="issue-helper"
-          value={d().agent}
-          placeholder={t("web.issue.todo.pickForMe")}
-          onChange={(v) => edit({ agent: v })}
-          options={agentOptions()}
-        />
+        <View class="gap-1.5">
+          <AgentSelect
+            quiet
+            size="control"
+            label={t("web.issue.detail.helper")}
+            testid="issue-helper"
+            value={d().agent}
+            disabled={closed()}
+            agents={agents()}
+            readiness={agentReadiness}
+            placeholder={t("web.issue.todo.pickForMe")}
+            onChange={(v) => edit({ agent: v })}
+          />
+          <If when={d().agent !== ""}>
+            <AgentReadinessNote agentId={d().agent} readiness={agentReadiness} testid="issue-helper-status" />
+          </If>
+        </View>
       </Property>
       <Property align="start" label={t("web.issue.task.repo")} icon={<Icon name="folder" size={13} tone="muted" />} inset>
         <View class="gap-1">
@@ -570,35 +583,61 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             onChange={(v) => edit({ repo: v })}
             options={repoOptions()}
           />
-          <Popover
-            open={newRepo()}
-            onOpenChange={(e) => newRepo.set(e.open)}
-            placement="bottom"
-            align="start"
-            offset={6}
-            popupClass="w-64 rounded-lg border border-line bg-elevated p-3 shadow-float"
-            trigger={
+          <View class="flex-row flex-wrap items-center gap-1">
+            <Popover
+              open={newRepo()}
+              onOpenChange={(e) => newRepo.set(e.open)}
+              placement="bottom"
+              align="start"
+              offset={6}
+              popupClass="w-64 rounded-lg border border-line bg-elevated p-3 shadow-float"
+              trigger={
+                <View
+                  role="button"
+                  testID="new-repo"
+                  onPress={() => newRepo.set(true)}
+                  class="flex-row items-center gap-1 self-start rounded-sm px-2 py-0.5 hover:bg-hover"
+                >
+                  <Icon name="add" size={12} tone="water" />
+                  <Text class="text-xs text-water">{repos().length === 0 && !d().repo ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}</Text>
+                </View>
+              }
+            >
+              <If when={newRepo()}>
+                <NewRepoPopoverBody
+                  onClose={() => newRepo.set(false)}
+                  onMade={(name) => {
+                    newRepo.set(false);
+                    edit({ repo: name });
+                  }}
+                />
+              </If>
+            </Popover>
+            <If when={!closed()}>
               <View
                 role="button"
-                testID="new-repo"
-                onPress={() => newRepo.set(true)}
+                testID="mount-local-repo"
+                onPress={() => {
+                  void (async () => {
+                    const picked = await hostApi.pickFolder();
+                    if (picked.bizCode !== 0 || !picked.data) return;
+                    const folder = picked.data;
+                    try {
+                      const mounted = await api.repo.mount({ path: folder.path, ...(folder.git ? {} : { initGit: true }) });
+                      await queries.invalidate({ prefix: ["repos"] });
+                      edit({ repo: mounted.name });
+                    } catch (e) {
+                      toast(reasonOf(e));
+                    }
+                  })();
+                }}
                 class="flex-row items-center gap-1 self-start rounded-sm px-2 py-0.5 hover:bg-hover"
               >
-                <Icon name="add" size={12} tone="water" />
-                <Text class="text-xs text-water">{repos().length === 0 && !d().repo ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}</Text>
+                <Icon name="folder" size={12} tone="water" />
+                <Text class="text-xs text-water">{t("web.issue.todo.mountLocalLink")}</Text>
               </View>
-            }
-          >
-            <If when={newRepo()}>
-              <NewRepoPopoverBody
-                onClose={() => newRepo.set(false)}
-                onMade={(name) => {
-                  newRepo.set(false);
-                  edit({ repo: name });
-                }}
-              />
             </If>
-          </Popover>
+          </View>
         </View>
       </Property>
       <Property label={t("web.issue.todo.priority")} icon={<PriorityMark priority={d().priority} size={13} />} inset>

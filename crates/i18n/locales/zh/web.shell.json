@@ -255,6 +255,7 @@
   },
   "repoDetail": {
     "badgeManaged": "VibeValley 仓库",
+    "badgeMounted": "本地关联仓库",
     "badgeFolder": "本地目录",
     "openFullPage": "打开完整仓库页",
     "copied": "已复制路径",

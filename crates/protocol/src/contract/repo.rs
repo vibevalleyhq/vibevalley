@@ -162,6 +162,8 @@ pub struct RepoSummary {
     pub name: String,
     pub path: String,
     pub git: bool,
+    #[serde(default)]
+    pub external: bool,
     pub last: Option<i64>,
     pub max_sessions: i64,
     pub pull_request: PullRequestCapability,
@@ -175,6 +177,26 @@ pub struct RepoSummary {
 pub struct NewRepo {
     pub name: String,
     pub github: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct MountRepo {
+    pub path: String,
+    pub name: Option<String>,
+    pub init_git: Option<bool>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct RepoUnmountInput {
+    pub id: String,
 }
 
 #[skip_serializing_none]
@@ -401,6 +423,8 @@ crate::typescript::module! {
     PullRequestCapability,
     RepoSummary,
     NewRepo,
+    MountRepo,
+    RepoUnmountInput,
     Commit,
     UncommittedItem,
     SubmitBranch,

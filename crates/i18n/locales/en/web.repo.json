@@ -88,5 +88,22 @@
   "busy": "Working…",
   "download": "Download to the work folder",
   "create": "Create the repo",
-  "otherLang": "Other"
+  "otherLang": "Other",
+  "mountLocal": "Mount local repo",
+  "local": "Local folder",
+  "localPath": "Folder path",
+  "localPathHint": "Mount an existing Git repository from anywhere on disk without moving or copying its files.",
+  "localPathPlaceholder": "/Users/name/projects/my-repo",
+  "pickFolder": "Choose folder",
+  "mount": "Mount repository",
+  "mounting": "Mounting…",
+  "initGit": "Initialize Git repository if needed",
+  "initGitHint": "Creates an initial Git commit if the chosen folder is not yet tracked by Git.",
+  "nameOptionalHint": "Optional. Defaults to the folder name and appends a suffix if that name is already taken.",
+  "badgeManaged": "Workspace",
+  "badgeLocal": "Local mount",
+  "unmount": "Unmount",
+  "unmounting": "Unmounting…",
+  "unmounted": "Unmounted {name} (files on disk were kept)",
+  "unmountTip": "Stop managing this external folder in VibeValley without deleting files on disk"
 }

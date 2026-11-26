@@ -230,6 +230,7 @@ pub fn handle_stateless_op(op: &vibevalley_protocol::HostOp) -> Option<vibevalle
         | HostOp::OpenUrl(_)
         | HostOp::OpenFile(_)
         | HostOp::PickFile
+        | HostOp::PickFolder
         | HostOp::SaveFile(_)
         | HostOp::SpeechState(_)
         | HostOp::SpeechStart(_)
@@ -274,6 +275,22 @@ pub fn read_file(path: &Path) -> Result<Value, String> {
 }
 
 pub use vibevalley_protocol::HostLocalFile as LocalFile;
+pub use vibevalley_protocol::HostLocalFolder as LocalFolder;
+
+pub fn folder_info(path: &Path) -> Result<LocalFolder, String> {
+    let metadata = std::fs::metadata(path).map_err(|e| e.to_string())?;
+    if !path.is_absolute() || !metadata.is_dir() {
+        return Err("a local folder must be an absolute path to a directory".into());
+    }
+    let canon = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let name = canon.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let git = canon.join(".git").exists();
+    Ok(LocalFolder {
+        path: canon.to_string_lossy().into_owned(),
+        name,
+        git,
+    })
+}
 
 pub fn file_info(path: &Path) -> Result<LocalFile, String> {
     let metadata = std::fs::metadata(path).map_err(|e| e.to_string())?;

@@ -704,6 +704,7 @@
       "name": "vibevalley",
       "path": "/Users/farmer/code/vibevalley",
       "git": true,
+      "external": false,
       "last": 1795528081171,
       "maxSessions": 3,
       "pullRequest": {
@@ -715,6 +716,7 @@
       "name": "site",
       "path": "/Users/farmer/code/site",
       "git": true,
+      "external": false,
       "last": 1795106881171,
       "maxSessions": 2,
       "pullRequest": {
@@ -726,6 +728,7 @@
       "name": "notes",
       "path": "/Users/farmer/notes",
       "git": false,
+      "external": false,
       "maxSessions": 1,
       "pullRequest": {
         "available": false,

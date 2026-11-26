@@ -12,6 +12,8 @@ export interface RepoHandlers {
   /** The first thing Create would refuse in this repo, without making it. */
   readonly "repo.validate": (a: T.NewRepo) => Promise<T.Validation>;
   readonly "repo.create": (a: T.NewRepo) => Promise<T.RepoSummary>;
+  readonly "repo.mount": (a: T.MountRepo) => Promise<T.RepoSummary>;
+  readonly "repo.unmount": (a: { readonly id: string }) => Promise<void>;
   readonly "repo.language.list": (a: { readonly id: string }) => Promise<T.RepoLanguages>;
   readonly "repo.template.list": (a: { readonly id: string }) => Promise<T.RepoTemplates>;
   readonly "repo.activity.get": (a: { readonly id: string }) => Promise<T.RepoActivity>;
@@ -52,6 +54,20 @@ export const repoEndpoints: readonly Endpoint[] = [
     about: [],
     input: S.NewRepo,
     result: S.RepoSummary,
+    can: ["user", "remote"],
+  },
+  {
+    op: "repo.mount",
+    about: [],
+    input: S.MountRepo,
+    result: S.RepoSummary,
+    can: ["user", "remote"],
+  },
+  {
+    op: "repo.unmount",
+    about: ["id"],
+    input: S.RepoUnmountInput,
+    result: undefined,
     can: ["user", "remote"],
   },
   {

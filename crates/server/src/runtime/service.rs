@@ -129,7 +129,12 @@ impl Runtime {
         tokio::fs::create_dir_all(config.data_dir.join("records")).await.map_err(io)?;
         let opened = reopen_sessions_async(&ctx).await?;
         let config = Arc::new(config);
-        let worktree = Arc::new(Worktree::new(config.worktrees_dir.clone(), config.repos_dir.clone(), config.data_dir.clone()));
+        let worktree = Arc::new(Worktree::with_repo(
+            config.worktrees_dir.clone(),
+            config.repos_dir.clone(),
+            config.data_dir.clone(),
+            config.repo.clone(),
+        ));
         let trajectory = Trajectory::open(ctx.clone());
         let write_lock = Arc::new(AsyncMutex::new(()));
         let session = SessionEngine::new_async(ctx.clone(), write_lock, drivers, worktree.clone(), config, Some(trajectory.clone())).await?;

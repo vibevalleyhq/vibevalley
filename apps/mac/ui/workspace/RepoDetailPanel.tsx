@@ -31,6 +31,7 @@ export interface RepoDetailTarget {
   readonly branch?: string | null;
   readonly active: boolean;
   readonly vibevalley: boolean;
+  readonly external?: boolean;
   readonly git?: boolean;
   readonly maxSessions?: number;
   readonly pullRequest?: { readonly available: boolean; readonly reason: string };
@@ -146,7 +147,11 @@ export function RepoDetailPanel(props: { repo: RepoDetailTarget; onClose: () => 
               <View class="flex-row items-center gap-1.5">
                 <View class={`rounded-sm px-1.5 py-px ${props.repo.vibevalley ? "bg-ok-soft" : "bg-hover"}`}>
                   <Text class={`text-2xs font-medium ${props.repo.vibevalley ? "text-ok-ink" : "text-muted"}`}>
-                    {props.repo.vibevalley ? t("web.shell.repoDetail.badgeManaged") : t("web.shell.repoDetail.badgeFolder")}
+                    {props.repo.vibevalley
+                      ? props.repo.external === true
+                        ? t("web.shell.repoDetail.badgeMounted")
+                        : t("web.shell.repoDetail.badgeManaged")
+                      : t("web.shell.repoDetail.badgeFolder")}
                   </Text>
                 </View>
               </View>

@@ -297,3 +297,29 @@ test("regression: todo add button renders in lane header above cards and draggin
   await fake.pumpUntil(app, () => app.count("id:issue") === 1);
   expect(app.count("id:issue-peek-modal")).toBe(0);
 });
+
+test("NewIssue unified AgentSelect surfaces agent.validate readiness diagnostics", async () => {
+  setLocale("zh");
+  const { app, fake } = await mountBoard("typical", (f) => {
+    f.respond("agent.validate", [{ id: "xiaolin", problems: [{ field: "runtime", level: "error", text: "Codex 未配置密钥" }] }]);
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-new") === 1);
+  await app.press("id:issue-new");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper") === 1);
+
+  // Choose an enabled helper whose validation has an error problem -> inline diagnostic displays error text.
+  await app.press("id:issue-new-helper");
+  await fake.pump(app);
+  expect(app.texts()).toContain("小林");
+  expect(app.texts()).toContain("Codex 未配置密钥");
+  await app.press("text:小林");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper-status") === 1);
+  expect(app.texts()).toContain("Codex 未配置密钥");
+
+  // Choose a ready agent -> shows ready status instead of problem text.
+  await app.press("id:issue-new-helper");
+  await fake.pump(app);
+  await app.press("text:老周");
+  await fake.pump(app);
+  expect(app.texts()).toContain("就绪");
+});

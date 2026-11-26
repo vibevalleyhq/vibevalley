@@ -27,11 +27,13 @@ export {
   Changes,
   Conflict,
   GitHubStatus,
+  MountRepo,
   NewRepo,
   RepoActivity,
   RepoLanguages,
   RepoSummary,
   RepoTemplates,
+  RepoUnmountInput,
   SubmitBranch,
 } from "./repo/schema";
 export {

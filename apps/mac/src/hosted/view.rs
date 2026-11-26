@@ -290,6 +290,10 @@ impl HostedView {
         let _ = self.app.read(cx).host().send("farm-sound", json!(name));
     }
 
+    pub fn notify_repos_changed(&self, cx: &App) {
+        let _ = self.app.read(cx).host().send("repos-changed", json!(null));
+    }
+
     pub fn navigate(&self, route: &str, cx: &App) {
         let _ = self.app.read(cx).host().send("route", json!(route));
     }

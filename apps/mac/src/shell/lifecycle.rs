@@ -204,6 +204,9 @@ impl Shell {
                             shell.workspace.server_ready = true;
                             shell.overlays.startup.slow = false;
                             shell.sync_chat_watches(cx);
+                            if shell.workspace.loaded {
+                                shell.sync_all_project_mounts(cx);
+                            }
                             shell.finish_opening(true, cx);
                         }
                         Err(failure) => {
@@ -381,6 +384,9 @@ impl Shell {
                     }
                     this.refresh_summaries(cx);
                     this.sync_chat_watches(cx);
+                    if this.workspace.server_ready {
+                        this.sync_all_project_mounts(cx);
+                    }
                     this.push_sidebar(cx);
                     this.finish_opening(true, cx);
                     cx.notify();

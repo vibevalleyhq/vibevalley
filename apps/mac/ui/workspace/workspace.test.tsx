@@ -1,7 +1,7 @@
 import "../infra/polyfill";
 import { expect, open, test } from "nsh/test";
 
-import { t } from "@vibevalley/i18n";
+import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
 import type { RuntimeInfo } from "@vibevalley/protocol";
 
@@ -1725,4 +1725,54 @@ test("workspace ChatPane shows collapsed activity latest command, ticks elapsed 
   await host.pump(app);
   expect(app.texts()).not.toContain(t("web.shell.chat.toolInput"));
   expect(app.texts()).toContain("Simplify Content Hub");
+});
+
+test("Sidebar distinguishes mounted external repos from managed repos and refreshes on repos-changed", async () => {
+  setLocale("zh");
+  let repos: { name: string; path: string; git: boolean; external: boolean; maxSessions: number; pullRequest: { available: boolean; reason: string } }[] = [
+    {
+      name: "managed-app",
+      path: "/work/repos/managed-app",
+      git: true,
+      external: false,
+      maxSessions: 2,
+      pullRequest: { available: false, reason: "" },
+    },
+  ];
+  const host = workspaceHost({ view: "sidebar" }, { "repo.list": () => repos });
+  const app = await open("../ShellApp.story.tsx", {
+    width: 320,
+    height: 760,
+    colorScheme: "light",
+    platform: "macos",
+    host: host.options,
+  });
+  await host.pump(app);
+  await host.pushFrame(app, "slice:board", { seq: 1, issues: [] });
+  await host.pushFrame(app, "slice:sessions", { seq: 1, sessions: [], machines: [] });
+  await host.pushFrame(app, "rail", { projects: [], panel: "files" });
+  expect(app.texts()).toContain("managed-app");
+
+  // Server finishes auto-mounting an open Workspace git repo and emits repos-changed.
+  repos = [
+    ...repos,
+    {
+      name: "ext-repo",
+      path: "/Users/dev/ext-repo",
+      git: true,
+      external: true,
+      maxSessions: 3,
+      pullRequest: { available: true, reason: "" },
+    },
+  ];
+  await app.host.send("repos-changed", null);
+  await host.pump(app);
+  expect(app.texts()).toContain("ext-repo");
+
+  // RepoDetailPanel shows the mounted external repo badge instead of managed repo badge.
+  await app.rightClick("text:ext-repo");
+  await app.press("id:sidebar-repo-menu-details-ext-repo");
+  await host.pump(app);
+  expect(app.count("id:workspace-repo-detail")).toBe(1);
+  expect(app.texts()).toContain(t("web.shell.repoDetail.badgeMounted"));
 });
