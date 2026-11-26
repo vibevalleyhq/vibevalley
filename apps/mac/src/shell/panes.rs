@@ -15,7 +15,7 @@ use crate::theme::Ui;
 use crate::viewer::FileViewer;
 
 use super::projects::SidebarTopics;
-use super::{DioramaSlot, PaneSlot, Shell, TerminalSlot};
+use super::{ChatTabStatus, DioramaSlot, PaneSlot, Shell, TerminalSlot};
 
 impl Shell {
     pub(crate) fn navigate_workbench(&mut self, route: &str, cx: &mut Context<Self>) {
@@ -654,30 +654,80 @@ impl Shell {
     }
 
     pub(super) fn close_active_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(project) = self.workspace.ws.active_mut() else { return };
+        let Some(project) = self.workspace.ws.active() else { return };
         let Some(tab) = project.layout.active_tab().map(|t| t.id) else { return };
         self.close_tab(tab, window, cx);
     }
 
     pub fn close_tab(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(project) = self.workspace.ws.active_mut() else { return };
+        self.close_tab_with_force(tab, false, window, cx);
+    }
+
+    pub fn close_tab_with_force(&mut self, tab: TabId, force: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(project) = self.workspace.ws.active() else { return };
         let pid = project.id();
-        let closed = project.close_tab(tab);
-        if let Some(PaneKind::Terminal { terminal_id, .. }) = &closed {
+        let Some(tab_ref) = project.layout.tabs().find(|t| t.id == tab) else { return };
+        let busy = if force { None } else { self.busy_tab_label(pid, tab_ref, cx) };
+        match tab_close_action(busy, force) {
+            TabCloseAction::CloseNow => self.force_close_tab(pid, tab, window, cx),
+            TabCloseAction::ConfirmBusy { label } => {
+                let title_text = crate::panes::tab_title(self, tab_ref, cx);
+                let title = vibevalley_i18n::t("desktop.tab.closeBusy.title", &[("title", title_text.into())]);
+                let detail = vibevalley_i18n::t("desktop.tab.closeBusy.detail", &[("process", label.into())]);
+                let cancel = vibevalley_i18n::t("desktop.tab.closeBusy.cancel", &[]);
+                let confirm = vibevalley_i18n::t("desktop.tab.closeBusy.confirm", &[]);
+                let rx = window.prompt(
+                    gpui::PromptLevel::Warning,
+                    &title,
+                    Some(&detail),
+                    &[gpui::PromptButton::cancel(cancel), gpui::PromptButton::new(confirm)],
+                    cx,
+                );
+                let shell = cx.weak_entity();
+                window
+                    .spawn(cx, async move |cx| {
+                        if rx.await == Ok(1) {
+                            let _ = cx.update(|window, cx| {
+                                let _ = shell.update(cx, |shell, cx| shell.force_close_tab(pid, tab, window, cx));
+                            });
+                        }
+                    })
+                    .detach();
+            }
+        }
+    }
+
+    fn busy_tab_label(&self, pid: ProjectId, tab: &vibevalley_workspace::Tab, cx: &gpui::App) -> Option<String> {
+        match &tab.kind {
+            PaneKind::Terminal { terminal_id, .. } => self.workspace.terminals.get(terminal_id).and_then(|slot| slot.view.read(cx).busy_label()),
+            kind => non_terminal_tab_busy_label(kind, self.workspace.chat_statuses.get(&(pid, tab.id))),
+        }
+    }
+
+    fn force_close_tab(&mut self, pid: ProjectId, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(project) = self.workspace.ws.project_mut(pid) else { return };
+        let Some(closed) = project.close_tab(tab) else { return };
+        if let PaneKind::Terminal { terminal_id, .. } = &closed {
             self.workspace.terminals.remove(terminal_id);
         }
-        if let Some(session_id) = closed_chat_session_id(closed.as_ref())
+        if let Some(session_id) = closed_chat_session_id(Some(&closed))
             && let Some(bridge) = cx.try_global::<crate::hosted::BridgeHub>()
         {
             bridge.0.call("session.closeWorkspace".into(), json!({ "id": session_id }), |_| {});
         }
         self.workspace.panes.remove(&(pid, tab));
         self.workspace.chat_statuses.remove(&(pid, tab));
-        if self.workspace.ws.active().is_some_and(|p| p.layout.tabs().next().is_none()) {
-            self.new_terminal(None, window, cx);
-            return;
+        if self.workspace.ws.active_id() == Some(pid) {
+            if self.workspace.ws.active().is_some_and(|p| p.layout.tabs().next().is_none()) {
+                self.new_terminal(None, window, cx);
+                return;
+            }
+            self.layout_changed(window, cx);
+        } else {
+            self.schedule_save(cx);
+            self.push_sidebar(cx);
+            cx.notify();
         }
-        self.layout_changed(window, cx);
     }
 
     pub fn layout_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1131,6 +1181,39 @@ fn classify_terminal_file_action(path: PathBuf, line: Option<u32>, project_root:
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum TabCloseAction {
+    CloseNow,
+    ConfirmBusy { label: String },
+}
+
+pub(crate) fn tab_close_action(busy_label: Option<String>, force: bool) -> TabCloseAction {
+    if force {
+        return TabCloseAction::CloseNow;
+    }
+    match busy_label {
+        Some(label) => TabCloseAction::ConfirmBusy { label },
+        None => TabCloseAction::CloseNow,
+    }
+}
+
+pub(crate) fn non_terminal_tab_busy_label(kind: &PaneKind, chat_status: Option<&ChatTabStatus>) -> Option<String> {
+    match kind {
+        PaneKind::Chat { runtime, title, .. } => {
+            if !chat_status.is_some_and(|s| s.status == "working") {
+                return None;
+            }
+            let label = title
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| crate::panes::chat_runtime_label(runtime));
+            Some(label.to_string())
+        }
+        PaneKind::Terminal { .. } | PaneKind::File { .. } | PaneKind::Diff { .. } | PaneKind::Hosted { .. } | PaneKind::Diorama { .. } => None,
+    }
+}
+
 #[cfg(test)]
 mod url_tests {
     #[test]
@@ -1257,5 +1340,59 @@ mod url_tests {
 
         let missing = dir.path().join("does-not-exist");
         assert!(super::resolve_project_directory(missing, vec![]).is_err());
+    }
+
+    #[test]
+    fn tab_close_decision_guards_busy_tabs_and_honors_force_bypass() {
+        assert_eq!(super::tab_close_action(None, false), super::TabCloseAction::CloseNow);
+        assert_eq!(
+            super::tab_close_action(Some("cargo test".into()), false),
+            super::TabCloseAction::ConfirmBusy { label: "cargo test".into() }
+        );
+        assert_eq!(super::tab_close_action(Some("cargo test".into()), true), super::TabCloseAction::CloseNow);
+        assert_eq!(super::tab_close_action(None, true), super::TabCloseAction::CloseNow);
+    }
+
+    #[test]
+    fn non_terminal_tab_busy_label_guards_working_chats_and_never_flags_viewers() {
+        use std::path::PathBuf;
+        use vibevalley_workspace::{DiffSpec, PaneKind};
+
+        let chat = PaneKind::Chat {
+            session_id: "s1".into(),
+            runtime: "antigravity".into(),
+            cwd: PathBuf::from("/tmp"),
+            title: None,
+        };
+        let working = super::ChatTabStatus {
+            status: "working".into(),
+            attention: false,
+        };
+        let ready = super::ChatTabStatus {
+            status: "ready".into(),
+            attention: true,
+        };
+        assert_eq!(super::non_terminal_tab_busy_label(&chat, Some(&working)), Some("Antigravity".into()));
+        assert_eq!(super::non_terminal_tab_busy_label(&chat, Some(&ready)), None);
+        assert_eq!(super::non_terminal_tab_busy_label(&chat, None), None);
+
+        let titled_chat = PaneKind::Chat {
+            session_id: "s2".into(),
+            runtime: "claude".into(),
+            cwd: PathBuf::from("/tmp"),
+            title: Some("  Refactor panes  ".into()),
+        };
+        assert_eq!(super::non_terminal_tab_busy_label(&titled_chat, Some(&working)), Some("Refactor panes".into()));
+
+        let file = PaneKind::File {
+            path: PathBuf::from("/tmp/main.rs"),
+        };
+        let diff = PaneKind::Diff {
+            spec: DiffSpec::Unstaged,
+            path: None,
+            repo: None,
+        };
+        assert_eq!(super::non_terminal_tab_busy_label(&file, Some(&working)), None);
+        assert_eq!(super::non_terminal_tab_busy_label(&diff, Some(&working)), None);
     }
 }

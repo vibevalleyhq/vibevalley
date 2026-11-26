@@ -406,3 +406,37 @@ pub(super) fn classify_terminal_status(
 
     TerminalStatus::idle()
 }
+
+pub(crate) fn classify_busy_label(
+    alive: bool,
+    has_foreground_process: bool,
+    running_command: Option<&str>,
+    status: &TerminalStatus,
+    osc_title: Option<&str>,
+    fallback_label: &str,
+) -> Option<String> {
+    if !alive {
+        return None;
+    }
+    let trimmed_command = running_command.map(str::trim).filter(|c| !c.is_empty());
+    let active_status = status.state != RunningState::Idle;
+    if !has_foreground_process && trimmed_command.is_none() && !active_status {
+        return None;
+    }
+    if status.is_coding_agent()
+        && let Some(agent) = status.agent.as_deref()
+    {
+        return Some(agent_display_name(agent, status.label.as_deref().unwrap_or(agent)));
+    }
+    if let Some(cmd) = trimmed_command {
+        return Some(cmd.to_string());
+    }
+    if let Some(title) = osc_title.map(str::trim).filter(|t| !t.is_empty() && !crate::panes::is_default_title(t)) {
+        return Some(title.to_string());
+    }
+    if let Some(label) = status.label.as_deref().map(str::trim).filter(|l| !l.is_empty() && *l != "运行中") {
+        return Some(label.to_string());
+    }
+    let fallback = fallback_label.trim();
+    Some(if fallback.is_empty() { "shell".to_string() } else { fallback.to_string() })
+}

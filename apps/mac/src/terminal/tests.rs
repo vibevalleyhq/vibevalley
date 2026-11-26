@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use gpui::{point, px};
 use vibevalley_terminal::{TermEvent, TermSize};
 
-use super::status::{AgentTurnTracker, classify_terminal_status, coalesce_term_events, detect_agent_token, detect_inline_agent};
+use super::status::{AgentTurnTracker, classify_busy_label, classify_terminal_status, coalesce_term_events, detect_agent_token, detect_inline_agent};
 use super::{Geometry, RunningState, TerminalStatus};
 
 #[test]
@@ -151,4 +151,41 @@ fn coalesce_term_events_collapses_dirty_bursts_and_preserves_semantic_events() {
     let semantic_only = coalesce_term_events(vec![TermEvent::Bell]);
     assert_eq!(semantic_only.len(), 1);
     assert!(matches!(&semantic_only[0], TermEvent::Bell));
+}
+
+#[test]
+fn classify_busy_label_distinguishes_idle_running_agent_and_exited() {
+    let idle = TerminalStatus::idle();
+    assert_eq!(classify_busy_label(true, false, None, &idle, Some("zsh"), "zsh"), None);
+
+    let cmd = TerminalStatus {
+        state: RunningState::Working,
+        agent: Some("cmd".into()),
+        label: Some("cargo".into()),
+    };
+    assert_eq!(
+        classify_busy_label(true, true, Some("cargo test"), &cmd, Some("cargo"), "zsh"),
+        Some("cargo test".into())
+    );
+
+    let agent = TerminalStatus {
+        state: RunningState::Ready,
+        agent: Some("antigravity".into()),
+        label: Some("antigravity".into()),
+    };
+    assert_eq!(
+        classify_busy_label(true, true, Some("agy"), &agent, Some("✳ Fix bug"), "zsh"),
+        Some("Antigravity".into())
+    );
+
+    // Foreground process without OSC 133 preexec falls back to custom OSC title or shell name.
+    assert_eq!(classify_busy_label(true, true, None, &idle, Some("zsh"), "zsh"), Some("zsh".into()));
+    assert_eq!(
+        classify_busy_label(true, true, None, &idle, Some("vim notes.md"), "zsh"),
+        Some("vim notes.md".into())
+    );
+
+    // Exited terminals are never busy regardless of stale command/status fields.
+    assert_eq!(classify_busy_label(false, true, Some("cargo test"), &cmd, Some("cargo"), "zsh"), None);
+    assert_eq!(classify_busy_label(false, false, Some("agy"), &agent, None, "zsh"), None);
 }

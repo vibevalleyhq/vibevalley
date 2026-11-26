@@ -393,7 +393,7 @@ pub(crate) fn is_default_title(title: &str) -> bool {
     })
 }
 
-fn shell_name() -> String {
+pub(crate) fn shell_name() -> String {
     std::env::var("SHELL")
         .ok()
         .and_then(|s| s.rsplit('/').next().map(String::from))
@@ -401,7 +401,7 @@ fn shell_name() -> String {
         .unwrap_or_else(|| "shell".into())
 }
 
-fn chat_runtime_label(runtime: &str) -> &str {
+pub(crate) fn chat_runtime_label(runtime: &str) -> &str {
     match runtime {
         "antigravity" => "Antigravity",
         "claude" => "Claude",
@@ -567,9 +567,9 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_down(
                     MouseButton::Middle,
-                    cx.listener(move |shell, _, window, cx| {
+                    cx.listener(move |shell, event: &gpui::MouseDownEvent, window, cx| {
                         cx.stop_propagation();
-                        shell.close_tab(tab_id, window, cx);
+                        shell.close_tab_with_force(tab_id, event.modifiers.shift, window, cx);
                     }),
                 )
                 .on_click(cx.listener(move |shell, _, window, cx| {
@@ -599,9 +599,9 @@ fn render_group(shell: &mut Shell, layout: &Layout, g: &Group, _: &mut Window, c
                         .tooltip_show_delay(TOOLTIP_SHOW_DELAY)
                         .child(gpui_icon("close", 11.0, if active { colors.muted } else { colors.faint }))
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .on_click(cx.listener(move |shell, _, window, cx| {
+                        .on_click(cx.listener(move |shell, event: &gpui::ClickEvent, window, cx| {
                             cx.stop_propagation();
-                            shell.close_tab(tab_id, window, cx);
+                            shell.close_tab_with_force(tab_id, event.modifiers().shift, window, cx);
                         })),
                 ),
         );

@@ -18,8 +18,8 @@ use super::element::{self, Geometry, RowCache, TerminalElement};
 use super::keys;
 use super::preview;
 use super::status::{
-    ACTIVE_OUTPUT_WINDOW, AgentTurnTracker, HoveredLink, Input, RunningState, SpawnSpec, State, TerminalEvent, TerminalStatus, classify_terminal_status,
-    coalesce_term_events, looks_like_shell_prompt,
+    ACTIVE_OUTPUT_WINDOW, AgentTurnTracker, HoveredLink, Input, RunningState, SpawnSpec, State, TerminalEvent, TerminalStatus, classify_busy_label,
+    classify_terminal_status, coalesce_term_events, looks_like_shell_prompt,
 };
 use super::{Clear, Copy, Paste, ScrollPageDown, ScrollPageUp, ScrollToBottom};
 use crate::theme::Ui;
@@ -271,11 +271,26 @@ impl TerminalView {
             .unwrap_or_else(|| self.spec.cwd.clone())
     }
 
+    pub fn is_alive(&self) -> bool {
+        !self.exited && !matches!(self.state, State::Failed(_)) && self.session().is_none_or(TermSession::is_alive)
+    }
+
+    pub fn has_foreground_process(&self) -> bool {
+        self.is_alive() && self.session().is_some_and(TermSession::has_foreground_process)
+    }
+
+    /// Returns a descriptive process or agent label when closing this terminal
+    /// would interrupt an active foreground command or agent, else `None`.
+    pub fn busy_label(&self) -> Option<String> {
+        let alive = self.is_alive();
+        let has_fg = self.has_foreground_process();
+        let status = self.terminal_status();
+        let fallback = crate::panes::shell_name();
+        classify_busy_label(alive, has_fg, self.running_command.as_deref(), &status, self.title.as_deref(), &fallback)
+    }
+
     pub fn can_reopen_in(&self, target: &std::path::Path) -> bool {
-        !self.exited
-            && !matches!(self.state, State::Failed(_))
-            && self.session().is_none_or(TermSession::is_alive)
-            && self.directory().canonicalize().is_ok_and(|cwd| cwd.starts_with(target))
+        self.is_alive() && self.directory().canonicalize().is_ok_and(|cwd| cwd.starts_with(target))
     }
 
     pub fn has_exited(&self) -> bool {

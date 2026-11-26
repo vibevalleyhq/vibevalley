@@ -36,6 +36,14 @@
     "newChatWith": "新建 {runtime} 对话",
     "chooseRuntime": "选择对话引擎"
   },
+  "tab": {
+    "closeBusy": {
+      "title": "关闭“{title}”？",
+      "detail": "此标签页中仍有“{process}”正在运行，关闭将中止当前运行。",
+      "cancel": "取消",
+      "confirm": "关闭标签页"
+    }
+  },
   "terminal": {
     "noProject": "请先打开项目，再启动终端。",
     "missingFolder": "工作区已不存在，无法在此打开终端。",

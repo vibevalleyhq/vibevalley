@@ -36,6 +36,14 @@
     "newChatWith": "New {runtime} chat",
     "chooseRuntime": "Choose chat runtime"
   },
+  "tab": {
+    "closeBusy": {
+      "title": "Close \"{title}\"?",
+      "detail": "{process} is still running in this tab. Closing it will stop the active process.",
+      "cancel": "Cancel",
+      "confirm": "Close Tab"
+    }
+  },
   "terminal": {
     "noProject": "Open a project to start a terminal.",
     "missingFolder": "This working directory no longer exists. The terminal could not open here.",
