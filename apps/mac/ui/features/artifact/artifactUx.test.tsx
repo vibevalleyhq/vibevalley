@@ -154,3 +154,88 @@ test("DashboardView renders single-framed chart matching viewport width and pret
   expect(texts).toContain("Sample");
   expect(texts).not.toContain("sample.json");
 });
+
+test("Artifact files view opens .html and .htm files in Preview mode by default with Source toggle", async () => {
+  setLocale("en");
+  const aid = "art-html-files-ux" as ArtifactId;
+  const protoArt: Artifact = {
+    id: aid,
+    title: "Landing Prototype",
+    artifactType: "prototype",
+    isDefault: false,
+    by: userId,
+    byName: "You",
+    version: 0,
+    seq: 1,
+    versions: [],
+    at: SCENARIO_NOW - 60_000,
+    updated: SCENARIO_NOW - 60_000,
+  };
+  const indexHtml = "<!doctype html><html><body><h1>Main Page</h1></body></html>";
+  const aboutHtm = "<!doctype html><html><body><p>About Page</p></body></html>";
+  const notesMd = "# Notes\n\nSome details.";
+  const contents: Record<string, { mime: string; content: string }> = {
+    "structure/index.html": { mime: "text/html", content: indexHtml },
+    "structure/about.htm": { mime: "text/html", content: aboutHtm },
+    "structure/notes.md": { mime: "text/markdown", content: notesMd },
+  };
+
+  const { app, fake } = await mountArtifactRoute(`/artifacts/${aid}`, (f) => {
+    f.respond("artifact.get", () => protoArt);
+    f.respond("artifact.list", () => [protoArt]);
+    f.respond("artifact.file.list", () => ({
+      artifactId: aid,
+      seq: 1,
+      files: Object.entries(contents).map(([path, entry], idx) => ({
+        path,
+        mime: entry.mime,
+        size: entry.content.length,
+        hash: `h-${idx}`,
+        updatedAt: SCENARIO_NOW,
+      })),
+    }));
+    f.respond("artifact.file.get", (p: { path: string }) => {
+      const entry = contents[p.path] ?? contents["structure/index.html"];
+      return {
+        artifactId: aid,
+        path: p.path,
+        mime: entry.mime,
+        encoding: "utf8",
+        content: entry.content,
+        size: entry.content.length,
+        hash: `h-${p.path}`,
+        updatedAt: SCENARIO_NOW,
+      };
+    });
+  });
+
+  await app.press("id:artifact-more");
+  await fake.pumpUntil(app, () => app.count("id:artifact-view-mode") === 1);
+  await app.press("id:artifact-view-mode");
+  await fake.pumpUntil(app, () => app.count("id:artifact-files-view") === 1 && app.count("id:artifact-file-html-preview") === 1);
+
+  expect(app.count("id:artifact-file-editor")).toBe(0);
+  const previewTab = app.layout("id:artifact-file-html-mode-preview");
+  const codeTab = app.layout("id:artifact-file-html-mode-code");
+  expect(previewTab).not.toBeNull();
+  expect(codeTab).not.toBeNull();
+  expect(previewTab!.x).toBeLessThan(codeTab!.x);
+
+  await app.press("id:artifact-file-html-mode-code");
+  await fake.pumpUntil(app, () => app.count("id:artifact-file-editor") === 1);
+  expect(app.count("id:artifact-file-html-preview")).toBe(0);
+  expect(app.value("id:artifact-file-editor")).toContain("<h1>Main Page</h1>");
+
+  await app.type("id:artifact-file-editor", "\n<!-- edited -->");
+  await fake.pump(app);
+  await app.press("id:artifact-file-html-mode-preview");
+  await fake.pumpUntil(app, () => app.count("id:artifact-file-html-preview") === 1);
+  expect(app.count("id:artifact-file-editor")).toBe(0);
+
+  await app.press("id:artifact-file-row-structure/notes.md");
+  await fake.pumpUntil(app, () => app.count("id:artifact-file-editor") === 1 && app.count("id:artifact-file-html-mode") === 0);
+
+  await app.press("id:artifact-file-row-structure/about.htm");
+  await fake.pumpUntil(app, () => app.count("id:artifact-file-html-preview") === 1);
+  expect(app.count("id:artifact-file-editor")).toBe(0);
+});

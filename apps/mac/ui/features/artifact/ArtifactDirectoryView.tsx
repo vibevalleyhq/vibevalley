@@ -152,7 +152,7 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   const newFilePath = signal("");
   const addingFile = signal(false);
   const deletingPath = signal<string | undefined>(undefined);
-  const fileHtmlMode = signal<"code" | "preview">("code");
+  const fileHtmlMode = signal<"preview" | "code">("preview");
   const slideIndex = signal(0);
   const activeSheetIndex = signal(0);
   const activeFramePath = signal<string | undefined>(undefined);
@@ -262,10 +262,11 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
   });
 
   const selectFile = (path: string) => {
+    const changed = path !== selectedPath();
     selectedPath.set(path);
     deletingPath.set(undefined);
-    if (!/\.(?:html|htm)$/iu.test(path)) {
-      fileHtmlMode.set("code");
+    if (changed) {
+      fileHtmlMode.set(/\.(?:html|htm)$/iu.test(path) ? "preview" : "code");
     }
     if (!snapshot().contents.has(path)) {
       void client().readFile(path);
@@ -1232,8 +1233,8 @@ export function ArtifactDirectoryView(props: ArtifactDirectoryViewProps) {
                       value={fileHtmlMode()}
                       onChange={(v) => fileHtmlMode.set(v)}
                       options={[
-                        { value: "code" as const, label: t("web.artifact.files.codeMode") },
                         { value: "preview" as const, label: t("web.artifact.files.htmlPreviewMode") },
+                        { value: "code" as const, label: t("web.artifact.files.codeMode") },
                       ]}
                     />
                   </If>
