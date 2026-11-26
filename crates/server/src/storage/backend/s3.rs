@@ -2,10 +2,12 @@
 //! MinIO, RustFS, and LocalStack using pure AWS SigV4 (HMAC-SHA256 over `sha2`)
 //! and `reqwest`.
 
+use std::collections::HashSet;
 use std::fmt;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use backon::{BackoffBuilder, ExponentialBuilder};
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use reqwest::{Method, StatusCode};
@@ -23,6 +25,10 @@ const UNSIGNED_PAYLOAD: &str = "UNSIGNED-PAYLOAD";
 const EMPTY_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 const MAX_PRESIGN_EXPIRES_SECS: u64 = 7 * 24 * 60 * 60;
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
+const DEFAULT_MAX_RETRIES: usize = 3;
+const DEFAULT_RETRY_MIN_DELAY: Duration = Duration::from_millis(100);
+const DEFAULT_RETRY_MAX_DELAY: Duration = Duration::from_secs(2);
+const MAX_LIST_PAGES: usize = 10_000;
 
 /// Pure RFC 2104 HMAC-SHA256 implemented over [`sha2::Sha256`] with zero extra dependencies.
 pub(crate) fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
@@ -276,6 +282,10 @@ pub struct S3Backend {
     config: S3Config,
     endpoint: EndpointSpec,
     client: reqwest::Client,
+    retry_min_delay: Duration,
+    retry_max_delay: Duration,
+    max_retries: usize,
+    max_list_pages: usize,
 }
 
 impl fmt::Debug for S3Backend {
@@ -304,7 +314,30 @@ impl S3Backend {
             .timeout(REQUEST_TIMEOUT)
             .build()
             .map_err(|e| StorageError::Transport(format!("failed to build S3 HTTP client: {e}")))?;
-        Ok(Self { config, endpoint, client })
+        Ok(Self {
+            config,
+            endpoint,
+            client,
+            retry_min_delay: DEFAULT_RETRY_MIN_DELAY,
+            retry_max_delay: DEFAULT_RETRY_MAX_DELAY,
+            max_retries: DEFAULT_MAX_RETRIES,
+            max_list_pages: MAX_LIST_PAGES,
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_retry_and_page_limits(
+        mut self,
+        retry_min_delay: Duration,
+        retry_max_delay: Duration,
+        max_retries: usize,
+        max_list_pages: usize,
+    ) -> Self {
+        self.retry_min_delay = retry_min_delay;
+        self.retry_max_delay = retry_max_delay;
+        self.max_retries = max_retries;
+        self.max_list_pages = max_list_pages;
+        self
     }
 
     pub fn config(&self) -> &S3Config {
@@ -340,34 +373,62 @@ impl S3Backend {
         body: Vec<u8>,
     ) -> Result<reqwest::Response, StorageError> {
         let payload_hash = if body.is_empty() { EMPTY_SHA256.to_owned() } else { sha256_hex(&body) };
-        let signed = sign_v4_request(
-            method.as_str(),
-            canonical_uri,
-            query_params,
-            &self.endpoint.host,
-            extra_headers,
-            &payload_hash,
-            &self.config.access_key_id,
-            &self.config.secret_access_key,
-            &self.config.region,
-            Timestamp::now(),
-        );
         let url = self.endpoint.full_url(canonical_uri, query_params);
-        let mut req = self
-            .client
-            .request(method, &url)
-            .header("host", &self.endpoint.host)
-            .header("x-amz-date", &signed.x_amz_date)
-            .header("x-amz-content-sha256", &signed.x_amz_content_sha256)
-            .header("authorization", &signed.authorization);
-        for &(name, value) in extra_headers {
-            req = req.header(name, value);
+        let mut backoff = ExponentialBuilder::new()
+            .with_factor(2.0)
+            .with_min_delay(self.retry_min_delay.min(self.retry_max_delay))
+            .with_max_delay(self.retry_max_delay)
+            .with_max_times(self.max_retries)
+            .build();
+
+        loop {
+            let signed = sign_v4_request(
+                method.as_str(),
+                canonical_uri,
+                query_params,
+                &self.endpoint.host,
+                extra_headers,
+                &payload_hash,
+                &self.config.access_key_id,
+                &self.config.secret_access_key,
+                &self.config.region,
+                Timestamp::now(),
+            );
+            let mut req = self
+                .client
+                .request(method.clone(), &url)
+                .header("host", &self.endpoint.host)
+                .header("x-amz-date", &signed.x_amz_date)
+                .header("x-amz-content-sha256", &signed.x_amz_content_sha256)
+                .header("authorization", &signed.authorization);
+            for &(name, value) in extra_headers {
+                req = req.header(name, value);
+            }
+            if !body.is_empty() {
+                req = req.body(body.clone());
+            }
+
+            match req.send().await {
+                Ok(resp) if is_transient_status(resp.status()) => {
+                    let Some(delay) = backoff.next() else {
+                        return Ok(resp);
+                    };
+                    tokio::time::sleep(delay).await;
+                }
+                Ok(resp) => return Ok(resp),
+                Err(err) => {
+                    let Some(delay) = backoff.next() else {
+                        return Err(StorageError::Transport(err.to_string()));
+                    };
+                    tokio::time::sleep(delay).await;
+                }
+            }
         }
-        if !body.is_empty() {
-            req = req.body(body);
-        }
-        req.send().await.map_err(|e| StorageError::Transport(e.to_string()))
     }
+}
+
+fn is_transient_status(status: StatusCode) -> bool {
+    matches!(status.as_u16(), 429 | 500 | 502 | 503 | 504)
 }
 
 fn clean_etag(raw: &str) -> String {
@@ -487,8 +548,17 @@ impl StorageBackend for S3Backend {
 
             let mut out = Vec::new();
             let mut continuation_token: Option<String> = None;
+            let mut seen_tokens = HashSet::new();
+            let mut pages = 0usize;
 
             loop {
+                pages += 1;
+                if pages > self.max_list_pages {
+                    return Err(StorageError::Protocol(format!(
+                        "S3 ListObjectsV2 exceeded maximum page limit ({})",
+                        self.max_list_pages
+                    )));
+                }
                 let mut params = vec![("list-type".to_owned(), "2".to_owned())];
                 if !full_prefix.is_empty() {
                     params.push(("prefix".to_owned(), full_prefix.clone()));
@@ -505,7 +575,12 @@ impl StorageBackend for S3Backend {
                 out.extend(page.objects);
                 if page.is_truncated {
                     match page.next_continuation_token {
-                        Some(next) if !next.is_empty() => continuation_token = Some(next),
+                        Some(next) if !next.is_empty() => {
+                            if !seen_tokens.insert(next.clone()) {
+                                return Err(StorageError::Protocol(format!("S3 ListObjectsV2 repeated continuation token `{next}`")));
+                            }
+                            continuation_token = Some(next);
+                        }
                         _ => break,
                     }
                 } else {
@@ -546,19 +621,188 @@ pub(crate) struct ListObjectsV2Page {
 }
 
 fn unescape_xml(raw: &str) -> String {
-    raw.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
+    let mut out = String::with_capacity(raw.len());
+    let bytes = raw.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if bytes[i] == b'&'
+            && let Some(rel_semi) = raw[i + 1..].find(';')
+            && rel_semi > 0
+            && rel_semi <= 16
+        {
+            let entity = &raw[i + 1..i + 1 + rel_semi];
+            if !entity.contains(['<', '&']) {
+                let decoded = match entity {
+                    "amp" => Some('&'),
+                    "lt" => Some('<'),
+                    "gt" => Some('>'),
+                    "quot" => Some('"'),
+                    "apos" => Some('\''),
+                    _ if entity.starts_with("#x") || entity.starts_with("#X") => u32::from_str_radix(&entity[2..], 16).ok().and_then(char::from_u32),
+                    _ if entity.starts_with('#') => entity[1..].parse::<u32>().ok().and_then(char::from_u32),
+                    _ => None,
+                };
+                if let Some(ch) = decoded {
+                    out.push(ch);
+                    i += 1 + rel_semi + 1;
+                    continue;
+                }
+            }
+        }
+        let ch = raw[i..].chars().next().expect("valid UTF-8");
+        out.push(ch);
+        i += ch.len_utf8();
+    }
+    out
+}
+
+fn local_xml_name(qname: &str) -> &str {
+    qname.rsplit_once(':').map_or(qname, |(_, local)| local)
+}
+
+fn find_tag_end(bytes: &[u8], open_lt: usize) -> Option<usize> {
+    let mut i = open_lt + 1;
+    let mut quote: Option<u8> = None;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if let Some(q) = quote {
+            if b == q {
+                quote = None;
+            }
+        } else if b == b'"' || b == b'\'' {
+            quote = Some(b);
+        } else if b == b'>' {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
+fn collect_xml_elements<'a>(xml: &'a str, target_local: &str) -> Result<Vec<&'a str>, StorageError> {
+    let bytes = xml.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0usize;
+    let mut match_depth = 0usize;
+    let mut content_start = 0usize;
+
+    while i < bytes.len() {
+        let Some(rel_lt) = xml[i..].find('<') else {
+            break;
+        };
+        let lt = i + rel_lt;
+        let rest = &xml[lt..];
+
+        if rest.starts_with("<!--") {
+            let Some(end_rel) = xml[lt + 4..].find("-->") else {
+                return Err(StorageError::Protocol(format!("unterminated XML comment while reading <{target_local}>")));
+            };
+            i = lt + 4 + end_rel + 3;
+            continue;
+        }
+        if rest.starts_with("<![CDATA[") {
+            let Some(end_rel) = xml[lt + 9..].find("]]>") else {
+                return Err(StorageError::Protocol(format!("unterminated CDATA section while reading <{target_local}>")));
+            };
+            i = lt + 9 + end_rel + 3;
+            continue;
+        }
+        if rest.starts_with("<?") {
+            let Some(end_rel) = xml[lt + 2..].find("?>") else {
+                return Err(StorageError::Protocol(format!(
+                    "unterminated processing instruction while reading <{target_local}>"
+                )));
+            };
+            i = lt + 2 + end_rel + 2;
+            continue;
+        }
+        if rest.starts_with("<!") {
+            let Some(gt) = find_tag_end(bytes, lt) else {
+                return Err(StorageError::Protocol(format!("unterminated XML declaration while reading <{target_local}>")));
+            };
+            i = gt + 1;
+            continue;
+        }
+
+        let Some(gt) = find_tag_end(bytes, lt) else {
+            return Err(StorageError::Protocol(format!("unterminated XML tag while reading <{target_local}>")));
+        };
+        let inside = xml[lt + 1..gt].trim();
+        if let Some(closing) = inside.strip_prefix('/') {
+            let name = closing.split_whitespace().next().unwrap_or("");
+            if local_xml_name(name) == target_local && match_depth > 0 {
+                match_depth -= 1;
+                if match_depth == 0 {
+                    out.push(&xml[content_start..lt]);
+                }
+            }
+            i = gt + 1;
+            continue;
+        }
+
+        let self_closing = inside.ends_with('/');
+        let header = inside.strip_suffix('/').unwrap_or(inside).trim();
+        let name = header.split(|c: char| c.is_ascii_whitespace() || c == '/').next().unwrap_or("");
+        if local_xml_name(name) == target_local {
+            if self_closing {
+                if match_depth == 0 {
+                    out.push("");
+                }
+            } else {
+                if match_depth == 0 {
+                    content_start = gt + 1;
+                }
+                match_depth += 1;
+            }
+        }
+        i = gt + 1;
+    }
+
+    if match_depth > 0 {
+        return Err(StorageError::Protocol(format!("unterminated <{target_local}> element in XML response")));
+    }
+    Ok(out)
+}
+
+fn decode_xml_element_text(inner: &str) -> String {
+    let bytes = inner.as_bytes();
+    let mut out = String::with_capacity(inner.len());
+    let mut i = 0usize;
+
+    while i < bytes.len() {
+        let Some(rel_lt) = inner[i..].find('<') else {
+            out.push_str(&unescape_xml(&inner[i..]));
+            break;
+        };
+        let lt = i + rel_lt;
+        out.push_str(&unescape_xml(&inner[i..lt]));
+        let rest = &inner[lt..];
+
+        if rest.starts_with("<!--")
+            && let Some(end_rel) = inner[lt + 4..].find("-->")
+        {
+            i = lt + 4 + end_rel + 3;
+            continue;
+        }
+        if rest.starts_with("<![CDATA[")
+            && let Some(end_rel) = inner[lt + 9..].find("]]>")
+        {
+            out.push_str(&inner[lt + 9..lt + 9 + end_rel]);
+            i = lt + 9 + end_rel + 3;
+            continue;
+        }
+        if let Some(gt) = find_tag_end(bytes, lt) {
+            i = gt + 1;
+            continue;
+        }
+        out.push_str(&unescape_xml(&inner[lt..]));
+        break;
+    }
+    out
 }
 
 fn extract_xml_tag(xml: &str, tag: &str) -> Option<String> {
-    let open = format!("<{tag}>");
-    let close = format!("</{tag}>");
-    let start = xml.find(&open)? + open.len();
-    let end = xml[start..].find(&close)?;
-    Some(unescape_xml(&xml[start..start + end]))
+    collect_xml_elements(xml, tag).ok()?.into_iter().next().map(decode_xml_element_text)
 }
 
 fn parse_http_or_iso_timestamp(raw: &str) -> Option<i64> {
@@ -573,15 +817,7 @@ pub(crate) fn parse_list_objects_v2_xml(xml: &str, strip_prefix: Option<&str>) -
     let next_continuation_token = extract_xml_tag(xml, "NextContinuationToken").filter(|s| !s.is_empty());
 
     let mut objects = Vec::new();
-    let mut cursor = 0usize;
-    while let Some(rel_start) = xml[cursor..].find("<Contents>") {
-        let block_start = cursor + rel_start + "<Contents>".len();
-        let Some(rel_end) = xml[block_start..].find("</Contents>") else {
-            return Err(StorageError::Protocol("unterminated <Contents> element in ListBucketResult".into()));
-        };
-        let block = &xml[block_start..block_start + rel_end];
-        cursor = block_start + rel_end + "</Contents>".len();
-
+    for block in collect_xml_elements(xml, "Contents")? {
         let Some(raw_key) = extract_xml_tag(block, "Key") else {
             continue;
         };
@@ -723,5 +959,136 @@ mod tests {
         assert!(signed.starts_with("https://r2.example.com/vv-bucket/tenant-a/attachments/1?"));
         assert!(signed.contains("X-Amz-Signature="));
         assert!(!signed.contains("top-secret-r2-token-xyz9"));
+    }
+
+    #[test]
+    fn xml_parser_handles_single_pass_entities_numeric_refs_namespaces_attributes_and_cdata() {
+        assert_eq!(unescape_xml("&amp;lt;tag&amp;gt;"), "&lt;tag&gt;");
+        assert_eq!(unescape_xml("&#38;&#x26;&#X3C;&#62;&#x1F600;"), "&&<>😀");
+        assert_eq!(unescape_xml("raw &unknown; &amp"), "raw &unknown; &amp");
+
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<s3:ListBucketResult xmlns:s3="http://s3.amazonaws.com/doc/2006-03-01/">
+  <!-- <s3:IsTruncated>false</s3:IsTruncated> -->
+  <s3:IsTruncated>true</s3:IsTruncated>
+  <s3:NextContinuationToken>tok&#x2D;2</s3:NextContinuationToken>
+  <s3:Contents empty="false" note="a>b">
+    <s3:Key attr="1">prod/a&amp;lt;b&#x2F;c</s3:Key>
+    <s3:Size>42</s3:Size>
+    <s3:ETag>&quot;abc&#x31;&quot;</s3:ETag>
+  </s3:Contents>
+  <s3:Contents>
+    <s3:Key><![CDATA[prod/raw&amp;cdata]]></s3:Key>
+    <s3:Size>7</s3:Size>
+  </s3:Contents>
+  <s3:Contents/>
+</s3:ListBucketResult>"#;
+
+        let page = parse_list_objects_v2_xml(xml, Some("prod/")).unwrap();
+        assert!(page.is_truncated);
+        assert_eq!(page.next_continuation_token.as_deref(), Some("tok-2"));
+        assert_eq!(page.objects.len(), 2);
+        assert_eq!(page.objects[0].key, "a&lt;b/c");
+        assert_eq!(page.objects[0].size, 42);
+        assert_eq!(page.objects[0].etag.as_deref(), Some("abc1"));
+        assert_eq!(page.objects[1].key, "raw&amp;cdata");
+        assert_eq!(page.objects[1].size, 7);
+
+        let unterminated = "<ListBucketResult><Contents><Key>a</Key></ListBucketResult>";
+        assert!(matches!(parse_list_objects_v2_xml(unterminated, None), Err(StorageError::Protocol(_))));
+    }
+
+    #[tokio::test]
+    async fn send_signed_retries_transient_503_and_list_guards_pagination_loops() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        use axum::Router;
+        use axum::extract::{Query, State};
+        use axum::http::StatusCode;
+        use axum::response::IntoResponse;
+        use axum::routing::get;
+        use tokio::net::TcpListener;
+
+        struct MockState {
+            get_attempts: AtomicUsize,
+            list_mode: RwLock<&'static str>,
+        }
+
+        use parking_lot::RwLock;
+
+        async fn handle_get(State(st): State<Arc<MockState>>) -> impl IntoResponse {
+            let attempt = st.get_attempts.fetch_add(1, Ordering::SeqCst);
+            if attempt < 2 {
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "<Error><Code>SlowDown</Code><Message>try again</Message></Error>",
+                )
+                    .into_response()
+            } else {
+                (StatusCode::OK, "recovered-payload").into_response()
+            }
+        }
+
+        async fn handle_list(State(st): State<Arc<MockState>>, Query(params): Query<std::collections::HashMap<String, String>>) -> impl IntoResponse {
+            let mode = *st.list_mode.read();
+            match mode {
+                "repeat-token" => (
+                    StatusCode::OK,
+                    "<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>stuck-tok</NextContinuationToken><Contents><Key>k1</Key><Size>1</Size></Contents></ListBucketResult>",
+                )
+                    .into_response(),
+                _ => {
+                    let page = params.get("continuation-token").and_then(|t| t.parse::<usize>().ok()).unwrap_or(0) + 1;
+                    let body = format!(
+                        "<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>{page}</NextContinuationToken><Contents><Key>k{page}</Key><Size>1</Size></Contents></ListBucketResult>"
+                    );
+                    (StatusCode::OK, body).into_response()
+                }
+            }
+        }
+
+        let state = Arc::new(MockState {
+            get_attempts: AtomicUsize::new(0),
+            list_mode: RwLock::new("repeat-token"),
+        });
+        let app = Router::new()
+            .route("/vv-bucket/{*key}", get(handle_get))
+            .route("/vv-bucket", get(handle_list))
+            .with_state(state.clone());
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server_task = tokio::spawn(async move {
+            let _ = axum::serve(listener, app).await;
+        });
+
+        let backend = S3Backend::new(S3Config {
+            bucket: "vv-bucket".into(),
+            region: "us-east-1".into(),
+            endpoint: Some(format!("http://{addr}")),
+            prefix: None,
+            path_style: true,
+            access_key_id: "AKIA1234".into(),
+            secret_access_key: Secret::new("secret-key"),
+        })
+        .unwrap()
+        .with_retry_and_page_limits(Duration::from_millis(5), Duration::from_millis(15), 3, 3);
+
+        // 1) Transient 503 x2 recovers on the 3rd attempt.
+        let bytes = backend.get("hello.txt").await.unwrap().expect("object bytes");
+        assert_eq!(bytes, b"recovered-payload");
+        assert_eq!(state.get_attempts.load(Ordering::SeqCst), 3);
+
+        // 2) Repeated NextContinuationToken returns StorageError::Protocol instead of looping forever.
+        let repeat_err = backend.list("").await.unwrap_err();
+        assert!(matches!(repeat_err, StorageError::Protocol(ref msg) if msg.contains("repeated continuation token")));
+
+        // 3) Distinct tokens exceeding max_list_pages also return StorageError::Protocol.
+        *state.list_mode.write() = "unlimited";
+        let page_limit_err = backend.list("").await.unwrap_err();
+        assert!(matches!(page_limit_err, StorageError::Protocol(ref msg) if msg.contains("exceeded maximum page limit")));
+
+        server_task.abort();
     }
 }

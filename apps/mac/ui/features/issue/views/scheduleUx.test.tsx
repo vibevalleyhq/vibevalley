@@ -1,4 +1,5 @@
 import "../../../infra/polyfill";
+import { effect, signal } from "nsh";
 import { expect, open, test } from "nsh/test";
 
 import { setLocale } from "@vibevalley/i18n";
@@ -8,6 +9,7 @@ import type { Issue, IssueId, SliceBundle } from "@vibevalley/protocol";
 import { fakeHost } from "../../../fixtures/fakeHost";
 import { SCENARIO_NOW, scenarios } from "../../../fixtures/scenarios";
 import { addUtcDays, DAY_MS, utcDayStart } from "../model/schedule";
+import { createFrameQueue } from "./IssueTimeline";
 
 function makeIssue(overrides: Partial<Omit<Issue, "id">> & { id: string; number: number; title: string }): Issue {
   return {
@@ -191,4 +193,83 @@ test("IssuesPage supports Timeline (Gantt) and Calendar views with scale switchi
     startAt: Date.UTC(2026, 10, 26),
     dueAt: Date.UTC(2026, 10, 26),
   });
+});
+
+test("IssueTimeline frame queue cancels pending requestAnimationFrame callbacks on cleanup and rapid view switch", async () => {
+  const origRaf = globalThis.requestAnimationFrame;
+  const origCancel = globalThis.cancelAnimationFrame;
+  const queued = new Map<number, (time: number) => void>();
+  const canceled: number[] = [];
+  let ran = 0;
+  let nextId = 100;
+
+  globalThis.requestAnimationFrame = (cb: (time: number) => void) => {
+    const id = ++nextId;
+    queued.set(id, cb);
+    return id;
+  };
+  globalThis.cancelAnimationFrame = (id: number | undefined) => {
+    if (id === undefined) return;
+    canceled.push(id);
+    queued.delete(id);
+  };
+
+  try {
+    const mounted = signal(true);
+    effect(() => {
+      if (!mounted()) return;
+      const frames = createFrameQueue();
+      frames.schedule(() => {
+        ran += 1;
+      });
+      frames.schedule(() => {
+        ran += 1;
+      });
+    });
+
+    expect(queued.size).toBe(2);
+    const pendingIds = [...queued.keys()];
+
+    mounted.set(false);
+
+    expect(canceled).toEqual(pendingIds);
+    expect(queued.size).toBe(0);
+    expect(ran).toBe(0);
+  } finally {
+    globalThis.requestAnimationFrame = origRaf;
+    globalThis.cancelAnimationFrame = origCancel;
+  }
+
+  // Also verify rapid scale switch -> immediate Calendar unmount completes cleanly in-app.
+  setLocale("zh");
+  const todayMs = utcDayStart(SCENARIO_NOW);
+  const scheduled = makeIssue({
+    id: "i-raf-1",
+    number: 21,
+    title: "Pending rAF cleanup check",
+    status: "in_progress",
+    startAt: todayMs,
+    dueAt: addUtcDays(todayMs, 2),
+  });
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 1, issues: [scheduled] },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "zh" });
+  fake.respond("issue.history.list", [{ issue: scheduled, sessions: [], missingSessions: [] }]);
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-view-timeline") === 1);
+  await app.press("id:issue-view-timeline");
+  await fake.pumpUntil(app, () => app.count("id:issue-timeline") === 1);
+  await app.press("id:timeline-scale-week");
+  await app.press("id:issue-view-calendar");
+  await fake.pumpUntil(app, () => app.count("id:issue-calendar") === 1);
 });

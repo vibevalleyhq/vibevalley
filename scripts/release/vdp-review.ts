@@ -1,13 +1,27 @@
-import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
-import { setTimeout as sleep } from "node:timers/promises";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { z } from "zod";
 
-export const REVIEW_THEMES = ["light", "dark"] as const;
-export type ReviewTheme = (typeof REVIEW_THEMES)[number];
+import {
+  captureVdpScreenshot,
+  CreatedEntitySchema,
+  countUiTreeNodes,
+  ensureVdpArtifactsBuilt,
+  extractShellErrors,
+  isReviewTheme,
+  parseJsonOutput,
+  parsePositiveInt,
+  REVIEW_THEMES,
+  resolveVdpWorkspacePaths,
+  runChecked,
+  runSoft,
+  type ReviewTheme,
+  withVdpSandbox,
+  writeTempPayload,
+} from "./vdp-client.ts";
+
+export { countUiTreeNodes, extractShellErrors, isReviewTheme, REVIEW_THEMES, type ReviewTheme };
 
 export interface ReviewOptions {
   readonly outDir: string;
@@ -50,105 +64,6 @@ export interface ScreenPlanEntry extends ScreenSpec {
   readonly fileName: string;
 }
 
-const HostedViewDumpSchema = z.object({
-  ready: z.boolean().optional(),
-  errors: z.array(z.string()).default([]),
-});
-
-const ShellStateSchema = z.object({
-  loaded: z.boolean().default(false),
-  load_error: z.string().nullable().default(null),
-  route: z.string().optional(),
-  theme_dark: z.boolean().optional(),
-  startup_failure: z
-    .object({
-      kind: z.string(),
-      summary: z.string(),
-    })
-    .nullable()
-    .optional(),
-  sidebar: HostedViewDumpSchema.nullable().optional(),
-  workbench: HostedViewDumpSchema.nullable().optional(),
-  inspector: HostedViewDumpSchema.nullable().optional(),
-  palette: z
-    .object({
-      view: HostedViewDumpSchema.optional(),
-    })
-    .nullable()
-    .optional(),
-  projects: z
-    .array(
-      z.object({
-        tabs: z
-          .array(
-            z.object({
-              hosted: HostedViewDumpSchema.optional(),
-            }),
-          )
-          .default([]),
-      }),
-    )
-    .default([]),
-});
-
-const PageMetricsSchema = z.object({
-  width: z.number(),
-  height: z.number(),
-  scaleFactor: z.number(),
-  themeDark: z.boolean(),
-  lastFrameMs: z.number().nullable().optional(),
-});
-
-interface UiNodeShape {
-  readonly testId?: string | null | undefined;
-  readonly role?: string | null | undefined;
-  readonly text?: string | null | undefined;
-  readonly children?: readonly UiNodeShape[] | null | undefined;
-}
-
-const UiNodeSchema: z.ZodType<UiNodeShape> = z.lazy(() =>
-  z.object({
-    testId: z.string().nullable().optional(),
-    role: z.string().nullable().optional(),
-    text: z.string().nullable().optional(),
-    children: z.array(UiNodeSchema).nullable().optional(),
-  }),
-);
-
-const UiTreeSchema = z.object({
-  view: z.string(),
-  route: z.string().nullable().optional(),
-  nodes: z.array(UiNodeSchema).default([]),
-});
-
-const ScreenshotSavedSchema = z.object({
-  path: z.string(),
-  mime: z.string(),
-  width: z.number(),
-  height: z.number(),
-  bytes: z.number(),
-});
-
-const DebugEndpointFileSchema = z.object({
-  pid: z.number(),
-  port: z.number().int().positive(),
-  httpUrl: z.string().min(1),
-  wsUrl: z.string().min(1),
-});
-
-const ServerReceiptSchema = z.object({
-  port: z.number().int().positive().optional(),
-  url: z.string().min(1).optional(),
-});
-
-const CreatedEntitySchema = z.union([
-  z
-    .string()
-    .min(1)
-    .transform((id) => ({ id })),
-  z.object({ id: z.string().min(1) }),
-]);
-
 export const ScreenCaptureSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -179,10 +94,7 @@ export type ScreenCapture = z.infer<typeof ScreenCaptureSchema>;
 export const ReviewManifestSchema = z.object({
   generatedAt: z.string(),
   outDir: z.string(),
-  viewport: z.object({
-    width: z.number().int().positive(),
-    height: z.number().int().positive(),
-  }),
+  viewport: z.object({ width: z.number().int().positive(), height: z.number().int().positive() }),
   themes: z.array(z.enum(REVIEW_THEMES)),
   seeded: z.object({
     firstIssueId: z.string(),
@@ -209,21 +121,6 @@ export const ReviewManifestSchema = z.object({
 });
 
 export type ReviewManifest = z.infer<typeof ReviewManifestSchema>;
-
-export function isReviewTheme(value: string): value is ReviewTheme {
-  return value === "light" || value === "dark";
-}
-
-function parsePositiveInt(flag: string, raw: string): number {
-  if (!/^\d+$/u.test(raw.trim())) {
-    throw new Error(`${flag} requires a positive integer (got "${raw}")`);
-  }
-  const parsed = Number.parseInt(raw.trim(), 10);
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    throw new Error(`${flag} requires a positive integer (got "${raw}")`);
-  }
-  return parsed;
-}
 
 function parseThemeList(raw: string): ReviewTheme[] {
   const parts = raw
@@ -335,59 +232,10 @@ export function buildScreenMatrix(ids: SeededWorkspaceIds, themes: readonly Revi
   const entries: ScreenPlanEntry[] = [];
   for (const theme of themes) {
     for (const screen of baseScreens) {
-      entries.push({
-        ...screen,
-        theme,
-        fileName: `${screen.id}-${theme}.png`,
-      });
+      entries.push({ ...screen, theme, fileName: `${screen.id}-${theme}.png` });
     }
   }
   return entries;
-}
-
-export function countUiTreeNodes(nodes: readonly UiNodeShape[]): number {
-  let count = 0;
-  for (const node of nodes) {
-    count += 1;
-    if (node.children && node.children.length > 0) {
-      count += countUiTreeNodes(node.children);
-    }
-  }
-  return count;
-}
-
-export function extractShellErrors(rawState: unknown): {
-  readonly loaded: boolean;
-  readonly route: string | null;
-  readonly errors: string[];
-} {
-  const parsed = ShellStateSchema.safeParse(rawState);
-  if (!parsed.success) {
-    return {
-      loaded: false,
-      route: null,
-      errors: [`invalid Shell.getState payload: ${parsed.error.issues.map((i) => i.message).join("; ")}`],
-    };
-  }
-  const state = parsed.data;
-  const errors: string[] = [];
-  if (!state.loaded) errors.push("shell.loaded is false");
-  if (state.load_error !== null) errors.push(`load_error: ${state.load_error}`);
-  if (state.startup_failure) errors.push(`startup_failure(${state.startup_failure.kind}): ${state.startup_failure.summary}`);
-  for (const msg of state.sidebar?.errors ?? []) errors.push(`sidebar: ${msg}`);
-  for (const msg of state.workbench?.errors ?? []) errors.push(`workbench: ${msg}`);
-  for (const msg of state.inspector?.errors ?? []) errors.push(`inspector: ${msg}`);
-  for (const msg of state.palette?.view?.errors ?? []) errors.push(`palette: ${msg}`);
-  for (const project of state.projects) {
-    for (const tab of project.tabs) {
-      for (const msg of tab.hosted?.errors ?? []) errors.push(`pane: ${msg}`);
-    }
-  }
-  return {
-    loaded: state.loaded,
-    route: state.route ?? null,
-    errors,
-  };
 }
 
 function escapeHtml(raw: string): string {
@@ -411,24 +259,11 @@ export function renderContactSheetHtml(manifest: ReviewManifest): string {
       const errBlock =
         screen.shellErrors.length > 0 ? `<div class="shot-errors">${screen.shellErrors.map((e) => `<div>${escapeHtml(e)}</div>`).join("")}</div>` : "";
       return `<figure class="shot-card" data-theme="${escapeHtml(screen.theme)}" data-screen="${escapeHtml(screen.id)}">
-        <a href="${escapeHtml(screen.relPath)}" target="_blank" rel="noreferrer">
-          <img src="${escapeHtml(screen.relPath)}" alt="${escapeHtml(`${screen.label} (${screen.theme})`)}" loading="lazy" />
-        </a>
+        <a href="${escapeHtml(screen.relPath)}" target="_blank" rel="noreferrer"><img src="${escapeHtml(screen.relPath)}" alt="${escapeHtml(`${screen.label} (${screen.theme})`)}" loading="lazy" /></a>
         <figcaption>
-          <div class="shot-head">
-            <strong>${escapeHtml(screen.id)}</strong>
-            <div class="shot-badges">
-              <span class="badge theme">${escapeHtml(screen.theme)}</span>
-              ${statusBadge}
-            </div>
-          </div>
+          <div class="shot-head"><strong>${escapeHtml(screen.id)}</strong><div class="shot-badges"><span class="badge theme">${escapeHtml(screen.theme)}</span>${statusBadge}</div></div>
           <div class="shot-route"><code>${escapeHtml(screen.route)}</code></div>
-          <div class="shot-meta">
-            <span>${screen.imageWidth}×${screen.imageHeight}</span>
-            <span>${kb} KB</span>
-            <span>${screen.uiNodeCount} UI nodes</span>
-            <span>frame ${escapeHtml(frame)}</span>
-          </div>
+          <div class="shot-meta"><span>${screen.imageWidth}×${screen.imageHeight}</span><span>${kb} KB</span><span>${screen.uiNodeCount} UI nodes</span><span>frame ${escapeHtml(frame)}</span></div>
           ${errBlock}
         </figcaption>
       </figure>`;
@@ -436,42 +271,11 @@ export function renderContactSheetHtml(manifest: ReviewManifest): string {
     .join("\n");
 
   const totalMb = (manifest.summary.totalBytes / (1024 * 1024)).toFixed(2);
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VibeValley VDP UX Review Contact Sheet</title>
   <style>
-    :root {
-      --bg: #f6f5f0;
-      --surface: #ffffff;
-      --border: #e5e2da;
-      --ink: #1f1e1a;
-      --muted: #6c685d;
-      --accent: #3d6b2c;
-      --accent-soft: #e7f3e3;
-      --ok-bg: #e7f3e3;
-      --ok-ink: #27581d;
-      --fail-bg: #fde8e8;
-      --fail-ink: #991b1b;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #171714;
-        --surface: #201f1b;
-        --border: #34322b;
-        --ink: #ece9df;
-        --muted: #a19c8e;
-        --accent: #74b457;
-        --accent-soft: #1f331b;
-        --ok-bg: #1f331b;
-        --ok-ink: #9be084;
-        --fail-bg: #3b1c1c;
-        --fail-ink: #fca5a5;
-      }
-    }
+    :root { --bg: #f6f5f0; --surface: #ffffff; --border: #e5e2da; --ink: #1f1e1a; --muted: #6c685d; --accent: #3d6b2c; --accent-soft: #e7f3e3; --ok-bg: #e7f3e3; --ok-ink: #27581d; --fail-bg: #fde8e8; --fail-ink: #991b1b; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #171714; --surface: #201f1b; --border: #34322b; --ink: #ece9df; --muted: #a19c8e; --accent: #74b457; --accent-soft: #1f331b; --ok-bg: #1f331b; --ok-ink: #9be084; --fail-bg: #3b1c1c; --fail-ink: #fca5a5; } }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; background: var(--bg); color: var(--ink); line-height: 1.5; }
     main { max-width: 1440px; margin: 0 auto; padding: 28px 24px 64px; }
@@ -500,10 +304,7 @@ export function renderContactSheetHtml(manifest: ReviewManifest): string {
     .badge.ok { background: var(--ok-bg); color: var(--ok-ink); }
     .badge.fail { background: var(--fail-bg); color: var(--fail-ink); }
     .badge.theme { background: rgba(127, 127, 127, 0.14); color: var(--ink); }
-  </style>
-</head>
-<body>
-  <main>
+  </style></head><body><main>
     <h1>VibeValley Live VDP UX Review</h1>
     <div class="meta">Generated ${escapeHtml(manifest.generatedAt)} · Viewport ${manifest.viewport.width}×${manifest.viewport.height} · Output <code>${escapeHtml(manifest.outDir)}</code></div>
     <section class="kpis">
@@ -512,133 +313,30 @@ export function renderContactSheetHtml(manifest: ReviewManifest): string {
       <div class="kpi"><div class="label">Shell / View Errors</div><div class="val">${manifest.summary.totalErrors}</div></div>
       <div class="kpi"><div class="label">Total PNG Size</div><div class="val">${totalMb} MB</div></div>
     </section>
-    <div class="toolbar" id="filter-bar">
-      ${themeButtons}
-      <span class="count" id="filter-count">Showing ${manifest.screens.length} / ${manifest.screens.length}</span>
-    </div>
-    <section class="gallery" id="gallery">
-      ${cards}
-    </section>
-  </main>
-  <script>
-    (() => {
-      const buttons = Array.from(document.querySelectorAll("#filter-bar .filter-btn"));
-      const cards = Array.from(document.querySelectorAll("#gallery .shot-card"));
-      const countEl = document.getElementById("filter-count");
-      let active = "all";
-      function update() {
-        let shown = 0;
-        for (const card of cards) {
-          const ok = active === "all" || card.getAttribute("data-theme") === active;
-          card.classList.toggle("hidden", !ok);
-          if (ok) shown++;
-        }
-        if (countEl) countEl.textContent = "Showing " + shown + " / " + cards.length;
+    <div class="toolbar" id="filter-bar">${themeButtons}<span class="count" id="filter-count">Showing ${manifest.screens.length} / ${manifest.screens.length}</span></div>
+    <section class="gallery" id="gallery">${cards}</section>
+  </main><script>(() => {
+    const buttons = Array.from(document.querySelectorAll("#filter-bar .filter-btn"));
+    const cards = Array.from(document.querySelectorAll("#gallery .shot-card"));
+    const countEl = document.getElementById("filter-count");
+    let active = "all";
+    function update() {
+      let shown = 0;
+      for (const card of cards) {
+        const ok = active === "all" || card.getAttribute("data-theme") === active;
+        card.classList.toggle("hidden", !ok);
+        if (ok) shown++;
       }
-      for (const btn of buttons) {
-        btn.addEventListener("click", () => {
-          active = btn.getAttribute("data-filter-theme") || "all";
-          for (const b of buttons) b.classList.toggle("active", b === btn);
-          update();
-        });
-      }
-    })();
-  </script>
-</body>
-</html>
-`;
-}
-
-const errorCode = (error: unknown): unknown => (typeof error === "object" && error !== null && "code" in error ? error.code : undefined);
-
-function runChecked(
-  command: string,
-  args: readonly string[],
-  options: { cwd: string; env?: NodeJS.ProcessEnv; capture?: boolean; timeoutMs?: number },
-): string {
-  const res = spawnSync(command, args, {
-    cwd: options.cwd,
-    env: options.env ?? process.env,
-    encoding: "utf8",
-    stdio: options.capture === true ? ["ignore", "pipe", "pipe"] : "inherit",
-    timeout: options.timeoutMs ?? 60_000,
-  });
-  if (res.error) {
-    throw new Error(`${command} ${args.join(" ")} failed to spawn: ${res.error.message}`, { cause: res.error });
-  }
-  if (res.status !== 0) {
-    const stdout = typeof res.stdout === "string" ? res.stdout.trim() : "";
-    const stderr = typeof res.stderr === "string" ? res.stderr.trim() : "";
-    const detail = [stdout, stderr].filter(Boolean).join("\n");
-    throw new Error(`${command} ${args.join(" ")} failed with exit code ${String(res.status)}${detail ? `:\n${detail}` : ""}`);
-  }
-  return typeof res.stdout === "string" ? res.stdout : "";
-}
-
-function runSoft(
-  command: string,
-  args: readonly string[],
-  options: { cwd: string; env?: NodeJS.ProcessEnv; timeoutMs?: number },
-): {
-  readonly ok: boolean;
-  readonly stdout: string;
-  readonly stderr: string;
-} {
-  const res = spawnSync(command, args, {
-    cwd: options.cwd,
-    env: options.env ?? process.env,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: options.timeoutMs ?? 20_000,
-  });
-  return {
-    ok: !res.error && res.status === 0,
-    stdout: typeof res.stdout === "string" ? res.stdout : "",
-    stderr: typeof res.stderr === "string" ? res.stderr : "",
-  };
-}
-
-function isolatedEnv(root: string, homeDir: string, workDir: string, storeDb: string): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && !key.startsWith("VIBEVALLEY_") && key !== "DEEPSEEK_API_KEY") {
-      env[key] = value;
+      if (countEl) countEl.textContent = "Showing " + shown + " / " + cards.length;
     }
-  }
-  return {
-    ...env,
-    VIBEVALLEY_HOME: homeDir,
-    VIBEVALLEY_WORK_ROOT: workDir,
-    VIBEVALLEY_STORE: storeDb,
-    VIBEVALLEY_PORT: "0",
-    VIBEVALLEY_DEBUG_PORT: "0",
-    VIBEVALLEY_NO_OPENING: "1",
-    VIBEVALLEY_ASSETS: resolve(root, "assets"),
-    VIBEVALLEY_DIORAMA_DIST: resolve(root, "assets/diorama"),
-    VIBEVALLEY_VOICE_LINE_PORT: "0",
-    VIBEVALLEY_PATROL_HEARTBEAT_MINUTES: "0",
-  };
-}
-
-function writeTempPayload(payloadDir: string, fileName: string, content: string): string {
-  const filePath = join(payloadDir, fileName);
-  writeFileSync(filePath, content, "utf8");
-  return filePath;
-}
-
-function parseJsonOutput<T>(raw: string, schema: z.ZodType<T>, label: string): T {
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(raw);
-  } catch (err) {
-    throw new Error(`failed to parse JSON from ${label}: ${raw.slice(0, 240)}`, { cause: err });
-  }
-  const parsed = schema.safeParse(decoded);
-  if (!parsed.success) {
-    const detail = parsed.error.issues.map((i) => `${i.path.join(".") || "<root>"}: ${i.message}`).join("; ");
-    throw new Error(`unexpected JSON shape from ${label} (${detail}): ${raw.slice(0, 240)}`);
-  }
-  return parsed.data;
+    for (const btn of buttons) {
+      btn.addEventListener("click", () => {
+        active = btn.getAttribute("data-filter-theme") || "all";
+        for (const b of buttons) b.classList.toggle("active", b === btn);
+        update();
+      });
+    }
+  })();</script></body></html>`;
 }
 
 function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.ProcessEnv, payloadDir: string): SeededWorkspaceIds {
@@ -646,43 +344,19 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
   const vvJson = <T>(args: readonly string[], schema: z.ZodType<T>, label: string): T => parseJsonOutput(vv([...args, "--json"]), schema, label);
 
   const agentSpecs = [
-    {
-      name: "Ada",
-      runtime: "vibevalley",
-      role: "worker",
-      duty: "Core Rust architecture, VDP transport, and state projections",
-    },
-    {
-      name: "Milo",
-      runtime: "claude",
-      role: "worker",
-      duty: "Desktop GPUI & nsh UI polish, Papertrails design tokens, and interaction tests",
-    },
-    {
-      name: "Sora",
-      runtime: "codex",
-      role: "worker",
-      duty: "Collaborative artifacts, traceable SLO dashboards, and interactive prototypes",
-    },
+    { name: "Ada", runtime: "vibevalley", role: "worker", duty: "Core Rust architecture, VDP transport, and state projections" },
+    { name: "Milo", runtime: "claude", role: "worker", duty: "Desktop GPUI & nsh UI polish, Papertrails design tokens, and interaction tests" },
+    { name: "Sora", runtime: "codex", role: "worker", duty: "Collaborative artifacts, traceable SLO dashboards, and interactive prototypes" },
   ] as const;
 
-  const agentIds: string[] = [];
-  for (const spec of agentSpecs) {
-    const created = vvJson(
-      ["agent", "create", spec.name, "--runtime", spec.runtime, "--role", spec.role, "--duty", spec.duty],
-      CreatedEntitySchema,
-      `agent create ${spec.name}`,
-    );
-    agentIds.push(created.id);
-  }
-
+  const agentIds = agentSpecs.map(
+    (s) => vvJson(["agent", "create", s.name, "--runtime", s.runtime, "--role", s.role, "--duty", s.duty], CreatedEntitySchema, `agent create ${s.name}`).id,
+  );
   const [adaId, miloId, soraId] = agentIds;
 
-  // Create a local sandbox repository so seeded issues carry realistic repo badges and dispatch cleanly.
   const repoName = "vibevalley";
   runSoft(cliBin, ["repo", "create", repoName], { cwd: root, env: cliEnv, timeoutMs: 20_000 });
 
-  // Upload bundled Papertrails screenshots so the board renders live card thumbnails and an interactive ```compare card.
   const uploadAsset = (relPath: string, name: string): string | undefined => {
     const absPath = resolve(root, relPath);
     if (!existsSync(absPath)) return undefined;
@@ -700,24 +374,19 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
 
   const compareBlock =
     beforeImgId && afterImgId
-      ? [
-          "",
-          "```compare",
-          JSON.stringify(
-            {
-              title: "Issues Board & Preview-First Detail Polish",
-              before: { attachment: beforeImgId, label: "Before (Raw Form)" },
-              after: { attachment: afterImgId, label: "After (Preview-First)" },
-              annotations: [
-                { n: 1, side: "after", rect: [0.08, 0.14, 0.42, 0.24], tone: "fixed", note: "Kanban cards render crisp image thumbnails with compare badge" },
-                { n: 2, side: "after", rect: [0.54, 0.22, 0.36, 0.28], tone: "note", note: "Preview-first markdown + visual criteria checklist" },
-              ],
-            },
-            null,
-            2,
-          ),
-          "```",
-        ].join("\n")
+      ? `\n\`\`\`compare\n${JSON.stringify(
+          {
+            title: "Issues Board & Preview-First Detail Polish",
+            before: { attachment: beforeImgId, label: "Before (Raw Form)" },
+            after: { attachment: afterImgId, label: "After (Preview-First)" },
+            annotations: [
+              { n: 1, side: "after", rect: [0.08, 0.14, 0.42, 0.24], tone: "fixed", note: "Kanban cards render crisp image thumbnails with compare badge" },
+              { n: 2, side: "after", rect: [0.54, 0.22, 0.36, 0.28], tone: "note", note: "Preview-first markdown + visual criteria checklist" },
+            ],
+          },
+          null,
+          2,
+        )}\n\`\`\``
       : "";
 
   const issueSpecs: readonly {
@@ -739,8 +408,7 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
         "## Overview",
         "Upgrade the Issues board so reviewers scan thumbnails at a glance, inspect drafts in a centered **Quick-Peek** modal, and read formatted `<Markdown>` + `<Compare>` blocks before entering edit mode.",
         compareBlock,
-        "",
-        "## UX Highlights",
+        "\n## UX Highlights",
         "- Card thumbnails extract the first `compare` or image attachment cleanly",
         "- Draft detail renders Markdown, criteria checklist, and a calm action bar by default",
       ].join("\n"),
@@ -756,10 +424,8 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       status: "backlog",
       agent: miloId,
       attachments: previewImgId ? [previewImgId] : undefined,
-      description: [
-        "## Audit Scope",
-        "Verify WCAG AA contrast (>= 4.5:1) across `page`, `side`, `elevated`, and `ink` tokens in both light and dark modes across Dashboard, Design System, Whiteboard, and Settings.",
-      ].join("\n"),
+      description:
+        "## Audit Scope\nVerify WCAG AA contrast (>= 4.5:1) across `page`, `side`, `elevated`, and `ink` tokens in both light and dark modes across Dashboard, Design System, Whiteboard, and Settings.",
       criteria: ["All 12 artifact views use theme tokens without hardcoded hex borders", "Dark and light screenshots pass contrast checks"],
     },
     {
@@ -767,10 +433,8 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       priority: "medium",
       status: "backlog",
       agent: adaId,
-      description: [
-        "## Goal",
-        "Compact Loro update history when collaborative whiteboards cross 500 incremental edits while preserving per-origin undo checkpoints.",
-      ].join("\n"),
+      description:
+        "## Goal\nCompact Loro update history when collaborative whiteboards cross 500 incremental edits while preserving per-origin undo checkpoints.",
       criteria: ["History preview remains deterministic before and after compaction"],
     },
     {
@@ -779,10 +443,8 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       status: "in_progress",
       agent: adaId,
       description: [
-        "## Context",
-        "Enable CDP-style live loopback inspection (`--remote-debugging-port` / `VIBEVALLEY_DEBUG_PORT=0`) across `apps/mac` and `vibevalley debug`.",
-        "",
-        "## Deliverables",
+        "## Context\nEnable CDP-style live loopback inspection (`--remote-debugging-port` / `VIBEVALLEY_DEBUG_PORT=0`) across `apps/mac` and `vibevalley debug`.",
+        "\n## Deliverables",
         "- Expose `/json/version`, `/json/list`, and authenticated `/devtools` WebSocket transport",
         "- Implement `Shell.*`, `Page.captureScreenshot`, `Page.getMetrics`, and `UI.*` probe methods",
         "- Wire `vp run ui:review` contact sheet generator with zero shell/view errors",
@@ -799,10 +461,8 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       status: "in_review",
       agent: adaId,
       description: [
-        "## Problem",
-        "Long bullet items in `OutlineView` clipped horizontally at 1280px instead of wrapping cleanly beneath the disclosure chevron.",
-        "",
-        "## Approach",
+        "## Problem\nLong bullet items in `OutlineView` clipped horizontally at 1280px instead of wrapping cleanly beneath the disclosure chevron.",
+        "\n## Approach",
         "- Enforce `min-w-0 flex-1` on node text containers and wrap long URLs/sentences gracefully",
         "- Keep `Tab` / `Shift+Tab` indent focus stable when reparenting nested todos",
       ].join("\n"),
@@ -813,10 +473,8 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       priority: "high",
       status: "in_review",
       agent: soraId,
-      description: [
-        "## Summary",
-        "When opening a `prototype` artifact in `PrototypeView`, silently snapshot the loaded `WKWebView` into `artifact.cover.set` so `/library` cards display live thumbnails.",
-      ].join("\n"),
+      description:
+        "## Summary\nWhen opening a `prototype` artifact in `PrototypeView`, silently snapshot the loaded `WKWebView` into `artifact.cover.set` so `/library` cards display live thumbnails.",
       criteria: [
         "Library card updates with captured cover PNG after visiting prototype view",
         "Capture avoids flicker and skips redundant writes when seq is unchanged",
@@ -827,10 +485,7 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       priority: "low",
       status: "done",
       agent: soraId,
-      description: [
-        "## Highlights",
-        "Consolidated native build timings, VDP debugging workflow, and screenshot acceptance steps for the alpha.5 release cut.",
-      ].join("\n"),
+      description: "## Highlights\nConsolidated native build timings, VDP debugging workflow, and screenshot acceptance steps for the alpha.5 release cut.",
       criteria: ["Checklist archived and announced in #release-ops"],
     },
     {
@@ -838,10 +493,8 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       priority: "low",
       status: "canceled",
       agent: miloId,
-      description: [
-        "## Outcome",
-        "Replaced the noisy `0 / 6` concurrency indicator on the Kanban header with clean PM lane labels (`待办 / 进行中 / 待验收 / 已完成`).",
-      ].join("\n"),
+      description:
+        "## Outcome\nReplaced the noisy `0 / 6` concurrency indicator on the Kanban header with clean PM lane labels (`待办 / 进行中 / 待验收 / 已完成`).",
       criteria: ["Board header shows lane icon, title, and issue count pill only"],
     },
   ];
@@ -865,35 +518,33 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       canceled: ["canceled"],
     };
     for (const stepStatus of transitions[spec.status]) {
-      const res = runSoft(cliBin, ["issue", "status", created.id, stepStatus], { cwd: root, env: cliEnv, timeoutMs: 15_000 });
-      if (!res.ok) break;
+      if (!runSoft(cliBin, ["issue", "status", created.id, stepStatus], { cwd: root, env: cliEnv, timeoutMs: 15_000 }).ok) break;
     }
   }
 
   const firstIssueId = issueIds[0]!;
-
   const releaseChannel = vvJson(
     ["channel", "create", "release-ops", "--description", "Release readiness, live VDP verification, and Papertrails UX reviews"],
     CreatedEntitySchema,
     "channel create release-ops",
   );
 
-  const docsMarkdown = [
-    "# VDP Remote Debugging Architecture RFC",
-    "",
-    "## Executive Summary",
-    "VibeValley exposes a loopback-only JSON-RPC 2.0 WebSocket protocol (**VDP**) so CLI tools, automated visual audits, and the embedded DevTools inspector share one typed observation and actuation layer.",
-    "",
-    "## Protocol Domains",
-    "- **Target**: `Target.list`, `Target.attach`, `Target.detach`",
-    "- **Shell**: `Shell.getState`, `Shell.navigate`, `Shell.resize`, `Shell.setTheme`",
-    "- **Page**: `Page.captureScreenshot` (GPUI Metal frame or active `WKWebView`), `Page.getMetrics`",
-    "- **UI**: `UI.getTree`, `UI.query`, `UI.press`, `UI.waitFor` via `vdpProbe`",
-    "",
-    "## Security Boundary",
-    "Every VDP listener binds strictly to `127.0.0.1`, generates a per-launch bearer token persisted under `$VIBEVALLEY_HOME/debug.json` (`0600`), and never opens external ports.",
-  ].join("\n");
-  const docsFile = writeTempPayload(payloadDir, "docs.md", docsMarkdown);
+  const docsFile = writeTempPayload(
+    payloadDir,
+    "docs.md",
+    [
+      "# VDP Remote Debugging Architecture RFC\n",
+      "## Executive Summary",
+      "VibeValley exposes a loopback-only JSON-RPC 2.0 WebSocket protocol (**VDP**) so CLI tools, automated visual audits, and the embedded DevTools inspector share one typed observation and actuation layer.\n",
+      "## Protocol Domains",
+      "- **Target**: `Target.list`, `Target.attach`, `Target.detach`",
+      "- **Shell**: `Shell.getState`, `Shell.navigate`, `Shell.resize`, `Shell.setTheme`",
+      "- **Page**: `Page.captureScreenshot` (GPUI Metal frame or active `WKWebView`), `Page.getMetrics`",
+      "- **UI**: `UI.getTree`, `UI.query`, `UI.press`, `UI.waitFor` via `vdpProbe`\n",
+      "## Security Boundary",
+      "Every VDP listener binds strictly to `127.0.0.1`, generates a per-launch bearer token persisted under `$VIBEVALLEY_HOME/debug.json` (`0600`), and never opens external ports.",
+    ].join("\n"),
+  );
   const docsArtifact = vvJson(
     [
       "artifact",
@@ -940,19 +591,8 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
         checked: false,
         children: ["n_r2a", "n_r2b"],
       },
-      n_r2a: {
-        id: "n_r2a",
-        text: "Confirm disclosure chevron stays top-aligned with the first line of wrapped text",
-        kind: "bullet",
-        children: [],
-      },
-      n_r2b: {
-        id: "n_r2b",
-        text: "Validate keyboard Tab / Shift+Tab preserves focus while indenting subtrees",
-        kind: "todo",
-        checked: true,
-        children: [],
-      },
+      n_r2a: { id: "n_r2a", text: "Confirm disclosure chevron stays top-aligned with the first line of wrapped text", kind: "bullet", children: [] },
+      n_r2b: { id: "n_r2b", text: "Validate keyboard Tab / Shift+Tab preserves focus while indenting subtrees", kind: "todo", checked: true, children: [] },
       n_r3: {
         id: "n_r3",
         text: "Freeze Papertrails token baseline in default design-system artifact before beta cut",
@@ -960,32 +600,10 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
         checked: false,
         children: [],
       },
-      n_ux: {
-        id: "n_ux",
-        text: "Visual & Accessibility Checks",
-        kind: "heading",
-        children: ["n_u1", "n_u2"],
-        props: { owner: "Milo" },
-      },
-      n_u1: {
-        id: "n_u1",
-        text: "Check WCAG AA contrast across light parchment and dark charcoal surfaces",
-        kind: "todo",
-        checked: true,
-        children: [],
-      },
-      n_u2: {
-        id: "n_u2",
-        text: "Audit spacing rhythm across Issues board, Library masonry cards, and Settings panes",
-        kind: "bullet",
-        children: [],
-      },
-      n_risks: {
-        id: "n_risks",
-        text: "Open Risks & Mitigations",
-        kind: "heading",
-        children: ["n_k1"],
-      },
+      n_ux: { id: "n_ux", text: "Visual & Accessibility Checks", kind: "heading", children: ["n_u1", "n_u2"], props: { owner: "Milo" } },
+      n_u1: { id: "n_u1", text: "Check WCAG AA contrast across light parchment and dark charcoal surfaces", kind: "todo", checked: true, children: [] },
+      n_u2: { id: "n_u2", text: "Audit spacing rhythm across Issues board, Library masonry cards, and Settings panes", kind: "bullet", children: [] },
+      n_risks: { id: "n_risks", text: "Open Risks & Mitigations", kind: "heading", children: ["n_k1"] },
       n_k1: {
         id: "n_k1",
         text: "WKWebView prototype cover capture needs initial visit settle window so library thumbnails never render stale placeholders",
@@ -1128,10 +746,7 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       { id: "danger", bg: "{color.berry}", fg: "{color.surface}" },
     ],
     states: ["default", "hover", "active", "disabled"],
-    guidelines: {
-      do: ["Use one primary action per toolbar or dialog footer"],
-      dont: ["Never mix raw hex fills outside design tokens"],
-    },
+    guidelines: { do: ["Use one primary action per toolbar or dialog footer"], dont: ["Never mix raw hex fills outside design tokens"] },
   };
   const dsBadgeComp = {
     id: "badge",
@@ -1143,10 +758,7 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
       { id: "neutral", bg: "{color.panel}", fg: "{color.muted}" },
     ],
     states: ["default"],
-    guidelines: {
-      do: ["Pair semantic color with concise 1-2 word status copy"],
-      dont: ["Avoid using status pills as interactive primary triggers"],
-    },
+    guidelines: { do: ["Pair semantic color with concise 1-2 word status copy"], dont: ["Avoid using status pills as interactive primary triggers"] },
   };
   const dsTokensFile = writeTempPayload(payloadDir, "tokens.json", `${JSON.stringify(dsTokens, null, 2)}\n`);
   const dsButtonFile = writeTempPayload(payloadDir, "button.json", `${JSON.stringify(dsButtonComp, null, 2)}\n`);
@@ -1164,16 +776,7 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
     grid: "architectural",
     viewport: { x: 0, y: 0, zoom: 1 },
     elements: {
-      t_title: {
-        id: "t_title",
-        type: "text",
-        variant: "title",
-        x: 64,
-        y: 28,
-        w: 760,
-        h: 48,
-        label: "Q4 Native Workbench & VDP Architecture",
-      },
+      t_title: { id: "t_title", type: "text", variant: "title", x: 64, y: 28, w: 760, h: 48, label: "Q4 Native Workbench & VDP Architecture" },
       t_sub: {
         id: "t_sub",
         type: "text",
@@ -1185,16 +788,7 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
         label: "Zero-drift loopback debugging, 6-slice state feeds, and 12 collaborative artifact surfaces in 14 days",
         highlight: "14 days",
       },
-      grp_core: {
-        id: "grp_core",
-        type: "container",
-        x: 56,
-        y: 128,
-        w: 544,
-        h: 292,
-        title: "Desktop Host & VDP Loopback",
-        fill: "side",
-      },
+      grp_core: { id: "grp_core", type: "container", x: 56, y: 128, w: 544, h: 292, title: "Desktop Host & VDP Loopback", fill: "side" },
       n_vdp: {
         id: "n_vdp",
         type: "shape",
@@ -1391,59 +985,21 @@ function seedRealisticWorkspace(cliBin: string, root: string, cliEnv: NodeJS.Pro
   vv(["artifact", "file", "write", sheetArtifact.id, "structure/sheets/sheet1.json", `@${sheet1File}`, "--mime", "application/json"]);
   vv(["artifact", "file", "write", sheetArtifact.id, "structure/sheets/sheet2.json", `@${sheet2File}`, "--mime", "application/json"]);
 
-  const protoHtml = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Interactive Release Readiness Explorer</title>
-  <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
-  <main class="canvas">
-    <header class="hero">
-      <div>
-        <span class="eyebrow">PAPERTRAILS · ALPHA 0.2</span>
-        <h1>Release Readiness Explorer</h1>
-        <p class="subtitle">Interactive rollout gate monitor backed by live VDP telemetry and automated surface checks.</p>
-      </div>
-      <div class="pill-group" role="tablist" aria-label="Filter release checks">
-        <button type="button" class="pill active" data-filter="all">All Gates (6)</button>
-        <button type="button" class="pill" data-filter="ready">Ready (4)</button>
-        <button type="button" class="pill" data-filter="review">In Review (2)</button>
-      </div>
-    </header>
-    <section class="metrics">
-      <article class="metric-card"><span class="m-label">Visual Coverage</span><strong class="m-val">13 / 13</strong><span class="m-hint">Light + Dark verified</span></article>
-      <article class="metric-card"><span class="m-label">Mean Frame Time</span><strong class="m-val">6.4 ms</strong><span class="m-hint">Target &lt; 16.6 ms</span></article>
-      <article class="metric-card"><span class="m-label">Shell Errors</span><strong class="m-val ok">0</strong><span class="m-hint">Strict zero-error gate</span></article>
-      <article class="metric-card"><span class="m-label">Artifact Surfaces</span><strong class="m-val">12</strong><span class="m-hint">CRDT collab enabled</span></article>
-    </section>
-    <section class="gates" id="gate-list"></section>
-  </main>
-  <script type="module" src="./app.js"></script>
-</body>
-</html>
-`;
-  const protoCss = `:root {
-  --bg: #f8f6f1;
-  --surface: #ffffff;
-  --ink: #1c1917;
-  --muted: #645e56;
-  --line: #e4dfd5;
-  --accent: #4d7a2a;
-  --accent-soft: #e9f2e1;
-  --review: #b86e18;
-  --review-soft: #fdf2e2;
-}
+  const protoHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Interactive Release Readiness Explorer</title><link rel="stylesheet" href="./styles.css" /></head><body><main class="canvas">
+<header class="hero"><div><span class="eyebrow">PAPERTRAILS · ALPHA 0.2</span><h1>Release Readiness Explorer</h1>
+<p class="subtitle">Interactive rollout gate monitor backed by live VDP telemetry and automated surface checks.</p></div>
+<div class="pill-group" role="tablist" aria-label="Filter release checks"><button type="button" class="pill active" data-filter="all">All Gates (6)</button>
+<button type="button" class="pill" data-filter="ready">Ready (4)</button><button type="button" class="pill" data-filter="review">In Review (2)</button></div></header>
+<section class="metrics">
+<article class="metric-card"><span class="m-label">Visual Coverage</span><strong class="m-val">13 / 13</strong><span class="m-hint">Light + Dark verified</span></article>
+<article class="metric-card"><span class="m-label">Mean Frame Time</span><strong class="m-val">6.4 ms</strong><span class="m-hint">Target &lt; 16.6 ms</span></article>
+<article class="metric-card"><span class="m-label">Shell Errors</span><strong class="m-val ok">0</strong><span class="m-hint">Strict zero-error gate</span></article>
+<article class="metric-card"><span class="m-label">Artifact Surfaces</span><strong class="m-val">12</strong><span class="m-hint">CRDT collab enabled</span></article>
+</section><section class="gates" id="gate-list"></section></main><script type="module" src="./app.js"></script></body></html>`;
+  const protoCss = `:root { --bg: #f8f6f1; --surface: #ffffff; --ink: #1c1917; --muted: #645e56; --line: #e4dfd5; --accent: #4d7a2a; --accent-soft: #e9f2e1; --review: #b86e18; --review-soft: #fdf2e2; }
 * { box-sizing: border-box; }
-body {
-  margin: 0;
-  padding: 28px 32px;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
-  background: radial-gradient(circle at top right, #eef4e6 0%, var(--bg) 52%);
-  color: var(--ink);
-}
+body { margin: 0; padding: 28px 32px; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; background: radial-gradient(circle at top right, #eef4e6 0%, var(--bg) 52%); color: var(--ink); }
 .canvas { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 .hero { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; }
 .eyebrow { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); background: var(--accent-soft); padding: 3px 9px; border-radius: 999px; }
@@ -1454,20 +1010,13 @@ h1 { margin: 8px 0 4px; font-size: 26px; letter-spacing: -0.02em; }
 .pill.active { background: var(--accent); color: #fff; }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .metric-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; box-shadow: 0 2px 8px rgba(28, 25, 23, 0.04); }
-.m-label { font-size: 12px; color: var(--muted); font-weight: 500; }
-.m-val { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.m-val.ok { color: var(--accent); }
-.m-hint { font-size: 11px; color: var(--muted); }
+.m-label { font-size: 12px; color: var(--muted); font-weight: 500; } .m-val { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; } .m-val.ok { color: var(--accent); } .m-hint { font-size: 11px; color: var(--muted); }
 .gates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .gate { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
-.gate-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.gate-title { font-size: 14px; font-weight: 600; margin: 0; }
-.status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
-.status.ready { background: var(--accent-soft); color: var(--accent); }
-.status.review { background: var(--review-soft); color: var(--review); }
+.gate-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; } .gate-title { font-size: 14px; font-weight: 600; margin: 0; }
+.status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; } .status.ready { background: var(--accent-soft); color: var(--accent); } .status.review { background: var(--review-soft); color: var(--review); }
 .gate-desc { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
-.gate-foot { display: flex; justify-content: space-between; font-size: 11px; font-family: ui-monospace, SFMono-Regular, monospace; color: var(--muted); }
-`;
+.gate-foot { display: flex; justify-content: space-between; font-size: 11px; font-family: ui-monospace, SFMono-Regular, monospace; color: var(--muted); }`;
   const protoJs = `const gates = [
   { title: "VDP Loopback Protocol", status: "ready", owner: "Ada", metric: "14/14 RPCs", desc: "Authenticated WebSocket discovery, Shell controls, and UI probe queries." },
   { title: "GPUI Metal Screenshots", status: "ready", owner: "Ada", metric: "1280×840 PNG", desc: "Off-thread PNG encoding works even when the macOS display is locked." },
@@ -1476,36 +1025,20 @@ h1 { margin: 8px 0 4px; font-size: 26px; letter-spacing: -0.02em; }
   { title: "Papertrails Dual Theme", status: "ready", owner: "Milo", metric: "WCAG AA", desc: "Unified parchment light and obsidian dark semantic surfaces." },
   { title: "CRDT Directory Storage", status: "ready", owner: "Sora", metric: "12 types", desc: "Per-origin history and collaborative presence across all views." },
 ];
-const list = document.getElementById("gate-list");
-let current = "all";
+const list = document.getElementById("gate-list"); let current = "all";
 function render() {
   list.replaceChildren();
   for (const item of gates.filter((g) => current === "all" || g.status === current)) {
-    const card = document.createElement("article");
-    card.className = "gate";
-    card.innerHTML =
-      '<div class="gate-top"><h2 class="gate-title"></h2><span class="status"></span></div>' +
-      '<p class="gate-desc"></p>' +
-      '<div class="gate-foot"><span class="owner"></span><span class="metric"></span></div>';
+    const card = document.createElement("article"); card.className = "gate";
+    card.innerHTML = '<div class="gate-top"><h2 class="gate-title"></h2><span class="status"></span></div><p class="gate-desc"></p><div class="gate-foot"><span class="owner"></span><span class="metric"></span></div>';
     card.querySelector(".gate-title").textContent = item.title;
-    const badge = card.querySelector(".status");
-    badge.classList.add(item.status);
-    badge.textContent = item.status === "ready" ? "Ready" : "In Review";
-    card.querySelector(".gate-desc").textContent = item.desc;
-    card.querySelector(".owner").textContent = "Owner: " + item.owner;
-    card.querySelector(".metric").textContent = item.metric;
+    const badge = card.querySelector(".status"); badge.classList.add(item.status); badge.textContent = item.status === "ready" ? "Ready" : "In Review";
+    card.querySelector(".gate-desc").textContent = item.desc; card.querySelector(".owner").textContent = "Owner: " + item.owner; card.querySelector(".metric").textContent = item.metric;
     list.append(card);
   }
 }
-for (const btn of document.querySelectorAll(".pill")) {
-  btn.addEventListener("click", () => {
-    current = btn.getAttribute("data-filter") || "all";
-    for (const b of document.querySelectorAll(".pill")) b.classList.toggle("active", b === btn);
-    render();
-  });
-}
-render();
-`;
+for (const btn of document.querySelectorAll(".pill")) { btn.addEventListener("click", () => { current = btn.getAttribute("data-filter") || "all"; for (const b of document.querySelectorAll(".pill")) b.classList.toggle("active", b === btn); render(); }); }
+render();`;
   const protoHtmlFile = writeTempPayload(payloadDir, "proto-index.html", protoHtml);
   const protoCssFile = writeTempPayload(payloadDir, "proto-styles.css", protoCss);
   const protoJsFile = writeTempPayload(payloadDir, "proto-app.js", protoJs);
@@ -1532,21 +1065,18 @@ render();
   vv(["artifact", "file", "write", protoArtifact.id, "structure/styles.css", `@${protoCssFile}`, "--mime", "text/css"]);
   vv(["artifact", "file", "write", protoArtifact.id, "structure/app.js", `@${protoJsFile}`, "--mime", "application/javascript"]);
 
-  const generalMessages = [
+  for (const msg of [
     `Kicked off the live VDP visual sweep — tracking architecture details in ${docsArtifact.id} ("VDP Remote Debugging Architecture RFC").`,
     `Outline multiline wrapping fix is up for review; check the nested checklist in ${outlineArtifact.id} at 1280×840.`,
     `Posted the interactive Release Readiness Explorer (${protoArtifact.id}) — visiting it once captures the WKWebView cover thumbnail for /library.`,
     `Papertrails Fieldcraft tokens (${dsArtifact.id}) are set as default so Dashboard, Whiteboard, and Slides stay visually aligned in light and dark themes.`,
-  ];
-  for (const msg of generalMessages) {
+  ]) {
     vv(["channel", "message", "send", "general", msg]);
   }
-
-  const releaseOpsMessages = [
+  for (const msg of [
     `SLO dashboard (${dashboardArtifact.id}) shows 99.96% mean availability across Gateway RPC, Slice Feed, and VDP Bridge.`,
     `All 6 release issues are triaged across todo, in_progress, in_review, and done — ready for the full-app VDP UX review pass.`,
-  ];
-  for (const msg of releaseOpsMessages) {
+  ]) {
     vv(["channel", "message", "send", releaseChannel.id, msg]);
   }
 
@@ -1568,78 +1098,6 @@ render();
   };
 }
 
-function readValidJsonFile<T>(filePath: string, schema: z.ZodType<T>): T | null {
-  if (!existsSync(filePath)) return null;
-  try {
-    const raw = readFileSync(filePath, "utf8");
-    const parsed = schema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
-}
-
-async function waitForSandboxReady(
-  homeDir: string,
-  cliBin: string,
-  root: string,
-  cliEnv: NodeJS.ProcessEnv,
-  appExited: () => number | null,
-  logPath: string,
-): Promise<void> {
-  const debugJsonPath = join(homeDir, "debug.json");
-  const serverJsonPath = join(homeDir, "server.json");
-  const deadline = Date.now() + 60_000;
-
-  while (Date.now() < deadline) {
-    const code = appExited();
-    if (code !== null) {
-      throw new Error(`vibevalley-mac exited early with code ${code} (see ${logPath})`);
-    }
-    const debugInfo = readValidJsonFile(debugJsonPath, DebugEndpointFileSchema);
-    const serverInfo = readValidJsonFile(serverJsonPath, ServerReceiptSchema);
-    if (debugInfo && serverInfo) {
-      const stateRes = runSoft(cliBin, ["debug", "--home", homeDir, "state", "--json"], { cwd: root, env: cliEnv, timeoutMs: 10_000 });
-      if (stateRes.ok) {
-        try {
-          const parsed = ShellStateSchema.safeParse(JSON.parse(stateRes.stdout));
-          if (parsed.success && parsed.data.loaded && parsed.data.workbench?.ready === true) {
-            return;
-          }
-        } catch {
-          /* Retry while shell finishes hydrating its initial state snapshot. */
-        }
-      }
-    }
-    await sleep(150);
-  }
-  throw new Error(`timed out waiting for VDP debug.json, server.json, and workbench readiness in ${homeDir} (see ${logPath})`);
-}
-
-function signalGroup(pid: number | undefined, sig: "SIGTERM" | "SIGKILL"): boolean {
-  if (pid === undefined) return true;
-  try {
-    process.kill(-pid, sig);
-    return true;
-  } catch (err) {
-    if (errorCode(err) === "ESRCH") return true;
-    if (errorCode(err) === "EPERM") return false;
-    throw err;
-  }
-}
-
-function groupAlive(pid: number | undefined): boolean {
-  if (pid === undefined) return false;
-  try {
-    process.kill(-pid, 0);
-    return true;
-  } catch (err) {
-    if (errorCode(err) === "ESRCH") return false;
-    if (errorCode(err) === "EPERM") return true;
-    throw err;
-  }
-}
-
 function printUsage(): void {
   console.log(`Usage: vp run ui:review -- [options]
 
@@ -1659,231 +1117,122 @@ export async function runVdpReview(options: ReviewOptions): Promise<ReviewManife
   }
 
   const root = resolve(import.meta.dirname, "../..");
-  const targetDir = process.env.CARGO_TARGET_DIR ? resolve(root, process.env.CARGO_TARGET_DIR) : resolve(root, "target");
-  const macBin = resolve(targetDir, "debug/vibevalley-mac");
-  const cliBin = resolve(targetDir, "debug/vibevalley");
-  const uiBundle = resolve(root, "apps/mac/ui/build/bundle.nshc");
-  const uiShellBundle = resolve(root, "apps/mac/ui/build-shell/bundle.nshc");
-  const nshBin = resolve(root, ".tools/bin/nsh");
-
-  if (!options.skipBuild || !existsSync(uiBundle) || !existsSync(uiShellBundle)) {
-    runChecked(nshBin, ["build", "App.tsx", "-o", "build"], { cwd: resolve(root, "apps/mac/ui"), timeoutMs: 180_000 });
-    runChecked(nshBin, ["build", "ShellApp.tsx", "-o", "build-shell"], { cwd: resolve(root, "apps/mac/ui"), timeoutMs: 180_000 });
-  }
-  if (!options.skipBuild || !existsSync(macBin)) {
-    runChecked("cargo", ["build", "-p", "vibevalley-mac", "--features", "shot"], { cwd: root, timeoutMs: 600_000 });
-  }
-  if (!options.skipBuild || !existsSync(cliBin)) {
-    runChecked("cargo", ["build", "-p", "vibevalley-cli"], { cwd: root, timeoutMs: 300_000 });
-  }
+  const paths = resolveVdpWorkspacePaths(root);
+  ensureVdpArtifactsBuilt(paths, { skipBuild: options.skipBuild });
 
   const shotsDir = resolve(options.outDir, "shots");
   mkdirSync(options.outDir, { recursive: true });
   rmSync(shotsDir, { recursive: true, force: true });
   mkdirSync(shotsDir, { recursive: true });
 
-  const sandboxDir = mkdtempSync(join(tmpdir(), "vv-ux-review-"));
-  const homeDir = join(sandboxDir, "home");
-  const workDir = join(sandboxDir, "work");
-  const payloadDir = join(sandboxDir, "payloads");
-  const storeDb = join(sandboxDir, "state.db");
-  const sandboxLogPath = join(sandboxDir, "app.log");
-  const outLogPath = resolve(options.outDir, "app.log");
-  for (const dir of [homeDir, workDir, payloadDir]) mkdirSync(dir, { recursive: true });
+  const manifest = await withVdpSandbox(
+    {
+      prefix: "vv-ux-review-",
+      logTag: "vdp-review",
+      paths,
+      outDir: options.outDir,
+      keepSandbox: options.keepSandbox,
+      requireWorkbenchReady: true,
+    },
+    async ({ payloadDir, cliEnv, driver }) => {
+      const seeded = seedRealisticWorkspace(paths.cliBin, root, cliEnv, payloadDir);
 
-  const appEnv = isolatedEnv(root, homeDir, workDir, storeDb);
-  const cliEnv: Record<string, string> = { ...appEnv, VIBEVALLEY_HOME: homeDir };
+      await driver.resize(options.width, options.height);
+      await driver.settle(300);
 
-  const logFd = openSync(sandboxLogPath, "w");
-  let child: ChildProcess | undefined;
-  let exitCode: number | null = null;
-  let exitedPromise: Promise<number> = Promise.resolve(0);
+      // Visit the prototype once before capturing /library so silent WKWebView auto-cover populates its thumbnail.
+      await driver.navigate(`/artifacts/${seeded.artifacts.prototype}`);
+      await driver.settle(1400);
 
-  const onSignal = () => {
-    signalGroup(child?.pid, "SIGTERM");
-  };
-  process.on("SIGINT", onSignal);
-  process.on("SIGTERM", onSignal);
+      const plan = buildScreenMatrix(seeded, options.themes);
+      const captures: ScreenCapture[] = [];
+      let currentTheme: ReviewTheme | null = null;
 
-  const vdp = (args: readonly string[], timeoutMs = 20_000): string =>
-    runChecked(cliBin, ["debug", "--home", homeDir, ...args], { cwd: root, env: cliEnv, capture: true, timeoutMs });
+      for (const entry of plan) {
+        if (entry.theme !== currentTheme) {
+          await driver.setTheme(entry.theme);
+          currentTheme = entry.theme;
+          await driver.settle(400);
+        }
 
-  try {
-    child = spawn(macBin, [], {
-      cwd: root,
-      env: appEnv,
-      detached: true,
-      stdio: ["ignore", logFd, logFd],
-    });
-    closeSync(logFd);
+        await driver.navigate(entry.route);
+        if (entry.waitTestId) {
+          await driver.uiWaitFor({ testId: entry.waitTestId, timeoutMs: 3_500 });
+        }
+        await driver.settle(entry.settleMs);
 
-    exitedPromise = new Promise<number>((done) => {
-      child?.once("exit", (code, sig) => {
-        exitCode = code ?? (sig ? 128 : 1);
-        done(exitCode);
-      });
-      child?.once("error", () => {
-        exitCode = 1;
-        done(1);
-      });
-    });
+        const stateRaw = await driver.getState();
+        const shellCheck = extractShellErrors(stateRaw);
+        const shellErrors = [...shellCheck.errors];
+        const shot = await captureVdpScreenshot(driver, shotsDir, entry.fileName, shellErrors, entry.target ?? "shell");
+        const rawMetrics = driver.getMetrics ? await driver.getMetrics() : null;
+        const metrics = rawMetrics
+          ? {
+              width: rawMetrics.width,
+              height: rawMetrics.height,
+              scaleFactor: rawMetrics.scaleFactor,
+              themeDark: rawMetrics.themeDark,
+              lastFrameMs: rawMetrics.lastFrameMs ?? null,
+            }
+          : null;
 
-    await waitForSandboxReady(homeDir, cliBin, root, cliEnv, () => exitCode, sandboxLogPath);
+        let uiNodeCount = 0;
+        let uiRoute: string | null = null;
+        try {
+          const tree = await driver.uiGetTree("workbench");
+          uiNodeCount = countUiTreeNodes(tree.nodes);
+          uiRoute = tree.route ?? null;
+        } catch {
+          // Leave uiNodeCount at 0 if UI tree probe is unavailable on this screen.
+        }
 
-    const seeded = seedRealisticWorkspace(cliBin, root, cliEnv, payloadDir);
-
-    vdp(["resize", String(options.width), String(options.height), "--json"]);
-    await sleep(300);
-
-    // Visit the prototype once before capturing /library so silent WKWebView auto-cover populates its thumbnail.
-    vdp(["navigate", `/artifacts/${seeded.artifacts.prototype}`, "--json"]);
-    await sleep(1400);
-
-    const plan = buildScreenMatrix(seeded, options.themes);
-    const captures: ScreenCapture[] = [];
-    let currentTheme: ReviewTheme | null = null;
-
-    for (const entry of plan) {
-      if (entry.theme !== currentTheme) {
-        vdp(["theme", entry.theme === "dark" ? "--dark" : "--light", "--json"]);
-        currentTheme = entry.theme;
-        await sleep(400);
-      }
-
-      vdp(["navigate", entry.route, "--json"]);
-      if (entry.waitTestId) {
-        runSoft(cliBin, ["debug", "--home", homeDir, "ui-wait", "--test-id", entry.waitTestId, "--timeout-ms", "3500", "--json"], {
-          cwd: root,
-          env: cliEnv,
-          timeoutMs: 10_000,
+        captures.push({
+          id: entry.id,
+          label: entry.label,
+          route: entry.route,
+          theme: entry.theme,
+          pngPath: shot.path,
+          relPath: shot.relPath,
+          bytes: shot.bytes,
+          imageWidth: shot.width,
+          imageHeight: shot.height,
+          metrics,
+          uiNodeCount,
+          uiRoute,
+          shellRoute: shellCheck.route,
+          shellErrors,
         });
       }
-      await sleep(entry.settleMs);
 
-      const pngPath = resolve(shotsDir, entry.fileName);
-      const captureTarget = entry.target ?? "shell";
-      const shot = parseJsonOutput(
-        vdp(["screenshot", pngPath, "--target", captureTarget, "--json"], 25_000),
-        ScreenshotSavedSchema,
-        `debug screenshot ${entry.fileName}`,
-      );
-
-      const stateRaw: unknown = JSON.parse(vdp(["state", "--json"]));
-      const shellCheck = extractShellErrors(stateRaw);
-
-      let metrics: ScreenCapture["metrics"] = null;
-      const metricsRes = runSoft(cliBin, ["debug", "--home", homeDir, "call", "Page.getMetrics", "--json"], { cwd: root, env: cliEnv });
-      if (metricsRes.ok) {
-        const parsedMetrics = PageMetricsSchema.safeParse(JSON.parse(metricsRes.stdout));
-        if (parsedMetrics.success) {
-          metrics = {
-            width: parsedMetrics.data.width,
-            height: parsedMetrics.data.height,
-            scaleFactor: parsedMetrics.data.scaleFactor,
-            themeDark: parsedMetrics.data.themeDark,
-            lastFrameMs: parsedMetrics.data.lastFrameMs ?? null,
-          };
-        }
-      }
-
-      let uiNodeCount = 0;
-      let uiRoute: string | null = null;
-      const treeRes = runSoft(cliBin, ["debug", "--home", homeDir, "ui-tree", "--view", "workbench", "--json"], { cwd: root, env: cliEnv });
-      if (treeRes.ok) {
-        const parsedTree = UiTreeSchema.safeParse(JSON.parse(treeRes.stdout));
-        if (parsedTree.success) {
-          uiNodeCount = countUiTreeNodes(parsedTree.data.nodes);
-          uiRoute = parsedTree.data.route ?? null;
-        }
-      }
-
-      const fileBytes = existsSync(pngPath) ? statSync(pngPath).size : 0;
-      const shellErrors = [...shellCheck.errors];
-      if (fileBytes <= 0) {
-        shellErrors.push(`screenshot missing or empty: ${pngPath}`);
-      }
-
-      captures.push({
-        id: entry.id,
-        label: entry.label,
-        route: entry.route,
-        theme: entry.theme,
-        pngPath,
-        relPath: `shots/${basename(pngPath)}`,
-        bytes: fileBytes > 0 ? fileBytes : shot.bytes,
-        imageWidth: shot.width,
-        imageHeight: shot.height,
-        metrics,
-        uiNodeCount,
-        uiRoute,
-        shellRoute: shellCheck.route,
-        shellErrors,
+      const totalErrors = captures.reduce((sum, item) => sum + item.shellErrors.length, 0);
+      const totalBytes = captures.reduce((sum, item) => sum + item.bytes, 0);
+      return ReviewManifestSchema.parse({
+        generatedAt: new Date().toISOString(),
+        outDir: options.outDir,
+        viewport: { width: options.width, height: options.height },
+        themes: [...options.themes],
+        seeded,
+        screens: captures,
+        summary: { totalScreens: captures.length, totalErrors, totalBytes },
       });
-    }
+    },
+  );
 
-    // Request a graceful macOS quit over VDP before falling back to process group termination in finally.
-    runSoft(cliBin, ["debug", "--home", homeDir, "key", "cmd-q", "--json"], { cwd: root, env: cliEnv, timeoutMs: 8_000 });
-    const quitDeadline = Date.now() + 6_000;
-    while (exitCode === null && Date.now() < quitDeadline) {
-      await sleep(100);
-    }
+  writeFileSync(resolve(options.outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  writeFileSync(resolve(options.outDir, "index.html"), renderContactSheetHtml(manifest), "utf8");
 
-    const totalErrors = captures.reduce((sum, item) => sum + item.shellErrors.length, 0);
-    const totalBytes = captures.reduce((sum, item) => sum + item.bytes, 0);
-    const manifest: ReviewManifest = ReviewManifestSchema.parse({
-      generatedAt: new Date().toISOString(),
-      outDir: options.outDir,
-      viewport: { width: options.width, height: options.height },
-      themes: [...options.themes],
-      seeded,
-      screens: captures,
-      summary: {
-        totalScreens: captures.length,
-        totalErrors,
-        totalBytes,
-      },
-    });
-
-    writeFileSync(resolve(options.outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-    writeFileSync(resolve(options.outDir, "index.html"), renderContactSheetHtml(manifest), "utf8");
-
-    if (totalErrors > 0) {
-      const details = captures
-        .filter((c) => c.shellErrors.length > 0)
-        .map((c) => `${c.id} (${c.theme}): ${c.shellErrors.join("; ")}`)
-        .join("\n- ");
-      throw new Error(`vdp-review found ${totalErrors} shell/view error(s):\n- ${details}`);
-    }
-
-    console.log(
-      `vdp-review: captured ${manifest.summary.totalScreens} screens (${manifest.themes.join(", ")}) -> ${resolve(options.outDir, "manifest.json")} & ${resolve(options.outDir, "index.html")}`,
-    );
-    return manifest;
-  } finally {
-    process.off("SIGINT", onSignal);
-    process.off("SIGTERM", onSignal);
-
-    if (child && exitCode === null) {
-      signalGroup(child.pid, "SIGTERM");
-      const termDeadline = Date.now() + 6_000;
-      while (groupAlive(child.pid) && Date.now() < termDeadline) {
-        await sleep(100);
-      }
-      if (groupAlive(child.pid)) {
-        signalGroup(child.pid, "SIGKILL");
-      }
-      await exitedPromise;
-    }
-
-    if (existsSync(sandboxLogPath)) {
-      copyFileSync(sandboxLogPath, outLogPath);
-    }
-    if (!options.keepSandbox) {
-      rmSync(sandboxDir, { recursive: true, force: true });
-    } else {
-      console.log(`vdp-review: kept sandbox at ${sandboxDir}`);
-    }
+  if (manifest.summary.totalErrors > 0) {
+    const details = manifest.screens
+      .filter((c) => c.shellErrors.length > 0)
+      .map((c) => `${c.id} (${c.theme}): ${c.shellErrors.join("; ")}`)
+      .join("\n- ");
+    throw new Error(`vdp-review found ${manifest.summary.totalErrors} shell/view error(s):\n- ${details}`);
   }
+
+  console.log(
+    `vdp-review: captured ${manifest.summary.totalScreens} screens (${manifest.themes.join(", ")}) -> ${resolve(options.outDir, "manifest.json")} & ${resolve(options.outDir, "index.html")}`,
+  );
+  return manifest;
 }
 
 if (import.meta.main) {

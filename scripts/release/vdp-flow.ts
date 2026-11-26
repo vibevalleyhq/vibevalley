@@ -1,12 +1,30 @@
-import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { closeSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
-import { setTimeout as sleep } from "node:timers/promises";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { z } from "zod";
 
-import { countUiTreeNodes, extractShellErrors, isReviewTheme, type ReviewTheme } from "./vdp-review.ts";
+import {
+  captureVdpScreenshot,
+  CreatedEntitySchema,
+  countUiTreeNodes,
+  createCliVdpDriver,
+  ensureVdpArtifactsBuilt,
+  extractShellErrors,
+  flattenUiNodes,
+  isReviewTheme,
+  parseJsonOutput,
+  parsePort,
+  parsePositiveInt,
+  resolveVdpWorkspacePaths,
+  runChecked,
+  runSoft,
+  type ReviewTheme,
+  type VdpDriver,
+  type VdpUiNode,
+  withVdpSandbox,
+} from "./vdp-client.ts";
+
+export { flattenUiNodes, type VdpDriver, type VdpUiNode };
 
 export interface FlowOptions {
   readonly outDir: string;
@@ -19,66 +37,6 @@ export interface FlowOptions {
   readonly skipBuild: boolean;
   readonly keepSandbox: boolean;
   readonly help: boolean;
-}
-
-export interface VdpUiNode {
-  readonly testId?: string | null | undefined;
-  readonly role?: string | null | undefined;
-  readonly text?: string | null | undefined;
-  readonly route?: string | null | undefined;
-  readonly pressable?: boolean | undefined;
-  readonly children?: readonly VdpUiNode[] | null | undefined;
-}
-
-export interface VdpUiQueryResult {
-  readonly view: string;
-  readonly route?: string | null | undefined;
-  readonly count: number;
-  readonly nodes: readonly VdpUiNode[];
-}
-
-export interface VdpUiPressResult {
-  readonly pressed: boolean;
-  readonly view?: string | undefined;
-  readonly testId?: string | undefined;
-}
-
-export interface VdpUiWaitForResult {
-  readonly found: boolean;
-  readonly node?: VdpUiNode | null | undefined;
-}
-
-export interface VdpUiTreeResult {
-  readonly view: string;
-  readonly route?: string | null | undefined;
-  readonly nodes: readonly VdpUiNode[];
-}
-
-export interface VdpScreenshotInfo {
-  readonly path: string;
-  readonly mime: string;
-  readonly width: number;
-  readonly height: number;
-  readonly bytes: number;
-}
-
-export interface VdpDriver {
-  navigate(route: string): Promise<void>;
-  resize(width: number, height: number): Promise<void>;
-  setTheme(theme: ReviewTheme): Promise<void>;
-  getState(): Promise<unknown>;
-  uiQuery(params: { readonly testId?: string; readonly text?: string; readonly role?: string; readonly view?: string }): Promise<VdpUiQueryResult>;
-  uiPress(testId: string, view?: string): Promise<VdpUiPressResult>;
-  uiWaitFor(params: {
-    readonly testId?: string;
-    readonly text?: string;
-    readonly role?: string;
-    readonly view?: string;
-    readonly timeoutMs?: number;
-  }): Promise<VdpUiWaitForResult>;
-  uiGetTree(view?: string, maxDepth?: number): Promise<VdpUiTreeResult>;
-  captureScreenshot(outPath: string, target?: "shell" | "webview"): Promise<VdpScreenshotInfo>;
-  settle(ms: number): Promise<void>;
 }
 
 export const FlowCheckSchema = z.object({
@@ -144,69 +102,6 @@ export const FlowReportSchema = z.object({
 
 export type FlowReport = z.infer<typeof FlowReportSchema>;
 
-const UiNodeSchema: z.ZodType<VdpUiNode> = z.lazy(() =>
-  z.object({
-    testId: z.string().nullable().optional(),
-    role: z.string().nullable().optional(),
-    text: z.string().nullable().optional(),
-    route: z.string().nullable().optional(),
-    pressable: z.boolean().optional(),
-    children: z.array(UiNodeSchema).nullable().optional(),
-  }),
-);
-
-const UiQueryResultSchema: z.ZodType<VdpUiQueryResult> = z.object({
-  view: z.string().default("workbench"),
-  route: z.string().nullable().optional(),
-  count: z.number().int().nonnegative().default(0),
-  nodes: z.array(UiNodeSchema).default([]),
-});
-
-const UiPressResultSchema: z.ZodType<VdpUiPressResult> = z.object({
-  pressed: z.boolean().default(true),
-  view: z.string().optional(),
-  testId: z.string().optional(),
-});
-
-const UiWaitForResultSchema: z.ZodType<VdpUiWaitForResult> = z.object({
-  found: z.boolean().default(false),
-  node: UiNodeSchema.nullable().optional(),
-});
-
-const UiTreeResultSchema: z.ZodType<VdpUiTreeResult> = z.object({
-  view: z.string().default("workbench"),
-  route: z.string().nullable().optional(),
-  nodes: z.array(UiNodeSchema).default([]),
-});
-
-const ScreenshotSavedSchema: z.ZodType<VdpScreenshotInfo> = z.object({
-  path: z.string(),
-  mime: z.string(),
-  width: z.number(),
-  height: z.number(),
-  bytes: z.number(),
-});
-
-const DebugEndpointFileSchema = z.object({
-  pid: z.number(),
-  port: z.number().int().positive(),
-  httpUrl: z.string().min(1),
-  wsUrl: z.string().min(1),
-});
-
-const ServerReceiptSchema = z.object({
-  port: z.number().int().positive().optional(),
-  url: z.string().min(1).optional(),
-});
-
-const CreatedEntitySchema = z.union([
-  z
-    .string()
-    .min(1)
-    .transform((id) => ({ id })),
-  z.object({ id: z.string().min(1) }),
-]);
-
 export const KANBAN_LANES = [
   { testId: "lane-todo", zh: "待办", en: "To do" },
   { testId: "lane-working", zh: "进行中", en: "In progress" },
@@ -219,25 +114,6 @@ export const SWEEP_ROUTES = [
   { id: "route-agents", label: "Agents Roster", route: "/agents", shotName: "flow-agents.png" },
   { id: "route-settings", label: "Settings", route: "/settings", shotName: "flow-settings.png" },
 ] as const;
-
-function parsePositiveInt(flag: string, raw: string): number {
-  if (!/^\d+$/u.test(raw.trim())) {
-    throw new Error(`${flag} requires a positive integer (got "${raw}")`);
-  }
-  const parsed = Number.parseInt(raw.trim(), 10);
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    throw new Error(`${flag} requires a positive integer (got "${raw}")`);
-  }
-  return parsed;
-}
-
-function parsePort(raw: string): number {
-  const port = parsePositiveInt("--port", raw);
-  if (port > 65_535) {
-    throw new Error(`--port must be between 1 and 65535 (got "${raw}")`);
-  }
-  return port;
-}
 
 export function parseFlowArgs(argv: readonly string[], cwd = process.cwd()): FlowOptions {
   let outDir = "/tmp/vv-vdp-flow";
@@ -318,20 +194,6 @@ export function parseFlowArgs(argv: readonly string[], cwd = process.cwd()): Flo
   }
 
   return { outDir, port, home, url, theme, width, height, skipBuild, keepSandbox, help };
-}
-
-export function flattenUiNodes(nodes: readonly VdpUiNode[]): VdpUiNode[] {
-  const flat: VdpUiNode[] = [];
-  const visit = (list: readonly VdpUiNode[]) => {
-    for (const node of list) {
-      flat.push(node);
-      if (node.children && node.children.length > 0) {
-        visit(node.children);
-      }
-    }
-  };
-  visit(nodes);
-  return flat;
 }
 
 export function checkKanbanBoardInvariants(nodes: readonly VdpUiNode[], workingSlotsCount: number): FlowCheck[] {
@@ -512,23 +374,6 @@ function makeStepResult(params: {
   };
 }
 
-async function captureStepShot(driver: VdpDriver, shotsDir: string, fileName: string, shellErrors: string[]): Promise<FlowScreenshot> {
-  const pngPath = resolve(shotsDir, fileName);
-  const saved = await driver.captureScreenshot(pngPath, "shell");
-  const diskBytes = existsSync(pngPath) ? statSync(pngPath).size : 0;
-  const bytes = diskBytes > 0 ? diskBytes : saved.bytes;
-  if (bytes <= 0) {
-    shellErrors.push(`screenshot missing or empty: ${pngPath}`);
-  }
-  return {
-    path: pngPath,
-    relPath: `shots/${basename(pngPath)}`,
-    width: Math.max(0, Math.round(saved.width)),
-    height: Math.max(0, Math.round(saved.height)),
-    bytes,
-  };
-}
-
 async function inspectShellAndTree(driver: VdpDriver): Promise<{
   readonly shellRoute: string | null;
   readonly shellErrors: string[];
@@ -591,7 +436,7 @@ export async function runFlowScenario(
     }
 
     const checks = checkKanbanBoardInvariants(queriedLanes, slotsRes.count);
-    const screenshot = await captureStepShot(driver, shotsDir, "flow-issues-board.png", shellErrors);
+    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-issues-board.png", shellErrors);
     steps.push(
       makeStepResult({
         id: "issues-board",
@@ -635,7 +480,7 @@ export async function runFlowScenario(
 
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
     shellErrors.push(...extraErrors);
-    const screenshot = await captureStepShot(driver, shotsDir, "flow-new-issue.png", shellErrors);
+    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-new-issue.png", shellErrors);
 
     if (dialogOpen) {
       try {
@@ -692,7 +537,7 @@ export async function runFlowScenario(
 
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
     shellErrors.push(...extraErrors);
-    const screenshot = await captureStepShot(driver, shotsDir, "flow-quick-peek.png", shellErrors);
+    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-quick-peek.png", shellErrors);
     const checks = checkQuickPeekInvariants({ cardCount: cards.count, peekExpandCount, shellRoute });
 
     steps.push(
@@ -727,7 +572,7 @@ export async function runFlowScenario(
 
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
     shellErrors.push(...extraErrors);
-    const screenshot = await captureStepShot(driver, shotsDir, "flow-detail-expanded.png", shellErrors);
+    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-detail-expanded.png", shellErrors);
     const onDetailRoute = shellRoute !== null && shellRoute.startsWith("/issues/") && shellRoute.length > "/issues/".length;
 
     const checks: FlowCheck[] = [
@@ -785,7 +630,7 @@ export async function runFlowScenario(
     const listCards = await driver.uiQuery({ testId: "issue-card", view: "workbench" });
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
     shellErrors.push(...extraErrors);
-    const screenshot = await captureStepShot(driver, shotsDir, "flow-issues-list.png", shellErrors);
+    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-issues-list.png", shellErrors);
 
     const checks: FlowCheck[] = [
       {
@@ -889,7 +734,7 @@ export async function runFlowScenario(
 
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
     shellErrors.push(...extraErrors);
-    const screenshot = await captureStepShot(driver, shotsDir, "flow-runs-expanded.png", shellErrors);
+    const screenshot = await captureVdpScreenshot(driver, shotsDir, "flow-runs-expanded.png", shellErrors);
     steps.push(
       makeStepResult({
         id: "runs-expanded",
@@ -915,7 +760,7 @@ export async function runFlowScenario(
     await driver.settle(450);
 
     const { shellRoute, shellErrors, uiNodeCount } = await inspectShellAndTree(driver);
-    const screenshot = await captureStepShot(driver, shotsDir, spec.shotName, shellErrors);
+    const screenshot = await captureVdpScreenshot(driver, shotsDir, spec.shotName, shellErrors);
     const checks: FlowCheck[] = [
       {
         name: `${spec.id}-zero-shell-errors`,
@@ -945,208 +790,6 @@ export async function runFlowScenario(
     theme: options.theme,
     steps,
   });
-}
-
-const errorCode = (error: unknown): unknown => (typeof error === "object" && error !== null && "code" in error ? error.code : undefined);
-
-function runChecked(
-  command: string,
-  args: readonly string[],
-  options: { cwd: string; env?: NodeJS.ProcessEnv; capture?: boolean; timeoutMs?: number },
-): string {
-  const res = spawnSync(command, args, {
-    cwd: options.cwd,
-    env: options.env ?? process.env,
-    encoding: "utf8",
-    stdio: options.capture === true ? ["ignore", "pipe", "pipe"] : "inherit",
-    timeout: options.timeoutMs ?? 60_000,
-  });
-  if (res.error) {
-    throw new Error(`${command} ${args.join(" ")} failed to spawn: ${res.error.message}`, { cause: res.error });
-  }
-  if (res.status !== 0) {
-    const stdout = typeof res.stdout === "string" ? res.stdout.trim() : "";
-    const stderr = typeof res.stderr === "string" ? res.stderr.trim() : "";
-    const detail = [stdout, stderr].filter(Boolean).join("\n");
-    throw new Error(`${command} ${args.join(" ")} failed with exit code ${String(res.status)}${detail ? `:\n${detail}` : ""}`);
-  }
-  return typeof res.stdout === "string" ? res.stdout : "";
-}
-
-function runSoft(
-  command: string,
-  args: readonly string[],
-  options: { cwd: string; env?: NodeJS.ProcessEnv; timeoutMs?: number },
-): { readonly ok: boolean; readonly stdout: string; readonly stderr: string } {
-  const res = spawnSync(command, args, {
-    cwd: options.cwd,
-    env: options.env ?? process.env,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: options.timeoutMs ?? 20_000,
-  });
-  return {
-    ok: !res.error && res.status === 0,
-    stdout: typeof res.stdout === "string" ? res.stdout : "",
-    stderr: typeof res.stderr === "string" ? res.stderr : "",
-  };
-}
-
-function parseJsonOutput<T>(raw: string, schema: z.ZodType<T>, label: string): T {
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(raw);
-  } catch (err) {
-    throw new Error(`failed to parse JSON from ${label}: ${raw.slice(0, 240)}`, { cause: err });
-  }
-  const parsed = schema.safeParse(decoded);
-  if (!parsed.success) {
-    const detail = parsed.error.issues.map((i) => `${i.path.join(".") || "<root>"}: ${i.message}`).join("; ");
-    throw new Error(`unexpected JSON shape from ${label} (${detail}): ${raw.slice(0, 240)}`);
-  }
-  return parsed.data;
-}
-
-function createCliVdpDriver(params: {
-  readonly cliBin: string;
-  readonly root: string;
-  readonly env: NodeJS.ProcessEnv;
-  readonly targetFlags: readonly string[];
-}): VdpDriver {
-  const runDebug = (args: readonly string[], timeoutMs = 20_000): string =>
-    runChecked(params.cliBin, ["debug", ...params.targetFlags, ...args], {
-      cwd: params.root,
-      env: params.env,
-      capture: true,
-      timeoutMs,
-    });
-
-  return {
-    async navigate(route: string): Promise<void> {
-      runDebug(["navigate", route, "--json"]);
-    },
-    async resize(width: number, height: number): Promise<void> {
-      runDebug(["resize", String(width), String(height), "--json"]);
-    },
-    async setTheme(theme: ReviewTheme): Promise<void> {
-      runDebug(["theme", theme === "dark" ? "--dark" : "--light", "--json"]);
-    },
-    async getState(): Promise<unknown> {
-      return JSON.parse(runDebug(["state", "--json"]));
-    },
-    async uiQuery(query): Promise<VdpUiQueryResult> {
-      const payload: Record<string, string> = {};
-      if (query.testId !== undefined) payload.testId = query.testId;
-      if (query.text !== undefined) payload.text = query.text;
-      if (query.role !== undefined) payload.role = query.role;
-      if (query.view !== undefined) payload.view = query.view;
-      const raw = runDebug(["call", "UI.query", JSON.stringify(payload), "--json"]);
-      return parseJsonOutput(raw, UiQueryResultSchema, "UI.query");
-    },
-    async uiPress(testId: string, view?: string): Promise<VdpUiPressResult> {
-      const payload: Record<string, string> = { testId };
-      if (view !== undefined) payload.view = view;
-      const raw = runDebug(["call", "UI.press", JSON.stringify(payload), "--json"]);
-      return parseJsonOutput(raw, UiPressResultSchema, `UI.press(${testId})`);
-    },
-    async uiWaitFor(wait): Promise<VdpUiWaitForResult> {
-      const args = ["ui-wait"];
-      if (wait.testId !== undefined) args.push("--test-id", wait.testId);
-      if (wait.text !== undefined) args.push("--text", wait.text);
-      if (wait.view !== undefined) args.push("--view", wait.view);
-      args.push("--timeout-ms", String(wait.timeoutMs ?? 4_000), "--json");
-      const res = runSoft(params.cliBin, ["debug", ...params.targetFlags, ...args], {
-        cwd: params.root,
-        env: params.env,
-        timeoutMs: (wait.timeoutMs ?? 4_000) + 4_000,
-      });
-      if (!res.ok) return { found: false };
-      try {
-        return parseJsonOutput(res.stdout, UiWaitForResultSchema, "UI.waitFor");
-      } catch {
-        return { found: false };
-      }
-    },
-    async uiGetTree(view = "workbench", maxDepth = 10): Promise<VdpUiTreeResult> {
-      const raw = runDebug(["ui-tree", "--view", view, "--max-depth", String(maxDepth), "--json"]);
-      return parseJsonOutput(raw, UiTreeResultSchema, "UI.getTree");
-    },
-    async captureScreenshot(outPath: string, target: "shell" | "webview" = "shell"): Promise<VdpScreenshotInfo> {
-      const raw = runDebug(["screenshot", outPath, "--target", target, "--json"], 25_000);
-      return parseJsonOutput(raw, ScreenshotSavedSchema, `Page.captureScreenshot(${basename(outPath)})`);
-    },
-    async settle(ms: number): Promise<void> {
-      await sleep(ms);
-    },
-  };
-}
-
-function isolatedEnv(root: string, homeDir: string, workDir: string, storeDb: string): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && !key.startsWith("VIBEVALLEY_") && key !== "DEEPSEEK_API_KEY") {
-      env[key] = value;
-    }
-  }
-  return {
-    ...env,
-    VIBEVALLEY_HOME: homeDir,
-    VIBEVALLEY_WORK_ROOT: workDir,
-    VIBEVALLEY_STORE: storeDb,
-    VIBEVALLEY_PORT: "0",
-    VIBEVALLEY_DEBUG_PORT: "0",
-    VIBEVALLEY_NO_OPENING: "1",
-    VIBEVALLEY_ASSETS: resolve(root, "assets"),
-    VIBEVALLEY_DIORAMA_DIST: resolve(root, "assets/diorama"),
-    VIBEVALLEY_VOICE_LINE_PORT: "0",
-    VIBEVALLEY_PATROL_HEARTBEAT_MINUTES: "0",
-  };
-}
-
-function readValidJsonFile<T>(filePath: string, schema: z.ZodType<T>): T | null {
-  if (!existsSync(filePath)) return null;
-  try {
-    const raw = readFileSync(filePath, "utf8");
-    const parsed = schema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
-}
-
-async function waitForSandboxReady(
-  homeDir: string,
-  cliBin: string,
-  root: string,
-  cliEnv: NodeJS.ProcessEnv,
-  appExited: () => number | null,
-  logPath: string,
-): Promise<void> {
-  const debugJsonPath = join(homeDir, "debug.json");
-  const serverJsonPath = join(homeDir, "server.json");
-  const deadline = Date.now() + 60_000;
-
-  while (Date.now() < deadline) {
-    const code = appExited();
-    if (code !== null) {
-      throw new Error(`vibevalley-mac exited early with code ${code} (see ${logPath})`);
-    }
-    const debugInfo = readValidJsonFile(debugJsonPath, DebugEndpointFileSchema);
-    const serverInfo = readValidJsonFile(serverJsonPath, ServerReceiptSchema);
-    if (debugInfo && serverInfo) {
-      const stateRes = runSoft(cliBin, ["debug", "--home", homeDir, "state", "--json"], { cwd: root, env: cliEnv, timeoutMs: 10_000 });
-      if (stateRes.ok) {
-        try {
-          const check = extractShellErrors(JSON.parse(stateRes.stdout));
-          if (check.loaded) return;
-        } catch {
-          // Retry while shell finishes hydrating its initial state snapshot.
-        }
-      }
-    }
-    await sleep(150);
-  }
-  throw new Error(`timed out waiting for VDP readiness in ${homeDir} (see ${logPath})`);
 }
 
 function seedFlowSandbox(cliBin: string, root: string, cliEnv: NodeJS.ProcessEnv, payloadDir: string): void {
@@ -1190,30 +833,6 @@ function seedFlowSandbox(cliBin: string, root: string, cliEnv: NodeJS.ProcessEnv
   );
 }
 
-function signalGroup(pid: number | undefined, sig: "SIGTERM" | "SIGKILL"): boolean {
-  if (pid === undefined) return true;
-  try {
-    process.kill(-pid, sig);
-    return true;
-  } catch (err) {
-    if (errorCode(err) === "ESRCH") return true;
-    if (errorCode(err) === "EPERM") return false;
-    throw err;
-  }
-}
-
-function groupAlive(pid: number | undefined): boolean {
-  if (pid === undefined) return false;
-  try {
-    process.kill(-pid, 0);
-    return true;
-  } catch (err) {
-    if (errorCode(err) === "ESRCH") return false;
-    if (errorCode(err) === "EPERM") return true;
-    throw err;
-  }
-}
-
 function printUsage(): void {
   console.log(`Usage: vp run ui:flow -- [options]
 
@@ -1230,20 +849,21 @@ Options:
   -h, --help           Show this help message`);
 }
 
+function writeAndCheckFlowReport(outDir: string, report: FlowReport): FlowReport {
+  writeFileSync(resolve(outDir, "report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  if (!report.summary.allPassed) {
+    throw new Error(`vdp-flow failed (${report.summary.failedSteps} step(s), ${report.summary.totalErrors} error(s)) -> ${resolve(outDir, "report.json")}`);
+  }
+  console.log(
+    `vdp-flow: passed ${report.summary.passedSteps}/${report.summary.totalSteps} steps (${report.summary.totalScreenshots} shots) -> ${resolve(outDir, "report.json")}`,
+  );
+  return report;
+}
+
 export async function runVdpFlow(options: FlowOptions): Promise<FlowReport> {
   const root = resolve(import.meta.dirname, "../..");
-  const targetDir = process.env.CARGO_TARGET_DIR ? resolve(root, process.env.CARGO_TARGET_DIR) : resolve(root, "target");
-  const macBin = resolve(targetDir, "debug/vibevalley-mac");
-  const cliBin = resolve(targetDir, "debug/vibevalley");
-  const uiBundle = resolve(root, "apps/mac/ui/build/bundle.nshc");
-  const uiShellBundle = resolve(root, "apps/mac/ui/build-shell/bundle.nshc");
-  const nshBin = resolve(root, ".tools/bin/nsh");
-
+  const paths = resolveVdpWorkspacePaths(root);
   const isAttached = options.port !== undefined || options.home !== undefined || options.url !== undefined;
-
-  if (!options.skipBuild || !existsSync(cliBin)) {
-    runChecked("cargo", ["build", "-p", "vibevalley-cli"], { cwd: root, timeoutMs: 300_000 });
-  }
 
   const shotsDir = resolve(options.outDir, "shots");
   mkdirSync(options.outDir, { recursive: true });
@@ -1251,137 +871,47 @@ export async function runVdpFlow(options: FlowOptions): Promise<FlowReport> {
   mkdirSync(shotsDir, { recursive: true });
 
   if (isAttached) {
+    ensureVdpArtifactsBuilt(paths, { skipBuild: options.skipBuild, cliOnly: true });
     const targetFlags: string[] = [];
     if (options.home !== undefined) targetFlags.push("--home", options.home);
     if (options.port !== undefined) targetFlags.push("--port", String(options.port));
     if (options.url !== undefined) targetFlags.push("--url", options.url);
 
-    const driver = createCliVdpDriver({ cliBin, root, env: process.env, targetFlags });
+    const driver = createCliVdpDriver({ cliBin: paths.cliBin, root, env: process.env, targetFlags });
     const report = await runFlowScenario(driver, {
       outDir: options.outDir,
       mode: "attached",
       viewport: { width: options.width, height: options.height },
       theme: options.theme,
     });
-    writeFileSync(resolve(options.outDir, "report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
-    if (!report.summary.allPassed) {
-      throw new Error(
-        `vdp-flow failed (${report.summary.failedSteps} step(s), ${report.summary.totalErrors} error(s)) -> ${resolve(options.outDir, "report.json")}`,
-      );
-    }
-    console.log(
-      `vdp-flow: passed ${report.summary.passedSteps}/${report.summary.totalSteps} steps (${report.summary.totalScreenshots} shots) -> ${resolve(options.outDir, "report.json")}`,
-    );
-    return report;
+    return writeAndCheckFlowReport(options.outDir, report);
   }
 
   if (process.platform === "win32") {
     throw new Error("vdp-flow sandbox mode requires macOS/Unix process groups");
   }
 
-  if (!options.skipBuild || !existsSync(uiBundle) || !existsSync(uiShellBundle)) {
-    runChecked(nshBin, ["build", "App.tsx", "-o", "build"], { cwd: resolve(root, "apps/mac/ui"), timeoutMs: 180_000 });
-    runChecked(nshBin, ["build", "ShellApp.tsx", "-o", "build-shell"], { cwd: resolve(root, "apps/mac/ui"), timeoutMs: 180_000 });
-  }
-  if (!options.skipBuild || !existsSync(macBin)) {
-    runChecked("cargo", ["build", "-p", "vibevalley-mac", "--features", "shot"], { cwd: root, timeoutMs: 600_000 });
-  }
+  ensureVdpArtifactsBuilt(paths, { skipBuild: options.skipBuild });
 
-  const sandboxDir = mkdtempSync(join(tmpdir(), "vv-vdp-flow-"));
-  const homeDir = join(sandboxDir, "home");
-  const workDir = join(sandboxDir, "work");
-  const payloadDir = join(sandboxDir, "payloads");
-  const storeDb = join(sandboxDir, "state.db");
-  const sandboxLogPath = join(sandboxDir, "app.log");
-  const outLogPath = resolve(options.outDir, "app.log");
-  for (const dir of [homeDir, workDir, payloadDir]) mkdirSync(dir, { recursive: true });
-
-  const appEnv = isolatedEnv(root, homeDir, workDir, storeDb);
-  const cliEnv: Record<string, string> = { ...appEnv, VIBEVALLEY_HOME: homeDir };
-
-  const logFd = openSync(sandboxLogPath, "w");
-  let child: ChildProcess | undefined;
-  let exitCode: number | null = null;
-  let exitedPromise: Promise<number> = Promise.resolve(0);
-
-  const onSignal = () => {
-    signalGroup(child?.pid, "SIGTERM");
-  };
-  process.on("SIGINT", onSignal);
-  process.on("SIGTERM", onSignal);
-
-  try {
-    child = spawn(macBin, [], {
-      cwd: root,
-      env: appEnv,
-      detached: true,
-      stdio: ["ignore", logFd, logFd],
-    });
-    closeSync(logFd);
-
-    exitedPromise = new Promise<number>((done) => {
-      child?.once("exit", (code, sig) => {
-        exitCode = code ?? (sig ? 128 : 1);
-        done(exitCode);
-      });
-      child?.once("error", () => {
-        exitCode = 1;
-        done(1);
-      });
-    });
-
-    await waitForSandboxReady(homeDir, cliBin, root, cliEnv, () => exitCode, sandboxLogPath);
-    seedFlowSandbox(cliBin, root, cliEnv, payloadDir);
-
-    const driver = createCliVdpDriver({ cliBin, root, env: cliEnv, targetFlags: ["--home", homeDir] });
-    const report = await runFlowScenario(driver, {
+  const report = await withVdpSandbox(
+    {
+      prefix: "vv-vdp-flow-",
+      logTag: "vdp-flow",
+      paths,
       outDir: options.outDir,
-      mode: "sandbox",
-      viewport: { width: options.width, height: options.height },
-      theme: options.theme,
-    });
-
-    runSoft(cliBin, ["debug", "--home", homeDir, "key", "cmd-q", "--json"], { cwd: root, env: cliEnv, timeoutMs: 8_000 });
-    const quitDeadline = Date.now() + 6_000;
-    while (exitCode === null && Date.now() < quitDeadline) {
-      await sleep(100);
-    }
-
-    writeFileSync(resolve(options.outDir, "report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
-    if (!report.summary.allPassed) {
-      throw new Error(
-        `vdp-flow failed (${report.summary.failedSteps} step(s), ${report.summary.totalErrors} error(s)) -> ${resolve(options.outDir, "report.json")}`,
-      );
-    }
-    console.log(
-      `vdp-flow: passed ${report.summary.passedSteps}/${report.summary.totalSteps} steps (${report.summary.totalScreenshots} shots) -> ${resolve(options.outDir, "report.json")}`,
-    );
-    return report;
-  } finally {
-    process.off("SIGINT", onSignal);
-    process.off("SIGTERM", onSignal);
-
-    if (child && exitCode === null) {
-      signalGroup(child.pid, "SIGTERM");
-      const termDeadline = Date.now() + 6_000;
-      while (groupAlive(child.pid) && Date.now() < termDeadline) {
-        await sleep(100);
-      }
-      if (groupAlive(child.pid)) {
-        signalGroup(child.pid, "SIGKILL");
-      }
-      await exitedPromise;
-    }
-
-    if (existsSync(sandboxLogPath)) {
-      copyFileSync(sandboxLogPath, outLogPath);
-    }
-    if (!options.keepSandbox) {
-      rmSync(sandboxDir, { recursive: true, force: true });
-    } else {
-      console.log(`vdp-flow: kept sandbox at ${sandboxDir}`);
-    }
-  }
+      keepSandbox: options.keepSandbox,
+    },
+    async ({ payloadDir, cliEnv, driver }) => {
+      seedFlowSandbox(paths.cliBin, root, cliEnv, payloadDir);
+      return runFlowScenario(driver, {
+        outDir: options.outDir,
+        mode: "sandbox",
+        viewport: { width: options.width, height: options.height },
+        theme: options.theme,
+      });
+    },
+  );
+  return writeAndCheckFlowReport(options.outDir, report);
 }
 
 if (import.meta.main) {
