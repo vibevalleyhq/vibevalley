@@ -910,3 +910,174 @@ fn vv_whiteboard_borderless_inline_editor_commits_on_outside_click_and_cancels_o
         );
     });
 }
+
+fn frame_rect(harness: &TestHarness, tid: &str) -> (f32, f32, f32, f32) {
+    let id = harness.find_test_id(tid).unwrap_or_else(|| panic!("missing test_id {tid}"));
+    let b = harness.screen_bounds(id).unwrap_or_else(|| panic!("missing layout frame for {tid}"));
+    let x = b.origin.x.0;
+    let y = b.origin.y.0;
+    (x, y, x + b.size.width.0, y + b.size.height.0)
+}
+
+fn rects_overlap(a: (f32, f32, f32, f32), b: (f32, f32, f32, f32)) -> bool {
+    a.0 < b.2 - 0.5 && a.2 > b.0 + 0.5 && a.1 < b.3 - 0.5 && a.3 > b.1 + 0.5
+}
+
+#[test]
+fn vv_whiteboard_hud_anchors_zoom_and_minimap_bottom_right_without_overlap() {
+    let doc = build_template_doc(TemplateKind::Timeline, &TemplateCopy::zh());
+    let mut entries: Vec<WhiteboardEntry> = Vec::new();
+    for el in &doc.elements {
+        let encoded = encode_element_json(el);
+        entries.push(WhiteboardEntry {
+            artifact_id: "art-hud-test".to_owned(),
+            path: format!("elements/{}", el.id.0),
+            kind: WhiteboardEntryKind::Json,
+            mime: "application/json".to_owned(),
+            size: encoded.len() as i64,
+            rev: el.rev.max(1),
+            updated_by: "user".to_owned(),
+            updated: 1,
+            value: Some(encoded),
+            attachment_id: None,
+        });
+    }
+    let entries_json = serde_json::to_string(&entries).expect("serialize hud test entries");
+    WB_EVENTS.with(|r| *r.borrow_mut() = RecordedWbEvents::default());
+    WB_SEED_JSON.with(|s| *s.borrow_mut() = entries_json);
+    WB_PRESENCES_JSON.with(|s| s.borrow_mut().clear());
+
+    // 1. Wide desktop viewport: top-right has a single actions pill, bottom-dock is centered,
+    //    zoom bar sits at bottom-right baseline, and minimap expands upward above the zoom bar.
+    let mut wide = TestHarness::mount_with_size(Root::of::<WhiteboardTestRoot>(), Size::new(px(1280.0), px(760.0)));
+    let stage = frame_rect(&wide, "wb-stage");
+    let top_left = frame_rect(&wide, "wb-top-left-hud");
+    let top_right = frame_rect(&wide, "wb-top-right-hud");
+    let dock = frame_rect(&wide, "wb-bottom-dock");
+    let zoom = frame_rect(&wide, "wb-zoom-bar");
+
+    assert!((top_right.1 - 12.0).abs() <= 1.5, "top-right HUD should sit at top 12px: {top_right:?}");
+    assert!(
+        (stage.2 - top_right.2 - 12.0).abs() <= 1.5,
+        "top-right HUD should sit at right 12px: stage={stage:?} top_right={top_right:?}"
+    );
+    assert!(
+        (stage.3 - zoom.3 - 12.0).abs() <= 1.5,
+        "zoom bar should sit at bottom 12px: stage={stage:?} zoom={zoom:?}"
+    );
+    assert!(
+        (stage.2 - zoom.2 - 12.0).abs() <= 1.5,
+        "zoom bar should sit at right 12px: stage={stage:?} zoom={zoom:?}"
+    );
+    assert!(
+        (dock.3 - zoom.3).abs() <= 1.5,
+        "bottom dock and zoom bar should share the bottom baseline: dock={dock:?} zoom={zoom:?}"
+    );
+    assert!(
+        zoom.1 > top_right.3 + 200.0,
+        "zoom bar must be in bottom-right, not stacked under top-right HUD: top_right={top_right:?} zoom={zoom:?}"
+    );
+    assert!(
+        !rects_overlap(dock, zoom),
+        "bottom dock and zoom bar must never overlap: dock={dock:?} zoom={zoom:?}"
+    );
+    let dock_center_x = (dock.0 + dock.2) * 0.5;
+    let stage_center_x = (stage.0 + stage.2) * 0.5;
+    assert!(
+        (dock_center_x - stage_center_x).abs() <= 2.0,
+        "bottom dock should stay centered on wide viewports: dock_cx={dock_center_x} stage_cx={stage_center_x}"
+    );
+
+    // Default empty camera pan_y clears the top-left HUD band, and fitted board content leaves breathing room under top-left HUD.
+    assert!(
+        Camera::default().pan_y >= f64::from(top_left.3 + 10.0),
+        "default camera pan_y should clear top-left HUD ({top_left:?})"
+    );
+    let canvas_id = wide.find_test_id("wb-canvas").expect("wb-canvas present");
+    let min_el_top = wide
+        .canvases
+        .get(&canvas_id)
+        .expect("canvas drawing present")
+        .nodes
+        .iter()
+        .filter(|n| n.test_id.as_deref().is_some_and(|id| id.starts_with("wb-el-")))
+        .map(|n| n.bounds.origin.y.0)
+        .fold(f32::INFINITY, f32::min);
+    assert!(
+        min_el_top >= top_left.3 + 12.0,
+        "initial fitted elements should leave breathing room below top-left HUD (min_el_top={min_el_top}, hud_bottom={})",
+        top_left.3
+    );
+
+    // Expand minimap -> opens upward above zoom bar (never overflowing bottom or overlapping bottom dock).
+    let minimap_btn = wide.find_test_id("wb-minimap-toggle").expect("wb-minimap-toggle present");
+    assert!(wide.press(minimap_btn));
+    let minimap_card = frame_rect(&wide, "wb-minimap-card");
+    let zoom_after = frame_rect(&wide, "wb-zoom-bar");
+    let dock_after = frame_rect(&wide, "wb-bottom-dock");
+    assert!(
+        minimap_card.3 <= zoom_after.1 + 0.5,
+        "expanded minimap must open above zoom bar: minimap={minimap_card:?} zoom={zoom_after:?}"
+    );
+    assert!(
+        minimap_card.1 >= top_right.3 + 8.0,
+        "expanded minimap must stay below top-right HUD: minimap={minimap_card:?} top_right={top_right:?}"
+    );
+    assert!(
+        (minimap_card.2 - zoom_after.2).abs() <= 1.5,
+        "expanded minimap must stay right-aligned with zoom bar: minimap={minimap_card:?} zoom={zoom_after:?}"
+    );
+    assert!(
+        !rects_overlap(minimap_card, dock_after),
+        "expanded minimap must not overlap bottom dock: minimap={minimap_card:?} dock={dock_after:?}"
+    );
+    assert!(
+        !rects_overlap(dock_after, zoom_after),
+        "bottom dock and zoom bar must not overlap when minimap is open"
+    );
+
+    // Light & dark theme switch keeps the exact HUD geometry intact.
+    wide.set_dark(true);
+    let minimap_dark = frame_rect(&wide, "wb-minimap-card");
+    let zoom_dark = frame_rect(&wide, "wb-zoom-bar");
+    assert!(minimap_dark.3 <= zoom_dark.1 + 0.5);
+
+    // 2. Narrower viewport (900x700) + right inspector drawer open + minimap expanded:
+    //    bottom dock, zoom bar, minimap card, and inspector sidebar must never overlap each other.
+    let mut narrow = TestHarness::mount(Root::of::<WhiteboardTestRoot>());
+    let inspector_btn = narrow.find_test_id("wb-inspector-toggle").expect("wb-inspector-toggle present");
+    assert!(narrow.press(inspector_btn));
+    let minimap_btn = narrow.find_test_id("wb-minimap-toggle").expect("wb-minimap-toggle present");
+    assert!(narrow.press(minimap_btn));
+
+    let narrow_stage = frame_rect(&narrow, "wb-stage");
+    let inspector = frame_rect(&narrow, "wb-inspector");
+    let narrow_dock = frame_rect(&narrow, "wb-bottom-dock");
+    let narrow_zoom = frame_rect(&narrow, "wb-zoom-bar");
+    let narrow_minimap = frame_rect(&narrow, "wb-minimap-card");
+
+    assert!(
+        narrow_zoom.2 <= inspector.0 + 0.5 && narrow_zoom.2 <= narrow_stage.2 + 0.5,
+        "zoom bar must stay left of open inspector: zoom={narrow_zoom:?} inspector={inspector:?}"
+    );
+    assert!(
+        narrow_minimap.2 <= inspector.0 + 0.5,
+        "minimap card must stay left of open inspector: minimap={narrow_minimap:?} inspector={inspector:?}"
+    );
+    assert!(
+        narrow_minimap.3 <= narrow_zoom.1 + 0.5,
+        "minimap card must stay above zoom bar when inspector is open: minimap={narrow_minimap:?} zoom={narrow_zoom:?}"
+    );
+    assert!(
+        !rects_overlap(narrow_dock, narrow_zoom),
+        "bottom dock and zoom bar must not overlap when inspector is open: dock={narrow_dock:?} zoom={narrow_zoom:?}"
+    );
+    assert!(
+        !rects_overlap(narrow_dock, narrow_minimap),
+        "bottom dock and minimap must not overlap when inspector is open: dock={narrow_dock:?} minimap={narrow_minimap:?}"
+    );
+    assert!(
+        !rects_overlap(narrow_zoom, inspector) && !rects_overlap(narrow_minimap, inspector),
+        "zoom HUD and minimap must not overlap inspector drawer"
+    );
+}
