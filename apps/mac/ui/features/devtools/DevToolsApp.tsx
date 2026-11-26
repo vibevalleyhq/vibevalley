@@ -15,9 +15,11 @@ import { useInterval } from "../../infra/base/timer";
 import { act, frame } from "../../infra/bridge";
 import { readDevToolsParams } from "../../infra/hostParams";
 import { onSettled } from "../../infra/solid";
+import { useVdpNode } from "../../infra/vdpProbe";
 import { DEVTOOLS_TABS, type DevToolsTab, formatFrameMs, isDisabledError } from "./format";
 import { LabOverridesTab } from "./LabOverridesTab";
 import { OverviewTab } from "./OverviewTab";
+import { type AttachedRemoteVdp, RemoteVdpPanel } from "./RemoteVdpPanel";
 import { RoutesTab } from "./RoutesTab";
 import { StateCacheTab } from "./StateCacheTab";
 import { TimelineTab } from "./TimelineTab";
@@ -37,6 +39,8 @@ function tabMeta(tab: DevToolsTab): { icon: IconName; label: string } {
       return { icon: "memory", label: t("web.devtools.tabs.state") };
     case "lab":
       return { icon: "bolt", label: t("web.devtools.tabs.lab") };
+    case "remote":
+      return { icon: "plug", label: t("web.devtools.tabs.remote") };
   }
 }
 
@@ -51,8 +55,11 @@ export function DevToolsApp() {
   const error = signal<string | undefined>(undefined);
   const autoRefresh = signal(true);
   const refreshTick = signal(0);
+  const remoteConn = signal<AttachedRemoteVdp | undefined>(undefined);
   const visibleFrame = frame("devtools_visible", devtoolsVisibleSchema);
   const visible = computed(() => visibleFrame()?.visible !== false);
+
+  useVdpNode({ testId: "devtools-root", role: "main", text: () => t("web.devtools.title") });
 
   let inFlight = false;
   let wasVisible = true;
@@ -121,6 +128,13 @@ export function DevToolsApp() {
               </If>
             </View>
           </If>
+          <If when={remoteConn()}>
+            {(conn) => (
+              <View role="button" testID="devtools-vdp-badge" onPress={() => activeTab.set("remote")}>
+                <Tag tone="ok" label={`VDP ${conn().label}`} />
+              </View>
+            )}
+          </If>
         </View>
 
         <View class="shrink-0 flex-row items-center gap-1">
@@ -176,49 +190,56 @@ export function DevToolsApp() {
 
         <View class="min-h-0 min-w-0 flex-1 bg-page">
           <If
-            when={!disabled()}
+            when={activeTab() === "remote"}
             else={
-              <Empty icon="lock" testid="devtools-disabled">
-                {t("web.devtools.status.disabled")}
-              </Empty>
-            }
-          >
-            <If when={error() !== undefined}>
-              <Banner tone="bad" edge testID="devtools-error">
-                {t("web.devtools.status.error", { reason: error() ?? "" })}
-              </Banner>
-            </If>
-            <If
-              when={snapshot() !== undefined}
-              else={
-                <If when={loading()}>
-                  <View testID="devtools-loading" class="flex-1 items-center justify-center p-6">
-                    <Text class="text-sm text-muted">{t("web.devtools.status.loading")}</Text>
+              <If
+                when={!disabled()}
+                else={
+                  <Empty icon="lock" testid="devtools-disabled">
+                    {t("web.devtools.status.disabled")}
+                  </Empty>
+                }
+              >
+                <If when={error() !== undefined}>
+                  <Banner tone="bad" edge testID="devtools-error">
+                    {t("web.devtools.status.error", { reason: error() ?? "" })}
+                  </Banner>
+                </If>
+                <If
+                  when={snapshot() !== undefined}
+                  else={
+                    <If when={loading()}>
+                      <View testID="devtools-loading" class="flex-1 items-center justify-center p-6">
+                        <Text class="text-sm text-muted">{t("web.devtools.status.loading")}</Text>
+                      </View>
+                    </If>
+                  }
+                >
+                  <View class="min-h-0 flex-1">
+                    <If when={activeTab() === "overview"}>
+                      <OverviewTab overview={() => snapshot()!.overview} graph={() => snapshot()!.graph} />
+                    </If>
+                    <If when={activeTab() === "routes"}>
+                      <RoutesTab routes={() => snapshot()!.routes} />
+                    </If>
+                    <If when={activeTab() === "timeline"}>
+                      <TimelineTab fallbackEvents={() => snapshot()!.recentTimeline} refreshTick={refreshTick} onCleared={() => void refresh()} />
+                    </If>
+                    <If when={activeTab() === "trajectory"}>
+                      <TrajectoryTab refreshTick={refreshTick} />
+                    </If>
+                    <If when={activeTab() === "state"}>
+                      <StateCacheTab stateCache={() => snapshot()!.stateCache} />
+                    </If>
+                    <If when={activeTab() === "lab"}>
+                      <LabOverridesTab overrides={() => snapshot()!.overrides} onUpdated={onOverridesUpdated} />
+                    </If>
                   </View>
                 </If>
-              }
-            >
-              <View class="min-h-0 flex-1">
-                <If when={activeTab() === "overview"}>
-                  <OverviewTab overview={() => snapshot()!.overview} graph={() => snapshot()!.graph} />
-                </If>
-                <If when={activeTab() === "routes"}>
-                  <RoutesTab routes={() => snapshot()!.routes} />
-                </If>
-                <If when={activeTab() === "timeline"}>
-                  <TimelineTab fallbackEvents={() => snapshot()!.recentTimeline} refreshTick={refreshTick} onCleared={() => void refresh()} />
-                </If>
-                <If when={activeTab() === "trajectory"}>
-                  <TrajectoryTab refreshTick={refreshTick} />
-                </If>
-                <If when={activeTab() === "state"}>
-                  <StateCacheTab stateCache={() => snapshot()!.stateCache} />
-                </If>
-                <If when={activeTab() === "lab"}>
-                  <LabOverridesTab overrides={() => snapshot()!.overrides} onUpdated={onOverridesUpdated} />
-                </If>
-              </View>
-            </If>
+              </If>
+            }
+          >
+            <RemoteVdpPanel visible={visible} onConnectionChange={(next) => remoteConn.set(next)} />
           </If>
         </View>
       </View>

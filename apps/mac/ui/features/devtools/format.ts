@@ -14,11 +14,11 @@ import { DebugTimelineLane as DebugTimelineLaneSchema } from "@vibevalley/protoc
 
 import type { TagTone } from "../../design/Tag";
 
-export type DevToolsTab = "overview" | "routes" | "timeline" | "trajectory" | "state" | "lab";
+export type DevToolsTab = "overview" | "routes" | "timeline" | "trajectory" | "state" | "lab" | "remote";
 
 export type TimelineLaneFilter = "all" | DebugTimelineLane;
 
-export const DEVTOOLS_TABS: readonly DevToolsTab[] = ["overview", "routes", "timeline", "trajectory", "state", "lab"];
+export const DEVTOOLS_TABS: readonly DevToolsTab[] = ["overview", "routes", "timeline", "trajectory", "state", "lab", "remote"];
 
 export const TIMELINE_LANES: readonly TimelineLaneFilter[] = ["all", ...DebugTimelineLaneSchema.options];
 

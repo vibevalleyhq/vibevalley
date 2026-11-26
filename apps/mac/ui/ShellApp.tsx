@@ -11,6 +11,7 @@ import { DevToolsApp } from "./features/devtools/DevToolsApp";
 import { act, viewName } from "./infra/bridge";
 import { useBridge } from "./infra/bridged";
 import { readHostMotion } from "./infra/hostParams";
+import { installVdpProbe } from "./infra/vdpProbe";
 import { BridgeProbe } from "./workspace/BridgeProbe";
 import { WorkspaceChatPane } from "./workspace/ChatPane";
 import { Palette } from "./workspace/Palette";
@@ -40,7 +41,10 @@ host.on("locale", (loc) => {
 installMotionReporter();
 applyMotion(readHostMotion());
 host.on("motion", applyMotion);
-if (host.available()) useBridge();
+if (host.available()) {
+  useBridge();
+  installVdpProbe();
+}
 
 const Surface = views[viewName()] ?? Unknown;
 mount(() => (

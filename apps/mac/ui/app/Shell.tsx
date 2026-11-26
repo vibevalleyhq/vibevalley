@@ -1,4 +1,4 @@
-import { colorScheme, effect, host, keymap, Scroll, signal, Text, untracked, View, windowSize, type JSX } from "nsh";
+import { colorScheme, effect, host, keymap, Scroll, signal, Text, untracked, View, windowSize, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession } from "@vibevalley/protocol/rules";
@@ -25,6 +25,7 @@ import { readHostParams } from "../infra/hostParams";
 import { NavLink, useLocation, useMatches, useRouter } from "../infra/router";
 import { useUpdates } from "../infra/settings";
 import { safeLastContentPath } from "../infra/state/contentNav";
+import { isVdpEnabled, useVdpNode } from "../infra/vdpProbe";
 import { type Place, places, runsPlace, settingsPlace } from "./places";
 
 const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;
@@ -36,6 +37,17 @@ const compactTall = () => windowSize().height < 760;
 
 /** 24px icon (or the 38px farm anchor) with its short name underneath, so it reads without hovering. */
 function Slot(props: { to: string; place: string; label: string; name?: string; current?: boolean; badge?: number; hero?: boolean; icon: () => JSX.Element }) {
+  const router = useRouter();
+  let slotRef: ViewRef | undefined;
+  useVdpNode({
+    testId: `place-${untracked(() => props.place)}`,
+    role: "link",
+    text: () => props.label,
+    route: () => props.to,
+    parentId: "workbench-page",
+    getRef: () => slotRef,
+    onPress: () => router.navigate(props.to),
+  });
   const current = () => props.current === true;
   const hero = () => props.hero === true;
   const badgeText = () => {
@@ -47,6 +59,13 @@ function Slot(props: { to: string; place: string; label: string; name?: string; 
       href={props.to}
       testID={`place-${props.place}`}
       accessibilityLabel={props.label}
+      ref={
+        isVdpEnabled()
+          ? (node) => {
+              slotRef = node;
+            }
+          : undefined
+      }
       tooltip={<Bubble text={props.label} placement="right" />}
       class={[
         "relative items-center justify-center gap-0.5 rounded-lg px-0.5",
