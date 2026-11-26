@@ -7,7 +7,7 @@ use std::sync::{Arc, OnceLock};
 use crate::agent::{Agent, AgentDriver, Mcp, Memory, Orchestrator, OrchestratorParts, PendingExecution, Profile, Resource, ToolRegistry};
 use crate::artifact::Manager as ArtifactManager;
 use crate::boot::{
-    LazyCronOrchestrator, build_runtimes, register_session_reported_outbox, seat_orchestrators_and_watch, seed_starter_issues_on_boot,
+    LazyCronOrchestrator, build_runtimes, open_context, register_session_reported_outbox, seat_orchestrators_and_watch, seed_starter_issues_on_boot,
     spawn_chat_artifact_bridge, spawn_skin_event_bridge,
 };
 use crate::channel::Chat;
@@ -15,7 +15,7 @@ use crate::config::failed;
 pub use crate::config::{Config, StartError, StartErrorKind};
 use crate::connector::Connector;
 use crate::context::port::{CronOrchestratorPort, MemoryRecallPort};
-use crate::context::{Context, Fetch, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup, install_tls};
+use crate::context::{Context, install_tls};
 use crate::cron::Scheduler as CronScheduler;
 use crate::debug::DebugKit;
 use crate::debug_sources::build_debug_kit;
@@ -141,25 +141,7 @@ pub async fn create_app_with_storage(config: Config, storage_config: StorageConf
 async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Result<App, StartError> {
     let boot_started = std::time::Instant::now();
     install_tls();
-    tokio::fs::create_dir_all(&config.home).await.map_err(|e| failed("the home")(&e))?;
-    for dir in [config.work_root.clone(), config.work_root.join("repos"), config.work_root.join("worktrees")] {
-        tokio::fs::create_dir_all(&dir).await.map_err(|e| failed("the work root")(&e))?;
-    }
-
-    let service = match config.database_url.as_deref() {
-        Some(url) => Box::pin(Service::open_url(url)).await.map_err(|e| StartError::from_db_error(e, None))?,
-        None => Box::pin(Service::open(&config.home))
-            .await
-            .map_err(|e| StartError::from_db_error(e, Some(config.home.join("server.db"))))?,
-    };
-    let (http, download): (Arc<dyn Fetch>, Arc<dyn Fetch>) = match &config.media_network {
-        Some(network) => network.clone(),
-        None if config.offline_media => crate::fake::moss::network(),
-        None => (Arc::new(Http), Arc::new(PublicDownload)),
-    };
-    let (live, outbox, feed) = (Arc::new(LiveState::new()), Arc::new(Outbox::new(service.clone())), Arc::new(StateFeed::new()));
-    let clock = config.clock.clone();
-    let ctx = Arc::new(Context::new(service, TaskGroup::new(), live, outbox, feed, clock, http, download));
+    let ctx = open_context(&config).await?;
     let active_subscriptions = Arc::new(AtomicUsize::new(0));
 
     let setting = Setting::open_async(SettingConfig {

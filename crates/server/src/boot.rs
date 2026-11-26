@@ -14,14 +14,45 @@ use vibevalley_runtime::oar::Registry;
 
 use crate::agent::{Agent, Profile};
 use crate::channel::{ChannelMessageEvent, Chat};
-use crate::config::Config;
-use crate::context::Context;
+use crate::config::{Config, StartError, failed};
 use crate::context::api::BoxFuture;
 use crate::context::port::CronOrchestratorPort;
+use crate::context::{Context, Fetch, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use crate::game::Game;
 use crate::issue::{Board, IssueChat, SessionChat};
 use crate::runtime::{OUTBOX_SESSION_REPORTED, OutboxSessionReported, Runtime, SessionLifecycleEvent};
+use crate::service::Service;
 use crate::setting::Setting;
+
+/// Creates workspace directories, opens the database [`Service`], and assembles [`Context`].
+pub(crate) async fn open_context(config: &Config) -> Result<Arc<Context>, StartError> {
+    tokio::fs::create_dir_all(&config.home).await.map_err(|e| failed("the home")(&e))?;
+    for dir in [config.work_root.clone(), config.work_root.join("repos"), config.work_root.join("worktrees")] {
+        tokio::fs::create_dir_all(&dir).await.map_err(|e| failed("the work root")(&e))?;
+    }
+    let service = match config.database_url.as_deref() {
+        Some(url) => Box::pin(Service::open_url(url)).await.map_err(|e| StartError::from_db_error(e, None))?,
+        None => Box::pin(Service::open(&config.home))
+            .await
+            .map_err(|e| StartError::from_db_error(e, Some(config.home.join("server.db"))))?,
+    };
+    let (http, download): (Arc<dyn Fetch>, Arc<dyn Fetch>) = match &config.media_network {
+        Some(network) => network.clone(),
+        None if config.offline_media => crate::fake::moss::network(),
+        None => (Arc::new(Http), Arc::new(PublicDownload)),
+    };
+    let (live, outbox, feed) = (Arc::new(LiveState::new()), Arc::new(Outbox::new(service.clone())), Arc::new(StateFeed::new()));
+    Ok(Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        live,
+        outbox,
+        feed,
+        config.clock.clone(),
+        http,
+        download,
+    )))
+}
 
 /// Seeds the 3 starter guide issues once on a fresh real-server database.
 /// Skipped for test and scripted boots (`probe_runtimes == false` or injected fakes).
