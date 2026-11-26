@@ -13,6 +13,7 @@ import { IconButton } from "../../../design/IconButton";
 import { Markdown } from "../../../design/Markdown";
 import { motionClass } from "../../../design/motion";
 import { Dot } from "../../../design/Tag";
+import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { useAgent } from "../../../infra/agents";
@@ -112,18 +113,24 @@ export function IssueDetail(props: {
   const heading = (
     <View>
       <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-1.5 flex-row flex-wrap items-center gap-1">
-        <Text class="text-xs text-muted">{s().repo || t("web.issue.detail.noRepo")}</Text>
-        <If when={s().inFamily ? props.onParent : undefined}>
-          {(onParent) => (
+        <If when={s().repo}>
+          {(repo) => (
             <>
+              <Text class="text-xs text-muted">{repo()}</Text>
               <Icon name="next" size={12} tone="muted" />
-              <View role="button" testID="parent-issue" onPress={() => onParent()()} class="-mx-1 rounded-sm px-1 py-0.5 hover:bg-hover">
-                <Text class="text-xs text-water">{parent()?.title ?? t("web.issue.family.parent")}</Text>
-              </View>
             </>
           )}
         </If>
-        <Icon name="next" size={12} tone="muted" />
+        <If when={s().inFamily ? props.onParent : undefined}>
+          {(onParent) => (
+            <>
+              <View role="button" testID="parent-issue" onPress={() => onParent()()} class="-mx-1 rounded-sm px-1 py-0.5 hover:bg-hover">
+                <Text class="text-xs text-water">{parent()?.title ?? t("web.issue.family.parent")}</Text>
+              </View>
+              <Icon name="next" size={12} tone="muted" />
+            </>
+          )}
+        </If>
         <IssueNumberPill number={props.issue.number} />
       </View>
       <View class="flex-row flex-wrap items-baseline gap-x-2">
@@ -235,6 +242,15 @@ export function IssueDetail(props: {
                 else={<If when={ask().line}>{(line) => <Text class="mt-1 line-clamp-4 text-sm text-ink">{plainText(line())}</Text>}</If>}
               >
                 {(conflict) => <ConflictFiles files={conflict().files} worktree={sessionWorktree(head())} />}
+              </If>
+              <If when={ask().settingsHref}>
+                {(href) => (
+                  <View class="mt-2">
+                    <TextLink href={href()} testid="issue-error-settings">
+                      {t("web.issue.error.goSettings")}
+                    </TextLink>
+                  </View>
+                )}
               </If>
               <If when={s().stage.state === "asking"}>
                 <Each of={props.issue.questions} key={(a) => a.question}>
@@ -622,7 +638,7 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
           <If
             when={props.editable}
             else={
-              <Text role="header" testID="issue-title" class="line-clamp-2 text-lg font-semibold text-ink">
+              <Text role="header" testID="issue-title" class="text-xl font-semibold text-ink">
                 {props.shown}
               </Text>
             }
@@ -635,9 +651,9 @@ function IssueTitle(props: { shown: string; full: string; editable: boolean; sta
                 typed = props.full;
                 editing.set(true);
               }}
-              class="-mx-1 self-start rounded-sm px-1 hover:bg-hover"
+              class="-mx-1 max-w-full self-start rounded-sm px-1 hover:bg-hover"
             >
-              <Text role="header" testID="issue-title" class="line-clamp-2 text-lg font-semibold text-ink">
+              <Text role="header" testID="issue-title" class="text-xl font-semibold text-ink">
                 {props.shown}
               </Text>
             </View>

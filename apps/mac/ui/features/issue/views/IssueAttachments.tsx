@@ -4,6 +4,7 @@ import { Progress } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import type { Attachment } from "@vibevalley/protocol";
 
+import { Button } from "../../../design/Button";
 import { AttachmentTile, fileKind, kindIcon, sizeText } from "../../../design/domain/AttachmentTile";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
@@ -127,34 +128,36 @@ export function IssueAttachments(props: {
     <If when={visible()}>
       <View testID="issue-attachments" accessibilityLabel={t("web.issue.attachments.title")}>
         <Lightbox pictures={pictures()} at={lightboxAt()} onAt={(at) => lightboxAt.set(at)} />
-        <View class={`${props.first === true ? "mt-0" : "mt-6"} mb-2 flex-row items-center justify-between gap-2`}>
-          <View class="flex-row items-baseline gap-2">
-            <Text class="text-xs font-semibold text-muted">{t("web.issue.attachments.title")}</Text>
-            <If when={props.files.length > 0}>
-              <Text testID="issue-attachments-count" class="text-xs text-muted tabular-nums">
-                {String(props.files.length)}
-              </Text>
+        <If
+          when={hasItems()}
+          else={
+            <View class={`${props.first === true ? "mt-0" : "mt-4"} flex-row items-center gap-2`}>
+              <Button size="compact" tone="quiet" icon="attach" testID="issue-attach-file" disabled={disabled()} onPress={() => void uploader.pick()}>
+                {t("web.issue.attachments.attachFile")}
+              </Button>
+            </View>
+          }
+        >
+          <View class={`${props.first === true ? "mt-0" : "mt-6"} mb-2 flex-row items-center justify-between gap-2`}>
+            <View class="flex-row items-baseline gap-2">
+              <Text class="text-xs font-semibold text-muted">{t("web.issue.attachments.title")}</Text>
+              <If when={props.files.length > 0}>
+                <Text testID="issue-attachments-count" class="text-xs text-muted tabular-nums">
+                  {String(props.files.length)}
+                </Text>
+              </If>
+            </View>
+            <If when={props.editable === true}>
+              <IconButton
+                icon="attach"
+                size={14}
+                label={t("web.issue.attachments.attachFile")}
+                disabled={disabled()}
+                onClick={() => void uploader.pick()}
+                testid="issue-attach-file"
+              />
             </If>
           </View>
-          <If when={props.editable === true}>
-            <IconButton
-              icon="attach"
-              size={14}
-              label={t("web.issue.attachments.attachFile")}
-              disabled={disabled()}
-              onClick={() => void uploader.pick()}
-              testid="issue-attach-file"
-            />
-          </If>
-        </View>
-        <If when={uploader.error()}>
-          {(err) => (
-            <Text role="alert" testID="issue-attach-error" class="mb-2 text-xs text-berry">
-              {t("web.issue.attachments.uploadFailed", { why: err() })}
-            </Text>
-          )}
-        </If>
-        <If when={hasItems()}>
           <View class="flex-row flex-wrap items-start gap-2">
             <Each of={props.files} key={(f) => f.id}>
               {(f) => (
@@ -175,6 +178,13 @@ export function IssueAttachments(props: {
               {(u) => <UploadingChip name={u().name} />}
             </Each>
           </View>
+        </If>
+        <If when={uploader.error()}>
+          {(err) => (
+            <Text role="alert" testID="issue-attach-error" class="mt-2 text-xs text-berry">
+              {t("web.issue.attachments.uploadFailed", { why: err() })}
+            </Text>
+          )}
         </If>
       </View>
     </If>

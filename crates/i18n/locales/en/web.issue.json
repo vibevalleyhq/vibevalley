@@ -408,5 +408,9 @@
     "uploadFailed": "Upload failed: {why}",
     "uploading": "Uploading {name}…",
     "remove": "Remove attachment {name}"
+  },
+  "error": {
+    "missingApiKey": "No model API key is configured. Set it up in Settings and try again.",
+    "goSettings": "Settings"
   }
 }

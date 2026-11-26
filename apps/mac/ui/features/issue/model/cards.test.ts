@@ -1,9 +1,13 @@
 import "../../../infra/polyfill";
 import { expect, test } from "nsh/test";
 
+import { setLocale, t } from "@vibevalley/i18n";
+import "@vibevalley/i18n/catalogs";
 import type { Issue, IssueId, IssueStageKind, Session, SessionId } from "@vibevalley/protocol";
 
-import { type BoardCard, cardUrgencyTone } from "./cards";
+import { type BoardCard, cardLook, cardUrgencyTone } from "./cards";
+import { localizeIssueError } from "./issueError";
+import { issueState } from "./overview";
 
 function makeIssue(id: string, state: IssueStageKind): Issue {
   return {
@@ -66,4 +70,44 @@ test("cardUrgencyTone maps user-blocking stages to wheat/berry and non-blocking 
   expect(cardUrgencyTone({ kind: "orchestrator", id: "o1", lane: "working", issue: makeIssue("o1", "working") })).toBeUndefined();
   expect(cardUrgencyTone({ kind: "missing", id: "m1", lane: "working", issue: makeIssue("m1", "working"), missing: ["s1"] })).toBe("berry");
   expect(cardUrgencyTone({ kind: "family", id: "f1", lane: "waiting", issue: makeIssue("f1", "reviewing"), children: [] })).toBe("wheat");
+});
+
+test("cardLook and issueState preserve full titles over 40 chars and quiet draft flags", () => {
+  setLocale("zh");
+  const longTitle = "Polish mobile responsive layout for remote worktree session view";
+  const activeIssue: Issue = {
+    ...makeIssue("i-long", "working"),
+    title: longTitle,
+  };
+  const card: BoardCard = {
+    kind: "issue",
+    id: activeIssue.id,
+    lane: "working",
+    issue: activeIssue,
+    sessions: [dummySession],
+    tag: "working",
+  };
+  expect(cardLook(card, (id) => id, [activeIssue], 2_000).title).toBe(longTitle);
+  expect(issueState(activeIssue, [dummySession], undefined, [activeIssue]).title).toBe(longTitle);
+
+  const draftIssue: Issue = {
+    ...makeIssue("i-draft", "draft"),
+    status: "backlog",
+  };
+  const draftLook = cardLook({ kind: "todo", id: draftIssue.id, lane: "todo", issue: draftIssue }, (id) => id, [draftIssue], 2_000);
+  expect(draftLook.flags).toEqual([{ text: t("web.issue.card.draft"), tone: "faint" }]);
+});
+
+test("localizeIssueError maps raw English API-key failures to localized copy with settings href", () => {
+  setLocale("zh");
+  const direct = localizeIssueError("no API key is set for the model");
+  expect(direct.text).toBe(t("web.issue.error.missingApiKey"));
+  expect(direct.settingsHref).toBe("/settings/models");
+
+  const milestone = localizeIssueError("失败：no DeepSeek API key is set");
+  expect(milestone.text).toBe(`失败：${t("web.issue.error.missingApiKey")}`);
+  expect(milestone.settingsHref).toBe("/settings/models");
+
+  const unrelated = localizeIssueError("exit status 1");
+  expect(unrelated).toEqual({ text: "exit status 1" });
 });

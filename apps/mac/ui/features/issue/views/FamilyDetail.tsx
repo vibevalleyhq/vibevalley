@@ -30,11 +30,17 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
   const heading = (
     <View>
       <View class="mb-1.5 flex-row flex-wrap items-center gap-1">
-        <Text class="text-xs text-muted">{props.issue.repo || t("web.issue.detail.noRepo")}</Text>
-        <Icon name="next" size={12} tone="muted" />
+        <If when={props.issue.repo}>
+          {(repo) => (
+            <>
+              <Text class="text-xs text-muted">{repo()}</Text>
+              <Icon name="next" size={12} tone="muted" />
+            </>
+          )}
+        </If>
         <IssueNumberPill number={props.issue.number} />
       </View>
-      <Text role="header" class="text-lg font-semibold text-ink">
+      <Text role="header" class="text-xl font-semibold text-ink">
         {props.issue.title}
       </Text>
       <View class="mt-2 flex-row items-center gap-2">

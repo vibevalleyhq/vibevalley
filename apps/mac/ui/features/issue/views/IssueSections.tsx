@@ -11,6 +11,7 @@ import { Icon } from "../../../design/Icon";
 import type { IconName } from "../../../design/icons";
 import { Markdown } from "../../../design/Markdown";
 import { Dot } from "../../../design/Tag";
+import { TextLink } from "../../../design/TextLink";
 import { mix } from "../../../design/tone";
 import { useNow } from "../../../infra/base/dom";
 import { shortMomentText, tookText, wallClockText } from "../../../infra/base/format";
@@ -20,6 +21,7 @@ import { SubagentProgress } from "../../session";
 import { perform } from "../model/acts";
 import { useIssueRuns } from "../model/history";
 import { issueTag, runText, tagOpen, tagText } from "../model/issue";
+import { localizeIssueError } from "../model/issueError";
 import { issueMove, issueMoveOf, sendMove } from "../model/moves";
 import { type CriterionRow, stageTone } from "../model/overview";
 import { updateIssueAttachments } from "../model/write";
@@ -79,7 +81,13 @@ export function Criteria(props: { rows: CriterionRow[]; checking: boolean }) {
             </If>
             <If
               when={r().result}
-              else={<View accessibilityLabel={t("web.issue.detail.unsaid")} class="mt-1 h-3 w-3 shrink-0 rounded-full border border-line" />}
+              else={
+                <View
+                  testID="criterion-unsaid"
+                  accessibilityLabel={t("web.issue.detail.unsaid")}
+                  class="mt-1 h-3 w-3 shrink-0 rounded-full border border-idle"
+                />
+              }
             >
               {(res) => (
                 <View class="mt-0.5 shrink-0">
@@ -119,7 +127,7 @@ export function Story(props: { milestones: Milestone[] }) {
               <If when={m().who}>
                 <Text class="text-muted">{`${m().who} · `}</Text>
               </If>
-              {plainText(m().text)}
+              {localizeIssueError(plainText(m().text)).text}
             </Text>
           </View>
         )}
@@ -163,7 +171,18 @@ export function Runs(props: { issue: string; version: string; onChanges?: (() =>
               <View class="min-w-0 flex-1">
                 <Text class="text-sm text-ink">{runText(r(), now(), tookText)}</Text>
                 <If when={r().summary}>
-                  <Text class="mt-0.5 line-clamp-2 text-xs text-muted">{r().summary}</Text>
+                  {(summary) => (
+                    <View class="mt-0.5 gap-1">
+                      <Text class="line-clamp-2 text-xs text-muted">{localizeIssueError(summary()).text}</Text>
+                      <If when={localizeIssueError(summary()).settingsHref}>
+                        {(href) => (
+                          <TextLink href={href()} testid="run-error-settings">
+                            {t("web.issue.error.goSettings")}
+                          </TextLink>
+                        )}
+                      </If>
+                    </View>
+                  )}
                 </If>
                 <If when={r().needsReconciliation}>
                   <ReconcileWorktree onChanges={props.onChanges} />
@@ -207,7 +226,9 @@ export function WorkLog(props: { steps: SessionEvent[] }) {
             <Text class={`w-12 shrink-0 font-mono text-xs ${e().type === "run/error" ? "text-berry" : e().type === "tool/call" ? "text-water" : "text-muted"}`}>
               {stepWord[e().type] ?? ""}
             </Text>
-            <Text class="line-clamp-3 min-w-0 flex-1 text-sm text-ink">{e().type === "tool/call" ? (e().actionText ?? e().text) : e().text}</Text>
+            <Text class="line-clamp-3 min-w-0 flex-1 text-sm text-ink">
+              {e().type === "tool/call" ? (e().actionText ?? e().text) : e().type === "run/error" ? localizeIssueError(e().text).text : e().text}
+            </Text>
           </View>
         )}
       </Each>
@@ -250,7 +271,7 @@ export function OrchestratorIssueDetail(props: { issue: Issue }) {
         <Icon name="next" size={12} tone="muted" />
         <IssueNumberPill number={props.issue.number} />
       </View>
-      <Text role="header" class="text-lg font-semibold text-ink">
+      <Text role="header" class="text-xl font-semibold text-ink">
         {props.issue.title}
       </Text>
       <View class="mt-2 flex-row items-center gap-2">

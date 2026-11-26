@@ -1637,6 +1637,7 @@ export const catalogs = {
         uploading: "正在上传 {name}…",
         remove: "移除附件 {name}",
       },
+      error: { missingApiKey: "未配置模型 API Key，请先在设置中配置后再重试。", goSettings: "去设置" },
     },
     "web.library": {
       upload: "上传",
@@ -5015,6 +5016,7 @@ export const catalogs = {
         uploading: "Uploading {name}…",
         remove: "Remove attachment {name}",
       },
+      error: { missingApiKey: "No model API key is configured. Set it up in Settings and try again.", goSettings: "Settings" },
     },
     "web.library": {
       upload: "Upload",
@@ -8287,6 +8289,8 @@ export interface Messages {
   "web.issue.display.orderNote": undefined;
   "web.issue.display.reset": undefined;
   "web.issue.display.show": undefined;
+  "web.issue.error.goSettings": undefined;
+  "web.issue.error.missingApiKey": undefined;
   "web.issue.family.children": undefined;
   "web.issue.family.parent": undefined;
   "web.issue.issue.and": undefined;

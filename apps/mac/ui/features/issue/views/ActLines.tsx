@@ -4,8 +4,10 @@ import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
+import { TextLink } from "../../../design/TextLink";
 import { mix } from "../../../design/tone";
 import { useIntents } from "../../../infra/state/intent";
+import { localizeIssueError } from "../model/issueError";
 import { issueMove, issueMoveOf } from "../model/moves";
 import type { PendingWords } from "../model/write";
 
@@ -25,6 +27,7 @@ export function ActLines(props: {
         <If when={move()}>
           {(m) => {
             const failed = () => m().state === "failed";
+            const moveErr = () => (m().reason ? localizeIssueError(m().reason!) : undefined);
             return (
               <View
                 testID="issue-move"
@@ -34,8 +37,15 @@ export function ActLines(props: {
               >
                 <Icon name={failed() ? "cross" : "wait"} size={14} tone={failed() ? "berry" : "muted"} />
                 <Text class={`min-w-0 flex-1 truncate text-sm ${failed() ? "font-medium text-berry" : "text-muted"}`}>
-                  {m().state === "moving" ? t("web.issue.acts.moving") : (m().reason ?? t("web.issue.board.moveFailed"))}
+                  {m().state === "moving" ? t("web.issue.acts.moving") : (moveErr()?.text ?? t("web.issue.board.moveFailed"))}
                 </Text>
+                <If when={failed() ? moveErr()?.settingsHref : undefined}>
+                  {(href) => (
+                    <TextLink href={href()} testid="move-error-settings">
+                      {t("web.issue.error.goSettings")}
+                    </TextLink>
+                  )}
+                </If>
                 <If when={failed()}>
                   <View class="shrink-0 flex-row items-center gap-0.5">
                     <IconButton testid="move-retry" icon="retry" size={14} label={t("web.issue.board.retryMove")} onClick={() => void moves.retry(m().key)} />
@@ -49,6 +59,7 @@ export function ActLines(props: {
         <Each of={props.words ?? []} key={(w) => w.key}>
           {(w) => {
             const failed = () => w().state === "failed";
+            const wordErr = () => (w().reason ? localizeIssueError(w().reason!) : undefined);
             return (
               <View
                 testID="issue-said"
@@ -61,7 +72,16 @@ export function ActLines(props: {
                 <View class="min-w-0 flex-1 gap-0.5">
                   <Text class="line-clamp-3 text-sm text-ink">{w().text}</Text>
                   <If when={failed()}>
-                    <Text class="text-xs text-berry">{w().reason ?? t("web.issue.acts.notSaid")}</Text>
+                    <View class="flex-row flex-wrap items-center gap-2">
+                      <Text class="text-xs text-berry">{wordErr()?.text ?? t("web.issue.acts.notSaid")}</Text>
+                      <If when={wordErr()?.settingsHref}>
+                        {(href) => (
+                          <TextLink href={href()} testid="said-error-settings">
+                            {t("web.issue.error.goSettings")}
+                          </TextLink>
+                        )}
+                      </If>
+                    </View>
                   </If>
                 </View>
                 <If when={failed()} else={<Text class="mt-0.5 shrink-0 text-xs text-muted">{t("web.issue.acts.sending")}</Text>}>
