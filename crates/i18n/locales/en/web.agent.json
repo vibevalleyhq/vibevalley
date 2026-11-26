@@ -22,6 +22,7 @@
   "fine": "The configuration is fine: it can be sent work.",
   "problems": "Why it cannot be sent",
   "cannot": "Cannot be sent: ",
+  "missingApiKey": "No model API key set yet",
   "random": "A random one",
   "avatar": "Role avatar",
   "avatarHint": "Shown in lists and chat; when unset, the farm animal face is shown.",

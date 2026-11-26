@@ -161,12 +161,40 @@ test("Sidebar only renders channel-readiness-alert when orchestrator readiness i
   await readyChat.fake.pumpUntil(readyChat.app, () => readyChat.app.count("id:channels-side") === 1);
   expect(readyChat.app.count("id:channel-readiness-alert")).toBe(0);
 
-  const missingChat = await mountChat("typical", (f) => {
-    f.respond("setting.get", {
-      ...baseSettings,
-      readiness: { ...baseSettings.readiness, orchestrator: { ready: false, missing: "deepseekKey" } },
-    });
-  });
+  const missingChat = await mountChat(
+    "typical",
+    (f) => {
+      f.respond("setting.get", {
+        ...baseSettings,
+        readiness: { ...baseSettings.readiness, orchestrator: { ready: false, missing: "deepseekKey" } },
+      });
+    },
+    {
+      state: {
+        ...scenarios.typical.state,
+        collab: {
+          ...scenarios.typical.state.collab,
+          chat: {
+            userMentions: [],
+            channels: [
+              makeChannel("general", { default: true }),
+              makeDirect("d-orchestrator", "全能主助手", "orchestrator", {
+                at: SCENARIO_NOW - 2 * min,
+                last: { from: "orchestrator", name: "全能主助手", text: "我随时待命", at: SCENARIO_NOW - 1 * min },
+              }),
+            ],
+          },
+        },
+      },
+    },
+  );
   await missingChat.fake.pumpUntil(missingChat.app, () => missingChat.app.count("id:channel-readiness-alert") === 1);
   expect(missingChat.app.count("id:orchestrator-fix")).toBe(1);
+  // Warning is shown once in the bottom alert banner, not duplicated in the orchestrator DM preview row.
+  const warnText = "回不了话：还没填 DeepSeek 的钥匙";
+  expect(missingChat.app.texts().filter((line) => line === warnText).length).toBe(1);
+  expect(missingChat.app.shows("id:channel-row-d-orchestrator >> text:我随时待命")).toBe(true);
+  // Rail, sidebar header, and chat tab use unified 对话 terminology.
+  expect(missingChat.app.texts()).not.toContain("聊天");
+  expect(missingChat.app.texts().filter((line) => line === "对话").length).toBeGreaterThanOrEqual(2);
 });

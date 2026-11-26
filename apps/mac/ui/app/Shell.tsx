@@ -437,25 +437,42 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
           href="/runs"
           testID="rail-runs-status"
           accessibilityLabel={working() > 0 ? t("web.base.working", { n: working() }) : t("web.base.runsHint")}
+          accessibilityState={{ selected: onRuns() }}
           tooltip={
             <Bubble
               text={working() > 0 ? `${t("web.base.working", { n: working() })} · ${t("web.base.runsHint")}` : t("web.base.runsHint")}
               placement="right"
             />
           }
-          class={`h-7 shrink-0 flex-row items-center justify-center gap-1.5 rounded-full border px-2 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus ${
-            working() > 0 ? "" : onRuns() ? "border-line bg-selected" : "border-transparent hover:bg-hover"
+          class={`relative ${small() ? "h-9 w-11" : "h-9 w-16"} shrink-0 flex-row items-center justify-center rounded-lg px-1 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus ${
+            onRuns() ? "" : "hover:bg-hover"
           }`}
-          style={working() > 0 ? { backgroundColor: mix("leaf", 0.14), borderColor: mix("leaf", 0.45) } : undefined}
+          style={onRuns() ? { backgroundColor: mix("on-rail", colorScheme() === "dark" ? 0.12 : 0.09) } : undefined}
         >
-          <View class="size-3 shrink-0 items-center justify-center rounded-full" style={working() > 0 ? { backgroundColor: mix("leaf", 0.25) } : undefined}>
-            <View
-              class={`size-1.5 rounded-full ${working() > 0 ? `bg-leaf ${motionClass("animate-pulse")}` : inbox()?.call === "live" ? "bg-leaf" : "bg-faint"}`}
-            />
-          </View>
-          <If when={working() > 0}>
-            <Text class="font-mono text-2xs font-semibold text-leaf tabular-nums">{String(working())}</Text>
+          <If when={onRuns()}>
+            <View testID="rail-runs-active-bar" class="absolute top-0 bottom-0 left-0 justify-center">
+              <View class="h-4 w-0.5 rounded-full bg-accent" />
+            </View>
           </If>
+          <View
+            class="h-6 flex-row items-center justify-center gap-1.5 rounded-full border border-transparent px-2"
+            style={
+              working() > 0
+                ? { backgroundColor: mix("leaf", 0.14), borderColor: mix("leaf", 0.45) }
+                : onRuns()
+                  ? { backgroundColor: mix("accent", 0.14), borderColor: mix("accent", 0.4) }
+                  : undefined
+            }
+          >
+            <View class="size-3 shrink-0 items-center justify-center rounded-full" style={working() > 0 ? { backgroundColor: mix("leaf", 0.25) } : undefined}>
+              <View
+                class={`size-1.5 rounded-full ${working() > 0 ? `bg-leaf ${motionClass("animate-pulse")}` : onRuns() ? "bg-accent" : inbox()?.call === "live" ? "bg-leaf" : "bg-faint"}`}
+              />
+            </View>
+            <If when={working() > 0}>
+              <Text class="font-mono text-2xs font-semibold text-leaf tabular-nums">{String(working())}</Text>
+            </If>
+          </View>
         </NavLink>
         <Slot
           to={settings.path}
@@ -509,7 +526,7 @@ export function Shell(props: { children: JSX.Element }) {
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <View class="min-w-0 flex-1">
-        {/* Issues, Chat, Content, and Runtimes draw their own top bars; native workspace fills its own pane. */}
+        {/* Issues, Chat, Content, Runtimes, and Team draw their own top bars; native workspace fills its own pane. */}
         <If
           when={
             !inFarm() &&
@@ -517,6 +534,7 @@ export function Shell(props: { children: JSX.Element }) {
             here()?.id !== "chat" &&
             here()?.id !== "content" &&
             here()?.id !== "runtimes" &&
+            here()?.id !== "team" &&
             location().pathname !== "/workspace"
           }
         >

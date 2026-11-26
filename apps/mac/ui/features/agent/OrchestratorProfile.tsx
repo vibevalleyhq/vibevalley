@@ -91,7 +91,7 @@ export function OrchestratorProfile(props: { saved?: Agent | undefined; start: A
   return (
     <Scroll testID="orchestrator-profile" class="h-full flex-1 bg-page" contentClass="px-5 pb-8">
       <View class="max-w-3xl gap-4">
-        <View testID="profile-bar" class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
+        <View testID="profile-bar" desktop={{ windowDrag: true }} class="flex-row flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-line py-3">
           <A
             href="/agents"
             testID="back"

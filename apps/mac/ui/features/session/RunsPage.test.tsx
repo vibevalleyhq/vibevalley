@@ -93,3 +93,52 @@ test("WorkLog expanded tool step copies tool input with toast feedback", async (
   await clock.fastForward(4_100);
   expect(app.count("id:toast")).toBe(0);
 });
+
+test("RunsPage shows active rail bar, strips collapsed prompt scaffolding while keeping raw prompt expanded, and gives 0ms ticks minimum width", async () => {
+  const rawPrompt = [
+    "【现在】2026-11-26 21:00",
+    "【现状】",
+    "用户的语言：zh",
+    "仓库（工作目录 /var/folders/tmp/work 下的文件夹）：app",
+    "",
+    "[来源：用户]",
+    "用户说：检查发布脚本",
+  ].join("\n");
+
+  const fake = fakeHost(scenarios.typical, { route: "/runs?session=orchestrator", locale: "zh" });
+  fake.respond("session.event.list", () => ({
+    events: [
+      { seq: 1, run: "r1", type: "user/message", text: rawPrompt, time: SCENARIO_NOW - 10_000, revision: 1 },
+      { seq: 2, run: "r1", type: "assistant/message", text: "好的，这就检查。", time: SCENARIO_NOW - 10_000, revision: 1 },
+    ],
+  }));
+
+  const app = await open("../../app/main.tsx", {
+    width: 1200,
+    height: 800,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:step-toggle-1") === 1);
+
+  expect(app.count("id:rail-runs-active-bar")).toBe(1);
+
+  // Collapsed row shows the clean human summary without raw internal prompt scaffolding.
+  expect(app.shows("id:step-toggle-1 >> text:检查发布脚本")).toBe(true);
+  expect(app.texts().some((line) => line.includes("【现状】") || line.includes("/var/folders/"))).toBe(false);
+
+  // Expanding reveals the full raw prompt.
+  await app.press("id:step-toggle-1");
+  expect(app.texts().some((line) => line.includes("【现状】") && line.includes("/var/folders/tmp/work"))).toBe(true);
+
+  // 0ms timeline spans keep a visible minimum pill width (>= 6px).
+  expect(app.count("id:waterfall-bar-1")).toBe(1);
+  expect(app.layout("id:waterfall-bar-1")?.width).toBeGreaterThanOrEqual(6);
+
+  // Leaving /runs removes the /runs active indicator bar.
+  await app.press("id:place-issues");
+  await fake.pumpUntil(app, () => app.count("id:issues-page") === 1);
+  expect(app.count("id:rail-runs-active-bar")).toBe(0);
+});
