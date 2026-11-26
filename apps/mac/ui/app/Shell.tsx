@@ -5,7 +5,7 @@ import { isFreeUserSession } from "@vibevalley/protocol/rules";
 
 import { useAssetsDir } from "../design/art";
 import { Button } from "../design/Button";
-import { Dialog } from "../design/Dialog";
+import { Dialog, hasOpenModal } from "../design/Dialog";
 import { OrchestratorFace } from "../design/domain/Face";
 import { Icon } from "../design/Icon";
 import { OutLink } from "../design/IconButton";
@@ -518,10 +518,11 @@ export function Shell(props: { children: JSX.Element }) {
     return places.find((place) => place.id === id);
   };
   const inFarm = () => meta()?.skin === "farm";
+  const transparentOverlay = () => readHostParams().globalShell && hasOpenModal() && (inFarm() || location().pathname === "/workspace");
   // Ctrl+J (⌘J on a Mac) opens the channel quick switcher without colliding with global ⌘K command palette.
   keymap.bind("mod+j", () => switcher.toggle(), { when: "always" });
   return (
-    <View class="flex-1 flex-row bg-page">
+    <View class={transparentOverlay() ? "flex-1 flex-row bg-transparent" : "flex-1 flex-row bg-page"}>
       <QuickSwitcher />
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />

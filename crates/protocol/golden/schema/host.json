@@ -287,6 +287,10 @@
    "line": 12
   },
   {
+   "type": "global_modal",
+   "active": true
+  },
+  {
    "type": "toggle_devtools"
   },
   {

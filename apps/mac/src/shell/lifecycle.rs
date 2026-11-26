@@ -149,6 +149,7 @@ impl Shell {
                 workbench,
                 native_workspace: false,
                 native_diorama: None,
+                modal_overlay: false,
                 global_rail_width: 76.0,
                 panel: Panel::Files,
                 inspector_open: ui_settings.inspector_open,

@@ -2,10 +2,12 @@ import { z } from "zod";
 
 import { reasonOf } from "../infra/api";
 import { saveFile } from "../infra/attachmentFile";
-import { hostApi } from "../infra/bridge";
+import { act, hostApi } from "../infra/bridge";
 import { currentHost } from "../infra/host";
+import { readHostParams } from "../infra/hostParams";
 import { prefsNow, setWidth } from "../infra/state/prefs";
 import { transport } from "../infra/transport";
+import { setModalOverlayReporter } from "./Dialog";
 import type { DesignHost, QrMatrix } from "./host";
 import { setMotionReporter } from "./motion";
 import { toast } from "./toasts";
@@ -17,6 +19,12 @@ const QrMatrixSchema = z.object({
 
 export function installMotionReporter(): void {
   setMotionReporter((choice) => currentHost().motion?.(choice));
+}
+
+export function installModalOverlayReporter(): void {
+  setModalOverlayReporter((active) => {
+    if (readHostParams().globalShell) act({ type: "global_modal", active });
+  });
 }
 
 export function createAppDesignHost(navigate: DesignHost["navigate"]): DesignHost {

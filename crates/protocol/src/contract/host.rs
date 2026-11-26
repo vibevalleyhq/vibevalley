@@ -321,6 +321,11 @@ pub enum HostAction {
     GlobalRail {
         rail_width: f32,
     },
+    /// Whether a workbench modal overlay (`Dialog`, `Lightbox`, etc.) is currently open,
+    /// raising the workbench above native workspace/diorama layers.
+    GlobalModal {
+        active: bool,
+    },
     /// The view applied frame `rev` of `topic` (debug bookkeeping).
     Applied {
         topic: String,

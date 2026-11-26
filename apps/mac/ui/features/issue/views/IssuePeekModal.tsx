@@ -4,6 +4,7 @@ import { Dialog as Base } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 
 import { Button } from "../../../design/Button";
+import { useModalOverlay } from "../../../design/Dialog";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { fadeAnimation } from "../../../design/motion";
@@ -13,6 +14,7 @@ import { createIssueChrome, IssueChromeContext, IssueNumberPill } from "./Sheet"
 
 /** Quick-Peek modal overlay for reviewing and acting on an issue without leaving the board. */
 export function IssuePeekModal(props: { card: BoardCard; blocked: () => boolean; onExpand: (id: string) => void; onClose: () => void; children: JSX.Element }) {
+  useModalOverlay(() => true);
   const chrome = createIssueChrome();
   const repo = computed(() => cardRepo(props.card));
   const dims = computed(() => {

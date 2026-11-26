@@ -1,7 +1,12 @@
 import "../infra/polyfill";
-import { describe, expect, test } from "nsh/test";
+import { effect, signal } from "nsh";
+import { afterEach, describe, expect, test } from "nsh/test";
 
-import { dialogDimensions, type DialogSize } from "./Dialog";
+import { dialogDimensions, hasOpenModal, setModalOverlayReporter, useModalOverlay, type DialogSize } from "./Dialog";
+
+afterEach(() => {
+  setModalOverlayReporter(undefined);
+});
 
 describe("design/Dialog", () => {
   test("computes pixel-capped dimensions and consistent top Y anchor on standard viewports", () => {
@@ -41,5 +46,49 @@ describe("design/Dialog", () => {
       expect(fixed.marginTop + (fixed.height ?? 0)).toBeLessThanOrEqual(small.height);
       expect(auto.marginTop + (auto.maxHeight ?? 0)).toBeLessThanOrEqual(small.height);
     }
+  });
+
+  test("ref-counts nested modal overlays and releases on close or unmount", () => {
+    const events: boolean[] = [];
+    setModalOverlayReporter((active) => events.push(active));
+
+    const firstOpen = signal(false);
+    const secondOpen = signal(false);
+    const firstMounted = signal(true);
+    const secondMounted = signal(true);
+
+    effect(() => {
+      if (firstMounted()) useModalOverlay(() => firstOpen());
+    });
+    effect(() => {
+      if (secondMounted()) useModalOverlay(() => secondOpen());
+    });
+
+    expect(hasOpenModal()).toBe(false);
+    expect(events).toEqual([]);
+
+    // Opening first modal raises the workbench overlay once.
+    firstOpen.set(true);
+    expect(hasOpenModal()).toBe(true);
+    expect(events).toEqual([true]);
+
+    // Opening a nested second modal keeps overlay active without duplicate host notification.
+    secondOpen.set(true);
+    expect(hasOpenModal()).toBe(true);
+    expect(events).toEqual([true]);
+
+    // Closing first while second remains open keeps overlay active.
+    firstOpen.set(false);
+    expect(hasOpenModal()).toBe(true);
+    expect(events).toEqual([true]);
+
+    // Unmounting the second modal while still open cleanly releases the overlay.
+    secondMounted.set(false);
+    expect(hasOpenModal()).toBe(false);
+    expect(events).toEqual([true, false]);
+
+    firstMounted.set(false);
+    expect(hasOpenModal()).toBe(false);
+    expect(events).toEqual([true, false]);
   });
 });

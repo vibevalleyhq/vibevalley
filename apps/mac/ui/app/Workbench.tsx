@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
+import { hasOpenModal } from "../design/Dialog";
 import { ToastHost } from "../design/ToastHost";
 import { AgentsRoute } from "../features/agent";
 import { ArtifactsPage, PresenterPage, StandaloneArtifactPage } from "../features/artifact";
@@ -20,9 +21,10 @@ import { RunsPage } from "../features/session";
 import { SettingsPage } from "../features/setting";
 import { Keyed } from "../infra/base/dom";
 import { act } from "../infra/bridge";
+import { readHostParams } from "../infra/hostParams";
 import { ready, useRepos } from "../infra/query";
 import { Root } from "../infra/Root";
-import { appHistory, Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useParams } from "../infra/router";
+import { Link, Navigate, Outlet, route, type RouteDefinition, type SearchCheck, Routes, useLocation, useParams } from "../infra/router";
 import type { RouterHistory } from "../infra/router/history";
 import { safeLastContentPath } from "../infra/state/contentNav";
 import { prefsNow } from "../infra/state/prefs";
@@ -77,9 +79,12 @@ function Farm(props: { repo: string }) {
     if (props.repo) lastFarm.set(props.repo);
     act({ type: "openFarm", repo: props.repo });
   });
+  const transparentOverlay = () => readHostParams().globalShell && hasOpenModal();
   return (
-    <View testID="farm" class="flex-1 items-center justify-center bg-page p-6">
-      <Text class="text-sm text-muted">{t("web.base.farm")}</Text>
+    <View testID="farm" class={transparentOverlay() ? "flex-1 bg-transparent" : "flex-1 items-center justify-center bg-page p-6"}>
+      <If when={!transparentOverlay()}>
+        <Text class="text-sm text-muted">{t("web.base.farm")}</Text>
+      </If>
     </View>
   );
 }
@@ -190,32 +195,46 @@ const routes: readonly RouteDefinition[] = [
   },
 ];
 
-export function App(props: { history?: RouterHistory }) {
+function isNativeSurfacePath(pathname: string): boolean {
+  return pathname === "/workspace" || pathname === "/farm" || pathname.startsWith("/farm/");
+}
+
+function WorkbenchSurface() {
   let pageRef: ViewRef | undefined;
+  const location = useLocation();
+  const transparentOverlay = () => readHostParams().globalShell && hasOpenModal() && isNativeSurfacePath(location().pathname);
   useVdpNode({
     testId: "workbench-page",
     role: "main",
-    route: () => (props.history ?? appHistory).read().pathname,
+    route: () => location().pathname,
     getRef: () => pageRef,
   });
   return (
+    <>
+      <Follow />
+      <View
+        testID="workbench-page"
+        ref={
+          isVdpEnabled()
+            ? (node) => {
+                pageRef = node;
+              }
+            : undefined
+        }
+        class={transparentOverlay() ? "flex-1 bg-transparent" : "flex-1 bg-page"}
+      >
+        <Routes routes={routes} fallback={() => <MissingPage />} invalid={() => <MissingPage invalid />} />
+        <ToastHost />
+      </View>
+    </>
+  );
+}
+
+export function App(props: { history?: RouterHistory }) {
+  return (
     <Root history={props.history}>
       <WorkbenchDesignHost>
-        <Follow />
-        <View
-          testID="workbench-page"
-          ref={
-            isVdpEnabled()
-              ? (node) => {
-                  pageRef = node;
-                }
-              : undefined
-          }
-          class="flex-1 bg-page"
-        >
-          <Routes routes={routes} fallback={() => <MissingPage />} invalid={() => <MissingPage invalid />} />
-          <ToastHost />
-        </View>
+        <WorkbenchSurface />
       </WorkbenchDesignHost>
     </Root>
   );

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-use gpui::{AppContext as _, Context, Entity, PathPromptOptions, Subscription, Window};
+use gpui::{AppContext as _, Context, Entity, Focusable as _, PathPromptOptions, Subscription, Window};
 use serde_json::{Value, json};
 use vibevalley_workspace::PaneKind;
 
@@ -19,6 +19,15 @@ impl Shell {
                 let next = rail_width.clamp(56.0, 80.0);
                 if (self.chrome.global_rail_width - next).abs() > 0.01 {
                     self.chrome.global_rail_width = next;
+                    cx.notify();
+                }
+            }
+            Action::GlobalModal { active } => {
+                if self.chrome.modal_overlay != active {
+                    self.chrome.modal_overlay = active;
+                    if active {
+                        window.focus(&self.chrome.workbench.read(cx).focus_handle(cx), cx);
+                    }
                     cx.notify();
                 }
             }

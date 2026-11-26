@@ -160,6 +160,7 @@ export const HostAction = z.discriminatedUnion("type", [
   z.object({ type: z.literal("global_route"), path: z.string() }),
   z.object({ type: z.literal("open_route"), path: z.string() }),
   z.object({ type: z.literal("global_rail"), rail_width: z.number() }),
+  z.object({ type: z.literal("global_modal"), active: z.boolean() }),
   z.object({ type: z.literal("applied"), topic: z.string(), rev: z.number() }),
   z.object({ type: z.literal("ready") }),
   z.object({ type: z.literal("call"), id: z.string(), op: z.string(), payload: z.exactOptional(z.unknown()) }),

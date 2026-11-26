@@ -1,11 +1,11 @@
-use gpui::{Context, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels, Render, Styled as _, Window, div, px};
+use gpui::{Context, Focusable as _, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Pixels, Render, Styled as _, Window, div, px};
 use vibevalley_workspace::Axis;
 
 use crate::hosted::frames::PaletteMode;
 use crate::theme::Ui;
 
 use super::menus::*;
-use super::{Shell, should_mount_inspector};
+use super::{Shell, should_mount_inspector, should_raise_workbench_overlay};
 
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -55,6 +55,77 @@ impl Render for Shell {
             f32::from(window.viewport_size().width),
         );
         let inspector_view = show_inspector.then(|| self.chrome.inspector.as_ref().map(|slot| slot.view.clone())).flatten();
+        let raise_workbench = should_raise_workbench_overlay(self.chrome.modal_overlay, self.chrome.native_workspace, self.chrome.native_diorama.is_some());
+        let workbench_layer = div().size_full().child(self.chrome.workbench.clone());
+        let native_workspace_layer = self.chrome.native_workspace.then(|| {
+            let inspector_w: Pixels = px(self.chrome.inspector_width);
+            div()
+                .id("workspace")
+                .key_context("Workspace")
+                .absolute()
+                .top_0()
+                .bottom_0()
+                .right_0()
+                .left(px(self.chrome.global_rail_width))
+                .flex()
+                .flex_row()
+                .bg(colors.bg)
+                .children(
+                    self.chrome
+                        .sidebar_visible
+                        .then(|| div().w(sidebar_w).h_full().flex_none().child(self.chrome.sidebar.clone())),
+                )
+                .children(self.chrome.sidebar_visible.then(|| {
+                    div()
+                        .id("sidebar-divider")
+                        .w(px(1.0))
+                        .h_full()
+                        .flex_none()
+                        .bg(colors.border)
+                        .cursor_col_resize()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|s, _, _, cx| {
+                                cx.stop_propagation();
+                                s.chrome.window_drag_origin = None;
+                                s.chrome.resizing_sidebar = true;
+                            }),
+                        )
+                }))
+                .child(div().flex_1().h_full().min_w_0().child(main))
+                .children(inspector_view.is_some().then(|| {
+                    div()
+                        .id("inspector-divider")
+                        .w(px(1.0))
+                        .h_full()
+                        .flex_none()
+                        .bg(colors.border)
+                        .cursor_col_resize()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|s, _, _, cx| {
+                                cx.stop_propagation();
+                                s.chrome.window_drag_origin = None;
+                                s.chrome.resizing_inspector = true;
+                            }),
+                        )
+                }))
+                .children(inspector_view.map(|view| div().w(inspector_w).h_full().flex_none().child(view)))
+        });
+        let native_diorama_layer = self.chrome.native_diorama.as_ref().map(|slot| {
+            div()
+                .absolute()
+                .top_0()
+                .bottom_0()
+                .right_0()
+                .left(px(self.chrome.global_rail_width))
+                .child(slot.view.clone())
+        });
+        let (workbench_below, workbench_above) = if raise_workbench {
+            (None, Some(workbench_layer))
+        } else {
+            (Some(workbench_layer), None)
+        };
         let root = div()
             .id("shell")
             .size_full()
@@ -65,7 +136,17 @@ impl Render for Shell {
             .text_color(colors.text)
             .key_context("Shell")
             .track_focus(&self.focus)
-            .capture_any_mouse_down(|_, _, _| crate::host::restore_window_first_responder())
+            .capture_any_mouse_down(cx.listener(|s, e: &gpui::MouseDownEvent, window, cx| {
+                crate::host::restore_window_first_responder();
+                if e.button == MouseButton::Left
+                    && (s.chrome.modal_overlay
+                        || (!s.chrome.native_workspace && s.chrome.native_diorama.is_none())
+                        || f32::from(e.position.x) < s.chrome.global_rail_width)
+                {
+                    window.focus(&s.chrome.workbench.read(cx).focus_handle(cx), cx);
+                    cx.notify();
+                }
+            }))
             .capture_key_down(cx.listener(|s, e: &gpui::KeyDownEvent, _, cx| {
                 if s.workspace.chat_menu_group.is_some() && e.keystroke.key == "escape" && !e.keystroke.modifiers.modified() {
                     s.workspace.chat_menu_group = None;
@@ -169,71 +250,10 @@ impl Render for Shell {
             .on_action(cx.listener(|_, _: &Quit, _, cx| cx.quit()))
             .on_mouse_move(cx.listener(Self::on_mouse_move))
             .on_mouse_up(MouseButton::Left, cx.listener(|s, _, _, cx| s.on_mouse_up(cx)))
-            .child(div().size_full().child(self.chrome.workbench.clone()))
-            .children(self.chrome.native_workspace.then(|| {
-                let inspector_w: Pixels = px(self.chrome.inspector_width);
-                div()
-                    .id("workspace")
-                    .key_context("Workspace")
-                    .absolute()
-                    .top_0()
-                    .bottom_0()
-                    .right_0()
-                    .left(px(self.chrome.global_rail_width))
-                    .flex()
-                    .flex_row()
-                    .bg(colors.bg)
-                    .children(
-                        self.chrome
-                            .sidebar_visible
-                            .then(|| div().w(sidebar_w).h_full().flex_none().child(self.chrome.sidebar.clone())),
-                    )
-                    .children(self.chrome.sidebar_visible.then(|| {
-                        div()
-                            .id("sidebar-divider")
-                            .w(px(1.0))
-                            .h_full()
-                            .flex_none()
-                            .bg(colors.border)
-                            .cursor_col_resize()
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(|s, _, _, cx| {
-                                    cx.stop_propagation();
-                                    s.chrome.window_drag_origin = None;
-                                    s.chrome.resizing_sidebar = true;
-                                }),
-                            )
-                    }))
-                    .child(div().flex_1().h_full().min_w_0().child(main))
-                    .children(inspector_view.is_some().then(|| {
-                        div()
-                            .id("inspector-divider")
-                            .w(px(1.0))
-                            .h_full()
-                            .flex_none()
-                            .bg(colors.border)
-                            .cursor_col_resize()
-                            .on_mouse_down(
-                                MouseButton::Left,
-                                cx.listener(|s, _, _, cx| {
-                                    cx.stop_propagation();
-                                    s.chrome.window_drag_origin = None;
-                                    s.chrome.resizing_inspector = true;
-                                }),
-                            )
-                    }))
-                    .children(inspector_view.map(|view| div().w(inspector_w).h_full().flex_none().child(view)))
-            }))
-            .children(self.chrome.native_diorama.as_ref().map(|slot| {
-                div()
-                    .absolute()
-                    .top_0()
-                    .bottom_0()
-                    .right_0()
-                    .left(px(self.chrome.global_rail_width))
-                    .child(slot.view.clone())
-            }))
+            .children(workbench_below)
+            .children(native_workspace_layer)
+            .children(native_diorama_layer)
+            .children(workbench_above)
             .children(palette)
             .children(self.workspace.terminal_notice.as_ref().map(|message| {
                 div()

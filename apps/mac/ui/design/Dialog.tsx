@@ -1,10 +1,47 @@
-import { Scroll, Text, View, windowSize, type JSX } from "nsh";
+import { cleanup, effect, Scroll, signal, Text, untracked, View, windowSize, type JSX } from "nsh";
 import { Dialog as Base } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
 import { IconButton } from "./IconButton";
 import { fadeAnimation } from "./motion";
+
+const openModalCount = signal(0);
+let reportModalOverlay: ((active: boolean) => void) | undefined;
+
+export function setModalOverlayReporter(reporter: ((active: boolean) => void) | undefined): void {
+  reportModalOverlay = reporter;
+  if (reporter && untracked(openModalCount) > 0) reporter(true);
+}
+
+export function hasOpenModal(): boolean {
+  return openModalCount() > 0;
+}
+
+/** Tracks an open modal surface so the desktop shell lifts the workbench above native workspace/diorama layers. */
+export function useModalOverlay(isOpen: () => boolean): void {
+  let counted = false;
+  const release = () => {
+    if (!counted) return;
+    counted = false;
+    const next = Math.max(0, untracked(openModalCount) - 1);
+    openModalCount.set(next);
+    if (next === 0) reportModalOverlay?.(false);
+  };
+  effect(() => {
+    if (isOpen()) {
+      if (!counted) {
+        counted = true;
+        const next = untracked(openModalCount) + 1;
+        openModalCount.set(next);
+        if (next === 1) reportModalOverlay?.(true);
+      }
+    } else {
+      release();
+    }
+  });
+  cleanup(release);
+}
 
 export type DialogSize = "sm" | "md" | "lg" | "xl";
 export type DialogHeight = "auto" | "fixed";
@@ -58,6 +95,7 @@ export function Dialog(props: {
   bodyClass?: string;
   testid?: string;
 }) {
+  useModalOverlay(() => props.open);
   const heightMode = (): DialogHeight => props.height ?? "auto";
   const isFixed = () => heightMode() === "fixed";
   const dims = () => dialogDimensions(props.size ?? "sm", heightMode(), windowSize());

@@ -5,7 +5,7 @@ import { t } from "@vibevalley/i18n";
 
 import { CodeBlock } from "./code/CodeBlock";
 import { Diagram } from "./code/Diagram";
-import { dialogDimensions } from "./Dialog";
+import { dialogDimensions, useModalOverlay } from "./Dialog";
 import { IconButton } from "./IconButton";
 import { fadeAnimation } from "./motion";
 import { Segmented } from "./Segmented";
@@ -30,6 +30,7 @@ export interface RichPreviewModalProps {
 
 /** Modal viewer for rich message previews (Mermaid diagram + source toggle + zoom). */
 export function RichPreviewModal(props: RichPreviewModalProps) {
+  useModalOverlay(() => props.payload !== undefined);
   const mode = signal<RichPreviewMode>("diagram");
   const zoom = signal(ZOOM_DEFAULT);
   const copied = signal(false);
