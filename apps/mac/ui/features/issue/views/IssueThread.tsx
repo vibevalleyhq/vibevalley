@@ -15,7 +15,7 @@ import { useNow } from "../../../infra/base/dom";
 import { momentText, shortMomentText } from "../../../infra/base/format";
 import { useCollabSlice } from "../../../infra/frame";
 import { defineQuery, ready, retryRead, useQuery } from "../../../infra/query";
-import { Composer, followed, issueThreadOf, useFollowed } from "../../channel";
+import { Attachments, Composer, followed, issueThreadOf, useFollowed } from "../../channel";
 
 const conversationQuery = defineQuery({
   key: (id: string) => ["issues", "conversation", id],
@@ -74,7 +74,12 @@ export function IssueThread(props: { issue: string }) {
                     <Text class="text-2xs text-faint tabular-nums">{shortMomentText(message().at, now())}</Text>
                   </View>
                 </View>
-                <Markdown size="sm" text={message().text} />
+                <If when={message().text.trim() !== "" || message().attachments.length === 0}>
+                  <View testID="issue-message-body" class="min-w-0">
+                    <Markdown size="sm" text={message().text} />
+                  </View>
+                </If>
+                <If when={message().attachments.length > 0 ? message().attachments : undefined}>{(files) => <Attachments files={files()} />}</If>
               </View>
             )}
           </Each>
