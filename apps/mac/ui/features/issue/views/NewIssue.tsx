@@ -157,6 +157,9 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
                 <Select
                   quiet
                   size="control"
+                  searchable
+                  searchPlaceholder={t("web.shell.palette.mode.search")}
+                  emptyText={t("web.base.table.empty")}
                   label={t("web.issue.task.repo")}
                   testid="issue-new-repo"
                   value={draft().repo}

@@ -432,3 +432,98 @@ test("Board renders tags, parent badges, scope toggle, and TodoDetail supports t
   expect(app.count("id:issue-sub-progress-bar")).toBe(1);
   expect(app.count("id:sub-issue-row")).toBe(1);
 });
+
+test("Issue DB-backed pickers (NewIssue repo/helper and ParentPicker) filter via search while fixed enums stay clean dropdowns", async () => {
+  setLocale("zh");
+  const parentOne = makeIssueFixture({
+    id: "i-parent-alpha",
+    number: 101,
+    title: "Alpha Core Architecture",
+    status: "todo",
+    stage: { state: "draft", acts: [] },
+  });
+  const parentTwo = makeIssueFixture({
+    id: "i-parent-beta",
+    number: 102,
+    title: "Beta Polish Pipeline",
+    status: "todo",
+    stage: { state: "draft", acts: [] },
+  });
+  const targetIssue = makeIssueFixture({
+    id: "i-child-target",
+    number: 103,
+    title: "Child Picker Target",
+    status: "backlog",
+    stage: { state: "draft", acts: [] },
+  });
+
+  const state: SliceBundle = {
+    ...scenarios.typical.state,
+    board: { seq: 30, issues: [parentOne, parentTwo, targetIssue] },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "zh" });
+  fake.respond("issue.history.list", [
+    { issue: parentOne, sessions: [], missingSessions: [] },
+    { issue: parentTwo, sessions: [], missingSessions: [] },
+    { issue: targetIssue, sessions: [], missingSessions: [] },
+  ]);
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-new") === 1);
+
+  // NewIssue repo & helper pickers open downward and include searchable filtering.
+  await app.press("id:issue-new");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-repo") === 1 && app.count("id:issue-new-helper") === 1);
+
+  const repoTrigger = app.layout("id:issue-new-repo-trigger");
+  expect(repoTrigger).toBeDefined();
+  await app.press("id:issue-new-repo-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-repo-search") === 1);
+  const repoSearch = app.layout("id:issue-new-repo-search");
+  expect(repoSearch).toBeDefined();
+  expect(repoSearch!.y).toBeGreaterThanOrEqual(repoTrigger!.y + repoTrigger!.height);
+  await app.keyboard.press("escape");
+
+  await app.press("id:issue-new-helper-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-helper-search") === 1);
+  await app.type("id:issue-new-helper-search", "小林");
+  await fake.pump(app);
+  expect(app.texts()).toContain("小林");
+  expect(app.texts()).not.toContain("老周");
+  await app.keyboard.press("escape");
+  await app.press("id:issue-new-dialog-never");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-dialog") === 0);
+
+  // TodoDetail: ParentPicker is searchable while status/priority/deliver remain non-searchable enum dropdowns.
+  await app.host.send("route", `/issues/${targetIssue.id}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-parent-picker") === 1);
+
+  await app.press("id:todo-status-trigger");
+  await fake.pump(app);
+  expect(app.count("id:todo-status-search")).toBe(0);
+  await app.keyboard.press("escape");
+
+  await app.press("id:issue-priority-trigger");
+  await fake.pump(app);
+  expect(app.count("id:issue-priority-search")).toBe(0);
+  await app.keyboard.press("escape");
+
+  await app.press("id:issue-deliver-trigger");
+  await fake.pump(app);
+  expect(app.count("id:issue-deliver-search")).toBe(0);
+  await app.keyboard.press("escape");
+
+  await app.press("id:issue-parent-picker-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-parent-picker-search") === 1);
+  await app.type("id:issue-parent-picker-search", "Beta");
+  await fake.pump(app);
+  expect(app.texts()).toContain("#102 Beta Polish Pipeline");
+  expect(app.texts()).not.toContain("#101 Alpha Core Architecture");
+});

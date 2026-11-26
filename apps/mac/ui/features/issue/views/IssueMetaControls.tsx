@@ -168,6 +168,9 @@ export function ParentPicker(props: {
           disabled={props.disabled}
           state={props.state}
           options={options()}
+          searchable
+          searchPlaceholder={t("web.shell.palette.mode.search")}
+          emptyText={t("web.issue.list.emptyFiltered")}
           onChange={props.onChange}
         />
       </View>

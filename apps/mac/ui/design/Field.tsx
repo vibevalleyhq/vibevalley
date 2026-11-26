@@ -201,8 +201,10 @@ export function Select<V extends string>(props: {
   const triggerSurface = () => {
     if (props.state === "failed") return "border-berry bg-bad-soft";
     if (props.state === "pending" || tinted()) return "";
-    if (props.quiet === true) return disabled() ? "border-transparent bg-transparent" : "border-transparent bg-transparent hover:border-line hover:bg-page";
-    return disabled() ? "border-line bg-page" : "border-line bg-page hover:border-faint hover:bg-hover";
+    if (props.quiet === true) {
+      return disabled() ? "border-transparent bg-transparent" : "border-transparent bg-transparent hover:border-line hover:bg-page aria-expanded:bg-page";
+    }
+    return disabled() ? "border-line bg-page" : "border-line bg-page hover:border-faint hover:bg-hover aria-expanded:bg-page";
   };
   const triggerStyle = () => {
     if (props.state === "pending") return { borderColor: mix("wheat", 0.55), backgroundColor: mix("wheat", 0.1) };
@@ -224,12 +226,13 @@ export function Select<V extends string>(props: {
       disabled={props.disabled}
       items={selectItems()}
       searchable={props.searchable}
-      searchPlaceholder={props.searchPlaceholder}
+      searchPlaceholder={props.searchPlaceholder ?? (props.searchable === true ? t("web.shell.palette.mode.search") : undefined)}
+      searchAccessibilityLabel={props.searchPlaceholder ?? props.label}
       searchTestID={props.testid ? `${props.testid}-search` : undefined}
-      searchClass="mb-1 h-7 rounded-md border border-line bg-page px-2 text-xs text-ink placeholder:text-faint"
+      searchClass="mb-1 h-7 rounded-md border border-line bg-page px-2 text-xs text-ink placeholder:text-faint hover:border-faint focus:border-focus"
       groupClass="px-2 pt-1.5 pb-0.5 text-2xs font-semibold text-faint"
       empty={
-        <If when={props.emptyText}>
+        <If when={props.emptyText ?? (props.searchable === true ? t("web.base.table.empty") : undefined)}>
           {(msg) => (
             <View class="items-center px-2 py-3">
               <Text class="text-xs text-muted">{msg()}</Text>
@@ -241,13 +244,18 @@ export function Select<V extends string>(props: {
         const v = e.value ?? "";
         if (offered(v)) props.onChange(v);
       }}
+      cover={false}
+      placement="bottom"
       offset={4}
       align="start"
-      popupClass={`max-h-72 rounded-lg border border-line bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")} ${props.popupClass ?? ""}`}
+      popupClass={`min-w-40 max-h-72 rounded-lg border border-line-strong bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")} ${props.popupClass ?? ""}`}
       popupStartingClass={popupTransition("opacity-0")}
       popupEndingClass={popupTransition("opacity-0")}
       listClass="gap-0.5"
-      itemClass={props.itemClass ?? "group h-7 flex-row items-center gap-2 rounded-md px-2 focus:bg-hover selected:bg-selected disabled:opacity-50"}
+      itemClass={
+        props.itemClass ??
+        "group min-h-7 flex-row items-center gap-2 rounded-md px-2 py-1 focus:bg-hover hover:bg-hover selected:bg-selected disabled:opacity-50"
+      }
       renderItem={(entry) => (
         <View class="min-w-0 flex-1 flex-row items-center gap-2">
           <If

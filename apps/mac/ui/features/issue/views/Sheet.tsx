@@ -291,6 +291,9 @@ export function Pick<V extends string>(props: {
   disabled?: boolean;
   testid?: string;
   state?: "pending" | "failed" | undefined;
+  searchable?: boolean | undefined;
+  searchPlaceholder?: string | undefined;
+  emptyText?: string | undefined;
 }) {
   const shown = () => props.options.find((o) => o.value === props.value)?.label ?? props.placeholder ?? "";
   return (
@@ -307,6 +310,9 @@ export function Pick<V extends string>(props: {
           onChange={props.onChange}
           testid={props.testid}
           state={props.state}
+          searchable={props.searchable}
+          searchPlaceholder={props.searchPlaceholder}
+          emptyText={props.emptyText}
         />
       }
     >
