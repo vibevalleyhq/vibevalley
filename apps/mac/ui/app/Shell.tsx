@@ -1,4 +1,4 @@
-import { colorScheme, effect, host, keymap, Scroll, signal, Text, untracked, View, windowSize, type JSX, type ViewRef } from "nsh";
+import { colorScheme, computed, effect, host, keymap, Scroll, signal, Text, untracked, View, windowSize, type JSX, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession } from "@vibevalley/protocol/rules";
@@ -8,6 +8,7 @@ import { Button } from "../design/Button";
 import { Dialog } from "../design/Dialog";
 import { OrchestratorFace } from "../design/domain/Face";
 import { Icon } from "../design/Icon";
+import { OutLink } from "../design/IconButton";
 import type { IconName } from "../design/icons";
 import { motionClass } from "../design/motion";
 import { ShortcutSheet } from "../design/ShortcutSheet";
@@ -20,7 +21,7 @@ import { reasonOf } from "../infra/api";
 import { Keyed, variant } from "../infra/base/dom";
 import { hostApi } from "../infra/bridge";
 import { useInboxSlice, useLink, useSessionsSlice } from "../infra/frame";
-import { currentHost } from "../infra/host";
+import { clampUpdatePercent, currentHost, formatUpdateTransfer } from "../infra/host";
 import { readHostParams } from "../infra/hostParams";
 import { NavLink, useLocation, useMatches, useRouter } from "../infra/router";
 import { useUpdates } from "../infra/settings";
@@ -109,24 +110,39 @@ const railIcon = (name: IconName, current: () => boolean) => () => <Icon name={n
 
 const railGroups = ["work", "setup"] as const;
 
+const stripVersionPrefix = (version: string) => version.replace(/^v/u, "");
+
 function RailUpdateControl(props: { small: boolean; working: number }) {
   const updates = useUpdates();
   const router = useRouter();
   const installing = signal(false);
-  const confirmOpen = signal(false);
+  const dialogOpen = signal(false);
 
-  const readyState = () => {
+  const readyState = computed(() => {
     const s = updates();
     return s ? variant(s, "_tag", "ready") : undefined;
-  };
-  const downloadingState = () => {
+  });
+  const downloadingState = computed(() => {
     const s = updates();
     return s ? variant(s, "_tag", "downloading") : undefined;
-  };
-  const manualState = () => {
+  });
+  const verifyingState = computed(() => {
+    const s = updates();
+    return s ? variant(s, "_tag", "verifying") : undefined;
+  });
+  const installingState = computed(() => {
+    const s = updates();
+    return s ? variant(s, "_tag", "installing") : undefined;
+  });
+  const manualState = computed(() => {
     const s = updates();
     return s ? variant(s, "_tag", "manual") : undefined;
-  };
+  });
+
+  effect(() => {
+    const tag = updates()?._tag;
+    if (tag !== "ready" && tag !== "installing") installing.set(false);
+  });
 
   const doInstall = () => {
     if (untracked(installing)) return;
@@ -140,13 +156,8 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
   };
 
   const handleReadyPress = () => {
-    const r = readyState();
-    if (!r || untracked(installing)) return;
-    if (props.working > 0 || r.newFarm) {
-      confirmOpen.set(true);
-      return;
-    }
-    doInstall();
+    if (!readyState() || untracked(installing)) return;
+    dialogOpen.set(true);
   };
 
   return (
@@ -157,14 +168,14 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
             <View
               role="button"
               testID="rail-update-btn"
-              accessibilityLabel={t("web.base.updateReadyOneClick", { next: r().next })}
+              accessibilityLabel={t("web.base.updateReadyOneClick", { next: stripVersionPrefix(r().next) })}
               accessibilityState={{ busy: installing(), disabled: installing() }}
               tooltip={
                 <Bubble
                   text={
                     props.working > 0
-                      ? `${t("web.base.updateReadyOneClick", { next: r().next })} · ${t("web.base.working", { n: props.working })}`
-                      : t("web.base.updateReadyOneClick", { next: r().next })
+                      ? `${t("web.base.updateReadyOneClick", { next: stripVersionPrefix(r().next) })} · ${t("web.base.working", { n: props.working })}`
+                      : t("web.base.updateReadyOneClick", { next: stripVersionPrefix(r().next) })
                   }
                   placement="right"
                 />
@@ -181,21 +192,32 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
               </If>
             </View>
             <Dialog
-              open={confirmOpen()}
-              onClose={() => confirmOpen.set(false)}
-              title={t("web.base.updateReadyTitle", { next: r().next })}
+              open={dialogOpen()}
+              onClose={() => dialogOpen.set(false)}
+              title={t("web.base.updateReadyTitle", { next: stripVersionPrefix(r().next) })}
               testid="rail-update-confirm-dialog"
             >
               <View class="gap-3.5">
-                <Text class="text-sm text-ink">
-                  {r().newFarm
-                    ? t("web.setting.about.newFarmQuestion")
-                    : props.working > 0
-                      ? t("web.setting.about.workingQuestion", { n: props.working })
-                      : t("web.setting.about.restartQuestion")}
-                </Text>
+                <View class="flex-row flex-wrap items-center justify-between gap-2">
+                  <View testID="rail-update-version-badge" class="rounded-sm border border-line bg-side px-2 py-0.5">
+                    <Text class="font-mono text-xs text-muted tabular-nums">{`v${stripVersionPrefix(r().version)} → v${stripVersionPrefix(r().next)}`}</Text>
+                  </View>
+                  <If when={r().page.trim()}>{(page) => <OutLink href={page()} label={t("web.base.updateReleasePage")} />}</If>
+                </View>
+                <If when={props.working > 0 || r().newFarm} else={<Text class="text-sm text-muted">{t("web.base.updateReadyHint")}</Text>}>
+                  <View
+                    testID="rail-update-warning"
+                    class="flex-row items-start gap-2 rounded-md border bg-warn-soft px-3 py-2"
+                    style={{ borderColor: mix("wheat", 0.4) }}
+                  >
+                    <Icon name="warn" size={14} tone="wheat" />
+                    <Text class="min-w-0 flex-1 text-xs leading-relaxed font-medium text-warn-ink">
+                      {r().newFarm ? t("web.setting.about.newFarmQuestion") : t("web.setting.about.workingQuestion", { n: props.working })}
+                    </Text>
+                  </View>
+                </If>
                 <If when={r().notes.length > 0}>
-                  <View class="gap-1.5 rounded-md border border-line bg-side p-3">
+                  <View testID="rail-update-notes" class="gap-1.5 rounded-md border border-line bg-side p-3">
                     <Text class="text-xs font-semibold text-muted">{t("web.base.updateNotesTitle")}</Text>
                     <Each of={r().notes} key={(_, i) => String(i)}>
                       {(note) => (
@@ -208,8 +230,8 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
                   </View>
                 </If>
                 <View class="flex-row items-center justify-end gap-2">
-                  <Button tone="quiet" testID="rail-update-confirm-cancel" onPress={() => confirmOpen.set(false)}>
-                    {t("web.base.form.never")}
+                  <Button tone="quiet" testID="rail-update-confirm-cancel" onPress={() => dialogOpen.set(false)}>
+                    {t("web.base.updateLaterOnQuit")}
                   </Button>
                   <Button
                     tone="primary"
@@ -217,7 +239,7 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
                     testID="rail-update-confirm-sure"
                     disabled={installing()}
                     onPress={() => {
-                      confirmOpen.set(false);
+                      dialogOpen.set(false);
                       doInstall();
                     }}
                   >
@@ -231,16 +253,63 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
       </If>
 
       <If when={downloadingState()}>
-        {(d) => (
+        {(d) => {
+          const percent = () => clampUpdatePercent(d().percent);
+          const tooltipText = () => {
+            const base = t("web.setting.about.downloading", { next: d().next, percent: percent() });
+            const transfer = formatUpdateTransfer(d());
+            return transfer ? `${base} · ${transfer}` : base;
+          };
+          return (
+            <View
+              testID="rail-update-downloading"
+              accessibilityLabel={tooltipText()}
+              tooltip={<Bubble text={tooltipText()} placement="right" />}
+              class={`${props.small ? "size-9 px-1" : "w-15 px-1.5 py-1.5"} shrink-0 items-center justify-center gap-1 rounded-lg border border-line bg-side`}
+            >
+              <View class="flex-row items-center justify-center gap-1">
+                <Icon name="update" size={14} tone="accent" />
+                <If when={!props.small}>
+                  <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{`${percent()}%`}</Text>
+                </If>
+              </View>
+              <View testID="rail-update-progress" class="h-1 w-full overflow-hidden rounded-full bg-hover">
+                <View class="h-full rounded-full bg-accent" style={{ width: `${percent()}%` }} />
+              </View>
+            </View>
+          );
+        }}
+      </If>
+
+      <If when={verifyingState()}>
+        {(v) => (
           <View
-            testID="rail-update-downloading"
-            accessibilityLabel={t("web.setting.about.downloading", { next: d().next, percent: d().percent })}
-            tooltip={<Bubble text={t("web.setting.about.downloading", { next: d().next, percent: d().percent })} placement="right" />}
+            testID="rail-update-verifying"
+            accessibilityLabel={t("web.setting.about.verifying", { next: v().next })}
+            tooltip={<Bubble text={t("web.setting.about.verifying", { next: v().next })} placement="right" />}
             class={`${props.small ? "size-9" : "w-15 px-1.5 py-1"} shrink-0 items-center justify-center gap-0.5 rounded-lg border border-line bg-side`}
           >
-            <Icon name="update" size={16} tone="accent" />
+            <Icon name="wait" size={16} tone="water" />
             <If when={!props.small}>
-              <Text class="font-mono text-2xs font-medium text-muted tabular-nums">{`${d().percent}%`}</Text>
+              <Text class="w-full truncate text-center font-sans text-2xs leading-tight font-medium text-muted">{t("web.base.updateVerifying")}</Text>
+            </If>
+          </View>
+        )}
+      </If>
+
+      <If when={installingState()}>
+        {(inst) => (
+          <View
+            testID="rail-update-installing"
+            accessibilityLabel={t("web.setting.about.installing", { next: inst().next })}
+            accessibilityState={{ busy: true, disabled: true }}
+            tooltip={<Bubble text={t("web.setting.about.installing", { next: inst().next })} placement="right" />}
+            class={`${props.small ? "size-9" : "w-15 px-1.5 py-1"} shrink-0 items-center justify-center gap-0.5 rounded-lg border opacity-75`}
+            style={{ backgroundColor: mix("accent", 0.12), borderColor: mix("accent", 0.35) }}
+          >
+            <Icon name="wait" size={16} tone="accent" />
+            <If when={!props.small}>
+              <Text class="w-full truncate text-center font-sans text-2xs leading-tight font-medium text-accent">{t("web.base.updateInstalling")}</Text>
             </If>
           </View>
         )}

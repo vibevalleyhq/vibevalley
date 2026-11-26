@@ -721,9 +721,13 @@ export const catalogs = {
         zoomReset: "重置缩放",
       },
       updateInstall: "立即更新",
-      updateInstalling: "重启中…",
-      updateReadyOneClick: "{next} 已就绪，点击一键重启更新",
-      updateReadyTitle: "更新到 {next}",
+      updateInstalling: "安装中",
+      updateVerifying: "校验中",
+      updateReadyOneClick: "v{next} 已就绪，点击查看更新并重启",
+      updateReadyTitle: "新版本 v{next} 已就绪",
+      updateReadyHint: "新版本已下载并校验完成，重启应用即可生效。",
+      updateLaterOnQuit: "下次退出时更新",
+      updateReleasePage: "查看完整发布说明",
       updateNotesTitle: "本次更新内容",
       intent: { timedOut: "等了太久没回音，可以重试", offline: "没连上 VibeValley，这一下没发出去" },
       pickTooLarge: "{name} 没加上：超过 512 MiB 了",
@@ -2932,25 +2936,40 @@ export const catalogs = {
         copied: "路径复制好了",
         reveal: "在访达里显示",
         update: "更新",
-        updateHint: "桌面版从 GitHub 上的发布自己更新",
-        upToDate: "已是最新",
-        checking: "正在查有没有新版本…",
-        downloading: "正在下载 {next}（{percent}%）",
-        ready: "{next} 已下好，退出时装上",
-        readyNewFarm: "{next} 已下好：它会从新的数据开始，旧的留在一边",
+        updateHint: "桌面版从 GitHub 上的发布自动更新",
+        disabled: "开发构建未启用自动更新",
+        upToDate: "已是最新版本",
+        lastChecked: "上次检查：{time}",
+        checking: "正在检查更新…",
+        downloading: "正在下载 {next} · {percent}%",
+        verifying: "正在校验并准备 {next}…",
+        ready: "新版本 {next} 已就绪",
+        readyNewFarm: "新版本 {next} 已就绪：将从新数据目录启动，旧数据会保留",
+        installing: "正在安装 {next} 并重启…",
         manual: {
-          diskImage: "{next} 要手动装：应用还在安装盘里运行，先拖进「应用程序」",
-          translocated: "{next} 要手动装：macOS 把应用挪到了临时的地方运行，先拖进「应用程序」再打开",
-          readOnly: "{next} 要手动装：应用所在的文件夹不能写",
-          noBuild: "{next} 没有这台 Mac 的版本",
+          diskImage: "{next} 需要手动安装：应用仍在安装盘中运行，请先拖入「应用程序」",
+          translocated: "{next} 需要手动安装：macOS 在临时位置运行了应用，请先拖入「应用程序」再打开",
+          readOnly: "{next} 需要手动安装：应用所在目录不可写",
+          noBuild: "{next} 暂无适用于这台 Mac 的构建",
         },
-        failed: "没查成：{why}",
+        failedKind: {
+          network: "网络异常，暂时无法获取更新",
+          rateLimit: "GitHub 请求过于频繁，请稍后再试",
+          integrity: "安装包校验未通过，请重试或手动下载",
+          signature: "应用签名校验未通过，请前往发布页手动下载",
+          permission: "没有权限替换应用，请检查应用目录权限或手动安装",
+          install: "安装新版本失败，请重试或手动下载",
+          unknown: "更新失败，请稍后重试",
+        },
         check: "检查更新",
-        restart: "重启更新",
+        retry: "重试",
+        restart: "立即重启更新",
         restartQuestion: "重启到新版本？",
-        workingQuestion: "{n} 个执行会话在运行，重启会打断它们。现在重启？",
-        newFarmQuestion: "新版本从新的数据开始，旧的留在家目录里。现在重启？",
-        download: "去下载",
+        workingQuestion: "{n} 个执行会话正在运行，重启会中断它们。确认现在重启？",
+        newFarmQuestion: "新版本将从新数据开始，旧数据会保留在家目录里。确认现在重启？",
+        download: "前往下载",
+        manualDownload: "手动下载",
+        releaseNotesLink: "发布说明",
         cli: "命令行",
         cliHint: "装上以后，在终端里用 {command} 读写这个 VibeValley，本机的 agent 也能用",
         cliReady: "在终端里用 {command}；本机的 agent 也能用它读写这个 VibeValley",
@@ -4013,9 +4032,13 @@ export const catalogs = {
         zoomReset: "Reset zoom",
       },
       updateInstall: "Update",
-      updateInstalling: "Restarting…",
-      updateReadyOneClick: "{next} is ready — click to update & restart",
-      updateReadyTitle: "Update to {next}",
+      updateInstalling: "Installing",
+      updateVerifying: "Verifying",
+      updateReadyOneClick: "v{next} is ready — click to review & restart",
+      updateReadyTitle: "Version {next} is ready",
+      updateReadyHint: "Downloaded and verified in the background. Restart to apply.",
+      updateLaterOnQuit: "Later, on quit",
+      updateReleasePage: "View full release notes",
       updateNotesTitle: "What's new",
       intent: { timedOut: "No answer in time; try again", offline: "Not connected to the farm, so this was not sent" },
       pickTooLarge: "{name} was not added: it is over 512 MiB",
@@ -6357,25 +6380,40 @@ export const catalogs = {
         copied: "Path copied",
         reveal: "Show in Finder",
         update: "Updates",
-        updateHint: "The desktop app updates itself from the releases on GitHub",
+        updateHint: "The desktop app updates itself from GitHub releases",
+        disabled: "Auto-update is off in dev builds",
         upToDate: "Up to date",
-        checking: "Looking for a new version…",
-        downloading: "Downloading {next} ({percent}%)",
-        ready: "{next} is ready and goes in when you quit",
-        readyNewFarm: "{next} is ready: it starts from fresh data and keeps the old aside",
+        lastChecked: "Last checked {time}",
+        checking: "Checking for updates…",
+        downloading: "Downloading {next} · {percent}%",
+        verifying: "Verifying and preparing {next}…",
+        ready: "Version {next} is ready",
+        readyNewFarm: "Version {next} is ready: starts fresh and keeps previous data aside",
+        installing: "Installing {next} and restarting…",
         manual: {
-          diskImage: "{next} needs installing by hand: the app runs from its disk image; drag it to Applications first",
-          translocated: "{next} needs installing by hand: macOS runs the app from a temporary place; drag it to Applications and open it again",
-          readOnly: "{next} needs installing by hand: the app's folder cannot be written",
+          diskImage: "{next} must be installed manually: the app is running from its disk image; drag it to Applications first",
+          translocated: "{next} must be installed manually: macOS launched it from a temporary location; drag it to Applications and reopen",
+          readOnly: "{next} must be installed manually: the app's folder is not writable",
           noBuild: "{next} has no build for this Mac",
         },
-        failed: "Could not check: {why}",
+        failedKind: {
+          network: "Network error while checking or downloading the update",
+          rateLimit: "GitHub rate limit reached; try again shortly",
+          integrity: "Download integrity check failed; retry or download manually",
+          signature: "App signature verification failed; download from the release page",
+          permission: "No permission to replace the app; check folder permissions or install manually",
+          install: "Could not install the update; retry or download manually",
+          unknown: "Update failed; try again later",
+        },
         check: "Check for updates",
+        retry: "Retry",
         restart: "Restart to update",
         restartQuestion: "Restart into the new version?",
-        workingQuestion: "{n} helpers are working; restarting cuts them off. Restart now?",
+        workingQuestion: "{n} active sessions are running; restarting will interrupt them. Restart now?",
         newFarmQuestion: "The new version starts from fresh data; the old stays in the home folder. Restart now?",
         download: "Download",
+        manualDownload: "Download manually",
+        releaseNotesLink: "Release notes",
         cli: "Command line",
         cliHint: "Once installed, {command} reads and writes this farm from a terminal, for agents on this Mac too",
         cliReady: "Use {command} in a terminal; agents on this Mac can read and write this farm with it",
@@ -7461,9 +7499,13 @@ export interface Messages {
   "web.base.update": undefined;
   "web.base.updateInstall": undefined;
   "web.base.updateInstalling": undefined;
+  "web.base.updateLaterOnQuit": undefined;
   "web.base.updateNotesTitle": undefined;
+  "web.base.updateReadyHint": undefined;
   "web.base.updateReadyOneClick": { readonly next: string | number };
   "web.base.updateReadyTitle": { readonly next: string | number };
+  "web.base.updateReleasePage": undefined;
+  "web.base.updateVerifying": undefined;
   "web.base.user": undefined;
   "web.base.working": { readonly n: string | number };
   "web.base.write": undefined;
@@ -9668,29 +9710,42 @@ export interface Messages {
   "web.setting.about.cliTaken": { readonly link: string | number };
   "web.setting.about.copied": undefined;
   "web.setting.about.copy": undefined;
+  "web.setting.about.disabled": undefined;
   "web.setting.about.download": undefined;
   "web.setting.about.downloading": { readonly next: string | number; readonly percent: string | number };
-  "web.setting.about.failed": { readonly why: string | number };
+  "web.setting.about.failedKind.install": undefined;
+  "web.setting.about.failedKind.integrity": undefined;
+  "web.setting.about.failedKind.network": undefined;
+  "web.setting.about.failedKind.permission": undefined;
+  "web.setting.about.failedKind.rateLimit": undefined;
+  "web.setting.about.failedKind.signature": undefined;
+  "web.setting.about.failedKind.unknown": undefined;
   "web.setting.about.files": undefined;
   "web.setting.about.home": undefined;
   "web.setting.about.homeHint": undefined;
+  "web.setting.about.installing": { readonly next: string | number };
+  "web.setting.about.lastChecked": { readonly time: string | number };
   "web.setting.about.manual.diskImage": { readonly next: string | number };
   "web.setting.about.manual.noBuild": { readonly next: string | number };
   "web.setting.about.manual.readOnly": { readonly next: string | number };
   "web.setting.about.manual.translocated": { readonly next: string | number };
+  "web.setting.about.manualDownload": undefined;
   "web.setting.about.newFarmQuestion": undefined;
   "web.setting.about.ready": { readonly next: string | number };
   "web.setting.about.readyNewFarm": { readonly next: string | number };
+  "web.setting.about.releaseNotesLink": undefined;
   "web.setting.about.repos": undefined;
   "web.setting.about.reposHint": undefined;
   "web.setting.about.restart": undefined;
   "web.setting.about.restartQuestion": undefined;
+  "web.setting.about.retry": undefined;
   "web.setting.about.reveal": undefined;
   "web.setting.about.settings": undefined;
   "web.setting.about.settingsHint": undefined;
   "web.setting.about.upToDate": undefined;
   "web.setting.about.update": undefined;
   "web.setting.about.updateHint": undefined;
+  "web.setting.about.verifying": { readonly next: string | number };
   "web.setting.about.version": undefined;
   "web.setting.about.versionHint": undefined;
   "web.setting.about.workingQuestion": { readonly n: string | number };

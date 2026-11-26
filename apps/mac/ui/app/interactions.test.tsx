@@ -867,15 +867,15 @@ test("regression: defineStored preferences persist through nsh Storage and survi
   expect(rootReload.fake.acts.some((a) => a.type === "openFarm")).toBe(true);
 });
 
-test("bottom-left update control: one-click install when idle, downloading pill, and confirm dialog when sessions are working", async () => {
+test("bottom-left update control: always shows release-notes dialog before restart, downloading/verifying/installing pills, and active-session warning", async () => {
   const readyApp = await mountApp("/issues", (f) => {
     f.respond("host.updateState", {
       _tag: "ready",
       version: "0.4.0",
       next: "0.4.1",
-      notes: ["Faster content views"],
+      notes: ["Faster content views", "Resumable auto-update"],
       newFarm: false,
-      page: "",
+      page: "https://github.com/vibevalleyhq/vibevalley/releases/tag/v0.4.1",
     });
     f.respond("host.updateInstall", null);
   });
@@ -887,8 +887,21 @@ test("bottom-left update control: one-click install when idle, downloading pill,
   await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.app.count("id:rail-update-btn") === 1);
   readyApp.fake.clearCalls();
   await readyApp.app.press("id:rail-update-btn");
+  await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.app.count("id:rail-update-confirm-dialog") === 1);
+  expect(readyApp.fake.calls.some((c) => c.op === "host.updateInstall")).toBe(false);
+  expect(readyApp.app.count("id:rail-update-warning")).toBe(0);
+  expect(readyApp.app.count("id:rail-update-notes")).toBe(1);
+  expect(readyApp.app.texts()).toContain("v0.4.0 → v0.4.1");
+  expect(readyApp.app.texts()).toContain("Faster content views");
+  expect(readyApp.app.texts()).toContain("Resumable auto-update");
+  await readyApp.app.press("id:rail-update-confirm-cancel");
+  await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.app.count("id:rail-update-confirm-dialog") === 0);
+  expect(readyApp.fake.calls.some((c) => c.op === "host.updateInstall")).toBe(false);
+
+  await readyApp.app.press("id:rail-update-btn");
+  await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.app.count("id:rail-update-confirm-dialog") === 1);
+  await readyApp.app.press("id:rail-update-confirm-sure");
   await readyApp.fake.pumpUntil(readyApp.app, () => readyApp.fake.calls.some((c) => c.op === "host.updateInstall"));
-  expect(readyApp.app.count("id:rail-update-confirm-dialog")).toBe(0);
 
   const downloadingApp = await mountApp("/issues", (f) => {
     f.respond("host.updateState", {
@@ -896,10 +909,28 @@ test("bottom-left update control: one-click install when idle, downloading pill,
       version: "0.4.0",
       next: "0.4.1",
       percent: 42,
+      downloadedBytes: Math.round(42.1 * 1024 * 1024),
+      totalBytes: Math.round(86.4 * 1024 * 1024),
+      speedBps: Math.round(3.2 * 1024 * 1024),
     });
   });
   await downloadingApp.fake.pumpUntil(downloadingApp.app, () => downloadingApp.app.count("id:rail-update-downloading") === 1);
+  expect(downloadingApp.app.count("id:rail-update-progress")).toBe(1);
   expect(downloadingApp.app.texts()).toContain("42%");
+
+  await downloadingApp.fake.pushUpdateState(downloadingApp.app, {
+    _tag: "verifying",
+    version: "0.4.0",
+    next: "0.4.1",
+  });
+  await downloadingApp.fake.pumpUntil(downloadingApp.app, () => downloadingApp.app.count("id:rail-update-verifying") === 1);
+
+  await downloadingApp.fake.pushUpdateState(downloadingApp.app, {
+    _tag: "installing",
+    version: "0.4.0",
+    next: "0.4.1",
+  });
+  await downloadingApp.fake.pumpUntil(downloadingApp.app, () => downloadingApp.app.count("id:rail-update-installing") === 1);
 
   const busyApp = await mountApp("/issues", (f) => {
     f.respond("host.updateState", {
@@ -916,6 +947,7 @@ test("bottom-left update control: one-click install when idle, downloading pill,
   busyApp.fake.clearCalls();
   await busyApp.app.press("id:rail-update-btn");
   await busyApp.fake.pumpUntil(busyApp.app, () => busyApp.app.count("id:rail-update-confirm-dialog") === 1);
+  expect(busyApp.app.count("id:rail-update-warning")).toBe(1);
   expect(busyApp.fake.calls.some((c) => c.op === "host.updateInstall")).toBe(false);
   await busyApp.app.press("id:rail-update-confirm-sure");
   await busyApp.fake.pumpUntil(busyApp.app, () => busyApp.fake.calls.some((c) => c.op === "host.updateInstall"));

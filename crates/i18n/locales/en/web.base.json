@@ -240,9 +240,13 @@
     "zoomReset": "Reset zoom"
   },
   "updateInstall": "Update",
-  "updateInstalling": "Restarting…",
-  "updateReadyOneClick": "{next} is ready — click to update & restart",
-  "updateReadyTitle": "Update to {next}",
+  "updateInstalling": "Installing",
+  "updateVerifying": "Verifying",
+  "updateReadyOneClick": "v{next} is ready — click to review & restart",
+  "updateReadyTitle": "Version {next} is ready",
+  "updateReadyHint": "Downloaded and verified in the background. Restart to apply.",
+  "updateLaterOnQuit": "Later, on quit",
+  "updateReleasePage": "View full release notes",
   "updateNotesTitle": "What's new",
   "intent": {
     "timedOut": "No answer in time; try again",
