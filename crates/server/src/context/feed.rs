@@ -3,7 +3,6 @@
 //! `collab`, `inbox`, `ops`, and `farm`, with `loom`-checked lock-free wake gating.
 
 use std::collections::BTreeMap;
-use std::fmt::Display;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,11 +21,10 @@ use vibevalley_protocol::{
 };
 
 use super::task::TaskGroup;
-use crate::BoxFuture;
 
 /// Conditional synchronization primitives switching to `loom::sync` under
 /// `--features loom` so lock-free wake-gate protocols can be exhaustively explored.
-pub mod loom_sync {
+mod loom_sync {
     #[cfg(feature = "loom")]
     pub use loom::sync::atomic::{AtomicI64, AtomicU8, Ordering};
     #[cfg(not(feature = "loom"))]
@@ -68,14 +66,14 @@ pub fn encode_slice<T: Serialize>(value: &T) -> Result<Arc<str>, ApiError> {
 }
 
 /// Lock-free dirty-slice sequence tracker and coalescing wakeup gate.
-pub struct SliceWakeGate {
+struct SliceWakeGate {
     seq: LoomAtomicI64,
     dirty_seqs: [LoomAtomicI64; SLICE_COUNT],
     pending_mask: LoomAtomicU8,
 }
 
 impl SliceWakeGate {
-    pub fn new(initial_seq: i64) -> Self {
+    fn new(initial_seq: i64) -> Self {
         Self {
             seq: LoomAtomicI64::new(initial_seq),
             dirty_seqs: std::array::from_fn(|_| LoomAtomicI64::new(initial_seq)),
@@ -83,15 +81,15 @@ impl SliceWakeGate {
         }
     }
 
-    pub fn seq(&self) -> i64 {
+    fn seq(&self) -> i64 {
         self.seq.load(LoomOrdering::Acquire)
     }
 
-    pub fn dirty_seq(&self, idx: usize) -> i64 {
+    fn dirty_seq(&self, idx: usize) -> i64 {
         self.dirty_seqs[idx].load(LoomOrdering::Acquire)
     }
 
-    pub fn record_commit(&self, mask: u8) -> (i64, bool) {
+    fn record_commit(&self, mask: u8) -> (i64, bool) {
         let mask = mask & SLICE_MASK_ALL;
         if mask == 0 {
             return (self.seq(), false);
@@ -106,11 +104,11 @@ impl SliceWakeGate {
         (seq, prev == 0)
     }
 
-    pub fn take_pending(&self) -> u8 {
+    fn take_pending(&self) -> u8 {
         self.pending_mask.swap(0, LoomOrdering::AcqRel)
     }
 
-    pub fn pending_bits(&self) -> u8 {
+    fn pending_bits(&self) -> u8 {
         self.pending_mask.load(LoomOrdering::Acquire)
     }
 }
@@ -129,7 +127,6 @@ struct FeedState {
 
 /// Pre-encoded `tokio::sync::watch<Arc<str>>` feed for a single state slice.
 pub struct SliceFeed {
-    kind: SliceKind,
     topic: &'static str,
     json_tx: watch::Sender<Arc<str>>,
     frame_tx: watch::Sender<SliceFrame>,
@@ -139,7 +136,7 @@ pub struct SliceFeed {
 
 impl SliceFeed {
     /// Creates a [`SliceFeed`] initialized with `initial_seq` and pre-encoded `initial_json`.
-    pub fn new(kind: SliceKind, initial_seq: i64, initial_json: impl Into<Arc<str>>) -> Self {
+    fn new(kind: SliceKind, initial_seq: i64, initial_json: impl Into<Arc<str>>) -> Self {
         let json: Arc<str> = initial_json.into();
         let initial = SliceFrame {
             seq: initial_seq,
@@ -149,7 +146,6 @@ impl SliceFeed {
         let (json_tx, _) = watch::channel(json);
         let (frame_tx, _) = watch::channel(initial.clone());
         Self {
-            kind,
             topic: slice_topic(kind),
             json_tx,
             frame_tx,
@@ -164,20 +160,8 @@ impl SliceFeed {
         Self::new(kind, initial_seq, json)
     }
 
-    pub fn kind(&self) -> SliceKind {
-        self.kind
-    }
-
-    pub fn topic(&self) -> &'static str {
-        self.topic
-    }
-
     pub fn seq(&self) -> i64 {
         self.state.lock().latest.seq
-    }
-
-    pub fn snapshot(&self) -> SliceFrame {
-        self.state.lock().latest.clone()
     }
 
     pub fn snapshot_json(&self) -> Arc<str> {
@@ -194,7 +178,7 @@ impl SliceFeed {
 
     /// Publishes `(seq, json)` if `seq` is strictly greater than the current feed sequence.
     /// Returns `true` when published.
-    pub fn publish_if_newer(&self, seq: i64, json: impl Into<Arc<str>>) -> bool {
+    fn publish_if_newer(&self, seq: i64, json: impl Into<Arc<str>>) -> bool {
         let json: Arc<str> = json.into();
         let frame = {
             let mut state = self.state.lock();
@@ -243,14 +227,13 @@ impl SliceFeed {
     }
 
     /// Direct `tokio::sync::watch::Receiver<Arc<str>>` subscription carrying pre-encoded JSON.
-    pub fn subscribe_json(&self) -> watch::Receiver<Arc<str>> {
+    fn subscribe_json(&self) -> watch::Receiver<Arc<str>> {
         self.json_tx.subscribe()
     }
 
     /// Subscribes with `(seq, generation, json)` metadata for SSE `Last-Event-ID` streaming.
     pub fn subscribe(&self) -> SliceSubscription {
         SliceSubscription {
-            kind: self.kind,
             topic: self.topic,
             rx: self.frame_tx.subscribe(),
             strip_initial_effects: self.strip_initial_effects,
@@ -328,17 +311,12 @@ impl SliceFeed {
 
 /// Subscription handle for a single [`SliceFeed`] preserving `seq` and SSE `Last-Event-ID` semantics.
 pub struct SliceSubscription {
-    kind: SliceKind,
     topic: &'static str,
     rx: watch::Receiver<SliceFrame>,
     strip_initial_effects: bool,
 }
 
 impl SliceSubscription {
-    pub fn kind(&self) -> SliceKind {
-        self.kind
-    }
-
     pub fn topic(&self) -> &'static str {
         self.topic
     }
@@ -410,7 +388,7 @@ fn strip_farm_effects(json: &Arc<str>) -> Arc<str> {
 }
 
 /// Six pre-encoded slice feeds named in strict singular form.
-pub struct SliceFeedSet {
+struct SliceFeedSet {
     pub board: SliceFeed,
     pub session: SliceFeed,
     pub collab: SliceFeed,
@@ -454,7 +432,7 @@ impl SliceFeedSet {
         }
     }
 
-    pub fn get(&self, kind: SliceKind) -> &SliceFeed {
+    fn get(&self, kind: SliceKind) -> &SliceFeed {
         match kind {
             SliceKind::Board => &self.board,
             SliceKind::Sessions => &self.session,
@@ -463,23 +441,6 @@ impl SliceFeedSet {
             SliceKind::Ops => &self.ops,
             SliceKind::Farm => &self.farm,
         }
-    }
-}
-
-/// Async projection callback trait implemented for any `FnMut(SliceKind, i64) -> Fut`.
-pub trait SliceProjectFn: Send + 'static {
-    fn project(&mut self, kind: SliceKind, seq: i64) -> BoxFuture<'static, Result<Arc<str>, String>>;
-}
-
-impl<F, Fut, E> SliceProjectFn for F
-where
-    F: FnMut(SliceKind, i64) -> Fut + Send + 'static,
-    Fut: std::future::Future<Output = Result<Arc<str>, E>> + Send + 'static,
-    E: Display + Send + 'static,
-{
-    fn project(&mut self, kind: SliceKind, seq: i64) -> BoxFuture<'static, Result<Arc<str>, String>> {
-        let fut = (self)(kind, seq);
-        Box::pin(async move { fut.await.map_err(|err| err.to_string()) })
     }
 }
 
@@ -504,7 +465,7 @@ impl StateFeed {
 
     /// Creates a [`StateFeed`] with an explicit leading/trailing throttle duration.
     /// Passing `Duration::ZERO` projects every coalesced single-flight batch immediately.
-    pub fn with_throttle(throttle: Duration) -> Self {
+    fn with_throttle(throttle: Duration) -> Self {
         let (cycle_tx, _) = watch::channel(0u64);
         let (dirty_tx, _) = watch::channel(0i64);
         Self {
@@ -549,7 +510,8 @@ impl StateFeed {
     }
 
     /// Returns all 6 pre-encoded feeds.
-    pub fn feeds(&self) -> &SliceFeedSet {
+    #[cfg(test)]
+    fn feeds(&self) -> &SliceFeedSet {
         &self.feeds
     }
 
@@ -578,14 +540,6 @@ impl StateFeed {
         self.cycle_tx.subscribe()
     }
 
-    pub fn has_watchers(&self, kind: SliceKind) -> bool {
-        self.feeds.get(kind).has_watchers()
-    }
-
-    pub fn watcher_count(&self, kind: SliceKind) -> usize {
-        self.feeds.get(kind).watcher_count()
-    }
-
     /// Marks the slices in `mask` dirty, advances the monotonic global `seq`,
     /// updates per-slice dirty watermarks, and wakes the single-flight projector loop.
     pub fn mark_dirty(&self, mask: SliceMask) -> i64 {
@@ -598,7 +552,12 @@ impl StateFeed {
     }
 
     /// Spawns the single-flight projector worker on `task` using `projector`.
-    pub fn start(self: &Arc<Self>, task: &TaskGroup, mut projector: impl SliceProjectFn) {
+    pub fn start<F, Fut, E>(self: &Arc<Self>, task: &TaskGroup, mut projector: F)
+    where
+        F: FnMut(SliceKind, i64) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Result<Arc<str>, E>> + Send + 'static,
+        E: std::fmt::Display + Send + 'static,
+    {
         self.running.store(true, Ordering::Release);
         let this = self.clone();
         let cancel = task.token();
@@ -701,13 +660,18 @@ impl StateFeed {
         }
     }
 
-    async fn project_one(&self, projector: &mut impl SliceProjectFn, kind: SliceKind) {
+    async fn project_one<F, Fut, E>(&self, projector: &mut F, kind: SliceKind)
+    where
+        F: FnMut(SliceKind, i64) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Result<Arc<str>, E>> + Send + 'static,
+        E: std::fmt::Display + Send + 'static,
+    {
         let target_seq = self.dirty_seq(kind);
         let feed = self.feed(kind);
         if feed.seq() >= target_seq && kind != SliceKind::Farm {
             return;
         }
-        match projector.project(kind, target_seq).await {
+        match projector(kind, target_seq).await {
             Ok(json) => {
                 if kind == SliceKind::Farm {
                     feed.publish(target_seq, json);

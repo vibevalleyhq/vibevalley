@@ -7,9 +7,9 @@ use vibevalley_core::{Clock, ManualClock};
 use vibevalley_protocol::{ActorKind, BizCode, ConnectorID, CronRequest, CronWhen, CronWhenEvery, CronWhenOnce, IssueStatus};
 use vibevalley_runtime::oar::Registry;
 
+use super::digest::DigestSpec;
 use super::{DigestCronRequest, DigestDeliveryPort, Scheduler};
-use crate::connector::digest::{DigestSpec, DigestTargets};
-use crate::context::port::{CronAgentPort, CronOrchestratorPort};
+use crate::context::port::{CronAgentPort, CronOrchestratorPort, DigestTargets};
 use crate::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use crate::issue::{Board, NewIssue};
 use crate::runtime::{Runtime, RuntimeConfig, RuntimeDriver};

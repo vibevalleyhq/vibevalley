@@ -5,9 +5,9 @@ use std::sync::Arc;
 use tokio::sync::{Mutex as AsyncMutex, broadcast};
 use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
-    ApiError, ExecutionPolicy, Issue, IssueGetInput, LastRun, Millis, Outcome, Phase, Run, Session, SessionBindingInput, SessionChildTranscript,
-    SessionChildTranscriptInput, SessionController, SessionEventListInput, SessionEventPage, SessionOpenWorkspaceInput, SessionRespondInteractionInput,
-    SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionWatchPayload, SessionWorkspace,
+    ApiError, ExecutionPolicy, Issue, IssueGetInput, LastRun, Millis, Outcome, Phase, Run, Session, SessionChildTranscript, SessionChildTranscriptInput,
+    SessionController, SessionEventListInput, SessionEventPage, SessionOpenWorkspaceInput, SessionRespondInteractionInput, SessionRespondPermissionInput,
+    SessionSendInput, SessionSetConfigInput, SessionWatchPayload, SessionWorkspace,
 };
 use vibevalley_runtime::oar::Registry;
 
@@ -352,14 +352,6 @@ impl Runtime {
 
     pub(crate) async fn child_transcript_endpoint_async(&self, input: SessionChildTranscriptInput) -> std::result::Result<SessionChildTranscript, ApiError> {
         self.session.child_transcript_endpoint_async(input).await
-    }
-
-    pub(crate) async fn attach_binding_endpoint_async(&self, input: SessionBindingInput) -> std::result::Result<Session, ApiError> {
-        self.session.attach_binding_endpoint_async(input).await
-    }
-
-    pub(crate) async fn detach_binding_endpoint_async(&self, input: SessionBindingInput) -> std::result::Result<Session, ApiError> {
-        self.session.detach_binding_endpoint_async(input).await
     }
 
     pub(crate) async fn watch_session_async(&self, input: SessionWatchPayload, sink: crate::context::Sink) -> std::result::Result<(), ApiError> {

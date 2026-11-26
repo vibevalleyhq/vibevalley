@@ -1353,11 +1353,19 @@ fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
     // Create an issue and attach a ContextRef::Issue dynamically to the User session.
     let issue = call("issue.create", json!({ "title": "attach me", "repo": "demo" })).data.unwrap();
     let issue_id = issue["id"].as_str().unwrap().to_string();
-    let attached = call("session.binding.attach", json!({ "id": sid, "binding": { "kind": "issue", "id": issue_id } }));
-    assert_eq!(attached.biz_code, 0, "{}", attached.message);
-    let attached_data = attached.data.unwrap();
-    assert_eq!(attached_data["controller"], "user");
-    assert_eq!(attached_data["bindings"], json!([{ "kind": "issue", "id": issue_id }]));
+    let binding = vibevalley_protocol::ContextRef::Issue {
+        id: issue_id.clone(),
+        refining: None,
+    };
+    let attached_data = vibevalley_runtime::rt::block_on(server.test_internals().runtime.session_engine().attach_binding_async(
+        vibevalley_protocol::SessionBindingInput {
+            id: sid.clone(),
+            binding: binding.clone(),
+        },
+    ))
+    .unwrap();
+    assert_eq!(attached_data.controller, vibevalley_protocol::SessionController::User);
+    assert_eq!(attached_data.bindings, vec![binding.clone()]);
     assert!(crate::support::board_session(server.test_internals().board, &sid).unwrap().is_board_worker());
     assert_eq!(
         crate::support::board_session(server.test_internals().board, &sid).unwrap().issue_id(),
@@ -1371,13 +1379,15 @@ fn pr2_zero_binding_isolation_and_dynamic_binding_attach_detach() {
     let reopened = start_with(home.path(), rt2);
     let persisted = crate::support::board_session(reopened.test_internals().board, &sid).unwrap();
     assert_eq!(persisted.issue_id(), Some(issue_id.as_str()));
-    let detached = reopened.router().call_as(
-        Caller::User,
-        "session.binding.detach",
-        json!({ "id": sid, "binding": { "kind": "issue", "id": issue_id } }),
-    );
-    assert_eq!(detached.biz_code, 0, "{}", detached.message);
-    assert_eq!(detached.data.unwrap()["bindings"], json!([]));
+    let detached_data = vibevalley_runtime::rt::block_on(
+        reopened
+            .test_internals()
+            .runtime
+            .session_engine()
+            .detach_binding_async(vibevalley_protocol::SessionBindingInput { id: sid.clone(), binding }),
+    )
+    .unwrap();
+    assert!(detached_data.bindings.is_empty());
     assert!(!crate::support::board_session(reopened.test_internals().board, &sid).unwrap().is_board_worker());
     assert!(reopened.server().ports().voice.is_some(), "started server exposes voice");
     let closed = reopened.router().call_as(Caller::User, "session.closeWorkspace", json!({ "id": sid }));

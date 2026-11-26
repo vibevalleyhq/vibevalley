@@ -11,8 +11,6 @@ export interface ChannelHandlers {
   readonly "channel.message.send": (a: T.SayRequest) => Promise<void>;
   readonly "channel.create": (a: T.ChannelRequest) => Promise<string>;
   readonly "channel.update": (a: { readonly id: string } & T.ChannelUpdate) => Promise<void>;
-  /** The channel what names none goes to from now on: a connector's, a call's. */
-  readonly "channel.default.set": (a: { readonly id: string }) => Promise<void>;
   /** What deleteTask would do, refused as it would be; nothing changes. */
   readonly "channel.message.list": (a: { readonly id: string; readonly before?: number; readonly limit?: number }) => Promise<T.ChatMessage[]>;
   readonly "channel.markRead": (a: { readonly id: string } & T.ChatReadRequest) => Promise<void>;
@@ -69,13 +67,6 @@ export const channelEndpoints: readonly Endpoint[] = [
     input: input({ id: z.string() }, S.ChannelUpdate),
     result: undefined,
     can: ["user", "remote", "orchestrator"],
-  },
-  {
-    op: "channel.default.set",
-    about: ["id"],
-    input: input({ id: z.string() }),
-    result: undefined,
-    can: ["user", "remote"],
   },
   {
     op: "channel.message.list",

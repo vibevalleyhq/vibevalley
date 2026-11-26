@@ -101,18 +101,9 @@ pub const ENDPOINTS: &[Endpoint] = &[
         module: "agent",
         about: &["id"],
         can: &[Caller::User],
-        dry_run: Some("agent.template.previewDelete"),
-        input: Some("AgentDeleteInput"),
-        result: None,
-    },
-    Endpoint {
-        op: "agent.template.previewDelete",
-        module: "agent",
-        about: &["id"],
-        can: &[Caller::User],
         dry_run: None,
         input: Some("AgentDeleteInput"),
-        result: Some("Preview"),
+        result: None,
     },
     Endpoint {
         op: "skill.list",
@@ -146,18 +137,9 @@ pub const ENDPOINTS: &[Endpoint] = &[
         module: "agent",
         about: &["id"],
         can: &[Caller::User],
-        dry_run: Some("skill.previewDelete"),
-        input: Some("SkillDeleteInput"),
-        result: None,
-    },
-    Endpoint {
-        op: "skill.previewDelete",
-        module: "agent",
-        about: &["id"],
-        can: &[Caller::User],
         dry_run: None,
         input: Some("SkillDeleteInput"),
-        result: Some("Preview"),
+        result: None,
     },
     Endpoint {
         op: "runtime.list",
@@ -466,24 +448,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("SessionChildTranscript"),
     },
     Endpoint {
-        op: "session.binding.attach",
-        module: "session",
-        about: &["id"],
-        can: &[Caller::User, Caller::Orchestrator, Caller::Remote],
-        dry_run: None,
-        input: Some("SessionBindingInput"),
-        result: Some("Session"),
-    },
-    Endpoint {
-        op: "session.binding.detach",
-        module: "session",
-        about: &["id"],
-        can: &[Caller::User, Caller::Orchestrator, Caller::Remote],
-        dry_run: None,
-        input: Some("SessionBindingInput"),
-        result: Some("Session"),
-    },
-    Endpoint {
         op: "issue.conversation.get",
         module: "issue",
         about: &["id"],
@@ -709,15 +673,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: None,
     },
     Endpoint {
-        op: "channel.default.set",
-        module: "channel",
-        about: &["id"],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("ChannelDefaultSetInput"),
-        result: None,
-    },
-    Endpoint {
         op: "channel.message.list",
         module: "channel",
         about: &["id"],
@@ -880,15 +835,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("Vec<ChannelUnread>"),
     },
     Endpoint {
-        op: "connector.list",
-        module: "connector",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: None,
-        result: Some("Vec<ConnectorStatus>"),
-    },
-    Endpoint {
         op: "connector.login",
         module: "connector",
         about: &["id"],
@@ -923,24 +869,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         dry_run: None,
         input: Some("ConnectorChannelSetInput"),
         result: Some("ConnectorStatus"),
-    },
-    Endpoint {
-        op: "game.achievement.list",
-        module: "game",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: None,
-        result: Some("AchievementList"),
-    },
-    Endpoint {
-        op: "game.title.set",
-        module: "game",
-        about: &[],
-        can: &[Caller::User, Caller::Remote],
-        dry_run: None,
-        input: Some("ChooseTitleRequest"),
-        result: None,
     },
     Endpoint {
         op: "media.dialogue.create",
@@ -1021,15 +949,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         can: &[Caller::User],
         dry_run: None,
         input: Some("MediaInputAdoptInput"),
-        result: Some("MediaInput"),
-    },
-    Endpoint {
-        op: "media.input.get",
-        module: "media",
-        about: &["id"],
-        can: &[Caller::User],
-        dry_run: None,
-        input: Some("MediaJobRequest"),
         result: Some("MediaInput"),
     },
     Endpoint {
@@ -1114,20 +1033,11 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("MediaSpeechJob"),
     },
     Endpoint {
-        op: "media.understanding.previewCleanup",
-        module: "media",
-        about: &["id"],
-        can: &[Caller::User],
-        dry_run: None,
-        input: Some("MediaJobRequest"),
-        result: Some("Preview"),
-    },
-    Endpoint {
         op: "media.understanding.cleanup",
         module: "media",
         about: &["id"],
         can: &[Caller::User],
-        dry_run: Some("media.understanding.previewCleanup"),
+        dry_run: None,
         input: Some("MediaJobRequest"),
         result: Some("MediaUnderstandingJob"),
     },
@@ -1699,24 +1609,6 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("DebugTrajectoryDetail"),
     },
     Endpoint {
-        op: "debug.graph",
-        module: "debug",
-        about: &[],
-        can: &[Caller::User],
-        dry_run: None,
-        input: None,
-        result: Some("DebugGraph"),
-    },
-    Endpoint {
-        op: "debug.override.get",
-        module: "debug",
-        about: &[],
-        can: &[Caller::User],
-        dry_run: None,
-        input: None,
-        result: Some("DebugOverrideConfig"),
-    },
-    Endpoint {
         op: "debug.override.set",
         module: "debug",
         about: &[],
@@ -1887,13 +1779,6 @@ pub mod ops {
         type Input = t::AgentDeleteInput;
         type Result = ();
     }
-    /// What deleting the template would do, refused as it would be; nothing changes.
-    pub struct AgentTemplatePreviewDelete;
-    impl Op for AgentTemplatePreviewDelete {
-        const NAME: &'static str = "agent.template.previewDelete";
-        type Input = t::AgentDeleteInput;
-        type Result = t::Preview;
-    }
     pub struct SkillList;
     impl Op for SkillList {
         const NAME: &'static str = "skill.list";
@@ -1918,13 +1803,6 @@ pub mod ops {
         const NAME: &'static str = "skill.delete";
         type Input = t::SkillDeleteInput;
         type Result = ();
-    }
-    /// What delete would do, refused as it would be; nothing changes.
-    pub struct SkillPreviewDelete;
-    impl Op for SkillPreviewDelete {
-        const NAME: &'static str = "skill.previewDelete";
-        type Input = t::SkillDeleteInput;
-        type Result = t::Preview;
     }
     pub struct RuntimeList;
     impl Op for RuntimeList {
@@ -2144,20 +2022,6 @@ pub mod ops {
         type Input = t::SessionChildTranscriptInput;
         type Result = t::SessionChildTranscript;
     }
-    /// Attaches a context reference to an existing session.
-    pub struct SessionBindingAttach;
-    impl Op for SessionBindingAttach {
-        const NAME: &'static str = "session.binding.attach";
-        type Input = t::SessionBindingInput;
-        type Result = t::Session;
-    }
-    /// Detaches a context reference from an existing session.
-    pub struct SessionBindingDetach;
-    impl Op for SessionBindingDetach {
-        const NAME: &'static str = "session.binding.detach";
-        type Input = t::SessionBindingInput;
-        type Result = t::Session;
-    }
     pub struct IssueConversationGet;
     impl Op for IssueConversationGet {
         const NAME: &'static str = "issue.conversation.get";
@@ -2320,13 +2184,6 @@ pub mod ops {
         type Input = t::ChannelUpdateInput;
         type Result = ();
     }
-    /// The channel what names none goes to from now on: a connector's, a call's.
-    pub struct ChannelDefaultSet;
-    impl Op for ChannelDefaultSet {
-        const NAME: &'static str = "channel.default.set";
-        type Input = t::ChannelDefaultSetInput;
-        type Result = ();
-    }
     /// What deleteTask would do, refused as it would be; nothing changes.
     pub struct ChannelMessageList;
     impl Op for ChannelMessageList {
@@ -2450,12 +2307,6 @@ pub mod ops {
         type Input = ();
         type Result = Vec<t::ChannelUnread>;
     }
-    pub struct ConnectorList;
-    impl Op for ConnectorList {
-        const NAME: &'static str = "connector.list";
-        type Input = ();
-        type Result = Vec<t::ConnectorStatus>;
-    }
     pub struct ConnectorLogin;
     impl Op for ConnectorLogin {
         const NAME: &'static str = "connector.login";
@@ -2479,19 +2330,6 @@ pub mod ops {
         const NAME: &'static str = "connector.channel.set";
         type Input = t::ConnectorChannelSetInput;
         type Result = t::ConnectorStatus;
-    }
-    /// Every achievement and its current standing.
-    pub struct GameAchievementList;
-    impl Op for GameAchievementList {
-        const NAME: &'static str = "game.achievement.list";
-        type Input = ();
-        type Result = t::AchievementList;
-    }
-    pub struct GameTitleSet;
-    impl Op for GameTitleSet {
-        const NAME: &'static str = "game.title.set";
-        type Input = t::ChooseTitleRequest;
-        type Result = ();
     }
     pub struct MediaDialogueCreate;
     impl Op for MediaDialogueCreate {
@@ -2548,12 +2386,6 @@ pub mod ops {
         type Input = t::MediaInputAdoptInput;
         type Result = t::MediaInput;
     }
-    pub struct MediaInputGet;
-    impl Op for MediaInputGet {
-        const NAME: &'static str = "media.input.get";
-        type Input = t::MediaJobRequest;
-        type Result = t::MediaInput;
-    }
     pub struct MediaInputList;
     impl Op for MediaInputList {
         const NAME: &'static str = "media.input.list";
@@ -2607,12 +2439,6 @@ pub mod ops {
         const NAME: &'static str = "media.speech.resume";
         type Input = t::MediaJobRequest;
         type Result = t::MediaSpeechJob;
-    }
-    pub struct MediaUnderstandingPreviewCleanup;
-    impl Op for MediaUnderstandingPreviewCleanup {
-        const NAME: &'static str = "media.understanding.previewCleanup";
-        type Input = t::MediaJobRequest;
-        type Result = t::Preview;
     }
     pub struct MediaUnderstandingCleanup;
     impl Op for MediaUnderstandingCleanup {
@@ -3035,18 +2861,6 @@ pub mod ops {
         type Input = t::DebugTrajectoryGetRequest;
         type Result = t::DebugTrajectoryDetail;
     }
-    pub struct DebugGraph;
-    impl Op for DebugGraph {
-        const NAME: &'static str = "debug.graph";
-        type Input = ();
-        type Result = t::DebugGraph;
-    }
-    pub struct DebugOverrideGet;
-    impl Op for DebugOverrideGet {
-        const NAME: &'static str = "debug.override.get";
-        type Input = ();
-        type Result = t::DebugOverrideConfig;
-    }
     pub struct DebugOverrideSet;
     impl Op for DebugOverrideSet {
         const NAME: &'static str = "debug.override.set";
@@ -3266,12 +3080,10 @@ endpoint_ids! {
     AgentTemplateUpdate => "agent.template.update",
     AgentTemplateAdd => "agent.template.add",
     AgentTemplateDelete => "agent.template.delete",
-    AgentTemplatePreviewDelete => "agent.template.previewDelete",
     SkillList => "skill.list",
     SkillCreate => "skill.create",
     SkillUpdate => "skill.update",
     SkillDelete => "skill.delete",
-    SkillPreviewDelete => "skill.previewDelete",
     // runtime
     RuntimeList => "runtime.list",
     RuntimeRefresh => "runtime.refresh",
@@ -3310,8 +3122,6 @@ endpoint_ids! {
     SessionRespondInteraction => "session.respondInteraction",
     SessionSetConfig => "session.setConfig",
     SessionChildTranscript => "session.childTranscript",
-    SessionBindingAttach => "session.binding.attach",
-    SessionBindingDetach => "session.binding.detach",
     // issue
     IssueConversationGet => "issue.conversation.get",
     IssueCommentCreate => "issue.comment.create",
@@ -3340,7 +3150,6 @@ endpoint_ids! {
     ChannelMessageSend => "channel.message.send",
     ChannelCreate => "channel.create",
     ChannelUpdate => "channel.update",
-    ChannelDefaultSet => "channel.default.set",
     ChannelMessageList => "channel.message.list",
     ChannelMarkRead => "channel.markRead",
     ChannelMessageUpdate => "channel.message.update",
@@ -3360,14 +3169,10 @@ endpoint_ids! {
     ChannelList => "channel.list",
     ChannelUnreadList => "channel.unread.list",
     // connector
-    ConnectorList => "connector.list",
     ConnectorLogin => "connector.login",
     ConnectorVerify => "connector.verify",
     ConnectorLogout => "connector.logout",
     ConnectorChannelSet => "connector.channel.set",
-    // game
-    GameAchievementList => "game.achievement.list",
-    GameTitleSet => "game.title.set",
     // media & library
     MediaDialogueCreate => "media.dialogue.create",
     MediaVoiceDesignCreate => "media.voiceDesign.create",
@@ -3378,7 +3183,6 @@ endpoint_ids! {
     MediaAudioCleanup => "media.audio.cleanup",
     MediaInputCreate => "media.input.create",
     MediaInputAdopt => "media.input.adopt",
-    MediaInputGet => "media.input.get",
     MediaInputList => "media.input.list",
     MediaInputDelete => "media.input.delete",
     MediaInputPreviewDelete => "media.input.previewDelete",
@@ -3388,7 +3192,6 @@ endpoint_ids! {
     MediaUnderstandingStart => "media.understanding.start",
     MediaSpeechCreate => "media.speech.create",
     MediaSpeechResume => "media.speech.resume",
-    MediaUnderstandingPreviewCleanup => "media.understanding.previewCleanup",
     MediaUnderstandingCleanup => "media.understanding.cleanup",
     MediaJobGet => "media.job.get",
     MediaJobCancel => "media.job.cancel",
@@ -3459,8 +3262,6 @@ endpoint_ids! {
     DebugTimelineClear => "debug.timeline.clear",
     DebugTrajectoryList => "debug.trajectory.list",
     DebugTrajectoryGet => "debug.trajectory.get",
-    DebugGraph => "debug.graph",
-    DebugOverrideGet => "debug.override.get",
     DebugOverrideSet => "debug.override.set",
     DebugBundleExport => "debug.bundle.export",
     // remote & machine

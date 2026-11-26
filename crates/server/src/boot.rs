@@ -3,6 +3,7 @@
 //! cross-domain event bridges (chat→artifact and runtime/chat→farm skin).
 
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
 use tokio::sync::broadcast;
@@ -14,34 +15,83 @@ use vibevalley_runtime::oar::Registry;
 
 use crate::agent::{Agent, Profile};
 use crate::channel::{ChannelMessageEvent, Chat};
-use crate::config::{Config, StartError};
-use crate::connector::Connector;
+use crate::config::{Config, StartError, StartErrorKind, failed};
+use crate::connector::{Connector, Options as ConnectorOptions};
 use crate::context::api::BoxFuture;
 use crate::context::port::CronOrchestratorPort;
 use crate::context::{Context, Fetch, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use crate::cron::Scheduler as CronScheduler;
 use crate::game::Game;
-use crate::issue::{Board, IssueChat, SessionChat};
+use crate::issue::{Board, IssueChat, Publisher, SessionChat};
 use crate::runtime::{OUTBOX_SESSION_REPORTED, OutboxSessionReported, Runtime, SessionLifecycleEvent};
+use crate::service::{DbError, Service};
 use crate::setting::Setting;
+use crate::voice::moss::Realtime;
+
+/// Domain-level test and embedding overrides supplied at server composition time.
+#[derive(Clone, Default)]
+pub struct Overrides {
+    /// Optional hosted-branch publisher override (offline tests).
+    pub publisher: Option<Arc<Publisher>>,
+    /// External chat app connector configuration override.
+    pub connector: Option<ConnectorOptions>,
+    /// Optional MOSS realtime probe override for offline voice tests.
+    pub voice_realtime: Option<Arc<dyn Realtime>>,
+}
+
+pub(crate) fn apply_env_overrides(config: &mut Config) {
+    if config.registry.is_none() && config.model_client.is_none() && std::env::var("VIBEVALLEY_TEST_RUNTIMES").ok().as_deref() == Some("1") {
+        let port = std::env::var("VIBEVALLEY_TEST_MODEL_PORT").ok().filter(|v| !v.is_empty());
+        crate::fake::runtime::configure(config, port.as_deref());
+    }
+}
+
+fn start_error_from_db(err: DbError, fallback_path: Option<PathBuf>) -> StartError {
+    let (kind, message, detail, db_path) = match err.schema_mismatch() {
+        Some(r) => (
+            StartErrorKind::DatabaseSchema,
+            format!("the database: {r}"),
+            Some(r.format_detail()),
+            r.db_path.clone().or(fallback_path),
+        ),
+        None => (StartErrorKind::Database, format!("the database: {err}"), None, fallback_path),
+    };
+    StartError {
+        kind,
+        message,
+        detail,
+        db_path,
+    }
+}
+
+pub(crate) async fn open_service(config: &Config) -> Result<Arc<Service>, StartError> {
+    tokio::fs::create_dir_all(&config.home).await.map_err(|e| failed("the home")(&e))?;
+    for dir in [config.work_root.clone(), config.work_root.join("repos"), config.work_root.join("worktrees")] {
+        tokio::fs::create_dir_all(&dir).await.map_err(|e| failed("the work root")(&e))?;
+    }
+    match config.database_url.as_deref() {
+        Some(url) => Box::pin(Service::open_url(url)).await.map_err(|e| start_error_from_db(e, None)),
+        None => Box::pin(Service::open(&config.home))
+            .await
+            .map_err(|e| start_error_from_db(e, Some(config.home.join("server.db")))),
+    }
+}
 
 /// Opens the database service and assembles [`Context`].
 pub(crate) async fn open_context(config: &Config) -> Result<Arc<Context>, StartError> {
-    let service = config.open_service().await?;
+    let service = open_service(config).await?;
     let (http, download): (Arc<dyn Fetch>, Arc<dyn Fetch>) = match &config.media_network {
         Some(network) => network.clone(),
         None if config.offline_media => crate::fake::moss::network(),
         None => (Arc::new(Http), Arc::new(PublicDownload)),
     };
-    let live = Arc::new(LiveState::new());
     let outbox = Arc::new(Outbox::new(service.clone()).with_clock(config.clock.clone()));
-    let feed = Arc::new(StateFeed::new());
     Ok(Arc::new(Context::new(
         service,
         TaskGroup::new(),
-        live,
+        Arc::new(LiveState::new()),
         outbox,
-        feed,
+        Arc::new(StateFeed::new()),
         config.clock.clone(),
         http,
         download,
@@ -146,12 +196,14 @@ pub(crate) fn register_session_reported_outbox(
     cron: &Arc<CronScheduler>,
 ) {
     cron.set_digest_delivery(connector.clone());
-    let ic = Arc::downgrade(issue_chat);
-    let sc = Arc::downgrade(session_chat);
-    let ag = Arc::downgrade(agent);
-    let g = Arc::downgrade(game);
-    let rt = Arc::downgrade(runtime);
-    let conn = Arc::downgrade(connector);
+    let (ic, sc, ag, g, rt, conn) = (
+        Arc::downgrade(issue_chat),
+        Arc::downgrade(session_chat),
+        Arc::downgrade(agent),
+        Arc::downgrade(game),
+        Arc::downgrade(runtime),
+        Arc::downgrade(connector),
+    );
     ctx.outbox.register(OUTBOX_SESSION_REPORTED, move |delivery| {
         let (ic, sc, ag, g, rt, conn) = (ic.clone(), sc.clone(), ag.clone(), g.clone(), rt.clone(), conn.clone());
         async move {
@@ -163,16 +215,16 @@ pub(crate) fn register_session_reported_outbox(
                 sc.handle_report_async(&report).await;
             }
             if let Some(rt) = rt.upgrade()
-                && let Some(reported_session) = rt.session_async(&report.id).await
+                && let Some(reported) = rt.session_async(&report.id).await
             {
                 if let Some(ag) = ag.upgrade() {
-                    ag.memory.keep_session_reported_async(&reported_session).await;
+                    ag.memory.keep_session_reported_async(&reported).await;
                     ag.profile
                         .fleet
-                        .on_session_reported(&reported_session.runtime, report.spent.as_ref().and_then(|s| s.cny).map(|n| n.0));
+                        .on_session_reported(&reported.runtime, report.spent.as_ref().and_then(|s| s.cny).map(|n| n.0));
                 }
                 if let Some(g) = g.upgrade() {
-                    g.on_session_reported(&reported_session, report.outcome);
+                    g.on_session_reported(&reported, report.outcome);
                 }
             }
             if let Some(conn) = conn.upgrade() {
@@ -183,26 +235,26 @@ pub(crate) fn register_session_reported_outbox(
     });
 }
 
+fn index_sessions(sessions: Vec<vibevalley_protocol::Session>, known: &mut HashMap<String, vibevalley_protocol::Session>, working: &mut HashSet<String>) {
+    known.clear();
+    working.clear();
+    for s in sessions {
+        if s.phase.is_working() {
+            working.insert(s.id.clone());
+        }
+        known.insert(s.id.clone(), s);
+    }
+}
+
 pub(crate) async fn spawn_skin_event_bridge(ctx: &Context, game: &Arc<Game>, runtime: &Arc<Runtime>, channel: &Arc<Chat>) {
-    let mut session_rx = runtime.subscribe_events();
-    let mut doing_rx = runtime.subscribe_doing();
-    let mut message_rx = channel.subscribe_message_events();
+    let (mut session_rx, mut doing_rx, mut message_rx) = (runtime.subscribe_events(), runtime.subscribe_doing(), channel.subscribe_message_events());
     let initial_sessions = runtime.list_async().await;
     game.seed_sessions(&initial_sessions);
-
-    let game = Arc::downgrade(game);
-    let runtime_ref = Arc::downgrade(runtime);
-    let cancel = ctx.task.child_token();
+    let (game, runtime_ref, cancel) = (Arc::downgrade(game), Arc::downgrade(runtime), ctx.task.child_token());
 
     ctx.spawn("game.event_bridge", async move {
-        let mut known_sessions: HashMap<String, vibevalley_protocol::Session> = HashMap::new();
-        let mut was_working: HashSet<String> = HashSet::new();
-        for s in initial_sessions {
-            if s.phase.is_working() {
-                was_working.insert(s.id.clone());
-            }
-            known_sessions.insert(s.id.clone(), s);
-        }
+        let (mut known_sessions, mut was_working) = (HashMap::new(), HashSet::new());
+        index_sessions(initial_sessions, &mut known_sessions, &mut was_working);
         loop {
             tokio::select! {
                 biased;
@@ -210,87 +262,43 @@ pub(crate) async fn spawn_skin_event_bridge(ctx: &Context, game: &Arc<Game>, run
                 ev = session_rx.recv() => match ev {
                     Ok(SessionLifecycleEvent::Changed(session)) => {
                         let Some(g) = game.upgrade() else { return };
-                        let existed = known_sessions.contains_key(&session.id);
                         let others: Vec<&vibevalley_protocol::Session> = known_sessions.values().filter(|s| s.id != session.id).collect();
-                        if !existed {
-                            g.on_session_hired(&session, &others);
-                        } else {
-                            g.on_session_changed(&session, &others);
-                        }
+                        if known_sessions.contains_key(&session.id) { g.on_session_changed(&session, &others); } else { g.on_session_hired(&session, &others); }
                         match &session.phase {
                             Phase::Working(w) => {
-                                let was = was_working.contains(&session.id);
-                                g.on_session_working(&session, was, &w.doing);
+                                g.on_session_working(&session, was_working.contains(&session.id), &w.doing);
                                 was_working.insert(session.id.clone());
                             }
-                            Phase::Done(_) | Phase::Failed(_) | Phase::Resting(_) | Phase::Closed(_) => {
-                                was_working.remove(&session.id);
-                            }
+                            Phase::Done(_) | Phase::Failed(_) | Phase::Resting(_) | Phase::Closed(_) => { was_working.remove(&session.id); }
                         }
                         known_sessions.insert(session.id.clone(), *session);
                     }
-                    Ok(SessionLifecycleEvent::Left {
-                        id,
-                        closed,
-                        merged_commits,
-                        ..
-                    }) => {
+                    Ok(SessionLifecycleEvent::Left { id, closed, merged_commits, .. }) => {
                         was_working.remove(&id);
                         if let Some(g) = game.upgrade() {
-                            if let Some(removed) = known_sessions.remove(&id) {
-                                g.on_session_left(&removed, closed, merged_commits);
-                            } else {
-                                g.remove_play(&id);
-                            }
+                            if let Some(removed) = known_sessions.remove(&id) { g.on_session_left(&removed, closed, merged_commits); } else { g.remove_play(&id); }
                         }
                     }
-                    Err(broadcast::error::RecvError::Lagged(_)) => {
-                        if let Some(rt) = runtime_ref.upgrade() {
-                            let current = rt.list_async().await;
-                            if let Some(g) = game.upgrade() {
-                                g.seed_sessions(&current);
-                            }
-                            known_sessions.clear();
-                            was_working.clear();
-                            for s in current {
-                                if s.phase.is_working() {
-                                    was_working.insert(s.id.clone());
-                                }
-                                known_sessions.insert(s.id.clone(), s);
-                            }
-                        }
-                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => if let Some(rt) = runtime_ref.upgrade() {
+                        let current = rt.list_async().await;
+                        if let Some(g) = game.upgrade() { g.seed_sessions(&current); }
+                        index_sessions(current, &mut known_sessions, &mut was_working);
+                    },
                     Err(broadcast::error::RecvError::Closed) => return,
                 },
                 ev = doing_rx.recv() => match ev {
-                    Ok((id, at, doing)) => {
-                        let Some(g) = game.upgrade() else { return };
-                        if let Some(session) = known_sessions.get(&id) {
-                            g.on_session_doing(session, at, &doing);
-                        }
-                    }
+                    Ok((id, at, doing)) => if let (Some(g), Some(s)) = (game.upgrade(), known_sessions.get(&id)) { g.on_session_doing(s, at, &doing); },
                     Err(broadcast::error::RecvError::Lagged(_)) => {}
                     Err(broadcast::error::RecvError::Closed) => return,
                 },
                 ev = message_rx.recv() => match ev {
                     Ok(ChannelMessageEvent::Posted { message, thread_issue_id, answers }) => {
                         let Some(g) = game.upgrade() else { return };
-                        let thread_worker = thread_issue_id.as_deref().and_then(|iid| {
-                            known_sessions
-                                .values()
-                                .find(|s| s.is_board_worker() && s.issue_id() == Some(iid))
-                                .map(|s| s.id.as_str())
-                        });
-                        let mentioned_sessions: Vec<String> = message
-                            .mentions
-                            .iter()
-                            .filter(|m| known_sessions.contains_key(m.as_str()))
-                            .cloned()
-                            .collect();
-                        g.on_message_posted(&message.actor, thread_worker, &mentioned_sessions, answers.is_some());
+                        let thread_worker = thread_issue_id.as_deref().and_then(|iid| known_sessions.values().find(|s| s.is_board_worker() && s.issue_id() == Some(iid)).map(|s| s.id.as_str()));
+                        let mentioned: Vec<String> = message.mentions.iter().filter(|m| known_sessions.contains_key(m.as_str())).cloned().collect();
+                        g.on_message_posted(&message.actor, thread_worker, &mentioned, answers.is_some());
                     }
-                    Ok(ChannelMessageEvent::Edited(_)) => {}
-                    Err(broadcast::error::RecvError::Lagged(_)) => {}
+                    Ok(ChannelMessageEvent::Edited(_)) | Err(broadcast::error::RecvError::Lagged(_)) => {}
                     Err(broadcast::error::RecvError::Closed) => return,
                 }
             }

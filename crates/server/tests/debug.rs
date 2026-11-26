@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use vibevalley_core::SliceMask;
 use vibevalley_protocol::{
-    BizCode, Caller, ContextRef, DebugBundleResult, DebugGraph, DebugOverrideConfig, DebugSnapshot, DebugTimelineEvent, DebugTimelineLane, DebugTimelinePage,
+    BizCode, Caller, ContextRef, DebugBundleResult, DebugOverrideConfig, DebugSnapshot, DebugTimelineEvent, DebugTimelineLane, DebugTimelinePage,
     DebugTrajectoryDetail, DebugTrajectoryKind, DebugTrajectorySummary, EventTokens, Execution, ExecutionPolicy, Issue, Phase, Session, SessionAction,
     SessionController, SliceKind,
 };
@@ -125,14 +125,12 @@ fn disabled_by_default_refuses_all_nine_endpoints_and_leaves_hub_unobserved() {
     assert!(!started.router().has_fault_gate(), "disabled server must not attach fault gate");
     assert!(!vibevalley_runtime::oar::has_observer(), "disabled server must not attach global oar observer");
 
-    let cases: [(&str, Value); 9] = [
+    let cases: [(&str, Value); 7] = [
         ("debug.snapshot", json!({})),
         ("debug.timeline.list", json!({})),
         ("debug.timeline.clear", json!({})),
         ("debug.trajectory.list", json!({})),
         ("debug.trajectory.get", json!({ "id": "orchestrator" })),
-        ("debug.graph", json!({})),
-        ("debug.override.get", json!({})),
         ("debug.override.set", json!({ "rpcDelayMs": 0, "sliceDelayMs": 0 })),
         ("debug.bundle.export", json!({})),
     ];
@@ -448,12 +446,12 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
     assert_eq!(cfg.disconnect_topic.as_deref(), Some("slice:board"));
 
     let t_debug = Instant::now();
-    let get_env = started.router().call_as(Caller::User, "debug.override.get", json!({}));
+    let get_env = started.router().call_as(Caller::User, "debug.snapshot", json!({}));
     let debug_elapsed = t_debug.elapsed();
     assert_eq!(get_env.biz_code, 0);
     assert!(
         debug_elapsed < Duration::from_millis(30),
-        "debug.override.get must not be delayed (took {debug_elapsed:?})"
+        "debug.snapshot must not be delayed (took {debug_elapsed:?})"
     );
 
     let t_normal = Instant::now();
@@ -485,8 +483,8 @@ fn fault_gate_delays_normal_ops_without_delaying_or_recording_debug_ops() {
     assert_eq!(gate.delay_ms("debug.snapshot"), 0);
     assert!(gate.should_disconnect("slice:board"));
     assert!(!gate.should_disconnect("slice:board"), "disconnect_topic must be one-shot");
-    let after_cfg: DebugOverrideConfig = serde_json::from_value(started.router().call_as(Caller::User, "debug.override.get", json!({})).data.unwrap()).unwrap();
-    assert_eq!(after_cfg.disconnect_topic, None);
+    let snap_after: DebugSnapshot = serde_json::from_value(started.router().call_as(Caller::User, "debug.snapshot", json!({})).data.unwrap()).unwrap();
+    assert_eq!(snap_after.overrides.disconnect_topic, None);
 
     started.router().call_as(
         Caller::User,
@@ -721,13 +719,12 @@ fn trajectory_inspector_covers_issue_workspace_and_orchestrator_with_voyage_toke
 
     let base_board_watchers = started.router().slice_watcher_counts().get("board").copied().unwrap_or(0);
     let _board_watch = started.ctx().feed.subscribe(SliceKind::Board);
-    let graph: DebugGraph = serde_json::from_value(started.router().call_as(Caller::User, "debug.graph", json!({})).data.unwrap()).unwrap();
-    let g_issue = graph.sessions.iter().find(|s| s.session_id == "sess-issue-1").unwrap();
+
+    let snap: DebugSnapshot = serde_json::from_value(started.router().call_as(Caller::User, "debug.snapshot", json!({})).data.unwrap()).unwrap();
+    let g_issue = snap.graph.sessions.iter().find(|s| s.session_id == "sess-issue-1").unwrap();
     assert_eq!(g_issue.issue_id, Some(7));
     assert_eq!(g_issue.kind, DebugTrajectoryKind::IssueSession);
     assert_eq!(g_issue.status, "working");
-
-    let snap: DebugSnapshot = serde_json::from_value(started.router().call_as(Caller::User, "debug.snapshot", json!({})).data.unwrap()).unwrap();
     assert_eq!(snap.state_cache.slice_seqs.len(), 6);
     assert_eq!(snap.state_cache.slice_watchers.get("board"), Some(&(base_board_watchers + 1)));
     assert_eq!(snap.state_cache.counts.issues, 1);

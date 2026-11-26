@@ -455,8 +455,9 @@ async function verifyOldContent(c: Client, ids: SeedIds): Promise<void> {
   );
   const downloaded = Buffer.from(AttachmentGet.parse(c.cli("attachment", "get", ids.attachment)).data, "base64");
   assert(createHash("sha256").update(downloaded).digest("hex") === ids.attachment, "attachment sha256 mismatch");
-  const mediaInput = MediaInput.parse(await c.call("media.input.get", { id: ids.mediaInput }));
-  assert(mediaInput.hash === ids.attachment, "mediaInput hash mismatch");
+  const mediaInputs = z.array(MediaInput).parse(c.cli("media", "input", "list"));
+  const mediaInput = mediaInputs.find((item) => item.id === ids.mediaInput);
+  assert(mediaInput !== undefined && mediaInput.hash === ids.attachment, "mediaInput hash mismatch");
   const job = MediaJob.parse(c.cli("media", "job", "show", ids.mediaJob));
   assert(job.phase === ids.mediaPhase && job.attachment?.id === ids.generatedAttachment, "mediaJob mismatch");
   const crons = z.array(IdObj).parse(c.cli("cron", "list"));
@@ -508,8 +509,8 @@ function seedConnectorFixture(dbPath: string): void {
 }
 
 async function verifyConnector(c: Client, live: string): Promise<void> {
-  const connectors = z.array(ConnectorRow).parse(await c.call("connector.list"));
-  const qq = connectors.find((x) => x.id === "qq");
+  const collab = z.object({ connectors: z.array(ConnectorRow) }).parse(c.cli("state", "--slice", "collab"));
+  const qq = collab.connectors.find((x) => x.id === "qq");
   assert(qq !== undefined && qq.state === "paused" && qq.pending === 1, JSON.stringify(qq));
   const path = join(live, "home/server.db");
   const reportRow = readDb(path, "SELECT id FROM channel_message WHERE kind='report' ORDER BY created_at LIMIT 1", (r) =>

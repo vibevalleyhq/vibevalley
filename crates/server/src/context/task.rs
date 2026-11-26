@@ -46,7 +46,7 @@ impl TaskGroup {
     }
 
     /// Root cancellation token for this group.
-    pub fn token(&self) -> CancellationToken {
+    pub(super) fn token(&self) -> CancellationToken {
         self.inner.token.clone()
     }
 
@@ -82,7 +82,8 @@ impl TaskGroup {
     }
 
     /// Number of currently tracked active tasks.
-    pub fn task_count(&self) -> usize {
+    #[cfg(test)]
+    fn task_count(&self) -> usize {
         self.inner.tasks.len()
     }
 
@@ -123,23 +124,9 @@ impl TaskGroup {
             .spawn_blocking_on(move || tracing::dispatcher::with_default(&dispatch, || span.in_scope(func)), &handle)
     }
 
-    /// Spawns a tracked blocking closure annotated with a `task` tracing span named `name`.
-    pub fn spawn_blocking_named<F, R>(&self, name: &'static str, func: F) -> JoinHandle<R>
-    where
-        F: FnOnce() -> R + Send + 'static,
-        R: Send + 'static,
-    {
-        let handle = vibevalley_runtime::rt::current_or_global_handle();
-        let dispatch = tracing::dispatcher::get_default(|d| d.clone());
-        let span = tracing::debug_span!("task", name);
-        self.inner
-            .tasks
-            .spawn_blocking_on(move || tracing::dispatcher::with_default(&dispatch, || span.in_scope(func)), &handle)
-    }
-
     /// Spawns a cancelable periodic ticker waiting `interval` before the first tick.
     /// The ticker stops when the group cancels, `Ticker::stop` is called, or `tick` returns `false`.
-    pub fn every<F, Fut>(&self, name: &'static str, interval: Duration, tick: F) -> Ticker
+    pub(super) fn every<F, Fut>(&self, name: &'static str, interval: Duration, tick: F) -> Ticker
     where
         F: FnMut() -> Fut + Send + 'static,
         Fut: Future<Output = bool> + Send + 'static,
@@ -168,7 +155,7 @@ impl TaskGroup {
 
     /// Cancels the root token, closes the task tracker, and awaits up to `grace` for all tracked
     /// tasks to finish. Returns `true` if all tasks drained within `grace`.
-    pub async fn shutdown(&self, grace: Duration) -> bool {
+    pub(super) async fn shutdown(&self, grace: Duration) -> bool {
         self.inner.token.cancel();
         self.inner.tasks.close();
         if tokio::time::timeout(grace, self.inner.tasks.wait()).await.is_ok() {

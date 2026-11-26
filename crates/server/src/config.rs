@@ -8,12 +8,9 @@ use vibevalley_runtime::agent::ModelClient;
 use vibevalley_runtime::agent::extensions::governance::Permissions;
 use vibevalley_runtime::oar::Registry;
 
-use crate::connector::Options as ConnectorOptions;
 use crate::context::Fetch;
 use crate::context::api::SharedHostDebug;
-use crate::issue::Publisher;
 use crate::log::SharedInvokeObserver;
-use crate::voice::moss::Realtime;
 
 /// Server configuration read from environment or test harness.
 #[derive(Clone)]
@@ -32,8 +29,6 @@ pub struct Config {
     pub tool_permissions: Permissions,
     /// Probe every runtime at boot in the background.
     pub probe_runtimes: bool,
-    /// Optional hosted-branch publisher override (offline tests).
-    pub publisher: Option<Arc<Publisher>>,
     /// Poll open PRs every N seconds (`None` disables the background poller).
     pub poll_pulls: Option<u64>,
     /// Runs due crons every 20 s.
@@ -50,14 +45,10 @@ pub struct Config {
     pub model_client: Option<Arc<dyn ModelClient>>,
     /// Whether orchestrator listens to incoming channel dispatches.
     pub orchestrator_listens: bool,
-    /// External chat app connector configuration.
-    pub connector: ConnectorOptions,
     /// Enables DevTools diagnostics (`debug.*` endpoints, timeline observer, fault gate).
     pub debug_enabled: bool,
     /// Optional GPUI shell debug bridge attached at startup (immutable on [`crate::Router`]).
     pub host_debug: Option<SharedHostDebug>,
-    /// Optional MOSS realtime probe override for offline voice tests.
-    pub voice_realtime: Option<Arc<dyn Realtime>>,
     /// Optional RPC invoke observer override for telemetry tests.
     pub invoke_observer: Option<SharedInvokeObserver>,
     /// Optional database URL overriding `<home>/server.db`.
@@ -91,7 +82,6 @@ impl Config {
             registry: None,
             tool_permissions: Permissions::default(),
             probe_runtimes: true,
-            publisher: None,
             poll_pulls: None,
             tick_crons: true,
             link_previews: true,
@@ -100,10 +90,8 @@ impl Config {
             offline_media: false,
             media_network: None,
             orchestrator_listens: true,
-            connector: ConnectorOptions::default(),
             debug_enabled: false,
             host_debug: None,
-            voice_realtime: None,
             invoke_observer: None,
             database_url: None,
             clock: vibevalley_core::system_clock(),
@@ -120,7 +108,7 @@ impl Config {
                 .unwrap_or_default()
         };
         let home = home.into();
-        let mut config = Config {
+        Config {
             work_root: Self::default_work_root(),
             version: version.into(),
             deepseek_api_key: env_str("DEEPSEEK_API_KEY").unwrap_or_default(),
@@ -130,11 +118,7 @@ impl Config {
             debug_enabled: env_str("VIBEVALLEY_DEBUG").as_deref() == Some("1"),
             database_url: env_str("VIBEVALLEY_DATABASE_URL"),
             ..Self::under(home)
-        };
-        if env_str("VIBEVALLEY_TEST_RUNTIMES").as_deref() == Some("1") {
-            crate::fake::runtime::configure(&mut config, env_str("VIBEVALLEY_TEST_MODEL_PORT").as_deref());
         }
-        config
     }
 }
 
@@ -163,23 +147,6 @@ impl StartError {
             db_path: None,
         }
     }
-
-    pub(crate) fn from_db_error(err: crate::service::DbError, fallback_path: Option<PathBuf>) -> Self {
-        if let Some(report) = err.schema_mismatch() {
-            return Self {
-                kind: StartErrorKind::DatabaseSchema,
-                message: format!("the database: {report}"),
-                detail: Some(report.format_detail()),
-                db_path: report.db_path.clone().or(fallback_path),
-            };
-        }
-        Self {
-            kind: StartErrorKind::Database,
-            message: format!("the database: {err}"),
-            detail: None,
-            db_path: fallback_path,
-        }
-    }
 }
 
 impl std::fmt::Display for StartError {
@@ -197,21 +164,4 @@ pub(crate) fn failed(what: &str) -> impl Fn(&dyn std::fmt::Display) -> StartErro
         StartErrorKind::Boot
     };
     move |e| StartError::new(kind, format!("{what}: {e}"))
-}
-
-impl Config {
-    pub(crate) async fn open_service(&self) -> Result<std::sync::Arc<crate::service::Service>, StartError> {
-        tokio::fs::create_dir_all(&self.home).await.map_err(|e| failed("the home")(&e))?;
-        for dir in [self.work_root.clone(), self.work_root.join("repos"), self.work_root.join("worktrees")] {
-            tokio::fs::create_dir_all(&dir).await.map_err(|e| failed("the work root")(&e))?;
-        }
-        match self.database_url.as_deref() {
-            Some(url) => Box::pin(crate::service::Service::open_url(url))
-                .await
-                .map_err(|e| StartError::from_db_error(e, None)),
-            None => Box::pin(crate::service::Service::open(&self.home))
-                .await
-                .map_err(|e| StartError::from_db_error(e, Some(self.home.join("server.db")))),
-        }
-    }
 }

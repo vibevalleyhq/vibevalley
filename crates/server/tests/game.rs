@@ -3,9 +3,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use serde_json::json;
 use vibevalley_core::game::progress::harvest_coins;
-use vibevalley_protocol::{Caller, LedgerEntry, LedgerEntryHarvested, Repo as ProtocolRepo};
+use vibevalley_protocol::{LedgerEntry, LedgerEntryHarvested, Repo as ProtocolRepo};
 use vibevalley_server::context::{Context, Http, LiveState, Outbox, PublicDownload, StateFeed, TaskGroup};
 use vibevalley_server::game::Game;
 use vibevalley_server::repo::Repo;
@@ -56,14 +55,6 @@ fn the_ledger_folds_back_through_a_restart_and_skips_what_it_cannot_read() {
             (progress.counts.get("farm_level").copied().unwrap_or(0) > 1).then_some(progress)
         });
         assert!(p.counts.get("farm_level").copied().unwrap_or(0) > 1, "{:?}", p.counts);
-        let titled = app
-            .router()
-            .call_as(Caller::User, "game.title.set", json!({ "achievement": "harvests", "tier": 1 }));
-        assert!(titled.error.is_none(), "{}", titled.message);
-        let list = app.router().call_as(Caller::User, "game.achievement.list", json!(null)).data.unwrap();
-        let parsed: vibevalley_protocol::AchievementList = serde_json::from_value(list).unwrap();
-        assert!(!parsed.items.is_empty());
-        assert!(!parsed.standings.is_empty());
         let saved = game.progress();
         app.close_blocking();
         saved

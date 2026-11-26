@@ -1544,12 +1544,22 @@ impl Index {
             self.scan_ts_client_file("mac", &clean, &lines, &file.path, &known_ops, &known_subs, &known_modules);
         }
 
-        // 1b. Mac native host (`apps/mac/src/**`) slice subscriptions
+        // 1b. Mac native host (`apps/mac/src/**`) slice subscriptions & RPC calls
         let mac_src_files = walk_matching_files(root, &["apps/mac/src"], |rel| rel.ends_with(".rs"))?;
+        let mut mac_excluded = BTreeSet::new();
+        for f in &mac_src_files {
+            let no_lit = strip_rust_comments_and_literals(&f.text);
+            mac_excluded.extend(strip_cfg_test_and_collect_excluded(&f.text, &no_lit, &f.path).excluded_submodules);
+        }
         for file in mac_src_files {
+            if is_excluded_by_cfg_test(&file.path, &mac_excluded) {
+                continue;
+            }
             let non_code = strip_rust_non_code(&file.text, &file.path);
+            let clean = strip_rust_comments_keep_strings_non_test(&file.text, &file.path);
             let lines = LineIndex::new(&file.text);
             self.scan_rust_slice_kinds("mac-host", &non_code, &lines, &file.path);
+            self.scan_mac_host_calls(&clean, &lines, &file.path, &known_ops);
         }
 
         // 2. Mobile (`apps/mobile/src/**`)
@@ -1574,6 +1584,14 @@ impl Index {
             let clean = strip_rust_comments_keep_strings_non_test(&file.text, &file.path);
             let lines = LineIndex::new(&file.text);
             self.scan_cli_file(&clean, &lines, &file.path, &known_ops);
+        }
+
+        // 4. Built-in agent tool dispatcher (`crates/server/src/agent/tool/dispatch.rs`)
+        let tool_files = walk_matching_files(root, &["crates/server/src/agent/tool"], |rel| rel == "crates/server/src/agent/tool/dispatch.rs")?;
+        for file in tool_files {
+            let clean = strip_rust_comments_keep_strings_non_test(&file.text, &file.path);
+            let lines = LineIndex::new(&file.text);
+            self.scan_agent_tool_dispatch(&clean, &lines, &file.path, &known_ops);
         }
 
         for list in self.client_ops.values_mut() {
@@ -1783,6 +1801,17 @@ impl Index {
                     } else {
                         format!("ops::{variant}")
                     };
+                    if snippet.contains("mutate::")
+                        && let Some(preview_op) = self.op_to_idx.get(&op).and_then(|&idx| self.endpoints[idx].dry_run.clone())
+                    {
+                        self.client_ops.entry(preview_op).or_default().push(ClientCall {
+                            client: "cli".to_owned(),
+                            via: format!("mutate::<ops::{variant}> (--dry-run)"),
+                            file: file.to_owned(),
+                            line,
+                            detail: None,
+                        });
+                    }
                     self.client_ops.entry(op).or_default().push(ClientCall {
                         client: "cli".to_owned(),
                         via,
@@ -1856,6 +1885,69 @@ impl Index {
                 }
                 ac = pos + "SliceArg::".len();
             }
+        }
+    }
+
+    fn scan_mac_host_calls(&mut self, clean: &str, lines: &LineIndex, file: &str, known_ops: &BTreeSet<String>) {
+        for needle in [".call(", ".call_with("] {
+            let mut c = 0usize;
+            while let Some(rel) = clean[c..].find(needle) {
+                let pos = c + rel;
+                let paren = pos + needle.len() - 1;
+                let window_end = clean[paren + 1..].find(';').map_or(clean.len(), |n| paren + 1 + n);
+                let args = &clean[paren + 1..window_end];
+                let mut q = 0usize;
+                while let Some(qrel) = args[q..].find('"') {
+                    let qpos = q + qrel;
+                    if let Some(op) = extract_quoted_at(args, qpos) {
+                        if known_ops.contains(&op) {
+                            let line = lines.line_at(pos);
+                            let via = if needle == ".call(" {
+                                format!("host.call(\"{op}\")")
+                            } else {
+                                format!("host.call_with(\"{op}\")")
+                            };
+                            self.client_ops.entry(op).or_default().push(ClientCall {
+                                client: "mac-host".to_owned(),
+                                via,
+                                file: file.to_owned(),
+                                line,
+                                detail: None,
+                            });
+                            break;
+                        }
+                        q = qpos + op.len() + 2;
+                    } else {
+                        q = qpos + 1;
+                    }
+                }
+                c = paren + 1;
+            }
+        }
+    }
+
+    fn scan_agent_tool_dispatch(&mut self, clean: &str, lines: &LineIndex, file: &str, known_ops: &BTreeSet<String>) {
+        let mut c = 0usize;
+        while let Some(rel) = clean[c..].find('"') {
+            let pos = c + rel;
+            let Some(op) = extract_quoted_at(clean, pos) else {
+                c = pos + 1;
+                continue;
+            };
+            if known_ops.contains(&op) {
+                let line = lines.line_at(pos);
+                let snippet = lines.snippet_at(line);
+                if snippet.contains("typed!(") {
+                    self.client_ops.entry(op.clone()).or_default().push(ClientCall {
+                        client: "agent-tool".to_owned(),
+                        via: format!("tool dispatch \"{op}\""),
+                        file: file.to_owned(),
+                        line,
+                        detail: None,
+                    });
+                }
+            }
+            c = pos + op.len() + 2;
         }
     }
 
@@ -3606,6 +3698,32 @@ mod tests {
 }
 "#,
         );
+        tree.write(
+            "apps/mac/src/shell/panes.rs",
+            r#"
+pub fn close_ws(bridge: &Bridge) {
+    bridge.0.call("session.closeWorkspace".into(), json!({}), |_| {});
+    bridge.0.call("issue.delete".into(), json!({}), |_| {});
+}
+#[cfg(test)]
+mod tests {
+    fn ignored() {
+        bridge.0.call("unused.internal".into(), json!({}), |_| {});
+    }
+}
+"#,
+        );
+        tree.write(
+            "crates/server/src/agent/tool/dispatch.rs",
+            r#"
+fn handler(op: &str) {
+    match op {
+        "issue.delete" => typed!(delete),
+        _ => {}
+    }
+}
+"#,
+        );
 
         tree
     }
@@ -3681,6 +3799,10 @@ mod tests {
         let list_callers = index.client_ops.get("issue.list").expect("issue.list callers");
         let list_clients: BTreeSet<&str> = list_callers.iter().map(|c| c.client.as_str()).collect();
         assert_eq!(list_clients, BTreeSet::from(["cli", "mac", "mobile"]));
+        let delete_clients: BTreeSet<&str> = index.client_ops["issue.delete"].iter().map(|c| c.client.as_str()).collect();
+        assert_eq!(delete_clients, BTreeSet::from(["agent-tool", "cli", "mac-host"]));
+        let preview_clients: BTreeSet<&str> = index.client_ops["issue.previewDelete"].iter().map(|c| c.client.as_str()).collect();
+        assert_eq!(preview_clients, BTreeSet::from(["cli"]));
         assert!(!index.client_ops.contains_key("unused.internal"));
 
         // 6. Orphans & single-client gaps

@@ -96,7 +96,6 @@ export class VibeValleyApi {
   readonly debug = {
     snapshot: (options?: { signal?: AbortSignal }): Promise<T.DebugSnapshot> =>
       this.call<T.DebugSnapshot>("debug.snapshot", "/api/v1/debug/snapshot", undefined, options),
-    graph: (options?: { signal?: AbortSignal }): Promise<T.DebugGraph> => this.call<T.DebugGraph>("debug.graph", "/api/v1/debug/graph", undefined, options),
     timeline: {
       list: (a: T.DebugTimelineQuery, options?: { signal?: AbortSignal }): Promise<T.DebugTimelinePage> =>
         this.call<T.DebugTimelinePage>("debug.timeline.list", "/api/v1/debug/timeline/list", a, options),
@@ -109,8 +108,6 @@ export class VibeValleyApi {
         this.call<T.DebugTrajectoryDetail>("debug.trajectory.get", "/api/v1/debug/trajectory/get", a, options),
     },
     override: {
-      get: (options?: { signal?: AbortSignal }): Promise<T.DebugOverrideConfig> =>
-        this.call<T.DebugOverrideConfig>("debug.override.get", "/api/v1/debug/override/get", undefined, options),
       set: (a: T.DebugOverrideConfig, options?: { signal?: AbortSignal }): Promise<T.DebugOverrideConfig> =>
         this.call<T.DebugOverrideConfig>("debug.override.set", "/api/v1/debug/override/set", a, options),
     },
@@ -220,8 +217,6 @@ export class VibeValleyApi {
       /** A kept attachment (a library item) taken as an input, checked as an upload is. */
       adopt: (a: { attachment: string }, options?: { signal?: AbortSignal }): Promise<T.MediaInput> =>
         this.call<T.MediaInput>("media.input.adopt", "/api/v1/media/input/adopt", a, options),
-      get: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.MediaInput> =>
-        this.call<T.MediaInput>("media.input.get", "/api/v1/media/input/get", a, options),
       list: (options?: { signal?: AbortSignal }): Promise<T.MediaInput[]> =>
         this.call<T.MediaInput[]>("media.input.list", "/api/v1/media/input/list", undefined, options),
       delete: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<void> =>
@@ -240,8 +235,6 @@ export class VibeValleyApi {
         this.call<T.MediaUnderstandingJob>("media.understanding.authorize", "/api/v1/media/understanding/authorize", a, options),
       start: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.MediaUnderstandingJob> =>
         this.call<T.MediaUnderstandingJob>("media.understanding.start", "/api/v1/media/understanding/start", a, options),
-      previewCleanup: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
-        this.call<T.Preview>("media.understanding.previewCleanup", "/api/v1/media/understanding/previewCleanup", a, options),
       cleanup: (a: T.MediaJobRequest, options?: { signal?: AbortSignal }): Promise<T.MediaUnderstandingJob> =>
         this.call<T.MediaUnderstandingJob>("media.understanding.cleanup", "/api/v1/media/understanding/cleanup", a, options),
     },
@@ -316,11 +309,6 @@ export class VibeValleyApi {
         this.call<T.Preview>("channel.message.previewDelete", "/api/v1/channel/message/previewDelete", a, options),
       search: (a: T.MessageSearch, options?: { signal?: AbortSignal }): Promise<T.MessageHit[]> =>
         this.call<T.MessageHit[]>("channel.message.search", "/api/v1/channel/message/search", a, options),
-    },
-    default: {
-      /** The channel what names none goes to from now on: a connector's, a call's. */
-      set: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> =>
-        this.call<void>("channel.default.set", "/api/v1/channel/default/set", a, options),
     },
     reaction: {
       /** The user's reaction on or off; as it already is, nothing changes. */
@@ -479,12 +467,6 @@ export class VibeValleyApi {
       list: (a: T.SessionEventListInput, options?: { signal?: AbortSignal }): Promise<T.SessionEventPage> =>
         this.call<T.SessionEventPage>("session.event.list", "/api/v1/session/event/list", a, options),
     },
-    binding: {
-      attach: (a: T.SessionBindingInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
-        this.call<T.Session>("session.binding.attach", "/api/v1/session/binding/attach", a, options),
-      detach: (a: T.SessionBindingInput, options?: { signal?: AbortSignal }): Promise<T.Session> =>
-        this.call<T.Session>("session.binding.detach", "/api/v1/session/binding/detach", a, options),
-    },
   };
 
   readonly artifact = {
@@ -580,17 +562,6 @@ export class VibeValleyApi {
     },
   };
 
-  readonly game = {
-    achievement: {
-      list: (options?: { signal?: AbortSignal }): Promise<T.AchievementList> =>
-        this.call<T.AchievementList>("game.achievement.list", "/api/v1/game/achievement/list", undefined, options),
-    },
-    title: {
-      set: (a: T.ChooseTitleRequest, options?: { signal?: AbortSignal }): Promise<void> =>
-        this.call<void>("game.title.set", "/api/v1/game/title/set", a, options),
-    },
-  };
-
   readonly runtime = {
     list: (options?: { signal?: AbortSignal }): Promise<T.RuntimeInfo[]> =>
       this.call<T.RuntimeInfo[]>("runtime.list", "/api/v1/runtime/list", undefined, options),
@@ -672,9 +643,6 @@ export class VibeValleyApi {
       /** An added template gone; the profiles installed from it stay. */
       delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> =>
         this.call<void>("agent.template.delete", "/api/v1/agent/template/delete", a, options),
-      /** What deleting the template would do, refused as it would be; nothing changes. */
-      previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
-        this.call<T.Preview>("agent.template.previewDelete", "/api/v1/agent/template/previewDelete", a, options),
     },
   };
 
@@ -684,9 +652,6 @@ export class VibeValleyApi {
     create: (a: T.Skill, options?: { signal?: AbortSignal }): Promise<T.Skill> => this.call<T.Skill>("skill.create", "/api/v1/skill/create", a, options),
     update: (a: T.Skill, options?: { signal?: AbortSignal }): Promise<T.Skill> => this.call<T.Skill>("skill.update", "/api/v1/skill/update", a, options),
     delete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<void> => this.call<void>("skill.delete", "/api/v1/skill/delete", a, options),
-    /** What delete would do, refused as it would be; nothing changes. */
-    previewDelete: (a: { id: string }, options?: { signal?: AbortSignal }): Promise<T.Preview> =>
-      this.call<T.Preview>("skill.previewDelete", "/api/v1/skill/previewDelete", a, options),
   };
 
   readonly memory = {
@@ -709,8 +674,6 @@ export class VibeValleyApi {
   };
 
   readonly connector = {
-    list: (options?: { signal?: AbortSignal }): Promise<T.ConnectorStatus[]> =>
-      this.call<T.ConnectorStatus[]>("connector.list", "/api/v1/connector/list", undefined, options),
     login: (a: { id: T.ConnectorID } & T.ConnectorLogin, options?: { signal?: AbortSignal }): Promise<T.ConnectorStatus> =>
       this.call<T.ConnectorStatus>("connector.login", "/api/v1/connector/login", a, options),
     verify: (a: { id: T.ConnectorID } & T.VerifyRequest, options?: { signal?: AbortSignal }): Promise<T.ConnectorStatus> =>

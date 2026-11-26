@@ -20,7 +20,7 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use vibevalley_server::channel::{ChannelEvent, Posting};
 use vibevalley_server::connector::{Options, Vendors};
 use vibevalley_server::gateway::api::Server;
-use vibevalley_server::{App, Config, create_app_blocking};
+use vibevalley_server::{App, Config};
 
 const USER: &str = "o9cq80wkM5NnUserOfThisFarm@im.wechat";
 const QR: &str = "https://liteapp.weixin.qq.com/q/q1";
@@ -561,31 +561,36 @@ fn start(dir: &std::path::Path, world: &World) -> App {
     vibevalley_i18n::set_locale("zh");
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
-    let started = create_app_blocking(Config {
-        registry: Some(Arc::new(registry)),
-        probe_runtimes: false,
-        tick_crons: false,
-        link_previews: false,
-        orchestrator_listens: false,
-        connector: Options {
-            vendors: Vendors {
-                weixin: world.http.clone(),
-                qq_api: world.http.clone(),
-                qq_token: format!("{}/app/getAppAccessToken", world.http),
-                feishu_accounts: world.http.clone(),
-                lark_accounts: world.http.clone(),
-                feishu_open: world.http.clone(),
-                lark_open: world.http.clone(),
-            },
-            retry_first: Duration::from_millis(150),
-            retry_most: Duration::from_millis(400),
-            reconnect: Duration::from_millis(50),
-            moment: Duration::from_millis(1500),
-            poll_floor: Duration::from_millis(30),
-            ..Options::default()
+    let started = vibevalley_server::app::create_app_with_overrides_blocking(
+        Config {
+            registry: Some(Arc::new(registry)),
+            probe_runtimes: false,
+            tick_crons: false,
+            link_previews: false,
+            orchestrator_listens: false,
+            ..Config::under(dir)
         },
-        ..Config::under(dir)
-    })
+        vibevalley_server::app::Overrides {
+            connector: Some(Options {
+                vendors: Vendors {
+                    weixin: world.http.clone(),
+                    qq_api: world.http.clone(),
+                    qq_token: format!("{}/app/getAppAccessToken", world.http),
+                    feishu_accounts: world.http.clone(),
+                    lark_accounts: world.http.clone(),
+                    feishu_open: world.http.clone(),
+                    lark_open: world.http.clone(),
+                },
+                retry_first: Duration::from_millis(150),
+                retry_most: Duration::from_millis(400),
+                reconnect: Duration::from_millis(50),
+                moment: Duration::from_millis(1500),
+                poll_floor: Duration::from_millis(30),
+                ..Options::default()
+            }),
+            ..Default::default()
+        },
+    )
     .unwrap();
     // The orchestrator, played: it answers each of the user's words where they were said.
     let (mut events, chat, cancel) = (
@@ -641,9 +646,14 @@ fn wait_notify<T>(notify: &Notify, what: &str, mut look: impl FnMut() -> Option<
     })
 }
 
+fn connectors_snapshot(s: &App) -> Vec<Value> {
+    vibevalley_runtime::rt::block_on(s.ctx().feed.flush());
+    let collab: Value = serde_json::from_str(&s.ctx().feed.snapshot_json(vibevalley_protocol::SliceKind::Collab)).unwrap();
+    collab["connectors"].as_array().unwrap().clone()
+}
+
 fn status(s: &App, id: &str) -> Value {
-    let all = call(s, "connector.list", Value::Null);
-    all.as_array().unwrap().iter().find(|c| c["id"] == id).unwrap().clone()
+    connectors_snapshot(s).into_iter().find(|c| c["id"] == id).unwrap()
 }
 
 fn status_is(s: &App, id: &str, what: &str, ok: impl Fn(&Value) -> bool) -> Value {
@@ -685,14 +695,15 @@ fn weixin_is_scanned_and_verified_and_the_users_words_reach_the_default_channel_
     let dir = tempfile::tempdir().unwrap();
     let world = World::new();
     let s = start(dir.path(), &world);
-    let off = call(&s, "connector.list", Value::Null);
-    let listed: Vec<(&str, &str)> = off
-        .as_array()
-        .unwrap()
+    let off = connectors_snapshot(&s);
+    let listed: Vec<(String, String)> = off
         .iter()
-        .map(|c| (c["id"].as_str().unwrap(), c["state"].as_str().unwrap()))
+        .map(|c| (c["id"].as_str().unwrap().to_owned(), c["state"].as_str().unwrap().to_owned()))
         .collect();
-    assert_eq!(listed, vec![("weixin", "off"), ("feishu", "off"), ("qq", "off")]);
+    assert_eq!(
+        listed,
+        vec![("weixin".into(), "off".into()), ("feishu".into(), "off".into()), ("qq".into(), "off".into())]
+    );
 
     // The answer carries the code; asking again while it waits is the same login.
     let first = call(&s, "connector.login", json!({ "id": "weixin" }));
@@ -1091,32 +1102,37 @@ fn start_with_clock_and_notify(
         turn.commit("fix.txt", "ok\n");
         turn.done("all checks green");
     }));
-    create_app_blocking(Config {
-        registry: Some(Arc::new(registry)),
-        probe_runtimes: false,
-        tick_crons: false,
-        link_previews: false,
-        orchestrator_listens: false,
-        clock,
-        connector: Options {
-            vendors: Vendors {
-                weixin: world.http.clone(),
-                qq_api: world.http.clone(),
-                qq_token: format!("{}/app/getAppAccessToken", world.http),
-                feishu_accounts: world.http.clone(),
-                lark_accounts: world.http.clone(),
-                feishu_open: world.http.clone(),
-                lark_open: world.http.clone(),
-            },
-            retry_first: Duration::from_millis(80),
-            retry_most: Duration::from_millis(200),
-            reconnect: Duration::from_millis(50),
-            moment: Duration::from_millis(1500),
-            poll_floor: Duration::from_millis(30),
-            notify,
+    vibevalley_server::app::create_app_with_overrides_blocking(
+        Config {
+            registry: Some(Arc::new(registry)),
+            probe_runtimes: false,
+            tick_crons: false,
+            link_previews: false,
+            orchestrator_listens: false,
+            clock,
+            ..Config::under(dir)
         },
-        ..Config::under(dir)
-    })
+        vibevalley_server::app::Overrides {
+            connector: Some(Options {
+                vendors: Vendors {
+                    weixin: world.http.clone(),
+                    qq_api: world.http.clone(),
+                    qq_token: format!("{}/app/getAppAccessToken", world.http),
+                    feishu_accounts: world.http.clone(),
+                    lark_accounts: world.http.clone(),
+                    feishu_open: world.http.clone(),
+                    lark_open: world.http.clone(),
+                },
+                retry_first: Duration::from_millis(80),
+                retry_most: Duration::from_millis(200),
+                reconnect: Duration::from_millis(50),
+                moment: Duration::from_millis(1500),
+                poll_floor: Duration::from_millis(30),
+                notify,
+            }),
+            ..Default::default()
+        },
+    )
     .unwrap()
 }
 
@@ -1274,8 +1290,9 @@ fn scheduled_cron_digest_summarizes_issues_and_runs_over_weixin_and_survives_res
     use vibevalley_core::{Clock, ManualClock, SystemClock};
     use vibevalley_protocol::{ActorKind, ConnectorID, CronWhen, CronWhenEvery, IssueStageKind as StageKind, IssueStatus};
     use vibevalley_server::connector::NotifyOptions;
-    use vibevalley_server::connector::digest::{DigestSpec, DigestTargets};
+    use vibevalley_server::context::port::DigestTargets;
     use vibevalley_server::cron::DigestCronRequest;
+    use vibevalley_server::cron::digest::DigestSpec;
     use vibevalley_server::issue::NewIssue;
 
     let dir = tempfile::tempdir().unwrap();

@@ -8,11 +8,12 @@ use std::time::Duration;
 use serde_json::{Value, json};
 use vibevalley_protocol::{BizCode, Caller, Envelope, VoiceFix};
 use vibevalley_runtime::agent::{ChatRequest, Completion, Delta, FinishReason, Message, ModelClient, Role, Usage};
+use vibevalley_server::app::{Overrides, create_app_with_overrides_blocking};
 use vibevalley_server::gateway::bridge::LiveVoiceLine as _;
 use vibevalley_server::setting::Secret;
 use vibevalley_server::voice::Voice;
 use vibevalley_server::voice::moss::{Realtime, Verdict};
-use vibevalley_server::{App, Config, create_app_blocking};
+use vibevalley_server::{App, Config};
 
 struct Scripted {
     answers: Mutex<VecDeque<&'static str>>,
@@ -130,15 +131,20 @@ fn farm(answers: &[&'static str]) -> Farm {
     let mut registry = vibevalley_runtime::oar::Registry::new();
     registry.register(Arc::new(vibevalley_runtime::oar::scripted::ScriptedRuntime::demo()));
     let live = Arc::new(Live(Mutex::new(Verdict::Ok)));
-    let app = create_app_blocking(Config {
-        registry: Some(Arc::new(registry)),
-        probe_runtimes: false,
-        link_previews: false,
-        tick_crons: false,
-        model_client: Some(model.clone()),
-        voice_realtime: Some(live.clone()),
-        ..Config::under(dir.path())
-    })
+    let app = create_app_with_overrides_blocking(
+        Config {
+            registry: Some(Arc::new(registry)),
+            probe_runtimes: false,
+            link_previews: false,
+            tick_crons: false,
+            model_client: Some(model.clone()),
+            ..Config::under(dir.path())
+        },
+        Overrides {
+            voice_realtime: Some(live.clone()),
+            ..Overrides::default()
+        },
+    )
     .unwrap();
     Farm { _dir: dir, app, live, model }
 }

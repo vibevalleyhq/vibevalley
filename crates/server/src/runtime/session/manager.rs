@@ -6,9 +6,9 @@ use tokio_util::sync::CancellationToken;
 use vibevalley_core::rules::session_ids_of;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, Session, SessionBindingInput, SessionChildTranscript, SessionChildTranscriptInput,
-    SessionController, SessionEventListInput, SessionEventPage, SessionId, SessionOpenWorkspaceInput, SessionRespondInteractionInput,
-    SessionRespondPermissionInput, SessionSendInput, SessionSetConfigInput, SessionWatchEvent, SessionWatchPayload, SessionWorkspace, SliceKind,
+    ApiError, Issue, IssueGetInput, IssueStageKind, IssueWatch, LiveEvent, Session, SessionChildTranscript, SessionChildTranscriptInput, SessionController,
+    SessionEventListInput, SessionEventPage, SessionId, SessionOpenWorkspaceInput, SessionRespondInteractionInput, SessionRespondPermissionInput,
+    SessionSendInput, SessionSetConfigInput, SessionWatchEvent, SessionWatchPayload, SessionWorkspace, SliceKind,
 };
 
 use super::engine::SessionEngine;
@@ -95,14 +95,6 @@ impl SessionEngine {
 
     pub(crate) async fn child_transcript_endpoint_async(&self, input: SessionChildTranscriptInput) -> Result<SessionChildTranscript, ApiError> {
         self.read_child_transcript_async(input).await.map_err(session_error)
-    }
-
-    pub(crate) async fn attach_binding_endpoint_async(&self, input: SessionBindingInput) -> Result<Session, ApiError> {
-        self.attach_binding_async(input).await.map_err(session_error)
-    }
-
-    pub(crate) async fn detach_binding_endpoint_async(&self, input: SessionBindingInput) -> Result<Session, ApiError> {
-        self.detach_binding_async(input).await.map_err(session_error)
     }
 
     pub(crate) async fn watch_session_async(&self, input: SessionWatchPayload, sink: crate::context::Sink) -> Result<(), ApiError> {

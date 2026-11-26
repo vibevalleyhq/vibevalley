@@ -30,8 +30,6 @@
 | `debug.timeline.clear` | 清空开发者工具时间线缓冲区 | `/api/v1/debug/timeline/clear` | ✓ |   |   |   |
 | `debug.trajectory.list` | 列出可检视的执行会话、工作区对话与主助手轨迹摘要 | `/api/v1/debug/trajectory/list` | ✓ |   |   |   |
 | `debug.trajectory.get` | 读取单条执行会话、工作区对话或主助手轨迹详情与原始帧 | `/api/v1/debug/trajectory/get` | ✓ |   |   |   |
-| `debug.graph` | 读取当前客户端监听与执行会话拓扑图 | `/api/v1/debug/graph` | ✓ |   |   |   |
-| `debug.override.get` | 读取当前故障注入与延迟覆盖配置 | `/api/v1/debug/override/get` | ✓ |   |   |   |
 | `debug.override.set` | 更新故障注入与延迟覆盖配置 | `/api/v1/debug/override/set` | ✓ |   |   |   |
 | `debug.bundle.export` | 导出脱敏后的本机诊断包 | `/api/v1/debug/bundle/export` | ✓ |   |   |   |
 
@@ -105,7 +103,6 @@
 | `media.audio.cleanup` | 清理已知远端音频文件，不重复转写或合成 | `/api/v1/media/audio/cleanup` | ✓ |   |   |   |
 | `media.input.create` | 为媒体输入预留有限的本机空间，不上传给供应商 | `/api/v1/media/input/create` | ✓ |   |   |   |
 | `media.input.adopt` | 把媒体库里的一个文件拿来当媒体输入，照上传一样检查 | `/api/v1/media/input/adopt` | ✓ |   |   |   |
-| `media.input.get` | 查看本机的媒体输入 | `/api/v1/media/input/get` | ✓ |   |   |   |
 | `media.input.list` | 列出本机的媒体输入 | `/api/v1/media/input/list` | ✓ |   |   |   |
 | `media.input.delete` | 删除没有被任务保留的本机媒体输入 | `/api/v1/media/input/delete` | ✓ |   |   |   |
 | `media.input.previewDelete` | 预览删除本机媒体输入，不实际改动 | `/api/v1/media/input/previewDelete` | ✓ |   |   |   |
@@ -115,7 +112,6 @@
 | `media.understanding.start` | 主助手按已授权任务编号执行理解，不接受新的输入或授权声明 | `/api/v1/media/understanding/start` |   |   | ✓ |   |
 | `media.speech.create` | 创建单人语音任务，生成后下载到本机，不重复提交同一编号 | `/api/v1/media/speech/create` | ✓ |   | ✓ |   |
 | `media.speech.resume` | 继续查询已知语音任务，不重新提交 | `/api/v1/media/speech/resume` | ✓ |   |   |   |
-| `media.understanding.previewCleanup` | 预览远端清理和本机保留释放，不改变任何文件 | `/api/v1/media/understanding/previewCleanup` | ✓ |   |   |   |
 | `media.understanding.cleanup` | 清理已知远端文件，不重复理解请求 | `/api/v1/media/understanding/cleanup` | ✓ |   |   |   |
 | `media.job.get` | 读取生成任务 | `/api/v1/media/job/get` | ✓ |   | ✓ |   |
 | `media.job.cancel` | 取消本机等待，不保证停止厂商计费 | `/api/v1/media/job/cancel` | ✓ |   | ✓ |   |
@@ -144,7 +140,6 @@
 | `channel.message.send` | 在频道或串里发一条消息 | `/api/v1/channel/message/send` | ✓ | ✓ |   | ✓ |
 | `channel.create` | 新建一个频道 | `/api/v1/channel/create` | ✓ | ✓ | ✓ |   |
 | `channel.update` | 改一个频道 | `/api/v1/channel/update` | ✓ | ✓ | ✓ |   |
-| `channel.default.set` | 设成默认频道：没指名的话都到这里 | `/api/v1/channel/default/set` | ✓ | ✓ |   |   |
 | `channel.message.list` | 读一个频道的消息，可以往前翻 | `/api/v1/channel/message/list` | ✓ | ✓ | ✓ | ✓ |
 | `channel.markRead` | 标成已读，读到这一条为止 | `/api/v1/channel/markRead` | ✓ | ✓ |   |   |
 | `channel.message.update` | 改你自己发的一条消息，不再通知谁 | `/api/v1/channel/message/update` | ✓ | ✓ |   |   |
@@ -231,8 +226,6 @@ MOSS Live 语音通话
 | `session.respondInteraction` | 回复会话的交互式提问 | `/api/v1/session/respondInteraction` | ✓ | ✓ |   |   |
 | `session.setConfig` | 调整工作区会话的模型、推理强度或权限模式 | `/api/v1/session/setConfig` | ✓ | ✓ |   |   |
 | `session.childTranscript` | 读取子代理或协作组员最近的轨迹步骤 | `/api/v1/session/childTranscript` | ✓ | ✓ |   |   |
-| `session.binding.attach` | 给执行会话挂载上下文绑定 | `/api/v1/session/binding/attach` | ✓ | ✓ | ✓ |   |
-| `session.binding.detach` | 从执行会话移除上下文绑定 | `/api/v1/session/binding/detach` | ✓ | ✓ | ✓ |   |
 
 ## artifact
 
@@ -266,15 +259,6 @@ MOSS Live 语音通话
 | `artifact.history.undoOrigin` | 按提交来源选择性撤销某一轮的改动，保留其他人的并发编辑 | `/api/v1/artifact/history/undoOrigin` | ✓ | ✓ |   |   |
 | `artifact.history.compact` | 把较早的操作历史压缩成浅快照，当前内容保持不变 | `/api/v1/artifact/history/compact` | ✓ | ✓ |   |   |
 | `artifact.cover.set` | cap.op.artifact.cover.set | `/api/v1/artifact/cover/set` | ✓ | ✓ |   |   |
-
-## game
-
-里程碑和称号
-
-| 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
-|---|---|---|---|---|---|---|
-| `game.achievement.list` | 列出全部里程碑 | `/api/v1/game/achievement/list` | ✓ | ✓ |   |   |
-| `game.title.set` | 挑一个挂在农场卡上的称号 | `/api/v1/game/title/set` | ✓ | ✓ |   |   |
 
 ## runtime
 
@@ -331,7 +315,6 @@ GitHub 的检测：gh 装没装、登没登录
 | `agent.template.update` | 照模板现在的版本重做角色，本机的设置留着 | `/api/v1/agent/template/update` | ✓ |   |   |   |
 | `agent.template.add` | 把本机的一个模板文件夹加进来，不装 | `/api/v1/agent/template/add` | ✓ |   |   |   |
 | `agent.template.delete` | 删掉加进来的模板，从它装的角色留着 | `/api/v1/agent/template/delete` | ✓ |   |   |   |
-| `agent.template.previewDelete` | 试删一个角色模板：说会删掉什么，不真删 | `/api/v1/agent/template/previewDelete` | ✓ |   |   |   |
 
 ## skill
 
@@ -343,7 +326,6 @@ GitHub 的检测：gh 装没装、登没登录
 | `skill.create` | 新建一个技能 | `/api/v1/skill/create` | ✓ |   |   |   |
 | `skill.update` | 改一个技能 | `/api/v1/skill/update` | ✓ |   |   |   |
 | `skill.delete` | 删掉一个技能 | `/api/v1/skill/delete` | ✓ |   |   |   |
-| `skill.previewDelete` | 试删一个技能：说会删掉什么，不真删 | `/api/v1/skill/previewDelete` | ✓ |   |   |   |
 
 ## memory
 
@@ -364,7 +346,6 @@ GitHub 的检测：gh 装没装、登没登录
 
 | 操作 | 做什么 | 路径（POST） | 用户 | 连进来的设备 | 主助手 | 执行会话 |
 |---|---|---|---|---|---|---|
-| `connector.list` | 列出微信、飞书、QQ 连接器和它们的状况 | `/api/v1/connector/list` | ✓ | ✓ |   |   |
 | `connector.login` | 登录一个连接器 | `/api/v1/connector/login` | ✓ |   |   |   |
 | `connector.verify` | 交验证码，接着连接器的登录 | `/api/v1/connector/verify` | ✓ |   |   |   |
 | `connector.logout` | 退出一个连接器的登录 | `/api/v1/connector/logout` | ✓ |   |   |   |

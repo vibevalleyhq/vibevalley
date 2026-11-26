@@ -20,8 +20,6 @@ export interface SessionHandlers {
   readonly "session.respondInteraction": (a: T.SessionRespondInteractionInput) => Promise<void>;
   readonly "session.setConfig": (a: T.SessionSetConfigInput) => Promise<T.SessionWorkspace>;
   readonly "session.childTranscript": (a: T.SessionChildTranscriptInput) => Promise<T.SessionChildTranscript>;
-  readonly "session.binding.attach": (a: T.SessionBindingInput) => Promise<T.Session>;
-  readonly "session.binding.detach": (a: T.SessionBindingInput) => Promise<T.Session>;
 }
 
 export const sessionEndpoints: readonly Endpoint[] = [
@@ -144,25 +142,5 @@ export const sessionEndpoints: readonly Endpoint[] = [
     }),
     result: S.SessionChildTranscript,
     can: ["user", "remote"],
-  },
-  {
-    op: "session.binding.attach",
-    about: ["id"],
-    input: input({
-      id: z.string(),
-      binding: S.ContextRef,
-    }),
-    result: S.Session,
-    can: ["user", "orchestrator", "remote"],
-  },
-  {
-    op: "session.binding.detach",
-    about: ["id"],
-    input: input({
-      id: z.string(),
-      binding: S.ContextRef,
-    }),
-    result: S.Session,
-    can: ["user", "orchestrator", "remote"],
   },
 ];

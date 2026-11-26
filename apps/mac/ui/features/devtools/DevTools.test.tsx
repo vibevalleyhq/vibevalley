@@ -337,7 +337,6 @@ test("DevTools renders all 6 tabs, filters timeline, inspects trajectory, applie
     { detached: false },
     {
       "debug.snapshot": () => ({ ...sampleSnapshot, overrides, recentTimeline: timelineEvents }),
-      "debug.graph": () => sampleGraph,
       "debug.timeline.list": (payload: unknown): DebugTimelinePage => {
         const q = (payload ?? {}) as DebugTimelineQuery;
         const filtered = timelineEvents.filter((ev) => {
@@ -503,7 +502,6 @@ test("DevTools auto-refresh polls on interval and pauses cleanly", async () => {
     { detached: false },
     {
       "debug.snapshot": () => sampleSnapshot,
-      "debug.graph": () => sampleGraph,
     },
   );
 
@@ -717,7 +715,6 @@ test("DevTools Remote VDP discovers instances, attaches, drives remote shell/scr
     { detached: false },
     {
       "debug.snapshot": () => sampleSnapshot,
-      "debug.graph": () => sampleGraph,
       "host.vdpDiscover": () => discoveredInstances,
       "host.vdpCall": (payload: unknown) => {
         const req = payload as { wsUrl?: string; port?: number; token?: string; method: string; params?: Record<string, unknown> };

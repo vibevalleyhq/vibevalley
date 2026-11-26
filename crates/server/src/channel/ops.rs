@@ -95,10 +95,6 @@ impl Chat {
         .await
     }
 
-    pub(crate) async fn handle_default_set(&self, req: <ops::ChannelDefaultSet as Op>::Input) -> Result<(), ApiError> {
-        self.make_default_async(&req.id).await
-    }
-
     pub(crate) async fn handle_message_list(&self, req: <ops::ChannelMessageList as Op>::Input) -> Result<Vec<ChatMessage>, ApiError> {
         self.history_async(&req.id, req.before, req.limit).await
     }

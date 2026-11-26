@@ -14,10 +14,11 @@ use vibevalley_protocol::{
 
 use super::adapter::App;
 use super::bridge::{self, Bridge, Env, Handoff};
-use super::digest::{DigestTargets, PersonalEvent, personal_event_for_issue, personal_event_for_run};
+use super::digest::{PersonalEvent, personal_event_for_issue, personal_event_for_run};
 use super::notify::{NotifyDecision, NotifyOptions, NotifyRouter};
 use super::{feishu, qq, weixin};
 use crate::channel::{ChannelEvent, Chat, to_message};
+use crate::context::port::{DigestDeliveryPort, DigestTargets};
 use crate::context::{Context, OUTBOX_CONNECTOR_NOTIFY, OutboxConnectorNotify, OutboxEvent, OutboxSessionReported, now};
 use crate::setting::Setting;
 
@@ -348,10 +349,6 @@ impl Connector {
         Ok(delivered)
     }
 
-    pub(crate) async fn handle_list(&self) -> Vec<ConnectorStatus> {
-        self.list_async().await
-    }
-
     pub(crate) async fn handle_login(&self, req: <ops::ConnectorLogin as Op>::Input) -> Result<ConnectorStatus, ApiError> {
         let id = app_of(&req.id)?;
         Ok(self
@@ -506,4 +503,16 @@ pub fn app_of(id: &str) -> Result<ConnectorID, ApiError> {
         .into_iter()
         .find(|c| c.as_str() == id)
         .ok_or_else(|| refused(t("server.connector.noConnector", &[("id", id.into())])))
+}
+
+impl DigestDeliveryPort for Connector {
+    fn deliver_digest_async<'a>(
+        &'a self,
+        cron_id: &'a str,
+        at: Millis,
+        targets: DigestTargets,
+        text: &'a str,
+    ) -> crate::BoxFuture<'a, Result<usize, ApiError>> {
+        Box::pin(async move { Self::deliver_digest_async(self, cron_id, at, targets, text).await })
+    }
 }

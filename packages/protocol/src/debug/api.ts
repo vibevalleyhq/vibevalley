@@ -10,8 +10,6 @@ export interface DebugHandlers {
   readonly "debug.timeline.clear": () => Promise<void>;
   readonly "debug.trajectory.list": () => Promise<T.DebugTrajectorySummary[]>;
   readonly "debug.trajectory.get": (a: T.DebugTrajectoryGetRequest) => Promise<T.DebugTrajectoryDetail>;
-  readonly "debug.graph": () => Promise<T.DebugGraph>;
-  readonly "debug.override.get": () => Promise<T.DebugOverrideConfig>;
   readonly "debug.override.set": (a: T.DebugOverrideConfig) => Promise<T.DebugOverrideConfig>;
   readonly "debug.bundle.export": () => Promise<T.DebugBundleResult>;
 }
@@ -50,20 +48,6 @@ export const debugEndpoints: readonly Endpoint[] = [
     about: ["id"],
     input: S.DebugTrajectoryGetRequest,
     result: S.DebugTrajectoryDetail,
-    can: ["user"],
-  },
-  {
-    op: "debug.graph",
-    about: [],
-    input: undefined,
-    result: S.DebugGraph,
-    can: ["user"],
-  },
-  {
-    op: "debug.override.get",
-    about: [],
-    input: undefined,
-    result: S.DebugOverrideConfig,
     can: ["user"],
   },
   {

@@ -205,7 +205,7 @@ fn the_chat_through_its_endpoints() {
 
     // Default and removal.
     assert_eq!(call("channel.delete", json!({ "id": gid })).biz_code, BizCode::ChannelRefused.code());
-    ok(call("channel.default.set", json!({ "id": dev })));
+    vibevalley_runtime::rt::block_on(app.test_internals().channel.make_default_async(&dev)).unwrap();
     let preview = ok(call("channel.previewDelete", json!({ "id": gid })));
     assert!(preview["does"][0].as_str().unwrap().contains("#general"), "{preview}");
     ok(call("channel.delete", json!({ "id": gid })));

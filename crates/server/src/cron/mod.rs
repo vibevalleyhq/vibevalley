@@ -2,8 +2,10 @@
 //! going or nudges the channel's orchestrator. Schedule rules live in
 //! `vibevalley-core::cron`; persistence is delegated to `ctx.service.cron`.
 
+pub mod digest;
 mod service;
 #[cfg(test)]
 mod tests;
 
-pub use service::{DEFAULT_CHANNEL, DigestCronRequest, DigestDeliveryPort, Scheduler};
+pub use crate::context::port::DigestDeliveryPort;
+pub use service::{DEFAULT_CHANNEL, DigestCronRequest, Scheduler};
