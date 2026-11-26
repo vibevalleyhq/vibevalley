@@ -169,14 +169,18 @@ test("OutlineView aligns depth indentation by OUTLINE_INDENT_STEP_PX across bull
   const rootTodo = app.layout("id:outline-text-r_todo");
   const childBullet = app.layout("id:outline-text-c_bullet");
   const childTodo = app.layout("id:outline-text-c_todo");
+  const quickInput = app.layout("id:outline-quick-add");
 
-  if (!rootBullet || !rootTodo || !childBullet || !childTodo) {
+  if (!rootBullet || !rootTodo || !childBullet || !childTodo || !quickInput) {
     throw new Error("expected depth rows to have computed layout");
   }
 
   expect(rootBullet.x).toBe(rootTodo.x);
   expect(childBullet.x).toBe(childTodo.x);
   expect(childBullet.x - rootBullet.x).toBe(OUTLINE_INDENT_STEP_PX);
+  // Quick-add input left edge & width align identically with depth-0 bullet/todo text.
+  expect(quickInput.x).toBe(rootBullet.x);
+  expect(quickInput.width).toBe(rootBullet.width);
 });
 
 test("OutlineView keyboard flows: Enter, Tab/Shift+Tab with collapsed auto-expand, ArrowUp/Down, Alt+Up/Down, Backspace, Escape", async () => {
@@ -305,9 +309,15 @@ test("OutlineView Enter on heading inserts a bullet sibling, hover actions work 
   expect(getDoc().nodes.child).toBeDefined();
   await app.keyboard.press("escape");
 
-  // Collapse parent, then hover add-child button expands parent and focuses the new child.
+  // No floating text kind pill is mounted on rows; actions live inside the borderless `...` menu.
+  expect(app.count("id:outline-more-parent")).toBe(1);
+  expect(app.count("id:outline-child-parent")).toBe(0);
+
+  // Collapse parent, then open row `...` menu and choose Add child: expands parent and focuses the new child.
   await app.press("id:outline-collapse-parent");
   expect(app.count("id:outline-node-child")).toBe(0);
+  await app.press("id:outline-more-parent");
+  await fake.pumpUntil(app, () => app.count("id:outline-child-parent") === 1);
   const writesBeforeAddChild = getWriteCount();
   await app.press("id:outline-child-parent");
   await fake.pumpUntil(app, () => getWriteCount() > writesBeforeAddChild);
@@ -317,6 +327,14 @@ test("OutlineView Enter on heading inserts a bullet sibling, hover actions work 
   if (addedChildId === undefined) throw new Error("expected newly added child");
   await fake.pumpUntil(app, () => app.count(`id:outline-node-input-${addedChildId}`) === 1);
   await app.keyboard.press("escape");
+
+  // Row `...` menu switches node kind directly (bullet -> todo).
+  await app.press("id:outline-more-child");
+  await fake.pumpUntil(app, () => app.count("id:outline-kind-todo-child") === 1);
+  const writesBeforeKind = getWriteCount();
+  await app.press("id:outline-kind-todo-child");
+  await fake.pumpUntil(app, () => getWriteCount() > writesBeforeKind);
+  expect(getDoc().nodes.child?.kind).toBe("todo");
 
   // Toggle todo checkbox persists checked=true.
   const writesBeforeToggle = getWriteCount();
