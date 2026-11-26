@@ -91,7 +91,7 @@ fn interpolates_strings_numbers_booleans_plurals_and_handles_fallbacks() {
     // Whole numbers print without `.0`, fractional numbers keep decimal, multi-param works.
     assert_eq!(translate_json("zh", "web.shell.sidebar.terminalCount", Some(r#"{"n":3}"#)), "3 个终端");
     assert_eq!(translate_json("en", "web.shell.sidebar.terminalCount", Some(r#"{"n":3.0}"#)), "3 terminals");
-    assert_eq!(translate_json("en", "web.issue.board.spots", Some(r#"{"taken":2,"of":4}"#)), "2 / 4 spots");
+    assert_eq!(translate_json("en", "web.issue.page.shown", Some(r#"{"shown":2,"of":4}"#)), "2 / 4");
     assert_eq!(translate_json("zh", "web.artifact.card.version", Some(r#"{"version":1.5}"#)), "第 1.5 稿");
 
     // ICU plural branches (`one` vs `other`) in English and plain count in Chinese.
