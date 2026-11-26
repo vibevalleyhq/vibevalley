@@ -23,6 +23,7 @@ import { useQueryClient } from "../../../infra/query";
 import { useRouter, useSearchValues } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
+import { pendingNewIssue } from "../../../infra/state/issueDraft";
 import { rememberPick } from "../../../infra/state/prefs";
 import {
   type BoardCard,
@@ -257,9 +258,16 @@ export function IssuesPage(props: { rest: string }) {
     const at = id();
     return at === undefined ? undefined : all().find((c) => c.id === at || (c.kind === "issue" && issueIs(c.issue, at)));
   });
-  const activeOverlay = createMemo(() =>
-    effectiveIssueOverlay(overlay(), props.rest, { ...(repo() ? { repo: repo() } : {}), ...(agent() ? { agent: agent() } : {}) }, id()),
-  );
+  const activeOverlay = createMemo(() => {
+    const promoted = props.rest === "new" ? pendingNewIssue.get() : undefined;
+    const effectiveRepo = promoted?.repo ?? (repo() || undefined);
+    const routeDefaults: NewIssueAt = {
+      ...(promoted ? { text: promoted.text, attachmentFiles: promoted.attachmentFiles } : {}),
+      ...(effectiveRepo ? { repo: effectiveRepo } : {}),
+      ...(agent() ? { agent: agent() } : {}),
+    };
+    return effectiveIssueOverlay(overlay(), props.rest, routeDefaults, id());
+  });
   const peekCard = createMemo(() => {
     const cur = activeOverlay();
     if (cur.kind !== "peeking") return undefined;
@@ -310,6 +318,7 @@ export function IssuesPage(props: { rest: string }) {
   };
 
   const closeDraft = () => {
+    pendingNewIssue.set(undefined);
     dispatchOverlay({ kind: "clear" });
     if (props.rest === "new") open(undefined);
   };

@@ -535,6 +535,11 @@ impl Manager {
         {
             return Err(refused(t("server.artifact.defaultDesignSystemOnly", &[])));
         }
+        let new_issue = match req.issue.as_deref().map(str::trim) {
+            Some("") => Some(None),
+            Some(iss) => Some(Some(self.issue_id_for_ref_async(iss).await?)),
+            None => None,
+        };
         let target_title = new_title.as_deref().unwrap_or(&row.title);
         if new_title.is_some() {
             self.storage.artifact.sync_manifest_title_async(&row.id, ty, target_title).await?;
@@ -544,6 +549,7 @@ impl Manager {
         let svc_tx = svc.clone();
         let id_tx = row.id.clone();
         let new_title_tx = new_title.clone();
+        let new_issue_tx = new_issue;
         let is_default = req.is_default;
         svc.transaction::<_, DbError>(move |tx| {
             Box::pin(async move {
@@ -555,6 +561,9 @@ impl Manager {
                         svc_tx.artifact.clear_default_design_system_in_tx(tx, at).await?;
                     }
                     svc_tx.artifact.set_default_in_tx(tx, &id_tx, flag, at).await?;
+                }
+                if let Some(issue_opt) = new_issue_tx {
+                    svc_tx.artifact.set_issue_in_tx(tx, &id_tx, issue_opt.as_deref(), at).await?;
                 }
                 Ok(())
             })

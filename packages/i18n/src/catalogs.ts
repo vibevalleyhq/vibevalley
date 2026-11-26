@@ -311,7 +311,22 @@ export const catalogs = {
       },
       prototype: { viewportLabel: "视口尺寸", viewportFull: "铺满", viewportTablet: "平板", viewportMobile: "手机", reload: "重新载入" },
       files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
-      issue: { title: "作品" },
+      issue: {
+        title: "作品",
+        empty: "还没有关联作品",
+        linkExisting: "关联已有作品…",
+        linkPlaceholder: "搜索作品…",
+        linkEmpty: "没有可关联的作品",
+        new: "新建作品",
+        newDialogTitle: "新建关联作品",
+        newTitle: "标题",
+        newTitlePlaceholder: "给作品起个标题…",
+        newType: "类型",
+        newCreate: "创建",
+        unlink: "取消关联「{title}」",
+        linkedToast: "已关联「{title}」",
+        unlinkedToast: "已取消关联「{title}」",
+      },
       blocks: { saved: "都存好了", user: "你", start: "从这里开始写……" },
       canvas: { label: "打开的作品", close: "关掉", openPage: "在作品页打开" },
       suggestions: { title: "建议（{n}）", by: "{name} 提的", accept: "接受", reject: "不要", delete: "删掉这一块" },
@@ -941,7 +956,26 @@ export const catalogs = {
         unarchive: "取消归档「{title}」",
         notify: "话题的提醒",
       },
-      more: { label: "更多", copyLink: "复制链接", copied: "链接已复制", markUnread: "从这里标成未读", jump: "跳到这条" },
+      more: {
+        label: "更多",
+        copyLink: "复制链接",
+        copied: "链接已复制",
+        markUnread: "从这里标成未读",
+        jump: "跳到这条",
+        promoteIssue: "转为工单",
+        saveArtifact: "存为作品",
+      },
+      promote: {
+        source: "来自 {where}",
+        saveTitle: "将消息存为作品",
+        artifactTitle: "标题",
+        artifactType: "类型",
+        artifactContent: "内容",
+        artifactSave: "保存作品",
+        artifactSaved: "已存为「{title}」",
+        artifactNote: "存自 {where}",
+        fallbackTitle: "第 {number} 条消息",
+      },
       switcher: {
         open: "跳到…",
         title: "跳到频道、话题或私聊",
@@ -3854,7 +3888,22 @@ export const catalogs = {
       },
       prototype: { viewportLabel: "Viewport", viewportFull: "Full", viewportTablet: "Tablet", viewportMobile: "Mobile", reload: "Reload" },
       files: { codeMode: "Code", htmlPreviewMode: "Preview" },
-      issue: { title: "Artifacts" },
+      issue: {
+        title: "Artifacts",
+        empty: "No linked artifacts yet",
+        linkExisting: "Link existing artifact…",
+        linkPlaceholder: "Search artifacts…",
+        linkEmpty: "No matching unlinked artifacts",
+        new: "New artifact",
+        newDialogTitle: "New linked artifact",
+        newTitle: "Title",
+        newTitlePlaceholder: "Give this artifact a title…",
+        newType: "Type",
+        newCreate: "Create",
+        unlink: 'Unlink "{title}"',
+        linkedToast: 'Linked "{title}"',
+        unlinkedToast: 'Unlinked "{title}"',
+      },
       blocks: { saved: "All saved", user: "You", start: "Start writing here…" },
       canvas: { label: "Open artifact", close: "Close", openPage: "Open its page" },
       suggestions: { title: "Suggestions ({n})", by: "From {name}", accept: "Accept", reject: "Dismiss", delete: "Delete this block" },
@@ -4509,7 +4558,26 @@ export const catalogs = {
         unarchive: 'Unarchive "{title}"',
         notify: "Thread notifications",
       },
-      more: { label: "More", copyLink: "Copy link", copied: "Link copied", markUnread: "Mark unread from here", jump: "Jump to it" },
+      more: {
+        label: "More",
+        copyLink: "Copy link",
+        copied: "Link copied",
+        markUnread: "Mark unread from here",
+        jump: "Jump to it",
+        promoteIssue: "Promote to ticket",
+        saveArtifact: "Save as artifact",
+      },
+      promote: {
+        source: "From {where}",
+        saveTitle: "Save message as artifact",
+        artifactTitle: "Title",
+        artifactType: "Type",
+        artifactContent: "Content",
+        artifactSave: "Save artifact",
+        artifactSaved: 'Saved as "{title}"',
+        artifactNote: "Saved from {where}",
+        fallbackTitle: "Message #{number}",
+      },
       switcher: {
         open: "Jump to…",
         title: "Jump to a channel, thread or direct message",
@@ -7555,7 +7623,20 @@ export interface Messages {
   "web.artifact.edit.saved": { readonly version: string | number };
   "web.artifact.files.codeMode": undefined;
   "web.artifact.files.htmlPreviewMode": undefined;
+  "web.artifact.issue.empty": undefined;
+  "web.artifact.issue.linkEmpty": undefined;
+  "web.artifact.issue.linkExisting": undefined;
+  "web.artifact.issue.linkPlaceholder": undefined;
+  "web.artifact.issue.linkedToast": { readonly title: string | number };
+  "web.artifact.issue.new": undefined;
+  "web.artifact.issue.newCreate": undefined;
+  "web.artifact.issue.newDialogTitle": undefined;
+  "web.artifact.issue.newTitle": undefined;
+  "web.artifact.issue.newTitlePlaceholder": undefined;
+  "web.artifact.issue.newType": undefined;
   "web.artifact.issue.title": undefined;
+  "web.artifact.issue.unlink": { readonly title: string | number };
+  "web.artifact.issue.unlinkedToast": { readonly title: string | number };
   "web.artifact.motion.chapters": undefined;
   "web.artifact.motion.layers": { readonly n: string | number };
   "web.artifact.motion.loop": undefined;
@@ -8246,6 +8327,8 @@ export interface Messages {
   "web.channel.more.jump": undefined;
   "web.channel.more.label": undefined;
   "web.channel.more.markUnread": undefined;
+  "web.channel.more.promoteIssue": undefined;
+  "web.channel.more.saveArtifact": undefined;
   "web.channel.names.everyone": undefined;
   "web.channel.names.everyoneNote": undefined;
   "web.channel.names.issueThread": undefined;
@@ -8263,6 +8346,15 @@ export interface Messages {
   "web.channel.pins.none": undefined;
   "web.channel.pins.open": undefined;
   "web.channel.pins.title": undefined;
+  "web.channel.promote.artifactContent": undefined;
+  "web.channel.promote.artifactNote": { readonly where: string | number };
+  "web.channel.promote.artifactSave": undefined;
+  "web.channel.promote.artifactSaved": { readonly title: string | number };
+  "web.channel.promote.artifactTitle": undefined;
+  "web.channel.promote.artifactType": undefined;
+  "web.channel.promote.fallbackTitle": { readonly number: string | number };
+  "web.channel.promote.saveTitle": undefined;
+  "web.channel.promote.source": { readonly where: string | number };
   "web.channel.replies": { readonly n: number };
   "web.channel.reply": undefined;
   "web.channel.runsEntry": undefined;

@@ -219,7 +219,11 @@ export type ArtifactVersionRequest = { id: ArtifactId,
  */
 content?: string, note?: string, };
 
-export type ArtifactUpdateRequest = { id: ArtifactId, title?: string, isDefault?: boolean, };
+export type ArtifactUpdateRequest = { id: ArtifactId, title?: string, isDefault?: boolean,
+/**
+ * Linked issue id or number; "" clears the linked issue.
+ */
+issue?: string, };
 
 export type ArtifactListRequest = { channel?: string, issue?: string, artifactType?: ArtifactType, };
 

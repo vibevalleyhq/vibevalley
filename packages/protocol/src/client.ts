@@ -478,7 +478,7 @@ export class VibeValleyApi {
     /** Creates a new directory-backed artifact seeded with starter files for its `artifactType`. */
     create: (a: T.ArtifactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
       this.call<T.Artifact>("artifact.create", "/api/v1/artifact/create", a, options),
-    /** Updates an artifact's title or default design-system flag. */
+    /** Updates an artifact's title, linked issue, or default design-system flag. */
     update: (a: T.ArtifactUpdateRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
       this.call<T.Artifact>("artifact.update", "/api/v1/artifact/update", a, options),
     delete: (a: { id: T.ArtifactId }, options?: { signal?: AbortSignal }): Promise<void> =>

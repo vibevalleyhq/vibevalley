@@ -98,7 +98,20 @@
     "htmlPreviewMode": "网页预览"
   },
   "issue": {
-    "title": "作品"
+    "title": "作品",
+    "empty": "还没有关联作品",
+    "linkExisting": "关联已有作品…",
+    "linkPlaceholder": "搜索作品…",
+    "linkEmpty": "没有可关联的作品",
+    "new": "新建作品",
+    "newDialogTitle": "新建关联作品",
+    "newTitle": "标题",
+    "newTitlePlaceholder": "给作品起个标题…",
+    "newType": "类型",
+    "newCreate": "创建",
+    "unlink": "取消关联「{title}」",
+    "linkedToast": "已关联「{title}」",
+    "unlinkedToast": "已取消关联「{title}」"
   },
   "blocks": {
     "saved": "都存好了",

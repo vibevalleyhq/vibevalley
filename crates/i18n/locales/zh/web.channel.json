@@ -189,7 +189,20 @@
     "copyLink": "复制链接",
     "copied": "链接已复制",
     "markUnread": "从这里标成未读",
-    "jump": "跳到这条"
+    "jump": "跳到这条",
+    "promoteIssue": "转为工单",
+    "saveArtifact": "存为作品"
+  },
+  "promote": {
+    "source": "来自 {where}",
+    "saveTitle": "将消息存为作品",
+    "artifactTitle": "标题",
+    "artifactType": "类型",
+    "artifactContent": "内容",
+    "artifactSave": "保存作品",
+    "artifactSaved": "已存为「{title}」",
+    "artifactNote": "存自 {where}",
+    "fallbackTitle": "第 {number} 条消息"
   },
   "switcher": {
     "open": "跳到…",

@@ -873,3 +873,54 @@ fn regression_symlinked_home_canonicalizes_cover_and_frame_paths() {
 
     restarted.close_blocking();
 }
+
+#[test]
+fn artifact_issue_link_and_unlink_roundtrip() {
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.router().clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    let issue_one = ok(call("issue.create", json!({ "title": "First linked issue" })));
+    let issue_two = ok(call("issue.create", json!({ "title": "Second linked issue" })));
+    let issue_one_id = issue_one["id"].as_str().unwrap().to_string();
+    let issue_two_id = issue_two["id"].as_str().unwrap().to_string();
+    let issue_two_num = issue_two["number"].as_i64().unwrap();
+
+    let created = ok(call(
+        "artifact.create",
+        json!({ "title": "Spec Draft", "artifactType": "docs", "announce": false }),
+    ));
+    let art_id = created["id"].as_str().unwrap().to_string();
+    assert!(created.get("issue").is_none());
+
+    // Link by issue id.
+    let linked_one = ok(call("artifact.update", json!({ "id": art_id, "issue": issue_one_id })));
+    assert_eq!(linked_one["issue"].as_str(), Some(issue_one_id.as_str()));
+    let listed_one = ok(call("artifact.list", json!({ "issue": issue_one_id })));
+    assert_eq!(listed_one.as_array().unwrap().len(), 1);
+    assert_eq!(listed_one[0]["id"], art_id);
+
+    // Re-link by `#number` reference.
+    let linked_two = ok(call("artifact.update", json!({ "id": art_id, "issue": format!("#{issue_two_num}") })));
+    assert_eq!(linked_two["issue"].as_str(), Some(issue_two_id.as_str()));
+    assert!(ok(call("artifact.list", json!({ "issue": issue_one_id }))).as_array().unwrap().is_empty());
+    let listed_two = ok(call("artifact.list", json!({ "issue": issue_two_id })));
+    assert_eq!(listed_two.as_array().unwrap().len(), 1);
+    assert_eq!(listed_two[0]["id"], art_id);
+
+    // Unknown issue reference must be refused and leave the existing link intact.
+    assert_eq!(
+        code(call("artifact.update", json!({ "id": art_id, "issue": "i-does-not-exist" }))),
+        BizCode::IssueNotFound.code()
+    );
+    assert_eq!(ok(call("artifact.get", json!({ "id": art_id })))["issue"].as_str(), Some(issue_two_id.as_str()));
+
+    // Clear link with empty string.
+    let unlinked = ok(call("artifact.update", json!({ "id": art_id, "issue": "" })));
+    assert!(unlinked.get("issue").is_none());
+    assert!(ok(call("artifact.get", json!({ "id": art_id }))).get("issue").is_none());
+    assert!(ok(call("artifact.list", json!({ "issue": issue_two_id }))).as_array().unwrap().is_empty());
+
+    started.close_blocking();
+}

@@ -323,7 +323,9 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
     const { id, title } = props.artifact;
     const description = `${kindLabel(props.artifact)} · ${artifactHref(id)}`;
     return creatingIssue.run(async () => {
-      await api.issue.create({ title, description, requestKey: newSendKey() });
+      const made = await api.issue.create({ title, description, requestKey: newSendKey() });
+      await api.artifact.update({ id, issue: made.id });
+      void queries.invalidate({ prefix: ["artifacts"] });
       toast(t("web.library.content.issueCreated"));
     });
   };

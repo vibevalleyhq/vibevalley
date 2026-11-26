@@ -17,7 +17,7 @@ export interface ArtifactHandlers {
   readonly "artifact.create": (a: T.ArtifactRequest) => Promise<T.Artifact>;
   /** Cuts a new immutable directory snapshot version over the latest state. */
   readonly "artifact.version.create": (a: T.ArtifactVersionRequest) => Promise<T.Artifact>;
-  /** Updates an artifact's title or default design-system flag. */
+  /** Updates an artifact's title, linked issue, or default design-system flag. */
   readonly "artifact.update": (a: T.ArtifactUpdateRequest) => Promise<T.Artifact>;
   readonly "artifact.delete": (a: { readonly id: T.ArtifactId }) => Promise<void>;
   readonly "artifact.previewDelete": (a: { readonly id: T.ArtifactId }) => Promise<T.Preview>;

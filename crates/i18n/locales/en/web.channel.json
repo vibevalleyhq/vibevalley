@@ -189,7 +189,20 @@
     "copyLink": "Copy link",
     "copied": "Link copied",
     "markUnread": "Mark unread from here",
-    "jump": "Jump to it"
+    "jump": "Jump to it",
+    "promoteIssue": "Promote to ticket",
+    "saveArtifact": "Save as artifact"
+  },
+  "promote": {
+    "source": "From {where}",
+    "saveTitle": "Save message as artifact",
+    "artifactTitle": "Title",
+    "artifactType": "Type",
+    "artifactContent": "Content",
+    "artifactSave": "Save artifact",
+    "artifactSaved": "Saved as \"{title}\"",
+    "artifactNote": "Saved from {where}",
+    "fallbackTitle": "Message #{number}"
   },
   "switcher": {
     "open": "Jump to…",

@@ -1,7 +1,7 @@
 import { cleanup, computed, effect, keymap, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import type { RuntimeInfo } from "@vibevalley/protocol";
+import type { Attachment, RuntimeInfo } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
@@ -31,6 +31,7 @@ export interface NewIssueAt {
   readonly parent?: string;
   readonly text?: string;
   readonly attachments?: readonly string[];
+  readonly attachmentFiles?: readonly Attachment[];
   readonly tags?: readonly string[];
   readonly startAt?: number;
   readonly dueAt?: number;
@@ -44,7 +45,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
       text: props.at.text ?? "",
       repo: props.at.repo ?? last.repo,
       agent: props.at.agent ?? (last.pick === "auto" ? "" : last.pick),
-      attachments: [],
+      attachments: [...(props.at.attachmentFiles ?? [])],
     }),
   );
   const machineId = signal(props.at.machineId ?? "");

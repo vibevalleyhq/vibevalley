@@ -754,6 +754,9 @@ pub struct ArtifactUpdateRequest {
     pub id: ArtifactId,
     pub title: Option<String>,
     pub is_default: Option<bool>,
+    /// Linked issue id or number; "" clears the linked issue.
+    #[serde(default)]
+    pub issue: Option<String>,
 }
 
 #[skip_serializing_none]

@@ -302,6 +302,7 @@ export const ArtifactUpdateRequest = z.object({
   id: ArtifactId,
   title: z.exactOptional(z.string()),
   isDefault: z.exactOptional(z.boolean()),
+  issue: z.exactOptional(z.string()),
 }) satisfies Codec<T.ArtifactUpdateRequest>;
 
 export const ArtifactListRequest = z.object({

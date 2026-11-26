@@ -565,6 +565,10 @@ impl ArtifactService {
         update_artifact_field_impl(tx, id, artifact::Column::Title, title, at).await
     }
 
+    pub(crate) async fn set_issue_in_tx(&self, tx: &Tx, id: &str, issue: Option<&str>, at: i64) -> DbResult<()> {
+        update_artifact_field_impl(tx, id, artifact::Column::Issue, issue.map(str::to_owned), at).await
+    }
+
     pub(crate) async fn delete(&self, id: &str) -> DbResult<()> {
         super::delete_by_id::<artifact::Entity, _>(self.db.write_conn(), id).await
     }
