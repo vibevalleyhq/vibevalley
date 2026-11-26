@@ -42,7 +42,7 @@ import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from ".
 import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
 import { IssueThread } from "./IssueThread";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
-import { Fold, IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, StagePill } from "./Sheet";
+import { Fold, IssueSheet, IssueTrail, More, Note, Pick, Property, SheetLabel, StagePill } from "./Sheet";
 
 export { OrchestratorIssueDetail };
 
@@ -132,35 +132,7 @@ export function IssueDetail(props: {
   const stageMeta = computed(() => statusParts().slice(1).filter(Boolean));
   const heading = (
     <View>
-      <View accessibilityLabel={t("web.issue.detail.trail")} testID="issue-trail" class="mb-2 flex-row flex-wrap items-center gap-1.5">
-        <If when={s().repo}>
-          {(repo) => (
-            <>
-              <View class="flex-row items-center gap-1 rounded-md bg-side px-1.5 py-0.5">
-                <Icon name="folder" size={12} tone="muted" />
-                <Text class="text-xs font-medium text-muted">{repo()}</Text>
-              </View>
-              <Icon name="next" size={12} tone="faint" />
-            </>
-          )}
-        </If>
-        <If when={live().parent}>
-          {(parentId) => (
-            <>
-              <View
-                role="button"
-                testID="parent-issue"
-                onPress={() => openIssue(parentId())}
-                class="flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:bg-hover"
-              >
-                <Text class="text-xs text-water">{parent() ? `#${parent()!.number} ${parent()!.title}` : t("web.issue.family.parent")}</Text>
-              </View>
-              <Icon name="next" size={12} tone="faint" />
-            </>
-          )}
-        </If>
-        <IssueNumberPill number={props.issue.number} />
-      </View>
+      <IssueTrail number={props.issue.number} repo={s().repo || undefined} parentId={live().parent} parent={parent()} onOpenParent={openIssue} />
       <View class="flex-row flex-wrap items-baseline gap-x-2">
         <IssueTitle shown={s().title} full={live().title} editable={s().open} state={labeled().state("title")} onSave={(title) => setLabel({ title })} />
       </View>
@@ -623,6 +595,7 @@ export function IssueDetail(props: {
           value={live().startAt}
           disabled={busy() || !s().open}
           testid="issue-start-at"
+          maxMs={live().dueAt}
           onCommit={(startAt) => setLabel({ startAt })}
         />
       </Property>
@@ -632,6 +605,7 @@ export function IssueDetail(props: {
           value={live().dueAt}
           disabled={busy() || !s().open}
           testid="issue-due-at"
+          minMs={live().startAt}
           onCommit={(dueAt) => setLabel({ dueAt })}
         />
       </Property>

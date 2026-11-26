@@ -307,9 +307,13 @@ test("Board uses professional PM lane labels without concurrency badge, renders 
   // Compare card carries the subtle Compare badge; plain image attachment does not.
   expect(app.count("id:card-preview-compare")).toBe(1);
 
-  // Clicking a card opens Quick-Peek modal with preview-first Compare content, dismissible via Close, or expandable to full screen.
+  // Clicking a card opens Quick-Peek modal with responsive viewport scaling and preview-first Compare content, dismissible via Close, or expandable to full screen.
   await app.press("id:issue-card >> nth=0");
   await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1 && app.count("id:compare-card") === 1);
+  const peekBox = app.layout("id:issue-peek-surface");
+  expect(peekBox).toBeDefined();
+  expect(peekBox!.width).toBe(1124);
+  expect(peekBox!.height).toBe(720);
   expect(app.count("id:issue")).toBe(0);
   expect(app.count("id:issue-peek-expand")).toBe(1);
 
@@ -365,9 +369,13 @@ test("Board renders tags, parent badges, scope toggle, and TodoDetail supports t
     { issue: childIssue, sessions: [], missingSessions: [] },
     { issue: canceledIssue, sessions: [], missingSessions: [] },
   ]);
+  fake.respond("issue.update", (payload: unknown) => {
+    const p = payload as { id: string; startAt?: number; dueAt?: number };
+    return { ...childIssue, id: p.id as IssueId, startAt: p.startAt, dueAt: p.dueAt, seq: 21 };
+  });
   fake.respond("issue.status.update", (payload: unknown) => {
     const p = payload as { id: string; status: Issue["status"] };
-    return { ...childIssue, id: p.id as IssueId, status: p.status, seq: 21 };
+    return { ...childIssue, id: p.id as IssueId, status: p.status, seq: 22 };
   });
 
   const app = await open("../../../app/main.tsx", {
@@ -401,7 +409,7 @@ test("Board renders tags, parent badges, scope toggle, and TodoDetail supports t
   await app.press("id:issue-scope-all");
   await fake.pumpUntil(app, () => app.count("id:issue-card") === 3);
 
-  // Open child draft directly to verify TodoDetail inspector controls, interactive status picker, and one-click triage actions.
+  // Open child draft directly to verify TodoDetail inspector controls, EpochDatePicker, status picker, and trimmed triage actions.
   await app.host.send("route", `/issues/${childIssue.id}`);
   await fake.pumpUntil(app, () => app.count("id:todo-triage-actions") === 1);
   expect(app.count("id:todo-status")).toBe(1);
@@ -410,17 +418,26 @@ test("Board renders tags, parent badges, scope toggle, and TodoDetail supports t
   expect(app.count("id:issue-start-at")).toBe(1);
   expect(app.count("id:issue-due-at")).toBe(1);
   expect(app.count("id:todo-mark-ready")).toBe(1);
-  expect(app.count("id:todo-mark-done")).toBe(1);
-  expect(app.count("id:todo-mark-canceled")).toBe(1);
+  expect(app.count("id:issue-remove")).toBe(1);
+  expect(app.count("id:todo-mark-done")).toBe(0);
+  expect(app.count("id:todo-mark-canceled")).toBe(0);
+  expect(app.count("id:todo-stage-pill")).toBe(0);
+  expect(app.count("id:todo-review-banner")).toBe(0);
 
-  // Even when a draft field is edited locally, marking done optimistically updates status to done (closed) immediately.
-  await app.press("id:issue-title-trigger");
-  await fake.pumpUntil(app, () => app.count("id:issue-title-input") === 1);
-  await app.type("id:issue-title-input", " draft edit");
-  await app.keyboard.press("enter");
+  // EpochDatePicker in inspector picks a date preset (+3d) and commits via Save.
+  await app.press("id:issue-start-at-trigger");
+  await fake.pumpUntil(app, () => app.count("text:+3d") === 1);
+  await app.press("text:+3d");
   await fake.pumpUntil(app, () => app.count("id:issue-save") === 1);
+  await app.press("id:issue-save");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.update"));
+  const dateUpdate = fake.calls.findLast((c) => c.op === "issue.update");
+  expect((dateUpdate?.payload as { startAt?: number } | undefined)?.startAt).toBeGreaterThan(0);
 
-  await app.press("id:todo-mark-done");
+  // Completing via status picker updates status to done (closed) immediately.
+  await app.press("id:todo-status-trigger");
+  await fake.pumpUntil(app, () => app.count(`text:${t("shared.status.done")}`) >= 1);
+  await app.press(`text:${t("shared.status.done")}`);
   await fake.pumpUntil(app, () => app.count("id:todo-revive") === 1);
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.status.update"));
   const statusCall = fake.calls.find((c) => c.op === "issue.status.update");
@@ -467,6 +484,22 @@ test("Issue DB-backed pickers (NewIssue repo/helper and ParentPicker) filter via
     { issue: parentTwo, sessions: [], missingSessions: [] },
     { issue: targetIssue, sessions: [], missingSessions: [] },
   ]);
+  fake.respond("issue.create", (payload: unknown) => {
+    const p = payload as { title?: string; parent?: IssueId; startAt?: number };
+    return makeIssueFixture({
+      id: "i-created-child",
+      number: 104,
+      title: p.title ?? "Created child",
+      status: "backlog",
+      ...(p.parent ? { parent: p.parent } : {}),
+      ...(p.startAt !== undefined ? { startAt: p.startAt } : {}),
+      stage: { state: "draft", acts: [] },
+    });
+  });
+  fake.respond("issue.refine", (payload: unknown) => {
+    const p = payload as { id: string; text?: string };
+    return makeIssueFixture({ id: p.id, number: 104, title: p.text ?? "Created child", status: "backlog", stage: { state: "draft", acts: [] } });
+  });
 
   const app = await open("../../../app/main.tsx", {
     width: 1280,
@@ -498,8 +531,31 @@ test("Issue DB-backed pickers (NewIssue repo/helper and ParentPicker) filter via
   expect(app.texts()).toContain("小林");
   expect(app.texts()).not.toContain("老周");
   await app.keyboard.press("escape");
-  await app.press("id:issue-new-dialog-never");
+
+  // NewIssue searchable ParentPicker & EpochDatePicker wire parent + startAt into issue.create.
+  await fake.pumpUntil(app, () => app.count("id:issue-new-parent-trigger") === 1 && app.count("id:issue-new-start-at-trigger") === 1);
+  await app.press("id:issue-new-parent-trigger");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-parent-search") === 1);
+  await app.type("id:issue-new-parent-search", "Beta");
+  await fake.pump(app);
+  expect(app.texts()).toContain("#102 Beta Polish Pipeline");
+  expect(app.texts()).not.toContain("#101 Alpha Core Architecture");
+  await app.press("text:#102 Beta Polish Pipeline");
+
+  await app.press("id:issue-new-start-at-trigger");
+  await fake.pumpUntil(app, () => app.count("text:+3d") === 1);
+  await app.press("text:+3d");
+  await fake.pumpUntil(app, () => app.count("id:issue-new-dates") === 1);
+
+  await app.type("id:issue-new-text", "Child task from NewIssue");
+  await app.press("id:issue-new-keep");
   await fake.pumpUntil(app, () => app.count("id:issue-new-dialog") === 0);
+  const createdCall = fake.calls.findLast((c) => c.op === "issue.create");
+  expect(createdCall?.payload).toMatchObject({
+    title: "Child task from NewIssue",
+    parent: "i-parent-beta",
+  });
+  expect((createdCall?.payload as { startAt?: number } | undefined)?.startAt).toBeGreaterThan(0);
 
   // TodoDetail: ParentPicker is searchable while status/priority/deliver remain non-searchable enum dropdowns.
   await app.host.send("route", `/issues/${targetIssue.id}`);

@@ -234,6 +234,7 @@ export function IssuesPage(props: { rest: string }) {
       ...(agent ? { agent } : {}),
       ...(text ? { text } : {}),
       ...(machineId ? { machineId } : {}),
+      ...(where.parent ? { parent: where.parent } : {}),
       ...(where.startAt !== undefined ? { startAt: where.startAt } : {}),
       ...(where.dueAt !== undefined ? { dueAt: where.dueAt } : {}),
     });
@@ -256,6 +257,7 @@ export function IssuesPage(props: { rest: string }) {
   const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
     const made = await act.run(() =>
       writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? "", where.attachments, where.tags, {
+        parent: where.parent,
         startAt: where.startAt,
         dueAt: where.dueAt,
       }),

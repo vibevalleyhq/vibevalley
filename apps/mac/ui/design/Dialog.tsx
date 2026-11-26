@@ -59,19 +59,22 @@ interface DialogSpec {
   readonly maxHeight: number;
   readonly gutterX: number;
   readonly heightRatio: number;
+  readonly widthRatio?: number;
 }
 
 const DIALOG_SPECS: Record<DialogSize, DialogSpec> = {
   sm: { width: 480, fixedHeight: 440, maxHeight: 560, gutterX: 32, heightRatio: 0.8 },
   md: { width: 640, fixedHeight: 540, maxHeight: 620, gutterX: 32, heightRatio: 0.8 },
-  lg: { width: 820, fixedHeight: 640, maxHeight: 680, gutterX: 32, heightRatio: 0.82 },
-  xl: { width: 1000, fixedHeight: 680, maxHeight: 720, gutterX: 48, heightRatio: 0.82 },
+  lg: { width: 980, fixedHeight: 740, maxHeight: 800, gutterX: 40, heightRatio: 0.85, widthRatio: 0.88 },
+  xl: { width: 1220, fixedHeight: 860, maxHeight: 900, gutterX: 48, heightRatio: 0.86, widthRatio: 0.9 },
 };
 
 /** Computes bounded modal width, height, and consistent top Y anchor from size tier, height mode, and viewport. */
 export function dialogDimensions(size: DialogSize, height: DialogHeight, viewport: { width: number; height: number }): DialogDimensions {
   const spec = DIALOG_SPECS[size];
-  const width = Math.min(spec.width, Math.max(240, Math.round(viewport.width - spec.gutterX)));
+  const maxViewportWidth =
+    spec.widthRatio !== undefined ? Math.min(Math.round(viewport.width * spec.widthRatio), viewport.width - spec.gutterX) : viewport.width - spec.gutterX;
+  const width = Math.min(spec.width, Math.max(240, Math.round(maxViewportWidth)));
   const marginTop = Math.max(24, Math.min(80, Math.round(viewport.height * 0.09)));
   const bottomGutter = Math.max(24, Math.min(48, Math.round(viewport.height * 0.06)));
   const maxViewportHeight = Math.max(220, Math.min(Math.round(viewport.height * spec.heightRatio), viewport.height - marginTop - bottomGutter));

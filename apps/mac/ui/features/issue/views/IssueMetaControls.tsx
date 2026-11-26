@@ -4,11 +4,11 @@ import { Input } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import type { Issue } from "@vibevalley/protocol";
 
+import { EpochDatePicker } from "../../../design/DatePicker";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { Bubble } from "../../../design/Tip";
-import { createEffect } from "../../../infra/solid";
-import { childIssuesOf, eligibleParentOptions, formatIsoDate, issueTagPresets, normalizeTagList, parseIsoDateInput } from "../model/meta";
+import { childIssuesOf, eligibleParentOptions, issueTagPresets, normalizeTagList } from "../model/meta";
 import { StatusMark } from "./Marks";
 import { Pick } from "./Sheet";
 
@@ -147,22 +147,25 @@ export function TagEditor(props: {
   );
 }
 
-/** Cycle-safe parent issue selector + clear button for right inspector. */
+/** Cycle-safe parent issue selector + clear button for right inspector and new-issue dialog. */
 export function ParentPicker(props: {
   issueId: string;
   parentId: string;
   allIssues: readonly Issue[];
   disabled?: boolean | undefined;
   state?: "pending" | "failed" | undefined;
+  testid?: string | undefined;
   onChange: (parentId: string) => void;
 }) {
   const options = computed(() => eligibleParentOptions(props.issueId, props.allIssues));
+  const testid = () => props.testid ?? "issue-parent-picker";
+  const clearTestid = () => (props.testid ? `${props.testid}-clear` : "issue-parent-clear");
   return (
     <View class="flex-row items-center gap-1">
       <View class="min-w-0 flex-1">
         <Pick
           label={t("web.issue.family.parent")}
-          testid="issue-parent-picker"
+          testid={testid()}
           value={props.parentId}
           placeholder={t("web.issue.family.noParent")}
           disabled={props.disabled}
@@ -175,67 +178,40 @@ export function ParentPicker(props: {
         />
       </View>
       <If when={props.parentId !== "" && props.disabled !== true}>
-        <IconButton testid="issue-parent-clear" icon="close" size={12} label={t("web.issue.family.clearParent")} onClick={() => props.onChange("")} />
+        <IconButton testid={clearTestid()} icon="close" size={12} label={t("web.issue.family.clearParent")} onClick={() => props.onChange("")} />
       </If>
     </View>
   );
 }
 
-/** Compact YYYY-MM-DD date property editor for `startAt` and `dueAt` schedule foundation (#25). */
+/** Interactive calendar date picker for `startAt` and `dueAt` schedule fields (#25, #68). */
 export function DatePropertyEditor(props: {
   label: string;
   value: number | undefined;
   disabled?: boolean | undefined;
   testid: string;
+  placeholder?: string | undefined;
+  minMs?: number | undefined;
+  maxMs?: number | undefined;
+  quiet?: boolean | undefined;
   onCommit: (ms: number) => void;
 }) {
-  const text = signal(formatIsoDate(props.value));
-  createEffect(
-    () => formatIsoDate(props.value),
-    (fresh) => {
-      text.set(fresh);
-    },
-    { defer: true },
-  );
-  const commit = () => {
-    const parsed = parseIsoDateInput(text());
-    if (parsed === undefined) {
-      text.set(formatIsoDate(props.value));
-      return;
-    }
-    const current = props.value ?? 0;
-    if (parsed !== current) props.onCommit(parsed);
-  };
   return (
-    <If
-      when={props.disabled !== true}
-      else={<Text class="px-2 font-mono text-xs text-ink tabular-nums">{formatIsoDate(props.value) || t("web.issue.dates.notSet")}</Text>}
-    >
-      <View class="flex-row items-center gap-1">
-        <Input
-          testID={props.testid}
-          accessibilityLabel={props.label}
-          value={text()}
-          placeholder={t("web.issue.dates.datePlaceholder")}
-          onChange={(e) => text.set(e.value)}
-          onSubmit={commit}
-          onBlur={commit}
-          class="h-7 min-w-0 flex-1 rounded-md border border-line bg-page px-2 font-mono text-xs text-ink tabular-nums placeholder:text-faint hover:border-faint focus:border-focus"
-        />
-        <If when={props.value !== undefined && props.value > 0}>
-          <IconButton
-            testid={`${props.testid}-clear`}
-            icon="close"
-            size={12}
-            label={t("web.issue.dates.clearDate")}
-            onClick={() => {
-              text.set("");
-              props.onCommit(0);
-            }}
-          />
-        </If>
-      </View>
-    </If>
+    <EpochDatePicker
+      label={props.label}
+      value={props.value}
+      disabled={props.disabled}
+      testid={props.testid}
+      placeholder={props.placeholder}
+      size="control"
+      quiet={props.quiet ?? true}
+      minMs={props.minMs}
+      maxMs={props.maxMs}
+      onChange={(ms) => {
+        const current = props.value ?? 0;
+        if (ms !== current) props.onCommit(ms);
+      }}
+    />
   );
 }
 

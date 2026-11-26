@@ -292,7 +292,6 @@ export function cardLook(c: BoardCard, nameOf: (agent: string) => string, issues
       const item = c.issue;
       if (item.refining) flags.push({ text: t("web.issue.card.refining", { name: item.refining.name }), tone: "water" });
       else if (item.status === "backlog") flags.push({ text: t("web.issue.card.draft"), tone: "faint" });
-      else if (item.status === "in_review") flags.push({ text: t("shared.stage.reviewing"), tone: "wheat" });
       if (item.queuedAt !== undefined) flags.push({ text: t("web.issue.card.queued"), tone: "water" });
       if (item.cron !== undefined) flags.push({ text: t("web.issue.card.cron"), tone: "faint" });
       const agent = assignedAgentOf(item);

@@ -87,7 +87,7 @@ test("cardMove unlocks 6-lane tracking for unsent todo cards while keeping backl
   expect(cardMove(waitingTodo, "done")).toBe("close");
   expect(cardMove(waitingTodo, "canceled")).toBe("close");
   expect(cardUrgencyTone(waitingTodo)).toBe("wheat");
-  expect(cardLook(waitingTodo, (id) => id, [waitingTodo.issue], SCENARIO_NOW).flags).toContainEqual({
+  expect(cardLook(waitingTodo, (id) => id, [waitingTodo.issue], SCENARIO_NOW).flags).not.toContainEqual({
     text: t("shared.stage.reviewing"),
     tone: "wheat",
   });
@@ -111,7 +111,7 @@ test("cardMove unlocks 6-lane tracking for unsent todo cards while keeping backl
   expect(cardMove(closedTodo, "in_review")).toBe("track");
 });
 
-test("TodoDetail toggles criteria [x] persistence, exposes all 6 statuses in Pick, and shows primary 验收通过 button in in_review", async () => {
+test("TodoDetail toggles criteria [x] persistence, exposes all 6 statuses in Pick, and avoids redundant in_review banners/buttons", async () => {
   setLocale("zh");
   let current = makeUnsentIssue({
     id: "i-wf-1",
@@ -188,13 +188,18 @@ test("TodoDetail toggles criteria [x] persistence, exposes all 6 statuses in Pic
   const toReview = fake.calls.findLast((c) => c.op === "issue.status.update");
   expect((toReview?.payload as { status?: string } | undefined)?.status).toBe("in_review");
 
-  // When liveStatus is in_review, primary 验收通过 banner + side button render and clicking completes to done.
-  await fake.pumpUntil(
-    app,
-    () => app.count("id:todo-review-banner") === 1 && app.count("id:todo-accept") === 1 && !app.texts().includes(t("web.issue.acts.moving")),
-  );
-  expect(app.count("id:todo-accept-side")).toBe(1);
-  await app.press("id:todo-accept");
+  // When liveStatus is in_review, no redundant yellow banner, duplicate stage pill, or duplicate status buttons appear; completing via status Pick works cleanly.
+  await fake.pumpUntil(app, () => !app.texts().includes(t("web.issue.acts.moving")));
+  expect(app.count("id:todo-review-banner")).toBe(0);
+  expect(app.count("id:todo-accept")).toBe(0);
+  expect(app.count("id:todo-accept-side")).toBe(0);
+  expect(app.count("id:todo-stage-pill")).toBe(0);
+  expect(app.count("id:todo-mark-done")).toBe(0);
+  expect(app.count("id:todo-mark-canceled")).toBe(0);
+
+  await app.press("id:todo-status");
+  await fake.pumpUntil(app, () => app.count(`text:${t("shared.status.done")}`) >= 1);
+  await app.press(`text:${t("shared.status.done")}`);
   await fake.pumpUntil(app, () => app.count("id:todo-revive") === 1);
   const toDone = fake.calls.findLast((c) => c.op === "issue.status.update");
   expect((toDone?.payload as { status?: string } | undefined)?.status).toBe("done");

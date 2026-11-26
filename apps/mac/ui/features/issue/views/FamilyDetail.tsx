@@ -19,7 +19,7 @@ import { issueSet, labeledIssue, sendLabel } from "../model/write";
 import { ActLines } from "./ActLines";
 import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { StatusMark } from "./Marks";
-import { IssueNumberPill, IssueSheet, Property, SheetLabel, StagePill } from "./Sheet";
+import { IssueSheet, IssueTrail, Property, SheetLabel, StagePill } from "./Sheet";
 
 export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (id: string) => void; onClose: (review: boolean) => void }) {
   const allIssues = useIssues();
@@ -41,35 +41,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
 
   const heading = (
     <View>
-      <View class="mb-2 flex-row flex-wrap items-center gap-1.5">
-        <If when={live().repo}>
-          {(repo) => (
-            <>
-              <View class="flex-row items-center gap-1 rounded-md bg-side px-1.5 py-0.5">
-                <Icon name="folder" size={12} tone="muted" />
-                <Text class="text-xs font-medium text-muted">{repo()}</Text>
-              </View>
-              <Icon name="next" size={12} tone="faint" />
-            </>
-          )}
-        </If>
-        <If when={live().parent}>
-          {(parentId) => (
-            <>
-              <View
-                role="button"
-                testID="parent-issue"
-                onPress={() => props.onOpen(parentId())}
-                class="flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:bg-hover"
-              >
-                <Text class="text-xs text-water">{parent() ? `#${parent()!.number} ${parent()!.title}` : t("web.issue.family.parent")}</Text>
-              </View>
-              <Icon name="next" size={12} tone="faint" />
-            </>
-          )}
-        </If>
-        <IssueNumberPill number={live().number} />
-      </View>
+      <IssueTrail number={live().number} repo={live().repo} parentId={live().parent} parent={parent()} onOpenParent={props.onOpen} />
       <Text role="header" testID="issue-title" class="text-2xl leading-snug font-semibold text-ink">
         {live().title}
       </Text>
@@ -138,6 +110,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
           value={live().startAt}
           disabled={!open()}
           testid="issue-start-at"
+          maxMs={live().dueAt}
           onCommit={(startAt) => setLabel({ startAt })}
         />
       </Property>
@@ -147,6 +120,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
           value={live().dueAt}
           disabled={!open()}
           testid="issue-due-at"
+          minMs={live().startAt}
           onCommit={(dueAt) => setLabel({ dueAt })}
         />
       </Property>

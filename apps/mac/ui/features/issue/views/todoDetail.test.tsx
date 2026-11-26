@@ -215,3 +215,46 @@ test("TodoDetail displays agent.validate readiness diagnostics and can mount a l
   await fake.pump(app);
   expect(fake.calls.some((c) => c.op === "repo.mount")).toBe(true);
 });
+
+test("TodoDetail inspector scrolls smoothly at 900x720 so bottom delete button is never clipped", async () => {
+  const baseTodo =
+    scenarios.typical.state.board.issues.find((i) => i.status === "backlog") ?? scenarios.typical.state.board.issues.find((i) => i.status === "todo");
+  if (!baseTodo) throw new Error("typical scenario must include a backlog or todo issue");
+  const tallTodo = {
+    ...baseTodo,
+    queuedAt: SCENARIO_NOW - 120_000,
+    tags: ["UX", "架构", "MCP", "ACP", "存储", "语音", "白板", "Bug", "custom-long-tag-one", "custom-long-tag-two"],
+  };
+  const state = {
+    ...scenarios.typical.state,
+    board: {
+      ...scenarios.typical.state.board,
+      issues: scenarios.typical.state.board.issues.map((i) => (i.id === tallTodo.id ? tallTodo : i)),
+    },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${tallTodo.id}` });
+  const app = await open("../../../app/main.tsx", {
+    width: 900,
+    height: 720,
+    colorScheme: "light",
+    platform: "macos",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-title") === 1);
+
+  // At 900x720 with sidebar open, inspector toggles as a drawer; open it if collapsed.
+  if (app.count("id:issue-inspector-scroll") === 0 && app.count("id:issue-inspector-toggle") === 1) {
+    await app.press("id:issue-inspector-toggle");
+    await fake.pumpUntil(app, () => app.count("id:issue-inspector-scroll") === 1);
+  }
+  await fake.pumpUntil(app, () => app.count("id:issue-remove") === 1);
+  await app.press("id:sheet-more");
+  await fake.pump(app);
+  await app.scroll("id:issue-inspector-scroll", 600);
+  await fake.pump(app);
+  const removeBox = app.layout("id:issue-remove");
+  expect(removeBox).toBeDefined();
+  expect(removeBox!.clipped).toBe(false);
+  expect(removeBox!.y + removeBox!.height).toBeLessThanOrEqual(720);
+});

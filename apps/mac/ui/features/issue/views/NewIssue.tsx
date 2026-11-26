@@ -7,7 +7,6 @@ import { Button } from "../../../design/Button";
 import { Dialog } from "../../../design/Dialog";
 import { AgentReadinessNote, AgentSelect } from "../../../design/domain/AgentSelect";
 import { Select, TextArea } from "../../../design/Field";
-import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { Banner } from "../../../design/layout";
 import { toast } from "../../../design/toasts";
@@ -18,17 +17,18 @@ import { ready, useRepos, useRuntimes } from "../../../infra/query";
 import { useRouter } from "../../../infra/router";
 import { prefsNow } from "../../../infra/state/prefs";
 import { canSubmitDraft, type DraftSubmitEvent, type DraftSubmitState, draftSubmitTransition, initialDraftSubmit } from "../model/draftSubmit";
-import { formatIsoDate } from "../model/meta";
+import { useIssues } from "../model/history";
 import { createAttachmentUploader, IssueAttachmentStrip } from "./IssueAttachments";
-import { TagEditor } from "./IssueMetaControls";
+import { DatePropertyEditor, ParentPicker, TagEditor } from "./IssueMetaControls";
 
 const isRuntimeReady = (runtime: RuntimeInfo) => runtime.installation.status === "available" && runtime.settings.enabled;
 
-/** The repo, helper, optional execution machine, starter template text, tags, attachment ids, or schedule dates for a new issue. */
+/** The repo, helper, optional execution machine, parent issue, starter template text, tags, attachment ids, or schedule dates for a new issue. */
 export interface NewIssueAt {
   readonly repo?: string;
   readonly agent?: string;
   readonly machineId?: string;
+  readonly parent?: string;
   readonly text?: string;
   readonly attachments?: readonly string[];
   readonly tags?: readonly string[];
@@ -48,10 +48,12 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     }),
   );
   const machineId = signal(props.at.machineId ?? "");
+  const parent = signal(props.at.parent ?? "");
   const tags = signal<string[]>([...(props.at.tags ?? [])]);
   const startAt = signal<number | undefined>(props.at.startAt);
   const dueAt = signal<number | undefined>(props.at.dueAt);
-  const scheduledDateText = computed(() => formatIsoDate(startAt() ?? dueAt()));
+  const hasSchedule = computed(() => startAt() !== undefined || dueAt() !== undefined);
+  const allIssues = useIssues();
   const dispatch = (event: DraftSubmitEvent): DraftSubmitState => {
     const next = draftSubmitTransition(untracked(flow), event, newSendKey);
     flow.set(next);
@@ -89,6 +91,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     if (started.kind !== "submitting") return;
     const { submitted, requestKey } = started;
     const pickedMachine = untracked(machineId);
+    const pickedParent = untracked(parent);
     const pickedTags = untracked(tags);
     const pickedStartAt = untracked(startAt);
     const pickedDueAt = untracked(dueAt);
@@ -100,6 +103,7 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           ...(submitted.repo ? { repo: submitted.repo } : {}),
           ...(submitted.agent ? { agent: submitted.agent } : {}),
           ...(pickedMachine ? { machineId: pickedMachine } : {}),
+          ...(pickedParent ? { parent: pickedParent } : {}),
           ...(submitted.attachments.length > 0 ? { attachments: submitted.attachments.map((file) => file.id) } : {}),
           ...(pickedTags.length > 0 ? { tags: pickedTags } : {}),
           ...(pickedStartAt !== undefined ? { startAt: pickedStartAt } : {}),
@@ -198,26 +202,41 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
           <If when={!noReadyRuntimes() && draft().agent !== ""}>
             <AgentReadinessNote agentId={draft().agent} readiness={agentReadiness} testid="issue-new-helper-status" onNavigate={goTo} />
           </If>
+          <View class="flex-row flex-wrap items-center gap-2">
+            <If when={allIssues().length > 0}>
+              <View class="min-w-44 flex-1">
+                <ParentPicker issueId="" parentId={parent()} allIssues={allIssues()} testid="issue-new-parent" onChange={(next) => parent.set(next)} />
+              </View>
+            </If>
+            <View testID={hasSchedule() ? "issue-new-dates" : undefined} class="flex-row flex-wrap items-center gap-2">
+              <View class="w-36">
+                <DatePropertyEditor
+                  label={t("web.issue.dates.startAt")}
+                  placeholder={t("web.issue.dates.startAt")}
+                  value={startAt()}
+                  testid="issue-new-start-at"
+                  quiet={false}
+                  maxMs={dueAt()}
+                  onCommit={(ms) => startAt.set(ms > 0 ? ms : undefined)}
+                />
+              </View>
+              <View class="w-36">
+                <DatePropertyEditor
+                  label={t("web.issue.dates.dueAt")}
+                  placeholder={t("web.issue.dates.dueAt")}
+                  value={dueAt()}
+                  testid="issue-new-due-at"
+                  quiet={false}
+                  minMs={startAt()}
+                  onCommit={(ms) => dueAt.set(ms > 0 ? ms : undefined)}
+                />
+              </View>
+            </View>
+          </View>
           <View class="gap-1">
             <Text class="text-xs font-medium text-muted">{t("web.issue.tags.label")}</Text>
             <TagEditor compact tags={tags()} onChange={(next) => tags.set(next)} testid="issue-new-tags" />
           </View>
-          <If when={scheduledDateText() !== ""}>
-            <View testID="issue-new-dates" class="flex-row items-center gap-1.5 self-start rounded-md border border-line bg-side px-2 py-1">
-              <Icon name="calendar" size={12} tone="water" />
-              <Text class="font-mono text-xs text-ink tabular-nums">{t("web.issue.calendar.scheduledBadge", { date: scheduledDateText() })}</Text>
-              <IconButton
-                testid="issue-new-dates-clear"
-                icon="close"
-                size={12}
-                label={t("web.issue.calendar.clearScheduledDate")}
-                onClick={() => {
-                  startAt.set(undefined);
-                  dueAt.set(undefined);
-                }}
-              />
-            </View>
-          </If>
           <If when={noRepos() || noReadyRuntimes()}>
             <View class="gap-2">
               <If when={noRepos()}>

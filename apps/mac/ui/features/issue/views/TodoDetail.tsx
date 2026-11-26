@@ -13,6 +13,7 @@ import {
   PriorityValues,
 } from "@vibevalley/protocol";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
+import { IssueLane as IssueLaneSchema } from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -40,7 +41,7 @@ import { IssueAttachments } from "./IssueAttachments";
 import { DatePropertyEditor, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { IssueThread } from "./IssueThread";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
-import { IssueNumberPill, IssueSheet, More, Note, Pick, Property, SheetLabel, StagePill, Stages } from "./Sheet";
+import { IssueSheet, IssueTrail, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 import { criteriaList, NewRepoPopoverBody, TodoCriteriaSection, TodoTitle, toggleCriterionLine } from "./TodoSections";
 
 interface Draft {
@@ -158,17 +159,14 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
 
   const liveStatus = computed(() => movedIssue(props.item, moves.list()).status);
   const backlog = () => liveStatus() === "backlog";
-  const inProgress = () => liveStatus() === "in_progress";
-  const inReview = () => liveStatus() === "in_review";
   const closed = () => liveStatus() === "done" || liveStatus() === "canceled";
-  const todoStatuses: readonly IssueStatus[] = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"];
   const todoStatusLabel = (status: IssueStatus): string => {
     if (status === "backlog") return t("web.issue.todo.draftStatus");
     if (status === "todo") return t("web.issue.todo.todoStatus");
     return t(`shared.status.${status}`);
   };
   const statusOptions = computed(() =>
-    todoStatuses.filter((s) => s === liveStatus() || props.item.moves.includes(s)).map((s) => ({ value: s, label: todoStatusLabel(s) })),
+    IssueLaneSchema.options.filter((s) => s === liveStatus() || props.item.moves.includes(s)).map((s) => ({ value: s, label: todoStatusLabel(s) })),
   );
   const drafting = () => props.item.refining;
   const refined = () => isRefined(props.item);
@@ -268,54 +266,14 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   const criteria = computed(() => criteriaList(d().criteria));
   const heading = (
     <View>
-      <View class="mb-2 flex-row flex-wrap items-center gap-1.5">
-        <If when={d().repo}>
-          {(repo) => (
-            <>
-              <View class="flex-row items-center gap-1 rounded-md bg-side px-1.5 py-0.5">
-                <Icon name="folder" size={12} tone="muted" />
-                <Text class="text-xs font-medium text-muted">{repo()}</Text>
-              </View>
-              <Icon name="next" size={12} tone="faint" />
-            </>
-          )}
-        </If>
-        <If when={d().parent}>
-          {(parentId) => (
-            <>
-              <View
-                role="button"
-                testID="parent-issue"
-                class="flex-row items-center gap-1 rounded-md border border-line bg-side px-1.5 py-0.5 hover:bg-hover"
-                onPress={() => props.onDone(parentId())}
-              >
-                <Text class="text-xs text-water">{parentIssue() ? `#${parentIssue()!.number} ${parentIssue()!.title}` : t("web.issue.family.parent")}</Text>
-              </View>
-              <Icon name="next" size={12} tone="faint" />
-            </>
-          )}
-        </If>
-        <IssueNumberPill number={props.item.number} />
-      </View>
-      <If
-        when={backlog()}
-        else={
-          <View testID="todo-stage-pill" class="mb-3 flex-row items-center gap-2">
-            <StagePill
-              tone={inReview() ? "wheat" : inProgress() ? "water" : liveStatus() === "done" ? "leaf" : "muted"}
-              label={
-                inReview()
-                  ? t("shared.stage.reviewing")
-                  : inProgress()
-                    ? t("shared.status.in_progress")
-                    : liveStatus() === "todo"
-                      ? t("web.issue.todo.todoStatus")
-                      : t(`shared.status.${liveStatus()}`)
-              }
-            />
-          </View>
-        }
-      >
+      <IssueTrail
+        number={props.item.number}
+        repo={d().repo || undefined}
+        parentId={d().parent || undefined}
+        parent={parentIssue()}
+        onOpenParent={(id) => props.onDone(id)}
+      />
+      <If when={backlog()}>
         <View class="mb-4">
           <Stages at="talk" />
         </View>
@@ -432,21 +390,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         }
       >
         <View>
-          <If when={inReview()}>
-            <View
-              testID="todo-review-banner"
-              class="mb-5 flex-row flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3"
-              style={{ borderColor: mix("wheat", 0.35), backgroundColor: mix("wheat", 0.08) }}
-            >
-              <View class="min-w-0 flex-1 flex-row items-center gap-2">
-                <Icon name="check" size={15} tone="wheat" />
-                <Text class="min-w-0 flex-1 text-sm font-semibold text-ink">{t("shared.stage.reviewing")}</Text>
-              </View>
-              <Button tone="primary" icon="check" testID="todo-accept" disabled={busy()} onPress={() => void markStatus("done")}>
-                {t("web.issue.todo.accept")}
-              </Button>
-            </View>
-          </If>
           <If
             when={editingDesc()}
             else={
@@ -657,6 +600,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           value={d().startAt}
           disabled={closed()}
           testid="issue-start-at"
+          maxMs={d().dueAt}
           onCommit={(ms) => edit({ startAt: ms > 0 ? ms : undefined })}
         />
       </Property>
@@ -666,6 +610,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           value={d().dueAt}
           disabled={closed()}
           testid="issue-due-at"
+          minMs={d().startAt}
           onCommit={(ms) => edit({ dueAt: ms > 0 ? ms : undefined })}
         />
       </Property>
@@ -716,7 +661,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             </View>
           }
         >
-          <View testID="todo-triage-actions" class="flex-row flex-wrap items-center gap-1.5">
+          <View testID="todo-triage-actions" class="flex-row flex-wrap items-center gap-2">
             <If when={backlog()}>
               <Button
                 size="compact"
@@ -729,23 +674,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
                 {t("web.issue.todo.markReady")}
               </Button>
             </If>
-            <If
-              when={inReview()}
-              else={
-                <Button size="compact" tone="plain" icon="check" testID="todo-mark-done" disabled={busy()} onPress={() => void markStatus("done")}>
-                  {t("web.issue.todo.markDone")}
-                </Button>
-              }
-            >
-              <Button size="compact" tone="primary" icon="check" testID="todo-accept-side" disabled={busy()} onPress={() => void markStatus("done")}>
-                {t("web.issue.todo.accept")}
-              </Button>
-            </If>
-            <Button size="compact" tone="danger" testID="todo-mark-canceled" disabled={busy()} onPress={() => void markStatus("canceled")}>
-              {t("web.issue.todo.markCanceled")}
-            </Button>
-          </View>
-          <View class="flex-row flex-wrap items-center gap-2 pt-1">
             <ConfirmButton testid="issue-remove" tone="danger" label={t("web.issue.todo.remove")} disabled={busy()} onConfirm={remove} />
           </View>
         </If>
