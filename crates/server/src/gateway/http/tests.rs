@@ -908,3 +908,149 @@ fn slice_returns_service_unavailable_when_server_has_no_async_subscription() {
     let body: Value = res.json().unwrap();
     assert_eq!(body["bizCode"], BizCode::ServiceUnavailable.code());
 }
+
+#[test]
+fn gateway_mcp_route_serves_stateless_discover_skills_and_routable_headers() {
+    use vibevalley_mcp::{
+        EXT_SKILLS, HEADER_METHOD, HEADER_NAME, HEADER_PROTOCOL_VERSION, McpHandler, PROTOCOL_STATELESS, RequestContext, RpcError, ServerCapabilities,
+        ServerInfo, SkillCatalog, ToolCallResult, ToolDef, builtin_artifact_skills, dispatch_json, error_code,
+    };
+
+    struct GatewayMcpDoor {
+        skills: SkillCatalog,
+    }
+
+    impl McpHandler for GatewayMcpDoor {
+        fn server_info(&self) -> ServerInfo {
+            ServerInfo::new("vibevalley", "0.1.0-gateway-test")
+        }
+
+        fn capabilities(&self) -> ServerCapabilities {
+            ServerCapabilities::default().with_tools().with_resources().with_skills_extension(true)
+        }
+
+        fn skills(&self) -> Option<&SkillCatalog> {
+            Some(&self.skills)
+        }
+
+        fn list_tools<'a>(&'a self, _ctx: &'a RequestContext) -> vibevalley_mcp::BoxFuture<'a, Result<Vec<ToolDef>, RpcError>> {
+            Box::pin(async {
+                Ok(vec![ToolDef {
+                    name: "vv_artifact_list".into(),
+                    description: "List artifacts".into(),
+                    input_schema: json!({ "type": "object", "properties": {} }),
+                }])
+            })
+        }
+
+        fn call_tool<'a>(
+            &'a self,
+            _ctx: &'a RequestContext,
+            name: &'a str,
+            arguments: Value,
+        ) -> vibevalley_mcp::BoxFuture<'a, Result<ToolCallResult, RpcError>> {
+            let name = name.to_owned();
+            Box::pin(async move { Ok(ToolCallResult::json(&json!({ "tool": name, "arguments": arguments }))) })
+        }
+    }
+
+    impl crate::context::api::Mcp for GatewayMcpDoor {
+        fn message_json(&self, _token: &str, _message_json: &str) -> Option<String> {
+            None
+        }
+
+        fn message_json_async(self: Arc<Self>, token: String, message_json: String) -> BoxFuture<'static, Option<String>> {
+            Box::pin(async move {
+                let ctx = RequestContext {
+                    protocol_version: None,
+                    meta: Default::default(),
+                    bearer_token: (!token.is_empty()).then_some(token),
+                };
+                dispatch_json(self.as_ref(), &ctx, &message_json).await.ok().flatten()
+            })
+        }
+    }
+
+    struct WithMcpDoor {
+        inner: Arc<FakeServer>,
+        door: Arc<GatewayMcpDoor>,
+    }
+
+    impl Server for WithMcpDoor {
+        fn call(&self, op: &str, payload: Value) -> Envelope {
+            self.inner.call(op, payload)
+        }
+        fn slice_snapshot(&self, kind: SliceKind) -> Value {
+            self.inner.slice_snapshot(kind)
+        }
+        fn watch_slice(&self, kind: SliceKind, after_seq: Option<i64>, stop: &tokio_util::sync::CancellationToken, emit: &mut dyn FnMut(i64, &Value)) {
+            self.inner.watch_slice(kind, after_seq, stop, emit)
+        }
+        fn live(&self) -> tokio::sync::mpsc::UnboundedReceiver<vibevalley_protocol::LiveEvent> {
+            self.inner.live()
+        }
+        fn subscribe(&self, name: &str, payload: Value) -> Result<(u64, tokio::sync::mpsc::UnboundedReceiver<Value>), Envelope> {
+            self.inner.subscribe(name, payload)
+        }
+        fn unsubscribe(&self, id: u64) {
+            self.inner.unsubscribe(id)
+        }
+        fn ports(&self) -> GatewayPorts {
+            GatewayPorts {
+                mcp: Some(self.door.clone()),
+                ..Default::default()
+            }
+        }
+    }
+
+    let door = Arc::new(GatewayMcpDoor {
+        skills: builtin_artifact_skills(),
+    });
+    let server: Shared = Arc::new(WithMcpDoor {
+        inner: Arc::new(FakeServer::new()),
+        door,
+    });
+    let listener = serve(server, "127.0.0.1:0".parse().unwrap()).unwrap();
+    let mcp_url = format!("{}/mcp", listener.url());
+
+    // 1. Stateless server/discover with SEP-2640 skills extension.
+    let discover = agent()
+        .post(&mcp_url)
+        .header(HEADER_PROTOCOL_VERSION, PROTOCOL_STATELESS)
+        .header(HEADER_METHOD, "server/discover")
+        .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": "server/discover", "params": {} }))
+        .send()
+        .unwrap();
+    assert_eq!(discover.status().as_u16(), 200);
+    assert_eq!(discover.headers()[HEADER_PROTOCOL_VERSION], PROTOCOL_STATELESS);
+    let discover_body: Value = discover.json().unwrap();
+    assert_eq!(discover_body["result"]["stateless"], true);
+    assert_eq!(discover_body["result"]["capabilities"]["extensions"][EXT_SKILLS]["directoryRead"], true);
+
+    // 2. SEP-2640 skills/list returns all 12 artifact type skills.
+    let skills = agent()
+        .post(&mcp_url)
+        .json(&json!({ "jsonrpc": "2.0", "id": 2, "method": "skills/list", "params": {} }))
+        .send()
+        .unwrap();
+    assert_eq!(skills.status().as_u16(), 200);
+    let skills_body: Value = skills.json().unwrap();
+    assert_eq!(skills_body["result"]["skills"].as_array().unwrap().len(), 12);
+
+    // 3. SEP-2243 Mcp-Name mismatch returns HTTP 400 with -32020.
+    let mismatch = agent()
+        .post(&mcp_url)
+        .header(HEADER_METHOD, "tools/call")
+        .header(HEADER_NAME, "wrong_tool")
+        .json(&json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": { "name": "vv_artifact_list", "arguments": {} }
+        }))
+        .send()
+        .unwrap();
+    assert_eq!(mismatch.status().as_u16(), 400);
+    let mismatch_body: Value = mismatch.json().unwrap();
+    assert_eq!(mismatch_body["error"]["code"], error_code::HEADER_MISMATCH);
+}
