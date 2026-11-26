@@ -122,7 +122,7 @@
   "templates": {
     "title": "Templates",
     "intro": "Each template is a recipe for an agent: its role, duty, persona, the machine it is written for and its look. Installing one adds a profile, and one template can be installed many times; change what is installed as you like, and when the template has a new version the profile says so.",
-    "open": "Install from a template",
+    "open": "Templates",
     "openLine": "Recipes for assistants and helpers, to pick from",
     "folder": "Template folder",
     "folderHint": "The path of a template folder on this machine (with agent.json in it)",

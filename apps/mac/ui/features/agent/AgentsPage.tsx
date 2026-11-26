@@ -8,11 +8,11 @@ import { Button, ButtonLink } from "../../design/Button";
 import { AgentFace, OrchestratorFace } from "../../design/domain/Face";
 import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
-import { Empty, PageBody, Toggle } from "../../design/layout";
+import { Empty, Toggle } from "../../design/layout";
 import { Segmented } from "../../design/Segmented";
 import { CountPill, Dot } from "../../design/Tag";
 import { TextLink } from "../../design/TextLink";
-import { Bubble, Hint } from "../../design/Tip";
+import { Bubble } from "../../design/Tip";
 import { useAgentProblems, useOrchestrators, useWorkAgents } from "../../infra/agents";
 import { api } from "../../infra/api";
 import { ready, useAgentTemplates, useQueryClient, useRuntimes } from "../../infra/query";
@@ -57,7 +57,15 @@ function matchesProfileQuery(agent: Agent, runtime: RuntimeInfo | undefined, nee
 export function AgentsRoute(props: { rest: string }) {
   return (
     <If when={props.rest} else={<AgentsPage />}>
-      {(id) => <Each of={[id()]}>{(at) => (at() === "templates" ? <TemplatesPage /> : <AgentPage id={decodeURIComponent(at())} />)}</Each>}
+      {(id) => (
+        <Each of={[id()]} key={(v) => v}>
+          {(at) => (
+            <If when={at() === "templates"} else={<AgentPage id={decodeURIComponent(at())} />}>
+              <TemplatesPage />
+            </If>
+          )}
+        </Each>
+      )}
     </If>
   );
 }
@@ -73,10 +81,11 @@ function AgentsPage() {
   const category = signal<CategoryFilter>("all");
   const query = signal("");
   const width = signal(0);
-  const wide = createMemo(() => width() === 0 || width() >= 680);
+  const wide = createMemo(() => width() === 0 || width() >= 720);
 
   const runtimeById = createMemo(() => new Map(ready(runtimes, []).map((r) => [r.id, r])));
   const needle = createMemo(() => query().trim().toLowerCase());
+  const totalCount = createMemo(() => orchestrators().length + agents().length);
 
   const visibleOrchestrators = createMemo(() =>
     showsOrchestrators(roleFilter()) ? orchestrators().filter((a) => matchesProfileQuery(a, runtimeById().get(a.runtime), needle())) : [],
@@ -99,7 +108,7 @@ function AgentsPage() {
     () => (showsOrchestrators(roleFilter()) && visibleOrchestrators().length > 0) || (showsWorkers(roleFilter()) && visibleWorkers().length > 0),
   );
   const roleOptions = createMemo(() => [
-    { value: "all" as const, label: t("web.agent.list.all"), count: orchestrators().length + agents().length },
+    { value: "all" as const, label: t("web.agent.list.all"), count: totalCount() },
     { value: "orchestrator" as const, label: t("web.agent.list.orchestrators"), count: orchestrators().length },
     { value: "worker" as const, label: t("web.agent.list.helpers"), count: agents().length },
   ]);
@@ -125,9 +134,16 @@ function AgentsPage() {
       <View
         testID="agents-toolbar"
         desktop={{ windowDrag: true }}
-        class="shrink-0 flex-row flex-wrap items-center justify-between gap-2 border-b border-line bg-page px-3.5 py-2"
+        class="min-h-11 shrink-0 flex-row flex-wrap items-center justify-between gap-3 border-b border-line bg-page px-6 py-1.5"
       >
-        <View class="flex-row flex-wrap items-center gap-2">
+        <View class="min-w-0 flex-row flex-wrap items-center gap-2.5">
+          <View class="flex-row items-center gap-2">
+            <Text role="header" class="shrink-0 text-sm font-semibold text-ink">
+              {t("web.base.place.team.label")}
+            </Text>
+            <CountPill count={totalCount()} />
+          </View>
+          <View class="h-4 w-px shrink-0 bg-line" />
           <Segmented
             testid="agents-role-filter"
             label={t("web.agent.list.filterLabel")}
@@ -135,6 +151,8 @@ function AgentsPage() {
             onChange={(v) => roleFilter.set(v)}
             options={roleOptions()}
           />
+        </View>
+        <View class="shrink-0 flex-row flex-wrap items-center gap-2">
           <SearchField
             testid="agents-search"
             clearTestid="agents-search-clear"
@@ -143,10 +161,8 @@ function AgentsPage() {
             onInput={(v) => query.set(v)}
             placeholder={t("web.agent.list.searchHint")}
             label={t("web.agent.list.search")}
-            class="w-56"
+            class="w-52"
           />
-        </View>
-        <View class="flex-row flex-wrap items-center gap-1.5">
           <ButtonLink href="/agents/templates" tone="quiet" testID="open-templates" icon="folder" tooltip={<Bubble text={t("web.agent.templates.openLine")} />}>
             {t("web.agent.templates.open")}
           </ButtonLink>
@@ -158,8 +174,9 @@ function AgentsPage() {
           </ButtonLink>
         </View>
       </View>
-      <Scroll class="min-h-0 flex-1" contentClass="px-3.5 pt-4 pb-8">
-        <PageBody width="manage">
+
+      <Scroll class="min-h-0 flex-1" contentClass="px-6 py-6 pb-10">
+        <View class="mx-auto w-full max-w-230 gap-6">
           <If
             when={!noMatches()}
             else={
@@ -179,7 +196,7 @@ function AgentsPage() {
           >
             <If when={showsOrchestrators(roleFilter()) && visibleOrchestrators().length > 0}>
               <GroupSection title={t("web.agent.list.orchestrators")} count={visibleOrchestrators().length} testid="agents-group-orchestrators">
-                <View class="overflow-hidden rounded-lg border border-line bg-page">
+                <View class="overflow-hidden rounded-xl border border-line bg-elevated">
                   <Each of={visibleOrchestrators()} key={(a) => a.id}>
                     {(a, i) => <OrchestratorRow agent={a()} first={i() === 0} wide={wide()} />}
                   </Each>
@@ -189,7 +206,7 @@ function AgentsPage() {
 
             <If when={showsWorkers(roleFilter()) && visibleWorkers().length > 0}>
               <GroupSection title={t("web.agent.list.helpers")} count={visibleWorkers().length} testid="agents-group-workers">
-                <View class="overflow-hidden rounded-lg border border-line bg-page">
+                <View class="overflow-hidden rounded-xl border border-line bg-elevated">
                   <Each of={visibleWorkers()} key={(a) => a.id}>
                     {(a, i) => (
                       <WorkerRow
@@ -207,18 +224,20 @@ function AgentsPage() {
             </If>
 
             <If when={ready(templates, []).length > 0}>
-              <View testID="agents-templates-gallery" class={hasProfileSection() ? "gap-3 border-t border-line pt-5" : "gap-3"}>
-                <View class="flex-row flex-wrap items-center justify-between gap-2">
-                  <View class="flex-row items-center gap-2">
-                    <Text role="header" class="text-xs font-semibold text-muted">
-                      {t("web.agent.templates.galleryTitle")}
-                    </Text>
-                    <CountPill count={visibleTemplates().length} />
-                    <Hint text={t("web.agent.templates.galleryIntro")} />
+              <View testID="agents-templates-gallery" class={hasProfileSection() ? "mt-2 gap-4 border-t border-line pt-7" : "gap-4"}>
+                <View class="flex-row flex-wrap items-start justify-between gap-3 px-0.5">
+                  <View class="min-w-0 flex-1 gap-1">
+                    <View class="flex-row items-center gap-2">
+                      <Text role="header" class="text-sm font-semibold text-ink">
+                        {t("web.agent.templates.galleryTitle")}
+                      </Text>
+                      <CountPill count={visibleTemplates().length} />
+                    </View>
+                    <Text class="text-xs leading-relaxed text-muted">{t("web.agent.templates.galleryIntro")}</Text>
                   </View>
                   <ButtonLink href="/agents/templates" tone="quiet" size="compact" testID="gallery-manage-templates">
                     <>
-                      <Text class="text-xs text-ink">{t("web.agent.templates.manageLink")}</Text>
+                      <Text class="text-xs font-medium text-muted">{t("web.agent.templates.manageLink")}</Text>
                       <Icon name="next" size={12} tone="muted" />
                     </>
                   </ButtonLink>
@@ -237,7 +256,7 @@ function AgentsPage() {
                     })),
                   ]}
                 />
-                <View class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                <View class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <Each of={visibleTemplates()} key={(tpl) => tpl.id}>
                     {(tpl) => <TemplateCard template={tpl()} runtimes={ready(runtimes, [])} />}
                   </Each>
@@ -245,7 +264,7 @@ function AgentsPage() {
               </View>
             </If>
           </If>
-        </PageBody>
+        </View>
       </Scroll>
     </View>
   );
@@ -254,32 +273,54 @@ function AgentsPage() {
 function GroupSection(props: { title: string; count: number; testid: string; children: JSX.Element }) {
   return (
     <View testID={props.testid} class="gap-2">
-      <View class="flex-row items-center gap-2">
-        <Text role="header" class="text-xs font-semibold text-muted">
-          {props.title}
-        </Text>
-        <If when={props.count > 0}>
-          <CountPill count={props.count} />
-        </If>
+      <View class="flex-row items-center justify-between gap-2 px-0.5">
+        <View class="flex-row items-center gap-2">
+          <Text role="header" class="text-xs font-semibold text-muted">
+            {props.title}
+          </Text>
+          <If when={props.count > 0}>
+            <CountPill count={props.count} />
+          </If>
+        </View>
       </View>
       {props.children}
     </View>
   );
 }
 
-function RowShell(props: { agent: Agent; to: string; first: boolean; muted?: boolean; trailing?: JSX.Element; children: JSX.Element }) {
+function RowShell(props: {
+  agent: Agent;
+  to: string;
+  first: boolean;
+  wide: boolean;
+  muted?: boolean;
+  readiness?: JSX.Element;
+  runtimePill: JSX.Element;
+  action?: JSX.Element;
+  children: JSX.Element;
+}) {
   return (
     <View
-      class={`flex-row items-center gap-3 px-3.5 py-2.5 hover:bg-hover ${
-        props.first ? "" : "border-t border-line"
-      } ${props.muted === true ? "opacity-75" : ""}`}
+      class={`min-h-14 flex-row items-center gap-4 px-4 py-3 hover:bg-hover ${props.first ? "" : "border-t border-line"} ${
+        props.muted === true ? "opacity-65" : ""
+      }`}
     >
       <A href={props.to} testID={`agent-card-${props.agent.id}`} accessibilityLabel={props.agent.name} class="min-w-0 flex-1 flex-row items-center gap-3">
         {props.children}
       </A>
-      <View class="shrink-0 flex-row items-center gap-2.5">
-        {props.trailing}
-        <A href={props.to} accessibilityLabel={props.agent.name} class="flex h-6 w-5 items-center justify-center rounded-sm">
+      <If when={props.readiness}>
+        <View class="shrink-0 flex-row items-center gap-2">{props.readiness}</View>
+      </If>
+      <If when={props.wide}>
+        <View class="w-36 shrink-0 flex-row items-center">{props.runtimePill}</View>
+      </If>
+      <View class="w-16 shrink-0 flex-row items-center justify-end gap-2">
+        {props.action}
+        <A
+          href={props.to}
+          accessibilityLabel={props.agent.name}
+          class="flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+        >
           <Icon name="next" size={14} tone="faint" />
         </A>
       </View>
@@ -291,29 +332,32 @@ function OrchestratorRow(props: { agent: Agent; first: boolean; wide: boolean })
   const isDefault = () => props.agent.id === defaultOrchestrator;
   const summary = () => props.agent.model || t("web.agent.list.orchestratorSummary");
   return (
-    <RowShell agent={props.agent} to={orchestratorHref(props.agent.id)} first={props.first} trailing={<View class="w-7" />}>
-      <View class="h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-side">
-        <OrchestratorFace size={34} agent={props.agent.id} />
+    <RowShell
+      agent={props.agent}
+      to={orchestratorHref(props.agent.id)}
+      first={props.first}
+      wide={props.wide}
+      runtimePill={
+        <View tooltip={<Bubble text={summary()} />} class="h-6 max-w-full flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2">
+          <Dot tone="leaf" size={6} ring={false} />
+          <Text class="min-w-0 truncate text-xs font-medium text-muted">{summary()}</Text>
+        </View>
+      }
+    >
+      <View class="size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-side">
+        <OrchestratorFace size={30} agent={props.agent.id} />
       </View>
       <View class="min-w-0 flex-1 gap-0.5">
-        <View class="flex-row items-center gap-2">
-          <Text class="min-w-0 shrink truncate text-sm font-semibold text-ink">{props.agent.name}</Text>
+        <View class="flex-row items-center gap-1.5">
+          <Text class="min-w-0 shrink truncate text-sm font-medium text-ink">{props.agent.name}</Text>
           <If when={isDefault()}>
-            <View class="shrink-0 rounded-sm border border-line bg-side px-1.5 py-px">
+            <View class="shrink-0 rounded-full bg-hover px-2 py-px">
               <Text class="text-2xs font-medium text-muted">{t("web.agent.list.defaultBadge")}</Text>
             </View>
           </If>
         </View>
-        <Text class="truncate text-xs text-muted">{props.agent.duty || t("web.agent.list.orchestratorLine")}</Text>
+        <Text class="truncate text-xs leading-snug text-muted">{props.agent.duty || t("web.agent.list.orchestratorLine")}</Text>
       </View>
-      <If when={props.wide}>
-        <View class="shrink-0 flex-row items-center gap-3">
-          <View class="w-52 flex-row items-center">
-            <Text class="min-w-0 flex-1 truncate text-xs text-muted">{summary()}</Text>
-          </View>
-          <View class="w-28" />
-        </View>
-      </If>
     </RowShell>
   );
 }
@@ -338,11 +382,10 @@ function WorkerRow(props: {
       await client.invalidate({ prefix: ["agents"] });
     });
   };
-  const runtimeSpec = createMemo(() => [props.runtime?.preset.label ?? props.agent.runtime, props.agent.model, props.agent.effort].filter(Boolean).join(" · "));
+  const runtimeLabel = createMemo(() => props.runtime?.preset.label ?? props.agent.runtime);
+  const runtimeSpec = createMemo(() => [runtimeLabel(), props.agent.model, props.agent.effort].filter(Boolean).join(" · "));
   const toggleAction = () => (props.agent.enabled ? t("web.agent.list.disable") : t("web.agent.list.enable"));
   const toggleLabel = () => t("web.agent.list.toggle", { act: toggleAction(), name: props.agent.name });
-  const healthy = createMemo(() => props.errors.length === 0);
-  const shownTags = createMemo(() => (healthy() ? props.agent.tags.slice(0, 2) : []));
   const fixHref = createMemo(() => props.errors.find((e) => e.fixHref !== undefined)?.fixHref);
   const displayLook = createMemo(() => withDefaultWorkerAvatar(props.agent, props.defaultAvatar));
   return (
@@ -350,67 +393,59 @@ function WorkerRow(props: {
       agent={props.agent}
       to={`/agents/${encodeURIComponent(props.agent.id)}`}
       first={props.first}
+      wide={props.wide}
       muted={!props.agent.enabled}
-      trailing={
-        <>
-          <If when={fixHref()}>
-            {(href) => (
-              <TextLink href={href()} testid={`agent-card-fix-${props.agent.id}`} danger>
-                {t("web.setting.readiness.fix")}
-              </TextLink>
-            )}
-          </If>
-          <View tooltip={<Bubble text={toggleLabel()} />}>
-            <Toggle
-              bare
-              checked={props.agent.enabled}
-              disabled={act.busy()}
-              ariaLabel={toggleLabel()}
-              testid={`toggle-${props.agent.enabled ? "on" : "off"}`}
-              onChange={() => void toggle()}
-            />
-          </View>
-        </>
-      }
-    >
-      <View class="h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line bg-side">
-        <AgentFace agentId={props.agent.id} name={props.agent.name} runtime={props.agent.runtime} look={displayLook()} size={34} muted={!props.agent.enabled} />
-      </View>
-      <View class="min-w-0 flex-1 gap-0.5">
-        <View class="flex-row items-center gap-1.5">
-          <Text class="min-w-0 shrink truncate text-sm font-semibold text-ink">{props.agent.name}</Text>
-          <If when={!props.agent.enabled}>
-            <View class="shrink-0 rounded-sm bg-hover px-1.5 py-px">
-              <Text class="text-2xs font-medium text-muted">{t("web.agent.list.disabledBadge")}</Text>
-            </View>
-          </If>
-          <If when={props.errors.length > 0}>
-            <View tooltip={<Bubble text={props.errors.map((e) => e.text).join("\n")} />} class="max-w-60 shrink rounded-sm bg-bad-soft px-1.5 py-px">
+      readiness={
+        <If when={props.errors.length > 0}>
+          <>
+            <View tooltip={<Bubble text={props.errors.map((e) => e.text).join("\n")} />} class="max-w-56 shrink rounded-full bg-bad-soft px-2 py-0.5">
               <Text testID="agent-card-error" class="truncate text-2xs font-medium text-berry">
                 {t("web.agent.cannot") + (props.errors[0]?.text ?? "")}
               </Text>
             </View>
+            <If when={fixHref()}>
+              {(href) => (
+                <TextLink href={href()} testid={`agent-card-fix-${props.agent.id}`} danger>
+                  {t("web.setting.readiness.fix")}
+                </TextLink>
+              )}
+            </If>
+          </>
+        </If>
+      }
+      runtimePill={
+        <View tooltip={<Bubble text={runtimeSpec()} />} class="h-6 max-w-full flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2">
+          <Dot tone={available() ? "leaf" : "berry"} size={6} ring={false} />
+          <Text class="min-w-0 truncate text-xs font-medium text-muted">{runtimeLabel()}</Text>
+        </View>
+      }
+      action={
+        <View tooltip={<Bubble text={toggleLabel()} />}>
+          <Toggle
+            bare
+            checked={props.agent.enabled}
+            disabled={act.busy()}
+            ariaLabel={toggleLabel()}
+            testid={`toggle-${props.agent.enabled ? "on" : "off"}`}
+            onChange={() => void toggle()}
+          />
+        </View>
+      }
+    >
+      <View class="size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-side">
+        <AgentFace agentId={props.agent.id} name={props.agent.name} runtime={props.agent.runtime} look={displayLook()} size={30} muted={!props.agent.enabled} />
+      </View>
+      <View class="min-w-0 flex-1 gap-0.5">
+        <View class="flex-row items-center gap-1.5">
+          <Text class="min-w-0 shrink truncate text-sm font-medium text-ink">{props.agent.name}</Text>
+          <If when={!props.agent.enabled}>
+            <View class="shrink-0 rounded-full bg-hover px-2 py-px">
+              <Text class="text-2xs font-medium text-faint">{t("web.agent.list.disabledBadge")}</Text>
+            </View>
           </If>
         </View>
-        <Text class="truncate text-xs text-muted">{props.agent.duty || runtimeSpec()}</Text>
+        <Text class="truncate text-xs leading-snug text-muted">{props.agent.duty || runtimeSpec()}</Text>
       </View>
-      <If when={props.wide}>
-        <View class="shrink-0 flex-row items-center gap-3">
-          <View class="w-52 flex-row items-center gap-1.5">
-            <Dot tone={available() ? "leaf" : "berry"} size={7} ring={false} />
-            <Text class="min-w-0 flex-1 truncate text-xs text-muted">{runtimeSpec()}</Text>
-          </View>
-          <View class="w-28 flex-row items-center justify-end gap-1 overflow-hidden">
-            <Each of={shownTags()} key={(tag) => tag}>
-              {(tag) => (
-                <View class="max-w-full shrink rounded-sm bg-hover px-1.5 py-px">
-                  <Text class="truncate text-2xs text-muted">{tag()}</Text>
-                </View>
-              )}
-            </Each>
-          </View>
-        </View>
-      </If>
     </RowShell>
   );
 }

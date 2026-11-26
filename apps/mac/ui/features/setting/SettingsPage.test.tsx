@@ -70,6 +70,9 @@ test("SettingsPage search finds 技能 and 记忆 in Chinese locale", async () =
 test("SettingsPage general renders symmetric left section titles paired with scope notes (zh & en)", async () => {
   const zh = await mountSettings("/settings/general", "zh");
   const zhTexts = zh.app.texts();
+  expect(zhTexts).toContain("工作区");
+  expect(zhTexts).toContain("语音与连接");
+  expect(zhTexts).toContain("调整语言、启动方式、主题与界面显示偏好。");
   expect(zhTexts).toContain("语言");
   expect(zhTexts).toContain("对整个 VibeValley");
   expect(zhTexts).toContain("启动");
@@ -78,6 +81,9 @@ test("SettingsPage general renders symmetric left section titles paired with sco
 
   const en = await mountSettings("/settings/general", "en");
   const enTexts = en.app.texts();
+  expect(enTexts).toContain("Workspace");
+  expect(enTexts).toContain("Voice & Connections");
+  expect(enTexts).toContain("Configure language, startup behavior, theme, and display preferences.");
   expect(enTexts).toContain("Language");
   expect(enTexts).toContain("For all of VibeValley");
   expect(enTexts).toContain("Startup");

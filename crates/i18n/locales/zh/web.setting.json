@@ -53,7 +53,9 @@
     "about": "关于与数据",
     "memory": "记忆",
     "chat": "聊天软件",
-    "width": "导航的宽窄（拖动，双击回默认）"
+    "width": "导航的宽窄（拖动，双击回默认）",
+    "groupWorkspace": "工作区",
+    "groupConnect": "语音与连接"
   },
   "words": {
     "general": "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
@@ -70,6 +72,7 @@
     "device": "只对这台设备"
   },
   "general": {
+    "intro": "调整语言、启动方式、主题与界面显示偏好。",
     "languageHint": "界面、主助手和执行会话说的话都用它",
     "startupTitle": "启动",
     "start": "启动时打开",
@@ -110,6 +113,7 @@
     "intro": "执行会话还能去外面的记忆来源里查、往里记。"
   },
   "about": {
+    "intro": "查看版本信息、桌面更新状态、命令行工具与本机数据路径。",
     "version": "版本",
     "versionHint": "这台电脑上的服务端",
     "files": "文件",

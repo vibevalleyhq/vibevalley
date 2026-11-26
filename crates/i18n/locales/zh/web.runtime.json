@@ -8,7 +8,7 @@
     "mcpServers": "MCP 清单",
     "tools": "工具清单"
   },
-  "available": "可用",
+  "available": "已就绪",
   "disabled": "已停用",
   "unsupported": "不支持",
   "notFound": "没找到",
@@ -151,5 +151,7 @@
   "remoteSummary": "运行在 {machine} 上，由该执行主机托管。",
   "sessions": "相关会话",
   "noSessions": "暂无活跃或最近的会话。",
-  "quickActions": "快捷操作"
+  "quickActions": "快捷操作",
+  "installation": "安装与路径",
+  "source": "安装方式"
 }

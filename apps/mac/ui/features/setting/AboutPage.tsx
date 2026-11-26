@@ -18,7 +18,7 @@ function PathRow(props: { label: string; hint: string; path: string; last?: bool
   return (
     <SettingRow label={props.label} hint={props.hint} last={props.last}>
       <Tip text={props.path}>
-        <View class="max-w-80 rounded-sm bg-page px-2 py-0.5">
+        <View class="max-w-72 rounded-md border border-line bg-side px-2 py-0.5">
           <Text class="truncate font-mono text-xs text-muted">{props.path}</Text>
         </View>
       </Tip>
@@ -42,7 +42,7 @@ export function AboutPage() {
   const updates = useUpdates();
   const cli = useCommandLine();
   return (
-    <SettingsPage title={t("web.setting.nav.about")}>
+    <SettingsPage title={t("web.setting.nav.about")} description={t("web.setting.about.intro")}>
       <If
         when={ready(settings, undefined)}
         else={<Quiet>{settings.error() ? t("web.base.form.unreachable", { why: reasonOf(settings.error()) }) : t("web.base.form.asking")}</Quiet>}
@@ -51,9 +51,11 @@ export function AboutPage() {
           <>
             <SettingsGroup>
               <SettingRow label={t("web.setting.about.version")} hint={t("web.setting.about.versionHint")} last={!updates() && !cli.state()}>
-                <Text testID="about-version" class="font-mono text-sm tabular-nums text-ink">
-                  {s().version}
-                </Text>
+                <View class="rounded-md border border-line bg-side px-2 py-0.5">
+                  <Text testID="about-version" class="font-mono text-xs font-medium tabular-nums text-ink">
+                    {s().version}
+                  </Text>
+                </View>
               </SettingRow>
               <UpdateRow state={updates} last={!cli.state()} />
               <CommandLineRow state={cli.state} onInstall={cli.install} onRemove={cli.remove} last />

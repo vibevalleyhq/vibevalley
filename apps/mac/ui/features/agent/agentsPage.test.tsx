@@ -80,6 +80,11 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   // Single unified toolbar instead of a two-tier <Desk> + toolbar stack.
   expect(app.count("id:desk")).toBe(0);
   expect(app.count("id:agents-toolbar")).toBe(1);
+  expect(app.count("id:open-templates")).toBe(1);
+  expect(app.count("id:new-orchestrator")).toBe(1);
+  expect(app.count("id:new-agent")).toBe(1);
+  expect(app.texts()).toContain("团队");
+  expect(app.texts()).toContain("模板库");
 
   // Localized Chinese error text replaces raw English, paired with a direct 去设置 link.
   expect(app.texts()).toContain("派不出去：还没填 DeepSeek 的钥匙");

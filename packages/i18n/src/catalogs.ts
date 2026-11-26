@@ -172,7 +172,7 @@ export const catalogs = {
         title: "模板",
         intro:
           "每个模板是一份 agent 的配方：角色、职责、人设、推荐的引擎和长相。装一份就多一份角色，同一个模板能装好几份；装好的随便改，模板出了新版本，角色页会提示更新。",
-        open: "从模板装",
+        open: "模板库",
         openLine: "主助手与执行角色的配方，挑着装",
         folder: "模板文件夹",
         folderHint: "本机上一个模板文件夹的路径（里面有 agent.json）",
@@ -2639,7 +2639,7 @@ export const catalogs = {
         mcpServers: "MCP 清单",
         tools: "工具清单",
       },
-      available: "可用",
+      available: "已就绪",
       disabled: "已停用",
       unsupported: "不支持",
       notFound: "没找到",
@@ -2765,6 +2765,8 @@ export const catalogs = {
       sessions: "相关会话",
       noSessions: "暂无活跃或最近的会话。",
       quickActions: "快捷操作",
+      installation: "安装与路径",
+      source: "安装方式",
     },
     "web.session": {
       log: {
@@ -2944,6 +2946,8 @@ export const catalogs = {
         memory: "记忆",
         chat: "聊天软件",
         width: "导航的宽窄（拖动，双击回默认）",
+        groupWorkspace: "工作区",
+        groupConnect: "语音与连接",
       },
       words: {
         general: "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
@@ -2957,6 +2961,7 @@ export const catalogs = {
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
       general: {
+        intro: "调整语言、启动方式、主题与界面显示偏好。",
         languageHint: "界面、主助手和执行会话说的话都用它",
         startupTitle: "启动",
         start: "启动时打开",
@@ -2981,6 +2986,7 @@ export const catalogs = {
       models: { intro: "配置主助手、执行会话与语音功能的模型账号和 API 密钥。", deepseekHint: "主助手和 VibeValley 自研执行会话用它" },
       memory: { intro: "执行会话还能去外面的记忆来源里查、往里记。" },
       about: {
+        intro: "查看版本信息、桌面更新状态、命令行工具与本机数据路径。",
         version: "版本",
         versionHint: "这台电脑上的服务端",
         files: "文件",
@@ -3527,7 +3533,7 @@ export const catalogs = {
         title: "Templates",
         intro:
           "Each template is a recipe for an agent: its role, duty, persona, the machine it is written for and its look. Installing one adds a profile, and one template can be installed many times; change what is installed as you like, and when the template has a new version the profile says so.",
-        open: "Install from a template",
+        open: "Templates",
         openLine: "Recipes for assistants and helpers, to pick from",
         folder: "Template folder",
         folderHint: "The path of a template folder on this machine (with agent.json in it)",
@@ -6123,7 +6129,7 @@ export const catalogs = {
         mcpServers: "MCP list",
         tools: "Tool list",
       },
-      available: "available",
+      available: "Ready",
       disabled: "disabled",
       unsupported: "unsupported",
       notFound: "not found",
@@ -6259,6 +6265,8 @@ export const catalogs = {
       sessions: "Related sessions",
       noSessions: "No active or recent sessions.",
       quickActions: "Quick actions",
+      installation: "Installation",
+      source: "Install source",
     },
     "web.session": {
       log: {
@@ -6448,6 +6456,8 @@ export const catalogs = {
         memory: "Memory",
         chat: "Chat apps",
         width: "Navigation width (drag; double-click for the default)",
+        groupWorkspace: "Workspace",
+        groupConnect: "Voice & Connections",
       },
       words: {
         general: "language start workbench farm theme dark light size zoom scale font animation motion reduce",
@@ -6461,6 +6471,7 @@ export const catalogs = {
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
       general: {
+        intro: "Configure language, startup behavior, theme, and display preferences.",
         languageHint: "The page, the assistant and the helpers all speak it",
         startupTitle: "Startup",
         start: "Open on start",
@@ -6485,6 +6496,7 @@ export const catalogs = {
       models: { intro: "Configure model accounts, API keys, and feature bindings.", deepseekHint: "The assistant and VibeValley's own helpers use it" },
       memory: { intro: "Helpers can also look things up in, and write to, memory outside VibeValley." },
       about: {
+        intro: "Inspect version details, desktop updates, CLI installation, and local data paths.",
         version: "Version",
         versionHint: "The server on this machine",
         files: "Files",
@@ -9636,6 +9648,7 @@ export interface Messages {
   "web.runtime.inspectorHide": undefined;
   "web.runtime.inspectorShow": undefined;
   "web.runtime.inspectorTitle": undefined;
+  "web.runtime.installation": undefined;
   "web.runtime.left": { readonly pct: string | number };
   "web.runtime.library.body": undefined;
   "web.runtime.library.bodyExample": undefined;
@@ -9724,6 +9737,7 @@ export interface Messages {
   "web.runtime.signInTerminal": undefined;
   "web.runtime.signedOut": { readonly runtime: string | number };
   "web.runtime.skills": undefined;
+  "web.runtime.source": undefined;
   "web.runtime.spentToday": { readonly spent: string | number };
   "web.runtime.spentTodayBudget": { readonly budget: string | number; readonly spent: string | number };
   "web.runtime.steer": undefined;
@@ -9896,6 +9910,7 @@ export interface Messages {
   "web.setting.about.home": undefined;
   "web.setting.about.homeHint": undefined;
   "web.setting.about.installing": { readonly next: string | number };
+  "web.setting.about.intro": undefined;
   "web.setting.about.lastChecked": { readonly time: string | number };
   "web.setting.about.manual.diskImage": { readonly next: string | number };
   "web.setting.about.manual.noBuild": { readonly next: string | number };
@@ -9950,6 +9965,7 @@ export interface Messages {
   "web.setting.feature.understanding": undefined;
   "web.setting.feature.vision": undefined;
   "web.setting.feature.voiceDesign": undefined;
+  "web.setting.general.intro": undefined;
   "web.setting.general.languageHint": undefined;
   "web.setting.general.start": undefined;
   "web.setting.general.startHint": undefined;
@@ -9984,6 +10000,8 @@ export interface Messages {
   "web.setting.nav.chat": undefined;
   "web.setting.nav.connections": undefined;
   "web.setting.nav.general": undefined;
+  "web.setting.nav.groupConnect": undefined;
+  "web.setting.nav.groupWorkspace": undefined;
   "web.setting.nav.label": undefined;
   "web.setting.nav.memory": undefined;
   "web.setting.nav.models": undefined;
