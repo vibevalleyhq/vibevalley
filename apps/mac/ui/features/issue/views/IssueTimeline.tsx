@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, View, type ScrollRef } from "nsh";
+import { cleanup, computed, Scroll, signal, Text, View, type ScrollRef } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -97,6 +97,27 @@ function barTooltipText(row: ScheduledCardRow): string {
   return parts.join("\n");
 }
 
+/** Tracks pending `requestAnimationFrame` callbacks under the active reactive owner and cancels them on cleanup. */
+export function createFrameQueue() {
+  let disposed = false;
+  const pending = new Set<number>();
+  const schedule = (fn: () => void) => {
+    if (disposed) return;
+    const id = requestAnimationFrame(() => {
+      pending.delete(id);
+      if (!disposed) fn();
+    });
+    pending.add(id);
+  };
+  const cancelAll = () => {
+    disposed = true;
+    for (const id of pending) cancelAnimationFrame(id);
+    pending.clear();
+  };
+  cleanup(cancelAll);
+  return { schedule, cancelAll };
+}
+
 /** Interactive Gantt / Timeline view with zoom scales, parent-child rollup, today marker, and inline date shifts. */
 export function IssueTimeline(props: {
   cards: BoardCard[];
@@ -114,6 +135,8 @@ export function IssueTimeline(props: {
   const gridViewportWidth = signal(0);
   const now = useNow(60_000);
   let timelineScroll: ScrollRef | undefined;
+  let disposed = false;
+  const frames = createFrameQueue();
 
   const timeline = computed(() => buildScheduleForCards(props.cards, props.allIssues, scale(), now()));
   const dayWidth = computed(() => timelineScaleSpec[scale()].dayWidth);
@@ -122,12 +145,21 @@ export function IssueTimeline(props: {
   const todayX = computed(() => todayIndex() * dayWidth());
 
   const scrollToToday = (animated = true) => {
-    if (!timelineScroll) return;
+    if (disposed || !timelineScroll) return;
     const w = gridViewportWidth();
     const vw = w > 0 ? w : 720;
     const x = Math.max(0, todayX() - Math.round(vw * 0.32));
     timelineScroll.scrollTo({ x, animated });
   };
+
+  const scheduleScrollToToday = (animated = false) => {
+    frames.schedule(() => scrollToToday(animated));
+  };
+
+  cleanup(() => {
+    disposed = true;
+    timelineScroll = undefined;
+  });
 
   const scheduleToday = (issue: Issue) => {
     const startAt = utcDayStart(now());
@@ -148,7 +180,7 @@ export function IssueTimeline(props: {
               value={scale()}
               onChange={(next) => {
                 scale.set(next);
-                requestAnimationFrame(() => scrollToToday(false));
+                scheduleScrollToToday(false);
               }}
               options={scaleOptions()}
             />
@@ -255,7 +287,7 @@ export function IssueTimeline(props: {
                       const w = e.bounds.size.width;
                       if (w > 0 && gridViewportWidth() === 0) {
                         gridViewportWidth.set(w);
-                        requestAnimationFrame(() => scrollToToday(false));
+                        scheduleScrollToToday(false);
                       } else {
                         gridViewportWidth.set(w);
                       }
