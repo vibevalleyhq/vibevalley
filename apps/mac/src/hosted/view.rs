@@ -306,6 +306,10 @@ impl HostedView {
         let _ = self.app.read(cx).host().send("motion", json!(motion.as_str()));
     }
 
+    pub fn push_update_state(&self, state: Value, cx: &App) {
+        let _ = self.app.read(cx).host().send("update_state", state);
+    }
+
     pub fn set_ui_font_size(&self, size: f32, cx: &mut App) {
         let scale = size / 13.0;
         let scale = ((scale - 1.0).abs() > 0.01).then_some(scale);

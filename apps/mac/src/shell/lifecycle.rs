@@ -36,9 +36,20 @@ impl Shell {
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => {
                 this.workspace.workbench_ready = true;
+                this.chrome.workbench.read(cx).push_update_state(crate::update::state(), cx);
                 this.finish_opening(true, cx);
             }
         });
+        let mut update_rx = crate::update::subscribe();
+        cx.spawn(async move |this, cx| {
+            while update_rx.changed().await.is_ok() {
+                let state = update_rx.borrow_and_update().clone();
+                if this.update(cx, |shell, cx| shell.notify_update_state(state, cx)).is_err() {
+                    break;
+                }
+            }
+        })
+        .detach();
         let (fs_tx, fs_rx) = flume::unbounded::<(ProjectId, Vec<FsChange>)>();
         cx.spawn(async move |this, cx| {
             while let Ok(first) = fs_rx.recv_async().await {
