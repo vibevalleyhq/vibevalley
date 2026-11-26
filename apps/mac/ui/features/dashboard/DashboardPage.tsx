@@ -78,14 +78,14 @@ function QuickLinkCard(props: { href: string; testid: string; icon: IconName; la
     <A
       href={props.href}
       testID={props.testid}
-      class="min-w-44 flex-1 flex-row items-center gap-3 rounded-xl border border-line bg-elevated px-3.5 py-3 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
+      class="min-w-0 flex-row items-center gap-3 rounded-xl border border-line bg-elevated px-3.5 py-3 hover:border-faint hover:bg-hover focus-visible:outline-2 focus-visible:outline-focus"
     >
       <View class="size-8 shrink-0 items-center justify-center rounded-md bg-side">
         <Icon name={props.icon} size={16} tone="ink" />
       </View>
       <View class="min-w-0 flex-1 gap-0.5">
         <Text class="truncate text-sm font-medium text-ink">{props.label}</Text>
-        <Text class="truncate text-xs text-muted">{props.hint}</Text>
+        <Text class="text-xs leading-snug text-muted">{props.hint}</Text>
       </View>
     </A>
   );
@@ -280,7 +280,7 @@ function DashboardOverview() {
 
       <View class="gap-2">
         <Text class="px-0.5 text-xs font-semibold text-muted">{t("web.base.dashboard.quick.title")}</Text>
-        <View class="flex-row flex-wrap gap-3">
+        <View class="grid gap-3 md:grid-cols-2">
           <QuickLinkCard
             href="/issues"
             testid="dashboard-quick-issues"

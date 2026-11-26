@@ -1,4 +1,5 @@
-import { cleanup, keymap, Scroll, signal, Text, View, type JSX } from "nsh";
+import { cleanup, keymap, Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
+import { Popover } from "nsh/base";
 
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
@@ -11,6 +12,7 @@ import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { motionClass, motionDuration } from "../../../design/motion";
 import { Segmented } from "../../../design/Segmented";
+import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
 import { useOrchestrators } from "../../../infra/agents";
@@ -577,16 +579,22 @@ function Toolbar(props: {
   );
   const isFiltered = createMemo(() => filterAny(props.filter));
   const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "" || props.filter.tag !== "");
+  const compactToolbar = () => windowSize().width < 1100;
+  const popoverFilterCount = createMemo(
+    () => Number(props.filter.scope !== "all") + Number(props.filter.repo !== "") + Number(props.filter.agent !== "") + Number(props.filter.tag !== ""),
+  );
   return (
-    <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-4">
+    <View testID="issues-toolbar" desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-4">
       <View class="min-w-0 flex-1 flex-row items-center gap-2">
-        <Segmented
-          label={t("web.issue.scope.label")}
-          testid="issue-scope"
-          value={props.filter.scope}
-          onChange={(scope) => props.onFilter({ ...props.filter, scope })}
-          options={scopeOptions()}
-        />
+        <If when={!compactToolbar()}>
+          <Segmented
+            label={t("web.issue.scope.label")}
+            testid="issue-scope"
+            value={props.filter.scope}
+            onChange={(scope) => props.onFilter({ ...props.filter, scope })}
+            options={scopeOptions()}
+          />
+        </If>
         <SearchField
           testid="issue-search"
           clearTestid="issue-search-clear"
@@ -594,66 +602,160 @@ function Toolbar(props: {
           onInput={(query) => props.onFilter({ ...props.filter, query })}
           placeholder={t("web.issue.page.find")}
           label={t("web.issue.page.findLabel")}
-          class="w-40 shrink"
+          class={compactToolbar() ? "w-36 min-w-20 shrink" : "w-40 shrink"}
         />
-        <View
-          testID="issue-filter-bar"
-          accessibilityLabel={t("web.issue.page.filter")}
-          class="flex-row items-center rounded-md border border-line bg-side pl-2"
+        <If
+          when={!compactToolbar()}
+          else={
+            <Popover
+              placement="bottom"
+              align="start"
+              offset={6}
+              popupClass="w-72 gap-2.5 rounded-lg border border-line bg-elevated p-3 shadow-float"
+              popupStyle={{ maxWidth: Math.max(240, windowSize().width - 24) }}
+              trigger={
+                <View
+                  testID="issue-filter-popover"
+                  role="button"
+                  accessibilityLabel={t("web.issue.page.filter")}
+                  tooltip={<Bubble text={t("web.issue.page.filter")} />}
+                  class={`h-7 shrink-0 flex-row items-center gap-1.5 rounded-md border border-line px-2.5 ${
+                    popoverFilterCount() > 0 ? "bg-selected" : "bg-page hover:bg-hover"
+                  } ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px`}
+                >
+                  <Icon name="filter" size={14} tone={popoverFilterCount() > 0 ? "accent" : "muted"} />
+                  <Text class="text-sm text-ink">{t("web.issue.page.filter")}</Text>
+                  <If when={popoverFilterCount() > 0}>
+                    <CountPill count={popoverFilterCount()} active />
+                  </If>
+                </View>
+              }
+            >
+              <View testID="issue-filter-popover-menu" accessibilityLabel={t("web.issue.page.filter")} class="gap-2.5">
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.scope.label")}</Text>
+                  <Segmented
+                    label={t("web.issue.scope.label")}
+                    testid="issue-scope"
+                    block
+                    value={props.filter.scope}
+                    onChange={(scope) => props.onFilter({ ...props.filter, scope })}
+                    options={scopeOptions()}
+                  />
+                </View>
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.page.byRepo")}</Text>
+                  <Select
+                    size="control"
+                    class="w-full"
+                    label={t("web.issue.page.byRepo")}
+                    testid="filter-repo"
+                    filter
+                    value={props.filter.repo}
+                    placeholder={t("web.issue.page.allRepos")}
+                    options={repoOptions()}
+                    onChange={(repo) => props.onFilter({ ...props.filter, repo })}
+                  />
+                </View>
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.page.byHelper")}</Text>
+                  <Select
+                    size="control"
+                    class="w-full"
+                    label={t("web.issue.page.byHelper")}
+                    testid="filter-agent"
+                    filter
+                    value={props.filter.agent}
+                    placeholder={t("web.issue.page.allHelpers")}
+                    options={agentOptions()}
+                    onChange={(agent) => props.onFilter({ ...props.filter, agent })}
+                  />
+                </View>
+                <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.tags.byTag")}</Text>
+                  <Select
+                    size="control"
+                    class="w-full"
+                    label={t("web.issue.tags.byTag")}
+                    testid="filter-tag"
+                    filter
+                    value={props.filter.tag}
+                    placeholder={t("web.issue.tags.allTags")}
+                    options={tagOptions()}
+                    onChange={(tag) => props.onFilter({ ...props.filter, tag })}
+                  />
+                </View>
+                <If when={isFiltered()}>
+                  <View class="flex-row items-center justify-between gap-2 border-t border-line pt-2">
+                    <Text class="text-xs text-muted tabular-nums">{t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}</Text>
+                    <Button size="compact" tone="quiet" testID="filter-clear" onPress={() => props.onFilter(noFilter)}>
+                      {t("web.issue.page.clear")}
+                    </Button>
+                  </View>
+                </If>
+              </View>
+            </Popover>
+          }
         >
-          <Icon name="filter" size={14} tone={hasFacetFilter() ? "accent" : "faint"} />
-          <View class="mx-1.5 h-3.5 w-px bg-line" />
-          <Select
-            quiet
-            size="control"
-            class="max-w-32"
-            label={t("web.issue.page.byRepo")}
-            testid="filter-repo"
-            filter
-            value={props.filter.repo}
-            placeholder={t("web.issue.page.allRepos")}
-            options={repoOptions()}
-            onChange={(repo) => props.onFilter({ ...props.filter, repo })}
-          />
-          <View class="h-3.5 w-px bg-line" />
-          <Select
-            quiet
-            size="control"
-            class="max-w-32"
-            label={t("web.issue.page.byHelper")}
-            testid="filter-agent"
-            filter
-            value={props.filter.agent}
-            placeholder={t("web.issue.page.allHelpers")}
-            options={agentOptions()}
-            onChange={(agent) => props.onFilter({ ...props.filter, agent })}
-          />
-          <View class="h-3.5 w-px bg-line" />
-          <Select
-            quiet
-            size="control"
-            class="max-w-28"
-            label={t("web.issue.tags.byTag")}
-            testid="filter-tag"
-            filter
-            value={props.filter.tag}
-            placeholder={t("web.issue.tags.allTags")}
-            options={tagOptions()}
-            onChange={(tag) => props.onFilter({ ...props.filter, tag })}
-          />
-        </View>
-        <If when={isFiltered()}>
-          <Text class="shrink-0 text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
-            {t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}
-          </Text>
           <View
-            role="button"
-            testID="filter-clear"
-            onPress={() => props.onFilter(noFilter)}
-            class={`h-7 shrink-0 flex-row items-center rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
+            testID="issue-filter-bar"
+            accessibilityLabel={t("web.issue.page.filter")}
+            class="flex-row items-center rounded-md border border-line bg-side pl-2"
           >
-            <Text class="text-xs font-medium text-water">{t("web.issue.page.clear")}</Text>
+            <Icon name="filter" size={14} tone={hasFacetFilter() ? "accent" : "faint"} />
+            <View class="mx-1.5 h-3.5 w-px bg-line" />
+            <Select
+              quiet
+              size="control"
+              class="max-w-32"
+              label={t("web.issue.page.byRepo")}
+              testid="filter-repo"
+              filter
+              value={props.filter.repo}
+              placeholder={t("web.issue.page.allRepos")}
+              options={repoOptions()}
+              onChange={(repo) => props.onFilter({ ...props.filter, repo })}
+            />
+            <View class="h-3.5 w-px bg-line" />
+            <Select
+              quiet
+              size="control"
+              class="max-w-32"
+              label={t("web.issue.page.byHelper")}
+              testid="filter-agent"
+              filter
+              value={props.filter.agent}
+              placeholder={t("web.issue.page.allHelpers")}
+              options={agentOptions()}
+              onChange={(agent) => props.onFilter({ ...props.filter, agent })}
+            />
+            <View class="h-3.5 w-px bg-line" />
+            <Select
+              quiet
+              size="control"
+              class="max-w-28"
+              label={t("web.issue.tags.byTag")}
+              testid="filter-tag"
+              filter
+              value={props.filter.tag}
+              placeholder={t("web.issue.tags.allTags")}
+              options={tagOptions()}
+              onChange={(tag) => props.onFilter({ ...props.filter, tag })}
+            />
           </View>
+          <If when={isFiltered()}>
+            <Text class="shrink-0 text-xs text-muted" style={{ fontVariant: ["tabular-nums"] }}>
+              {t("web.issue.page.shown", { shown: props.shown, of: props.cards.length })}
+            </Text>
+            <View
+              role="button"
+              testID="filter-clear"
+              onPress={() => props.onFilter(noFilter)}
+              class={`h-7 shrink-0 flex-row items-center rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
+            >
+              <Text class="text-xs font-medium text-water">{t("web.issue.page.clear")}</Text>
+            </View>
+          </If>
         </If>
       </View>
       <View class="ml-auto shrink-0 flex-row items-center gap-1.5">

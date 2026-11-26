@@ -101,3 +101,33 @@ test("AgentsPage uses unified top bar, localizes API-key readiness errors with c
   await fake.pumpUntil(app, () => app.count("id:settings-models") === 1);
   expect(app.count("id:settings-models")).toBe(1);
 });
+
+test("AgentsPage keeps primary + New CTA unclipped at 900x720 by collapsing secondary links into overflow menu", async () => {
+  for (const locale of ["en", "zh"] as const) {
+    setLocale(locale);
+    const fake = fakeHost(scenarios.typical, { route: "/agents", locale });
+    const app = await open("../../app/main.tsx", {
+      width: 900,
+      height: 720,
+      colorScheme: "light",
+      platform: "macos",
+      clock: { time: SCENARIO_NOW },
+      host: fake.options,
+    });
+    await fake.pumpUntil(app, () => app.count("id:new-agent") === 1);
+
+    expect(app.count("id:agents-more")).toBe(1);
+    expect(app.count("id:open-templates")).toBe(0);
+    expect(app.count("id:new-orchestrator")).toBe(0);
+
+    const toolbar = app.layout("id:agents-toolbar")!;
+    const newAgent = app.layout("id:new-agent")!;
+    const more = app.layout("id:agents-more")!;
+    const roleFilter = app.layout("id:agents-role-filter")!;
+
+    expect(newAgent.x + newAgent.width).toBeLessThanOrEqual(900 - 12);
+    expect(newAgent.y + newAgent.height).toBeLessThanOrEqual(toolbar.y + toolbar.height + 1);
+    expect(roleFilter.x + roleFilter.width).toBeLessThanOrEqual(more.x);
+    expect(more.x + more.width).toBeLessThanOrEqual(newAgent.x);
+  }
+});

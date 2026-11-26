@@ -274,8 +274,8 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
     activeArtifactType.set(props.artifact.artifactType);
   });
   cleanup(() => activeArtifactType.set(undefined));
-  // Wide visual canvases start with the right rail collapsed so the canvas gets the full width.
-  const rightPanel = signal<ArtifactRightPanel>(untracked(isWideCanvas) ? "none" : "chat");
+  // Wide visual canvases and narrower viewports (< lg) start with the right rail collapsed so the editor keeps full width.
+  const rightPanel = signal<ArtifactRightPanel>(untracked(() => !isWideCanvas() && lg()) ? "chat" : "none");
   const setRightPanel = (next: ArtifactRightPanel) => {
     rightPanel.set(next);
     if (next !== "history") historyPreview.set(undefined);

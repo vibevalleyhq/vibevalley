@@ -176,7 +176,7 @@ function ProfileForm(props: { status: SettingsStatus }) {
           </View>
         </SettingRow>
         <SettingRow label={t("web.setting.profile.presets")} wide last>
-          <View class="flex-row flex-wrap items-center gap-2">
+          <View class="min-w-0 w-full flex-row flex-wrap items-center gap-2">
             <View
               role="button"
               testID="profile-preset-monogram"

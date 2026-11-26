@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, View } from "nsh";
+import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
@@ -46,6 +46,7 @@ export function IssueList(props: {
   const isOrchestrator = (id: string) => orchestratorIds().has(id);
   const box = useWidth();
   const wide = computed(() => box.width() === 0 || box.width() >= 640);
+  const showParentTitle = computed(() => (box.width() === 0 ? windowSize().width >= 1080 : box.width() >= 1000));
   const groups = computed(() => groupRows(props.cards, props.grouping, rowKeys));
 
   // Only where a new todo belongs: the backlog/todo group, a repo's, a helper's (not the orchestrator's), or the one group.
@@ -170,6 +171,7 @@ export function IssueList(props: {
                             <Row
                               card={c()}
                               wide={wide()}
+                              showParentTitle={showParentTitle()}
                               selected={c().id === props.selected}
                               showRepo={props.grouping !== "repo"}
                               divider={i() < rows().length - 1 || showOlder()}
@@ -199,6 +201,7 @@ export function IssueList(props: {
 function Row(props: {
   card: BoardCard;
   wide: boolean;
+  showParentTitle: boolean;
   selected: boolean;
   showRepo: boolean;
   divider: boolean;
@@ -246,10 +249,16 @@ function Row(props: {
       <If when={props.wide}>
         <Text class="w-11 shrink-0 truncate font-mono text-xs text-faint tabular-nums">{look().number ?? ""}</Text>
       </If>
-      <View class="min-w-0 flex-1 gap-0.5">
-        <View class="min-w-0 flex-row items-center gap-1.5">
+      <View class="min-w-0 flex-1 gap-0.5 overflow-hidden">
+        <View class="min-w-0 flex-row items-center gap-1.5 overflow-hidden">
           <Text class="min-w-0 shrink truncate text-sm font-medium text-ink">{look().title}</Text>
-          <If when={parentIssue()}>{(p) => <ParentBadge parent={p()} showTitle={props.wide} onOpen={props.onOpen} testid="row-parent-badge" />}</If>
+          <If when={parentIssue()}>
+            {(p) => (
+              <View class="min-w-0 max-w-44 shrink overflow-hidden">
+                <ParentBadge parent={p()} showTitle={props.showParentTitle} onOpen={props.onOpen} testid="row-parent-badge" />
+              </View>
+            )}
+          </If>
         </View>
         <If when={look().wait}>{(wait) => <Text class="truncate text-xs text-water">{wait()}</Text>}</If>
       </View>

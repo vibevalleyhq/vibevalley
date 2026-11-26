@@ -1,4 +1,4 @@
-import { Scroll, signal, Text, View, type JSX } from "nsh";
+import { Scroll, signal, Text, View, windowSize, type JSX } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import { type Agent, defaultOrchestrator, type RuntimeInfo, TemplateCategoryValues } from "@vibevalley/protocol";
@@ -9,6 +9,7 @@ import { AgentFace, OrchestratorFace } from "../../design/domain/Face";
 import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import { Empty, Toggle } from "../../design/layout";
+import { MoreMenu } from "../../design/MoreMenu";
 import { Segmented } from "../../design/Segmented";
 import { CountPill, Dot } from "../../design/Tag";
 import { TextLink } from "../../design/TextLink";
@@ -16,7 +17,7 @@ import { Bubble } from "../../design/Tip";
 import { useAgentProblems, useOrchestrators, useWorkAgents } from "../../infra/agents";
 import { api } from "../../infra/api";
 import { ready, useAgentTemplates, useQueryClient, useRuntimes } from "../../infra/query";
-import { Link as A } from "../../infra/router";
+import { Link as A, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import { assignWorkerAvatars, withDefaultWorkerAvatar } from "./AgentLook";
 import { AgentPage } from "./AgentPage";
@@ -71,6 +72,7 @@ export function AgentsRoute(props: { rest: string }) {
 }
 
 function AgentsPage() {
+  const router = useRouter();
   const agents = useWorkAgents();
   const orchestrators = useOrchestrators();
   const templates = useAgentTemplates();
@@ -82,6 +84,7 @@ function AgentsPage() {
   const query = signal("");
   const width = signal(0);
   const wide = createMemo(() => width() === 0 || width() >= 720);
+  const compactToolbar = createMemo(() => (width() > 0 ? width() < 980 : windowSize().width < 1060));
 
   const runtimeById = createMemo(() => new Map(ready(runtimes, []).map((r) => [r.id, r])));
   const needle = createMemo(() => query().trim().toLowerCase());
@@ -134,10 +137,10 @@ function AgentsPage() {
       <View
         testID="agents-toolbar"
         desktop={{ windowDrag: true }}
-        class="h-11 shrink-0 flex-row items-center justify-between gap-3 border-b border-line bg-page px-4"
+        class="h-11 shrink-0 flex-row items-center justify-between gap-2 border-b border-line bg-page px-4"
       >
-        <View class="min-w-0 flex-row flex-wrap items-center gap-2.5">
-          <View class="flex-row items-center gap-2">
+        <View class="min-w-0 shrink flex-row items-center gap-2">
+          <View class="shrink-0 flex-row items-center gap-2">
             <Text role="header" class="shrink-0 text-sm font-semibold text-ink">
               {t("web.base.place.team.label")}
             </Text>
@@ -152,7 +155,7 @@ function AgentsPage() {
             options={roleOptions()}
           />
         </View>
-        <View class="shrink-0 flex-row flex-wrap items-center gap-2">
+        <View class="min-w-0 flex-1 flex-row items-center justify-end gap-2">
           <SearchField
             testid="agents-search"
             clearTestid="agents-search-clear"
@@ -161,15 +164,45 @@ function AgentsPage() {
             onInput={(v) => query.set(v)}
             placeholder={t("web.agent.list.searchHint")}
             label={t("web.agent.list.search")}
-            class="w-52"
+            class={compactToolbar() ? "w-36 min-w-20 shrink" : "w-52 shrink"}
           />
-          <ButtonLink href="/agents/templates" tone="quiet" testID="open-templates" icon="folder" tooltip={<Bubble text={t("web.agent.templates.openLine")} />}>
-            {t("web.agent.templates.open")}
-          </ButtonLink>
-          <ButtonLink href="/agents/new?role=orchestrator" tone="quiet" testID="new-orchestrator" icon="add">
-            {t("web.agent.list.makeOrchestrator")}
-          </ButtonLink>
-          <ButtonLink href="/agents/new" tone="primary" testID="new-agent" icon="add">
+          <If
+            when={!compactToolbar()}
+            else={
+              <MoreMenu
+                testid="agents-more"
+                label={t("web.agent.templates.open")}
+                items={[
+                  {
+                    key: "templates",
+                    label: t("web.agent.templates.open"),
+                    icon: "folder",
+                    onSelect: () => router.navigate("/agents/templates"),
+                  },
+                  {
+                    key: "new-orchestrator",
+                    label: t("web.agent.list.makeOrchestrator"),
+                    icon: "add",
+                    onSelect: () => router.navigate("/agents/new?role=orchestrator"),
+                  },
+                ]}
+              />
+            }
+          >
+            <ButtonLink
+              href="/agents/templates"
+              tone="quiet"
+              testID="open-templates"
+              icon="folder"
+              tooltip={<Bubble text={t("web.agent.templates.openLine")} />}
+            >
+              {t("web.agent.templates.open")}
+            </ButtonLink>
+            <ButtonLink href="/agents/new?role=orchestrator" tone="quiet" testID="new-orchestrator" icon="add">
+              {t("web.agent.list.makeOrchestrator")}
+            </ButtonLink>
+          </If>
+          <ButtonLink href="/agents/new" tone="primary" testID="new-agent" icon="add" class="shrink-0">
             {t("web.agent.list.make")}
           </ButtonLink>
         </View>

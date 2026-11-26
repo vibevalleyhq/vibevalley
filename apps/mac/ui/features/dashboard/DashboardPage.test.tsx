@@ -52,3 +52,29 @@ test("DashboardPage renders profile overview, switches to hosted /dashboard/runs
   expect(app.count("id:dashboard-page")).toBe(1);
   expect(app.count("id:dashboard-header")).toBe(1);
 });
+
+test("DashboardPage renders Quick Navigation in a 2-column grid without narrow 4-col description truncation", async () => {
+  setLocale("en");
+  const fake = fakeHost(scenarios.typical, { route: "/dashboard", locale: "en" });
+  const app = await open("../../app/main.tsx", {
+    width: 900,
+    height: 720,
+    colorScheme: "light",
+    platform: "macos",
+    locale: "en-US",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:dashboard-quick-mcp") === 1);
+  const issuesBox = app.layout("id:dashboard-quick-issues")!;
+  const chatBox = app.layout("id:dashboard-quick-chat")!;
+  const farmBox = app.layout("id:dashboard-quick-farm")!;
+  const mcpBox = app.layout("id:dashboard-quick-mcp")!;
+
+  expect(issuesBox.y).toBe(chatBox.y);
+  expect(farmBox.y).toBeGreaterThan(issuesBox.y);
+  expect(mcpBox.y).toBe(farmBox.y);
+  expect(issuesBox.width).toBeGreaterThan(300);
+  expect(mcpBox.width).toBeGreaterThan(300);
+});

@@ -22,7 +22,7 @@ import { GeneralGroups } from "./GeneralPage";
 import { McpSettingsPage } from "./McpSettingsPage";
 import { ProfileSettingsPage } from "./ProfileSettingsPage";
 import { RemoteAccessPage } from "./RemoteAccessPage";
-import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
+import { GitHub, SettingsForm } from "./SettingsForm";
 
 type Group = "workspace" | "connect" | "about";
 
@@ -102,14 +102,14 @@ function SectionBody(props: { id: string; connectorId: string | undefined }) {
         </Page>
       </If>
       <If when={props.id === "models"}>
-        <Page title={t("web.setting.nav.models")} hint={t("web.setting.models.intro")} action={<SettingsFile />}>
+        <Page title={t("web.setting.nav.models")} hint={t("web.setting.models.intro")}>
           <Readiness features={["orchestrator", "call"]} />
           <SettingsForm part="deepseek" />
           <ProviderModels />
         </Page>
       </If>
       <If when={props.id === "memory"}>
-        <Page title={t("web.setting.nav.memory")} hint={t("web.setting.memory.intro")} action={<SettingsFile />}>
+        <Page title={t("web.setting.nav.memory")} hint={t("web.setting.memory.intro")}>
           <SettingsForm part="memory" />
         </Page>
       </If>
