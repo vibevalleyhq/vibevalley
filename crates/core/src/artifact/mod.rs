@@ -4,6 +4,7 @@
 
 pub mod manifest;
 pub mod path;
+pub mod preview;
 pub mod starter;
 
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,7 @@ pub use path::{
     ASSET_DIR, ASSET_FILE_MAX_BYTES, ArtifactPathZone, FILE_MAX_COUNT, MANIFEST_FILE, PATH_MAX_LEN, STRUCTURE_DIR, STRUCTURE_FILE_MAX_BYTES,
     apply_json_merge_patch, canonical_json, infer_encoding, infer_mime, is_text_mime, validate_artifact_path, validate_deletable_path, validate_prefix,
 };
+pub use preview::{extract_artifact_preview, preview_frame_asset, set_preview_frame_path};
 pub use starter::{StarterDirectory, StarterFile, starter_directory, starter_files_for_type};
 
 /// One live collaborator highlight rendered inside a sandboxed preview without

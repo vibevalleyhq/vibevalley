@@ -610,3 +610,187 @@ fn time_travel_preview_restore_fork_compaction_and_selective_origin_undo() {
 
     started.close_blocking();
 }
+
+fn minimal_png_bytes(width: u32, height: u32) -> Vec<u8> {
+    let mut out = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+    out.extend_from_slice(&13u32.to_be_bytes());
+    out.extend_from_slice(b"IHDR");
+    out.extend_from_slice(&width.to_be_bytes());
+    out.extend_from_slice(&height.to_be_bytes());
+    out.extend_from_slice(&[8, 6, 0, 0, 0, 0, 0, 0, 0]);
+    out
+}
+
+#[test]
+fn artifact_preview_and_derived_cover_without_crdt_or_version_pollution() {
+    vibevalley_i18n::set_locale("en");
+    let dir = tempfile::tempdir().unwrap();
+    let started = start(dir.path());
+    let hub = started.router().clone();
+    let call = |op: &str, p: Value| hub.call_as(Caller::User, op, p);
+
+    // 1. Storyboard with frame asset resolves `frameAsset` and absolute `framePath` on preview.
+    let png = minimal_png_bytes(320, 200);
+    let png_b64 = BASE64.encode(&png);
+    let sb = ok(call(
+        "artifact.create",
+        json!({
+            "title": "Launch Film",
+            "artifactType": "storyboard",
+            "announce": false,
+            "files": [
+                {
+                    "path": "structure/shots.json",
+                    "content": serde_json::to_string(&json!({
+                        "title": "Launch Film",
+                        "shots": [
+                            { "id": "sh01", "scene": "Opening", "durationSec": 4.0, "visual": "Warm desk overview", "frameAsset": "asset/frames/sh01.png" },
+                            { "id": "sh02", "scene": "Close", "durationSec": 2.5, "visual": "Logo lockup" }
+                        ]
+                    })).unwrap()
+                },
+                {
+                    "path": "asset/frames/sh01.png",
+                    "encoding": "base64",
+                    "content": png_b64
+                }
+            ]
+        }),
+    ));
+    let sb_id = sb["id"].as_str().unwrap();
+    assert_eq!(sb["preview"]["_tag"], "storyboard");
+    assert_eq!(sb["preview"]["shotCount"], 2);
+    assert_eq!(sb["preview"]["firstShot"], "Warm desk overview");
+    assert_eq!(sb["preview"]["frameAsset"], "asset/frames/sh01.png");
+    let frame_path = sb["preview"]["framePath"].as_str().expect("framePath resolved");
+    assert!(std::path::Path::new(frame_path).is_file());
+
+    // 2. Prototype preview + derived auto-cover lifecycle.
+    let proto = ok(call(
+        "artifact.create",
+        json!({
+            "title": "Checkout Flow",
+            "artifactType": "prototype",
+            "announce": false,
+            "content": "<!doctype html><html><head><title>Checkout</title></head><body><h1>Checkout Flow</h1><p>One-click cart preview</p></body></html>"
+        }),
+    ));
+    let id = proto["id"].as_str().unwrap().to_string();
+    assert_eq!(proto["preview"]["_tag"], "prototype");
+    assert_eq!(proto["preview"]["heading"], "Checkout Flow");
+    assert_eq!(proto["preview"]["subtitle"], "One-click cart preview");
+    assert!(proto.get("cover").is_none());
+
+    // Derived cache file `.preview.json` must never appear in file list or manifest.
+    let files_before = ok(call("artifact.file.list", json!({ "id": id })));
+    let file_paths_before: Vec<&str> = files_before["files"].as_array().unwrap().iter().map(|f| f["path"].as_str().unwrap()).collect();
+    assert!(!file_paths_before.iter().any(|p| p.contains(".preview") || p.contains(".cover")));
+
+    // Invalid MIME / mismatched magic bytes / oversized covers are refused.
+    assert_eq!(
+        code(call(
+            "artifact.cover.set",
+            json!({ "id": id, "seq": 1, "mime": "image/svg+xml", "data": BASE64.encode(b"<svg/>") })
+        )),
+        BizCode::ArtifactRefused.code()
+    );
+    assert_eq!(
+        code(call(
+            "artifact.cover.set",
+            json!({ "id": id, "seq": 1, "mime": "image/png", "data": BASE64.encode(b"not-a-png") })
+        )),
+        BizCode::ArtifactRefused.code()
+    );
+    let oversized = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]
+        .into_iter()
+        .chain(std::iter::repeat_n(0u8, 2 * 1024 * 1024 + 16))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        code(call(
+            "artifact.cover.set",
+            json!({ "id": id, "seq": 1, "mime": "image/png", "data": BASE64.encode(&oversized) })
+        )),
+        BizCode::ArtifactRefused.code()
+    );
+
+    // Valid cover save sets metadata, infers PNG dimensions, and does NOT touch seq/version/CRDT/files.
+    let history_before = ok(call("artifact.history.list", json!({ "id": id }))).as_array().unwrap().len();
+    let cover1 = ok(call("artifact.cover.set", json!({ "id": id, "seq": 1, "mime": "image/png", "data": png_b64 })));
+    assert_eq!(cover1["seq"], 1);
+    assert_eq!(cover1["mime"], "image/png");
+    assert_eq!(cover1["width"], 320);
+    assert_eq!(cover1["height"], 200);
+    assert_eq!(cover1["url"], format!("/api/v1/artifact/{id}/cover?seq=1"));
+    let cover1_path = cover1["path"].as_str().unwrap().to_string();
+    assert!(std::path::Path::new(&cover1_path).is_file());
+
+    let after_cover = ok(call("artifact.get", json!({ "id": id })));
+    assert_eq!(after_cover["seq"], 1);
+    assert_eq!(after_cover["version"], 1);
+    assert_eq!(after_cover["cover"]["path"], cover1_path);
+    assert_eq!(ok(call("artifact.history.list", json!({ "id": id }))).as_array().unwrap().len(), history_before);
+    let files_after = ok(call("artifact.file.list", json!({ "id": id })));
+    assert_eq!(files_after["files"], files_before["files"]);
+
+    // Version snapshot must NOT copy `.cover*` or `.preview.json`.
+    let v2 = ok(call("artifact.version.create", json!({ "id": id, "note": "v2" })));
+    assert_eq!(v2["version"], 2);
+    let snap_parent = dir.path().join("artifact_snapshot").join(&id);
+    for entry in std::fs::read_dir(&snap_parent).unwrap() {
+        let snap_dir = entry.unwrap().path();
+        for f in std::fs::read_dir(&snap_dir).unwrap() {
+            let name = f.unwrap().file_name().to_string_lossy().to_string();
+            assert!(!name.starts_with('.'), "derived hidden file leaked into snapshot: {name}");
+        }
+    }
+
+    // Editing content advances `seq` and refreshes cached preview.
+    ok(call(
+        "artifact.file.write",
+        json!({
+            "id": id,
+            "files": [{ "path": "structure/index.html", "content": "<!doctype html><h1>Checkout v2</h1><p>Updated copy</p>" }]
+        }),
+    ));
+    let updated = ok(call("artifact.get", json!({ "id": id })));
+    assert_eq!(updated["seq"], 2);
+    assert_eq!(updated["preview"]["heading"], "Checkout v2");
+    assert_eq!(updated["preview"]["subtitle"], "Updated copy");
+
+    // Re-capturing cover at seq 2 replaces the old cover file path (busting GPUI file:// cache)
+    // and rejects/ignores a stale seq 1 overwrite.
+    let cover2 = ok(call(
+        "artifact.cover.set",
+        json!({ "id": id, "seq": 2, "mime": "image/png", "data": BASE64.encode(minimal_png_bytes(640, 400)), "width": 640, "height": 400 }),
+    ));
+    let cover2_path = cover2["path"].as_str().unwrap().to_string();
+    assert_ne!(cover2_path, cover1_path);
+    assert!(std::path::Path::new(&cover2_path).is_file());
+    assert!(!std::path::Path::new(&cover1_path).exists());
+
+    let stale = ok(call("artifact.cover.set", json!({ "id": id, "seq": 1, "mime": "image/png", "data": png_b64 })));
+    assert_eq!(stale["seq"], 2);
+    assert_eq!(stale["path"], cover2_path);
+
+    // List endpoint includes previews and covers for all artifacts.
+    let listed = ok(call("artifact.list", json!({})));
+    let items = listed.as_array().unwrap();
+    let proto_item = items.iter().find(|a| a["id"] == id).unwrap();
+    assert_eq!(proto_item["preview"]["heading"], "Checkout v2");
+    assert_eq!(proto_item["cover"]["path"], cover2_path);
+
+    // HTTP GET /api/v1/artifact/{id}/cover serves stored bytes and 404s when absent.
+    let listener = vibevalley_server::gateway::http::serve(hub.clone(), "127.0.0.1:0".parse().unwrap()).unwrap();
+    let base = listener.url();
+    let client = reqwest::blocking::Client::new();
+    let resp = client.get(format!("{base}/api/v1/artifact/{id}/cover?seq=2")).send().unwrap();
+    assert_eq!(resp.status(), reqwest::StatusCode::OK);
+    assert_eq!(resp.headers().get("content-type").unwrap().to_str().unwrap(), "image/png");
+    assert_eq!(resp.bytes().unwrap().as_ref(), minimal_png_bytes(640, 400).as_slice());
+
+    let missing_cover = client.get(format!("{base}/api/v1/artifact/{sb_id}/cover")).send().unwrap();
+    assert_eq!(missing_cover.status(), reqwest::StatusCode::NOT_FOUND);
+
+    drop(listener);
+    started.close_blocking();
+}

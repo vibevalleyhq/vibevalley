@@ -10,10 +10,11 @@ use vibevalley_core::artifact::{type_spec, validate_artifact_path, validate_dele
 use vibevalley_core::collab::{CommitMeta, encode_frontiers};
 use vibevalley_i18n::{list, t};
 use vibevalley_protocol::{
-    ApiError, Artifact as Wire, ArtifactCard, ArtifactContent, ArtifactEvent, ArtifactFileContent, ArtifactFileDeleteRequest, ArtifactFileDeleteResult,
-    ArtifactFileEncoding, ArtifactFileGetRequest, ArtifactFileListRequest, ArtifactFileListResult, ArtifactFileWriteItem, ArtifactFileWriteRequest,
-    ArtifactFileWriteResult, ArtifactListRequest, ArtifactPresenceEvent, ArtifactRequest, ArtifactSaid, ArtifactType, ArtifactUpdateRequest, ArtifactVersion,
-    ArtifactVersionRequest, BizCode, Caller, ChatMessage, Preview, Suggestion, SuggestionChange, SuggestionEvent, USER_ID,
+    ApiError, Artifact as Wire, ArtifactCard, ArtifactContent, ArtifactCover, ArtifactCoverSetRequest, ArtifactEvent, ArtifactFileContent,
+    ArtifactFileDeleteRequest, ArtifactFileDeleteResult, ArtifactFileEncoding, ArtifactFileGetRequest, ArtifactFileListRequest, ArtifactFileListResult,
+    ArtifactFileWriteItem, ArtifactFileWriteRequest, ArtifactFileWriteResult, ArtifactListRequest, ArtifactPresenceEvent, ArtifactRequest, ArtifactSaid,
+    ArtifactType, ArtifactUpdateRequest, ArtifactVersion, ArtifactVersionRequest, BizCode, Caller, ChatMessage, Preview, Suggestion, SuggestionChange,
+    SuggestionEvent, USER_ID,
 };
 
 use super::collab::{
@@ -168,8 +169,10 @@ impl Manager {
         Ok(t_str.to_string())
     }
 
-    fn wire_of(row: ArtifactRow, versions: Vec<VersionRow>) -> Result<Wire, ApiError> {
+    async fn wire_of_async(&self, row: ArtifactRow, versions: Vec<VersionRow>) -> Result<Wire, ApiError> {
         let ty = artifact_type_of(&row.artifact_type)?;
+        let preview = self.storage.artifact.preview_async(&row.id, ty, row.seq).await;
+        let cover = self.storage.artifact.cover_async(&row.id).await;
         let msg_num = row.message_id.as_deref().and_then(|s| s.parse::<i64>().ok());
         let said = msg_num.and_then(|num| {
             row.channel_id.as_ref().map(|ch| ArtifactSaid {
@@ -206,7 +209,16 @@ impl Manager {
             versions: wire_versions,
             at: row.created_at,
             updated: row.updated_at,
+            preview: Some(Box::new(preview)),
+            cover: cover.map(Box::new),
         })
+    }
+
+    /// Saves a derived auto-captured cover image outside the artifact directory and CRDT
+    /// without bumping `version` or `seq`.
+    pub async fn set_cover_async(&self, req: &ArtifactCoverSetRequest) -> Result<ArtifactCover, ApiError> {
+        let row = self.row_async(&req.id).await?;
+        self.storage.artifact.write_cover_async(&row.id, req).await
     }
 
     async fn announce_card_async(&self, channel_id: Option<&str>, maker: &Maker, say: String, card: ArtifactCard, send_key: String) -> Option<ArtifactSaid> {
@@ -241,7 +253,7 @@ impl Manager {
                 continue;
             }
             let versions = self.ctx.service.artifact.versions(&row.id).await.map_err(q)?;
-            out.push(Self::wire_of(row, versions)?);
+            out.push(self.wire_of_async(row, versions).await?);
         }
         Ok(out)
     }
@@ -249,7 +261,7 @@ impl Manager {
     pub async fn get_async(&self, id: &str) -> Result<Wire, ApiError> {
         let row = self.row_async(id).await?;
         let versions = self.ctx.service.artifact.versions(&row.id).await.map_err(q)?;
-        Self::wire_of(row, versions)
+        self.wire_of_async(row, versions).await
     }
 
     pub async fn content_async(&self, id: &str, version: Option<i64>) -> Result<ArtifactContent, ApiError> {

@@ -1,5 +1,5 @@
 //! Thin compile-time exhaustive [`Router`] implementing [`Server`] over all
-//! `EndpointId` (202), `NativeEndpointId` (3), and `SUBSCRIPTIONS` (8).
+//! `EndpointId` (203), `NativeEndpointId` (3), and `SUBSCRIPTIONS` (8).
 
 mod glue;
 
@@ -274,6 +274,7 @@ impl Router {
             E::ArtifactHistoryFork => on!(p, ArtifactHistoryFork, |r| art.history_fork_async(&art.caller_meta(ctx).0, &r).await?),
             E::ArtifactHistoryUndoOrigin => on!(p, ArtifactHistoryUndoOrigin, |r| glue::artifact_undo_origin(art, ctx, &r).await?),
             E::ArtifactHistoryCompact => on!(p, ArtifactHistoryCompact, |r| art.history_compact_async(&r).await?),
+            E::ArtifactCoverSet => on!(p, ArtifactCoverSet, |r| art.set_cover_async(&r).await?),
             E::ConnectorList => ret!(ok_json(c.connector.handle_list().await)),
             E::ConnectorLogin => on!(p, ConnectorLogin, |r| c.connector.handle_login(r).await?),
             E::ConnectorVerify => on!(p, ConnectorVerify, |r| c.connector.handle_verify(r).await?),

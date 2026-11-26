@@ -306,6 +306,165 @@ pub struct ArtifactSaid {
 }
 
 #[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactCover {
+    /// Absolute local filesystem path on the desktop host (for `file://` rendering).
+    pub path: String,
+    /// Authenticated HTTP URL path for remote clients (e.g. `/api/v1/artifact/<id>/cover?seq=<seq>`).
+    pub url: String,
+    /// Stored cover MIME type (`image/png`, `image/jpeg`, or `image/webp`).
+    pub mime: String,
+    /// Collaborative `seq` the cover was captured from.
+    pub seq: i64,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub updated_at: i64,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactCoverSetRequest {
+    #[cfg_attr(feature = "ts-gen", ts(as = "crate::typescript::ArtifactId"))]
+    pub id: ArtifactId,
+    /// Collaborative `seq` rendered when capturing this cover.
+    pub seq: i64,
+    /// Image MIME type (`image/png`, `image/jpeg`, or `image/webp`).
+    pub mime: String,
+    /// Base64-encoded image bytes (max 2 MiB decoded).
+    pub data: String,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactPreviewOutlineItem {
+    pub depth: u32,
+    pub text: String,
+    pub kind: String,
+    pub checked: Option<bool>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactPreviewSwatch {
+    pub name: String,
+    pub light: String,
+    pub dark: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactPreviewKpi {
+    pub label: String,
+    pub value: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct ArtifactPreviewMinimapShape {
+    pub x: JsNumber,
+    pub y: JsNumber,
+    pub w: JsNumber,
+    pub h: JsNumber,
+    pub kind: String,
+    pub label: Option<String>,
+}
+
+/// Lightweight structured content preview extracted from an artifact's `structure/` and `asset/` files.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "_tag")]
+pub enum ArtifactPreview {
+    #[serde(rename = "docs", rename_all = "camelCase")]
+    Docs { heading: Option<String>, excerpt: String },
+    #[serde(rename = "outline", rename_all = "camelCase")]
+    Outline {
+        items: Vec<ArtifactPreviewOutlineItem>,
+        todo_done: u32,
+        todo_total: u32,
+    },
+    #[serde(rename = "design-system", rename_all = "camelCase")]
+    DesignSystem { swatches: Vec<ArtifactPreviewSwatch>, fonts: Vec<String> },
+    #[serde(rename = "dashboard", rename_all = "camelCase")]
+    Dashboard { kpis: Vec<ArtifactPreviewKpi>, series: Vec<JsNumber> },
+    #[serde(rename = "sheet", rename_all = "camelCase")]
+    Sheet {
+        sheet_name: Option<String>,
+        columns: Vec<String>,
+        rows: Vec<Vec<String>>,
+        total_rows: u32,
+        total_cols: u32,
+    },
+    #[serde(rename = "slides", rename_all = "camelCase")]
+    Slides {
+        first_title: Option<String>,
+        first_subtitle: Option<String>,
+        slide_count: u32,
+    },
+    #[serde(rename = "whiteboard", rename_all = "camelCase")]
+    Whiteboard {
+        shapes: Vec<ArtifactPreviewMinimapShape>,
+        node_count: u32,
+    },
+    #[serde(rename = "diagram", rename_all = "camelCase")]
+    Diagram {
+        kind: Option<String>,
+        nodes: Vec<String>,
+        node_count: u32,
+        edge_count: u32,
+    },
+    #[serde(rename = "design", rename_all = "camelCase")]
+    Design {
+        artboard: Option<String>,
+        width: Option<u32>,
+        height: Option<u32>,
+        theme: Option<String>,
+        nodes: Vec<String>,
+        frame_asset: Option<String>,
+        frame_path: Option<String>,
+    },
+    #[serde(rename = "storyboard", rename_all = "camelCase")]
+    Storyboard {
+        shot_count: u32,
+        first_shot: Option<String>,
+        duration_sec: Option<JsNumber>,
+        frame_asset: Option<String>,
+        frame_path: Option<String>,
+    },
+    #[serde(rename = "motion", rename_all = "camelCase")]
+    Motion {
+        scene_count: u32,
+        duration_sec: Option<JsNumber>,
+        first_scene: Option<String>,
+        frame_asset: Option<String>,
+        frame_path: Option<String>,
+    },
+    #[serde(rename = "prototype", rename_all = "camelCase")]
+    Prototype { heading: Option<String>, subtitle: Option<String> },
+}
+
+#[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
@@ -331,6 +490,10 @@ pub struct Artifact {
     pub versions: Vec<ArtifactVersion>,
     pub at: i64,
     pub updated: i64,
+    /// Derived lightweight content preview extracted from `structure/` and `asset/`.
+    pub preview: Option<Box<ArtifactPreview>>,
+    /// Derived auto-captured cover image stored outside the artifact directory and CRDT.
+    pub cover: Option<Box<ArtifactCover>>,
 }
 
 #[skip_serializing_none]
@@ -1033,6 +1196,13 @@ crate::typescript::module! {
     ArtifactCard,
     ArtifactVersion,
     ArtifactSaid,
+    ArtifactCover,
+    ArtifactCoverSetRequest,
+    ArtifactPreviewOutlineItem,
+    ArtifactPreviewSwatch,
+    ArtifactPreviewKpi,
+    ArtifactPreviewMinimapShape,
+    ArtifactPreview,
     Artifact,
     ArtifactFileMeta,
     ArtifactFileListRequest,

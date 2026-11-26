@@ -573,6 +573,11 @@ export class VibeValleyApi {
       compact: (a: T.ArtifactHistoryCompactRequest, options?: { signal?: AbortSignal }): Promise<T.Artifact> =>
         this.call<T.Artifact>("artifact.history.compact", "/api/v1/artifact/history/compact", a, options),
     },
+    cover: {
+      /** Saves a derived auto-captured cover image outside the artifact directory and CRDT. */
+      set: (a: T.ArtifactCoverSetRequest, options?: { signal?: AbortSignal }): Promise<T.ArtifactCover> =>
+        this.call<T.ArtifactCover>("artifact.cover.set", "/api/v1/artifact/cover/set", a, options),
+    },
   };
 
   readonly game = {

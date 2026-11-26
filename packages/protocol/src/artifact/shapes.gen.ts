@@ -60,6 +60,51 @@ export type ArtifactVersion = { version: number, size: number, note: string, by:
 
 export type ArtifactSaid = { channel: string, number: number, };
 
+export type ArtifactCover = {
+/**
+ * Absolute local filesystem path on the desktop host (for `file://` rendering).
+ */
+path: string,
+/**
+ * Authenticated HTTP URL path for remote clients (e.g. `/api/v1/artifact/<id>/cover?seq=<seq>`).
+ */
+url: string,
+/**
+ * Stored cover MIME type (`image/png`, `image/jpeg`, or `image/webp`).
+ */
+mime: string,
+/**
+ * Collaborative `seq` the cover was captured from.
+ */
+seq: number, width?: number, height?: number, updatedAt: number, };
+
+export type ArtifactCoverSetRequest = { id: ArtifactId,
+/**
+ * Collaborative `seq` rendered when capturing this cover.
+ */
+seq: number,
+/**
+ * Image MIME type (`image/png`, `image/jpeg`, or `image/webp`).
+ */
+mime: string,
+/**
+ * Base64-encoded image bytes (max 2 MiB decoded).
+ */
+data: string, width?: number, height?: number, };
+
+export type ArtifactPreviewOutlineItem = { depth: number, text: string, kind: string, checked?: boolean, };
+
+export type ArtifactPreviewSwatch = { name: string, light: string, dark?: string, };
+
+export type ArtifactPreviewKpi = { label: string, value: string, };
+
+export type ArtifactPreviewMinimapShape = { x: number, y: number, w: number, h: number, kind: string, label?: string, };
+
+/**
+ * Lightweight structured content preview extracted from an artifact's `structure/` and `asset/` files.
+ */
+export type ArtifactPreview = { "_tag": "docs", heading?: string, excerpt: string, } | { "_tag": "outline", items: Array<ArtifactPreviewOutlineItem>, todoDone: number, todoTotal: number, } | { "_tag": "design-system", swatches: Array<ArtifactPreviewSwatch>, fonts: Array<string>, } | { "_tag": "dashboard", kpis: Array<ArtifactPreviewKpi>, series: Array<number>, } | { "_tag": "sheet", sheetName?: string, columns: Array<string>, rows: Array<Array<string>>, totalRows: number, totalCols: number, } | { "_tag": "slides", firstTitle?: string, firstSubtitle?: string, slideCount: number, } | { "_tag": "whiteboard", shapes: Array<ArtifactPreviewMinimapShape>, nodeCount: number, } | { "_tag": "diagram", kind?: string, nodes: Array<string>, nodeCount: number, edgeCount: number, } | { "_tag": "design", artboard?: string, width?: number, height?: number, theme?: string, nodes: Array<string>, frameAsset?: string, framePath?: string, } | { "_tag": "storyboard", shotCount: number, firstShot?: string, durationSec?: number, frameAsset?: string, framePath?: string, } | { "_tag": "motion", sceneCount: number, durationSec?: number, firstScene?: string, frameAsset?: string, framePath?: string, } | { "_tag": "prototype", heading?: string, subtitle?: string, };
+
 export type Artifact = { id: ArtifactId, title: string, artifactType: ArtifactType,
 /**
  * True on the standing default design-system artifact consumed when creating visual artifacts.
@@ -76,7 +121,15 @@ seq: number,
 /**
  * Immutable version snapshots, oldest first.
  */
-versions: Array<ArtifactVersion>, at: number, updated: number, };
+versions: Array<ArtifactVersion>, at: number, updated: number,
+/**
+ * Derived lightweight content preview extracted from `structure/` and `asset/`.
+ */
+preview?: ArtifactPreview,
+/**
+ * Derived auto-captured cover image stored outside the artifact directory and CRDT.
+ */
+cover?: ArtifactCover, };
 
 export type ArtifactFileMeta = {
 /**

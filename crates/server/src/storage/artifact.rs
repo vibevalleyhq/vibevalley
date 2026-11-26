@@ -4,21 +4,97 @@
 //! `structure/`, and `asset/`, plus immutable version snapshots under
 //! `<home>/artifact_snapshot/<id>/<storage_id>/`.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use base64::Engine as _;
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 use vibevalley_core::artifact::{
-    ArtifactPathZone, FILE_MAX_COUNT, MANIFEST_FILE, STRUCTURE_DIR, canonical_json, default_manifest, infer_encoding, infer_mime, is_text_mime, parse_manifest,
-    serialize_manifest, starter_directory, type_spec, validate_artifact_path, validate_deletable_path, validate_manifest, validate_prefix,
+    ArtifactPathZone, FILE_MAX_COUNT, MANIFEST_FILE, STRUCTURE_DIR, canonical_json, default_manifest, extract_artifact_preview, infer_encoding, infer_mime,
+    is_text_mime, parse_manifest, preview_frame_asset, serialize_manifest, set_preview_frame_path, starter_directory, type_spec, validate_artifact_path,
+    validate_deletable_path, validate_manifest, validate_prefix,
 };
 use vibevalley_i18n::t;
-use vibevalley_protocol::{ApiError, ArtifactFileContent, ArtifactFileEncoding, ArtifactFileMeta, ArtifactFileWriteItem, ArtifactType, BizCode};
+use vibevalley_protocol::{
+    ApiError, ArtifactCover, ArtifactCoverSetRequest, ArtifactFileContent, ArtifactFileEncoding, ArtifactFileMeta, ArtifactFileWriteItem, ArtifactPreview,
+    ArtifactType, BizCode,
+};
 
 use crate::context::{Context, internal};
+
+const COVER_META_FILE: &str = ".cover.json";
+const PREVIEW_CACHE_FILE: &str = ".preview.json";
+const PREVIEW_CACHE_VERSION: u32 = 1;
+const COVER_MAX_BYTES: usize = 2 * 1024 * 1024;
+const PREVIEW_STRUCTURE_MAX_BYTES: u64 = 512 * 1024;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredCoverMeta {
+    file: String,
+    mime: String,
+    seq: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    width: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    height: Option<u32>,
+    updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredPreviewCache {
+    schema_version: u32,
+    seq: i64,
+    preview: ArtifactPreview,
+}
+
+fn cover_ext_for_mime(mime: &str) -> Option<(&'static str, &'static str)> {
+    match mime.trim().to_ascii_lowercase().as_str() {
+        "image/png" => Some(("image/png", "png")),
+        "image/jpeg" | "image/jpg" => Some(("image/jpeg", "jpg")),
+        "image/webp" => Some(("image/webp", "webp")),
+        _ => None,
+    }
+}
+
+fn has_valid_image_magic(mime: &str, bytes: &[u8]) -> bool {
+    match mime {
+        "image/png" => bytes.len() >= 8 && bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]),
+        "image/jpeg" => bytes.len() >= 3 && bytes.starts_with(&[0xff, 0xd8, 0xff]),
+        "image/webp" => bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP",
+        _ => false,
+    }
+}
+
+fn png_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
+    if bytes.len() < 24 || !bytes.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]) || &bytes[12..16] != b"IHDR" {
+        return None;
+    }
+    let w = u32::from_be_bytes([bytes[16], bytes[17], bytes[18], bytes[19]]);
+    let h = u32::from_be_bytes([bytes[20], bytes[21], bytes[22], bytes[23]]);
+    (w > 0 && h > 0).then_some((w, h))
+}
+
+fn cover_wire(artifact_id: &str, root: &Path, meta: &StoredCoverMeta) -> ArtifactCover {
+    ArtifactCover {
+        path: root.join(&meta.file).to_string_lossy().into_owned(),
+        url: format!("/api/v1/artifact/{artifact_id}/cover?seq={}", meta.seq),
+        mime: meta.mime.clone(),
+        seq: meta.seq,
+        width: meta.width,
+        height: meta.height,
+        updated_at: meta.updated_at,
+    }
+}
+
+fn is_safe_cover_filename(file: &str) -> bool {
+    !file.is_empty() && !file.contains('/') && !file.contains('\\') && file.starts_with(".cover-")
+}
 
 fn refused(text: impl Into<String>) -> ApiError {
     ApiError::new(BizCode::ArtifactRefused, text.into())
@@ -69,7 +145,7 @@ async fn collect_relative_files_async(root: &Path) -> std::io::Result<BTreeMap<S
         while let Some(entry) = rd.next_entry().await? {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
-            if name_str.starts_with(".tmp-") || name_str == ".versions" {
+            if name_str.starts_with('.') {
                 continue;
             }
             let path = entry.path();
@@ -158,6 +234,8 @@ pub struct ArtifactStorage {
     live_root: PathBuf,
     snapshot_root: PathBuf,
     ctx: Arc<Context>,
+    preview_cache: RwLock<HashMap<String, (i64, ArtifactPreview)>>,
+    cover_cache: RwLock<HashMap<String, Option<ArtifactCover>>>,
 }
 
 /// Initialized artifact directory metadata and raw file map returned by [`ArtifactStorage::init_directory_async`].
@@ -169,6 +247,8 @@ impl ArtifactStorage {
             live_root: home.join("artifact"),
             snapshot_root: home.join("artifact_snapshot"),
             ctx,
+            preview_cache: RwLock::new(HashMap::new()),
+            cover_cache: RwLock::new(HashMap::new()),
         })
     }
 
@@ -469,6 +549,8 @@ impl ArtifactStorage {
 
     /// Deletes `<home>/artifact/<id>/` and any version snapshots under `<home>/artifact_snapshot/<id>/`.
     pub async fn delete_directory_async(&self, artifact_id: &str) -> Result<(), ApiError> {
+        self.preview_cache.write().remove(artifact_id);
+        self.cover_cache.write().remove(artifact_id);
         let live = self.artifact_dir(artifact_id);
         let snap = self.snapshot_root.join(artifact_id);
         if tokio::fs::try_exists(&live).await.map_err(internal)? {
@@ -478,5 +560,164 @@ impl ArtifactStorage {
             tokio::fs::remove_dir_all(&snap).await.map_err(internal)?;
         }
         Ok(())
+    }
+
+    async fn resolve_frame_path_async(&self, root: &Path, preview: &mut ArtifactPreview) {
+        let resolved = match preview_frame_asset(preview) {
+            Some(rel) if validate_artifact_path(rel).ok() == Some(ArtifactPathZone::Asset) => {
+                let abs = root.join(rel);
+                if tokio::fs::metadata(&abs).await.is_ok_and(|m| m.is_file()) {
+                    Some(abs.to_string_lossy().into_owned())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        set_preview_frame_path(preview, resolved);
+    }
+
+    /// Extracts (or serves from cache) a lightweight structured [`ArtifactPreview`] keyed by `(artifact_id, seq)`.
+    pub async fn preview_async(&self, artifact_id: &str, artifact_type: ArtifactType, seq: i64) -> ArtifactPreview {
+        if let Some((cached_seq, cached)) = self.preview_cache.read().get(artifact_id)
+            && *cached_seq == seq
+        {
+            return cached.clone();
+        }
+
+        let root = self.artifact_dir(artifact_id);
+        let cache_file = root.join(PREVIEW_CACHE_FILE);
+        if let Ok(raw) = tokio::fs::read_to_string(&cache_file).await
+            && let Ok(mut disk) = serde_json::from_str::<StoredPreviewCache>(&raw)
+            && disk.schema_version == PREVIEW_CACHE_VERSION
+            && disk.seq == seq
+        {
+            self.resolve_frame_path_async(&root, &mut disk.preview).await;
+            self.preview_cache.write().insert(artifact_id.to_owned(), (seq, disk.preview.clone()));
+            return disk.preview;
+        }
+
+        let mut files = BTreeMap::new();
+        if let Ok(paths) = collect_relative_files_async(&root).await {
+            for (rel, abs) in paths {
+                if rel.starts_with("structure/") {
+                    let within_cap = tokio::fs::metadata(&abs)
+                        .await
+                        .is_ok_and(|m| m.is_file() && m.len() <= PREVIEW_STRUCTURE_MAX_BYTES);
+                    if within_cap && let Ok(bytes) = tokio::fs::read(&abs).await {
+                        files.insert(rel, bytes);
+                    }
+                } else if rel.starts_with("asset/") {
+                    // Preview extraction only checks relative asset existence, never reads media bytes.
+                    files.insert(rel, Vec::new());
+                }
+            }
+        }
+
+        let mut preview = extract_artifact_preview(artifact_type, &files);
+        self.resolve_frame_path_async(&root, &mut preview).await;
+
+        if tokio::fs::try_exists(&root).await.unwrap_or(false)
+            && let Ok(encoded) = serde_json::to_vec(&StoredPreviewCache {
+                schema_version: PREVIEW_CACHE_VERSION,
+                seq,
+                preview: preview.clone(),
+            })
+        {
+            let _ = write_atomic_async(&cache_file, &encoded).await;
+        }
+
+        self.preview_cache.write().insert(artifact_id.to_owned(), (seq, preview.clone()));
+        preview
+    }
+
+    async fn read_cover_from_disk_async(&self, artifact_id: &str) -> Option<ArtifactCover> {
+        let root = self.artifact_dir(artifact_id);
+        let raw = tokio::fs::read_to_string(root.join(COVER_META_FILE)).await.ok()?;
+        let meta = serde_json::from_str::<StoredCoverMeta>(&raw).ok()?;
+        if !is_safe_cover_filename(&meta.file) {
+            return None;
+        }
+        let abs = root.join(&meta.file);
+        if !tokio::fs::metadata(&abs).await.is_ok_and(|m| m.is_file()) {
+            return None;
+        }
+        Some(cover_wire(artifact_id, &root, &meta))
+    }
+
+    /// Reads the derived auto-cover metadata for `artifact_id` if present (cached in memory).
+    pub async fn cover_async(&self, artifact_id: &str) -> Option<ArtifactCover> {
+        if let Some(cached) = self.cover_cache.read().get(artifact_id) {
+            return cached.clone();
+        }
+        let loaded = self.read_cover_from_disk_async(artifact_id).await;
+        self.cover_cache.write().insert(artifact_id.to_owned(), loaded.clone());
+        loaded
+    }
+
+    /// Stores a derived auto-captured cover image under `<home>/artifact/<id>/.cover-<seq>-<ts>.<ext>` + `.cover.json`
+    /// without touching `manifest.json`, `structure/`, `asset/`, CRDT, or version snapshots.
+    pub async fn write_cover_async(&self, artifact_id: &str, req: &ArtifactCoverSetRequest) -> Result<ArtifactCover, ApiError> {
+        let Some((canonical_mime, ext)) = cover_ext_for_mime(&req.mime) else {
+            return Err(refused("cover mime must be image/png, image/jpeg, or image/webp"));
+        };
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(req.data.trim())
+            .map_err(|e| refused(format!("cover: invalid base64 content: {e}")))?;
+        if bytes.is_empty() {
+            return Err(refused("cover image data is empty"));
+        }
+        if bytes.len() > COVER_MAX_BYTES {
+            return Err(refused(format!("cover exceeds {COVER_MAX_BYTES} byte limit")));
+        }
+        if !has_valid_image_magic(canonical_mime, &bytes) {
+            return Err(refused(format!("cover bytes do not match {canonical_mime}")));
+        }
+
+        if let Some(existing) = self.cover_async(artifact_id).await
+            && existing.seq > req.seq
+        {
+            return Ok(existing);
+        }
+
+        let root = self.artifact_dir(artifact_id);
+        tokio::fs::create_dir_all(&root).await.map_err(internal)?;
+        let updated_at = self.ctx.now();
+        let (inferred_w, inferred_h) = if canonical_mime == "image/png" {
+            png_dimensions(&bytes).map_or((None, None), |(w, h)| (Some(w), Some(h)))
+        } else {
+            (None, None)
+        };
+        let width = req.width.or(inferred_w);
+        let height = req.height.or(inferred_h);
+
+        let filename = format!(".cover-{}-{updated_at}.{ext}", req.seq);
+        let meta = StoredCoverMeta {
+            file: filename.clone(),
+            mime: canonical_mime.to_owned(),
+            seq: req.seq,
+            width,
+            height,
+            updated_at,
+        };
+        let meta_bytes = serde_json::to_vec(&meta).map_err(internal)?;
+
+        write_atomic_async(&root.join(&filename), &bytes).await.map_err(internal)?;
+        write_atomic_async(&root.join(COVER_META_FILE), &meta_bytes).await.map_err(internal)?;
+
+        // Clean up superseded derived cover files so disk stays tidy.
+        if let Ok(mut rd) = tokio::fs::read_dir(&root).await {
+            while let Ok(Some(entry)) = rd.next_entry().await {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str.starts_with(".cover") && name_str != filename && name_str != COVER_META_FILE {
+                    let _ = tokio::fs::remove_file(entry.path()).await;
+                }
+            }
+        }
+
+        let wire = cover_wire(artifact_id, &root, &meta);
+        self.cover_cache.write().insert(artifact_id.to_owned(), Some(wire.clone()));
+        Ok(wire)
     }
 }
