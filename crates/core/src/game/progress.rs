@@ -10,7 +10,7 @@ use vibevalley_protocol::{
     LedgerEntryLevel, LedgerEntryMoment, LedgerEntryTold, Outcome, Progress, ProgressNews, ProgressTitle, SessionClose, SpaceState, USER_ID, Unlock,
 };
 
-use super::{AchievementDef, achievements, level_for_commits};
+use super::frame::{AchievementDef, achievements, level_for_commits};
 use crate::deps::{DagNode, dag_layers};
 use crate::status::{is_hired, session_of, session_on_issue};
 

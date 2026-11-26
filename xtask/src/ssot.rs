@@ -49,6 +49,45 @@ const INTERNAL_HOST_DTO_ALLOWLIST: &[(&str, &str, &str)] = &[
     ("apps/mac/src/live_voice.rs", "Turn", "external MOSS WebSocket protocol frame"),
     ("apps/mac/src/live_voice.rs", "Transcript", "external MOSS WebSocket protocol frame"),
     ("apps/mac/src/live_voice.rs", "Event", "external MOSS WebSocket protocol frame"),
+    (
+        "apps/mac/src/applet/protocol.rs",
+        "Modifiers",
+        "frozen Swift VibeValleyShim Unix-socket NDJSON IPC protocol",
+    ),
+    (
+        "apps/mac/src/applet/protocol.rs",
+        "MouseButtonKind",
+        "frozen Swift VibeValleyShim Unix-socket NDJSON IPC protocol",
+    ),
+    (
+        "apps/mac/src/applet/protocol.rs",
+        "ScrollPhaseKind",
+        "frozen Swift VibeValleyShim Unix-socket NDJSON IPC protocol",
+    ),
+    (
+        "apps/mac/src/applet/protocol.rs",
+        "ShimToHost",
+        "frozen Swift VibeValleyShim Unix-socket NDJSON IPC protocol",
+    ),
+    (
+        "apps/mac/src/applet/protocol.rs",
+        "HostToShim",
+        "frozen Swift VibeValleyShim Unix-socket NDJSON IPC protocol",
+    ),
+    ("apps/mac/src/island.rs", "Row", "Swift VibeValleyIsland stdio NDJSON IPC protocol"),
+    ("apps/mac/src/island.rs", "Glance", "Swift VibeValleyIsland stdio NDJSON IPC protocol"),
+    ("apps/mac/src/island.rs", "Strip", "Swift VibeValleyIsland stdio NDJSON IPC protocol"),
+    ("apps/mac/src/island.rs", "Open", "Swift VibeValleyIsland stdio NDJSON IPC protocol"),
+    (
+        "apps/mac/src/hosted/debug.rs",
+        "DebugFrameRecord",
+        "internal GPUI frame ring buffer entry mapped to protocol DebugSnapshot",
+    ),
+    (
+        "apps/mac/src/hosted/debug.rs",
+        "DebugCacheEntry",
+        "internal GPUI cache ring buffer entry mapped to protocol DebugSnapshot",
+    ),
 ];
 
 const STANDARD_ENV_VARS: &[&str] = &[

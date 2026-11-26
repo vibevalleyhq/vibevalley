@@ -13,8 +13,8 @@ use crate::BoxFuture;
 use crate::oar::record::Recorder;
 use crate::oar::voyage::{normalize_trace_id, now_ms};
 use crate::oar::{
-    AgentError, Capabilities, ContentBlock, Event, EventKind, InteractionDecision, PermissionDecision, PermissionMode, Result, Session, SessionStatus,
-    StopReason, TurnOptions, Usage,
+    AgentError, Capabilities, ContentBlock, Event, EventKind, InteractionDecision, PermissionDecision, PermissionMode, Result, Session, SessionOptions,
+    SessionStatus, StopReason, TurnOptions, Usage,
 };
 
 pub trait OarObserver: Send + Sync {
@@ -1351,4 +1351,14 @@ pub fn check_cwd(cwd: &std::path::Path) -> Result<()> {
         });
     }
     Ok(())
+}
+
+impl SessionOptions {
+    pub(crate) fn prepare(&mut self, runtime: &str) -> Result<()> {
+        self.validate_for(runtime)?;
+        if self.cwd.as_os_str().is_empty() {
+            self.cwd = std::env::current_dir().map_err(|e| AgentError::Io(e.to_string()))?;
+        }
+        check_cwd(&self.cwd)
+    }
 }

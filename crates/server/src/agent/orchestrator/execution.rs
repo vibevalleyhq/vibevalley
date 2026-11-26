@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, OnceLock, Weak, atomic::Ordering};
+use std::sync::{Arc, OnceLock, Weak};
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -19,9 +19,31 @@ use vibevalley_runtime::agent::extensions::todo::TodoExtension;
 use vibevalley_runtime::agent::harness::{Harness, SharedExecution, generation_kind};
 use vibevalley_runtime::agent::{AgentEvent, Brain, BrainError, Message, TurnOutcome};
 
-use super::{Input, Orchestrator, Run};
+use super::types::Input;
 use crate::agent::tool::Route;
-use crate::channel::Posting;
+use crate::artifact::Manager as ArtifactManager;
+use crate::channel::{Chat, Posting};
+use crate::issue::Board;
+use crate::runtime::Runtime;
+
+pub(super) trait OrchestratorHost: Send + Sync {
+    fn chat(&self) -> &Chat;
+    fn runtime(&self) -> &Runtime;
+    fn issue(&self) -> &Board;
+    fn artifact(&self) -> &ArtifactManager;
+    fn brain_at_async<'a>(&'a self, id: &'a str, route: &'a Arc<Mutex<Route>>, model: &'a str) -> BoxFuture<'a, Brain>;
+}
+
+pub(super) trait RunSink: Send + Sync {
+    fn me_id(&self) -> &str;
+    fn route(&self) -> &Route;
+    fn run_id(&self) -> &str;
+    fn has_ports(&self) -> bool;
+    fn is_closed(&self) -> bool;
+    fn chat(&self) -> &Chat;
+    fn set_durable(&mut self);
+    fn on_async<'a>(&'a mut self, e: AgentEvent) -> BoxFuture<'a, ()>;
+}
 
 pub(super) enum EvalEntry {
     TurnStarted { input: String },
@@ -30,7 +52,7 @@ pub(super) enum EvalEntry {
 }
 
 struct Bound {
-    orchestrator: OnceLock<Weak<Orchestrator>>,
+    orchestrator: OnceLock<Weak<dyn OrchestratorHost>>,
     store: Store,
     listeners: Mutex<HashMap<String, mpsc::UnboundedSender<AgentEvent>>>,
 }
@@ -47,7 +69,7 @@ impl BrainProvider for Bound {
                 .await?;
             let route: Route = route.map(serde_json::from_value).transpose()?.unwrap_or_else(|| Route {
                 agent: conv.into(),
-                channel: o.chat.default_channel(),
+                channel: o.chat().default_channel(),
                 ..Default::default()
             });
             Ok(Some(Arc::new(o.brain_at_async(conv, &Arc::new(Mutex::new(route)), provider).await)))
@@ -113,7 +135,7 @@ impl ReviewProvider for Bound {
             };
             let o = self.orchestrator.get().and_then(Weak::upgrade).ok_or(Error::Closed)?;
             let Some((issue, report)) = o
-                .runtime
+                .runtime()
                 .review_work_async(vendor, run, request.candidate)
                 .await
                 .map_err(|e| Error::Invalid(e.to_string()))?
@@ -121,7 +143,7 @@ impl ReviewProvider for Bound {
                 return Ok(None);
             };
             let changes = if issue.repo.is_some() {
-                let diff = o.issue.diff_async(&issue.id, None).await.map_err(|e| Error::Invalid(e.message))?;
+                let diff = o.issue().diff_async(&issue.id, None).await.map_err(|e| Error::Invalid(e.message))?;
                 Some(ReviewChanges {
                     files: diff.files,
                     uncommitted: diff.uncommitted,
@@ -131,7 +153,7 @@ impl ReviewProvider for Bound {
                 None
             };
             let artifacts = o
-                .artifact
+                .artifact()
                 .list_async(&vibevalley_protocol::ArtifactListRequest {
                     channel: None,
                     issue: Some(issue.id.clone()),
@@ -187,7 +209,7 @@ impl PendingExecution {
         self.shared.clone()
     }
 
-    pub(super) fn attach(self, o: Weak<Orchestrator>) -> Execution {
+    pub(super) fn attach(self, o: Weak<dyn OrchestratorHost>) -> Execution {
         let _ = self.bound.orchestrator.set(o);
         let scheduler = self.harness.scheduler().clone();
         Execution {
@@ -214,7 +236,7 @@ pub(super) struct TurnInput<'a> {
 }
 
 impl Execution {
-    pub(super) fn new(store: Store, o: Weak<Orchestrator>, permissions: Permissions) -> Self {
+    pub(super) fn new(store: Store, o: Weak<dyn OrchestratorHost>, permissions: Permissions) -> Self {
         PendingExecution::prepare(store, permissions).attach(o)
     }
 
@@ -410,8 +432,8 @@ impl Execution {
             .await
     }
 
-    pub(super) async fn run_async(&self, run: &mut Run<'_>, input: TurnInput<'_>) -> vibevalley_runtime::agent::Result<TurnOutcome> {
-        let id = run.me.id.clone();
+    pub(super) async fn run_async(&self, run: &mut dyn RunSink, input: TurnInput<'_>) -> vibevalley_runtime::agent::Result<TurnOutcome> {
+        let id = run.me_id().to_owned();
         let (send, mut events) = mpsc::unbounded_channel();
         self.bound.listeners.lock().insert(id.clone(), send);
         let result = self.dispatch_async(run, &input, &mut events).await;
@@ -419,24 +441,24 @@ impl Execution {
         result.map_err(|e| BrainError::Store(e.to_string()))
     }
 
-    async fn dispatch_async(&self, run: &mut Run<'_>, input: &TurnInput<'_>, events: &mut mpsc::UnboundedReceiver<AgentEvent>) -> Result<TurnOutcome> {
-        let conv = &run.me.id;
+    async fn dispatch_async(&self, run: &mut dyn RunSink, input: &TurnInput<'_>, events: &mut mpsc::UnboundedReceiver<AgentEvent>) -> Result<TurnOutcome> {
+        let conv = run.me_id().to_owned();
         let turn = format!("turn:{}", input.requests[0]);
         let brain = self
             .bound
-            .resolve_brain(conv, input.model)
+            .resolve_brain(&conv, input.model)
             .await?
             .ok_or_else(|| Error::Invalid("orchestrator brain unavailable".into()))?;
         let trusted = input.batch.iter().filter(|i| i.user).map(|i| i.line.as_str()).collect::<Vec<_>>().join("\n");
         let mut changes = self.store().subscribe_tasks()?;
         let requests: Vec<String> = input.requests.to_vec();
         let conv_owned = conv.clone();
-        let route_val = serde_json::to_value(run.route)?;
+        let route_val = serde_json::to_value(run.route())?;
         let (sub, task, _) = self
             .harness
             .submit_with(
                 Request {
-                    conversation: conv,
+                    conversation: &conv,
                     provider: input.model,
                     request_id: &turn,
                     prompt: input.text,
@@ -456,9 +478,9 @@ impl Execution {
                 },
             )
             .await?;
-        run.durable = true;
+        run.set_durable();
         let task = loop {
-            if run.o.closed.load(Ordering::Acquire) {
+            if run.is_closed() {
                 return Err(Error::Closed);
             }
             while let Ok(e) = events.try_recv() {
@@ -511,7 +533,7 @@ impl Execution {
         }
     }
 
-    async fn publish_async(&self, run: &Run<'_>, task: &Task) -> Result<()> {
+    async fn publish_async(&self, run: &dyn RunSink, task: &Task) -> Result<()> {
         let conv = task.conversation_id.clone();
         let task_id = task.id.clone();
         let replies = self
@@ -535,16 +557,15 @@ impl Execution {
             })
             .await?;
         for (seq, text) in replies {
-            run.o
-                .chat
+            run.chat()
                 .post_async(Posting {
-                    from: run.me.id.clone(),
-                    channel: run.route.channel.clone(),
+                    from: run.me_id().to_owned(),
+                    channel: run.route().channel.clone(),
                     text,
-                    run: Some(run.run.clone()),
+                    run: Some(run.run_id().to_owned()),
                     send_key: format!("{}:{seq}", task.id),
                     made: None,
-                    spoken: !run.ports.is_empty(),
+                    spoken: run.has_ports(),
                 })
                 .await
                 .map_err(|e| Error::Invalid(e.message))?;

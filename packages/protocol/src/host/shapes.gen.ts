@@ -1,6 +1,7 @@
 // Generated from crates/protocol/src/contract (vp run protocol:ts). Do not edit.
 
 import type { Locale } from "../common/shapes.gen";
+import type { InboxItem } from "../inbox/shapes.gen";
 
 export const HostPanelValues = ["files", "git"] as const;
 export type HostPanel = (typeof HostPanelValues)[number];
@@ -140,6 +141,64 @@ export type HostAppletInstallPayload = { artifactId: string, artifactType: strin
  * Request payload for `host.appletUninstall` and `host.appletOpen`.
  */
 export type HostAppletIdPayload = { artifactId: string, };
+
+/**
+ * Result payload returned by `host.appletUninstall`.
+ */
+export type AppletRemoveResult = { removed: boolean, bundlePath?: string, };
+
+/**
+ * Result payload returned by `host.appletOpen`.
+ */
+export type AppletOpenResult = { opened: boolean, bundlePath: string, };
+
+/**
+ * Status snapshot for the bundled CLI symlink (`host.cliState` / `cliInstall` / `cliRemove`).
+ */
+export type HostCommandLineState = { command: string, link: string, installed: boolean, onPath: boolean, taken: boolean, };
+
+/**
+ * Encoded QR code grid including its quiet zone (`'1'` = dark, `'0'` = light).
+ */
+export type QrMatrix = { size: number, rows: Array<string>, };
+
+/**
+ * Local regular file metadata returned by `host.pickFile`.
+ */
+export type HostLocalFile = { path: string, name: string, type: string, size: number, };
+
+/**
+ * Native live-voice playback/call phase (`host.voice*`).
+ */
+export const HostLiveVoicePhaseValues = ["idle", "connecting", "live", "stopping"] as const;
+/**
+ * Native live-voice playback/call phase (`host.voice*`).
+ */
+export type HostLiveVoicePhase = (typeof HostLiveVoicePhaseValues)[number];
+
+/**
+ * Snapshot returned by `host.voice*` bridge operations.
+ */
+export type HostLiveVoiceState = { phase: HostLiveVoicePhase, muted: boolean, problem: string | null, heard: string, said: string, };
+
+/**
+ * Native speech-stream playback phase (`host.speech*`).
+ */
+export const HostSpeechAudioPhaseValues = ["idle", "playing", "draining", "stopping"] as const;
+/**
+ * Native speech-stream playback phase (`host.speech*`).
+ */
+export type HostSpeechAudioPhase = (typeof HostSpeechAudioPhaseValues)[number];
+
+/**
+ * Snapshot returned by `host.speech*` bridge operations.
+ */
+export type HostSpeechAudioState = { phase: HostSpeechAudioPhase, problem: string | null, };
+
+/**
+ * Farm phone call history entry tracked by the diorama shell.
+ */
+export type HostPhoneCallLog = { call: InboxItem, answered: boolean, };
 
 /**
  * Every `host.*` bridge call answered by the native shell, decoded once at the boundary.

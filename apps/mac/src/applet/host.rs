@@ -958,7 +958,7 @@ fn handle_standalone_host_call(op: HostOp, reply: crate::hosted::Replier, cx: &m
             return;
         }
         HostOp::PlaySound(req) => {
-            let name = crate::audio::SoundName::from(req.name);
+            let name = req.name;
             crate::audio::dispatch(reply, move || crate::audio::play_sound(name));
             return;
         }

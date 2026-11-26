@@ -3,7 +3,7 @@
 use serde::Deserialize;
 use vibevalley_protocol::{Actor, AgentRole, ChannelUpdate};
 
-use super::{ToolRegistry, Who, given};
+use super::registry::{ToolRegistry, Who, given};
 use crate::agent::profile::text;
 use crate::channel::{AddressedMessage, ReadOptions, Speaking, Spoken};
 use crate::context::text::format_artifact_view_context;

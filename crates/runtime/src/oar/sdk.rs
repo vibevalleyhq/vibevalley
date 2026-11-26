@@ -1,16 +1,12 @@
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
-use std::path::Path;
 use std::sync::Arc;
 
 use serde_json::{Value, json};
-use tempfile::{Builder, TempDir};
+use tempfile::TempDir;
 
 use crate::BoxFuture;
 use crate::oar::claude::{StreamLaunch, open_sdk};
-use crate::oar::process::probe_installation_with;
-use crate::oar::{AgentError, Capabilities, Installation, McpServer, ModelInfo, Result, Runtime, Session, SessionOptions};
+use crate::oar::process::{private_dir, probe_installation_with, secret};
+use crate::oar::{Capabilities, Installation, McpServer, ModelInfo, Result, Runtime, Session, SessionOptions};
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum SdkRuntime {
@@ -25,18 +21,6 @@ impl SdkRuntime {
             Self::Qoder => "qoder",
         }
     }
-}
-
-pub(super) fn secret(dir: &Path, name: &str, data: &[u8]) -> Result<String> {
-    let path = dir.join(name);
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(&path)
-        .map_err(|e| AgentError::Io(e.to_string()))?;
-    file.write_all(data).map_err(|e| AgentError::Io(e.to_string()))?;
-    Ok(path.to_string_lossy().into_owned())
 }
 
 fn qwen_mcp(opts: &SessionOptions) -> Value {
@@ -58,14 +42,6 @@ fn qwen_mcp(opts: &SessionOptions) -> Value {
         })
         .collect();
     json!(entries)
-}
-
-pub(super) fn private_dir(prefix: &str) -> Result<TempDir> {
-    Builder::new()
-        .prefix(prefix)
-        .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o700))
-        .tempdir()
-        .map_err(|e| AgentError::Io(e.to_string()))
 }
 
 fn qoder_config(opts: &SessionOptions, args: &mut Vec<String>) -> Result<Option<TempDir>> {

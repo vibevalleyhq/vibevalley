@@ -4,7 +4,7 @@
 use vibevalley_i18n::t;
 use vibevalley_protocol::{Agent, ApiError, BizCode, CallState, Channel, ChannelUnread, ChannelUpdate, ChatMessage, MessageHit, Op, Preview, USER_ID, ops};
 
-use super::Chat;
+use super::service::Chat;
 use super::types::{Picked, Saying, Seat, profile_id};
 use crate::context::{LookIn, missing};
 

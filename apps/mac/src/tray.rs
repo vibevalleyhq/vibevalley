@@ -5,15 +5,9 @@ use gpui::App;
 use objc2::{AnyThread, DefinedClass as _, MainThreadOnly, rc::Retained, runtime::AnyObject, sel};
 use objc2_app_kit::{NSImage, NSMenu, NSMenuItem, NSStatusBar, NSStatusItem};
 use objc2_foundation::{MainThreadMarker, NSObject, NSSize, NSString};
-use serde::Deserialize;
 use vibevalley_i18n::t;
+pub use vibevalley_protocol::HostTrayPayload as Summary;
 use vibevalley_protocol::home::{ReleaseChannel, current_channel};
-
-#[derive(Clone, Default, Deserialize)]
-pub struct Summary {
-    pub title: String,
-    pub lines: Vec<String>,
-}
 
 enum TrayEvent {
     Open,

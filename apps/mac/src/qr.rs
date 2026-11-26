@@ -1,13 +1,6 @@
 //! Pure-Rust ISO/IEC 18004 QR Code encoder (byte mode, error-correction level L, versions 1–40).
 
-use serde::Serialize;
-
-/// Encoded QR code grid including its quiet zone (`'1'` = dark, `'0'` = light).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct QrMatrix {
-    pub size: usize,
-    pub rows: Vec<String>,
-}
+pub use vibevalley_protocol::QrMatrix;
 
 /// `(ec_codewords_per_block, num_blocks)` for error-correction level L, versions 1..=40 (ISO/IEC 18004 Table 9).
 const EC_L: [(usize, usize); 40] = [

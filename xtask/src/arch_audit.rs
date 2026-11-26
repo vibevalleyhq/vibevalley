@@ -82,6 +82,12 @@ pub const SERVER_SYNC_PROCESS_CEILING: usize = 0;
 /// Initialized to 0 for strict post-refactor gating; never raise this ceiling.
 pub const BLOCKING_REQWEST_CEILING: usize = 0;
 
+/// Default non-test code line ceiling for `mod.rs` facade files across `crates/**/src/` and `apps/mac/src/`.
+pub const MOD_RS_NON_TEST_LINE_CEILING: usize = 200;
+
+/// Legacy shrink-only grandfather list (now emptied — all `mod.rs` files across the repo must stay `<= MOD_RS_NON_TEST_LINE_CEILING`).
+pub const LEGACY_FAT_MOD_RS_CEILINGS: &[(&str, usize)] = &[];
+
 const GATEWAY_ALLOWED_ROOT_FILES: &[&str] = &["router.rs", "app.rs", "main.rs", "lib.rs"];
 const DAG_IGNORED_BASE_MODULES: &[&str] = &["context", "log", "db", "service", "setting", "provider", "fake"];
 const DAG_ROOT_MODULES: &[&str] = &["app", "router", "boot", "projection", "debug_sources", "main", "lib"];
@@ -139,10 +145,11 @@ pub enum ArchAuditRule {
     NoRawGitCommand,
     NoSyncProcessInServer,
     NoBlockingReqwest,
+    ThinModRs,
 }
 
 impl ArchAuditRule {
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 15] = [
         Self::NoGatewayReverseImport,
         Self::ServerDomainDag,
         Self::NoSeaOrmOutsideService,
@@ -157,6 +164,7 @@ impl ArchAuditRule {
         Self::NoRawGitCommand,
         Self::NoSyncProcessInServer,
         Self::NoBlockingReqwest,
+        Self::ThinModRs,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -175,6 +183,7 @@ impl ArchAuditRule {
             Self::NoRawGitCommand => "no-raw-git-command",
             Self::NoSyncProcessInServer => "no-sync-process-in-server",
             Self::NoBlockingReqwest => "no-blocking-reqwest",
+            Self::ThinModRs => "thin-mod-rs",
         }
     }
 }
@@ -1067,6 +1076,34 @@ fn count_non_test_code_lines(non_test_code: &str) -> usize {
     non_test_code.split('\n').filter(|line| !line.trim().is_empty()).count()
 }
 
+fn mod_rs_ceiling_for(path: &str) -> usize {
+    LEGACY_FAT_MOD_RS_CEILINGS
+        .iter()
+        .find_map(|&(entry, ceiling)| (entry == path).then_some(ceiling))
+        .unwrap_or(MOD_RS_NON_TEST_LINE_CEILING)
+}
+
+fn check_thin_mod_rs(file_path: &str, non_test_code: &str, out: &mut Vec<ArchViolation>) {
+    if file_path != "mod.rs" && !file_path.ends_with("/mod.rs") {
+        return;
+    }
+    let count = count_non_test_code_lines(non_test_code);
+    let ceiling = mod_rs_ceiling_for(file_path);
+    if count > ceiling {
+        out.push(ArchViolation {
+            rule: ArchAuditRule::ThinModRs,
+            file: file_path.to_owned(),
+            line: 1,
+            message: format!("`{file_path}` has {count} non-test code lines, exceeding shrink-only `mod.rs` ceiling {ceiling}"),
+            fix: format!(
+                "Keep `mod.rs` a thin module facade (<= {ceiling} non-test code lines) by moving cohesive implementation bodies into sibling modules and keeping essential leaf complexity in leaf `.rs` files."
+            ),
+            see: MODULE_DESIGN_DOC,
+            details: Vec::new(),
+        });
+    }
+}
+
 fn collect_flume_sites(file_path: &str, tokens: &[Token], index: &LineIndex, out: &mut Vec<CodeSite>) {
     for i in 0..tokens.len() {
         if tokens[i].kind == TokenKind::Ident && tokens[i].text == "flume" && tokens.get(i + 1).is_some_and(|t| t.text == "::") {
@@ -1705,6 +1742,9 @@ fn run_arch_audit_on_files(files: &[SourceFile], existing_legacy_dirs: &BTreeSet
             collect_blocking_reqwest_sites(&file.path, &tokens, &refs, &index, &mut blocking_reqwest_sites);
         }
 
+        // Rule 15: thin-mod-rs (applies across crates/**/src/** and apps/mac/src/**)
+        check_thin_mod_rs(&file.path, &non_test_code, &mut violations);
+
         if file.path.starts_with("crates/runtime/src/") {
             // Standalone test fixture binaries under `crates/runtime/src/bin/` are excluded from production runtime ceilings.
             if !file.path.starts_with("crates/runtime/src/bin/") {
@@ -2160,13 +2200,13 @@ pub fn audit_server_architecture_with_config(repo_root: &Path, config: ArchAudit
     Ok(run_arch_audit_on_files(&files, &existing_legacy_dirs, config))
 }
 
-/// Runs all 14 deterministic architecture & full-stack concurrency rules and returns
+/// Runs all 15 deterministic architecture & full-stack concurrency rules and returns
 /// the full structured report (per-rule violation lists, counts, ratchet metrics, and lock inventory).
 pub fn audit_server_architecture_report(repo_root: &Path) -> Result<ArchAuditReport, String> {
     audit_server_architecture_with_config(repo_root, ArchAuditConfig::strict())
 }
 
-/// Strict architecture gate (all 14 rules using exported shrink-only ceilings).
+/// Strict architecture gate (all 15 rules using exported shrink-only ceilings).
 pub fn audit_server_architecture_strict(repo_root: &Path) -> Result<ArchAuditReport, String> {
     audit_server_architecture_with_config(repo_root, ArchAuditConfig::strict())
 }
@@ -3088,5 +3128,31 @@ mod tests {
         assert!(details.iter().any(|d| d.contains("crates/cli/src/client.rs:1")));
         assert!(details.iter().any(|d| d.contains("crates/cli/src/client.rs:2")));
         assert!(details.iter().any(|d| d.contains("crates/server/src/fake/moss.rs:1")));
+    }
+
+    #[test]
+    fn rule15_thin_mod_rs_enforces_ceiling_on_mod_rs_only_and_exempts_tests_and_leaf_files() {
+        assert!(LEGACY_FAT_MOD_RS_CEILINGS.is_empty());
+        let dir = TempDir::new("vv-arch-r15");
+        let leaf_body: String = (0..260).map(|i| format!("pub fn leaf_{i}() -> usize {{ {i} }}\n")).collect();
+        let test_body: String = (0..250).map(|i| format!("#[test] fn t_{i}() {{}}\n")).collect();
+
+        // Large non-mod.rs leaf implementation file is intentionally allowed (essential complexity).
+        dir.write("crates/server/src/runtime/session/engine.rs", &leaf_body);
+        // Thin mod.rs with a large inline #[cfg(test)] mod tests stays well below the non-test ceiling.
+        dir.write(
+            "crates/server/src/issue/mod.rs",
+            &format!("pub mod engine;\n#[cfg(test)]\nmod tests {{\n{test_body}}}\n"),
+        );
+
+        let clean = audit_server_architecture_strict(&dir.0).unwrap();
+        assert!(clean.violations.is_empty(), "expected 0 violations, got: {:?}", clean.violations);
+
+        // Exceeding the 200 non-test ceiling on any mod.rs triggers `thin-mod-rs`.
+        let fat_mod: String = (0..205).map(|i| format!("pub fn f_{i}() -> usize {{ {i} }}\n")).collect();
+        dir.write("crates/server/src/issue/mod.rs", &fat_mod);
+
+        let dirty = audit_server_architecture_strict(&dir.0).unwrap();
+        assert_eq!(tags(&dirty.violations), vec!["thin-mod-rs@crates/server/src/issue/mod.rs:1"]);
     }
 }

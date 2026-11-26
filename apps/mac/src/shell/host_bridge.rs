@@ -9,7 +9,7 @@ use crate::host::percent_decode;
 use crate::hosted::{Action, HostedEvent, HostedView};
 use crate::theme::{MotionChoice, ThemeChoice, Ui};
 
-use super::{Shell, update_menus};
+use super::{InspectorSlot, Shell, should_mount_inspector, update_menus};
 
 impl Shell {
     pub fn on_action(&mut self, action: Action, window: &mut Window, cx: &mut Context<Self>) {
@@ -542,7 +542,7 @@ impl Shell {
                 return;
             }
             HostOp::PlaySound(req) => {
-                let name = crate::audio::SoundName::from(req.name);
+                let name = req.name;
                 crate::audio::dispatch(reply, move || crate::audio::play_sound(name));
                 return;
             }
@@ -598,23 +598,19 @@ impl Shell {
             HostOp::AppletList => {
                 Self::bg(cx, crate::applet::AppletHost::list, move |_, result, _| {
                     reply.send(match result {
-                        Ok(list) => {
-                            let mapped: Vec<vibevalley_protocol::ArtifactAppletInfo> = list.into_iter().map(Into::into).collect();
-                            Envelope::ok(json!(mapped))
-                        }
+                        Ok(list) => Envelope::ok(json!(list)),
                         Err(error) => refusal(BizCode::Refused, error),
                     });
                 });
                 return;
             }
-            HostOp::AppletInstall(req) => {
-                let request: crate::applet::AppletInstallRequest = req.into();
+            HostOp::AppletInstall(request) => {
                 Self::bg(
                     cx,
                     move || crate::applet::AppletHost::install_applet(request),
                     move |_, result, _| {
                         reply.send(match result {
-                            Ok(info) => Envelope::ok(json!(vibevalley_protocol::ArtifactAppletInfo::from(info))),
+                            Ok(info) => Envelope::ok(json!(info)),
                             Err(error) => refusal(BizCode::Refused, error),
                         });
                     },
@@ -682,6 +678,33 @@ impl Shell {
             HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
             HostedEvent::Ready => {}
         })
+    }
+
+    /// Lazily spawns the inspector QuickJS view only when the workspace inspector is visible
+    /// at a wide enough viewport, and drops it immediately when closed.
+    pub(super) fn sync_inspector(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.chrome.inspector_open {
+            self.chrome.inspector = None;
+            return;
+        }
+        if !should_mount_inspector(
+            self.chrome.native_workspace,
+            self.chrome.inspector_open,
+            f32::from(window.viewport_size().width),
+        ) {
+            return;
+        }
+        if self.chrome.inspector.is_some() {
+            return;
+        }
+        let dark = Ui::get(cx).colors.dark;
+        let view = cx.new(|cx| HostedView::new("sidebar", serde_json::from_value(json!({"role":"inspector"})).unwrap(), dark, window, cx));
+        let sub = cx.subscribe_in(&view, window, |this, _, event: &HostedEvent, window, cx| match event {
+            HostedEvent::Action(action) => this.on_action(action.clone(), window, cx),
+            HostedEvent::HostCall { op, reply } => this.host_call(op.clone(), reply.clone(), window, cx),
+            HostedEvent::Ready => this.push_sidebar(cx),
+        });
+        self.chrome.inspector = Some(InspectorSlot { view, _sub: sub });
     }
 }
 

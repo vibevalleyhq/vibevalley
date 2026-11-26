@@ -334,11 +334,11 @@ fn active_diorama(s: &Shell, cx: &App) -> Option<Entity<crate::diorama::DioramaV
 /// reflect up-to-date telemetry.
 fn step_unpainted_dioramas(shell: &Shell, cx: &mut App) {
     if let Some(slot) = &shell.chrome.native_diorama {
-        slot.view.update(cx, |v, _| v.draw_unpainted());
+        slot.view.update(cx, |v, cx| v.draw_unpainted(cx));
     }
     for pane in shell.workspace.panes.values() {
         if let PaneEntity::Diorama(view) = &pane.entity {
-            view.update(cx, |v, _| v.draw_unpainted());
+            view.update(cx, |v, cx| v.draw_unpainted(cx));
         }
     }
 }

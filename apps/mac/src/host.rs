@@ -270,14 +270,7 @@ pub fn read_file(path: &Path) -> Result<Value, String> {
     Ok(serde_json::json!({ "data": base64::engine::general_purpose::STANDARD.encode(&bytes), "type": info.kind, "name": info.name }))
 }
 
-#[derive(serde::Serialize)]
-pub struct LocalFile {
-    path: std::path::PathBuf,
-    name: String,
-    #[serde(rename = "type")]
-    kind: &'static str,
-    size: u64,
-}
+pub use vibevalley_protocol::HostLocalFile as LocalFile;
 
 pub fn file_info(path: &Path) -> Result<LocalFile, String> {
     let metadata = std::fs::metadata(path).map_err(|e| e.to_string())?;
@@ -312,9 +305,9 @@ pub fn file_info(path: &Path) -> Result<LocalFile, String> {
         _ => "application/octet-stream",
     };
     Ok(LocalFile {
-        path: path.to_path_buf(),
+        path: path.to_string_lossy().into_owned(),
         name,
-        kind,
+        kind: kind.to_owned(),
         size: metadata.len(),
     })
 }

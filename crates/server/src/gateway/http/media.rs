@@ -1,6 +1,6 @@
 //! Local binary inputs: bounded streaming upload and ranged playback.
 use super::auth::{LocalOnly, LocalOnlyStatus};
-use super::{FileRangeSpec, HttpState, refuse, reply, serve_file_range};
+use super::shared::{FileRangeSpec, HttpState, is_media_input_uuid, refuse, reply, serve_file_range};
 use axum::{
     body::{Body, Bytes},
     extract::{Path, State},
@@ -55,7 +55,7 @@ pub(super) async fn upload(State(state): State<HttpState>, _local: LocalOnly, Pa
     {
         return refuse(BizCode::PayloadTooLarge, "the body exceeds 512000000 bytes");
     }
-    if !super::is_media_input_uuid(&id) {
+    if !is_media_input_uuid(&id) {
         return refuse(BizCode::MediaNotFound, "media input not found");
     }
     let Some(inputs) = state.ports().media_input else {
@@ -70,7 +70,7 @@ pub(super) async fn upload(State(state): State<HttpState>, _local: LocalOnly, Pa
 }
 
 pub(super) async fn content(State(state): State<HttpState>, _local: LocalOnlyStatus, Path(id): Path<String>, headers: HeaderMap) -> Response {
-    if !super::is_media_input_uuid(&id) {
+    if !is_media_input_uuid(&id) {
         return StatusCode::NOT_FOUND.into_response();
     }
     let Some(inputs) = state.ports().media_input else {
@@ -128,7 +128,7 @@ pub(super) async fn speech(State(state): State<HttpState>, _local: LocalOnly, Pa
 
 #[cfg(test)]
 mod tests {
-    use super::super::parse_byte_range;
+    use super::super::shared::parse_byte_range;
     #[test]
     fn byte_ranges() {
         for (s, want) in [

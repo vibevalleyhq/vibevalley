@@ -25,7 +25,7 @@ use vibevalley_protocol::{BizCode, MachinePing, MachinePong, MachineWireError, M
 use crate::gateway::api::{MachineConnection, RemoteDeviceIdentity, Server, SharedMachineBus};
 
 use super::auth::MachineAuth;
-use super::{HttpState, refuse};
+use super::shared::{HttpState, refuse};
 
 const WS_CHANNEL_CAPACITY: usize = 256;
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(15);

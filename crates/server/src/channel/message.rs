@@ -5,12 +5,12 @@ use vibevalley_protocol::{
 };
 
 use super::model::{Q, WriteTx, message_of};
+use super::service::Chat;
 use super::types::{
-    AddressedMessage, ChannelEvent, Made, Meta, Note, Noticing, Picked, Posting, Saying, Speaking, Spoken, ThreadSubject, Write, line_of, meta_of, meta_text,
-    reactions_of, reactions_text, to_message,
+    AddressedMessage, ChannelEvent, HELD_SHOWN, LAST_MAX, Made, Meta, NO_NUMBER, Note, Noticing, Picked, Posting, RETRY_WINDOW_MS, SEARCH_MAX, SEND_KEY_MAX,
+    Saying, Speaking, Spoken, ThreadSubject, Write, line_of, meta_of, meta_text, no_channel, reactions_of, reactions_text, refused, to_message,
 };
 use super::words::{self, Has};
-use super::{Chat, HELD_SHOWN, LAST_MAX, NO_NUMBER, RETRY_WINDOW_MS, SEARCH_MAX, SEND_KEY_MAX, no_channel, refused};
 use crate::context::{LookIn, missing, now};
 use crate::service::channel::{EventRow, MsgRow, SearchParams};
 

@@ -2,8 +2,9 @@
 //! child processes with kqueue-driven waits and process-group reaping.
 
 use std::collections::VecDeque;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{ExitStatus, Stdio};
 use std::sync::Arc;
@@ -15,12 +16,13 @@ use nix::sys::signal::{Signal, killpg};
 use nix::unistd::Pid;
 use parking_lot::Mutex;
 use serde_json::json;
+use tempfile::{Builder, TempDir};
 use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::sync::{Mutex as AsyncMutex, Notify, oneshot, watch};
 
 use crate::oar::core::SessionCore;
-use crate::oar::{AgentError, EventKind, Installation, Result, StopReason, Usage};
+use crate::oar::{AgentError, EventKind, Installation, Result, SessionOptions, StopReason, Usage};
 
 /// Shared abort-grace watchdog across subprocess-backed `oar` drivers.
 /// Disarms immediately when the active turn finishes or the session exits;
@@ -413,6 +415,32 @@ pub(crate) async fn probe_installation_with(name: &str, login: Option<&LoginChec
 
 pub(crate) fn require_binary(name: &str) -> Result<PathBuf> {
     find_binary(name).ok_or_else(|| AgentError::NotAvailable(format!("`{name}` was not found on PATH")))
+}
+
+impl SessionOptions {
+    pub(crate) fn binary(&self, name: &str) -> Result<PathBuf> {
+        self.bin_path.clone().map_or_else(|| require_binary(name), Ok)
+    }
+}
+
+pub(crate) fn private_dir(prefix: &str) -> Result<TempDir> {
+    Builder::new()
+        .prefix(prefix)
+        .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o700))
+        .tempdir()
+        .map_err(|e| AgentError::Io(e.to_string()))
+}
+
+pub(crate) fn secret(dir: &Path, name: &str, data: &[u8]) -> Result<String> {
+    let path = dir.join(name);
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)
+        .map_err(|e| AgentError::Io(e.to_string()))?;
+    file.write_all(data).map_err(|e| AgentError::Io(e.to_string()))?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 /// Raw wire capture for debugging and for refreshing test fixtures: with

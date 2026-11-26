@@ -1136,10 +1136,10 @@ pub(crate) fn claude_launch(session_id: &str, opts: &SessionOptions) -> Result<S
     let secrets = if opts.mcp_servers.is_empty() {
         None
     } else {
-        let dir = crate::oar::sdk::private_dir("oar-claude-")?;
+        let dir = crate::oar::process::private_dir("oar-claude-")?;
         args.extend([
             "--mcp-config".into(),
-            crate::oar::sdk::secret(dir.path(), "mcp.json", crate::oar::mcp_config(&opts.mcp_servers).to_string().as_bytes())?,
+            crate::oar::process::secret(dir.path(), "mcp.json", crate::oar::mcp_config(&opts.mcp_servers).to_string().as_bytes())?,
         ]);
         Some(dir)
     };

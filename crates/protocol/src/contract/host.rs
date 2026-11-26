@@ -955,6 +955,7 @@ pub struct HostAppletInstallPayload {
     pub artifact_id: String,
     pub artifact_type: String,
     pub app_name: String,
+    #[serde(default)]
     pub always_on_top: bool,
 }
 
@@ -966,6 +967,114 @@ pub struct HostAppletInstallPayload {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct HostAppletIdPayload {
     pub artifact_id: String,
+}
+
+/// Result payload returned by `host.appletUninstall`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct AppletRemoveResult {
+    pub removed: bool,
+    #[serde(default)]
+    pub bundle_path: Option<String>,
+}
+
+/// Result payload returned by `host.appletOpen`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct AppletOpenResult {
+    pub opened: bool,
+    pub bundle_path: String,
+}
+
+/// Status snapshot for the bundled CLI symlink (`host.cliState` / `cliInstall` / `cliRemove`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostCommandLineState {
+    pub command: String,
+    pub link: String,
+    pub installed: bool,
+    pub on_path: bool,
+    pub taken: bool,
+}
+
+/// Encoded QR code grid including its quiet zone (`'1'` = dark, `'0'` = light).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct QrMatrix {
+    pub size: usize,
+    pub rows: Vec<String>,
+}
+
+/// Local regular file metadata returned by `host.pickFile`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostLocalFile {
+    pub path: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub size: u64,
+}
+
+/// Native live-voice playback/call phase (`host.voice*`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum HostLiveVoicePhase {
+    #[default]
+    Idle,
+    Connecting,
+    Live,
+    Stopping,
+}
+
+/// Snapshot returned by `host.voice*` bridge operations.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostLiveVoiceState {
+    pub phase: HostLiveVoicePhase,
+    pub muted: bool,
+    pub problem: Option<String>,
+    pub heard: String,
+    pub said: String,
+}
+
+/// Native speech-stream playback phase (`host.speech*`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub enum HostSpeechAudioPhase {
+    #[default]
+    Idle,
+    Playing,
+    Draining,
+    Stopping,
+}
+
+/// Snapshot returned by `host.speech*` bridge operations.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostSpeechAudioState {
+    pub phase: HostSpeechAudioPhase,
+    pub problem: Option<String>,
+}
+
+/// Farm phone call history entry tracked by the diorama shell.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[serde(rename_all = "camelCase")]
+pub struct HostPhoneCallLog {
+    pub call: super::inbox::InboxItem,
+    pub answered: bool,
 }
 
 /// Every `host.*` bridge call answered by the native shell, decoded once at the boundary.
@@ -1307,6 +1416,16 @@ crate::typescript::module! {
     ArtifactAppletInfo,
     HostAppletInstallPayload,
     HostAppletIdPayload,
+    AppletRemoveResult,
+    AppletOpenResult,
+    HostCommandLineState,
+    QrMatrix,
+    HostLocalFile,
+    HostLiveVoicePhase,
+    HostLiveVoiceState,
+    HostSpeechAudioPhase,
+    HostSpeechAudioState,
+    HostPhoneCallLog,
     HostOp];
     aliases: [];
 }

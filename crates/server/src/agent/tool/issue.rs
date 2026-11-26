@@ -7,7 +7,7 @@ use vibevalley_protocol::{
     IssueStatusUpdateInput, IssueTimeline, IssueUpdateInput, MandateStrength, SubmitBranch,
 };
 
-use super::{ToolRegistry, Who, given};
+use super::registry::{ToolRegistry, Who, given};
 use crate::agent::profile::text;
 use crate::issue::ChildDraft;
 use crate::runtime::{Report, ReportQuestion, ReportStatus};
