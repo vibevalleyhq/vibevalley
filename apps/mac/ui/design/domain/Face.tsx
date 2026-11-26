@@ -1,11 +1,12 @@
 import { computed, Image, pixelRatio, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { defaultOrchestrator, type Look } from "@vibevalley/protocol";
+import { defaultOrchestrator, type Look, type UserProfile } from "@vibevalley/protocol";
 
 import { orchestratorLookOf } from "../../infra/agents";
-import { ready, useAgents } from "../../infra/query";
-import { orchestratorPortraitUrl, ownerPortraitUrl, roleAvatarUrl, speciesPortraitUrl, useAssetsDir } from "../art";
+import { useAttachmentUrl } from "../../infra/attachmentFile";
+import { ready, useAgents, useSettings } from "../../infra/query";
+import { orchestratorPortraitUrl, ownerPortraitUrl, ROLE_AVATARS, roleAvatarUrl, speciesPortraitUrl, useAssetsDir } from "../art";
 import { tone } from "../tone";
 import { castOf, hexColor, orchestratorLooks } from "./cast";
 import { initialOf, RuntimeBadge } from "./RuntimeBadge";
@@ -106,24 +107,56 @@ export function OrchestratorFace(props: { size?: number; agent?: string | undefi
   );
 }
 
-/** The user: courtyard owner portrait when assets are available, else a compact badge. */
-export function UserFace(props: { size?: number }) {
+export const USER_AVATAR_PRESETS = ["user", ...ROLE_AVATARS] as const;
+
+function resolvePresetAvatarUrl(dir: string | undefined, preset: string | undefined): string | undefined {
+  if (!dir) return undefined;
+  if (preset === "monogram") return undefined;
+  if (!preset || preset === "user") return ownerPortraitUrl(dir);
+  return roleAvatarUrl(dir, preset) ?? ownerPortraitUrl(dir);
+}
+
+function userMonogram(profile: UserProfile | undefined): string {
+  const name = profile?.displayName?.trim();
+  if (name) return initialOf(name);
+  return initialOf(t("web.base.user"));
+}
+
+/** The user's avatar: uploaded attachment first, then preset Papertrails portrait, else monogram badge. */
+export function UserAvatar(props: {
+  size?: number | undefined;
+  profile?: UserProfile | undefined;
+  class?: string | undefined;
+  rounded?: "sm" | "full" | undefined;
+}) {
+  const settings = useSettings();
   const assetsDir = useAssetsDir();
   const size = () => props.size ?? 24;
+  const profile = computed(() => props.profile ?? ready(settings, undefined)?.profile);
+  const attachmentUrl = useAttachmentUrl(() => profile()?.avatarAttachmentId ?? "");
   const src = computed(() => {
-    const dir = assetsDir();
-    return dir ? ownerPortraitUrl(dir) : undefined;
+    const custom = attachmentUrl();
+    if (custom) return custom;
+    return resolvePresetAvatarUrl(assetsDir(), profile()?.avatarPreset);
   });
+  const shapeClass = () => (props.rounded === "full" ? "rounded-full" : "rounded-sm");
   return (
     <If
       when={src()}
       else={
-        <View class="shrink-0 items-center justify-center rounded-sm bg-selected" style={{ width: size(), height: size() }}>
-          <Text class="text-xs font-semibold text-muted">{t("web.base.user")}</Text>
+        <View class={`shrink-0 items-center justify-center bg-selected ${shapeClass()} ${props.class ?? ""}`} style={{ width: size(), height: size() }}>
+          <Text class="font-semibold text-ink" style={{ fontSize: Math.max(10, Math.round(size() * 0.44)), lineHeight: size() }}>
+            {userMonogram(profile())}
+          </Text>
         </View>
       }
     >
-      {(url) => <Portrait size={size()} src={url()} class="bg-avatar-paper" />}
+      {(url) => <Portrait size={size()} src={url()} class={`bg-avatar-paper ${shapeClass()} ${props.class ?? ""}`} />}
     </If>
   );
+}
+
+/** The user: configured avatar or courtyard portrait when assets are available, else a compact badge. */
+export function UserFace(props: { size?: number }) {
+  return <UserAvatar size={props.size} />;
 }

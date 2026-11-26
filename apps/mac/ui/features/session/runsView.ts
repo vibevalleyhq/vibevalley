@@ -57,14 +57,14 @@ function parseRunsScope(value: string | null): RunsScope {
   }
 }
 
-export function runsHref(params: RunsQueryParams = {}): string {
+export function runsHref(params: RunsQueryParams = {}, basePath = "/runs"): string {
   const sp = new URLSearchParams();
   if (params.session) sp.set("session", params.session);
   if (params.scope && params.scope !== "all") sp.set("scope", params.scope);
   if (params.agent) sp.set("agent", params.agent);
   if (params.issue) sp.set("issue", params.issue);
   const qs = sp.toString();
-  return qs ? `/runs?${qs}` : "/runs";
+  return qs ? `${basePath}?${qs}` : basePath;
 }
 
 export function parseRunsSearch(search: string | URLSearchParams): RunsQueryParams {

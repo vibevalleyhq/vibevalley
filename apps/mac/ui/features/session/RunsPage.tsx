@@ -21,7 +21,7 @@ import { ago } from "../../infra/base/format";
 import { useTimeout } from "../../infra/base/timer";
 import { useBoardSlice, useSessionsSlice } from "../../infra/frame";
 import { defineQuery, ready, retryRead, useAgents, useQuery } from "../../infra/query";
-import { useRouter, useSearch } from "../../infra/router";
+import { useLocation, useRouter, useSearch } from "../../infra/router";
 import { localizeRuntimeError } from "../../infra/runtimeError";
 import { createEffect, createMemo } from "../../infra/solid";
 import {
@@ -44,7 +44,7 @@ const markWrongOf =
   (on: number, want: string): Promise<OrchestratorEval> =>
     api.orchestrator.eval.create({ agent, on, want });
 
-const allSessionsQuery = defineQuery({
+export const allSessionsQuery = defineQuery({
   key: () => ["sessions", "all"],
   fetch: (_: void, context) => api.session.list({}, context),
   ...retryRead,
@@ -168,7 +168,9 @@ export function RunsPage(props: { approvals?: RunApprovals }) {
   const board = useBoardSlice();
   const sessionsSlice = useSessionsSlice();
   const router = useRouter();
+  const location = useLocation();
   const search = useSearch();
+  const basePath = () => (location().pathname.startsWith("/dashboard/runs") ? "/dashboard/runs" : "/runs");
   const now = useNow();
   const orchestrators = useOrchestrators();
   const agents = useAgents();
@@ -233,24 +235,24 @@ export function RunsPage(props: { approvals?: RunApprovals }) {
   );
 
   const setScope = (next: RunsScope) => {
-    router.navigate(runsHref({ ...parsed(), scope: next }), { replace: true });
+    router.navigate(runsHref({ ...parsed(), scope: next }, basePath()), { replace: true });
   };
 
   const clearAgent = () => {
-    router.navigate(runsHref({ ...parsed(), agent: undefined }), { replace: true });
+    router.navigate(runsHref({ ...parsed(), agent: undefined }, basePath()), { replace: true });
   };
 
   const clearIssue = () => {
-    router.navigate(runsHref({ ...parsed(), issue: undefined }), { replace: true });
+    router.navigate(runsHref({ ...parsed(), issue: undefined }, basePath()), { replace: true });
   };
 
   const clearAllFilters = () => {
     query.set("");
-    router.navigate(runsHref({ session: parsed().session }), { replace: true });
+    router.navigate(runsHref({ session: parsed().session }, basePath()), { replace: true });
   };
 
   const pickEntry = (entry: RunEntry) => {
-    router.navigate(runsHref({ ...parsed(), session: entry.id }), { replace: true });
+    router.navigate(runsHref({ ...parsed(), session: entry.id }, basePath()), { replace: true });
     if (!wide()) narrowPane.set("detail");
   };
 
@@ -513,11 +515,7 @@ function RunDetail(props: { entry: RunEntry; look?: Look | undefined; now: numbe
 
   return (
     <View class="h-full min-h-0 flex-1 bg-page">
-      <View
-        desktop={{ windowDrag: true }}
-        testID="run-detail-header"
-        class="min-h-11 shrink-0 flex-row flex-wrap items-center gap-2.5 border-b border-line bg-page px-4 py-1.5"
-      >
+      <View desktop={{ windowDrag: true }} testID="run-detail-header" class="h-11 shrink-0 flex-row items-center gap-2.5 border-b border-line bg-page px-4">
         <If when={props.showBack}>
           <View
             role="button"

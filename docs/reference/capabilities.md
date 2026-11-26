@@ -285,6 +285,9 @@ MOSS Live 语音通话
 | `runtime.list` | 列出全部引擎 | `/api/v1/runtime/list` | ✓ | ✓ |   |   |
 | `runtime.refresh` | 重新探测一个引擎 | `/api/v1/runtime/refresh` | ✓ | ✓ |   |   |
 | `runtime.setting.update` | 改一个引擎的设置：开关、路径、默认模型、预算 | `/api/v1/runtime/setting/update` | ✓ |   |   |   |
+| `runtime.mcp.list` | cap.op.runtime.mcp.list | `/api/v1/runtime/mcp/list` | ✓ | ✓ |   |   |
+| `runtime.mcp.install` | cap.op.runtime.mcp.install | `/api/v1/runtime/mcp/install` | ✓ |   |   |   |
+| `runtime.mcp.uninstall` | cap.op.runtime.mcp.uninstall | `/api/v1/runtime/mcp/uninstall` | ✓ |   |   |   |
 
 ## repo
 

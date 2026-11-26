@@ -600,6 +600,14 @@ export class VibeValleyApi {
       update: (a: { id: string } & T.RuntimeSettings, options?: { signal?: AbortSignal }): Promise<T.RuntimeInfo> =>
         this.call<T.RuntimeInfo>("runtime.setting.update", "/api/v1/runtime/setting/update", a, options),
     },
+    mcp: {
+      list: (a: T.McpListInput, options?: { signal?: AbortSignal }): Promise<T.McpListResult> =>
+        this.call<T.McpListResult>("runtime.mcp.list", "/api/v1/runtime/mcp/list", a, options),
+      install: (a: T.McpInstallInput, options?: { signal?: AbortSignal }): Promise<T.McpHostInfo> =>
+        this.call<T.McpHostInfo>("runtime.mcp.install", "/api/v1/runtime/mcp/install", a, options),
+      uninstall: (a: T.McpUninstallInput, options?: { signal?: AbortSignal }): Promise<T.McpHostInfo> =>
+        this.call<T.McpHostInfo>("runtime.mcp.uninstall", "/api/v1/runtime/mcp/uninstall", a, options),
+    },
   };
 
   readonly repo = {

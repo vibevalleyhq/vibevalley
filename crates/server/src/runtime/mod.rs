@@ -4,6 +4,7 @@
 //! Has zero compile-time dependency on `crate::agent` or `crate::issue`:
 //! `agent/` implements [`SessionDriver`] and injects it at boot.
 
+mod mcp;
 mod service;
 pub mod session;
 mod types;

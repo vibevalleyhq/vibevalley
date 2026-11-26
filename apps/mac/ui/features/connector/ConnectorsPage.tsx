@@ -129,7 +129,7 @@ export function ConnectorsPage(props: { id?: string | undefined; basePath?: stri
               const pending = () => Math.round(st()?.pending ?? 0);
               return (
                 <ListRow
-                  to={`${props.basePath ?? "/settings/connections/chat"}/${c()}`}
+                  to={`${props.basePath ?? "/settings/chat"}/${c()}`}
                   item={c()}
                   active={c() === selected()}
                   title={connectorLabel[c()]}

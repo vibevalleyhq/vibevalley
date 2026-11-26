@@ -345,6 +345,125 @@ pub struct RuntimeSettingUpdateInput {
     pub max_working: Option<i64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum McpHostId {
+    #[serde(rename = "antigravity")]
+    Antigravity,
+    #[serde(rename = "claude")]
+    Claude,
+    #[serde(rename = "codex")]
+    Codex,
+    #[serde(rename = "cursor")]
+    Cursor,
+}
+
+impl McpHostId {
+    pub const ALL: [McpHostId; 4] = [McpHostId::Antigravity, McpHostId::Claude, McpHostId::Codex, McpHostId::Cursor];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            McpHostId::Antigravity => "antigravity",
+            McpHostId::Claude => "claude",
+            McpHostId::Codex => "codex",
+            McpHostId::Cursor => "cursor",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+pub enum McpTransportKind {
+    #[serde(rename = "stdio")]
+    Stdio,
+    #[serde(rename = "streamableHttp")]
+    StreamableHttp,
+}
+
+impl McpTransportKind {
+    pub const ALL: [McpTransportKind; 2] = [McpTransportKind::Stdio, McpTransportKind::StreamableHttp];
+
+    /// The string on the wire.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            McpTransportKind::Stdio => "stdio",
+            McpTransportKind::StreamableHttp => "streamableHttp",
+        }
+    }
+}
+
+/// Told apart by `kind`.
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum McpInstallStatus {
+    NotInstalled,
+    Installed { transport: McpTransportKind },
+    Outdated { current: McpTransportKind, reason: String },
+    Unsupported { reason: String },
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpHostInfo {
+    pub id: McpHostId,
+    pub label: String,
+    pub installed: bool,
+    pub config_path: Option<String>,
+    pub status: McpInstallStatus,
+    pub supports_stdio: bool,
+    pub supports_http: bool,
+    pub stdio_snippet: String,
+    pub http_snippet: Option<String>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpListInput {
+    pub transport: Option<McpTransportKind>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpListResult {
+    pub server_name: String,
+    pub stdio_command: String,
+    pub stdio_args: Vec<String>,
+    pub http_url: Option<String>,
+    pub hosts: Vec<McpHostInfo>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpInstallInput {
+    pub host: McpHostId,
+    pub transport: Option<McpTransportKind>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpUninstallInput {
+    pub host: McpHostId,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "runtime";
@@ -370,6 +489,14 @@ crate::typescript::module! {
     RuntimeSettings,
     RuntimeInfo,
     RuntimeRefreshInput,
-    RuntimeSettingUpdateInput];
+    RuntimeSettingUpdateInput,
+    McpHostId,
+    McpTransportKind,
+    McpInstallStatus,
+    McpHostInfo,
+    McpListInput,
+    McpListResult,
+    McpInstallInput,
+    McpUninstallInput];
     aliases: [];
 }

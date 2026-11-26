@@ -126,7 +126,8 @@ test("RunsPage shows active rail bar, strips collapsed prompt scaffolding while 
   });
   await fake.pumpUntil(app, () => app.count("id:step-toggle-1") === 1);
 
-  expect(app.count("id:rail-runs-active-bar")).toBe(1);
+  expect(app.count("id:dashboard-page")).toBe(1);
+  expect(app.count("id:dashboard-header")).toBe(1);
 
   // Collapsed row shows the clean human summary without raw internal prompt scaffolding.
   expect(app.shows("id:step-toggle-1 >> text:检查发布脚本")).toBe(true);
@@ -140,10 +141,10 @@ test("RunsPage shows active rail bar, strips collapsed prompt scaffolding while 
   expect(app.count("id:waterfall-bar-1")).toBe(1);
   expect(app.layout("id:waterfall-bar-1")?.width).toBeGreaterThanOrEqual(6);
 
-  // Leaving /runs removes the /runs active indicator bar.
+  // Leaving /runs leaves the Dashboard host shell.
   await app.press("id:place-issues");
   await fake.pumpUntil(app, () => app.count("id:issues-page") === 1);
-  expect(app.count("id:rail-runs-active-bar")).toBe(0);
+  expect(app.count("id:dashboard-page")).toBe(0);
 });
 
 test("RunsPage localizes raw runtime API-key errors in trajectory step summaries and run/error rows", async () => {

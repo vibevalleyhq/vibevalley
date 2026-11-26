@@ -199,7 +199,7 @@ export function ThreadPane(props: { thread: Channel; point: number | undefined; 
   };
   return (
     <View testID="thread-pane" accessibilityLabel={t("web.channel.thread")} class="min-w-0 flex-1">
-      <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
+      <View class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line px-3.5">
         <View class="h-6 w-6 shrink-0 items-center justify-center rounded-md bg-side">
           <If when={session()} else={<Icon name="thread" size={14} tone="muted" />}>
             {(s) => <HelperFace agent={sessionProfile(s()) ?? ""} runtime={s().runtime} size={24} />}
@@ -266,7 +266,7 @@ export function ChannelSidePane(props: {
         <Keyed key={c().id}>
           {() => (
             <View testID="artifact-chat-pane" class="min-h-0 min-w-0 flex-1">
-              <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center justify-between gap-1.5 border-b border-line px-2.5">
+              <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center justify-between gap-1.5 border-b border-line px-2.5">
                 <A href={href()} testID="artifact-message" class="min-w-0 flex-1 flex-row items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-hover">
                   <Icon name="chat" size={14} tone="muted" />
                   <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{channelLabel(c())}</Text>

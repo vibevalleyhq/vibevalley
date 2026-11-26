@@ -9,6 +9,7 @@ import { AgentsRoute } from "../features/agent";
 import { ArtifactsPage, PresenterPage, StandaloneArtifactPage } from "../features/artifact";
 import { ChannelSidePane, ChatPage } from "../features/channel";
 import { ContentShell } from "../features/content";
+import { DashboardPage } from "../features/dashboard";
 import { Follow } from "../features/inbox";
 import { issueSearch } from "../features/issue/model/navigation";
 import { IssuesPage } from "../features/issue/views/IssuesPage";
@@ -17,7 +18,6 @@ import { OrchestratorPage, PendingApprovals } from "../features/orchestrator";
 import { ReposPage } from "../features/repo";
 import { sortRepos } from "../features/repo/repos";
 import { RuntimesPage } from "../features/runtime";
-import { RunsPage } from "../features/session";
 import { SettingsPage } from "../features/setting";
 import { Keyed } from "../infra/base/dom";
 import { act } from "../infra/bridge";
@@ -160,7 +160,8 @@ const routes: readonly RouteDefinition[] = [
       { path: farmRoute, meta: { skin: "farm" }, component: RepoFarm },
       { path: "/workspace", meta: { place: "workspace" }, component: () => <View testID="native-workspace" class="flex-1" /> },
       page("/issues", "issues", (rest) => <IssuesPage rest={rest()} />, issueSearch),
-      page("/runs", "runs", () => <RunsPage approvals={PendingApprovals} />),
+      page("/dashboard", "dashboard", (rest) => <DashboardPage tab={rest().split("/")[0] === "runs" ? "runs" : "overview"} approvals={PendingApprovals} />),
+      page("/runs", "dashboard", () => <DashboardPage tab="runs" approvals={PendingApprovals} />),
       page("/chat", "chat", () => <ChatPage />),
       page("/settings", "settings", (rest) => <SettingsPage rest={rest()} />),
       { path: "/team", component: () => <Navigate href="/agents" /> },

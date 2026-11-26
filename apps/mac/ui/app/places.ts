@@ -12,12 +12,12 @@ export interface Place {
   readonly group: "work" | "setup";
 }
 
-export const runsPlace: Place = {
-  id: "runs",
-  label: t("web.base.place.runs.label"),
-  hint: t("web.base.place.runs.hint"),
+export const dashboardPlace: Place = {
+  id: "dashboard",
+  label: t("web.base.place.dashboard.label"),
+  hint: t("web.base.place.dashboard.hint"),
   icon: "log",
-  path: "/runs",
+  path: "/dashboard",
   group: "work",
 };
 
@@ -35,6 +35,7 @@ export const places: readonly Place[] = [
   { id: "issues", label: t("web.base.place.issues.label"), hint: t("web.base.place.issues.hint"), icon: "issues", path: "/issues", group: "work" },
   { id: "workspace", label: t("web.base.place.workspace.name"), hint: t("web.base.place.workspace.hint"), icon: "terminal", path: "/repos", group: "work" },
   { id: "content", label: t("web.base.place.content.label"), hint: t("web.base.place.content.hint"), icon: "media", path: "/library", group: "work" },
+  { id: "farm", label: t("web.base.place.farm.label"), hint: t("web.base.place.farm.hint"), icon: "farm", path: "/farm", group: "work" },
   { id: "runtimes", label: t("web.base.place.runtimes.label"), hint: t("web.base.place.runtimes.hint"), icon: "runtimes", path: "/runtimes", group: "setup" },
   { id: "team", label: t("web.base.place.team.label"), hint: t("web.base.place.team.hint"), icon: "agents", path: "/agents", group: "setup" },
   settingsPlace,

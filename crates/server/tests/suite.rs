@@ -25,6 +25,7 @@ mod module_boundaries;
 mod orchestrator;
 mod provider;
 mod remote;
+mod runtime_mcp;
 mod session;
 mod setting;
 mod spine_and_gateway;

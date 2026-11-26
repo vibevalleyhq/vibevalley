@@ -197,6 +197,10 @@ impl Runtime {
         self.session.set_mcp_url(url);
     }
 
+    pub fn mcp_url(&self) -> Option<String> {
+        self.session.mcp_url()
+    }
+
     pub fn subscribe_events(&self) -> broadcast::Receiver<SessionLifecycleEvent> {
         self.session.subscribe_events()
     }

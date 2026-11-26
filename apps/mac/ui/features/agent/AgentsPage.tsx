@@ -134,7 +134,7 @@ function AgentsPage() {
       <View
         testID="agents-toolbar"
         desktop={{ windowDrag: true }}
-        class="min-h-11 shrink-0 flex-row flex-wrap items-center justify-between gap-3 border-b border-line bg-page px-6 py-1.5"
+        class="h-11 shrink-0 flex-row items-center justify-between gap-3 border-b border-line bg-page px-4"
       >
         <View class="min-w-0 flex-row flex-wrap items-center gap-2.5">
           <View class="flex-row items-center gap-2">

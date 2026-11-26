@@ -167,6 +167,7 @@ async fn create_app_inner(config: Config, storage_config: StorageConfig) -> Resu
         work_root: config.work_root.clone(),
         version: config.version.clone(),
         deepseek_api_key: config.deepseek_api_key.clone(),
+        storage_backend: Some(storage_config.kind().to_string()),
     })
     .await;
     let provider = Arc::new(Provider::new(setting.clone(), ctx.http.clone()));

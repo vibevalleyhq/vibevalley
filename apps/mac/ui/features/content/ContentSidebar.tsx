@@ -136,7 +136,7 @@ export function ContentSidebar() {
 
   return (
     <View testID="content-sidebar" accessibilityLabel={t("web.library.content.title")} class="h-full w-58 shrink-0 border-r border-line bg-side">
-      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-1.5 border-b border-line px-2.5">
+      <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-1.5 border-b border-line px-2.5">
         <IconButton
           icon="sidebar"
           size={16}

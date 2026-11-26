@@ -641,10 +641,6 @@ test("settings: general settings route renders controls and persists updates", a
   expect(app.count("id:start-workbench")).toBe(1);
   expect(app.count("id:language-zh")).toBe(1);
   expect(app.count("id:language-en")).toBe(1);
-  expect(app.count("id:theme-dark")).toBe(1);
-
-  await app.press("id:theme-dark");
-  expect(fake.calls.find((c) => c.op === "host.theme")?.payload).toBe("dark");
 
   await app.press("id:start-farm");
 
@@ -653,11 +649,16 @@ test("settings: general settings route renders controls and persists updates", a
   await fake.pump(app);
   expect(fake.calls.find((c) => c.op === "setting.update")?.payload).toMatchObject({ locale: "en" });
   expect(fake.calls.find((c) => c.op === "host.locale")?.payload).toBe("en");
+
+  await app.press("id:settings-section-appearance");
+  await fake.pumpUntil(app, () => app.count("id:theme-dark") === 1);
+  await app.press("id:theme-dark");
+  expect(fake.calls.find((c) => c.op === "host.theme")?.payload).toBe("dark");
 });
 
 test("settings: appearance motion control dispatches host.motion, syncs host events, and applies off mode", async () => {
   const { app, fake } = await mountApp(
-    "/settings/general",
+    "/settings/appearance",
     (f) => {
       f.respond("host.info", { capabilities: ["theme", "motion"], motion: "on" });
       f.respond("host.motion", null);
@@ -701,7 +702,7 @@ test("settings: appearance motion control dispatches host.motion, syncs host eve
   expect(app.count("id:issue-new-dialog")).toBe(0);
 
   const bootOff = await mountApp(
-    "/settings/general",
+    "/settings/appearance",
     (f) => {
       f.respond("host.info", { capabilities: ["theme", "motion"], motion: "off" });
     },
@@ -844,9 +845,11 @@ test("regression: defineStored preferences persist through nsh Storage and survi
     f.respond("host.font", { monoFont: "Menlo", terminalFontSize: 14, uiFontSize: 14 });
   });
 
+  await first.app.press("id:start-farm");
+  await first.app.press("id:settings-section-appearance");
+  await first.fake.pumpUntil(first.app, () => first.app.count("id:theme-dark") === 1);
   await first.app.press("id:theme-dark");
   await first.app.press("id:scale-110");
-  await first.app.press("id:start-farm");
   await first.app.waitUntil(() => {
     const raw = first.app.storage()["vibevalley.prefs"];
     if (!raw) return false;
@@ -862,14 +865,15 @@ test("regression: defineStored preferences persist through nsh Storage and survi
   });
 
   const reloaded = await mountApp("/settings/general", undefined, { storage: persisted });
+  await reloaded.app.waitUntil(() => reloaded.app.viewStyle("id:start-farm")?.backgroundColor !== undefined);
+  expect(reloaded.app.viewStyle("id:start-workbench")?.backgroundColor).toBeUndefined();
+
+  await reloaded.app.press("id:settings-section-appearance");
+  await reloaded.fake.pumpUntil(reloaded.app, () => reloaded.app.count("id:theme-dark") === 1);
   await reloaded.app.waitUntil(
-    () =>
-      reloaded.app.viewStyle("id:theme-dark")?.backgroundColor !== undefined &&
-      reloaded.app.viewStyle("id:scale-110")?.backgroundColor !== undefined &&
-      reloaded.app.viewStyle("id:start-farm")?.backgroundColor !== undefined,
+    () => reloaded.app.viewStyle("id:theme-dark")?.backgroundColor !== undefined && reloaded.app.viewStyle("id:scale-110")?.backgroundColor !== undefined,
   );
   expect(reloaded.app.viewStyle("id:theme-system")?.backgroundColor).toBeUndefined();
-  expect(reloaded.app.viewStyle("id:start-workbench")?.backgroundColor).toBeUndefined();
 
   const rootReload = await mountApp("/", undefined, { storage: persisted });
   await rootReload.fake.pumpUntil(rootReload.app, () => rootReload.fake.acts.some((a) => a.type === "openFarm"));
