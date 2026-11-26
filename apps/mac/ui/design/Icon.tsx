@@ -8,7 +8,7 @@ import { tone as toneOf } from "./tone";
 // The size ladder (docs/design/01-philosophy-and-tokens.md).
 export type IconSize = 10 | 12 | 14 | 16 | 20 | 24 | 48;
 
-/** The marks keep their colour wherever they stand, over a caller's colour too: met is green, unmet red, unsure amber. */
+/** Default semantic tones for status marks when callers omit both `color` and `tone`. */
 const iconTone: Partial<Record<IconName, string>> = { check: "leaf", cross: "berry", warn: "wheat" };
 
 const pathCache = new Map<string, Path2D>();
@@ -22,15 +22,18 @@ function cachedPath(d: string): Path2D {
   return path;
 }
 
+/** Resolves an icon's hex color: explicit `color`, explicit `tone`, status fallback (`iconTone`), or `"ink"`. */
+export function resolveIconColor(props: { name: IconName; color?: string; tone?: string }): string {
+  // Read colorScheme so theme switches push the updated hex token into VvIcon and Canvas draws.
+  colorScheme();
+  if (props.color !== undefined) return props.color;
+  if (props.tone !== undefined) return toneOf(props.tone);
+  return toneOf(iconTone[props.name] ?? "ink");
+}
+
 export function Icon(props: { name: IconName; size?: number; label?: string; color?: string; tone?: string; testID?: string }) {
   const size = () => props.size ?? 16;
-  const color = () => {
-    // Read colorScheme so theme switches push the updated hex token into VvIcon and Canvas draws.
-    colorScheme();
-    const fixed = iconTone[props.name];
-    if (fixed) return toneOf(fixed);
-    return props.color ?? toneOf(props.tone ?? "ink");
-  };
+  const color = () => resolveIconColor(props);
   const VvIcon = richNative()?.VvIcon;
   if (VvIcon) {
     return <VvIcon name={props.name} size={size()} color={color()} label={props.label ?? null} testID={props.testID} />;
