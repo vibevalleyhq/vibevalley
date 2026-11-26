@@ -13,10 +13,12 @@ const UPDATE_FALLBACK_POLL_MS = 60_000;
 const BYTES_PER_KB = 1024;
 const BYTES_PER_MB = 1024 * 1024;
 
+/** Clamps an update download percentage to a whole number between 0 and 100. */
 export function clampUpdatePercent(percent: number): number {
   return Math.max(0, Math.min(100, Math.round(percent)));
 }
 
+/** Formats downloaded/total bytes and transfer speed for the update progress UI. */
 export function formatUpdateTransfer(info: {
   readonly downloadedBytes?: number | undefined;
   readonly totalBytes?: number | undefined;
