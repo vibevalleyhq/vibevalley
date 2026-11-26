@@ -84,7 +84,6 @@
     "runtime": "引擎自己接着做",
     "refined": "起草好了",
     "reported": "交回来了",
-    "said": "：{summary}",
     "accepted": "验收通过",
     "asked": "问你：{questions}",
     "rejected": "打回：{lines}",

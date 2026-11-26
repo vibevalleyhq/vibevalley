@@ -203,8 +203,8 @@ function responsesFor(density: ScenarioDensity, bundle: SliceBundle): Record<str
     "issue.timeline.get": {
       milestones: [
         { at: SCENARIO_NOW - 40 * MIN_MS, kind: "opened", text: "写下这张工单" },
-        { at: SCENARIO_NOW - 20 * MIN_MS, kind: "started", who: "老周", text: "开始处理" },
-        { at: SCENARIO_NOW - 6 * MIN_MS, kind: "reported", who: "老周", text: "已提交修改并补充测试。" },
+        { at: SCENARIO_NOW - 20 * MIN_MS, kind: "started", who: "老周", text: "开始处理", run: "run-1" },
+        { at: SCENARIO_NOW - 6 * MIN_MS, kind: "reported", who: "老周", text: "交回来了", said: "已提交修改并补充测试。", run: "run-1" },
       ],
       spent: { tokens: 182_400, cny: 0.42 },
     },

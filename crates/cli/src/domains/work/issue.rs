@@ -565,8 +565,13 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
                     .milestones
                     .iter()
                     .map(|m| {
-                        let who = m.who.as_ref().map(|w| format!("  {w}")).unwrap_or_default();
-                        format!("{}  {}{who}  {}", minute_of(m.at), m.kind.as_str(), m.text)
+                        let who = m.who.as_deref().unwrap_or_default();
+                        let run = m.run.as_deref().unwrap_or_default();
+                        let detail = match &m.said {
+                            Some(said) if !said.is_empty() => format!("{}: {said}", m.text),
+                            _ => m.text.clone(),
+                        };
+                        line(&[&minute_of(m.at), m.kind.as_str(), who, run, &detail])
                     })
                     .collect();
                 if let Some(spent) = &tl.spent {

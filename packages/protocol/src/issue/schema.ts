@@ -110,6 +110,8 @@ const Milestone = z.object({
   kind: MilestoneKind,
   who: z.exactOptional(z.string()),
   text: z.string(),
+  said: z.exactOptional(z.string()),
+  run: z.exactOptional(z.string()),
 }) satisfies Codec<T.Milestone>;
 
 export const IssueTimeline = z.object({

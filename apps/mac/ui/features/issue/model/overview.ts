@@ -219,6 +219,3 @@ export function issueState(issue: Issue, sessions: Session[], session: SessionVi
     showsChanges: issue.deliveryEvidence?.mergedCommit !== undefined || (session !== undefined && stage.state !== "done" && stage.state !== "canceled"),
   };
 }
-
-/** The empty work log says why. */
-export const noStepsText = (head: Session) => (endedAt(head) === undefined ? t("web.issue.issue.noSteps") : t("web.issue.issue.stepsGone"));

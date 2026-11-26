@@ -80,14 +80,22 @@ export type IssueStage = { state: IssueStageKind, since?: number, stuck?: StuckR
  */
 lead?: IssueAct, acts: Array<IssueAction>, };
 
-export const MilestoneKindValues = ["opened", "refined", "started", "reported", "asked", "told", "failed", "stopped", "rejected", "accepted", "closed"] as const;
+export const MilestoneKindValues = ["opened", "refined", "started", "reported", "asked", "failed", "stopped", "rejected", "accepted", "closed"] as const;
 export type MilestoneKind = (typeof MilestoneKindValues)[number];
 
 export type Milestone = { at: number, kind: MilestoneKind,
 /**
  * Session name; absent for user or system milestones.
  */
-who?: string, text: string, };
+who?: string, text: string,
+/**
+ * Plain-text summary from the run that produced this milestone, if any.
+ */
+said?: string,
+/**
+ * Run id that produced this milestone, if any.
+ */
+run?: string, };
 
 export type IssueTimeline = { milestones: Array<Milestone>, spent?: Spent, };
 

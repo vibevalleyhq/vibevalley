@@ -460,8 +460,6 @@ pub enum MilestoneKind {
     Reported,
     #[serde(rename = "asked")]
     Asked,
-    #[serde(rename = "told")]
-    Told,
     #[serde(rename = "failed")]
     Failed,
     #[serde(rename = "stopped")]
@@ -475,13 +473,12 @@ pub enum MilestoneKind {
 }
 
 impl MilestoneKind {
-    pub const ALL: [MilestoneKind; 11] = [
+    pub const ALL: [MilestoneKind; 10] = [
         MilestoneKind::Opened,
         MilestoneKind::Refined,
         MilestoneKind::Started,
         MilestoneKind::Reported,
         MilestoneKind::Asked,
-        MilestoneKind::Told,
         MilestoneKind::Failed,
         MilestoneKind::Stopped,
         MilestoneKind::Rejected,
@@ -497,7 +494,6 @@ impl MilestoneKind {
             MilestoneKind::Started => "started",
             MilestoneKind::Reported => "reported",
             MilestoneKind::Asked => "asked",
-            MilestoneKind::Told => "told",
             MilestoneKind::Failed => "failed",
             MilestoneKind::Stopped => "stopped",
             MilestoneKind::Rejected => "rejected",
@@ -518,6 +514,10 @@ pub struct Milestone {
     /// Session name; absent for user or system milestones.
     pub who: Option<String>,
     pub text: String,
+    /// Plain-text summary from the run that produced this milestone, if any.
+    pub said: Option<String>,
+    /// Run id that produced this milestone, if any.
+    pub run: Option<String>,
 }
 
 #[skip_serializing_none]

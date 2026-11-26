@@ -73,8 +73,11 @@ export const useIssueChanges = (id: () => string, shown: () => boolean = () => t
   );
 
 /** The issue's timeline, read again as it moves on: where it stands, its helper's rounds, the findings it was sent back with. */
-export const useIssueTimeline = (issue: () => Issue, rounds: () => number) =>
-  useQuery(() => timelineQuery({ id: issue().id, state: issue().stage.state, rounds: rounds(), findings: issue().findings.length }), { keepPrevious: true });
+export const useIssueTimeline = (issue: () => Issue, rounds: () => number, enabled: () => boolean = () => true) =>
+  useQuery(() => timelineQuery({ id: issue().id, state: issue().stage.state, rounds: rounds(), findings: issue().findings.length }), {
+    keepPrevious: true,
+    enabled,
+  });
 
 /** The issue's runs, read again whenever version changes. */
 export const useIssueRuns = (id: () => string, version: () => string) => useQuery(() => runsQuery({ id: id(), version: version() }), { keepPrevious: true });

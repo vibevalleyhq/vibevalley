@@ -4,10 +4,11 @@ import { min, now, sampleChanges, sampleSession, working } from "../features/iss
 import { finishedRun, liveRun } from "../features/session/session.samples";
 
 const milestones: Milestone[] = [
-  { at: now - 6 * min, kind: "reported", who: "老周", text: "过期回到登录页，登录页说明原因，加了两条测试。" },
-  { at: now - 9 * min, kind: "told", text: "再补一条跨过期限的测试。" },
-  { at: now - 20 * min, kind: "started", who: "老周", text: "开始做了" },
   { at: now - 40 * min, kind: "opened", text: "写下这张工单" },
+  { at: now - 20 * min, kind: "started", who: "老周", text: "开始做了", run: "run-1" },
+  { at: now - 14 * min, kind: "reported", who: "老周", text: "交回来了", said: "过期回到登录页，加了两条测试。", run: "run-1" },
+  { at: now - 9 * min, kind: "started", who: "老周", text: "你带了话，接着做一轮", run: "run-2" },
+  { at: now - 6 * min, kind: "reported", who: "老周", text: "交回来了", said: "过期回到登录页，登录页说明原因，加了两条测试。", run: "run-2" },
 ];
 
 const runs: Run[] = [

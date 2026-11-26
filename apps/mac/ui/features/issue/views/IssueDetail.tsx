@@ -12,7 +12,6 @@ import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import type { IconName } from "../../../design/icons";
 import { Markdown } from "../../../design/Markdown";
-import { motionClass } from "../../../design/motion";
 import { TextLink } from "../../../design/TextLink";
 import { Bubble } from "../../../design/Tip";
 import { toast } from "../../../design/toasts";
@@ -23,25 +22,24 @@ import { shortMomentText } from "../../../infra/base/format";
 import { hostApi } from "../../../infra/bridge";
 import { useBoardSlice } from "../../../infra/frame";
 import { ready } from "../../../infra/query";
-import { Link as A } from "../../../infra/router";
 import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { IssueArtifacts } from "../../artifact";
-import { createSessionEvents, runsHref, SubagentProgress } from "../../session";
+import { SubagentProgress } from "../../session";
 import { createIssueActs } from "../model/acts";
 import type { Tone } from "../model/cards";
 import { changesLine } from "../model/changes";
 import { useIssueChanges, useIssues, useIssueTimeline } from "../model/history";
 import { blockerIssuesOf } from "../model/meta";
 import { issueMove, movedIssue } from "../model/moves";
-import { issueState, noStepsText, stageTone } from "../model/overview";
+import { issueState, stageTone } from "../model/overview";
 import { issueSet, labeledIssue, sendLabel, updateIssueAttachments } from "../model/write";
 import { ActLines } from "./ActLines";
 import { ChangesBody, ChangesHead, ConflictFiles } from "./CloseDialog";
+import { IssueActivity } from "./IssueActivity";
 import { IssueAttachments } from "./IssueAttachments";
 import { BlockedByChips, BlockedByPicker, DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
-import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree, Runs, stepsLine, Story, WorkLog } from "./IssueSections";
-import { IssueThread } from "./IssueThread";
+import { AnswerView, Criteria, OrchestratorIssueDetail, Question, ReconcileWorktree } from "./IssueSections";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
 import { Fold, IssueSheet, IssueTrail, More, Note, Pick, Property, SheetLabel, StagePill } from "./Sheet";
 
@@ -86,8 +84,6 @@ export function IssueDetail(props: {
   const doAct = acts.send;
   const sayAct = acts.say;
   const agent = useAgent(() => sessionProfile(head()));
-  const showSteps = signal(false);
-  const steps = createSessionEvents(() => head().id, showSteps);
   const changesQuery = useIssueChanges(
     () => props.issue.id,
     () => s().showsChanges,
@@ -445,7 +441,6 @@ export function IssueDetail(props: {
         </If>
       </View>
 
-      <IssueThread issue={props.issue.id} />
       <IssueArtifacts
         issue={props.issue.id}
         heading={
@@ -455,44 +450,14 @@ export function IssueDetail(props: {
         }
       />
 
-      <View accessibilityLabel={t("web.issue.detail.story")} testID="issue-story" class="mt-7 border-t border-line pt-5">
-        <SheetLabel first>{t("web.issue.detail.story")}</SheetLabel>
-        <If
-          when={timeline()}
-          else={<Text class="text-xs text-faint">{timelineQuery.status() === "pending" ? t("web.issue.reading") : t("web.issue.detail.unread")}</Text>}
-        >
-          {(line) => <Story milestones={line().milestones} />}
-        </If>
-        <View class="mt-4 overflow-hidden rounded-lg border border-line bg-page px-3.5">
-          <Fold
-            testID="issue-steps-fold"
-            label={t("web.issue.detail.steps")}
-            summary={steps().length > 0 ? stepsLine(steps()) : undefined}
-            aside={
-              <A
-                href={runsHref({ session: head().id, issue: props.issue.id })}
-                testID="issue-open-trajectory"
-                class={`h-6 shrink-0 flex-row items-center gap-1 rounded-md px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px`}
-              >
-                <Icon name="log" size={12} tone="muted" />
-                <Text class="text-xs font-medium text-muted">{t("web.issue.detail.openTrajectory")}</Text>
-              </A>
-            }
-            onToggle={(v) => showSteps.set(v)}
-          >
-            <If when={steps().length > 0 ? steps() : undefined} else={<Text class="text-xs text-faint">{noStepsText(head())}</Text>}>
-              {(st) => <WorkLog steps={st()} />}
-            </If>
-          </Fold>
-          <Fold bordered={false} label={t("web.issue.detail.runs")} summary={s().historyLine} testID="issue-runs-fold">
-            <Runs
-              issue={props.issue.id}
-              version={`${props.issue.stage.state}:${props.session?.runs}:${props.session?.phase._tag}`}
-              onChanges={changesAction()}
-            />
-          </Fold>
-        </View>
-      </View>
+      <IssueActivity
+        issue={props.issue}
+        headSessionId={head().id}
+        timeline={timeline()}
+        timelinePending={timelineQuery.status() === "pending"}
+        runsVersion={`${props.issue.stage.state}:${props.session?.runs}:${props.session?.phase._tag}:${props.issue.findings.length}:${props.issue.closedAt ?? ""}`}
+        onChanges={changesAction()}
+      />
     </>
   );
 
@@ -714,7 +679,7 @@ export function IssueDetail(props: {
           )}
         </If>
         <Property label={t("web.issue.detail.took")}>
-          <Text class="text-sm text-ink tabular-nums">{s().usedLine(steps(), now())}</Text>
+          <Text class="text-sm text-ink tabular-nums">{s().usedLine([], now())}</Text>
         </Property>
         <If when={s().resolvedFindings.length > 0}>
           <Property align="start" label={t("web.issue.detail.resolved")}>

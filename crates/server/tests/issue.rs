@@ -97,7 +97,10 @@ fn an_issue_goes_through_the_endpoints_from_create_to_done() {
     let runs = call(router, "issue.run.list", json!({ "id": id }));
     assert_eq!(runs["data"][0]["triggeredBy"]["kind"], "issue");
     let timeline = call(router, "issue.timeline.get", json!({ "id": id }));
-    assert_eq!(timeline["data"]["milestones"][0]["kind"], "reported", "{timeline}");
+    let milestones = timeline["data"]["milestones"].as_array().expect("milestones array");
+    assert_eq!(milestones.first().map(|m| &m["kind"]), Some(&json!("opened")), "{timeline}");
+    assert_eq!(milestones.last().map(|m| &m["kind"]), Some(&json!("reported")), "{timeline}");
+    assert!(milestones.last().unwrap()["run"].is_string(), "{timeline}");
 
     let done = call(router, "issue.status.update", json!({ "id": id, "status": "done" }));
     assert_eq!(done["bizCode"], 0, "{done}");

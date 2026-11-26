@@ -39,9 +39,9 @@ import { isRefined, newIssueTitle } from "../model/issue";
 import { blockerIssuesOf } from "../model/meta";
 import { issueMove, issueMoveOf, movedIssue, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
+import { IssueActivity } from "./IssueActivity";
 import { IssueAttachments } from "./IssueAttachments";
 import { BlockedByChips, BlockedByPicker, DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
-import { IssueThread } from "./IssueThread";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
 import { IssueSheet, IssueTrail, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
 import { criteriaList, NewRepoPopoverBody, TodoCriteriaSection, TodoTitle, toggleCriterionLine } from "./TodoSections";
@@ -465,7 +465,6 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       </If>
       <IssueAttachments files={d().attachments} editable={!closed()} busy={busy()} onAdd={addAttachment} onRemove={removeAttachment} />
       <SubIssuesSection issueId={props.item.id} allIssues={allIssues()} onOpen={(id) => props.onDone(id)} />
-      <IssueThread issue={props.item.id} />
       <IssueArtifacts
         issue={props.item.id}
         heading={
@@ -473,6 +472,10 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             <SheetLabel first>{t("web.artifact.issue.title")}</SheetLabel>
           </View>
         }
+      />
+      <IssueActivity
+        issue={props.item}
+        runsVersion={`${props.item.stage.state}:${props.item.refining?.session ?? ""}:${props.item.findings.length}:${props.item.closedAt ?? ""}`}
       />
     </>
   );

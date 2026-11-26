@@ -1626,10 +1626,7 @@ export const catalogs = {
         changedFiles: "改了哪些文件",
         fileCount: "{n} 个",
         changesUnread: "读不到改动。",
-        story: "怎么走到这一步",
-        unread: "读不到。",
         full: "要做的（完整说明）",
-        steps: "执行会话的每一步",
         openTrajectory: "完整轨迹",
         runs: "每一轮",
         time: "时间",
@@ -1655,19 +1652,6 @@ export const catalogs = {
         unsaid: "它还没说",
         noRuns: "还没有干过活。",
         runCount: "{n} 次",
-        stepCount: "{n} 步",
-        stepsAndTools: "{n} 步 · 用了 {tools} 个工具",
-        step: {
-          "run/start": "开工",
-          "user/message": "听到",
-          "memory/recalled": "想起",
-          "assistant/thinking": "想",
-          "assistant/message": "说",
-          "tool/call": "用工具",
-          "llm/retry": "重试",
-          "run/error": "出错",
-          "run/end": "这一轮结束",
-        },
         orchestratorStuck: "主助手这一轮没答成：在频道里看它说了什么",
         job: "要做的",
         from: "来自",
@@ -1800,8 +1784,6 @@ export const catalogs = {
         since: "{span}了",
         ran: "第 {n} 轮",
         used: "共用 {span}",
-        noSteps: "还什么都没做。",
-        stepsGone: "轨迹只留 30 天（配置里的 session.trajectory_days），这个工单的已经清掉了。",
         change: { A: { mark: "新", label: "新增" }, M: { mark: "改", label: "修改" }, D: { mark: "删", label: "删除" } },
         and: "、",
         doing: "正在{action}",
@@ -1828,12 +1810,8 @@ export const catalogs = {
         missingRuntime: "尚未启用可用引擎，配置好编码引擎后就能自动起草和开工。",
         goRuntimes: "去配置引擎",
       },
-      conversation: {
-        title: "讨论与交付记录",
-        older: "加载更早的消息",
-        empty: "需求讨论、执行反馈与交付会保留在这里",
-        placeholder: "写一条评论、补充说明或反馈…",
-      },
+      conversation: { older: "加载更早的消息", placeholder: "写一条评论、补充说明或反馈…" },
+      activity: { title: "动态记录", empty: "需求讨论、进展节点与执行步骤会汇总在这里" },
       attachments: {
         title: "附件",
         attachFile: "添加附件",
@@ -5448,10 +5426,7 @@ export const catalogs = {
         changedFiles: "Changed files",
         fileCount: "{n}",
         changesUnread: "The changes cannot be read.",
-        story: "How it got here",
-        unread: "Cannot be read.",
         full: "What to do (in full)",
-        steps: "The helper's every step",
         openTrajectory: "Full trajectory",
         runs: "Every round of work",
         time: "Time",
@@ -5477,19 +5452,6 @@ export const catalogs = {
         unsaid: "It has not said yet",
         noRuns: "No work yet.",
         runCount: "{n, plural, one {# round} other {# rounds}}",
-        stepCount: "{n, plural, one {# step} other {# steps}}",
-        stepsAndTools: "{n} steps · used {tools} tools",
-        step: {
-          "run/start": "Started",
-          "user/message": "Heard",
-          "memory/recalled": "Recalled",
-          "assistant/thinking": "Thought",
-          "assistant/message": "Said",
-          "tool/call": "Used a tool",
-          "llm/retry": "Retried",
-          "run/error": "Error",
-          "run/end": "Round over",
-        },
         orchestratorStuck: "The assistant did not finish answering this round: see what it said in its channel",
         job: "To do",
         from: "From",
@@ -5627,8 +5589,6 @@ export const catalogs = {
         since: "for {span}",
         ran: "round {n}",
         used: "{span} in all",
-        noSteps: "No steps yet.",
-        stepsGone: "Work steps are kept for 30 days (session.trajectory_days in the configuration); this ticket's are cleared.",
         change: { A: { mark: "A", label: "Added" }, M: { mark: "M", label: "Modified" }, D: { mark: "D", label: "Deleted" } },
         and: ", ",
         doing: "{action}",
@@ -5655,12 +5615,8 @@ export const catalogs = {
         missingRuntime: "No ready engine configured yet. Set up an engine to draft and run tickets.",
         goRuntimes: "Configure engines",
       },
-      conversation: {
-        title: "Discussion and delivery",
-        older: "Load earlier messages",
-        empty: "Requirements, execution feedback and deliveries stay here",
-        placeholder: "Write a comment, note, or feedback…",
-      },
+      conversation: { older: "Load earlier messages", placeholder: "Write a comment, note, or feedback…" },
+      activity: { title: "Activity", empty: "Discussion, milestones, and run steps appear here" },
       attachments: {
         title: "Attachments",
         attachFile: "Attach file",
@@ -9134,6 +9090,8 @@ export interface Messages {
   "web.inbox.tray.off": undefined;
   "web.inbox.tray.unread": { readonly n: string | number };
   "web.inbox.tray.working": { readonly n: number };
+  "web.issue.activity.empty": undefined;
+  "web.issue.activity.title": undefined;
   "web.issue.acts.carry": undefined;
   "web.issue.acts.goesOn": { readonly helper: string | number };
   "web.issue.acts.moving": undefined;
@@ -9251,10 +9209,8 @@ export interface Messages {
   "web.issue.close.stopAndCancel": undefined;
   "web.issue.close.title": { readonly issue: string | number };
   "web.issue.close.working": { readonly who: string | number };
-  "web.issue.conversation.empty": undefined;
   "web.issue.conversation.older": undefined;
   "web.issue.conversation.placeholder": undefined;
-  "web.issue.conversation.title": undefined;
   "web.issue.dates.clearDate": undefined;
   "web.issue.dates.dueAt": undefined;
   "web.issue.dates.notSet": undefined;
@@ -9316,19 +9272,6 @@ export interface Messages {
   "web.issue.detail.since": { readonly clock: string | number };
   "web.issue.detail.started": undefined;
   "web.issue.detail.status": undefined;
-  "web.issue.detail.step.assistant/message": undefined;
-  "web.issue.detail.step.assistant/thinking": undefined;
-  "web.issue.detail.step.llm/retry": undefined;
-  "web.issue.detail.step.memory/recalled": undefined;
-  "web.issue.detail.step.run/end": undefined;
-  "web.issue.detail.step.run/error": undefined;
-  "web.issue.detail.step.run/start": undefined;
-  "web.issue.detail.step.tool/call": undefined;
-  "web.issue.detail.step.user/message": undefined;
-  "web.issue.detail.stepCount": { readonly n: number };
-  "web.issue.detail.steps": undefined;
-  "web.issue.detail.stepsAndTools": { readonly n: string | number; readonly tools: string | number };
-  "web.issue.detail.story": undefined;
   "web.issue.detail.tell": { readonly who: string | number };
   "web.issue.detail.tellIdle": undefined;
   "web.issue.detail.tellSection": undefined;
@@ -9337,7 +9280,6 @@ export interface Messages {
   "web.issue.detail.time": undefined;
   "web.issue.detail.took": undefined;
   "web.issue.detail.trail": undefined;
-  "web.issue.detail.unread": undefined;
   "web.issue.detail.unsaid": undefined;
   "web.issue.detail.unsure": undefined;
   "web.issue.detail.waiting": undefined;
@@ -9406,7 +9348,6 @@ export interface Messages {
   "web.issue.issue.interrupted": undefined;
   "web.issue.issue.justNow": undefined;
   "web.issue.issue.main": undefined;
-  "web.issue.issue.noSteps": undefined;
   "web.issue.issue.quiet": { readonly who: string | number };
   "web.issue.issue.quietLine": undefined;
   "web.issue.issue.ran": { readonly n: string | number };
@@ -9414,7 +9355,6 @@ export interface Messages {
   "web.issue.issue.reviewAfterFailedCheck": undefined;
   "web.issue.issue.reviewed": undefined;
   "web.issue.issue.since": { readonly span: string | number };
-  "web.issue.issue.stepsGone": undefined;
   "web.issue.issue.stuck": undefined;
   "web.issue.issue.used": { readonly span: string | number };
   "web.issue.issue.who": { readonly name: string | number };

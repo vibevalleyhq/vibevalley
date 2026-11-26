@@ -84,7 +84,6 @@
     "runtime": "The machine carried on by itself",
     "refined": "Drafted",
     "reported": "Handed back",
-    "said": ": {summary}",
     "accepted": "Accepted",
     "asked": "Asked you: {questions}",
     "rejected": "Sent back: {lines}",

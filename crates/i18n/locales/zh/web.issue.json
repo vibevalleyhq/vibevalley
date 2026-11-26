@@ -224,10 +224,7 @@
     "changedFiles": "改了哪些文件",
     "fileCount": "{n} 个",
     "changesUnread": "读不到改动。",
-    "story": "怎么走到这一步",
-    "unread": "读不到。",
     "full": "要做的（完整说明）",
-    "steps": "执行会话的每一步",
     "openTrajectory": "完整轨迹",
     "runs": "每一轮",
     "time": "时间",
@@ -257,19 +254,6 @@
     "unsaid": "它还没说",
     "noRuns": "还没有干过活。",
     "runCount": "{n} 次",
-    "stepCount": "{n} 步",
-    "stepsAndTools": "{n} 步 · 用了 {tools} 个工具",
-    "step": {
-      "run/start": "开工",
-      "user/message": "听到",
-      "memory/recalled": "想起",
-      "assistant/thinking": "想",
-      "assistant/message": "说",
-      "tool/call": "用工具",
-      "llm/retry": "重试",
-      "run/error": "出错",
-      "run/end": "这一轮结束"
-    },
     "orchestratorStuck": "主助手这一轮没答成：在频道里看它说了什么",
     "job": "要做的",
     "from": "来自",
@@ -440,8 +424,6 @@
     "since": "{span}了",
     "ran": "第 {n} 轮",
     "used": "共用 {span}",
-    "noSteps": "还什么都没做。",
-    "stepsGone": "轨迹只留 30 天（配置里的 session.trajectory_days），这个工单的已经清掉了。",
     "change": {
       "A": {
         "mark": "新",
@@ -482,10 +464,12 @@
     "goRuntimes": "去配置引擎"
   },
   "conversation": {
-    "title": "讨论与交付记录",
     "older": "加载更早的消息",
-    "empty": "需求讨论、执行反馈与交付会保留在这里",
     "placeholder": "写一条评论、补充说明或反馈…"
+  },
+  "activity": {
+    "title": "动态记录",
+    "empty": "需求讨论、进展节点与执行步骤会汇总在这里"
   },
   "attachments": {
     "title": "附件",

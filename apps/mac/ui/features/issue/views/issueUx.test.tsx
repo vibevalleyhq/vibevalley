@@ -75,10 +75,10 @@ test("IssueDetail shows full unclamped title, omits empty repo crumb, localizes 
 
   const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${issue.id}`, locale: "zh" });
   fake.respond("issue.history.list", [{ issue, sessions: [session], missingSessions: [] }]);
-  fake.respond("issue.timeline", {
+  fake.respond("issue.timeline.get", {
     milestones: [
-      { at: SCENARIO_NOW - 60_000, kind: "failed", who: "老周", text: "失败：no API key is set for the model" },
       { at: SCENARIO_NOW - 600_000, kind: "opened", text: "开了这个工单" },
+      { at: SCENARIO_NOW - 60_000, kind: "failed", who: "老周", text: "没做成", said: "no API key is set for the model" },
     ],
   });
 

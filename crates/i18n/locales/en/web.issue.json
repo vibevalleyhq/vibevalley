@@ -224,10 +224,7 @@
     "changedFiles": "Changed files",
     "fileCount": "{n}",
     "changesUnread": "The changes cannot be read.",
-    "story": "How it got here",
-    "unread": "Cannot be read.",
     "full": "What to do (in full)",
-    "steps": "The helper's every step",
     "openTrajectory": "Full trajectory",
     "runs": "Every round of work",
     "time": "Time",
@@ -257,19 +254,6 @@
     "unsaid": "It has not said yet",
     "noRuns": "No work yet.",
     "runCount": "{n, plural, one {# round} other {# rounds}}",
-    "stepCount": "{n, plural, one {# step} other {# steps}}",
-    "stepsAndTools": "{n} steps · used {tools} tools",
-    "step": {
-      "run/start": "Started",
-      "user/message": "Heard",
-      "memory/recalled": "Recalled",
-      "assistant/thinking": "Thought",
-      "assistant/message": "Said",
-      "tool/call": "Used a tool",
-      "llm/retry": "Retried",
-      "run/error": "Error",
-      "run/end": "Round over"
-    },
     "orchestratorStuck": "The assistant did not finish answering this round: see what it said in its channel",
     "job": "To do",
     "from": "From",
@@ -440,8 +424,6 @@
     "since": "for {span}",
     "ran": "round {n}",
     "used": "{span} in all",
-    "noSteps": "No steps yet.",
-    "stepsGone": "Work steps are kept for 30 days (session.trajectory_days in the configuration); this ticket's are cleared.",
     "change": {
       "A": {
         "mark": "A",
@@ -482,10 +464,12 @@
     "goRuntimes": "Configure engines"
   },
   "conversation": {
-    "title": "Discussion and delivery",
     "older": "Load earlier messages",
-    "empty": "Requirements, execution feedback and deliveries stay here",
     "placeholder": "Write a comment, note, or feedback…"
+  },
+  "activity": {
+    "title": "Activity",
+    "empty": "Discussion, milestones, and run steps appear here"
   },
   "attachments": {
     "title": "Attachments",

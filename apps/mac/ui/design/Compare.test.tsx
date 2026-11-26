@@ -403,7 +403,7 @@ test("IssueAttachments Add compare uploads via pick and file drop, links attachm
   let createdIdx = 0;
   const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: `/issues/${issue.id}`, locale: "zh" });
   fake.respond("issue.history.list", [{ issue, sessions: [session], missingSessions: [] }]);
-  fake.respond("issue.timeline", { milestones: [{ at: SCENARIO_NOW - 600_000, kind: "opened", text: "开了这个工单" }] });
+  fake.respond("issue.timeline.get", { milestones: [{ at: SCENARIO_NOW - 600_000, kind: "opened", text: "开了这个工单" }] });
   fake.respond("attachment.create", (payload: unknown): Attachment => {
     const p = payload as { name?: string; type?: string };
     createdIdx += 1;
