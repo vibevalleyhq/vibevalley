@@ -7,7 +7,7 @@ Status: proposed
 在拆出独立协议包之前，VibeValley 的 MCP 实现分散在两处：
 
 - [crates/server/src/agent/mcp/mod.rs](crates/server/src/agent/mcp/mod.rs) 与 [crates/server/src/gateway/http/server.rs](crates/server/src/gateway/http/server.rs) 手写 JSON-RPC 2.0 解析、`initialize` 握手、工具/资源分发与密钥脱敏；仅支持旧版有状态会话（`2025-06-18`），缺少 SEP-2575 `server/discover` 与 `_meta` 自描述无状态调用，也未校验 SEP-2243 路由头（`MCP-Protocol-Version`、`Mcp-Method`、`Mcp-Name`）。
-- [crates/cli/src/domains/mcp.rs](crates/cli/src/domains/mcp.rs) 复制了另一套 JSON-RPC 2.0 结构体、错误码常量、脱敏逻辑与 stdio 行循环，难以与服务端同步演进，也没有共享的 `McpServerConfig` 契约供 OAR 层配置外部编码 agent 使用。
+- [crates/cli/src/domains/mcp/mod.rs](crates/cli/src/domains/mcp/mod.rs) 复制了另一套 JSON-RPC 2.0 结构体、错误码常量、脱敏逻辑与 stdio 行循环，难以与服务端同步演进，也没有共享的 `McpServerConfig` 契约供 OAR 层配置外部编码 agent 使用。
 - `crates/server/assets/artifact/types/` 下 12 类作品的渐进披露指南（`SKILL.md` 与 `references/*.md`）只能通过内部工具 `artifact_type_read` 访问，尚未按 SEP-2640 Skills over MCP（`skill://`、`skills/list`、`skills/get`）暴露给外部与执行会话客户端。
 
 ## Proposal
@@ -28,7 +28,7 @@ Status: proposed
 ### 消费方重构
 
 - **服务端**：[crates/server/src/agent/mcp/mod.rs](crates/server/src/agent/mcp/mod.rs) 实现 `McpHandler`，通过 `SkillCatalog::from_embedded_entries` 直接以 `skill://artifact/<type>` 暴露全部 12 类作品指南；[crates/server/src/gateway/http/server.rs](crates/server/src/gateway/http/server.rs) 在 `POST /mcp` 入口执行 SEP-2243 头校验并回写 `MCP-Protocol-Version` 与 `Cache-Control` 响应头，同时不引入跨模块边界依赖。
-- **命令行**：[crates/cli/src/domains/mcp.rs](crates/cli/src/domains/mcp.rs) 实现 `McpHandler` 并复用 `serve_stdio`、`ToolDef`、`ToolCallResult` 与 `scrub_tool_result`，保留全部 17 个工单与 VDP 工具并同步获得 `server/discover` 与 `skills/*` 能力。
+- **命令行**：[crates/cli/src/domains/mcp/mod.rs](crates/cli/src/domains/mcp/mod.rs) 实现 `McpHandler` 并复用 `serve_stdio`、`ToolDef`、`ToolCallResult` 与 `scrub_tool_result`，保留全部 17 个工单与 VDP 工具并同步获得 `server/discover` 与 `skills/*` 能力。
 
 ## Alternatives considered
 

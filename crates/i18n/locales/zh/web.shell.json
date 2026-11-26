@@ -1,6 +1,6 @@
 {
   "sidebar": {
-    "title": "仓库与终端",
+    "title": "工作区",
     "toggleSidebar": "收起侧边栏",
     "toggleSidebarTooltip": "收起侧边栏 (⌘B)",
     "addRepo": "添加仓库",

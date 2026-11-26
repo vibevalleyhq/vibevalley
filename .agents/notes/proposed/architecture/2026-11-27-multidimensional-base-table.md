@@ -8,7 +8,7 @@ Status: proposed
 
 1. **缺少强类型字段与结构化视图**：单元格仅是弱约束 JSON 值，缺少单选/多选标签、日期区间、媒体附件（图/音/视频）、VibeValley 工单双向关联（`issueLink`）与确定性公式/汇总列；同一份数据也无法在表格（Grid）、看板（Kanban）、画廊（Gallery）、时间线（Timeline/Gantt）与日历（Calendar）间切换，更无法内嵌进文档协同阅读。
 2. **缺少行级 Agent 批量执行原语**：当用户需要让角色批量处理一批行（如逐行调研竞品 URL、为 30 个分镜生成参考图/配音、批量审查一组接口并生成工单）时，目前只能手工拆单或写一次性脚本，无法在表内配置「Agent 执行列」、通过 OAR 并发调度、实时观测每格 `queued`/`running`/`done`/`failed` 状态并将结果自动回填或派生跟踪工单。
-3. **缺少面向内外部编码 Agent 的结构化表工具**：`POST /mcp`（[crates/server/src/agent/mcp/mod.rs](crates/server/src/agent/mcp/mod.rs)）与 `vibevalley mcp`（[crates/cli/src/domains/mcp.rs](crates/cli/src/domains/mcp.rs)）目前仅暴露文件级读写（`artifact_file_get`/`write`），外部 agent 改一行数据容易整份重写 `sheets/*.json`，破坏他人并发编辑。
+3. **缺少面向内外部编码 Agent 的结构化表工具**：`POST /mcp`（[crates/server/src/agent/mcp/mod.rs](crates/server/src/agent/mcp/mod.rs)）与 `vibevalley mcp`（[crates/cli/src/domains/mcp/mod.rs](crates/cli/src/domains/mcp/mod.rs)）目前仅暴露文件级读写（`artifact_file_get`/`write`），外部 agent 改一行数据容易整份重写 `sheets/*.json`，破坏他人并发编辑。
 
 本提案结合 [作品类型收敛与 Block Rich Doc 统一内容模型（#31）](.agents/notes/proposed/architecture/2026-11-27-artifact-block-doc-convergence.md)，将原 `sheet` 升级为飞书多维表格 / Airtable / Notion Database 级的核心原语 **`Base`（`artifactType: "base"`）**，复用 `storage/` 目录 + Loro CRDT + OAR 运行时架构。
 

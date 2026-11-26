@@ -45,7 +45,7 @@ fn registry_exports_sync_translate_function_and_declarations() {
 fn translates_zh_and_en_across_shared_and_web_namespaces() {
     let static_cases = [
         ("shared.action.run_command", "跑命令", "running a command"),
-        ("web.shell.sidebar.title", "仓库与终端", "Repos & terminals"),
+        ("web.shell.sidebar.title", "工作区", "Workspace"),
         ("web.issue.family.children", "子工单", "Child issues"),
         ("web.artifact.page.delete", "删掉", "Delete"),
         ("web.setting.language.title", "语言", "Language"),
@@ -118,9 +118,9 @@ fn interpolates_strings_numbers_booleans_plurals_and_handles_fallbacks() {
     // Null values are skipped without discarding sibling params; empty / malformed JSON and
     // unknown locales or keys fall back safely without panicking.
     assert_eq!(translate_json("en", "shared.doneWith", Some(r#"{"what":"ready","extra":null}"#)), "Done, ready");
-    assert_eq!(translate_json("zh", "web.shell.sidebar.title", Some("")), "仓库与终端");
-    assert_eq!(translate_json("zh", "web.shell.sidebar.title", Some("{not-json")), "仓库与终端");
-    assert_eq!(translate_json("fr", "web.shell.sidebar.title", None), "仓库与终端");
+    assert_eq!(translate_json("zh", "web.shell.sidebar.title", Some("")), "工作区");
+    assert_eq!(translate_json("zh", "web.shell.sidebar.title", Some("{not-json")), "工作区");
+    assert_eq!(translate_json("fr", "web.shell.sidebar.title", None), "工作区");
     assert_eq!(translate_json("en", "no.such.translation.key", Some(r#"{"x":1}"#)), "no.such.translation.key");
 }
 
@@ -143,7 +143,7 @@ fn quickjs_native_module_calls_translate_synchronously() {
         const checks = [
             // Omitted optional third argument
             [rich.translate("zh", "shared.action.run_command"), "跑命令"],
-            [rich.translate("en", "web.shell.sidebar.title"), "Repos & terminals"],
+            [rich.translate("en", "web.shell.sidebar.title"), "Workspace"],
             // Explicit undefined, null, and empty JSON object
             [rich.translate("zh", "web.issue.family.children", undefined), "子工单"],
             [rich.translate("en", "web.setting.language.title", null), "Language"],

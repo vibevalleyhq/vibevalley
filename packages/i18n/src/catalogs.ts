@@ -3208,7 +3208,7 @@ export const catalogs = {
     },
     "web.shell": {
       sidebar: {
-        title: "仓库与终端",
+        title: "工作区",
         toggleSidebar: "收起侧边栏",
         toggleSidebarTooltip: "收起侧边栏 (⌘B)",
         addRepo: "添加仓库",
@@ -6870,7 +6870,7 @@ export const catalogs = {
     },
     "web.shell": {
       sidebar: {
-        title: "Repos & terminals",
+        title: "Workspace",
         toggleSidebar: "Hide sidebar",
         toggleSidebarTooltip: "Hide sidebar (⌘B)",
         addRepo: "Add repository",

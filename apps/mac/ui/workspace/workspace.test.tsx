@@ -291,44 +291,33 @@ test("workspace sidebar header toggles sidebar collapse and repo/worktree chevro
   await app.press("id:sidebar-toggle");
   expect(host.acts).toContainEqual({ type: "palette_select", id: "sidebar.toggle" });
 
-  // Non-expandable repo does not render a fold toggle; expandable repo & worktrees start expanded.
+  // Row fold chevrons are removed; expandable repo & worktrees start expanded and toggle by pressing the row directly.
   expect(app.count("id:sidebar-repo-toggle-notes")).toBe(0);
-  expect(app.count("id:sidebar-repo-toggle-vibevalley")).toBe(1);
-  expect(app.count("id:sidebar-repo-toggle-vibevalley-expanded")).toBe(1);
-  expect(app.count("id:sidebar-repo-toggle-vibevalley-collapsed")).toBe(0);
+  expect(app.count("id:sidebar-repo-toggle-vibevalley")).toBe(0);
+  expect(app.count("id:sidebar-wt-toggle-feat/ui")).toBe(0);
   expect(app.count("id:sidebar-repo-summary-vibevalley")).toBe(0);
-  expect(app.count("id:sidebar-wt-toggle-feat/ui")).toBe(1);
-  expect(app.count("id:sidebar-wt-toggle-feat/ui-expanded")).toBe(1);
   expect(app.texts()).toContain("main-zsh");
   expect(app.texts()).toContain("ui-term");
 
-  // Collapsing an individual worktree switches its chevron to collapsed and displays its summary pill.
-  await app.press("id:sidebar-wt-toggle-feat/ui");
-  expect(app.count("id:sidebar-wt-toggle-feat/ui-expanded")).toBe(0);
-  expect(app.count("id:sidebar-wt-toggle-feat/ui-collapsed")).toBe(1);
+  // Pressing an expandable worktree row collapses it and displays its summary pill.
+  await app.press("id:sidebar-wt-row-feat/ui");
   expect(app.count("id:sidebar-wt-summary-feat/ui")).toBe(1);
   expect(app.texts()).not.toContain("ui-term");
   expect(app.texts()).toContain("main-zsh");
 
-  // Re-expanding the worktree restores its expanded chevron and child tab row.
-  await app.press("id:sidebar-wt-toggle-feat/ui");
-  expect(app.count("id:sidebar-wt-toggle-feat/ui-expanded")).toBe(1);
-  expect(app.count("id:sidebar-wt-toggle-feat/ui-collapsed")).toBe(0);
+  // Pressing the worktree row again re-expands its child tab row.
+  await app.press("id:sidebar-wt-row-feat/ui");
   expect(app.count("id:sidebar-wt-summary-feat/ui")).toBe(0);
   expect(app.texts()).toContain("ui-term");
 
-  // Collapsing the repo row hides worktrees/tabs, flips the icon state, and renders the collapsed summary pill.
-  await app.press("id:sidebar-repo-toggle-vibevalley");
-  expect(app.count("id:sidebar-repo-toggle-vibevalley-expanded")).toBe(0);
-  expect(app.count("id:sidebar-repo-toggle-vibevalley-collapsed")).toBe(1);
+  // Pressing the repo row collapses worktrees/tabs and renders the collapsed summary pill.
+  await app.press("id:sidebar-repo-row-vibevalley");
   expect(app.count("id:sidebar-repo-summary-vibevalley")).toBe(1);
   expect(app.texts()).not.toContain("main-zsh");
   expect(app.texts()).not.toContain("ui-term");
 
-  // Expanding the repo row restores its expanded icon and child rows.
-  await app.press("id:sidebar-repo-toggle-vibevalley");
-  expect(app.count("id:sidebar-repo-toggle-vibevalley-expanded")).toBe(1);
-  expect(app.count("id:sidebar-repo-toggle-vibevalley-collapsed")).toBe(0);
+  // Pressing the repo row again restores its child rows.
+  await app.press("id:sidebar-repo-row-vibevalley");
   expect(app.count("id:sidebar-repo-summary-vibevalley")).toBe(0);
   expect(app.texts()).toContain("main-zsh");
   expect(app.texts()).toContain("ui-term");

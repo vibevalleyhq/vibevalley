@@ -152,8 +152,8 @@ type ActivitySummary = {
 // Depth 1 (Tab):      icon @ 30,    label @ 50
 // Depth 1 (Worktree): chevron @ 18, icon @ 42, label @ 62
 // Depth 2 (Tab):      icon @ 42,    label @ 62
-const ROW_BASE_PAD = 18;
-const INDENT_STEP = 12;
+const ROW_BASE_PAD = 12;
+const INDENT_STEP = 14;
 
 function formatDisplayPath(path: string): string {
   return path.replace(/^\/(?:Users|home)\/[^/]+/u, "~");
@@ -340,28 +340,6 @@ function SidebarHeaderButton(props: { testID?: string; icon: IconName; size?: nu
       class={`size-5.5 shrink-0 items-center justify-center rounded-md ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
     >
       <Icon name={props.icon} size={props.size ?? 13} tone={hovered() ? "ink" : "muted"} />
-    </Button>
-  );
-}
-
-function ChevronButton(props: { testID?: string; expanded: boolean; label: string; onToggle: () => void }) {
-  const hovered = signal(false);
-  return (
-    <Button
-      testID={props.testID}
-      onPress={props.onToggle}
-      onMouseEnter={() => hovered.set(true)}
-      onMouseLeave={() => hovered.set(false)}
-      accessibilityLabel={props.label}
-      tooltip={<Bubble text={props.label} />}
-      class={`size-5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
-    >
-      <Icon
-        testID={props.testID ? `${props.testID}-${props.expanded ? "expanded" : "collapsed"}` : undefined}
-        name={props.expanded ? "choose" : "expand"}
-        size={14}
-        tone={hovered() ? "ink" : props.expanded ? "ink" : "muted"}
-      />
     </Button>
   );
 }
@@ -679,28 +657,18 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
               if (props.ctx.hoveredKey() === rowKey()) props.ctx.setHoveredKey(null);
             }}
             tooltip={<Bubble text={tipText()} />}
-            class={`relative h-7 flex-row items-center gap-1 rounded-md pr-1.5 ${isSelected() ? "bg-selected" : "hover:bg-hover"}`}
+            class={`relative h-7 flex-row items-center gap-1 rounded-md pr-1.5 ${isSelected() ? "bg-selected" : expandable() && expanded() ? "bg-hover" : "hover:bg-hover"}`}
             style={{ paddingLeft: ROW_BASE_PAD }}
           >
             <If when={isSelected()}>
               <ActiveBar />
             </If>
-            <View class="size-5 shrink-0 items-center justify-center">
-              <If when={expandable()}>
-                <ChevronButton
-                  testID={`sidebar-wt-toggle-${props.group.label}`}
-                  expanded={expanded()}
-                  label={
-                    expanded()
-                      ? t("web.shell.sidebar.collapseItem", { name: props.group.label })
-                      : t("web.shell.sidebar.expandItem", { name: props.group.label })
-                  }
-                  onToggle={() => props.ctx.toggleFold(groupFoldKey(props.group), expanded())}
-                />
-              </If>
-            </View>
             <Button
-              onPress={() => act({ type: "activate_path", path: props.group.path })}
+              testID={`sidebar-wt-row-${props.group.label}`}
+              onPress={() => {
+                if (expandable()) props.ctx.toggleFold(groupFoldKey(props.group), expanded());
+                act({ type: "activate_path", path: props.group.path });
+              }}
               class="h-7 min-w-0 flex-1 flex-row items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
             >
               <View class="size-4 shrink-0 items-center justify-center">
@@ -804,25 +772,17 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
               if (props.ctx.hoveredKey() === rowKey()) props.ctx.setHoveredKey(null);
             }}
             tooltip={<Bubble text={repoTip()} />}
-            class={`relative min-h-11 flex-row items-start gap-1 rounded-md py-1.5 pr-1.5 pl-1.5 ${isRepoSelected() ? "bg-selected" : "hover:bg-hover"}`}
+            class={`relative min-h-11 flex-row items-start gap-1 rounded-md py-1.5 pr-1.5 pl-2 ${isRepoSelected() ? "bg-selected" : expandable() && expanded() && !showActiveCard() ? "bg-hover" : "hover:bg-hover"}`}
           >
             <If when={isRepoSelected()}>
               <ActiveBar />
             </If>
-            <View class="mt-0.5 size-5 shrink-0 items-center justify-center">
-              <If when={expandable()}>
-                <ChevronButton
-                  testID={`sidebar-repo-toggle-${props.repo.name}`}
-                  expanded={expanded()}
-                  label={
-                    expanded() ? t("web.shell.sidebar.collapseItem", { name: props.repo.name }) : t("web.shell.sidebar.expandItem", { name: props.repo.name })
-                  }
-                  onToggle={() => props.ctx.toggleFold(repoFoldKey(props.repo), expanded())}
-                />
-              </If>
-            </View>
             <Button
-              onPress={() => act({ type: "activate_path", path: props.repo.path })}
+              testID={`sidebar-repo-row-${props.repo.name}`}
+              onPress={() => {
+                if (expandable()) props.ctx.toggleFold(repoFoldKey(props.repo), expanded());
+                act({ type: "activate_path", path: props.repo.path });
+              }}
               class="min-w-0 flex-1 flex-row items-start gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-focus"
             >
               <View class="mt-0.5 size-4 shrink-0 items-center justify-center">

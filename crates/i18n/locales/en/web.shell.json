@@ -1,6 +1,6 @@
 {
   "sidebar": {
-    "title": "Repos & terminals",
+    "title": "Workspace",
     "toggleSidebar": "Hide sidebar",
     "toggleSidebarTooltip": "Hide sidebar (⌘B)",
     "addRepo": "Add repository",
