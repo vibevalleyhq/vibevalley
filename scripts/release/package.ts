@@ -146,9 +146,10 @@ async function main(): Promise<void> {
       run("vp", ["run", "mac:check"]);
     }
     const cargoProfileArgs = profile === "release" ? ["--release"] : profile === "alpha" ? ["--profile", "alpha"] : [];
+    const cargoFeatureArgs = profile === "release" ? [] : ["--features", "vibevalley-mac/shot"];
     const cargoEnv = profile === "release" ? { LIBGHOSTTY_VT_SYS_OPTIMIZE: "ReleaseFast" } : undefined;
     const buildTasks: Promise<void>[] = [
-      runAsync("cargo", ["build", "--locked", ...cargoProfileArgs, "-p", "vibevalley-mac", "-p", "vibevalley-cli"], root, cargoEnv),
+      runAsync("cargo", ["build", "--locked", ...cargoProfileArgs, "-p", "vibevalley-mac", "-p", "vibevalley-cli", ...cargoFeatureArgs], root, cargoEnv),
     ];
     if (!values.fast || needsSwiftBuild(join(root, "apps/island"), islandBin)) {
       buildTasks.push(runAsync("swift", ["build", "-c", "release", "--package-path", "apps/island"], root));
