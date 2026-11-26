@@ -169,8 +169,20 @@ function DashboardOverview() {
           count={waitingCount()}
           tone={waitingCount() > 0 ? "bad" : "default"}
         />
-        <StatCard href="/issues" testid="dashboard-stat-issues" icon="issues" label={t("web.base.dashboard.stats.issues")} count={openIssueCount()} />
-        <StatCard href="/issues" testid="dashboard-stat-review" icon="check" label={t("web.base.dashboard.stats.review")} count={reviewIssueCount()} />
+        <StatCard
+          href="/issues?status=todo,in_progress"
+          testid="dashboard-stat-issues"
+          icon="issues"
+          label={t("web.base.dashboard.stats.issues")}
+          count={openIssueCount()}
+        />
+        <StatCard
+          href="/issues?status=in_review"
+          testid="dashboard-stat-review"
+          icon="check"
+          label={t("web.base.dashboard.stats.review")}
+          count={reviewIssueCount()}
+        />
       </View>
 
       <View class="flex-row flex-wrap items-start gap-4">
@@ -237,11 +249,15 @@ function DashboardOverview() {
               <Text class="text-sm text-ink">{t("web.base.dashboard.pending.waiting", { n: waitingCount() })}</Text>
               <CountPill count={waitingCount()} tone={waitingCount() > 0 ? "bad" : "neutral"} />
             </A>
-            <A href="/issues" class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover">
+            <A
+              href="/issues?status=in_review"
+              testID="dashboard-pending-review"
+              class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover"
+            >
               <Text class="text-sm text-ink">{t("web.base.dashboard.pending.inReview", { n: reviewIssueCount() })}</Text>
               <CountPill count={reviewIssueCount()} />
             </A>
-            <A href="/issues" class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover">
+            <A href="/issues?status=todo" testID="dashboard-pending-todo" class="flex-row items-center justify-between rounded-md px-2 py-1.5 hover:bg-hover">
               <Text class="text-sm text-ink">{t("web.base.dashboard.pending.todo", { n: todoIssueCount() })}</Text>
               <CountPill count={todoIssueCount()} />
             </A>

@@ -4,6 +4,7 @@ import { Popover } from "nsh/base";
 import { list, t } from "@vibevalley/i18n";
 import type { Issue, Session } from "@vibevalley/protocol";
 import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
+import { IssueStatus as IssueStatusSchema } from "@vibevalley/protocol/schema";
 
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
@@ -21,7 +22,7 @@ import { variant } from "../../../infra/base/dom";
 import { useBoardSlice, useRefreshSlice, useSessionsSlice } from "../../../infra/frame";
 import { useQueryClient } from "../../../infra/query";
 import { useRouter, useSearchValues } from "../../../infra/router";
-import { createMemo } from "../../../infra/solid";
+import { createMemo, createEffect } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { pendingNewIssue } from "../../../infra/state/issueDraft";
 import { rememberPick } from "../../../infra/state/prefs";
@@ -56,7 +57,9 @@ import { issueIs } from "../model/issue";
 import { type IssueScope, issueScopes, issueTagPresets } from "../model/meta";
 import { issueMove, movedCards, sendMove } from "../model/moves";
 import { issueSearch } from "../model/navigation";
+import { orderedVisibleCardIds, selectRange, stepFocusId, toggleSelection } from "../model/triage";
 import { issueSet, labeledIssue, sendLabel, writeIssue } from "../model/write";
+import { BatchTriageBar } from "./BatchTriageBar";
 import { IssueBoard } from "./Board";
 import { CloseIssueDialog, ReopenDialog } from "./CloseDialog";
 import { DisplayMenu } from "./DisplayMenu";
@@ -196,8 +199,9 @@ export function IssuesPage(props: { rest: string }) {
   const agent = () => searchValues().agent ?? "";
   const tag = () => searchValues().tag ?? "";
   const scope = (): IssueScope => searchValues().scope ?? "all";
+  const status = () => searchValues().status ?? "";
   const query = signal("");
-  const filter = (): BoardFilter => ({ query: query(), repo: repo(), agent: agent(), tag: tag(), scope: scope() });
+  const filter = (): BoardFilter => ({ query: query(), repo: repo(), agent: agent(), tag: tag(), scope: scope(), status: status() });
   const setFilter = (f: BoardFilter) => {
     query.set(f.query);
     setSearchValues(
@@ -206,6 +210,7 @@ export function IssuesPage(props: { rest: string }) {
         agent: f.agent || undefined,
         tag: f.tag || undefined,
         scope: f.scope === "all" ? undefined : f.scope,
+        status: f.status || undefined,
       }),
       { replace: true },
     );
@@ -222,7 +227,7 @@ export function IssuesPage(props: { rest: string }) {
   // The filter's part of the address goes along, so closing an issue comes back to the board as filtered.
   const kept = () => {
     const search = new URLSearchParams(
-      Object.entries({ repo: repo(), agent: agent(), tag: tag(), scope: scope() === "all" ? "" : scope() }).filter(([, v]) => v !== ""),
+      Object.entries({ repo: repo(), agent: agent(), tag: tag(), scope: scope() === "all" ? "" : scope(), status: status() }).filter(([, v]) => v !== ""),
     ).toString();
     return search ? `?${search}` : "";
   };
@@ -269,6 +274,54 @@ export function IssuesPage(props: { rest: string }) {
   const effectiveGroupBy = (): GroupBy => look().groupBy ?? "none";
   const effectiveHierarchy = (): HierarchyMode => look().hierarchy ?? "all";
   const visibleCards = createMemo(() => shown().filter((c) => hierarchyShows(effectiveHierarchy(), c, allIssues())));
+  const orderedIds = createMemo(() => orderedVisibleCardIds(visibleCards(), look(), allIssues(), older()));
+  const focusedId = signal<string | undefined>(undefined);
+  const selectedIds = signal<ReadonlySet<string>>(new Set());
+  const selectionAnchor = signal<string | undefined>(undefined);
+  const clearSelection = () => {
+    selectedIds.set(new Set());
+    selectionAnchor.set(undefined);
+  };
+  createEffect(
+    () =>
+      allIssues()
+        .map((i) => i.id)
+        .join("\0"),
+    () => {
+      const known = new Set<string>(allIssues().map((i) => i.id));
+      const cur = untracked(selectedIds);
+      if (cur.size > 0 && [...cur].some((item) => !known.has(item))) {
+        selectedIds.set(new Set([...cur].filter((item) => known.has(item))));
+      }
+      const focus = untracked(focusedId);
+      if (focus !== undefined && !known.has(focus)) {
+        focusedId.set(undefined);
+      }
+    },
+    { defer: true },
+  );
+  const activeFocusId = () => {
+    const cur = focusedId();
+    if (cur !== undefined && orderedIds().includes(cur)) return cur;
+    return returnTo();
+  };
+  const selectedIssues = createMemo(() => {
+    const ids = selectedIds();
+    if (ids.size === 0) return [];
+    return allIssues().filter((item) => ids.has(item.id));
+  });
+  const handleToggleSelect = (targetId: string, opts: { range: boolean }) => {
+    if (opts.range) {
+      const next = selectRange(untracked(selectedIds), orderedIds(), untracked(selectionAnchor) ?? untracked(focusedId), targetId);
+      selectedIds.set(next);
+      if (untracked(selectionAnchor) === undefined) selectionAnchor.set(targetId);
+    } else {
+      const next = toggleSelection(untracked(selectedIds), targetId);
+      selectedIds.set(next);
+      selectionAnchor.set(next.has(targetId) ? targetId : undefined);
+    }
+    focusedId.set(targetId);
+  };
   const card = createMemo(() => {
     const at = id();
     return at === undefined ? undefined : all().find((c) => c.id === at || (c.kind === "issue" && issueIs(c.issue, at)));
@@ -364,15 +417,49 @@ export function IssuesPage(props: { rest: string }) {
     const cur = activeOverlay();
     return cur.kind === "peeking" ? peekCard() !== undefined : isIssueOverlayBlocking(cur);
   };
-  // C, unless a field has focus, a dialog is up or an issue is open.
-  keymap.bind(
-    "c",
-    () => {
-      if (id() !== undefined || dialogUp()) return;
-      startNew({});
-    },
-    { when: "notEditing" },
-  );
+  // Board navigation shortcuts: active only when on the board surface with no modal or detail open.
+  const canNavigateBoard = () => id() === undefined && !dialogUp();
+  createEffect(() => {
+    if (!canNavigateBoard()) return;
+    return keymap.bind(
+      {
+        c: () => startNew({}),
+        j: () => {
+          const next = stepFocusId(orderedIds(), untracked(focusedId), 1);
+          if (next !== undefined) focusedId.set(next);
+        },
+        down: () => {
+          const next = stepFocusId(orderedIds(), untracked(focusedId), 1);
+          if (next !== undefined) focusedId.set(next);
+        },
+        k: () => {
+          const next = stepFocusId(orderedIds(), untracked(focusedId), -1);
+          if (next !== undefined) focusedId.set(next);
+        },
+        up: () => {
+          const next = stepFocusId(orderedIds(), untracked(focusedId), -1);
+          if (next !== undefined) focusedId.set(next);
+        },
+        enter: () => {
+          const target = untracked(focusedId);
+          if (target !== undefined && orderedIds().includes(target)) peek(target);
+        },
+        e: () => {
+          const target = untracked(focusedId);
+          if (target !== undefined && orderedIds().includes(target)) open(target);
+        },
+        x: () => {
+          const target = untracked(focusedId);
+          if (target !== undefined && orderedIds().includes(target)) handleToggleSelect(target, { range: false });
+        },
+      },
+      { when: "notEditing" },
+    );
+  });
+  createEffect(() => {
+    if (selectedIds().size === 0 || !canNavigateBoard()) return;
+    return keymap.bind("escape", clearSelection, { when: "notEditing" });
+  });
   const keepNew = async (words: string, where: NewIssueAt, requestKey: string) => {
     const made = await act.run(() =>
       writeIssue(words, where.agent ?? "", where.repo ?? "", requestKey, where.machineId ?? "", where.attachments, where.tags, {
@@ -442,8 +529,10 @@ export function IssuesPage(props: { rest: string }) {
                         allIssues={allIssues()}
                         filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                         loading={history.loading()}
-                        selected={returnTo()}
+                        selected={activeFocusId()}
+                        selectedIds={selectedIds()}
                         onOpen={peek}
+                        onToggleSelect={handleToggleSelect}
                         onUpdateDates={updateScheduleDates}
                         onNew={startNew}
                         onClearFilter={() => setFilter(noFilter)}
@@ -456,7 +545,8 @@ export function IssuesPage(props: { rest: string }) {
                     allIssues={allIssues()}
                     filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                     loading={history.loading()}
-                    selected={returnTo()}
+                    selected={activeFocusId()}
+                    selectedIds={selectedIds()}
                     older={older()}
                     grouping={look().grouping}
                     groupBy={effectiveGroupBy()}
@@ -464,6 +554,7 @@ export function IssuesPage(props: { rest: string }) {
                     ordering={look().ordering}
                     onOlder={() => older.set(!older())}
                     onOpen={peek}
+                    onToggleSelect={handleToggleSelect}
                     onAdd={addInList}
                     onClearFilter={() => setFilter(noFilter)}
                   />
@@ -476,13 +567,15 @@ export function IssuesPage(props: { rest: string }) {
                 summary={board()?.boardSummary}
                 filtered={filterAny(filter()) || effectiveHierarchy() !== "all"}
                 loading={history.loading()}
-                selected={returnTo()}
+                selected={activeFocusId()}
+                selectedIds={selectedIds()}
                 older={older()}
                 ordering={look().ordering}
                 groupBy={effectiveGroupBy()}
                 hierarchy={effectiveHierarchy()}
                 onOlder={() => older.set(!older())}
                 onOpen={peek}
+                onToggleSelect={handleToggleSelect}
                 onDrop={(c, to) => void drop(c, to)}
                 onRetry={(c) => void retry(c)}
                 onPutBack={(c) => c.move && moves.drop(c.move.key)}
@@ -490,6 +583,9 @@ export function IssuesPage(props: { rest: string }) {
                 onNew={() => startNew({})}
                 onClearFilter={() => setFilter(noFilter)}
               />
+            </If>
+            <If when={selectedIssues().length > 0}>
+              <BatchTriageBar selectedIssues={selectedIssues()} allIssues={allIssues()} onClear={clearSelection} />
             </If>
           </>
         }
@@ -701,6 +797,13 @@ function Toolbar(props: {
   const repoOptions = createMemo(() => repos().map((p) => ({ value: p, label: p })));
   const agentOptions = createMemo(() => agents().map((a) => ({ value: a, label: nameOf()(a) })));
   const tagOptions = createMemo(() => tags().map((tag) => ({ value: tag, label: tag })));
+  const statusOptions = createMemo(() => {
+    const base: { value: string; label: string }[] = IssueStatusSchema.options.map((s) => ({ value: s, label: t(`shared.status.${s}`) }));
+    if (props.filter.status === "todo,in_progress") {
+      return [{ value: "todo,in_progress", label: t("web.issue.page.todoAndInProgress") }, ...base];
+    }
+    return base;
+  });
   const scopeOptions = createMemo(() =>
     issueScopes.map((s) => ({
       value: s,
@@ -712,7 +815,7 @@ function Toolbar(props: {
   const currentGroupBy = (): GroupBy => props.look.groupBy ?? "none";
   const currentHierarchy = (): HierarchyMode => props.look.hierarchy ?? "all";
   const isFiltered = createMemo(() => filterAny(props.filter));
-  const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "" || props.filter.tag !== "");
+  const hasFacetFilter = createMemo(() => props.filter.repo !== "" || props.filter.agent !== "" || props.filter.tag !== "" || props.filter.status !== "");
   const compactToolbar = () => windowSize().width < 1100;
   const popoverFilterCount = createMemo(
     () =>
@@ -720,6 +823,7 @@ function Toolbar(props: {
       Number(props.filter.repo !== "") +
       Number(props.filter.agent !== "") +
       Number(props.filter.tag !== "") +
+      Number(props.filter.status !== "") +
       Number(currentGroupBy() !== "none") +
       Number(currentHierarchy() !== "all"),
   );
@@ -826,6 +930,20 @@ function Toolbar(props: {
                   />
                 </View>
                 <View class="gap-1">
+                  <Text class="text-xs font-medium text-muted">{t("web.issue.page.byStatus")}</Text>
+                  <Select
+                    size="control"
+                    class="w-full"
+                    label={t("web.issue.page.byStatus")}
+                    testid="filter-status"
+                    filter
+                    value={props.filter.status}
+                    placeholder={t("web.issue.page.allStatuses")}
+                    options={statusOptions()}
+                    onChange={(status) => props.onFilter({ ...props.filter, status })}
+                  />
+                </View>
+                <View class="gap-1">
                   <Text class="text-xs font-medium text-muted">{t("web.issue.groupBy.label")}</Text>
                   <Select
                     size="control"
@@ -905,6 +1023,19 @@ function Toolbar(props: {
               placeholder={t("web.issue.tags.allTags")}
               options={tagOptions()}
               onChange={(tag) => props.onFilter({ ...props.filter, tag })}
+            />
+            <View class="h-3.5 w-px bg-line" />
+            <Select
+              quiet
+              size="control"
+              class="max-w-24"
+              label={t("web.issue.page.byStatus")}
+              testid="filter-status"
+              filter
+              value={props.filter.status}
+              placeholder={t("web.issue.page.allStatuses")}
+              options={statusOptions()}
+              onChange={(status) => props.onFilter({ ...props.filter, status })}
             />
           </View>
           <View testID="issue-layout-bar" class="shrink-0 flex-row items-center rounded-md border border-line bg-side pl-1.5">

@@ -4,6 +4,7 @@ import { Input } from "nsh/base";
 import { t } from "@vibevalley/i18n";
 import type { ActorRef, Issue, Priority } from "@vibevalley/protocol";
 
+import { Combobox } from "../../../design/Combobox";
 import { EpochDatePicker } from "../../../design/DatePicker";
 import { UserAvatar } from "../../../design/domain/Face";
 import { initialOf } from "../../../design/domain/RuntimeBadge";
@@ -13,9 +14,10 @@ import { IconButton } from "../../../design/IconButton";
 import { motionDuration, motionOff } from "../../../design/motion";
 import { CountPill } from "../../../design/Tag";
 import { Bubble } from "../../../design/Tip";
+import { mix } from "../../../design/tone";
 import { ready, useAgents, useSettings } from "../../../infra/query";
 import { decodeActorRef, encodeActorRef, type GroupBy } from "../model/display";
-import { childIssuesOf, eligibleParentOptions, issueTagPresets, normalizeTagList } from "../model/meta";
+import { childIssuesOf, eligibleBlockerOptions, eligibleParentOptions, issueTagPresets, normalizeTagList } from "../model/meta";
 import { AgentFaceOf, NoFaceMark, PriorityMark, StatusMark } from "./Marks";
 import { Pick } from "./Sheet";
 
@@ -191,6 +193,120 @@ export function ParentPicker(props: {
   );
 }
 
+/** Clickable `"Blocked by #N"` chips for Kanban cards, List rows, Timeline rows, and Detail headers. */
+export function BlockedByChips(props: {
+  blockers: readonly Issue[];
+  max?: number | undefined;
+  compact?: boolean | undefined;
+  onOpen: (id: string) => void;
+  onBeforePress?: (() => void) | undefined;
+  testid?: string | undefined;
+}) {
+  const max = () => props.max ?? 3;
+  const shown = computed(() => props.blockers.slice(0, max()));
+  const extra = computed(() => Math.max(0, props.blockers.length - max()));
+  const isActive = (issue: Issue) => issue.status !== "done" && issue.status !== "canceled";
+  return (
+    <If when={props.blockers.length > 0}>
+      <View testID={props.testid ?? "issue-blocked-by-chips"} class="flex-row flex-wrap items-center gap-1">
+        <Each of={shown()} key={(b) => b.id}>
+          {(b) => {
+            const active = () => isActive(b());
+            const chipText = () => t("web.issue.deps.blockedByChip", { n: b().number });
+            return (
+              <View
+                role="button"
+                testID={props.testid ? `${props.testid}-${b().id}` : `issue-blocker-chip-${b().id}`}
+                accessibilityLabel={`#${b().number} ${b().title}`}
+                tooltip={<Bubble text={`#${b().number} ${b().title} · ${t(`shared.status.${b().status}`)}`} />}
+                onPress={() => {
+                  props.onBeforePress?.();
+                  props.onOpen(b().id);
+                }}
+                class={`shrink-0 flex-row items-center gap-1 rounded-sm border px-1.5 py-px ${
+                  active() ? "bg-warn-soft hover:border-line-strong" : "border-line bg-side opacity-75 hover:border-line-strong hover:bg-hover"
+                }`}
+                style={active() ? { borderColor: mix("wheat", 0.45) } : undefined}
+              >
+                <Icon name="lock" size={props.compact === true ? 9 : 10} tone={active() ? "warn-ink" : "muted"} />
+                <Text class={`truncate font-mono text-2xs leading-3.5 ${active() ? "font-medium text-warn-ink" : "text-muted line-through"}`}>
+                  {chipText()}
+                </Text>
+              </View>
+            );
+          }}
+        </Each>
+        <If when={extra() > 0}>
+          <View class="rounded-sm border border-line bg-side px-1 py-px">
+            <Text class="text-2xs leading-3.5 text-faint tabular-nums">{`+${extra()}`}</Text>
+          </View>
+        </If>
+      </View>
+    </If>
+  );
+}
+
+/** Cycle-safe searchable multi-select blocker picker for IssueDetail, TodoDetail, and FamilyDetail. */
+export function BlockedByPicker(props: {
+  issueId: string;
+  blockedBy: readonly string[];
+  allIssues: readonly Issue[];
+  disabled?: boolean | undefined;
+  state?: "pending" | "failed" | undefined;
+  testid?: string | undefined;
+  onOpen?: ((id: string) => void) | undefined;
+  onChange: (blockedBy: string[]) => void;
+}) {
+  const testid = () => props.testid ?? "issue-blocked-by-picker";
+  const options = computed(() => {
+    const eligible = eligibleBlockerOptions(props.issueId, props.allIssues);
+    const known = new Set(eligible.map((o) => o.value));
+    const extra = props.blockedBy
+      .filter((id) => !known.has(id))
+      .map((id) => {
+        const found = props.allIssues.find((item) => item.id === id);
+        return { value: id, label: found ? `#${found.number} ${found.title}` : id };
+      });
+    return [...eligible, ...extra];
+  });
+  const selectedIssues = computed(() => {
+    const byId = new Map<string, Issue>(props.allIssues.map((item) => [item.id, item]));
+    return props.blockedBy.flatMap((id) => {
+      const found = byId.get(id);
+      return found ? [found] : [];
+    });
+  });
+  return (
+    <If
+      when={props.disabled === true}
+      else={
+        <Combobox
+          multiple
+          clearable
+          quiet
+          size="control"
+          label={t("web.issue.deps.blockedBy")}
+          testid={testid()}
+          value={props.blockedBy}
+          placeholder={t("web.issue.deps.pick")}
+          emptyText={t("web.issue.list.emptyFiltered")}
+          clearLabel={t("web.issue.deps.clear")}
+          state={props.state}
+          options={options()}
+          onChange={props.onChange}
+          onClear={() => props.onChange([])}
+        />
+      }
+    >
+      <If when={selectedIssues().length > 0} else={<Text class="px-2 py-1 text-xs text-faint">{t("web.issue.deps.none")}</Text>}>
+        <View class="px-1 py-0.5">
+          <BlockedByChips blockers={selectedIssues()} max={12} onOpen={(id) => props.onOpen?.(id)} testid={`${testid()}-readonly`} />
+        </View>
+      </If>
+    </If>
+  );
+}
+
 /** Interactive calendar date picker for `startAt` and `dueAt` schedule fields (#25, #68). */
 export function DatePropertyEditor(props: {
   label: string;
@@ -318,27 +434,14 @@ export function useOwnerLabel(): () => (owner: ActorRef | undefined) => string {
   });
 }
 
-/** Searchable owner selector (`Select` with `cover={false}`) for assigning self, collaborators, or an Expert agent. */
-export function OwnerPicker(props: {
-  owner: ActorRef | undefined;
-  allIssues: readonly Issue[];
-  disabled?: boolean | undefined;
-  quiet?: boolean | undefined;
-  size?: "control" | "field" | undefined;
-  state?: "pending" | "failed" | undefined;
-  clearable?: boolean | undefined;
-  testid?: string | undefined;
-  class?: string | undefined;
-  onChange: (owner: ActorRef | undefined) => void;
-}) {
+/** Shared searchable option list for `OwnerPicker` and `BatchTriageBar`. */
+export function useOwnerOptions(
+  allIssues: () => readonly Issue[],
+  currentOwner?: () => ActorRef | undefined,
+): () => { value: string; label: string; group: string }[] {
   const settings = useSettings();
   const agents = useAgents();
-  const ownerLabel = useOwnerLabel();
-  const testid = () => props.testid ?? "issue-owner-picker";
-  const clearTestid = () => `${testid()}-clear`;
-  const encodedValue = computed(() => encodeActorRef(props.owner));
-
-  const options = computed(() => {
+  return computed(() => {
     const peopleGroup = t("web.issue.owner.peopleGroup");
     const expertsGroup = t("web.issue.owner.expertsGroup");
     const profileName = ready(settings, undefined)?.profile?.displayName?.trim();
@@ -346,13 +449,14 @@ export function OwnerPicker(props: {
     const items: { value: string; label: string; group: string }[] = [{ value: "user:self", label: selfLabel, group: peopleGroup }];
 
     const collaboratorIds = new Set<string>();
-    for (const issue of props.allIssues) {
+    for (const issue of allIssues()) {
       if (issue.owner?.kind === "user" && issue.owner.id !== "self" && issue.owner.id.trim() !== "") {
         collaboratorIds.add(issue.owner.id);
       }
     }
-    if (props.owner?.kind === "user" && props.owner.id !== "self" && props.owner.id.trim() !== "") {
-      collaboratorIds.add(props.owner.id);
+    const cur = currentOwner?.();
+    if (cur?.kind === "user" && cur.id !== "self" && cur.id.trim() !== "") {
+      collaboratorIds.add(cur.id);
     }
     for (const userId of [...collaboratorIds].toSorted()) {
       items.push({ value: `user:${userId}`, label: userId, group: peopleGroup });
@@ -369,11 +473,35 @@ export function OwnerPicker(props: {
       seenAgents.add(a.id);
       items.push({ value: `agent:${a.id}`, label: a.name, group: expertsGroup });
     }
-    if (props.owner?.kind === "agent" && props.owner.id.trim() !== "" && !seenAgents.has(props.owner.id)) {
-      items.push({ value: `agent:${props.owner.id}`, label: props.owner.id, group: expertsGroup });
+    if (cur?.kind === "agent" && cur.id.trim() !== "" && !seenAgents.has(cur.id)) {
+      items.push({ value: `agent:${cur.id}`, label: cur.id, group: expertsGroup });
     }
     return items;
   });
+}
+
+/** Searchable owner selector (`Select` with `cover={false}`) for assigning self, collaborators, or an Expert agent. */
+export function OwnerPicker(props: {
+  owner: ActorRef | undefined;
+  allIssues: readonly Issue[];
+  disabled?: boolean | undefined;
+  quiet?: boolean | undefined;
+  size?: "control" | "field" | undefined;
+  state?: "pending" | "failed" | undefined;
+  clearable?: boolean | undefined;
+  testid?: string | undefined;
+  class?: string | undefined;
+  onChange: (owner: ActorRef | undefined) => void;
+}) {
+  const ownerLabel = useOwnerLabel();
+  const testid = () => props.testid ?? "issue-owner-picker";
+  const clearTestid = () => `${testid()}-clear`;
+  const encodedValue = computed(() => encodeActorRef(props.owner));
+
+  const options = useOwnerOptions(
+    () => props.allIssues,
+    () => props.owner,
+  );
 
   const shownLabel = computed(() => ownerLabel()(props.owner));
 

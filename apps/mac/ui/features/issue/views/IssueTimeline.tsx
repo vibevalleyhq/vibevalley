@@ -13,7 +13,7 @@ import { Bubble } from "../../../design/Tip";
 import { mix, tone } from "../../../design/tone";
 import { useNow } from "../../../infra/base/dom";
 import type { BoardCard, Tone } from "../model/cards";
-import { formatIsoDate } from "../model/meta";
+import { blockerIssuesOf, formatIsoDate } from "../model/meta";
 import {
   addUtcDays,
   buildScheduleForCards,
@@ -27,6 +27,7 @@ import {
   utcDayStart,
 } from "../model/schedule";
 import { EmptyNote } from "./Board";
+import { BlockedByChips } from "./IssueMetaControls";
 import { PriorityMark, StatusMark } from "./Marks";
 import type { NewIssueAt } from "./NewIssue";
 
@@ -135,7 +136,9 @@ export function IssueTimeline(props: {
   filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
+  selectedIds?: ReadonlySet<string> | undefined;
   onOpen: (id: string) => void;
+  onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
   onUpdateDates: (id: string, dates: { startAt?: number; dueAt?: number }) => Promise<void> | void;
   onNew: (at: NewIssueAt) => void;
   onClearFilter?: (() => void) | undefined;
@@ -260,14 +263,21 @@ export function IssueTimeline(props: {
                     </View>
                     <Each of={timeline().rows} key={(r) => r.card.id}>
                       {(r) => {
-                        const selected = () => props.selected === r().card.id;
+                        const selected = () => props.selected === r().card.id || props.selectedIds?.has(r().card.id) === true;
+                        const blockers = computed(() => blockerIssuesOf(r().issue, props.allIssues));
                         return (
                           <View
                             role="button"
                             testID="timeline-row"
                             accessibilityLabel={`#${r().issue.number} ${r().issue.title}`}
                             accessibilityState={{ selected: selected() }}
-                            onPress={() => props.onOpen(r().card.id)}
+                            onPress={(e) => {
+                              if (e.modifiers.shift && props.onToggleSelect) {
+                                props.onToggleSelect(r().card.id, { range: true });
+                                return;
+                              }
+                              props.onOpen(r().card.id);
+                            }}
                             class={`flex-row items-center gap-1.5 border-b pr-2.5 ${selected() ? "bg-selected" : "hover:bg-hover"}`}
                             style={{
                               height: ROW_HEIGHT,
@@ -281,6 +291,7 @@ export function IssueTimeline(props: {
                             <StatusMark status={r().issue.status} size={13} />
                             <Text class="shrink-0 font-mono text-2xs text-faint tabular-nums">{`#${r().issue.number}`}</Text>
                             <Text class="min-w-0 flex-1 truncate text-xs font-medium text-ink">{r().issue.title}</Text>
+                            <BlockedByChips blockers={blockers()} max={1} compact onOpen={props.onOpen} testid="timeline-blocked-by" />
                             <If when={r().span.overdue}>
                               <View class="size-1.5 shrink-0 rounded-full bg-berry" />
                             </If>

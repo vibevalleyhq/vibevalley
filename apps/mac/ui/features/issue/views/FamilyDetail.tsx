@@ -14,10 +14,11 @@ import { createMemo } from "../../../infra/solid";
 import { useIntents } from "../../../infra/state/intent";
 import { createIssueActs } from "../model/acts";
 import { useIssues } from "../model/history";
+import { blockerIssuesOf } from "../model/meta";
 import { stageTone } from "../model/overview";
 import { issueSet, labeledIssue, sendLabel } from "../model/write";
 import { ActLines } from "./ActLines";
-import { DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
+import { BlockedByChips, BlockedByPicker, DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { StatusMark } from "./Marks";
 import { IssueSheet, IssueTrail, Property, SheetLabel, StagePill } from "./Sheet";
 
@@ -29,6 +30,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
   const open = computed(() => live().status !== "done" && live().status !== "canceled");
   const setLabel = (label: Omit<Parameters<typeof sendLabel>[1], "id">) => void sendLabel(sets, { id: props.issue.id, ...label });
   const parent = createMemo(() => (live().parent ? allIssues().find((item) => item.id === live().parent) : undefined));
+  const blockers = createMemo(() => blockerIssuesOf(live(), allIssues()));
   const acts = createIssueActs(() => props.issue, {
     act: createAct(),
     complete: () => props.onClose(true),
@@ -47,6 +49,7 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
       </Text>
       <View class="mt-2.5 flex-row flex-wrap items-center gap-2">
         <StagePill tone={tone()} label={t(`shared.stage.${props.issue.stage.state}`)} />
+        <BlockedByChips blockers={blockers()} max={6} onOpen={props.onOpen} testid="detail-blocked-by" />
       </View>
     </View>
   );
@@ -108,6 +111,17 @@ export function FamilyDetail(props: { issue: Issue; children: Issue[]; onOpen: (
           disabled={!open()}
           state={labeled().state("parent")}
           onChange={(parent) => setLabel({ parent })}
+        />
+      </Property>
+      <Property align="start" label={t("web.issue.deps.blockedBy")} icon={<Icon name="lock" size={13} tone="muted" />} inset>
+        <BlockedByPicker
+          issueId={live().id}
+          blockedBy={live().blockedBy}
+          allIssues={allIssues()}
+          disabled={!open()}
+          state={labeled().state("blockedBy")}
+          onOpen={props.onOpen}
+          onChange={(blockedBy) => setLabel({ blockedBy })}
         />
       </Property>
       <Property align="start" label={t("web.issue.tags.label")} icon={<Icon name="catalog" size={13} tone="muted" />} inset>

@@ -926,6 +926,9 @@ pub struct IssueUpdate {
     /// Parent issue id or number; "" clears the parent.
     #[serde(default)]
     pub parent: Option<String>,
+    /// Blocker issue ids or numbers; `[]` clears all blockers.
+    #[serde(default)]
+    pub blocked_by: Option<Vec<String>>,
     #[serde(default)]
     pub tags: Option<Vec<String>>,
     /// Start date timestamp (ms); 0 or negative clears it.
@@ -1264,6 +1267,9 @@ pub struct IssueUpdateInput {
     /// Parent issue id or number; "" clears the parent.
     #[serde(default)]
     pub parent: Option<String>,
+    /// Blocker issue ids or numbers; `[]` clears all blockers.
+    #[serde(default)]
+    pub blocked_by: Option<Vec<String>>,
     #[serde(default)]
     pub tags: Option<Vec<String>>,
     /// Start date timestamp (ms); 0 or negative clears it.

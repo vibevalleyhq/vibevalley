@@ -75,6 +75,24 @@ pub struct NewIssue {
     pub owner: Option<ActorRef>,
 }
 
+pub(super) fn resolve_blocked_by(all_issues: &[Issue], self_id: Option<&str>, refs: &[String]) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    for raw in refs {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let target = find_issue(all_issues, trimmed).ok_or_else(|| BoardError::NoIssue(trimmed.to_string()))?;
+        if self_id == Some(target.id.as_str()) {
+            return Err(BoardError::Other("an issue cannot be blocked by itself".into()));
+        }
+        if !out.contains(&target.id) {
+            out.push(target.id.clone());
+        }
+    }
+    Ok(out)
+}
+
 pub(super) fn clean_tags(tags: &[String]) -> Vec<String> {
     let mut out = Vec::new();
     for raw in tags {
@@ -473,10 +491,7 @@ impl Board {
                 Some(p) => Some(find_issue(&all_issues, p).cloned().ok_or_else(|| BoardError::NoIssue(p.clone()))?),
                 None => None,
             };
-            let mut blocked_by = Vec::new();
-            for b in &new.blocked_by {
-                blocked_by.push(find_issue(&all_issues, b).ok_or_else(|| BoardError::NoIssue(b.clone()))?.id.clone());
-            }
+            let blocked_by = resolve_blocked_by(&all_issues, None, &new.blocked_by)?;
             if let Some(p) = &parent
                 && p.status.is_closed()
             {
@@ -810,7 +825,7 @@ impl Board {
         Ok(())
     }
 
-    async fn refresh_queue_unlocked_async(&self) {
+    pub(super) async fn refresh_queue_unlocked_async(&self) {
         let queued = {
             let _work = self.work.lock().await;
             match self.issues_async().await {

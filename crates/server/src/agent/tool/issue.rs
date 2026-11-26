@@ -242,6 +242,8 @@ pub struct UpdateArgs {
     priority: Option<String>,
     agent: Option<String>,
     owner: Option<ActorRef>,
+    #[serde(rename = "blockedBy")]
+    blocked_by: Option<Vec<String>>,
     attachments: Option<Vec<String>>,
 }
 
@@ -259,6 +261,7 @@ pub async fn update(f: &ToolRegistry, _who: &Who, a: UpdateArgs) -> Result<Strin
         deliver: a.deliver,
         attachments: a.attachments,
         owner: a.owner,
+        blocked_by: a.blocked_by,
         ..Default::default()
     };
     if let Some(pr) = given(&a.priority) {

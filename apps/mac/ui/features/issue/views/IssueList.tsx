@@ -1,9 +1,10 @@
-import { computed, Scroll, signal, Text, View, windowSize } from "nsh";
+import { computed, Scroll, signal, Text, View, windowSize, type ViewRef } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { ActorRef, Issue } from "@vibevalley/protocol";
 
 import { Button } from "../../../design/Button";
+import { Checkbox } from "../../../design/Checkbox";
 import { OrchestratorFace } from "../../../design/domain/Face";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
@@ -14,6 +15,7 @@ import { Bubble } from "../../../design/Tip";
 import { mix } from "../../../design/tone";
 import { useOrchestrators } from "../../../infra/agents";
 import { ago } from "../../../infra/base/format";
+import { createEffect } from "../../../infra/solid";
 import { type BoardCard, cardAgent, cardLook, cardRepo, closedShown, laneLabel, laneStatus } from "../model/cards";
 import {
   type GroupBy,
@@ -28,9 +30,9 @@ import {
   rowKeys,
 } from "../model/display";
 import { useIssues, useNameOf } from "../model/history";
-import { childIssuesOf } from "../model/meta";
+import { blockerIssuesOf, childIssuesOf } from "../model/meta";
 import { EmptyNote, OlderLink } from "./Board";
-import { CardChildRows, IssueGroupHeader, ParentBadge, TagPills, useGroupLabel } from "./IssueMetaControls";
+import { BlockedByChips, CardChildRows, IssueGroupHeader, ParentBadge, TagPills, useGroupLabel } from "./IssueMetaControls";
 import { AgentFaceOf, CardFace, FlagChip, NoFaceMark, PriorityMark, ProgressMark, StatusMark } from "./Marks";
 import type { NewIssueAt } from "./NewIssue";
 import { useWidth } from "./Sheet";
@@ -54,6 +56,7 @@ export function IssueList(props: {
   filtered?: boolean | undefined;
   loading: boolean;
   selected?: string | undefined;
+  selectedIds?: ReadonlySet<string> | undefined;
   older: boolean;
   grouping: Grouping;
   groupBy?: GroupBy | undefined;
@@ -61,6 +64,7 @@ export function IssueList(props: {
   ordering: Ordering;
   onOlder: () => void;
   onOpen: (id: string) => void;
+  onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
   onAdd: ListAdd;
   onClearFilter?: (() => void) | undefined;
 }) {
@@ -259,9 +263,12 @@ export function IssueList(props: {
                               wide={wide()}
                               showParentTitle={showParentTitle()}
                               selected={c().id === props.selected}
+                              checked={props.selectedIds?.has(c().id) === true}
+                              selectionActive={(props.selectedIds?.size ?? 0) > 0}
                               showRepo={activeGroupBy() !== "repo" && props.grouping !== "repo"}
                               divider={i() < rows().length - 1 || showOlder()}
                               onOpen={props.onOpen}
+                              onToggleSelect={props.onToggleSelect}
                               nameOf={nameOf()}
                             />
                           )}
@@ -291,9 +298,12 @@ function Row(props: {
   wide: boolean;
   showParentTitle: boolean;
   selected: boolean;
+  checked?: boolean | undefined;
+  selectionActive?: boolean | undefined;
   showRepo: boolean;
   divider: boolean;
   onOpen: (id: string) => void;
+  onToggleSelect?: ((id: string, opts: { range: boolean }) => void) | undefined;
   nameOf: (id: string) => string;
 }) {
   const issues = useIssues();
@@ -303,18 +313,34 @@ function Row(props: {
   const repo = computed(() => cardRepo(props.card));
   const shownFlags = computed(() => (props.wide ? look().flags : look().flags.slice(0, 1)));
   const parentIssue = computed(() => (props.card.issue.parent ? resolvedIssues().find((item) => item.id === props.card.issue.parent) : undefined));
+  const blockerIssues = computed(() => blockerIssuesOf(props.card.issue, resolvedIssues()));
   const childIssues = computed(() =>
     props.hierarchy === "top_level" || props.hierarchy === "parents_only" ? childIssuesOf(props.card.issue.id, resolvedIssues()) : [],
   );
   const tags = computed(() => props.card.issue.tags ?? []);
   const attachmentCount = computed(() => props.card.issue.attachments?.length ?? 0);
-  const hasTrailingMarks = computed(() => Boolean(look().progress) || tags().length > 0 || shownFlags().length > 0 || attachmentCount() > 0);
+  const hasTrailingMarks = computed(
+    () => Boolean(look().progress) || blockerIssues().length > 0 || tags().length > 0 || shownFlags().length > 0 || attachmentCount() > 0,
+  );
+  let rowEl: ViewRef | undefined;
+  createEffect(
+    () => props.selected,
+    (sel) => {
+      if (sel && rowEl) {
+        requestAnimationFrame(() => {
+          rowEl?.reveal({ vertical: "nearest" });
+        });
+      }
+    },
+    { defer: true },
+  );
   return (
     <View class={props.divider ? "border-b" : undefined} style={props.divider ? { borderColor: mix("line", 0.55) } : undefined}>
       <View
         role="button"
         testID="issue-card"
         ref={(el) => {
+          rowEl = el;
           if (props.selected)
             requestAnimationFrame(() => {
               el.reveal({ vertical: "nearest" });
@@ -322,13 +348,33 @@ function Row(props: {
             });
         }}
         accessibilityLabel={look().title}
-        accessibilityState={{ selected: props.selected }}
+        accessibilityState={{ selected: props.selected || props.checked === true }}
         tooltip={<If when={look().detail}>{(d) => <Bubble text={d()} />}</If>}
-        onPress={() => props.onOpen(props.card.id)}
-        class={`relative min-h-9.5 flex-row items-center gap-2.5 px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${props.selected ? "bg-selected" : "hover:bg-hover"}`}
+        onPress={(e) => {
+          if (e.modifiers.shift && props.onToggleSelect) {
+            props.onToggleSelect(props.card.id, { range: true });
+            return;
+          }
+          props.onOpen(props.card.id);
+        }}
+        class={`group relative min-h-9.5 flex-row items-center gap-2.5 px-2.5 py-1.5 focus-visible:outline-2 focus-visible:outline-focus ${
+          props.checked === true || props.selected ? "bg-selected" : "hover:bg-hover"
+        }`}
       >
-        <If when={props.selected}>
+        <If when={props.selected || props.checked === true}>
           <ActiveBar />
+        </If>
+        <If when={props.onToggleSelect}>
+          {(onToggle) => (
+            <View class={props.checked === true || props.selectionActive === true ? "shrink-0" : "shrink-0 opacity-0 group-hover:opacity-100"}>
+              <Checkbox
+                testid={`issue-select-${props.card.id}`}
+                label={t("web.issue.triage.selectIssue", { n: props.card.issue.number })}
+                checked={props.checked === true}
+                onChange={() => onToggle()(props.card.id, { range: false })}
+              />
+            </View>
+          )}
         </If>
         <View class="w-4 shrink-0 items-center justify-center">
           <If when={look().priority === "urgent" || look().priority === "high" ? look().priority : undefined}>
@@ -356,6 +402,7 @@ function Row(props: {
         </View>
         <If when={hasTrailingMarks()}>
           <View class="shrink-0 flex-row items-center gap-1.5">
+            <BlockedByChips blockers={blockerIssues()} max={props.wide ? 2 : 1} onOpen={props.onOpen} testid="row-blocked-by" />
             <TagPills tags={tags()} max={props.wide ? 3 : 1} testid="row-tags" />
             <If when={look().progress}>{(pg) => <ProgressMark done={pg().done} total={pg().total} />}</If>
             <If when={attachmentCount() > 0}>

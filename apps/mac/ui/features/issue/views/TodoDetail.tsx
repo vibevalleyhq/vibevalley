@@ -36,10 +36,11 @@ import { rememberPick } from "../../../infra/state/prefs";
 import { IssueArtifacts } from "../../artifact";
 import { useIssues } from "../model/history";
 import { isRefined, newIssueTitle } from "../model/issue";
+import { blockerIssuesOf } from "../model/meta";
 import { issueMove, issueMoveOf, movedIssue, sendMove } from "../model/moves";
 import { ActLines } from "./ActLines";
 import { IssueAttachments } from "./IssueAttachments";
-import { DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
+import { BlockedByChips, BlockedByPicker, DatePropertyEditor, OwnerMark, OwnerPicker, ParentPicker, SubIssuesSection, TagEditor } from "./IssueMetaControls";
 import { IssueThread } from "./IssueThread";
 import { AgentFaceOf, PriorityMark, StatusMark } from "./Marks";
 import { IssueSheet, IssueTrail, More, Note, Pick, Property, SheetLabel, Stages } from "./Sheet";
@@ -56,6 +57,7 @@ interface Draft {
   deliver: Deliverable;
   attachments: readonly Attachment[];
   parent: string;
+  blockedBy: readonly string[];
   tags: readonly string[];
   startAt: number | undefined;
   dueAt: number | undefined;
@@ -72,6 +74,7 @@ const draftOf = (i: Issue): Draft => ({
   deliver: i.deliver,
   attachments: i.attachments ?? [],
   parent: i.parent ?? "",
+  blockedBy: [...i.blockedBy],
   tags: i.tags ?? [],
   startAt: i.startAt,
   dueAt: i.dueAt,
@@ -133,6 +136,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   };
 
   const sameOwner = (a: ActorRef | undefined, b: ActorRef | undefined) => a?.kind === b?.kind && a?.id === b?.id;
+  const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 
   const update = (x: Draft): IssueUpdate => ({
     title: x.title,
@@ -145,6 +149,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
     attachments: x.attachments.map((a) => a.id),
     parent: x.parent,
     tags: [...x.tags],
+    ...(!sameIds(x.blockedBy, props.item.blockedBy) ? { blockedBy: [...x.blockedBy] } : {}),
     ...(x.startAt !== props.item.startAt ? { startAt: x.startAt ?? 0 } : {}),
     ...(x.dueAt !== props.item.dueAt ? { dueAt: x.dueAt ?? 0 } : {}),
     ...(!sameOwner(x.owner, props.item.owner) ? { owner: x.owner ?? { kind: "user", id: "" } } : {}),
@@ -269,6 +274,7 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
   };
 
   const parentIssue = computed(() => (d().parent ? allIssues().find((i) => i.id === d().parent) : undefined));
+  const blockers = computed(() => blockerIssuesOf({ blockedBy: [...d().blockedBy] }, allIssues()));
   const criteria = computed(() => criteriaList(d().criteria));
   const heading = (
     <View>
@@ -285,6 +291,11 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
         </View>
       </If>
       <TodoTitle value={d().title} editable={!closed()} onCommit={(title) => edit({ title })} />
+      <If when={blockers().length > 0}>
+        <View class="mt-2">
+          <BlockedByChips blockers={blockers()} max={6} onOpen={(id) => props.onDone(id)} testid="detail-blocked-by" />
+        </View>
+      </If>
     </View>
   );
 
@@ -598,6 +609,16 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
       </Property>
       <Property label={t("web.issue.family.parent")} icon={<Icon name="indent" size={13} tone="muted" />} inset>
         <ParentPicker issueId={props.item.id} parentId={d().parent} allIssues={allIssues()} disabled={closed()} onChange={(parent) => edit({ parent })} />
+      </Property>
+      <Property align="start" label={t("web.issue.deps.blockedBy")} icon={<Icon name="lock" size={13} tone="muted" />} inset>
+        <BlockedByPicker
+          issueId={props.item.id}
+          blockedBy={d().blockedBy}
+          allIssues={allIssues()}
+          disabled={closed()}
+          onOpen={(id) => props.onDone(id)}
+          onChange={(blockedBy) => edit({ blockedBy })}
+        />
       </Property>
       <Property align="start" label={t("web.issue.tags.label")} icon={<Icon name="catalog" size={13} tone="muted" />} inset>
         <TagEditor tags={d().tags} disabled={closed()} onChange={(tags) => edit({ tags })} />

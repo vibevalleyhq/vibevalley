@@ -20,7 +20,7 @@ import { matches } from "../../../infra/base/search";
 import { describeSubagents } from "../../session";
 import { endedAt, assignedOnDuty, issueSession, issueTag, needsWorktreeCheck, type IssueTag, issueTitle, tagOpen, tagText } from "./issue";
 import { localizeIssueError } from "./issueError";
-import { type IssueScope, scopeMatches } from "./meta";
+import { type IssueScope, scopeMatches, statusMatches } from "./meta";
 import type { CardMove } from "./moves";
 import { stageTone } from "./overview";
 
@@ -247,12 +247,14 @@ export interface BoardFilter {
   agent: string;
   tag: string;
   scope: IssueScope;
+  status: string;
 }
 
-export const noFilter: BoardFilter = { query: "", repo: "", agent: "", tag: "", scope: "all" };
-export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.repo !== "" || f.agent !== "" || f.tag !== "" || f.scope !== "all";
+export const noFilter: BoardFilter = { query: "", repo: "", agent: "", tag: "", scope: "all", status: "" };
+export const filterAny = (f: BoardFilter) => f.query.trim() !== "" || f.repo !== "" || f.agent !== "" || f.tag !== "" || f.scope !== "all" || f.status !== "";
 export const filterShows = (f: BoardFilter, c: BoardCard) =>
   scopeMatches(f.scope, c.issue) &&
+  statusMatches(f.status, c.issue) &&
   (f.repo === "" || cardRepo(c) === f.repo) &&
   (f.agent === "" || cardAgent(c) === f.agent) &&
   (f.tag === "" || cardTags(c).includes(f.tag)) &&

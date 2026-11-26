@@ -87,12 +87,14 @@ impl Board {
             if let Some(ids) = &upd.attachments {
                 issue.attachments = self.resolve_attachments_async(ids).await?;
             }
+            let touch_dag = upd.parent.is_some() || upd.blocked_by.is_some();
+            let all_issues = if touch_dag { Some(self.issues_async().await?) } else { None };
             if let Some(raw_parent) = upd.parent.as_deref().map(str::trim) {
                 if raw_parent.is_empty() {
                     issue.parent = None;
                 } else {
-                    let all_issues = self.issues_async().await?;
-                    let target = crate::runtime::find_issue(&all_issues, raw_parent).ok_or_else(|| BoardError::NoIssue(raw_parent.to_string()))?;
+                    let all_issues = all_issues.as_deref().expect("loaded above");
+                    let target = crate::runtime::find_issue(all_issues, raw_parent).ok_or_else(|| BoardError::NoIssue(raw_parent.to_string()))?;
                     if target.id == was.id {
                         return Err(BoardError::Other("an issue cannot be its own parent".into()));
                     }
@@ -107,18 +109,27 @@ impl Board {
                         }
                         cursor = all_issues.iter().find(|i| i.id == curr).and_then(|i| i.parent.as_deref());
                     }
-                    let graph: Vec<(String, Option<String>, Vec<String>)> = all_issues
-                        .iter()
-                        .map(|t| {
-                            let parent = if t.id == was.id { Some(target.id.clone()) } else { t.parent.clone() };
-                            (t.id.clone(), parent, t.blocked_by.clone())
-                        })
-                        .collect();
-                    let problems = vibevalley_core::dependency_problems(&graph);
-                    if !problems.is_empty() {
-                        return Err(BoardError::Other(format!("the dependencies do not form a DAG: {problems:?}")));
-                    }
                     issue.parent = Some(target.id.clone());
+                }
+            }
+            if let Some(raw_blockers) = &upd.blocked_by {
+                let all_issues = all_issues.as_deref().expect("loaded above");
+                issue.blocked_by = super::board::resolve_blocked_by(all_issues, Some(&was.id), raw_blockers)?;
+            }
+            if let Some(all_issues) = all_issues {
+                let graph: Vec<(String, Option<String>, Vec<String>)> = all_issues
+                    .iter()
+                    .map(|t| {
+                        if t.id == was.id {
+                            (t.id.clone(), issue.parent.clone(), issue.blocked_by.clone())
+                        } else {
+                            (t.id.clone(), t.parent.clone(), t.blocked_by.clone())
+                        }
+                    })
+                    .collect();
+                let problems = vibevalley_core::dependency_problems(&graph);
+                if !problems.is_empty() {
+                    return Err(BoardError::Other(format!("the dependencies do not form a DAG: {problems:?}")));
                 }
             }
             if let Some(tags) = &upd.tags {
@@ -144,6 +155,11 @@ impl Board {
                 }
             }
             self.state.put_issues_async(&edited).await?;
+            let should_refresh_queue = upd.blocked_by.is_some() && was.status == IssueStatus::Todo && was.queued_at.is_some();
+            drop(_work);
+            if should_refresh_queue {
+                self.refresh_queue_unlocked_async().await;
+            }
             self.stored_async(&was.id).await
         })
     }

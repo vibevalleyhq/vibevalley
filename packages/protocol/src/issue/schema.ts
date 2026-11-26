@@ -230,6 +230,7 @@ export const IssueUpdate = z.object({
   before: z.exactOptional(z.string()),
   attachments: z.exactOptional(z.array(z.string())),
   parent: z.exactOptional(z.string()),
+  blockedBy: z.exactOptional(z.array(z.string())),
   tags: z.exactOptional(z.array(z.string())),
   startAt: z.exactOptional(z.number()),
   dueAt: z.exactOptional(z.number()),

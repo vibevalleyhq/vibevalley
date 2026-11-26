@@ -153,7 +153,11 @@ before?: string, attachments?: Array<string>,
 /**
  * Parent issue id or number; "" clears the parent.
  */
-parent?: string, tags?: Array<string>,
+parent?: string,
+/**
+ * Blocker issue ids or numbers; `[]` clears all blockers.
+ */
+blockedBy?: Array<string>, tags?: Array<string>,
 /**
  * Start date timestamp (ms); 0 or negative clears it.
  */
@@ -249,7 +253,11 @@ export type IssueUpdateInput = { id: string, title?: string, description?: strin
 /**
  * Parent issue id or number; "" clears the parent.
  */
-parent?: string, tags?: Array<string>,
+parent?: string,
+/**
+ * Blocker issue ids or numbers; `[]` clears all blockers.
+ */
+blockedBy?: Array<string>, tags?: Array<string>,
 /**
  * Start date timestamp (ms); 0 or negative clears it.
  */

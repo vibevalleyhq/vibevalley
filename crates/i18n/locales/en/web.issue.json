@@ -129,6 +129,9 @@
     "allRepos": "All repos",
     "byHelper": "By helper",
     "allHelpers": "All helpers",
+    "byStatus": "By status",
+    "allStatuses": "All statuses",
+    "todoAndInProgress": "Todo & In Progress",
     "shown": "{shown} / {of}",
     "clear": "Clear the filter",
     "view": "View",
@@ -530,5 +533,30 @@
     "newOnDate": "New ticket on {date}",
     "moreItems": "{n} more",
     "collapseDay": "Less"
+  },
+  "deps": {
+    "blockedBy": "Blocked by",
+    "pick": "Add blockers…",
+    "none": "No blockers",
+    "clear": "Clear blockers",
+    "blockedByChip": "Blocked by #{n}"
+  },
+  "triage": {
+    "selected": "{n} selected",
+    "selectIssue": "Select issue #{n}",
+    "clear": "Clear",
+    "status": "Status",
+    "agent": "Helper",
+    "noAgent": "Unassigned",
+    "owner": "Assignee",
+    "noOwner": "Clear assignee",
+    "repo": "Repo",
+    "noRepo": "No repo",
+    "priority": "Priority",
+    "tags": "Tags",
+    "addTags": "Add tags",
+    "replaceTags": "Replace tags",
+    "updated": "Updated {n} issues",
+    "partial": "Updated {ok} issues; {failed} could not be updated"
   }
 }

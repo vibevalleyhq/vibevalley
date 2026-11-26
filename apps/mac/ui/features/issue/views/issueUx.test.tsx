@@ -848,3 +848,279 @@ test("Group By renders collapsible groups across Kanban & List, and hierarchy mo
   expect(app.texts()).toContain("#301 Parent epic A");
   expect(app.texts()).toContain("Child task A1");
 });
+
+test("BlockedByPicker edits blockedBy with cycle-safe options and clickable Blocked-by chips navigate across Board, List, and Timeline", async () => {
+  setLocale("en");
+  const dayStart = Date.UTC(2026, 10, 20);
+  const blockerA = makeIssueFixture({
+    id: "i-dep-a",
+    number: 401,
+    title: "Core API contract",
+    status: "todo",
+    startAt: dayStart,
+    dueAt: dayStart + 86_400_000,
+    stage: { state: "draft", acts: [] },
+  });
+  const blockedB = makeIssueFixture({
+    id: "i-dep-b",
+    number: 402,
+    title: "UI integration task",
+    status: "backlog",
+    blockedBy: ["i-dep-a" as IssueId],
+    startAt: dayStart + 86_400_000,
+    dueAt: dayStart + 2 * 86_400_000,
+    stage: { state: "draft", acts: [] },
+  });
+  const candidateC = makeIssueFixture({
+    id: "i-dep-c",
+    number: 403,
+    title: "Telemetry verifier",
+    status: "in_progress",
+    assignments: [
+      {
+        id: "assign-dep-c",
+        issue: "i-dep-c" as IssueId,
+        agent: "laozhou",
+        assignedAt: SCENARIO_NOW - 10_000,
+        executions: [{ kind: "worker", session: "s-dep-c" as SessionId, startedAt: SCENARIO_NOW - 10_000 }],
+      },
+    ],
+    stage: { state: "working", acts: [] },
+  });
+  const depSession = makeFailedSession("s-dep-c", "Running telemetry");
+
+  let issuesState = [blockerA, blockedB, candidateC];
+  let seq = 30;
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq, issues: issuesState },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "en" });
+  fake.respond("issue.history.list", () =>
+    issuesState.map((issue) => ({
+      issue,
+      sessions: issue.id === candidateC.id ? [depSession] : [],
+      missingSessions: [],
+    })),
+  );
+  fake.respond("issue.update", (payload: unknown) => {
+    const p = payload as { id: string; blockedBy?: string[] };
+    issuesState = issuesState.map((item) =>
+      item.id === p.id
+        ? {
+            ...item,
+            ...(p.blockedBy !== undefined ? { blockedBy: p.blockedBy.map((id) => id as IssueId) } : {}),
+          }
+        : item,
+    );
+    const updated = issuesState.find((i) => i.id === p.id)!;
+    return { ...updated, seq: ++seq };
+  });
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    locale: "en-US",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:card-blocked-by-i-dep-a") === 1);
+
+  // 1. Kanban Board renders clickable "Blocked by #401" chip; clicking it peeks #401 (not #402).
+  expect(app.shows("id:card-blocked-by-i-dep-a >> text:Blocked by #401")).toBe(true);
+  await app.press("id:card-blocked-by-i-dep-a");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  expect(app.texts()).toContain("Core API contract");
+  await app.press("id:issue-peek-close");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 0);
+
+  // 2. List view renders clickable "Blocked by #401" chip; clicking it peeks #401.
+  await app.press("id:issue-view-list");
+  await fake.pumpUntil(app, () => app.count("id:row-blocked-by-i-dep-a") === 1);
+  await app.press("id:row-blocked-by-i-dep-a");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  expect(app.texts()).toContain("Core API contract");
+  await app.press("id:issue-peek-close");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 0);
+
+  // 3. Timeline view renders clickable "Blocked by #401" chip; clicking it peeks #401.
+  await app.press("id:issue-view-timeline");
+  await fake.pumpUntil(app, () => app.count("id:timeline-blocked-by-i-dep-a") === 1);
+  await app.press("id:timeline-blocked-by-i-dep-a");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  expect(app.texts()).toContain("Core API contract");
+  await app.press("id:issue-peek-close");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 0);
+
+  // 4. TodoDetail: BlockedByPicker excludes self and cycle-forming B (#402) on A (#401), and adds #403 to B (#402).
+  await app.host.send("route", `/issues/${blockerA.id}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-blocked-by-picker-trigger") === 1);
+  await app.press("id:issue-blocked-by-picker-trigger");
+  await fake.pumpUntil(app, () => app.count("text:#403 Telemetry verifier") === 1);
+  expect(app.count("text:#402 UI integration task")).toBe(0);
+  await app.keyboard.press("escape");
+
+  await app.host.send("route", `/issues/${blockedB.id}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-blocked-by-picker-trigger") === 1);
+  await app.type("id:issue-blocked-by-picker-input", "Telemetry");
+  await fake.pumpUntil(app, () => app.count("text:#403 Telemetry verifier") === 1);
+  await app.press("text:#403 Telemetry verifier");
+  await fake.pumpUntil(app, () => app.count("id:issue-save") === 1);
+  await app.press("id:issue-save");
+  await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "issue.update"));
+  const todoUpd = fake.calls.findLast((c) => c.op === "issue.update");
+  expect(todoUpd?.payload).toMatchObject({
+    id: blockedB.id,
+    blockedBy: [blockerA.id, candidateC.id],
+  });
+
+  // 5. IssueDetail (running issue): BlockedByPicker updates blockedBy immediately via intent.
+  await app.host.send("route", `/issues/${candidateC.id}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-blocked-by-picker-trigger") === 1);
+  await app.press("id:issue-blocked-by-picker-trigger");
+  await fake.pumpUntil(app, () => app.count("text:#401 Core API contract") === 1);
+  await app.press("text:#401 Core API contract");
+  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length >= 2);
+  const detailUpd = fake.calls.findLast((c) => c.op === "issue.update");
+  expect(detailUpd?.payload).toMatchObject({
+    id: candidateC.id,
+    blockedBy: [blockerA.id],
+  });
+});
+
+test("Keyboard j/k/Enter/e navigation, x/Shift+click multi-select, and BatchTriageBar compose with Group By and Hierarchy", async () => {
+  setLocale("en");
+  const t1 = makeIssueFixture({
+    id: "i-kbd-1",
+    number: 501,
+    title: "First backlog item",
+    status: "backlog",
+    moves: ["todo", "in_progress", "in_review", "done", "canceled"],
+    priority: "medium",
+    stage: { state: "draft", acts: [] },
+  });
+  const t2 = makeIssueFixture({
+    id: "i-kbd-2",
+    number: 502,
+    title: "Second todo item",
+    status: "todo",
+    moves: ["backlog", "in_progress", "in_review", "done", "canceled"],
+    priority: "high",
+    stage: { state: "draft", acts: [] },
+  });
+  const t3 = makeIssueFixture({
+    id: "i-kbd-3",
+    number: 503,
+    title: "Third review item",
+    status: "in_review",
+    moves: ["backlog", "todo", "in_progress", "done", "canceled"],
+    priority: "low",
+    stage: { state: "reviewing", acts: [] },
+  });
+  const childHidden = makeIssueFixture({
+    id: "i-kbd-child",
+    number: 504,
+    title: "Hidden child in top_level mode",
+    parent: t2.id,
+    status: "todo",
+    moves: ["backlog", "in_progress", "done", "canceled"],
+    priority: "urgent",
+    stage: { state: "draft", acts: [] },
+  });
+
+  const all = [t1, t2, t3, childHidden];
+  const state: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 40, issues: all },
+  };
+  const fake = fakeHost({ state, responses: scenarios.typical.responses }, { route: "/issues", locale: "en" });
+  fake.respond(
+    "issue.history.list",
+    all.map((issue) => ({ issue, sessions: [], missingSessions: [] })),
+  );
+  fake.respond("issue.update", (payload: unknown) => {
+    const p = payload as { id: string };
+    const found = all.find((i) => i.id === p.id)!;
+    return { ...found, seq: 41 };
+  });
+  fake.respond("issue.status.update", (payload: unknown) => {
+    const p = payload as { id: string; status: Issue["status"] };
+    const found = all.find((i) => i.id === p.id)!;
+    return { ...found, status: p.status, seq: 42 };
+  });
+
+  const app = await open("../../../app/main.tsx", {
+    width: 1280,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    locale: "en-US",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 4);
+
+  // Compose with Hierarchy -> top_level (hides i-kbd-child, leaving 3 top-level cards: 501, 502, 503).
+  await app.press("id:hierarchy-mode-trigger");
+  await fake.pumpUntil(app, () => app.count(`text:${t("web.issue.hierarchy.top_level")}`) === 1);
+  await app.press(`text:${t("web.issue.hierarchy.top_level")}`);
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 3);
+
+  // j moves focus to first item (#501), j again to #502, Enter opens Quick-Peek for #502.
+  await app.keyboard.press("j");
+  await app.keyboard.press("j");
+  await app.keyboard.press("enter");
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 1);
+  expect(app.texts()).toContain("Second todo item");
+  await app.back();
+  await fake.pumpUntil(app, () => app.count("id:issue-peek-modal") === 0);
+
+  // k moves focus back to #501; e opens full Issue detail page for #501, Escape returns to board.
+  await app.keyboard.press("k");
+  await app.keyboard.press("e");
+  await fake.pumpUntil(app, () => app.count("id:issue") === 1);
+  expect(app.texts()).toContain("First backlog item");
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => app.count("id:issue-board") === 1);
+
+  // x toggles selection on #501 and opens floating BatchTriageBar ("1 selected").
+  await app.keyboard.press("x");
+  await fake.pumpUntil(app, () => app.count("id:batch-triage-bar") === 1);
+  expect(app.shows("id:batch-triage-count >> text:1 selected")).toBe(true);
+
+  // Shift+click on #503 selects range (#501, #502, #503 -> 3 selected, excluding hidden child).
+  await app.keyboard.down("shift");
+  await app.press("text:Third review item");
+  await app.keyboard.up("shift");
+  await fake.pumpUntil(app, () => app.shows("id:batch-triage-count >> text:3 selected"));
+
+  // Batch update priority -> urgent (fires issue.update for all 3 selected issues).
+  await app.press("id:batch-triage-priority-trigger");
+  await fake.pumpUntil(app, () => app.count(`text:${t("shared.priority.urgent")}`) >= 1);
+  await app.press(`text:${t("shared.priority.urgent")}`);
+  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length === 3);
+  expect(fake.calls.filter((c) => c.op === "issue.update").map((c) => c.payload)).toEqual([
+    { id: t1.id, priority: "urgent" },
+    { id: t2.id, priority: "urgent" },
+    { id: t3.id, priority: "urgent" },
+  ]);
+
+  // Batch update status -> done (skips nothing since none are done, fires 3 issue.status.update calls).
+  await app.press("id:batch-triage-status-trigger");
+  await fake.pumpUntil(app, () => app.count(`text:${t("shared.status.done")}`) >= 1);
+  await app.press(`text:${t("shared.status.done")}`);
+  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.status.update").length === 3);
+
+  // Batch add tag ("UX") via tags popover.
+  await app.press("id:batch-triage-tags-trigger");
+  await fake.pumpUntil(app, () => app.count("id:batch-triage-tags-popover") === 1);
+  await app.press("id:tag-preset-UX");
+  await app.press("id:batch-triage-tags-add");
+  await fake.pumpUntil(app, () => fake.calls.filter((c) => c.op === "issue.update").length === 6);
+
+  // Clear selection closes the floating BatchTriageBar.
+  await app.press("id:batch-triage-clear");
+  await fake.pumpUntil(app, () => app.count("id:batch-triage-bar") === 0);
+});

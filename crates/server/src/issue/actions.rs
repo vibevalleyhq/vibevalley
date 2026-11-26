@@ -364,6 +364,9 @@ fn apply_preview_edit(item: &mut Issue, edit: &IssueUpdate) {
         let trimmed = p.trim();
         item.parent = (!trimmed.is_empty()).then(|| trimmed.to_string());
     }
+    if let Some(blocked_by) = &edit.blocked_by {
+        item.blocked_by = blocked_by.iter().map(|b| b.trim().to_string()).filter(|b| !b.is_empty()).collect();
+    }
     if let Some(tags) = &edit.tags {
         item.tags = super::board::clean_tags(tags);
     }
@@ -445,6 +448,7 @@ impl Board {
             before: input.before,
             attachments: input.attachments,
             parent: input.parent,
+            blocked_by: input.blocked_by,
             tags: input.tags,
             start_at: input.start_at,
             due_at: input.due_at,

@@ -1542,6 +1542,9 @@ export const catalogs = {
         allRepos: "所有仓库",
         byHelper: "按角色看",
         allHelpers: "全部角色",
+        byStatus: "按状态看",
+        allStatuses: "全部状态",
+        todoAndInProgress: "待办与进行中",
         shown: "{shown} / {of} 张",
         clear: "清掉筛选",
         view: "看法",
@@ -1861,6 +1864,25 @@ export const catalogs = {
         newOnDate: "在 {date} 新建工单",
         moreItems: "还有 {n} 项",
         collapseDay: "收起",
+      },
+      deps: { blockedBy: "阻塞于", pick: "选择前置工单…", none: "无前置阻塞", clear: "清除前置依赖", blockedByChip: "被 #{n} 阻塞" },
+      triage: {
+        selected: "已选 {n} 项",
+        selectIssue: "选择工单 #{n}",
+        clear: "取消选择",
+        status: "改状态",
+        agent: "派执行会话",
+        noAgent: "清除执行会话",
+        owner: "负责人",
+        noOwner: "清除负责人",
+        repo: "仓库",
+        noRepo: "清除仓库",
+        priority: "优先级",
+        tags: "标签",
+        addTags: "追加标签",
+        replaceTags: "替换标签",
+        updated: "已批量更新 {n} 张工单",
+        partial: "已更新 {ok} 张工单，{failed} 张未能更新",
       },
     },
     "web.library": {
@@ -5340,6 +5362,9 @@ export const catalogs = {
         allRepos: "All repos",
         byHelper: "By helper",
         allHelpers: "All helpers",
+        byStatus: "By status",
+        allStatuses: "All statuses",
+        todoAndInProgress: "Todo & In Progress",
         shown: "{shown} / {of}",
         clear: "Clear the filter",
         view: "View",
@@ -5666,6 +5691,25 @@ export const catalogs = {
         newOnDate: "New ticket on {date}",
         moreItems: "{n} more",
         collapseDay: "Less",
+      },
+      deps: { blockedBy: "Blocked by", pick: "Add blockers…", none: "No blockers", clear: "Clear blockers", blockedByChip: "Blocked by #{n}" },
+      triage: {
+        selected: "{n} selected",
+        selectIssue: "Select issue #{n}",
+        clear: "Clear",
+        status: "Status",
+        agent: "Helper",
+        noAgent: "Unassigned",
+        owner: "Assignee",
+        noOwner: "Clear assignee",
+        repo: "Repo",
+        noRepo: "No repo",
+        priority: "Priority",
+        tags: "Tags",
+        addTags: "Add tags",
+        replaceTags: "Replace tags",
+        updated: "Updated {n} issues",
+        partial: "Updated {ok} issues; {failed} could not be updated",
       },
     },
     "web.library": {
@@ -9215,6 +9259,11 @@ export interface Messages {
   "web.issue.dates.dueAt": undefined;
   "web.issue.dates.notSet": undefined;
   "web.issue.dates.startAt": undefined;
+  "web.issue.deps.blockedBy": undefined;
+  "web.issue.deps.blockedByChip": { readonly n: string | number };
+  "web.issue.deps.clear": undefined;
+  "web.issue.deps.none": undefined;
+  "web.issue.deps.pick": undefined;
   "web.issue.detail.answer": undefined;
   "web.issue.detail.answerTo": { readonly question: string | number };
   "web.issue.detail.answered": undefined;
@@ -9406,9 +9455,11 @@ export interface Messages {
   "web.issue.owner.unassigned": undefined;
   "web.issue.page.allHelpers": undefined;
   "web.issue.page.allRepos": undefined;
+  "web.issue.page.allStatuses": undefined;
   "web.issue.page.backToBoard": undefined;
   "web.issue.page.byHelper": undefined;
   "web.issue.page.byRepo": undefined;
+  "web.issue.page.byStatus": undefined;
   "web.issue.page.clear": undefined;
   "web.issue.page.filter": undefined;
   "web.issue.page.find": undefined;
@@ -9422,6 +9473,7 @@ export interface Messages {
   "web.issue.page.refresh": undefined;
   "web.issue.page.refreshing": undefined;
   "web.issue.page.shown": { readonly of: string | number; readonly shown: string | number };
+  "web.issue.page.todoAndInProgress": undefined;
   "web.issue.page.view": undefined;
   "web.issue.peek.close": undefined;
   "web.issue.peek.compareBadge": undefined;
@@ -9530,6 +9582,22 @@ export interface Messages {
   "web.issue.todo.whatLine": undefined;
   "web.issue.todo.whichRepo": undefined;
   "web.issue.todo.writeOwn": undefined;
+  "web.issue.triage.addTags": undefined;
+  "web.issue.triage.agent": undefined;
+  "web.issue.triage.clear": undefined;
+  "web.issue.triage.noAgent": undefined;
+  "web.issue.triage.noOwner": undefined;
+  "web.issue.triage.noRepo": undefined;
+  "web.issue.triage.owner": undefined;
+  "web.issue.triage.partial": { readonly failed: string | number; readonly ok: string | number };
+  "web.issue.triage.priority": undefined;
+  "web.issue.triage.replaceTags": undefined;
+  "web.issue.triage.repo": undefined;
+  "web.issue.triage.selectIssue": { readonly n: string | number };
+  "web.issue.triage.selected": { readonly n: string | number };
+  "web.issue.triage.status": undefined;
+  "web.issue.triage.tags": undefined;
+  "web.issue.triage.updated": { readonly n: string | number };
   "web.issue.trigger.comment": undefined;
   "web.issue.trigger.commentNumbered": { readonly id: string | number };
   "web.issue.trigger.cron": undefined;

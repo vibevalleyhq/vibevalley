@@ -684,3 +684,122 @@ async fn issue_retro_uses_injected_clock_and_full_persisted_issues() {
     board.close_async().await;
     let _ = ctx.shutdown(Duration::from_secs(1)).await;
 }
+
+#[tokio::test]
+async fn issue_blocked_by_update_validates_cycles_dedup_clear_and_parent_composition() {
+    use vibevalley_protocol::ActorRef;
+
+    let dir = tempfile::tempdir().unwrap();
+    let service = Service::open(dir.path()).await.unwrap();
+    let outbox = Arc::new(Outbox::new(service.clone()));
+    let http: Arc<dyn crate::context::Fetch> = Arc::new(Http);
+    let ctx = Arc::new(Context::new(
+        service,
+        TaskGroup::new(),
+        Arc::new(LiveState::new()),
+        outbox,
+        Arc::new(StateFeed::new()),
+        vibevalley_core::system_clock(),
+        http.clone(),
+        http,
+    ));
+    let board = Board::open_standalone_async(ctx.clone(), Arc::new(Registry::new()), BoardConfig::under(dir.path()))
+        .await
+        .unwrap();
+
+    let a = board
+        .create_from_request_async(&IssueRequest {
+            title: "Issue A".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let b = board
+        .create_from_request_async(&IssueRequest {
+            title: "Issue B".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let c = board
+        .create_from_request_async(&IssueRequest {
+            title: "Issue C".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    // Update A.blocked_by using #number and id, deduplicating cleanly alongside owner update.
+    let a = board
+        .update_from_input_async(IssueUpdateInput {
+            id: a.id.clone(),
+            blocked_by: Some(vec![format!("#{}", b.number), b.id.clone(), String::new()]),
+            owner: Some(ActorRef::Agent { id: "laozhou".into() }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(a.blocked_by, vec![b.id.clone()]);
+    assert_eq!(a.owner, Some(ActorRef::Agent { id: "laozhou".into() }));
+
+    // B blocked by C succeeds (chain A -> B -> C).
+    let b = board
+        .update_from_input_async(IssueUpdateInput {
+            id: b.id.clone(),
+            blocked_by: Some(vec![c.id.clone()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(b.blocked_by, vec![c.id.clone()]);
+
+    // Self-blocking is refused.
+    let self_err = board
+        .update_from_input_async(IssueUpdateInput {
+            id: a.id.clone(),
+            blocked_by: Some(vec![a.id.clone()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(self_err.biz_code, BizCode::IssueRefused);
+
+    // Transitive cycle C -> A (with A -> B -> C) is refused.
+    let cycle_err = board
+        .update_from_input_async(IssueUpdateInput {
+            id: c.id.clone(),
+            blocked_by: Some(vec![format!("#{}", a.number)]),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(cycle_err.biz_code, BizCode::IssueRefused);
+
+    // Parent + blocked_by cycle: setting C.parent = A while A -> B -> C would make A wait on child C and C transitively already reached from A -> B -> C? Wait:
+    // If C is child of A, A waits on C; if C is also blocked_by A, that's a cycle.
+    let parent_cycle_err = board
+        .update_from_input_async(IssueUpdateInput {
+            id: c.id.clone(),
+            parent: Some(a.id.clone()),
+            blocked_by: Some(vec![a.id.clone()]),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(parent_cycle_err.biz_code, BizCode::IssueRefused);
+
+    // Clearing blocked_by via [] persists and unblocks, preserving owner.
+    let cleared = board
+        .update_from_input_async(IssueUpdateInput {
+            id: a.id.clone(),
+            blocked_by: Some(vec![]),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(cleared.blocked_by.is_empty());
+    assert_eq!(cleared.owner, Some(ActorRef::Agent { id: "laozhou".into() }));
+
+    board.close_async().await;
+    let _ = ctx.shutdown(Duration::from_secs(1)).await;
+}

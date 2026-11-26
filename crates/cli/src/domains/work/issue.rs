@@ -134,6 +134,9 @@ pub enum IssueActionCmd {
         /// Acceptance criterion (repeatable)
         #[arg(long)]
         criterion: Vec<String>,
+        /// Blocker issue number or id (repeatable)
+        #[arg(long)]
+        blocked_by: Vec<String>,
         /// Uploaded attachment id (repeatable)
         #[arg(long)]
         attach: Vec<String>,
@@ -167,6 +170,12 @@ pub enum IssueActionCmd {
         /// Replace acceptance criteria (repeatable)
         #[arg(long)]
         criterion: Vec<String>,
+        /// Replace blocker issue numbers or ids (repeatable)
+        #[arg(long)]
+        blocked_by: Vec<String>,
+        /// Clear all blockers
+        #[arg(long, conflicts_with = "blocked_by")]
+        clear_blocked_by: bool,
         /// Replace attachments with uploaded attachment ids (repeatable)
         #[arg(long)]
         attach: Vec<String>,
@@ -329,6 +338,9 @@ fn issue_text(issue: &Issue) -> String {
     if !owner.is_empty() {
         lines.push(format!("owner: {owner}"));
     }
+    if !issue.blocked_by.is_empty() {
+        lines.push(format!("blocked_by: {}", issue.blocked_by.join(", ")));
+    }
     if !issue.description.trim().is_empty() {
         lines.extend([String::new(), issue.description.trim().to_string()]);
     }
@@ -437,10 +449,12 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
             owner,
             priority,
             criterion,
+            blocked_by,
             attach,
             key,
         } => {
             let owner = owner.as_deref().map(parse_actor_ref).transpose()?;
+            let blocked_by = (!blocked_by.is_empty()).then(|| blocked_by.into_iter().map(|b| issue_ref(&b)).collect());
             let request = IssueRequest {
                 title: title.join(" "),
                 description: load_description(description)?,
@@ -449,6 +463,7 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
                 owner,
                 priority: priority.map(Into::into),
                 criteria: (!criterion.is_empty()).then_some(criterion),
+                blocked_by,
                 attachments: (!attach.is_empty()).then_some(attach),
                 request_key: key,
                 ..Default::default()
@@ -464,9 +479,18 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
             owner,
             priority,
             criterion,
+            blocked_by,
+            clear_blocked_by,
             attach,
         } => {
             let owner = owner.as_deref().map(parse_actor_ref).transpose()?;
+            let blocked_by = if clear_blocked_by {
+                Some(Vec::new())
+            } else if !blocked_by.is_empty() {
+                Some(blocked_by.into_iter().map(|b| issue_ref(&b)).collect())
+            } else {
+                None
+            };
             let request = IssueUpdateInput {
                 id: issue_ref(&issue),
                 title,
@@ -476,6 +500,7 @@ pub async fn run(client: &Client, cmd: IssueCmd) -> Done {
                 owner,
                 priority: priority.map(Into::into),
                 criteria: (!criterion.is_empty()).then_some(criterion),
+                blocked_by,
                 attachments: (!attach.is_empty()).then_some(attach),
                 ..Default::default()
             };

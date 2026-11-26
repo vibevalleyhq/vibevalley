@@ -225,3 +225,41 @@ test("DashboardPage Retro tab switches time windows, renders analytics, handles 
   await app.host.send("route", "/dashboard/retro");
   await fake.pumpUntil(app, () => app.count("id:dashboard-retro") === 1);
 });
+
+test("DashboardPage overview stat cards and pending rows deep-link into pre-filtered /issues views", async () => {
+  setLocale("en");
+  const fake = fakeHost(scenarios.typical, { route: "/dashboard", locale: "en" });
+  const app = await open("../../app/main.tsx", {
+    width: 1200,
+    height: 820,
+    colorScheme: "light",
+    platform: "macos",
+    locale: "en-US",
+    clock: { time: SCENARIO_NOW },
+    host: fake.options,
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:dashboard-stat-issues") === 1);
+
+  // Clicking the Review stat card navigates to /issues?status=in_review and pre-filters the board.
+  await app.press("id:dashboard-stat-review");
+  await fake.pumpUntil(app, () => app.count("id:issues-page") === 1);
+  expect(app.count("id:filter-clear")).toBe(1);
+  expect(app.count("id:issue-card")).toBe(scenarios.typical.state.board.issues.filter((i) => i.status === "in_review").length);
+
+  // Navigate back to dashboard and test Open Issues stat card -> /issues?status=todo,in_progress.
+  await app.host.send("route", "/dashboard");
+  await fake.pumpUntil(app, () => app.count("id:dashboard-stat-issues") === 1);
+  await app.press("id:dashboard-stat-issues");
+  await fake.pumpUntil(app, () => app.count("id:issues-page") === 1);
+  expect(app.count("id:filter-clear")).toBe(1);
+  expect(app.count("id:issue-card")).toBe(scenarios.typical.state.board.issues.filter((i) => i.status === "todo" || i.status === "in_progress").length);
+
+  // Navigate back to dashboard and test Pending Todo row -> /issues?status=todo.
+  await app.host.send("route", "/dashboard");
+  await fake.pumpUntil(app, () => app.count("id:dashboard-pending-todo") === 1);
+  await app.press("id:dashboard-pending-todo");
+  await fake.pumpUntil(app, () => app.count("id:issues-page") === 1);
+  expect(app.count("id:filter-clear")).toBe(1);
+  expect(app.count("id:issue-card")).toBe(scenarios.typical.state.board.issues.filter((i) => i.status === "todo").length);
+});
