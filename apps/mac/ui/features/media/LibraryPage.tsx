@@ -33,6 +33,7 @@ import {
   openContentSearch,
   openTemplatePicker,
   pinnedKeys,
+  templatePickerContextFor,
   togglePinned,
 } from "../../infra/state/contentNav";
 import { prefsNow, setLibraryTile } from "../../infra/state/prefs";
@@ -40,19 +41,7 @@ import { artifactTypeLabel, buildOutlineFromMarkdown, inferArtifactFromName, Ins
 import { AudioPanel } from "./AudioPanel";
 import { ImagePanel } from "./ImagePanel";
 import { Inspector } from "./Inspector";
-import {
-  type ArtifactTypeFilter,
-  justify,
-  kindOf,
-  making,
-  type Names,
-  neighbor,
-  shownArtifacts,
-  shownMedia,
-  type SourceFilter,
-  sourceFilters,
-  understoodText,
-} from "./items";
+import { type ArtifactTypeFilter, justify, kindOf, making, type Names, neighbor, shownArtifacts, shownMedia, understoodText } from "./items";
 import {
   activeFileId,
   askRemove,
@@ -85,6 +74,7 @@ import { UnderstandingPanel } from "./UnderstandingPanel";
 type Make = "image" | "speech" | "audio";
 const makes: readonly Make[] = ["image", "speech", "audio"];
 const tileMin = 96;
+const isMediaMakeSupported = (b: ContentBucket) => showsMediaInBucket(b) && bucketFileKind(b) !== "video" && bucketFileKind(b) !== "other";
 const tileMax = 280;
 
 const deliverableNameRe =
@@ -136,7 +126,6 @@ export function LibraryPage() {
   const queries = useQueryClient();
   const [search, setSearch] = useSearchParams();
   const sort = signal<LibrarySort>("recent");
-  const source = signal<SourceFilter>("all");
   const items = useQuery(() => libraryQuery({ text: "", sort: sort() }), { interval: () => 10_000, keepPrevious: true });
   const artifactsQuery = useArtifacts(() => ({}));
   const installedApplets = useInstalledApplets();
@@ -144,7 +133,6 @@ export function LibraryPage() {
   const dragging = signal(false);
   const seen = signal<ReadonlyMap<string, Seen>>(new Map());
   const appletTarget = signal<Artifact | undefined>(undefined);
-  const deletingArtifact = signal<Artifact | undefined>(undefined);
   const act = createAct();
 
   const bucket = () => contentBrowseBucket();
@@ -176,7 +164,6 @@ export function LibraryPage() {
   const visibleArtifacts = createMemo(() => {
     if (!showsArtifactsInBucket(bucket())) return [];
     const base = shownArtifacts(allArtifacts(), {
-      source: source(),
       artifactType: bucketArtifactType(bucket()),
       sort: effectiveSort(),
       pinnedOnly: pinnedOnly(),
@@ -187,7 +174,6 @@ export function LibraryPage() {
   const visibleMedia = createMemo(() =>
     showsMediaInBucket(bucket())
       ? shownMedia(allMedia(), {
-          source: source(),
           fileKind: bucketFileKind(bucket()),
           pinnedOnly: pinnedOnly(),
           pinned: pinnedSet(),
@@ -259,9 +245,6 @@ export function LibraryPage() {
     const currentBucket = untracked(contentBrowseBucket);
     if (!showsMediaInBucket(currentBucket) || isPinnedBucket(currentBucket)) {
       contentBrowseBucket.set({ kind: "media" });
-    }
-    if (untracked(source) !== "all") {
-      source.set("all");
     }
     const mediaList = allMedia();
     const target = mediaList.find((item) => item.attachment.id === targetId);
@@ -465,19 +448,6 @@ export function LibraryPage() {
             </Text>
             <CountPill count={totalCount()} />
           </View>
-          <Segmented
-            label={t("web.library.content.source.all")}
-            testid="library-source"
-            value={source()}
-            onChange={(v) => {
-              source.set(v);
-              selection.set(cancelRemove(untracked(selection)));
-            }}
-            options={sourceFilters.map((value) => ({
-              value,
-              label: t(`web.library.content.source.${value}`),
-            }))}
-          />
           <View class="min-w-0 flex-1" />
           <If when={!contentSidebarOpen.get()}>
             <IconButton icon="search" size={14} label={t("web.library.content.searchAll")} testid="content-search-btn" onClick={() => openContentSearch()} />
@@ -491,7 +461,7 @@ export function LibraryPage() {
             onChange={(v) => sort.set(v)}
             options={sortOptions()}
           />
-          <If when={showsMediaInBucket(bucket())}>
+          <If when={showsMediaInBucket(bucket()) && visibleMedia().length > 0}>
             <Segmented
               label={t("web.library.tileSize")}
               testid="library-tile-size"
@@ -504,14 +474,16 @@ export function LibraryPage() {
               ]}
             />
           </If>
-          <Button
-            size="compact"
-            testID="library-make-btn"
-            icon="generate"
-            onPress={() => setSearch({ make: bucketFileKind(bucket()) === "audio" ? "audio" : "image" })}
-          >
-            {t("web.library.make")}
-          </Button>
+          <If when={isMediaMakeSupported(bucket())}>
+            <Button
+              size="compact"
+              testID="library-make-btn"
+              icon="generate"
+              onPress={() => setSearch({ make: bucketFileKind(bucket()) === "audio" ? "audio" : "image" })}
+            >
+              {t("web.library.make")}
+            </Button>
+          </If>
           <Button size="compact" testID="library-upload" icon="upload" disabled={act.busy()} onPress={() => void pickFiles()}>
             {act.busy() ? t("web.library.uploading") : t("web.library.upload")}
           </Button>
@@ -558,20 +530,8 @@ export function LibraryPage() {
                   testid={appsOnly() ? "library-apps-empty" : "library-nothing-shown"}
                   action={
                     <View class="flex-row flex-wrap items-center justify-center gap-2">
-                      <If when={source() !== "all"}>
-                        <Button testID="library-reset-filter" icon="refresh" onPress={() => source.set("all")}>
-                          {t("web.library.content.resetFilter")}
-                        </Button>
-                      </If>
                       <If when={bucket().kind === "artifacts"}>
-                        <Button
-                          tone="primary"
-                          icon="add"
-                          onPress={() => {
-                            const type = bucketArtifactType(bucket());
-                            openTemplatePicker(type === "outline" ? "note" : type === "whiteboard" ? "whiteboard" : "deliverable");
-                          }}
-                        >
+                        <Button tone="primary" icon="add" onPress={() => openTemplatePicker(templatePickerContextFor(bucket()))}>
                           {t("web.library.content.new")}
                         </Button>
                       </If>
@@ -580,9 +540,15 @@ export function LibraryPage() {
                           <Button icon="upload" onPress={() => void pickFiles()}>
                             {t("web.library.upload")}
                           </Button>
-                          <Button tone="primary" icon="generate" onPress={() => setSearch({ make: bucketFileKind(bucket()) === "audio" ? "audio" : "image" })}>
-                            {t("web.library.make")}
-                          </Button>
+                          <If when={isMediaMakeSupported(bucket())}>
+                            <Button
+                              tone="primary"
+                              icon="generate"
+                              onPress={() => setSearch({ make: bucketFileKind(bucket()) === "audio" ? "audio" : "image" })}
+                            >
+                              {t("web.library.make")}
+                            </Button>
+                          </If>
                         </>
                       </If>
                     </View>
@@ -610,7 +576,13 @@ export function LibraryPage() {
                     onOpen={(id) => openArtifact(id)}
                     isPinned={(id) => isPinned(`artifact:${id}`)}
                     onTogglePin={(id) => handleTogglePin(`artifact:${id}`)}
-                    onDelete={(a) => deletingArtifact.set(a)}
+                    onDelete={(art) => {
+                      void act.run(async () => {
+                        await api.artifact.delete({ id: art.id });
+                        toast(t("web.artifact.page.deleted", { title: art.title }));
+                        void queries.invalidate({ prefix: ["artifacts"] });
+                      });
+                    }}
                     installedApplets={installedMap()}
                     canInstallApplet={currentHost().applet !== undefined}
                     onInstallApplet={(a) => appletTarget.set(a)}
@@ -697,14 +669,23 @@ export function LibraryPage() {
         onAt={(at) => selection.set(at === undefined ? closeLightbox(untracked(selection)) : openLightbox(untracked(selection), at, imageItems().length))}
       />
 
-      <Dialog open={make() !== undefined} onClose={() => setSearch({ make: undefined })} title={t("web.library.makeTitle")} wide testid="library-make-dialog">
-        <Segmented
-          label={t("web.library.makeTitle")}
-          testid="library-make-form"
-          value={make() ?? "image"}
-          onChange={(value) => setSearch({ make: value })}
-          options={makes.map((value) => ({ value, label: t(`web.library.makeTabs.${value}`) }))}
-        />
+      <Dialog
+        open={make() !== undefined}
+        onClose={() => setSearch({ make: undefined })}
+        title={t("web.library.makeTitle")}
+        size="lg"
+        height="fixed"
+        toolbar={
+          <Segmented
+            label={t("web.library.makeTitle")}
+            testid="library-make-form"
+            value={make() ?? "image"}
+            onChange={(value) => setSearch({ make: value })}
+            options={makes.map((value) => ({ value, label: t(`web.library.makeTabs.${value}`) }))}
+          />
+        }
+        testid="library-make-dialog"
+      >
         <If when={make() === "image"}>
           <ImagePanel />
         </If>
@@ -722,7 +703,8 @@ export function LibraryPage() {
             open
             onClose={() => setSearch({ understand: undefined })}
             title={t("web.library.understandTitle", { name: file().name })}
-            wide
+            size="lg"
+            height="fixed"
             testid="library-understand-dialog"
           >
             <UnderstandingPanel file={file()} />
@@ -731,38 +713,6 @@ export function LibraryPage() {
       </If>
 
       <If when={appletTarget()}>{(a) => <InstallAppletModal open artifact={a()} onClose={() => appletTarget.set(undefined)} />}</If>
-
-      <If when={deletingArtifact()}>
-        {(target) => (
-          <Dialog open onClose={() => deletingArtifact.set(undefined)} title={t("web.artifact.page.delete")} testid="library-artifact-delete-dialog">
-            <View class="gap-4">
-              <Text class="text-sm text-ink">{t("web.artifact.page.deleteAsk", { title: target().title })}</Text>
-              <View class="flex-row items-center justify-end gap-2">
-                <Button tone="quiet" onPress={() => deletingArtifact.set(undefined)}>
-                  {t("web.base.form.never")}
-                </Button>
-                <Button
-                  tone="danger"
-                  icon="delete"
-                  testID="library-artifact-delete-confirm"
-                  disabled={act.busy()}
-                  onPress={() => {
-                    const art = target();
-                    deletingArtifact.set(undefined);
-                    void act.run(async () => {
-                      await api.artifact.delete({ id: art.id });
-                      toast(t("web.artifact.page.deleted", { title: art.title }));
-                      void queries.invalidate({ prefix: ["artifacts"] });
-                    });
-                  }}
-                >
-                  {t("web.artifact.page.delete")}
-                </Button>
-              </View>
-            </View>
-          </Dialog>
-        )}
-      </If>
     </View>
   );
 }

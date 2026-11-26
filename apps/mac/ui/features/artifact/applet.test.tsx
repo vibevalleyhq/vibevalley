@@ -35,7 +35,12 @@ test("StandaloneArtifactPage renders chromeless artifact view without workbench 
   expect(app.count("id:standalone-artifact-page")).toBe(1);
   expect(app.count("id:standalone-artifact-header")).toBe(1);
   expect(app.count("id:artifact-collab-bar")).toBe(0);
-  expect(app.count("id:artifact-view-mode")).toBe(1);
+  expect(app.count("id:standalone-artifact-more")).toBe(1);
+  expect(app.count("id:artifact-view-mode")).toBe(0);
+  await app.press("id:standalone-artifact-more");
+  await fake.pumpUntil(app, () => app.count("id:artifact-view-mode") === 1);
+  await app.keyboard.press("escape");
+  await fake.pumpUntil(app, () => app.count("id:artifact-view-mode") === 0);
   expect(app.count("id:rail")).toBe(0);
   expect(app.count("id:artifacts")).toBe(0);
   expect(app.count("id:content-sidebar")).toBe(0);
@@ -51,24 +56,14 @@ test("StandaloneArtifactPage renders chromeless artifact view without workbench 
 test("StandaloneArtifactPage displays loading skeleton and missing error state cleanly", async () => {
   setLocale("en");
   const fake = fakeHost(scenarios.typical, { route: "/standalone/artifact/art-launch-board", locale: "en" });
+  fake.defer("artifact.get");
   const app = await open("../../app/main.tsx", {
     width: 1000,
     height: 700,
     colorScheme: "light",
     platform: "macos",
     clock: { time: SCENARIO_NOW },
-    host: {
-      ...fake.options,
-      handlers: {
-        ...fake.options.handlers,
-        action: (data: unknown) => {
-          const a = data as { type?: string; op?: string };
-          if (a.type === "call" && a.op === "artifact.get") return null;
-          const base = fake.options.handlers?.action;
-          return typeof base === "function" ? base(data) : null;
-        },
-      },
-    },
+    host: fake.options,
   });
   await fake.pump(app);
   const clock = app.clock;
@@ -90,8 +85,10 @@ test("InstallAppletModal installs, updates, opens, and uninstalls applet with li
   setLocale("en");
   const { app, fake } = await mountRoute("/artifacts/art-launch-board");
 
+  await fake.pumpUntil(app, () => app.count("id:artifact-more") === 1);
+  await app.press("id:artifact-more");
   await fake.pumpUntil(app, () => app.count("id:artifact-install-applet") === 1);
-  expect(app.count("id:artifact-install-applet-badge")).toBe(0);
+  expect(app.count("id:artifact-open-applet")).toBe(0);
 
   await app.press("id:artifact-install-applet");
   await fake.pumpUntil(app, () => app.count("id:install-applet-modal") === 1);
@@ -122,18 +119,28 @@ test("InstallAppletModal installs, updates, opens, and uninstalls applet with li
   expect(app.texts()).toContain(t("web.artifact.applet.reinstall"));
   expect(app.count("id:install-applet-open")).toBe(1);
   expect(app.count("id:install-applet-uninstall")).toBe(1);
-  expect(app.count("id:artifact-install-applet-badge")).toBe(1);
 
   await app.press("id:install-applet-open");
   await fake.pumpUntil(app, () => fake.calls.some((c) => c.op === "host.appletOpen"));
   expect(fake.calls.findLast((c) => c.op === "host.appletOpen")?.payload).toEqual({ artifactId: "art-launch-board" });
+
+  await app.press(`id:install-applet-modal >> label:${t("web.base.lightbox.close")}`);
+  await fake.pumpUntil(app, () => app.count("id:install-applet-modal") === 0);
+  await app.press("id:artifact-more");
+  await fake.pumpUntil(app, () => app.count("id:artifact-open-applet") === 1 && app.count("id:artifact-install-applet") === 1);
+  await app.press("id:artifact-install-applet");
+  await fake.pumpUntil(app, () => app.count("id:install-applet-uninstall") === 1);
 
   await app.press("id:install-applet-uninstall");
   await fake.pumpUntil(app, () => app.count("id:install-applet-meta") === 0);
   expect(fake.calls.findLast((c) => c.op === "host.appletUninstall")?.payload).toEqual({ artifactId: "art-launch-board" });
   expect(app.count("id:install-applet-open")).toBe(0);
   expect(app.count("id:install-applet-uninstall")).toBe(0);
-  expect(app.count("id:artifact-install-applet-badge")).toBe(0);
+  await app.press(`id:install-applet-modal >> label:${t("web.base.lightbox.close")}`);
+  await fake.pumpUntil(app, () => app.count("id:install-applet-modal") === 0);
+  await app.press("id:artifact-more");
+  await fake.pumpUntil(app, () => app.count("id:artifact-install-applet") === 1);
+  expect(app.count("id:artifact-open-applet")).toBe(0);
 });
 
 test("InstallAppletModal surfaces install errors and wires ArtifactCanvas button when host.applet exists", async () => {
@@ -142,6 +149,8 @@ test("InstallAppletModal surfaces install errors and wires ArtifactCanvas button
     f.respond("host.appletInstall", () => ({ bizCode: BizCode.Refused, message: "codesign failed" }));
   });
 
+  await canvas.fake.pumpUntil(canvas.app, () => canvas.app.count("id:artifact-canvas-more") === 1);
+  await canvas.app.press("id:artifact-canvas-more");
   await canvas.fake.pumpUntil(canvas.app, () => canvas.app.count("id:artifact-canvas-install-applet") === 1);
   await canvas.app.press("id:artifact-canvas-install-applet");
   await canvas.fake.pumpUntil(canvas.app, () => canvas.app.count("id:install-applet-modal") === 1);
@@ -150,7 +159,9 @@ test("InstallAppletModal surfaces install errors and wires ArtifactCanvas button
   expect(canvas.app.texts()).toContain("codesign failed");
 
   const browser = await mountRoute("/artifacts/art-launch-board", undefined, { view: undefined });
-  await browser.fake.pumpUntil(browser.app, () => browser.app.count("id:artifact-header") === 1);
+  await browser.fake.pumpUntil(browser.app, () => browser.app.count("id:artifact-more") === 1);
+  await browser.app.press("id:artifact-more");
+  await browser.fake.pumpUntil(browser.app, () => browser.app.count("id:artifact-view-mode") === 1);
   expect(browser.app.count("id:artifact-install-applet")).toBe(0);
 });
 

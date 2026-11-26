@@ -16,7 +16,7 @@
     "rail": "Beside this artifact",
     "railShow": "Show the side panel",
     "railHide": "Hide the side panel",
-    "backToLibrary": "Back to content",
+    "backToLibrary": "Back to artifacts",
     "previewTab": "Preview",
     "filesTab": "Files",
     "filesTabCount": "Files ({n})",
@@ -32,8 +32,7 @@
   "docs": {
     "split": "Split",
     "edit": "Edit",
-    "read": "Read",
-    "chars": "{n} chars"
+    "read": "Read"
   },
   "outline": {
     "progress": "{done}/{total} done",
@@ -85,10 +84,7 @@
     "viewportFull": "Full",
     "viewportTablet": "Tablet",
     "viewportMobile": "Mobile",
-    "reload": "Reload",
-    "iterateAi": "Iterate with AI",
-    "installApp": "Install as App",
-    "openApp": "Open App"
+    "reload": "Reload"
   },
   "files": {
     "codeMode": "Code",
@@ -132,14 +128,16 @@
     "storyboard": "Storyboard"
   },
   "timeline": {
-    "toggle": "History timeline",
-    "title": "Timeline",
+    "title": "Version history",
+    "show": "Show version history",
+    "hide": "Hide version history",
+    "savedVersions": "Saved versions",
+    "commits": "Changes",
     "loading": "Loading history…",
     "empty": "No history commits yet",
-    "prev": "Previous commit",
-    "next": "Next commit",
     "backToLive": "Back to live",
     "previewBanner": "Read-only history preview · {summary}",
+    "versionBanner": "Viewing version {version} (read-only){note}",
     "turn": "Turn {n}",
     "restore": "Restore",
     "restored": "Restored to selected commit",
@@ -266,7 +264,6 @@
   },
   "applet": {
     "button": "Install as App",
-    "buttonInstalled": "App Installed",
     "badgeInstalled": "Installed",
     "modalTitle": "Local Desktop App",
     "subtitle": "Install this artifact as a standalone Mac app you can launch from Spotlight or the Dock.",

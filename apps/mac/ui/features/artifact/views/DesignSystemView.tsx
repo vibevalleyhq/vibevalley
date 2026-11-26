@@ -1,9 +1,8 @@
-import { Clipboard, Scroll, signal, Text, View } from "nsh";
+import { Clipboard, Scroll, Text, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../../../design/Icon";
-import { Segmented } from "../../../design/Segmented";
 import { toast } from "../../../design/toasts";
 import { type DesignSystemModel, resolveDesignColor } from "./previewModel";
 
@@ -12,34 +11,15 @@ function numericTokenPx(raw: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function DesignSystemView(props: { readonly model: DesignSystemModel }) {
-  const previewTheme = signal<"light" | "dark">(props.model.defaultTheme);
-
-  const surfaceColor = () => resolveDesignColor("{color.surface}", previewTheme());
-  const panelColor = () => resolveDesignColor("{color.panel}", previewTheme());
-  const inkColor = () => resolveDesignColor("{color.ink}", previewTheme());
-  const accentColor = () => resolveDesignColor("{color.accent}", previewTheme());
-  const borderColor = () => resolveDesignColor("{color.border}", previewTheme());
+export function DesignSystemView(props: { readonly model: DesignSystemModel; readonly theme: "light" | "dark" }) {
+  const surfaceColor = () => resolveDesignColor("{color.surface}", props.theme);
+  const panelColor = () => resolveDesignColor("{color.panel}", props.theme);
+  const inkColor = () => resolveDesignColor("{color.ink}", props.theme);
+  const accentColor = () => resolveDesignColor("{color.accent}", props.theme);
+  const borderColor = () => resolveDesignColor("{color.border}", props.theme);
 
   return (
     <Scroll testID="artifact-design-system-view" class="min-h-0 flex-1" contentClass="gap-5 p-5">
-      <View class="flex-row flex-wrap items-center justify-between gap-2">
-        <View class="flex-row items-center gap-2">
-          <Text class="text-base font-semibold text-ink">{props.model.name}</Text>
-          <Text class="rounded-sm border border-line bg-side px-1.5 py-0.5 font-mono text-xs text-muted">{`v${props.model.version}`}</Text>
-        </View>
-        <Segmented
-          testid="ds-theme-toggle"
-          label={t("web.artifact.designSystem.previewTheme")}
-          value={previewTheme()}
-          onChange={(v) => previewTheme.set(v)}
-          options={[
-            { value: "light" as const, icon: "themeLight", label: t("web.artifact.design.themeLight") },
-            { value: "dark" as const, icon: "themeDark", label: t("web.artifact.design.themeDark") },
-          ]}
-        />
-      </View>
-
       <If when={props.model.colors.length > 0}>
         <View class="gap-2">
           <Text class="text-xs font-semibold text-muted">{t("web.artifact.designSystem.colors")}</Text>
@@ -50,7 +30,7 @@ export function DesignSystemView(props: { readonly model: DesignSystemModel }) {
                   role="button"
                   testID={`ds-color-${c().name}`}
                   onPress={() => {
-                    const chosen = previewTheme() === "dark" ? c().dark : c().light;
+                    const chosen = props.theme === "dark" ? c().dark : c().light;
                     const value = chosen || c().light;
                     if (value) {
                       void Clipboard.writeText(value).then(() => toast(t("web.base.rich.copied")));
@@ -180,8 +160,8 @@ export function DesignSystemView(props: { readonly model: DesignSystemModel }) {
                     >
                       <Each of={comp().variants} key={(v) => v.id}>
                         {(v) => {
-                          const bg = () => resolveDesignColor(v().bg, previewTheme()) ?? (v().id === "primary" ? accentColor() : panelColor());
-                          const fg = () => resolveDesignColor(v().fg, previewTheme()) ?? (v().id === "primary" ? surfaceColor() : inkColor());
+                          const bg = () => resolveDesignColor(v().bg, props.theme) ?? (v().id === "primary" ? accentColor() : panelColor());
+                          const fg = () => resolveDesignColor(v().fg, props.theme) ?? (v().id === "primary" ? surfaceColor() : inkColor());
                           return (
                             <View
                               class="rounded-md border px-2.5 py-1"

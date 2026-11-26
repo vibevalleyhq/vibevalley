@@ -1,5 +1,5 @@
 import { computed, signal, Text, View } from "nsh";
-import { Input } from "nsh/base";
+import { Input, Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import { type Attachment, type Deliverable, DeliverableValues, type Issue, type IssueUpdate, type Priority, PriorityValues } from "@vibevalley/protocol";
@@ -8,7 +8,6 @@ import { assignedAgentOf, omitUndefined } from "@vibevalley/protocol/rules";
 import { createAct } from "../../../design/act";
 import { Button } from "../../../design/Button";
 import { ConfirmButton } from "../../../design/ConfirmButton";
-import { Dialog } from "../../../design/Dialog";
 import { TextArea, TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { toast } from "../../../design/toasts";
@@ -361,15 +360,35 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
             onChange={(v) => edit({ repo: v })}
             options={repoOptions()}
           />
-          <View
-            role="button"
-            testID="new-repo"
-            onPress={() => newRepo.set(true)}
-            class="-ml-1 flex-row items-center gap-1 self-start rounded-sm px-1 py-0.5 hover:bg-hover"
+          <Popover
+            open={newRepo()}
+            onOpenChange={(e) => newRepo.set(e.open)}
+            placement="bottom"
+            align="start"
+            offset={6}
+            popupClass="w-64 rounded-lg border border-line bg-elevated p-3 shadow-float"
+            trigger={
+              <View
+                role="button"
+                testID="new-repo"
+                onPress={() => newRepo.set(true)}
+                class="-ml-1 flex-row items-center gap-1 self-start rounded-sm px-1 py-0.5 hover:bg-hover"
+              >
+                <Icon name="add" size={12} tone="water" />
+                <Text class="text-xs text-water">{repos().length === 0 && !d().repo ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}</Text>
+              </View>
+            }
           >
-            <Icon name="add" size={12} tone="water" />
-            <Text class="text-xs text-water">{repos().length === 0 && !d().repo ? t("web.issue.todo.firstRepo") : t("web.issue.todo.newRepoLink")}</Text>
-          </View>
+            <If when={newRepo()}>
+              <NewRepoPopoverBody
+                onClose={() => newRepo.set(false)}
+                onMade={(name) => {
+                  newRepo.set(false);
+                  edit({ repo: name });
+                }}
+              />
+            </If>
+          </Popover>
         </View>
       </Property>
       <Property label={t("web.issue.todo.priority")}>
@@ -430,21 +449,12 @@ export function TodoDetail(props: { item: Issue; onDone: (id: string | undefined
           <ConfirmButton testid="issue-remove" tone="danger" label={t("web.issue.todo.remove")} disabled={busy()} onConfirm={remove} />
         </View>
       </View>
-      <If when={newRepo()}>
-        <NewRepoDialog
-          onClose={() => newRepo.set(false)}
-          onMade={(name) => {
-            newRepo.set(false);
-            edit({ repo: name });
-          }}
-        />
-      </If>
     </>
   );
   return <IssueSheet heading={heading} main={main} side={side} />;
 }
 
-function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => void }) {
+function NewRepoPopoverBody(props: { onClose: () => void; onMade: (name: string) => void }) {
   const queries = useQueryClient();
   const name = signal("");
   const act = createAct();
@@ -458,7 +468,8 @@ function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => v
     props.onMade(made.name);
   };
   return (
-    <Dialog open onClose={props.onClose} title={t("web.issue.todo.newRepo")} testid="new-repo-dialog">
+    <View testID="new-repo-dialog" class="gap-2.5">
+      <Text class="text-xs font-semibold text-ink">{t("web.issue.todo.newRepo")}</Text>
       <TextInput
         autoFocus
         value={name()}
@@ -467,12 +478,14 @@ function NewRepoDialog(props: { onClose: () => void; onMade: (name: string) => v
         placeholder={t("web.issue.todo.repoHint")}
         accessibilityLabel={t("web.issue.todo.repoName")}
       />
-      <View class="mt-5 flex-row justify-end gap-2">
-        <Button onPress={() => props.onClose()}>{t("web.issue.never")}</Button>
-        <Button tone="primary" disabled={!canCreate()} onPress={() => void make()}>
+      <View class="flex-row justify-end gap-1.5">
+        <Button size="compact" tone="quiet" onPress={() => props.onClose()}>
+          {t("web.issue.never")}
+        </Button>
+        <Button size="compact" tone="primary" disabled={!canCreate()} onPress={() => void make()}>
           {t("web.issue.todo.create")}
         </Button>
       </View>
-    </Dialog>
+    </View>
   );
 }

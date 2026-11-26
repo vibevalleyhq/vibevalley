@@ -15,8 +15,10 @@ import {
   formatTokens,
   formatToolDetails,
   groupChatSteps,
+  latestSessionTodos,
   mergeChatSteps,
   parseBoardTokens,
+  parseTodoChecklist,
   preferredModelFor,
   thinkingPreview,
   toWorkspaceRuntime,
@@ -354,10 +356,80 @@ test("groupChatSteps keeps single intermediate steps bare and aggregates consecu
       totalTools: 5,
       runningCount: 0,
       failedCount: 1,
+      startedAt: 1_700_000_005_000,
       durationMs: 5_000,
       editedFiles: [{ path: "src/a.rs", line: 42, canDiff: true }],
+      latestCommand: { seq: 10, command: "cargo test", running: false, failed: true },
     });
   }
+
+  const runningPreference = groupChatSteps([
+    step(1, "assistant/thinking", { text: "Checking" }),
+    step(2, "tool/call", { action: "run_command", input: JSON.stringify({ command: "vp run mac:check" }), ok: undefined }),
+    step(3, "tool/call", { action: "run_command", input: JSON.stringify({ command: "git status" }), ok: true }),
+  ]);
+  const runningCluster = runningPreference[0];
+  expect(runningCluster?.kind).toBe("activity");
+  if (runningCluster?.kind === "activity") {
+    expect(runningCluster.summary.latestCommand).toEqual({
+      seq: 2,
+      command: "vp run mac:check",
+      running: true,
+      failed: false,
+    });
+  }
+
+  const loneTrailing = groupChatSteps([step(1, "assistant/thinking", { text: "Still thinking" })]);
+  expect(loneTrailing[0]).toMatchObject({ kind: "step", key: "s:1", trailing: true });
+});
+
+test("parseTodoChecklist and latestSessionTodos parse update_steps, TodoWrite, and update_plan payloads", () => {
+  const step1 = step(1, "tool/call", {
+    tool: "update_steps",
+    action: "other",
+    input: JSON.stringify({
+      steps: [
+        { status: "done", title: "Simplify Content Hub source filter & docs" },
+        { status: "in_progress", title: "Unify Artifact single-row header & dropdown" },
+        { status: "pending", title: "Verify native screenshots" },
+        { status: "skipped", title: "Optional cleanup" },
+        { status: "failed", title: "Broken check" },
+      ],
+      kind: "other",
+    }),
+  });
+  const parsed = parseTodoChecklist(step1);
+  expect(parsed).toEqual({
+    seq: 1,
+    doneCount: 1,
+    inProgressCount: 1,
+    failedCount: 1,
+    totalCount: 5,
+    activeStep: { status: "in_progress", title: "Unify Artifact single-row header & dropdown" },
+    steps: [
+      { status: "done", title: "Simplify Content Hub source filter & docs" },
+      { status: "in_progress", title: "Unify Artifact single-row header & dropdown" },
+      { status: "pending", title: "Verify native screenshots" },
+      { status: "skipped", title: "Optional cleanup" },
+      { status: "failed", title: "Broken check" },
+    ],
+  });
+  expect(formatToolDetails(step1).headline).toBe("1/5 · Unify Artifact single-row header & dropdown");
+
+  const step2 = step(2, "tool/call", {
+    tool: "TodoWrite",
+    input: JSON.stringify({ todos: [{ content: "Write docs", status: "completed" }] }),
+  });
+  expect(parseTodoChecklist(step2)?.doneCount).toBe(1);
+
+  const step3 = step(3, "tool/call", {
+    tool: "update_plan",
+    input: JSON.stringify({ plan: [{ step: "Run tests", status: "in-progress" }] }),
+  });
+  expect(parseTodoChecklist(step3)?.inProgressCount).toBe(1);
+
+  expect(latestSessionTodos([step1, step2, step3])?.seq).toBe(3);
+  expect(parseTodoChecklist(step(4, "tool/call", { tool: "run_command", input: JSON.stringify({ command: "ls" }) }))).toBeUndefined();
 });
 
 test("formatToolDetails, formatDurationMs, and thinkingPreview extract scannable summaries", () => {

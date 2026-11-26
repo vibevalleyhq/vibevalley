@@ -564,11 +564,66 @@ function TabRow(props: { group: WorktreeGroup; tab: RailTab; depth: number; ctx:
   );
 }
 
+function NewAtMenu(props: { menuKey: string; name: string; path: string; foldKey: string; testKey: string; ctx: SidebarTreeCtx }) {
+  const isOpen = () => props.ctx.openMenuKey() === props.menuKey;
+  return (
+    <Menu
+      open={isOpen()}
+      onOpenChange={(e) => {
+        if (e.open) props.ctx.setOpenMenuKey(props.menuKey);
+        else if (props.ctx.openMenuKey() === props.menuKey) props.ctx.setOpenMenuKey(null);
+      }}
+      placement="bottom"
+      align="end"
+      offset={4}
+      popupClass={`${menuPopupClass} ${motionClass("transition-opacity duration-120 ease-out")}`}
+      popupStartingClass={popupTransition("opacity-0")}
+      popupEndingClass={popupTransition("opacity-0")}
+      trigger={
+        <View
+          testID={`sidebar-new-${props.testKey}`}
+          accessibilityLabel={t("web.shell.sidebar.newMenu", { name: props.name })}
+          tooltip={<Bubble text={t("web.shell.sidebar.newMenu", { name: props.name })} />}
+          class={`size-5 shrink-0 items-center justify-center rounded-sm ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected aria-expanded:bg-selected focus-visible:outline-2 focus-visible:outline-focus`}
+        >
+          <Icon name="add" size={12} tone="muted" />
+        </View>
+      }
+    >
+      <MenuItem
+        testID={`sidebar-new-chat-${props.testKey}`}
+        onSelect={() => {
+          props.ctx.setFold(props.foldKey, true);
+          act({ type: "new_chat_at", path: props.path });
+        }}
+        class="h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover"
+      >
+        <Icon name="chat" size={13} tone="muted" />
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.newChatHere")}</Text>
+      </MenuItem>
+      <MenuItem
+        testID={`sidebar-new-term-${props.testKey}`}
+        onSelect={() => {
+          props.ctx.setFold(props.foldKey, true);
+          act({ type: "new_terminal_at", path: props.path });
+        }}
+        class="h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover"
+      >
+        <Icon name="terminal" size={13} tone="muted" />
+        <Text class="text-sm text-ink">{t("web.shell.sidebar.newTerminalHere")}</Text>
+      </MenuItem>
+    </Menu>
+  );
+}
+
 function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) {
   const rowKey = () => `wt:${props.group.path}`;
+  const newMenuKey = () => `new:wt:${props.group.path}`;
   const expandable = computed(() => isGroupExpandable(props.group));
   const expanded = computed(() => props.ctx.isGroupExpanded(props.group));
   const isHovered = computed(() => props.ctx.hoveredKey() === rowKey());
+  const isMenuOpen = computed(() => props.ctx.openMenuKey() === newMenuKey());
+  const showActions = computed(() => isHovered() || isMenuOpen());
   const isSelected = computed(() => props.group.active && props.group.tabs.length === 0);
   const summary = computed(() => summarizeGroup(props.group));
   const sessionLogo = () => (props.group.sessionRunning ? props.ctx.engineLogoSrc(props.group.sessionAgent) : undefined);
@@ -618,7 +673,7 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
             </Button>
             <View class="shrink-0 flex-row items-center gap-1">
               <If
-                when={isHovered()}
+                when={showActions()}
                 else={
                   <If
                     when={expandable() && !expanded()}
@@ -645,25 +700,13 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
                 >
                   <CollapsedSummary summary={summary()} />
                 </If>
-                <ShellIconButton
-                  compact
-                  icon="chat"
-                  size={12}
-                  label={t("web.shell.sidebar.newChat", { name: props.group.label })}
-                  onPress={() => {
-                    props.ctx.setFold(groupFoldKey(props.group), true);
-                    act({ type: "new_chat_at", path: props.group.path });
-                  }}
-                />
-                <ShellIconButton
-                  compact
-                  icon="add"
-                  size={12}
-                  label={t("web.shell.sidebar.newTerminal", { name: props.group.label })}
-                  onPress={() => {
-                    props.ctx.setFold(groupFoldKey(props.group), true);
-                    act({ type: "new_terminal_at", path: props.group.path });
-                  }}
+                <NewAtMenu
+                  menuKey={newMenuKey()}
+                  name={props.group.label}
+                  path={props.group.path}
+                  foldKey={groupFoldKey(props.group)}
+                  testKey={`wt-${props.group.label}`}
+                  ctx={props.ctx}
                 />
               </If>
               <If when={expandable()}>
@@ -694,11 +737,14 @@ function WorktreeGroupRow(props: { group: WorktreeGroup; ctx: SidebarTreeCtx }) 
 
 function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; ctx: SidebarTreeCtx }) {
   const rowKey = () => `repo:${props.repo.path}`;
+  const newMenuKey = () => `new:repo:${props.repo.path}`;
   const hasMultipleWorktrees = computed(() => props.repo.groups.length > 1);
   const mainGroup = () => props.repo.groups[0];
   const expandable = computed(() => isRepoExpandable(props.repo));
   const expanded = computed(() => props.ctx.isRepoExpanded(props.repo));
   const isHovered = computed(() => props.ctx.hoveredKey() === rowKey());
+  const isMenuOpen = computed(() => props.ctx.openMenuKey() === newMenuKey());
+  const showActions = computed(() => isHovered() || isMenuOpen());
   const summary = computed(() => summarizeRepo(props.repo));
   const showActiveCard = computed(() => props.repo.active && expandable() && expanded());
   const isRepoSelected = computed(() => props.repo.active && (!expandable() || !expanded()));
@@ -743,7 +789,7 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
 
             <View class="mt-0.5 shrink-0 flex-row items-center gap-0.5">
               <If
-                when={isHovered()}
+                when={showActions()}
                 else={
                   <If
                     when={expandable() && !expanded()}
@@ -770,25 +816,13 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
                   </If>
                 }
               >
-                <ShellIconButton
-                  compact
-                  icon="chat"
-                  size={12}
-                  label={t("web.shell.sidebar.newChat", { name: props.repo.name })}
-                  onPress={() => {
-                    props.ctx.setFold(repoFoldKey(props.repo), true);
-                    act({ type: "new_chat_at", path: props.repo.path });
-                  }}
-                />
-                <ShellIconButton
-                  compact
-                  icon="add"
-                  size={12}
-                  label={t("web.shell.sidebar.newTerminal", { name: props.repo.name })}
-                  onPress={() => {
-                    props.ctx.setFold(repoFoldKey(props.repo), true);
-                    act({ type: "new_terminal_at", path: props.repo.path });
-                  }}
+                <NewAtMenu
+                  menuKey={newMenuKey()}
+                  name={props.repo.name}
+                  path={props.repo.path}
+                  foldKey={repoFoldKey(props.repo)}
+                  testKey={`repo-${props.repo.name}`}
+                  ctx={props.ctx}
                 />
                 <If when={props.repo.projectId !== undefined && !props.repo.vibevalley}>
                   <ShellIconButton
@@ -828,18 +862,6 @@ function RepoNodeRow(props: { repo: RepoNode; parentHint?: string | undefined; c
           }
         >
           <View class="gap-px">
-            <If when={mainGroup().tabs.length > 0}>
-              <View
-                testID={`sidebar-tabs-group-${props.repo.name}`}
-                class="h-6 flex-row items-center justify-between pr-1.5"
-                style={{ paddingLeft: ROW_BASE_PAD + INDENT_STEP }}
-              >
-                <View class="flex-row items-center gap-1.5">
-                  <Text class="text-2xs font-semibold text-faint">{t("web.shell.sidebar.tabsGroup")}</Text>
-                  <Text class="font-mono text-2xs text-faint tabular-nums">{String(mainGroup().tabs.length)}</Text>
-                </View>
-              </View>
-            </If>
             <Each of={mainGroup().tabs} key={(tab) => tab.id}>
               {(tab) => <TabRow group={mainGroup()} tab={tab()} depth={1} ctx={props.ctx} />}
             </Each>
@@ -1303,12 +1325,6 @@ export function Sidebar() {
             <View desktop={{ windowDrag: true }} class="h-9 flex-row items-center justify-between border-b border-line pr-2 pl-3">
               <Text class="text-xs font-semibold text-ink">{t("web.shell.sidebar.title")}</Text>
               <View class="flex-row items-center gap-1">
-                <ShellIconButton
-                  icon="catalog"
-                  size={13}
-                  label={t("web.shell.sidebar.manageRepos")}
-                  onPress={() => act({ type: "open_route", path: "/repos" })}
-                />
                 <If when={hasFoldableItems()}>
                   <ShellIconButton
                     icon={anyExpanded() ? "collapseAll" : "expandAll"}
@@ -1317,15 +1333,13 @@ export function Sidebar() {
                     onPress={toggleCollapseAll}
                   />
                 </If>
-                <Button
+                <ShellIconButton
+                  icon="folder"
+                  size={13}
+                  label={t("web.shell.sidebar.addRepo")}
+                  tooltip={t("web.shell.sidebar.addRepoTooltip")}
                   onPress={() => act({ type: "add_project" })}
-                  accessibilityLabel={t("web.shell.sidebar.addRepo")}
-                  tooltip={<Bubble text={t("web.shell.sidebar.addRepoTooltip")} />}
-                  class={`h-5.5 flex-row items-center gap-1 rounded-md border border-line bg-hover px-2 ${motionClass("transition-opacity duration-120 ease-out")} hover:bg-selected active:opacity-80 focus-visible:outline-2 focus-visible:outline-focus`}
-                >
-                  <Icon name="add" size={11} tone="ink" />
-                  <Text class="text-2xs font-medium text-ink">{t("web.shell.sidebar.addRepoButton")}</Text>
-                </Button>
+                />
               </View>
             </View>
 

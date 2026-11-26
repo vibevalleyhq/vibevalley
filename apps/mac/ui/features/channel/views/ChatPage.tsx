@@ -131,8 +131,11 @@ function HeadPopover(props: {
       placement="bottom"
       align="end"
       offset={4}
-      popupClass="rounded-lg border border-line bg-elevated p-2 shadow-float"
-      popupStyle={{ width: props.width, maxHeight: 448 }}
+      popupClass="flex-col overflow-hidden rounded-lg border border-line bg-elevated p-2 shadow-float"
+      popupStyle={{
+        width: Math.min(props.width, Math.max(240, windowSize().width - 24)),
+        maxHeight: Math.min(448, Math.max(200, Math.round(windowSize().height * 0.72))),
+      }}
       trigger={
         <View
           testID={props.testid}

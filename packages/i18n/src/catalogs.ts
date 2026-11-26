@@ -141,7 +141,7 @@ export const catalogs = {
       persona: {
         append: { label: "追加到系统提示", detail: "保留引擎自带的工作方式，在后面加上人设。大多数情况选这个。" },
         replace: { label: "替换系统提示", detail: "整段换掉引擎自带的系统提示。只有你清楚自己在做什么时才用。" },
-        prompt: { label: "写进任务开头", detail: "每个任务前面加上人设。所有引擎都能用，但会被长对话冲淡。" },
+        prompt: { label: "写进工单开头", detail: "每个工单前面加上人设。所有引擎都能用，但会被长对话冲淡。" },
       },
       personaLabel: "人设",
       personaTip: "它是谁、怎么干活、什么不做。会按下面的方式交给引擎。",
@@ -257,7 +257,7 @@ export const catalogs = {
         rail: "这篇的旁注",
         railShow: "打开旁注",
         railHide: "收起旁注",
-        backToLibrary: "返回内容库",
+        backToLibrary: "返回作品库",
         previewTab: "预览",
         filesTab: "文件",
         filesTabCount: "文件 ({n})",
@@ -270,7 +270,7 @@ export const catalogs = {
         deleteFileAsk: "删除文件「{path}」？",
         snapshotNote: "手动快照",
       },
-      docs: { split: "分栏", edit: "编辑", read: "阅读", chars: "{n} 字" },
+      docs: { split: "分栏", edit: "编辑", read: "阅读" },
       outline: {
         progress: "{done}/{total} 已完成",
         hideDone: "隐藏已完成",
@@ -306,16 +306,7 @@ export const catalogs = {
         sfx: "音效",
         transition: "转场",
       },
-      prototype: {
-        viewportLabel: "视口尺寸",
-        viewportFull: "铺满",
-        viewportTablet: "平板",
-        viewportMobile: "手机",
-        reload: "重新载入",
-        iterateAi: "让助手修改",
-        installApp: "安装为应用",
-        openApp: "打开应用",
-      },
+      prototype: { viewportLabel: "视口尺寸", viewportFull: "铺满", viewportTablet: "平板", viewportMobile: "手机", reload: "重新载入" },
       files: { codeMode: "源码", htmlPreviewMode: "网页预览" },
       issue: { title: "作品" },
       blocks: { saved: "都存好了", user: "你", start: "从这里开始写……" },
@@ -339,14 +330,16 @@ export const catalogs = {
         storyboard: "分镜脚本",
       },
       timeline: {
-        toggle: "时间轴历史",
-        title: "时间轴",
+        title: "历史记录",
+        show: "打开历史记录",
+        hide: "收起历史记录",
+        savedVersions: "已保存版本",
+        commits: "变更记录",
         loading: "正在载入历史…",
         empty: "还没有可回放的提交",
-        prev: "上一个提交",
-        next: "下一个提交",
         backToLive: "回到最新",
         previewBanner: "历史只读预览 · {summary}",
+        versionBanner: "正在查看第 {version} 稿（只读）{note}",
         turn: "第 {n} 轮",
         restore: "恢复到此版本",
         restored: "已恢复到所选版本",
@@ -462,7 +455,6 @@ export const catalogs = {
       standalone: { missing: "这份作品已经删掉了，或者没有这份作品。", version: "第 {version} 稿", live: "最新" },
       applet: {
         button: "安装为桌面应用",
-        buttonInstalled: "桌面应用已安装",
         badgeInstalled: "已安装",
         modalTitle: "本地桌面应用",
         subtitle: "将这份作品安装为独立 Mac 应用，可从聚焦搜索或程序坞直接打开。",
@@ -585,10 +577,10 @@ export const catalogs = {
       route: { missing: "这个页面不存在", invalid: "这个地址无效", home: "返回应用" },
       place: {
         chat: { label: "对话", hint: "频道与话题" },
-        issues: { label: "任务", hint: "每件任务从记下到完成" },
+        issues: { label: "工单", hint: "每张工单从记下到完成" },
         runs: { label: "运行与轨迹", hint: "执行会话、主助手审批与历史轨迹" },
         workspace: { hint: "管理仓库与工作区", name: "工作区" },
-        content: { label: "内容", hint: "媒体库、作品与笔记" },
+        content: { label: "作品", hint: "作品、大纲笔记与素材" },
         runtimes: { label: "引擎", hint: "本机与远端已安装的编码引擎" },
         team: { label: "团队", hint: "角色与团队模板" },
         settings: { label: "设置", hint: "通用与外观、模型与密钥、语音与通话、外部连接、关于与数据" },
@@ -680,7 +672,7 @@ export const catalogs = {
           everywhere: "到处",
           composer: "输入框",
           lists: "菜单和名单",
-          issues: "任务",
+          issues: "工单",
           pictures: "看图",
           library: "媒体库",
           farm: "农场",
@@ -703,8 +695,8 @@ export const catalogs = {
           farmMenu: "放下农具，或打开菜单",
           debug: "调试台",
           voice: "跟主助手说话（在设置里能换）",
-          command: "命令：建任务、让主助手记住、叫停、私聊",
-          newIssue: "新建任务",
+          command: "命令：建工单、让主助手记住、叫停、私聊",
+          newIssue: "新建工单",
           libraryMove: "在素材之间挪",
           libraryLook: "全屏看选中的图",
           libraryRemove: "从库里拿掉选中的",
@@ -739,7 +731,7 @@ export const catalogs = {
       stop: "停止",
     },
     "web.channel": {
-      tab: { chat: "聊天", issues: "任务", crons: "定时任务" },
+      tab: { chat: "聊天", issues: "工单", crons: "定时任务" },
       defaultRepo: "默认仓库 {repo}",
       channels: "频道列表",
       defaultHint: "默认的频道：你、主助手和执行会话都在这儿",
@@ -782,7 +774,7 @@ export const catalogs = {
         settingsOf: "# {name} 的设置",
         save: "保存",
       },
-      issues: { empty: "这个频道里还没有任务。在聊天里跟主助手说一件要做的事，它会派执行会话，任务就列在这里。", thread: "任务话题" },
+      issues: { empty: "这个频道里还没有工单。在聊天里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。", thread: "工单话题" },
       crons: {
         empty: "还没有定时任务：跟主助手说「每天九点跑一遍测试」。",
         next: "下次 {next}",
@@ -924,7 +916,7 @@ export const catalogs = {
         preview: "链接预览",
       },
       names: {
-        issueThread: "任务话题",
+        issueThread: "工单话题",
         talkThread: "{who}的话题",
         thread: "话题",
         mention: { orchestrator: "@主助手", user: "@用户", everyone: "@所有人" },
@@ -934,7 +926,7 @@ export const catalogs = {
       },
       threadWidth: "话题的宽窄（拖动，双击回默认）",
       commands: {
-        issue: { name: "记一个任务", args: "标题", note: "记进备选，在这个频道的仓库里", needs: "/issue 后面写任务的标题" },
+        issue: { name: "记一个工单", args: "标题", note: "记进备选，在这个频道的仓库里", needs: "/issue 后面写工单的标题" },
         remember: { name: "让主助手记住", args: "一句话", note: "记进这里主助手的记忆", needs: "/remember 后面写要它记住的话" },
         stop: { name: "叫停主助手", args: "", note: "这里的主助手停下这一轮，派出去的执行会话照常干活", needs: "" },
         dm: { name: "私聊", args: "名字", note: "打开和这份角色的私聊", needs: "/dm 后面写角色的名字或 id" },
@@ -973,7 +965,7 @@ export const catalogs = {
             "2": "QQ 只让机器人在你说话后的一小段时间里回复。过了时间的汇报先攒着，隔一会儿再试，你下次说一句就一起发过来。",
           },
         },
-        always: "执行会话能在这台电脑上跑命令，所以只认你；回复时引用某条汇报，你的话会进那件活的任务话题。VibeValley 只往外连，不开端口。",
+        always: "执行会话能在这台电脑上跑命令，所以只认你；回复时引用某条汇报，你的话会进那件活的工单话题。VibeValley 只往外连，不开端口。",
         state: {
           off: "没连接",
           waiting: "等你扫码",
@@ -1075,7 +1067,7 @@ export const catalogs = {
         correlationId: "关联 #{id}",
       },
       trajectory: {
-        kind: { issueSession: "任务", workspaceChat: "对话", orchestrator: "主助手" },
+        kind: { issueSession: "工单", workspaceChat: "对话", orchestrator: "主助手" },
         silentError: "静默错误",
         tokens: "Token 消耗",
         rawPayload: "原始载荷",
@@ -1098,7 +1090,7 @@ export const catalogs = {
         counts: "实体计数",
         caches: "缓存统计",
         entries: "{count} 项",
-        issues: "任务",
+        issues: "工单",
         sessions: "执行会话",
         channels: "频道",
         agents: "角色",
@@ -1241,7 +1233,7 @@ export const catalogs = {
     },
     "web.inbox": { tray: { working: "{n} 个执行会话在干活", idle: "开工了，没有在干的活", off: "还没开工", unread: "频道 {n} 条没读" } },
     "web.issue": {
-      family: { children: "子任务", parent: "父任务" },
+      family: { children: "子工单", parent: "父工单" },
       reading: "在读……",
       never: "算了",
       later: "先放着",
@@ -1254,18 +1246,18 @@ export const catalogs = {
           todo: "想到要做的先写在这里，拖到「处理中」就派人开工；上下拖排先后。",
           working: "没有在干的活。",
           waiting: "做完的、没做成的在这里等你看；拖到「已关」完成或取消。",
-          closed: "已完成、已取消的任务；拖回「处理中」重开。",
+          closed: "已完成、已取消的工单；拖回「处理中」重开。",
         },
         emptyGuide: {
           todoTitle: "待办还是空的",
-          todoBody: "记下要做的任务，选好仓库和角色就能派发开工。",
-          workingTitle: "暂无处理中任务",
-          workingBody: "给待办任务选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
+          todoBody: "记下要做的工单，选好仓库和角色就能派发开工。",
+          workingTitle: "暂无处理中工单",
+          workingBody: "给待办工单选好角色并派发，或拖到这里即开独立 worktree 执行会话。",
           waitingTitle: "暂无待验收改动",
           waitingBody: "执行会话跑完一轮或有疑问时会停在这里，方便看改动、回复或完成交付。",
-          closedTitle: "还没有已关任务",
-          closedBody: "已完成或取消的任务会留在这里，拖回「处理中」即可随时重开。",
-          filtered: "当前筛选条件下此列没有任务。",
+          closedTitle: "还没有已关工单",
+          closedBody: "已完成或取消的工单会留在这里，拖回「处理中」即可随时重开。",
+          filtered: "当前筛选条件下此列没有工单。",
         },
         whichLane: "看哪一列",
         spots: "{taken} / {of} 个并发上限",
@@ -1284,21 +1276,21 @@ export const catalogs = {
       },
       list: {
         noRepo: "没有仓库",
-        all: "全部任务",
+        all: "全部工单",
         unfold: "展开 {group}",
         fold: "收起 {group}",
         writeIn: "在「{group}」写一张",
-        empty: "暂无任务，按 C 或点右上角「新任务」写下第一条。",
-        emptyFiltered: "当前筛选条件下没有匹配的任务。",
+        empty: "暂无工单，按 C 或点右上角「新工单」写下第一条。",
+        emptyFiltered: "当前筛选条件下没有匹配的工单。",
       },
       page: {
         pickFirst: "还差一点：选好派哪个执行会话、在哪个仓库里做，再点「开工」。",
         notDrafted: "先没起草：{why}",
-        historyUnread: "任务记录没读到：",
-        notFound: "找不到这个任务",
-        notFoundLine: "没有 {id} 这个任务：可能已经删掉了，或者链接写错了。",
-        find: "找任务：标题、执行会话、仓库",
-        findLabel: "找任务",
+        historyUnread: "工单记录没读到：",
+        notFound: "找不到这个工单",
+        notFoundLine: "没有 {id} 这个工单：可能已经删掉了，或者链接写错了。",
+        find: "找工单：标题、执行会话、仓库",
+        findLabel: "找工单",
         filter: "筛选",
         byRepo: "按仓库看",
         allRepos: "所有仓库",
@@ -1308,12 +1300,12 @@ export const catalogs = {
         clear: "清掉筛选",
         view: "看法",
         missing: "这一轮的记录缺失：{what}。对它的操作暂不可用。",
-        backToBoard: "任务",
+        backToBoard: "工单",
       },
       marks: { priority: "优先级：{word}" },
       sheet: { less: "收起", more: "更多", at: "在「{stage}」", stageDone: "{stage}做完了" },
       acts: {
-        reopened: "任务重开了",
+        reopened: "工单重开了",
         goesOn: "{helper} 接着做。",
         rejectWith: "打回，照上面修",
         carry: "带过去",
@@ -1325,12 +1317,12 @@ export const catalogs = {
       },
       close: {
         title: "关上「{issue}」",
-        working: "{who} 还在干这个任务。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
+        working: "{who} 还在干这个工单。取消就是叫停它、让它收工，分支上的改动不合进主分支。",
         completable: "完成就是把 {who} 的分支合进仓库的主分支，先看一遍改动；取消就是让它收工，改动不合进去。",
-        notCompletable: "这个任务现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
+        notCompletable: "这个工单现在不能完成。取消会让 {who} 离开，改动不合进主分支。",
         review: "看改动，完成",
         stopAndCancel: "叫停并取消",
-        cancel: "取消任务",
+        cancel: "取消工单",
       },
       changes: {
         checkOutput: "检查输出",
@@ -1341,13 +1333,13 @@ export const catalogs = {
         mergedCommit: "合入提交",
         reading: "正在看它改了什么…",
         unreadable: "看不了改动：",
-        none: "这个任务没有改动。完成就是请它收工。",
+        none: "这个工单没有改动。完成就是请它收工。",
         conflict: "合进 {base} 会冲突，先没法完成",
         resolveHow: "让它在自己的分支上把 {base} 合进来、解决冲突、跑一遍测试再提交；解决了再来完成。",
         behind: "它干活这段时间，{base} 上多了 {n} 个提交；完成时会合在一起（多一个合并提交）。",
         uncommitted: "还有 {n} 个文件没提交，完成时会先帮它提交：",
         resolve: "让它解决冲突",
-        moved: "任务状态变了，先回到任务看看要你做的事。",
+        moved: "工单状态变了，先回到工单看看要你做的事。",
         counts: "{commits} 个提交 · {files} 个文件",
         commits: "提交 {n}",
         files: "改了的文件 {n}",
@@ -1355,8 +1347,8 @@ export const catalogs = {
         binary: "二进制",
       },
       reopen: {
-        title: "重开这个任务",
-        line: "「{issue}」由同一份角色的新执行会话接着做，它会知道这个任务原来要做什么、上一次是怎么关的。",
+        title: "重开这个工单",
+        line: "「{issue}」由同一份角色的新执行会话接着做，它会知道这个工单原来要做什么、上一次是怎么关的。",
         what: "这次要它做什么（不填就是接着做完）",
         whatLabel: "这次要做什么",
         reopen: "重开",
@@ -1374,7 +1366,7 @@ export const catalogs = {
         tellIdle: "说一句，它接着做一轮",
         progress: "做到哪了",
         met: "{met} / {of} 条做到了",
-        noCriteria: "{answer, select, true {这个任务没写做完的标准：交回来时看结论判断。} other {这个任务没写做完的标准：交回来时看改动判断。}}",
+        noCriteria: "{answer, select, true {这个工单没写做完的标准：交回来时看结论判断。} other {这个工单没写做完的标准：交回来时看改动判断。}}",
         rejected: "上次打回的",
         made: "做出了什么",
         nothingToSee: "没有可看的改动。",
@@ -1440,7 +1432,7 @@ export const catalogs = {
         repo: "仓库",
         noRepo: "没有仓库",
         rename: "改标题",
-        trail: "任务在哪",
+        trail: "工单在哪",
       },
       task: { repo: "仓库", written: "写于" },
       todo: {
@@ -1452,7 +1444,7 @@ export const catalogs = {
         drafted: "草稿写好了",
         draftedLine: "看一遍、改一改，没问题就开工。",
         what: "想做什么？",
-        whatLine: "写一句就行：执行会话读过代码，替你写成任务。",
+        whatLine: "写一句就行：执行会话读过代码，替你写成工单。",
         titleHint: "比如：给登录页加上记住我",
         title: "标题",
         descriptionHint: "说明：为什么、要做的、不做的、可能涉及哪些文件（起草会写好）",
@@ -1495,7 +1487,7 @@ export const catalogs = {
         ordering: { manual: "默认", priority: "优先级", updated: "最近更新", created: "创建时间" },
         lane: { todo: "待办", working: "处理中", waiting: "等你看", closed: "已关" },
         stage: { talk: "聊清楚", work: "安排活", finish: "完成" },
-        newIssue: "新任务",
+        newIssue: "新工单",
       },
       trigger: {
         issue: "派出去",
@@ -1506,7 +1498,7 @@ export const catalogs = {
         refine: "起草",
         runtime: "引擎自己",
       },
-      run: { working: "正在干", heard: "中途听到 {n} 句", reconcile: "需要核对工作区", currentChanges: "查看任务当前改动" },
+      run: { working: "正在干", heard: "中途听到 {n} 句", reconcile: "需要核对工作区", currentChanges: "查看工单当前改动" },
       card: {
         orchestrator: "主助手",
         refining: "{name}在起草",
@@ -1550,7 +1542,7 @@ export const catalogs = {
         ran: "第 {n} 轮",
         used: "共用 {span}",
         noSteps: "还什么都没做。",
-        stepsGone: "轨迹只留 30 天（配置里的 session.trajectory_days），这个任务的已经清掉了。",
+        stepsGone: "轨迹只留 30 天（配置里的 session.trajectory_days），这个工单的已经清掉了。",
         change: { A: { mark: "新", label: "新增" }, M: { mark: "改", label: "修改" }, D: { mark: "删", label: "删除" } },
         and: "、",
         doing: "正在{action}",
@@ -1560,11 +1552,11 @@ export const catalogs = {
         changes: "{branch} → {base} · {commits} 个提交 · +{added} -{removed}",
         changesUncommitted: "{branch} → {base} · {commits} 个提交 · +{added} -{removed} · {uncommitted} 个没提交",
         justNow: "刚刚",
-        reviewAfterFailedCheck: "核对修复后，再次完成任务以重跑检查",
+        reviewAfterFailedCheck: "核对修复后，再次完成工单以重跑检查",
       },
       new: {
-        title: "新任务",
-        card: "新任务",
+        title: "新工单",
+        card: "新工单",
         words: "要做什么",
         placeholder: "要做什么？一句话就行，执行会话会照它起草",
         keys: "⌘ 回车记下",
@@ -1594,7 +1586,7 @@ export const catalogs = {
       makeTitle: "生成",
       empty: "还没有媒体文件",
       emptyHow: "生成一张图或一段语音、上传或拖进来一个文件，或者在对话里让执行会话把找到的东西放进来。",
-      nothingShown: "没有符合筛选的内容。",
+      nothingShown: "没有符合筛选的作品。",
       drop: "松开，放进媒体库",
       kind: { all: "全部", image: "图片", audio: "音频", video: "视频", other: "其它" },
       sortLabel: "排序",
@@ -1641,14 +1633,13 @@ export const catalogs = {
       understood: "理解的结果",
       makeTabs: { image: "生图", speech: "单人语音", audio: "音频工作台" },
       content: {
-        title: "内容",
+        title: "作品",
         new: "新建",
-        searchAll: "搜索全部内容…",
-        sidebarToggle: "展开或收起内容导航",
+        searchAll: "搜索全部作品…",
+        sidebarToggle: "展开或收起作品导航",
         recent: "全部最近",
         pinned: "置顶收藏",
-        pinnedEmpty: "还没有置顶内容。悬停任意作品或素材并点击图钉即可置顶到这里。",
-        resetFilter: "重置筛选",
+        pinnedEmpty: "还没有置顶作品。悬停任意作品或素材并点击图钉即可置顶到这里。",
         installedApps: "已安装应用",
         installedAppsEmpty: "还没有安装独立应用。在任意作品卡片或详情右上角点击「安装为应用」，即可把它装成独立的 macOS 桌面应用并在此集中启动与管理。",
         pin: "置顶",
@@ -1660,9 +1651,8 @@ export const catalogs = {
         media: "素材",
         sendArtifact: "发到频道",
         exportArtifact: "导出",
-        turnIntoIssue: "转为任务",
-        issueCreated: "已创建任务",
-        source: { all: "全部来源", agent: "执行会话交付", user: "我创建的" },
+        turnIntoIssue: "转为工单",
+        issueCreated: "已创建工单",
         artifactType: { all: "全部作品" },
         inspector: {
           openExternal: "系统打开",
@@ -1673,7 +1663,7 @@ export const catalogs = {
           stopAudio: "停止播放",
         },
         templates: {
-          title: "新建内容",
+          title: "新建作品",
           search: "搜索模板…",
           searchCount: "找到 {n} 个模板",
           empty: "没有匹配的模板",
@@ -1786,11 +1776,11 @@ export const catalogs = {
             wbTlP3Title: "阶段三 · 验收发布",
             wbTlP3Body: "双主题截图核验与发布上线",
             wbJourneyJ1Title: "1. 触发入口",
-            wbJourneyJ1Body: "进入统一内容工作台",
+            wbJourneyJ1Body: "进入统一作品工作台",
             wbJourneyJ2Title: "2. 定位筛选",
             wbJourneyJ2Body: "一次定位笔记、作品与素材",
             wbJourneyJ3Title: "3. 协作交付",
-            wbJourneyJ3Body: "发到频道或转为任务推进",
+            wbJourneyJ3Body: "发到频道或转为工单推进",
             wbJourneyS1Title: "痛点观察",
             wbJourneyS1Body: "减少列表与编辑页之间的来回切换",
             wbJourneyE1: "定位",
@@ -1848,7 +1838,7 @@ export const catalogs = {
             wbToE2: "对比",
             wbToE3: "定案",
             docRfcBody:
-              "# {title}\n\n- **状态**：Draft / Review / Accepted\n- **负责人**：\n- **关联任务**：\n\n## 1. 背景与动机\n\n描述当前系统痛点、触发契机与本次要解决的核心问题。\n\n## 2. 目标与非目标\n\n### 目标\n- 明确可量化的工程收益与功能边界。\n\n### 非目标\n- 显式列出本次故意不做的部分，防止范围蔓延。\n\n## 3. 备选方案对比\n\n| 维度 | 方案 A（推荐） | 方案 B |\n|---|---|---|\n| 复杂度 | 低，复用现有模块 | 高，需新增独立状态 |\n| 性能与可靠性 | 满足 SLA | 存在额外网络跳数 |\n| 回滚成本 | 可通过开关秒级回退 | 涉及不可逆数据结构改动 |\n\n## 4. 详细设计\n\n### 4.1 模块边界与接口契约\n```ts\n// 在此贴入核心类型、接口签名或状态机定义\n```\n\n### 4.2 数据模型与存储变更\n- 说明新增/变更的表结构、索引与迁移策略。\n\n### 4.3 失败模式与并发安全\n- 梳理超时、重试幂等、部分失败与降级路径。\n\n## 5. 测试、灰度与回滚计划\n- [ ] 单元测试与集成测试\n- [ ] 指标监控与告警阈值\n- [ ] 灰度放量节奏与一键回滚步骤\n",
+              "# {title}\n\n- **状态**：Draft / Review / Accepted\n- **负责人**：\n- **关联工单**：\n\n## 1. 背景与动机\n\n描述当前系统痛点、触发契机与本次要解决的核心问题。\n\n## 2. 目标与非目标\n\n### 目标\n- 明确可量化的工程收益与功能边界。\n\n### 非目标\n- 显式列出本次故意不做的部分，防止范围蔓延。\n\n## 3. 备选方案对比\n\n| 维度 | 方案 A（推荐） | 方案 B |\n|---|---|---|\n| 复杂度 | 低，复用现有模块 | 高，需新增独立状态 |\n| 性能与可靠性 | 满足 SLA | 存在额外网络跳数 |\n| 回滚成本 | 可通过开关秒级回退 | 涉及不可逆数据结构改动 |\n\n## 4. 详细设计\n\n### 4.1 模块边界与接口契约\n```ts\n// 在此贴入核心类型、接口签名或状态机定义\n```\n\n### 4.2 数据模型与存储变更\n- 说明新增/变更的表结构、索引与迁移策略。\n\n### 4.3 失败模式与并发安全\n- 梳理超时、重试幂等、部分失败与降级路径。\n\n## 5. 测试、灰度与回滚计划\n- [ ] 单元测试与集成测试\n- [ ] 指标监控与告警阈值\n- [ ] 灰度放量节奏与一键回滚步骤\n",
             docAdrBody:
               "# {title}\n\n- **状态**：Proposed / Accepted / Superseded\n- **日期**：\n- **决策人**：\n\n## 1. 上下文与问题陈述\n\n描述促使我们做出架构决策的技术背景、约束条件与业务诉求。\n\n## 2. 决策驱动因素\n- 性能与延迟预算\n- 开发维护成本与团队熟悉度\n- 长期演进与可替换性\n\n## 3. 候选方案\n1. **方案一**：\n2. **方案二**：\n3. **维持现状**：\n\n## 4. 决策结果\n\n**选定方案**：写明最终拍板的方案与核心理由。\n\n### 正面影响\n- 带来的收益与简化。\n\n### 负面影响与风险缓释\n- 需要承担的代价及对应的防护措施。\n\n## 5. 校验与后续复核\n- 说明如何在代码审查、静态门禁或压测中长期守住该决策。\n",
             docPostmortemBody:
@@ -1887,7 +1877,7 @@ export const catalogs = {
             diagSeqE5: "5. 推送切片",
             diagErdUser: "用户 / 角色 (agent)",
             diagErdRepo: "代码仓库 (repo)",
-            diagErdIssue: "任务单 (issue)",
+            diagErdIssue: "工单 (issue)",
             diagErdSession: "执行会话 (session)",
             diagErdArtifact: "协作作品",
             diagErdVersion: "版本快照 (version)",
@@ -1992,7 +1982,7 @@ export const catalogs = {
             sheetApiColStability: "稳定性",
             sheetApiR1Auth: "回环 / Bearer",
             sheetApiR1Rate: "无限制 (本地)",
-            sheetApiR1Owner: "任务域",
+            sheetApiR1Owner: "工单域",
             sheetApiR1Stab: "稳定 v1",
             sheetApiR2Auth: "令牌鉴权 (Bearer)",
             sheetApiR2Rate: "60 次/分钟",
@@ -2077,7 +2067,7 @@ export const catalogs = {
             slidesRelS5Title: "下一步计划与 Q&A",
             slidesRelS5Sub: "后续演进路线与反馈收集",
             slidesRelS5B1: "补齐更多团队自定义模板能力",
-            slidesRelS5B2: "打通任务流转一键沉淀到内容库",
+            slidesRelS5B2: "打通工单流转一键沉淀到作品库",
             slidesRelS5B3: "欢迎在团队频道留下使用反馈",
             slidesRelS5Notes: "预留 5 分钟问答并记录反馈问题。",
             protoApiTitle: "接口报文与 Schema 沙盒",
@@ -2141,7 +2131,7 @@ export const catalogs = {
           },
         },
         search: {
-          title: "搜索内容",
+          title: "搜索作品",
           placeholder: "搜索笔记、作品和素材…",
           empty: "未找到匹配的笔记、作品或素材",
           typeMedia: "素材",
@@ -2256,7 +2246,7 @@ export const catalogs = {
         own: "它自己记的",
         intro:
           "这个 agent 派出去的执行会话共用一份记忆。每一轮开始，和这一轮有关的几条放在它收到的话前面；一轮结束，它在汇报里写的「记住：」那几行，和这件活做到哪了，记进来。",
-        issues: "手上的任务",
+        issues: "手上的工单",
         noIssues: "它的执行会话还没做完过一轮。",
         helper: "执行会话",
         allRepos: "所有仓库",
@@ -2412,7 +2402,7 @@ export const catalogs = {
         offline: "已断开",
         disconnect: "断开连接",
       },
-      tabs: { inbox: "收件箱", channels: "频道", sessions: "会话", issues: "任务" },
+      tabs: { inbox: "收件箱", channels: "频道", sessions: "会话", issues: "工单" },
       inbox: { approve: "同意", deny: "拒绝", answer: "回复", empty: "收件箱为空，暂时没有待处理项。" },
       channel: { replyPlaceholder: "输入消息回复…", send: "发送", empty: "这个频道还没有消息。" },
       session: { promptPlaceholder: "给执行会话发一条指令…", send: "发送", stop: "停止", events: "轨迹", empty: "当前没有运行中的执行会话。" },
@@ -2422,7 +2412,7 @@ export const catalogs = {
         approve: "通过验收",
         changes: "打回修改",
         status: "状态",
-        empty: "没有符合条件的任务。",
+        empty: "没有符合条件的工单。",
       },
       controlPlane: {
         title: "总控端连接",
@@ -2590,7 +2580,7 @@ export const catalogs = {
       defaultEffort: "默认推理强度",
       default: "默认",
       maxWorking: "最多同时干活",
-      maxWorkingHint: "用它的执行会话同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受 VibeValley 整体的上限（同时 6 张任务）。",
+      maxWorkingHint: "用它的执行会话同时干活的上限，服务商限并发时有用。到了上限，新活派不出去，等有人干完。留空只受 VibeValley 整体的上限（同时 6 张工单）。",
       noLimit: "不另设",
       budget: "每日预算（元）",
       budgetLabel: "每日预算",
@@ -2703,7 +2693,7 @@ export const catalogs = {
         earlier: "更早的几步",
         unasked: "自己起的一轮",
         subagentGot: "子代理接到",
-        issue: "任务",
+        issue: "工单",
         told: "带话",
         usedTools: "用了 {n} 个工具",
         process: "这一轮的轨迹",
@@ -2741,25 +2731,25 @@ export const catalogs = {
       },
       hub: {
         search: "搜索运行与轨迹",
-        searchHint: "搜名字、任务、仓库…",
+        searchHint: "搜名字、工单、仓库…",
         scopeLabel: "按范围看",
         scope: { all: "全部", active: "进行中", orchestrator: "主助手", worker: "执行会话" },
         list: "运行列表",
         back: "全部运行",
         filterAgent: "角色：{name}",
-        filterIssue: "任务：{label}",
+        filterIssue: "工单：{label}",
         clearFilter: "清掉筛选",
         clear: "清除",
         empty: "还没有运行记录。",
         emptyFiltered: "没有符合当前筛选的运行。",
         pick: "选一条运行，查看完整轨迹。",
-        openIssue: "看任务",
+        openIssue: "看工单",
         openProfile: "看角色",
         orchestratorRole: "主助手",
         status: { working: "进行中", listening: "在听", resting: "待命", done: "已完成", failed: "失败", interrupted: "已中断", closed: "已结束" },
       },
       subagents: {
-        heading: "子任务",
+        heading: "子代理任务",
         root: "主线程",
         wait: "{who}在等「{targets}」",
         observed: "{ago}确认 · {status}",
@@ -2882,7 +2872,7 @@ export const catalogs = {
         repos: "仓库目录",
         reposHint: "这个空间的仓库，每个文件夹都是一个 git 仓库",
         worktrees: "工作树目录",
-        worktreesHint: "执行会话运行时每个任务自己的检出",
+        worktreesHint: "执行会话运行时每个工单自己的检出",
         copy: "复制路径",
         copied: "路径复制好了",
         reveal: "在访达里显示",
@@ -2939,9 +2929,8 @@ export const catalogs = {
       sidebar: {
         title: "仓库与终端",
         addRepo: "添加仓库",
-        addRepoButton: "仓库",
         addRepoTooltip: "添加本地仓库或文件夹",
-        manageRepos: "管理仓库",
+        newMenu: "新建：{name}",
         running: "正在运行",
         runningAgent: "{agent} 正在运行",
         ready: "待命",
@@ -2952,10 +2941,7 @@ export const catalogs = {
         readyCount: "{n} 待命",
         attentionCount: "{n} 需要关注",
         closeTab: "关闭标签",
-        tabsGroup: "标签页",
         tabMore: "更多操作",
-        newTerminal: "新终端：{name}",
-        newChat: "新对话：{name}",
         closeFolder: "关闭文件夹：{name}",
         closeFolderMenu: "关闭文件夹",
         repoDetails: "仓库详情",
@@ -2990,6 +2976,9 @@ export const catalogs = {
         copyAbsPath: "复制绝对路径",
         revealInFinder: "在 Finder 中显示",
         newTerminalInDir: "在此目录新建终端",
+        unsupportedHint: "此文件暂不支持应用内预览",
+        openWithDefault: "用默认方式打开",
+        openInApp: "在应用内打开",
       },
       git: {
         title: "版本控制",
@@ -3068,8 +3057,9 @@ export const catalogs = {
         statusWaiting: "等待确认",
         emptyTitle: "在当前工作区直接对话",
         emptyHint: "选择引擎后直接提问，工具调用结果可一键在右侧分栏打开源码或 Diff。",
-        you: "你",
         steerTag: "轮中引导",
+        todoTitle: "任务进度",
+        todoToolLabel: "更新进度",
         thinking: "思考过程",
         toolOpenFile: "打开文件",
         toolOpenDiff: "查看 Diff",
@@ -3103,8 +3093,7 @@ export const catalogs = {
         permissionAllowSession: "本会话始终允许",
         permissionDeny: "拒绝",
         composerPlaceholder: "向 {runtime} 提问或下达改动任务… (Enter 发送，Shift+Enter 换行)",
-        steerPlaceholder: "会话运行中，输入指令即插入轮中引导 (Steer)…",
-        steeringBanner: "回合进行中 · 发送将经 session.send 插入轮中引导，不中断上下文",
+        steerPlaceholder: "继续输入或补充指令…",
         send: "发送",
         steer: "插入引导",
         stop: "停止",
@@ -3173,7 +3162,7 @@ export const catalogs = {
         typeFolder: "普通目录",
         activity: "工作区",
         activitySummary: "{worktrees} 工作树 · {tabs} 标签",
-        openIssues: "进行中任务",
+        openIssues: "进行中工单",
         runningSessions: "运行中会话",
         maxSessions: "并发上限",
         pullRequest: "合并请求",
@@ -3489,7 +3478,7 @@ export const catalogs = {
         rail: "Beside this artifact",
         railShow: "Show the side panel",
         railHide: "Hide the side panel",
-        backToLibrary: "Back to content",
+        backToLibrary: "Back to artifacts",
         previewTab: "Preview",
         filesTab: "Files",
         filesTabCount: "Files ({n})",
@@ -3502,7 +3491,7 @@ export const catalogs = {
         deleteFileAsk: "Delete file “{path}”?",
         snapshotNote: "Snapshot",
       },
-      docs: { split: "Split", edit: "Edit", read: "Read", chars: "{n} chars" },
+      docs: { split: "Split", edit: "Edit", read: "Read" },
       outline: {
         progress: "{done}/{total} done",
         hideDone: "Hide done",
@@ -3538,16 +3527,7 @@ export const catalogs = {
         sfx: "SFX",
         transition: "Transition",
       },
-      prototype: {
-        viewportLabel: "Viewport",
-        viewportFull: "Full",
-        viewportTablet: "Tablet",
-        viewportMobile: "Mobile",
-        reload: "Reload",
-        iterateAi: "Iterate with AI",
-        installApp: "Install as App",
-        openApp: "Open App",
-      },
+      prototype: { viewportLabel: "Viewport", viewportFull: "Full", viewportTablet: "Tablet", viewportMobile: "Mobile", reload: "Reload" },
       files: { codeMode: "Code", htmlPreviewMode: "Preview" },
       issue: { title: "Artifacts" },
       blocks: { saved: "All saved", user: "You", start: "Start writing here…" },
@@ -3571,14 +3551,16 @@ export const catalogs = {
         storyboard: "Storyboard",
       },
       timeline: {
-        toggle: "History timeline",
-        title: "Timeline",
+        title: "Version history",
+        show: "Show version history",
+        hide: "Hide version history",
+        savedVersions: "Saved versions",
+        commits: "Changes",
         loading: "Loading history…",
         empty: "No history commits yet",
-        prev: "Previous commit",
-        next: "Next commit",
         backToLive: "Back to live",
         previewBanner: "Read-only history preview · {summary}",
+        versionBanner: "Viewing version {version} (read-only){note}",
         turn: "Turn {n}",
         restore: "Restore",
         restored: "Restored to selected commit",
@@ -3694,7 +3676,6 @@ export const catalogs = {
       standalone: { missing: "This artifact was deleted, or there is no such artifact.", version: "v{version}", live: "Live" },
       applet: {
         button: "Install as App",
-        buttonInstalled: "App Installed",
         badgeInstalled: "Installed",
         modalTitle: "Local Desktop App",
         subtitle: "Install this artifact as a standalone Mac app you can launch from Spotlight or the Dock.",
@@ -3818,10 +3799,10 @@ export const catalogs = {
       route: { missing: "This page does not exist", invalid: "This address is invalid", home: "Back to the app" },
       place: {
         chat: { label: "Chat", hint: "Channels and threads" },
-        issues: { label: "Tasks", hint: "Every task from creation to completion" },
+        issues: { label: "Issues", hint: "Every issue from creation to completion" },
         runs: { label: "Runs & trajectories", hint: "Active sessions, orchestrator approvals, and trajectories" },
         workspace: { hint: "Manage repositories and workspaces", name: "Workspace" },
-        content: { label: "Content", hint: "Library, artifacts, and notes" },
+        content: { label: "Artifacts", hint: "Artifacts, notes, and media" },
         runtimes: { label: "Engines", hint: "Installed coding engines across machines" },
         team: { label: "Team", hint: "Roles and team templates" },
         settings: { label: "Settings", hint: "General & appearance, models & keys, voice, connections, about" },
@@ -4948,14 +4929,13 @@ export const catalogs = {
       understood: "What it shows",
       makeTabs: { image: "Image", speech: "Speech", audio: "Audio workbench" },
       content: {
-        title: "Content",
+        title: "Artifacts",
         new: "New",
-        searchAll: "Search all content…",
-        sidebarToggle: "Toggle content sidebar",
+        searchAll: "Search all artifacts…",
+        sidebarToggle: "Toggle artifacts sidebar",
         recent: "All recent",
         pinned: "Pinned",
         pinnedEmpty: "Nothing pinned yet. Hover any artifact or media item and click the pin icon to keep it handy here.",
-        resetFilter: "Reset filter",
         installedApps: "Installed Apps",
         installedAppsEmpty:
           "No standalone apps installed yet. Click “Install as App” on any artifact card or toolbar to install it as an independent macOS app and manage it here.",
@@ -4970,7 +4950,6 @@ export const catalogs = {
         exportArtifact: "Export",
         turnIntoIssue: "Turn into ticket",
         issueCreated: "Ticket created",
-        source: { all: "All sources", agent: "From helpers", user: "Created by me" },
         artifactType: { all: "All artifacts" },
         inspector: {
           openExternal: "Open externally",
@@ -4981,7 +4960,7 @@ export const catalogs = {
           stopAudio: "Stop audio",
         },
         templates: {
-          title: "New content",
+          title: "New artifact",
           search: "Search templates…",
           searchCount: "{n} matching templates",
           empty: "No matching templates",
@@ -5473,7 +5452,7 @@ export const catalogs = {
           },
         },
         search: {
-          title: "Search content",
+          title: "Search artifacts",
           placeholder: "Search notes, artifacts, and media…",
           empty: "No matching notes, artifacts, or media",
           typeMedia: "Media",
@@ -6312,9 +6291,8 @@ export const catalogs = {
       sidebar: {
         title: "Repos & terminals",
         addRepo: "Add repository",
-        addRepoButton: "Repo",
         addRepoTooltip: "Add a local repository or folder",
-        manageRepos: "Manage repositories",
+        newMenu: "New in {name}",
         running: "Running",
         runningAgent: "{agent} running",
         ready: "Ready",
@@ -6325,10 +6303,7 @@ export const catalogs = {
         readyCount: "{n} ready",
         attentionCount: "{n} attention",
         closeTab: "Close tab",
-        tabsGroup: "Tabs",
         tabMore: "More actions",
-        newTerminal: "New terminal: {name}",
-        newChat: "New chat: {name}",
         closeFolder: "Close folder: {name}",
         closeFolderMenu: "Close folder",
         repoDetails: "Repository details",
@@ -6363,6 +6338,9 @@ export const catalogs = {
         copyAbsPath: "Copy full path",
         revealInFinder: "Reveal in Finder",
         newTerminalInDir: "New terminal in folder",
+        unsupportedHint: "In-app preview is not available for this file",
+        openWithDefault: "Open with Default App",
+        openInApp: "Open in App",
       },
       git: {
         title: "Source Control",
@@ -6441,8 +6419,9 @@ export const catalogs = {
         statusWaiting: "Needs reply",
         emptyTitle: "Direct coding chat in this workspace",
         emptyHint: "Pick a runtime and start chatting. Tool call cards open files and diffs directly in an adjacent split pane.",
-        you: "You",
         steerTag: "Steer",
+        todoTitle: "Progress",
+        todoToolLabel: "Update steps",
         thinking: "Thinking",
         toolOpenFile: "Open file",
         toolOpenDiff: "View diff",
@@ -6476,8 +6455,7 @@ export const catalogs = {
         permissionAllowSession: "Allow for session",
         permissionDeny: "Deny",
         composerPlaceholder: "Ask {runtime} or describe a change… (Enter to send, Shift+Enter for newline)",
-        steerPlaceholder: "Turn running — type to steer mid-turn…",
-        steeringBanner: "Turn active · sending steers mid-turn via session.send without cancelling context",
+        steerPlaceholder: "Add instructions while running…",
         send: "Send",
         steer: "Steer",
         stop: "Stop",
@@ -6862,7 +6840,6 @@ export interface Messages {
   "web.artifact.applet.bundleIdLabel": undefined;
   "web.artifact.applet.bundlePathLabel": undefined;
   "web.artifact.applet.button": undefined;
-  "web.artifact.applet.buttonInstalled": undefined;
   "web.artifact.applet.install": undefined;
   "web.artifact.applet.installedToast": { readonly name: string | number };
   "web.artifact.applet.installing": undefined;
@@ -6907,7 +6884,6 @@ export interface Messages {
   "web.artifact.diagram.nodes": undefined;
   "web.artifact.diagram.structure": undefined;
   "web.artifact.diagram.visual": undefined;
-  "web.artifact.docs.chars": { readonly n: string | number };
   "web.artifact.docs.edit": undefined;
   "web.artifact.docs.read": undefined;
   "web.artifact.docs.split": undefined;
@@ -6973,9 +6949,6 @@ export interface Messages {
   "web.artifact.presenter.notes": undefined;
   "web.artifact.presenter.restart": undefined;
   "web.artifact.presenter.waiting": undefined;
-  "web.artifact.prototype.installApp": undefined;
-  "web.artifact.prototype.iterateAi": undefined;
-  "web.artifact.prototype.openApp": undefined;
   "web.artifact.prototype.reload": undefined;
   "web.artifact.prototype.viewportFull": undefined;
   "web.artifact.prototype.viewportLabel": undefined;
@@ -7014,23 +6987,25 @@ export interface Messages {
   "web.artifact.suggestions.reject": undefined;
   "web.artifact.suggestions.title": { readonly n: string | number };
   "web.artifact.timeline.backToLive": undefined;
+  "web.artifact.timeline.commits": undefined;
   "web.artifact.timeline.compact": undefined;
   "web.artifact.timeline.compacted": undefined;
   "web.artifact.timeline.empty": undefined;
   "web.artifact.timeline.fork": undefined;
   "web.artifact.timeline.forkTitle": { readonly title: string | number };
   "web.artifact.timeline.forked": { readonly title: string | number };
+  "web.artifact.timeline.hide": undefined;
   "web.artifact.timeline.loading": undefined;
-  "web.artifact.timeline.next": undefined;
-  "web.artifact.timeline.prev": undefined;
   "web.artifact.timeline.previewBanner": { readonly summary: string | number };
   "web.artifact.timeline.restore": undefined;
   "web.artifact.timeline.restored": undefined;
+  "web.artifact.timeline.savedVersions": undefined;
+  "web.artifact.timeline.show": undefined;
   "web.artifact.timeline.title": undefined;
-  "web.artifact.timeline.toggle": undefined;
   "web.artifact.timeline.turn": { readonly n: string | number };
   "web.artifact.timeline.undoTurn": undefined;
   "web.artifact.timeline.undoneOrigin": undefined;
+  "web.artifact.timeline.versionBanner": { readonly note: string | number; readonly version: string | number };
   "web.artifact.types.dashboard": undefined;
   "web.artifact.types.defaultBadge": undefined;
   "web.artifact.types.design": undefined;
@@ -8274,7 +8249,6 @@ export interface Messages {
   "web.library.content.pinnedEmpty": undefined;
   "web.library.content.pinnedToast": undefined;
   "web.library.content.recent": undefined;
-  "web.library.content.resetFilter": undefined;
   "web.library.content.search.empty": undefined;
   "web.library.content.search.placeholder": undefined;
   "web.library.content.search.scopeAll": undefined;
@@ -8285,9 +8259,6 @@ export interface Messages {
   "web.library.content.searchAll": undefined;
   "web.library.content.sendArtifact": undefined;
   "web.library.content.sidebarToggle": undefined;
-  "web.library.content.source.agent": undefined;
-  "web.library.content.source.all": undefined;
-  "web.library.content.source.user": undefined;
   "web.library.content.templates.cat.ai": undefined;
   "web.library.content.templates.cat.apps": undefined;
   "web.library.content.templates.cat.deliverable": undefined;
@@ -9685,7 +9656,6 @@ export interface Messages {
   "web.shell.chat.steer": undefined;
   "web.shell.chat.steerPlaceholder": undefined;
   "web.shell.chat.steerTag": undefined;
-  "web.shell.chat.steeringBanner": undefined;
   "web.shell.chat.stop": undefined;
   "web.shell.chat.stopFailed": { readonly why: string | number };
   "web.shell.chat.telemetryCache": { readonly pct: string | number };
@@ -9709,6 +9679,8 @@ export interface Messages {
   "web.shell.chat.thoughtMax": undefined;
   "web.shell.chat.thoughtMedium": undefined;
   "web.shell.chat.title": undefined;
+  "web.shell.chat.todoTitle": undefined;
+  "web.shell.chat.todoToolLabel": undefined;
   "web.shell.chat.toolFailed": undefined;
   "web.shell.chat.toolInput": undefined;
   "web.shell.chat.toolLines": { readonly n: string | number };
@@ -9719,15 +9691,17 @@ export interface Messages {
   "web.shell.chat.toolOutput": undefined;
   "web.shell.chat.toolPending": undefined;
   "web.shell.chat.toolRunning": undefined;
-  "web.shell.chat.you": undefined;
   "web.shell.fileTree.collapseAllDirs": undefined;
   "web.shell.fileTree.copyAbsPath": undefined;
   "web.shell.fileTree.copyRelPath": undefined;
   "web.shell.fileTree.empty": undefined;
   "web.shell.fileTree.loading": undefined;
   "web.shell.fileTree.newTerminalInDir": undefined;
+  "web.shell.fileTree.openInApp": undefined;
+  "web.shell.fileTree.openWithDefault": undefined;
   "web.shell.fileTree.revealInFinder": undefined;
   "web.shell.fileTree.title": undefined;
+  "web.shell.fileTree.unsupportedHint": undefined;
   "web.shell.git.branches": undefined;
   "web.shell.git.cancel": undefined;
   "web.shell.git.changes": undefined;
@@ -9828,7 +9802,6 @@ export interface Messages {
   "web.shell.section.collapse": { readonly title: string | number };
   "web.shell.section.expand": { readonly title: string | number };
   "web.shell.sidebar.addRepo": undefined;
-  "web.shell.sidebar.addRepoButton": undefined;
   "web.shell.sidebar.addRepoTooltip": undefined;
   "web.shell.sidebar.attentionCount": { readonly n: string | number };
   "web.shell.sidebar.backToRepos": undefined;
@@ -9851,11 +9824,9 @@ export interface Messages {
   "web.shell.sidebar.gitCommitsTip": undefined;
   "web.shell.sidebar.mainLabel": undefined;
   "web.shell.sidebar.mainWorktree": { readonly label: string | number };
-  "web.shell.sidebar.manageRepos": undefined;
   "web.shell.sidebar.needsAttention": undefined;
-  "web.shell.sidebar.newChat": { readonly name: string | number };
   "web.shell.sidebar.newChatHere": undefined;
-  "web.shell.sidebar.newTerminal": { readonly name: string | number };
+  "web.shell.sidebar.newMenu": { readonly name: string | number };
   "web.shell.sidebar.newTerminalHere": undefined;
   "web.shell.sidebar.ready": undefined;
   "web.shell.sidebar.readyAgent": { readonly agent: string | number };
@@ -9866,7 +9837,6 @@ export interface Messages {
   "web.shell.sidebar.running": undefined;
   "web.shell.sidebar.runningAgent": { readonly agent: string | number };
   "web.shell.sidebar.tabMore": undefined;
-  "web.shell.sidebar.tabsGroup": undefined;
   "web.shell.sidebar.terminalCount": { readonly n: string | number };
   "web.shell.sidebar.title": undefined;
   "web.shell.sidebar.workingCount": { readonly n: string | number };

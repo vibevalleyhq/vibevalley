@@ -66,14 +66,13 @@
     "audio": "Audio workbench"
   },
   "content": {
-    "title": "Content",
+    "title": "Artifacts",
     "new": "New",
-    "searchAll": "Search all content…",
-    "sidebarToggle": "Toggle content sidebar",
+    "searchAll": "Search all artifacts…",
+    "sidebarToggle": "Toggle artifacts sidebar",
     "recent": "All recent",
     "pinned": "Pinned",
     "pinnedEmpty": "Nothing pinned yet. Hover any artifact or media item and click the pin icon to keep it handy here.",
-    "resetFilter": "Reset filter",
     "installedApps": "Installed Apps",
     "installedAppsEmpty": "No standalone apps installed yet. Click “Install as App” on any artifact card or toolbar to install it as an independent macOS app and manage it here.",
     "pin": "Pin",
@@ -87,11 +86,6 @@
     "exportArtifact": "Export",
     "turnIntoIssue": "Turn into ticket",
     "issueCreated": "Ticket created",
-    "source": {
-      "all": "All sources",
-      "agent": "From helpers",
-      "user": "Created by me"
-    },
     "artifactType": {
       "all": "All artifacts"
     },
@@ -104,7 +98,7 @@
       "stopAudio": "Stop audio"
     },
     "templates": {
-      "title": "New content",
+      "title": "New artifact",
       "search": "Search templates…",
       "searchCount": "{n} matching templates",
       "empty": "No matching templates",
@@ -753,7 +747,7 @@
       }
     },
     "search": {
-      "title": "Search content",
+      "title": "Search artifacts",
       "placeholder": "Search notes, artifacts, and media…",
       "empty": "No matching notes, artifacts, or media",
       "typeMedia": "Media",

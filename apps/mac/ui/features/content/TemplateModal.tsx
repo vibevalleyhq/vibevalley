@@ -1,4 +1,4 @@
-import { computed, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
+import { computed, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { ArtifactType } from "@vibevalley/protocol";
@@ -14,12 +14,13 @@ import { mix } from "../../design/tone";
 import { ready, useQueryClient } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { closeTemplatePicker, type TemplateCategory, templatePickerState } from "../../infra/state/contentNav";
-import { useArtifacts } from "../artifact";
+import { artifactTypeLabel, useArtifacts } from "../artifact";
 import {
   CONTENT_TEMPLATES,
   type ContentTemplate,
   createFromTemplate,
   TEMPLATE_CATEGORIES,
+  templateArtifactType,
   templateBadge,
   templateDesc,
   templateIcon,
@@ -30,41 +31,62 @@ import {
 export function TemplateModal() {
   const state = () => templatePickerState.get();
   return (
-    <Dialog open={state() !== undefined} onClose={closeTemplatePicker} title={t("web.library.content.templates.title")} wide testid="content-template-modal">
-      <If when={state()}>{(s) => <TemplateModalBody initialCategory={untracked(() => s().category)} />}</If>
+    <Dialog
+      open={state() !== undefined}
+      onClose={closeTemplatePicker}
+      title={t("web.library.content.templates.title")}
+      size="xl"
+      height="fixed"
+      scroll={false}
+      testid="content-template-modal"
+    >
+      <If when={state()}>
+        {(s) => <TemplateModalBody initialCategory={untracked(() => s().category)} initialArtifactType={untracked(() => s().artifactType)} />}
+      </If>
     </Dialog>
   );
 }
 
-function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
+type TemplateTab = TemplateCategory | `type:${ArtifactType}`;
+
+function TemplateModalBody(props: { initialCategory: TemplateCategory; initialArtifactType?: ArtifactType | undefined }) {
   const queries = useQueryClient();
   const router = useRouter();
   const artifacts = useArtifacts(() => ({}));
   const act = createAct();
-  const category = signal<TemplateCategory>(untracked(() => props.initialCategory));
+  const scopedType = untracked(() => props.initialArtifactType);
+  const hasTypeTab = scopedType !== undefined && scopedType !== "outline" && scopedType !== "whiteboard";
+  const initialTab: TemplateTab = hasTypeTab ? `type:${scopedType}` : untracked(() => props.initialCategory);
+  const selectedTab = signal<TemplateTab>(initialTab);
   const query = signal("");
 
   const filtered = computed(() => {
     const q = query().trim();
+    const tab = selectedTab();
     return CONTENT_TEMPLATES.filter((tpl) => {
       const catMatch = q
         ? true
-        : category() === "recommended"
-          ? tpl.recommended
-          : category() === "apps"
-            ? tpl.standaloneApp === true
-            : category() === "engineering"
-              ? tpl.engineering === true
-              : tpl.category === category();
+        : hasTypeTab && tab === `type:${scopedType}`
+          ? templateArtifactType(tpl) === scopedType
+          : tab === "recommended"
+            ? tpl.recommended
+            : tab === "apps"
+              ? tpl.standaloneApp === true
+              : tab === "engineering"
+                ? tpl.engineering === true
+                : tpl.category === tab;
       if (!catMatch) return false;
       return templateMatchesQuery(tpl, q);
     });
   });
   const hasFiltered = computed(() => filtered().length > 0);
-  const categoryOptions = TEMPLATE_CATEGORIES.map((c) => ({
-    value: c,
-    label: t(`web.library.content.templates.cat.${c}`),
-  }));
+  const categoryOptions: { value: TemplateTab; label: string }[] = [
+    ...(hasTypeTab ? [{ value: `type:${scopedType}` as TemplateTab, label: artifactTypeLabel(scopedType) }] : []),
+    ...TEMPLATE_CATEGORIES.map((c) => ({
+      value: c as TemplateTab,
+      label: t(`web.library.content.templates.cat.${c}`),
+    })),
+  ];
 
   const pick = (tpl: ContentTemplate) => {
     if (act.busy()) return;
@@ -74,8 +96,8 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
   };
 
   return (
-    <View class="gap-3.5">
-      <View class="flex-row flex-wrap items-center gap-2.5">
+    <View class="min-h-0 flex-1">
+      <View class="shrink-0 flex-row flex-wrap items-center gap-2.5 border-b border-line px-5 py-3">
         <SearchField
           testid="content-template-search"
           autoFocus
@@ -93,8 +115,8 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
           <Segmented
             testid="content-template-category"
             label={t("web.library.content.templates.title")}
-            value={category()}
-            onChange={(v) => category.set(v)}
+            value={selectedTab()}
+            onChange={(v) => selectedTab.set(v)}
             options={categoryOptions}
           />
         </View>
@@ -105,9 +127,16 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
         </If>
       </View>
 
-      <Scroll style={{ maxHeight: Math.max(280, windowSize().height * 0.62) }} contentClass="pb-1">
-        <If when={hasFiltered()} else={<Quiet>{t("web.library.content.templates.empty")}</Quiet>}>
-          <View class="flex-row flex-wrap gap-3">
+      <Scroll class="min-h-0 flex-1" contentClass="px-5 py-4">
+        <If
+          when={hasFiltered()}
+          else={
+            <View class="py-12">
+              <Quiet>{t("web.library.content.templates.empty")}</Quiet>
+            </View>
+          }
+        >
+          <View class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             <Each of={filtered()} key={(tpl) => tpl.id}>
               {(tpl) => (
                 <View
@@ -116,7 +145,7 @@ function TemplateModalBody(props: { initialCategory: TemplateCategory }) {
                   accessibilityLabel={templateName(tpl())}
                   disabled={act.busy()}
                   onPress={() => pick(tpl())}
-                  class={`group w-58 shrink-0 overflow-hidden rounded-lg border border-line bg-page ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:shadow-raise active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+                  class={`group overflow-hidden rounded-lg border border-line bg-page ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:shadow-raise active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
                 >
                   <TemplatePreview tpl={tpl()} />
                   <View class="gap-1 p-2.5">

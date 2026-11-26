@@ -16,7 +16,7 @@
     "windowSeparator": "，"
   },
   "lessThanCent": "不到 ¥0.01",
-  "persona": "{refused}。把人设改成「写进任务开头」。",
+  "persona": "{refused}。把人设改成「写进工单开头」。",
   "noModel": "{runtime} 的模型列表里没有 {model}",
   "runtimeDefault": "{runtime} 默认用的 {model}",
   "unknownRuntime": "不认识的引擎：{runtime}",

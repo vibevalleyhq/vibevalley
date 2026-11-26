@@ -19,14 +19,14 @@ vibevalley-diorama = { version = "0.1.0", path = "crates/diorama" }
 vibevalley-terminal = { version = "0.1.0", path = "crates/terminal" }
 vibevalley-workspace = { version = "0.1.0", path = "crates/workspace" }
 flume = { workspace = true }
-gpui = { package = "gpui-fast", version = "0.1.17", default-features = false, features = ["font-kit"] }
-gpui-platform = { package = "gpui-fast-platform", version = "0.1.17", default-features = false, features = ["font-kit"] }
+gpui = { package = "gpui-fast", version = "0.1.19", default-features = false, features = ["font-kit"] }
+gpui-platform = { package = "gpui-fast-platform", version = "0.1.19", default-features = false, features = ["font-kit"] }
 image = { workspace = true }
 indexmap = "2.14.2"
 jiff = { workspace = true }
-nsh-base = { version = "0.6.0", default-features = false }
-nsh-engine = { version = "0.6.0", default-features = false }
-nsh-platform-gpui = { version = "0.6.0", default-features = false, features = ["js", "webview", "editor", "math", "svg"] }
+nsh-base = { version = "0.7.1", default-features = false }
+nsh-engine = { version = "0.7.1", default-features = false }
+nsh-platform-gpui = { version = "0.7.1", default-features = false, features = ["js", "webview", "editor", "math", "svg"] }
 objc2 = "0.6.5"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [
   "std",

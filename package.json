@@ -1,6 +1,6 @@
 {
   "name": "vibevalley",
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -18,7 +18,7 @@
     "ui:gallery": "vpx scripts/audit/ui-gallery.ts",
     "api:client": "vpx scripts/gen/api-client.ts",
     "i18n:gen": "vpx scripts/gen/i18n.ts gen",
-    "nsh:install": "sh scripts/release/install-nsh.sh 0.6.0",
+    "nsh:install": "sh scripts/release/install-nsh.sh 0.7.1",
     "branding:dmg": "vpx scripts/gen/mac-branding.ts --dmg-only",
     "package:mac": "vpx scripts/release/package.ts",
     "package:mac:alpha": "vpx scripts/release/package.ts --profile alpha --fast --no-dmg --no-zip",

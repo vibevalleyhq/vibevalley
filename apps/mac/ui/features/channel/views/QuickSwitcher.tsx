@@ -28,7 +28,15 @@ export const switcher = { show: () => shown.set(true), toggle: () => shown.updat
 /** Ctrl+K: a channel, thread or direct channel by its name; a profile not yet talked with gets its direct channel. */
 export function QuickSwitcher() {
   return (
-    <Dialog open={shown.get()} onClose={() => shown.set(false)} title={t("web.channel.switcher.title")} testid="switcher">
+    <Dialog
+      open={shown.get()}
+      onClose={() => shown.set(false)}
+      title={t("web.channel.switcher.title")}
+      size="md"
+      height="fixed"
+      scroll={false}
+      testid="switcher"
+    >
       <If when={shown.get()}>
         <SwitcherBody onClose={() => shown.set(false)} />
       </If>
@@ -98,7 +106,7 @@ function SwitcherBody(props: { onClose: () => void }) {
         const to = byId().get(e.id);
         if (to) go(to);
       }}
-      class="gap-2.5"
+      class="min-h-0 flex-1 gap-2.5 px-5 pt-3.5 pb-3"
       searchBarClass="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 hover:border-faint focus-within:border-focus"
       searchPrefix={<Icon name="search" size={16} tone="muted" />}
       searchSuffix={
@@ -115,7 +123,7 @@ function SwitcherBody(props: { onClose: () => void }) {
         </If>
       }
       searchClass="min-w-0 flex-1 text-base text-ink placeholder:text-faint"
-      listClass="max-h-96"
+      listClass="min-h-0 flex-1"
       separatorClass="my-1.5 h-px bg-line"
       renderGroup={(g) => (
         <View class="px-2.5 pt-1.5 pb-1">

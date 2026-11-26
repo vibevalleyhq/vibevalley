@@ -58,6 +58,7 @@ impl HostedView {
         let options = AppOptions {
             appearance: Appearance::System,
             data_dir: Some(crate::host::Storage::configured().views),
+            inline_root: true,
             ..Default::default()
         };
         let name = view.to_string();

@@ -119,7 +119,7 @@
     "repos": "仓库目录",
     "reposHint": "这个空间的仓库，每个文件夹都是一个 git 仓库",
     "worktrees": "工作树目录",
-    "worktreesHint": "执行会话运行时每个任务自己的检出",
+    "worktreesHint": "执行会话运行时每个工单自己的检出",
     "copy": "复制路径",
     "copied": "路径复制好了",
     "reveal": "在访达里显示",

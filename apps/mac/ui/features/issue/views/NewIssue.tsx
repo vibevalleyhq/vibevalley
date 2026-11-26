@@ -1,4 +1,4 @@
-import { cleanup, computed, effect, keymap, signal, Text, untracked, View } from "nsh";
+import { cleanup, computed, effect, keymap, Scroll, signal, Text, untracked, View } from "nsh";
 
 import { t } from "@vibevalley/i18n";
 import type { RuntimeInfo } from "@vibevalley/protocol";
@@ -114,90 +114,92 @@ export function NewIssue(props: { at: NewIssueAt; onKeep: (words: string, where:
     if (textFocused()) return keymap.bind("escape", props.onClose, { when: "always" });
   });
   return (
-    <Dialog open onClose={props.onClose} title={t("web.issue.new.title")} testid="issue-new-dialog">
-      <View class="gap-3">
-        <TextArea
-          testID="issue-new-text"
-          accessibilityLabel={t("web.issue.new.words")}
-          placeholder={t("web.issue.new.placeholder")}
-          rows={4}
-          value={draft().text}
-          autoFocus
-          onInput={(text) => dispatch({ kind: "setText", text })}
-          onFocus={() => textFocused.set(true)}
-          onBlur={() => textFocused.set(false)}
-        />
-        <IssueAttachmentStrip
-          files={draft().attachments}
-          uploading={uploader.uploading()}
-          onRemove={(id) => dispatch({ kind: "removeAttachment", id })}
-          testid="issue-new-attachments"
-        />
-        <If when={!noRepos() || !noReadyRuntimes() || hasMultipleMachines()}>
-          <View class="flex-row flex-wrap items-center gap-2">
-            <If when={!noRepos()}>
-              <Select
-                quiet
-                size="control"
-                label={t("web.issue.task.repo")}
-                testid="issue-new-repo"
-                value={draft().repo}
-                placeholder={t("web.issue.todo.whichRepo")}
-                onChange={(repo) => dispatch({ kind: "setRepo", repo })}
-                options={repoOptions()}
-              />
-            </If>
-            <If when={!noReadyRuntimes()}>
-              <Select
-                quiet
-                size="control"
-                label={t("web.issue.detail.helper")}
-                testid="issue-new-helper"
-                value={draft().agent}
-                placeholder={t("web.issue.todo.pickForMe")}
-                onChange={(agent) => dispatch({ kind: "setAgent", agent })}
-                options={agentOptions()}
-              />
-            </If>
-            <If when={hasMultipleMachines()}>
-              <Select
-                quiet
-                size="control"
-                label={t("web.issue.new.machine")}
-                testid="issue-new-machine"
-                value={machineId()}
-                placeholder={t("web.issue.new.machineAuto")}
-                onChange={(id) => machineId.set(id)}
-                options={machineOptions()}
-              />
-            </If>
-          </View>
-        </If>
-        <If when={noRepos() || noReadyRuntimes()}>
-          <View class="gap-2">
-            <If when={noRepos()}>
-              <Banner tone="warn" size="sm" icon="repos">
-                <View testID="issue-new-missing-repo" class="flex-row items-center justify-between gap-2">
-                  <Text class="min-w-0 flex-1 text-xs leading-snug text-warn-ink">{t("web.issue.new.missingRepo")}</Text>
-                  <Button size="compact" icon="repos" testID="issue-new-go-repos" onPress={() => goTo("/repos")}>
-                    {t("web.issue.new.goRepos")}
-                  </Button>
-                </View>
-              </Banner>
-            </If>
-            <If when={noReadyRuntimes()}>
-              <Banner tone="warn" size="sm" icon="runtimes">
-                <View testID="issue-new-missing-runtime" class="flex-row items-center justify-between gap-2">
-                  <Text class="min-w-0 flex-1 text-xs leading-snug text-warn-ink">{t("web.issue.new.missingRuntime")}</Text>
-                  <Button size="compact" icon="runtimes" testID="issue-new-go-runtimes" onPress={() => goTo("/runtimes")}>
-                    {t("web.issue.new.goRuntimes")}
-                  </Button>
-                </View>
-              </Banner>
-            </If>
-          </View>
-        </If>
-        <View class="flex-row items-center justify-end gap-2 border-t border-line pt-3">
+    <Dialog open onClose={props.onClose} title={t("web.issue.new.title")} size="md" height="auto" scroll={false} testid="issue-new-dialog">
+      <View class="min-h-0 shrink">
+        <Scroll class="min-h-0 shrink" contentClass="gap-3 px-5 py-4">
+          <TextArea
+            testID="issue-new-text"
+            accessibilityLabel={t("web.issue.new.words")}
+            placeholder={t("web.issue.new.placeholder")}
+            rows={4}
+            value={draft().text}
+            autoFocus
+            onInput={(text) => dispatch({ kind: "setText", text })}
+            onFocus={() => textFocused.set(true)}
+            onBlur={() => textFocused.set(false)}
+          />
+          <IssueAttachmentStrip
+            files={draft().attachments}
+            uploading={uploader.uploading()}
+            onRemove={(id) => dispatch({ kind: "removeAttachment", id })}
+            testid="issue-new-attachments"
+          />
+          <If when={!noRepos() || !noReadyRuntimes() || hasMultipleMachines()}>
+            <View class="flex-row flex-wrap items-center gap-2">
+              <If when={!noRepos()}>
+                <Select
+                  quiet
+                  size="control"
+                  label={t("web.issue.task.repo")}
+                  testid="issue-new-repo"
+                  value={draft().repo}
+                  placeholder={t("web.issue.todo.whichRepo")}
+                  onChange={(repo) => dispatch({ kind: "setRepo", repo })}
+                  options={repoOptions()}
+                />
+              </If>
+              <If when={!noReadyRuntimes()}>
+                <Select
+                  quiet
+                  size="control"
+                  label={t("web.issue.detail.helper")}
+                  testid="issue-new-helper"
+                  value={draft().agent}
+                  placeholder={t("web.issue.todo.pickForMe")}
+                  onChange={(agent) => dispatch({ kind: "setAgent", agent })}
+                  options={agentOptions()}
+                />
+              </If>
+              <If when={hasMultipleMachines()}>
+                <Select
+                  quiet
+                  size="control"
+                  label={t("web.issue.new.machine")}
+                  testid="issue-new-machine"
+                  value={machineId()}
+                  placeholder={t("web.issue.new.machineAuto")}
+                  onChange={(id) => machineId.set(id)}
+                  options={machineOptions()}
+                />
+              </If>
+            </View>
+          </If>
+          <If when={noRepos() || noReadyRuntimes()}>
+            <View class="gap-2">
+              <If when={noRepos()}>
+                <Banner tone="warn" size="sm" icon="repos">
+                  <View testID="issue-new-missing-repo" class="flex-row items-center justify-between gap-2">
+                    <Text class="min-w-0 flex-1 text-xs leading-snug text-warn-ink">{t("web.issue.new.missingRepo")}</Text>
+                    <Button size="compact" icon="repos" testID="issue-new-go-repos" onPress={() => goTo("/repos")}>
+                      {t("web.issue.new.goRepos")}
+                    </Button>
+                  </View>
+                </Banner>
+              </If>
+              <If when={noReadyRuntimes()}>
+                <Banner tone="warn" size="sm" icon="runtimes">
+                  <View testID="issue-new-missing-runtime" class="flex-row items-center justify-between gap-2">
+                    <Text class="min-w-0 flex-1 text-xs leading-snug text-warn-ink">{t("web.issue.new.missingRuntime")}</Text>
+                    <Button size="compact" icon="runtimes" testID="issue-new-go-runtimes" onPress={() => goTo("/runtimes")}>
+                      {t("web.issue.new.goRuntimes")}
+                    </Button>
+                  </View>
+                </Banner>
+              </If>
+            </View>
+          </If>
+        </Scroll>
+        <View class="shrink-0 flex-row items-center justify-end gap-2 border-t border-line px-5 py-3">
           <IconButton icon="attach" size={14} label={t("web.issue.attachments.attachFile")} onClick={() => void uploader.pick()} testid="issue-new-attach" />
           <Text class="mr-auto text-xs text-faint">{t("web.issue.new.keys")}</Text>
           <Button tone="quiet" testID="issue-new-dialog-never" onPress={() => props.onClose()}>

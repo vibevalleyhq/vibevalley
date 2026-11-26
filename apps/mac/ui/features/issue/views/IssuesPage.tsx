@@ -108,7 +108,6 @@ export function IssuesPage(props: { rest: string }) {
     const move = cardMove(c, to);
     if (move === "start" && (c.kind === "todo" || c.kind === "family")) {
       if (!assignedAgentOf(c.issue) || !c.issue.repo) {
-        open(c.id);
         toast(t("web.issue.page.pickFirst"));
         return;
       }

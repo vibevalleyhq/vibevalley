@@ -1,9 +1,8 @@
-import { computed, Scroll, signal, Text, untracked, View } from "nsh";
+import { computed, effect, Scroll, signal, Text, untracked, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
-import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
 import { Empty } from "../../../design/layout";
@@ -13,7 +12,6 @@ import {
   addOutlineChild,
   addOutlineRootItem,
   addOutlineSibling,
-  countOutlineTodos,
   cycleOutlineKind,
   deleteOutlineNode,
   flattenOutline,
@@ -26,7 +24,8 @@ import {
 export interface OutlineViewProps {
   readonly doc: OutlineDocument;
   readonly version?: number | undefined;
-  readonly busy: boolean;
+  readonly hideDone?: boolean | undefined;
+  readonly addRequest?: number | undefined;
   readonly onSaveDoc: (next: OutlineDocument, summary: string) => void;
 }
 
@@ -45,15 +44,13 @@ export function OutlineView(props: OutlineViewProps) {
   const editingId = signal<string | undefined>(undefined);
   const editingText = signal("");
   const collapsedIds = signal<ReadonlySet<string>>(new Set());
-  const hideDone = signal(false);
   const quickText = signal("");
   const quickKind = signal<"bullet" | "todo">("bullet");
 
   const readOnly = () => props.version !== undefined;
-  const todoStats = computed(() => countOutlineTodos(props.doc));
   const rows = computed(() => {
     const all = flattenOutline(props.doc, collapsedIds());
-    if (!hideDone()) return all;
+    if (props.hideDone !== true) return all;
     return all.filter((r) => !(r.node.kind === "todo" && r.node.checked === true));
   });
 
@@ -101,6 +98,14 @@ export function OutlineView(props: OutlineViewProps) {
     editingText.set("");
   };
 
+  let handledAddRequest = untracked(() => props.addRequest ?? 0);
+  effect(() => {
+    const req = props.addRequest ?? 0;
+    if (req <= handledAddRequest) return;
+    handledAddRequest = req;
+    untracked(() => handleAddRoot());
+  });
+
   const handleQuickSubmit = () => {
     const text = untracked(quickText).trim();
     if (!text || readOnly()) return;
@@ -112,29 +117,6 @@ export function OutlineView(props: OutlineViewProps) {
 
   return (
     <Scroll testID="artifact-outline-view" class="min-h-0 flex-1 bg-page" contentClass="mx-auto w-full max-w-2xl gap-2.5 px-5 py-4">
-      <View class="flex-row flex-wrap items-center justify-between gap-2 pb-1">
-        <View class="flex-row items-center gap-2">
-          <If when={todoStats().total > 0}>
-            <View testID="outline-progress" class="flex-row items-center gap-2">
-              <View class="h-1.5 w-20 overflow-hidden rounded-full bg-selected">
-                <View class="h-full rounded-full bg-accent" style={{ width: `${Math.round((todoStats().done / Math.max(1, todoStats().total)) * 100)}%` }} />
-              </View>
-              <Text class="font-mono text-2xs text-muted tabular-nums">
-                {t("web.artifact.outline.progress", { done: todoStats().done, total: todoStats().total })}
-              </Text>
-              <Button size="compact" tone="quiet" testID="outline-toggle-done" onPress={() => hideDone.set(!hideDone())}>
-                {hideDone() ? t("web.artifact.outline.showDone") : t("web.artifact.outline.hideDone")}
-              </Button>
-            </View>
-          </If>
-        </View>
-        <If when={!readOnly()}>
-          <Button size="compact" icon="add" testID="outline-add-item" disabled={props.busy} onPress={handleAddRoot}>
-            {t("web.artifact.page.new")}
-          </Button>
-        </If>
-      </View>
-
       <If when={rows().length > 0} else={<Empty icon="notes">{t("web.artifact.blocks.start")}</Empty>}>
         <View class="gap-0.5">
           <Each of={rows()} key={(row) => row.node.id}>

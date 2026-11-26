@@ -125,6 +125,7 @@ export function SectionHead(props: {
 
 export function ShellIconButton(props: {
   label: string;
+  tooltip?: string;
   icon: IconName;
   onPress: () => void;
   danger?: boolean;
@@ -147,7 +148,7 @@ export function ShellIconButton(props: {
       onMouseEnter={() => hovered.set(true)}
       onMouseLeave={() => hovered.set(false)}
       accessibilityLabel={props.label}
-      tooltip={<Bubble text={props.label} />}
+      tooltip={<Bubble text={props.tooltip ?? props.label} />}
       class={[
         props.compact === true ? "size-5 rounded-sm" : "size-5.5 rounded-md",
         `shrink-0 items-center justify-center ${motionClass("transition-opacity duration-120 ease-out")}`,

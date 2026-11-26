@@ -12,8 +12,8 @@ pub mod remote_layer;
 mod tests;
 
 pub use host::AppletHost;
+#[cfg(test)]
 pub(crate) use protocol::apps_dir_from;
-pub use protocol::{
-    AppletInfo, AppletInstallRequest, AppletOpenResult, AppletRemoveResult, HostToShim, Modifiers, MouseButtonKind, ScrollPhaseKind, ShimToHost, apps_dir,
-    socket_path,
-};
+pub use protocol::{AppletInfo, AppletInstallRequest, AppletOpenResult, AppletRemoveResult, HostToShim, ShimToHost, apps_dir, socket_path};
+#[cfg(test)]
+pub use protocol::{Modifiers, MouseButtonKind, ScrollPhaseKind};

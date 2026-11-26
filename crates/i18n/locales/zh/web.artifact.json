@@ -16,7 +16,7 @@
     "rail": "这篇的旁注",
     "railShow": "打开旁注",
     "railHide": "收起旁注",
-    "backToLibrary": "返回内容库",
+    "backToLibrary": "返回作品库",
     "previewTab": "预览",
     "filesTab": "文件",
     "filesTabCount": "文件 ({n})",
@@ -32,8 +32,7 @@
   "docs": {
     "split": "分栏",
     "edit": "编辑",
-    "read": "阅读",
-    "chars": "{n} 字"
+    "read": "阅读"
   },
   "outline": {
     "progress": "{done}/{total} 已完成",
@@ -85,10 +84,7 @@
     "viewportFull": "铺满",
     "viewportTablet": "平板",
     "viewportMobile": "手机",
-    "reload": "重新载入",
-    "iterateAi": "让助手修改",
-    "installApp": "安装为应用",
-    "openApp": "打开应用"
+    "reload": "重新载入"
   },
   "files": {
     "codeMode": "源码",
@@ -132,14 +128,16 @@
     "storyboard": "分镜脚本"
   },
   "timeline": {
-    "toggle": "时间轴历史",
-    "title": "时间轴",
+    "title": "历史记录",
+    "show": "打开历史记录",
+    "hide": "收起历史记录",
+    "savedVersions": "已保存版本",
+    "commits": "变更记录",
     "loading": "正在载入历史…",
     "empty": "还没有可回放的提交",
-    "prev": "上一个提交",
-    "next": "下一个提交",
     "backToLive": "回到最新",
     "previewBanner": "历史只读预览 · {summary}",
+    "versionBanner": "正在查看第 {version} 稿（只读）{note}",
     "turn": "第 {n} 轮",
     "restore": "恢复到此版本",
     "restored": "已恢复到所选版本",
@@ -266,7 +264,6 @@
   },
   "applet": {
     "button": "安装为桌面应用",
-    "buttonInstalled": "桌面应用已安装",
     "badgeInstalled": "已安装",
     "modalTitle": "本地桌面应用",
     "subtitle": "将这份作品安装为独立 Mac 应用，可从聚焦搜索或程序坞直接打开。",

@@ -5,9 +5,10 @@ import { t } from "@vibevalley/i18n";
 import { Button } from "../../../design/Button";
 import { Icon } from "../../../design/Icon";
 import { IconButton } from "../../../design/IconButton";
-import { Segmented } from "../../../design/Segmented";
 import { mix } from "../../../design/tone";
 import { type StoryboardModel } from "./previewModel";
+
+export type StoryboardMode = "grid" | "animatic";
 
 function FramingGuide(props: { readonly framing: string; readonly color?: string | undefined }) {
   return (
@@ -61,8 +62,7 @@ function FramingGuide(props: { readonly framing: string; readonly color?: string
   );
 }
 
-export function StoryboardView(props: { readonly model: StoryboardModel }) {
-  const mode = signal<"grid" | "animatic">("grid");
+export function StoryboardView(props: { readonly model: StoryboardModel; readonly mode: StoryboardMode }) {
   const activeIdx = signal(0);
   const playing = signal(false);
 
@@ -74,7 +74,7 @@ export function StoryboardView(props: { readonly model: StoryboardModel }) {
   const totalSec = computed(() => props.model.shots.reduce((acc, s) => acc + s.durationSec, 0));
 
   effect(() => {
-    if (!playing() || mode() !== "animatic" || props.model.shots.length === 0) return;
+    if (!playing() || props.mode !== "animatic" || props.model.shots.length === 0) return;
     const shot = currentShot();
     const waitMs = Math.max(900, Math.round((shot?.durationSec ?? 3) * 1000));
     const timer = setTimeout(() => {
@@ -93,37 +93,20 @@ export function StoryboardView(props: { readonly model: StoryboardModel }) {
 
   return (
     <Scroll testID="artifact-storyboard-view" class="min-h-0 flex-1" contentClass="gap-4 p-5">
-      <View class="flex-row flex-wrap items-center justify-between gap-2.5 rounded-lg border border-line bg-side px-3.5 py-2.5">
-        <View class="flex-row flex-wrap items-center gap-2.5">
-          <Text class="font-mono text-xs text-muted">{`${props.model.aspectRatio} · ${props.model.fps} fps`}</Text>
-          <Text class="font-mono text-xs text-muted tabular-nums">{t("web.artifact.storyboard.totalDuration", { sec: totalSec().toFixed(1) })}</Text>
-          <If when={props.model.visualTone}>
-            <Text class="text-xs text-ink">{props.model.visualTone}</Text>
-          </If>
-          <View class="flex-row items-center gap-1">
-            <Each of={props.model.palette} key={(hex) => hex}>
-              {(hex) => <View class="size-4 rounded-xs border border-line" style={{ backgroundColor: hex() }} />}
-            </Each>
-          </View>
-        </View>
-        <If when={props.model.shots.length > 0}>
-          <Segmented
-            testid="storyboard-mode"
-            label={t("web.artifact.storyboard.gridMode")}
-            value={mode()}
-            onChange={(v) => {
-              playing.set(false);
-              mode.set(v);
-            }}
-            options={[
-              { value: "grid" as const, label: t("web.artifact.storyboard.gridMode") },
-              { value: "animatic" as const, icon: "play", label: t("web.artifact.storyboard.animaticMode") },
-            ]}
-          />
+      <View class="flex-row flex-wrap items-center gap-2.5">
+        <Text class="font-mono text-xs text-muted">{`${props.model.aspectRatio} · ${props.model.fps} fps`}</Text>
+        <Text class="font-mono text-xs text-muted tabular-nums">{t("web.artifact.storyboard.totalDuration", { sec: totalSec().toFixed(1) })}</Text>
+        <If when={props.model.visualTone}>
+          <Text class="text-xs text-ink">{props.model.visualTone}</Text>
         </If>
+        <View class="flex-row items-center gap-1">
+          <Each of={props.model.palette} key={(hex) => hex}>
+            {(hex) => <View class="size-3.5 rounded-xs border border-line" style={{ backgroundColor: hex() }} />}
+          </Each>
+        </View>
       </View>
 
-      <If when={mode() === "animatic" && currentShot() !== undefined}>
+      <If when={props.mode === "animatic" && currentShot() !== undefined}>
         <View testID="storyboard-animatic" class="mx-auto w-full max-w-3xl gap-3">
           <If when={currentShot()}>
             {(sh) => (
@@ -210,7 +193,7 @@ export function StoryboardView(props: { readonly model: StoryboardModel }) {
         </View>
       </If>
 
-      <If when={mode() === "grid"}>
+      <If when={props.mode === "grid"}>
         <View class="flex-row flex-wrap gap-3">
           <Each of={props.model.shots} key={(sh) => sh.id}>
             {(sh, idx) => {

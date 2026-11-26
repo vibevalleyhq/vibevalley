@@ -6,10 +6,8 @@ import { t } from "@vibevalley/i18n";
 import { Button } from "../../../design/Button";
 import { Chart } from "../../../design/code/Chart";
 import { Diagram } from "../../../design/code/Diagram";
-import { SearchField } from "../../../design/Field";
 import { IconButton } from "../../../design/IconButton";
 import { Empty } from "../../../design/layout";
-import { Segmented } from "../../../design/Segmented";
 import { formatCellValue } from "../store";
 import {
   asString,
@@ -111,44 +109,24 @@ export function DashboardView(props: {
   );
 }
 
-export function DiagramView(props: { readonly data: DiagramModel; readonly mmdSource?: string | undefined }) {
+export type DiagramMode = "visual" | "structure";
+
+export function DiagramView(props: { readonly data: DiagramModel; readonly mode: DiagramMode; readonly mmdSource?: string | undefined }) {
   const mermaidSource = computed(() => {
     const raw = props.mmdSource?.trim();
     if (raw) return raw;
     return diagramToMermaid(props.data);
   });
-  const mode = signal<"visual" | "structure">("visual");
 
   return (
     <Scroll testID="artifact-diagram-view" class="min-h-0 flex-1" contentClass="gap-4 p-5">
-      <View class="flex-row flex-wrap items-center justify-between gap-2">
-        <View class="flex-row items-center gap-2">
-          <Text class="text-sm font-semibold text-ink">{props.data.title}</Text>
-          <View class="rounded-sm bg-side px-1.5 py-0.5">
-            <Text class="font-mono text-2xs text-muted">{`${props.data.kind} · ${props.data.direction}`}</Text>
-          </View>
-        </View>
-        <If when={mermaidSource().length > 0}>
-          <Segmented
-            testid="diagram-view-mode"
-            label={t("web.artifact.diagram.visual")}
-            value={mode()}
-            onChange={(v) => mode.set(v)}
-            options={[
-              { value: "visual", label: t("web.artifact.diagram.visual") },
-              { value: "structure", label: t("web.artifact.diagram.structure") },
-            ]}
-          />
-        </If>
-      </View>
-
-      <If when={mode() === "visual" && mermaidSource().length > 0}>
+      <If when={props.mode === "visual" && mermaidSource().length > 0}>
         <View class="rounded-xl border border-line bg-side p-4">
           <Diagram source={mermaidSource()} interactive />
         </View>
       </If>
 
-      <If when={mode() === "structure" || mermaidSource().length === 0}>
+      <If when={props.mode === "structure" || mermaidSource().length === 0}>
         <View class="gap-3">
           <Text class="text-xs font-semibold text-muted">{`${t("web.artifact.diagram.nodes")} (${props.data.nodes.length})`}</Text>
           <View class="flex-row flex-wrap gap-2.5">
@@ -192,14 +170,11 @@ export interface SheetTab {
 export function SheetView(props: {
   readonly sheets: readonly SheetTab[];
   readonly activeIndex: number;
+  readonly filter: string;
   readonly readOnly: boolean;
-  readonly busy: boolean;
   readonly onSelectSheet: (idx: number) => void;
-  readonly onExportCsv: (name: string, rows: readonly Record<string, unknown>[]) => void;
   readonly onUpdateCell: (sheet: SheetTab, rowIndex: number, colKey: string, value: string, colType: string) => void;
-  readonly onAddRow: (sheet: SheetTab) => void;
 }) {
-  const filter = signal("");
   const editingCell = signal<{ readonly rowIdx: number; readonly colKey: string } | undefined>(undefined);
   const editingVal = signal("");
 
@@ -212,7 +187,7 @@ export function SheetView(props: {
   const indexedRows = computed(() => {
     const sh = currentSheet();
     if (!sh) return [];
-    const q = filter().trim().toLowerCase();
+    const q = props.filter.trim().toLowerCase();
     return sh.rows
       .map((row, idx) => ({ row, idx }))
       .filter(
@@ -236,52 +211,6 @@ export function SheetView(props: {
 
   return (
     <View testID="artifact-sheet-view" class="min-h-0 flex-1">
-      <View class="shrink-0 flex-row flex-wrap items-center justify-between gap-2 border-b border-line bg-side px-3 py-1.5">
-        <View class="flex-row flex-wrap items-center gap-1.5">
-          <Each of={props.sheets} key={(s) => s.id}>
-            {(sh, idx) => (
-              <Button
-                size="compact"
-                tone={props.activeIndex === idx() ? "primary" : "plain"}
-                onPress={() => {
-                  editingCell.set(undefined);
-                  props.onSelectSheet(idx());
-                }}
-              >
-                {sh().title}
-              </Button>
-            )}
-          </Each>
-        </View>
-        <If when={currentSheet()}>
-          {(sh) => (
-            <View class="flex-row items-center gap-2">
-              <SearchField
-                testid="sheet-filter-input"
-                value={filter()}
-                onInput={(v) => filter.set(v)}
-                placeholder={t("web.artifact.sheet.filterPlaceholder")}
-                label={t("web.artifact.sheet.filterPlaceholder")}
-                class="w-40"
-              />
-              <Text class="font-mono text-2xs text-muted tabular-nums">{t("web.artifact.sheet.rowsCount", { n: indexedRows().length })}</Text>
-              <If when={!props.readOnly}>
-                <Button size="compact" icon="add" testID="sheet-add-row" disabled={props.busy} onPress={() => props.onAddRow(sh())}>
-                  {t("web.artifact.sheet.addRow")}
-                </Button>
-              </If>
-              <IconButton
-                icon="download"
-                size={14}
-                label={t("web.artifact.dashboard.exportCsv")}
-                disabled={props.busy}
-                onClick={() => props.onExportCsv(sh().title, sh().rows)}
-              />
-            </View>
-          )}
-        </If>
-      </View>
-
       <Scroll class="min-h-0 flex-1" contentClass="gap-1 p-4">
         <If when={currentSheet()} else={<Empty icon="log">{t("web.artifact.sheet.empty")}</Empty>}>
           {(sh) => {
@@ -369,6 +298,28 @@ export function SheetView(props: {
           }}
         </If>
       </Scroll>
+
+      <If when={props.sheets.length > 1}>
+        <View testID="sheet-tabs-bar" class="h-8 shrink-0 flex-row items-center justify-between gap-2 border-t border-line bg-side px-3">
+          <View class="min-w-0 flex-1 flex-row items-center gap-1 overflow-hidden">
+            <Each of={props.sheets} key={(s) => s.id}>
+              {(sh, idx) => (
+                <Button
+                  size="compact"
+                  tone={props.activeIndex === idx() ? "primary" : "plain"}
+                  onPress={() => {
+                    editingCell.set(undefined);
+                    props.onSelectSheet(idx());
+                  }}
+                >
+                  {sh().title}
+                </Button>
+              )}
+            </Each>
+          </View>
+          <Text class="shrink-0 font-mono text-2xs text-muted tabular-nums">{t("web.artifact.sheet.rowsCount", { n: indexedRows().length })}</Text>
+        </View>
+      </If>
     </View>
   );
 }

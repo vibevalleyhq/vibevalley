@@ -1,4 +1,4 @@
-import { computed, effect, host, keymap, Scroll, signal, Text, untracked, View } from "nsh";
+import { computed, effect, host, keymap, Scroll, signal, Text, untracked, View, windowSize } from "nsh";
 import { Input, Menu, MenuItem, MenuSeparator, Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -23,6 +23,7 @@ import {
   PermissionCard,
   ThinkingBlock,
   thoughtLabel,
+  TodoProgressPanel,
   ToolCallCard,
 } from "./chat/ActivityWidgets";
 import {
@@ -33,6 +34,7 @@ import {
   fetchWorkspaceRuntimes,
   formatTokens,
   groupChatSteps,
+  latestSessionTodos,
   mergeChatSteps,
   openWorkspaceSession,
   pickWorkspaceFile,
@@ -111,6 +113,7 @@ export function WorkspaceChatPane() {
   const effectivePhase = computed((): ChatPhase => (hasAttention() ? "waiting" : phase()));
   const shownSteps = computed(() => visibleChatSteps(steps()));
   const feedItems = computed(() => groupChatSteps(shownSteps()));
+  const latestTodos = computed(() => latestSessionTodos(shownSteps()));
   const telemetry = computed(() => computeTelemetry(steps(), latestTokens()));
 
   if (host.available()) {
@@ -472,20 +475,19 @@ export function WorkspaceChatPane() {
                           class="gap-1 rounded-lg border border-line bg-side px-3 py-2"
                           style={steeredSeqs().has(single().step.seq) ? { borderLeftColor: mix("water", 0.9), backgroundColor: mix("water", 0.08) } : undefined}
                         >
-                          <View class="flex-row items-center gap-1.5">
-                            <Text class="text-xs font-semibold text-ink">{t("web.shell.chat.you")}</Text>
-                            <If when={steeredSeqs().has(single().step.seq)}>
+                          <If when={steeredSeqs().has(single().step.seq)}>
+                            <View class="flex-row items-center gap-1.5">
                               <View class="rounded-sm px-1.5 py-px" style={{ backgroundColor: mix("water", 0.14) }}>
                                 <Text class="text-2xs font-medium text-water">{t("web.shell.chat.steerTag")}</Text>
                               </View>
-                            </If>
-                          </View>
+                            </View>
+                          </If>
                           <Text class="text-sm text-ink select-text">{single().step.text}</Text>
                         </View>
                       </If>
 
                       <If when={single().step.type === "assistant/thinking"}>
-                        <ThinkingBlock step={single().step} durationMs={single().durationMs} />
+                        <ThinkingBlock step={single().step} durationMs={single().durationMs} running={single().trailing && effectivePhase() === "working"} />
                       </If>
 
                       <If when={single().step.type === "tool/call"}>
@@ -579,12 +581,7 @@ export function WorkspaceChatPane() {
           )}
         </If>
 
-        <If when={effectivePhase() === "working"}>
-          <View testID="chat-steering-banner" class="flex-row items-center gap-1.5 rounded-md px-2.5 py-1" style={{ backgroundColor: mix("water", 0.1) }}>
-            <Dot tone="water" size={6} ring={false} />
-            <Text class="min-w-0 flex-1 truncate text-xs font-medium text-water">{t("web.shell.chat.steeringBanner")}</Text>
-          </View>
-        </If>
+        <If when={latestTodos()}>{(todo) => <TodoProgressPanel checklist={todo()} working={effectivePhase() === "working"} />}</If>
 
         <View testID="chat-composer-card" class={`rounded-xl border bg-page ${composerFocused() ? "border-focus" : "border-line"}`}>
           <If when={attachedFiles().length > 0}>
@@ -797,7 +794,8 @@ export function WorkspaceChatPane() {
                   placement="top"
                   align="end"
                   offset={8}
-                  popupClass={`w-72 rounded-xl border border-line bg-elevated p-2.5 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
+                  popupClass={`w-72 flex-col overflow-hidden rounded-xl border border-line bg-elevated p-2.5 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`}
+                  popupStyle={{ maxHeight: Math.min(420, Math.max(200, Math.round(windowSize().height * 0.7))) }}
                   popupStartingClass={popupTransition("opacity-0")}
                   trigger={
                     <View
@@ -834,62 +832,64 @@ export function WorkspaceChatPane() {
                     </View>
                   }
                 >
-                  <View testID="chat-telemetry-drawer" class="gap-2">
-                    <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
-                      <View class="flex-row items-center justify-between gap-2">
-                        <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryQuotaTitle")}</Text>
-                        <If when={quotaPct() !== undefined}>
-                          <Text class={`shrink-0 font-mono text-xs tabular-nums ${(quotaPct() ?? 100) <= 15 ? "font-semibold text-warn-ink" : "text-ink"}`}>
-                            {t("web.shell.chat.telemetryQuota", { pct: quotaPct() ?? 0 })}
-                          </Text>
+                  <Scroll class="min-h-0 shrink">
+                    <View testID="chat-telemetry-drawer" class="gap-2">
+                      <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
+                        <View class="flex-row items-center justify-between gap-2">
+                          <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryQuotaTitle")}</Text>
+                          <If when={quotaPct() !== undefined}>
+                            <Text class={`shrink-0 font-mono text-xs tabular-nums ${(quotaPct() ?? 100) <= 15 ? "font-semibold text-warn-ink" : "text-ink"}`}>
+                              {t("web.shell.chat.telemetryQuota", { pct: quotaPct() ?? 0 })}
+                            </Text>
+                          </If>
+                        </View>
+                        <If when={quotaPct() !== undefined} else={<Text class="text-2xs text-faint">{t("web.shell.chat.telemetryQuotaUnavailable")}</Text>}>
+                          <View class="gap-1">
+                            <View class="h-1.5 overflow-hidden rounded-full bg-selected">
+                              <View class={(quotaPct() ?? 100) <= 15 ? "h-full bg-wheat" : "h-full bg-accent"} style={{ width: `${quotaPct() ?? 0}%` }} />
+                            </View>
+                            <If when={currentRuntime()?.quotaText}>{(label) => <Text class="text-2xs text-faint">{label()}</Text>}</If>
+                          </View>
                         </If>
                       </View>
-                      <If when={quotaPct() !== undefined} else={<Text class="text-2xs text-faint">{t("web.shell.chat.telemetryQuotaUnavailable")}</Text>}>
-                        <View class="gap-1">
-                          <View class="h-1.5 overflow-hidden rounded-full bg-selected">
-                            <View class={(quotaPct() ?? 100) <= 15 ? "h-full bg-wheat" : "h-full bg-accent"} style={{ width: `${quotaPct() ?? 0}%` }} />
+
+                      <If when={hasSessionTelemetry()}>
+                        <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
+                          <View class="flex-row items-center justify-between gap-2">
+                            <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryContextTitle")}</Text>
+                            <Text class="shrink-0 font-mono text-xs text-ink tabular-nums">
+                              {`${telemetry().contextPct}% · ${formatTokens(telemetry().contextUsed)}/${formatTokens(telemetry().contextWindow)}`}
+                            </Text>
                           </View>
-                          <If when={currentRuntime()?.quotaText}>{(label) => <Text class="text-2xs text-faint">{label()}</Text>}</If>
+                          <ContextBar
+                            cached={cachedBarPercent()}
+                            uncached={uncachedBarPercent()}
+                            class="h-1.5 flex-row overflow-hidden rounded-full bg-selected"
+                          />
+                          <View class="flex-row flex-wrap gap-2">
+                            <Text class="font-mono text-2xs text-ok-ink">{`${t("web.shell.chat.telemetryCached")} ${formatTokens(telemetry().cachedRead)}`}</Text>
+                            <Text class="font-mono text-2xs text-water">{`${t("web.shell.chat.telemetryUncached")} ${formatTokens(telemetry().uncachedInput)}`}</Text>
+                            <Text class="font-mono text-2xs text-muted">{`${t("web.shell.chat.telemetryOutput")} ${formatTokens(telemetry().output)}`}</Text>
+                            <If when={telemetry().reasoning > 0}>
+                              <Text class="font-mono text-2xs text-warn-ink">{`${t("web.shell.chat.telemetryReasoning")} ${formatTokens(telemetry().reasoning)}`}</Text>
+                            </If>
+                          </View>
+                        </View>
+
+                        <View class="flex-row items-center justify-between gap-2 rounded-lg border border-line bg-side px-2.5 py-2">
+                          <View class="min-w-0 gap-0.5">
+                            <Text class="truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryCacheTitle")}</Text>
+                            <Text class="font-mono text-xs font-semibold text-ink tabular-nums">
+                              {t("web.shell.chat.telemetryTurns", { turns: telemetry().turns, tools: telemetry().toolCount })}
+                            </Text>
+                          </View>
+                          <Text class="shrink-0 font-mono text-xs font-semibold text-ok-ink tabular-nums">
+                            {t("web.shell.chat.telemetryCache", { pct: telemetry().cacheHitPct })}
+                          </Text>
                         </View>
                       </If>
                     </View>
-
-                    <If when={hasSessionTelemetry()}>
-                      <View class="gap-1.5 rounded-lg border border-line bg-side p-2.5">
-                        <View class="flex-row items-center justify-between gap-2">
-                          <Text class="min-w-0 truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryContextTitle")}</Text>
-                          <Text class="shrink-0 font-mono text-xs text-ink tabular-nums">
-                            {`${telemetry().contextPct}% · ${formatTokens(telemetry().contextUsed)}/${formatTokens(telemetry().contextWindow)}`}
-                          </Text>
-                        </View>
-                        <ContextBar
-                          cached={cachedBarPercent()}
-                          uncached={uncachedBarPercent()}
-                          class="h-1.5 flex-row overflow-hidden rounded-full bg-selected"
-                        />
-                        <View class="flex-row flex-wrap gap-2">
-                          <Text class="font-mono text-2xs text-ok-ink">{`${t("web.shell.chat.telemetryCached")} ${formatTokens(telemetry().cachedRead)}`}</Text>
-                          <Text class="font-mono text-2xs text-water">{`${t("web.shell.chat.telemetryUncached")} ${formatTokens(telemetry().uncachedInput)}`}</Text>
-                          <Text class="font-mono text-2xs text-muted">{`${t("web.shell.chat.telemetryOutput")} ${formatTokens(telemetry().output)}`}</Text>
-                          <If when={telemetry().reasoning > 0}>
-                            <Text class="font-mono text-2xs text-warn-ink">{`${t("web.shell.chat.telemetryReasoning")} ${formatTokens(telemetry().reasoning)}`}</Text>
-                          </If>
-                        </View>
-                      </View>
-
-                      <View class="flex-row items-center justify-between gap-2 rounded-lg border border-line bg-side px-2.5 py-2">
-                        <View class="min-w-0 gap-0.5">
-                          <Text class="truncate text-xs font-medium text-muted">{t("web.shell.chat.telemetryCacheTitle")}</Text>
-                          <Text class="font-mono text-xs font-semibold text-ink tabular-nums">
-                            {t("web.shell.chat.telemetryTurns", { turns: telemetry().turns, tools: telemetry().toolCount })}
-                          </Text>
-                        </View>
-                        <Text class="shrink-0 font-mono text-xs font-semibold text-ok-ink tabular-nums">
-                          {t("web.shell.chat.telemetryCache", { pct: telemetry().cacheHitPct })}
-                        </Text>
-                      </View>
-                    </If>
-                  </View>
+                  </Scroll>
                 </Popover>
               </If>
 

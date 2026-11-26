@@ -1,4 +1,4 @@
-import { computed, keymap, Scroll, signal, Text, View } from "nsh";
+import { computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -178,7 +178,8 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
           placement="bottom"
           align="end"
           offset={4}
-          popupClass="max-h-88 w-56 rounded-lg border border-line bg-elevated p-1 shadow-float"
+          popupClass="w-56 flex-col overflow-hidden rounded-lg border border-line bg-elevated p-1 shadow-float"
+          popupStyle={{ maxHeight: Math.min(352, Math.max(180, Math.round(windowSize().height * 0.7))) }}
           trigger={
             <View
               testID="chat-new"
@@ -192,11 +193,11 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
             </View>
           }
         >
-          <View class="gap-0.5">
+          <View class="min-h-0 shrink gap-0.5">
             <View
               role="menuitem"
               testID="new-channel"
-              class="flex-row items-center gap-2 rounded-md px-2 py-1.5 hover:bg-hover"
+              class="shrink-0 flex-row items-center gap-2 rounded-md px-2 py-1.5 hover:bg-hover"
               onPress={() => {
                 menuOpen.set(false);
                 props.onNew();
@@ -205,7 +206,7 @@ export function Sidebar(props: { channel: Channel | undefined; thread: Channel |
               <Icon name="chat" size={14} tone="muted" />
               <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.channel.newChannel")}</Text>
             </View>
-            <View class="my-1 h-px bg-line" />
+            <View class="my-1 h-px shrink-0 bg-line" />
             <DirectPicker
               onPicked={(id) => {
                 menuOpen.set(false);
@@ -296,7 +297,7 @@ function DirectPicker(props: { onPicked: (channel: string) => void }) {
     if (id !== undefined) props.onPicked(id);
   };
   return (
-    <Scroll testID="direct-picker" accessibilityLabel={t("web.channel.direct.pick")} contentClass="gap-0.5">
+    <Scroll testID="direct-picker" accessibilityLabel={t("web.channel.direct.pick")} class="min-h-0 shrink" contentClass="gap-0.5">
       <Text class="px-2 py-1 text-xs font-semibold text-muted">{t("web.channel.direct.pick")}</Text>
       <If when={all.status() === "success" && agents().length === 0}>
         <Text class="px-2 py-1 text-sm text-muted">{t("web.channel.direct.none")}</Text>

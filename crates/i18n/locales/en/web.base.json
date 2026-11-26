@@ -10,8 +10,8 @@
       "hint": "Channels and threads"
     },
     "issues": {
-      "label": "Tasks",
-      "hint": "Every task from creation to completion"
+      "label": "Issues",
+      "hint": "Every issue from creation to completion"
     },
     "runs": {
       "label": "Runs & trajectories",
@@ -22,8 +22,8 @@
       "name": "Workspace"
     },
     "content": {
-      "label": "Content",
-      "hint": "Library, artifacts, and notes"
+      "label": "Artifacts",
+      "hint": "Artifacts, notes, and media"
     },
     "runtimes": {
       "label": "Engines",

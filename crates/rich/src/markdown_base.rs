@@ -414,6 +414,8 @@ pub fn vv_markdown_options(streaming: bool) -> MarkdownOptions {
         math: true,
         alerts: true,
         html: true,
+        links: true,
+        images: true,
         frontmatter: false,
         mdx: false,
         streaming,

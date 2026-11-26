@@ -666,6 +666,19 @@ export const CONTENT_TEMPLATES: readonly ContentTemplate[] = [
   { id: "tpl-ai-audio", key: "aiAudio", category: "ai", recommended: false, icon: "audio", kind: "ai", makeTab: "audio" },
 ];
 
+export function templateArtifactType(tpl: ContentTemplate): ArtifactType | undefined {
+  switch (tpl.kind) {
+    case "note":
+      return "outline";
+    case "whiteboard":
+      return "whiteboard";
+    case "deliverable":
+      return tpl.artifactType;
+    case "ai":
+      return undefined;
+  }
+}
+
 export function templateIcon(tpl: ContentTemplate): IconName {
   switch (tpl.kind) {
     case "note":

@@ -138,7 +138,7 @@ export function ReposPage(props: { rest: string }) {
           {(name) => <Keyed key={name()}>{() => <RepoPanel name={untrack(name)} repos={sorted} now={now()} />}</Keyed>}
         </If>
       </Scroll>
-      <Dialog open={creating()} onClose={() => creating.set(false)} title={t("web.repo.add")} testid="new-repo-dialog">
+      <Dialog open={creating()} onClose={() => creating.set(false)} title={t("web.repo.add")} size="sm" height="fixed" scroll={false} testid="new-repo-dialog">
         <NewRepoForm
           onDone={(made) => {
             creating.set(false);

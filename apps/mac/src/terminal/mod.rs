@@ -10,6 +10,7 @@ mod view;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
 pub use element::Geometry;
 pub(crate) use status::first_command_token;
 pub use status::{RunningState, SpawnSpec, TerminalEvent, TerminalStatus, agent_display_name};

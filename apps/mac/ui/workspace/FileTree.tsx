@@ -1,18 +1,109 @@
 // The file tree: nsh's Tree over the frame Rust keeps (directories load as
 // they expand), with git status colors.
-import { Clipboard, computed, Text, View } from "nsh";
-import { ContextMenu, MenuItem, MenuSeparator, Tree, type TreeItem } from "nsh/base";
+import { Clipboard, computed, keymap, signal, Text, View } from "nsh";
+import { Button, ContextMenu, MenuItem, MenuSeparator, Tree, type TreeItem } from "nsh/base";
 import { z } from "zod";
 
 import { t } from "@vibevalley/i18n";
 
 import { Icon } from "../design/Icon";
+import { IconButton } from "../design/IconButton";
+import { motionClass } from "../design/motion";
 import { SkeletonBar, SkeletonLines, useDelayedBusy } from "../design/Skeleton";
 import { act, hostApi } from "../infra/bridge";
 import { gitToneIconTone, gitToneTextClass, menuItemClass, menuPopupClass, menuSeparatorClass, PanelEmpty, SectionHead, ShellIconButton } from "./chrome";
 
 export type FileItem = TreeItem & { tone?: string; hidden?: boolean; loading?: boolean; children?: FileItem[] };
 export type FilesFrame = { root?: string; name?: string; items: FileItem[]; expanded?: string[]; selected?: string | null; loading?: boolean };
+
+const UNSUPPORTED_PREVIEW_EXTENSIONS = new Set([
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+  "pages",
+  "numbers",
+  "key",
+  "epub",
+  "rtf",
+  "zip",
+  "tar",
+  "gz",
+  "tgz",
+  "bz2",
+  "xz",
+  "7z",
+  "rar",
+  "dmg",
+  "iso",
+  "pkg",
+  "deb",
+  "rpm",
+  "mp3",
+  "wav",
+  "flac",
+  "aac",
+  "ogg",
+  "m4a",
+  "opus",
+  "aiff",
+  "mp4",
+  "mov",
+  "mkv",
+  "avi",
+  "webm",
+  "m4v",
+  "wmv",
+  "ttf",
+  "otf",
+  "woff",
+  "woff2",
+  "eot",
+  "db",
+  "sqlite",
+  "sqlite3",
+  "wasm",
+  "bin",
+  "exe",
+  "dll",
+  "so",
+  "dylib",
+  "a",
+  "o",
+  "obj",
+  "lib",
+  "rlib",
+  "class",
+  "jar",
+  "war",
+  "pyc",
+  "pyo",
+  "node",
+  "apk",
+  "ipa",
+  "psd",
+  "ai",
+  "sketch",
+  "fig",
+  "xd",
+  "blend",
+  "glb",
+  "gltf",
+  "fbx",
+  "usdz",
+  "stl",
+  "3ds",
+]);
+
+function isUnsupportedPreviewFile(path: string): boolean {
+  const base = path.split("/").pop() ?? path;
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0 || dot === base.length - 1) return false;
+  return UNSUPPORTED_PREVIEW_EXTENSIONS.has(base.slice(dot + 1).toLowerCase());
+}
 
 const fileItemSchema: z.ZodType<FileItem> = z.lazy(() =>
   z.object({
@@ -48,6 +139,14 @@ export function FileTree(props: { frame: FilesFrame | null }) {
   const hasItems = computed(() => (props.frame?.items.length ?? 0) > 0);
   const isLoadingTree = computed(() => !props.frame || (props.frame.items.length === 0 && props.frame.loading === true));
   const showLoading = useDelayedBusy(isLoadingTree);
+  const unsupportedChoice = signal<{ readonly path: string; readonly label: string } | null>(null);
+  keymap.bind(
+    "escape",
+    () => {
+      if (unsupportedChoice() !== null) unsupportedChoice.set(null);
+    },
+    { when: "always" },
+  );
   const relPath = (abs: string) => {
     const root = props.frame?.root?.replace(/\/+$/u, "");
     return root && abs.startsWith(`${root}/`) ? abs.slice(root.length + 1) : abs;
@@ -56,6 +155,16 @@ export function FileTree(props: { frame: FilesFrame | null }) {
     if (folder) return abs;
     const i = abs.lastIndexOf("/");
     return i > 0 ? abs.slice(0, i) : (props.frame?.root ?? abs);
+  };
+  const handleFileSelect = (path: string) => {
+    const item = byId().get(path);
+    if (!item || item.children || item.tone === "placeholder" || item.loading === true) return;
+    if (isUnsupportedPreviewFile(path)) {
+      unsupportedChoice.set({ path, label: item.label });
+      return;
+    }
+    unsupportedChoice.set(null);
+    act({ type: "open_file", path });
   };
   return (
     <View class="flex-1">
@@ -103,14 +212,8 @@ export function FileTree(props: { frame: FilesFrame | null }) {
           itemClass="group h-6.5 rounded-md hover:bg-hover selected:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
           onExpand={({ id }) => act({ type: "expand_dir", path: id })}
           onCollapse={({ id }) => act({ type: "collapse_dir", path: id })}
-          onSelectedChange={({ selected }) => {
-            const item = byId().get(selected);
-            if (item && !item.children && item.tone !== "placeholder" && item.loading !== true) act({ type: "open_file", path: selected });
-          }}
-          onAction={({ id }) => {
-            const item = byId().get(id);
-            if (item && !item.children && item.tone !== "placeholder" && item.loading !== true) act({ type: "open_file", path: id });
-          }}
+          onSelectedChange={({ selected }) => handleFileSelect(selected)}
+          onAction={({ id }) => handleFileSelect(id)}
           renderItem={(entry) => {
             const item = () => byId().get(entry.id);
             const isPlaceholder = () => item()?.tone === "placeholder";
@@ -157,6 +260,19 @@ export function FileTree(props: { frame: FilesFrame | null }) {
                 when={isPlaceholder() || isLoadingRow()}
                 else={
                   <ContextMenu trigger={renderRow()} popupClass={menuPopupClass}>
+                    <If when={!entry.folder}>
+                      <MenuItem
+                        testID="file-menu-open-default"
+                        onSelect={() => {
+                          unsupportedChoice.set(null);
+                          void hostApi.openFile(entry.id);
+                        }}
+                        class={menuItemClass}
+                      >
+                        <Text class="text-xs text-ink">{t("web.shell.fileTree.openWithDefault")}</Text>
+                      </MenuItem>
+                      <MenuSeparator class={menuSeparatorClass} />
+                    </If>
                     <MenuItem onSelect={() => void Clipboard.writeText(relPath(entry.id))} class={menuItemClass}>
                       <Text class="text-xs text-ink">{t("web.shell.fileTree.copyRelPath")}</Text>
                     </MenuItem>
@@ -178,6 +294,51 @@ export function FileTree(props: { frame: FilesFrame | null }) {
             );
           }}
         />
+      </If>
+      <If when={unsupportedChoice()}>
+        {(choice) => (
+          <View testID="file-unsupported-popover" class="shrink-0 gap-2 border-t border-line bg-elevated p-2.5">
+            <View class="flex-row items-start gap-2">
+              <View class="min-w-0 flex-1 gap-0.5">
+                <Text class="truncate text-xs font-semibold text-ink">{choice().label}</Text>
+                <Text class="text-2xs leading-snug text-muted">{t("web.shell.fileTree.unsupportedHint")}</Text>
+              </View>
+              <IconButton
+                icon="close"
+                size={12}
+                label={t("web.shell.git.cancel")}
+                testid="file-unsupported-close"
+                onClick={() => unsupportedChoice.set(null)}
+              />
+            </View>
+            <View class="flex-row items-center gap-1.5">
+              <Button
+                testID="file-open-default"
+                onPress={() => {
+                  const target = choice().path;
+                  unsupportedChoice.set(null);
+                  void hostApi.openFile(target);
+                }}
+                class={`h-7 flex-1 flex-row items-center justify-center gap-1.5 rounded-md bg-accent px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:opacity-90 active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+              >
+                <Icon name="open" size={12} tone="page" />
+                <Text class="truncate text-xs font-medium text-page">{t("web.shell.fileTree.openWithDefault")}</Text>
+              </Button>
+              <Button
+                testID="file-open-in-app"
+                onPress={() => {
+                  const target = choice().path;
+                  unsupportedChoice.set(null);
+                  act({ type: "open_file", path: target });
+                }}
+                class={`h-7 flex-1 flex-row items-center justify-center gap-1.5 rounded-md border border-line bg-page px-2 ${motionClass("transition-transform duration-120 ease-out")} hover:bg-hover active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus`}
+              >
+                <Icon name="file" size={12} tone="muted" />
+                <Text class="truncate text-xs font-medium text-ink">{t("web.shell.fileTree.openInApp")}</Text>
+              </Button>
+            </View>
+          </View>
+        )}
       </If>
     </View>
   );

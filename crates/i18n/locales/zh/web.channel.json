@@ -1,7 +1,7 @@
 {
   "tab": {
     "chat": "聊天",
-    "issues": "任务",
+    "issues": "工单",
     "crons": "定时任务"
   },
   "defaultRepo": "默认仓库 {repo}",
@@ -57,8 +57,8 @@
     "save": "保存"
   },
   "issues": {
-    "empty": "这个频道里还没有任务。在聊天里跟主助手说一件要做的事，它会派执行会话，任务就列在这里。",
-    "thread": "任务话题"
+    "empty": "这个频道里还没有工单。在聊天里跟主助手说一件要做的事，它会派执行会话，工单就列在这里。",
+    "thread": "工单话题"
   },
   "crons": {
     "empty": "还没有定时任务：跟主助手说「每天九点跑一遍测试」。",
@@ -233,7 +233,7 @@
     "preview": "链接预览"
   },
   "names": {
-    "issueThread": "任务话题",
+    "issueThread": "工单话题",
     "talkThread": "{who}的话题",
     "thread": "话题",
     "mention": {
@@ -248,10 +248,10 @@
   "threadWidth": "话题的宽窄（拖动，双击回默认）",
   "commands": {
     "issue": {
-      "name": "记一个任务",
+      "name": "记一个工单",
       "args": "标题",
       "note": "记进备选，在这个频道的仓库里",
-      "needs": "/issue 后面写任务的标题"
+      "needs": "/issue 后面写工单的标题"
     },
     "remember": {
       "name": "让主助手记住",

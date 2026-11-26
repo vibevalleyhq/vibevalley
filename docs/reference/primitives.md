@@ -239,10 +239,12 @@
 | `useLatest` | `state/atom.ts` | The answer to the newest `key()` while the component lives; undefined while there is nothing to ask. |
 | `contentSidebarOpen` | `state/contentNav.ts` |  |
 | `contentBrowseBucket` | `state/contentNav.ts` |  |
+| `activeArtifactType` | `state/contentNav.ts` |  |
 | `contentPresenting` | `state/contentNav.ts` |  |
 | `contentFocusMediaId` | `state/contentNav.ts` |  |
 | `templatePickerState` | `state/contentNav.ts` |  |
 | `contentSearchOpen` | `state/contentNav.ts` |  |
+| `templatePickerContextFor` | `state/contentNav.ts` |  |
 | `pinnedKeys` | `state/contentNav.ts` |  |
 | `isPinned` | `state/contentNav.ts` |  |
 | `togglePinned` | `state/contentNav.ts` |  |

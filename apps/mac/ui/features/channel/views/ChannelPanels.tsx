@@ -47,43 +47,45 @@ export function Pins(props: { channel: Channel; onPick: () => void }) {
     return a?.state === "failed" ? a.reason : undefined;
   };
   return (
-    <Scroll testID="pins" accessibilityLabel={t("web.channel.pins.title")} contentClass="gap-1">
-      <View class="mb-1 flex-row items-center justify-between border-b border-line px-2 pt-1 pb-1.5">
+    <View testID="pins" accessibilityLabel={t("web.channel.pins.title")} class="min-h-0 shrink">
+      <View class="mb-1 shrink-0 flex-row items-center justify-between border-b border-line px-2 pt-1 pb-1.5">
         <Text class="text-xs font-semibold text-muted">{t("web.channel.pins.title")}</Text>
         <If when={pinned() !== undefined}>
           <CountPill count={pinned()?.length ?? 0} hoverBright />
         </If>
       </View>
-      <If when={pinned()?.length === 0}>
-        <Text class="px-3 py-4 text-center text-xs leading-relaxed text-muted">{t("web.channel.pins.none")}</Text>
-      </If>
-      <If when={failed()}>
-        {(why) => (
-          <Text testID="pins-failed" class="px-2 py-2 text-sm text-berry">
-            {t("web.channel.pins.failed", { why: why() })}
-          </Text>
-        )}
-      </If>
-      <Each of={pinned() ?? []} key={(m) => m.id}>
-        {(m) => (
-          <View
-            role="button"
-            testID={`pin-${m().id}`}
-            class="gap-1 rounded-md border border-transparent px-2.5 py-2 hover:border-line hover:bg-hover"
-            onPress={() => {
-              router.navigate(messagePath(channelOf(collab()?.chat, m().channel), m().number));
-              untracked(() => props.onPick)();
-            }}
-          >
-            <View class="flex-row items-baseline justify-between gap-2">
-              <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{m().from === userId ? t("web.channel.messages.user") : m().name}</Text>
-              <Text class="shrink-0 text-2xs text-faint tabular-nums">{workbenchClock(m().at)}</Text>
+      <Scroll class="min-h-0 shrink" contentClass="gap-1">
+        <If when={pinned()?.length === 0}>
+          <Text class="px-3 py-4 text-center text-xs leading-relaxed text-muted">{t("web.channel.pins.none")}</Text>
+        </If>
+        <If when={failed()}>
+          {(why) => (
+            <Text testID="pins-failed" class="px-2 py-2 text-sm text-berry">
+              {t("web.channel.pins.failed", { why: why() })}
+            </Text>
+          )}
+        </If>
+        <Each of={pinned() ?? []} key={(m) => m.id}>
+          {(m) => (
+            <View
+              role="button"
+              testID={`pin-${m().id}`}
+              class="gap-1 rounded-md border border-transparent px-2.5 py-2 hover:border-line hover:bg-hover"
+              onPress={() => {
+                router.navigate(messagePath(channelOf(collab()?.chat, m().channel), m().number));
+                untracked(() => props.onPick)();
+              }}
+            >
+              <View class="flex-row items-baseline justify-between gap-2">
+                <Text class="min-w-0 flex-1 truncate text-xs font-semibold text-ink">{m().from === userId ? t("web.channel.messages.user") : m().name}</Text>
+                <Text class="shrink-0 text-2xs text-faint tabular-nums">{workbenchClock(m().at)}</Text>
+              </View>
+              <Text class="line-clamp-3 text-sm text-ink">{m().text}</Text>
             </View>
-            <Text class="line-clamp-3 text-sm text-ink">{m().text}</Text>
-          </View>
-        )}
-      </Each>
-    </Scroll>
+          )}
+        </Each>
+      </Scroll>
+    </View>
   );
 }
 
@@ -306,41 +308,43 @@ export function ThreadList(props: { channel: Channel; onPick: () => void }) {
     />
   );
   return (
-    <Scroll testID="thread-list" accessibilityLabel={t("web.channel.threadList.title")} contentClass="gap-0.5">
-      <View class="mb-1 flex-row items-center justify-between border-b border-line px-2 pt-1 pb-1.5">
+    <View testID="thread-list" accessibilityLabel={t("web.channel.threadList.title")} class="min-h-0 shrink">
+      <View class="mb-1 shrink-0 flex-row items-center justify-between border-b border-line px-2 pt-1 pb-1.5">
         <Text class="text-xs font-semibold text-muted">{t("web.channel.threadList.title")}</Text>
         <CountPill count={live().length} hoverBright />
       </View>
-      <If when={live().length === 0}>
-        <Text testID="threads-empty" class="px-3 py-4 text-center text-xs leading-relaxed text-muted">
-          {t("web.channel.threadList.none")}
-        </Text>
-      </If>
-      <Each of={live()} key={(c) => c.id}>
-        {(c) => item(c)}
-      </Each>
-      <If when={archived().length > 0}>
-        <View class="mt-1.5 gap-0.5 border-t border-line pt-1.5">
-          <View
-            role="button"
-            testID="threads-archived"
-            accessibilityState={{ expanded: showArchived() }}
-            class="group h-7 flex-row items-center gap-1.5 rounded-md px-1.5 hover:bg-hover"
-            onPress={() => showArchived.set(!showArchived())}
-          >
-            <View class="h-4 w-4 shrink-0 items-center justify-center">
-              <Icon name={showArchived() ? "choose" : "expand"} size={14} tone="muted" />
+      <Scroll class="min-h-0 shrink" contentClass="gap-0.5">
+        <If when={live().length === 0}>
+          <Text testID="threads-empty" class="px-3 py-4 text-center text-xs leading-relaxed text-muted">
+            {t("web.channel.threadList.none")}
+          </Text>
+        </If>
+        <Each of={live()} key={(c) => c.id}>
+          {(c) => item(c)}
+        </Each>
+        <If when={archived().length > 0}>
+          <View class="mt-1.5 gap-0.5 border-t border-line pt-1.5">
+            <View
+              role="button"
+              testID="threads-archived"
+              accessibilityState={{ expanded: showArchived() }}
+              class="group h-7 flex-row items-center gap-1.5 rounded-md px-1.5 hover:bg-hover"
+              onPress={() => showArchived.set(!showArchived())}
+            >
+              <View class="h-4 w-4 shrink-0 items-center justify-center">
+                <Icon name={showArchived() ? "choose" : "expand"} size={14} tone="muted" />
+              </View>
+              <Text class="text-xs font-medium text-muted group-hover:text-ink">{t("web.channel.threadList.archived", { n: archived().length })}</Text>
             </View>
-            <Text class="text-xs font-medium text-muted group-hover:text-ink">{t("web.channel.threadList.archived", { n: archived().length })}</Text>
+            <If when={showArchived()}>
+              <Each of={archived()} key={(c) => c.id}>
+                {(c) => item(c)}
+              </Each>
+            </If>
           </View>
-          <If when={showArchived()}>
-            <Each of={archived()} key={(c) => c.id}>
-              {(c) => item(c)}
-            </Each>
-          </If>
-        </View>
-      </If>
-    </Scroll>
+        </If>
+      </Scroll>
+    </View>
   );
 }
 
@@ -439,7 +443,15 @@ function RenameBox(props: { value: string; label: string; onInput: (v: string) =
 /** Every channel and thread searched at once, the server reading the filters; a hit opens where it is. */
 export function FarmSearch(props: { open: boolean; onClose: () => void }) {
   return (
-    <Dialog open={props.open} onClose={() => props.onClose()} title={t("web.channel.farmSearch.title")} wide testid="farm-search">
+    <Dialog
+      open={props.open}
+      onClose={() => props.onClose()}
+      title={t("web.channel.farmSearch.title")}
+      size="md"
+      height="fixed"
+      scroll={false}
+      testid="farm-search"
+    >
       <If when={props.open}>
         <FarmSearchBody onClose={() => props.onClose()} />
       </If>
@@ -465,59 +477,63 @@ function FarmSearchBody(props: { onClose: () => void }) {
     return a?.state === "failed" ? a.reason : undefined;
   };
   return (
-    <View class="gap-3">
-      <View class="h-9 flex-row items-center gap-2">
-        <Icon name="search" size={16} tone="muted" />
-        <TextInput
-          testID="farm-search-input"
-          autoFocus
-          value={text()}
-          onInput={(v) => text.set(v)}
-          placeholder={t("web.channel.farmSearch.hint")}
-          accessibilityLabel={t("web.channel.farmSearch.title")}
-          class="flex-1"
-          wide={false}
-        />
+    <View class="min-h-0 flex-1">
+      <View class="shrink-0 gap-2 border-b border-line px-5 py-3">
+        <View class="h-9 flex-row items-center gap-2">
+          <Icon name="search" size={16} tone="muted" />
+          <TextInput
+            testID="farm-search-input"
+            autoFocus
+            value={text()}
+            onInput={(v) => text.set(v)}
+            placeholder={t("web.channel.farmSearch.hint")}
+            accessibilityLabel={t("web.channel.farmSearch.title")}
+            class="flex-1"
+            wide={false}
+          />
+        </View>
+        <View class="rounded-md bg-side px-2.5 py-1.5">
+          <Text class="font-mono text-xs text-muted">{t("web.channel.farmSearch.filters")}</Text>
+        </View>
       </View>
-      <View class="rounded-md bg-side px-2.5 py-1.5">
-        <Text class="font-mono text-xs text-muted">{t("web.channel.farmSearch.filters")}</Text>
-      </View>
-      <If when={search()?.state === "waiting"}>
-        <Text class="text-sm text-muted">{t("web.channel.farmSearch.searching")}</Text>
-      </If>
-      <If when={failed()}>
-        {(why) => (
-          <Text testID="search-failed" class="text-sm text-berry">
-            {t("web.channel.farmSearch.failed", { why: why() })}
-          </Text>
-        )}
-      </If>
-      <If when={hits()?.length === 0 && text().trim() !== ""}>
-        <Text class="py-4 text-center text-sm text-muted">{t("web.channel.farmSearch.none")}</Text>
-      </If>
-      <View role="list" accessibilityLabel={t("web.channel.messages.label")} class="gap-1">
-        <Each of={hits() ?? []} key={(h) => h.message.id}>
-          {(h) => (
-            <View
-              role="button"
-              testID={`search-hit-${h().message.id}`}
-              tooltip={<Bubble text={h().address} />}
-              class="gap-1 rounded-md border border-transparent px-2.5 py-2 hover:border-line hover:bg-hover"
-              onPress={() => {
-                router.navigate(messagePath(channelOf(collab()?.chat, h().message.channel), h().message.number));
-                untracked(() => props.onClose)();
-              }}
-            >
-              <View class="flex-row items-baseline gap-2">
-                <Text class="text-xs font-semibold text-accent">{h().address}</Text>
-                <Text class="text-xs font-semibold text-ink">{h().message.from === userId ? t("web.channel.messages.user") : h().message.name}</Text>
-                <Text class="text-xs text-muted tabular-nums">{workbenchClock(h().message.at)}</Text>
-              </View>
-              <Text class="line-clamp-2 text-sm text-ink">{h().message.text}</Text>
-            </View>
+      <Scroll class="min-h-0 flex-1" contentClass="gap-1 px-5 py-3">
+        <If when={search()?.state === "waiting"}>
+          <Text class="text-sm text-muted">{t("web.channel.farmSearch.searching")}</Text>
+        </If>
+        <If when={failed()}>
+          {(why) => (
+            <Text testID="search-failed" class="text-sm text-berry">
+              {t("web.channel.farmSearch.failed", { why: why() })}
+            </Text>
           )}
-        </Each>
-      </View>
+        </If>
+        <If when={hits()?.length === 0 && text().trim() !== ""}>
+          <Text class="py-4 text-center text-sm text-muted">{t("web.channel.farmSearch.none")}</Text>
+        </If>
+        <View role="list" accessibilityLabel={t("web.channel.messages.label")} class="gap-1">
+          <Each of={hits() ?? []} key={(h) => h.message.id}>
+            {(h) => (
+              <View
+                role="button"
+                testID={`search-hit-${h().message.id}`}
+                tooltip={<Bubble text={h().address} />}
+                class="gap-1 rounded-md border border-transparent px-2.5 py-2 hover:border-line hover:bg-hover"
+                onPress={() => {
+                  router.navigate(messagePath(channelOf(collab()?.chat, h().message.channel), h().message.number));
+                  untracked(() => props.onClose)();
+                }}
+              >
+                <View class="flex-row items-baseline gap-2">
+                  <Text class="text-xs font-semibold text-accent">{h().address}</Text>
+                  <Text class="text-xs font-semibold text-ink">{h().message.from === userId ? t("web.channel.messages.user") : h().message.name}</Text>
+                  <Text class="text-xs text-muted tabular-nums">{workbenchClock(h().message.at)}</Text>
+                </View>
+                <Text class="line-clamp-2 text-sm text-ink">{h().message.text}</Text>
+              </View>
+            )}
+          </Each>
+        </View>
+      </Scroll>
     </View>
   );
 }

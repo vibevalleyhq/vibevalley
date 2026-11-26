@@ -46,7 +46,7 @@ fn translates_zh_and_en_across_shared_and_web_namespaces() {
     let static_cases = [
         ("shared.action.run_command", "跑命令", "running a command"),
         ("web.shell.sidebar.title", "仓库与终端", "Repos & terminals"),
-        ("web.issue.family.children", "子任务", "Child issues"),
+        ("web.issue.family.children", "子工单", "Child issues"),
         ("web.artifact.page.delete", "删掉", "Delete"),
         ("web.setting.language.title", "语言", "Language"),
         ("web.farm.hud.workbench", "工作台", "Workbench"),
@@ -112,7 +112,7 @@ fn interpolates_strings_numbers_booleans_plurals_and_handles_fallbacks() {
     );
     assert_eq!(
         translate_json("zh", "web.issue.detail.noCriteria", Some(r#"{"answer":true}"#)),
-        "这个任务没写做完的标准：交回来时看结论判断。"
+        "这个工单没写做完的标准：交回来时看结论判断。"
     );
 
     // Null values are skipped without discarding sibling params; empty / malformed JSON and
@@ -145,7 +145,7 @@ fn quickjs_native_module_calls_translate_synchronously() {
             [rich.translate("zh", "shared.action.run_command"), "跑命令"],
             [rich.translate("en", "web.shell.sidebar.title"), "Repos & terminals"],
             // Explicit undefined, null, and empty JSON object
-            [rich.translate("zh", "web.issue.family.children", undefined), "子任务"],
+            [rich.translate("zh", "web.issue.family.children", undefined), "子工单"],
             [rich.translate("en", "web.setting.language.title", null), "Language"],
             [rich.translate("en", "web.setting.language.title", "{}"), "Language"],
             // Parameterized strings, numbers, plurals, and booleans

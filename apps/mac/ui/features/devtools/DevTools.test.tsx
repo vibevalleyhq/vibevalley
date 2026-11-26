@@ -235,8 +235,10 @@ function createDevToolsHost(params: Record<string, unknown> = {}, initialRespons
   const calls: { op: string; payload: unknown }[] = [];
   const responses: Record<string, unknown> = { ...initialResponses };
   let rev = 0;
+  let boundApp: App | null = null;
+  let seenPosts = 0;
 
-  const action = (data: unknown) => {
+  const processAction = (data: unknown) => {
     const a = data as { type: string; id?: string; op?: string; payload?: unknown };
     if (a.type === "call") {
       const op = a.op ?? "";
@@ -253,16 +255,30 @@ function createDevToolsHost(params: Record<string, unknown> = {}, initialRespons
       if (deferOps.includes(op)) heldReplies.push(reply);
       else queue.push(reply);
     }
-    return null;
   };
 
-  const pump = async (app: App) => {
-    for (let round = 0; round < 50 && queue.length > 0; round++) {
-      for (const [name, data] of queue.splice(0)) await app.host.send(name, data);
+  const sync = (app: App | null = boundApp) => {
+    if (!app) return;
+    boundApp = app;
+    const posts = app.host.posts();
+    while (seenPosts < posts.length) {
+      const msg = posts[seenPosts++];
+      if (msg?.name === "action") processAction(msg.data);
     }
   };
 
+  const pump = async (app: App) => {
+    boundApp = app;
+    for (let round = 0; round < 50; round++) {
+      sync(app);
+      if (queue.length === 0) break;
+      for (const [name, data] of queue.splice(0)) await app.host.send(name, data);
+    }
+    sync(app);
+  };
+
   const releaseDeferred = async (app: App) => {
+    sync(app);
     queue.push(...heldReplies.splice(0));
     await pump(app);
   };
@@ -271,26 +287,38 @@ function createDevToolsHost(params: Record<string, unknown> = {}, initialRespons
     const deadline = Date.now() + timeoutMs;
     await pump(app);
     while (!done()) {
+      sync(app);
       if (queue.length > 0) {
         await pump(app);
         continue;
       }
       const left = deadline - Date.now();
       if (left <= 0) break;
-      await app.waitUntil(() => queue.length > 0 || done(), { timeout: left });
+      await app.waitUntil(
+        () => {
+          sync(app);
+          return queue.length > 0 || done();
+        },
+        { timeout: left },
+      );
     }
     await pump(app);
   };
 
   const pushFrame = async (app: App, topic: string, data: unknown) => {
+    sync(app);
     await app.host.send(`frame:${topic}`, { rev: ++rev, data });
     await pump(app);
   };
 
   return {
-    options: { params: { view: "devtools", locale: "en", detached: false, ...params }, handlers: { action, ready: null } },
-    calls,
+    options: { params: { view: "devtools", locale: "en", detached: false, ...params }, handlers: { action: null, ready: null } },
+    get calls() {
+      sync();
+      return calls;
+    },
     clearCalls: () => {
+      sync();
       calls.length = 0;
     },
     pump,

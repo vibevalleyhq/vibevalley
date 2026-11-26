@@ -22,7 +22,7 @@
   "orchestratorRuntime": "主助手只在 VibeValley 自己的 agent 上跑：引擎要是 {runtime}",
   "newAgentId": "新角色的 id 要留空；指定 id 请用保存",
   "newSkillId": "新技能的 id 要留空；指定 id 请用保存",
-  "removeAgent": "删掉角色「{name}」（{id}，跑在 {runtime} 上）：已经派给它的任务不跟着改",
+  "removeAgent": "删掉角色「{name}」（{id}，跑在 {runtime} 上）：已经派给它的工单不跟着改",
   "removeSkill": "删掉技能「{name}」",
   "unequip": "从 {holders} 的角色里摘掉它",
   "quoted": "「{name}」"

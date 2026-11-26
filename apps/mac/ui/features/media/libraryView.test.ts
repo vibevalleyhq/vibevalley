@@ -104,7 +104,7 @@ test("artifactMatchesType matches all 12 exact artifact types", () => {
   }
 });
 
-test("orthogonal SourceFilter and pinned filtering work across artifacts and media", () => {
+test("artifactType, fileKind, sort, and pinned filtering work across artifacts and media", () => {
   const artifacts = [
     makeArtifact({ id: "art-user", title: "My Board", artifactType: "whiteboard", by: userId, updated: 150 }),
     makeArtifact({ id: "art-agent", title: "Agent Deck", artifactType: "slides", by: "a1", byName: "Agent", updated: 250 }),
@@ -116,17 +116,14 @@ test("orthogonal SourceFilter and pinned filtering work across artifacts and med
   ];
   const pinned = new Set(["artifact:art-agent", "media:m-up"]);
 
-  expect(shownArtifacts(artifacts, { source: "all", sort: "recent" }).map((a) => a.id)).toEqual(["art-agent", "art-user"]);
-  expect(shownArtifacts(artifacts, { source: "agent", sort: "recent" }).map((a) => a.id)).toEqual(["art-agent"]);
-  expect(shownArtifacts(artifacts, { source: "user", sort: "recent" }).map((a) => a.id)).toEqual(["art-user"]);
-  expect(shownArtifacts(artifacts, { source: "all", artifactType: "whiteboard", sort: "recent" }).map((a) => a.id)).toEqual(["art-user"]);
-  expect(shownArtifacts(artifacts, { source: "all", sort: "recent", pinnedOnly: true, pinned }).map((a) => a.id)).toEqual(["art-agent"]);
+  expect(shownArtifacts(artifacts, { sort: "recent" }).map((a) => a.id)).toEqual(["art-agent", "art-user"]);
+  expect(shownArtifacts(artifacts, { sort: "name" }).map((a) => a.id)).toEqual(["art-agent", "art-user"]);
+  expect(shownArtifacts(artifacts, { artifactType: "whiteboard", sort: "recent" }).map((a) => a.id)).toEqual(["art-user"]);
+  expect(shownArtifacts(artifacts, { sort: "recent", pinnedOnly: true, pinned }).map((a) => a.id)).toEqual(["art-agent"]);
 
-  expect(shownMedia(media, { source: "all" }).map((m) => m.attachment.id)).toEqual(["m-up", "m-gen", "m-fetch"]);
-  expect(shownMedia(media, { source: "agent" }).map((m) => m.attachment.id)).toEqual(["m-gen", "m-fetch"]);
-  expect(shownMedia(media, { source: "user" }).map((m) => m.attachment.id)).toEqual(["m-up"]);
-  expect(shownMedia(media, { source: "all", fileKind: "audio" }).map((m) => m.attachment.id)).toEqual(["m-gen"]);
-  expect(shownMedia(media, { source: "all", pinnedOnly: true, pinned }).map((m) => m.attachment.id)).toEqual(["m-up"]);
+  expect(shownMedia(media, {}).map((m) => m.attachment.id)).toEqual(["m-up", "m-gen", "m-fetch"]);
+  expect(shownMedia(media, { fileKind: "audio" }).map((m) => m.attachment.id)).toEqual(["m-gen"]);
+  expect(shownMedia(media, { pinnedOnly: true, pinned }).map((m) => m.attachment.id)).toEqual(["m-up"]);
 });
 
 test("single, toggle (add), and shift range multi-select maintain anchor and never leave empty files selection", () => {
@@ -270,10 +267,10 @@ test("regression: countContentHub sidebar badges match LibraryPage visible count
     const pinnedOnly = isPinnedBucket(bucket);
     const pageTotal =
       (showsArtifactsInBucket(bucket)
-        ? shownArtifacts(artifacts, { source: "all", artifactType: bucketArtifactType(bucket), sort: "recent", pinnedOnly, pinned }).filter(
+        ? shownArtifacts(artifacts, { artifactType: bucketArtifactType(bucket), sort: "recent", pinnedOnly, pinned }).filter(
             (a) => bucket.kind !== "apps" || installedArtifactIds.has(a.id),
           ).length
-        : 0) + (showsMediaInBucket(bucket) ? shownMedia(media, { source: "all", fileKind: bucketFileKind(bucket), pinnedOnly, pinned }).length : 0);
+        : 0) + (showsMediaInBucket(bucket) ? shownMedia(media, { fileKind: bucketFileKind(bucket), pinnedOnly, pinned }).length : 0);
     expect(countForBucket(counts, bucket)).toBe(pageTotal);
   }
   expect(counts.total).toBe(artifacts.length + media.length);

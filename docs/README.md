@@ -86,14 +86,14 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | 一轮 | a round of work | `Run` | 一次干活、turn（指一轮时） |
 | 角色 | profile | agent（`Agent`） | 帮工档案、档案（中文界面） |
 | 引擎 | engine | runtime（`RuntimeInfo`） | harness、runtime（中文界面）、农机（中文界面） |
-| 任务 | ticket | issue（`Issue`） | job、ticket（中文界面）、工单（中文界面） |
+| 工单 | ticket | issue（`Issue`） | job、ticket（中文界面）、任务（中文界面，指工单时） |
 | 作品 | artifact | artifact（`Artifact`，正文 `blocks`、`store` 或 `html`） | 稿子、草稿（指作品时）、产出、文档（指作品时）、doc（指作品时）、Artifact（中文界面） |
 | 仓库 | repo | repo（`RepoSummary`） | 一块地 |
 | 空间 | space | `SpaceState`；目录是 `work_root`（`VIBEVALLEY_WORK_ROOT`） | 世界、全图 |
 | 宿主 | host | `ServerConfig.home`（`$VIBEVALLEY_HOME`） |  |
 | 并发上限 | spot | `ServerConfig.repo.maxSessions`（配置 `repo.max_sessions`）、`Session.room`；每个引擎另有 `maxWorking` | 并发位、空地、空位（中文界面） |
 | 角色模板 | profile template | `AgentTemplate`（`agent.template.*`） | 种子、预设 |
-| 任务模板 | ticket template | issue template（`IssueTemplate`、`repo.template.list`） | seed |
+| 工单模板 | ticket template | issue template（`IssueTemplate`、`repo.template.list`） | seed |
 | 阶段 | what it is doing | phase（`Session.phase`） | 状态（指阶段时） |
 | 核心状态 | core state | `SpaceState` |  |
 | VibeValley | VibeValley | 服务端、整个系统 | 农场（指系统时） |
@@ -113,8 +113,8 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | 人设 | persona | `persona.md`、`PersonaMode` |  |
 | 子代理 | subagent | subagent（Rust 的自研 agent 还没有） | 帮手（中文界面，指子代理时） |
 | 待办清单 | todo | `Todo`（工具 `todo_add`、`todo_update`、`todo_list`） | 自己的任务（中文界面） |
-| 父任务 | parent issue | `Issue`（有子任务） | 计划图、TaskGraph、父工单（中文界面） |
-| 子任务 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | Task、步骤状态机、子工单（中文界面） |
+| 父工单 | parent issue | `Issue`（有子工单） | 计划图、TaskGraph、父任务（中文界面） |
+| 子工单 | child issue | `Issue`（带 `parent`、`blockedBy`；拆单输入为 `IssueChildDraft`） | Task、步骤状态机、子任务（中文界面） |
 | 派活 | dispatch | hire（`Issue.hire`、事实 `FactSessionChanged`） |  |
 | 派工关联 | assignment | `Assignment`（`Issue.assignments`） |  |
 | 执行器 | executor | `Drivers`（角色经 oar 开会话） |  |
@@ -150,7 +150,7 @@ VibeValley 是 AI 版的 [Linear](https://linear.app)，穿着 Papertrails 纸�
 | 收获 | harvest | 完成（收之前看改动） | 动作 `complete`、`Changes` |
 | 麦茬 | stubble | 已完成 | `done` |
 | 仓库 | warehouse | 合进主分支或 PR 合了的任务 | `delivered`：`merged`、`pull_request` |
-| 图纸桌 | issue board | 任务 | `Issue` |
+| 图纸桌 | issue board | 工单 | `Issue` |
 | 一季庄稼 | a crop | 一轮 | `Run` |
 | 地里 | in the field | 在场的执行会话 | `Session.hired` |
 | 帮工 | helper | 在农场地里干活的执行会话 | `Session.hired` |

@@ -206,6 +206,30 @@ export interface ActivityEditedFile {
   readonly canDiff: boolean;
 }
 
+export interface ActivityCommandPreview {
+  readonly seq: number;
+  readonly command: string;
+  readonly running: boolean;
+  readonly failed: boolean;
+}
+
+export type TodoStepStatus = "pending" | "in_progress" | "done" | "skipped" | "failed";
+
+export interface TodoStep {
+  readonly title: string;
+  readonly status: TodoStepStatus;
+}
+
+export interface TodoChecklist {
+  readonly seq: number;
+  readonly steps: readonly TodoStep[];
+  readonly doneCount: number;
+  readonly inProgressCount: number;
+  readonly failedCount: number;
+  readonly totalCount: number;
+  readonly activeStep?: TodoStep | undefined;
+}
+
 export interface ActivitySummary {
   readonly totalSteps: number;
   readonly thinkingCount: number;
@@ -217,8 +241,10 @@ export interface ActivitySummary {
   readonly totalTools: number;
   readonly runningCount: number;
   readonly failedCount: number;
+  readonly startedAt: number;
   readonly durationMs: number;
   readonly editedFiles: readonly ActivityEditedFile[];
+  readonly latestCommand?: ActivityCommandPreview | undefined;
 }
 
 export type ChatFeedItem =
@@ -227,6 +253,7 @@ export type ChatFeedItem =
       readonly key: string;
       readonly step: SessionEvent;
       readonly durationMs?: number | undefined;
+      readonly trailing: boolean;
     }
   | {
       readonly kind: "activity";
@@ -248,6 +275,10 @@ function isIntermediateStep(step: SessionEvent): boolean {
   return step.type === "assistant/thinking" || step.type === "tool/call" || step.type === "memory/recalled";
 }
 
+function isPlainRecord(val: unknown): val is Readonly<Record<string, unknown>> {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
 function firstStringField(obj: Readonly<Record<string, unknown>>, keys: readonly string[]): string | undefined {
   for (const key of keys) {
     const val = obj[key];
@@ -267,6 +298,112 @@ function firstPositiveInt(obj: Readonly<Record<string, unknown>>, keys: readonly
   return undefined;
 }
 
+function normalizeTodoStatus(raw: unknown): TodoStepStatus | undefined {
+  if (typeof raw !== "string") return undefined;
+  switch (raw.trim().toLowerCase()) {
+    case "done":
+    case "completed":
+    case "complete":
+      return "done";
+    case "in_progress":
+    case "in-progress":
+    case "working":
+    case "running":
+      return "in_progress";
+    case "pending":
+    case "todo":
+    case "not_started":
+      return "pending";
+    case "skipped":
+    case "cancelled":
+    case "canceled":
+      return "skipped";
+    case "failed":
+    case "error":
+      return "failed";
+    default:
+      return undefined;
+  }
+}
+
+/** Parses `update_steps` (Antigravity/AMP), `TodoWrite`, or `update_plan` payloads into a structured checklist. */
+export function parseTodoChecklist(step: Pick<SessionEvent, "seq" | "type" | "tool" | "input">): TodoChecklist | undefined {
+  if (step.type !== "tool/call") return undefined;
+  const raw = step.input?.trim() ?? "";
+  if (raw === "") return undefined;
+  const parsed = JsonObjectInput.safeParse(raw);
+  if (!parsed.success) return undefined;
+  const obj = parsed.data;
+  const toolLower = (step.tool ?? "").toLowerCase();
+
+  let candidates: unknown;
+  if (Array.isArray(obj.steps)) {
+    candidates = obj.steps;
+  } else if ((toolLower.includes("todo") || toolLower.includes("plan") || toolLower.includes("steps")) && Array.isArray(obj.todos)) {
+    candidates = obj.todos;
+  } else if ((toolLower.includes("todo") || toolLower.includes("plan") || toolLower.includes("steps")) && Array.isArray(obj.plan)) {
+    candidates = obj.plan;
+  }
+  if (!Array.isArray(candidates) || candidates.length === 0) return undefined;
+
+  const steps: TodoStep[] = [];
+  for (const item of candidates) {
+    if (!isPlainRecord(item)) continue;
+    const title = firstStringField(item, ["title", "content", "step", "label"]);
+    const status = normalizeTodoStatus(item.status) ?? "pending";
+    if (title !== undefined) steps.push({ title, status });
+  }
+  if (steps.length === 0) return undefined;
+
+  let doneCount = 0;
+  let inProgressCount = 0;
+  let failedCount = 0;
+  for (const item of steps) {
+    if (item.status === "done") doneCount += 1;
+    else if (item.status === "in_progress") inProgressCount += 1;
+    else if (item.status === "failed") failedCount += 1;
+  }
+  const activeStep = steps.find((s) => s.status === "in_progress") ?? steps.find((s) => s.status === "pending");
+
+  return {
+    seq: step.seq,
+    steps,
+    doneCount,
+    inProgressCount,
+    failedCount,
+    totalCount: steps.length,
+    ...(activeStep !== undefined ? { activeStep } : {}),
+  };
+}
+
+/** Returns the latest `update_steps` / todo checklist from a session transcript, if any. */
+export function latestSessionTodos(steps: readonly SessionEvent[]): TodoChecklist | undefined {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const step = steps[i];
+    if (step === undefined) continue;
+    const parsed = parseTodoChecklist(step);
+    if (parsed !== undefined) return parsed;
+  }
+  return undefined;
+}
+
+function extractCommandText(step: SessionEvent): string | undefined {
+  if (step.type !== "tool/call" || step.action !== "run_command") return undefined;
+  const raw = step.input?.trim() ?? "";
+  if (raw !== "") {
+    const parsed = JsonObjectInput.safeParse(raw);
+    if (parsed.success) {
+      const cmd = firstStringField(parsed.data, ["command", "CommandLine", "cmd"]);
+      if (cmd !== undefined) return cmd.replaceAll(/\s+/gu, " ").trim();
+    }
+  }
+  const fallback = step.text
+    .replaceAll(/\s+/gu, " ")
+    .trim()
+    .replace(/^\$\s+/u, "");
+  return fallback.length > 0 ? fallback : undefined;
+}
+
 function summarizeActivity(run: readonly ActivityStep[], endTime: number): ActivitySummary {
   let thinkingCount = 0;
   let readCount = 0;
@@ -277,6 +414,8 @@ function summarizeActivity(run: readonly ActivityStep[], endTime: number): Activ
   let runningCount = 0;
   let failedCount = 0;
   const editedByPath = new Map<string, ActivityEditedFile>();
+  let latestRunningCommand: ActivityCommandPreview | undefined;
+  let latestAnyCommand: ActivityCommandPreview | undefined;
 
   for (const { step } of run) {
     if (step.type === "assistant/thinking") {
@@ -298,9 +437,21 @@ function summarizeActivity(run: readonly ActivityStep[], endTime: number): Activ
       case "edit_file":
         editCount += 1;
         break;
-      case "run_command":
+      case "run_command": {
         commandCount += 1;
+        const cmdText = extractCommandText(step);
+        if (cmdText !== undefined) {
+          const preview: ActivityCommandPreview = {
+            seq: step.seq,
+            command: cmdText,
+            running: step.ok === undefined,
+            failed: step.ok === false,
+          };
+          latestAnyCommand = preview;
+          if (preview.running) latestRunningCommand = preview;
+        }
         break;
+      }
       default:
         otherToolCount += 1;
         break;
@@ -319,7 +470,9 @@ function summarizeActivity(run: readonly ActivityStep[], endTime: number): Activ
 
   const first = run[0];
   const last = run[run.length - 1];
-  const durationMs = first !== undefined && last !== undefined ? Math.max(0, endTime - first.step.time) : 0;
+  const startedAt = first?.step.time ?? endTime;
+  const durationMs = first !== undefined && last !== undefined ? Math.max(0, endTime - startedAt) : 0;
+  const latestCommand = latestRunningCommand ?? latestAnyCommand;
 
   return {
     totalSteps: run.length,
@@ -332,8 +485,10 @@ function summarizeActivity(run: readonly ActivityStep[], endTime: number): Activ
     totalTools: readCount + searchCount + editCount + commandCount + otherToolCount,
     runningCount,
     failedCount,
+    startedAt,
     durationMs,
     editedFiles: [...editedByPath.values()],
+    ...(latestCommand !== undefined ? { latestCommand } : {}),
   };
 }
 
@@ -354,12 +509,14 @@ export function groupChatSteps(steps: readonly SessionEvent[]): ChatFeedItem[] {
       bufferEndIdx = -1;
       return;
     }
+    const isTrailing = bufferEndIdx === steps.length - 1;
     if (buffer.length === 1) {
       items.push({
         kind: "step",
         key: `s:${first.step.seq}`,
         step: first.step,
         ...(first.durationMs !== undefined ? { durationMs: first.durationMs } : {}),
+        trailing: isTrailing,
       });
     } else {
       const after = steps[bufferEndIdx + 1];
@@ -369,7 +526,7 @@ export function groupChatSteps(steps: readonly SessionEvent[]): ChatFeedItem[] {
         key: `g:${first.step.seq}`,
         steps: buffer,
         summary: summarizeActivity(buffer, endTime),
-        trailing: bufferEndIdx === steps.length - 1,
+        trailing: isTrailing,
       });
     }
     buffer = [];
@@ -391,6 +548,7 @@ export function groupChatSteps(steps: readonly SessionEvent[]): ChatFeedItem[] {
         key: `s:${step.seq}`,
         step,
         ...(durationMs !== undefined ? { durationMs } : {}),
+        trailing: i === steps.length - 1,
       });
     }
   }
@@ -432,7 +590,10 @@ export function formatToolDetails(step: SessionEvent): ToolDetails {
   }
 
   let headline = target?.path ?? (step.text || step.tool || "");
-  if (step.action === "run_command" && obj !== undefined) {
+  const todo = parseTodoChecklist(step);
+  if (todo !== undefined) {
+    headline = todo.activeStep !== undefined ? `${todo.doneCount}/${todo.totalCount} · ${todo.activeStep.title}` : `${todo.doneCount}/${todo.totalCount}`;
+  } else if (step.action === "run_command" && obj !== undefined) {
     const cmd = firstStringField(obj, ["command", "CommandLine", "cmd"]);
     if (cmd !== undefined) {
       headline = `$ ${cmd}`;

@@ -19,14 +19,45 @@ export type TemplateCategory = "recommended" | "apps" | "engineering" | "note" |
 
 export const contentSidebarOpen = defineStored("content.sidebar", z.boolean(), true);
 export const contentBrowseBucket = signal<ContentBucket>({ kind: "recent" });
+export const activeArtifactType = signal<ArtifactType | undefined>(undefined);
 export const contentPresenting = signal(false);
 export const contentFocusMediaId = signal<string | undefined>(undefined);
 
 const pinnedStorage = defineStored("content.pinned", z.array(z.string()), []);
 const lastContentPathStorage = defineStored("content.lastPath", z.string(), "/library");
 
-export const templatePickerState = defineAtom<{ readonly category: TemplateCategory } | undefined>(undefined);
+export interface TemplatePickerInitial {
+  readonly category: TemplateCategory;
+  readonly artifactType?: ArtifactType | undefined;
+}
+
+export const templatePickerState = defineAtom<TemplatePickerInitial | undefined>(undefined);
 export const contentSearchOpen = defineAtom<boolean>(false);
+
+function categoryForArtifactType(type: ArtifactType): TemplateCategory {
+  if (type === "outline") return "note";
+  if (type === "whiteboard") return "whiteboard";
+  return "deliverable";
+}
+
+export function templatePickerContextFor(bucket: ContentBucket, openType?: ArtifactType): TemplatePickerInitial {
+  if (openType !== undefined) {
+    return { category: categoryForArtifactType(openType), artifactType: openType };
+  }
+  switch (bucket.kind) {
+    case "artifacts":
+      return bucket.artifactType !== undefined
+        ? { category: categoryForArtifactType(bucket.artifactType), artifactType: bucket.artifactType }
+        : { category: "recommended" };
+    case "apps":
+      return { category: "apps" };
+    case "media":
+      return { category: "ai" };
+    case "recent":
+    case "pinned":
+      return { category: "recommended" };
+  }
+}
 
 export function pinnedKeys(): readonly string[] {
   return pinnedStorage.get();
@@ -46,8 +77,22 @@ export function togglePinned(key: string): boolean {
   return true;
 }
 
-export function openTemplatePicker(category: TemplateCategory = "recommended"): void {
-  templatePickerState.set({ category });
+export function openTemplatePicker(
+  input?: TemplateCategory | { readonly category?: TemplateCategory | undefined; readonly artifactType?: ArtifactType | undefined },
+): void {
+  if (typeof input === "string") {
+    templatePickerState.set({ category: input });
+    return;
+  }
+  if (input === undefined) {
+    templatePickerState.set({ category: "recommended" });
+    return;
+  }
+  const category = input.category ?? (input.artifactType !== undefined ? categoryForArtifactType(input.artifactType) : "recommended");
+  templatePickerState.set({
+    category,
+    ...(input.artifactType !== undefined ? { artifactType: input.artifactType } : {}),
+  });
 }
 
 export function closeTemplatePicker(): void {

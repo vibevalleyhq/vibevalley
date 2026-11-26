@@ -488,7 +488,7 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
     expect(app.count("id:issue")).toBe(1);
     expect(app.count("id:issue-ask")).toBe(1);
     expect(app.count("id:failed-project-check")).toBe(1);
-    expect(app.texts()).toContain("核对修复后，再次完成任务以重跑检查");
+    expect(app.texts()).toContain("核对修复后，再次完成工单以重跑检查");
   });
   await visit(app, fake, "/issues/i-edge-reviewed", row, () => {
     expect(app.count("id:issue-ask")).toBe(1);

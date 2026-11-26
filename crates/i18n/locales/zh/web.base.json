@@ -10,8 +10,8 @@
       "hint": "频道与话题"
     },
     "issues": {
-      "label": "任务",
-      "hint": "每件任务从记下到完成"
+      "label": "工单",
+      "hint": "每张工单从记下到完成"
     },
     "runs": {
       "label": "运行与轨迹",
@@ -22,8 +22,8 @@
       "name": "工作区"
     },
     "content": {
-      "label": "内容",
-      "hint": "媒体库、作品与笔记"
+      "label": "作品",
+      "hint": "作品、大纲笔记与素材"
     },
     "runtimes": {
       "label": "引擎",
@@ -192,7 +192,7 @@
       "everywhere": "到处",
       "composer": "输入框",
       "lists": "菜单和名单",
-      "issues": "任务",
+      "issues": "工单",
       "pictures": "看图",
       "library": "媒体库",
       "farm": "农场",
@@ -215,8 +215,8 @@
       "farmMenu": "放下农具，或打开菜单",
       "debug": "调试台",
       "voice": "跟主助手说话（在设置里能换）",
-      "command": "命令：建任务、让主助手记住、叫停、私聊",
-      "newIssue": "新建任务",
+      "command": "命令：建工单、让主助手记住、叫停、私聊",
+      "newIssue": "新建工单",
       "libraryMove": "在素材之间挪",
       "libraryLook": "全屏看选中的图",
       "libraryRemove": "从库里拿掉选中的"

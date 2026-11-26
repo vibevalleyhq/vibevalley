@@ -287,7 +287,7 @@ function LaneView(props: {
   const shown = computed(() => (folded() ? ordered().slice(0, closedShown) : ordered()));
   const hidden = computed(() => (folded() ? ordered().length - closedShown : 0));
   const guide = () => emptyLaneGuide[props.lane];
-  const showTopNew = computed(() => props.lane === "todo" && (props.board.loading || props.cards.length > 0));
+  const showBottomNew = computed(() => props.lane === "todo" && (props.board.loading || props.cards.length > 0));
   return (
     <View
       ref={(r) => props.drag.lane(props.lane, r)}
@@ -316,18 +316,6 @@ function LaneView(props: {
           <Hint text={emptyText[props.lane]} />
         </View>
       </View>
-      <If when={showTopNew()}>
-        <View
-          onPress={() => p().onNew()}
-          role="button"
-          testID="issue-new"
-          accessibilityLabel={t("web.issue.new.title")}
-          class={`group mt-1.5 h-9 w-full shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-dashed border-line ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:bg-page active:translate-y-px`}
-        >
-          <Icon name="add" size={14} tone="muted" />
-          <Text class="text-sm font-medium text-muted group-hover:text-ink">{t("web.issue.new.card")}</Text>
-        </View>
-      </If>
       <Scroll class="mt-2 min-h-0 shrink" contentClass="gap-1.5 pb-0.5">
         <If
           when={p().loading}
@@ -392,6 +380,18 @@ function LaneView(props: {
           <Text class="px-1 text-xs text-faint">{t("web.issue.reading")}</Text>
         </If>
       </Scroll>
+      <If when={showBottomNew()}>
+        <View
+          onPress={() => p().onNew()}
+          role="button"
+          testID="issue-new"
+          accessibilityLabel={t("web.issue.new.title")}
+          class={`group mt-2 h-9 w-full shrink-0 flex-row items-center justify-center gap-1.5 rounded-md border border-dashed border-line ${motionClass("transition-transform duration-120 ease-out")} hover:border-faint hover:bg-page active:translate-y-px`}
+        >
+          <Icon name="add" size={14} tone="muted" />
+          <Text class="text-sm font-medium text-muted group-hover:text-ink">{t("web.issue.new.card")}</Text>
+        </View>
+      </If>
     </View>
   );
 }
@@ -444,13 +444,24 @@ function CardView(props: {
       look().flags.length > 0,
   );
   const draggable = computed(() => props.card.kind !== "orchestrator" && props.card.kind !== "missing" && props.card.move?.state !== "moving");
+  // Dragging sends a synthetic press on mouse-up; suppress opening the card right after a drag ends.
+  let suppressPressUntil = 0;
   const pan = PanResponder.create({
     // A press opens the card; only a move of a few points starts a drag.
     onMoveShouldSetPanResponder: (_, g) => draggable() && Math.abs(g.dx) + Math.abs(g.dy) > 4,
-    onPanResponderGrant: (_, g) => void props.drag.start(props.card, look().title, g.x0, g.y0),
+    onPanResponderGrant: (_, g) => {
+      suppressPressUntil = Number.POSITIVE_INFINITY;
+      void props.drag.start(props.card, look().title, g.x0, g.y0);
+    },
     onPanResponderMove: (_, g) => props.drag.move(g.moveX, g.moveY),
-    onPanResponderRelease: () => props.drag.end(true),
-    onPanResponderTerminate: () => props.drag.end(false),
+    onPanResponderRelease: () => {
+      suppressPressUntil = Date.now() + 300;
+      props.drag.end(true);
+    },
+    onPanResponderTerminate: () => {
+      suppressPressUntil = Date.now() + 300;
+      props.drag.end(false);
+    },
   });
   const before = computed(() => props.drag.before() === props.card.id);
   const urgency = computed(() => cardUrgencyTone(props.card));
@@ -469,7 +480,10 @@ function CardView(props: {
               el.focus();
             });
         }}
-        onPress={() => props.onOpen(props.card.id)}
+        onPress={() => {
+          if (props.drag.dragging() !== undefined || Date.now() < suppressPressUntil) return;
+          props.onOpen(props.card.id);
+        }}
         role="button"
         testID="issue-card"
         accessibilityLabel={look().title}

@@ -5,6 +5,7 @@ import { t } from "@vibevalley/i18n";
 
 import { CodeBlock } from "./code/CodeBlock";
 import { Diagram } from "./code/Diagram";
+import { dialogDimensions } from "./Dialog";
 import { IconButton } from "./IconButton";
 import { fadeAnimation } from "./motion";
 import { Segmented } from "./Segmented";
@@ -42,9 +43,8 @@ export function RichPreviewModal(props: RichPreviewModalProps) {
     copied.set(false);
   });
 
-  const modalWidth = computed(() => Math.min(1080, windowSize().width * 0.92));
-  const modalHeight = computed(() => windowSize().height * 0.88);
-  const maxDiagramWidth = computed(() => Math.max(320, Math.round((modalWidth() - 64) * (zoom() / 100))));
+  const dims = computed(() => dialogDimensions("xl", "fixed", windowSize()));
+  const maxDiagramWidth = computed(() => Math.max(320, Math.round((dims().width - 64) * (zoom() / 100))));
   const canZoomOut = computed(() => zoom() > ZOOM_MIN);
   const canZoomIn = computed(() => zoom() < ZOOM_MAX);
   const zoomLabel = computed(() => `${zoom()}%`);
@@ -74,8 +74,8 @@ export function RichPreviewModal(props: RichPreviewModalProps) {
       animation={fadeAnimation()}
       onOpenChange={(e) => !e.open && props.onClose()}
       backdropClass="bg-scrim"
-      class="m-auto flex-col overflow-hidden rounded-lg border border-line bg-elevated shadow-float"
-      style={{ width: modalWidth(), maxHeight: modalHeight() }}
+      class="mx-auto flex-col overflow-hidden rounded-lg border border-line bg-elevated shadow-float"
+      style={dims()}
     >
       <If when={props.payload}>
         {(item) => (

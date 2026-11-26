@@ -312,62 +312,64 @@ export function NewRepoForm(props: { onDone: (made?: RepoSummary) => void }) {
     });
   };
   return (
-    <View class="gap-4">
-      <Segmented
-        label={t("web.repo.how")}
-        testid="repo-how"
-        value={importing()}
-        options={[
-          { value: "new", label: t("web.repo.fresh"), disabled: busy() },
-          { value: "github", label: t("web.repo.github"), disabled: busy() },
-        ]}
-        onChange={(v) => {
-          importing.set(v);
-          error.set(undefined);
-        }}
-      />
-      <If when={importing() === "github"}>
-        <Field label={t("web.repo.githubAddress")} hint={t("web.repo.githubHint")}>
+    <View class="min-h-0 flex-1">
+      <Scroll class="min-h-0 flex-1" contentClass="gap-4 px-5 py-4">
+        <Segmented
+          label={t("web.repo.how")}
+          testid="repo-how"
+          value={importing()}
+          options={[
+            { value: "new", label: t("web.repo.fresh"), disabled: busy() },
+            { value: "github", label: t("web.repo.github"), disabled: busy() },
+          ]}
+          onChange={(v) => {
+            importing.set(v);
+            error.set(undefined);
+          }}
+        />
+        <If when={importing() === "github"}>
+          <Field label={t("web.repo.githubAddress")} hint={t("web.repo.githubHint")}>
+            <TextInput
+              autoFocus
+              testID="repo-github"
+              accessibilityLabel={t("web.repo.githubAddress")}
+              disabled={busy()}
+              placeholder={t("web.base.form.example", { value: "https://github.com/botiverse/raft-source" })}
+              value={github()}
+              onInput={(typed) => {
+                github.set(typed);
+                if (!named()) name.set(githubRepository(typed)?.name ?? "");
+                error.set(undefined);
+              }}
+              onSubmit={() => void submit()}
+            />
+          </Field>
+        </If>
+        <Field label={t("web.repo.name")} hint={t("web.repo.nameHint")}>
           <TextInput
-            autoFocus
-            testID="repo-github"
-            accessibilityLabel={t("web.repo.githubAddress")}
+            testID="repo-name"
+            accessibilityLabel={t("web.repo.name")}
             disabled={busy()}
-            placeholder={t("web.base.form.example", { value: "https://github.com/botiverse/raft-source" })}
-            value={github()}
+            placeholder={t("web.repo.nameExample")}
+            value={name()}
             onInput={(typed) => {
-              github.set(typed);
-              if (!named()) name.set(githubRepository(typed)?.name ?? "");
+              named.set(true);
+              name.set(typed);
               error.set(undefined);
             }}
             onSubmit={() => void submit()}
           />
         </Field>
-      </If>
-      <Field label={t("web.repo.name")} hint={t("web.repo.nameHint")}>
-        <TextInput
-          testID="repo-name"
-          accessibilityLabel={t("web.repo.name")}
-          disabled={busy()}
-          placeholder={t("web.repo.nameExample")}
-          value={name()}
-          onInput={(typed) => {
-            named.set(true);
-            name.set(typed);
-            error.set(undefined);
-          }}
-          onSubmit={() => void submit()}
-        />
-      </Field>
-      <If when={error()}>
-        <Text role="alert" class="text-sm text-berry">
-          {error()}
-        </Text>
-      </If>
-      <If when={busy()}>
-        <Text class="text-sm text-muted">{importing() === "github" ? t("web.repo.downloading") : t("web.repo.making")}</Text>
-      </If>
-      <View class="flex-row justify-end gap-2 border-t border-line pt-3">
+        <If when={error()}>
+          <Text role="alert" class="text-sm text-berry">
+            {error()}
+          </Text>
+        </If>
+        <If when={busy()}>
+          <Text class="text-sm text-muted">{importing() === "github" ? t("web.repo.downloading") : t("web.repo.making")}</Text>
+        </If>
+      </Scroll>
+      <View class="shrink-0 flex-row justify-end gap-2 border-t border-line px-5 py-3">
         <Button tone="quiet" disabled={busy()} testID="cancel" onPress={() => props.onDone()}>
           {t("web.repo.cancel")}
         </Button>

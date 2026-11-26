@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Native Rust rich UI set (`"vibevalley/rich"`) for `apps/mac` on stock `nsh 0.6.0`.
+//! Native Rust rich UI set (`"vibevalley/rich"`) for `apps/mac` on stock `nsh 0.7.1`.
 //!
 //! Mount alongside `nsh_base::registry()` via:
 //! ```text

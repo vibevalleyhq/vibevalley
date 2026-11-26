@@ -17,21 +17,25 @@ impl Render for Shell {
         let sidebar_w: Pixels = px(self.chrome.sidebar_width);
         let main = crate::panes::render_main(self, window, cx);
         let palette = self.overlays.palette.as_ref().filter(|p| p.open).map(|p| {
+            let vp = window.viewport_size();
+            let palette_w = (f32::from(vp.width) - 32.0).clamp(280.0, 620.0);
+            let palette_top = if f32::from(vp.height) < 520.0 { 24.0 } else { 72.0 };
+            let palette_h = (f32::from(vp.height) - palette_top - 24.0).clamp(220.0, 420.0);
             div()
                 .absolute()
                 .inset_0()
                 .flex()
                 .flex_col()
                 .items_center()
-                .pt(px(72.0))
+                .pt(px(palette_top))
                 .bg(gpui::hsla(0.0, 0.0, 0.0, 0.25))
                 .key_context("Palette")
                 .on_action(cx.listener(|this, _: &ClosePalette, window, cx| this.close_palette(window, cx)))
                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| this.close_palette(window, cx)))
                 .child(
                     div()
-                        .w(px(620.0))
-                        .h(px(420.0))
+                        .w(px(palette_w))
+                        .h(px(palette_h))
                         .rounded(px(12.0))
                         .overflow_hidden()
                         .shadow_lg()

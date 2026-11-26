@@ -1,4 +1,4 @@
-import { computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
+import { computed, keymap, Scroll, signal, Text, View } from "nsh";
 import { Input } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -21,7 +21,15 @@ import { libraryQuery } from "../media";
 
 export function ContentSearchModal() {
   return (
-    <Dialog open={contentSearchOpen.get()} onClose={closeContentSearch} title={t("web.library.content.search.title")} wide testid="content-search-modal">
+    <Dialog
+      open={contentSearchOpen.get()}
+      onClose={closeContentSearch}
+      title={t("web.library.content.search.title")}
+      size="md"
+      height="fixed"
+      scroll={false}
+      testid="content-search-modal"
+    >
       <If when={contentSearchOpen.get()}>
         <SearchBody />
       </If>
@@ -142,60 +150,62 @@ function SearchBody() {
   keymap.bind({ up: () => move(-1), down: () => move(1) }, { when: "always" });
 
   return (
-    <View class="gap-3">
-      <View class="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 hover:border-faint focus-within:border-focus">
-        <Icon name="search" size={16} tone="muted" />
-        <Input
-          autoFocus
-          testID="content-search-input"
-          value={query()}
-          placeholder={t("web.library.content.search.placeholder")}
-          accessibilityLabel={t("web.library.content.search.title")}
-          submitBehavior="submit"
-          onChange={(e) => {
-            query.set(e.value);
-            active.set(0);
-          }}
-          onSubmit={() => {
-            const idx = clampedIndex();
-            const chosen = idx >= 0 ? hits()[idx] : undefined;
-            if (chosen) openHit(chosen);
-          }}
-          class="min-w-0 flex-1 text-base text-ink placeholder:text-faint"
-        />
-        <If when={query().length > 0}>
-          <View
-            role="button"
-            accessibilityLabel={t("web.issue.page.clear")}
-            onPress={() => {
-              query.set("");
+    <View class="min-h-0 flex-1">
+      <View class="shrink-0 gap-2.5 border-b border-line px-5 py-3">
+        <View class="h-10 flex-row items-center gap-2 rounded-md border border-line bg-page px-3 hover:border-faint focus-within:border-focus">
+          <Icon name="search" size={16} tone="muted" />
+          <Input
+            autoFocus
+            testID="content-search-input"
+            value={query()}
+            placeholder={t("web.library.content.search.placeholder")}
+            accessibilityLabel={t("web.library.content.search.title")}
+            submitBehavior="submit"
+            onChange={(e) => {
+              query.set(e.value);
               active.set(0);
             }}
-            class="size-5 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
-          >
-            <Icon name="close" size={12} tone="muted" />
-          </View>
-        </If>
+            onSubmit={() => {
+              const idx = clampedIndex();
+              const chosen = idx >= 0 ? hits()[idx] : undefined;
+              if (chosen) openHit(chosen);
+            }}
+            class="min-w-0 flex-1 text-base text-ink placeholder:text-faint"
+          />
+          <If when={query().length > 0}>
+            <View
+              role="button"
+              accessibilityLabel={t("web.issue.page.clear")}
+              onPress={() => {
+                query.set("");
+                active.set(0);
+              }}
+              class="size-5 shrink-0 items-center justify-center rounded-sm hover:bg-hover"
+            >
+              <Icon name="close" size={12} tone="muted" />
+            </View>
+          </If>
+        </View>
+
+        <View class="flex-row items-center justify-between gap-2">
+          <Segmented
+            testid="content-search-scope"
+            label={t("web.library.content.search.title")}
+            value={scope()}
+            onChange={(v) => {
+              scope.set(v);
+              active.set(0);
+            }}
+            options={[
+              { value: "all", label: t("web.library.content.search.scopeAll") },
+              { value: "artifacts", label: t("web.library.content.search.scopeArtifacts") },
+              { value: "media", label: t("web.library.content.search.scopeMedia") },
+            ]}
+          />
+        </View>
       </View>
 
-      <View class="flex-row items-center justify-between gap-2">
-        <Segmented
-          testid="content-search-scope"
-          label={t("web.library.content.search.title")}
-          value={scope()}
-          onChange={(v) => {
-            scope.set(v);
-            active.set(0);
-          }}
-          options={[
-            { value: "all", label: t("web.library.content.search.scopeAll") },
-            { value: "artifacts", label: t("web.library.content.search.scopeArtifacts") },
-            { value: "media", label: t("web.library.content.search.scopeMedia") },
-          ]}
-        />
-      </View>
-
-      <Scroll accessibilityLabel={t("web.library.content.search.title")} style={{ maxHeight: Math.max(240, windowSize().height * 0.54) }} contentClass="gap-1">
+      <Scroll accessibilityLabel={t("web.library.content.search.title")} class="min-h-0 flex-1" contentClass="gap-1 px-5 py-3">
         <If when={hits().length === 0}>
           <Text class="px-2 py-6 text-center text-sm text-muted">{t("web.library.content.search.empty")}</Text>
         </If>
@@ -229,7 +239,7 @@ function SearchBody() {
         </Each>
       </Scroll>
 
-      <View class="flex-row items-center gap-3 border-t border-line pt-2">
+      <View class="shrink-0 flex-row items-center gap-3 border-t border-line bg-side px-5 py-2.5">
         <View class="flex-row items-center gap-1">
           <Kbd>↑↓</Kbd>
           <Text class="text-2xs text-faint">{t("web.base.shortcuts.say.move")}</Text>

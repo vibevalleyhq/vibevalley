@@ -1,9 +1,11 @@
-import { computed, effect, Image, Text, View } from "nsh";
+import { computed, effect, Image, signal, Text, View } from "nsh";
+import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 import type { Artifact, ArtifactType, LibraryItem, MediaJob } from "@vibevalley/protocol";
 import type { ArtifactAppletInfo } from "@vibevalley/protocol/host";
 
+import { Button } from "../../design/Button";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
 import { Bubble } from "../../design/Tip";
@@ -350,20 +352,7 @@ export function ArtifactTiles(props: {
                     )}
                   </If>
                   <CardPinButton testid={`library-artifact-pin-${a().id}`} pinned={pinned()} onToggle={() => props.onTogglePin(a().id)} />
-                  <If when={props.onDelete}>
-                    {(onDel) => (
-                      <View
-                        role="button"
-                        testID={`library-artifact-delete-${a().id}`}
-                        accessibilityLabel={t("web.artifact.page.delete")}
-                        tooltip={<Bubble text={t("web.artifact.page.delete")} />}
-                        onPress={() => onDel()(a())}
-                        class="size-6 shrink-0 items-center justify-center rounded-sm border border-transparent bg-transparent opacity-0 group-hover:opacity-100 hover:bg-bad-soft focus:opacity-100 focus-visible:outline-2 focus-visible:outline-focus"
-                      >
-                        <Icon name="delete" size={12} tone="berry" />
-                      </View>
-                    )}
-                  </If>
+                  <If when={props.onDelete}>{(onDel) => <DeleteArtifactButton artifact={a()} onDelete={onDel()} />}</If>
                 </View>
               </View>
               <Text class="truncate text-sm font-semibold text-ink">{a().title}</Text>
@@ -390,5 +379,55 @@ export function ArtifactTiles(props: {
         }}
       </Each>
     </View>
+  );
+}
+
+function DeleteArtifactButton(props: { artifact: Artifact; onDelete: (artifact: Artifact) => void }) {
+  const open = signal(false);
+  return (
+    <Popover
+      open={open()}
+      onOpenChange={(e) => open.set(e.open)}
+      placement="top"
+      align="end"
+      offset={6}
+      popupClass="w-60 rounded-lg border border-line bg-elevated p-3 shadow-float"
+      trigger={
+        <View
+          role="button"
+          testID={`library-artifact-delete-${props.artifact.id}`}
+          accessibilityLabel={t("web.artifact.page.delete")}
+          tooltip={<Bubble text={t("web.artifact.page.delete")} />}
+          onPress={() => open.set(true)}
+          class={`size-6 shrink-0 items-center justify-center rounded-sm border border-transparent focus-visible:outline-2 focus-visible:outline-focus ${
+            open() ? "bg-bad-soft opacity-100" : "bg-transparent opacity-0 group-hover:opacity-100 hover:bg-bad-soft focus:opacity-100"
+          }`}
+        >
+          <Icon name="delete" size={12} tone="berry" />
+        </View>
+      }
+    >
+      <View class="gap-2.5">
+        <Text class="text-xs leading-relaxed text-ink">{t("web.artifact.page.deleteAsk", { title: props.artifact.title })}</Text>
+        <View class="flex-row items-center justify-end gap-1.5">
+          <Button size="compact" tone="quiet" onPress={() => open.set(false)}>
+            {t("web.base.form.never")}
+          </Button>
+          <Button
+            size="compact"
+            tone="danger"
+            icon="delete"
+            testID="library-artifact-delete-confirm"
+            onPress={() => {
+              const target = props.artifact;
+              open.set(false);
+              props.onDelete(target);
+            }}
+          >
+            {t("web.artifact.page.delete")}
+          </Button>
+        </View>
+      </View>
+    </Popover>
   );
 }

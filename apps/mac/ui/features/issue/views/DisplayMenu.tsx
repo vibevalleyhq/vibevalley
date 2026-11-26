@@ -1,4 +1,4 @@
-import { Text, View } from "nsh";
+import { Text, View, windowSize } from "nsh";
 import { Popover } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
@@ -24,6 +24,7 @@ export function DisplayMenu(props: { look: BoardLook; onChange: (l: BoardLook) =
       align="end"
       offset={6}
       popupClass="w-85 rounded-lg border border-line bg-elevated p-3 shadow-float"
+      popupStyle={{ maxWidth: Math.max(240, windowSize().width - 24) }}
       trigger={
         <View
           testID="display"

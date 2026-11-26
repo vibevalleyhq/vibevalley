@@ -7,7 +7,7 @@ import type { AppletInstallInput, ArtifactAppletInfo } from "@vibevalley/protoco
 import type { SliceMap } from "../infra/transport";
 
 type App = {
-  host: { send(name: string, data?: unknown): Promise<void> };
+  host: { send(name: string, data?: unknown): Promise<void>; posts?(): readonly { name: string; data: unknown }[] };
   waitUntil?(condition: () => boolean, options?: { timeout?: number }): Promise<void>;
 };
 
@@ -26,6 +26,8 @@ export interface FakeHost {
   readonly acts: { type: string; [key: string]: unknown }[];
   /** Override or add a canned/function RPC answer at runtime. */
   respond(op: string, answer: unknown): void;
+  /** Hold RPC replies for `op` indefinitely (e.g., to test loading skeletons). */
+  defer(op: string): void;
   clearCalls(): void;
   /** Sends the queued events until none is left. */
   pump(app: App): Promise<void>;
@@ -52,9 +54,11 @@ export function fakeHost(fixture: { state: SliceBundle; responses: Record<string
   let state: SliceBundle = fixture.state;
   const sliceRevs: Record<SliceKind, number> = { board: 0, sessions: 0, collab: 0, inbox: 0, ops: 0, farm: 0 };
   const watchedSlices = new Set<SliceKind>();
-  let liveRev = 0;
+  const liveRev = { value: 0 };
   const subscriptions = new Map<string, { name: string; payload: unknown }>();
   const installedApplets = new Map<string, ArtifactAppletInfo>();
+  const deferredOps = new Set<string>();
+  const bound: { app: App | null; seenPosts: number } = { app: null, seenPosts: 0 };
   const defaultHostAnswers: Record<string, (payload: unknown) => unknown> = {
     "host.appletList": () => [...installedApplets.values()],
     "host.appletInstall": (payload: unknown) => {
@@ -89,11 +93,14 @@ export function fakeHost(fixture: { state: SliceBundle; responses: Record<string
     const v = typeof r === "function" ? (r as (p: unknown) => unknown)(payload) : r;
     return v !== null && typeof v === "object" && "bizCode" in v ? v : { bizCode: 0, message: "ok", data: v };
   };
-  const action = (data: unknown) => {
+  const processAction = (data: unknown) => {
     const a = data as { type: string; id?: string; op?: string; payload?: unknown; topic?: string; name?: string };
     if (a.type === "call") {
-      calls.push({ op: a.op ?? "", payload: a.payload });
-      queue.push([`reply:${a.id}`, answer(a.op ?? "", a.payload)]);
+      const op = a.op ?? "";
+      calls.push({ op, payload: a.payload });
+      if (!deferredOps.has(op)) {
+        queue.push([`reply:${a.id}`, answer(op, a.payload)]);
+      }
     } else if (a.type === "subscribe" && a.id !== undefined) {
       subscriptions.set(a.id, { name: a.name ?? "", payload: a.payload });
     } else if (a.type === "unsubscribe" && a.id !== undefined) {
@@ -110,40 +117,71 @@ export function fakeHost(fixture: { state: SliceBundle; responses: Record<string
     } else if (!["applied", "ready"].includes(a.type)) {
       acts.push(a);
     }
-    return null;
+  };
+  const sync = (app: App | null = bound.app) => {
+    if (!app) return;
+    bound.app = app;
+    const posts = app.host.posts?.();
+    if (!posts) return;
+    while (bound.seenPosts < posts.length) {
+      const msg = posts[bound.seenPosts++];
+      if (msg?.name === "action") processAction(msg.data);
+    }
   };
   const pump = async (app: App) => {
-    for (let round = 0; round < 50 && queue.length > 0; round++) {
+    bound.app = app;
+    for (let round = 0; round < 50; round++) {
+      sync(app);
+      if (queue.length === 0) break;
       for (const [name, data] of queue.splice(0)) await app.host.send(name, data);
     }
+    sync(app);
   };
   const pumpUntil = async (app: App, done: () => boolean, timeoutMs = 5_000) => {
     const deadline = Date.now() + timeoutMs;
     await pump(app);
     while (!done()) {
+      sync(app);
       if (queue.length > 0) {
         await pump(app);
         continue;
       }
       const left = deadline - Date.now();
       if (app.waitUntil === undefined || left <= 0) break;
-      await app.waitUntil(() => queue.length > 0 || done(), { timeout: left });
+      await app.waitUntil(
+        () => {
+          sync(app);
+          return queue.length > 0 || done();
+        },
+        { timeout: left },
+      );
     }
     await pump(app);
   };
   return {
-    options: { params: { view: "vibevalley", ...params }, handlers: { action, ready: null } },
-    calls,
-    acts,
+    options: { params: { view: "vibevalley", ...params }, handlers: { action: null, ready: null } },
+    get calls() {
+      sync();
+      return calls;
+    },
+    get acts() {
+      sync();
+      return acts;
+    },
     respond: (op, value) => {
       responses[op] = value;
     },
+    defer: (op) => {
+      deferredOps.add(op);
+    },
     clearCalls: () => {
+      sync();
       calls.length = 0;
     },
     pump,
     pumpUntil,
     setState: async (app, next) => {
+      sync(app);
       const nextSeq = state.seq + 1;
       state = {
         ...next,
@@ -161,6 +199,7 @@ export function fakeHost(fixture: { state: SliceBundle; responses: Record<string
       await pump(app);
     },
     setSlice: async (app, kind, next) => {
+      sync(app);
       const nextSeq = state.seq + 1;
       const updated = { ...next, seq: Math.max(next.seq, nextSeq) };
       state = { ...state, seq: nextSeq, [kind]: updated };
@@ -170,15 +209,21 @@ export function fakeHost(fixture: { state: SliceBundle; responses: Record<string
       await pump(app);
     },
     pushLive: async (app, event) => {
-      queue.push(["frame:live", { rev: ++liveRev, data: event }]);
+      sync(app);
+      queue.push(["frame:live", { rev: ++liveRev.value, data: event }]);
       await pump(app);
     },
-    subscriptions,
+    get subscriptions() {
+      sync();
+      return subscriptions;
+    },
     emit: async (app, name, event, matches) => {
+      sync(app);
       for (const [id, s] of subscriptions) if (s.name === name && (matches?.(s.payload) ?? true)) queue.push([`sub:${id}`, { event }]);
       await pump(app);
     },
     end: async (app, name) => {
+      sync(app);
       for (const [id, s] of [...subscriptions]) {
         if (s.name !== name) continue;
         subscriptions.delete(id);

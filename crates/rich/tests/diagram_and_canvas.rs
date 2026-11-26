@@ -1,4 +1,3 @@
-use std::sync::Mutex;
 use std::time::Duration;
 
 use nsh_core::ViewKind;
@@ -9,9 +8,7 @@ use vibevalley_rich::{
     diagram_cache_stats, render_canvas, render_diagram, render_diagram_with_max_width, vv_canvas, vv_diagram,
 };
 
-use crate::support::{TestHarness, assert_inline_svg_image};
-
-static DIAGRAM_CACHE_TEST_LOCK: Mutex<()> = Mutex::new(());
+use crate::support::{DIAGRAM_CACHE_TEST_LOCK, TestHarness, assert_inline_svg_image};
 
 const SAMPLE_FLOWCHART: &str = "flowchart LR\n  A[Request] --> B{Valid?}\n  B -->|Yes| C[Done]\n  B -->|No| D[Retry]";
 const SAMPLE_SEQUENCE: &str = "sequenceDiagram\n  Alice->>Bob: Hello\n  Bob-->>Alice: Hi!";

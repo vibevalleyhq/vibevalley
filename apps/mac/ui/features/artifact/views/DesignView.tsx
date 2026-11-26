@@ -6,7 +6,6 @@ import { Button } from "../../../design/Button";
 import { TextInput } from "../../../design/Field";
 import { Icon } from "../../../design/Icon";
 import { Empty, Toggle } from "../../../design/layout";
-import { Segmented } from "../../../design/Segmented";
 import { mix } from "../../../design/tone";
 import { type DesignFrameModel, type DesignNode, type DesignPropDef, resolveDesignColor, resolveDesignExpr } from "./previewModel";
 
@@ -235,10 +234,9 @@ function DesignNodeCanvas(props: {
 export function DesignView(props: {
   readonly frames: readonly DesignFrameModel[];
   readonly activeFramePath: string | undefined;
-  readonly onSelectFrame: (path: string) => void;
+  readonly theme: "light" | "dark";
 }) {
   const currentFrame = computed((): DesignFrameModel | undefined => props.frames.find((f) => f.path === props.activeFramePath) ?? props.frames.at(0));
-  const previewTheme = signal<"light" | "dark">("light");
   const propOverrides = signal<Record<string, string | number | boolean>>({});
 
   effect(() => {
@@ -247,7 +245,6 @@ export function DesignView(props: {
     if (untracked(() => Object.keys(propOverrides())).length > 0) {
       propOverrides.set({});
     }
-    previewTheme.set(f.theme);
   });
 
   const resolvedPropValues = computed((): Record<string, string | number | boolean> => {
@@ -270,36 +267,11 @@ export function DesignView(props: {
 
   return (
     <View testID="artifact-design-view" class="min-h-0 flex-1">
-      <View class="shrink-0 flex-row flex-wrap items-center justify-between gap-2 border-b border-line bg-side px-3 py-1.5">
-        <Scroll horizontal class="min-w-0 flex-1" contentClass="flex-row items-center gap-1.5">
-          <Each of={props.frames} key={(f) => f.path}>
-            {(f) => (
-              <Button size="compact" tone={currentFrame()?.path === f().path ? "primary" : "plain"} onPress={() => props.onSelectFrame(f().path)}>
-                {f().name}
-              </Button>
-            )}
-          </Each>
-        </Scroll>
-        <View class="shrink-0 flex-row items-center gap-2">
-          <If when={currentFrame()}>{(f) => <Text class="font-mono text-2xs text-muted tabular-nums">{`${f().width} × ${f().height}`}</Text>}</If>
-          <Segmented
-            testid="design-theme-toggle"
-            label={t("web.artifact.designSystem.previewTheme")}
-            value={previewTheme()}
-            onChange={(v) => previewTheme.set(v)}
-            options={[
-              { value: "light" as const, icon: "themeLight", label: t("web.artifact.design.themeLight") },
-              { value: "dark" as const, icon: "themeDark", label: t("web.artifact.design.themeDark") },
-            ]}
-          />
-        </View>
-      </View>
-
       <If when={currentFrame()} else={<Empty icon="devices">{t("web.artifact.design.emptyCanvas")}</Empty>}>
         {(frame) => {
           const canvasBg = () =>
-            resolveDesignColor(frame().background ?? "{color.surface}", previewTheme(), resolvedPropValues()) ??
-            resolveDesignColor("{color.surface}", previewTheme());
+            resolveDesignColor(frame().background ?? "{color.surface}", props.theme, resolvedPropValues()) ??
+            resolveDesignColor("{color.surface}", props.theme);
           const hasContent = () => frame().root !== undefined || frame().nodes.length > 0;
           return (
             <View class="min-h-0 flex-1 flex-row">
@@ -309,10 +281,10 @@ export function DesignView(props: {
                   style={canvasBg() !== undefined ? { backgroundColor: canvasBg() } : undefined}
                 >
                   <View class="flex-row items-center justify-between border-b border-line px-4 py-2 opacity-80">
-                    <Text class="font-mono text-2xs font-semibold" style={{ color: resolveDesignColor("{color.muted}", previewTheme()) }}>
+                    <Text class="font-mono text-2xs font-semibold" style={{ color: resolveDesignColor("{color.muted}", props.theme) }}>
                       {frame().name}
                     </Text>
-                    <Text class="font-mono text-2xs tabular-nums" style={{ color: resolveDesignColor("{color.muted}", previewTheme()) }}>
+                    <Text class="font-mono text-2xs tabular-nums" style={{ color: resolveDesignColor("{color.muted}", props.theme) }}>
                       {`${frame().width} × ${frame().height}`}
                     </Text>
                   </View>
@@ -328,12 +300,12 @@ export function DesignView(props: {
                       }
                     >
                       <If when={frame().root}>
-                        {(rootNode) => <DesignNodeCanvas node={rootNode()} theme={previewTheme()} propValues={resolvedPropValues()} depth={0} />}
+                        {(rootNode) => <DesignNodeCanvas node={rootNode()} theme={props.theme} propValues={resolvedPropValues()} depth={0} />}
                       </If>
                       <If when={frame().root === undefined && frame().nodes.length > 0}>
                         <View class="flex-row flex-wrap gap-3">
                           <Each of={frame().nodes} key={(n) => n.id}>
-                            {(n) => <DesignNodeCanvas node={n()} theme={previewTheme()} propValues={resolvedPropValues()} depth={1} />}
+                            {(n) => <DesignNodeCanvas node={n()} theme={props.theme} propValues={resolvedPropValues()} depth={1} />}
                           </Each>
                         </View>
                       </If>

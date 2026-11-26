@@ -16,6 +16,7 @@ import { ready, useQuery, useQueryClient } from "../../infra/query";
 import { useLocation, useRouter } from "../../infra/router";
 import { createMemo } from "../../infra/solid";
 import {
+  activeArtifactType,
   type ContentBucket,
   contentBrowseBucket,
   contentSidebarOpen,
@@ -24,6 +25,7 @@ import {
   openContentSearch,
   openTemplatePicker,
   pinnedKeys,
+  templatePickerContextFor,
 } from "../../infra/state/contentNav";
 import { defineStored } from "../../infra/state/stored";
 import { artifactTypeIcon, artifactTypeLabel, useArtifacts, useInstalledApplets } from "../artifact";
@@ -129,7 +131,7 @@ export function ContentSidebar() {
           icon="add"
           testID="content-new-btn"
           tooltip={<Bubble text={`${t("web.library.content.new")} (⌘N)`} />}
-          onPress={() => openTemplatePicker()}
+          onPress={() => openTemplatePicker(templatePickerContextFor(bucket(), inBrowse() ? undefined : activeArtifactType()))}
         >
           {t("web.library.content.new")}
         </Button>

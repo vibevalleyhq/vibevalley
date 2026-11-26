@@ -43,7 +43,7 @@
     "agentTurnDone": "{agent} 本轮已完成"
   },
   "files": {
-    "missingInWorktree": "此任务的工作区中无法打开 {path}"
+    "missingInWorktree": "此工单的工作区中无法打开 {path}"
   },
   "startup": {
     "titleSchema": "数据库结构不匹配",

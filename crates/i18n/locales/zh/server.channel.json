@@ -12,11 +12,11 @@
   "channelTaken": "已经有叫 {name} 的频道了",
   "hopLimit": "执行会话之间已经来回 {limit} 次了，先停一停：等用户说一句再接着叫人。",
   "dispatch": {
-    "draft": "看代码，起草这个任务",
+    "draft": "看代码，起草这个工单",
     "repo": "仓库",
     "sent": "派 @{id}（{name}）去 {repo}：{what}",
-    "redraft": "这个任务交给 @{id}（{name}）再起草一版",
-    "handedOn": "这个任务交给 @{id}（{name}）接着做，第 {nth} 次派活"
+    "redraft": "这个工单交给 @{id}（{name}）再起草一版",
+    "handedOn": "这个工单交给 @{id}（{name}）接着做，第 {nth} 次派活"
   },
   "badTarget": "不认识这个地方：{target}（写 #<频道>，比如 #general；或 #<频道>:<消息号>）",
   "noMessage": "频道里没有 {n} 这条消息",
@@ -32,7 +32,7 @@
   "inUse": "删不了：{why}。可以归档它",
   "helpersThere": "还有执行会话在这个频道里干活",
   "connectorsThere": "接着连接器",
-  "issuesThere": "这里派过 {n} 个任务的活",
+  "issuesThere": "这里派过 {n} 张工单的活",
   "messageGone": "这条消息已经删了",
   "notYours": "只能改你自己说的话",
   "badEmoji": "回应是一个表情或一个短词，不带空格",

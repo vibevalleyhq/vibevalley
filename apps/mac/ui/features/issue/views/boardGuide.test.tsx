@@ -252,3 +252,42 @@ test("IssueList empty-filter CTA resets search and IssueDetail copies issue refe
   await fake.pumpUntil(app, () => app.clipboard() === `#${workingIssue.number}`);
   expect(app.texts()).toContain(t("web.base.rich.copied"));
 });
+
+test("regression: todo add button renders below cards and dragging a card does not open it", async () => {
+  setLocale("zh");
+  const first = makeTodoIssue("i-drag-1", "第一张工单", "laozhou");
+  const second = makeTodoIssue("i-drag-2", "第二张工单");
+  const customState: SliceBundle = {
+    ...scenarios.empty.state,
+    board: { seq: 2, issues: [first, second] },
+  };
+  const { app, fake } = await mountBoard(
+    "typical",
+    (f) => {
+      f.respond("issue.history.list", [
+        { issue: first, sessions: [], missingSessions: [] },
+        { issue: second, sessions: [], missingSessions: [] },
+      ]);
+    },
+    { state: customState },
+  );
+  await fake.pumpUntil(app, () => app.count("id:issue-card") === 2 && app.count("id:issue-new") === 1);
+
+  const cardBox = app.layout("id:issue-card >> nth=1");
+  const newBtnBox = app.layout("id:issue-new");
+  expect(cardBox).toBeDefined();
+  expect(newBtnBox).toBeDefined();
+  expect(newBtnBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height);
+
+  // Dragging a card (even across lanes) must not open its detail page.
+  const secondBox = app.layout("id:issue-card >> nth=1")!;
+  const workingBox = app.layout("id:lane-working")!;
+  await app.drag("id:issue-card >> nth=1", { x: workingBox.x + workingBox.width / 2 - (secondBox.x + secondBox.width / 2), y: 0 });
+  await fake.pump(app);
+  expect(app.count("id:issue")).toBe(0);
+
+  // Advance virtual clock past the post-drag click suppression window, then verify a plain click opens detail.
+  await app.wait(350);
+  await app.press("id:issue-card >> nth=1");
+  await fake.pumpUntil(app, () => app.count("id:issue") === 1);
+});
