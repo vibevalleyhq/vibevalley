@@ -43,36 +43,44 @@
   "nav": {
     "label": "设置的分区",
     "search": "搜索设置…",
-    "general": "通用与外观",
+    "profile": "个人资料",
+    "general": "通用",
     "appearance": "外观",
-    "models": "模型与密钥",
+    "models": "模型与引擎",
     "skills": "技能",
+    "mcp": "MCP 接入",
     "voice": "语音与通话",
-    "connections": "外部连接",
     "remote": "远程访问",
-    "about": "关于与数据",
+    "data": "数据与存储",
+    "about": "关于",
     "memory": "记忆",
-    "chat": "聊天软件",
+    "chat": "聊天通道",
     "width": "导航的宽窄（拖动，双击回默认）",
-    "groupWorkspace": "工作区",
-    "groupConnect": "语音与连接"
+    "groupWorkspace": "个人与工作区",
+    "groupConnect": "连接与集成",
+    "groupAbout": "数据与关于"
   },
   "words": {
-    "general": "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
-    "models": "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定",
+    "profile": "个人资料 头像 昵称 签名 avatar profile display name",
+    "general": "语言 language 启动 打开 工作台 农场",
+    "appearance": "主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
+    "models": "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定 引擎",
     "skills": "技能 skill skills 内置 安装 指南 提示词",
     "memory": "记忆 memory 来源 source Nowledge EverOS 外部记忆 读 写",
+    "mcp": "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp 接入 配置",
     "voice": "电话 通话 MOSS Live 实时 视觉 转写 语音",
-    "connections": "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
+    "chat": "微信 飞书 QQ 聊天通道 连接器 配对",
+    "github": "GitHub gh PR 登录",
     "remote": "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
-    "about": "版本 家目录 设置文件 数据 version"
+    "data": "家目录 设置文件 仓库 目录 工作树 存储 后端 数据 data storage",
+    "about": "版本 更新 命令行 CLI version update"
   },
   "scope": {
     "farm": "对整个 VibeValley",
     "device": "只对这台设备"
   },
   "general": {
-    "intro": "调整语言、启动方式、主题与界面显示偏好。",
+    "intro": "调整界面语言与启动默认页面。",
     "languageHint": "界面、主助手和执行会话说的话都用它",
     "startupTitle": "启动",
     "start": "启动时打开",
@@ -83,6 +91,7 @@
     }
   },
   "appearance": {
+    "intro": "自定义主题配色、动效偏好、界面缩放与终端字体。",
     "theme": "主题",
     "themeHint": "跟随系统时随电脑的浅色和深色变",
     "themes": {
@@ -105,6 +114,56 @@
     "terminalFontSize": "终端字号",
     "terminalFontSizeHint": "也可在工作区随时按 ⌘+ / ⌘- / ⌘0 调整"
   },
+  "profile": {
+    "intro": "设置你在工作台顶部导航和总览仪表盘中的显示名称、简介与头像。",
+    "preview": "导航栏预览",
+    "identity": "身份信息",
+    "displayName": "显示名称",
+    "displayNameHint": "显示在总览页与个人名片上",
+    "displayNamePlaceholder": "例如：Lucas",
+    "tagline": "个人简介",
+    "taglineHint": "一句话说明你当前关注的项目或方向",
+    "taglinePlaceholder": "例如：打造全原生 AI 工作台",
+    "avatar": "头像",
+    "avatarHint": "上传自定义图片，或从 Papertrails 角色头像中选择",
+    "upload": "上传图片",
+    "uploading": "上传中…",
+    "clearCustom": "移除自定义头像",
+    "monogram": "首字母徽章",
+    "presets": "内置角色头像",
+    "saved": "个人资料已保存"
+  },
+  "mcp": {
+    "intro": "将 VibeValley 作为 MCP 服务一键接入本机编码工具，或复制标准配置片段。",
+    "transport": "默认传输方式",
+    "transportHint": "stdio 走本机命令行进程（完整读写权限）；streamableHttp 连接运行中的服务端 /mcp 端点",
+    "detected": "已检测到应用",
+    "notDetected": "未检测到",
+    "statusInstalled": "已接入 ({transport})",
+    "statusOutdated": "需要更新 ({current})",
+    "statusNotInstalled": "未配置",
+    "statusUnsupported": "不可用",
+    "install": "一键接入",
+    "update": "更新配置",
+    "reinstall": "重新写入",
+    "uninstall": "移除接入",
+    "copySnippet": "复制配置",
+    "copiedSnippet": "MCP 配置片段已复制",
+    "installedToast": "已为 {label} 写入 MCP 配置",
+    "uninstalledToast": "已从 {label} 移除 VibeValley MCP",
+    "configPath": "配置文件",
+    "snippet": "配置片段",
+    "refresh": "重新检测"
+  },
+  "data": {
+    "intro": "查看本机数据目录、Git 仓库与工作树路径，以及当前存储后端。",
+    "storageTitle": "存储后端",
+    "backend": "当前后端",
+    "backendHint": "附件、媒体输入与作品目录的底层存储引擎",
+    "backendLocalFs": "本地文件系统 (LocalFs)",
+    "backendS3": "对象存储 (S3)",
+    "backendMemory": "内存存储 (Memory)"
+  },
   "models": {
     "intro": "配置主助手、执行会话与语音功能的模型账号和 API 密钥。",
     "deepseekHint": "主助手和 VibeValley 自研执行会话用它"
@@ -113,7 +172,7 @@
     "intro": "执行会话还能去外面的记忆来源里查、往里记。"
   },
   "about": {
-    "intro": "查看版本信息、桌面更新状态、命令行工具与本机数据路径。",
+    "intro": "查看服务端版本、桌面自动更新状态与命令行工具安装情况。",
     "version": "版本",
     "versionHint": "这台电脑上的服务端",
     "files": "文件",

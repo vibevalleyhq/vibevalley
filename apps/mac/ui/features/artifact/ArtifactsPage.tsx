@@ -43,7 +43,7 @@ export type ArtifactChat = (props: {
 function ArtifactSkeleton() {
   return (
     <View testID="artifact-skeleton" accessibilityState={{ busy: true }} class="min-h-0 flex-1 bg-page">
-      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+      <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
         <If when={!contentSidebarOpen.get()}>
           <IconButton
             icon="sidebar"
@@ -71,7 +71,7 @@ function ArtifactSkeleton() {
 function CollapsedContentHeader() {
   return (
     <If when={!contentSidebarOpen.get()}>
-      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+      <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
         <IconButton
           icon="sidebar"
           size={16}
@@ -360,7 +360,7 @@ function Shown(props: { artifact: Artifact; chat: ArtifactChat }) {
     >
       <View class="min-h-0 min-w-0 flex-1">
         <If when={presenting()}>
-          <View testID="artifact-presenting" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-side px-3">
+          <View testID="artifact-presenting" desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-side px-3">
             <Text class="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{props.artifact.title}</Text>
             <Button size="compact" icon="close" testID="artifact-present-end" onPress={() => contentPresenting.set(false)}>
               {t("web.artifact.canvas.close")}

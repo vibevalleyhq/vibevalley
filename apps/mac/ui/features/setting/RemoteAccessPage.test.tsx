@@ -128,9 +128,10 @@ test("RemoteAccessPage: disabled -> enable -> pair/QR/copy -> revoke device -> d
   if (!clock) throw new Error("virtual clock required");
 
   await fake.pumpUntil(app, () => app.count("id:remote-access-page") === 1);
-  expect(app.count("id:connections-subnav-chat")).toBe(1);
-  expect(app.count("id:connections-subnav-github")).toBe(1);
-  expect(app.count("id:connections-subnav-remote")).toBe(1);
+  expect(app.count("id:settings-section-mcp")).toBe(1);
+  expect(app.count("id:settings-section-chat")).toBe(1);
+  expect(app.count("id:settings-section-github")).toBe(1);
+  expect(app.count("id:settings-section-remote")).toBe(1);
   expect(app.texts()).toContain(t("web.remote.title"));
   expect(app.texts()).toContain(t("web.remote.toggle.disabled"));
   expect(app.texts()).toContain(t("web.remote.tailscale.offline"));
@@ -211,19 +212,20 @@ test("SettingsPage: legacy /settings/remote redirect, search words, sub-tab navi
   });
 
   await fake.pumpUntil(app, () => app.count("id:remote-access-page") === 1);
-  expect(app.count("id:connections-subnav")).toBe(1);
+  expect(app.count("id:settings-section-remote")).toBe(1);
 
   await app.press("id:remote-enable");
   await fake.pumpUntil(app, () => app.count("id:remote-error") === 1);
   expect(app.texts()).toContain("Tailscale listener bind failed");
 
   await app.type("id:settings-search", "tailscale");
-  expect(app.count("id:settings-section-connections")).toBe(1);
+  expect(app.count("id:settings-section-remote")).toBe(1);
   expect(app.count("id:settings-section-general")).toBe(0);
 
-  await app.press("id:connections-subnav-github");
+  await app.press("id:settings-search-clear");
+  await app.press("id:settings-section-github");
   await fake.pumpUntil(app, () => app.count("id:remote-access-page") === 0);
-  await app.press("id:connections-subnav-remote");
+  await app.press("id:settings-section-remote");
   await fake.pumpUntil(app, () => app.count("id:remote-access-page") === 1);
 });
 

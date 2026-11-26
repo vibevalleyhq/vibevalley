@@ -3,10 +3,9 @@ import { colorScheme, computed, effect, host, keymap, Scroll, signal, Text, untr
 import { t } from "@vibevalley/i18n";
 import { isFreeUserSession } from "@vibevalley/protocol/rules";
 
-import { useAssetsDir } from "../design/art";
 import { Button } from "../design/Button";
 import { Dialog, hasOpenModal } from "../design/Dialog";
-import { OrchestratorFace } from "../design/domain/Face";
+import { UserAvatar } from "../design/domain/Face";
 import { Icon } from "../design/Icon";
 import { OutLink } from "../design/IconButton";
 import type { IconName } from "../design/icons";
@@ -27,7 +26,7 @@ import { NavLink, useLocation, useMatches, useRouter } from "../infra/router";
 import { useUpdates } from "../infra/settings";
 import { safeLastContentPath } from "../infra/state/contentNav";
 import { isVdpEnabled, useVdpNode } from "../infra/vdpProbe";
-import { type Place, places, runsPlace, settingsPlace } from "./places";
+import { dashboardPlace, type Place, places, settingsPlace } from "./places";
 
 const linkWords = { connecting: t("web.base.link.connecting"), open: t("web.base.link.open"), lost: t("web.base.link.lost") } as const;
 
@@ -342,13 +341,12 @@ function RailUpdateControl(props: { small: boolean; working: number }) {
 }
 
 function Rail(props: { here?: Place | undefined; farm: boolean }) {
-  const assetsDir = useAssetsDir();
   const sessions = useSessionsSlice();
   const inbox = useInboxSlice();
   const link = useLink();
   const waiting = () => waitingOnUser(inbox()?.items ?? []);
   const working = () => sessions()?.sessions.filter((s) => !isFreeUserSession(s) && s.phase._tag === "working").length ?? 0;
-  const onRuns = () => props.here === runsPlace;
+  const atDashboard = () => props.here === dashboardPlace;
   const settings = settingsPlace;
   const atSettings = () => props.here === settings;
   const location = useLocation();
@@ -369,25 +367,16 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
       </If>
       <View class={`shrink-0 items-center ${globalShell ? "pt-1 pb-2" : compactTall() ? "pt-1.5 pb-2" : "pt-2 pb-2"}`}>
         <Slot
-          to="/farm"
-          place="farm"
-          label={`${t("web.base.farm")} · ${linkWords[link()]}`}
-          name={t("web.base.farmShort")}
-          current={props.farm}
+          to={dashboardPlace.path}
+          place={dashboardPlace.id}
+          label={`${dashboardPlace.label} · ${linkWords[link()]}`}
+          name={dashboardPlace.label}
+          current={atDashboard()}
           hero
           icon={() => (
             <View class="relative">
               <View class="overflow-hidden rounded-md border border-line">
-                <If
-                  when={assetsDir()}
-                  else={
-                    <View class="h-9.5 w-9.5 items-center justify-center bg-page">
-                      <Icon name="farm" size={20} tone="leaf" />
-                    </View>
-                  }
-                >
-                  <OrchestratorFace size={38} />
-                </If>
+                <UserAvatar size={38} />
               </View>
               <View
                 testID="link"
@@ -411,7 +400,8 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
                 <Each of={places.filter((p) => p.group === group() && p.id !== "settings")}>
                   {(p) => {
                     const to = () => (p().id === "workspace" && globalShell ? "/workspace" : p().id === "content" ? safeLastContentPath() : p().path);
-                    const isCurrent = () => (p().id === "workspace" ? location().pathname === "/workspace" || p() === props.here : p() === props.here);
+                    const isCurrent = () =>
+                      p().id === "workspace" ? location().pathname === "/workspace" || p() === props.here : p().id === "farm" ? props.farm : p() === props.here;
                     return (
                       <Slot
                         to={to()}
@@ -433,47 +423,6 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
       <View class="shrink-0 items-center gap-1 pt-2 pb-3">
         <View class="mb-1 h-px w-8" style={{ backgroundColor: mix("on-rail", 0.1) }} />
         <RailUpdateControl small={small()} working={working()} />
-        <NavLink
-          href="/runs"
-          testID="rail-runs-status"
-          accessibilityLabel={working() > 0 ? t("web.base.working", { n: working() }) : t("web.base.runsHint")}
-          accessibilityState={{ selected: onRuns() }}
-          tooltip={
-            <Bubble
-              text={working() > 0 ? `${t("web.base.working", { n: working() })} · ${t("web.base.runsHint")}` : t("web.base.runsHint")}
-              placement="right"
-            />
-          }
-          class={`relative ${small() ? "h-9 w-11" : "h-9 w-16"} shrink-0 flex-row items-center justify-center rounded-lg px-1 ${motionClass("transition-transform duration-120 ease-out")} active:translate-y-px focus-visible:outline-2 focus-visible:outline-focus ${
-            onRuns() ? "" : "hover:bg-hover"
-          }`}
-          style={onRuns() ? { backgroundColor: mix("on-rail", colorScheme() === "dark" ? 0.12 : 0.09) } : undefined}
-        >
-          <If when={onRuns()}>
-            <View testID="rail-runs-active-bar" class="absolute top-0 bottom-0 left-0 justify-center">
-              <View class="h-4 w-0.5 rounded-full bg-accent" />
-            </View>
-          </If>
-          <View
-            class="h-6 flex-row items-center justify-center gap-1.5 rounded-full border border-transparent px-2"
-            style={
-              working() > 0
-                ? { backgroundColor: mix("leaf", 0.14), borderColor: mix("leaf", 0.45) }
-                : onRuns()
-                  ? { backgroundColor: mix("accent", 0.14), borderColor: mix("accent", 0.4) }
-                  : undefined
-            }
-          >
-            <View class="size-3 shrink-0 items-center justify-center rounded-full" style={working() > 0 ? { backgroundColor: mix("leaf", 0.25) } : undefined}>
-              <View
-                class={`size-1.5 rounded-full ${working() > 0 ? `bg-leaf ${motionClass("animate-pulse")}` : onRuns() ? "bg-accent" : inbox()?.call === "live" ? "bg-leaf" : "bg-faint"}`}
-              />
-            </View>
-            <If when={working() > 0}>
-              <Text class="font-mono text-2xs font-semibold text-leaf tabular-nums">{String(working())}</Text>
-            </If>
-          </View>
-        </NavLink>
         <Slot
           to={settings.path}
           place={settings.id}
@@ -489,7 +438,7 @@ function Rail(props: { here?: Place | undefined; farm: boolean }) {
 
 function Desk(props: { place?: Place | undefined }) {
   return (
-    <View testID="desk" desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center justify-between gap-3 border-b border-line px-3.5">
+    <View testID="desk" desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center justify-between gap-3 border-b border-line px-3.5">
       <If when={props.place} else={<View class="flex-1" />}>
         {(place) => (
           <View class="min-w-0 flex-1 flex-row items-center gap-2.5 overflow-hidden">
@@ -514,7 +463,8 @@ export function Shell(props: { children: JSX.Element }) {
   const meta = () => matches().at(-1)?.meta;
   const here = () => {
     const id = meta()?.place;
-    if (id === runsPlace.id) return runsPlace;
+    if (id === dashboardPlace.id || id === "runs") return dashboardPlace;
+    if (meta()?.skin === "farm") return places.find((place) => place.id === "farm");
     return places.find((place) => place.id === id);
   };
   const inFarm = () => meta()?.skin === "farm";
@@ -527,10 +477,11 @@ export function Shell(props: { children: JSX.Element }) {
       <ShortcutSheet />
       <Rail here={here()} farm={inFarm()} />
       <View class="min-w-0 flex-1">
-        {/* Issues, Chat, Content, Runtimes, and Team draw their own top bars; native workspace fills its own pane. */}
+        {/* Dashboard, Issues, Chat, Content, Runtimes, and Team draw their own top bars; native workspace fills its own pane. */}
         <If
           when={
             !inFarm() &&
+            here()?.id !== "dashboard" &&
             here()?.id !== "issues" &&
             here()?.id !== "chat" &&
             here()?.id !== "content" &&

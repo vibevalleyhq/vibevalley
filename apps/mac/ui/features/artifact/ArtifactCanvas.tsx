@@ -28,7 +28,7 @@ export function ArtifactCanvas(props: { id: string; version?: number | undefined
   return (
     <View accessibilityLabel={t("web.artifact.canvas.label")} testID="artifact-canvas" class="min-h-0 min-w-0 flex-1 border-l border-line bg-page">
       <If when={!shown()}>
-        <View class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
+        <View class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3">
           <View class="min-w-0 flex-1" />
           <View class="shrink-0 flex-row items-center gap-1">
             <IconButton icon="open" label={t("web.artifact.canvas.openPage")} testid="artifact-canvas-page" onClick={() => router.navigate(pageHref())} />

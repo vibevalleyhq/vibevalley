@@ -38,6 +38,13 @@ const Readiness = z.discriminatedUnion("ready", [
   z.object({ ready: z.literal(false), missing: z.enum(T.MissingValues) }),
 ]) satisfies Codec<T.Readiness>;
 
+export const UserProfile = z.object({
+  displayName: z.exactOptional(z.string()),
+  avatarAttachmentId: z.exactOptional(z.string()),
+  avatarPreset: z.exactOptional(z.string()),
+  tagline: z.exactOptional(z.string()),
+}) satisfies Codec<T.UserProfile>;
+
 export const SettingsStatus = z.object({
   file: z.string(),
   home: z.string(),
@@ -49,6 +56,8 @@ export const SettingsStatus = z.object({
   voiceDefaults: VoiceSettings,
   readiness: z.record(z.enum(T.FeatureValues), Readiness),
   memorySources: z.array(MemorySource),
+  profile: z.exactOptional(UserProfile),
+  storageBackend: z.exactOptional(z.string()),
 }) satisfies Codec<T.SettingsStatus>;
 
 const MemorySourceUpdate = z.object({
@@ -67,4 +76,5 @@ export const SettingsUpdate = z.object({
   deepseekApiKey: z.exactOptional(z.string()),
   voice: z.exactOptional(SettingsUpdateVoice),
   memorySources: z.exactOptional(z.array(MemorySourceUpdate)),
+  profile: z.exactOptional(UserProfile),
 }) satisfies Codec<T.SettingsUpdate>;

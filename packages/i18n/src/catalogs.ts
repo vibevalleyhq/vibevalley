@@ -578,22 +578,37 @@ export const catalogs = {
     "web.base": {
       route: { missing: "这个页面不存在", invalid: "这个地址无效", home: "返回应用" },
       place: {
+        dashboard: { label: "总览", hint: "个人名片、活跃会话、待办摘要与运行记录" },
         chat: { label: "对话", hint: "频道与话题" },
         issues: { label: "工单", hint: "每张工单从记下到完成" },
-        runs: { label: "运行与轨迹", hint: "执行会话、主助手审批与历史轨迹" },
         workspace: { hint: "管理仓库与工作区", name: "工作区" },
         content: { label: "作品", hint: "作品、大纲笔记与素材" },
+        farm: { label: "农场", hint: "3D 纸雕农场与院落现场" },
         runtimes: { label: "引擎", hint: "本机与远端已安装的编码引擎" },
         team: { label: "团队", hint: "角色与团队模板" },
-        settings: { label: "设置", hint: "通用与外观、模型与密钥、语音与通话、外部连接、关于与数据" },
+        settings: { label: "设置", hint: "个人资料、通用与外观、模型与引擎、MCP 接入、语音与连接、数据与关于" },
+      },
+      dashboard: {
+        title: "总览仪表盘",
+        tabsLabel: "仪表盘视图",
+        tab: { overview: "概览", runs: "运行记录" },
+        profile: { defaultName: "工作台用户", defaultTagline: "在工作台与默认频道统筹角色与工单", edit: "编辑个人资料" },
+        stats: { working: "运行中会话", waiting: "等你回应", issues: "待办与进行中", review: "待验收" },
+        pulse: {
+          title: "活跃引擎与执行脉搏",
+          empty: "当前没有运行中的执行会话，随时去工单或对话里派活。",
+          active: "{n} 个会话正在干活",
+          openRuns: "查看全部运行记录",
+        },
+        pending: { title: "工作台待关注", waiting: "{n} 项正在等你答复", inReview: "{n} 张工单待验收", todo: "{n} 张待办工单", openIssues: "打开工单看板" },
+        recent: { title: "最近运行记录", empty: "还没有运行记录。" },
+        quick: { title: "快捷入口" },
       },
       link: { connecting: "连接中", open: "已连上", lost: "断了，重连中" },
       rail: "工作台",
       farm: "回农场",
-      farmShort: "农场",
       update: "更新",
       working: "运行中 · {n} 个执行会话",
-      runsHint: "查看执行会话、主助手审批与轨迹",
       chips: { drop: "去掉 {v}", valueOf: "{k} 的值", removeKey: "删除 {k}", remove: "删除", name: "变量名", value: "变量的值", valueHint: "值", add: "添加" },
       toasts: "提示",
       runtime: "运行工具：{name}",
@@ -2956,33 +2971,41 @@ export const catalogs = {
       nav: {
         label: "设置的分区",
         search: "搜索设置…",
-        general: "通用与外观",
+        profile: "个人资料",
+        general: "通用",
         appearance: "外观",
-        models: "模型与密钥",
+        models: "模型与引擎",
         skills: "技能",
+        mcp: "MCP 接入",
         voice: "语音与通话",
-        connections: "外部连接",
         remote: "远程访问",
-        about: "关于与数据",
+        data: "数据与存储",
+        about: "关于",
         memory: "记忆",
-        chat: "聊天软件",
+        chat: "聊天通道",
         width: "导航的宽窄（拖动，双击回默认）",
-        groupWorkspace: "工作区",
-        groupConnect: "语音与连接",
+        groupWorkspace: "个人与工作区",
+        groupConnect: "连接与集成",
+        groupAbout: "数据与关于",
       },
       words: {
-        general: "语言 language 启动 打开 工作台 农场 主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
-        models: "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定",
+        profile: "个人资料 头像 昵称 签名 avatar profile display name",
+        general: "语言 language 启动 打开 工作台 农场",
+        appearance: "主题 深色 浅色 暗色 dark light 界面大小 缩放 字体 字号 动画 无动画 动效 motion animation",
+        models: "密钥 钥匙 账号 DeepSeek MOSS API Key 模型 绑定 引擎",
         skills: "技能 skill skills 内置 安装 指南 提示词",
         memory: "记忆 memory 来源 source Nowledge EverOS 外部记忆 读 写",
+        mcp: "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp 接入 配置",
         voice: "电话 通话 MOSS Live 实时 视觉 转写 语音",
-        connections: "微信 飞书 QQ 连接器 配对 GitHub gh PR 登录",
+        chat: "微信 飞书 QQ 聊天通道 连接器 配对",
+        github: "GitHub gh PR 登录",
         remote: "远程 手机 Tailscale 配对 二维码 设备 iOS Android CLI 命令行 执行机 沙箱 监听 令牌 总控端 内嵌 远端",
-        about: "版本 家目录 设置文件 数据 version",
+        data: "家目录 设置文件 仓库 目录 工作树 存储 后端 数据 data storage",
+        about: "版本 更新 命令行 CLI version update",
       },
       scope: { farm: "对整个 VibeValley", device: "只对这台设备" },
       general: {
-        intro: "调整语言、启动方式、主题与界面显示偏好。",
+        intro: "调整界面语言与启动默认页面。",
         languageHint: "界面、主助手和执行会话说的话都用它",
         startupTitle: "启动",
         start: "启动时打开",
@@ -2990,6 +3013,7 @@ export const catalogs = {
         starts: { workbench: "工作台", farm: "农场" },
       },
       appearance: {
+        intro: "自定义主题配色、动效偏好、界面缩放与终端字体。",
         theme: "主题",
         themeHint: "跟随系统时随电脑的浅色和深色变",
         themes: { light: "浅色", dark: "深色", system: "跟随系统" },
@@ -3004,10 +3028,60 @@ export const catalogs = {
         terminalFontSize: "终端字号",
         terminalFontSizeHint: "也可在工作区随时按 ⌘+ / ⌘- / ⌘0 调整",
       },
+      profile: {
+        intro: "设置你在工作台顶部导航和总览仪表盘中的显示名称、简介与头像。",
+        preview: "导航栏预览",
+        identity: "身份信息",
+        displayName: "显示名称",
+        displayNameHint: "显示在总览页与个人名片上",
+        displayNamePlaceholder: "例如：Lucas",
+        tagline: "个人简介",
+        taglineHint: "一句话说明你当前关注的项目或方向",
+        taglinePlaceholder: "例如：打造全原生 AI 工作台",
+        avatar: "头像",
+        avatarHint: "上传自定义图片，或从 Papertrails 角色头像中选择",
+        upload: "上传图片",
+        uploading: "上传中…",
+        clearCustom: "移除自定义头像",
+        monogram: "首字母徽章",
+        presets: "内置角色头像",
+        saved: "个人资料已保存",
+      },
+      mcp: {
+        intro: "将 VibeValley 作为 MCP 服务一键接入本机编码工具，或复制标准配置片段。",
+        transport: "默认传输方式",
+        transportHint: "stdio 走本机命令行进程（完整读写权限）；streamableHttp 连接运行中的服务端 /mcp 端点",
+        detected: "已检测到应用",
+        notDetected: "未检测到",
+        statusInstalled: "已接入 ({transport})",
+        statusOutdated: "需要更新 ({current})",
+        statusNotInstalled: "未配置",
+        statusUnsupported: "不可用",
+        install: "一键接入",
+        update: "更新配置",
+        reinstall: "重新写入",
+        uninstall: "移除接入",
+        copySnippet: "复制配置",
+        copiedSnippet: "MCP 配置片段已复制",
+        installedToast: "已为 {label} 写入 MCP 配置",
+        uninstalledToast: "已从 {label} 移除 VibeValley MCP",
+        configPath: "配置文件",
+        snippet: "配置片段",
+        refresh: "重新检测",
+      },
+      data: {
+        intro: "查看本机数据目录、Git 仓库与工作树路径，以及当前存储后端。",
+        storageTitle: "存储后端",
+        backend: "当前后端",
+        backendHint: "附件、媒体输入与作品目录的底层存储引擎",
+        backendLocalFs: "本地文件系统 (LocalFs)",
+        backendS3: "对象存储 (S3)",
+        backendMemory: "内存存储 (Memory)",
+      },
       models: { intro: "配置主助手、执行会话与语音功能的模型账号和 API 密钥。", deepseekHint: "主助手和 VibeValley 自研执行会话用它" },
       memory: { intro: "执行会话还能去外面的记忆来源里查、往里记。" },
       about: {
-        intro: "查看版本信息、桌面更新状态、命令行工具与本机数据路径。",
+        intro: "查看服务端版本、桌面自动更新状态与命令行工具安装情况。",
         version: "版本",
         versionHint: "这台电脑上的服务端",
         files: "文件",
@@ -3965,22 +4039,43 @@ export const catalogs = {
     "web.base": {
       route: { missing: "This page does not exist", invalid: "This address is invalid", home: "Back to the app" },
       place: {
+        dashboard: { label: "Dashboard", hint: "Profile, active sessions, attention summary, and runs" },
         chat: { label: "Chat", hint: "Channels and threads" },
         issues: { label: "Issues", hint: "Every issue from creation to completion" },
-        runs: { label: "Runs & trajectories", hint: "Active sessions, orchestrator approvals, and trajectories" },
         workspace: { hint: "Manage repositories and workspaces", name: "Workspace" },
         content: { label: "Artifacts", hint: "Artifacts, notes, and media" },
+        farm: { label: "Farm", hint: "3D papercraft farm courtyard" },
         runtimes: { label: "Engines", hint: "Installed coding engines across machines" },
         team: { label: "Team", hint: "Roles and team templates" },
-        settings: { label: "Settings", hint: "General & appearance, models & keys, voice, connections, about" },
+        settings: { label: "Settings", hint: "Profile, general & appearance, models & engines, MCP, connections, data & about" },
+      },
+      dashboard: {
+        title: "Dashboard",
+        tabsLabel: "Dashboard views",
+        tab: { overview: "Overview", runs: "Runs" },
+        profile: { defaultName: "Workspace User", defaultTagline: "Coordinating roles and issues across your workspace", edit: "Edit profile" },
+        stats: { working: "Active sessions", waiting: "Needs response", issues: "Open issues", review: "In review" },
+        pulse: {
+          title: "Live Execution Pulse",
+          empty: "No active helper sessions right now. Dispatch work from Issues or Chat.",
+          active: "{n} active sessions",
+          openRuns: "Open all runs",
+        },
+        pending: {
+          title: "Needs Review & Action",
+          waiting: "{n} waiting on your reply",
+          inReview: "{n} issues in review",
+          todo: "{n} todo issues",
+          openIssues: "Open issues board",
+        },
+        recent: { title: "Recent Runs", empty: "No runs recorded yet." },
+        quick: { title: "Quick Navigation" },
       },
       link: { connecting: "Connecting", open: "Connected", lost: "Lost, reconnecting" },
       rail: "Workbench",
       farm: "Back to the farm",
-      farmShort: "Farm",
       update: "Update",
       working: "Open · {n} working",
-      runsHint: "View active runs, assistant approvals, and trajectories",
       chips: {
         drop: "Remove {v}",
         valueOf: "{k}'s value",
@@ -6491,33 +6586,41 @@ export const catalogs = {
       nav: {
         label: "Settings sections",
         search: "Search settings…",
-        general: "General & Appearance",
+        profile: "Profile",
+        general: "General",
         appearance: "Appearance",
-        models: "Models & Keys",
+        models: "Models & Engines",
         skills: "Skills",
-        voice: "Voice",
-        connections: "Connections",
+        mcp: "MCP Integrations",
+        voice: "Voice & Calls",
         remote: "Remote Access",
-        about: "About & Data",
+        data: "Data & Storage",
+        about: "About",
         memory: "Memory",
-        chat: "Chat apps",
+        chat: "Chat Channels",
         width: "Navigation width (drag; double-click for the default)",
-        groupWorkspace: "Workspace",
-        groupConnect: "Voice & Connections",
+        groupWorkspace: "Profile & Workspace",
+        groupConnect: "Connections & Integrations",
+        groupAbout: "Data & About",
       },
       words: {
-        general: "language start workbench farm theme dark light size zoom scale font animation motion reduce",
-        models: "keys accounts DeepSeek MOSS API key models binding",
+        profile: "profile avatar display name tagline bio",
+        general: "language start workbench farm startup",
+        appearance: "theme dark light size zoom scale font animation motion reduce",
+        models: "keys accounts DeepSeek MOSS API key models binding engines",
         skills: "skills skill built-in installed library prompt",
         memory: "memory source sources Nowledge EverOS external read write",
+        mcp: "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp integration",
         voice: "call phone recognition speech MOSS live realtime vision transcription",
-        connections: "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
+        chat: "WeChat Feishu Lark QQ connectors chat pairing",
+        github: "GitHub gh PR login",
         remote: "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
-        about: "version home folder settings data",
+        data: "home folder settings repos worktrees data storage backend",
+        about: "version update cli command line",
       },
       scope: { farm: "For all of VibeValley", device: "This device only" },
       general: {
-        intro: "Configure language, startup behavior, theme, and display preferences.",
+        intro: "Configure interface language and startup behavior.",
         languageHint: "The page, the assistant and the helpers all speak it",
         startupTitle: "Startup",
         start: "Open on start",
@@ -6525,6 +6628,7 @@ export const catalogs = {
         starts: { workbench: "Workbench", farm: "Farm" },
       },
       appearance: {
+        intro: "Customize theme, animations, interface scale, and terminal font.",
         theme: "Theme",
         themeHint: "With the system, it follows the computer's light and dark",
         themes: { light: "Light", dark: "Dark", system: "System" },
@@ -6539,10 +6643,60 @@ export const catalogs = {
         terminalFontSize: "Terminal font size",
         terminalFontSizeHint: "Also adjustable anytime in the terminal view with ⌘+ / ⌘- / ⌘0",
       },
+      profile: {
+        intro: "Customize your display name, tagline, and avatar shown in the rail and dashboard.",
+        preview: "Rail Preview",
+        identity: "Identity",
+        displayName: "Display name",
+        displayNameHint: "Shown on your dashboard and profile card",
+        displayNamePlaceholder: "e.g. Lucas",
+        tagline: "Tagline",
+        taglineHint: "A short bio or focus note",
+        taglinePlaceholder: "e.g. Building native AI workflows",
+        avatar: "Avatar",
+        avatarHint: "Upload a custom image or pick a Papertrails preset",
+        upload: "Upload image",
+        uploading: "Uploading…",
+        clearCustom: "Remove custom",
+        monogram: "Monogram",
+        presets: "Preset avatars",
+        saved: "Profile saved",
+      },
+      mcp: {
+        intro: "Connect VibeValley as an MCP server into your local coding agents with one click or copyable snippets.",
+        transport: "Transport",
+        transportHint: "stdio launches the local CLI process (full access); streamableHttp connects to the running server /mcp endpoint",
+        detected: "Detected",
+        notDetected: "Not detected",
+        statusInstalled: "Installed ({transport})",
+        statusOutdated: "Outdated ({current})",
+        statusNotInstalled: "Not installed",
+        statusUnsupported: "Unsupported",
+        install: "Install",
+        update: "Update",
+        reinstall: "Reinstall",
+        uninstall: "Uninstall",
+        copySnippet: "Copy snippet",
+        copiedSnippet: "MCP config snippet copied",
+        installedToast: "Installed MCP config for {label}",
+        uninstalledToast: "Removed VibeValley MCP from {label}",
+        configPath: "Config file",
+        snippet: "Config snippet",
+        refresh: "Recheck",
+      },
+      data: {
+        intro: "Inspect local data paths, repository and worktree folders, and the active storage backend.",
+        storageTitle: "Storage Backend",
+        backend: "Active backend",
+        backendHint: "Storage engine backing attachments, media inputs, and artifacts",
+        backendLocalFs: "Local Filesystem (LocalFs)",
+        backendS3: "Object Storage (S3)",
+        backendMemory: "In-Memory (Memory)",
+      },
       models: { intro: "Configure model accounts, API keys, and feature bindings.", deepseekHint: "The assistant and VibeValley's own helpers use it" },
       memory: { intro: "Helpers can also look things up in, and write to, memory outside VibeValley." },
       about: {
-        intro: "Inspect version details, desktop updates, CLI installation, and local data paths.",
+        intro: "Inspect server version, desktop auto-update status, and CLI installation.",
         version: "Version",
         versionHint: "The server on this machine",
         files: "Files",
@@ -7555,8 +7709,30 @@ export interface Messages {
   "web.base.compare.uploadFailed": { readonly why: string | number };
   "web.base.compare.uploading": undefined;
   "web.base.compare.zoom": { readonly label: string | number };
+  "web.base.dashboard.pending.inReview": { readonly n: string | number };
+  "web.base.dashboard.pending.openIssues": undefined;
+  "web.base.dashboard.pending.title": undefined;
+  "web.base.dashboard.pending.todo": { readonly n: string | number };
+  "web.base.dashboard.pending.waiting": { readonly n: string | number };
+  "web.base.dashboard.profile.defaultName": undefined;
+  "web.base.dashboard.profile.defaultTagline": undefined;
+  "web.base.dashboard.profile.edit": undefined;
+  "web.base.dashboard.pulse.active": { readonly n: string | number };
+  "web.base.dashboard.pulse.empty": undefined;
+  "web.base.dashboard.pulse.openRuns": undefined;
+  "web.base.dashboard.pulse.title": undefined;
+  "web.base.dashboard.quick.title": undefined;
+  "web.base.dashboard.recent.empty": undefined;
+  "web.base.dashboard.recent.title": undefined;
+  "web.base.dashboard.stats.issues": undefined;
+  "web.base.dashboard.stats.review": undefined;
+  "web.base.dashboard.stats.waiting": undefined;
+  "web.base.dashboard.stats.working": undefined;
+  "web.base.dashboard.tab.overview": undefined;
+  "web.base.dashboard.tab.runs": undefined;
+  "web.base.dashboard.tabsLabel": undefined;
+  "web.base.dashboard.title": undefined;
   "web.base.farm": undefined;
-  "web.base.farmShort": undefined;
   "web.base.file.pdf": undefined;
   "web.base.file.remove": { readonly name: string | number };
   "web.base.form.asking": undefined;
@@ -7601,10 +7777,12 @@ export interface Messages {
   "web.base.place.chat.label": undefined;
   "web.base.place.content.hint": undefined;
   "web.base.place.content.label": undefined;
+  "web.base.place.dashboard.hint": undefined;
+  "web.base.place.dashboard.label": undefined;
+  "web.base.place.farm.hint": undefined;
+  "web.base.place.farm.label": undefined;
   "web.base.place.issues.hint": undefined;
   "web.base.place.issues.label": undefined;
-  "web.base.place.runs.hint": undefined;
-  "web.base.place.runs.label": undefined;
   "web.base.place.runtimes.hint": undefined;
   "web.base.place.runtimes.label": undefined;
   "web.base.place.settings.hint": undefined;
@@ -7635,7 +7813,6 @@ export interface Messages {
   "web.base.route.home": undefined;
   "web.base.route.invalid": undefined;
   "web.base.route.missing": undefined;
-  "web.base.runsHint": undefined;
   "web.base.runtime": { readonly name: string | number };
   "web.base.secret.hide": undefined;
   "web.base.secret.peek": undefined;
@@ -10023,6 +10200,7 @@ export interface Messages {
   "web.setting.about.workingQuestion": { readonly n: string | number };
   "web.setting.about.worktrees": undefined;
   "web.setting.about.worktreesHint": undefined;
+  "web.setting.appearance.intro": undefined;
   "web.setting.appearance.monoFont": undefined;
   "web.setting.appearance.monoFontHint": undefined;
   "web.setting.appearance.monoFontRow": undefined;
@@ -10040,6 +10218,13 @@ export interface Messages {
   "web.setting.appearance.themes.dark": undefined;
   "web.setting.appearance.themes.light": undefined;
   "web.setting.appearance.themes.system": undefined;
+  "web.setting.data.backend": undefined;
+  "web.setting.data.backendHint": undefined;
+  "web.setting.data.backendLocalFs": undefined;
+  "web.setting.data.backendMemory": undefined;
+  "web.setting.data.backendS3": undefined;
+  "web.setting.data.intro": undefined;
+  "web.setting.data.storageTitle": undefined;
   "web.setting.feature.call": undefined;
   "web.setting.feature.image": undefined;
   "web.setting.feature.live": undefined;
@@ -10072,6 +10257,26 @@ export interface Messages {
   "web.setting.language.line": undefined;
   "web.setting.language.title": undefined;
   "web.setting.language.zh": undefined;
+  "web.setting.mcp.configPath": undefined;
+  "web.setting.mcp.copiedSnippet": undefined;
+  "web.setting.mcp.copySnippet": undefined;
+  "web.setting.mcp.detected": undefined;
+  "web.setting.mcp.install": undefined;
+  "web.setting.mcp.installedToast": { readonly label: string | number };
+  "web.setting.mcp.intro": undefined;
+  "web.setting.mcp.notDetected": undefined;
+  "web.setting.mcp.refresh": undefined;
+  "web.setting.mcp.reinstall": undefined;
+  "web.setting.mcp.snippet": undefined;
+  "web.setting.mcp.statusInstalled": { readonly transport: string | number };
+  "web.setting.mcp.statusNotInstalled": undefined;
+  "web.setting.mcp.statusOutdated": { readonly current: string | number };
+  "web.setting.mcp.statusUnsupported": undefined;
+  "web.setting.mcp.transport": undefined;
+  "web.setting.mcp.transportHint": undefined;
+  "web.setting.mcp.uninstall": undefined;
+  "web.setting.mcp.uninstalledToast": { readonly label: string | number };
+  "web.setting.mcp.update": undefined;
   "web.setting.memory.intro": undefined;
   "web.setting.missing.binding": undefined;
   "web.setting.missing.deepseekKey": undefined;
@@ -10083,18 +10288,38 @@ export interface Messages {
   "web.setting.nav.about": undefined;
   "web.setting.nav.appearance": undefined;
   "web.setting.nav.chat": undefined;
-  "web.setting.nav.connections": undefined;
+  "web.setting.nav.data": undefined;
   "web.setting.nav.general": undefined;
+  "web.setting.nav.groupAbout": undefined;
   "web.setting.nav.groupConnect": undefined;
   "web.setting.nav.groupWorkspace": undefined;
   "web.setting.nav.label": undefined;
+  "web.setting.nav.mcp": undefined;
   "web.setting.nav.memory": undefined;
   "web.setting.nav.models": undefined;
+  "web.setting.nav.profile": undefined;
   "web.setting.nav.remote": undefined;
   "web.setting.nav.search": undefined;
   "web.setting.nav.skills": undefined;
   "web.setting.nav.voice": undefined;
   "web.setting.nav.width": undefined;
+  "web.setting.profile.avatar": undefined;
+  "web.setting.profile.avatarHint": undefined;
+  "web.setting.profile.clearCustom": undefined;
+  "web.setting.profile.displayName": undefined;
+  "web.setting.profile.displayNameHint": undefined;
+  "web.setting.profile.displayNamePlaceholder": undefined;
+  "web.setting.profile.identity": undefined;
+  "web.setting.profile.intro": undefined;
+  "web.setting.profile.monogram": undefined;
+  "web.setting.profile.presets": undefined;
+  "web.setting.profile.preview": undefined;
+  "web.setting.profile.saved": undefined;
+  "web.setting.profile.tagline": undefined;
+  "web.setting.profile.taglineHint": undefined;
+  "web.setting.profile.taglinePlaceholder": undefined;
+  "web.setting.profile.upload": undefined;
+  "web.setting.profile.uploading": undefined;
   "web.setting.readiness.fix": undefined;
   "web.setting.readiness.lacks": { readonly feature: string | number; readonly why: string | number };
   "web.setting.readiness.ready": { readonly feature: string | number };
@@ -10119,10 +10344,15 @@ export interface Messages {
   "web.setting.source.write": undefined;
   "web.setting.source.writeHint": undefined;
   "web.setting.words.about": undefined;
-  "web.setting.words.connections": undefined;
+  "web.setting.words.appearance": undefined;
+  "web.setting.words.chat": undefined;
+  "web.setting.words.data": undefined;
   "web.setting.words.general": undefined;
+  "web.setting.words.github": undefined;
+  "web.setting.words.mcp": undefined;
   "web.setting.words.memory": undefined;
   "web.setting.words.models": undefined;
+  "web.setting.words.profile": undefined;
   "web.setting.words.remote": undefined;
   "web.setting.words.skills": undefined;
   "web.setting.words.voice": undefined;

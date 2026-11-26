@@ -125,7 +125,7 @@ export function Inspector(props: {
 
   return (
     <View testID="library-inspector" class="h-full min-h-0 w-76 shrink-0 border-l border-line bg-side">
-      <View desktop={{ windowDrag: true }} class="h-9 shrink-0 flex-row items-center gap-1.5 border-b border-line px-3">
+      <View desktop={{ windowDrag: true }} class="h-11 shrink-0 flex-row items-center gap-1.5 border-b border-line px-3">
         <If
           when={one()}
           else={

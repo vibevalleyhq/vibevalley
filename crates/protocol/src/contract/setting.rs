@@ -170,6 +170,18 @@ impl Feature {
 }
 
 #[skip_serializing_none]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct UserProfile {
+    pub display_name: Option<String>,
+    pub avatar_attachment_id: Option<String>,
+    pub avatar_preset: Option<String>,
+    pub tagline: Option<String>,
+}
+
+#[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts-gen", derive(TS))]
 #[cfg_attr(feature = "ts-gen", ts(optional_fields))]
@@ -187,6 +199,8 @@ pub struct SettingsStatus {
     #[cfg_attr(feature = "ts-gen", ts(type = "Record<Feature, Readiness>"))]
     pub readiness: BTreeMap<Feature, Readiness>,
     pub memory_sources: Vec<MemorySource>,
+    pub profile: Option<UserProfile>,
+    pub storage_backend: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -215,6 +229,7 @@ pub struct SettingsUpdate {
     pub deepseek_api_key: Option<String>,
     pub voice: Option<SettingsUpdateVoice>,
     pub memory_sources: Option<Vec<MemorySourceUpdate>>,
+    pub profile: Option<UserProfile>,
 }
 
 #[cfg(feature = "ts-gen")]
@@ -227,6 +242,7 @@ crate::typescript::module! {
     Missing,
     Readiness,
     Feature,
+    UserProfile,
     SettingsStatus,
     MemorySourceUpdate,
     SettingsUpdate];

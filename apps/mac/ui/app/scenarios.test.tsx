@@ -60,14 +60,16 @@ test("empty scenario keeps every major route stable across themes and narrow wid
   expect(app.count("id:issues-page")).toBe(1);
   expect(app.count("id:issue-card")).toBe(0);
   expect(app.count("id:desk-status")).toBe(0);
-  expect(app.count("id:rail-runs-status")).toBe(1);
-  expect(app.shows("id:rail-runs-status >> text:未启动")).toBe(false);
+  expect(app.count("id:place-dashboard")).toBe(1);
+  expect(app.count("id:place-farm")).toBe(1);
+  expect(app.count("id:link")).toBe(1);
+  expect(app.count("id:rail-runs-status")).toBe(0);
   row.stepsPassed++;
 
   await fake.setSlice(app, "inbox", { ...fixture.state.inbox, call: "live" });
-  expect(app.count("id:rail-runs-status")).toBe(1);
+  expect(app.count("id:place-dashboard")).toBe(1);
   await fake.setState(app, fixture.state);
-  expect(app.shows("id:rail-runs-status >> text:未启动")).toBe(false);
+  expect(app.count("id:link")).toBe(1);
 
   await visit(app, fake, "/chat", row, () => {
     expect(app.count("id:chat-page")).toBe(1);
@@ -535,10 +537,10 @@ test("edge scenario verifies boardSummary, mediaSummary (all 8 MediaPhase), all 
   });
 
   await visit(app, fake, "/runs", row, () => {
+    expect(app.count("id:dashboard-page")).toBe(1);
     expect(app.count("id:runs-page")).toBe(1);
     expect(app.count("id:run-row-orchestrator")).toBe(1);
     expect(app.count("id:run-row-w-edge-fam4")).toBe(1);
-    expect(app.shows("id:rail-runs-status >> text:3")).toBe(true);
   });
 
   const seenConnectorStates = new Set<ConnectorState>();
@@ -647,15 +649,18 @@ test("english locale renders issues, chat, and settings cleanly with zero crashe
   await fake.pump(app);
   expect(app.count("id:settings-nav")).toBe(1);
   const settingsTexts = app.texts();
-  expect(settingsTexts).toContain("General & Appearance");
+  expect(settingsTexts).toContain("General");
+  expect(settingsTexts).toContain("Appearance");
   expect(settingsTexts).toContain("Page language");
 
   await app.host.send("route", "/runs");
   await fake.pump(app);
   await fake.pump(app);
+  expect(app.count("id:dashboard-page")).toBe(1);
   expect(app.count("id:runs-page")).toBe(1);
   const runsTexts = app.texts();
-  expect(runsTexts).toContain("Runs & trajectories");
+  expect(runsTexts).toContain("Dashboard");
+  expect(runsTexts).toContain("Runs");
   expect(runsTexts).toContain("Active");
 
   await app.host.send("route", "/agents");

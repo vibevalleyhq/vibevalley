@@ -435,7 +435,7 @@ export function LibraryPage() {
           role="toolbar"
           accessibilityLabel={bucketTitle()}
           desktop={{ windowDrag: true }}
-          class="h-9 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3"
+          class="h-11 shrink-0 flex-row items-center gap-2 border-b border-line bg-page px-3"
         >
           <If when={!contentSidebarOpen.get()}>
             <IconButton

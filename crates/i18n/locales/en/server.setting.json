@@ -9,5 +9,9 @@
   "voice": {
     "persona": "The assistant's persona cannot be empty"
   },
+  "profile": {
+    "displayNameLong": "Display name must be at most 80 characters",
+    "taglineLong": "Tagline must be at most 160 characters"
+  },
   "notSaved": "Could not save {file}: {why}"
 }

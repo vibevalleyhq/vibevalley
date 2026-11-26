@@ -43,36 +43,44 @@
   "nav": {
     "label": "Settings sections",
     "search": "Search settings…",
-    "general": "General & Appearance",
+    "profile": "Profile",
+    "general": "General",
     "appearance": "Appearance",
-    "models": "Models & Keys",
+    "models": "Models & Engines",
     "skills": "Skills",
-    "voice": "Voice",
-    "connections": "Connections",
+    "mcp": "MCP Integrations",
+    "voice": "Voice & Calls",
     "remote": "Remote Access",
-    "about": "About & Data",
+    "data": "Data & Storage",
+    "about": "About",
     "memory": "Memory",
-    "chat": "Chat apps",
+    "chat": "Chat Channels",
     "width": "Navigation width (drag; double-click for the default)",
-    "groupWorkspace": "Workspace",
-    "groupConnect": "Voice & Connections"
+    "groupWorkspace": "Profile & Workspace",
+    "groupConnect": "Connections & Integrations",
+    "groupAbout": "Data & About"
   },
   "words": {
-    "general": "language start workbench farm theme dark light size zoom scale font animation motion reduce",
-    "models": "keys accounts DeepSeek MOSS API key models binding",
+    "profile": "profile avatar display name tagline bio",
+    "general": "language start workbench farm startup",
+    "appearance": "theme dark light size zoom scale font animation motion reduce",
+    "models": "keys accounts DeepSeek MOSS API key models binding engines",
     "skills": "skills skill built-in installed library prompt",
     "memory": "memory source sources Nowledge EverOS external read write",
+    "mcp": "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp integration",
     "voice": "call phone recognition speech MOSS live realtime vision transcription",
-    "connections": "WeChat Feishu Lark QQ connectors pairing GitHub gh PR login",
+    "chat": "WeChat Feishu Lark QQ connectors chat pairing",
+    "github": "GitHub gh PR login",
     "remote": "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
-    "about": "version home folder settings data"
+    "data": "home folder settings repos worktrees data storage backend",
+    "about": "version update cli command line"
   },
   "scope": {
     "farm": "For all of VibeValley",
     "device": "This device only"
   },
   "general": {
-    "intro": "Configure language, startup behavior, theme, and display preferences.",
+    "intro": "Configure interface language and startup behavior.",
     "languageHint": "The page, the assistant and the helpers all speak it",
     "startupTitle": "Startup",
     "start": "Open on start",
@@ -83,6 +91,7 @@
     }
   },
   "appearance": {
+    "intro": "Customize theme, animations, interface scale, and terminal font.",
     "theme": "Theme",
     "themeHint": "With the system, it follows the computer's light and dark",
     "themes": {
@@ -105,6 +114,56 @@
     "terminalFontSize": "Terminal font size",
     "terminalFontSizeHint": "Also adjustable anytime in the terminal view with ⌘+ / ⌘- / ⌘0"
   },
+  "profile": {
+    "intro": "Customize your display name, tagline, and avatar shown in the rail and dashboard.",
+    "preview": "Rail Preview",
+    "identity": "Identity",
+    "displayName": "Display name",
+    "displayNameHint": "Shown on your dashboard and profile card",
+    "displayNamePlaceholder": "e.g. Lucas",
+    "tagline": "Tagline",
+    "taglineHint": "A short bio or focus note",
+    "taglinePlaceholder": "e.g. Building native AI workflows",
+    "avatar": "Avatar",
+    "avatarHint": "Upload a custom image or pick a Papertrails preset",
+    "upload": "Upload image",
+    "uploading": "Uploading…",
+    "clearCustom": "Remove custom",
+    "monogram": "Monogram",
+    "presets": "Preset avatars",
+    "saved": "Profile saved"
+  },
+  "mcp": {
+    "intro": "Connect VibeValley as an MCP server into your local coding agents with one click or copyable snippets.",
+    "transport": "Transport",
+    "transportHint": "stdio launches the local CLI process (full access); streamableHttp connects to the running server /mcp endpoint",
+    "detected": "Detected",
+    "notDetected": "Not detected",
+    "statusInstalled": "Installed ({transport})",
+    "statusOutdated": "Outdated ({current})",
+    "statusNotInstalled": "Not installed",
+    "statusUnsupported": "Unsupported",
+    "install": "Install",
+    "update": "Update",
+    "reinstall": "Reinstall",
+    "uninstall": "Uninstall",
+    "copySnippet": "Copy snippet",
+    "copiedSnippet": "MCP config snippet copied",
+    "installedToast": "Installed MCP config for {label}",
+    "uninstalledToast": "Removed VibeValley MCP from {label}",
+    "configPath": "Config file",
+    "snippet": "Config snippet",
+    "refresh": "Recheck"
+  },
+  "data": {
+    "intro": "Inspect local data paths, repository and worktree folders, and the active storage backend.",
+    "storageTitle": "Storage Backend",
+    "backend": "Active backend",
+    "backendHint": "Storage engine backing attachments, media inputs, and artifacts",
+    "backendLocalFs": "Local Filesystem (LocalFs)",
+    "backendS3": "Object Storage (S3)",
+    "backendMemory": "In-Memory (Memory)"
+  },
   "models": {
     "intro": "Configure model accounts, API keys, and feature bindings.",
     "deepseekHint": "The assistant and VibeValley's own helpers use it"
@@ -113,7 +172,7 @@
     "intro": "Helpers can also look things up in, and write to, memory outside VibeValley."
   },
   "about": {
-    "intro": "Inspect version details, desktop updates, CLI installation, and local data paths.",
+    "intro": "Inspect server version, desktop auto-update status, and CLI installation.",
     "version": "Version",
     "versionHint": "The server on this machine",
     "files": "Files",

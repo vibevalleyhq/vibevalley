@@ -20,7 +20,21 @@ export {
 export { BoardSlice, CollabSlice, Health, InboxSlice, LiveEvent, OpsSlice, SessionsSlice, SliceBundle, sliceDecoders, SliceKind } from "./core/schema";
 export { EnvelopeSchema } from "./endpoint";
 export { Agent, AgentTemplate, AgentValidateRequest, AgentValidation, Build, Outfit, PersonaMode, Skill, Species } from "./agent/schema";
-export { ModelEntry, RuntimeInfo, RuntimePreset, RuntimeSettings, RuntimeSupport } from "./runtime/schema";
+export {
+  McpHostId,
+  McpHostInfo,
+  McpInstallInput,
+  McpInstallStatus,
+  McpListInput,
+  McpListResult,
+  McpTransportKind,
+  McpUninstallInput,
+  ModelEntry,
+  RuntimeInfo,
+  RuntimePreset,
+  RuntimeSettings,
+  RuntimeSupport,
+} from "./runtime/schema";
 export { Memory, MemoryList, MemoryRequest, MemorySearch, RecallPreview } from "./memory/schema";
 export {
   BranchPublication,
@@ -242,7 +256,7 @@ export {
 export { Attachment, AttachmentImportPathInput, AttachmentUpload } from "./attachment/schema";
 export { ConnectorLogin, ConnectorsChannelRequest, ConnectorStatus, VerifyRequest } from "./connector/schema";
 export { SettingsUpdateVoice, VoiceCall, VoiceCallStart, VoiceGrant, VoiceHeard, VoiceSaid } from "./voice/schema";
-export { MemorySourceKind, SettingsStatus, SettingsUpdate } from "./setting/schema";
+export { MemorySourceKind, SettingsStatus, SettingsUpdate, UserProfile } from "./setting/schema";
 export { ProviderModelListing, ProviderModelRequest, ProviderStatus, ProviderUpdate, ProviderVoiceListing, ProviderVoiceRequest } from "./provider/schema";
 export {
   RemoteDeviceRevokeRequest,

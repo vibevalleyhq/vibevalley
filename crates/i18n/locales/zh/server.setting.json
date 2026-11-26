@@ -9,5 +9,9 @@
   "voice": {
     "persona": "主助手的人设不能空着"
   },
+  "profile": {
+    "displayNameLong": "显示名称最多 80 个字",
+    "taglineLong": "个人简介最多 160 个字"
+  },
   "notSaved": "存不进 {file}：{why}"
 }

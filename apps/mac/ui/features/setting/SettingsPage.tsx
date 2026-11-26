@@ -9,17 +9,18 @@ import { SearchField } from "../../design/Field";
 import { Icon } from "../../design/Icon";
 import type { IconName } from "../../design/icons";
 import { ActiveBar } from "../../design/layout";
-import { Segmented } from "../../design/Segmented";
 import { Splitter, usePaneWidth } from "../../design/Splitter";
 import { matches } from "../../infra/base/search";
-import { Link as A, Navigate, useRouter } from "../../infra/router";
+import { Link as A, Navigate } from "../../infra/router";
 import { ConnectorsPage } from "../connector";
 import { ProviderModels } from "../provider";
 import { SkillsPage } from "../runtime";
 import { VoiceForm } from "../voice";
-import { AboutPage } from "./AboutPage";
+import { AboutPage, DataSettingsPage } from "./AboutPage";
 import { AppearanceGroups } from "./AppearancePage";
 import { GeneralGroups } from "./GeneralPage";
+import { McpSettingsPage } from "./McpSettingsPage";
+import { ProfileSettingsPage } from "./ProfileSettingsPage";
 import { RemoteAccessPage } from "./RemoteAccessPage";
 import { GitHub, SettingsFile, SettingsForm } from "./SettingsForm";
 
@@ -35,41 +36,41 @@ interface Section {
 }
 
 const allSections = (): readonly Section[] => [
+  { id: "profile", group: "workspace", icon: "agents", label: t("web.setting.nav.profile"), words: t("web.setting.words.profile") },
   { id: "general", group: "workspace", icon: "settings", label: t("web.setting.nav.general"), words: t("web.setting.words.general") },
-  { id: "models", group: "workspace", icon: "plug", label: t("web.setting.nav.models"), words: t("web.setting.words.models") },
+  { id: "appearance", group: "workspace", icon: "appearance", label: t("web.setting.nav.appearance"), words: t("web.setting.words.appearance") },
+  { id: "models", group: "workspace", icon: "key", label: t("web.setting.nav.models"), words: t("web.setting.words.models") },
   { id: "skills", group: "workspace", icon: "skill", label: t("web.setting.nav.skills"), words: t("web.setting.words.skills") },
   { id: "memory", group: "workspace", icon: "memory", label: t("web.setting.nav.memory"), words: t("web.setting.words.memory") },
+  { id: "mcp", group: "connect", icon: "plug", label: t("web.setting.nav.mcp"), words: t("web.setting.words.mcp") },
   { id: "voice", group: "connect", icon: "call", label: t("web.setting.nav.voice"), words: t("web.setting.words.voice") },
-  {
-    id: "connections",
-    group: "connect",
-    icon: "chat",
-    label: t("web.setting.nav.connections"),
-    words: `${t("web.setting.words.connections")} ${t("web.setting.words.remote")}`,
-  },
+  { id: "chat", group: "connect", icon: "chat", label: t("web.setting.nav.chat"), words: t("web.setting.words.chat") },
+  { id: "github", group: "connect", icon: "branch", label: "GitHub", words: t("web.setting.words.github") },
+  { id: "remote", group: "connect", icon: "devices", label: t("web.setting.nav.remote"), words: t("web.setting.words.remote") },
+  { id: "data", group: "about", icon: "folder", label: t("web.setting.nav.data"), words: t("web.setting.words.data") },
   { id: "about", group: "about", icon: "info", label: t("web.setting.nav.about"), words: t("web.setting.words.about") },
 ];
 
-type ConnectionsTab = "chat" | "github" | "remote";
-
 function legacyRedirect(rest: string): string | undefined {
-  const [first, ...more] = rest.split("/");
-  const tail = more.join("/");
+  const [first, sub, ...more] = rest.split("/");
   switch (first) {
-    case "appearance":
-      return "/settings/general";
     case "accounts":
     case "providers":
       return "/settings/models";
     case "call":
     case "moss":
       return "/settings/voice";
-    case "chat":
-      return tail ? `/settings/connections/chat/${tail}` : "/settings/connections/chat";
-    case "github":
-      return "/settings/connections/github";
-    case "remote":
-      return "/settings/connections/remote";
+    case "connections": {
+      if (sub === "github") return "/settings/github";
+      if (sub === "remote") return "/settings/remote";
+      if (sub === "chat") {
+        const restId = more.filter(Boolean).join("/");
+        return restId ? `/settings/chat/${restId}` : "/settings/chat";
+      }
+      return "/settings/chat";
+    }
+    case "tree":
+      return "/settings/memory";
     default:
       return undefined;
   }
@@ -84,43 +85,19 @@ function VoiceSettings() {
   );
 }
 
-function ConnectionsSettings(props: { sub: string | undefined; id: string | undefined }) {
-  const router = useRouter();
-  const tab = (): ConnectionsTab => (props.sub === "github" || props.sub === "remote" ? props.sub : "chat");
-  return (
-    <View class={`w-full gap-6 ${tab() === "chat" ? "" : "max-w-180"}`}>
-      <Segmented
-        label={t("web.setting.nav.connections")}
-        testid="connections-subnav"
-        value={tab()}
-        options={[
-          { value: "chat", label: t("web.setting.nav.chat") },
-          { value: "github", label: "GitHub" },
-          { value: "remote", label: t("web.setting.nav.remote") },
-        ]}
-        onChange={(v) => router.navigate(`/settings/connections/${v}`)}
-      />
-      <If when={tab() === "chat"}>
-        <ConnectorsPage id={props.id} basePath="/settings/connections/chat" />
-      </If>
-      <If when={tab() === "github"}>
-        <Page title="GitHub" hint={t("web.setting.github.note")}>
-          <GitHub />
-        </Page>
-      </If>
-      <If when={tab() === "remote"}>
-        <RemoteAccessPage />
-      </If>
-    </View>
-  );
-}
-
-function SectionBody(props: { id: string; sub: string | undefined; connectorId: string | undefined }) {
+function SectionBody(props: { id: string; connectorId: string | undefined }) {
   return (
     <>
+      <If when={props.id === "profile"}>
+        <ProfileSettingsPage />
+      </If>
       <If when={props.id === "general"}>
         <Page title={t("web.setting.nav.general")} description={t("web.setting.general.intro")}>
           <GeneralGroups />
+        </Page>
+      </If>
+      <If when={props.id === "appearance"}>
+        <Page title={t("web.setting.nav.appearance")} description={t("web.setting.appearance.intro")}>
           <AppearanceGroups />
         </Page>
       </If>
@@ -136,11 +113,25 @@ function SectionBody(props: { id: string; sub: string | undefined; connectorId: 
           <SettingsForm part="memory" />
         </Page>
       </If>
+      <If when={props.id === "mcp"}>
+        <McpSettingsPage />
+      </If>
       <If when={props.id === "voice"}>
         <VoiceSettings />
       </If>
-      <If when={props.id === "connections"}>
-        <ConnectionsSettings sub={props.sub} id={props.connectorId} />
+      <If when={props.id === "chat"}>
+        <ConnectorsPage id={props.connectorId} basePath="/settings/chat" />
+      </If>
+      <If when={props.id === "github"}>
+        <Page title="GitHub" hint={t("web.setting.github.note")}>
+          <GitHub />
+        </Page>
+      </If>
+      <If when={props.id === "remote"}>
+        <RemoteAccessPage />
+      </If>
+      <If when={props.id === "data"}>
+        <DataSettingsPage />
       </If>
       <If when={props.id === "about"}>
         <AboutPage />
@@ -160,7 +151,7 @@ export function SettingsPage(props: { rest: string }) {
   const sections = allSections();
   const section = computed(() => sections.find((s) => s.id === parts()[0]));
   const skillId = computed(() => (parts().length > 1 ? decodeURIComponent(parts().slice(1).join("/")) : undefined));
-  const connectorId = computed(() => (parts().length > 2 ? decodeURIComponent(parts().slice(2).join("/")) : undefined));
+  const connectorId = computed(() => (parts()[0] === "chat" && parts().length > 1 ? decodeURIComponent(parts().slice(1).join("/")) : undefined));
   const workspaceShown = computed(() => sections.filter((s) => s.group === "workspace" && matches(q(), [s.label, s.words])));
   const connectShown = computed(() => sections.filter((s) => s.group === "connect" && matches(q(), [s.label, s.words])));
   const aboutShown = computed(() => sections.filter((s) => s.group === "about" && matches(q(), [s.label, s.words])));
@@ -185,6 +176,7 @@ export function SettingsPage(props: { rest: string }) {
                   <View class="shrink-0 px-2.5 pt-3 pb-2.5">
                     <SearchField
                       testid="settings-search"
+                      clearTestid="settings-search-clear"
                       value={query()}
                       onInput={(v) => query.set(v)}
                       placeholder={t("web.setting.nav.search")}
@@ -209,9 +201,12 @@ export function SettingsPage(props: { rest: string }) {
                   </Scroll>
                   <If when={aboutShown().length > 0}>
                     <View class="shrink-0 border-t border-line px-2.5 py-2.5">
-                      <Each of={aboutShown()} key={(s) => s.id}>
-                        {(s) => <SectionLink section={s()} current={s() === current()} />}
-                      </Each>
+                      <Text class="px-2.5 pt-0.5 pb-1 text-2xs font-semibold text-faint">{t("web.setting.nav.groupAbout")}</Text>
+                      <View class="gap-0.5">
+                        <Each of={aboutShown()} key={(s) => s.id}>
+                          {(s) => <SectionLink section={s()} current={s() === current()} />}
+                        </Each>
+                      </View>
                     </View>
                   </If>
                 </View>
@@ -220,7 +215,7 @@ export function SettingsPage(props: { rest: string }) {
                   else={
                     <Scroll testID={`settings-${current().id}`} class="min-h-0 min-w-0 flex-1 bg-page" contentClass={md() ? "px-8 py-7" : "px-5 py-5"}>
                       <Each of={[current()]} key={(s) => s.id}>
-                        {(s) => <SectionBody id={s().id} sub={parts()[1]} connectorId={connectorId()} />}
+                        {(s) => <SectionBody id={s().id} connectorId={connectorId()} />}
                       </Each>
                     </Scroll>
                   }

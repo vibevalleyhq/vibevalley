@@ -350,6 +350,19 @@ pub fn uninstall_mcp_host_in(home_dir: &Path, host: McpHostId, server_name: &str
     uninstall_host_inner(home_dir, host, server_name, false)
 }
 
+/// Renders a copyable configuration snippet for `config` in `host`'s native config format.
+pub fn render_mcp_snippet(host: McpHostId, config: &McpServerConfig) -> String {
+    match host {
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => serde_json::to_string_pretty(&json!({
+            "mcpServers": {
+                &config.name: encode_json_entry(host, &config.transport),
+            }
+        }))
+        .unwrap_or_default(),
+        McpHostId::Codex => codex_toml::format_server_section(&config.name, &config.transport).trim_end().to_owned(),
+    }
+}
+
 fn probe_host_report(host: McpHostId, home_dir: &Path, desired: &McpServerConfig, probe_system: bool) -> McpHostReport {
     let config_path = host.config_path(home_dir);
     let installed = detect_installed(host, home_dir, probe_system);
@@ -1301,7 +1314,7 @@ mod codex_toml {
         out
     }
 
-    fn format_server_section(server_name: &str, transport: &McpTransportSpec) -> String {
+    pub(super) fn format_server_section(server_name: &str, transport: &McpTransportSpec) -> String {
         let key = format_toml_key(server_name);
         let mut out = String::new();
         out.push_str(&format!("[mcp_servers.{key}]\n"));
@@ -1729,5 +1742,24 @@ model = "o4-mini"
         let matching = http_cfg("vibevalley", "http://127.0.0.1:8790/mcp");
         let matched = mcp_status_in(home.path(), McpHostId::Antigravity, &matching);
         assert!(matches!(matched.state, McpInstallState::Installed { .. }));
+    }
+
+    #[test]
+    fn render_mcp_snippet_formats_json_and_toml_for_each_host() {
+        let stdio = stdio_cfg("vibevalley", "vibevalley", &["mcp", "--channel", "alpha"]);
+        let http = http_cfg("vibevalley", "http://127.0.0.1:8789/mcp");
+
+        let claude_http: Value = serde_json::from_str(&render_mcp_snippet(McpHostId::Claude, &http)).unwrap();
+        assert_eq!(claude_http["mcpServers"]["vibevalley"]["type"], "http");
+        assert_eq!(claude_http["mcpServers"]["vibevalley"]["url"], "http://127.0.0.1:8789/mcp");
+
+        let cursor_stdio: Value = serde_json::from_str(&render_mcp_snippet(McpHostId::Cursor, &stdio)).unwrap();
+        assert_eq!(cursor_stdio["mcpServers"]["vibevalley"]["command"], "vibevalley");
+        assert_eq!(cursor_stdio["mcpServers"]["vibevalley"]["args"], json!(["mcp", "--channel", "alpha"]));
+
+        let codex_stdio = render_mcp_snippet(McpHostId::Codex, &stdio);
+        assert!(codex_stdio.contains("[mcp_servers.vibevalley]"));
+        assert!(codex_stdio.contains("command = \"vibevalley\""));
+        assert!(codex_stdio.contains("args = [\"mcp\", \"--channel\", \"alpha\"]"));
     }
 }

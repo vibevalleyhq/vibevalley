@@ -138,3 +138,67 @@ export const RuntimeInfo = z.object({
   stop: z.string(),
   checkedAt: z.number(),
 }) satisfies Codec<T.RuntimeInfo>;
+
+export const McpHostId = z.enum(T.McpHostIdValues) satisfies Codec<T.McpHostId>;
+
+export const McpTransportKind = z.enum(T.McpTransportKindValues) satisfies Codec<T.McpTransportKind>;
+
+const McpInstallStatusNotInstalled = z.object({
+  kind: z.literal("notInstalled"),
+});
+
+const McpInstallStatusInstalled = z.object({
+  kind: z.literal("installed"),
+  transport: McpTransportKind,
+});
+
+const McpInstallStatusOutdated = z.object({
+  kind: z.literal("outdated"),
+  current: McpTransportKind,
+  reason: z.string(),
+});
+
+const McpInstallStatusUnsupported = z.object({
+  kind: z.literal("unsupported"),
+  reason: z.string(),
+});
+
+export const McpInstallStatus = z.discriminatedUnion("kind", [
+  McpInstallStatusNotInstalled,
+  McpInstallStatusInstalled,
+  McpInstallStatusOutdated,
+  McpInstallStatusUnsupported,
+]) satisfies Codec<T.McpInstallStatus>;
+
+export const McpHostInfo = z.object({
+  id: McpHostId,
+  label: z.string(),
+  installed: z.boolean(),
+  configPath: z.exactOptional(z.string()),
+  status: McpInstallStatus,
+  supportsStdio: z.boolean(),
+  supportsHttp: z.boolean(),
+  stdioSnippet: z.string(),
+  httpSnippet: z.exactOptional(z.string()),
+}) satisfies Codec<T.McpHostInfo>;
+
+export const McpListInput = z.object({
+  transport: z.exactOptional(McpTransportKind),
+}) satisfies Codec<T.McpListInput>;
+
+export const McpListResult = z.object({
+  serverName: z.string(),
+  stdioCommand: z.string(),
+  stdioArgs: z.array(z.string()),
+  httpUrl: z.exactOptional(z.string()),
+  hosts: z.array(McpHostInfo),
+}) satisfies Codec<T.McpListResult>;
+
+export const McpInstallInput = z.object({
+  host: McpHostId,
+  transport: z.exactOptional(McpTransportKind),
+}) satisfies Codec<T.McpInstallInput>;
+
+export const McpUninstallInput = z.object({
+  host: McpHostId,
+}) satisfies Codec<T.McpUninstallInput>;
