@@ -37,6 +37,12 @@ import {
 } from "./machines";
 import { capabilityLabel, InventoryCard, ModelsCard, SettingsCard, SupportCard, Usage } from "./RuntimeCards";
 
+function compactVersion(raw: string): string {
+  const cleaned = raw.replace(/\s*\([^)]*\)\s*$/u, "").trim();
+  const semver = /\bv?\d+\.\d+(?:\.\d+)?(?:-[\w.-]+)?\b/u.exec(cleaned);
+  return semver ? semver[0] : cleaned;
+}
+
 const statusOf = (entry: MachineRuntimeEntry): string => {
   const r = entry.info;
   if (!r) return t("web.runtime.available");
@@ -51,6 +57,14 @@ const statusOf = (entry: MachineRuntimeEntry): string => {
     case "checking":
       return t("web.runtime.checking");
   }
+};
+
+const compactStatusOf = (entry: MachineRuntimeEntry): string => {
+  const r = entry.info;
+  if (r?.installation.status === "available" && r.settings.enabled && r.installation.version) {
+    return compactVersion(r.installation.version);
+  }
+  return statusOf(entry);
 };
 
 type HeroStatus = { readonly label: string; readonly box: string; readonly text: string; readonly dot: DotTone };
@@ -479,11 +493,11 @@ function RuntimesSidebar(props: {
                               <ActiveBar />
                             </If>
                             <RuntimeIcon runtime={entry().runtimeId} size={18} />
-                            <Text class={`min-w-0 flex-1 truncate text-sm ${active() ? "font-medium text-ink" : "text-muted group-hover:text-ink"}`}>
+                            <Text class={`min-w-20 flex-1 truncate text-sm ${active() ? "font-medium text-ink" : "text-muted group-hover:text-ink"}`}>
                               {entry().label}
                             </Text>
-                            <View class="shrink-0 flex-row items-center gap-1.5">
-                              <Text class="max-w-20 truncate font-mono text-2xs tabular-nums text-faint">{statusOf(entry())}</Text>
+                            <View class="min-w-0 shrink-0 flex-row items-center justify-end gap-1.5">
+                              <Text class="max-w-16 truncate font-mono text-2xs tabular-nums text-faint">{compactStatusOf(entry())}</Text>
                               <View class={`h-2 w-2 shrink-0 rounded-full ${statusDotClass(entry())}`} />
                             </View>
                           </A>

@@ -182,12 +182,7 @@ export function SettingsPage(props: { rest: string }) {
                   <If when={md()}>
                     <Splitter pane="settingsNav" side="right" width={navWidth()} min={184} max={320} label={t("web.setting.nav.width")} />
                   </If>
-                  <View desktop={{ windowDrag: true }} class="shrink-0 px-3 pt-3.5 pb-2">
-                    <Text role="header" class="text-sm font-semibold text-ink">
-                      {t("web.base.place.settings.label")}
-                    </Text>
-                  </View>
-                  <View class="shrink-0 px-2.5 pb-2.5">
+                  <View class="shrink-0 px-2.5 pt-3 pb-2.5">
                     <SearchField
                       testid="settings-search"
                       value={query()}
