@@ -130,7 +130,6 @@
     "removeKey": "Remove {label}",
     "keepKey": "Keep {label}",
     "undo": "Undo",
-    "storedIn": "Saved in {file}",
     "keepEmpty": "Leave empty to keep",
     "save": "Save",
     "reset": "Reset",

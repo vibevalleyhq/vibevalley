@@ -24,7 +24,6 @@
   "dates": {
     "startAt": "Start date",
     "dueAt": "Due date",
-    "datePlaceholder": "YYYY-MM-DD",
     "notSet": "Not set",
     "clearDate": "Clear date"
   },
@@ -311,9 +310,6 @@
     "addCriteria": "Add acceptance criteria",
     "polish": "Refine with helper",
     "markReady": "Mark as Todo",
-    "markDone": "Mark as Done",
-    "accept": "Accept",
-    "markCanceled": "Discard",
     "revive": "Restore to Backlog",
     "criterionToggle": "Toggle criterion \"{criterion}\""
   },
@@ -478,9 +474,6 @@
     "scheduledCount": "{n} scheduled",
     "rolledUp": "Rolled up from sub-tickets",
     "overdue": "Overdue",
-    "shiftPrev": "Shift 1 day earlier",
-    "shiftNext": "Shift 1 day later",
-    "editDates": "Edit dates",
     "scheduleToday": "Schedule today",
     "emptyScheduled": "No scheduled tickets yet",
     "emptyScheduledHint": "Schedule an unscheduled ticket below, or set start and due dates in ticket properties.",
@@ -508,8 +501,6 @@
     "nextMonth": "Next month",
     "newOnDate": "New ticket on {date}",
     "moreItems": "{n} more",
-    "collapseDay": "Less",
-    "scheduledBadge": "Scheduled {date}",
-    "clearScheduledDate": "Clear prefilled date"
+    "collapseDay": "Less"
   }
 }

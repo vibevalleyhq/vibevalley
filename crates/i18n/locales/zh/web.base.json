@@ -130,7 +130,6 @@
     "removeKey": "移除 {label}",
     "keepKey": "不移除 {label}",
     "undo": "撤销",
-    "storedIn": "存在 {file}",
     "keepEmpty": "不改就空着",
     "save": "保存",
     "reset": "恢复默认",

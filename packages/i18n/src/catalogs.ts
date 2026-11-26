@@ -639,7 +639,6 @@ export const catalogs = {
         removeKey: "移除 {label}",
         keepKey: "不移除 {label}",
         undo: "撤销",
-        storedIn: "存在 {file}",
         keepEmpty: "不改就空着",
         save: "保存",
         reset: "恢复默认",
@@ -1364,7 +1363,7 @@ export const catalogs = {
         allTags: "全部标签",
         preset: { arch: "架构", storage: "存储", voice: "语音", whiteboard: "白板" },
       },
-      dates: { startAt: "计划开始", dueAt: "目标截止", datePlaceholder: "如 2026-12-01", notSet: "未设置", clearDate: "清除日期" },
+      dates: { startAt: "计划开始", dueAt: "目标截止", notSet: "未设置", clearDate: "清除日期" },
       scope: { label: "工单范围", all: "全部", active: "活跃", backlog: "需求池", canceled: "已废弃" },
       reading: "在读……",
       never: "算了",
@@ -1624,9 +1623,6 @@ export const catalogs = {
         addCriteria: "添加验收标准",
         polish: "让角色再润色",
         markReady: "标为待开发",
-        markDone: "标为已完成",
-        accept: "验收通过",
-        markCanceled: "废弃",
         revive: "恢复到需求池",
         criterionToggle: "切换验收标准「{criterion}」",
       },
@@ -1740,9 +1736,6 @@ export const catalogs = {
         scheduledCount: "已排期 {n}",
         rolledUp: "由子工单汇总",
         overdue: "已逾期",
-        shiftPrev: "提前 1 天",
-        shiftNext: "延后 1 天",
-        editDates: "调整排期",
         scheduleToday: "排到今天",
         emptyScheduled: "当前没有带起止日期的工单",
         emptyScheduledHint: "在下方未排期工单中点「排到今天」，或在工单属性里设置计划开始 / 目标截止日期。",
@@ -1758,8 +1751,6 @@ export const catalogs = {
         newOnDate: "在 {date} 新建工单",
         moreItems: "还有 {n} 项",
         collapseDay: "收起",
-        scheduledBadge: "排期 {date}",
-        clearScheduledDate: "清除预填日期",
       },
     },
     "web.library": {
@@ -4183,7 +4174,6 @@ export const catalogs = {
         removeKey: "Remove {label}",
         keepKey: "Keep {label}",
         undo: "Undo",
-        storedIn: "Saved in {file}",
         keepEmpty: "Leave empty to keep",
         save: "Save",
         reset: "Reset",
@@ -4973,7 +4963,7 @@ export const catalogs = {
         allTags: "All tags",
         preset: { arch: "Architecture", storage: "Storage", voice: "Voice", whiteboard: "Whiteboard" },
       },
-      dates: { startAt: "Start date", dueAt: "Due date", datePlaceholder: "YYYY-MM-DD", notSet: "Not set", clearDate: "Clear date" },
+      dates: { startAt: "Start date", dueAt: "Due date", notSet: "Not set", clearDate: "Clear date" },
       scope: { label: "Scope", all: "All", active: "Active", backlog: "Backlog", canceled: "Canceled" },
       reading: "Reading…",
       never: "Never mind",
@@ -5235,9 +5225,6 @@ export const catalogs = {
         addCriteria: "Add acceptance criteria",
         polish: "Refine with helper",
         markReady: "Mark as Todo",
-        markDone: "Mark as Done",
-        accept: "Accept",
-        markCanceled: "Discard",
         revive: "Restore to Backlog",
         criterionToggle: 'Toggle criterion "{criterion}"',
       },
@@ -5356,9 +5343,6 @@ export const catalogs = {
         scheduledCount: "{n} scheduled",
         rolledUp: "Rolled up from sub-tickets",
         overdue: "Overdue",
-        shiftPrev: "Shift 1 day earlier",
-        shiftNext: "Shift 1 day later",
-        editDates: "Edit dates",
         scheduleToday: "Schedule today",
         emptyScheduled: "No scheduled tickets yet",
         emptyScheduledHint: "Schedule an unscheduled ticket below, or set start and due dates in ticket properties.",
@@ -5374,8 +5358,6 @@ export const catalogs = {
         newOnDate: "New ticket on {date}",
         moreItems: "{n} more",
         collapseDay: "Less",
-        scheduledBadge: "Scheduled {date}",
-        clearScheduledDate: "Clear prefilled date",
       },
     },
     "web.library": {
@@ -7891,7 +7873,6 @@ export interface Messages {
   "web.base.form.removeOnSave": undefined;
   "web.base.form.reset": undefined;
   "web.base.form.save": undefined;
-  "web.base.form.storedIn": { readonly file: string | number };
   "web.base.form.undo": undefined;
   "web.base.form.unreachable": { readonly why: string | number };
   "web.base.form.unset": undefined;
@@ -8697,14 +8678,12 @@ export interface Messages {
   "web.issue.boardLabels.view.calendar": undefined;
   "web.issue.boardLabels.view.list": undefined;
   "web.issue.boardLabels.view.timeline": undefined;
-  "web.issue.calendar.clearScheduledDate": undefined;
   "web.issue.calendar.collapseDay": undefined;
   "web.issue.calendar.monthTitle": { readonly month: string | number; readonly year: string | number };
   "web.issue.calendar.moreItems": { readonly n: string | number };
   "web.issue.calendar.newOnDate": { readonly date: string | number };
   "web.issue.calendar.nextMonth": undefined;
   "web.issue.calendar.prevMonth": undefined;
-  "web.issue.calendar.scheduledBadge": { readonly date: string | number };
   "web.issue.card.assignHelper": undefined;
   "web.issue.card.cron": undefined;
   "web.issue.card.draft": undefined;
@@ -8759,7 +8738,6 @@ export interface Messages {
   "web.issue.conversation.placeholder": undefined;
   "web.issue.conversation.title": undefined;
   "web.issue.dates.clearDate": undefined;
-  "web.issue.dates.datePlaceholder": undefined;
   "web.issue.dates.dueAt": undefined;
   "web.issue.dates.notSet": undefined;
   "web.issue.dates.startAt": undefined;
@@ -8984,7 +8962,6 @@ export interface Messages {
   "web.issue.tags.remove": { readonly tag: string | number };
   "web.issue.task.repo": undefined;
   "web.issue.task.written": undefined;
-  "web.issue.timeline.editDates": undefined;
   "web.issue.timeline.emptyScheduled": undefined;
   "web.issue.timeline.emptyScheduledHint": undefined;
   "web.issue.timeline.issuesColumn": undefined;
@@ -8996,8 +8973,6 @@ export interface Messages {
   "web.issue.timeline.scale.week": undefined;
   "web.issue.timeline.scheduleToday": undefined;
   "web.issue.timeline.scheduledCount": { readonly n: string | number };
-  "web.issue.timeline.shiftNext": undefined;
-  "web.issue.timeline.shiftPrev": undefined;
   "web.issue.timeline.today": undefined;
   "web.issue.timeline.unscheduled": { readonly n: string | number };
   "web.issue.timeline.unscheduledTitle": undefined;
@@ -9008,7 +8983,6 @@ export interface Messages {
   "web.issue.timeline.weekday.thu": undefined;
   "web.issue.timeline.weekday.tue": undefined;
   "web.issue.timeline.weekday.wed": undefined;
-  "web.issue.todo.accept": undefined;
   "web.issue.todo.addCriteria": undefined;
   "web.issue.todo.addDescription": undefined;
   "web.issue.todo.againHint": undefined;
@@ -9028,8 +9002,6 @@ export interface Messages {
   "web.issue.todo.edit": undefined;
   "web.issue.todo.firstRepo": undefined;
   "web.issue.todo.inQueue": { readonly ago: string | number };
-  "web.issue.todo.markCanceled": undefined;
-  "web.issue.todo.markDone": undefined;
   "web.issue.todo.markReady": undefined;
   "web.issue.todo.mountLocalLink": undefined;
   "web.issue.todo.newRepo": undefined;

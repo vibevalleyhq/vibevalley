@@ -24,7 +24,6 @@
   "dates": {
     "startAt": "计划开始",
     "dueAt": "目标截止",
-    "datePlaceholder": "如 2026-12-01",
     "notSet": "未设置",
     "clearDate": "清除日期"
   },
@@ -311,9 +310,6 @@
     "addCriteria": "添加验收标准",
     "polish": "让角色再润色",
     "markReady": "标为待开发",
-    "markDone": "标为已完成",
-    "accept": "验收通过",
-    "markCanceled": "废弃",
     "revive": "恢复到需求池",
     "criterionToggle": "切换验收标准「{criterion}」"
   },
@@ -478,9 +474,6 @@
     "scheduledCount": "已排期 {n}",
     "rolledUp": "由子工单汇总",
     "overdue": "已逾期",
-    "shiftPrev": "提前 1 天",
-    "shiftNext": "延后 1 天",
-    "editDates": "调整排期",
     "scheduleToday": "排到今天",
     "emptyScheduled": "当前没有带起止日期的工单",
     "emptyScheduledHint": "在下方未排期工单中点「排到今天」，或在工单属性里设置计划开始 / 目标截止日期。",
@@ -508,8 +501,6 @@
     "nextMonth": "下一月",
     "newOnDate": "在 {date} 新建工单",
     "moreItems": "还有 {n} 项",
-    "collapseDay": "收起",
-    "scheduledBadge": "排期 {date}",
-    "clearScheduledDate": "清除预填日期"
+    "collapseDay": "收起"
   }
 }
