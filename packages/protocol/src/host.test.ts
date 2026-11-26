@@ -9,22 +9,86 @@ import {
   HostCapturedImage,
   MotionChoice,
   ThemeChoice,
+  type UpdateFailureKind,
+  type UpdateManual,
   UpdateState,
 } from "./host";
 
-test("host state schemas decode valid wire payloads and reject malformed shapes", () => {
-  expect(
-    UpdateState.parse({
+test("UpdateState decodes all variants across JSON round-trips and rejects malformed payloads", () => {
+  const manualReasons: readonly UpdateManual[] = ["diskImage", "translocated", "readOnly", "noBuild"];
+  const failureKinds: readonly UpdateFailureKind[] = ["network", "rateLimit", "integrity", "signature", "permission", "install", "unknown"];
+
+  const validStates: readonly UpdateState[] = [
+    { _tag: "disabled", version: "0.0.0" },
+    { _tag: "idle", version: "0.1.0" },
+    { _tag: "idle", version: "0.1.0", checkedAt: 1_764_160_800_000 },
+    { _tag: "checking", version: "0.1.0" },
+    { _tag: "downloading", version: "0.1.0", next: "0.2.0", percent: 42 },
+    {
+      _tag: "downloading",
+      version: "0.1.0",
+      next: "0.2.0",
+      percent: 42,
+      downloadedBytes: 42_000_000,
+      totalBytes: 100_000_000,
+      speedBps: 3_500_000,
+    },
+    { _tag: "verifying", version: "0.1.0", next: "0.2.0" },
+    {
       _tag: "ready",
       version: "0.1.0",
       next: "0.2.0",
-      notes: ["Faster startup"],
+      notes: ["Faster startup", "Resumable downloads"],
       newFarm: false,
-      page: "https://vibevalley.dev",
-    })._tag,
-  ).toBe("ready");
-  expect(UpdateState.safeParse({ _tag: "manual", version: "0.1.0", next: "0.2.0", why: "bogus", page: "" }).success).toBe(false);
+      page: "https://vibevalley.dev/releases/v0.2.0",
+    },
+    { _tag: "installing", version: "0.1.0", next: "0.2.0" },
+    ...manualReasons.map((why): UpdateState => ({
+      _tag: "manual",
+      version: "0.1.0",
+      next: "0.2.0",
+      why,
+      page: "https://vibevalley.dev/releases/v0.2.0",
+    })),
+    { _tag: "failed", version: "0.1.0", why: "connection reset" },
+    ...failureKinds.map((kind): UpdateState => ({
+      _tag: "failed",
+      version: "0.1.0",
+      why: `error:${kind}`,
+      kind,
+      page: "https://vibevalley.dev/releases",
+    })),
+  ];
 
+  for (const state of validStates) {
+    const roundTripped: unknown = JSON.parse(JSON.stringify(state));
+    expect(UpdateState.parse(roundTripped)).toEqual(state);
+  }
+
+  const invalidPayloads: readonly unknown[] = [
+    { _tag: "disabled" },
+    { _tag: "idle", version: "0.1.0", checkedAt: "now" },
+    { _tag: "idle", version: "0.1.0", checkedAt: null },
+    { _tag: "downloading", version: "0.1.0", percent: 50 },
+    { _tag: "downloading", version: "0.1.0", next: "0.2.0", percent: "50" },
+    { _tag: "downloading", version: "0.1.0", next: "0.2.0", percent: 50, downloadedBytes: "42" },
+    { _tag: "downloading", version: "0.1.0", next: "0.2.0", percent: 50, totalBytes: null },
+    { _tag: "downloading", version: "0.1.0", next: "0.2.0", percent: 50, speedBps: "fast" },
+    { _tag: "verifying", version: "0.1.0" },
+    { _tag: "installing", version: "0.1.0" },
+    { _tag: "manual", version: "0.1.0", next: "0.2.0", why: "bogus", page: "" },
+    { _tag: "failed", version: "0.1.0", why: "boom", kind: "bogus" },
+    { _tag: "failed", version: "0.1.0", why: "boom", kind: null },
+    { _tag: "failed", version: "0.1.0", why: "boom", page: 123 },
+    { _tag: "unknown", version: "0.1.0" },
+  ];
+
+  for (const payload of invalidPayloads) {
+    expect(UpdateState.safeParse(payload).success).toBe(false);
+  }
+});
+
+test("host state schemas decode valid wire payloads and reject malformed shapes", () => {
   expect(
     CommandLineState.parse({
       command: "vibevalley",
