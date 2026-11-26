@@ -153,5 +153,30 @@
   "noSessions": "暂无活跃或最近的会话。",
   "quickActions": "快捷操作",
   "installation": "安装与路径",
-  "source": "安装方式"
+  "source": "安装方式",
+  "mcpServer": {
+    "add": "添加",
+    "addTitle": "添加 MCP 服务器",
+    "editTitle": "编辑 MCP 服务器",
+    "edit": "编辑 {name}",
+    "remove": "移除 {name}",
+    "toggle": "开关 {name}",
+    "name": "名称",
+    "nameHint": "写进宿主配置里的服务器键名，比如 github 或 context7。",
+    "transport": "传输方式",
+    "command": "命令",
+    "args": "参数",
+    "argsHint": "传给命令的空格分隔参数。",
+    "env": "环境变量",
+    "url": "服务地址",
+    "headers": "请求头",
+    "enabled": "启用",
+    "disabledTag": "已停用",
+    "enabledTag": "已启用",
+    "cancel": "取消",
+    "save": "保存",
+    "savedToast": "已保存 MCP 服务器 {name}",
+    "removedToast": "已移除 MCP 服务器 {name}",
+    "toggledToast": "{enabled, select, true {已启用 MCP 服务器 {name}} other {已停用 MCP 服务器 {name}}}"
+  }
 }

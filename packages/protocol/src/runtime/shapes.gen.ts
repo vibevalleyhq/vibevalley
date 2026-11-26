@@ -80,3 +80,15 @@ export type McpListResult = { serverName: string, stdioCommand: string, stdioArg
 export type McpInstallInput = { host: McpHostId, transport?: McpTransportKind, };
 
 export type McpUninstallInput = { host: McpHostId, };
+
+export type McpServerEntry = { host: McpHostId, name: string, transport: McpTransportKind, command?: string, args: Array<string>, env: { [key in string]: string }, url?: string, headers: { [key in string]: string }, enabled: boolean, configPath: string, };
+
+export type McpServerListInput = { host: McpHostId, };
+
+export type McpServerListResult = { host: McpHostId, configPath?: string, servers: Array<McpServerEntry>, };
+
+export type McpServerSaveInput = { host: McpHostId, previousName?: string, name: string, transport: McpTransportKind, command?: string, args: Array<string>, env: { [key in string]: string }, url?: string, headers: { [key in string]: string }, enabled: boolean, };
+
+export type McpServerToggleInput = { host: McpHostId, name: string, enabled: boolean, };
+
+export type McpServerRemoveInput = { host: McpHostId, name: string, };

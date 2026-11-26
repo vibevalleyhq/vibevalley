@@ -196,6 +196,42 @@ pub const ENDPOINTS: &[Endpoint] = &[
         result: Some("McpHostInfo"),
     },
     Endpoint {
+        op: "runtime.mcpServer.list",
+        module: "runtime",
+        about: &["host"],
+        can: &[Caller::User, Caller::Remote],
+        dry_run: None,
+        input: Some("McpServerListInput"),
+        result: Some("McpServerListResult"),
+    },
+    Endpoint {
+        op: "runtime.mcpServer.save",
+        module: "runtime",
+        about: &["host"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("McpServerSaveInput"),
+        result: Some("McpServerListResult"),
+    },
+    Endpoint {
+        op: "runtime.mcpServer.toggle",
+        module: "runtime",
+        about: &["host"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("McpServerToggleInput"),
+        result: Some("McpServerListResult"),
+    },
+    Endpoint {
+        op: "runtime.mcpServer.remove",
+        module: "runtime",
+        about: &["host"],
+        can: &[Caller::User],
+        dry_run: None,
+        input: Some("McpServerRemoveInput"),
+        result: Some("McpServerListResult"),
+    },
+    Endpoint {
         op: "memory.list",
         module: "memory",
         about: &["agent"],
@@ -1840,6 +1876,30 @@ pub mod ops {
         type Input = t::McpUninstallInput;
         type Result = t::McpHostInfo;
     }
+    pub struct RuntimeMcpServerList;
+    impl Op for RuntimeMcpServerList {
+        const NAME: &'static str = "runtime.mcpServer.list";
+        type Input = t::McpServerListInput;
+        type Result = t::McpServerListResult;
+    }
+    pub struct RuntimeMcpServerSave;
+    impl Op for RuntimeMcpServerSave {
+        const NAME: &'static str = "runtime.mcpServer.save";
+        type Input = t::McpServerSaveInput;
+        type Result = t::McpServerListResult;
+    }
+    pub struct RuntimeMcpServerToggle;
+    impl Op for RuntimeMcpServerToggle {
+        const NAME: &'static str = "runtime.mcpServer.toggle";
+        type Input = t::McpServerToggleInput;
+        type Result = t::McpServerListResult;
+    }
+    pub struct RuntimeMcpServerRemove;
+    impl Op for RuntimeMcpServerRemove {
+        const NAME: &'static str = "runtime.mcpServer.remove";
+        type Input = t::McpServerRemoveInput;
+        type Result = t::McpServerListResult;
+    }
     /// An agent's memories from the database and its configured sources.
     pub struct MemoryList;
     impl Op for MemoryList {
@@ -3091,6 +3151,10 @@ endpoint_ids! {
     RuntimeMcpList => "runtime.mcp.list",
     RuntimeMcpInstall => "runtime.mcp.install",
     RuntimeMcpUninstall => "runtime.mcp.uninstall",
+    RuntimeMcpServerList => "runtime.mcpServer.list",
+    RuntimeMcpServerSave => "runtime.mcpServer.save",
+    RuntimeMcpServerToggle => "runtime.mcpServer.toggle",
+    RuntimeMcpServerRemove => "runtime.mcpServer.remove",
     // memory
     MemoryList => "memory.list",
     MemoryRecall => "memory.recall",

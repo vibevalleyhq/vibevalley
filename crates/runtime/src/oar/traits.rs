@@ -138,6 +138,21 @@ pub trait Runtime: Send + Sync {
             })
         })
     }
+    /// User-level MCP server entries configured on the local host for this runtime,
+    /// or `Ok(None)` when the runtime does not map to a host MCP config.
+    fn list_mcp_servers(&self) -> BoxFuture<'_, Result<Option<Vec<super::mcp_install::HostMcpServer>>>> {
+        let host = super::mcp_install::McpHostId::parse(self.id());
+        Box::pin(async move {
+            let Some(host) = host else {
+                return Ok(None);
+            };
+            tokio::task::spawn_blocking(move || super::mcp_install::list_host_mcp_servers(host))
+                .await
+                .map_err(|e| AgentError::Io(e.to_string()))?
+                .map(Some)
+                .map_err(|e| AgentError::Io(e.to_string()))
+        })
+    }
 }
 
 pub(crate) fn find_runtime(runtimes: &[Arc<dyn Runtime>], id: &str) -> Option<Arc<dyn Runtime>> {

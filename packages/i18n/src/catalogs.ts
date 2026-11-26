@@ -2848,6 +2848,31 @@ export const catalogs = {
       quickActions: "快捷操作",
       installation: "安装与路径",
       source: "安装方式",
+      mcpServer: {
+        add: "添加",
+        addTitle: "添加 MCP 服务器",
+        editTitle: "编辑 MCP 服务器",
+        edit: "编辑 {name}",
+        remove: "移除 {name}",
+        toggle: "开关 {name}",
+        name: "名称",
+        nameHint: "写进宿主配置里的服务器键名，比如 github 或 context7。",
+        transport: "传输方式",
+        command: "命令",
+        args: "参数",
+        argsHint: "传给命令的空格分隔参数。",
+        env: "环境变量",
+        url: "服务地址",
+        headers: "请求头",
+        enabled: "启用",
+        disabledTag: "已停用",
+        enabledTag: "已启用",
+        cancel: "取消",
+        save: "保存",
+        savedToast: "已保存 MCP 服务器 {name}",
+        removedToast: "已移除 MCP 服务器 {name}",
+        toggledToast: "{enabled, select, true {已启用 MCP 服务器 {name}} other {已停用 MCP 服务器 {name}}}",
+      },
     },
     "web.session": {
       log: {
@@ -6511,6 +6536,31 @@ export const catalogs = {
       quickActions: "Quick actions",
       installation: "Installation",
       source: "Install source",
+      mcpServer: {
+        add: "Add",
+        addTitle: "Add MCP server",
+        editTitle: "Edit MCP server",
+        edit: "Edit {name}",
+        remove: "Remove {name}",
+        toggle: "Toggle {name}",
+        name: "Name",
+        nameHint: "Unique server key in the host config, such as github or context7.",
+        transport: "Transport",
+        command: "Command",
+        args: "Arguments",
+        argsHint: "Space-separated arguments passed to the command.",
+        env: "Environment variables",
+        url: "Endpoint URL",
+        headers: "HTTP headers",
+        enabled: "Enabled",
+        disabledTag: "disabled",
+        enabledTag: "enabled",
+        cancel: "Cancel",
+        save: "Save",
+        savedToast: "Saved MCP server {name}",
+        removedToast: "Removed MCP server {name}",
+        toggledToast: "{enabled, select, true {Enabled MCP server {name}} other {Disabled MCP server {name}}}",
+      },
     },
     "web.session": {
       log: {
@@ -10135,6 +10185,29 @@ export interface Messages {
   "web.runtime.maxWorking": undefined;
   "web.runtime.maxWorkingHint": undefined;
   "web.runtime.mcp": undefined;
+  "web.runtime.mcpServer.add": undefined;
+  "web.runtime.mcpServer.addTitle": undefined;
+  "web.runtime.mcpServer.args": undefined;
+  "web.runtime.mcpServer.argsHint": undefined;
+  "web.runtime.mcpServer.cancel": undefined;
+  "web.runtime.mcpServer.command": undefined;
+  "web.runtime.mcpServer.disabledTag": undefined;
+  "web.runtime.mcpServer.edit": { readonly name: string | number };
+  "web.runtime.mcpServer.editTitle": undefined;
+  "web.runtime.mcpServer.enabled": undefined;
+  "web.runtime.mcpServer.enabledTag": undefined;
+  "web.runtime.mcpServer.env": undefined;
+  "web.runtime.mcpServer.headers": undefined;
+  "web.runtime.mcpServer.name": undefined;
+  "web.runtime.mcpServer.nameHint": undefined;
+  "web.runtime.mcpServer.remove": { readonly name: string | number };
+  "web.runtime.mcpServer.removedToast": { readonly name: string | number };
+  "web.runtime.mcpServer.save": undefined;
+  "web.runtime.mcpServer.savedToast": { readonly name: string | number };
+  "web.runtime.mcpServer.toggle": { readonly name: string | number };
+  "web.runtime.mcpServer.toggledToast": { readonly enabled: boolean; readonly name: string | number };
+  "web.runtime.mcpServer.transport": undefined;
+  "web.runtime.mcpServer.url": undefined;
   "web.runtime.modelCount": { readonly n: string | number };
   "web.runtime.models": undefined;
   "web.runtime.noEffort": undefined;

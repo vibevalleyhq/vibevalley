@@ -579,6 +579,16 @@ export class VibeValleyApi {
       uninstall: (a: T.McpUninstallInput, options?: { signal?: AbortSignal }): Promise<T.McpHostInfo> =>
         this.call<T.McpHostInfo>("runtime.mcp.uninstall", "/api/v1/runtime/mcp/uninstall", a, options),
     },
+    mcpServer: {
+      list: (a: T.McpServerListInput, options?: { signal?: AbortSignal }): Promise<T.McpServerListResult> =>
+        this.call<T.McpServerListResult>("runtime.mcpServer.list", "/api/v1/runtime/mcpServer/list", a, options),
+      save: (a: T.McpServerSaveInput, options?: { signal?: AbortSignal }): Promise<T.McpServerListResult> =>
+        this.call<T.McpServerListResult>("runtime.mcpServer.save", "/api/v1/runtime/mcpServer/save", a, options),
+      toggle: (a: T.McpServerToggleInput, options?: { signal?: AbortSignal }): Promise<T.McpServerListResult> =>
+        this.call<T.McpServerListResult>("runtime.mcpServer.toggle", "/api/v1/runtime/mcpServer/toggle", a, options),
+      remove: (a: T.McpServerRemoveInput, options?: { signal?: AbortSignal }): Promise<T.McpServerListResult> =>
+        this.call<T.McpServerListResult>("runtime.mcpServer.remove", "/api/v1/runtime/mcpServer/remove", a, options),
+    },
   };
 
   readonly repo = {

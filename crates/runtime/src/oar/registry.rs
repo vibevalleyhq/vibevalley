@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use vibevalley_mcp::McpServerConfig;
 
-use super::mcp_install::{McpHostId, McpHostReport, McpInstallError};
+use super::mcp_install::{HostMcpServer, McpHostId, McpHostReport, McpInstallError};
 use super::traits::{Runtime, find_runtime};
 use super::types::{AgentError, Event, Result};
 use super::{acp, claude, codex, mcp_install, process, record, scripted, sdk};
@@ -50,6 +50,28 @@ impl Registry {
 
     pub fn uninstall_mcp_host(&self, host: McpHostId, server_name: &str) -> std::result::Result<McpHostReport, McpInstallError> {
         mcp_install::uninstall_mcp_host(host, server_name)
+    }
+
+    pub fn list_host_mcp_servers(&self, host: McpHostId) -> std::result::Result<Vec<HostMcpServer>, McpInstallError> {
+        mcp_install::list_host_mcp_servers(host)
+    }
+
+    pub fn upsert_host_mcp_server(
+        &self,
+        host: McpHostId,
+        previous_name: Option<&str>,
+        config: &McpServerConfig,
+        enabled: bool,
+    ) -> std::result::Result<HostMcpServer, McpInstallError> {
+        mcp_install::upsert_host_mcp_server(host, previous_name, config, enabled)
+    }
+
+    pub fn set_host_mcp_server_enabled(&self, host: McpHostId, server_name: &str, enabled: bool) -> std::result::Result<HostMcpServer, McpInstallError> {
+        mcp_install::set_host_mcp_server_enabled(host, server_name, enabled)
+    }
+
+    pub fn remove_host_mcp_server(&self, host: McpHostId, server_name: &str) -> std::result::Result<(), McpInstallError> {
+        mcp_install::remove_host_mcp_server(host, server_name)
     }
 }
 

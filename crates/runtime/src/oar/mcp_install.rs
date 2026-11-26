@@ -127,6 +127,17 @@ pub struct McpHostReport {
     pub supports_http: bool,
 }
 
+/// One user-level MCP server entry read from a coding agent's host config.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostMcpServer {
+    pub host: McpHostId,
+    pub name: String,
+    pub transport: McpTransportSpec,
+    pub enabled: bool,
+    pub config_path: PathBuf,
+}
+
 /// Failure while installing or uninstalling an MCP server entry on a coding agent.
 #[derive(Debug, thiserror::Error)]
 pub enum McpInstallError {
@@ -136,6 +147,8 @@ pub enum McpInstallError {
     UnsupportedTransport { host: McpHostId, reason: String },
     #[error("invalid MCP server name `{0}`")]
     InvalidServerName(String),
+    #[error("MCP server `{name}` not found in host `{host}` config")]
+    ServerNotFound { host: McpHostId, name: String },
     #[error("invalid config file at `{path}`: {message}")]
     InvalidConfig { path: PathBuf, message: String },
     #[error("io error at `{path}`: {message}")]
@@ -350,12 +363,99 @@ pub fn uninstall_mcp_host_in(home_dir: &Path, host: McpHostId, server_name: &str
     uninstall_host_inner(home_dir, host, server_name, false)
 }
 
+/// Lists all user-level MCP servers configured on `host` under `$HOME`.
+pub fn list_host_mcp_servers(host: McpHostId) -> Result<Vec<HostMcpServer>, McpInstallError> {
+    let home_dir = current_home_dir().ok_or(McpInstallError::NoHomeDir(host))?;
+    list_host_mcp_servers_in(&home_dir, host)
+}
+
+/// Returns the user-level MCP configuration file path for `host` under `$HOME`, if `$HOME` is set.
+pub fn host_mcp_config_path(host: McpHostId) -> Option<PathBuf> {
+    current_home_dir().map(|home_dir| host.config_path(&home_dir))
+}
+
+/// Hermetic variant of [`list_host_mcp_servers`] scoped strictly to `home_dir`.
+pub fn list_host_mcp_servers_in(home_dir: &Path, host: McpHostId) -> Result<Vec<HostMcpServer>, McpInstallError> {
+    let config_path = host.config_path(home_dir);
+    match host {
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => read_json_servers(host, &config_path),
+        McpHostId::Codex => codex_toml::read_toml_servers(&config_path),
+    }
+}
+
+/// Atomically adds or updates an MCP server entry on `host` under `$HOME`, optionally renaming from `previous_name`.
+pub fn upsert_host_mcp_server(host: McpHostId, previous_name: Option<&str>, config: &McpServerConfig, enabled: bool) -> Result<HostMcpServer, McpInstallError> {
+    let home_dir = current_home_dir().ok_or(McpInstallError::NoHomeDir(host))?;
+    upsert_host_mcp_server_in(&home_dir, host, previous_name, config, enabled)
+}
+
+/// Hermetic variant of [`upsert_host_mcp_server`] scoped strictly to `home_dir`.
+pub fn upsert_host_mcp_server_in(
+    home_dir: &Path,
+    host: McpHostId,
+    previous_name: Option<&str>,
+    config: &McpServerConfig,
+    enabled: bool,
+) -> Result<HostMcpServer, McpInstallError> {
+    let name = validate_server_name(&config.name)?;
+    let prev = previous_name.map(validate_server_name).transpose()?.filter(|&p| p != name);
+    validate_transport_support(host, &config.transport)?;
+    let config_path = host.config_path(home_dir);
+    match host {
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => {
+            upsert_json_server(host, &config_path, prev, name, &config.transport, enabled)?;
+        }
+        McpHostId::Codex => {
+            codex_toml::upsert_toml_server(&config_path, prev, name, &config.transport, enabled)?;
+        }
+    }
+    Ok(HostMcpServer {
+        host,
+        name: name.to_owned(),
+        transport: config.transport.clone(),
+        enabled,
+        config_path,
+    })
+}
+
+/// Atomically toggles the `enabled` status of an existing MCP server on `host` under `$HOME`.
+pub fn set_host_mcp_server_enabled(host: McpHostId, server_name: &str, enabled: bool) -> Result<HostMcpServer, McpInstallError> {
+    let home_dir = current_home_dir().ok_or(McpInstallError::NoHomeDir(host))?;
+    set_host_mcp_server_enabled_in(&home_dir, host, server_name, enabled)
+}
+
+/// Hermetic variant of [`set_host_mcp_server_enabled`] scoped strictly to `home_dir`.
+pub fn set_host_mcp_server_enabled_in(home_dir: &Path, host: McpHostId, server_name: &str, enabled: bool) -> Result<HostMcpServer, McpInstallError> {
+    let name = validate_server_name(server_name)?;
+    let config_path = host.config_path(home_dir);
+    match host {
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => set_json_server_enabled(host, &config_path, name, enabled),
+        McpHostId::Codex => codex_toml::set_toml_server_enabled(&config_path, name, enabled),
+    }
+}
+
+/// Atomically removes `server_name` from `host`'s user-level MCP configuration under `$HOME`.
+pub fn remove_host_mcp_server(host: McpHostId, server_name: &str) -> Result<(), McpInstallError> {
+    let home_dir = current_home_dir().ok_or(McpInstallError::NoHomeDir(host))?;
+    remove_host_mcp_server_in(&home_dir, host, server_name)
+}
+
+/// Hermetic variant of [`remove_host_mcp_server`] scoped strictly to `home_dir`.
+pub fn remove_host_mcp_server_in(home_dir: &Path, host: McpHostId, server_name: &str) -> Result<(), McpInstallError> {
+    let name = validate_server_name(server_name)?;
+    let config_path = host.config_path(home_dir);
+    match host {
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => remove_json_server(host, &config_path, name),
+        McpHostId::Codex => codex_toml::remove_toml_server(&config_path, name),
+    }
+}
+
 /// Renders a copyable configuration snippet for `config` in `host`'s native config format.
 pub fn render_mcp_snippet(host: McpHostId, config: &McpServerConfig) -> String {
     match host {
         McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => serde_json::to_string_pretty(&json!({
             "mcpServers": {
-                &config.name: encode_json_entry(host, &config.transport),
+                &config.name: encode_json_entry(host, &config.transport, true),
             }
         }))
         .unwrap_or_default(),
@@ -386,38 +486,20 @@ fn probe_host_report(host: McpHostId, home_dir: &Path, desired: &McpServerConfig
 }
 
 fn install_host_inner(home_dir: &Path, host: McpHostId, config: &McpServerConfig, probe_system: bool) -> Result<McpHostReport, McpInstallError> {
-    let name = validate_server_name(&config.name)?;
-    validate_transport_support(host, &config.transport)?;
-    let config_path = host.config_path(home_dir);
-    match host {
-        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => {
-            upsert_json_server(host, &config_path, name, &config.transport)?;
-        }
-        McpHostId::Codex => {
-            codex_toml::upsert_toml_server(&config_path, name, &config.transport)?;
-        }
-    }
+    upsert_host_mcp_server_in(home_dir, host, None, config, true)?;
     Ok(probe_host_report(host, home_dir, config, probe_system))
 }
 
 fn uninstall_host_inner(home_dir: &Path, host: McpHostId, server_name: &str, probe_system: bool) -> Result<McpHostReport, McpInstallError> {
     let name = validate_server_name(server_name)?;
-    let config_path = host.config_path(home_dir);
-    match host {
-        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => {
-            remove_json_server(&config_path, name)?;
-        }
-        McpHostId::Codex => {
-            codex_toml::remove_toml_server(&config_path, name)?;
-        }
-    }
+    remove_host_mcp_server_in(home_dir, host, name)?;
     let probe = McpServerConfig::stdio(name, "placeholder", Vec::new());
     Ok(probe_host_report(host, home_dir, &probe, probe_system))
 }
 
 fn read_host_server(host: McpHostId, path: &Path, server_name: &str) -> Result<Option<McpTransportSpec>, McpInstallError> {
     match host {
-        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => read_json_server(path, server_name),
+        McpHostId::Antigravity | McpHostId::Claude | McpHostId::Cursor => read_json_server(host, path, server_name),
         McpHostId::Codex => codex_toml::read_toml_server(path, server_name),
     }
 }
@@ -507,13 +589,47 @@ fn parse_string_map(path: &Path, field: &str, value: Option<&Value>) -> Result<B
     Ok(out)
 }
 
-fn decode_json_entry(path: &Path, entry: &Value) -> Result<McpTransportSpec, McpInstallError> {
+fn claude_disabled_servers(host: McpHostId, root: &Map<String, Value>) -> std::collections::HashSet<String> {
+    if !matches!(host, McpHostId::Claude) {
+        return std::collections::HashSet::new();
+    }
+    root.get("disabledMcpServers")
+        .and_then(Value::as_array)
+        .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .unwrap_or_default()
+}
+
+fn remove_claude_disabled_server(host: McpHostId, root: &mut Map<String, Value>, server_name: &str) -> bool {
+    if !matches!(host, McpHostId::Claude) {
+        return false;
+    }
+    let Some(Value::Array(arr)) = root.get_mut("disabledMcpServers") else {
+        return false;
+    };
+    let before = arr.len();
+    arr.retain(|v| v.as_str() != Some(server_name));
+    arr.len() != before
+}
+
+fn decode_json_entry(path: &Path, entry: &Value, root_disabled: bool) -> Result<(McpTransportSpec, bool), McpInstallError> {
     let Some(obj) = entry.as_object() else {
         return Err(McpInstallError::InvalidConfig {
             path: path.to_path_buf(),
             message: "MCP server entry must be a JSON object".into(),
         });
     };
+    let entry_disabled = match (obj.get("disabled"), obj.get("enabled")) {
+        (Some(val), _) => val.as_bool().ok_or_else(|| McpInstallError::InvalidConfig {
+            path: path.to_path_buf(),
+            message: "`disabled` must be a JSON boolean".into(),
+        })?,
+        (None, Some(val)) => !val.as_bool().ok_or_else(|| McpInstallError::InvalidConfig {
+            path: path.to_path_buf(),
+            message: "`enabled` must be a JSON boolean".into(),
+        })?,
+        (None, None) => false,
+    };
+    let enabled = !entry_disabled && !root_disabled;
     if let Some(command) = obj.get("command").and_then(Value::as_str) {
         let args = match obj.get("args") {
             None | Some(Value::Null) => Vec::new(),
@@ -538,19 +654,25 @@ fn decode_json_entry(path: &Path, entry: &Value) -> Result<McpTransportSpec, Mcp
             }
         };
         let env = parse_string_map(path, "env", obj.get("env"))?;
-        return Ok(McpTransportSpec::Stdio {
-            command: command.to_owned(),
-            args,
-            env,
-        });
+        return Ok((
+            McpTransportSpec::Stdio {
+                command: command.to_owned(),
+                args,
+                env,
+            },
+            enabled,
+        ));
     }
     if let Some(url) = ["url", "serverUrl", "httpUrl"].into_iter().find_map(|k| obj.get(k).and_then(Value::as_str)) {
         let headers = parse_string_map(path, "headers", obj.get("headers"))?;
-        return Ok(McpTransportSpec::StreamableHttp {
-            url: url.to_owned(),
-            headers,
-            stateless: false,
-        });
+        return Ok((
+            McpTransportSpec::StreamableHttp {
+                url: url.to_owned(),
+                headers,
+                stateless: false,
+            },
+            enabled,
+        ));
     }
     Err(McpInstallError::InvalidConfig {
         path: path.to_path_buf(),
@@ -558,8 +680,8 @@ fn decode_json_entry(path: &Path, entry: &Value) -> Result<McpTransportSpec, Mcp
     })
 }
 
-fn encode_json_entry(host: McpHostId, transport: &McpTransportSpec) -> Value {
-    match transport {
+fn encode_json_entry(host: McpHostId, transport: &McpTransportSpec, enabled: bool) -> Value {
+    let mut obj = match transport {
         McpTransportSpec::Stdio { command, args, env } => {
             let mut obj = Map::new();
             obj.insert("command".into(), json!(command));
@@ -567,7 +689,7 @@ fn encode_json_entry(host: McpHostId, transport: &McpTransportSpec) -> Value {
             if !env.is_empty() {
                 obj.insert("env".into(), json!(env));
             }
-            Value::Object(obj)
+            obj
         }
         McpTransportSpec::StreamableHttp { url, headers, .. } => {
             let mut obj = Map::new();
@@ -578,38 +700,83 @@ fn encode_json_entry(host: McpHostId, transport: &McpTransportSpec) -> Value {
             if !headers.is_empty() {
                 obj.insert("headers".into(), json!(headers));
             }
-            Value::Object(obj)
+            obj
         }
+    };
+    if !enabled {
+        obj.insert("disabled".into(), Value::Bool(true));
     }
+    Value::Object(obj)
 }
 
-fn read_json_server(path: &Path, server_name: &str) -> Result<Option<McpTransportSpec>, McpInstallError> {
-    let raw = read_optional_file(path)?;
-    if raw.is_none() {
-        return Ok(None);
-    }
-    let root = parse_json_root(path, raw)?;
+fn read_json_servers_map<'a>(path: &Path, root: &'a Map<String, Value>) -> Result<Option<&'a Map<String, Value>>, McpInstallError> {
     let Some(servers_val) = root.get("mcpServers") else {
         return Ok(None);
     };
     if servers_val.is_null() {
         return Ok(None);
     }
-    let Some(servers) = servers_val.as_object() else {
-        return Err(McpInstallError::InvalidConfig {
-            path: path.to_path_buf(),
-            message: "`mcpServers` must be a JSON object".into(),
-        });
+    servers_val.as_object().map(Some).ok_or_else(|| McpInstallError::InvalidConfig {
+        path: path.to_path_buf(),
+        message: "`mcpServers` must be a JSON object".into(),
+    })
+}
+
+fn read_json_servers(host: McpHostId, path: &Path) -> Result<Vec<HostMcpServer>, McpInstallError> {
+    let Some(raw) = read_optional_file(path)? else {
+        return Ok(Vec::new());
     };
+    let root = parse_json_root(path, Some(raw))?;
+    let Some(servers) = read_json_servers_map(path, &root)? else {
+        return Ok(Vec::new());
+    };
+    let disabled_list = claude_disabled_servers(host, &root);
+    let mut out = Vec::with_capacity(servers.len());
+    for (name, entry) in servers {
+        let (transport, enabled) = decode_json_entry(path, entry, disabled_list.contains(name))?;
+        out.push(HostMcpServer {
+            host,
+            name: name.clone(),
+            transport,
+            enabled,
+            config_path: path.to_path_buf(),
+        });
+    }
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(out)
+}
+
+fn read_json_server(host: McpHostId, path: &Path, server_name: &str) -> Result<Option<McpTransportSpec>, McpInstallError> {
+    let Some(raw) = read_optional_file(path)? else {
+        return Ok(None);
+    };
+    let root = parse_json_root(path, Some(raw))?;
+    let Some(servers) = read_json_servers_map(path, &root)? else {
+        return Ok(None);
+    };
+    let disabled_list = claude_disabled_servers(host, &root);
     match servers.get(server_name) {
-        Some(entry) => decode_json_entry(path, entry).map(Some),
+        Some(entry) => decode_json_entry(path, entry, disabled_list.contains(server_name)).map(|(t, _)| Some(t)),
         None => Ok(None),
     }
 }
 
-fn upsert_json_server(host: McpHostId, path: &Path, server_name: &str, transport: &McpTransportSpec) -> Result<(), McpInstallError> {
+fn upsert_json_server(
+    host: McpHostId,
+    path: &Path,
+    previous_name: Option<&str>,
+    server_name: &str,
+    transport: &McpTransportSpec,
+    enabled: bool,
+) -> Result<(), McpInstallError> {
     let raw = read_optional_file(path)?;
     let mut root = parse_json_root(path, raw)?;
+    if let Some(prev) = previous_name {
+        remove_claude_disabled_server(host, &mut root, prev);
+    }
+    if enabled {
+        remove_claude_disabled_server(host, &mut root, server_name);
+    }
     let servers = match root.entry("mcpServers".to_owned()) {
         serde_json::map::Entry::Vacant(slot) => slot.insert(Value::Object(Map::new())),
         serde_json::map::Entry::Occupied(mut slot) => {
@@ -625,17 +792,79 @@ fn upsert_json_server(host: McpHostId, path: &Path, server_name: &str, transport
             message: "`mcpServers` must be a JSON object".into(),
         });
     };
-    servers_obj.insert(server_name.to_owned(), encode_json_entry(host, transport));
+    if let Some(prev) = previous_name {
+        servers_obj.remove(prev);
+    }
+    servers_obj.insert(server_name.to_owned(), encode_json_entry(host, transport, enabled));
     let mut encoded = serde_json::to_string_pretty(&Value::Object(root)).map_err(|e| io_err(path, e))?;
     encoded.push('\n');
     write_file_atomic(path, encoded.as_bytes())
 }
 
-fn remove_json_server(path: &Path, server_name: &str) -> Result<(), McpInstallError> {
+fn set_json_server_enabled(host: McpHostId, path: &Path, server_name: &str, enabled: bool) -> Result<HostMcpServer, McpInstallError> {
+    let Some(raw) = read_optional_file(path)? else {
+        return Err(McpInstallError::ServerNotFound {
+            host,
+            name: server_name.to_owned(),
+        });
+    };
+    let mut root = parse_json_root(path, Some(raw))?;
+    if enabled {
+        remove_claude_disabled_server(host, &mut root, server_name);
+    }
+    let servers_val = root.get_mut("mcpServers").ok_or_else(|| McpInstallError::ServerNotFound {
+        host,
+        name: server_name.to_owned(),
+    })?;
+    if servers_val.is_null() {
+        return Err(McpInstallError::ServerNotFound {
+            host,
+            name: server_name.to_owned(),
+        });
+    }
+    let Some(servers_obj) = servers_val.as_object_mut() else {
+        return Err(McpInstallError::InvalidConfig {
+            path: path.to_path_buf(),
+            message: "`mcpServers` must be a JSON object".into(),
+        });
+    };
+    let Some(entry) = servers_obj.get_mut(server_name) else {
+        return Err(McpInstallError::ServerNotFound {
+            host,
+            name: server_name.to_owned(),
+        });
+    };
+    let Some(entry_obj) = entry.as_object_mut() else {
+        return Err(McpInstallError::InvalidConfig {
+            path: path.to_path_buf(),
+            message: "MCP server entry must be a JSON object".into(),
+        });
+    };
+    entry_obj.remove("enabled");
+    if enabled {
+        entry_obj.remove("disabled");
+    } else {
+        entry_obj.insert("disabled".into(), Value::Bool(true));
+    }
+    let (transport, final_enabled) = decode_json_entry(path, entry, false)?;
+    let mut encoded = serde_json::to_string_pretty(&Value::Object(root)).map_err(|e| io_err(path, e))?;
+    encoded.push('\n');
+    write_file_atomic(path, encoded.as_bytes())?;
+    Ok(HostMcpServer {
+        host,
+        name: server_name.to_owned(),
+        transport,
+        enabled: final_enabled,
+        config_path: path.to_path_buf(),
+    })
+}
+
+fn remove_json_server(host: McpHostId, path: &Path, server_name: &str) -> Result<(), McpInstallError> {
     let Some(raw) = read_optional_file(path)? else {
         return Ok(());
     };
     let mut root = parse_json_root(path, Some(raw))?;
+    let removed_disabled = remove_claude_disabled_server(host, &mut root, server_name);
     let removed = match root.get_mut("mcpServers") {
         None | Some(Value::Null) => false,
         Some(Value::Object(servers)) => servers.remove(server_name).is_some(),
@@ -646,7 +875,7 @@ fn remove_json_server(path: &Path, server_name: &str) -> Result<(), McpInstallEr
             });
         }
     };
-    if !removed {
+    if !removed && !removed_disabled {
         return Ok(());
     }
     let mut encoded = serde_json::to_string_pretty(&Value::Object(root)).map_err(|e| io_err(path, e))?;
@@ -691,27 +920,11 @@ mod codex_toml {
         Ok(())
     }
 
-    pub(super) fn read_toml_server(path: &Path, server_name: &str) -> Result<Option<McpTransportSpec>, McpInstallError> {
-        let Some(raw) = read_optional_file(path)? else {
-            return Ok(None);
+    fn decode_toml_entry(path: &Path, server_name: &str, entry: &dyn TableLike) -> Result<(McpTransportSpec, bool), McpInstallError> {
+        let enabled = match entry.get("enabled") {
+            None => true,
+            Some(item) => item.as_bool().ok_or_else(|| invalid(path, "`enabled` must be a boolean"))?,
         };
-        if raw.trim().is_empty() {
-            return Ok(None);
-        }
-        let doc: DocumentMut = raw.parse().map_err(|e| invalid(path, e))?;
-        let Some(servers_item) = doc.get("mcp_servers") else {
-            return Ok(None);
-        };
-        let Some(servers) = servers_item.as_table_like() else {
-            return Err(invalid(path, "`mcp_servers` must be a TOML table"));
-        };
-        let Some(entry_item) = servers.get(server_name) else {
-            return Ok(None);
-        };
-        let Some(entry) = entry_item.as_table_like() else {
-            return Err(invalid(path, format!("`mcp_servers.{server_name}` must be a TOML table")));
-        };
-
         let command = match entry.get("command") {
             None => None,
             Some(item) => {
@@ -751,14 +964,17 @@ mod codex_toml {
         }
 
         if let Some(command) = command {
-            return Ok(Some(McpTransportSpec::Stdio { command, args, env }));
+            return Ok((McpTransportSpec::Stdio { command, args, env }, enabled));
         }
         if let Some(url) = url {
-            return Ok(Some(McpTransportSpec::StreamableHttp {
-                url,
-                headers,
-                stateless: false,
-            }));
+            return Ok((
+                McpTransportSpec::StreamableHttp {
+                    url,
+                    headers,
+                    stateless: false,
+                },
+                enabled,
+            ));
         }
         Err(invalid(
             path,
@@ -766,7 +982,62 @@ mod codex_toml {
         ))
     }
 
-    fn build_server_table(transport: &McpTransportSpec) -> Table {
+    pub(super) fn read_toml_servers(path: &Path) -> Result<Vec<HostMcpServer>, McpInstallError> {
+        let Some(raw) = read_optional_file(path)? else {
+            return Ok(Vec::new());
+        };
+        if raw.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let doc: DocumentMut = raw.parse().map_err(|e| invalid(path, e))?;
+        let Some(servers_item) = doc.get("mcp_servers") else {
+            return Ok(Vec::new());
+        };
+        let Some(servers) = servers_item.as_table_like() else {
+            return Err(invalid(path, "`mcp_servers` must be a TOML table"));
+        };
+        let mut out = Vec::with_capacity(servers.len());
+        for (name, entry_item) in servers.iter() {
+            let Some(entry) = entry_item.as_table_like() else {
+                return Err(invalid(path, format!("`mcp_servers.{name}` must be a TOML table")));
+            };
+            let (transport, enabled) = decode_toml_entry(path, name, entry)?;
+            out.push(HostMcpServer {
+                host: McpHostId::Codex,
+                name: name.to_owned(),
+                transport,
+                enabled,
+                config_path: path.to_path_buf(),
+            });
+        }
+        out.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(out)
+    }
+
+    pub(super) fn read_toml_server(path: &Path, server_name: &str) -> Result<Option<McpTransportSpec>, McpInstallError> {
+        let Some(raw) = read_optional_file(path)? else {
+            return Ok(None);
+        };
+        if raw.trim().is_empty() {
+            return Ok(None);
+        }
+        let doc: DocumentMut = raw.parse().map_err(|e| invalid(path, e))?;
+        let Some(servers_item) = doc.get("mcp_servers") else {
+            return Ok(None);
+        };
+        let Some(servers) = servers_item.as_table_like() else {
+            return Err(invalid(path, "`mcp_servers` must be a TOML table"));
+        };
+        let Some(entry_item) = servers.get(server_name) else {
+            return Ok(None);
+        };
+        let Some(entry) = entry_item.as_table_like() else {
+            return Err(invalid(path, format!("`mcp_servers.{server_name}` must be a TOML table")));
+        };
+        decode_toml_entry(path, server_name, entry).map(|(t, _)| Some(t))
+    }
+
+    fn build_server_table(transport: &McpTransportSpec, enabled: bool) -> Table {
         let mut table = Table::new();
         match transport {
             McpTransportSpec::Stdio { command, args, env } => {
@@ -795,6 +1066,9 @@ mod codex_toml {
                 }
             }
         }
+        if !enabled {
+            table.insert("enabled", Item::Value(Value::from(false)));
+        }
         table
     }
 
@@ -802,15 +1076,21 @@ mod codex_toml {
         let mut doc = DocumentMut::new();
         let mut mcp_servers = Table::new();
         mcp_servers.set_implicit(true);
-        mcp_servers.insert(server_name, Item::Table(build_server_table(transport)));
+        mcp_servers.insert(server_name, Item::Table(build_server_table(transport, true)));
         doc.insert("mcp_servers", Item::Table(mcp_servers));
         doc.to_string()
     }
 
-    pub(super) fn upsert_toml_server(path: &Path, server_name: &str, transport: &McpTransportSpec) -> Result<(), McpInstallError> {
+    pub(super) fn upsert_toml_server(
+        path: &Path,
+        previous_name: Option<&str>,
+        server_name: &str,
+        transport: &McpTransportSpec,
+        enabled: bool,
+    ) -> Result<(), McpInstallError> {
         let raw = read_optional_file(path)?.unwrap_or_default();
         let mut doc: DocumentMut = raw.parse().map_err(|e| invalid(path, e))?;
-        let entry = Item::Table(build_server_table(transport));
+        let entry = Item::Table(build_server_table(transport, enabled));
         match doc.get_mut("mcp_servers") {
             None => {
                 let mut mcp_servers = Table::new();
@@ -819,10 +1099,16 @@ mod codex_toml {
                 doc.insert("mcp_servers", Item::Table(mcp_servers));
             }
             Some(Item::Table(table)) => {
+                if let Some(prev) = previous_name {
+                    table.remove(prev);
+                }
                 table.insert(server_name, entry);
             }
             Some(Item::Value(Value::InlineTable(inline))) => {
                 let mut table = inline.clone().into_table();
+                if let Some(prev) = previous_name {
+                    table.remove(prev);
+                }
                 table.insert(server_name, entry);
                 doc.insert("mcp_servers", Item::Table(table));
             }
@@ -833,6 +1119,58 @@ mod codex_toml {
             encoded.push('\n');
         }
         write_file_atomic(path, encoded.as_bytes())
+    }
+
+    pub(super) fn set_toml_server_enabled(path: &Path, server_name: &str, enabled: bool) -> Result<HostMcpServer, McpInstallError> {
+        let Some(raw) = read_optional_file(path)? else {
+            return Err(McpInstallError::ServerNotFound {
+                host: McpHostId::Codex,
+                name: server_name.to_owned(),
+            });
+        };
+        if raw.trim().is_empty() {
+            return Err(McpInstallError::ServerNotFound {
+                host: McpHostId::Codex,
+                name: server_name.to_owned(),
+            });
+        }
+        let mut doc: DocumentMut = raw.parse().map_err(|e| invalid(path, e))?;
+        let Some(servers_item) = doc.get_mut("mcp_servers") else {
+            return Err(McpInstallError::ServerNotFound {
+                host: McpHostId::Codex,
+                name: server_name.to_owned(),
+            });
+        };
+        let Some(servers) = servers_item.as_table_like_mut() else {
+            return Err(invalid(path, "`mcp_servers` must be a TOML table"));
+        };
+        let Some(entry_item) = servers.get_mut(server_name) else {
+            return Err(McpInstallError::ServerNotFound {
+                host: McpHostId::Codex,
+                name: server_name.to_owned(),
+            });
+        };
+        let Some(entry) = entry_item.as_table_like_mut() else {
+            return Err(invalid(path, format!("`mcp_servers.{server_name}` must be a TOML table")));
+        };
+        if enabled {
+            entry.remove("enabled");
+        } else {
+            entry.insert("enabled", Item::Value(Value::from(false)));
+        }
+        let (transport, final_enabled) = decode_toml_entry(path, server_name, entry)?;
+        let mut encoded = doc.to_string();
+        if !encoded.is_empty() && !encoded.ends_with('\n') {
+            encoded.push('\n');
+        }
+        write_file_atomic(path, encoded.as_bytes())?;
+        Ok(HostMcpServer {
+            host: McpHostId::Codex,
+            name: server_name.to_owned(),
+            transport,
+            enabled: final_enabled,
+            config_path: path.to_path_buf(),
+        })
     }
 
     pub(super) fn remove_toml_server(path: &Path, server_name: &str) -> Result<(), McpInstallError> {
@@ -1267,5 +1605,127 @@ line two
             mcp_status_in(home.path(), McpHostId::Codex, &other).state,
             McpInstallState::Installed { transport: other.transport }
         );
+    }
+
+    #[test]
+    fn host_mcp_inventory_crud_and_enable_toggle_across_all_four_hosts() {
+        let home = tempfile::tempdir().unwrap();
+
+        // Missing config files yield empty inventory across all four hosts.
+        for &host in McpHostId::ALL {
+            assert!(list_host_mcp_servers_in(home.path(), host).unwrap().is_empty(), "host={host}");
+        }
+
+        // Antigravity: pre-seeded with disabled legacy serverUrl + enabled stdio server.
+        let agy_path = McpHostId::Antigravity.config_path(home.path());
+        std::fs::create_dir_all(agy_path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &agy_path,
+            r#"{
+  "mcpServers": {
+    "linear": { "serverUrl": "https://mcp.linear.app/mcp", "disabled": true },
+    "fs": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"] }
+  }
+}"#,
+        )
+        .unwrap();
+
+        let agy_list = list_host_mcp_servers_in(home.path(), McpHostId::Antigravity).unwrap();
+        assert_eq!(agy_list.len(), 2);
+        assert_eq!(agy_list[0].name, "fs");
+        assert!(agy_list[0].enabled);
+        assert_eq!(agy_list[0].config_path, agy_path);
+        assert_eq!(agy_list[1].name, "linear");
+        assert!(!agy_list[1].enabled);
+        assert_eq!(
+            agy_list[1].transport,
+            McpTransportSpec::StreamableHttp {
+                url: "https://mcp.linear.app/mcp".into(),
+                headers: BTreeMap::new(),
+                stateless: false,
+            }
+        );
+
+        // Claude: pre-seeded with disabledMcpServers list and unrelated state.
+        let claude_path = McpHostId::Claude.config_path(home.path());
+        std::fs::write(
+            &claude_path,
+            r#"{
+  "numStartups": 7,
+  "disabledMcpServers": ["sentry"],
+  "mcpServers": {
+    "sentry": { "type": "http", "url": "https://mcp.sentry.dev/mcp" }
+  }
+}"#,
+        )
+        .unwrap();
+        let claude_list = list_host_mcp_servers_in(home.path(), McpHostId::Claude).unwrap();
+        assert_eq!(claude_list.len(), 1);
+        assert_eq!(claude_list[0].name, "sentry");
+        assert!(!claude_list[0].enabled);
+
+        // Toggle sentry back on in Claude -> clears disabledMcpServers entry and preserves numStartups.
+        let enabled_claude = set_host_mcp_server_enabled_in(home.path(), McpHostId::Claude, "sentry", true).unwrap();
+        assert!(enabled_claude.enabled);
+        let claude_after: Value = serde_json::from_str(&std::fs::read_to_string(&claude_path).unwrap()).unwrap();
+        assert_eq!(claude_after["numStartups"], 7);
+        assert_eq!(claude_after["disabledMcpServers"], json!([]));
+
+        // Full CRUD + rename + toggle across all four hosts.
+        for &host in McpHostId::ALL {
+            let created = upsert_host_mcp_server_in(
+                home.path(),
+                host,
+                None,
+                &stdio_cfg("context7", "npx", &["-y", "@upstash/context7-mcp"]).with_env("API_KEY", "k1"),
+                true,
+            )
+            .unwrap();
+            assert_eq!(created.host, host);
+            assert!(created.enabled);
+
+            let disabled = set_host_mcp_server_enabled_in(home.path(), host, "context7", false).unwrap();
+            assert!(!disabled.enabled);
+            assert!(
+                list_host_mcp_servers_in(home.path(), host)
+                    .unwrap()
+                    .iter()
+                    .any(|s| s.name == "context7" && !s.enabled),
+                "host={host}"
+            );
+
+            let reenabled = set_host_mcp_server_enabled_in(home.path(), host, "context7", true).unwrap();
+            assert!(reenabled.enabled);
+
+            // Rename + switch transport atomically.
+            let renamed = upsert_host_mcp_server_in(
+                home.path(),
+                host,
+                Some("context7"),
+                &http_cfg("context7-http", "https://mcp.context7.com/mcp").with_header("Authorization", "Bearer tok"),
+                false,
+            )
+            .unwrap();
+            assert_eq!(renamed.name, "context7-http");
+            assert!(!renamed.enabled);
+
+            let listed = list_host_mcp_servers_in(home.path(), host).unwrap();
+            assert!(!listed.iter().any(|s| s.name == "context7"), "old name should be gone on {host}");
+            let found = listed.iter().find(|s| s.name == "context7-http").expect("renamed server present");
+            assert!(!found.enabled);
+            assert!(matches!(
+                found.transport,
+                McpTransportSpec::StreamableHttp { ref url, .. } if url == "https://mcp.context7.com/mcp"
+            ));
+
+            remove_host_mcp_server_in(home.path(), host, "context7-http").unwrap();
+            assert!(
+                !list_host_mcp_servers_in(home.path(), host).unwrap().iter().any(|s| s.name == "context7-http"),
+                "removed server must stay absent on {host}"
+            );
+
+            let missing_err = set_host_mcp_server_enabled_in(home.path(), host, "does-not-exist", true).unwrap_err();
+            assert!(matches!(missing_err, McpInstallError::ServerNotFound { .. }), "{missing_err}");
+        }
     }
 }

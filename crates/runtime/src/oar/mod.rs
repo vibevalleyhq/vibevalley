@@ -34,8 +34,10 @@ pub use crate::oar::process::{CommandOutput, run_output_with_timeout};
 pub use crate::oar::record::{RecordHeader, read_record_with_header};
 pub use accounting::TokenTotals;
 pub use mcp_install::{
-    McpHostId, McpHostReport, McpInstallError, McpInstallState, install_mcp_host, install_mcp_host_in, list_mcp_hosts, list_mcp_hosts_in, mcp_status,
-    mcp_status_in, render_mcp_snippet, uninstall_mcp_host, uninstall_mcp_host_in,
+    HostMcpServer, McpHostId, McpHostReport, McpInstallError, McpInstallState, host_mcp_config_path, install_mcp_host, install_mcp_host_in,
+    list_host_mcp_servers, list_host_mcp_servers_in, list_mcp_hosts, list_mcp_hosts_in, mcp_status, mcp_status_in, remove_host_mcp_server,
+    remove_host_mcp_server_in, render_mcp_snippet, set_host_mcp_server_enabled, set_host_mcp_server_enabled_in, uninstall_mcp_host, uninstall_mcp_host_in,
+    upsert_host_mcp_server, upsert_host_mcp_server_in,
 };
 pub use registry::{Registry, default_runtimes, read_record, set_binary};
 pub use specs::{BUILTIN_RUNTIME_SPECS, RuntimeSpec, runtime_refused_options, runtime_spec};

@@ -3,7 +3,17 @@ import { expect, open, test } from "nsh/test";
 
 import { setLocale, t } from "@vibevalley/i18n";
 import "@vibevalley/i18n/catalogs";
-import type { MachineInfo, RuntimeInfo, SessionsSlice, SliceBundle } from "@vibevalley/protocol";
+import type {
+  MachineInfo,
+  McpHostId,
+  McpServerEntry,
+  McpServerRemoveInput,
+  McpServerSaveInput,
+  McpServerToggleInput,
+  RuntimeInfo,
+  SessionsSlice,
+  SliceBundle,
+} from "@vibevalley/protocol";
 
 import type { DesignHost } from "../../design/host";
 import { fakeHost, type FakeHost } from "../../fixtures/fakeHost";
@@ -461,4 +471,128 @@ test("i18n: runtime inventory unreported copy avoids literal fragment in zh and 
   setLocale("en");
   expect(t("web.runtime.unreported")).toBe("Not reported by this engine.");
   expect(t("web.runtime.none")).toBe("None.");
+});
+
+test("RuntimesPage: MCP InventoryCard displays real host entries and supports add, edit, toggle, remove, and error display", async () => {
+  setLocale("en");
+  let serversByHost: Record<McpHostId, McpServerEntry[]> = {
+    antigravity: [
+      {
+        host: "antigravity",
+        name: "linear",
+        transport: "streamableHttp",
+        args: [],
+        env: {},
+        url: "https://mcp.linear.app/mcp",
+        headers: {},
+        enabled: true,
+        configPath: "/Users/test/.gemini/config/mcp_config.json",
+      },
+    ],
+    claude: [
+      {
+        host: "claude",
+        name: "github",
+        transport: "stdio",
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-github"],
+        env: {},
+        headers: {},
+        enabled: true,
+        configPath: "/Users/test/.claude.json",
+      },
+    ],
+    codex: [],
+    cursor: [],
+  };
+  let failNextToggle = false;
+
+  const { app, fake } = await mountRoute("/runtimes/local/claude", scenarios.typical.state, (f) => {
+    f.respond("runtime.mcpServer.list", (payload: unknown) => {
+      const { host } = payload as { host: McpHostId };
+      return {
+        host,
+        configPath: serversByHost[host][0]?.configPath ?? `/Users/test/.${host}.json`,
+        servers: serversByHost[host],
+      };
+    });
+    f.respond("runtime.mcpServer.save", (payload: unknown) => {
+      const input = payload as McpServerSaveInput;
+      const list = serversByHost[input.host].filter((s) => s.name !== input.previousName && s.name !== input.name);
+      const entry: McpServerEntry = {
+        host: input.host,
+        name: input.name,
+        transport: input.transport,
+        ...(input.command !== undefined ? { command: input.command } : {}),
+        args: input.args,
+        env: input.env,
+        ...(input.url !== undefined ? { url: input.url } : {}),
+        headers: input.headers,
+        enabled: input.enabled,
+        configPath: input.host === "claude" ? "/Users/test/.claude.json" : "/Users/test/.gemini/config/mcp_config.json",
+      };
+      serversByHost = { ...serversByHost, [input.host]: [...list, entry].toSorted((a, b) => a.name.localeCompare(b.name)) };
+      return { host: input.host, configPath: entry.configPath, servers: serversByHost[input.host] };
+    });
+    f.respond("runtime.mcpServer.toggle", (payload: unknown) => {
+      if (failNextToggle) {
+        failNextToggle = false;
+        return { bizCode: 100011, message: "corrupt config file" };
+      }
+      const input = payload as McpServerToggleInput;
+      serversByHost = {
+        ...serversByHost,
+        [input.host]: serversByHost[input.host].map((s) => (s.name === input.name ? { ...s, enabled: input.enabled } : s)),
+      };
+      return { host: input.host, configPath: "/Users/test/.claude.json", servers: serversByHost[input.host] };
+    });
+    f.respond("runtime.mcpServer.remove", (payload: unknown) => {
+      const input = payload as McpServerRemoveInput;
+      serversByHost = {
+        ...serversByHost,
+        [input.host]: serversByHost[input.host].filter((s) => s.name !== input.name),
+      };
+      return { host: input.host, configPath: "/Users/test/.claude.json", servers: serversByHost[input.host] };
+    });
+  });
+
+  await fake.pumpUntil(app, () => app.count("id:mcp-server-row-github") === 1);
+  expect(app.shows("id:mcp-server-row-github >> text:github")).toBe(true);
+  expect(app.shows("id:mcp-server-row-github >> text:stdio")).toBe(true);
+  expect(app.shows("id:mcp-server-row-github >> text:npx -y @modelcontextprotocol/server-github")).toBe(true);
+  expect(app.texts()).toContain("/Users/test/.claude.json");
+  expect(app.shows("id:mcp-server-row-github >> text:enabled")).toBe(true);
+
+  // Add a new streamableHttp MCP server via the dialog.
+  await app.press("id:mcp-server-add");
+  await fake.pumpUntil(app, () => app.count("id:mcp-server-dialog") === 1);
+  await app.type("id:mcp-server-name", "context7");
+  await app.press("id:mcp-server-transport-streamableHttp");
+  await fake.pump(app);
+  await app.type("id:mcp-server-url", "https://mcp.context7.com/mcp");
+  await app.press("id:mcp-server-save");
+  await fake.pumpUntil(app, () => app.count("id:mcp-server-row-context7") === 1);
+  expect(app.shows("id:mcp-server-row-context7 >> text:http")).toBe(true);
+  expect(app.texts()).toContain("https://mcp.context7.com/mcp");
+
+  // Toggle disabled -> shows disabled tag; error path shows banner.
+  await app.press("id:mcp-server-toggle-context7");
+  await fake.pumpUntil(app, () => app.shows("id:mcp-server-row-context7 >> text:disabled"));
+
+  failNextToggle = true;
+  await app.press("id:mcp-server-toggle-context7");
+  await fake.pumpUntil(app, () => app.count("id:mcp-server-error") === 1);
+  expect(app.texts()).toContain("corrupt config file");
+
+  // Edit existing entry (replace URL).
+  await app.press("id:mcp-server-edit-context7");
+  await fake.pumpUntil(app, () => app.count("id:mcp-server-dialog") === 1);
+  await app.clear("id:mcp-server-url");
+  await app.type("id:mcp-server-url", "https://mcp.context7.com/v2");
+  await app.press("id:mcp-server-save");
+  await fake.pumpUntil(app, () => app.texts().includes("https://mcp.context7.com/v2"));
+
+  // Remove entry -> disappears from inventory card.
+  await app.press("id:mcp-server-remove-context7");
+  await fake.pumpUntil(app, () => app.count("id:mcp-server-row-context7") === 0);
 });

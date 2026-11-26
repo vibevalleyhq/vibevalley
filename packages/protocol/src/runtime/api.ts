@@ -11,6 +11,10 @@ export interface RuntimeHandlers {
   readonly "runtime.mcp.list": (a: T.McpListInput) => Promise<T.McpListResult>;
   readonly "runtime.mcp.install": (a: T.McpInstallInput) => Promise<T.McpHostInfo>;
   readonly "runtime.mcp.uninstall": (a: T.McpUninstallInput) => Promise<T.McpHostInfo>;
+  readonly "runtime.mcpServer.list": (a: T.McpServerListInput) => Promise<T.McpServerListResult>;
+  readonly "runtime.mcpServer.save": (a: T.McpServerSaveInput) => Promise<T.McpServerListResult>;
+  readonly "runtime.mcpServer.toggle": (a: T.McpServerToggleInput) => Promise<T.McpServerListResult>;
+  readonly "runtime.mcpServer.remove": (a: T.McpServerRemoveInput) => Promise<T.McpServerListResult>;
 }
 
 export const runtimeEndpoints: readonly Endpoint[] = [
@@ -54,6 +58,34 @@ export const runtimeEndpoints: readonly Endpoint[] = [
     about: ["host"],
     input: S.McpUninstallInput,
     result: S.McpHostInfo,
+    can: ["user"],
+  },
+  {
+    op: "runtime.mcpServer.list",
+    about: ["host"],
+    input: S.McpServerListInput,
+    result: S.McpServerListResult,
+    can: ["user", "remote"],
+  },
+  {
+    op: "runtime.mcpServer.save",
+    about: ["host"],
+    input: S.McpServerSaveInput,
+    result: S.McpServerListResult,
+    can: ["user"],
+  },
+  {
+    op: "runtime.mcpServer.toggle",
+    about: ["host"],
+    input: S.McpServerToggleInput,
+    result: S.McpServerListResult,
+    can: ["user"],
+  },
+  {
+    op: "runtime.mcpServer.remove",
+    about: ["host"],
+    input: S.McpServerRemoveInput,
+    result: S.McpServerListResult,
     can: ["user"],
   },
 ];

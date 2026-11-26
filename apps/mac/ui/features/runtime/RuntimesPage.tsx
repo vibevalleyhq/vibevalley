@@ -1,7 +1,17 @@
 import { cleanup, computed, keymap, Scroll, signal, Text, View, windowSize } from "nsh";
 
 import { t } from "@vibevalley/i18n";
-import { type Agent, type MachinePlatform, type MachineStatus, RuntimeCapabilityValues, type RuntimeInfo, type SessionView } from "@vibevalley/protocol";
+import {
+  type Agent,
+  type InventoryEntry,
+  type MachinePlatform,
+  type MachineStatus,
+  type McpHostId,
+  type McpServerEntry,
+  RuntimeCapabilityValues,
+  type RuntimeInfo,
+  type SessionView,
+} from "@vibevalley/protocol";
 
 import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
@@ -35,7 +45,7 @@ import {
   type SelectedMachineRuntime,
   useMergedMachines,
 } from "./machines";
-import { capabilityLabel, InventoryCard, ModelsCard, SettingsCard, SupportCard, Usage } from "./RuntimeCards";
+import { capabilityLabel, InventoryCard, mcpEntryDescription, mcpHostOf, ModelsCard, SettingsCard, SupportCard, Usage } from "./RuntimeCards";
 
 function compactVersion(raw: string): string {
   const cleaned = raw.replace(/\s*\([^)]*\)\s*$/u, "").trim();
@@ -201,6 +211,18 @@ export function RuntimesPage(props: { rest: string }) {
 
   const keepRuntime = (got: RuntimeInfo) =>
     client.setData(runtimesQuery(), (all) => (all ? { value: all.value.map((r) => (r.id === got.id ? got : r)) } : undefined));
+
+  const syncMcpServers = (host: McpHostId, servers: readonly McpServerEntry[]) => {
+    const entries: InventoryEntry[] = servers.map((s) => ({
+      name: s.name,
+      description: mcpEntryDescription(s),
+      source: s.configPath,
+      enabled: s.enabled,
+    }));
+    client.setData(runtimesQuery(), (all) =>
+      all ? { value: all.value.map((r) => (mcpHostOf(r.id) === host ? { ...r, mcpServers: entries } : r)) } : undefined,
+    );
+  };
 
   const refreshAll = () =>
     refreshingAll.run(async () => {
@@ -396,6 +418,7 @@ export function RuntimesPage(props: { rest: string }) {
                       if (info) void recheckOne(info.id);
                       else void refreshAll();
                     }}
+                    onMcpServersSynced={syncMcpServers}
                   />
                 )}
               </If>
@@ -803,7 +826,13 @@ function InspectorRow(props: { label: string; value: string; mono?: boolean; las
   );
 }
 
-function RuntimeInspector(props: { selected: SelectedMachineRuntime; groupCount: number; recheckBusy: boolean; onRecheck: () => void }) {
+function RuntimeInspector(props: {
+  selected: SelectedMachineRuntime;
+  groupCount: number;
+  recheckBusy: boolean;
+  onRecheck: () => void;
+  onMcpServersSynced: (host: McpHostId, servers: readonly McpServerEntry[]) => void;
+}) {
   const machine = () => props.selected.machine;
   const entry = () => props.selected.entry;
   const kind = () => machineKindMeta(machineKindOf(machine()));
@@ -868,7 +897,12 @@ function RuntimeInspector(props: { selected: SelectedMachineRuntime; groupCount:
         {(info) => (
           <>
             <SupportCard info={info()} />
-            <InventoryCard title={t("web.runtime.mcp")} entries={info().mcpServers} />
+            <InventoryCard
+              title={t("web.runtime.mcp")}
+              entries={info().mcpServers}
+              mcpHost={machine().here ? mcpHostOf(info().id) : undefined}
+              onMcpServersSynced={props.onMcpServersSynced}
+            />
             <InventoryCard title={t("web.runtime.skills")} entries={info().skills} />
             <InventoryCard title={t("web.runtime.tools")} entries={info().tools} />
           </>

@@ -464,6 +464,83 @@ pub struct McpUninstallInput {
     pub host: McpHostId,
 }
 
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerEntry {
+    pub host: McpHostId,
+    pub name: String,
+    pub transport: McpTransportKind,
+    pub command: Option<String>,
+    pub args: Vec<String>,
+    pub env: BTreeMap<String, String>,
+    pub url: Option<String>,
+    pub headers: BTreeMap<String, String>,
+    pub enabled: bool,
+    pub config_path: String,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerListInput {
+    pub host: McpHostId,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerListResult {
+    pub host: McpHostId,
+    pub config_path: Option<String>,
+    pub servers: Vec<McpServerEntry>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerSaveInput {
+    pub host: McpHostId,
+    pub previous_name: Option<String>,
+    pub name: String,
+    pub transport: McpTransportKind,
+    pub command: Option<String>,
+    pub args: Vec<String>,
+    pub env: BTreeMap<String, String>,
+    pub url: Option<String>,
+    pub headers: BTreeMap<String, String>,
+    pub enabled: bool,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerToggleInput {
+    pub host: McpHostId,
+    pub name: String,
+    pub enabled: bool,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts-gen", derive(TS))]
+#[cfg_attr(feature = "ts-gen", ts(optional_fields))]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerRemoveInput {
+    pub host: McpHostId,
+    pub name: String,
+}
+
 #[cfg(feature = "ts-gen")]
 crate::typescript::module! {
     "runtime";
@@ -497,6 +574,12 @@ crate::typescript::module! {
     McpListInput,
     McpListResult,
     McpInstallInput,
-    McpUninstallInput];
+    McpUninstallInput,
+    McpServerEntry,
+    McpServerListInput,
+    McpServerListResult,
+    McpServerSaveInput,
+    McpServerToggleInput,
+    McpServerRemoveInput];
     aliases: [];
 }

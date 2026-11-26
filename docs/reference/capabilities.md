@@ -272,6 +272,10 @@ MOSS Live 语音通话
 | `runtime.mcp.list` | cap.op.runtime.mcp.list | `/api/v1/runtime/mcp/list` | ✓ | ✓ |   |   |
 | `runtime.mcp.install` | cap.op.runtime.mcp.install | `/api/v1/runtime/mcp/install` | ✓ |   |   |   |
 | `runtime.mcp.uninstall` | cap.op.runtime.mcp.uninstall | `/api/v1/runtime/mcp/uninstall` | ✓ |   |   |   |
+| `runtime.mcpServer.list` | cap.op.runtime.mcpServer.list | `/api/v1/runtime/mcpServer/list` | ✓ | ✓ |   |   |
+| `runtime.mcpServer.save` | cap.op.runtime.mcpServer.save | `/api/v1/runtime/mcpServer/save` | ✓ |   |   |   |
+| `runtime.mcpServer.toggle` | cap.op.runtime.mcpServer.toggle | `/api/v1/runtime/mcpServer/toggle` | ✓ |   |   |   |
+| `runtime.mcpServer.remove` | cap.op.runtime.mcpServer.remove | `/api/v1/runtime/mcpServer/remove` | ✓ |   |   |   |
 
 ## repo
 

@@ -244,6 +244,30 @@ pub(crate) async fn orch_open(orch: &Orchestrator) -> Result<(), ApiError> {
     orch.open_endpoint_async().await
 }
 
+pub(crate) async fn mcp_server_save(c: &AppCore, r: <ops::RuntimeMcpServerSave as Op>::Input) -> Result<<ops::RuntimeMcpServerSave as Op>::Result, ApiError> {
+    let res = c.runtime.save_host_mcp_server_endpoint_async(r).await?;
+    c.agent.profile.fleet.sync_host_mcp_servers(res.host, &res.servers);
+    Ok(res)
+}
+
+pub(crate) async fn mcp_server_toggle(
+    c: &AppCore,
+    r: <ops::RuntimeMcpServerToggle as Op>::Input,
+) -> Result<<ops::RuntimeMcpServerToggle as Op>::Result, ApiError> {
+    let res = c.runtime.toggle_host_mcp_server_endpoint_async(r).await?;
+    c.agent.profile.fleet.sync_host_mcp_servers(res.host, &res.servers);
+    Ok(res)
+}
+
+pub(crate) async fn mcp_server_remove(
+    c: &AppCore,
+    r: <ops::RuntimeMcpServerRemove as Op>::Input,
+) -> Result<<ops::RuntimeMcpServerRemove as Op>::Result, ApiError> {
+    let res = c.runtime.remove_host_mcp_server_endpoint_async(r).await?;
+    c.agent.profile.fleet.sync_host_mcp_servers(res.host, &res.servers);
+    Ok(res)
+}
+
 pub(crate) fn debug_clear(dbg: &DebugKit) -> Result<(), ApiError> {
     dbg.timeline_clear()
 }

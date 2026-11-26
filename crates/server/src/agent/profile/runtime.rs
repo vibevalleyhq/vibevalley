@@ -16,12 +16,14 @@ use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use vibevalley_i18n::t;
+use vibevalley_mcp::McpTransportSpec;
 use vibevalley_protocol::{
     Agent, AgentProblem, AgentProblemLevel, ApiError, BizCode, Installation, InstallationAvailable, InstallationChecking, InstallationNotFound,
-    InstallationUnsupported, JsNumber, LOCAL_MACHINE_ID, ModelEntry, NoticeLevel, RuntimeInfo, RuntimeRef, RuntimeSettings, Via,
+    InstallationUnsupported, InventoryEntry, JsNumber, LOCAL_MACHINE_ID, McpHostId, McpServerEntry, McpTransportKind, ModelEntry, NoticeLevel, RuntimeInfo,
+    RuntimeRef, RuntimeSettings, Via,
 };
 use vibevalley_runtime::machine::{MachineRegistry, MachineStatus as RtMachineStatus};
-use vibevalley_runtime::oar::{Registry, Runtime};
+use vibevalley_runtime::oar::{HostMcpServer, Registry, Runtime};
 
 use super::preset::{
     Candidate, agent_problems, choose_agent, money_stop, preset_of, quota_of, runtime_ids, runtime_label, runtime_reports_model_efforts, session_options,
@@ -140,6 +142,40 @@ async fn probe_with_timeout<T>(cancel: &CancellationToken, fut: impl std::future
 /// session on it reports.
 const USAGE_EVERY: Duration = Duration::from_secs(5 * 60);
 const USAGE_AFTER_RUN: Duration = Duration::from_secs(20);
+
+fn format_stdio_target(command: &str, args: &[String]) -> String {
+    if args.is_empty() {
+        format!("stdio · {command}")
+    } else {
+        format!("stdio · {command} {}", args.join(" "))
+    }
+}
+
+fn inventory_entry_from_host_mcp(server: HostMcpServer) -> InventoryEntry {
+    let description = match &server.transport {
+        McpTransportSpec::Stdio { command, args, .. } => format_stdio_target(command, args),
+        McpTransportSpec::StreamableHttp { url, .. } => format!("streamableHttp · {url}"),
+    };
+    InventoryEntry {
+        name: server.name,
+        description,
+        source: server.config_path.to_string_lossy().into_owned(),
+        enabled: server.enabled,
+    }
+}
+
+fn inventory_entry_from_mcp_entry(server: &McpServerEntry) -> InventoryEntry {
+    let description = match server.transport {
+        McpTransportKind::Stdio => format_stdio_target(server.command.as_deref().unwrap_or_default(), &server.args),
+        McpTransportKind::StreamableHttp => format!("streamableHttp · {}", server.url.as_deref().unwrap_or_default()),
+    };
+    InventoryEntry {
+        name: server.name.clone(),
+        description,
+        source: server.config_path.clone(),
+        enabled: server.enabled,
+    }
+}
 
 /// `fromOar`: oar's account usage as VibeValley shows it.
 pub fn usage_from_oar(usage: vibevalley_runtime::oar::AccountUsage) -> vibevalley_protocol::AccountUsage {
@@ -456,9 +492,10 @@ impl RuntimeFleet {
         if !matches!(info.installation, Installation::Available(_)) {
             return info;
         }
-        let (models_res, usage_res) = tokio::join!(
+        let (models_res, usage_res, mcp_res) = tokio::join!(
             probe_with_timeout(&self.cancel, runtime.list_models()),
             probe_with_timeout(&self.cancel, runtime.account_usage()),
+            probe_with_timeout(&self.cancel, runtime.list_mcp_servers()),
         );
         info.models = models_res.and_then(Result::ok).map(|models| {
             models
@@ -473,7 +510,35 @@ impl RuntimeFleet {
                 .collect()
         });
         info.usage = usage_res.and_then(Result::ok).map(usage_from_oar);
+        info.mcp_servers = match mcp_res {
+            Some(Ok(Some(servers))) => Some(servers.into_iter().map(inventory_entry_from_host_mcp).collect()),
+            Some(Ok(None)) | None => None,
+            Some(Err(err)) => {
+                tracing::warn!(runtime = %id, error = %err, "failed to probe host MCP servers");
+                None
+            }
+        };
         info
+    }
+
+    /// Updates cached `RuntimeInfo.mcp_servers` after a host MCP mutation and publishes a live update.
+    pub fn sync_host_mcp_servers(&self, host: McpHostId, servers: &[McpServerEntry]) {
+        let runtime_id = match host {
+            McpHostId::Antigravity => "antigravity",
+            McpHostId::Claude => "claude",
+            McpHostId::Codex => "codex",
+            McpHostId::Cursor => "cursor",
+        };
+        let entries: Vec<InventoryEntry> = servers.iter().map(inventory_entry_from_mcp_entry).collect();
+        let mut held = self.held.lock();
+        let Some(obs) = held.get_mut(runtime_id) else {
+            return;
+        };
+        obs.info.mcp_servers = Some(entries);
+        obs.info.checked_at = self.ctx.now();
+        let info = self.shown(obs.info.clone());
+        drop(held);
+        self.ctx.live.publish_runtime(self.ctx.now(), info);
     }
 
     /// A new lookup, kept and told on the live stream.
@@ -1025,6 +1090,120 @@ mod usage_tests {
         let after = fleet.refresh_async("scripted").await.unwrap();
         assert!((after.spent_today.map(JsNumber::get).unwrap_or(0.0) - 5.5).abs() < 1e-6);
         assert!(!after.stop.is_empty(), "daily budget stop should trigger at 5.5 >= 5.0");
+        fleet.close();
+        service.close().await;
+    }
+
+    #[tokio::test]
+    async fn probe_async_populates_mcp_servers_from_oar_and_syncs_updates() {
+        struct AntigravityMcpStub;
+        impl Runtime for AntigravityMcpStub {
+            fn id(&self) -> &str {
+                "acp:antigravity"
+            }
+            fn display_name(&self) -> &str {
+                "Antigravity"
+            }
+            fn capabilities(&self) -> vibevalley_runtime::oar::Capabilities {
+                vibevalley_runtime::oar::Capabilities::default()
+            }
+            fn installation(&self) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Installation> {
+                Box::pin(async {
+                    vibevalley_runtime::oar::Installation::Available {
+                        version: Some("1.0.0".into()),
+                        path: std::path::PathBuf::from("/usr/local/bin/agy"),
+                    }
+                })
+            }
+            fn list_models(&self) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Vec<vibevalley_runtime::oar::ModelInfo>>> {
+                Box::pin(async { Ok(Vec::new()) })
+            }
+            fn open(
+                &self,
+                _opts: vibevalley_runtime::oar::SessionOptions,
+            ) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Arc<dyn vibevalley_runtime::oar::Session>>> {
+                Box::pin(async { Err(vibevalley_runtime::oar::AgentError::NotAvailable("stub".into())) })
+            }
+            fn list_mcp_servers(&self) -> vibevalley_runtime::oar::BoxFuture<'_, vibevalley_runtime::oar::Result<Option<Vec<HostMcpServer>>>> {
+                Box::pin(async {
+                    Ok(Some(vec![
+                        HostMcpServer {
+                            host: vibevalley_runtime::oar::McpHostId::Antigravity,
+                            name: "github".into(),
+                            transport: McpTransportSpec::Stdio {
+                                command: "npx".into(),
+                                args: vec!["-y".into(), "@modelcontextprotocol/server-github".into()],
+                                env: BTreeMap::new(),
+                            },
+                            enabled: true,
+                            config_path: std::path::PathBuf::from("/Users/test/.gemini/config/mcp_config.json"),
+                        },
+                        HostMcpServer {
+                            host: vibevalley_runtime::oar::McpHostId::Antigravity,
+                            name: "linear".into(),
+                            transport: McpTransportSpec::StreamableHttp {
+                                url: "https://mcp.linear.app/mcp".into(),
+                                headers: BTreeMap::new(),
+                                stateless: false,
+                            },
+                            enabled: false,
+                            config_path: std::path::PathBuf::from("/Users/test/.gemini/config/mcp_config.json"),
+                        },
+                    ]))
+                })
+            }
+        }
+
+        let home = tempfile::tempdir().unwrap();
+        let service = Service::open(home.path()).await.unwrap();
+        let outbox = Arc::new(Outbox::new(service.clone()));
+        let ctx = Arc::new(Context::new(
+            service.clone(),
+            TaskGroup::new(),
+            Arc::new(LiveState::new()),
+            outbox,
+            Arc::new(StateFeed::new()),
+            vibevalley_core::system_clock(),
+            Arc::new(Http),
+            Arc::new(PublicDownload),
+        ));
+        let mut registry = Registry::new();
+        registry.register(Arc::new(AntigravityMcpStub));
+        let profiles = ProfileStore::open_async(home.path(), &[]).await.unwrap();
+        let fleet = RuntimeFleet::new(Arc::new(registry), profiles, ctx.clone(), false);
+
+        let probed = fleet.refresh_async("antigravity").await.unwrap();
+        let entries = probed.mcp_servers.expect("mcp_servers populated instead of None/unreported");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].name, "github");
+        assert_eq!(entries[0].description, "stdio · npx -y @modelcontextprotocol/server-github");
+        assert_eq!(entries[0].source, "/Users/test/.gemini/config/mcp_config.json");
+        assert!(entries[0].enabled);
+        assert_eq!(entries[1].name, "linear");
+        assert_eq!(entries[1].description, "streamableHttp · https://mcp.linear.app/mcp");
+        assert!(!entries[1].enabled);
+
+        // sync_host_mcp_servers updates cached RuntimeInfo without re-running subprocess probes.
+        fleet.sync_host_mcp_servers(
+            McpHostId::Antigravity,
+            &[McpServerEntry {
+                host: McpHostId::Antigravity,
+                name: "context7".into(),
+                transport: McpTransportKind::Stdio,
+                command: Some("npx".into()),
+                args: vec!["-y".into(), "@upstash/context7-mcp".into()],
+                env: BTreeMap::new(),
+                url: None,
+                headers: BTreeMap::new(),
+                enabled: true,
+                config_path: "/Users/test/.gemini/config/mcp_config.json".into(),
+            }],
+        );
+        let updated = fleet.cached_info("antigravity").unwrap();
+        let updated_entries = updated.mcp_servers.unwrap();
+        assert_eq!(updated_entries.len(), 1);
+        assert_eq!(updated_entries[0].name, "context7");
+
         fleet.close();
         service.close().await;
     }

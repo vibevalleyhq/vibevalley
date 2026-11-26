@@ -3977,5 +3977,22 @@
     },
     "createdAt": 1795536181172,
     "updatedAt": 1795536201172
+  },
+  "runtime.mcpServer.list": {
+    "host": "claude",
+    "configPath": "~/.claude.json",
+    "servers": [
+      {
+        "host": "claude",
+        "name": "github",
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": {},
+        "headers": {},
+        "enabled": true,
+        "configPath": "~/.claude.json"
+      }
+    ]
   }
 }

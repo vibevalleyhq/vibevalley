@@ -226,7 +226,7 @@
         "systemPrompt": "Antigravity ACP cannot replace the system prompt",
         "disallowedTools": "Antigravity ACP has no per-session tool blocklist"
       },
-      "capabilities": ["listModels", "accountUsage", "checkUpdate"]
+      "capabilities": ["listModels", "accountUsage", "checkUpdate", "mcpServers"]
     }
   },
   "runtimeIds": ["claude", "codex", "opencode", "qwen", "qoder", "codebuddy", "vibevalley", "pi", "cursor", "grok", "kimi", "antigravity"]

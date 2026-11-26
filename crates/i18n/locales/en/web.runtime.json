@@ -153,5 +153,30 @@
   "noSessions": "No active or recent sessions.",
   "quickActions": "Quick actions",
   "installation": "Installation",
-  "source": "Install source"
+  "source": "Install source",
+  "mcpServer": {
+    "add": "Add",
+    "addTitle": "Add MCP server",
+    "editTitle": "Edit MCP server",
+    "edit": "Edit {name}",
+    "remove": "Remove {name}",
+    "toggle": "Toggle {name}",
+    "name": "Name",
+    "nameHint": "Unique server key in the host config, such as github or context7.",
+    "transport": "Transport",
+    "command": "Command",
+    "args": "Arguments",
+    "argsHint": "Space-separated arguments passed to the command.",
+    "env": "Environment variables",
+    "url": "Endpoint URL",
+    "headers": "HTTP headers",
+    "enabled": "Enabled",
+    "disabledTag": "disabled",
+    "enabledTag": "enabled",
+    "cancel": "Cancel",
+    "save": "Save",
+    "savedToast": "Saved MCP server {name}",
+    "removedToast": "Removed MCP server {name}",
+    "toggledToast": "{enabled, select, true {Enabled MCP server {name}} other {Disabled MCP server {name}}}"
+  }
 }
