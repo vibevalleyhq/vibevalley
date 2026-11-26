@@ -278,7 +278,10 @@ function WhiteboardPreview(props: { readonly data: PreviewByTag<"whiteboard">; r
             };
             const showLabel = () => shape().label !== undefined && shape().label !== "" && w() >= 44 && h() >= 16;
             return (
-              <View class={`absolute justify-center overflow-hidden ${boxClass()}`} style={{ left: left(), top: top(), width: w(), height: h() }}>
+              <View
+                class={`absolute overflow-hidden ${kind() === "container" ? "justify-start pt-0.5" : "justify-center"} ${boxClass()}`}
+                style={{ left: left(), top: top(), width: w(), height: h() }}
+              >
                 <If when={showLabel()}>
                   <Text class="truncate px-1 text-2xs text-muted">{shape().label ?? ""}</Text>
                 </If>

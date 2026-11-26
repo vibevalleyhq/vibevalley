@@ -239,4 +239,16 @@ test("ArtifactTiles renders all 12 structured previews, covers, and clean instal
   expect(texts).toContain("Focus Studio");
   // Regression: never render the old overlapping "Installed" pill badge text on artifact cards.
   expect(texts).not.toContain(t("web.artifact.applet.badgeInstalled"));
+
+  // Regression: at 1280px width, 3 cards fit cleanly on the first row without wrapping the 3rd card.
+  const first = app.layout("id:library-artifact-p-docs");
+  const second = app.layout("id:library-artifact-p-outline");
+  const third = app.layout("id:library-artifact-p-ds");
+  expect(first).not.toBeNull();
+  expect(second).not.toBeNull();
+  expect(third).not.toBeNull();
+  expect(second!.y).toBe(first!.y);
+  expect(third!.y).toBe(first!.y);
+  expect(second!.x).toBeGreaterThan(first!.x);
+  expect(third!.x).toBeGreaterThan(second!.x);
 });
