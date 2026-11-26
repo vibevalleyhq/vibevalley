@@ -111,8 +111,20 @@
     "monoFont": "Terminal & code font",
     "monoFontRow": "Terminal & code font (Nerd Font)",
     "monoFontHint": "Monospace font for terminals, diffs, and file previews, with built-in Nerd Font icon fallback",
+    "fontGroupInstalled": "Installed",
+    "fontGroupFallback": "Fallback fonts",
+    "fontSearch": "Search fonts…",
+    "fontEmpty": "No matching fonts",
+    "fontFallbackBadge": "Fallback",
     "terminalFontSize": "Terminal font size",
-    "terminalFontSizeHint": "Also adjustable anytime in the terminal view with ⌘+ / ⌘- / ⌘0"
+    "terminalFontSizeHint": "Also adjustable anytime in the terminal view with ⌘+ / ⌘- / ⌘0",
+    "previewTitle": "Live Specimen",
+    "previewNote": "Updates live with scale, font, and terminal size",
+    "previewUiHeading": "Workbench UI",
+    "previewUiBody": "Bilingual clarity · 120ms latency · 3 active sessions",
+    "previewCodeHeading": "Code & Terminal",
+    "fontLoadFailed": "Could not load host font and appearance settings",
+    "fontApplyFailed": "Could not apply font settings"
   },
   "profile": {
     "intro": "Customize your display name, tagline, and avatar shown in the rail and dashboard.",

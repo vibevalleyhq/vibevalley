@@ -3079,8 +3079,20 @@ export const catalogs = {
         monoFont: "终端与代码字体",
         monoFontRow: "终端与代码字体（支持 Nerd Font）",
         monoFontHint: "用于终端、Diff 与文件预览的等宽字体，内置 Nerd Font 图标回退链",
+        fontGroupInstalled: "已安装字体",
+        fontGroupFallback: "回退字体（未检测到）",
+        fontSearch: "搜索字体…",
+        fontEmpty: "没有匹配的字体",
+        fontFallbackBadge: "未安装",
         terminalFontSize: "终端字号",
         terminalFontSizeHint: "也可在工作区随时按 ⌘+ / ⌘- / ⌘0 调整",
+        previewTitle: "实时排版预览",
+        previewNote: "随界面缩放、等宽字体与终端字号即时更新",
+        previewUiHeading: "界面正文",
+        previewUiBody: "中英文混排清晰对齐 · 响应 120ms · 3 个会话运行中",
+        previewCodeHeading: "代码与终端",
+        fontLoadFailed: "读取本机字体与外观设置失败",
+        fontApplyFailed: "应用字体设置失败",
       },
       profile: {
         intro: "设置你在工作台顶部导航和总览仪表盘中的显示名称、简介与头像。",
@@ -6749,8 +6761,20 @@ export const catalogs = {
         monoFont: "Terminal & code font",
         monoFontRow: "Terminal & code font (Nerd Font)",
         monoFontHint: "Monospace font for terminals, diffs, and file previews, with built-in Nerd Font icon fallback",
+        fontGroupInstalled: "Installed",
+        fontGroupFallback: "Fallback fonts",
+        fontSearch: "Search fonts…",
+        fontEmpty: "No matching fonts",
+        fontFallbackBadge: "Fallback",
         terminalFontSize: "Terminal font size",
         terminalFontSizeHint: "Also adjustable anytime in the terminal view with ⌘+ / ⌘- / ⌘0",
+        previewTitle: "Live Specimen",
+        previewNote: "Updates live with scale, font, and terminal size",
+        previewUiHeading: "Workbench UI",
+        previewUiBody: "Bilingual clarity · 120ms latency · 3 active sessions",
+        previewCodeHeading: "Code & Terminal",
+        fontLoadFailed: "Could not load host font and appearance settings",
+        fontApplyFailed: "Could not apply font settings",
       },
       profile: {
         intro: "Customize your display name, tagline, and avatar shown in the rail and dashboard.",
@@ -10377,6 +10401,13 @@ export interface Messages {
   "web.setting.about.workingQuestion": { readonly n: string | number };
   "web.setting.about.worktrees": undefined;
   "web.setting.about.worktreesHint": undefined;
+  "web.setting.appearance.fontApplyFailed": undefined;
+  "web.setting.appearance.fontEmpty": undefined;
+  "web.setting.appearance.fontFallbackBadge": undefined;
+  "web.setting.appearance.fontGroupFallback": undefined;
+  "web.setting.appearance.fontGroupInstalled": undefined;
+  "web.setting.appearance.fontLoadFailed": undefined;
+  "web.setting.appearance.fontSearch": undefined;
   "web.setting.appearance.intro": undefined;
   "web.setting.appearance.monoFont": undefined;
   "web.setting.appearance.monoFontHint": undefined;
@@ -10386,6 +10417,11 @@ export interface Messages {
   "web.setting.appearance.motionOption.off": undefined;
   "web.setting.appearance.motionOption.on": undefined;
   "web.setting.appearance.motionOption.system": undefined;
+  "web.setting.appearance.previewCodeHeading": undefined;
+  "web.setting.appearance.previewNote": undefined;
+  "web.setting.appearance.previewTitle": undefined;
+  "web.setting.appearance.previewUiBody": undefined;
+  "web.setting.appearance.previewUiHeading": undefined;
   "web.setting.appearance.scale": undefined;
   "web.setting.appearance.scaleHint": undefined;
   "web.setting.appearance.terminalFontSize": undefined;

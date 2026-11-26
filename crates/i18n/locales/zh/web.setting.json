@@ -111,8 +111,20 @@
     "monoFont": "终端与代码字体",
     "monoFontRow": "终端与代码字体（支持 Nerd Font）",
     "monoFontHint": "用于终端、Diff 与文件预览的等宽字体，内置 Nerd Font 图标回退链",
+    "fontGroupInstalled": "已安装字体",
+    "fontGroupFallback": "回退字体（未检测到）",
+    "fontSearch": "搜索字体…",
+    "fontEmpty": "没有匹配的字体",
+    "fontFallbackBadge": "未安装",
     "terminalFontSize": "终端字号",
-    "terminalFontSizeHint": "也可在工作区随时按 ⌘+ / ⌘- / ⌘0 调整"
+    "terminalFontSizeHint": "也可在工作区随时按 ⌘+ / ⌘- / ⌘0 调整",
+    "previewTitle": "实时排版预览",
+    "previewNote": "随界面缩放、等宽字体与终端字号即时更新",
+    "previewUiHeading": "界面正文",
+    "previewUiBody": "中英文混排清晰对齐 · 响应 120ms · 3 个会话运行中",
+    "previewCodeHeading": "代码与终端",
+    "fontLoadFailed": "读取本机字体与外观设置失败",
+    "fontApplyFailed": "应用字体设置失败"
   },
   "profile": {
     "intro": "设置你在工作台顶部导航和总览仪表盘中的显示名称、简介与头像。",
