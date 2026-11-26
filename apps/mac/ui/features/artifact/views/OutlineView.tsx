@@ -1,12 +1,12 @@
 import { computed, effect, keymap, Scroll, signal, Text, untracked, View, type InputRef } from "nsh";
-import { Input } from "nsh/base";
+import { Input, Menu, MenuItem, MenuSeparator } from "nsh/base";
 
 import { t } from "@vibevalley/i18n";
 
 import { Checkbox } from "../../../design/Checkbox";
 import { Icon } from "../../../design/Icon";
-import type { IconName } from "../../../design/icons";
 import { Empty } from "../../../design/layout";
+import { motionClass, popupTransition } from "../../../design/motion";
 import { Bubble } from "../../../design/Tip";
 import type { OutlineDocument, OutlineNode } from "../html";
 import {
@@ -22,7 +22,7 @@ import {
   outlineRowPaddingLeft,
   visibleOutlineRows,
 } from "./outlineEditor";
-import { addOutlineChild, addOutlineRootItem, cycleOutlineKind, deleteOutlineNode, toggleOutlineTodo } from "./previewModel";
+import { addOutlineChild, addOutlineRootItem, deleteOutlineNode, toggleOutlineTodo } from "./previewModel";
 
 export interface OutlineViewProps {
   readonly doc: OutlineDocument;
@@ -31,6 +31,12 @@ export interface OutlineViewProps {
   readonly addRequest?: number | undefined;
   readonly onSaveDoc: (next: OutlineDocument, summary: string) => void;
 }
+
+const rowMenuPopupClass = `min-w-40 gap-0.5 rounded-lg border border-line bg-elevated p-1 shadow-float ${motionClass("transition-opacity duration-120 ease-out")}`;
+const rowMenuItemClass = "h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-hover focus:bg-hover";
+const rowMenuSeparatorClass = "my-1 h-px bg-line";
+
+const OUTLINE_KINDS: readonly OutlineNode["kind"][] = ["heading", "bullet", "todo"];
 
 function kindLabelFor(kind: OutlineNode["kind"]): string {
   switch (kind) {
@@ -43,27 +49,23 @@ function kindLabelFor(kind: OutlineNode["kind"]): string {
   }
 }
 
-function RowActionButton(props: {
-  readonly icon: IconName;
-  readonly label: string;
-  readonly testid: string;
-  readonly tone?: "danger" | undefined;
-  readonly onClick: () => void;
-}) {
-  return (
-    <View
-      role="button"
-      testID={props.testid}
-      accessibilityLabel={props.label}
-      tooltip={<Bubble text={props.label} />}
-      onPress={() => props.onClick()}
-      class={`size-5 shrink-0 items-center justify-center rounded-xs focus-visible:outline-2 focus-visible:outline-focus ${
-        props.tone === "danger" ? "hover:bg-bad-soft" : "hover:bg-selected"
-      }`}
-    >
-      <Icon name={props.icon} size={12} tone={props.tone === "danger" ? "berry" : "muted"} />
-    </View>
-  );
+function setOutlineNodeKind(doc: OutlineDocument, nodeId: string, kind: OutlineNode["kind"]): OutlineDocument {
+  if (!Object.hasOwn(doc.nodes, nodeId)) return doc;
+  const node = doc.nodes[nodeId];
+  if (node.kind === kind) return doc;
+  return {
+    ...doc,
+    nodes: {
+      ...doc.nodes,
+      [nodeId]: {
+        id: node.id,
+        text: node.text,
+        kind,
+        children: node.children,
+        ...(kind === "todo" ? { checked: node.checked === true } : {}),
+      },
+    },
+  };
 }
 
 export function OutlineView(props: OutlineViewProps) {
@@ -259,7 +261,9 @@ export function OutlineView(props: OutlineViewProps) {
               return (
                 <View
                   testID={`outline-node-${id()}`}
-                  class={`group relative flex-row items-start gap-1 rounded-md py-1 pr-2 hover:bg-hover ${isHeading() && idx() > 0 ? "mt-2" : ""}`}
+                  class={`group relative flex-row items-start gap-1 rounded-md py-1 pr-2 ${isEditing() ? "" : "hover:bg-hover"} ${
+                    isHeading() && idx() > 0 ? "mt-2" : ""
+                  }`}
                   style={{ paddingLeft: outlineRowPaddingLeft(row().depth) }}
                 >
                   <If when={row().hasChildren} else={<View class="mt-px h-6 w-5 shrink-0" />}>
@@ -336,7 +340,7 @@ export function OutlineView(props: OutlineViewProps) {
                         }}
                         onSubmit={() => commitEdit(id(), true)}
                         onBlur={() => commitEdit(id(), false)}
-                        class={`w-full rounded-sm border border-focus bg-page px-1.5 leading-6 text-ink placeholder:text-faint ${
+                        class={`w-full rounded-sm border border-transparent bg-hover px-1.5 leading-6 text-ink placeholder:text-faint ${
                           isHeading() ? "text-base font-semibold" : "text-sm"
                         }`}
                       />
@@ -344,66 +348,109 @@ export function OutlineView(props: OutlineViewProps) {
                   </View>
 
                   <If when={!readOnly() && !isEditing()}>
-                    <View class="absolute top-1 right-1.5 z-10 flex-row items-center gap-0.5 rounded-sm border border-line bg-elevated px-0.5 py-0.5 opacity-0 shadow-raise group-hover:opacity-100 focus-within:opacity-100">
-                      <View
-                        role="button"
-                        testID={`outline-kind-${id()}`}
-                        tooltip={<Bubble text={t("web.artifact.outline.cycleKind", { kind: kindLabelFor(row().node.kind) })} />}
-                        onPress={() => props.onSaveDoc(cycleOutlineKind(props.doc, id()), `Cycle kind ${id()}`)}
-                        class="h-5 items-center justify-center rounded-xs px-1 hover:bg-selected"
+                    <View class="absolute top-1.5 right-1.5 z-10">
+                      <Menu
+                        placement="bottom"
+                        align="end"
+                        offset={4}
+                        popupClass={rowMenuPopupClass}
+                        popupStartingClass={popupTransition("opacity-0")}
+                        popupEndingClass={popupTransition("opacity-0")}
+                        trigger={
+                          <View
+                            testID={`outline-more-${id()}`}
+                            accessibilityLabel={t("web.artifact.page.more")}
+                            class="size-5 shrink-0 items-center justify-center rounded-xs opacity-0 group-hover:opacity-100 hover:bg-selected focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-focus aria-expanded:bg-selected aria-expanded:opacity-100"
+                          >
+                            <Icon name="more" size={14} tone="muted" />
+                          </View>
+                        }
                       >
-                        <Text class="font-mono text-2xs text-muted">{kindLabelFor(row().node.kind)}</Text>
-                      </View>
-                      <If when={canOutdent()}>
-                        <RowActionButton
-                          icon="back"
-                          label={t("web.artifact.outline.outdent")}
-                          testid={`outline-outdent-${id()}`}
-                          onClick={() => {
+                        <Each of={OUTLINE_KINDS} key={(kind) => kind}>
+                          {(kind) => (
+                            <MenuItem
+                              testID={`outline-kind-${kind()}-${id()}`}
+                              onSelect={() => {
+                                const next = setOutlineNodeKind(props.doc, id(), kind());
+                                if (next !== props.doc) props.onSaveDoc(next, `Set kind ${kind()} ${id()}`);
+                              }}
+                              class={rowMenuItemClass}
+                            >
+                              <Text class="min-w-0 flex-1 truncate text-sm text-ink">{kindLabelFor(kind())}</Text>
+                              <If when={row().node.kind === kind()}>
+                                <Icon name="check" size={12} tone="accent" />
+                              </If>
+                            </MenuItem>
+                          )}
+                        </Each>
+                        <MenuSeparator class={rowMenuSeparatorClass} />
+                        <MenuItem
+                          testID={`outline-child-${id()}`}
+                          onSelect={() => {
+                            const childId = makeNodeId();
                             const prevCollapsed = untracked(collapsedIds);
-                            const res = outdentOutlineWithFocus(props.doc, id(), prevCollapsed);
-                            if (res.changed) props.onSaveDoc(res.doc, `Outdent ${id()}`);
+                            if (prevCollapsed.has(id())) {
+                              const nextCollapsed = new Set(prevCollapsed);
+                              nextCollapsed.delete(id());
+                              collapsedIds.set(nextCollapsed);
+                            }
+                            const next = addOutlineChild(props.doc, id(), childId, "");
+                            editingId.set(childId);
+                            editingText.set("");
+                            props.onSaveDoc(next, `Add child ${childId}`);
                           }}
-                        />
-                      </If>
-                      <If when={canIndent()}>
-                        <RowActionButton
-                          icon="indent"
-                          label={t("web.artifact.outline.indent")}
-                          testid={`outline-indent-${id()}`}
-                          onClick={() => {
-                            const prevCollapsed = untracked(collapsedIds);
-                            const res = indentOutlineWithFocus(props.doc, id(), prevCollapsed);
-                            if (res.collapsed !== prevCollapsed) collapsedIds.set(res.collapsed);
-                            if (res.changed) props.onSaveDoc(res.doc, `Indent ${id()}`);
-                          }}
-                        />
-                      </If>
-                      <RowActionButton
-                        icon="add"
-                        label={t("web.artifact.outline.addChild")}
-                        testid={`outline-child-${id()}`}
-                        onClick={() => {
-                          const childId = makeNodeId();
-                          const prevCollapsed = untracked(collapsedIds);
-                          if (prevCollapsed.has(id())) {
-                            const nextCollapsed = new Set(prevCollapsed);
-                            nextCollapsed.delete(id());
-                            collapsedIds.set(nextCollapsed);
-                          }
-                          const next = addOutlineChild(props.doc, id(), childId, "");
-                          editingId.set(childId);
-                          editingText.set("");
-                          props.onSaveDoc(next, `Add child ${childId}`);
-                        }}
-                      />
-                      <RowActionButton
-                        icon="delete"
-                        tone="danger"
-                        label={t("web.artifact.page.delete")}
-                        testid={`outline-delete-${id()}`}
-                        onClick={() => props.onSaveDoc(deleteOutlineNode(props.doc, id()), `Delete ${id()}`)}
-                      />
+                          class={rowMenuItemClass}
+                        >
+                          <View class="size-3.5 shrink-0 items-center justify-center">
+                            <Icon name="add" size={14} tone="muted" />
+                          </View>
+                          <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.artifact.outline.addChild")}</Text>
+                        </MenuItem>
+                        <If when={canIndent()}>
+                          <MenuItem
+                            testID={`outline-indent-${id()}`}
+                            onSelect={() => {
+                              const prevCollapsed = untracked(collapsedIds);
+                              const res = indentOutlineWithFocus(props.doc, id(), prevCollapsed);
+                              if (res.collapsed !== prevCollapsed) collapsedIds.set(res.collapsed);
+                              if (res.changed) props.onSaveDoc(res.doc, `Indent ${id()}`);
+                            }}
+                            class={rowMenuItemClass}
+                          >
+                            <View class="size-3.5 shrink-0 items-center justify-center">
+                              <Icon name="indent" size={14} tone="muted" />
+                            </View>
+                            <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.artifact.outline.indent")}</Text>
+                          </MenuItem>
+                        </If>
+                        <If when={canOutdent()}>
+                          <MenuItem
+                            testID={`outline-outdent-${id()}`}
+                            onSelect={() => {
+                              const prevCollapsed = untracked(collapsedIds);
+                              const res = outdentOutlineWithFocus(props.doc, id(), prevCollapsed);
+                              if (res.changed) props.onSaveDoc(res.doc, `Outdent ${id()}`);
+                            }}
+                            class={rowMenuItemClass}
+                          >
+                            <View class="size-3.5 shrink-0 items-center justify-center">
+                              <Icon name="back" size={14} tone="muted" />
+                            </View>
+                            <Text class="min-w-0 flex-1 truncate text-sm text-ink">{t("web.artifact.outline.outdent")}</Text>
+                          </MenuItem>
+                        </If>
+                        <MenuSeparator class={rowMenuSeparatorClass} />
+                        <MenuItem
+                          testID={`outline-delete-${id()}`}
+                          onSelect={() => props.onSaveDoc(deleteOutlineNode(props.doc, id()), `Delete ${id()}`)}
+                          class="h-7 flex-row items-center gap-2 rounded-md px-2 hover:bg-bad-soft focus:bg-bad-soft"
+                        >
+                          <View class="size-3.5 shrink-0 items-center justify-center">
+                            <Icon name="delete" size={14} tone="berry" />
+                          </View>
+                          <Text class="min-w-0 flex-1 truncate text-sm text-berry">{t("web.artifact.page.delete")}</Text>
+                        </MenuItem>
+                      </Menu>
                     </View>
                   </If>
                 </View>
@@ -414,17 +461,25 @@ export function OutlineView(props: OutlineViewProps) {
       </If>
 
       <If when={!readOnly()}>
-        <View testID="outline-quick-bar" class="mt-1 flex-row items-center gap-1.5 rounded-md border border-line bg-side px-2 py-1.5">
+        <View
+          testID="outline-quick-bar"
+          class="mt-1 flex-row items-center gap-1 rounded-md py-1 pr-2 hover:bg-hover focus-within:bg-hover"
+          style={{ paddingLeft: outlineRowPaddingLeft(0) }}
+        >
           <View class="h-6 w-5 shrink-0 items-center justify-center">
             <Icon name="add" size={12} tone="faint" />
           </View>
           <View
             role="button"
             testID="outline-quick-kind"
+            accessibilityLabel={t("web.artifact.outline.cycleKind", { kind: kindLabelFor(quickKind()) })}
+            tooltip={<Bubble text={t("web.artifact.outline.cycleKind", { kind: kindLabelFor(quickKind()) })} />}
             onPress={() => quickKind.set(quickKind() === "bullet" ? "todo" : "bullet")}
-            class="h-5 shrink-0 items-center justify-center rounded-xs border border-line bg-page px-1.5 hover:bg-hover"
+            class="h-6 w-5 shrink-0 items-center justify-center rounded-xs hover:bg-selected focus-visible:outline-2 focus-visible:outline-focus"
           >
-            <Text class="font-mono text-2xs text-muted">{kindLabelFor(quickKind())}</Text>
+            <If when={quickKind() === "todo"} else={<View class="size-1.5 rounded-full bg-faint" />}>
+              <View class="size-3.5 items-center justify-center rounded-xs border border-idle bg-page" />
+            </If>
           </View>
           <Input
             testID="outline-quick-add"
@@ -440,7 +495,7 @@ export function OutlineView(props: OutlineViewProps) {
               if (untracked(quickText) !== e.value) quickText.set(e.value);
             }}
             onSubmit={handleQuickSubmit}
-            class="min-w-0 flex-1 bg-transparent px-1.5 text-sm leading-6 text-ink placeholder:text-faint"
+            class="min-w-0 flex-1 rounded-sm border border-transparent bg-transparent px-1.5 text-sm leading-6 text-ink placeholder:text-faint"
           />
         </View>
       </If>
