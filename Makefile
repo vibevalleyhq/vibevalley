@@ -1,9 +1,12 @@
-.PHONY: help rust rust-changed rust-audit rust-loom protocol protocol-write goldens ts mac mobile site docs check verify dev-server dev-mac package-alpha bump build-alpha build-beta build-release
+BASE ?= origin/main
+
+.PHONY: help rust rust-changed rust-fast rust-audit rust-loom protocol protocol-write goldens ts mac mobile site docs check verify verify-fast dev-server dev-mac package-alpha bump build-alpha build-beta build-release
 
 help:
 	@printf '%s\n' \
 		'  rust            cargo xtask check' \
-		'  rust-changed    cargo xtask changed' \
+		'  rust-changed    cargo xtask changed --base $(BASE)' \
+		'  rust-fast       fmt --check + audit + changed --fast [BASE=<ref>]' \
 		'  rust-audit      cargo xtask audit (boundaries, ratchets, arch, uml --strict, deps ui --strict)' \
 		'  rust-loom       cargo xtask loom' \
 		'  protocol        cargo xtask protocol' \
@@ -16,6 +19,7 @@ help:
 		'  docs            vp run docs:verify' \
 		'  check           rust + rust-audit + ts + docs' \
 		'  verify          rust + rust-audit + protocol + ts + mac:build-test + docs' \
+		'  verify-fast     rust-fast + protocol + ts + mac:check + mobile:check + docs [BASE=<ref>]' \
 		'  dev-server      cargo run -p vibevalley-server' \
 		'  dev-mac         cargo run -p vibevalley-mac' \
 		'  package-alpha   vp run package:mac:alpha' \
@@ -27,7 +31,9 @@ help:
 rust:
 	cargo xtask check
 rust-changed:
-	cargo xtask changed
+	cargo xtask changed --base $(BASE)
+rust-fast:
+	cargo fmt --all --check && cargo xtask audit && cargo xtask changed --base $(BASE) --fast
 rust-audit:
 	cargo xtask audit
 rust-loom:
@@ -52,6 +58,8 @@ check:
 	$(MAKE) rust && $(MAKE) rust-audit && $(MAKE) ts && $(MAKE) docs
 verify:
 	$(MAKE) rust && $(MAKE) rust-audit && $(MAKE) protocol && $(MAKE) ts && vp run mac:build-test && $(MAKE) docs
+verify-fast:
+	$(MAKE) rust-fast BASE=$(BASE) && $(MAKE) protocol && $(MAKE) ts && vp run mac:check && vp run mobile:check && $(MAKE) docs
 dev-server:
 	cargo run -p vibevalley-server
 dev-mac:
