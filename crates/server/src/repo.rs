@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
@@ -32,33 +31,6 @@ const REPO_CONCURRENCY: usize = 4;
 
 const GITIGNORE: &str = "node_modules/\ndist/\nbuild/\n.env\n.env.*\n!.env.example\n.DS_Store\n__pycache__/\n*.pyc\n.pytest_cache/\n.venv/\n";
 const YEAR_DAYS: i64 = 53 * 7;
-const LEFT_OUT: [&str; 25] = [
-    "pnpm-lock.yaml",
-    "package-lock.json",
-    "yarn.lock",
-    "bun.lock",
-    "bun.lockb",
-    "Cargo.lock",
-    "go.sum",
-    "poetry.lock",
-    "uv.lock",
-    "Pipfile.lock",
-    "Gemfile.lock",
-    "composer.lock",
-    "*.min.js",
-    "*.min.css",
-    "*.map",
-    "node_modules/",
-    "vendor/",
-    "dist/",
-    "build/",
-    "target/",
-    ".venv/",
-    "venv/",
-    "__pycache__/",
-    ".next/",
-    "coverage/",
-];
 
 fn refused(text: String) -> ApiError {
     ApiError::new(BizCode::RepoRefused, text)
@@ -221,28 +193,6 @@ pub fn activity_of(log: &str, day_of: impl Fn(i64) -> String) -> (Vec<DayCount>,
     (days, authors)
 }
 
-/// Parses `tokei --output json`, omitting totals and blank-only languages.
-pub fn counts_of(output: &str) -> Option<Vec<LanguageCount>> {
-    let raw: serde_json::Map<String, Value> = serde_json::from_str(output).ok()?;
-    let mut out = Vec::new();
-    for (name, l) in raw {
-        let (code, comments, blanks) = (l["code"].as_f64()?, l["comments"].as_f64()?, l["blanks"].as_f64()?);
-        let files = l["reports"].as_array()?.len() as i64;
-        if name == "Total" || code + comments <= 0.0 {
-            continue;
-        }
-        out.push(LanguageCount {
-            name,
-            files,
-            code: code as i64,
-            comments: comments as i64,
-            blanks: blanks as i64,
-        });
-    }
-    out.sort_by(|a, b| (b.code + b.comments).cmp(&(a.code + a.comments)).then_with(|| locale_compare(&a.name, &b.name)));
-    Some(out)
-}
-
 async fn gh_async(args: &[&str]) -> Run {
     let mut r = run_async("gh", args, None, &[("GH_HOST", "github.com"), ("GH_PROMPT_DISABLED", "1")]).await;
     r.out = format!("{}{}", r.out, r.err);
@@ -322,7 +272,6 @@ pub struct Repo {
     root: PathBuf,
     canon_root: PathBuf,
     per_repo: usize,
-    tokei: String,
     github: Mutex<Option<GitHubStatus>>,
     capabilities: Mutex<HashMap<String, PullRequestCapability>>,
     /// One change at a time per repo name; names being created are hidden from listings.
@@ -404,7 +353,6 @@ impl Repo {
             root,
             canon_root,
             per_repo,
-            tokei: "tokei".into(),
             github: Mutex::default(),
             capabilities: Mutex::default(),
             pending: Mutex::default(),
@@ -689,20 +637,21 @@ impl Repo {
 
     pub async fn languages_async(&self, name: &str) -> Result<Option<RepoLanguages>, ApiError> {
         let Some(p) = self.find_async(name).await else { return Ok(None) };
-        let path = p.path.to_string_lossy().into_owned();
-        let mut args = vec!["--output", "json"];
-        for x in LEFT_OUT {
-            args.extend(["--exclude", x]);
-        }
-        args.push(&path);
-        let r = run_async(&self.tokei, &args, None, &[]).await;
-        if r.missing {
-            return Err(refused(t("server.repo.noTokei", &[])));
-        }
-        if !r.ok {
-            return Err(refused(t("server.repo.tokeiFailed", &[("why", reason(&r.err).into())])));
-        }
-        let languages = counts_of(&r.out).ok_or_else(|| refused(t("server.repo.tokeiUnread", &[])))?;
+        let path = p.path;
+        let stats = crate::log::spawn_blocking_traced(move || vibevalley_files::count_loc(&path))
+            .await
+            .map_err(|e| refused(e.to_string()))?
+            .map_err(|e| refused(e.to_string()))?;
+        let languages = stats
+            .into_iter()
+            .map(|s| LanguageCount {
+                name: s.name.to_string(),
+                files: i64::try_from(s.files).unwrap_or(i64::MAX),
+                code: i64::try_from(s.code).unwrap_or(i64::MAX),
+                comments: i64::try_from(s.comments).unwrap_or(i64::MAX),
+                blanks: i64::try_from(s.blanks).unwrap_or(i64::MAX),
+            })
+            .collect();
         Ok(Some(RepoLanguages {
             repo: name.into(),
             at: now(),
@@ -1496,14 +1445,10 @@ mod tests {
     }
 
     #[test]
-    fn activity_and_counts() {
+    fn activity_counts() {
         let (days, authors) = activity_of("100\tAnn\n200\tbob\n86500\tAnn\nbad\n", |ms| (ms / 86_400_000).to_string());
         assert_eq!(days.iter().map(|d| (d.day.as_str(), d.commits)).collect::<Vec<_>>(), vec![("0", 2), ("1", 1)]);
         assert_eq!(authors[0].name, "Ann");
-        let tokei = r#"{"Rust":{"code":10,"comments":2,"blanks":1,"reports":[1,2]},"Total":{"code":10,"comments":2,"blanks":1,"reports":[]},"Text":{"code":0,"comments":0,"blanks":3,"reports":[]}}"#;
-        let counts = counts_of(tokei).unwrap();
-        assert_eq!(counts.len(), 1);
-        assert_eq!((counts[0].name.as_str(), counts[0].files), ("Rust", 2));
     }
 
     #[tokio::test]
@@ -1568,6 +1513,11 @@ mod tests {
         let activity = repo.activity_endpoint_async("alpha").await.unwrap();
         assert_eq!(activity.repo, "alpha");
         assert!(activity.total >= 1);
+
+        let langs = repo.languages_endpoint_async("alpha").await.unwrap();
+        assert_eq!(langs.repo, "alpha");
+        assert_eq!(langs.languages.len(), 1);
+        assert_eq!(langs.languages[0].name, "Markdown");
 
         let contribs = repo.contributions_async(vec!["vibevalley@localhost".into()]).await;
         assert_eq!(contribs.len(), 2);

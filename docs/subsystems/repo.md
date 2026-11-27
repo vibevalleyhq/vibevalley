@@ -10,13 +10,14 @@
 | 工单 worktree 与分支 `vibevalley/issue-<号>` 的创建、复用、重置与清理 | 何时派活、何时合并与交付编排（[工单](docs/subsystems/issue.md#完成和交付)） |
 | 分支改动读取（`Changes`）、冲突预检（`git merge-tree`）、运行 `.vibevalley/check`、子工单的检查（`verifyCheckout`） | 会话生命周期与并发槽位准入控制（[帮工](docs/subsystems/session.md)） |
 | 本地合并、无检出合入父分支（`merge_into`） | 分支推送、PR/MR 发布、状态与 CI/评审轮询（[PR 与分支发布](docs/subsystems/pull.md)） |
-| `gh` 状态检测缓存、语言统计（`tokei`）、年度提交日历与作者 commit 计数 | 经验值、等级与成就计算（[游戏](docs/subsystems/game.md#模型和不变量)）；仓库页与群岛地图渲染（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)） |
+| `gh` 状态检测缓存、语言统计（`vibevalley-files`）、年度提交日历与作者 commit 计数 | 经验值、等级与成就计算（[游戏](docs/subsystems/game.md#模型和不变量)）；仓库页与群岛地图渲染（[客户端](docs/subsystems/app.md)、[农场的皮](docs/subsystems/farm.md)） |
 
 ## 在哪
 
 | 位置 | 职责 |
 |---|---|
-| `crates/server/src/repo.rs` | `repo.*`、`github.*`：`<工作目录>/repos` 下按名字新建或克隆、活跃度与语言（`tokei`）、`gh` 能不能开 PR |
+| `crates/server/src/repo.rs` | `repo.*`、`github.*`：`<工作目录>/repos` 下按名字新建或克隆、活跃度与语言（`vibevalley_files::count_loc`）、`gh` 能不能开 PR |
+| `crates/files/src/loc.rs` | 纯 Rust 并行代码行与语言统计（跳过二进制、`.gitignore` 与锁文件/构建目录） |
 | `crates/git/src/read.rs`、`crates/git/src/cmd.rs`、`crates/git/src/repo.rs` | git 封装：`read.rs` 纯 Rust 无子进程只读（`discover_root`、`git_dir`、`git_common_dir`、`head`、`branch_exists`、`branches`、`commit_id_fast`、`remote_url`、`global_config_value`、`worktrees`）；`cmd.rs` 基于 `tokio::process::Command`（`.kill_on_drop(true)` + 异步 stdin）并施加 5 项环境安全保护；`repo.rs` 与 `verified_merge.rs` 负责状态、diff、分支、worktree、冲突预检与无检出合入 |
 | `crates/server/src/runtime/worktree/mod.rs`、`crates/server/src/runtime/worktree/check.rs` | `Workplace`：确保仓库在（`ensure_repo`）、工单的 worktree 与分支（`worktree`、`base`）、改动（`changes`）、交付（`land`）、子工单合进父分支（`join`）、帮工走时收拾 worktree 和分支（`release`）、异步 `.vibevalley/check`；不读工单板的状态 |
 
