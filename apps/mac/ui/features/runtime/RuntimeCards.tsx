@@ -22,6 +22,7 @@ import { createAct } from "../../design/act";
 import { Button } from "../../design/Button";
 import { KeyValueEditor } from "../../design/Chips";
 import { Dialog } from "../../design/Dialog";
+import { OpenTerminal } from "../../design/domain/OpenTerminal";
 import { SettingRow, SettingsGroup } from "../../design/domain/settings";
 import { Field, Select, TextInput } from "../../design/Field";
 import { Icon } from "../../design/Icon";
@@ -300,6 +301,16 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
     return saving.run(async () => onSaved(await api.runtime.setting.update({ id, ...body })));
   };
   const budgeted = () => props.info.id === "pi" || props.info.id === "vibevalley";
+  const resolvedCommand = () => (props.info.installation.status === "available" ? props.info.installation.command : undefined);
+  const resolvedFolder = () => {
+    const cmd = resolvedCommand();
+    return cmd !== undefined && cmd.startsWith("/") ? cmd.slice(0, cmd.lastIndexOf("/")) || "/" : undefined;
+  };
+  const binPathHint = () => {
+    const cmd = resolvedCommand();
+    const upper = props.info.id.toUpperCase();
+    return cmd ? t("web.runtime.binPathResolved", { path: cmd, id: upper }) : t("web.runtime.binPathHint", { id: upper });
+  };
   return (
     <SettingsGroup
       title={t("web.runtime.settings")}
@@ -316,17 +327,20 @@ export function SettingsCard(props: { info: RuntimeInfo; onSaved: (got: RuntimeI
         </If>
       }
     >
-      <SettingRow label={t("web.runtime.binPath")} hint={t("web.runtime.binPathHint", { id: props.info.id.toUpperCase() })}>
-        <View class="w-60 max-w-full">
-          <TextInput
-            accessibilityLabel={t("web.runtime.binPath")}
-            ref={props.pathRef}
-            testID="runtime-bin-path"
-            class="font-mono"
-            placeholder={t("web.runtime.auto")}
-            value={draft().binPath}
-            onInput={(binPath) => draft.set({ ...draft(), binPath })}
-          />
+      <SettingRow label={t("web.runtime.binPath")} hint={binPathHint()}>
+        <View class="flex-row items-center gap-2">
+          <View class="w-60 max-w-full">
+            <TextInput
+              accessibilityLabel={t("web.runtime.binPath")}
+              ref={props.pathRef}
+              testID="runtime-bin-path"
+              class="font-mono"
+              placeholder={t("web.runtime.auto")}
+              value={draft().binPath}
+              onInput={(binPath) => draft.set({ ...draft(), binPath })}
+            />
+          </View>
+          <If when={resolvedFolder()}>{(cwd) => <OpenTerminal cwd={cwd()} title={props.info.preset.label} testid="runtime-terminal" />}</If>
         </View>
       </SettingRow>
       <SettingRow label={t("web.runtime.defaultModel")} hint={t("web.runtime.defaultModelHint")}>

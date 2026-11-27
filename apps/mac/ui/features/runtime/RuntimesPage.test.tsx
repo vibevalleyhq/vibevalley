@@ -145,8 +145,26 @@ test("RuntimesPage: top-level nav above Experts, 3-column full-height layout, ma
   expect(app.count("id:runtime-row-local-opencode")).toBe(0);
   expect(app.count("id:runtime-detail")).toBe(1);
   expect(app.count("id:runtime-bin-path")).toBe(1);
-  expect(app.texts()).toContain(t("web.runtime.installation"));
   expect(app.texts()).toContain(t("web.runtime.available"));
+  expect(app.texts().some((line) => line.includes("/opt/homebrew/bin/claude"))).toBe(true);
+  expect(app.texts().filter((line) => line === t("web.runtime.binPath")).length).toBe(1);
+  expect(app.texts()).not.toContain(t("web.runtime.installation"));
+
+  // Codex has tools: null -> empty Tools inspector placeholder card is hidden while Skills remains visible.
+  await app.press("id:runtime-row-local-codex");
+  await fake.pump(app);
+  expect(app.texts()).toContain(t("web.runtime.skills"));
+  expect(app.texts()).not.toContain(t("web.runtime.tools"));
+
+  // VibeValley has both skills: null and tools: null -> both empty inspector cards are hidden.
+  await app.press("id:runtime-row-local-vibevalley");
+  await fake.pump(app);
+  expect(app.texts()).not.toContain(t("web.runtime.skills"));
+  expect(app.texts()).not.toContain(t("web.runtime.tools"));
+
+  // Switch back to Claude Code before testing remote machines.
+  await app.press("id:runtime-row-local-claude");
+  await fake.pump(app);
 
   // Remote & sandbox machines: installed coding agents appear; unavailable cursor on sbx-42 MUST NOT appear!
   expect(app.count("id:runtime-row-gpu-linux-codex")).toBe(1);

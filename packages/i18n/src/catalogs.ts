@@ -3014,6 +3014,7 @@ export const catalogs = {
       enabledHint: "停用后，用它的 agent 都派不出去。",
       binPath: "命令路径",
       binPathHint: "对应 oar 的 OAR_{id}_BIN。留空就在 PATH 里找。",
+      binPathResolved: "当前：{path} · 对应 oar 的 OAR_{id}_BIN，留空就在 PATH 里找。",
       auto: "自动查找",
       defaultModel: "默认模型",
       defaultModelHint: "agent 没指定模型时用它。",
@@ -7030,6 +7031,7 @@ export const catalogs = {
       enabledHint: "Disabled, the agents using it cannot be sent.",
       binPath: "Command path",
       binPathHint: "oar's OAR_{id}_BIN. Empty searches the PATH.",
+      binPathResolved: "Resolved: {path} · oar's OAR_{id}_BIN; empty searches PATH.",
       auto: "Find it",
       defaultModel: "Default model",
       defaultModelHint: "Used when an agent names no model.",
@@ -11008,6 +11010,7 @@ export interface Messages {
   "web.runtime.balance": { readonly enough: boolean; readonly provider: string | number };
   "web.runtime.binPath": undefined;
   "web.runtime.binPathHint": { readonly id: string | number };
+  "web.runtime.binPathResolved": { readonly id: string | number; readonly path: string | number };
   "web.runtime.budget": undefined;
   "web.runtime.budgetHint": { readonly pi: boolean; readonly spent: string | number };
   "web.runtime.budgetLabel": undefined;
