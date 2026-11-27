@@ -155,13 +155,14 @@ const settings: SettingsStatus = {
   version: "0.42.0",
   locale: "zh",
   deepseekApiKey: { source: "settings", hint: "…3f9a" },
+  githubToken: { source: null },
   voice,
   voiceDefaults: voice,
   readiness,
   memorySources: [{ kind: "nowledge", url: "http://127.0.0.1:14242/mcp/", enabled: true, read: true, write: true, everything: false, key: { source: null } }],
 };
 
-const github: GitHubStatus = { installed: true, version: "2.62.0", loggedIn: true, account: "lucas", reason: "", checkedAt: now };
+const github: GitHubStatus = { installed: true, version: "2.62.0", loggedIn: true, account: "lucas", authMode: "gh", reason: "", checkedAt: now };
 
 export const responses: Record<string, unknown> = {
   "channel.message.list": messages,

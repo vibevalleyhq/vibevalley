@@ -193,9 +193,13 @@ pub(crate) async fn session_send(c: &AppCore, ctx: &CallerContext, r: SessionSen
 
 pub(crate) async fn setting_update(c: &AppCore, r: <ops::SettingUpdate as Op>::Input) -> Result<<ops::SettingUpdate as Op>::Result, ApiError> {
     let locale_changed = r.locale.is_some();
+    let github_token_changed = r.github_token.is_some();
     let status = c.setting.save_async(r).await?;
     if locale_changed {
         c.ctx.mark_dirty(SliceMask::ALL);
+    }
+    if github_token_changed {
+        c.repo.invalidate_github_cache();
     }
     Ok(status)
 }

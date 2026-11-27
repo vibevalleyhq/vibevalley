@@ -9,8 +9,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
+use std::time::Duration;
 
 use parking_lot::Mutex;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::Semaphore;
@@ -20,13 +22,15 @@ use tracing::Instrument;
 use tracing::instrument::WithSubscriber;
 use vibevalley_i18n::t;
 use vibevalley_protocol::{
-    ApiError, Author, BizCode, DayCount, GitHubStatus, Issue, IssueTemplate, JsNumber, LanguageCount, MAX_RUNNING, MountRepo, NewRepo, PullRequestCapability,
-    RepoActivity, RepoLanguages, RepoStack, RepoSummary, RepoTemplates, TemplateBlank, TemplateKind, Validation,
+    ApiError, Author, BizCode, DayCount, GitHubAuthMode, GitHubStatus, Issue, IssueTemplate, JsNumber, LanguageCount, MAX_RUNNING, MountRepo, NewRepo,
+    PullRequestCapability, RepoActivity, RepoLanguages, RepoStack, RepoSummary, RepoTemplates, TemplateBlank, TemplateKind, Validation,
 };
 
 use crate::context::error::{LookIn, missing};
+use crate::context::http::no_redirect_client;
 use crate::context::task::TaskGroup;
 use crate::context::{Context, now};
+use crate::setting::{Secret, Setting};
 
 const REPO_CONCURRENCY: usize = 4;
 
@@ -243,34 +247,263 @@ pub fn counts_of(output: &str) -> Option<Vec<LanguageCount>> {
     Some(out)
 }
 
+pub(crate) const DEFAULT_GITHUB_API_BASE: &str = "https://api.github.com";
+
+pub(crate) type TokenSource = Arc<dyn Fn() -> Option<Secret> + Send + Sync>;
+
+#[derive(Deserialize)]
+struct WireGithubError {
+    #[serde(default)]
+    message: String,
+}
+
+#[derive(Deserialize)]
+struct WireGithubUser {
+    #[serde(default)]
+    login: String,
+}
+
+#[derive(Deserialize)]
+struct WireGithubRestRepoPermissions {
+    #[serde(default)]
+    admin: bool,
+    #[serde(default)]
+    maintain: bool,
+    #[serde(default)]
+    push: bool,
+}
+
+#[derive(Deserialize)]
+struct WireGithubRestRepo {
+    #[serde(default)]
+    permissions: Option<WireGithubRestRepoPermissions>,
+}
+
+#[derive(Debug)]
+pub(crate) enum GitHubApiError {
+    MissingToken,
+    Unauthorized,
+    Forbidden,
+    NotFound,
+    Http(u16, String),
+    Network(String),
+    Decode,
+}
+
+impl GitHubApiError {
+    pub(crate) fn summary(&self) -> String {
+        match self {
+            Self::MissingToken => "missing token".into(),
+            Self::Unauthorized => "401 unauthorized".into(),
+            Self::Forbidden => "403 forbidden".into(),
+            Self::NotFound => "404 not found".into(),
+            Self::Http(status, msg) if msg.is_empty() => format!("HTTP {status}"),
+            Self::Http(status, msg) => format!("HTTP {status}: {msg}"),
+            Self::Network(why) => why.clone(),
+            Self::Decode => "response decode".into(),
+        }
+    }
+}
+
+/// Direct GitHub REST API client backed by the shared no-redirect `reqwest::Client`.
+#[derive(Clone)]
+pub(crate) struct GitHubRest {
+    api_base: String,
+    token: TokenSource,
+}
+
+impl std::fmt::Debug for GitHubRest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GitHubRest")
+            .field("api_base", &self.api_base)
+            .field("has_token", &self.has_token())
+            .finish()
+    }
+}
+
+impl GitHubRest {
+    pub(crate) fn new(token: TokenSource) -> Self {
+        Self::with_base(DEFAULT_GITHUB_API_BASE, token)
+    }
+
+    pub(crate) fn with_base(api_base: impl Into<String>, token: TokenSource) -> Self {
+        Self {
+            api_base: api_base.into().trim_end_matches('/').to_string(),
+            token,
+        }
+    }
+
+    pub(crate) fn from_setting(setting: Arc<Setting>) -> Self {
+        Self::new(Arc::new(move || setting.github_token()))
+    }
+
+    pub(crate) fn token(&self) -> Option<Secret> {
+        (self.token)().filter(|s| !s.expose().trim().is_empty())
+    }
+
+    pub(crate) fn has_token(&self) -> bool {
+        self.token().is_some()
+    }
+
+    async fn send_bytes<B: Serialize + Sync>(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        query: &[(&str, &str)],
+        body: Option<&B>,
+    ) -> Result<(u16, Vec<u8>), GitHubApiError> {
+        let token = self.token().ok_or(GitHubApiError::MissingToken)?;
+        let url = format!("{}{}", self.api_base, path);
+        let client = no_redirect_client().map_err(GitHubApiError::Network)?;
+        let mut req = client
+            .request(method, &url)
+            .timeout(Duration::from_secs(15))
+            .header("authorization", format!("Bearer {}", token.expose().trim()))
+            .header("accept", "application/vnd.github+json")
+            .header("user-agent", "vibevalley")
+            .header("x-github-api-version", "2022-11-28");
+        if !query.is_empty() {
+            req = req.query(query);
+        }
+        if let Some(payload) = body {
+            req = req.json(payload);
+        }
+        let resp = req.send().await.map_err(|e| GitHubApiError::Network(e.to_string()))?;
+        let status = resp.status().as_u16();
+        let bytes = resp.bytes().await.map_err(|e| GitHubApiError::Network(e.to_string()))?.to_vec();
+        match status {
+            200..=299 => Ok((status, bytes)),
+            401 => Err(GitHubApiError::Unauthorized),
+            403 => Err(GitHubApiError::Forbidden),
+            404 => Err(GitHubApiError::NotFound),
+            s => {
+                let message = serde_json::from_slice::<WireGithubError>(&bytes)
+                    .map(|e| e.message)
+                    .unwrap_or_default();
+                Err(GitHubApiError::Http(s, message))
+            }
+        }
+    }
+
+    pub(crate) async fn get_json<T: DeserializeOwned>(&self, path: &str, query: &[(&str, &str)]) -> Result<T, GitHubApiError> {
+        let (_, bytes) = self.send_bytes(reqwest::Method::GET, path, query, Option::<&()>::None).await?;
+        serde_json::from_slice(&bytes).map_err(|_| GitHubApiError::Decode)
+    }
+
+    pub(crate) async fn post_json<B: Serialize + Sync, T: DeserializeOwned>(&self, path: &str, body: &B) -> Result<T, GitHubApiError> {
+        let (_, bytes) = self.send_bytes(reqwest::Method::POST, path, &[], Some(body)).await?;
+        serde_json::from_slice(&bytes).map_err(|_| GitHubApiError::Decode)
+    }
+
+    pub(crate) async fn put_json<B: Serialize + Sync, T: DeserializeOwned>(&self, path: &str, body: &B) -> Result<T, GitHubApiError> {
+        let (_, bytes) = self.send_bytes(reqwest::Method::PUT, path, &[], Some(body)).await?;
+        serde_json::from_slice(&bytes).map_err(|_| GitHubApiError::Decode)
+    }
+
+    /// Fetches plain-text content (such as failed Actions job logs), following at most one redirect without leaking auth headers.
+    pub(crate) async fn get_text_following_redirect_without_auth(&self, path: &str) -> Option<String> {
+        let token = self.token()?;
+        let url = format!("{}{}", self.api_base, path);
+        let client = no_redirect_client().ok()?;
+        let resp = client
+            .get(&url)
+            .timeout(Duration::from_secs(15))
+            .header("authorization", format!("Bearer {}", token.expose().trim()))
+            .header("accept", "application/vnd.github+json")
+            .header("user-agent", "vibevalley")
+            .header("x-github-api-version", "2022-11-28")
+            .send()
+            .await
+            .ok()?;
+        let status = resp.status();
+        if status.is_redirection() {
+            let location = resp.headers().get("location")?.to_str().ok()?.to_string();
+            let redirected = client.get(&location).timeout(Duration::from_secs(15)).send().await.ok()?;
+            return redirected.status().is_success().then_some(redirected.text().await.ok()?);
+        }
+        status.is_success().then_some(resp.text().await.ok()?)
+    }
+}
+
+type GhProbeFn = Arc<dyn Fn(&[&str]) -> Run + Send + Sync>;
+
+#[derive(Clone, Default)]
+enum GhProbe {
+    #[default]
+    Cli,
+    Custom(GhProbeFn),
+}
+
+impl std::fmt::Debug for GhProbe {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Cli => f.write_str("GhProbe::Cli"),
+            Self::Custom(_) => f.write_str("GhProbe::Custom"),
+        }
+    }
+}
+
+impl GhProbe {
+    async fn run(&self, args: &[&str]) -> Run {
+        match self {
+            Self::Cli => gh_async(args).await,
+            Self::Custom(f) => {
+                let f = f.clone();
+                let owned: Vec<String> = args.iter().map(|s| (*s).to_string()).collect();
+                crate::log::spawn_blocking_traced(move || {
+                    let refs: Vec<&str> = owned.iter().map(String::as_str).collect();
+                    f(&refs)
+                })
+                .await
+                .unwrap_or(Run {
+                    ok: false,
+                    out: String::new(),
+                    err: String::new(),
+                    missing: false,
+                })
+            }
+        }
+    }
+}
+
 async fn gh_async(args: &[&str]) -> Run {
     let mut r = run_async("gh", args, None, &[("GH_HOST", "github.com"), ("GH_PROMPT_DISABLED", "1")]).await;
     r.out = format!("{}{}", r.out, r.err);
     r
 }
 
-fn parse_github_probe(version: Run, auth: Option<Run>) -> GitHubStatus {
-    let mut s = GitHubStatus {
-        checked_at: now(),
-        ..Default::default()
-    };
+fn gh_version_from_output(version: &Run) -> (bool, Option<String>) {
     if !version.ok {
-        s.reason = t(if version.missing { "server.repo.gh.missing" } else { "server.repo.gh.failed" }, &[]);
-        return s;
+        return (false, None);
     }
-    s.installed = true;
-    s.version = version
+    let ver = version
         .out
         .lines()
         .find_map(|l| l.strip_prefix("gh version "))
         .and_then(|rest| rest.split_whitespace().next())
         .map(str::to_string);
+    (true, ver)
+}
+
+fn parse_github_probe(version: Run, auth: Option<Run>) -> GitHubStatus {
+    let mut s = GitHubStatus {
+        checked_at: now(),
+        auth_mode: GitHubAuthMode::None,
+        ..Default::default()
+    };
+    let (installed, ver) = gh_version_from_output(&version);
+    s.installed = installed;
+    s.version = ver;
+    if !installed {
+        s.reason = t("server.repo.github.noneConfigured", &[]);
+        return s;
+    }
     let Some(auth) = auth else {
-        s.reason = t("server.repo.gh.signedOut", &[]);
+        s.reason = t("server.repo.github.noneConfigured", &[]);
         return s;
     };
     if !auth.ok {
-        s.reason = t("server.repo.gh.signedOut", &[]);
+        s.reason = t("server.repo.github.noneConfigured", &[]);
         return s;
     }
     let account = auth.out.split("Logged in to github.com account ").nth(1).and_then(|rest| {
@@ -280,20 +513,49 @@ fn parse_github_probe(version: Run, auth: Option<Run>) -> GitHubStatus {
     match account {
         Some(a) => {
             s.logged_in = true;
+            s.auth_mode = GitHubAuthMode::Gh;
             s.account = Some(a);
         }
-        None => s.reason = t("server.repo.gh.noAccount", &[]),
+        None => s.reason = t("server.repo.github.noneConfigured", &[]),
     }
     s
 }
 
 /// Probes local `gh` installation and authentication status asynchronously.
 pub async fn probe_github_async() -> GitHubStatus {
-    let version = gh_async(&["--version"]).await;
+    probe_github_with_runner_async(&GhProbe::Cli, None).await
+}
+
+async fn probe_github_with_runner_async(gh: &GhProbe, rest: Option<&GitHubRest>) -> GitHubStatus {
+    let version = gh.run(&["--version"]).await;
+    if let Some(rest) = rest.filter(|r| r.has_token()) {
+        let (installed, ver) = gh_version_from_output(&version);
+        let mut s = GitHubStatus {
+            installed,
+            version: ver,
+            checked_at: now(),
+            auth_mode: GitHubAuthMode::None,
+            ..Default::default()
+        };
+        match rest.get_json::<WireGithubUser>("/user", &[]).await {
+            Ok(user) => {
+                s.logged_in = true;
+                s.auth_mode = GitHubAuthMode::Token;
+                s.account = (!user.login.is_empty()).then_some(user.login);
+            }
+            Err(GitHubApiError::Unauthorized | GitHubApiError::Forbidden) => {
+                s.reason = t("server.repo.github.tokenInvalid", &[]);
+            }
+            Err(err) => {
+                s.reason = t("server.repo.github.tokenNetwork", &[("why", err.summary().into())]);
+            }
+        }
+        return s;
+    }
     if !version.ok {
         return parse_github_probe(version, None);
     }
-    let auth = gh_async(&["auth", "status", "--hostname", "github.com", "--active"]).await;
+    let auth = gh.run(&["auth", "status", "--hostname", "github.com", "--active"]).await;
     parse_github_probe(version, Some(auth))
 }
 
@@ -323,6 +585,8 @@ pub struct Repo {
     canon_root: PathBuf,
     per_repo: usize,
     tokei: String,
+    github_rest: Option<GitHubRest>,
+    gh_probe: GhProbe,
     github: Mutex<Option<GitHubStatus>>,
     capabilities: Mutex<HashMap<String, PullRequestCapability>>,
     /// One change at a time per repo name; names being created are hidden from listings.
@@ -396,6 +660,11 @@ fn derive_repo_name(dir: &Path, taken: &HashSet<String>) -> String {
 impl Repo {
     /// Opens `<work_root>/repos` (creating it when missing) and loads mounted external repos.
     pub async fn open_async(work_root: &Path, per_repo: usize) -> std::io::Result<Arc<Repo>> {
+        Self::open_with_setting_async(work_root, per_repo, None).await
+    }
+
+    /// Opens `<work_root>/repos` with optional [`Setting`] for GitHub Token resolution.
+    pub async fn open_with_setting_async(work_root: &Path, per_repo: usize, setting: Option<Arc<Setting>>) -> std::io::Result<Arc<Repo>> {
         let root = work_root.join("repos");
         tokio::fs::create_dir_all(&root).await?;
         let canon_root = tokio::fs::canonicalize(&root).await.unwrap_or_else(|_| root.clone());
@@ -405,6 +674,8 @@ impl Repo {
             canon_root,
             per_repo,
             tokei: "tokei".into(),
+            github_rest: setting.map(GitHubRest::from_setting),
+            gh_probe: GhProbe::Cli,
             github: Mutex::default(),
             capabilities: Mutex::default(),
             pending: Mutex::default(),
@@ -414,6 +685,16 @@ impl Repo {
             cancel: CancellationToken::new(),
             probe: Mutex::default(),
         }))
+    }
+
+    /// Clears cached GitHub readiness and per-repo PR capability results after token changes.
+    pub fn invalidate_github_cache(&self) {
+        *self.github.lock() = None;
+        self.capabilities.lock().clear();
+    }
+
+    fn has_token(&self) -> bool {
+        self.github_rest.as_ref().is_some_and(GitHubRest::has_token)
     }
 
     /// Spawns a background `gh` capability probe on `task`.
@@ -647,10 +928,10 @@ impl Repo {
         let made = if let Some((_, url)) = req.github.as_deref().and_then(github_repository) {
             let known = self.github_status();
             let known = if known.checked_at != 0 { known } else { self.refresh_github_async().await };
-            if known.logged_in {
+            if known.logged_in && known.auth_mode == GitHubAuthMode::Gh {
                 let origin = github_origin(&url);
                 let path_text = path.to_string_lossy().into_owned();
-                if gh_async(&["repo", "clone", &origin, &path_text]).await.ok {
+                if self.gh_probe.run(&["repo", "clone", &origin, &path_text]).await.ok {
                     Ok(())
                 } else {
                     Err(refused(t("server.repo.cloneFailedGh", &[])))
@@ -743,21 +1024,34 @@ impl Repo {
     }
 
     pub fn github_status(&self) -> GitHubStatus {
-        match self.github.lock().clone() {
-            Some(s) if s.checked_at != 0 => s,
-            _ => GitHubStatus {
-                reason: t("server.repo.github.unchecked", &[]),
+        if let Some(s) = self.github.lock().clone()
+            && s.checked_at != 0
+        {
+            return s;
+        }
+        if self.has_token() {
+            return GitHubStatus {
+                logged_in: true,
+                auth_mode: GitHubAuthMode::Token,
+                reason: String::new(),
                 ..Default::default()
-            },
+            };
+        }
+        GitHubStatus {
+            auth_mode: GitHubAuthMode::None,
+            reason: t("server.repo.github.unchecked", &[]),
+            ..Default::default()
         }
     }
 
-    /// Re-probes `gh` and refreshes each repo's pull request capability with bounded fan-out.
+    /// Re-probes GitHub Token / `gh` readiness and refreshes each repo's pull request capability with bounded fan-out.
     pub async fn refresh_github_async(&self) -> GitHubStatus {
+        let rest = self.github_rest.clone();
+        let gh = self.gh_probe.clone();
         let probed = tokio::select! {
             biased;
             _ = self.cancel.cancelled() => return self.github_status(),
-            status = probe_github_async() => status,
+            status = probe_github_with_runner_async(&gh, rest.as_ref()) => status,
         };
         let folders = self.list_async().await;
         let next = if !probed.logged_in {
@@ -779,12 +1073,15 @@ impl Repo {
             let cancel = self.cancel.clone();
             let sem = Arc::new(Semaphore::new(REPO_CONCURRENCY));
             let mut set = JoinSet::new();
+            let rest_for_caps = (probed.auth_mode == GitHubAuthMode::Token).then(|| rest.clone()).flatten();
             for p in folders {
                 if cancel.is_cancelled() {
                     break;
                 }
                 let sem = sem.clone();
                 let cancel = cancel.clone();
+                let rest = rest_for_caps.clone();
+                let gh = gh.clone();
                 set.spawn(
                     async move {
                         let permit = tokio::select! {
@@ -796,7 +1093,7 @@ impl Repo {
                         if cancel.is_cancelled() {
                             return None;
                         }
-                        let c = probe_single_capability_async(&p.path, p.git, &cancel).await?;
+                        let c = probe_single_capability_async(&p.path, p.git, &cancel, rest.as_ref(), &gh).await?;
                         Some((p.name, c))
                     }
                     .in_current_span()
@@ -870,8 +1167,10 @@ impl Repo {
             }
             init_external_git_async(&canon).await?;
             let updated = RepoFolder { git: true, ..found };
-            if self.github_status().logged_in
-                && let Some(cap) = probe_single_capability_async(&updated.path, true, &self.cancel).await
+            let status = self.github_status();
+            let rest = (status.auth_mode == GitHubAuthMode::Token).then(|| self.github_rest.as_ref()).flatten();
+            if status.logged_in
+                && let Some(cap) = probe_single_capability_async(&updated.path, true, &self.cancel, rest, &self.gh_probe).await
             {
                 self.capabilities.lock().insert(updated.name.clone(), cap);
             }
@@ -909,8 +1208,10 @@ impl Repo {
         write_mounts_async(&self.root.join(MOUNTS_FILE), &next).await?;
         *self.mounts.lock() = next;
 
-        if self.github_status().logged_in
-            && let Some(cap) = probe_single_capability_async(&canon, true, &self.cancel).await
+        let status = self.github_status();
+        let rest = (status.auth_mode == GitHubAuthMode::Token).then(|| self.github_rest.as_ref()).flatten();
+        if status.logged_in
+            && let Some(cap) = probe_single_capability_async(&canon, true, &self.cancel, rest, &self.gh_probe).await
         {
             self.capabilities.lock().insert(name.clone(), cap);
         }
@@ -1013,7 +1314,13 @@ impl Repo {
     }
 }
 
-async fn probe_single_capability_async(path: &Path, git: bool, cancel: &CancellationToken) -> Option<PullRequestCapability> {
+async fn probe_single_capability_async(
+    path: &Path,
+    git: bool,
+    cancel: &CancellationToken,
+    rest: Option<&GitHubRest>,
+    gh: &GhProbe,
+) -> Option<PullRequestCapability> {
     #[derive(Deserialize)]
     struct ViewerPermission {
         #[serde(rename = "viewerPermission")]
@@ -1035,11 +1342,39 @@ async fn probe_single_capability_async(path: &Path, git: bool, cancel: &Cancella
             reason: t("server.repo.github.notGithub", &[]),
         });
     }
+    if let Some(rest) = rest.filter(|r| r.has_token()) {
+        let repo_path = format!("/repos/{origin}");
+        let res = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return None,
+            res = rest.get_json::<WireGithubRestRepo>(&repo_path, &[]) => res,
+        };
+        return Some(match res {
+            Ok(repo) => match repo.permissions {
+                Some(p) if p.admin || p.maintain || p.push => PullRequestCapability {
+                    available: true,
+                    reason: String::new(),
+                },
+                Some(_) => PullRequestCapability {
+                    available: false,
+                    reason: t("server.repo.github.readOnly", &[]),
+                },
+                None => PullRequestCapability {
+                    available: false,
+                    reason: t("server.repo.github.noPermission", &[]),
+                },
+            },
+            Err(_) => PullRequestCapability {
+                available: false,
+                reason: t("server.repo.github.noPermission", &[]),
+            },
+        });
+    }
     let view_args = ["repo", "view", &origin, "--json", "viewerPermission"];
     let view = tokio::select! {
         biased;
         _ = cancel.cancelled() => return None,
-        view = gh_async(&view_args) => view,
+        view = gh.run(&view_args) => view,
     };
     let permission = if view.ok {
         serde_json::from_str::<ViewerPermission>(&view.out).ok().and_then(|v| v.viewer_permission)
@@ -1723,5 +2058,159 @@ mod tests {
         let err = reopened.unmount_repo_async("managed").await.unwrap_err();
         assert_eq!(err.biz_code, BizCode::RepoRefused);
         reopened.close_async().await;
+    }
+
+    async fn spawn_github_mock_async(router: axum::Router) -> (String, tokio_util::sync::DropGuard) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let cancel = CancellationToken::new();
+        let guard = cancel.clone().drop_guard();
+        tokio::spawn(async move {
+            let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+        });
+        (format!("http://{addr}"), guard)
+    }
+
+    async fn open_with_github_for_test(work_root: &Path, github_rest: Option<GitHubRest>, gh_probe: GhProbe) -> Arc<Repo> {
+        let root = work_root.join("repos");
+        tokio::fs::create_dir_all(&root).await.unwrap();
+        let canon_root = tokio::fs::canonicalize(&root).await.unwrap();
+        Arc::new(Repo {
+            root,
+            canon_root,
+            per_repo: 3,
+            tokei: "tokei".into(),
+            github_rest,
+            gh_probe,
+            github: Mutex::default(),
+            capabilities: Mutex::default(),
+            pending: Mutex::default(),
+            mounts: Mutex::default(),
+            mount_lock: tokio::sync::Mutex::new(()),
+            health_inputs: Mutex::default(),
+            cancel: CancellationToken::new(),
+            probe: Mutex::default(),
+        })
+    }
+
+    fn init_git_with_github_origin(dir: &Path, remote_repo: &str) {
+        std::fs::create_dir_all(dir).unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec!["remote", "add", "origin", &format!("https://github.com/{remote_repo}.git")],
+        ] {
+            assert!(
+                std::process::Command::new("git")
+                    .args(&args)
+                    .current_dir(dir)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn github_status_distinguishes_token_gh_and_unconfigured_modes() {
+        use axum::Json;
+        use axum::http::{HeaderMap, StatusCode};
+        use axum::routing::get;
+
+        vibevalley_i18n::set_locale("en");
+        let missing_gh = GhProbe::Custom(Arc::new(|_| Run {
+            ok: false,
+            out: String::new(),
+            err: String::new(),
+            missing: true,
+        }));
+        let logged_gh = GhProbe::Custom(Arc::new(|args| match args.first().copied() {
+            Some("--version") => Run {
+                ok: true,
+                out: "gh version 2.62.0 (2025-01-01)\n".into(),
+                err: String::new(),
+                missing: false,
+            },
+            Some("auth") => Run {
+                ok: true,
+                out: "github.com\n  ✓ Logged in to github.com account cli-user (oauth_token)\n".into(),
+                err: String::new(),
+                missing: false,
+            },
+            _ => Run {
+                ok: false,
+                out: String::new(),
+                err: String::new(),
+                missing: false,
+            },
+        }));
+
+        let router = axum::Router::new()
+            .route(
+                "/user",
+                get(|headers: HeaderMap| async move {
+                    if headers.get("authorization").and_then(|v| v.to_str().ok()) == Some("Bearer ghp_valid") {
+                        (StatusCode::OK, Json(serde_json::json!({ "login": "octocat" })))
+                    } else {
+                        (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "message": "Bad credentials" })))
+                    }
+                }),
+            )
+            .route(
+                "/repos/acme/writable",
+                get(|| async { Json(serde_json::json!({ "permissions": { "push": true } })) }),
+            )
+            .route(
+                "/repos/acme/readonly",
+                get(|| async { Json(serde_json::json!({ "permissions": { "push": false } })) }),
+            );
+        let (base_url, _guard) = spawn_github_mock_async(router).await;
+
+        // 1. Token configured + gh missing -> GitHubAuthMode::Token, logged_in = true, writable vs readonly capability checked via REST.
+        let work_token = tempfile::tempdir().unwrap();
+        init_git_with_github_origin(&work_token.path().join("repos/writable"), "acme/writable");
+        init_git_with_github_origin(&work_token.path().join("repos/readonly"), "acme/readonly");
+        let rest = GitHubRest::with_base(base_url.clone(), Arc::new(|| Some(Secret::new("ghp_valid"))));
+        let repo_token = open_with_github_for_test(work_token.path(), Some(rest), missing_gh.clone()).await;
+        let status_token = repo_token.refresh_github_async().await;
+        assert_eq!(status_token.auth_mode, GitHubAuthMode::Token);
+        assert!(status_token.logged_in);
+        assert!(!status_token.installed);
+        assert_eq!(status_token.account.as_deref(), Some("octocat"));
+        let summaries = repo_token.list_summaries_async().await;
+        let writable = summaries.iter().find(|s| s.name == "writable").unwrap();
+        let readonly = summaries.iter().find(|s| s.name == "readonly").unwrap();
+        assert!(writable.pull_request.available);
+        assert!(!readonly.pull_request.available);
+        repo_token.close_async().await;
+
+        // 2. Invalid token -> unauthenticated with tokenInvalid reason.
+        let work_bad = tempfile::tempdir().unwrap();
+        let bad_rest = GitHubRest::with_base(base_url, Arc::new(|| Some(Secret::new("ghp_invalid"))));
+        let repo_bad = open_with_github_for_test(work_bad.path(), Some(bad_rest), missing_gh.clone()).await;
+        let status_bad = repo_bad.refresh_github_async().await;
+        assert_eq!(status_bad.auth_mode, GitHubAuthMode::None);
+        assert!(!status_bad.logged_in);
+        assert_eq!(status_bad.reason, t("server.repo.github.tokenInvalid", &[]));
+        repo_bad.close_async().await;
+
+        // 3. No token + gh installed & logged in -> GitHubAuthMode::Gh.
+        let work_gh = tempfile::tempdir().unwrap();
+        let repo_gh = open_with_github_for_test(work_gh.path(), None, logged_gh).await;
+        let status_gh = repo_gh.refresh_github_async().await;
+        assert_eq!(status_gh.auth_mode, GitHubAuthMode::Gh);
+        assert!(status_gh.installed);
+        assert!(status_gh.logged_in);
+        assert_eq!(status_gh.account.as_deref(), Some("cli-user"));
+        repo_gh.close_async().await;
+
+        // 4. Neither token nor gh -> GitHubAuthMode::None without hard blocker wording.
+        let work_none = tempfile::tempdir().unwrap();
+        let repo_none = open_with_github_for_test(work_none.path(), None, missing_gh).await;
+        let status_none = repo_none.refresh_github_async().await;
+        assert_eq!(status_none.auth_mode, GitHubAuthMode::None);
+        assert!(!status_none.installed);
+        assert!(!status_none.logged_in);
+        assert_eq!(status_none.reason, t("server.repo.github.noneConfigured", &[]));
+        repo_none.close_async().await;
     }
 }

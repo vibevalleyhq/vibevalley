@@ -31,13 +31,24 @@
     "everythingHint": "Not only what VibeValley remembered for helpers: every helper reads your own memories there too"
   },
   "github": {
-    "noGh": "gh is not installed",
-    "note": "Which repos can open PRs is on the Repos page; opening a PR on completion is turned on in the configuration (github.pr_repos).",
+    "noGh": "Not installed (optional)",
+    "note": "Configure a GitHub Token for direct REST API access or sign in with the local gh CLI to push branches and open or merge PRs for your projects.",
     "recheck": "Check again",
-    "cli": "gh command line",
-    "cliHint": "Used to open PRs and read repositories when merging",
-    "login": "Login",
-    "loginHint": "The account gh auth login signed in",
+    "status": "Connection status",
+    "statusHint": "Uses GitHub Token when configured; falls back to local gh login",
+    "mode": {
+      "token": "Connected via Token",
+      "gh": "Signed in via gh",
+      "none": "Not configured"
+    },
+    "token": "GitHub Token",
+    "tokenHint": "Used to call the GitHub REST API directly for PRs and checks; can also be set via GITHUB_TOKEN",
+    "tokenPlaceholder": "ghp_… or github_pat_… (leave empty to keep)",
+    "tokenConfigured": "Token configured",
+    "cli": "gh CLI (optional)",
+    "cliHint": "Used when no Token is configured to open PRs and inspect projects",
+    "login": "Account",
+    "loginHint": "GitHub account for the active Token or gh session",
     "notLoggedIn": "Not signed in"
   },
   "nav": {
@@ -70,7 +81,7 @@
     "mcp": "MCP Antigravity Claude Code Codex Cursor stdio streamableHttp integration",
     "voice": "call phone recognition speech MOSS live realtime vision transcription",
     "chat": "WeChat Feishu Lark QQ connectors chat pairing",
-    "github": "GitHub gh PR login",
+    "github": "GitHub Token gh PR login",
     "remote": "remote mobile phone Tailscale pair pairing QR device iOS Android CLI machine sandbox listener token control plane embedded",
     "data": "home folder settings repos worktrees data storage backend",
     "about": "version update cli command line"

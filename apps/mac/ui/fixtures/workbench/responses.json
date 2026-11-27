@@ -2911,6 +2911,9 @@
       "source": "settings",
       "hint": "…3f9a"
     },
+    "githubToken": {
+      "source": null
+    },
     "voice": {
       "persona": "",
       "greeting": "你好！今天种点什么？"
@@ -2978,6 +2981,9 @@
       "source": "settings",
       "hint": "…3f9a"
     },
+    "githubToken": {
+      "source": null
+    },
     "voice": {
       "persona": "",
       "greeting": "你好！今天种点什么？"
@@ -3037,6 +3043,7 @@
     "version": "2.62.0",
     "loggedIn": true,
     "account": "lucas",
+    "authMode": "gh",
     "reason": "",
     "checkedAt": 1795782697914
   },
@@ -3045,6 +3052,7 @@
     "version": "2.62.0",
     "loggedIn": true,
     "account": "lucas",
+    "authMode": "gh",
     "reason": "",
     "checkedAt": 1795782697914
   },

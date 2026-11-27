@@ -193,6 +193,7 @@ pub struct SettingsStatus {
     pub version: String,
     pub locale: Locale,
     pub deepseek_api_key: KeyStatus,
+    pub github_token: KeyStatus,
     pub voice: VoiceSettings,
     pub voice_defaults: VoiceSettings,
     /// Local configuration check only; does not probe remote endpoints.
@@ -227,6 +228,7 @@ pub struct MemorySourceUpdate {
 pub struct SettingsUpdate {
     pub locale: Option<Locale>,
     pub deepseek_api_key: Option<String>,
+    pub github_token: Option<String>,
     pub voice: Option<SettingsUpdateVoice>,
     pub memory_sources: Option<Vec<MemorySourceUpdate>>,
     pub profile: Option<UserProfile>,

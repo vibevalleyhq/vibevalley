@@ -423,3 +423,189 @@ fn pull_request_issue_mandates_records_and_completes_cleanly() {
 
     started.close_blocking();
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn github_token_direct_rest_creates_refreshes_merges_and_errors_without_credentials() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use axum::Json;
+    use axum::extract::State;
+    use axum::http::{HeaderMap, StatusCode};
+    use axum::routing::{get, post, put};
+    use tokio_util::sync::CancellationToken;
+    use vibevalley_protocol::{BizCode, PublishPlatform, PullRequestState};
+    use vibevalley_server::app::{Overrides, create_app_with_overrides_blocking};
+    use vibevalley_server::{Config, Server};
+
+    #[derive(Clone, Default)]
+    struct MockPrState {
+        created: Arc<AtomicBool>,
+        merged: Arc<AtomicBool>,
+    }
+
+    vibevalley_i18n::set_locale("en");
+    let state = MockPrState::default();
+    let router = axum::Router::new()
+        .route(
+            "/repos/acme/farm",
+            get(|| async {
+                Json(json!({
+                    "default_branch": "main",
+                    "permissions": { "push": true }
+                }))
+            }),
+        )
+        .route("/repos/acme/farm/pulls", get(|| async { Json(json!([])) }))
+        .route(
+            "/repos/acme/farm/pulls",
+            post(|State(st): State<MockPrState>, headers: HeaderMap, Json(body): Json<serde_json::Value>| async move {
+                assert_eq!(
+                    headers.get("authorization").and_then(|v| v.to_str().ok()),
+                    Some("Bearer ghp_direct_token")
+                );
+                assert_eq!(body["head"], "fix");
+                assert_eq!(body["base"], "main");
+                assert_eq!(body["title"], "fix: say two");
+                st.created.store(true, Ordering::SeqCst);
+                (
+                    StatusCode::CREATED,
+                    Json(json!({
+                        "number": 7,
+                        "html_url": "https://github.com/acme/farm/pull/7",
+                        "state": "open"
+                    })),
+                )
+            }),
+        )
+        .route(
+            "/repos/acme/farm/pulls/7",
+            get(|State(st): State<MockPrState>| async move {
+                if st.merged.load(Ordering::SeqCst) {
+                    Json(json!({
+                        "number": 7,
+                        "html_url": "https://github.com/acme/farm/pull/7",
+                        "state": "closed",
+                        "merged": true,
+                        "merged_at": "2026-11-27T00:00:00Z"
+                    }))
+                } else {
+                    Json(json!({
+                        "number": 7,
+                        "html_url": "https://github.com/acme/farm/pull/7",
+                        "state": "open",
+                        "merged": false,
+                        "merged_at": null
+                    }))
+                }
+            }),
+        )
+        .route(
+            "/repos/acme/farm/pulls/7/merge",
+            put(|State(st): State<MockPrState>, Json(body): Json<serde_json::Value>| async move {
+                assert_eq!(body["merge_method"], "squash");
+                st.merged.store(true, Ordering::SeqCst);
+                Json(json!({ "merged": true }))
+            }),
+        )
+        .with_state(state.clone());
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let cancel = CancellationToken::new();
+    let _guard = cancel.clone().drop_guard();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, router).with_graceful_shutdown(cancel.cancelled_owned()).await;
+    });
+    let base_url = format!("http://{addr}");
+
+    let mut f = farm();
+    let missing_gh: HostRun = Arc::new(|_: &[String]| Answer {
+        ok: false,
+        out: String::new(),
+        missing: true,
+    });
+    let missing_glab: HostRun = Arc::new(|_: &[String]| Answer {
+        ok: false,
+        out: String::new(),
+        missing: true,
+    });
+
+    // Missing both gh and GitHub Token returns explicit missing-credentials error.
+    let no_creds_publisher = Publisher::new(missing_gh.clone(), missing_glab.clone(), Arc::new(Local(f.bare.clone())));
+    let no_creds_err = no_creds_publisher.submit_async(&request(&f)).await.unwrap_err();
+    assert_eq!(no_creds_err.biz_code, BizCode::RepoRefused.code());
+    assert!(no_creds_err.message.contains("GitHub Token"), "{}", no_creds_err.message);
+    let repo_hosted = hosted_origin("https://github.com/acme/farm.git").unwrap();
+    let merge_no_creds = no_creds_publisher.merge_pull_async(&repo_hosted, 7, Some("squash")).await.unwrap_err();
+    assert_eq!(merge_no_creds.biz_code, BizCode::RepoRefused.code());
+    assert!(merge_no_creds.message.contains("GitHub Token"), "{}", merge_no_creds.message);
+
+    // With GitHub Token + missing gh: create PR, refresh state, and merge PR directly via REST API.
+    f.publisher = Publisher::new(missing_gh, missing_glab, Arc::new(Local(f.bare.clone())))
+        .with_github_api_for_test(base_url, Some("ghp_direct_token".into()));
+    let app_home = tempfile::tempdir().unwrap();
+    let publisher = Arc::new(f.publisher);
+    let app = tokio::task::spawn_blocking({
+        let home = app_home.path().to_path_buf();
+        let pub_clone = publisher.clone();
+        move || {
+            create_app_with_overrides_blocking(
+                Config {
+                    probe_runtimes: false,
+                    tick_crons: false,
+                    link_previews: false,
+                    orchestrator_listens: false,
+                    ..Config::under(&home)
+                },
+                Overrides {
+                    publisher: Some(pub_clone),
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+        }
+    })
+    .await
+    .unwrap();
+
+    let pull_svc = app.test_internals().pull.clone();
+    let created = pull_svc
+        .publish_async(
+            &SubmitBranch {
+                cwd: f.work.display().to_string(),
+                branch: "fix".into(),
+                sha: git(&f.work, &["rev-parse", "HEAD"]),
+                base: "main".into(),
+                title: "fix: say two".into(),
+                body: "## What changed".into(),
+                dry_run: None,
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    assert!(state.created.load(Ordering::SeqCst));
+    assert_eq!(created.number, Some(7));
+    assert_eq!(created.url.as_deref(), Some("https://github.com/acme/farm/pull/7"));
+
+    let open_state = pull_svc
+        .pull_request_state_async("acme/farm", 7, Some(PublishPlatform::Github))
+        .await
+        .unwrap();
+    assert_eq!(open_state, PullRequestState::Open);
+
+    let merged_state = pull_svc
+        .merge_pull_async("acme/farm", 7, Some(PublishPlatform::Github), Some("squash"))
+        .await
+        .unwrap();
+    assert_eq!(merged_state, PullRequestState::Merged);
+    assert!(state.merged.load(Ordering::SeqCst));
+
+    let refreshed = pull_svc
+        .pull_request_state_async("acme/farm", 7, Some(PublishPlatform::Github))
+        .await
+        .unwrap();
+    assert_eq!(refreshed, PullRequestState::Merged);
+
+    tokio::task::spawn_blocking(move || app.close_blocking()).await.unwrap();
+}

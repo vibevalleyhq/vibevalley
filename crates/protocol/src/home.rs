@@ -18,6 +18,7 @@ pub const SETTINGS_FILE: &str = "settings.json";
 pub const CANONICAL_ENV_VARS: &[&str] = &[
     "DEEPSEEK_API_KEY",
     "DEEPSEEK_BASE_URL",
+    "GITHUB_TOKEN",
     "GIT_CONFIG_GLOBAL",
     "MAC_TESTS_CONCURRENCY",
     "OAR_SUBAGENT_DEPTH",

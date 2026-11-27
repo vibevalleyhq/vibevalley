@@ -1,8 +1,9 @@
 import { computed, signal, Text, untracked, View } from "nsh";
+import { z } from "zod";
 
 import { setLocale, t, currentLocale } from "@vibevalley/i18n";
 import {
-  type GitHubStatus,
+  type GitHubAuthMode,
   type Locale,
   LocaleValues,
   type MemorySource,
@@ -14,8 +15,9 @@ import {
 import { omitUndefined } from "@vibevalley/protocol/rules";
 
 import { createAct } from "../../design/act";
-import { SettingRow, SettingsGroup } from "../../design/domain/settings";
+import { KeyRow, SettingRow, SettingsGroup } from "../../design/domain/settings";
 import { TextInput } from "../../design/Field";
+import { Form, formControl, formMessages } from "../../design/Form";
 import { Icon } from "../../design/Icon";
 import { IconButton } from "../../design/IconButton";
 import { KeyField, SaveBar } from "../../design/KeyField";
@@ -24,8 +26,9 @@ import { Segmented } from "../../design/Segmented";
 import { Hint, Tip } from "../../design/Tip";
 import { toast } from "../../design/toasts";
 import { api, reasonOf } from "../../infra/api";
+import { useForm, type Submission } from "../../infra/form";
 import { currentHost } from "../../infra/host";
-import { defineQuery, retryRead, ready, useQuery, useSettings } from "../../infra/query";
+import { defineQuery, ready, retryRead, useQuery, useQueryClient, useSettings } from "../../infra/query";
 import { useRouter } from "../../infra/router";
 import { useSaveSettings } from "../../infra/settings";
 import { DeepseekForm } from "./DeepseekForm";
@@ -268,43 +271,158 @@ function SourceField(props: { draft: SourceDraft; last: boolean; set: (change: P
   );
 }
 
-/** What the server found of gh (github.status); the refresh asks it to look again. */
+const GithubTokenInput = z.object({ key: z.string().trim(), removing: z.boolean() });
+const blankGithubToken = { key: "", removing: false };
+
+const githubModeStyle = (mode: GitHubAuthMode) => {
+  switch (mode) {
+    case "token":
+    case "gh":
+      return {
+        pill: "bg-ok-soft",
+        icon: "check" as const,
+        tone: "ok-ink" as const,
+        text: "text-ok-ink",
+      };
+    case "none":
+      return {
+        pill: "bg-warn-soft",
+        icon: "warn" as const,
+        tone: "warn-ink" as const,
+        text: "text-warn-ink",
+      };
+  }
+};
+
+function GitHubTokenForm(props: { status: SettingsStatus; onSaved: () => void }) {
+  const status = signal(untracked(() => props.status));
+  const saveSettings = useSaveSettings();
+  const act = createAct();
+  const form = useForm({
+    schema: GithubTokenInput,
+    defaultValues: blankGithubToken,
+    messages: formMessages,
+    onSubmit: async (value, attempt): Promise<Submission<SettingsStatus>> => {
+      const result = await act.attempt(() => saveSettings(value.key || value.removing ? { githubToken: value.key } : {}));
+      if (result.kind === "accepted") {
+        status.set(result.receipt);
+        form.reset(blankGithubToken, { ifRevision: attempt.revision });
+        toast(t("web.setting.keys.saved"));
+        props.onSaved();
+      }
+      return result;
+    },
+  });
+  const key = form.field(["key"]);
+  const removing = form.field(["removing"]);
+  const dirty = computed(() => key.value().trim() !== "" || removing.value());
+  return (
+    <Form form={form} class="gap-4" testid="github-token-form">
+      {(submit) => (
+        <View class="gap-4">
+          <SettingsGroup>
+            <KeyRow
+              label={t("web.setting.github.token")}
+              testid="github-token"
+              hint={t("web.setting.github.tokenHint")}
+              status={status().githubToken}
+              value={key.value()}
+              onInput={key.setValue}
+              control={formControl(key)}
+              removing={removing.value()}
+              onRemove={removing.setValue}
+              placeholder={t("web.setting.github.tokenPlaceholder")}
+              link={{ href: "https://github.com/settings/tokens", label: "github.com/settings/tokens" }}
+              last
+            />
+          </SettingsGroup>
+          <If when={dirty() || form.submitError() !== undefined}>
+            <SaveBar dirty={dirty()} busy={form.submitting()} onSave={submit} onUndo={() => form.reset(blankGithubToken)} />
+          </If>
+        </View>
+      )}
+    </Form>
+  );
+}
+
+/** GitHub PR delivery readiness: direct GitHub Token REST API, optional `gh` CLI login, or unconfigured. */
 const githubQuery = defineQuery({ key: () => ["github"], fetch: (_: void, context) => api.github.get(context), ...retryRead });
 export function GitHub() {
-  const refreshed = signal<GitHubStatus | undefined>(undefined);
   const error = signal<string | undefined>(undefined);
   // A refusal shows under the status it was asked about.
   const act = createAct((reason) => error.set(reason));
   const busy = act.busy;
+  const client = useQueryClient();
+  const settings = useSettings();
   const status = useQuery(githubQuery);
-  const now = () => refreshed() ?? ready(status, undefined);
   const recheck = () => {
     error.set(undefined);
-    return act.run(async () => refreshed.set(await api.github.refresh()));
+    return act.run(async () => {
+      const next = await api.github.refresh();
+      client.setData(githubQuery(), () => ({ value: next }));
+    });
   };
   return (
-    <View class="gap-2">
-      <If when={now()} else={<Quiet>{status.error() ? t("web.base.form.unreachable", { why: reasonOf(status.error()) }) : t("web.base.form.asking")}</Quiet>}>
-        {(s) => (
-          <SettingsGroup>
-            <SettingRow label={t("web.setting.github.cli")} hint={t("web.setting.github.cliHint")} tip={s().reason || undefined}>
-              <View class={`flex-row items-center gap-1.5 rounded-full px-2 py-0.5 ${s().installed ? "bg-ok-soft" : "bg-bad-soft"}`}>
-                <Icon name={s().installed ? "check" : "cross"} size={12} tone={s().installed ? "ok-ink" : "berry"} />
-                <Text class={`font-mono text-xs font-medium tabular-nums ${s().installed ? "text-ok-ink" : "text-berry"}`}>
-                  {s().installed ? (s().version ?? "") : t("web.setting.github.noGh")}
-                </Text>
-              </View>
-              <IconButton icon="refresh" testid="github-recheck" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
-            </SettingRow>
-            <SettingRow label={t("web.setting.github.login")} hint={t("web.setting.github.loginHint")} last>
-              <View class={`flex-row items-center gap-1.5 rounded-full px-2 py-0.5 ${s().loggedIn ? "bg-ok-soft" : "bg-warn-soft"}`}>
-                <Icon name={s().loggedIn ? "check" : "warn"} size={12} tone={s().loggedIn ? "ok-ink" : "warn-ink"} />
-                <Text class={`text-xs font-medium ${s().loggedIn ? "text-ok-ink" : "text-warn-ink"}`}>
-                  {s().loggedIn ? (s().account ?? "") : t("web.setting.github.notLoggedIn")}
-                </Text>
-              </View>
-            </SettingRow>
-          </SettingsGroup>
+    <View class="gap-4">
+      <If
+        when={ready(status, undefined)}
+        else={<Quiet>{status.error() ? t("web.base.form.unreachable", { why: reasonOf(status.error()) }) : t("web.base.form.asking")}</Quiet>}
+      >
+        {(s) => {
+          const mode = () => githubModeStyle(s().authMode);
+          return (
+            <SettingsGroup>
+              <SettingRow label={t("web.setting.github.status")} hint={t("web.setting.github.statusHint")} tip={s().reason || undefined}>
+                <View testID={`github-mode-${s().authMode}`} class={`flex-row items-center gap-1.5 rounded-full px-2 py-0.5 ${mode().pill}`}>
+                  <Icon name={mode().icon} size={12} tone={mode().tone} />
+                  <Text class={`text-xs font-medium ${mode().text}`}>{t(`web.setting.github.mode.${s().authMode}`)}</Text>
+                </View>
+                <IconButton icon="refresh" testid="github-recheck" label={t("web.setting.github.recheck")} disabled={busy()} onClick={() => void recheck()} />
+              </SettingRow>
+              <SettingRow label={t("web.setting.github.login")} hint={t("web.setting.github.loginHint")}>
+                <If
+                  when={s().loggedIn}
+                  else={
+                    <View class="flex-row items-center gap-1.5 rounded-full bg-warn-soft px-2 py-0.5">
+                      <Icon name="warn" size={12} tone="warn-ink" />
+                      <Text class="text-xs font-medium text-warn-ink">{t("web.setting.github.notLoggedIn")}</Text>
+                    </View>
+                  }
+                >
+                  <View class="flex-row items-center gap-1.5 rounded-full bg-ok-soft px-2 py-0.5">
+                    <Icon name="check" size={12} tone="ok-ink" />
+                    <Text class="text-xs font-medium text-ok-ink">{s().account || t("web.setting.github.tokenConfigured")}</Text>
+                  </View>
+                </If>
+              </SettingRow>
+              <SettingRow label={t("web.setting.github.cli")} hint={t("web.setting.github.cliHint")} last>
+                <If
+                  when={s().installed}
+                  else={
+                    <View class="flex-row items-center gap-1.5 rounded-full bg-hover px-2 py-0.5">
+                      <Text class="text-xs font-medium text-muted">{t("web.setting.github.noGh")}</Text>
+                    </View>
+                  }
+                >
+                  <View class="flex-row items-center gap-1.5 rounded-full bg-ok-soft px-2 py-0.5">
+                    <Icon name="check" size={12} tone="ok-ink" />
+                    <Text class="font-mono text-xs font-medium tabular-nums text-ok-ink">{s().version ?? ""}</Text>
+                  </View>
+                </If>
+              </SettingRow>
+            </SettingsGroup>
+          );
+        }}
+      </If>
+      <If when={ready(settings, undefined)}>
+        {(current) => (
+          <GitHubTokenForm
+            status={untracked(current)}
+            onSaved={() => {
+              void recheck();
+              void client.invalidate({ key: ["repos"] });
+            }}
+          />
         )}
       </If>
       <If when={error()}>

@@ -283,6 +283,7 @@ pub struct SettingConfig {
     pub work_root: PathBuf,
     pub version: String,
     pub deepseek_api_key: String,
+    pub github_token: Option<Secret>,
     pub storage_backend: Option<String>,
 }
 
@@ -318,6 +319,8 @@ struct Stored {
     locale: Option<Locale>,
     #[serde(default, skip_serializing_if = "Secret::is_empty")]
     deepseek_api_key: Secret,
+    #[serde(default, skip_serializing_if = "Secret::is_empty")]
+    github_token: Secret,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     memory_sources: Vec<StoredSource>,
     /// The voice's settings that differ from its defaults.
@@ -384,6 +387,10 @@ pub fn settings_problem(u: &SettingsUpdate) -> String {
     let deepseek = trimmed(&u.deepseek_api_key);
     if !deepseek.is_empty() && (has_space(&deepseek) || deepseek.chars().count() < 8) {
         return t("server.setting.deepseekKey", &[]);
+    }
+    let github = trimmed(&u.github_token);
+    if !github.is_empty() && has_space(&github) {
+        return t("server.setting.githubToken", &[]);
     }
     let mut seen = Vec::new();
     for m in u.memory_sources.iter().flatten() {
@@ -489,6 +496,16 @@ impl Setting {
         Self::pick(&self.stored().deepseek_api_key, &self.config.deepseek_api_key).map(|k| k.0.expose().to_string())
     }
 
+    /// The GitHub personal access token (`settings.json` wins over `GITHUB_TOKEN`).
+    pub fn github_token(&self) -> Option<Secret> {
+        self.github_token_with_source().map(|(secret, _)| secret)
+    }
+
+    fn github_token_with_source(&self) -> Option<(Secret, KeySource)> {
+        let given = self.config.github_token.as_ref().map(Secret::expose).unwrap_or("");
+        Self::pick(&self.stored().github_token, given)
+    }
+
     /// The voice's settings as a call reads them at its start.
     pub fn voice(&self) -> VoiceSettings {
         voice_over(self.voice_defaults(), &self.stored().voice.unwrap_or_default())
@@ -511,6 +528,10 @@ impl Setting {
         };
         push(st.deepseek_api_key.expose());
         push(&self.config.deepseek_api_key);
+        push(st.github_token.expose());
+        if let Some(token) = &self.config.github_token {
+            push(token.expose());
+        }
         for source in &st.memory_sources {
             push(source.key.expose());
         }
@@ -527,6 +548,7 @@ impl Setting {
         let st = self.stored();
         let c = &self.config;
         let deepseek = Self::pick(&st.deepseek_api_key, &c.deepseek_api_key);
+        let github_token = self.github_token_with_source();
         let picked = |k: &Option<(Secret, KeySource)>| match k {
             Some((v, from)) => v.status(*from),
             None => KeyStatus { source: None, hint: None },
@@ -573,6 +595,7 @@ impl Setting {
             version: c.version.clone(),
             locale: st.locale.unwrap_or(Locale::Zh),
             deepseek_api_key: picked(&deepseek),
+            github_token: picked(&github_token),
             voice,
             voice_defaults: self.voice_defaults(),
             readiness,
@@ -599,6 +622,9 @@ impl Setting {
             let mut next = guard.clone();
             if let Some(given) = &u.deepseek_api_key {
                 next.deepseek_api_key = Secret::new(given.trim());
+            }
+            if let Some(given) = &u.github_token {
+                next.github_token = Secret::new(given.trim());
             }
             if let Some(locale) = u.locale {
                 next.locale = (locale != Locale::Zh).then_some(locale);

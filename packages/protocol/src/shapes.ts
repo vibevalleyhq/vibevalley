@@ -104,6 +104,8 @@ export {
   type BranchPublication,
   type ChangedFile,
   type Changes,
+  type GitHubAuthMode,
+  GitHubAuthModeValues,
   type GitHubStatus,
   type LanguageCount,
   type MountRepo,

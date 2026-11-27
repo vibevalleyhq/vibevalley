@@ -156,6 +156,7 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
         work_root: config.work_root.clone(),
         version: config.version.clone(),
         deepseek_api_key: config.deepseek_api_key.clone(),
+        github_token: config.github_token.clone(),
         storage_backend: Some(storage_config.kind().to_string()),
     })
     .await;
@@ -205,9 +206,13 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     .await
     .map_err(|e| failed("notes")(&e.message))?;
 
-    let repo = Box::pin(Repo::open_async(&config.work_root, RuntimeConfig::under(&config.home).per_repo))
-        .await
-        .map_err(|e| failed("the repos")(&e))?;
+    let repo = Box::pin(Repo::open_with_setting_async(
+        &config.work_root,
+        RuntimeConfig::under(&config.home).per_repo,
+        Some(setting.clone()),
+    ))
+    .await
+    .map_err(|e| failed("the repos")(&e))?;
     if config.probe_runtimes {
         repo.probe_in_context(&ctx);
     }
@@ -234,7 +239,10 @@ async fn create_app_inner(mut config: Config, storage_config: StorageConfig, ove
     .await
     .map_err(|e| failed("the board")(&e))?;
     seed_starter_issues_on_boot(&config, &setting, &board).await;
-    let publisher = overrides.publisher.unwrap_or_default();
+    let publisher = overrides.publisher.unwrap_or_else(|| {
+        let s = setting.clone();
+        Arc::new(Publisher::default().with_github_token(Arc::new(move || s.github_token())))
+    });
     let pull = Box::pin(Pull::open_async(ctx.clone(), publisher, Some(repo.clone()), Some(board.clone()), None, None))
         .await
         .map_err(|e| failed("the pulls")(&e.message))?;

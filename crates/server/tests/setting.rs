@@ -201,3 +201,40 @@ fn user_profile_persists_merges_and_clears_fields() {
 
     app.close_blocking();
 }
+
+#[test]
+fn github_token_saves_masks_clears_and_never_leaks_via_debug() {
+    use vibevalley_server::setting::Secret;
+
+    let dir = tempfile::tempdir().unwrap();
+    let cfg = Config {
+        home: dir.path().to_path_buf(),
+        work_root: dir.path().join("work"),
+        version: "test".into(),
+        deepseek_api_key: "sk-from-config-0000".into(),
+        github_token: Some(Secret::new("ghp_from_config_0000")),
+        probe_runtimes: false,
+        orchestrator_listens: false,
+        link_previews: false,
+        tick_crons: false,
+        ..Config::under(dir.path())
+    };
+    let debug_cfg = format!("{cfg:?}");
+    assert!(!debug_cfg.contains("ghp_from_config_0000"), "Config Debug must mask github_token");
+
+    let app = create_app_blocking(cfg).unwrap();
+    let before = call(&app, "setting.get", Value::Null)["data"].clone();
+    assert_eq!(before["githubToken"], json!({ "source": "config", "hint": "…0000" }));
+    assert!(!before.to_string().contains("ghp_from_config"));
+
+    let saved = call(&app, "setting.update", json!({ "githubToken": " github_pat_saved_9999 " }))["data"].clone();
+    assert_eq!(saved["githubToken"], json!({ "source": "settings", "hint": "…9999" }));
+    assert!(!saved.to_string().contains("github_pat_saved"));
+    assert_eq!(file(dir.path())["githubToken"], "github_pat_saved_9999");
+
+    let cleared = call(&app, "setting.update", json!({ "githubToken": "" }))["data"].clone();
+    assert_eq!(cleared["githubToken"], json!({ "source": "config", "hint": "…0000" }));
+    assert!(file(dir.path()).get("githubToken").is_none());
+
+    app.close_blocking();
+}

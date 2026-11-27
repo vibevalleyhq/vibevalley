@@ -16,7 +16,7 @@ pub const REDACTED: &str = "[REDACTED]";
 static BEARER_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)\bBearer\s+(?:\[REDACTED\]|[A-Za-z0-9\-._~+/=]{4,})").expect("valid bearer regex"));
 
 static TOKEN_PREFIX_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\b(?:sk-[A-Za-z0-9_\-]{4,}|ghp_[A-Za-z0-9_\-]{4,}|gho_[A-Za-z0-9_\-]{4,}|xoxb-[A-Za-z0-9_\-]{4,}|AIza[A-Za-z0-9_\-]{4,})")
+    Regex::new(r"\b(?:sk-[A-Za-z0-9_\-]{4,}|ghp_[A-Za-z0-9_\-]{4,}|gho_[A-Za-z0-9_\-]{4,}|github_pat_[A-Za-z0-9_\-]{4,}|xoxb-[A-Za-z0-9_\-]{4,}|AIza[A-Za-z0-9_\-]{4,})")
         .expect("valid token prefix regex")
 });
 
@@ -63,6 +63,7 @@ fn is_sensitive_key_normalized(lower: &str, compact: &str) -> bool {
             | "secretkey"
             | "clientsecret"
             | "deepseekapikey"
+            | "githubtoken"
     ) {
         return true;
     }
