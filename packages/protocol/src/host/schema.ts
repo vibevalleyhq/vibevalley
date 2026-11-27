@@ -383,6 +383,7 @@ export const HostAsrState = z.object({
   micLevel: z.number(),
   text: z.string(),
   partial: z.string(),
+  rawText: z.exactOptional(z.string()),
   problem: z.string().nullable(),
 }) satisfies Codec<T.HostAsrState>;
 

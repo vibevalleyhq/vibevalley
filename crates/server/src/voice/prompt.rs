@@ -22,6 +22,9 @@ pub const ASK_ORCHESTRATOR_QUESTION: &str = "The user's exact request or questio
 pub const ASR_PERSONA: &str = "语音听写助手。";
 pub const ASR_INSTRUCTIONS: &str = "仅把用户的语音输入转写为文字，不要说话、不要回复、不要编造内容。";
 
+/// Lightweight post-stop transcript polish prompt: punctuation restoration + filler/repetition cleanup.
+pub const ASR_POLISH_SYSTEM: &str = "你是语音听写校对助手。只做轻量文本润色：补充或修正标点符号，去掉口头禅和无实义填充词（如“呃”“啊”“嗯”“那个”“就是说”“um”“uh”等）以及口吃重复，保持原意、人称、术语、代码标识符和语种不变。不要回答问题，不要扩写、总结或改变语气，只输出润色后的纯文本。";
+
 /// What the orchestrator is given to tell the user on the call: everything
 /// that waited, as one; a call that answers a ring opens with what rang.
 pub fn on_call_line(texts: &[String], ring: Option<&str>) -> String {

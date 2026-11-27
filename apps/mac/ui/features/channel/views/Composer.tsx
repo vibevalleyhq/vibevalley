@@ -115,9 +115,11 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   const focused = signal(false);
   const asr = signal<AsrSnapshot>(idleAsr);
   const dictateAnchor = signal<{ before: string; after: string } | undefined>(undefined);
+  const rawRevert = signal<{ raw: string; caret: number } | undefined>(undefined);
   const dictateId = crypto.randomUUID();
   let dictatePolling = false;
   let dictateClosed = false;
+  let applyingDictation = false;
   // Where the caret is (and the selection's end), as the input last said; `placed` moves it.
   const selection = signal({ start: 0, end: 0 });
   const placed = signal<{ start: number; end?: number } | undefined>(undefined);
@@ -154,14 +156,25 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     opened: (path) => router.navigate(path),
     edited: (value) => {
       problem.set(undefined);
+      if (!applyingDictation) rawRevert.set(undefined);
       if (at) drafts.text(at, value);
     },
     sent: () => {
+      rawRevert.set(undefined);
       if (asr().phase !== "idle") void stopDictation(true);
       const id = props.channel?.id;
       if (id) drafts.clear(id);
     },
   });
+
+  const applyDictationText = (next: string, caret: number) => {
+    applyingDictation = true;
+    try {
+      put(next, caret);
+    } finally {
+      applyingDictation = false;
+    }
+  };
 
   const applyDictationState = (next: AsrSnapshot) => {
     asr.set(next);
@@ -172,11 +185,22 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
     const live = joinDictated(next.text, next.partial);
     if (anchor && live) {
       const merged = spliceDictated(anchor.before, live, anchor.after);
-      put(merged.next, merged.caret);
+      applyDictationText(merged.next, merged.caret);
     }
     if (next.phase === "idle") {
+      if (anchor && next.rawText !== undefined && next.rawText.trim() !== "" && next.rawText.trim() !== next.text.trim()) {
+        const rawMerged = spliceDictated(anchor.before, next.rawText, anchor.after);
+        rawRevert.set({ raw: rawMerged.next, caret: rawMerged.caret });
+      } else {
+        rawRevert.set(undefined);
+      }
       dictateAnchor.set(undefined);
     }
+  };
+
+  const revertDictatedRaw = (revert: { raw: string; caret: number }) => {
+    applyDictationText(revert.raw, revert.caret);
+    rawRevert.set(undefined);
   };
 
   const callAsr = async (op: "host.asrStart" | "host.asrStop" | "host.asrState") => {
@@ -194,7 +218,10 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
   };
 
   const stopDictation = async (discardAnchor = false) => {
-    if (discardAnchor) dictateAnchor.set(undefined);
+    if (discardAnchor) {
+      dictateAnchor.set(undefined);
+      rawRevert.set(undefined);
+    }
     try {
       await callAsr("host.asrStop");
     } catch (error) {
@@ -209,6 +236,7 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
       return;
     }
     problem.set(undefined);
+    rawRevert.set(undefined);
     const { start, end } = untracked(selection);
     const current = untracked(box.text);
     const safeStart = Math.max(0, Math.min(start, current.length));
@@ -514,16 +542,43 @@ export function Composer(props: { channel: Channel | undefined; placeholder: str
             </View>
           </If>
           <If when={asr().phase !== "idle"}>
-            <View testID="composer-dictating" class="flex-row items-center gap-1.5 rounded-full bg-ok-soft px-2 py-0.5">
-              <MicWaveform testid="composer-waveform" compact active={asr().phase === "listening"} level={asr().micLevel} />
-              <Text class="text-2xs font-medium text-ok-ink">
+            <View
+              testID="composer-dictating"
+              class={`flex-row items-center gap-1.5 rounded-full px-2 py-0.5 ${asr().phase === "polishing" ? "bg-warn-soft" : "bg-ok-soft"}`}
+            >
+              <If
+                when={asr().phase === "polishing"}
+                else={<MicWaveform testid="composer-waveform" compact active={asr().phase === "listening"} level={asr().micLevel} />}
+              >
+                <Icon name="generate" size={12} tone="warn-ink" />
+              </If>
+              <Text class={`text-2xs font-medium ${asr().phase === "polishing" ? "text-warn-ink" : "text-ok-ink"}`}>
                 {asr().phase === "connecting"
                   ? t("web.channel.composer.dictateConnecting")
                   : asr().phase === "finishing"
                     ? t("web.channel.composer.dictateFinishing")
-                    : t("web.channel.composer.dictateListening")}
+                    : asr().phase === "polishing"
+                      ? t("web.channel.composer.dictatePolishing")
+                      : t("web.channel.composer.dictateListening")}
               </Text>
             </View>
+          </If>
+          <If when={asr().phase === "idle"}>
+            <If when={rawRevert()}>
+              {(revert) => (
+                <View
+                  role="button"
+                  testID="composer-dictate-revert"
+                  accessibilityLabel={t("web.channel.composer.dictateRevertRaw")}
+                  tooltip={<Bubble text={t("web.channel.composer.dictateRevertRaw")} />}
+                  onPress={() => revertDictatedRaw(revert())}
+                  class="h-6 flex-row items-center gap-1 rounded-full bg-hover px-2 hover:bg-selected active:translate-y-px"
+                >
+                  <Icon name="undo" size={12} tone="muted" />
+                  <Text class="text-2xs font-medium text-muted">{t("web.channel.composer.dictateRevertRaw")}</Text>
+                </View>
+              )}
+            </If>
           </If>
           <BoxButton
             icon={asr().phase === "idle" ? "record" : "stop"}

@@ -538,12 +538,12 @@ impl Voice {
         self.said_async(&req.agent_id, &req.text).await
     }
 
-    /// `voice.asr.start`: allocates an active ASR dictation session using the bound MOSS Live or Transcription key.
+    /// `voice.asr.start`: allocates an active ASR dictation session preferring dedicated Speech Transcription over MOSS Live.
     pub fn asr_start(&self) -> Result<VoiceAsrGrant, ApiError> {
         let providers = self.setting.providers();
         let account = providers
-            .account(Use::Live)
-            .or_else(|| providers.account(Use::Transcription))
+            .account(Use::Transcription)
+            .or_else(|| providers.account(Use::Live))
             .ok_or_else(|| unavailable(t("server.voice.moss.noAsrKey", &[]), Some(VoiceFix::Moss)))?;
         let mut state = self.state.lock();
         if state.stopped {
@@ -589,6 +589,21 @@ impl Voice {
             .account(Use::Transcription)
             .ok_or_else(|| unavailable(t("server.voice.moss.noTranscribeKey", &[]), Some(VoiceFix::Moss)))?;
         self.transcriber.transcribe_wav_async(&account.key, &account.model, wav).await.map_err(failed)
+    }
+
+    /// Lightweight post-dictation text polish pass (punctuation restoration + filler/repetition cleanup).
+    pub async fn polish_transcript_async(&self, raw: &str) -> Result<String, ApiError> {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            return Ok(String::new());
+        }
+        if self.state.lock().stopped {
+            return Err(Self::stopped());
+        }
+        self.orchestrator
+            .polish_text_async(prompt::ASR_POLISH_SYSTEM, trimmed)
+            .await
+            .map_err(failed)
     }
 
     /// Lightweight dictation-only MOSS Live WebSocket credentials (no tools or commentary).
@@ -803,6 +818,14 @@ impl LiveVoicePort for Voice {
         Box::pin(async move {
             let voice = voice.ok_or_else(Voice::stopped)?;
             voice.transcribe_wav_async(wav).await
+        })
+    }
+
+    fn polish_transcript_async(&self, raw: String) -> BoxFuture<'static, Result<String, ApiError>> {
+        let voice = self.me.upgrade();
+        Box::pin(async move {
+            let voice = voice.ok_or_else(Voice::stopped)?;
+            voice.polish_transcript_async(&raw).await
         })
     }
 

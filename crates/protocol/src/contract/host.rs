@@ -1156,6 +1156,7 @@ pub enum HostAsrPhase {
     Connecting,
     Listening,
     Finishing,
+    Polishing,
 }
 
 /// Snapshot returned by `host.asr*` bridge operations.
@@ -1168,6 +1169,9 @@ pub struct HostAsrState {
     pub mic_level: f64,
     pub text: String,
     pub partial: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts-gen", ts(optional))]
+    pub raw_text: Option<String>,
     pub problem: Option<String>,
 }
 
